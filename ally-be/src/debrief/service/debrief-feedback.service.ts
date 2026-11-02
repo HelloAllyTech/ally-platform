@@ -31,6 +31,9 @@ export interface DebriefCorrection {
 }
 
 /** The card a section key names, as text — what a reviewer reads beside the flag. */
+/** The review-queue section for an Ask Ally item. */
+export const ASK_ALLY_SECTION = 'ask_ally';
+
 export function sectionText(
   cards: DebriefCards | null,
   section: string,
@@ -88,10 +91,7 @@ export class DebriefFeedbackService {
   ) {}
 
   /** The learner's own published live debrief, or a refusal. */
-  private async ownLiveRun(
-    sessionId: string,
-    userId: number,
-  ): Promise<DebriefRun> {
+  async ownLiveRun(sessionId: string, userId: number): Promise<DebriefRun> {
     const [s] = await this.dataSource.query(
       `SELECT "counselorId" AS counselor_id FROM scenario_sessions WHERE id = $1`,
       [sessionId],
@@ -126,6 +126,38 @@ export class DebriefFeedbackService {
       [run.tenantId ?? null, run.id, sessionId, userId, helpful],
     );
     return { helpful };
+  }
+
+  /**
+   * The learner showed distress in Ask Ally: an urgent item in the review
+   * queue (v9 FR-23), at most one open per debrief. No message text is
+   * copied; the reviewer opens the thread.
+   */
+  async raiseChatDistress(run: DebriefRun, userId: number, source: string) {
+    const open = await this.feedback.findOne({
+      where: {
+        runId: run.id,
+        userId,
+        kind: DebriefFeedbackKind.FLAG,
+        section: ASK_ALLY_SECTION,
+        status: DebriefFeedbackStatus.OPEN,
+      },
+    });
+    if (open) return;
+    await this.feedback.save(
+      this.feedback.create({
+        tenantId: run.tenantId ?? null,
+        runId: run.id,
+        scenarioSessionId: run.scenarioSessionId,
+        userId,
+        kind: DebriefFeedbackKind.FLAG,
+        section: ASK_ALLY_SECTION,
+        reason: DebriefFlagReason.SOMETHING_ELSE,
+        note: `Learner distress in Ask Ally (${source}). Open the thread.`,
+        urgent: true,
+        status: DebriefFeedbackStatus.OPEN,
+      }),
+    );
   }
 
   async flag(

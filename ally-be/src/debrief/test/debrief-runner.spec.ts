@@ -77,6 +77,10 @@ function build(opts: {
   learnerTurns?: number;
   steps: Record<string, Array<unknown | Error>>;
   existing?: boolean;
+  practice?: Array<{ id: number; title: string; skills: string[] }>;
+  assessment?: boolean;
+  inCase?: boolean;
+  bundle?: unknown;
 }) {
   const saved: any[] = [];
   const calls: string[] = [];
@@ -119,7 +123,10 @@ function build(opts: {
       learnerTurns: opts.learnerTurns ?? 8,
       scenario: { title: 'x', description: 'y' },
       expectedBehaviours: [],
+      assessment: opts.assessment ?? false,
+      inCase: opts.inCase ?? false,
     }),
+    caseMemory: async () => 'Meena told you about her exams last time.',
     transcript: async () => transcript,
     pastWorkOnThis: async () => [],
     promptText: async () => null,
@@ -137,18 +144,26 @@ function build(opts: {
       if (next instanceof Error) throw next;
       return next;
     }),
-    searchGuidance: jest.fn(async () => []),
+  };
+  const knowledge = {
+    searchForAudience: jest.fn(async () => ({ passages: [] })),
   };
   const releases = {
-    getGa: async () => ({ id: 'rel', version: 1, bundle: DEBRIEF_SEED_BUNDLE }),
+    getGa: async () => ({
+      id: 'rel',
+      version: 1,
+      bundle: opts.bundle ?? DEBRIEF_SEED_BUNDLE,
+    }),
   };
   const svc = new DebriefRunnerService(
     runs as any,
     context as any,
     ai as any,
     releases as any,
+    { optionsFor: async () => opts.practice ?? [] } as any,
+    knowledge as any,
   );
-  return { svc, saved, calls, ai };
+  return { svc, saved, calls, ai, knowledge };
 }
 
 const safetyWithCue = {
@@ -194,6 +209,132 @@ describe('DebriefRunnerService', () => {
       ]),
     );
     expect(Number(run.estimatedCostUsd)).toBeGreaterThan(0);
+  });
+
+  it("offers the learner's own roleplays and keeps only links to them", async () => {
+    const base = cards();
+    const { svc, ai } = build({
+      practice: [{ id: 41, title: 'Exam stress', skills: ['Exploring risk'] }],
+      steps: {
+        'safety-reader': [safetyWithCue],
+        analyst: [analyst],
+        writer: [
+          {
+            model: 'gemini-3-flash-preview',
+            cards: cards({
+              work_on_this: [{ ...base.work_on_this[0], scenario_id: 41 }],
+              practise_next: {
+                skill: 'exploring risk',
+                reason: 'x',
+                scenario_id: 99,
+              },
+            }),
+          },
+        ],
+        evaluator: [evaluation(9)],
+      },
+    });
+    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    const writerCall = ai.step.mock.calls.find(
+      (c: unknown[]) => c[0] === 'writer',
+    ) as unknown[];
+    expect((writerCall[1] as any).practice_options).toEqual([
+      { id: 41, title: 'Exam stress', skills: ['Exploring risk'] },
+    ]);
+    expect(run.cards?.work_on_this[0].scenario_id).toBe(41);
+    // 99 was never offered to this learner, so it is dropped.
+    expect(run.cards?.practise_next?.scenario_id).toBeNull();
+  });
+
+  describe('Case and Assessment recipes', () => {
+    const steps = () => ({
+      'safety-reader': [safetyWithCue],
+      analyst: [analyst],
+      writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+      evaluator: [evaluation(9)],
+    });
+    const writerInput = (ai: any) =>
+      (
+        ai.step.mock.calls.find((c: unknown[]) => c[0] === 'writer') as any[]
+      )[1];
+
+    it('runs Assessment for a graded course roleplay, and tells the Writer', async () => {
+      const { svc, ai } = build({ assessment: true, steps: steps() });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.recipeKey).toBe('assessment');
+      expect(writerInput(ai).assessment).toBe(true);
+    });
+
+    it('runs Case for a case session, with the case memory', async () => {
+      const { svc, ai } = build({ inCase: true, steps: steps() });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.recipeKey).toBe('case');
+      expect(writerInput(ai).case_memory).toBe(
+        'Meena told you about her exams last time.',
+      );
+    });
+
+    it('runs Standard under a release made before Case existed', async () => {
+      const older = { ...DEBRIEF_SEED_BUNDLE.recipes };
+      delete older.case;
+      delete older.assessment;
+      const { svc } = build({
+        inCase: true,
+        bundle: { ...DEBRIEF_SEED_BUNDLE, recipes: older },
+        steps: steps(),
+      });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.recipeKey).toBe('standard');
+    });
+
+    it('keeps a short session short, case or not', async () => {
+      const { svc } = build({ inCase: true, learnerTurns: 3, steps: steps() });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.recipeKey).toBe('short');
+    });
+  });
+
+  it('looks guidance up in the debrief knowledge base, as the organisation may read it', async () => {
+    const { svc, knowledge } = build({
+      steps: {
+        'safety-reader': [safetyWithCue],
+        analyst: [
+          {
+            ...analyst,
+            evidence: {
+              ...(analyst as any).evidence,
+              pivotal_moments: [{ summary: 'client hints at self-harm' }],
+            },
+          },
+        ],
+        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+        evaluator: [evaluation(9)],
+      },
+    });
+    await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    expect(knowledge.searchForAudience).toHaveBeenCalledWith(
+      expect.objectContaining({
+        corpus: 'debrief_knowledge',
+        query: 'client hints at self-harm',
+      }),
+      // 't1' is not an organisation id, so only platform documents.
+      { tenantId: null },
+      expect.objectContaining({ consumer: 'debrief', sessionId: 's1' }),
+    );
+  });
+
+  it('reads the language from the transcript when the session recorded none, and keeps that on the run', async () => {
+    const { svc } = build({
+      steps: {
+        'safety-reader': [safetyWithCue],
+        analyst: [analyst],
+        writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+        evaluator: [evaluation(9)],
+      },
+    });
+    const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    expect(run.workspace?.languageSource).toMatch(/^detected/);
+    expect(run.workspace?.safety).toBeDefined();
   });
 
   it('revises a draft below the bar and keeps the better one', async () => {

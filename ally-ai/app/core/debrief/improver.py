@@ -118,14 +118,18 @@ async def analyse_signals(
     model: str,
     system: Optional[str] = None,
 ) -> Tuple[Optional[ImproverAnalysis], str]:
-    from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured
+    from app.core.llm.dispatch import (
+        PROVIDER_GEMINI,
+        generate_structured,
+        infer_provider_from_model,
+    )
     from app.core.llm_usage.tasks import LLMTask
 
     output, meta = await generate_structured(
         schema=ImproverAnalysis,
         prompt=build_prompt(signals, prompts, settings_, history, system),
         task=LLMTask.DEBRIEF_IMPROVER.value,
-        provider=PROVIDER_GEMINI,
+        provider=infer_provider_from_model(model) or PROVIDER_GEMINI,
         never_fallback=True,
         model=model,
         temperature=0,

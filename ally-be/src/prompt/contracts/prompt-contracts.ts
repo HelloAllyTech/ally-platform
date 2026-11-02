@@ -1344,6 +1344,31 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief/reply_system.txt */
+export const DEBRIEF_REPLY_SYSTEM = definePrompt(
+  'debrief_reply_system',
+  {},
+  {
+    name: 'Ask Ally (debrief reply)',
+    description:
+      "The Debrief agent in conversation mode: answers the learner's replies under the reflective question from the published debrief and the transcript. Streamed, one short answer per message, checked by code afterwards (no score, no diagnosis, quotes must match). Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/reflection_check_system.txt */
+export const DEBRIEF_REFLECTION_CHECK_SYSTEM = definePrompt(
+  'debrief_reflection_check_system',
+  { question: 'required' },
+  {
+    name: 'Debrief reflection check (XP)',
+    description:
+      "Says only whether a learner's message is an on-topic answer to the debrief's reflective question, for DEBRIEF_REFLECTION XP (v9 FR-65). Never grades quality or sincerity.",
+    category: 'evaluation',
+    output: 'json',
+  },
+);
+
 /** src/prompts/debrief/improver_system.txt */
 export const DEBRIEF_IMPROVER_SYSTEM = definePrompt(
   'debrief_improver_system',

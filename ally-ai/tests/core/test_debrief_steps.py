@@ -265,3 +265,61 @@ async def test_writer_is_told_every_risk_cue_turn_to_cover(dispatch_returns):
         TRANSCRIPT,
     )
     assert "RISK CUES TO COVER: turns 2, 9." in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_may_point_only_to_the_learners_own_roleplays(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    options = [{"id": 41, "title": "Exam stress", "skills": ["Open questions"]}]
+    await write(
+        {}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, practice_options=options
+    )
+    assert "PRACTICE OPTIONS: practice_options lists roleplays" in calls["prompt"]
+    assert '"Exam stress"' in calls["prompt"]
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "PRACTICE OPTIONS: none. Set every scenario_id to null." in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_respects_case_memory_and_never_regrades(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {},
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+        case_memory="Meena told you about her exams last time.",
+        assessment=True,
+    )
+    assert "CASE MEMORY:\nMeena told you about her exams last time." in calls["prompt"]
+    assert "Never contradict it" in calls["prompt"]
+    assert "Never mention, imply or argue with a grade" in calls["prompt"]
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "CASE MEMORY" not in calls["prompt"]
+    assert "ASSESSMENT" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_each_step_runs_on_the_provider_its_model_names(monkeypatch):
+    import app.core.llm.dispatch as dispatch
+    from app.core.debrief.steps import write
+
+    seen = []
+
+    async def fake(**kwargs):
+        seen.append(kwargs["provider"])
+        return DebriefCards(opening="Hi"), {"model": kwargs["model"]}
+
+    monkeypatch.setattr(dispatch, "generate_structured", fake)
+    for model in ("claude-sonnet-5-5", "gpt-5-mini", "gemini-2.5-flash"):
+        await write({}, {}, "en", model, TRANSCRIPT)
+    assert seen == ["anthropic", "openai", "gemini"]

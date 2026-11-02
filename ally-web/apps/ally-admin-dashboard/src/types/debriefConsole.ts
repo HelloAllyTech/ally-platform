@@ -43,6 +43,14 @@ export interface DebriefOverview {
   };
   testSets: Record<"debrief_open" | "debrief_gate" | "debrief_sealed", number>;
   liveTenants: Array<{ id: string; name: string }>;
+  /** Organisations where over 5% of today's debriefs guessed the language (v9 FR-40). */
+  languageIncidents?: Array<{
+    tenantId: string;
+    tenantName: string | null;
+    runs: number;
+    detected: number;
+    unsure: number;
+  }>;
 }
 
 export interface DebriefRunRow {
@@ -250,4 +258,26 @@ export interface DebriefReviewFlag {
 export interface DebriefReviewQueue {
   runs: DebriefReviewRun[];
   flags: DebriefReviewFlag[];
+}
+
+/** One document in the debrief knowledge base, with its clinical sign-off. */
+export interface DebriefKnowledgeDocument {
+  id: string;
+  title: string;
+  status: string;
+  isGlobal: boolean;
+  tenantCount: number;
+  chunkCount: number;
+  archived: boolean;
+  updatedAt: string;
+  needsClinicalSignOff: boolean;
+  clinical: "not_clinical" | "signed_off" | "awaiting";
+  signedOffBy: string | null;
+  signedOffAt: string | null;
+}
+
+export interface DebriefKnowledgeList {
+  documents: DebriefKnowledgeDocument[];
+  /** Whether the person looking may sign off clinical guidance. */
+  canSignOff: boolean;
 }

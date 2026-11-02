@@ -9,17 +9,24 @@ function build(opts: {
   live?: boolean;
   runs?: Array<Record<string, unknown>>;
   endedMinutesAgo?: number;
+  profile?: Record<string, unknown> | null;
 }) {
   const ended = new Date(Date.now() - (opts.endedMinutesAgo ?? 10) * 60_000);
   const dataSource = {
-    query: jest.fn(async () => [
-      {
-        counselor_id: opts.owner ?? 7,
-        tenant_id: 't1',
-        status: 'ENDED',
-        ended_at: ended,
-      },
-    ]),
+    query: jest.fn(async (sql: string) =>
+      sql.includes('guide_org_profiles')
+        ? opts.profile
+          ? [{ profile: opts.profile }]
+          : []
+        : [
+            {
+              counselor_id: opts.owner ?? 7,
+              tenant_id: 't1',
+              status: 'ENDED',
+              ended_at: ended,
+            },
+          ],
+    ),
   };
   const runs = { find: jest.fn(async () => opts.runs ?? []) };
   const overrides = {
@@ -35,6 +42,13 @@ function build(opts: {
     {} as any,
     overrides as any,
     { debriefAgentMode: 'shadow' } as any,
+    {
+      available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
+        ids
+          .filter((id) => id === 41)
+          .map((id) => ({ id, title: 'Exam stress' })),
+      ),
+    } as any,
   );
 }
 
@@ -67,7 +81,67 @@ describe('DebriefAgentService.learnerView', () => {
       state: 'ready',
       cards: { opening: 'x' },
       language: 'hi',
+      distress: false,
+      supportLines: expect.any(Array),
+      practice: [],
     });
+  });
+
+  it('gives Tele-MANAS when the organisation set no support lines', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: {},
+          language: 'hi-IN',
+          steps: [],
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.supportLines?.[0]).toMatchObject({
+      phone: '14416',
+      isCrisis: true,
+    });
+  });
+
+  it('gives the organisation’s own lines, in the debrief’s language', async () => {
+    const view = await build({
+      profile: {
+        supportLines: {
+          en: [{ name: 'Org line (en)', phone: '111' }],
+          hi: [{ name: 'Org line (hi)', phone: '222' }],
+        },
+      },
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: {},
+          language: 'hi-IN',
+          steps: [],
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.supportLines).toEqual([
+      { name: 'Org line (hi)', phone: '222' },
+    ]);
+  });
+
+  it('says when the learner was in distress, so support comes first', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: {},
+          language: 'en',
+          steps: [],
+          learnerDistress: true,
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.distress).toBe(true);
   });
 
   it('is working only while the drain will still pick the session up', async () => {
@@ -117,6 +191,7 @@ describe('DebriefAgentService.onSessionEnded', () => {
       releases as any,
       overrides as any,
       { debriefAgentMode: mode } as any,
+      { available: jest.fn(async () => []) } as any,
     );
     return { svc, runner };
   };
@@ -149,5 +224,50 @@ describe('DebriefAgentService.onSessionEnded', () => {
       await jest.advanceTimersByTimeAsync(LIVE_START_DELAY_MS);
       expect(runner.run).not.toHaveBeenCalled();
     }
+  });
+
+  it('links only roleplays the learner can still open', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          language: 'en',
+          steps: [],
+          cards: {
+            practise_next: { skill: 'x', reason: 'y', scenario_id: 41 },
+            work_on_this: [{ scenario_id: 41 }, { scenario_id: 7 }],
+          },
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.practice).toEqual([{ id: 41, title: 'Exam stress' }]);
+  });
+});
+
+describe('DebriefAgentService.sweepStuckRuns', () => {
+  it('sends a stuck live run to a person and fails a stuck shadow run', async () => {
+    const query = jest.fn(async () => [
+      [
+        { id: 'a', mode: 'live' },
+        { id: 'b', mode: 'shadow' },
+      ],
+      2,
+    ]);
+    const svc = new DebriefAgentService(
+      { query } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    expect(await svc.sweepStuckRuns()).toBe(2);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, string[]];
+    expect(sql).toContain("CASE WHEN mode = 'live' THEN $1 ELSE $2 END");
+    expect(sql).toContain("interval '10 minutes'");
+    expect(params).toEqual(['needs_person', 'failed', 'running']);
   });
 });

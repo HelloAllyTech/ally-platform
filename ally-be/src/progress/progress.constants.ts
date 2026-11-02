@@ -22,6 +22,10 @@ export const XP_RULE = {
   DAILY_DEPTH_MILESTONE: 'DAILY_DEPTH_MILESTONE',
   TRACK_ITEM_COMPLETED: 'TRACK_ITEM_COMPLETED',
   DEBRIEF_THREAD: 'DEBRIEF_THREAD',
+  /** Reading a Debrief-agent debrief to the end of its last Work-on-this card. */
+  DEBRIEF_READ: 'DEBRIEF_READ',
+  /** A genuine answer to a Debrief-agent debrief's reflective question. */
+  DEBRIEF_REFLECTION: 'DEBRIEF_REFLECTION',
   PEER_COMMENT: 'PEER_COMMENT',
   WEEKLY_CONSISTENCY: 'WEEKLY_CONSISTENCY',
 
@@ -47,6 +51,8 @@ export const ACTIVE_XP_RULES: readonly string[] = [
   XP_RULE.DAILY_DEPTH_MILESTONE,
   XP_RULE.TRACK_ITEM_COMPLETED,
   XP_RULE.DEBRIEF_THREAD,
+  XP_RULE.DEBRIEF_READ,
+  XP_RULE.DEBRIEF_REFLECTION,
   XP_RULE.PEER_COMMENT,
   XP_RULE.WEEKLY_CONSISTENCY,
 ];
@@ -69,6 +75,10 @@ export const XP_AWARD = {
   PER_PRACTICE_MINUTE: 1,
   PER_SESSION_COMPLETED: 10,
   PER_DEBRIEF_THREAD: 15,
+  // v9 FR-65: small next to a roleplay session, inside the debrief daily cap.
+  // PLACEHOLDERS: v9 says the XP model's owner sets these two amounts.
+  PER_DEBRIEF_READ: 5,
+  PER_DEBRIEF_REFLECTION: 10,
   PER_PEER_COMMENT: 5,
   WEEKLY_CONSISTENCY: 100,
 };
@@ -149,7 +159,15 @@ export const DAILY_SOURCE_CAPS: readonly {
   { name: 'sessions', rules: [XP_RULE.SESSION_COMPLETED], cap: 50 },
   { name: 'depth', rules: [XP_RULE.DAILY_DEPTH_MILESTONE], cap: 70 },
   { name: 'components', rules: [XP_RULE.TRACK_ITEM_COMPLETED], cap: 100 },
-  { name: 'debrief', rules: [XP_RULE.DEBRIEF_THREAD], cap: 45 },
+  {
+    name: 'debrief',
+    rules: [
+      XP_RULE.DEBRIEF_THREAD,
+      XP_RULE.DEBRIEF_READ,
+      XP_RULE.DEBRIEF_REFLECTION,
+    ],
+    cap: 45,
+  },
   { name: 'peer', rules: [XP_RULE.PEER_COMMENT], cap: 15 },
 ];
 

@@ -138,11 +138,19 @@ class WorkOnThisCard(BaseModel):
     lead: str
     why: str = Field(description="Why it mattered, at most 40 words.")
     try_saying: str = Field(description="One thing the counsellor could say next time.")
+    scenario_id: Optional[int] = Field(
+        default=None,
+        description="A roleplay from PRACTICE OPTIONS for this skill, or null.",
+    )
 
 
 class PractiseNext(BaseModel):
     skill: str
     reason: str
+    scenario_id: Optional[int] = Field(
+        default=None,
+        description="A roleplay from PRACTICE OPTIONS for this skill, or null.",
+    )
 
 
 class SkillWordItem(BaseModel):

@@ -75,6 +75,45 @@ void main() {
       expect(view.helpful, isNull);
     });
 
+    test('distress, support lines, and the roleplays a card may link to', () {
+      final json = readyDebriefJson();
+      final cards = json['cards'] as Map<String, dynamic>;
+      final view = LearnerDebriefView.fromJson({
+        ...json,
+        'distress': true,
+        'supportLines': [
+          {'name': 'Tele-MANAS', 'phone': '+91 14416', 'hours': '24 hours', 'isCrisis': true},
+          {'name': 'No number', 'phone': ''},
+        ],
+        'practice': [
+          {'id': 42, 'title': 'Grief call'},
+          {'id': 'bad', 'title': 'Dropped'},
+        ],
+        'cards': {
+          ...cards,
+          'practise_next': {...cards['practise_next'] as Map<String, dynamic>, 'scenario_id': 42},
+          'work_on_this': [
+            {...(cards['work_on_this'] as List).first as Map<String, dynamic>, 'scenario_id': null},
+          ],
+        },
+      });
+      expect(view.distress, isTrue);
+      final line = view.supportLines.single;
+      expect(line.isCrisis, isTrue);
+      expect(line.telUri.toString(), 'tel:+9114416');
+      expect(view.practice.single.title, 'Grief call');
+      expect(view.cards!.practiseNext!.scenarioId, 42);
+      expect(view.practiceFor(42)?.id, 42);
+      expect(view.cards!.workOnThis.single.scenarioId, isNull);
+      expect(view.practiceFor(null), isNull);
+      expect(view.practiceFor(7), isNull);
+      // Absent fields: no distress, nothing to link to.
+      final plain = LearnerDebriefView.fromJson(readyDebriefJson());
+      expect(plain.distress, isFalse);
+      expect(plain.supportLines, isEmpty);
+      expect(plain.practice, isEmpty);
+    });
+
     test('state mapping, and which answers replace today\'s debrief', () {
       LearnerDebriefView of(Map<String, dynamic> json) => LearnerDebriefView.fromJson(json);
       expect(of({'state': 'working', 'steps': ['a', 'b']}).steps, ['a', 'b']);
@@ -152,6 +191,18 @@ void main() {
           data: {'section': 'practise_next', 'reason': 'something_else', 'note': 'Hm'},
         ),
       ).called(1);
+    });
+
+    test('GET a card\'s audio (section URL-encoded) and POST read', () async {
+      when(() => dio.get<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async => _response({'url': 'https://signed/mp3', 'cached': true}));
+      expect(await repository.getCardAudioUrl('s-1', 'work_on_this[0]'), 'https://signed/mp3');
+      verify(() => dio.get<Map<String, dynamic>>('/debriefs/sessions/s-1/audio/work_on_this%5B0%5D')).called(1);
+
+      when(() => dio.post<void>(any())).thenAnswer((_) async => _response<void>(null));
+      await repository.markRead('s-1');
+      verify(() => dio.post<void>('/debriefs/sessions/s-1/read')).called(1);
+      expect(LearnerDebriefRepository.replyStreamPath('s-1'), '/debriefs/sessions/s-1/reply/stream');
     });
 
     test('DELETE a flag to undo it', () async {

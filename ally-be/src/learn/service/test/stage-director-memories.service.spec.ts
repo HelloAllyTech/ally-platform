@@ -127,15 +127,14 @@ describe('StageDirectorMemoriesService.mapMemories', () => {
     expect(memories[1].unlocksInStateIds).toEqual(['s2', 's3']);
   });
 
-  it('copies knowledge sources as they are when the model fails', async () => {
+  it('throws an error when the model fails', async () => {
     const { service } = build(new Error('timeout'));
-    const { memories, mapped } = await service.mapMemories({
-      knowledgeSources: SOURCES,
-      states: STATES,
-    });
-    expect(mapped).toBe(false);
-    expect(memories.map((m) => m.id)).toEqual(['k1', 'k2', 'k3']);
-    expect(memories[2].unlocksFromStateId).toBe('s2');
+    await expect(
+      service.mapMemories({
+        knowledgeSources: SOURCES,
+        states: STATES,
+      }),
+    ).rejects.toThrow('Failed to map memories: timeout');
   });
 
   it('does not call the model with fewer than two states', async () => {

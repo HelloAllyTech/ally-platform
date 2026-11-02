@@ -73,4 +73,9 @@ export type SSEEvent =
 
 export interface UseAskAIChatOptions {
   scenarioSessionId?: string;
+  /**
+   * Where the next message streams to, instead of today's chat stream. The
+   * thread (history) is the same either way.
+   */
+  streamPath?: string;
 }

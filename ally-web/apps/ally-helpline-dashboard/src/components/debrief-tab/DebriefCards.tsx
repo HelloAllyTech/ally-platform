@@ -1,11 +1,14 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useRef, useState } from "react";
 
 import {
   Bookmark,
+  ChevronDown,
   CircleDashed,
+  HeartHandshake,
   HelpCircle,
   Loader2,
   MessageSquareQuote,
+  Phone,
   Sprout,
   Star,
   Target,
@@ -13,10 +16,20 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
-import { DebriefCardsData, DebriefSkillWord, LearnerDebriefView } from "@types";
+import { DebriefCardsData, DebriefSkillWord, DebriefSupportLine, LearnerDebriefView } from "@types";
 
 import { CardFlag, DebriefHelpful } from "./DebriefCardFeedback";
+import {
+  ListenAllBar,
+  ListenButton,
+  ReadAloudContext,
+  ReadAloudStatusLine,
+  useIsBeingRead,
+} from "./ReadAloudControls";
+import { useDebriefReadAloud } from "./useDebriefReadAloud";
+import { useReadToTheEnd } from "./useReadToTheEnd";
 
 /** 'hi-IN' → 'hi'; anything unusable → undefined (inherit the page's lang). */
 export const toLangAttribute = (language?: string | null): string | undefined => {
@@ -45,22 +58,28 @@ const Card: FC<{
   tone?: "neutral" | "attention";
   children: ReactNode;
   testId?: string;
-}> = ({ title, icon, tone = "neutral", children, testId }) => (
-  <li
-    data-testid={testId}
-    className={
-      tone === "attention"
-        ? "flex flex-col gap-3 rounded-lg border-2 border-warning-300 bg-warning-50 p-4"
-        : "flex flex-col gap-3 rounded-lg border border-primary-100 bg-white p-4"
-    }
-  >
-    <h3 className="flex items-center gap-2 font-primary text-base font-semibold text-typography-900">
-      {icon}
-      {title}
-    </h3>
-    {children}
-  </li>
-);
+  /** The section read-aloud reads for this card, for its highlight. */
+  readSection?: string;
+}> = ({ title, icon, tone = "neutral", children, testId, readSection }) => {
+  const reading = useIsBeingRead(readSection ?? "");
+  return (
+    <li
+      data-testid={testId}
+      data-reading={reading || undefined}
+      className={`${
+        tone === "attention"
+          ? "flex flex-col gap-3 rounded-lg border-2 border-warning-300 bg-warning-50 p-4"
+          : "flex flex-col gap-3 rounded-lg border border-primary-100 bg-white p-4"
+      } ${reading ? "ring-2 ring-primary-400 ring-offset-2" : ""}`}
+    >
+      <h3 className="flex items-center gap-2 font-primary text-base font-semibold text-typography-900">
+        {icon}
+        {title}
+      </h3>
+      {children}
+    </li>
+  );
+};
 
 const Body: FC<{ children: ReactNode }> = ({ children }) => (
   <p className="font-primary text-sm leading-relaxed text-typography-800">{children}</p>
@@ -70,26 +89,115 @@ const Lead: FC<{ children: ReactNode }> = ({ children }) => (
   <h4 className="font-primary text-sm font-semibold text-typography-900">{children}</h4>
 );
 
-const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessionId: string }> = ({
-  cards,
-  view,
-  sessionId,
+/**
+ * `ROUTES.SCENARIO` for one roleplay. Built here rather than imported: the
+ * routes module loads icons at import time, which this card list must not.
+ */
+const scenarioPath = (id: number) => `/scenario/${id}`;
+
+/**
+ * "Practise this next" / "Practise this": opens the roleplay's own page, so
+ * its language choice and trigger warnings come first. Rendered only for a
+ * roleplay the server says the learner can still open.
+ */
+const PractiseLink: FC<{ scenario: { id: number; title: string }; primary?: boolean }> = ({
+  scenario,
+  primary,
 }) => {
   const { t } = useTranslation();
+  return (
+    <Link
+      to={scenarioPath(scenario.id)}
+      data-testid={primary ? "debrief-practise-next" : "debrief-practise-this"}
+      aria-label={t("postSim.debriefCards.practise.label", { title: scenario.title })}
+      className={
+        primary
+          ? "inline-flex min-h-[44px] items-center justify-center self-start rounded-md bg-primary-600 px-4 font-primary text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+          : "inline-flex min-h-[44px] items-center gap-1 self-start rounded-md px-2 font-primary text-sm font-semibold text-primary-700 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+      }
+    >
+      {primary ? t("postSim.debriefCards.practise.next") : t("postSim.debriefCards.practise.this")}
+    </Link>
+  );
+};
+
+/** The organisation's support lines, each number a tap-to-call link. */
+const SupportLines: FC<{ lines: DebriefSupportLine[] }> = ({ lines }) => (
+  <ul className="flex flex-col gap-2" data-testid="debrief-support-lines">
+    {lines.map(line => (
+      <li key={`${line.name}-${line.phone}`} className="flex flex-col font-primary text-sm">
+        <a
+          href={`tel:${line.phone.replace(/[^\d+]/g, "")}`}
+          className="inline-flex min-h-[44px] items-center gap-2 font-semibold text-typography-900 underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+        >
+          <Phone aria-hidden="true" className="h-4 w-4 shrink-0 text-primary-600" />
+          {line.name} · {line.phone}
+        </a>
+        {line.hours && <span className="pl-6 text-xs text-typography-700">{line.hours}</span>}
+      </li>
+    ))}
+  </ul>
+);
+
+/** A card item that gets a ring while read-aloud is reading it. */
+const ReadableItem: FC<{ section: string; children: ReactNode }> = ({ section, children }) => {
+  const reading = useIsBeingRead(section);
+  return (
+    <li
+      data-reading={reading || undefined}
+      className={`flex flex-col gap-2 rounded-md ${reading ? "ring-2 ring-primary-400 ring-offset-2" : ""}`}
+    >
+      {children}
+    </li>
+  );
+};
+
+/** The cards "Listen all" reads, in the order they appear; removed ones never. */
+export const readableSections = (view: LearnerDebriefView): string[] => {
+  const cards = view.cards;
+  if (!cards) return [];
+  const removed = new Set(
+    (view.corrections ?? []).filter(c => c.outcome === "removed").map(c => c.section),
+  );
+  return [
+    cards.important_moment ? "important_moment" : null,
+    "opening",
+    ...cards.what_worked.map((_, i) => `what_worked[${i}]`),
+    ...cards.work_on_this.map((_, i) => `work_on_this[${i}]`),
+    cards.practise_next ? "practise_next" : null,
+    cards.reflective_question ? "reflective_question" : null,
+  ].filter((x): x is string => !!x && !removed.has(x));
+};
+
+const ReadyCards: FC<{
+  cards: DebriefCardsData;
+  view: LearnerDebriefView;
+  sessionId: string;
+  replyThread?: ReactNode;
+}> = ({ cards, view, sessionId, replyThread }) => {
+  const { t } = useTranslation();
+  // The end of the last Work-on-this card, for DEBRIEF_READ XP.
+  const readEndRef = useRef<HTMLDivElement>(null);
+  useReadToTheEnd(sessionId, readEndRef);
   const corrections = view.corrections ?? [];
   // Sections keep their stored index, the one a flag and a correction name.
   const removed = new Set(corrections.filter(c => c.outcome === "removed").map(c => c.section));
   const flagFor = (section: string) => view.feedback?.flags.find(f => f.section === section);
   const correctionFor = (section: string) => corrections.find(c => c.section === section);
   const flagControl = (section: string, cardLabel: string) => (
-    <CardFlag
-      sessionId={sessionId}
-      section={section}
-      cardLabel={cardLabel}
-      flag={flagFor(section)}
-      correction={correctionFor(section)}
-    />
+    <div className="flex flex-wrap items-start gap-1">
+      <ListenButton section={section} cardLabel={cardLabel} />
+      <CardFlag
+        sessionId={sessionId}
+        section={section}
+        cardLabel={cardLabel}
+        flag={flagFor(section)}
+        correction={correctionFor(section)}
+      />
+    </div>
   );
+  const practiceFor = (id?: number | null) =>
+    id == null ? undefined : view.practice?.find(p => p.id === id);
   const moment = removed.has("important_moment") ? null : cards.important_moment;
   const worked = cards.what_worked
     .map((item, index) => ({ item, index }))
@@ -105,6 +213,7 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
         <ul className="flex flex-col gap-4">
           <Card
             testId="debrief-card-important-moment"
+            readSection="important_moment"
             tone="attention"
             title={t("postSim.debriefCards.importantMoment.title")}
             icon={<Bookmark aria-hidden="true" className="h-5 w-5 text-warning-700" />}
@@ -126,6 +235,7 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
               </div>
             )}
             <Body>{t("postSim.debriefCards.importantMoment.support")}</Body>
+            {!!view.supportLines?.length && <SupportLines lines={view.supportLines} />}
             {flagControl("important_moment", t("postSim.debriefCards.importantMoment.title"))}
           </Card>
         </ul>
@@ -147,12 +257,12 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
           >
             <ul className="flex flex-col gap-4">
               {worked.map(({ item, index }) => (
-                <li key={`${item.turn_index}-${index}`} className="flex flex-col gap-2">
+                <ReadableItem key={`${item.turn_index}-${index}`} section={`what_worked[${index}]`}>
                   <Lead>{item.lead}</Lead>
                   <Quote text={item.quote} />
                   <Body>{item.body}</Body>
                   {flagControl(`what_worked[${index}]`, item.lead)}
-                </li>
+                </ReadableItem>
               ))}
             </ul>
           </Card>
@@ -166,7 +276,10 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
           >
             <ul className="flex flex-col gap-4">
               {growth.map(({ item, index }) => (
-                <li key={`${item.turn_index}-${index}`} className="flex flex-col gap-2">
+                <ReadableItem
+                  key={`${item.turn_index}-${index}`}
+                  section={`work_on_this[${index}]`}
+                >
                   <Lead>{item.lead}</Lead>
                   <Quote text={item.quote} />
                   <Body>{item.why}</Body>
@@ -185,21 +298,29 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
                       {item.try_saying}
                     </span>
                   </p>
+                  {practiceFor(item.scenario_id) && (
+                    <PractiseLink scenario={practiceFor(item.scenario_id)!} />
+                  )}
                   {flagControl(`work_on_this[${index}]`, item.lead)}
-                </li>
+                </ReadableItem>
               ))}
             </ul>
+            <div ref={readEndRef} data-testid="debrief-read-end" aria-hidden="true" />
           </Card>
         )}
 
         {practise && (
           <Card
             testId="debrief-card-practise-next"
+            readSection="practise_next"
             title={t("postSim.debriefCards.practiseNext")}
             icon={<Sprout aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
             <Lead>{practise.skill}</Lead>
             <Body>{practise.reason}</Body>
+            {practiceFor(practise.scenario_id) && (
+              <PractiseLink scenario={practiceFor(practise.scenario_id)!} primary />
+            )}
             {flagControl("practise_next", t("postSim.debriefCards.practiseNext"))}
           </Card>
         )}
@@ -239,10 +360,16 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
 
         <Card
           testId="debrief-card-reflective-question"
+          readSection="reflective_question"
           title={t("postSim.debriefCards.reflectiveQuestion")}
           icon={<HelpCircle aria-hidden="true" className="h-5 w-5 text-primary-600" />}
         >
           <Body>{cards.reflective_question}</Body>
+          <ListenButton
+            section="reflective_question"
+            cardLabel={t("postSim.debriefCards.reflectiveQuestion")}
+          />
+          {replyThread}
         </Card>
       </ul>
       {removed.size > 0 && (
@@ -255,9 +382,64 @@ const ReadyCards: FC<{ cards: DebriefCardsData; view: LearnerDebriefView; sessio
   );
 };
 
+/**
+ * When the learner stepped out of the role in distress (plan flow C), care
+ * comes before coaching: an acknowledgement and the support lines first, and
+ * the debrief collapsed until the learner chooses to open it.
+ */
+const DistressFirst: FC<{ view: LearnerDebriefView; children: ReactNode }> = ({
+  view,
+  children,
+}) => {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-4">
+      <section
+        data-testid="debrief-distress"
+        aria-labelledby="debrief-distress-title"
+        className="flex flex-col gap-3 rounded-lg border border-primary-200 bg-primary-50 p-4"
+      >
+        <h3
+          id="debrief-distress-title"
+          className="flex items-center gap-2 font-primary text-base font-semibold text-typography-900"
+        >
+          <HeartHandshake aria-hidden="true" className="h-5 w-5 text-primary-600" />
+          {t("postSim.debriefCards.distress.title")}
+        </h3>
+        <Body>{t("postSim.debriefCards.distress.body")}</Body>
+        {!!view.supportLines?.length && (
+          <>
+            <Body>{t("postSim.debriefCards.distress.supportLead")}</Body>
+            <SupportLines lines={view.supportLines} />
+          </>
+        )}
+      </section>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="debrief-when-ready"
+        onClick={() => setOpen(o => !o)}
+        className="flex min-h-[44px] items-center justify-between gap-2 rounded-md border border-primary-100 px-4 font-primary text-sm font-semibold text-typography-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+      >
+        {t("postSim.debriefCards.distress.whenReady")}
+        <ChevronDown
+          aria-hidden="true"
+          className={`h-4 w-4 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      <div id="debrief-when-ready" hidden={!open}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
 interface DebriefCardsProps {
   view: LearnerDebriefView;
   sessionId: string;
+  /** Ask Ally's thread and composer, under the reflective question. */
+  replyThread?: ReactNode;
 }
 
 /**
@@ -268,8 +450,10 @@ interface DebriefCardsProps {
  * No score, no percentage and no red anywhere: amber marks what needs
  * attention, and every status carries text plus an icon, never colour alone.
  */
-export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId }) => {
+export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId, replyThread }) => {
   const { t } = useTranslation();
+  const readAloud = useDebriefReadAloud(sessionId);
+  const ready = view.state === "ready" && !!view.cards;
   const latestStep = view.steps?.length ? view.steps[view.steps.length - 1] : undefined;
 
   let content: ReactNode = null;
@@ -300,26 +484,35 @@ export const DebriefCards: FC<DebriefCardsProps> = ({ view, sessionId }) => {
   } else if (view.state === "too_short") {
     content = <Body>{t("postSim.debriefCards.tooShort")}</Body>;
   } else if (view.state === "ready" && view.cards) {
-    content = <ReadyCards cards={view.cards} view={view} sessionId={sessionId} />;
+    const cards = (
+      <ReadyCards cards={view.cards} view={view} sessionId={sessionId} replyThread={replyThread} />
+    );
+    content = view.distress ? <DistressFirst view={view}>{cards}</DistressFirst> : cards;
   }
 
   return (
-    <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
-      <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
-        <h2 className="font-primary text-lg font-semibold text-white">
-          {t("postSim.debriefCards.header")}
-        </h2>
-        <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-primary text-xs font-medium text-typography-800">
-          {t("postSim.debriefCards.aiLabel")}
-        </span>
+    <ReadAloudContext.Provider value={ready ? readAloud : null}>
+      <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
+          <h2 className="font-primary text-lg font-semibold text-white">
+            {t("postSim.debriefCards.header")}
+          </h2>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {ready && <ListenAllBar sections={readableSections(view)} />}
+            <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-primary text-xs font-medium text-typography-800">
+              {t("postSim.debriefCards.aiLabel")}
+            </span>
+          </div>
+        </div>
+        <div
+          lang={toLangAttribute(view.language)}
+          data-testid="debrief-cards"
+          className="flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6"
+        >
+          <ReadAloudStatusLine />
+          {content}
+        </div>
       </div>
-      <div
-        lang={toLangAttribute(view.language)}
-        data-testid="debrief-cards"
-        className="flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6"
-      >
-        {content}
-      </div>
-    </div>
+    </ReadAloudContext.Provider>
   );
 };

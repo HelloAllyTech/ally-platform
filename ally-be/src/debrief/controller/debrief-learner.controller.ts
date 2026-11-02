@@ -7,7 +7,14 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  DebriefEngagementEvent,
+  DebriefThreadQualifiedEventParams,
+} from 'src/learn/type/debrief-engagement-event.type';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
@@ -30,11 +37,20 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { DebriefFlagReason } from '../enum/debrief-run.enum';
 import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
+import { DebriefAudioService } from '../service/debrief-audio.service';
+import { DebriefReplyService } from '../service/debrief-reply.service';
 
 class HelpfulDto {
   @ApiProperty()
   @IsBoolean()
   helpful!: boolean;
+}
+
+class ReplyDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(4000)
+  message!: string;
 }
 
 class FlagDto {
@@ -68,7 +84,45 @@ export class DebriefLearnerController {
   constructor(
     private readonly agent: DebriefAgentService,
     private readonly feedback: DebriefFeedbackService,
+    private readonly replies: DebriefReplyService,
+    private readonly audio: DebriefAudioService,
+    private readonly events: EventEmitter2,
   ) {}
+
+  @Post('sessions/:sessionId/read')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary: 'The learner read the debrief to the end (earns XP once)',
+    description:
+      'Sent by the app once the end of the last Work-on-this card has been on screen with the debrief open for at least 30 seconds.',
+  })
+  async read(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const run = await this.feedback.ownLiveRun(sessionId, user.id);
+    this.events.emit(DebriefEngagementEvent.READ_QUALIFIED, {
+      userId: user.id,
+      tenantId: run.tenantId as string,
+      scenarioSessionId: sessionId,
+    } as DebriefThreadQualifiedEventParams);
+    return { ok: true };
+  }
+
+  @Get('sessions/:sessionId/audio/:section')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary: 'Read-aloud: a short-lived link to one card read aloud',
+    description:
+      'Generated on the first request and cached by the card text, so a second play makes no TTS call.',
+  })
+  readAloud(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('section') section: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.audio.audioUrl(sessionId, user.id, section);
+  }
 
   @Get('sessions/:sessionId')
   // Same permission as reading the session's existing debrief chat; the
@@ -120,5 +174,31 @@ export class DebriefLearnerController {
     @CurrentUser() user: TokenUser,
   ) {
     return this.feedback.undoFlag(sessionId, user.id, flagId);
+  }
+
+  @Post('sessions/:sessionId/reply/stream')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary:
+      'Ask Ally: a reply about the debrief, streamed as server-sent events',
+  })
+  async reply(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() body: ReplyDto,
+    @CurrentUser() user: TokenUser,
+    @Res() res: Response,
+  ) {
+    // Ownership and a published debrief are checked before the stream opens,
+    // so a refusal is an ordinary HTTP error, not a broken stream.
+    const stream = await this.replies.stream(sessionId, user.id, body.message);
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+    stream.subscribe({
+      next: (e) => res.write(`data: ${e.data}\n\n`),
+      complete: () => res.end(),
+      error: () => res.end(),
+    });
   }
 }

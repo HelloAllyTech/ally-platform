@@ -69,6 +69,8 @@ export type AiTaskProvider =
   | 'google'
   /** Legacy: unfunded since 2026-10, kept so an old row still reads. */
   | 'deepgram'
+  /** Sarvam AI speech (Indic TTS/STT). */
+  | 'sarvam'
   | 'multiple'
   | 'resolved';
 
@@ -968,6 +970,52 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     defaultModel: 'gemini-3-flash-preview',
     configuredBy:
       'debrief release bundle (recipes.standard.steps[reviser].model)',
+  },
+  {
+    id: 'debrief-reply',
+    task: LlmTask.DEBRIEF_REPLY,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner replies under the reflective question of a published Debrief-agent debrief',
+    detail:
+      'Ask Ally: answers from the published debrief and the transcript, streamed, one short reply ' +
+      'per message (≤ $0.05). A first-person risk statement gets the fixed support reply instead, ' +
+      'and the Safety reader reads each message alongside. Replaces coaching-chat for switched-on organisations.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (reply.model); default DEBRIEF_REPLY_DEFAULT',
+    promptOverride: 'debrief_reply_system',
+  },
+  {
+    id: 'debrief-read-aloud',
+    task: LlmTask.DEBRIEF_READ_ALOUD,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'A learner taps Listen on a card of a Debrief-agent debrief',
+    detail:
+      'Speech of one card, generated on the first tap and cached in the private audio bucket ' +
+      'by its exact text and voice, so a second play makes no TTS call (≤ $0.05 a debrief).',
+    kind: AiTaskKind.SPEECH,
+    provider: 'sarvam',
+    defaultModel: 'bulbul:v3',
+    configuredBy: 'DEBRIEF_READ_ALOUD_VOICE in debrief-audio.service.ts',
+  },
+  {
+    id: 'debrief-reflection-check',
+    task: LlmTask.DEBRIEF_REFLECTION_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner message in Ask Ally that is 15+ words and not copied from the debrief',
+    detail:
+      'Says only whether the message is an on-topic answer to the reflective question, for ' +
+      'DEBRIEF_REFLECTION XP (v9 FR-65). Never grades quality or sincerity. Off the reply path.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'DEBRIEF_REFLECTION_CHECK_MODEL in debrief-release.constants.ts',
+    promptOverride: 'debrief_reflection_check_system',
   },
   {
     id: 'debrief-improver',

@@ -127,6 +127,7 @@ async def read_safety(
     language: str,
     system: Optional[str] = None,
     scenario_session_id: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> Tuple[Optional[SafetyReading], str]:
     """One safety reading of a whole session.
 
@@ -134,19 +135,25 @@ async def read_safety(
     which would read as "no risk". The caller must treat None as a failure of
     the mandatory step, not as a safe session.
     """
+    # The release names the model, as for every step; the setting is the default.
+    model = model or settings.DEBRIEF.SAFETY_READER_MODEL
     if not transcript:
-        return SafetyReading(), settings.DEBRIEF.SAFETY_READER_MODEL
+        return SafetyReading(), model
 
-    from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured
+    from app.core.llm.dispatch import (
+        PROVIDER_GEMINI,
+        generate_structured,
+        infer_provider_from_model,
+    )
     from app.core.llm_usage.tasks import LLMTask
 
     output, meta = await generate_structured(
         schema=SafetyReading,
         prompt=build_prompt(transcript, language, system),
         task=LLMTask.DEBRIEF_SAFETY_READER.value,
-        provider=PROVIDER_GEMINI,
+        provider=infer_provider_from_model(model) or PROVIDER_GEMINI,
         never_fallback=True,
-        model=settings.DEBRIEF.SAFETY_READER_MODEL,
+        model=model,
         max_tokens=None,
         scenario_session_id=scenario_session_id,
     )

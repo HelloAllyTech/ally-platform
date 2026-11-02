@@ -12,6 +12,8 @@ const MAX_MESSAGE_LENGTH = 2000;
 interface DebriefReplyInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
+  /** Defaults to the debrief note's reply prompt. */
+  placeholder?: string;
 }
 
 /**
@@ -22,6 +24,7 @@ interface DebriefReplyInputProps {
 export const DebriefReplyInput: React.FC<DebriefReplyInputProps> = ({
   onSend,
   disabled,
+  placeholder,
 }) => {
   const {t} = useTranslate();
   const [inputText, setInputText] = useState('');
@@ -47,7 +50,7 @@ export const DebriefReplyInput: React.FC<DebriefReplyInputProps> = ({
         ]}>
         <TextInput
           style={styles.input}
-          placeholder={t('postSim.debrief.replyPlaceholder')}
+          placeholder={placeholder ?? t('postSim.debrief.replyPlaceholder')}
           placeholderTextColor={colors.ds.typography.lowEmphasis}
           value={inputText}
           onChangeText={setInputText}

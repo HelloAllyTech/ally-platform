@@ -289,8 +289,17 @@ export const loadHistory = async (sessionId: string) => {
   }
 };
 
-/** Send a user message and start SSE streaming */
-export const sendMessage = (sessionId: string, text: string) => {
+/**
+ * Send a user message and start SSE streaming. `streamPath` sends it
+ * somewhere other than today's chat stream — the Debrief agent's Ask Ally
+ * answers the same thread at its own path — mirrors ally-web's
+ * `useSendMessage(sessionId, streamPath)`.
+ */
+export const sendMessage = (
+  sessionId: string,
+  text: string,
+  streamPath?: string,
+) => {
   const trimmed = text.trim();
   const session = getOrCreateSession(sessionId);
 
@@ -304,11 +313,11 @@ export const sendMessage = (sessionId: string, text: string) => {
   session.messages = [...session.messages, userMsg];
   notifyListeners(sessionId);
 
-  startStream(sessionId, trimmed);
+  startStream(sessionId, trimmed, streamPath);
 };
 
 /** Retry the last user message */
-export const retry = (sessionId: string) => {
+export const retry = (sessionId: string, streamPath?: string) => {
   const session = getOrCreateSession(sessionId);
   const lastUserMsg = [...session.messages]
     .reverse()
@@ -321,7 +330,7 @@ export const retry = (sessionId: string) => {
   session.error = null;
   notifyListeners(sessionId);
 
-  startStream(sessionId, lastUserMsg.content);
+  startStream(sessionId, lastUserMsg.content, streamPath);
 };
 
 /** Abort an in-flight stream for a session */
@@ -370,6 +379,7 @@ const commitPartialStreamingMessage = (session: InternalSession): void => {
 const startStream = async (
   sessionId: string,
   userMessageContent: string,
+  streamPath?: string,
   isRetryAfterRefresh = false,
 ) => {
   const session = getOrCreateSession(sessionId);
@@ -390,7 +400,7 @@ const startStream = async (
 
   const url =
     `${env.API_BASE_URL}/api/${APIVersion.V1}` +
-    `${API_ROUTES.LEARN.CHAT_STREAM(sessionId)}`;
+    `${streamPath ?? API_ROUTES.LEARN.CHAT_STREAM(sessionId)}`;
 
   const xhr = new XMLHttpRequest();
   session.xhr = xhr;
@@ -483,7 +493,7 @@ const startStream = async (
 
       const newToken = await refreshAccessToken();
       if (newToken) {
-        startStream(sessionId, userMessageContent, true);
+        startStream(sessionId, userMessageContent, streamPath, true);
         return;
       }
 

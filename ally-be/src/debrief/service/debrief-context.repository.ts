@@ -14,6 +14,12 @@ export interface DebriefSessionContext {
   learnerTurns: number;
   scenario: { title: string | null; description: string | null };
   expectedBehaviours: string[];
+  /** Played for a course roleplay item in assessment mode: a graded attempt. */
+  assessment: boolean;
+  /** Played as one session of a case: earlier sessions are the client's memory. */
+  inCase: boolean;
+  /** False when the session recorded no language and `language` is only a default. */
+  languageRecorded: boolean;
 }
 
 /**
@@ -33,14 +39,19 @@ export class DebriefContextRepository {
     const rows = await this.dataSource.query(
       `SELECT s.id, s.tenant_id, s."counselorId" AS counselor_id, s.status,
               COALESCE(l.value, 'en') AS language,
+              l.value IS NOT NULL AS language_recorded,
               u.metadata AS user_metadata,
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
+              s."caseSessionItemId" IS NOT NULL AS in_case,
+              COALESCE((ti."completionCriteria"->>'assessmentMode')::boolean, false) AS assessment,
               (SELECT count(*)::int FROM scenario_session_messages m
                 WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1) AS learner_turns
          FROM scenario_sessions s
          LEFT JOIN users u ON u.id = s."counselorId"
          LEFT JOIN scenarios sc ON sc.id = s."scenarioId"
          LEFT JOIN languages l ON l.id = NULLIF(s.metadata->>'languageId', '')::int
+         LEFT JOIN track_item_progress tip ON tip.id = s."trackItemProgressId"
+         LEFT JOIN track_items ti ON ti.id = tip."trackItemId"
         WHERE s.id = $1`,
       [sessionId],
     );
@@ -65,7 +76,39 @@ export class DebriefContextRepository {
       learnerTurns: Number(r.learner_turns ?? 0),
       scenario: { title: r.title ?? null, description: r.description ?? null },
       expectedBehaviours: competencies.map((c: { name: string }) => c.name),
+      assessment: r.assessment === true,
+      inCase: r.in_case === true,
+      languageRecorded: r.language_recorded === true,
     };
+  }
+
+  /**
+   * The case's memory before this session: what the client carries from the
+   * learner's earlier sessions in the same case, read as the roleplay read it
+   * (the agent's end-of-session memory, else the legacy cumulative memory).
+   */
+  async caseMemory(sessionId: string): Promise<string | null> {
+    const rows: Array<{ mem: string | null; cum: string | null }> =
+      await this.dataSource.query(
+        `SELECT d."sessionMemory"->>'summary' AS mem,
+                d.summary->'feedback'->>'cumulativeMemory' AS cum
+           FROM scenario_sessions s
+           JOIN case_session_items ci ON ci.id = s."caseSessionItemId"
+           JOIN case_session_items ci2 ON ci2."caseSessionId" = ci."caseSessionId"
+           JOIN scenario_sessions s2 ON s2."caseSessionItemId" = ci2.id
+           LEFT JOIN scenario_session_details d ON d."scenarioSessionId" = s2.id
+          WHERE s.id = $1 AND s2.id <> s.id
+            AND s2."endedAt" IS NOT NULL
+            AND s2."endedAt" <= COALESCE(s."startedAt", s."createdAt")
+          ORDER BY s2."endedAt" DESC
+          LIMIT 3`,
+        [sessionId],
+      );
+    for (const r of rows ?? []) {
+      const memory = (r.mem ?? '').trim() || (r.cum ?? '').trim();
+      if (memory) return memory;
+    }
+    return null;
   }
 
   async transcript(sessionId: string): Promise<TranscriptTurn[]> {

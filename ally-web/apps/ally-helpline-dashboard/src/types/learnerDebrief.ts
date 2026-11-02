@@ -39,6 +39,7 @@ export interface DebriefWorkOnThis {
   lead: string;
   why: string;
   try_saying: string;
+  scenario_id?: number | null;
 }
 
 export interface DebriefCardsData {
@@ -46,7 +47,7 @@ export interface DebriefCardsData {
   important_moment?: DebriefImportantMoment | null;
   what_worked: DebriefWhatWorked[];
   work_on_this: DebriefWorkOnThis[];
-  practise_next?: { skill: string; reason: string } | null;
+  practise_next?: { skill: string; reason: string; scenario_id?: number | null } | null;
   skill_words: Array<{ skill: string; word: DebriefSkillWord }>;
   reflective_question: string;
   progress_note?: string | null;
@@ -73,6 +74,15 @@ export interface DebriefMyFlag {
   canUndoUntil: string | null;
 }
 
+/** A crisis or wellbeing line: the organisation's own, else Tele-MANAS. */
+export interface DebriefSupportLine {
+  name: string;
+  phone: string;
+  hours?: string | null;
+  url?: string | null;
+  isCrisis?: boolean;
+}
+
 export interface LearnerDebriefView {
   state: LearnerDebriefState;
   cards?: DebriefCardsData | null;
@@ -80,4 +90,9 @@ export interface LearnerDebriefView {
   steps?: string[];
   corrections?: DebriefCorrection[];
   feedback?: { helpful: boolean | null; flags: DebriefMyFlag[] };
+  /** The learner stepped out of the role in distress: support comes first. */
+  distress?: boolean;
+  supportLines?: DebriefSupportLine[];
+  /** Roleplays the cards link to that the learner can still open. */
+  practice?: Array<{ id: number; title: string }>;
 }

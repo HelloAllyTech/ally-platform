@@ -42,7 +42,7 @@ void main() {
   });
 
   // testWidgets for its fake clock: `pump(duration)` advances the poll timer.
-  testWidgets('polls every 5 s only while working, and a failed poll keeps the last answer', (tester) async {
+  testWidgets('polls every 3 s while working, and a failed poll keeps the last answer', (tester) async {
     final answers = <Object>[
       _view('working'),
       Exception('blip'),
@@ -56,27 +56,80 @@ void main() {
       return next as LearnerDebriefView;
     });
     final c = make();
-    addTearDown(c.dispose);
     await c.load();
     expect(c.view?.state, LearnerDebriefState.working);
     expect(calls, 1);
 
-    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(seconds: 2));
     expect(calls, 1);
     await tester.pump(const Duration(seconds: 1));
     expect(calls, 2);
     // The blip didn't swap back to today's debrief, and polling continues.
     expect(c.view?.state, LearnerDebriefState.working);
 
-    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 3));
     expect(calls, 3);
-    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 3));
     expect(calls, 4);
     expect(c.view?.state, LearnerDebriefState.ready);
 
     // Ready: no more polling.
     await tester.pump(const Duration(seconds: 30));
     expect(calls, 4);
+    c.dispose();
+  });
+
+  testWidgets('after 4 minutes of working, polls every 30 s', (tester) async {
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async {
+      calls++;
+      return _view('working');
+    });
+    final c = make();
+    await c.load();
+
+    // 4 minutes at 3 s: the first answer plus 80 polls.
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(seconds: 3));
+    }
+    expect(calls, 81);
+    // Slow now: nothing for 29 s, then one.
+    await tester.pump(const Duration(seconds: 29));
+    expect(calls, 81);
+    await tester.pump(const Duration(seconds: 1));
+    expect(calls, 82);
+    await tester.pump(const Duration(seconds: 30));
+    expect(calls, 83);
+    // Dispose inside the test: the next poll is still pending.
+    c.dispose();
+  });
+
+  testWidgets('polls every 30 s while on its way; not at all once too short', (tester) async {
+    final answers = [_view('on_its_way'), _view('on_its_way'), _view('too_short')];
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async => answers[calls++]);
+    final c = make();
+    addTearDown(c.dispose);
+    await c.load();
+
+    await tester.pump(const Duration(seconds: 29));
+    expect(calls, 1);
+    await tester.pump(const Duration(seconds: 1));
+    expect(calls, 2);
+    await tester.pump(const Duration(seconds: 30));
+    expect(calls, 3);
+    expect(c.view?.state, LearnerDebriefState.tooShort);
+    await tester.pump(const Duration(minutes: 5));
+    expect(calls, 3);
+  });
+
+  test('markRead is sent once, and a failure is silent', () async {
+    when(() => repo.markRead('s-1')).thenThrow(Exception('500'));
+    final c = make();
+    await c.markRead();
+    await c.markRead();
+    verify(() => repo.markRead('s-1')).called(1);
+    c.dispose();
   });
 
   test('helpful shows the pressed state once the server accepts', () async {

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DebriefTab } from "../DebriefTab";
 
@@ -11,10 +11,20 @@ import { DebriefTab } from "../DebriefTab";
  */
 
 const mockLearnerDebriefQuery = vi.hoisted(() => vi.fn());
+const mockFetchAudio = vi.hoisted(() => vi.fn());
+const mockMarkRead = vi.hoisted(() => vi.fn());
 const mockMutations = vi.hoisted(() => ({ helpful: vi.fn(), flag: vi.fn(), undo: vi.fn() }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+vi.mock("react-router-dom", () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 vi.mock("react-redux", () => ({
@@ -28,7 +38,11 @@ vi.mock("@api", () => ({
   useSetDebriefHelpfulMutation: () => [mockMutations.helpful, { isLoading: false }],
   useFlagDebriefCardMutation: () => [mockMutations.flag, { isLoading: false }],
   useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
-  LEARNER_DEBRIEF_POLL_MS: 5000,
+  useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
+  useMarkDebriefReadMutation: () => [mockMarkRead],
+  LEARNER_DEBRIEF_POLL_MS: 3000,
+  LEARNER_DEBRIEF_SLOW_POLL_MS: 30000,
+  LEARNER_DEBRIEF_FAST_FOR_MS: 240000,
 }));
 
 vi.mock("@assets", () => ({
@@ -36,15 +50,19 @@ vi.mock("@assets", () => ({
   Refresh: () => <svg />,
 }));
 
+const mockUseSendMessage = vi.hoisted(() => vi.fn());
 vi.mock("@hooks", () => ({
-  useSendMessage: () => ({
+  useSendMessage: (...args: unknown[]) => {
+    mockUseSendMessage(...args);
+    return {
     messages: [],
     streamingMessage: undefined,
     isStreaming: false,
     error: undefined,
     sendMessage: vi.fn(),
     retryLastMessage: vi.fn(),
-  }),
+    };
+  },
 }));
 
 vi.mock("@reducer", () => ({ initSession: vi.fn() }));
@@ -151,7 +169,15 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     renderTab();
 
     expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
+    // Ask Ally: the reply box sits under the reflective question and posts
+    // to the Debrief agent, not today's debrief chat.
+    expect(
+      within(screen.getByTestId("debrief-card-reflective-question")).getByTestId("reply-input"),
+    ).toBeInTheDocument();
+    expect(mockUseSendMessage).toHaveBeenLastCalledWith(
+      "s-1",
+      "/v1/debriefs/sessions/s-1/reply/stream",
+    );
 
     const container = screen.getByTestId("debrief-cards");
     expect(container).toHaveAttribute("lang", "hi");
@@ -222,7 +248,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
     expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
       "s-1",
-      expect.objectContaining({ pollingInterval: 5000 }),
+      expect.objectContaining({ pollingInterval: 3000 }),
     );
   });
 
@@ -349,6 +375,179 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
         within(helpful).getByRole("button", { name: "postSim.debriefCards.helpful.no" }),
       );
       expect(mockMutations.helpful).toHaveBeenCalledWith({ sessionId: "s-1", helpful: false });
+    });
+  });
+
+  describe("support and distress", () => {
+    const TELE_MANAS = { name: "Tele-MANAS (free, 24×7)", phone: "14416", isCrisis: true };
+
+    it("ends the important moment with the organisation's support lines, tap to call", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en", supportLines: [TELE_MANAS] },
+      });
+      renderTab();
+
+      const moment = screen.getByTestId("debrief-card-important-moment");
+      const call = within(moment).getByRole("link", { name: /Tele-MANAS/ });
+      expect(call).toHaveAttribute("href", "tel:14416");
+      expect(screen.queryByTestId("debrief-distress")).not.toBeInTheDocument();
+    });
+
+    it("puts care first when the learner was in distress, and the debrief opens on request", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: CARDS,
+          language: "en",
+          distress: true,
+          supportLines: [TELE_MANAS],
+        },
+      });
+      renderTab();
+
+      const care = screen.getByTestId("debrief-distress");
+      expect(within(care).getByText("postSim.debriefCards.distress.title")).toBeInTheDocument();
+      expect(within(care).getByRole("link", { name: /Tele-MANAS/ })).toBeInTheDocument();
+
+      const toggle = screen.getByRole("button", { name: "postSim.debriefCards.distress.whenReady" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByTestId("debrief-card-opening")).not.toBeVisible();
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByTestId("debrief-card-opening")).toBeVisible();
+    });
+  });
+
+  describe("practise this next", () => {
+    const withLinks = {
+      ...CARDS,
+      practise_next: { skill: "Open questions", reason: "It came up twice.", scenario_id: 41 },
+      work_on_this: CARDS.work_on_this.map((c: any, i: number) => ({
+        ...c,
+        scenario_id: i === 0 ? 41 : 7,
+      })),
+    };
+
+    it("opens the roleplay's own page, only for roleplays the learner can still open", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: withLinks,
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress" }],
+        },
+      });
+      renderTab();
+
+      expect(screen.getByTestId("debrief-practise-next")).toHaveAttribute("href", "/scenario/41");
+      // Roleplay 7 is gone or locked for this learner: no button for it.
+      expect(screen.getAllByTestId("debrief-practise-this")).toHaveLength(1);
+    });
+
+    it("shows no button when no linked roleplay is available", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: withLinks, language: "en", practice: [] },
+      });
+      renderTab();
+
+      expect(screen.queryByTestId("debrief-practise-next")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("debrief-practise-this")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("read-aloud", () => {
+    const plays: string[] = [];
+    beforeEach(() => {
+      plays.length = 0;
+      class FakeAudio {
+        src: string;
+        playbackRate = 1;
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        constructor(src: string) {
+          this.src = src;
+        }
+        play() {
+          plays.push(this.src);
+          return Promise.resolve();
+        }
+        pause() {}
+      }
+      vi.stubGlobal("Audio", FakeAudio);
+    });
+
+    it("Listen all fetches the first card's audio and highlights it", async () => {
+      mockFetchAudio.mockImplementation(({ section }: { section: string }) => ({
+        unwrap: () => Promise.resolve({ url: `https://a/${section}.mp3`, cached: true }),
+      }));
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en" },
+      });
+      renderTab();
+
+      fireEvent.click(screen.getByText("postSim.debriefCards.listen.all"));
+      await waitFor(() => expect(plays).toEqual(["https://a/important_moment.mp3"]));
+      expect(mockFetchAudio).toHaveBeenCalledWith(
+        { sessionId: "s-1", section: "important_moment" },
+        true,
+      );
+      expect(screen.getByTestId("debrief-card-important-moment")).toHaveAttribute(
+        "data-reading",
+        "true",
+      );
+    });
+
+    it("says the audio failed and leaves every card readable", async () => {
+      mockFetchAudio.mockImplementation(() => ({
+        unwrap: () => Promise.reject(new Error("503")),
+      }));
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en" },
+      });
+      renderTab();
+
+      fireEvent.click(screen.getAllByTestId("debrief-listen-card")[0]);
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "postSim.debriefCards.listen.error",
+      );
+      expect(screen.getByTestId("debrief-card-opening")).toBeVisible();
+    });
+  });
+
+  describe("XP for reading to the end", () => {
+    let visible: (() => void) | null = null;
+    beforeEach(() => {
+      vi.useFakeTimers();
+      visible = null;
+      class FakeObserver {
+        constructor(cb: (e: Array<{ isIntersecting: boolean }>) => void) {
+          visible = () => cb([{ isIntersecting: true }]);
+        }
+        observe() {}
+        disconnect() {}
+      }
+      vi.stubGlobal("IntersectionObserver", FakeObserver);
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en" },
+      });
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("tells the server once the end was seen and the debrief open 30 seconds", () => {
+      renderTab();
+      visible?.();
+      vi.advanceTimersByTime(29_000);
+      expect(mockMarkRead).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1_000);
+      expect(mockMarkRead).toHaveBeenCalledTimes(1);
+      expect(mockMarkRead).toHaveBeenCalledWith("s-1");
+    });
+
+    it("earns nothing when the end was never on screen", () => {
+      renderTab();
+      vi.advanceTimersByTime(60_000);
+      expect(mockMarkRead).not.toHaveBeenCalled();
     });
   });
 });

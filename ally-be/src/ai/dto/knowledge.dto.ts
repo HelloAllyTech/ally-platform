@@ -98,7 +98,8 @@ export interface KnowledgeChunkDeleteResponse {
 export type KnowledgeCorpus =
   | 'whatsapp_qa'
   | 'character_library'
-  | 'ally_guide_library';
+  | 'ally_guide_library'
+  | 'debrief_knowledge';
 
 export interface KnowledgeChunkSearchRequest {
   query: string;

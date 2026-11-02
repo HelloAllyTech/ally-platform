@@ -23,6 +23,7 @@ const SCENARIO_SESSION_ID = 'b14fae23-e0a9-44a7-a911-edf14498fc53';
  */
 export const useAskAIChat = ({
   scenarioSessionId = SCENARIO_SESSION_ID,
+  streamPath,
 }: UseAskAIChatOptions) => {
   const sessionId = scenarioSessionId || '';
 
@@ -63,11 +64,14 @@ export const useAskAIChat = ({
   );
 
   const send = useCallback(
-    (text: string) => sendMessage(sessionId, text),
-    [sessionId],
+    (text: string) => sendMessage(sessionId, text, streamPath),
+    [sessionId, streamPath],
   );
 
-  const retryFn = useCallback(() => retry(sessionId), [sessionId]);
+  const retryFn = useCallback(
+    () => retry(sessionId, streamPath),
+    [sessionId, streamPath],
+  );
 
   const cleanupFn = useCallback(() => cleanup(sessionId), [sessionId]);
 

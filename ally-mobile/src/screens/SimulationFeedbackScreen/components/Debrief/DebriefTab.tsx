@@ -11,6 +11,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
+import {API_ROUTES} from '@/constants';
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 import {SimulationSummaryData} from '@/types';
@@ -18,6 +19,7 @@ import {SimulationSummaryData} from '@/types';
 import {CitationsTable} from '../AskAI/ChatElements';
 import {AskAIChatMessage, ChatMessageRole} from '../AskAI/types';
 import {useAskAIChat} from '../AskAI/useAskAIChat';
+import {cardStyles} from './cardStyles';
 import {DebriefCards} from './DebriefCards';
 import {DebriefReplyInput} from './DebriefReplyInput';
 import {styles} from './styles';
@@ -195,6 +197,16 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
   // quotes to a name rather than just "AI Client".
   const clientName = simulationDetails?.scenario?.metadata?.name;
 
+  // The Debrief agent's debrief replaces everything here once the learner's
+  // organisation is switched on. `null` — not switched on, request failed or
+  // still loading — keeps today's debrief exactly as it was. Asked on the
+  // read-only Logs view too: a learner reopening their own session should see
+  // the debrief they got, and anyone else gets a 403, which falls back.
+  const learnerDebrief = useLearnerDebrief(scenarioSessionId);
+  // Ask Ally: the same thread, answered by the Debrief agent, under the
+  // reflective question. Never on a read-only (Logs) view.
+  const askAlly = learnerDebrief?.state === 'ready' && !readOnly;
+
   const {
     messages,
     isStreaming,
@@ -206,6 +218,9 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
     // An empty id is useAskAIChat's own no-op path — it guards loadHistory on a
     // truthy session id — so a read-only debrief never loads the thread.
     scenarioSessionId: readOnly ? '' : scenarioSessionId,
+    streamPath: askAlly
+      ? API_ROUTES.DEBRIEFS.REPLY_STREAM(scenarioSessionId)
+      : undefined,
   });
 
   const flatListRef = useRef<FlatList<AskAIChatMessage>>(null);
@@ -335,14 +350,33 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
 
   const keyExtractor = useCallback((item: AskAIChatMessage) => item.id, []);
 
-  // The Debrief agent's debrief replaces everything here once the learner's
-  // organisation is switched on. `null` — not switched on, request failed or
-  // still loading — keeps today's debrief exactly as it was. Asked on the
-  // read-only Logs view too: a learner reopening their own session should see
-  // the debrief they got, and anyone else gets a 403, which falls back.
-  const learnerDebrief = useLearnerDebrief(scenarioSessionId);
   if (learnerDebrief) {
-    return <DebriefCards view={learnerDebrief} sessionId={scenarioSessionId} />;
+    return (
+      <DebriefCards
+        view={learnerDebrief}
+        sessionId={scenarioSessionId}
+        replyThread={
+          askAlly ? (
+            <View style={cardStyles.askAlly} testID="ask-ally">
+              {messages.map(message => (
+                <ReplyBubble
+                  key={message.id}
+                  message={message}
+                  clientName={clientName}
+                  onOpenMoment={onOpenMoment}
+                />
+              ))}
+              {renderFooter()}
+              <DebriefReplyInput
+                onSend={sendMessage}
+                disabled={isStreaming}
+                placeholder={t('postSim.debriefCards.reply.placeholder')}
+              />
+            </View>
+          ) : undefined
+        }
+      />
+    );
   }
 
   return (

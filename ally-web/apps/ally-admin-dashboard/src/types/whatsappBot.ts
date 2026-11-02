@@ -9,6 +9,8 @@
 export enum KbCorpus {
   WHATSAPP_QA = "whatsapp_qa",
   CHARACTER_LIBRARY = "character_library",
+  /** The Debrief agent's guidance (Debriefs → Knowledge). */
+  DEBRIEF_KNOWLEDGE = "debrief_knowledge",
 }
 
 /**

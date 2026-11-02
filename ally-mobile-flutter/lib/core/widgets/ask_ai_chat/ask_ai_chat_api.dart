@@ -51,11 +51,20 @@ class AskAiChatApi {
     String sessionId,
     String message, {
     CancelToken? cancelToken,
+  }) => streamChatAt(streamPath(sessionId), message, cancelToken: cancelToken);
+
+  /// [streamChat] against another endpoint that speaks the same events on
+  /// the same thread — the Debrief agent's Ask Ally (web `useSendMessage`'s
+  /// `streamPath`).
+  Stream<AskAiSseEvent> streamChatAt(
+    String path,
+    String message, {
+    CancelToken? cancelToken,
   }) async* {
     final Response<ResponseBody> response;
     try {
       response = await _dio.post<ResponseBody>(
-        streamPath(sessionId),
+        path,
         data: {'message': message},
         cancelToken: cancelToken,
         options: Options(

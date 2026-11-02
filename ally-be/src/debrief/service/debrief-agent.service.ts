@@ -17,12 +17,15 @@ import {
   DEBRIEF_SEED_BUNDLE,
 } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
+import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
+import { resolveSupportLines } from '../../guide/safety/fixed-responses';
 import {
   ScenarioSessionLeaderboardEndedEventParams,
   ScenarioSessionLeaderboardEvent,
 } from '../../learn/type/scenario-session-leaderboard-event.type';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
+import { DebriefPracticeService } from './debrief-practice.service';
 import { DebriefRunnerService } from './debrief-runner.service';
 
 /** Sessions per 5-minute tick; at today's volume the backlog clears in one or two ticks. */
@@ -36,6 +39,8 @@ const DRAIN_CONCURRENCY = 2;
 export const LIVE_START_DELAY_MS = 45_000;
 /** Only recent sessions: a debrief days late is not what a learner waits for. */
 const DRAIN_WINDOW_HOURS = 48;
+/** Well past the longest deadline (risk cue: 3 min) plus a slow drain. */
+const STUCK_AFTER_MINUTES = 10;
 
 /** The tenant switch: the only per-org setting the Debrief agent has in v1. */
 export const DEBRIEF_POLICY: PolicySchema = {
@@ -56,6 +61,23 @@ export interface LearnerDebriefView {
   cards?: Record<string, any> | null;
   language?: string | null;
   steps?: string[];
+  /** The learner stepped out of the role in distress: support comes first. */
+  distress?: boolean;
+  /** The organisation's support lines (the Guide's), crisis lines first. */
+  supportLines?: GuideSupportLine[];
+  /** Roleplays the cards link to that the learner can still open. */
+  practice?: Array<{ id: number; title: string }>;
+}
+
+/** The roleplays a debrief's cards link to, once each. */
+function practiceIds(cards?: Record<string, any> | null): number[] {
+  const ids = [
+    cards?.practise_next?.scenario_id,
+    ...(
+      (cards?.work_on_this ?? []) as Array<{ scenario_id?: number | null }>
+    ).map((c) => c.scenario_id),
+  ].filter((id): id is number => id != null);
+  return [...new Set(ids.map(Number))];
 }
 
 /**
@@ -77,6 +99,7 @@ export class DebriefAgentService implements OnModuleInit {
     private readonly releases: AgentReleaseService,
     private readonly overrides: AgentConfigOverrideService,
     private readonly config: AppConfigService,
+    private readonly practice: DebriefPracticeService,
   ) {}
 
   onModuleInit(): void {
@@ -86,6 +109,9 @@ export class DebriefAgentService implements OnModuleInit {
     scheduledTaskRegistry.register('daily', 'debrief-cost-reconcile', () =>
       this.reconcileCosts(),
     );
+    scheduledTaskRegistry.register('5min', 'debrief-stuck-sweep', async () => {
+      await this.sweepStuckRuns();
+    });
   }
 
   /** Seed version 1 from code; a deploy never undoes a deliberate rollback. */
@@ -234,6 +260,36 @@ export class DebriefAgentService implements OnModuleInit {
     }
   }
 
+  /**
+   * The sweeper (v9 FR-3): a run still "running" well past every deadline
+   * lost its worker — a deploy or a crash. A live one goes to a person to
+   * finish (the learner sees "on its way", never an endless progress panel);
+   * a shadow or replay one is marked failed. Resuming mid-run is not built:
+   * the paid steps' results are not checkpointed yet.
+   */
+  async sweepStuckRuns(): Promise<number> {
+    const res = await this.dataSource.query(
+      `UPDATE debrief_runs
+          SET status = CASE WHEN mode = 'live' THEN $1 ELSE $2 END,
+              "skipReason" = 'stuck',
+              "finishedAt" = now(),
+              "updatedAt" = now()
+        WHERE status = $3
+          AND COALESCE("startedAt", "createdAt") < now() - interval '${STUCK_AFTER_MINUTES} minutes'
+        RETURNING id, mode`,
+      [
+        DebriefRunStatus.NEEDS_PERSON,
+        DebriefRunStatus.FAILED,
+        DebriefRunStatus.RUNNING,
+      ],
+    );
+    const rows = Array.isArray(res?.[0]) ? res[0] : (res ?? []);
+    if (rows.length) {
+      this.logger.warn(`[debrief] swept ${rows.length} stuck run(s)`);
+    }
+    return rows.length;
+  }
+
   /** What the learner sees on the Debrief tab, for their own session only. */
   async learnerView(
     sessionId: string,
@@ -279,6 +335,13 @@ export class DebriefAgentService implements OnModuleInit {
           runId: run.id,
           cards: run.cards,
           language: run.language,
+          distress: run.learnerDistress === true,
+          supportLines: await this.supportLines(s.tenant_id, run.language),
+          practice: await this.practice.available(
+            userId,
+            s.tenant_id,
+            practiceIds(run.cards),
+          ),
         };
       case DebriefRunStatus.SKIPPED:
         return {
@@ -287,6 +350,22 @@ export class DebriefAgentService implements OnModuleInit {
       default:
         return { state: 'on_its_way' };
     }
+  }
+
+  /**
+   * The support lines a learner sees: the organisation's own from its Guide
+   * profile for this language, else its English ones, else Tele-MANAS.
+   */
+  async supportLines(
+    tenantId: string,
+    language?: string | null,
+  ): Promise<GuideSupportLine[]> {
+    const rows = await this.dataSource.query(
+      `SELECT profile FROM guide_org_profiles WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    const lang = (language ?? 'en').split(/[-_]/)[0].toLowerCase() || 'en';
+    return resolveSupportLines(rows?.[0]?.profile ?? null, lang);
   }
 
   /**

@@ -226,7 +226,12 @@ const handleSSEEvent = (sessionId: string, parsed: ParsedSSE) => {
  * they mirror the streaming message in real-time. The broadcast also keeps
  * isStreaming in sync across tabs, preventing duplicate streams.
  */
-const processStream = async (sessionId: string, message: string, isRetry: boolean) => {
+const processStream = async (
+  sessionId: string,
+  message: string,
+  isRetry: boolean,
+  streamPath?: string,
+) => {
   const { dispatch, getState } = store;
 
   const streamSession = getState().chatStream.sessions[sessionId];
@@ -245,7 +250,7 @@ const processStream = async (sessionId: string, message: string, isRetry: boolea
   broadcast({ type: "start_streaming", sessionId });
 
   try {
-    const url = `${API_BASE}/api${ApiEndpoints.LEARN.CHAT_STREAM(sessionId)}`;
+    const url = `${API_BASE}/api${streamPath ?? ApiEndpoints.LEARN.CHAT_STREAM(sessionId)}`;
     const result = await fetchWithAuth(url, JSON.stringify({ message }));
 
     if (!result.ok || !result.body) {
@@ -320,7 +325,12 @@ const commitAndFinish = (sessionId: string) => {
   broadcast({ type: "finish", sessionId });
 };
 
-export const useSendMessage = (sessionId: string) => {
+/**
+ * `streamPath` sends the thread's next message somewhere other than today's
+ * debrief chat — Ask Ally, for the Debrief agent's debrief. The thread
+ * itself (history, store, cross-tab mirror) is the same either way.
+ */
+export const useSendMessage = (sessionId: string, streamPath?: string) => {
   const historySession = useSelector((state: RootState) => state.chatHistory.sessions[sessionId]);
   const streamSession = useSelector((state: RootState) => state.chatStream.sessions[sessionId]);
 
@@ -331,16 +341,16 @@ export const useSendMessage = (sessionId: string) => {
 
   const sendMessage = useCallback(
     (message: string) => {
-      processStream(sessionId, message, false);
+      processStream(sessionId, message, false, streamPath);
     },
-    [sessionId],
+    [sessionId, streamPath],
   );
 
   const retryLastMessage = useCallback(() => {
     const lastFailed = historySession?.lastFailedMessage;
     if (!lastFailed) return;
-    processStream(sessionId, lastFailed, true);
-  }, [sessionId, historySession?.lastFailedMessage]);
+    processStream(sessionId, lastFailed, true, streamPath);
+  }, [sessionId, historySession?.lastFailedMessage, streamPath]);
 
   return { messages, streamingMessage, isStreaming, error, sendMessage, retryLastMessage };
 };

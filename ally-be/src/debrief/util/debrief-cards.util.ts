@@ -40,6 +40,8 @@ export interface WorkOnThisCard {
   lead: string;
   why: string;
   try_saying: string;
+  /** A roleplay the learner can open that practises this skill. */
+  scenario_id?: number | null;
 }
 
 export interface DebriefCards {
@@ -47,7 +49,11 @@ export interface DebriefCards {
   important_moment?: ImportantMomentCard | null;
   what_worked: WorkedCard[];
   work_on_this: WorkOnThisCard[];
-  practise_next?: { skill: string; reason: string } | null;
+  practise_next?: {
+    skill: string;
+    reason: string;
+    scenario_id?: number | null;
+  } | null;
   skill_words: Array<{
     skill: string;
     word: 'strength' | 'keep_practising' | 'didnt_come_up';
@@ -484,4 +490,55 @@ export function renderCards(cards: DebriefCards): string {
     lines.push(`One question to think about: ${cards.reflective_question}`);
   }
   return lines.join('\n').trim();
+}
+
+/**
+ * Keep a roleplay link only when it is one of the learner's own options:
+ * the Writer chose from that list, and anything else is dropped, never shown.
+ */
+export function keepOfferedPractice(
+  cards: DebriefCards,
+  offered: ReadonlySet<number>,
+): DebriefCards {
+  const keep = (id?: number | null) =>
+    id != null && offered.has(Number(id)) ? Number(id) : null;
+  return {
+    ...cards,
+    work_on_this: (cards.work_on_this ?? []).map((c) => ({
+      ...c,
+      scenario_id: keep(c.scenario_id),
+    })),
+    practise_next: cards.practise_next
+      ? {
+          ...cards.practise_next,
+          scenario_id: keep(cards.practise_next.scenario_id),
+        }
+      : cards.practise_next,
+  };
+}
+
+/**
+ * The code checks on one Ask Ally reply (v9 FR-43): no score, no diagnosis,
+ * no turn numbers, and anything it puts in quotation marks is said
+ * somewhere — in the transcript, or in the debrief it is talking about.
+ */
+export function replyCheckFailures(
+  reply: string,
+  sources: string[],
+): DebriefCheckCode[] {
+  const fails: DebriefCheckCode[] = [];
+  if (SCORE_RE.test(reply)) fails.push(DebriefCheckCode.SCORE_MENTIONED);
+  if (DIAGNOSIS_RE.test(reply)) fails.push(DebriefCheckCode.DIAGNOSES_TRAINEE);
+  if (TURN_NUMBER_RE.test(reply)) fails.push(DebriefCheckCode.TURN_NUMBER);
+  const said = sources.map(normaliseForQuote);
+  const quotes = [...reply.matchAll(/[“"]([^”"]{12,})[”"]/g)].map((m) => m[1]);
+  if (
+    quotes.some((q) => {
+      const n = normaliseForQuote(q);
+      return !said.some((src) => src.includes(n));
+    })
+  ) {
+    fails.push(DebriefCheckCode.QUOTE_MISMATCH);
+  }
+  return fails;
 }

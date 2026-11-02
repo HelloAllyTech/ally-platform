@@ -39,8 +39,13 @@ import {
   DebriefTestSetsService,
 } from './debrief-test-sets.service';
 
-/** The Improver's monthly learning budget (plan §10.2), separate from production. */
-export const LEARNING_BUDGET_USD = 150;
+/**
+ * The learning skim (v9 FR-8/FR-58): this share of every production run's
+ * ceiling funds the learning pool, which pays for the Improver's analysis,
+ * screens and replays. Learner-facing work never draws on it; there is no
+ * monthly cap — the pool grows with usage and is bounded only by the skim.
+ */
+export const LEARNING_SKIM_PCT = 0.2;
 /** A screen: this many open-set sessions, each run as baseline and challenger. */
 export const SCREEN_CASES = 6;
 /** A screen passes when the challenger's mean judge score is at least this much higher, with no new hard fail. */
@@ -166,6 +171,17 @@ export class DebriefImproverService implements OnModuleInit {
   }
 
   // --- Learning budget ----------------------------------------------------------
+
+  /** The learning pool this month: the skim of every production run's ceiling. */
+  async learningBudgetThisMonth(): Promise<number> {
+    const [r] = await this.dataSource.query(
+      `SELECT COALESCE(sum(COALESCE("ceilingUsd", 0)::float), 0) AS ceilings
+         FROM debrief_runs
+        WHERE mode IN ('shadow','live') AND status <> 'skipped'
+          AND "createdAt" >= date_trunc('month', now())`,
+    );
+    return Number(r?.ceilings ?? 0) * LEARNING_SKIM_PCT;
+  }
 
   async learningSpentThisMonth(): Promise<number> {
     const replay = await this.dataSource.query(
@@ -327,7 +343,7 @@ export class DebriefImproverService implements OnModuleInit {
     skipped?: string;
   }> {
     const spent = await this.learningSpentThisMonth();
-    if (spent >= LEARNING_BUDGET_USD) {
+    if (spent >= (await this.learningBudgetThisMonth())) {
       await this.audit('curator_run', null, opts.actorUserId ?? null, {
         skipped: 'learning budget spent',
         spentUsd: spent,
@@ -397,7 +413,11 @@ export class DebriefImproverService implements OnModuleInit {
     });
 
     for (const id of ideaIds) {
-      if ((await this.learningSpentThisMonth()) >= LEARNING_BUDGET_USD) break;
+      if (
+        (await this.learningSpentThisMonth()) >=
+        (await this.learningBudgetThisMonth())
+      )
+        break;
       const idea = await this.getIdea(id);
       if (['prompt_edit', 'setting'].includes(idea.change?.ideaKind)) {
         await this.screen(id).catch((e: Error) =>
@@ -553,7 +573,10 @@ export class DebriefImproverService implements OnModuleInit {
     ) {
       throw new ConflictException('this idea is already being tried');
     }
-    if ((await this.learningSpentThisMonth()) >= LEARNING_BUDGET_USD) {
+    if (
+      (await this.learningSpentThisMonth()) >=
+      (await this.learningBudgetThisMonth())
+    ) {
       throw new ConflictException(
         'the learning budget for this month is spent',
       );

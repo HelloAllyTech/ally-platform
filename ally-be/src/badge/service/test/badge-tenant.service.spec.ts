@@ -5,6 +5,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { BadgeTenantService } from '../badge-tenant.service';
 import { BadgeTenant } from '../../entity/badge-tenant.entity';
@@ -280,15 +281,22 @@ describe('BadgeTenantService', () => {
       expect(result).toEqual(['tenant-1', 'tenant-2']);
     });
 
-    it('should throw an error on DB error', async () => {
+    it('should throw an error on DB error and log the error', async () => {
       const badge = {
         id: 'badge-1',
         visibilityType: BadgeVisibilityType.PUBLIC,
       } as Badge;
-      mockTenantsRepository.find.mockRejectedValue(new Error('DB error'));
+      const dbError = new Error('DB error');
+      mockTenantsRepository.find.mockRejectedValue(dbError);
+
+      const loggerSpy = jest.spyOn(Logger.prototype, 'error');
 
       await expect(service.assignBadgeToTenants(badge)).rejects.toThrow(
         InternalServerErrorException,
+      );
+      expect(loggerSpy).toHaveBeenCalledWith(
+        `Failed to assign badge ${badge.id} to tenants`,
+        dbError,
       );
     });
   });

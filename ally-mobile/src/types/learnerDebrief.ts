@@ -39,6 +39,8 @@ export interface DebriefWorkOnThis {
   lead: string;
   why: string;
   try_saying: string;
+  /** The roleplay that practises this skill, when one is linked. */
+  scenario_id?: number | null;
 }
 
 export interface DebriefCardsData {
@@ -46,7 +48,11 @@ export interface DebriefCardsData {
   important_moment?: DebriefImportantMoment | null;
   what_worked: DebriefWhatWorked[];
   work_on_this: DebriefWorkOnThis[];
-  practise_next?: {skill: string; reason: string} | null;
+  practise_next?: {
+    skill: string;
+    reason: string;
+    scenario_id?: number | null;
+  } | null;
   skill_words: Array<{skill: string; word: DebriefSkillWord}>;
   reflective_question: string;
   progress_note?: string | null;
@@ -73,6 +79,21 @@ export interface DebriefMyFlag {
   canUndoUntil: string | null;
 }
 
+/** One of the organisation's support lines, shown with the debrief. */
+export interface DebriefSupportLine {
+  name: string;
+  phone: string;
+  hours?: string;
+  url?: string;
+  isCrisis?: boolean;
+}
+
+/** A roleplay the learner can still open, for "Practise this". */
+export interface DebriefPractice {
+  id: number;
+  title: string;
+}
+
 export interface LearnerDebriefView {
   state: LearnerDebriefState;
   cards?: DebriefCardsData | null;
@@ -80,4 +101,9 @@ export interface LearnerDebriefView {
   steps?: string[];
   corrections?: DebriefCorrection[];
   feedback?: {helpful: boolean | null; flags: DebriefMyFlag[]};
+  /** The learner stepped out of the role in distress: care before coaching. */
+  distress?: boolean;
+  supportLines?: DebriefSupportLine[];
+  /** Roleplays the learner can open; a card's `scenario_id` must be in here. */
+  practice?: DebriefPractice[];
 }

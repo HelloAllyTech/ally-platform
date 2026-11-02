@@ -28,7 +28,9 @@ vi.mock("@api", () => ({
   useGetChatHistoryQuery: (...args: unknown[]) => mockChatHistoryQuery(...args),
   // The learner's org isn't on the new Debrief agent here, so today's view stays.
   useGetLearnerDebriefQuery: () => ({ data: { state: "not_available" } }),
-  LEARNER_DEBRIEF_POLL_MS: 5000,
+  LEARNER_DEBRIEF_POLL_MS: 3000,
+  LEARNER_DEBRIEF_SLOW_POLL_MS: 30000,
+  LEARNER_DEBRIEF_FAST_FOR_MS: 240000,
 }));
 
 vi.mock("@assets", () => ({

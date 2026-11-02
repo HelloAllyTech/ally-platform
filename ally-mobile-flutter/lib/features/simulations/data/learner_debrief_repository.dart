@@ -58,6 +58,7 @@ enum DebriefFlagReason {
 String _str(Object? value) => value is String ? value : '';
 String? _optStr(Object? value) => value is String && value.trim().isNotEmpty ? value : null;
 int _int(Object? value) => value is num ? value.toInt() : 0;
+int? _optInt(Object? value) => value is num ? value.toInt() : null;
 List<Map<String, dynamic>> _maps(Object? value) =>
     value is List ? value.whereType<Map<String, dynamic>>().toList() : const [];
 
@@ -133,6 +134,7 @@ class DebriefWorkOnThis {
     required this.lead,
     required this.why,
     required this.trySaying,
+    this.scenarioId,
   });
 
   factory DebriefWorkOnThis.fromJson(Map<String, dynamic> json) => DebriefWorkOnThis(
@@ -142,6 +144,7 @@ class DebriefWorkOnThis {
     lead: _str(json['lead']),
     why: _str(json['why']),
     trySaying: _str(json['try_saying']),
+    scenarioId: _optInt(json['scenario_id']),
   );
 
   final String skill;
@@ -150,13 +153,20 @@ class DebriefWorkOnThis {
   final String lead;
   final String why;
   final String trySaying;
+
+  /// The roleplay that practises this, when there is one. "Practise this"
+  /// shows only when it is also in [LearnerDebriefView.practice].
+  final int? scenarioId;
 }
 
 class DebriefPractiseNext {
-  const DebriefPractiseNext({required this.skill, required this.reason});
+  const DebriefPractiseNext({required this.skill, required this.reason, this.scenarioId});
 
   final String skill;
   final String reason;
+
+  /// As [DebriefWorkOnThis.scenarioId], for "Practise this next".
+  final int? scenarioId;
 }
 
 class DebriefSkillWordEntry {
@@ -187,7 +197,11 @@ class DebriefCardsData {
       whatWorked: _maps(json['what_worked']).map(DebriefWhatWorked.fromJson).toList(),
       workOnThis: _maps(json['work_on_this']).map(DebriefWorkOnThis.fromJson).toList(),
       practiseNext: practise is Map<String, dynamic>
-          ? DebriefPractiseNext(skill: _str(practise['skill']), reason: _str(practise['reason']))
+          ? DebriefPractiseNext(
+              skill: _str(practise['skill']),
+              reason: _str(practise['reason']),
+              scenarioId: _optInt(practise['scenario_id']),
+            )
           : null,
       skillWords: [
         for (final entry in _maps(json['skill_words']))
@@ -244,6 +258,37 @@ class DebriefMyFlag {
   bool canUndoAt(DateTime now) => canUndoUntil != null && canUndoUntil!.isAfter(now);
 }
 
+/// One of the organisation's support lines, shown with the important
+/// moment and when the learner stepped out of the role in distress.
+class DebriefSupportLine {
+  const DebriefSupportLine({required this.name, required this.phone, this.hours, this.url, this.isCrisis = false});
+
+  factory DebriefSupportLine.fromJson(Map<String, dynamic> json) => DebriefSupportLine(
+    name: _str(json['name']),
+    phone: _str(json['phone']),
+    hours: _optStr(json['hours']),
+    url: _optStr(json['url']),
+    isCrisis: json['isCrisis'] == true,
+  );
+
+  final String name;
+  final String phone;
+  final String? hours;
+  final String? url;
+  final bool isCrisis;
+
+  /// The `tel:` link: digits and a leading `+` only, as the web strips it.
+  Uri get telUri => Uri(scheme: 'tel', path: phone.replaceAll(RegExp(r'[^\d+]'), ''));
+}
+
+/// A roleplay the learner can still open, for "Practise this (next)".
+class DebriefPracticeScenario {
+  const DebriefPracticeScenario({required this.id, required this.title});
+
+  final int id;
+  final String title;
+}
+
 class LearnerDebriefView {
   const LearnerDebriefView({
     required this.state,
@@ -253,6 +298,9 @@ class LearnerDebriefView {
     this.corrections = const [],
     this.helpful,
     this.flags = const [],
+    this.distress = false,
+    this.supportLines = const [],
+    this.practice = const [],
   });
 
   factory LearnerDebriefView.fromJson(Map<String, dynamic> json) {
@@ -269,6 +317,15 @@ class LearnerDebriefView {
       flags: feedback is Map<String, dynamic>
           ? _maps(feedback['flags']).map(DebriefMyFlag.fromJson).toList()
           : const [],
+      distress: json['distress'] == true,
+      supportLines: _maps(json['supportLines'])
+          .map(DebriefSupportLine.fromJson)
+          .where((l) => l.phone.isNotEmpty)
+          .toList(),
+      practice: [
+        for (final p in _maps(json['practice']))
+          if (_optInt(p['id']) case final id?) DebriefPracticeScenario(id: id, title: _str(p['title'])),
+      ],
     );
   }
 
@@ -279,6 +336,17 @@ class LearnerDebriefView {
   final List<DebriefCorrection> corrections;
   final bool? helpful;
   final List<DebriefMyFlag> flags;
+
+  /// The learner stepped out of the role in distress: care comes before
+  /// coaching (an acknowledgement and [supportLines] first).
+  final bool distress;
+  final List<DebriefSupportLine> supportLines;
+
+  /// The roleplays a card may link to; anything else gets no button.
+  final List<DebriefPracticeScenario> practice;
+
+  DebriefPracticeScenario? practiceFor(int? scenarioId) =>
+      scenarioId == null ? null : practice.where((p) => p.id == scenarioId).firstOrNull;
 
   /// Whether this answer replaces today's debrief. False for `not_available`
   /// and for a `ready` answer with no cards (nothing to render).
@@ -293,6 +361,9 @@ class LearnerDebriefView {
     corrections: corrections,
     helpful: helpful ?? this.helpful,
     flags: flags ?? this.flags,
+    distress: distress,
+    supportLines: supportLines,
+    practice: practice,
   );
 }
 
@@ -335,6 +406,28 @@ class LearnerDebriefRepository {
   Future<void> undoFlag(String sessionId, String flagId) async {
     await _dio.delete<void>('/debriefs/sessions/$sessionId/flags/$flagId');
   }
+
+  /// Read-aloud: one card's audio (`important_moment`, `what_worked[0]`, …),
+  /// made on the first request and cached by the server. The signed link
+  /// lives an hour.
+  Future<String> getCardAudioUrl(String sessionId, String section) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/debriefs/sessions/$sessionId/audio/${Uri.encodeComponent(section)}',
+    );
+    final url = response.data?['url'];
+    if (url is! String || url.isEmpty) throw StateError('No audio url for $section');
+    return url;
+  }
+
+  /// The learner read the debrief to the end: earns DEBRIEF_READ XP once
+  /// (the server pays at most once per session).
+  Future<void> markRead(String sessionId) async {
+    await _dio.post<void>('/debriefs/sessions/$sessionId/read');
+  }
+
+  /// Ask Ally: the debrief chat's thread, answered by the Debrief agent.
+  /// Same SSE events as the scenario-session chat stream; the history is shared.
+  static String replyStreamPath(String sessionId) => '/debriefs/sessions/$sessionId/reply/stream';
 }
 
 final learnerDebriefRepositoryProvider = Provider<LearnerDebriefRepository>((ref) {

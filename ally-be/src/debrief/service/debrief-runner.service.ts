@@ -29,6 +29,7 @@ import {
   checkWeight,
   DebriefCards,
   DebriefCheckFailure,
+  keepOfferedPractice,
   renderCards,
   runDebriefChecks,
   SafetyReading,
@@ -40,6 +41,19 @@ import {
   FallbackRung,
 } from '../util/debrief-budget.util';
 import { DebriefAiClient, DebriefStepError } from './debrief-ai.client';
+import { DebriefPracticeService } from './debrief-practice.service';
+import { LanguageSource, detectLanguage } from '../util/detect-language';
+import {
+  modelsToTry,
+  recordModelFailure,
+  recordModelSuccess,
+} from '../util/model-circuit';
+import { isUUID } from 'class-validator';
+import {
+  KbCorpus,
+  KbRetrievalConsumer,
+} from '../../knowledge-base/enum/knowledge-base.enum';
+import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import {
   DebriefContextRepository,
   DebriefSessionContext,
@@ -116,6 +130,8 @@ export class DebriefRunnerService {
     private readonly context: DebriefContextRepository,
     private readonly ai: DebriefAiClient,
     private readonly releases: AgentReleaseService,
+    private readonly practice: DebriefPracticeService,
+    private readonly knowledge: KnowledgeBaseService,
   ) {}
 
   /** The GA bundle, or the seed when GA is missing or does not validate. */
@@ -193,11 +209,30 @@ export class DebriefRunnerService {
           skipReason: 'no_transcript',
         });
       }
+      // v9 FR-39: no recorded language → read it from what the learner wrote,
+      // and say so on the run (the Console counts these per organisation).
+      let languageSource: LanguageSource = 'recorded';
+      if (!session.languageRecorded) {
+        const detected = detectLanguage(
+          transcript.filter((t) => t.role === 'counselor').map((t) => t.text),
+        );
+        session.language = detected.language;
+        languageSource = detected.source;
+        run.language = detected.language;
+      }
+      run.workspace = { ...run.workspace, languageSource };
 
       const recipe: DebriefRecipe =
-        session.learnerTurns >= settings.standardMinLearnerTurns
-          ? bundle.recipes[DebriefRecipeKey.STANDARD]
-          : bundle.recipes[DebriefRecipeKey.SHORT];
+        session.learnerTurns < settings.standardMinLearnerTurns
+          ? bundle.recipes[DebriefRecipeKey.SHORT]
+          : // A release from before Case and Assessment runs Standard.
+            (bundle.recipes[
+              session.assessment
+                ? DebriefRecipeKey.ASSESSMENT
+                : session.inCase
+                  ? DebriefRecipeKey.CASE
+                  : DebriefRecipeKey.STANDARD
+            ] ?? bundle.recipes[DebriefRecipeKey.STANDARD]);
       run.recipeKey = recipe.key;
 
       let ceiling = settings.runCeilingUsd;
@@ -251,7 +286,8 @@ export class DebriefRunnerService {
         est: number,
         round?: number,
       ): Promise<T | null> => {
-        const models = [s.model, s.backupModel ?? s.model];
+        // A model whose breaker is open goes after its backup, not before.
+        const models = modelsToTry(s.model, s.backupModel);
         for (let attempt = 0; attempt < 2; attempt++) {
           const t0 = now();
           try {
@@ -260,6 +296,7 @@ export class DebriefRunnerService {
               model: models[attempt],
               scenario_session_id: sessionId,
             });
+            if (models[attempt]) recordModelSuccess(models[attempt]!);
             steps.push({
               step: s.step,
               label: s.label,
@@ -274,6 +311,7 @@ export class DebriefRunnerService {
             return res;
           } catch (e) {
             const err = e as DebriefStepError;
+            if (models[attempt]) recordModelFailure(models[attempt]!);
             steps.push({
               step: s.step,
               label: s.label,
@@ -363,7 +401,7 @@ export class DebriefRunnerService {
         rung = Math.max(rung, FallbackRung.WRITER_AND_CHECKS_ONLY);
         if (analystEst === null) skipped(analystStep, 'budget');
       }
-      run.workspace = { safety, evidence };
+      run.workspace = { ...run.workspace, safety, evidence };
 
       // 2. Progress reader, when the learner has history.
       let progress: Record<string, any> | null = null;
@@ -428,11 +466,27 @@ export class DebriefRunnerService {
           }
           try {
             lookups++;
-            const hits = await this.ai.searchGuidance(
-              m.summary,
-              session.tenantId,
-              settings.guidancePassagesPerMoment,
-              settings.guidanceMinSimilarity,
+            // The debrief knowledge base, as the learner's organisation may
+            // read it; clinical documents only as signed off. Logged to
+            // kb_retrievals like every other retrieval.
+            const { passages: hits } = await this.knowledge.searchForAudience(
+              {
+                corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+                query: m.summary,
+                limit: settings.guidancePassagesPerMoment,
+                minSimilarity: settings.guidanceMinSimilarity,
+              },
+              {
+                tenantId:
+                  session.tenantId && isUUID(session.tenantId)
+                    ? session.tenantId
+                    : null,
+              },
+              {
+                consumer: KbRetrievalConsumer.DEBRIEF,
+                sessionId: session.id,
+                userId: session.counselorId,
+              },
             );
             for (const h of hits) {
               if (seen.has(h.chunk_id)) continue;
@@ -456,9 +510,22 @@ export class DebriefRunnerService {
       }
       if (progress) run.workspace = { ...run.workspace, progress, history };
 
-      // 4. Writer.
+      // 4. Writer, with the roleplays "Practise this next" may point to.
+      const practiceOptions = await this.practice.optionsFor(
+        session.counselorId,
+        session.tenantId,
+      );
+      const offered = new Set(practiceOptions.map((o) => o.id));
       const writerStep = stepOf(DebriefStep.WRITER)!;
+      const caseMemory =
+        recipe.key === DebriefRecipeKey.CASE
+          ? await this.context.caseMemory(session.id)
+          : null;
+      if (caseMemory) run.workspace = { ...run.workspace, caseMemory };
       const writerInput = {
+        practice_options: practiceOptions,
+        case_memory: caseMemory,
+        assessment: recipe.key === DebriefRecipeKey.ASSESSMENT,
         evidence,
         safety,
         transcript,
@@ -675,7 +742,10 @@ export class DebriefRunnerService {
 
       run.workspace = { ...run.workspace, evaluations, bestRound: best.round };
       const patch: Partial<DebriefRun> = {
-        cards: best.cards as unknown as Record<string, any>,
+        cards: keepOfferedPractice(best.cards, offered) as unknown as Record<
+          string,
+          any
+        >,
         revisionRounds: round,
         checkFailures: best.checks,
         evaluatorOverall:

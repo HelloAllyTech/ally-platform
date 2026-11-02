@@ -9486,6 +9486,36 @@ export const en = {
       releases: "Releases",
       organisations: "Organisations",
       calibration: "Calibration",
+      knowledge: "Knowledge",
+    },
+    knowledge: {
+      title: "Guidance the Debrief agent can use",
+      help: "Practice guidelines, the debrief style guide, level guides and organisations' protocols. The agent looks up to two passages for each important moment. A document marked clinical is used only once the clinical advisor has signed off its current text; editing it afterwards needs a new sign-off. An empty knowledge base never stops a debrief.",
+      add: "Add a document",
+      empty: "No guidance yet. Debriefs are written without it until you add some.",
+      columns: {
+        title: "Document",
+        audience: "Who it's for",
+        status: "Indexing",
+        clinical: "Clinical sign-off",
+        actions: "",
+      },
+      everyone: "Every organisation",
+      organisations: (n: number) => (n === 1 ? "1 organisation" : `${n} organisations`),
+      nobody: "No one yet",
+      archived: "Archived",
+      notClinical: "Not clinical",
+      awaiting: "Waiting for sign-off — not used",
+      signedOff: (by: string | null, when: string) => `Signed off${by ? ` by ${by}` : ""}, ${when}`,
+      edit: "Edit",
+      markClinical: "Mark clinical",
+      markNotClinical: "Not clinical",
+      signOff: "Sign off",
+      signOffConfirm:
+        "Sign off this document's current text as sound clinical guidance? The Debrief agent will start using it.",
+      saved: "Saved",
+      signedOffToast: "Signed off. The Debrief agent now uses it.",
+      failed: "That didn't save. Try again.",
     },
     status: {
       queued: "Queued",
@@ -9498,6 +9528,11 @@ export const en = {
     } as Record<string, string>,
     mode: { shadow: "Shadow", live: "Live", replay: "Replay" } as Record<string, string>,
     runs: {
+      languageIncident: {
+        title: "Some sessions are not recording their language",
+        line: (org: string, detected: number, runs: number, unsure: number) =>
+          `${org}: ${detected} of today's ${runs} debriefs read the language from the transcript${unsure ? `, ${unsure} of them unsure` : ""}.`,
+      },
       heading: "What the Debrief agent wrote",
       help: "Every run of the Debrief agent. Shadow runs sit beside today's debrief and no learner sees them; live runs are what learners in a switched-on organisation read. The judge score is the independent judge's, out of 10; the bar is 8 with no hard fail.",
       loadFailed: "the runs",
@@ -9636,7 +9671,8 @@ export const en = {
       ran: "The Improver has finished",
       skipped: (why: string) => `The Improver did not run: ${why}`,
       runFailed: "The Improver could not run",
-      budget: (spent: string, of: string) => `Learning budget: ${spent} of ${of} this month`,
+      budget: (spent: string, of: string) =>
+        `Learning budget: ${spent} spent of ${of} set aside this month (20% of every debrief's budget)`,
       testSets: "Test sets",
       testSetsHelp:
         "Real sessions, split three ways. The Improver screens ideas on the open set; the gate set decides releases; the sealed set is never shown to it.",

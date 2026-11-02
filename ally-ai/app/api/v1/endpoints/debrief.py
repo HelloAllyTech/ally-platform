@@ -39,6 +39,8 @@ class SafetyReaderRequest(BaseModel):
     # The live `debrief_safety_reader_system` text; None uses the default.
     system_prompt: Optional[str] = None
     scenario_session_id: Optional[str] = None
+    # The release's model for this step; None uses DEBRIEF.SAFETY_READER_MODEL.
+    model: Optional[str] = None
 
 
 class SafetyReaderResponse(BaseModel):
@@ -60,6 +62,7 @@ async def safety_reader(req: SafetyReaderRequest) -> SafetyReaderResponse:
             req.language,
             system=req.system_prompt,
             scenario_session_id=req.scenario_session_id,
+            model=req.model,
         )
     except Exception as exc:  # noqa: BLE001 - surface as 500, keep caller decoupled
         logger.exception("[debrief-safety] reader failed")
@@ -178,6 +181,9 @@ class WriterRequest(StepRequest):
     learner_level: Optional[str] = None
     tone: Optional[str] = None
     short: bool = False
+    practice_options: List[Dict[str, Any]] = Field(default_factory=list)
+    case_memory: Optional[str] = None
+    assessment: bool = False
 
 
 class CardsResponse(BaseModel):
@@ -202,6 +208,9 @@ async def writer(req: WriterRequest) -> CardsResponse:
             short=req.short,
             system=req.system_prompt,
             scenario_session_id=req.scenario_session_id,
+            practice_options=req.practice_options,
+            case_memory=req.case_memory,
+            assessment=req.assessment,
         )
     except Exception as exc:  # noqa: BLE001
         raise _failed("writer", exc) from exc
