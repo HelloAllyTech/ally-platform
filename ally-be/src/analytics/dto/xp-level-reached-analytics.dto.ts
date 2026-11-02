@@ -149,6 +149,11 @@ export class XpLevelReachedResponseDto {
   })
   scoping!: AnalyticsScopingDto;
 
+  @ApiProperty({
+    description: `The maximum XP level, ${MAX_LEVEL}.`,
+  })
+  maxLevel!: number;
+
   @ApiProperty({ description: 'When this response was computed (ISO 8601)' })
   computedAt!: string;
 }
