@@ -173,6 +173,27 @@ describe('BuilderEvalFixtureService', () => {
         expect(repository.save.mock.calls[0][0].payload).toEqual(old);
       });
 
+      it('imports an export that still carries the retired pins, dropping them', async () => {
+        const { service, repository } = build();
+
+        await service.importFixtures(
+          [
+            {
+              name: 'debrief (pinned)',
+              kind: 'interview',
+              payload: interview({ pins: { 'ally-be': 'abc1234' } }),
+            },
+          ],
+          7,
+        );
+
+        const saved = repository.save.mock.calls[0][0].payload;
+        expect(saved).not.toHaveProperty('pins');
+        expect(saved.openingMessage).toBe(
+          'Version simulations every 24 hours.',
+        );
+      });
+
       it('refuses an expectation it does not know, rather than read it as a PRD', async () => {
         await expect(
           build().service.create(

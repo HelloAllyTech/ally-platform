@@ -27,8 +27,12 @@ database and never in a file here.** Ways to make one:
   either a seeded defect (`expect: { blocking: true, via: "<review category or readiness
   row>" }`) or a clean control (`expect: { blocking: false }`).
 
-`pins` (repo to commit) pins file reads in the replay to the commits the session ran against.
-Code search can't be pinned: GitHub only indexes the default branch.
+A replay reads today's code: file reads, code search, docs search, the catalog and the
+discovery sweep all see the default branch. (Fixtures used to carry `pins`, repo to commit, for
+file reads only. That was retired on 2026-10-23, because a pinned replay found code by search
+and then failed to read it at the old commit. An import that still carries `pins` is accepted
+with the key dropped.) To replay a session whose work has since shipped, re-derive its
+checklist against today's code, or give it `expectedOutcome: "nothing_to_build"`.
 
 ### Nothing to build
 
@@ -36,8 +40,7 @@ Code search can't be pinned: GitHub only indexes the default branch.
 `"prd_ready"`) means a PRD that reaches ready, which is what every fixture meant before the field
 existed. `"nothing_to_build"` is for a request the platform already meets: the right end is
 Builder saying so and planning nothing. Use it for a replay of a session whose work has since
-shipped. The replay's research tools read today's code, and pins can't change that, so such a
-fixture otherwise measures how well Builder rebuilds shipped work. Use it too for a real
+shipped. The replay's research tools read today's code, so such a fixture otherwise measures how well Builder rebuilds shipped work. Use it too for a real
 re-request of shipped work.
 
 The checklist still applies. Write it for the conclusion: what Builder must name as existing

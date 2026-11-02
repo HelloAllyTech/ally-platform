@@ -944,7 +944,6 @@ export interface BuilderEvalInterviewPayload {
   checklist: BuilderEvalChecklistItem[];
   handoffContext?: string | null;
   recordedPrd?: BuilderPrdDocument | null;
-  pins?: Record<string, string>;
   maxTurns?: number;
   /** How a correct interview ends. Absent means a ready PRD. */
   expectedOutcome?: BuilderEvalExpectedOutcome;
