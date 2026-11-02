@@ -296,3 +296,19 @@ export interface DebriefKnowledgeList {
   /** Whether the person looking may sign off clinical guidance. */
   canSignOff: boolean;
 }
+
+/** A model a person may pick for a debrief step or for Ask Ally. */
+export interface DebriefModelChoice {
+  model: string;
+  label: string;
+  provider: string | null;
+}
+
+/** Each step's model in the live release, and what may replace it. */
+export interface DebriefModels {
+  releaseVersion: number | null;
+  steps: Array<{ step: string; model: string | null; backupModel: string | null }>;
+  reply: string;
+  judge: string;
+  choices: { steps: DebriefModelChoice[]; reply: DebriefModelChoice[] };
+}

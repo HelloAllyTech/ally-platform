@@ -112,7 +112,7 @@ export interface DebriefSettings {
 /** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */
 export interface DebriefReplyConfig {
   /** A provider the in-process chat can run. */
-  provider: 'gemini' | 'openai';
+  provider: 'gemini' | 'openai' | 'anthropic';
   model: string;
   /** Room for a 120-word reply in an Indic script, which costs far more tokens than English. */
   maxTokens: number;
@@ -370,7 +370,7 @@ export function validateDebriefBundle(
     }
   }
   if (b.reply) {
-    if (!['gemini', 'openai'].includes(b.reply.provider)) {
+    if (!['gemini', 'openai', 'anthropic'].includes(b.reply.provider)) {
       problems.push(`Ask Ally cannot run on provider ${b.reply.provider}`);
     }
     if (!b.reply.model) problems.push('Ask Ally has no model');

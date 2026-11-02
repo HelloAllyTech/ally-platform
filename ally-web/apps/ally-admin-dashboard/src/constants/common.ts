@@ -450,6 +450,7 @@ export const ApiEndpoints = {
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
       `/v1/debriefs/console/improver/ideas/${id}/${action}`,
     RELEASES: "/v1/debriefs/console/releases",
+    MODELS: "/v1/debriefs/console/models",
     ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
     TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",
     TENANTS: "/v1/debriefs/console/tenants",

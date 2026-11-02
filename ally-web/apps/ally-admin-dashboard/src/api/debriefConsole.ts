@@ -3,6 +3,7 @@ import {
   DebriefCardCorrection,
   DebriefKnowledgeDocument,
   DebriefKnowledgeList,
+  DebriefModels,
   DebriefOverview,
   DebriefReleaseRow,
   DebriefRunDetail,
@@ -73,6 +74,21 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
     getDebriefReleases: builder.query<DebriefReleaseRow[], void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RELEASES, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefModels: builder.query<DebriefModels, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.MODELS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    setDebriefModels: builder.mutation<
+      { releaseId: string; version: number; changed: string[] },
+      { steps?: Record<string, string>; reply?: string; note?: string }
+    >({
+      query: body => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.MODELS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     rollbackDebriefRelease: builder.mutation<
       { id: string; version: number },
@@ -200,6 +216,8 @@ export const {
   useGetDebriefReviewQuery,
   useActOnDebriefRunMutation,
   useResolveDebriefFlagMutation,
+  useGetDebriefModelsQuery,
+  useSetDebriefModelsMutation,
   useSetDebriefTenantRegionMutation,
   useEscalateDebriefMutation,
 } = debriefConsoleAPI;

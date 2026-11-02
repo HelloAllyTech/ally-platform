@@ -22,6 +22,8 @@ const h = vi.hoisted(() => ({
   act: vi.fn(),
   resolve: vi.fn(),
   escalate: vi.fn(),
+  models: vi.fn(),
+  setModels: vi.fn(),
   knowledge: vi.fn(),
   setClinical: vi.fn(),
   signOff: vi.fn(),
@@ -61,6 +63,8 @@ vi.mock("@api", async importOriginal => ({
   useResolveDebriefFlagMutation: () => [h.resolve, { isLoading: false }],
   useSetDebriefTenantRegionMutation: () => [h.setRegion, { isLoading: false }],
   useEscalateDebriefMutation: () => [h.escalate, { isLoading: false }],
+  useGetDebriefModelsQuery: () => h.models(),
+  useSetDebriefModelsMutation: () => [h.setModels, { isLoading: false }],
   useGetDebriefKnowledgeQuery: () => h.knowledge(),
   useSetDebriefKnowledgeClinicalMutation: () => [h.setClinical, { isLoading: false }],
   useSignOffDebriefKnowledgeMutation: () => [h.signOff, { isLoading: false }],
@@ -317,6 +321,28 @@ describe("Debrief Console tabs", () => {
       h.setRegion,
     ].forEach(f => f.mockReturnValue(resolves()));
     h.runImprover.mockReturnValue(resolves({ report: "r", ideas: [] }));
+    h.models.mockReturnValue(
+      ok({
+        releaseVersion: 2,
+        steps: [
+          { step: "writer", model: "gemini-3-flash-preview", backupModel: "gemini-2.5-flash" },
+          { step: "evaluator", model: "gemini-2.5-flash", backupModel: null },
+        ],
+        reply: "gemini-2.5-flash",
+        judge: "gemini-2.5-pro",
+        choices: {
+          steps: [
+            { model: "gemini-3-flash-preview", label: "Gemini 3 Flash", provider: "gemini" },
+            { model: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "gemini" },
+            { model: "gpt-4.1", label: "GPT-4.1", provider: "openai" },
+          ],
+          reply: [
+            { model: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "gemini" },
+            { model: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", provider: "anthropic" },
+          ],
+        },
+      }),
+    );
   });
 
   it("Runs shows the agent at a glance and opens a run's timeline", () => {
@@ -398,6 +424,30 @@ describe("Debrief Console tabs", () => {
     render(<ImproverTab />);
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
+  });
+
+  it("Releases: picking a model makes a release with only the changed models, after confirming", async () => {
+    render(<ReleasesTab />);
+    const panel = screen.getByTestId("models-panel");
+    const save = within(panel).getByRole("button", { name: "Make a release with these models" });
+    expect(save).toBeDisabled();
+    expect(panel).toHaveTextContent("gemini-2.5-pro · Fixed");
+    fireEvent.change(within(panel).getByLabelText("Writer"), { target: { value: "gpt-4.1" } });
+    fireEvent.change(within(panel).getByLabelText("Ask Ally"), {
+      target: { value: "claude-sonnet-4-6" },
+    });
+    fireEvent.click(save);
+    expect(
+      screen.getByText(/Writer on gpt-4.1, Ask Ally on claude-sonnet-4-6/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Put it live" }));
+    await waitFor(() =>
+      expect(h.setModels).toHaveBeenCalledWith({
+        steps: { writer: "gpt-4.1" },
+        reply: "claude-sonnet-4-6",
+        note: undefined,
+      }),
+    );
   });
 
   it("Releases offers rollback on every release but the live one", async () => {

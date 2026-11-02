@@ -13,6 +13,7 @@ import { DebriefReleaseRow } from "@types";
 import { getErrorMessage } from "@utils";
 
 import { ConsoleTable, formatWhen } from "./consoleTable";
+import { ModelsPanel } from "./ModelsPanel";
 
 /** Releases: every version of the Debrief agent, and one-click rollback. */
 export const ReleasesTab: React.FC = () => {
@@ -38,6 +39,7 @@ export const ReleasesTab: React.FC = () => {
         <h2 className="text-xl font-normal text-typography-900">{s.heading}</h2>
         <p className="max-w-3xl pt-1 text-sm text-typography-700">{s.help}</p>
       </div>
+      <ModelsPanel />
       {releases.isError ? (
         <ErrorPanel
           what={s.loadFailed}

@@ -21,6 +21,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsObject,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
@@ -108,6 +109,28 @@ class TenantLiveDto {
   @ApiProperty()
   @IsBoolean()
   live!: boolean;
+}
+
+class ModelChangeDto {
+  @ApiProperty({
+    required: false,
+    description: 'step -> model id, e.g. { "writer": "gpt-4.1" }',
+  })
+  @IsOptional()
+  @IsObject()
+  steps?: Record<string, string>;
+
+  @ApiProperty({ required: false, description: "Ask Ally's model id" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  reply?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }
 
 class TenantRegionDto {
@@ -343,6 +366,32 @@ export class DebriefConsoleController {
   @ApiOperation({ summary: 'Every release, newest first' })
   releases() {
     return this.console.listReleases();
+  }
+
+  @Get('models')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      "Each step's model in the live release, and the models a person may pick for it",
+  })
+  models() {
+    return this.console.models();
+  }
+
+  @Post('models')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Change step models: makes a new release from the live one and puts it live',
+    description:
+      "Checked by the same rules as every release (approved, priced, active in the LLM catalog; the Writer and Evaluator on different models, neither on the judge's). Undo with Roll back.",
+  })
+  setModels(@Req() req: AuthedRequest, @Body() body: ModelChangeDto) {
+    return this.console.setModels(
+      { steps: body.steps, reply: body.reply },
+      req.user.id,
+      body.note,
+    );
   }
 
   @Post('releases/:id/rollback')

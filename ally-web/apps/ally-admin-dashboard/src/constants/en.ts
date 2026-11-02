@@ -9758,6 +9758,35 @@ export const en = {
     releases: {
       heading: "Releases",
       help: "Each release names the exact prompt versions and settings the Debrief agent runs. Rolling back puts an earlier release live on the next run.",
+      models: {
+        heading: "Models",
+        help: "The model each step runs on, in the live release. Changing one makes a new release and puts it live on the next debrief; Roll back undoes it. Only models active in Admin → Model Catalog, from an approved provider and with a known price, are offered. The independent judge stays fixed so it can judge the others fairly.",
+        loadFailed: "the models",
+        columns: { step: "Step", model: "Model", backup: "If it fails" },
+        steps: {
+          safety_reader: "Safety reader",
+          analyst: "Analyst",
+          progress_reader: "Earlier sessions reader",
+          writer: "Writer",
+          evaluator: "Evaluator",
+          reviser: "Reviser",
+          ask_ally: "Ask Ally",
+          judge: "Independent judge",
+        } as Record<string, string>,
+        fixed: "Fixed",
+        none: "—",
+        noteLabel: "Why (optional)",
+        save: "Make a release with these models",
+        reset: "Undo changes",
+        confirmTitle: "Put these models live?",
+        confirmBody: (changes: string) =>
+          `This makes a new release with ${changes} and puts it live. Learners in switched-on organisations get it on their next debrief. You can roll it back below.`,
+        confirm: "Put it live",
+        saved: (version: number) => `Release v${version} is live`,
+        failed: "That release was refused",
+        anthropicNote:
+          "Claude models are offered for Ask Ally. They come to the other steps once ally-ai has an Anthropic key.",
+      },
       loadFailed: "the releases",
       live: "Live",
       columns: {

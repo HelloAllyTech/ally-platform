@@ -1,15 +1,29 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
 import { debriefOverallSql } from '../../analytics/constants/debrief-quality.constants';
+import { DebriefRun } from '../entity/debrief-run.entity';
+import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
+import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
   DEBRIEF_AGENT_KEY,
+  DEBRIEF_MODELS,
+  DEBRIEF_REPLY_DEFAULT,
   DEBRIEF_SEED_BUNDLE,
+  DebriefBundle,
+  DebriefStep,
+  modelProblem,
+  providerOfModel,
+  validateDebriefBundle,
 } from '../constants/debrief-release.constants';
-import { DebriefRun } from '../entity/debrief-run.entity';
+import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefAgentService, DebriefRegion } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
@@ -17,6 +31,24 @@ import { DebriefImproverService } from './debrief-improver.service';
 
 const num = (v: unknown, d = 2) =>
   v == null ? null : Math.round(Number(v) * 10 ** d) / 10 ** d;
+
+/** The steps a person may pick a model for, in the order they run. */
+export const PICKABLE_STEPS = [
+  DebriefStep.SAFETY_READER,
+  DebriefStep.ANALYST,
+  DebriefStep.PROGRESS_READER,
+  DebriefStep.WRITER,
+  DebriefStep.EVALUATOR,
+  DebriefStep.REVISER,
+];
+/**
+ * Providers each place can call in production today. ally-be has an
+ * Anthropic key, so Ask Ally may run on Claude. ally-ai, which runs the
+ * steps, does not yet: add `ANTHROPIC__API_KEY` to its env, redeploy it, then
+ * add 'anthropic' here.
+ */
+const STEP_PROVIDERS: string[] = ['gemini', 'openai'];
+const REPLY_PROVIDERS: string[] = ['gemini', 'openai', 'anthropic'];
 
 /** Read models for the Debrief Console: overview, runs, releases, tenants. */
 @Injectable()
@@ -31,7 +63,126 @@ export class DebriefConsoleService {
     private readonly improver: DebriefImproverService,
     private readonly releases: AgentReleaseService,
     private readonly config: AppConfigService,
+    private readonly llmModels: LlmModelService,
+    private readonly runner: DebriefRunnerService,
   ) {}
+
+  /**
+   * Each step's model in the live release, and the models a person may pick
+   * for it: active in the LLM catalog where the step runs, from an approved
+   * provider the runtime can call, pinned and priced. Steps run in ally-ai
+   * and Ask Ally in ally-be. The judge is pinned and shown, never chosen.
+   */
+  async models() {
+    const { release, bundle } = await this.runner.resolveRelease();
+    const [ai, be] = await Promise.all([
+      this.llmModels.getModels(LlmRuntime.ALLY_AI),
+      this.llmModels.getModels(LlmRuntime.ALLY_BE),
+    ]);
+    const usable = (
+      rows: Array<{ model: string; label: string }>,
+      providers: string[],
+    ) =>
+      rows
+        .filter(
+          (m) =>
+            !modelProblem(m.model) &&
+            providers.includes(providerOfModel(m.model) as string),
+        )
+        .map((m) => ({
+          model: m.model,
+          label: m.label,
+          provider: providerOfModel(m.model),
+        }));
+    const standard = bundle.recipes.standard.steps;
+    return {
+      releaseVersion: release?.version ?? null,
+      steps: PICKABLE_STEPS.filter((st) =>
+        standard.some((x) => x.step === st),
+      ).map((st) => {
+        const s = standard.find((x) => x.step === st)!;
+        return {
+          step: st,
+          model: s.model ?? null,
+          backupModel: s.backupModel ?? null,
+        };
+      }),
+      reply: (bundle.reply ?? DEBRIEF_REPLY_DEFAULT).model,
+      judge: DEBRIEF_MODELS.judge,
+      choices: {
+        steps: usable(ai, STEP_PROVIDERS),
+        reply: usable(be, REPLY_PROVIDERS),
+      },
+    };
+  }
+
+  /**
+   * A person's model change, made the way every change is: a new release
+   * from the live one, checked by the same rules (approved, priced, in the
+   * catalog, the Writer and Evaluator on different models, neither on the
+   * judge's), put live, and undone from Releases with Roll back.
+   */
+  async setModels(
+    change: { steps?: Partial<Record<string, string>>; reply?: string },
+    userId: number,
+    note?: string,
+  ) {
+    const { bundle } = await this.runner.resolveRelease();
+    const next = JSON.parse(JSON.stringify(bundle)) as DebriefBundle;
+    const changed: string[] = [];
+    for (const [step, model] of Object.entries(change.steps ?? {})) {
+      if (!model) continue;
+      if (!(PICKABLE_STEPS as string[]).includes(step)) {
+        throw new BadRequestException(`${step} has no model to choose`);
+      }
+      if (!STEP_PROVIDERS.includes(providerOfModel(model) as string)) {
+        throw new BadRequestException(
+          `${model}: debrief steps can't run on this provider yet`,
+        );
+      }
+      for (const recipe of Object.values(next.recipes)) {
+        for (const s of recipe?.steps ?? []) {
+          if (s.step === step && s.model !== model) {
+            s.model = model;
+            if (s.backupModel === model) s.backupModel = null;
+            if (!changed.includes(step)) changed.push(step);
+          }
+        }
+      }
+    }
+    if (change.reply) {
+      const provider = providerOfModel(change.reply);
+      if (!provider || !REPLY_PROVIDERS.includes(provider)) {
+        throw new BadRequestException(
+          `${change.reply}: Ask Ally can't run on this provider`,
+        );
+      }
+      const reply = next.reply ?? { ...DEBRIEF_REPLY_DEFAULT };
+      if (reply.model !== change.reply) {
+        next.reply = { ...reply, provider, model: change.reply };
+        changed.push('ask_ally');
+      }
+    }
+    if (!changed.length) throw new BadRequestException('No model changed');
+    const problems = validateDebriefBundle(
+      next,
+      await this.runner.modelCatalog(),
+    );
+    if (problems.length) throw new BadRequestException(problems.join('; '));
+    const draft = await this.releases.createDraft(
+      DEBRIEF_AGENT_KEY,
+      next as unknown as Record<string, unknown>,
+      userId,
+      `Model change: ${changed.join(', ')}${note ? ` — ${note}` : ''}`,
+    );
+    await this.releases.makeGa(
+      draft.id,
+      userId,
+      AgentReleaseAuditAction.PROMOTED,
+      note,
+    );
+    return { releaseId: draft.id, version: draft.version, changed };
+  }
 
   async overview(days = 7) {
     const [r] = await this.dataSource.query(
