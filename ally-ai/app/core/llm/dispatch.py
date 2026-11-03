@@ -637,7 +637,9 @@ async def _generate_gemini(
 
     parsed = getattr(response, "parsed", None)
     if parsed is None:
-        logger.error("Gemini returned no parsable structured output")
+        logger.error(
+            "Gemini returned no parsable structured output. Response: %s", response
+        )
         raise LLMInvocationFailedException("Gemini returned no structured output.")
     # `parsed` is already an instance of `schema`, but revalidate so both providers are
     # guaranteed to have gone through the same validation before anything downstream
