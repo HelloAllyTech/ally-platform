@@ -363,4 +363,23 @@ describe("BrandingSettings — editor", () => {
     );
     expect(mockUpdateTenant).not.toHaveBeenCalled();
   });
+
+  it("saves the favicon immediately on upload", async () => {
+    mockPostFaviconUrl.mockResolvedValue({
+      presignedUrl: "https://s3/put",
+      faviconUrl: "https://x/fav.png",
+    });
+    renderTab();
+
+    const file = new File(["png"], "fav.png", { type: "image/png" });
+    fireEvent.change(screen.getByTestId("favicon-input"), { target: { files: [file] } });
+
+    await waitFor(() =>
+      expect(mockUpdateBranding).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ faviconUrl: "https://x/fav.png" }),
+        }),
+      ),
+    );
+  });
 });

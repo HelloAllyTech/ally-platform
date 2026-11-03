@@ -57,6 +57,7 @@ export const en = {
     allyFavicon: "Ally favicon",
     faviconWrongType: "Favicon must be a PNG, ICO, WebP or JPG file",
     faviconTooLarge: "Favicon must be 512 KB or smaller",
+    faviconSaved: "Favicon updated",
     uploadFailed: "Upload failed. Try again.",
     welcomeLine: "Welcome line",
     welcomeLineHint: "One line under the logo on the login page and the talker page.",
