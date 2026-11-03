@@ -57,7 +57,7 @@
         "standards"
       ],
       "last_reconciled": "2026-07-28",
-      "words": 1121,
+      "words": 1185,
       "url": "https://tech.helloally.ai/#/wiki/contributing/guide.md",
       "skip_reason": ""
     },
@@ -126,7 +126,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 12340,
+      "words": 12388,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
