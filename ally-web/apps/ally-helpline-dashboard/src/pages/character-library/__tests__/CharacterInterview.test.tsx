@@ -8,14 +8,20 @@ import { LOCAL_STORAGE_KEYS } from "@constants";
 
 const createSessionMock = vi.fn();
 const getSessionMock = vi.fn();
+const abandonSessionMock = vi.fn();
 vi.mock("@api", () => ({
+  useAbandonCharacterInterviewSessionMutation: () => [abandonSessionMock],
   useCreateCharacterInterviewSessionMutation: () => [createSessionMock],
   useLazyGetCharacterInterviewSessionQuery: () => [getSessionMock],
 }));
 
 vi.mock("@components", () => ({
   ButtonVariant: { DESTRUCTIVE: "destructive", SECONDARY: "secondary" },
-  FallbackUI: () => null,
+  FallbackUI: (props: { mainMessage: string; description: string }) => (
+    <div role="alert">
+      {props.mainMessage} {props.description}
+    </div>
+  ),
   // Renders its two actions while open, so the test can drive the dialog.
   ConfirmationDialog: (props: {
     isOpen: boolean;
@@ -68,6 +74,8 @@ vi.mock("react-router-dom", async importOriginal => {
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
+import { toast } from "sonner";
+
 import { CharacterInterview } from "../CharacterInterview";
 
 const key = LOCAL_STORAGE_KEYS.CHARACTER_INTERVIEW_SESSION_ID;
@@ -88,6 +96,7 @@ describe("CharacterInterview", () => {
       unwrap: () => Promise.resolve({ id: "stuck-session", status: "ACTIVE", messages: [] }),
     });
     createSessionMock.mockReturnValue({ unwrap: () => Promise.resolve({ id: "fresh-session" }) });
+    abandonSessionMock.mockReturnValue({ unwrap: () => Promise.resolve({}) });
   });
 
   it("forgets the session on Leave, so reopening starts a new interview", async () => {
@@ -101,6 +110,8 @@ describe("CharacterInterview", () => {
     // would be lost, so every visit resumed the same stuck conversation.
     expect(localStorage.getItem(key)).toBeNull();
     expect(navigateMock).toHaveBeenCalled();
+    // The server stops counting it toward the org's in-progress cap now.
+    expect(abandonSessionMock).toHaveBeenCalledWith("stuck-session");
   });
 
   it("starts a fresh session from Start over, after confirming", async () => {
@@ -116,6 +127,7 @@ describe("CharacterInterview", () => {
     fireEvent.click(dialog.querySelector("button") as HTMLButtonElement);
 
     await waitFor(() => expect(localStorage.getItem(key)).toBe("fresh-session"));
+    expect(abandonSessionMock).toHaveBeenCalledWith("stuck-session");
     expect(resetMessagesMock).toHaveBeenCalled();
     await waitFor(() =>
       expect(sendMessageMock).toHaveBeenCalledWith("Let's begin.", undefined, true),
@@ -140,5 +152,34 @@ describe("CharacterInterview", () => {
     expect(await screen.findByTestId("review-drawer")).toHaveTextContent("Aarav");
     expect(createSessionMock).not.toHaveBeenCalled();
     expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it("shows the server's own reason when the interview can't start", async () => {
+    // Production, 2026-11-03: the org was at its in-progress cap and the
+    // server said so, with what to do about it — and the page replaced that
+    // with "something went wrong reaching the character library".
+    const reason =
+      "Your organisation already has 10 interviews in progress. Finish or discard one before starting another.";
+    localStorage.removeItem(key);
+    createSessionMock.mockReturnValue({
+      unwrap: () => Promise.reject({ status: 403, data: { statusCode: 403, message: reason } }),
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(reason);
+    expect(toast.error).toHaveBeenCalledWith(reason);
+  });
+
+  it("falls back to the generic line when the failure carries no message", async () => {
+    localStorage.removeItem(key);
+    createSessionMock.mockReturnValue({
+      unwrap: () => Promise.reject({ status: "FETCH_ERROR", error: "offline" }),
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/reaching the character library/i);
+    expect(toast.error).toHaveBeenCalledWith("Couldn't start the interview");
   });
 });

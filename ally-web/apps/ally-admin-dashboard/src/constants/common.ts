@@ -245,6 +245,8 @@ export const ApiEndpoints = {
       `/v1/scenario-characters/interview/sessions/${sessionId}`,
     INTERVIEW_SESSION_STREAM: (sessionId: string) =>
       `/v1/scenario-characters/interview/sessions/${sessionId}/messages/stream`,
+    INTERVIEW_SESSION_ABANDON: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}/abandon`,
   },
 
   USER_MANAGEMENT: {

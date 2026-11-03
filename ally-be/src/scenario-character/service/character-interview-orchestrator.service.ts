@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { AppConfigService } from 'src/config/config.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
@@ -24,7 +29,10 @@ import {
 } from 'src/llm-agent/type/agent-llm.type';
 import { CharacterInterviewMessageRepository } from '../repository/character-interview-message.repository';
 import { CharacterInterviewMessage } from '../entity/character-interview-message.entity';
-import { CharacterInterviewMessageRole } from '../enum/character-interview.enum';
+import {
+  CharacterInterviewMessageRole,
+  CharacterInterviewSessionStatus,
+} from '../enum/character-interview.enum';
 import { CharacterInterviewSessionService } from './character-interview-session.service';
 import {
   CharacterInterviewToolsService,
@@ -325,6 +333,15 @@ export class CharacterInterviewOrchestratorService {
     userId: number,
   ): AsyncGenerator<CharacterInterviewSseFrame> {
     const session = await this.sessionService.getSession(sessionId, userId);
+    // A NotFoundException here is tagged `session_not_found` by the
+    // controller, which the web answers by starting a fresh session and
+    // replaying the message — the right outcome for a tab that kept an id
+    // another tab had already abandoned.
+    if (session.status === CharacterInterviewSessionStatus.ABANDONED) {
+      throw new NotFoundException(
+        'This interview was discarded — a new one will start.',
+      );
+    }
     const maxIterations = Math.max(
       1,
       Number(this.configService.characterInterview.maxToolIterations) || 8,
