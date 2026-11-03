@@ -24,10 +24,9 @@ Every app directory has its own `AGENTS.md` / `CLAUDE.md` router — read it bef
 
 ### Branch Naming
 ```
-feature/<ticket-id>-short-description
-fix/<ticket-id>-short-description
-chore/<ticket-id>-short-description
+<type>/<short-description>      e.g. feat/add-user-profile, fix/login-error
 ```
+Branches are **short-lived** (merged within 2 working days, never older than 7; delete on merge) and the root checkout stays on `master`; do feature work in a `git worktree`. Canonical rules: [Contributing Guide](helloallytech.github.io/wiki/contributing/guide.md#branch-naming) and [Branch Lifetime](helloallytech.github.io/wiki/contributing/guide.md#branch-lifetime).
 
 ### Commit Messages
 Follow conventional commits style. Check each repo's CONTRIBUTING.md for specifics.

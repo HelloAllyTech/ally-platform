@@ -8,6 +8,9 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-03] update | `contributing/guide.md`: Branch Lifetime rule.
+- Added a "Branch Lifetime" section: branches are short-lived (PR early, merge within 2 working days, nothing older than 7, delete on merge, one branch per change, root checkout stays on `master`, bots follow the same rules). Linked from `platform/agent-guide.md`, and the root `AGENTS.md` branch-naming block now points at the canonical rule instead of the old ticket-id convention.
+
 ## [2026-10-29] update | `repos/ally-ai.md`: the debrief Safety reader.
 - Added `/debrief/safety-reader`, the debrief agent's mandatory safety step, and its recall gate script. `last_reconciled` is unchanged, since the rest of the page was not re-verified.
 

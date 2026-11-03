@@ -69,7 +69,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 ## Cross-Repo Conventions
 
 ### Branch Naming
-`<type>/<short-description>` — e.g. `feat/add-user-profile`, `fix/login-error`. Canonical rules and the full type list live in the [Contributing Guide](../contributing/guide.md#branch-naming); don't restate them elsewhere.
+`<type>/<short-description>` — e.g. `feat/add-user-profile`, `fix/login-error`. Canonical rules and the full type list live in the [Contributing Guide](../contributing/guide.md#branch-naming); don't restate them elsewhere. Branches are short-lived: see [Branch Lifetime](../contributing/guide.md#branch-lifetime) (merge within 2 working days, nothing older than 7, delete on merge, one branch per change, root checkout stays on `master`).
 
 ### API Versioning
 - All REST APIs use the `/api/v1/` prefix.

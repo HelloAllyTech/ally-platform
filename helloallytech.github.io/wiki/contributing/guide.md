@@ -21,6 +21,21 @@ Examples: `feat/add-user-authentication`, `fix/login-error-handling`, `docs/upda
 
 **Rules:** hyphens (not underscores) between words, lowercase, short and descriptive. Do **not** embed a ticket id in the branch name — reference the ticket in the PR description instead. This is the single canonical statement of the convention for every repo; `commitlint`/Husky enforce the matching commit format in the TypeScript repos.
 
+### Branch Lifetime
+
+**Branches are short-lived. `master` is the only long-lived branch.** A branch exists to carry one small change to a merged pull request, then it goes away.
+
+- **Open a pull request early.** Push a branch only when you open a PR for it (a draft is fine). A branch with no PR is invisible to review and CI, so it is a branch nobody will ever look at.
+- **Merge within 2 working days.** Aim for small PRs that can be reviewed in one sitting. If a change will take longer, split it and land the pieces behind a feature flag. Do not keep a long-running feature branch.
+- **Nothing lives past 7 days.** A branch with no commits for 7 days is stale. Finish it, or delete it. If the work still matters, reopen it later from a fresh branch off `master`; the closed PR keeps the history.
+- **Delete on merge.** Squash-merge and delete the head branch. The repository setting "Automatically delete head branches" must stay on; do not turn it off per PR.
+- **One branch per change.** Do not push `-2`, `-v2` or `-retry` copies of a branch. Force-push to the existing branch, or close the old PR first and delete its branch.
+- **Start from, and stay close to, `master`.** Branch from the latest `origin/master` and rebase or merge it in often. A branch that is hundreds of commits behind is cheaper to redo than to rescue.
+- **Keep the root checkout on `master`.** Do feature work in a worktree (`git worktree add ../ally-wt/<branch> -b <branch> origin/master`) so the main checkout never carries a feature branch.
+- **Bots follow the same rules.** Automation (bug hunter, Builder) opens one branch per issue, reuses it on a retry, and closes the PR and deletes the branch when the work is superseded.
+
+Anyone may delete a stale branch that is not an open PR under active review: the cleanup is always safe, because the tip commit is recoverable from the PR or the reflog for 90 days. When in doubt, ask in the PR instead of keeping the branch.
+
 ## Commit Messages
 
 Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
