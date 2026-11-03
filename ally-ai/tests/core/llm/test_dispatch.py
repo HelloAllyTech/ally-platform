@@ -543,6 +543,30 @@ class TestGeminiPath:
 
         assert generate.call_args.kwargs["config"].temperature == sent
 
+    @pytest.mark.asyncio
+    async def test_recovers_from_markdown_wrapped_json(self, both_keys):
+        """A common failure mode is Gemini wrapping its valid JSON in a
+        markdown code fence. The parser has to strip that, not fail the call."""
+        response = SimpleNamespace(
+            parsed=None,
+            text='```json\n{"answer": "From markdown.", "confidence": 0.7}\n```',
+            usage_metadata=None,
+        )
+        client = SimpleNamespace(
+            aio=SimpleNamespace(
+                models=SimpleNamespace(
+                    generate_content=AsyncMock(return_value=response)
+                )
+            )
+        )
+
+        with patch.object(dispatch, "_get_gemini_client", return_value=client):
+            parsed, _ = await dispatch.generate_structured(
+                schema=Answer, prompt="q", provider="gemini"
+            )
+
+        assert parsed == Answer(answer="From markdown.", confidence=0.7)
+
     @pytest.mark.parametrize(
         "model,expected",
         [

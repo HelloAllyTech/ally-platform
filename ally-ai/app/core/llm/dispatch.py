@@ -29,10 +29,11 @@ An answer that changed because a fallback kicked in must be explainable after th
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Dict, Optional, Tuple, Type, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.core.config import settings
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
@@ -88,6 +89,11 @@ UNCAPPED_ANTHROPIC_MAX_TOKENS = 16384
 # appears in the request and in the returned tool_use block, and the response parser
 # looks for it.
 _STRUCTURED_TOOL_NAME = "emit_result"
+
+# How many times to retry a structured-output call when the response does not
+# parse. Specific to content-level failures, not provider-level outages (which
+# fall back to another provider instead).
+MAX_PARSE_ATTEMPTS = 3
 
 # Claude models known to accept a forced `tool_choice` (`any` / `tool`).
 #
@@ -175,7 +181,7 @@ def _is_retryable_provider_failure(error: BaseException) -> bool:
     # but the answer was unusable — no tool block, nothing parsable. It carries
     # an internal 500 for the API layer, which would otherwise read as a server
     # error here. The provider is fine; the response is not.
-    if isinstance(error, LLMInvocationFailedException):
+    if isinstance(error, (LLMInvocationFailedException, ValidationError)):
         return False
 
     # google-genai's `APIError` (and its `ClientError`/`ServerError`) carries the
@@ -267,6 +273,17 @@ def _is_configured(provider: str) -> bool:
     if provider == PROVIDER_OPENAI:
         return bool(settings.OPENAI.API_KEY)
     return False
+
+
+def _extract_json(text: str) -> Optional[Dict[str, Any]]:
+    """Pull a JSON object from a string that may have markdown fences around it."""
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return None
 
 
 def resolve_target(
@@ -577,7 +594,8 @@ async def _generate_gemini(
     scenario_session_id: Optional[str] = None,
 ) -> TSchema:
     """
-    Structured output from Gemini via `response_schema`, as the analytics agent does.
+    Structured output from Gemini via `response_schema`, with a retry-and-parse
+    layer for robustness.
     """
     from google.genai import types  # imported lazily; optional dependency
 
@@ -597,56 +615,89 @@ async def _generate_gemini(
     # which surfaces as a schema validation failure, not as "too long".
     if max_tokens:
         config_kwargs["max_output_tokens"] = max_tokens
+
+    # A minimal system prompt to keep the output clean, merged with any the
+    # caller supplied.
+    system_instruction = (
+        "You are a helpful assistant that only responds in JSON format "
+        "conforming to the provided schema. Do not add any conversational "
+        "text or markdown formatting."
+    )
     if system:
-        config_kwargs["system_instruction"] = system
+        system_instruction = f"{system}\n\n{system_instruction}"
+    config_kwargs["system_instruction"] = system_instruction
 
-    response = await client.aio.models.generate_content(
-        model=model,
-        contents=prompt,
-        config=types.GenerateContentConfig(**config_kwargs),
+    last_error: Optional[Exception] = None
+    for attempt in range(MAX_PARSE_ATTEMPTS):
+        try:
+            response = await client.aio.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(**config_kwargs),
+            )
+        except Exception as e:
+            # Not a content failure — the request itself failed.
+            last_error = e
+            logger.warning(
+                "Gemini invocation failed on attempt %d: %s",
+                attempt + 1,
+                e,
+                exc_info=True,
+            )
+            continue
+
+        um = getattr(response, "usage_metadata", None)
+        if um is not None:
+            prompt_tokens = int(getattr(um, "prompt_token_count", 0) or 0)
+            candidates_tokens = int(getattr(um, "candidates_token_count", 0) or 0)
+            # Thinking is billed at the OUTPUT rate but reported apart from the
+            # answer, so `candidates_token_count` alone undercounts every call that
+            # thinks — and the 2.5 series thinks by default. It is folded into
+            # completion here, and the split travels in metadata so the thinking
+            # share stays visible rather than merely priced.
+            thoughts_tokens = int(getattr(um, "thoughts_token_count", 0) or 0)
+            completion_tokens = candidates_tokens + thoughts_tokens
+            # total_token_count already includes thoughts, so it is used as given.
+            total_tokens = int(getattr(um, "total_token_count", 0) or 0) or (
+                prompt_tokens + completion_tokens
+            )
+            _emit_usage(
+                PROVIDER_GEMINI,
+                model,
+                task,
+                (prompt_tokens, completion_tokens, total_tokens),
+                # Part of prompt_token_count, not in addition to it.
+                cached_tokens=_count(getattr(um, "cached_content_token_count", None)),
+                metadata={
+                    "thoughts_tokens": thoughts_tokens,
+                    "candidates_tokens": candidates_tokens,
+                },
+                scenario_session_id=scenario_session_id,
+            )
+
+        # The SDK's `parsed` is the cleanest path: it is already an instance.
+        if (parsed := getattr(response, "parsed", None)) is not None:
+            return schema.model_validate(
+                parsed if isinstance(parsed, dict) else parsed.model_dump()
+            )
+
+        # Otherwise, try to pull JSON from the raw text.
+        if (text := getattr(response, "text", None)) and (
+            obj := _extract_json(text)
+        ) is not None:
+            try:
+                return schema.model_validate(obj)
+            except ValidationError as e:
+                last_error = e
+
+    logger.error(
+        "Gemini returned no parsable structured output after %d attempts. Response: %s",
+        MAX_PARSE_ATTEMPTS,
+        response,
     )
-
-    um = getattr(response, "usage_metadata", None)
-    if um is not None:
-        prompt_tokens = int(getattr(um, "prompt_token_count", 0) or 0)
-        candidates_tokens = int(getattr(um, "candidates_token_count", 0) or 0)
-        # Thinking is billed at the OUTPUT rate but reported apart from the
-        # answer, so `candidates_token_count` alone undercounts every call that
-        # thinks — and the 2.5 series thinks by default. It is folded into
-        # completion here, and the split travels in metadata so the thinking
-        # share stays visible rather than merely priced.
-        thoughts_tokens = int(getattr(um, "thoughts_token_count", 0) or 0)
-        completion_tokens = candidates_tokens + thoughts_tokens
-        # total_token_count already includes thoughts, so it is used as given.
-        total_tokens = int(getattr(um, "total_token_count", 0) or 0) or (
-            prompt_tokens + completion_tokens
-        )
-        _emit_usage(
-            PROVIDER_GEMINI,
-            model,
-            task,
-            (prompt_tokens, completion_tokens, total_tokens),
-            # Part of prompt_token_count, not in addition to it.
-            cached_tokens=_count(getattr(um, "cached_content_token_count", None)),
-            metadata={
-                "thoughts_tokens": thoughts_tokens,
-                "candidates_tokens": candidates_tokens,
-            },
-            scenario_session_id=scenario_session_id,
-        )
-
-    parsed = getattr(response, "parsed", None)
-    if parsed is None:
-        logger.error(
-            "Gemini returned no parsable structured output. Response: %s", response
-        )
-        raise LLMInvocationFailedException("Gemini returned no structured output.")
-    # `parsed` is already an instance of `schema`, but revalidate so both providers are
-    # guaranteed to have gone through the same validation before anything downstream
-    # trusts the shape.
-    return schema.model_validate(
-        parsed if isinstance(parsed, dict) else parsed.model_dump()
-    )
+    raise LLMInvocationFailedException(
+        f"Gemini returned no structured output after {MAX_PARSE_ATTEMPTS} attempts."
+    ) from last_error
 
 
 async def _generate_openai(
