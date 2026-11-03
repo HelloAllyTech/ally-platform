@@ -248,8 +248,9 @@ const BrandingEditor: FC<BrandingEditorProps> = ({ tenantId, orgName, initial, o
   const [deleteLogo] = useDeleteLogoMutation();
   const [postFaviconUrl] = usePostBrandingFaviconUrlMutation();
 
-  const [form, setForm] = useState<BrandingForm>(initial);
-  const [hexInput, setHexInput] = useState(initial.primaryColor);
+  const [localInitial, setLocalInitial] = useState(initial);
+  const [form, setForm] = useState<BrandingForm>(localInitial);
+  const [hexInput, setHexInput] = useState(localInitial.primaryColor);
   const [isSaving, setIsSaving] = useState(false);
   const [uploading, setUploading] = useState<"logo" | "favicon" | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -259,7 +260,10 @@ const BrandingEditor: FC<BrandingEditorProps> = ({ tenantId, orgName, initial, o
   const set = <K extends keyof BrandingForm>(key: K, value: BrandingForm[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
-  const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
+  const isDirty = useMemo(
+    () => JSON.stringify(form) !== JSON.stringify(localInitial),
+    [form, localInitial],
+  );
 
   const hexValid = isHexColour(hexInput);
   const contrast = useMemo(
@@ -314,7 +318,10 @@ const BrandingEditor: FC<BrandingEditorProps> = ({ tenantId, orgName, initial, o
         data: { fileName: file.name, fileSize: file.size, contentType: file.type },
       }).unwrap();
       await uploadToS3(file, res.presignedUrl);
+      await updateBranding({ id: tenantId, data: { faviconUrl: res.faviconUrl } }).unwrap();
       set("faviconUrl", res.faviconUrl);
+      setLocalInitial(prev => ({ ...prev, faviconUrl: res.faviconUrl }));
+      toast.success(en.orgBranding.faviconSaved);
     } catch (error: any) {
       toast.error(errorText(error, en.orgBranding.uploadFailed));
     } finally {
@@ -322,18 +329,32 @@ const BrandingEditor: FC<BrandingEditorProps> = ({ tenantId, orgName, initial, o
     }
   };
 
+  const handleRemoveFavicon = async () => {
+    setUploading("favicon");
+    try {
+      await updateBranding({ id: tenantId, data: { faviconUrl: null } }).unwrap();
+      set("faviconUrl", null);
+      setLocalInitial(prev => ({ ...prev, faviconUrl: null }));
+      toast.success(en.orgBranding.faviconSaved);
+    } catch (error: any) {
+      toast.error(errorText(error, en.orgBranding.failedToSave));
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const handleCancel = () => {
-    setForm(initial);
-    setHexInput(initial.primaryColor);
+    setForm(localInitial);
+    setHexInput(localInitial.primaryColor);
     setConfirmReset(false);
   };
 
   const persist = async (patch: UpdateTenantBrandingBody, logoUrl: string | null | undefined) => {
     setIsSaving(true);
     try {
-      if (logoUrl !== undefined && logoUrl !== initial.logoUrl) {
+      if (logoUrl !== undefined && logoUrl !== localInitial.logoUrl) {
         await updateTenant({ id: tenantId, data: { logoUrl: logoUrl ?? "" } }).unwrap();
-        if (initial.logoUrl) deleteLogo({ logoUrl: initial.logoUrl });
+        if (localInitial.logoUrl) deleteLogo({ logoUrl: localInitial.logoUrl });
       }
       const res = await updateBranding({ id: tenantId, data: patch }).unwrap();
       toast.success(en.orgBranding.saved);
@@ -513,7 +534,8 @@ const BrandingEditor: FC<BrandingEditorProps> = ({ tenantId, orgName, initial, o
             {form.faviconUrl && (
               <button
                 type="button"
-                onClick={() => set("faviconUrl", null)}
+                onClick={handleRemoveFavicon}
+                disabled={!!uploading}
                 className="text-typography-600 text-sm hover:text-typography-900"
               >
                 {en.orgBranding.removeFavicon}
