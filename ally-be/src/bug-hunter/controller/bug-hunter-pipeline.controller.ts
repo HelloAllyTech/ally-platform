@@ -340,9 +340,13 @@ export class BugHunterPipelineController {
   async writeMemory(
     @Body() body: WriteBugHunterMemoryDto,
   ): Promise<{ id: string }> {
+    // OPP-0820: The bug hunter agent can send malformed JSON with unescaped
+    // newlines. This is a workaround to prevent the request from failing.
+    const sanitizedBody = body.body.replace(/[\n\r]+/g, ' ');
+
     const row = await this.memoryService.write({
       agent: AgentMemoryAgent.BUG_HUNTER,
-      body: body.body,
+      body: sanitizedBody,
       repos: body.repos,
       tags: body.tags,
       runId: body.runId ?? null,

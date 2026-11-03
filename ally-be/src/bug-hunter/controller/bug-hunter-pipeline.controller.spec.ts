@@ -35,6 +35,7 @@ describe('BugHunterPipelineController', () => {
   let app: INestApplication;
   let mockBugHunterService: Partial<BugHunterService>;
   let mockBugFindingService: Partial<BugFindingService>;
+  let mockAgentMemoryService: Partial<AgentMemoryService>;
 
   beforeEach(async () => {
     mockBugHunterService = {
@@ -43,6 +44,10 @@ describe('BugHunterPipelineController', () => {
 
     mockBugFindingService = {
       persistFindings: jest.fn().mockResolvedValue([]),
+    };
+
+    mockAgentMemoryService = {
+      write: jest.fn().mockResolvedValue({ id: uuidv4() }),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -90,7 +95,7 @@ describe('BugHunterPipelineController', () => {
         // Telemetry: pass the fetch straight through, so finder-data cases
         // here read exactly as before and nothing is recorded.
         { provide: BugHunterEvalService, useValue: {} },
-        { provide: AgentMemoryService, useValue: {} },
+        { provide: AgentMemoryService, useValue: mockAgentMemoryService },
         { provide: BugHunterDossierService, useValue: { build: jest.fn() } },
         { provide: BugCaseFileService, useValue: { build: jest.fn() } },
         {
@@ -147,6 +152,23 @@ describe('BugHunterPipelineController', () => {
 
   afterEach(async () => {
     await app.close();
+  });
+
+  it('should not throw BadRequestException when memory body has unescaped newlines', async () => {
+    const memoryBody = 'This is a body with a \n newline';
+    const writeDto = { body: memoryBody };
+
+    await request(app.getHttpServer())
+      .post('/api/v1/bug-hunter/pipeline/memory')
+      .set('x-api-key', 'test-api-key')
+      .send(writeDto)
+      .expect(201);
+
+    expect(mockAgentMemoryService.write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'This is a body with a   newline',
+      }),
+    );
   });
 
   it('should 404 the old /pipeline/runs/:id/model route and never call the service', async () => {
