@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CharacterInterview } from "../CharacterInterview";
 
 vi.mock("@api", () => ({
+  useAbandonCharacterInterviewSessionMutation: vi.fn(),
   useCreateCharacterInterviewSessionMutation: vi.fn(),
   useLazyGetCharacterInterviewSessionQuery: vi.fn(),
   baseAPI: {
@@ -19,13 +20,22 @@ vi.mock("@api", () => ({
 }));
 
 import * as api from "@api";
+import { useCharacterInterviewStream } from "@hooks/useCharacterInterviewStream";
+import { toast } from "sonner";
 
 vi.mock("@assets", () => ({
   ArrowDown: () => <svg data-testid="arrow-down-icon" />,
 }));
 
 vi.mock("@components", () => ({
-  ActionConfirmationPopup: () => null,
+  // Renders its primary action while open, so a test can confirm Leave.
+  ActionConfirmationPopup: (props: {
+    isOpen: boolean;
+    primaryButton: { label: string; onClick: () => void };
+  }) =>
+    props.isOpen ? (
+      <button onClick={props.primaryButton.onClick}>{props.primaryButton.label}</button>
+    ) : null,
   CharacterSidePanel: () => null,
 }));
 vi.mock("@components/character-corpus", () => ({
@@ -39,6 +49,13 @@ vi.mock("@components/character-interview", () => ({
 
 vi.mock("@hooks", () => ({
   useCanCurateCharacterCorpus: vi.fn(() => true),
+  useUser: vi.fn(() => ({
+    featureFlags: {},
+  })),
+}));
+// The page imports the stream hook from its leaf module, so the "@hooks"
+// barrel mock above never reached it and the real hook ran.
+vi.mock("@hooks/useCharacterInterviewStream", () => ({
   useCharacterInterviewStream: vi.fn(() => ({
     messages: [],
     isStreaming: false,
@@ -46,9 +63,6 @@ vi.mock("@hooks", () => ({
     stop: vi.fn(),
     hydrateMessages: vi.fn(),
     resetMessages: vi.fn(),
-  })),
-  useUser: vi.fn(() => ({
-    featureFlags: {},
   })),
 }));
 
@@ -104,11 +118,17 @@ const renderCharacterInterview = () =>
 describe("CharacterInterview", () => {
   const mockCreateSession = vi.fn();
   const mockGetSession = vi.fn();
+  const mockAbandonSession = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     mockCreateSession.mockReturnValue({ unwrap: () => Promise.resolve({ id: "new-session" }) });
     mockGetSession.mockReturnValue({ unwrap: () => Promise.resolve({ id: "session-123", status: "ACTIVE", messages: []}) });
+    mockAbandonSession.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+    (api.useAbandonCharacterInterviewSessionMutation as ReturnType<typeof vi.fn>).mockReturnValue([
+        mockAbandonSession,
+    ]);
 
     (api.useCreateCharacterInterviewSessionMutation as ReturnType<typeof vi.fn>).mockReturnValue([
         mockCreateSession,
@@ -124,5 +144,53 @@ describe("CharacterInterview", () => {
     const charactersLink = screen.getByText("Characters");
     // The ArrowDown icon should be inside the clickable element for it to be a single control
     expect(charactersLink.querySelector('[data-testid="arrow-down-icon"]')).toBeInTheDocument();
+  });
+
+  it("toasts the server's own reason when the interview can't start", async () => {
+    // Production, 2026-11-03: the org was at its in-progress cap and the
+    // server said so, with what to do about it — the toast used to replace
+    // that with the generic line.
+    const reason =
+      "Your organisation already has 10 interviews in progress. Finish or discard one before starting another.";
+    mockCreateSession.mockReturnValue({
+      unwrap: () => Promise.reject({ status: 403, data: { statusCode: 403, message: reason } }),
+    });
+
+    renderCharacterInterview();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(reason));
+  });
+
+  it("falls back to the generic line when the failure carries no message", async () => {
+    mockCreateSession.mockReturnValue({
+      unwrap: () => Promise.reject({ status: "FETCH_ERROR", error: "offline" }),
+    });
+
+    renderCharacterInterview();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Failed to start session"));
+  });
+
+  it("tells the server the interview is abandoned on Leave", async () => {
+    localStorage.setItem("char_interview_session_id", "session-123");
+    vi.mocked(useCharacterInterviewStream).mockReturnValue({
+      messages: [{ id: "a1", role: "assistant", content: "Who is this character?" }],
+      isStreaming: false,
+      sendMessage: vi.fn(),
+      stop: vi.fn(),
+      hydrateMessages: vi.fn(),
+      resetMessages: vi.fn(),
+    } as any);
+
+    renderCharacterInterview();
+    await waitFor(() => expect(mockGetSession).toHaveBeenCalledWith("session-123"));
+
+    fireEvent.click(await screen.findByText("Characters"));
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+
+    // Left ACTIVE, the session would keep a slot under the org's in-progress
+    // cap until the idle window passed.
+    expect(mockAbandonSession).toHaveBeenCalledWith("session-123");
+    expect(mockNavigate).toHaveBeenCalled();
   });
 });

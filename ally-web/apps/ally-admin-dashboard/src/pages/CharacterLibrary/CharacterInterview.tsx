@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { SkeletonPlaceholder } from "@ally-ui-mono/ui-shared";
 import {
+  useAbandonCharacterInterviewSessionMutation,
   useCreateCharacterInterviewSessionMutation,
   useLazyGetCharacterInterviewSessionQuery,
 } from "@api";
@@ -22,7 +23,7 @@ import { en, LOCAL_STORAGE_KEYS, ROUTES } from "@constants";
 import { useCanCurateCharacterCorpus } from "@hooks";
 import { useCharacterInterviewStream } from "@hooks/useCharacterInterviewStream";
 import { CharacterData } from "@types";
-import { logger } from "@utils";
+import { getErrorMessage, logger } from "@utils";
 
 const sessionStorageKey = LOCAL_STORAGE_KEYS.CHARACTER_INTERVIEW_SESSION_ID;
 
@@ -52,6 +53,7 @@ export const CharacterInterview: React.FC = () => {
 
   const [createSession] = useCreateCharacterInterviewSessionMutation();
   const [getSession] = useLazyGetCharacterInterviewSessionQuery();
+  const [abandonSession] = useAbandonCharacterInterviewSessionMutation();
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
@@ -78,11 +80,26 @@ export const CharacterInterview: React.FC = () => {
       localStorage.setItem(sessionStorageKey, session.id);
       setSessionId(session.id);
       return session.id;
-    } catch {
-      toast.error(strings.startFailed);
+    } catch (error) {
+      // The per-org interview cap says exactly what to do ("finish or
+      // discard one of your open interviews"); the generic line used to
+      // replace it.
+      toast.error(getErrorMessage(error, strings.startFailed));
       return null;
     }
   }, [createSession, strings.startFailed]);
+
+  /**
+   * Tells the server the interview is over without a draft, so it stops
+   * counting toward the org's in-progress cap now rather than after the idle
+   * window. Fire-and-forget: the page has already moved on.
+   */
+  const abandonCurrentSession = useCallback(() => {
+    if (!sessionId) return;
+    void abandonSession(sessionId)
+      .unwrap()
+      .catch(() => undefined);
+  }, [abandonSession, sessionId]);
 
   const { messages, isStreaming, sendMessage, stop, hydrateMessages, resetMessages } =
     useCharacterInterviewStream({
@@ -164,11 +181,13 @@ export const CharacterInterview: React.FC = () => {
   const handleConfirmExit = () => {
     setShowExitConfirm(false);
     stop();
+    abandonCurrentSession();
     localStorage.removeItem(sessionStorageKey);
     navigate(ROUTES.CHARACTER_LIBRARY);
   };
 
   const handleStartOver = () => {
+    abandonCurrentSession();
     localStorage.removeItem(sessionStorageKey);
     setDraftCharacter(null);
     setIsReviewOpen(false);

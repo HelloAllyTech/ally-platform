@@ -375,6 +375,8 @@ export const ApiEndpoints = {
       `/v1/scenario-characters/interview/sessions/${sessionId}`,
     INTERVIEW_SESSION_STREAM: (sessionId: string) =>
       `/v1/scenario-characters/interview/sessions/${sessionId}/messages/stream`,
+    INTERVIEW_SESSION_ABANDON: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}/abandon`,
   },
   PRODUCT_UPDATES: {
     // Public (ungated) feature-level product updates for the /blog/changelog page.
