@@ -249,6 +249,7 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             resolved_graph.update_state(
                 {"configurable": {"thread_id": self.thread_id}},
                 values={"branching_and_feedback_data": branching_and_feedback_data},
+                as_node=True,
             )
 
         # Start timers for all TIME events
