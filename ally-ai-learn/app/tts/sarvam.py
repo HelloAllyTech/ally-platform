@@ -86,8 +86,6 @@ class _WhitespaceFilterWrapper:
         return getattr(self._tts_instance, name)
 
 
-
-
 class SarvamTTSClient(BaseTTSClient):
     """
     Sarvam TTS client implementation.
@@ -312,10 +310,9 @@ class SarvamTTSClient(BaseTTSClient):
                     logger.warning(
                         f"[Sarvam] Failed to apply parameters to new instance: " f"{e}"
                     )
-        
         if not isinstance(self._tts_instance, _WhitespaceFilterWrapper):
             self._tts_instance = _WhitespaceFilterWrapper(self._tts_instance)
-        
+
         return self._tts_instance
 
     def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:
