@@ -246,17 +246,13 @@ class SarvamTTSClient(BaseTTSClient):
             api_key=settings.SARVAM_API_KEY,
         )
 
-    @property
-    def tts_instance(self) -> "sarvam.TTS":
-        """Get the underlying Sarvam TTS instance."""
+    def _get_unwrapped_tts_instance(self) -> "sarvam.TTS":
+        """
+        Get or create the unwrapped Sarvam TTS instance, applying guards and
+        configurations. This method is idempotent.
+        """
+        # Create instance if it doesn't exist
         if self._tts_instance is None:
-            # Create TTS instance - parameters will be set via update_options()
-            # before synthesis starts
-            # The configured model MUST be passed: omitted, the plugin falls
-            # back to its own default (bulbul:v2) whatever the voice row says.
-            # That silently pinned every Sarvam voice to v2, and when Sarvam
-            # retired v2 (400 "Model 'bulbul:v2' has been deprecated") every
-            # Sarvam-voiced session lost all agent audio.
             self._tts_instance = sarvam.TTS(
                 target_language_code=self._target_language,
                 model=self._model,
@@ -264,15 +260,21 @@ class SarvamTTSClient(BaseTTSClient):
                 api_key=self._api_key,
             )
 
-        guard_stale_websockets(self._tts_instance)
+        # The instance might be a raw one or already wrapped.
+        # We need to operate on the raw instance.
+        raw_tts = (
+            self._tts_instance._tts_instance
+            if isinstance(self._tts_instance, _WhitespaceFilterWrapper)
+            else self._tts_instance
+        )
+
+        guard_stale_websockets(raw_tts)
 
         # Wrap stream method to inject higher timeout
-        # Apply this even if instance was provided via __init__
-        if not hasattr(self._tts_instance, "_timeout_wrapped"):
+        if not hasattr(raw_tts, "_timeout_wrapped"):
             from livekit.agents import APIConnectOptions
 
-            # Use getattr to avoid potential Mock issues
-            original_stream = getattr(self._tts_instance, "stream")
+            original_stream = getattr(raw_tts, "stream")
 
             def custom_stream(
                 conn_options: Optional[APIConnectOptions] = None,
@@ -289,13 +291,10 @@ class SarvamTTSClient(BaseTTSClient):
                     )
                 return original_stream(conn_options=conn_options)
 
-            # Explicitly override the method on the instance level
-            # This works for both regular objects and Mocks
-            object.__setattr__(self._tts_instance, "stream", custom_stream)
-            object.__setattr__(self._tts_instance, "_timeout_wrapped", True)
+            object.__setattr__(raw_tts, "stream", custom_stream)
+            object.__setattr__(raw_tts, "_timeout_wrapped", True)
 
-        # Apply current parameters immediately after creation
-        # This ensures they're set before WebSocket session starts
+        # Apply current parameters
         if hasattr(self, "_current_params") and self._current_params:
             valid_params = {
                 k: v
@@ -304,54 +303,47 @@ class SarvamTTSClient(BaseTTSClient):
             }
             if valid_params:
                 try:
-                    if hasattr(self._tts_instance, "update_options"):
-                        self._tts_instance.update_options(**valid_params)
+                    if hasattr(raw_tts, "update_options"):
+                        raw_tts.update_options(**valid_params)
                 except Exception as e:
                     logger.warning(
-                        f"[Sarvam] Failed to apply parameters to new instance: " f"{e}"
+                        f"[Sarvam] Failed to apply parameters to instance: {e}"
                     )
+
+        return raw_tts
+
+    @property
+    def tts_instance(self) -> "sarvam.TTS":
+        """Get the underlying Sarvam TTS instance, ensuring it is wrapped."""
+        unwrapped_instance = self._get_unwrapped_tts_instance()
+
         if not isinstance(self._tts_instance, _WhitespaceFilterWrapper):
-            self._tts_instance = _WhitespaceFilterWrapper(self._tts_instance)
+            self._tts_instance = _WhitespaceFilterWrapper(unwrapped_instance)
 
         return self._tts_instance
 
     def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:
         """
         Apply validated parameters dict to Sarvam TTS instance.
-
-        For Sarvam TTS, we need to ensure parameters are set before the WebSocket
-        session starts. If the instance already exists, we use update_options().
-        If it doesn't exist yet, parameters will be set when it's created.
-
-        Args:
-            params_dict: Validated dict with parameter names as keys
         """
         try:
             if not params_dict:
                 logger.debug("[Sarvam] No parameters to apply (empty dict)")
                 return
 
-            # Update stored parameters first
             if not hasattr(self, "_current_params"):
                 self._current_params = {}
             self._current_params.update(params_dict)
 
-            # If TTS instance already exists, update it
-            if self._tts_instance is not None:
-                if hasattr(self._tts_instance, "update_options"):
-                    self._tts_instance.update_options(**params_dict)
-                else:
-                    logger.warning(
-                        "[Sarvam] TTS instance does not have update_options() "
-                        "method. Parameters will be applied on next instance "
-                        "creation."
-                    )
+            # Accessing tts_instance property ensures instance is created and configured
+            instance = self.tts_instance
+            if hasattr(instance, "update_options"):
+                instance.update_options(**params_dict)
             else:
-                # Instance doesn't exist yet - parameters will be set when
-                # tts_instance property is accessed
-                logger.debug(
-                    "[Sarvam] TTS instance not created yet. Parameters "
-                    "will be applied when instance is created."
+                logger.warning(
+                    "[Sarvam] TTS instance does not have update_options() "
+                    "method. Parameters will be applied on next instance "
+                    "creation."
                 )
 
         except Exception as e:

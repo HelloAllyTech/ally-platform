@@ -97,7 +97,8 @@ Three Sarvam traps, all handled in `app/tts/sarvam.py`:
   only worked on the plugin's retry. `guard_stale_websockets` makes the pool discard a socket whose
   transport is gone before reusing it.
 - **Empty or whitespace-only text.** The Sarvam API rejects requests containing only whitespace,
-  leading to a lost turn. The client now filters these out before synthesis.
+  leading to a lost turn. The client was refactored in v1.46.0 to make this
+  filtering more robust.
 
 **Google Cloud** -- Uses `voice_name` and `gender` for voice selection. Supports voice cloning via `voice_cloning_key`. Voice parameters only (no SSML) when streaming is enabled.
 
