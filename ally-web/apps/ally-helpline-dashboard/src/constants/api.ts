@@ -41,6 +41,9 @@ export const ApiEndpoints = {
       `/v1/learn/admin/tracks/items/${trackItemId}/branching-reset`,
     REOPEN_ROLEPLAY_ASSESSMENT: (trackItemId: string) =>
       `/v1/learn/admin/tracks/items/${trackItemId}/assessment-reopen`,
+    LEARNER_ENROLLMENTS: (userId: number) => `/v1/learn/admin/learners/${userId}/enrollments`,
+    REMOVE_LEARNER_ENROLLMENT: (userId: number, trackEnrollmentId: string) =>
+      `/v1/learn/admin/learners/${userId}/enrollments/${trackEnrollmentId}`,
   },
   AUDIO_CALL: {
     GET_WAITING_CLIENTS: "/v1/users/waiting-list",

@@ -153,6 +153,9 @@ export const TAG_TYPES = {
   // A learner's open scenario-quiz attempts (trainer view). Also registered in
   // baseAPI.ts's `tagTypes` — an unregistered tag makes invalidatesTags a silent no-op.
   LEARNER_SCENARIO_ATTEMPTS: "LearnerScenarioAttempts",
+  // A learner's course enrolments (trainer view). Also registered in
+  // baseAPI.ts's `tagTypes` — an unregistered tag makes invalidatesTags a silent no-op.
+  LEARNER_ENROLLMENTS: "LearnerEnrollments",
   // Character Library (own-tenant list)
   CHARACTER_LIBRARY: "CharacterLibrary",
   // The per-user preferences blob (default language, org-metrics layout, ...)
