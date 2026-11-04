@@ -157,6 +157,7 @@ describe('UserDailyScoreRepository', () => {
         profileImageUrl: 'https://example.com/avatar.jpg',
         rank: '1',
         minutesPlayed: '120',
+        xpScore: '340',
         badgeCount: '5',
         status: 'ACTIVE',
         daysActiveThisWeek: '4',
@@ -190,6 +191,7 @@ describe('UserDailyScoreRepository', () => {
         status: 'ACTIVE',
         rank: 1,
         minutesPlayed: 120,
+        xpScore: 340,
         badgeCount: 5,
         daysActiveThisWeek: 4,
         weeklyGoalDays: 4,
@@ -197,7 +199,24 @@ describe('UserDailyScoreRepository', () => {
         currentStreak: 4,
       });
       expect(result.data[1].profileImageUrl).toBeUndefined(); // null converted to undefined
+      expect(result.data[1].xpScore).toBe(0); // missing score defaults to 0
       expect(result.totalCount).toBe(2);
+    });
+
+    it('exposes the windowed XP that rank is ordered by', async () => {
+      mockQuery
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ count: '0' }]);
+
+      await repository.getLeaderboardWithUserDetails(
+        mockTenantId,
+        mockStartDate,
+        mockEndDate,
+      );
+
+      const sql: string = mockQuery.mock.calls[0][0];
+      expect(sql).toContain('RANK() OVER (ORDER BY score DESC)');
+      expect(sql).toContain('p.score as "xpScore"');
     });
 
     it('should use default pagination when not provided', async () => {
@@ -436,6 +455,7 @@ describe('UserDailyScoreRepository', () => {
         profileImageUrl: 'https://example.com/avatar.jpg',
         rank: '5',
         minutesPlayed: '60',
+        xpScore: '85',
         badgeCount: '3',
         status: 'ACTIVE',
       },
@@ -462,6 +482,7 @@ describe('UserDailyScoreRepository', () => {
         status: 'ACTIVE',
         rank: 5,
         minutesPlayed: 60,
+        xpScore: 85,
         badgeCount: 3,
         daysActiveThisWeek: 4,
         weeklyGoalDays: 4,

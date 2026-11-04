@@ -108,7 +108,7 @@ export const styles = ScaledSheet.create({
     flex: 1,
     minWidth: '160@ms',
   },
-  durationColumnHeader: {
+  xpColumnHeader: {
     width: '88@ms',
   },
   badgesColumnHeader: {
@@ -179,10 +179,10 @@ export const styles = ScaledSheet.create({
     color: colors.blue,
     fontWeight: '500',
   },
-  durationColumn: {
+  xpColumn: {
     width: '95@ms',
   },
-  durationText: {
+  xpText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.tiny,
   },

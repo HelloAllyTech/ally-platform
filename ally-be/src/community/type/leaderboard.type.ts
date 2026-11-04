@@ -28,6 +28,8 @@ export interface UserRankResult {
   status: UserStatus;
   rank?: number;
   minutesPlayed: number;
+  /** XP earned in the window — the value rank is ordered by. */
+  xpScore: number;
   badgeCount: number;
   /** Days this ISO week on which the learner earned XP, of any kind. */
   daysActiveThisWeek: number;

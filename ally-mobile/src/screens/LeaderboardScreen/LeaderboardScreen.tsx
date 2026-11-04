@@ -27,7 +27,6 @@ import {
   useLeaderboard,
 } from '@/hooks';
 import {colors} from '@/theme';
-import {formatMinutesToDuration} from '@/utils';
 
 import {styles} from './styles';
 
@@ -189,13 +188,11 @@ export const LeaderboardScreen: React.FC = () => {
               {item.name}
             </Text>
           </View>
-          <View style={styles.durationColumn}>
+          {/* XP, not minutes: it is what rank is ordered by. */}
+          <View style={styles.xpColumn}>
             <Text
-              style={[
-                styles.durationText,
-                isHighlighted && styles.highlightedText,
-              ]}>
-              {formatMinutesToDuration(item.minutesPlayed)}
+              style={[styles.xpText, isHighlighted && styles.highlightedText]}>
+              {item.xpScore ?? '—'}
             </Text>
           </View>
           <View style={styles.badgesColumn}>
@@ -304,10 +301,8 @@ export const LeaderboardScreen: React.FC = () => {
         <View style={styles.userColumnHeader}>
           <Text style={styles.headerText}>{t('community.table.user')}</Text>
         </View>
-        <View style={styles.durationColumnHeader}>
-          <Text style={styles.headerText}>
-            {t('community.table.totalDuration')}
-          </Text>
+        <View style={styles.xpColumnHeader}>
+          <Text style={styles.headerText}>{t('community.table.xp')}</Text>
         </View>
         <View style={styles.badgesColumnHeader}>
           <Text style={styles.headerText}>{t('community.table.badges')}</Text>
