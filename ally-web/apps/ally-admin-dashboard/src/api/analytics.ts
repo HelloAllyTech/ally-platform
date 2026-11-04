@@ -107,6 +107,7 @@ import {
 } from "../pages/Analytics/foundationalSkillsValidityChart";
 import { EffectivenessOrgsResponse } from "../pages/Analytics/orgEffectivenessChart";
 import { SelfEfficacyResponse } from "../pages/Analytics/perceptionChart";
+import { RoadmapVotingResponse } from "../pages/Analytics/roadmapVotingChart";
 import {
   ScenarioCalibrationResponse,
   ScenarioProgressionResponse,
@@ -248,6 +249,7 @@ const GOALS_TAB_PATHS = {
   XP_LEVEL_REACHED: "/v1/analytics/xp-level-reached",
   BUG_HUNTER_VOLUME: "/v1/analytics/bug-hunter-volume",
   XP_BY_TENANT: "/v1/analytics/xp-by-tenant",
+  ROADMAP_VOTING: "/v1/analytics/roadmap-voting",
 } as const;
 
 type ConversationDriftQuery = AnalyticsWindowQuery & {
@@ -1173,6 +1175,14 @@ export const analyticsAPI = baseAPI.injectEndpoints({
         params: windowParams(q as AnalyticsWindowQuery),
       }),
     }),
+    // Roadmap votes cast per month by admin, with who could vote. No params:
+    // all-time and month-grained, and the roadmap carries no tenant.
+    getRoadmapVoting: builder.query<RoadmapVotingResponse, void>({
+      query: () => ({
+        url: GOALS_TAB_PATHS.ROADMAP_VOTING,
+        method: HttpMethod.GET,
+      }),
+    }),
     // Bug Hunter found vs. fixed volume per bucket. Standard window params;
     // `tenantId` is deliberately not offered here — `bug_findings` carries no
     // tenant column, so it would be a no-op on the server.
@@ -1296,5 +1306,6 @@ export const {
   useGetCourseUnitsQuery,
   useGetXpLevelReachedQuery,
   useGetBugHunterVolumeQuery,
+  useGetRoadmapVotingQuery,
   useGetXpByTenantQuery,
 } = analyticsAPI;

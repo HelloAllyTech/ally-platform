@@ -6,6 +6,7 @@ import dayjs, {
   BUSINESS_TIMEZONE,
   toBusinessDateString,
 } from 'src/common/util/date.util';
+import { RoadmapVotingAnalyticsService } from 'src/analytics/service/roadmap-voting-analytics.service';
 import { AppConfigService } from 'src/config/config.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { RedisService } from 'src/redis/service/redis.service';
@@ -75,6 +76,7 @@ export class ProductUpdateDigestService {
     private readonly sesService: SESService,
     private readonly configService: AppConfigService,
     private readonly redisService: RedisService,
+    private readonly roadmapVoting: RoadmapVotingAnalyticsService,
   ) {}
 
   /** The hourly tick: sends once, in the configured business hour, if there is anything to report. */
@@ -198,7 +200,12 @@ export class ProductUpdateDigestService {
     const editLink = (update: ProductUpdate) =>
       `${adminBase}/product-updates?update=${encodeURIComponent(update.id)}`;
 
+    // Votes lead the email: getting more of the team voting is the point of
+    // putting them here at all, and a section below the release cards is one
+    // most readers never scroll to.
     const sections: string[] = [];
+    const votes = await this.roadmapVotesSection(now, adminBase);
+    if (votes) sections.push(votes);
     sections.push(
       section(
         'Live for customers',
@@ -266,6 +273,78 @@ ${footer}
 </div>`;
 
     return { subject, html, live, waiting };
+  }
+
+  /**
+   * "Roadmap votes this month", by name — so the team sees who is shaping the
+   * roadmap, the same figures as Analytics → Highlights → Priority (AAQ-254),
+   * which reads the same service.
+   *
+   * Voters lead, highest first, as recognition (Stacks: *Social Presence and
+   * Recognition in Crowdsourced Work*); admins with access who have not voted
+   * yet follow on one quiet line in name order — the nudge, without ranking
+   * anyone at the bottom of a table.
+   *
+   * First section of the email, but a rider on one that is going out anyway: it never makes a digest send
+   * on its own, and a failure here drops the section rather than the email.
+   */
+  private async roadmapVotesSection(
+    now: Date,
+    adminBase: string,
+  ): Promise<string> {
+    try {
+      const data = await this.roadmapVoting.getRoadmapVoting(now);
+      const month = data.months.find((m) => m.partial);
+      if (!month || month.users.length === 0) return '';
+
+      const nameOf = new Map(data.users.map((u) => [u.userId, u.name]));
+      const name = (userId: number) => nameOf.get(userId) ?? `Admin #${userId}`;
+      const voters = month.users
+        .filter((u) => u.votes > 0)
+        .sort(
+          (a, b) =>
+            b.votes - a.votes || name(a.userId).localeCompare(name(b.userId)),
+        );
+      const notYet = month.users
+        .filter((u) => u.votes === 0)
+        .map((u) => name(u.userId))
+        .sort((a, b) => a.localeCompare(b));
+
+      const monthName = dayjs(now).tz(BUSINESS_TIMEZONE).format('MMMM');
+      const share =
+        month.eligible !== null
+          ? `${month.voters} of ${month.eligible} admins have voted`
+          : `${month.voters} admins have voted`;
+      const issued = month.granted
+        ? ` · ${month.votes.toLocaleString('en-IN')} of ${month.granted.toLocaleString('en-IN')} votes issued used`
+        : ` · ${month.votes.toLocaleString('en-IN')} votes`;
+
+      const rows = voters
+        .map(
+          (u) =>
+            `<tr><td style="padding:2px 16px 2px 0">${escapeHtml(name(u.userId))}</td><td style="padding:2px 0;text-align:right;font-variant-numeric:tabular-nums">${u.votes.toLocaleString('en-IN')}</td></tr>`,
+        )
+        .join('');
+      const table = rows
+        ? `<table style="border-collapse:collapse;margin:0 0 8px">${rows}</table>`
+        : `<p style="margin:0 0 8px;color:#6E6656">No votes cast yet this month.</p>`;
+      const pending = notYet.length
+        ? `<p style="margin:0 0 6px;color:#6E6656;font-size:13px">Not voted yet: ${escapeHtml(notYet.join(', '))}</p>`
+        : '';
+
+      return `<h2 style="font-size:16px;margin:24px 0 10px">Roadmap votes in ${escapeHtml(monthName)} so far</h2>
+<p style="margin:0 0 8px">${escapeHtml(share + issued)}</p>
+${table}
+${pending}
+<p style="margin:0;font-size:12px;color:#6E6656"><a href="${escapeHtml(`${adminBase}/analytics?tab=highlights`)}">Month by month in Analytics → Highlights → Priority</a></p>`;
+    } catch (error) {
+      this.logger.error(
+        `[PRODUCT-UPDATES] Roadmap votes section skipped: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return '';
+    }
   }
 }
 

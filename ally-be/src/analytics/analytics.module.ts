@@ -32,6 +32,9 @@ import { RoadmapDeliveryAnalyticsService } from './service/roadmap-delivery-anal
 import { ShipVolumeAnalyticsService } from './service/ship-volume-analytics.service';
 import { ChangelogModule } from 'src/changelog/changelog.module';
 import { RoadmapDeliveryAnalyticsRepository } from './repository/roadmap-delivery-analytics.repository';
+// Highlights → Priority "Roadmap votes cast": the same untenanted roadmap tables.
+import { RoadmapVotingAnalyticsService } from './service/roadmap-voting-analytics.service';
+import { RoadmapVotingAnalyticsRepository } from './repository/roadmap-voting-analytics.repository';
 // Testing-tab endpoints: candidates for the leadership Highlights tab, kept on a
 // separate admin tab until they have proved they change a decision.
 import { ActivationAnalyticsService } from './service/activation-analytics.service';
@@ -247,6 +250,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     RoleplayVolumeAnalyticsRepository,
     RoadmapDeliveryAnalyticsService,
     RoadmapDeliveryAnalyticsRepository,
+    RoadmapVotingAnalyticsService,
+    RoadmapVotingAnalyticsRepository,
     // No repository: this one reads GitHub's statistics API, not our database.
     ShipVolumeAnalyticsService,
     ActivationAnalyticsService,
