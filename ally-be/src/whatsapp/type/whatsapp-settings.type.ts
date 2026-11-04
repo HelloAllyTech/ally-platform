@@ -108,6 +108,12 @@ export interface WhatsAppBotSettings {
 
   /** Substituted into {helpline_numbers} in template bodies. */
   helplineNumbers: string;
+
+  /**
+   * The chatbot that answers the platform number configured in env vars, which has no connector
+   * row. Unset: the platform number does not reply.
+   */
+  platformChatbotId?: string | null;
 }
 
 export const WHATSAPP_SETTINGS_NAME = 'whatsapp_bot';

@@ -30,11 +30,12 @@ import {
   TestWaTemplateDto,
   UpdateWaTemplateDto,
 } from '../dto/whatsapp.dto';
-import { WhatsAppSettingsService } from './whatsapp-settings.service';
-import { WhatsAppTemplateService } from './whatsapp-template.service';
+import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
+import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 import { composeReply } from '../util/reply-composer';
+import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 
-import { KNOWLEDGE_PROMPT_CODES } from './whatsapp-inbound.service';
+import { KNOWLEDGE_PROMPT_CODES } from 'src/chatbot/engine/chatbot-engine.service';
 @Injectable()
 export class WhatsAppAdminService {
   private readonly logger = LoggerService.getInstance(
@@ -48,10 +49,12 @@ export class WhatsAppAdminService {
     private readonly phoneMappingRepository: Repository<WaPhoneMapping>,
     @InjectRepository(KbDocument)
     private readonly kbDocumentRepository: Repository<KbDocument>,
+    @InjectRepository(Chatbot)
+    private readonly chatbotRepository: Repository<Chatbot>,
     @Inject(WHATSAPP_PROVIDER)
     private readonly provider: WhatsAppProvider,
-    private readonly templateService: WhatsAppTemplateService,
-    private readonly settingsService: WhatsAppSettingsService,
+    private readonly templateService: ChatbotReplyService,
+    private readonly settingsService: ChatbotSettingsService,
     private readonly aiService: AiService,
   ) {}
 
@@ -61,24 +64,85 @@ export class WhatsAppAdminService {
 
   // ── templates ─────────────────────────────────────────────────────────
 
-  async listTemplates(kind?: WaTemplateKind, includeArchived = false) {
-    const templates = await this.templateRepository.find({
-      where: {
-        ...(kind ? { kind } : {}),
-        ...(includeArchived ? {} : { archivedAt: IsNull() }),
-      },
-      // Same order the matcher uses, so what an admin sees IS the evaluation order.
-      order: { priority: 'ASC', createdAt: 'ASC' },
+  /**
+   * Replies in evaluation order.
+   *
+   * Without a bot: the GLOBAL replies only, as every bot inherits them.
+   * With one: what that bot's bot actually uses, each annotated with where it comes from
+   * — `default` (a global reply, untouched), `customised` (its own wording of a global one),
+   * `off` (an optional global reply it switched off) or `own` (a reply only it has). A
+   * customised or switched-off reply also carries the default wording, for the screen to show.
+   */
+  async listTemplates(
+    kind?: WaTemplateKind,
+    includeArchived = false,
+    chatbotId?: string,
+  ) {
+    if (!chatbotId) {
+      const templates = await this.templateRepository.find({
+        where: {
+          chatbotId: IsNull(),
+          ...(kind ? { kind } : {}),
+          ...(includeArchived ? {} : { archivedAt: IsNull() }),
+        },
+        // Same order the matcher uses, so what an admin sees IS the evaluation order.
+        order: { priority: 'ASC', createdAt: 'ASC' },
+      });
+      return { templates, count: templates.length };
+    }
+
+    const rows = await this.templateRepository.find({
+      where: [
+        { archivedAt: IsNull(), chatbotId: IsNull() },
+        { archivedAt: IsNull(), chatbotId },
+      ],
     });
+    const globals = new Map(
+      rows.filter((r) => !r.chatbotId).map((r) => [r.id, r]),
+    );
+    const effective = ChatbotReplyService.resolve(rows, chatbotId);
+    const templates = effective
+      .filter((t) => !kind || t.kind === kind)
+      .map((t) => {
+        const global = t.overridesTemplateId
+          ? globals.get(t.overridesTemplateId)
+          : undefined;
+        const state = !t.chatbotId
+          ? 'default'
+          : global
+            ? t.active
+              ? 'customised'
+              : 'off'
+            : 'own';
+        return {
+          ...t,
+          state,
+          ...(global
+            ? {
+                name: global.name,
+                defaultResponseText: global.responseText,
+                defaultPatterns: global.patterns,
+              }
+            : {}),
+        };
+      });
     return { templates, count: templates.length };
   }
 
-  async createTemplate(dto: CreateWaTemplateDto) {
+  /**
+   * Create a reply. For a bot, only FAQ and command replies, placed after the safety
+   * bands: a bot's own reply can answer a question, never pre-empt a crisis or STOP.
+   */
+  async createTemplate(dto: CreateWaTemplateDto, chatbotId?: string) {
     this.validatePatterns(dto.matchType, dto.patterns);
+    if (chatbotId) this.assertBotKind(dto.kind);
 
     return this.templateRepository.save(
       this.templateRepository.create({
         ...dto,
+        ...(chatbotId
+          ? { chatbotId, priority: this.botPriority(dto.kind, dto.priority) }
+          : {}),
         bypassRag: dto.bypassRag ?? true,
         terminal: dto.terminal ?? dto.kind === WaTemplateKind.CRISIS,
         active: dto.active ?? true,
@@ -89,8 +153,84 @@ export class WhatsAppAdminService {
     );
   }
 
-  async updateTemplate(id: string, dto: UpdateWaTemplateDto) {
+  /**
+   * An bot's own version of a global reply: reworded, re-keyed, or (if optional)
+   * switched off. Creates the override the first time and edits it after, so the screen has one
+   * "Customise" action whatever the state. The reply keeps the global's kind and position.
+   */
+  async customiseTemplate(
+    globalId: string,
+    chatbotId: string,
+    dto: UpdateWaTemplateDto,
+  ) {
+    const global = await this.templateRepository.findOne({
+      where: { id: globalId, chatbotId: IsNull(), archivedAt: IsNull() },
+    });
+    if (!global)
+      throw new NotFoundException(`Template ${globalId} was not found`);
+    if (global.mandatory && dto.active === false) {
+      throw new ForbiddenException(
+        `"${global.name}" is a required safety reply and cannot be switched off. You can change its wording.`,
+      );
+    }
+    const changes = this.overrideFields(dto);
+    this.validatePatterns(
+      changes.matchType ?? global.matchType,
+      changes.patterns ?? global.patterns,
+    );
+
+    const existing = await this.templateRepository.findOne({
+      where: { chatbotId, overridesTemplateId: global.id, archivedAt: IsNull() },
+    });
+    if (existing) {
+      await this.templateRepository.update(
+        { id: existing.id },
+        { ...changes, updatedBy: this.userId() },
+      );
+      return this.findTemplateOrFail(existing.id);
+    }
+    return this.templateRepository.save(
+      this.templateRepository.create({
+        kind: global.kind,
+        name: global.name,
+        matchType: global.matchType,
+        patterns: global.patterns,
+        languageCode: global.languageCode,
+        priority: global.priority,
+        responseText: global.responseText,
+        bypassRag: global.bypassRag,
+        terminal: global.terminal,
+        active: true,
+        mandatory: false,
+        ...changes,
+        chatbotId,
+        overridesTemplateId: global.id,
+        createdBy: this.userId(),
+      }),
+    );
+  }
+
+  async updateTemplate(
+    id: string,
+    dto: UpdateWaTemplateDto,
+    chatbotId?: string,
+  ) {
     const template = await this.findTemplateOrFail(id);
+    if ((template.chatbotId ?? undefined) !== chatbotId) {
+      if (!template.chatbotId && chatbotId) {
+        throw new BadRequestException(
+          'This is a default reply shared by every chatbot. Customise it for this chatbot instead.',
+        );
+      }
+      throw new NotFoundException(`Template ${id} was not found`);
+    }
+    if (template.overridesTemplateId) {
+      return this.customiseTemplate(
+        template.overridesTemplateId,
+        chatbotId!,
+        dto,
+      );
+    }
 
     if (dto.matchType || dto.patterns) {
       this.validatePatterns(
@@ -111,13 +251,31 @@ export class WhatsAppAdminService {
 
     await this.templateRepository.update(
       { id },
-      { ...dto, updatedBy: this.userId() },
+      {
+        ...dto,
+        ...(chatbotId
+          ? {
+              priority: this.botPriority(
+                template.kind,
+                dto.priority ?? template.priority,
+              ),
+            }
+          : {}),
+        updatedBy: this.userId(),
+      },
     );
     return this.findTemplateOrFail(id);
   }
 
-  async archiveTemplate(id: string) {
+  /**
+   * Remove a reply. For a bot this removes its own reply, or — for its version of a
+   * global one — goes back to the default ("Reset to default"), which is always allowed.
+   */
+  async archiveTemplate(id: string, chatbotId?: string) {
     const template = await this.findTemplateOrFail(id);
+    if ((template.chatbotId ?? undefined) !== chatbotId) {
+      throw new NotFoundException(`Template ${id} was not found`);
+    }
     if (template.mandatory) {
       throw new ForbiddenException(
         `"${template.name}" is a required safety template and cannot be removed.`,
@@ -135,11 +293,16 @@ export class WhatsAppAdminService {
    *
    * Renumbered in steps of 10 within each kind's band rather than 0..n, so a later insert has room
    * between two rules without another full reorder — and so a reorder can never move an FAQ rule
-   * above a crisis rule, because each id keeps its own kind's band.
+   * above a crisis rule, because each id keeps its own kind's band. For a bot only its
+   * OWN replies move; the global ones keep their places.
    */
-  async reorderTemplates(dto: ReorderWaTemplatesDto) {
+  async reorderTemplates(dto: ReorderWaTemplatesDto, chatbotId?: string) {
     const templates = await this.templateRepository.find({
-      where: { archivedAt: IsNull() },
+      where: {
+        archivedAt: IsNull(),
+        chatbotId: chatbotId ?? IsNull(),
+        overridesTemplateId: IsNull(),
+      },
     });
     const byId = new Map(templates.map((t) => [t.id, t]));
 
@@ -159,7 +322,33 @@ export class WhatsAppAdminService {
       await this.templateRepository.update({ id }, { priority });
     }
 
-    return this.listTemplates();
+    return this.listTemplates(undefined, false, chatbotId);
+  }
+
+  /** Only the wording and matching of a global reply are a bot's to change. */
+  private overrideFields(dto: UpdateWaTemplateDto): Partial<WaKeywordTemplate> {
+    const out: Partial<WaKeywordTemplate> = {};
+    if (dto.responseText !== undefined) out.responseText = dto.responseText;
+    if (dto.patterns !== undefined) out.patterns = dto.patterns;
+    if (dto.matchType !== undefined) out.matchType = dto.matchType;
+    if (dto.active !== undefined) out.active = dto.active;
+    return out;
+  }
+
+  private assertBotKind(kind: WaTemplateKind): void {
+    if (kind !== WaTemplateKind.FAQ && kind !== WaTemplateKind.COMMAND) {
+      throw new BadRequestException(
+        'A chatbot can add FAQ and command replies. Crisis and consent replies are shared by every chatbot; customise their wording instead.',
+      );
+    }
+  }
+
+  /** Inside the kind's band and never ahead of the safety bands. */
+  private botPriority(kind: WaTemplateKind, requested?: number): number {
+    const floor = kind === WaTemplateKind.COMMAND ? 200 : 300;
+    const ceiling = kind === WaTemplateKind.COMMAND ? 299 : 9999;
+    const value = requested ?? floor + 50;
+    return Math.min(Math.max(value, floor), ceiling);
   }
 
   /**
@@ -169,21 +358,29 @@ export class WhatsAppAdminService {
    * cannot otherwise tell that their new FAQ rule now swallows a phrase the crisis rule used to
    * catch.
    */
-  async testTemplate(dto: TestWaTemplateDto) {
-    const settings = await this.settingsService.get();
-    const match = await this.templateService.match(dto.text, dto.language);
+  async testTemplate(dto: TestWaTemplateDto, chatbotId?: string) {
+    const settings = await this.settingsService.getForChatbot(
+      chatbotId
+        ? await this.chatbotRepository.findOne({ where: { id: chatbotId } })
+        : null,
+    );
+    const match = await this.templateService.match(
+      dto.text,
+      dto.language,
+      chatbotId ?? null,
+    );
 
     if (!match) {
       return {
         matched: false,
-        normalisedText: WhatsAppTemplateService.normalise(dto.text),
+        normalisedText: ChatbotReplyService.normalise(dto.text),
         wouldReachRetrieval: true,
       };
     }
 
     return {
       matched: true,
-      normalisedText: WhatsAppTemplateService.normalise(dto.text),
+      normalisedText: ChatbotReplyService.normalise(dto.text),
       template: {
         id: match.template.id,
         name: match.template.name,

@@ -291,6 +291,27 @@ class KnowledgeWhatsappAnswerInputs(PromptInputs):
     question: str
 
 
+class KnowledgeAnswerGeneralInputs(PromptInputs):
+    """`knowledge/answer_general.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_knowledge_answer_general",
+        name="Chatbot Answer (documents + general knowledge)",
+        description=(
+            "Answers a chatbot question from the bot's documents first and, when they do "
+            "not cover it, from general knowledge — saying so. Used only by bots set to "
+            "'Documents + general knowledge'."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    history: Optional[str] = None
+    max_chars: Optional[str] = None
+    passages: str
+    question: str
+
+
 class NotesContentEnhanceInputs(PromptInputs):
     """`notes/content_enhance.txt`."""
 

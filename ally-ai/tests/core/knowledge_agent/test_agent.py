@@ -685,3 +685,87 @@ class TestRetrievalAudience:
         gen.assert_not_called()
         assert result["intent"] == AnswerIntent.DECLINE
         assert result["decline_reason"] == DeclineReason.NO_HITS
+
+
+class TestChatbotPersonaAndMode:
+    """A chatbot's persona and answer mode, sent by ally-be per request."""
+
+    @pytest.mark.asyncio
+    async def test_persona_goes_ahead_of_the_rules(self, agent, chunk_service):
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.8)]
+        answer = KnowledgeAnswer(
+            intent=AnswerIntent.ANSWER, answer="Yes.", language="en", citations=[1]
+        )
+
+        with patch(f"{AGENT}.generate_structured", stub_generate(answer)) as gen:
+            await agent.answer(
+                "q",
+                ANY_AUDIENCE,
+                translate_query=False,
+                persona={"display_name": "Ava", "system_prompt": "Be brief."},
+            )
+
+        prompt = gen.call_args.kwargs["prompt"]
+        assert prompt.startswith("# Who you are\nYou are Ava.")
+        assert "Be brief." in prompt
+        # The template's own rules come after, so they have the last word.
+        assert prompt.index("Be brief.") < prompt.index("# How to answer")
+
+    @pytest.mark.asyncio
+    async def test_no_persona_leaves_the_prompt_as_it_was(self, agent, chunk_service):
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.8)]
+        answer = KnowledgeAnswer(
+            intent=AnswerIntent.ANSWER, answer="Yes.", language="en", citations=[1]
+        )
+
+        with patch(f"{AGENT}.generate_structured", stub_generate(answer)) as gen:
+            await agent.answer("q", ANY_AUDIENCE, translate_query=False)
+
+        assert "# Who you are" not in gen.call_args.kwargs["prompt"]
+
+    @pytest.mark.asyncio
+    async def test_general_mode_answers_when_the_documents_do_not_cover_it(
+        self, agent, chunk_service
+    ):
+        chunk_service.search.return_value = []
+        answer = KnowledgeAnswer(
+            intent=AnswerIntent.ANSWER,
+            answer="Generally speaking, yes.",
+            language="en",
+            citations=[],
+        )
+
+        with patch(f"{AGENT}.generate_structured", stub_generate(answer)) as gen:
+            result = await agent.answer(
+                "q",
+                ANY_AUDIENCE,
+                translate_query=False,
+                answer_mode="documents_and_general",
+            )
+
+        gen.assert_called_once()
+        assert "general knowledge" in gen.call_args.kwargs["prompt"]
+        assert "(no passages were retrieved)" in gen.call_args.kwargs["prompt"]
+        assert result["intent"] == AnswerIntent.ANSWER
+        assert result["citations"] == []
+
+    @pytest.mark.asyncio
+    async def test_general_mode_never_passes_weak_hits_off_as_sources(
+        self, agent, chunk_service
+    ):
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.30)]
+        answer = KnowledgeAnswer(
+            intent=AnswerIntent.ANSWER, answer="General.", language="en", citations=[1]
+        )
+
+        with patch(f"{AGENT}.generate_structured", stub_generate(answer)) as gen:
+            result = await agent.answer(
+                "q",
+                ANY_AUDIENCE,
+                translate_query=False,
+                decline_similarity=0.42,
+                answer_mode="documents_and_general",
+            )
+
+        assert "(no passages were retrieved)" in gen.call_args.kwargs["prompt"]
+        assert result["citations"] == []

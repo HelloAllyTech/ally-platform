@@ -430,8 +430,10 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Manage the WhatsApp Q&A bot: templates, conversations, unanswered queue and analytics.',
     legacyGrants: SDA_ONLY,
-    // One bot for the platform; most contacts belong to no organization.
-    platformOnly: true,
+    // The platform number and global settings span every organization, but each organization
+    // can connect its own number. An org-restricted admin reaches only the @OrgScopedRoute
+    // routes (their organization's number and settings); everything else stays platform-wide.
+    orgScopedRoutesOnly: true,
   },
   {
     key: FeatureToggleKey.KNOWLEDGE_BASE,
@@ -439,8 +441,10 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'View, edit, upload and archive documents in the WhatsApp bot’s knowledge base.',
     legacyGrants: SDA_ONLY,
-    // Feeds the one platform-wide WhatsApp bot.
-    platformOnly: true,
+    // An org-restricted admin manages only documents targeted solely at their organisations
+    // (the per-document routes, marked @OrgScopedRoute). Search, stats and the global corpus stay
+    // platform-wide.
+    orgScopedRoutesOnly: true,
   },
   {
     key: FeatureToggleKey.PRODUCT_ROADMAP_MANAGE,

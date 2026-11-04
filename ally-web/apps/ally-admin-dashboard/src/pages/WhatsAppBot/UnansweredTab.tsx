@@ -18,6 +18,7 @@ import { en, TooltipLocation } from "@constants";
 import { WaUnansweredQuestion, WaUnansweredReason, WaUnansweredStatus } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
+import { useChatbotId } from "./chatbotContext";
 import { UnansweredAnswerPanel } from "./UnansweredAnswerPanel";
 
 const PAGE_SIZE = 25;
@@ -62,11 +63,22 @@ export const UnansweredTab: React.FC = () => {
   // usually does. The row already carries its conversation id, so this is a link, not a search.
   const openThread = useCallback(
     (row: WaUnansweredQuestion) =>
-      setSearchParams({ tab: "conversations", conversation: row.conversationId }),
+      // Keeps the organisation in view: the thread belongs to it.
+      setSearchParams(current => {
+        const next = new URLSearchParams({
+          tab: "conversations",
+          conversation: row.conversationId,
+        });
+        const org = current.get("org");
+        if (org) next.set("org", org);
+        return next;
+      }),
     [setSearchParams],
   );
 
+  const chatbotId = useChatbotId();
   const { data, isLoading, isFetching, isError } = useGetWaUnansweredQuery({
+    chatbotId,
     limit: PAGE_SIZE,
     offset,
     status,
@@ -106,13 +118,13 @@ export const UnansweredTab: React.FC = () => {
   const handleUpdate = useCallback(
     async (row: WaUnansweredQuestion, next: WaUnansweredStatus) => {
       try {
-        await updateQuestion({ id: row.id, status: next }).unwrap();
+        await updateQuestion({ id: row.id, status: next, chatbotId }).unwrap();
         toast.success(en.whatsappBot.unanswered.updated);
       } catch {
         toast.error(en.whatsappBot.unanswered.updateFailed);
       }
     },
-    [updateQuestion],
+    [updateQuestion, chatbotId],
   );
 
   const columns: EntityTableColumn<WaUnansweredQuestion>[] = useMemo(

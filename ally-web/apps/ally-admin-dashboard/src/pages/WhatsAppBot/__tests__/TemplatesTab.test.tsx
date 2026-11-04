@@ -64,13 +64,17 @@ vi.mock("@api", () => ({
   useTestWaTemplateMutation: () => [vi.fn(), { data: undefined, isLoading: false, reset: vi.fn() }],
   useCreateWaTemplateMutation: () => [vi.fn(), { isLoading: false }],
   useUpdateWaTemplateMutation: () => [vi.fn(), { isLoading: false }],
+  useCustomiseWaTemplateMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 vi.mock("@components", () => ({
   ActionConfirmationPopup: () => null,
   Button: ({ children }: { children?: React.ReactNode }) => <button>{children}</button>,
   EmptyState: ({ title }: { title: string }) => <div>{title}</div>,
-  EntityTable: (props: { rows: { id: string; name: string }[]; onDelete?: (row: unknown) => void }) => {
+  EntityTable: (props: {
+    rows: { id: string; name: string }[];
+    onDelete?: (row: unknown) => void;
+  }) => {
     capturedTableProps.push(props);
     return (
       <ul>
@@ -86,7 +90,9 @@ vi.mock("@components", () => ({
   EntitySidePanel: () => null,
 }));
 
-vi.mock("@components/types", () => ({ ButtonVariant: { PRIMARY: "primary", SECONDARY: "secondary" } }));
+vi.mock("@components/types", () => ({
+  ButtonVariant: { PRIMARY: "primary", SECONDARY: "secondary" },
+}));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
   InlineNotification: ({ title }: { title: string }) => <div role="alert">{title}</div>,
@@ -98,7 +104,17 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   CarbonToggle: () => null,
 }));
 
-vi.mock("@icons", () => ({ ArrowUp: () => <span />, ArrowDown: () => <span /> }));
+vi.mock("@icons", () => ({
+  ArrowUp: () => <span />,
+  ArrowDown: () => <span />,
+  PauseIcon: () => <span />,
+  PlayIcon: () => <span />,
+  Refresh: () => <span />,
+  TrashCan: () => <span />,
+}));
+vi.mock("../shared", () => ({
+  StatusPill: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+}));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 let mockTemplatesResult: {

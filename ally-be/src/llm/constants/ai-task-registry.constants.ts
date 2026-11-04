@@ -1107,9 +1107,11 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'whatsapp-answer',
     task: null,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'A worker sends the WhatsApp bot a question',
+    trigger: 'Someone asks a chatbot a question (WhatsApp, or the test console)',
     detail:
-      'Answers only from retrieved corpus passages, or declines. Ran on Claude because ' +
+      'Answers from the bot’s documents, or declines — or, for a bot in "documents + general ' +
+      'knowledge" mode, answers generally and says so. A bot may pick its own model from the ' +
+      'catalog (ally-ai runtime); it applies to this call only, never to the crisis check. Ran on Claude because ' +
       'refusing to answer from outside the passages is an instruction-following problem, ' +
       'until that credential expired and took the bot silent — OpenAI is the one provider ' +
       'whose key is required in that service. Falls back to OpenAI whatever is selected, ' +
@@ -1118,7 +1120,7 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
     configuredBy:
-      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER',
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per bot: chatbots.model',
     promptOverride: 'ally_ai_knowledge_whatsapp_answer',
   },
   {

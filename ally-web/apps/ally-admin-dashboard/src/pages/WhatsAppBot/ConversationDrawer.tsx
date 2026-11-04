@@ -9,6 +9,8 @@ import { en, TooltipLocation } from "@constants";
 import { WaConversationMessage, WaHandledBy, WaPreviewCitation } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
+import { useChatbotId } from "./chatbotContext";
+
 interface ConversationDrawerProps {
   /** Null closes the drawer; the query is skipped while it is null. */
   conversationId: string | null;
@@ -32,9 +34,11 @@ export const ConversationDrawer: React.FC<ConversationDrawerProps> = ({
   conversationId,
   onClose,
 }) => {
-  const { data, isLoading, isError } = useGetWaConversationQuery(conversationId ?? "", {
-    skip: !conversationId,
-  });
+  const chatbotId = useChatbotId();
+  const { data, isLoading, isError } = useGetWaConversationQuery(
+    { id: conversationId ?? "", chatbotId },
+    { skip: !conversationId },
+  );
   const [openCitation, setOpenCitation] = useState<WaPreviewCitation | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 

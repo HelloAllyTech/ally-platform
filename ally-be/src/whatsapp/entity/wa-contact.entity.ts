@@ -24,13 +24,31 @@ import { WaConsentStatus, WaIdentitySource } from '../enum/whatsapp.enum';
  * needs to load the full number at all.
  */
 @Entity('wa_contacts')
+// One contact per (sender, business number): the same worker writing to two organisations' numbers
+// is two separate threads, with separate consent and rate limits. Two partial indexes because a
+// NULL never collides in a plain unique index, and NULL is the platform number.
+@Index('uq_wa_contacts_phone', ['phoneE164'], {
+  unique: true,
+  where: '"business_number_id" IS NULL',
+})
+@Index('uq_wa_contacts_phone_number', ['phoneE164', 'businessNumberId'], {
+  unique: true,
+  where: '"business_number_id" IS NOT NULL',
+})
 export class WaContact extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Index('uq_wa_contacts_phone', { unique: true })
   @Column({ type: 'varchar', length: 32, name: 'phone_e164' })
   phoneE164!: string;
+
+  /**
+   * The organisation number this contact wrote to (`wa_business_numbers.id`). Null for the
+   * env-configured platform number. Never changes after creation.
+   */
+  @Index('idx_wa_contacts_business_number')
+  @Column({ type: 'uuid', name: 'business_number_id', nullable: true })
+  businessNumberId?: string | null;
 
   /** Derived on write, so a masked list view never selects the full number. */
   @Column({ type: 'varchar', length: 4, name: 'phone_last4' })

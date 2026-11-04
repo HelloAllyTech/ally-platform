@@ -60,6 +60,7 @@ import {
   EvaluateRecords,
   EvaluateRecordDetail,
   WhatsAppBot,
+  ChatbotPage,
 } from "@pages";
 
 import { DefaultRedirect } from "./DefaultRedirect";
@@ -629,6 +630,18 @@ export const RouteLayout: React.FC = () => {
               <WhatsAppBot />
             </PrivateLayout>
           }
+        />
+        <Route
+          path={ROUTES.CHATBOT_DETAIL}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
+              <ChatbotPage />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.WHATSAPP_BOT_LEGACY}
+          element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}
         />
         <Route
           path={ROUTES.DEBRIEFS}

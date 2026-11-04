@@ -1,12 +1,18 @@
-A mental healthcare worker sent the message below to an automated question-answering assistant. Decide whether it is about a crisis happening now.
+Someone sent the message below to an automated question-answering assistant. The sender may be a mental healthcare worker, a counsellor, a trainee, or a member of the public. Decide whether the message shows that someone may be in danger now.
 
 # Message
 {message}
 
 # What you are deciding
-Return `is_crisis: true` when the sender, or a client they describe, is at risk of suicide, self-harm or harm right now, or someone's safety depends on what happens soon. Return `is_crisis: false` for reference questions asked in general terms, past cases, hypotheticals, and ordinary work stress. When unsure, choose `true`. Judge the message in whatever language it is written.
+Return `is_crisis: true` when the message shows that the sender, or a person they describe, may be at risk of suicide, self-harm, harm to others or abuse right now, or is in acute distress — including indirect ways of saying it ("I can't keep doing this", "everyone would be better off without me", "she said she won't be here tomorrow").
+
+Return `is_crisis: false` for messages with no sign of risk or distress: questions about a product, an app, an account, sign-in, features, settings, data, privacy, costs or contact details; greetings; reference questions asked in general terms; past cases; hypotheticals; ordinary work stress.
+
+When a message contains a sign of risk or distress and you are unsure how serious it is, choose `true`. Do not choose `true` for a message that contains no such sign.
+
+Judge the message in whatever language it is written.
 
 # What to return
 - `is_crisis`: your decision.
-- `signal`: the shortest phrase from the message that drove it, copied verbatim; empty when `is_crisis` is false.
+- `signal`: the shortest phrase from the message that shows risk or distress, copied verbatim; empty when `is_crisis` is false. If you cannot quote such a phrase, `is_crisis` must be false.
 - `confidence`: 0 to 1.

@@ -1,133 +1,215 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { Tabs } from "@ally-ui-mono/ui-shared";
-import { useGetWaUnansweredQuery } from "@api";
-import { en } from "@constants";
-import { WaUnansweredStatus } from "@types";
+import { SkeletonText, Tabs } from "@ally-ui-mono/ui-shared";
+import { useGetChatbotsQuery } from "@api";
+import { Button, EmptyState } from "@components";
+import { ButtonVariant } from "@components/types";
+import { en, ROUTES } from "@constants";
+import { Chatbot, ChatbotStatus } from "@types";
 
 import { BotSettingsTab } from "./BotSettingsTab";
-import { ConversationsTab } from "./ConversationsTab";
+import { AllConnectorsTab } from "./ConnectorsTab";
 import { CorpusTab } from "./CorpusTab";
+import { CreateChatbotPanel } from "./CreateChatbotPanel";
+import { fill, LoadError, StatusPill } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
-import { TestConsoleTab } from "./TestConsoleTab";
-import { UnansweredTab } from "./UnansweredTab";
-import { UsageTab } from "./UsageTab";
+
+const t = en.whatsappBot.bots;
+
+type HomeTab = "bots" | "connectors" | "defaults" | "library";
 
 /**
- * WhatsApp Q&A bot admin.
+ * Chatbots home.
  *
- * Gated in two places, matching every other feature-toggle-gated tab here: the
- * `whatsapp_bot` entry in `buildSidebarItemFeatureKeyMap` (utils/navigation.ts)
- * hides the sidebar entry, and `requiredFeature={FeatureToggleKey.WHATSAPP_BOT}`
- * on the route in RouteLayout blocks direct navigation. There is deliberately
- * no `Permissions` member — Settings, Logs,
- * Tooltips and Badges are all pure role/toggle gates, and adding one would need
- * a backend grant migration for zero extra gating.
+ * Everyone sees the bots they can work on, as cards. Platform admins — who create bots and own
+ * what every bot shares — also get the connectors (every number, and which bot it serves), the
+ * defaults every bot inherits (settings and shared quick replies), and the
+ * knowledge library bots pick their documents from.
  *
- * Known platform inconsistency worth naming: PrivateLayout compares the singular `userData.role`
- * while the repo's own CLAUDE.md says to gate on the `roles` array (the singular is a lossy legacy
- * collapse). This tab follows the existing pattern rather than diverging alone; fixing it is a
- * platform-wide change.
- *
- * All seven sub-tabs are shipped. The Usage tab is a lazy boundary rather than a direct import, so
- * `@carbon/charts` stays out of this route's eager bundle — see UsageTab.tsx.
+ * Gated in two places, matching every other feature-toggle-gated page here: the `whatsapp_bot`
+ * entry in `buildSidebarItemFeatureKeyMap` hides the sidebar entry, and `requiredFeature` on the
+ * route in RouteLayout blocks direct navigation.
  */
-enum WhatsAppBotTab {
-  CORPUS = "corpus",
-  TEMPLATES = "templates",
-  TEST_CONSOLE = "test-console",
-  SETTINGS = "settings",
-  CONVERSATIONS = "conversations",
-  UNANSWERED = "unanswered",
-  USAGE = "usage",
-}
-
-const TAB_ITEMS: { id: WhatsAppBotTab; label: string; count?: number }[] = [
-  { id: WhatsAppBotTab.CORPUS, label: en.whatsappBot.tabs.corpus },
-  { id: WhatsAppBotTab.TEMPLATES, label: en.whatsappBot.tabs.templates },
-  { id: WhatsAppBotTab.TEST_CONSOLE, label: en.whatsappBot.tabs.testConsole },
-  { id: WhatsAppBotTab.SETTINGS, label: en.whatsappBot.tabs.settings },
-  { id: WhatsAppBotTab.CONVERSATIONS, label: en.whatsappBot.tabs.conversations },
-  { id: WhatsAppBotTab.UNANSWERED, label: en.whatsappBot.tabs.unanswered },
-  { id: WhatsAppBotTab.USAGE, label: en.whatsappBot.tabs.usage },
-];
-
-const VALID_TABS = new Set<string>(TAB_ITEMS.map(t => t.id));
-
 export const WhatsAppBot: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { data, isLoading, isError, refetch } = useGetChatbotsQuery();
+  const [creating, setCreating] = useState(false);
+  const canCreate = Boolean(data?.canCreate);
 
-  // The open-queue size, shown on the tab itself. This is the one number in the whole feature that
-  // an operator needs without opening anything: a corpus gap is work waiting, and a worklist you
-  // have to click into to discover is a worklist that grows unnoticed. `limit: 1` because only the
-  // count is used — the rows come from the tab's own query.
-  const { data: openQueue } = useGetWaUnansweredQuery({
-    limit: 1,
-    status: WaUnansweredStatus.OPEN,
-  });
-
-  /**
-   * The open-queue size goes in the LABEL, not into `count` with `showCount`.
-   *
-   * The shared Tabs renders `showCount ? item.count || "0" : ""` — one flag for the whole strip — so
-   * enabling it to badge a single tab puts a literal "0" after all seven labels. Fixing that in
-   * ui-shared is the better answer but is a shared-surface change needing all three app suites; this
-   * gets the same result with no blast radius.
-   *
-   * Only rendered when something is actually waiting: "Unanswered (0)" is noise, and a badge that
-   * never disappears stops meaning "there is work here".
-   */
-  const tabItems = useMemo(() => {
-    const open = openQueue?.count ?? 0;
-    return TAB_ITEMS.map(item =>
-      item.id === WhatsAppBotTab.UNANSWERED && open > 0
-        ? { ...item, label: `${item.label} (${open})` }
-        : item,
-    );
-  }, [openQueue?.count]);
-
-  const activeTab = useMemo(() => {
-    const requested = searchParams.get("tab");
-    // An unknown ?tab= falls back to the default rather than rendering nothing, so a stale
-    // bookmark or a renamed tab cannot leave the page blank.
-    return requested && VALID_TABS.has(requested) ? requested : WhatsAppBotTab.CORPUS;
-  }, [searchParams]);
-
-  // Changing tabs drops any row-level deep link, so switching to Conversations from a link that
-  // opened one thread does not leave that thread pinned open under a different tab.
-  const handleTabChange = useCallback(
-    (id: string) => setSearchParams({ tab: id }),
+  const tabItems = useMemo(
+    () =>
+      canCreate
+        ? [
+            { id: "bots", label: t.homeTabs.bots },
+            { id: "connectors", label: t.homeTabs.connectors },
+            { id: "defaults", label: t.homeTabs.defaults },
+            { id: "library", label: t.homeTabs.library },
+          ]
+        : [{ id: "bots", label: t.homeTabs.bots }],
+    [canCreate],
+  );
+  const requested = searchParams.get("tab") ?? "bots";
+  const activeTab = (tabItems.find(tab => tab.id === requested)?.id ?? "bots") as HomeTab;
+  const goToTab = useCallback(
+    (id: string) => setSearchParams(id === "bots" ? {} : { tab: id }),
     [setSearchParams],
   );
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case WhatsAppBotTab.TEMPLATES:
-        return <TemplatesTab />;
-      case WhatsAppBotTab.TEST_CONSOLE:
-        return <TestConsoleTab />;
-      case WhatsAppBotTab.SETTINGS:
-        return <BotSettingsTab />;
-      case WhatsAppBotTab.CONVERSATIONS:
-        return <ConversationsTab />;
-      case WhatsAppBotTab.UNANSWERED:
-        return <UnansweredTab />;
-      case WhatsAppBotTab.USAGE:
-        return <UsageTab />;
-      case WhatsAppBotTab.CORPUS:
-      default:
-        return <CorpusTab />;
-    }
-  };
-
   return (
     <div className="py-[2px] font-primary relative">
-      <h1 className="text-2xl text-typography-900 pb-1 font-secondary">{en.whatsappBot.title}</h1>
-      <p className="text-sm text-typography-600 pb-6">{en.whatsappBot.subtitle}</p>
-      <Tabs items={tabItems} activeId={activeTab} onChange={handleTabChange} showCount={false} />
-      {renderTab()}
+      <div className="flex flex-wrap items-end justify-between gap-4 pb-6">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl text-typography-900 font-secondary">{en.whatsappBot.title}</h1>
+          <p className="text-sm text-typography-600">{en.whatsappBot.subtitle}</p>
+        </div>
+        {canCreate && (
+          <Button variant={ButtonVariant.PRIMARY} onClick={() => setCreating(true)}>
+            {t.create}
+          </Button>
+        )}
+      </div>
+      {tabItems.length > 1 && (
+        <Tabs items={tabItems} activeId={activeTab} onChange={goToTab} showCount={false} />
+      )}
+      <div className="pt-6">
+        {activeTab === "bots" &&
+          (isLoading ? (
+            <SkeletonText paragraph lineCount={6} />
+          ) : isError ? (
+            <LoadError title={t.loadFailed} onRetry={() => void refetch()} />
+          ) : (
+            <ChatbotGrid
+              bots={data?.chatbots ?? []}
+              canCreate={canCreate}
+              onCreate={() => setCreating(true)}
+            />
+          ))}
+        {activeTab === "connectors" && (
+          <AllConnectorsTab bots={data?.chatbots ?? []} onCreateAgent={() => setCreating(true)} />
+        )}
+        {activeTab === "defaults" && <DefaultsTab />}
+        {activeTab === "library" && <CorpusTab />}
+      </div>
+      <CreateChatbotPanel isOpen={creating} onClose={() => setCreating(false)} />
+    </div>
+  );
+};
+
+/**
+ * Defaults: what every agent starts from, split into its two halves so neither page is long —
+ * the settings, and the quick replies every agent shares.
+ */
+const DefaultsTab: React.FC = () => {
+  const [section, setSection] = useState<"settings" | "replies">("settings");
+  return (
+    <div className="flex flex-col gap-6">
+      <p className="text-sm text-typography-600 max-w-3xl">{t.defaults.intro}</p>
+      <div className="inline-flex w-fit rounded-md border border-border-light p-0.5" role="tablist">
+        {(["settings", "replies"] as const).map(id => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={section === id}
+            onClick={() => setSection(id)}
+            className={`px-4 py-1.5 text-sm rounded ${
+              section === id
+                ? "bg-primary-500 text-white"
+                : "text-typography-700 hover:bg-neutral-50"
+            }`}
+          >
+            {id === "settings" ? t.defaults.sectionSettings : t.defaults.sectionReplies}
+          </button>
+        ))}
+      </div>
+      {section === "settings" ? (
+        <BotSettingsTab />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-typography-600 max-w-3xl">{t.defaults.repliesIntro}</p>
+          <TemplatesTab />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const STATUS_TONE: Record<ChatbotStatus, "success" | "warning" | "neutral"> = {
+  [ChatbotStatus.LIVE]: "success",
+  [ChatbotStatus.DRAFT]: "neutral",
+  [ChatbotStatus.PAUSED]: "warning",
+};
+
+export const ChatbotStatusPill: React.FC<{ status: ChatbotStatus }> = ({ status }) => (
+  <StatusPill tone={STATUS_TONE[status]}>{t.status[status]}</StatusPill>
+);
+
+const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () => void }> = ({
+  bots,
+  canCreate,
+  onCreate,
+}) => {
+  const navigate = useNavigate();
+  if (!bots.length) {
+    return (
+      <EmptyState
+        title={canCreate ? t.listEmpty : t.listEmptyMember}
+        subtitle={canCreate ? t.listEmptyHint : t.listEmptyMemberHint}
+        actionLabel={t.create}
+        onAction={onCreate}
+        hideActionButton={!canCreate}
+      />
+    );
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {bots.map(bot => (
+        <button
+          key={bot.id}
+          type="button"
+          onClick={() => navigate(ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id))}
+          className="flex flex-col gap-3 text-left border border-border-light rounded-md p-5 hover:bg-neutral-50 min-w-0"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-base text-typography-900 font-secondary truncate">
+                {bot.name}
+              </span>
+              {bot.persona.displayName && bot.persona.displayName !== bot.name && (
+                <span className="text-xs text-typography-500 truncate">
+                  {bot.persona.displayName}
+                </span>
+              )}
+            </div>
+            <ChatbotStatusPill status={bot.status} />
+          </div>
+          {bot.description && (
+            <p className="text-sm text-typography-600 line-clamp-2">{bot.description}</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {bot.connectors.length ? (
+              bot.connectors.map(connector => (
+                <span
+                  key={connector.id}
+                  className="text-xs px-2 py-[2px] rounded-full bg-background-100 text-typography-800"
+                >
+                  {connector.typeLabel} {connector.summary?.address ?? ""}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-typography-500">{t.noConnector}</span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-typography-600">
+            <span>{fill(t.cardMessages, { count: bot.stats.messages })}</span>
+            <span>{fill(t.cardPeople, { count: bot.stats.people })}</span>
+            <span>{fill(t.cardDocs, { count: bot.documentCount })}</span>
+            <span className="ml-auto text-typography-500">{t.role[bot.myRole]}</span>
+          </div>
+        </button>
+      ))}
     </div>
   );
 };

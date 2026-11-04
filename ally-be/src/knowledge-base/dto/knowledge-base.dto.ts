@@ -334,6 +334,20 @@ export class GetKbDocumentsQueryDto {
   @IsBoolean()
   includeArchived?: boolean;
 
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'With `tenantId`: only the documents aimed at that organisation, leaving out the shared ' +
+      "ones every organisation gets. The organisation's own Knowledge tab.",
+  })
+  @IsOptional()
+  // Same string handling as includeArchived: only "true" is true.
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toLowerCase() === 'true' : value,
+  )
+  @IsBoolean()
+  excludeGlobal?: boolean;
+
   /**
    * Sort key and direction. Both are whitelisted server-side, so an unknown key falls back to the
    * default order rather than 400ing — a stale bookmark should render, not break.
@@ -404,6 +418,12 @@ export class KbDocumentResponseDto {
   @ApiProperty() isArchived!: boolean;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+  @ApiPropertyOptional({
+    description:
+      'The extracted text the passages are cut from. Returned by GET /documents/:id only — the ' +
+      'list leaves it out, since it can be megabytes per document.',
+  })
+  rawText?: string;
 }
 
 export class GetKbDocumentsResponseDto {

@@ -34,7 +34,7 @@ describe('KnowledgeBaseService.create — when enqueueing fails', () => {
     };
     ingestProducer = { enqueue: jest.fn() };
     // Positional order matches the constructor: document, chunk, documentTenant, ingest,
-    // ai, s3, config, retrieval, tenant.
+    // ai, s3, config, retrieval, tenant, tenantScope.
     service = new KnowledgeBaseService(
       documentRepository,
       {} as any,
@@ -45,6 +45,9 @@ describe('KnowledgeBaseService.create — when enqueueing fails', () => {
       {} as any,
       {} as any,
       {} as any,
+      {
+        resolveScope: async () => ({ tenantIds: null, restricted: false }),
+      } as any,
     );
   });
 

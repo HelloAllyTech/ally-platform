@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, Repository } from 'typeorm';
 import { CreateKbDocumentDto } from 'src/knowledge-base/dto/knowledge-base.dto';
@@ -19,7 +23,11 @@ import {
   WaUnansweredReason,
   WaUnansweredStatus,
 } from '../enum/whatsapp.enum';
-import { WaAnalyticsRepository } from '../repository/wa-analytics.repository';
+import {
+  conversationInBotSql,
+  WaAnalyticsRepository,
+} from '../repository/wa-analytics.repository';
+import { ChatbotAccessService } from 'src/chatbot/service/chatbot-access.service';
 import { resolveSort } from 'src/common/util/sort.util';
 import { ERASED, ERASED_PHONE_PREFIX } from './whatsapp-retention.service';
 
@@ -50,7 +58,57 @@ export class WhatsAppConversationService {
     private readonly tenantRepository: Repository<Tenant>,
     private readonly analyticsRepository: WaAnalyticsRepository,
     private readonly knowledgeBaseService: KnowledgeBaseService,
+    private readonly access: ChatbotAccessService,
   ) {}
+
+  /**
+   * Refuse a contact the caller has no bot in common with — answering exactly like a missing one,
+   * so a guessed id reveals nothing. Platform admins pass straight through.
+   *
+   * Every per-row route goes through here (thread, reveal, block, erase, and the unanswered
+   * question's thread): the list routes are filtered by `chatbotId`, but an id in a URL is not.
+   */
+  private async assertContactInScope(
+    contactId: string,
+    what: string,
+  ): Promise<void> {
+    const botIds = await this.access.accessibleChatbotIds();
+    if (botIds === null) return;
+    const found = botIds.length
+      ? await this.conversationRepository
+          .createQueryBuilder('c')
+          .where('c.contact_id = :contactId', { contactId })
+          .andWhere('c.chatbot_id IN (:...botIds)', { botIds })
+          .getCount()
+      : 0;
+    if (!found) throw new NotFoundException(`${what} was not found`);
+  }
+
+  /** A list route must name one of the caller's bots unless they are a platform admin. */
+  async assertListScope(chatbotId?: string): Promise<void> {
+    const botIds = await this.access.accessibleChatbotIds();
+    if (botIds === null) return;
+    if (!chatbotId || !botIds.includes(chatbotId)) {
+      throw new NotFoundException('Choose one of your chatbots.');
+    }
+  }
+
+  private async assertQuestionInScope(
+    conversationId: string,
+    questionId: string,
+  ): Promise<void> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: conversationId },
+      select: ['id', 'contactId'],
+    });
+    if (!conversation) {
+      throw new NotFoundException(`Question ${questionId} was not found`);
+    }
+    await this.assertContactInScope(
+      conversation.contactId,
+      `Question ${questionId}`,
+    );
+  }
 
   // ── conversations ─────────────────────────────────────────────────────
 
@@ -65,6 +123,7 @@ export class WhatsAppConversationService {
     search?: string;
     sortBy?: string;
     sortDir?: string;
+    chatbotId?: string;
   }) {
     const limit = options.limit ?? 25;
     const offset = options.offset ?? 0;
@@ -83,6 +142,9 @@ export class WhatsAppConversationService {
       // An inner join here would hide every unrecognised thread from the log — which is the half
       // of the log an admin most needs, since those are the people who got refused.
       .leftJoin(Tenant, 'tenant', 'tenant.id::text = contact.tenant_id')
+      .andWhere(options.chatbotId ? 'c.chatbot_id = :scopeBot' : '1=1', {
+        scopeBot: options.chatbotId,
+      })
       .select([
         'c.id AS id',
         'c.contact_id AS "contactId"',
@@ -158,11 +220,14 @@ export class WhatsAppConversationService {
    * not analytics access would get an empty filter, and a language nobody used this month would
    * disappear from the dropdown while its threads were still listed.
    */
-  async listLanguages(): Promise<string[]> {
+  async listLanguages(chatbotId?: string): Promise<string[]> {
     const rows = await this.conversationRepository
       .createQueryBuilder('c')
       .select('DISTINCT c.last_language', 'language')
       .where('c.last_language IS NOT NULL')
+      .andWhere(chatbotId ? 'c.chatbot_id = :scopeBot' : '1=1', {
+        scopeBot: chatbotId,
+      })
       .orderBy('c.last_language', 'ASC')
       .getRawMany<{ language: string }>();
 
@@ -177,6 +242,10 @@ export class WhatsAppConversationService {
     if (!conversation) {
       throw new NotFoundException(`Conversation ${id} was not found`);
     }
+    await this.assertContactInScope(
+      conversation.contactId,
+      `Conversation ${id}`,
+    );
 
     const contact = await this.contactRepository.findOne({
       where: { id: conversation.contactId },
@@ -254,6 +323,7 @@ export class WhatsAppConversationService {
    * crisis message or block a specific number; nothing else should hand it out.
    */
   async revealContactPhone(contactId: string) {
+    await this.assertContactInScope(contactId, `Contact ${contactId}`);
     const contact = await this.contactRepository.findOne({
       where: { id: contactId },
       select: ['id', 'phoneE164'],
@@ -275,6 +345,7 @@ export class WhatsAppConversationService {
     blocked: boolean,
     reason?: string,
   ) {
+    await this.assertContactInScope(contactId, `Contact ${contactId}`);
     const contact = await this.contactRepository.findOne({
       where: { id: contactId },
     });
@@ -302,6 +373,7 @@ export class WhatsAppConversationService {
    * historical usage figures.
    */
   async eraseContact(contactId: string) {
+    await this.assertContactInScope(contactId, `Contact ${contactId}`);
     const contact = await this.contactRepository.findOne({
       where: { id: contactId },
     });
@@ -360,6 +432,7 @@ export class WhatsAppConversationService {
     to?: Date;
     sortBy?: string;
     sortDir?: string;
+    chatbotId?: string;
   }) {
     const sort = resolveSort(
       UNANSWERED_SORT_COLUMNS,
@@ -370,6 +443,10 @@ export class WhatsAppConversationService {
 
     const query = this.unansweredRepository
       .createQueryBuilder('q')
+      .where(
+        options.chatbotId ? conversationInBotSql('q.conversation_id') : '1=1',
+        { scopeBot: options.chatbotId },
+      )
       .orderBy(sort.column, sort.direction)
       .limit(options.limit ?? 25)
       .offset(options.offset ?? 0);
@@ -405,6 +482,7 @@ export class WhatsAppConversationService {
   ) {
     const row = await this.unansweredRepository.findOne({ where: { id } });
     if (!row) throw new NotFoundException(`Question ${id} was not found`);
+    await this.assertQuestionInScope(row.conversationId, id);
 
     const resolving =
       patch.status === WaUnansweredStatus.ANSWERED ||
@@ -443,8 +521,25 @@ export class WhatsAppConversationService {
   ) {
     const row = await this.unansweredRepository.findOne({ where: { id } });
     if (!row) throw new NotFoundException(`Question ${id} was not found`);
+    await this.assertQuestionInScope(row.conversationId, id);
+
+    // Added to the knowledge of the bot that was asked, so the question it was written for is
+    // answered next time. Targeted at the asker's organisation when known — the platform bot
+    // answers per organisation, and an organisation-restricted admin may only add documents
+    // targeted at their own.
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: row.conversationId },
+      select: ['id', 'contactId', 'chatbotId'],
+    });
+    const contact = conversation
+      ? await this.contactRepository.findOne({
+          where: { id: conversation.contactId },
+          select: ['id', 'tenantId'],
+        })
+      : null;
 
     const document = await this.knowledgeBaseService.create({
+      corpus: KbCorpus.WHATSAPP_QA,
       title: body.title.trim(),
       sourceType: KbDocumentSourceType.PASTE,
       text: body.text,
@@ -452,7 +547,16 @@ export class WhatsAppConversationService {
       // The question's language, not the answer's: it is a hint for retrieval, and this is the
       // language the gap showed up in.
       language: row.language ?? undefined,
+      isGlobal: false,
+      tenantIds: contact?.tenantId ? [contact.tenantId] : [],
     } as CreateKbDocumentDto);
+    if (conversation?.chatbotId) {
+      await this.conversationRepository.manager.query(
+        `INSERT INTO chatbot_documents (chatbot_id, document_id, created_by)
+         VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        [conversation.chatbotId, document.id, Number(ExecutionManager.getUserId() ?? 0)],
+      );
+    }
 
     // Only marked answered once the document exists. If ingest later fails, the queue item is still
     // resolved but `linkedDocumentId` points at a row whose status says `failed` — visible, rather
@@ -475,26 +579,26 @@ export class WhatsAppConversationService {
 
   // ── analytics ─────────────────────────────────────────────────────────
 
-  private window(from?: string, to?: string) {
+  private window(from?: string, to?: string, chatbotId?: string) {
     // Defaults to the last 30 days. A dashboard with no range is a dashboard nobody can interpret,
     // and an unbounded scan over every message ever is not a sensible default either.
     const end = to ? new Date(to) : new Date();
     const start = from
       ? new Date(from)
       : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-    return { from: start, to: end };
+    return { from: start, to: end, ...(chatbotId ? { chatbotId } : {}) };
   }
 
-  overview(from?: string, to?: string) {
-    return this.analyticsRepository.overview(this.window(from, to));
+  overview(from?: string, to?: string, chatbotId?: string) {
+    return this.analyticsRepository.overview(this.window(from, to, chatbotId));
   }
 
-  timeseries(from?: string, to?: string) {
-    return this.analyticsRepository.timeseries(this.window(from, to));
+  timeseries(from?: string, to?: string, chatbotId?: string) {
+    return this.analyticsRepository.timeseries(this.window(from, to, chatbotId));
   }
 
-  languages(from?: string, to?: string) {
-    return this.analyticsRepository.languages(this.window(from, to));
+  languages(from?: string, to?: string, chatbotId?: string) {
+    return this.analyticsRepository.languages(this.window(from, to, chatbotId));
   }
 
   /**
@@ -513,10 +617,21 @@ export class WhatsAppConversationService {
    * a partial worklist as a complete one, which is worse than showing nothing: an admin would read
    * "nothing else is dead corpus" from a list that simply stopped early.
    */
-  async corpusCoverage(from?: string, to?: string) {
+  async corpusCoverage(from?: string, to?: string, chatbotId?: string) {
     const cited = await this.analyticsRepository.corpusCoverage(
-      this.window(from, to),
+      this.window(from, to, chatbotId),
     );
+    // For one bot: the documents it answers from, so "never cited" means never cited by IT.
+    const botDocumentIds = chatbotId
+      ? new Set(
+          (
+            await this.conversationRepository.manager.query<{ document_id: string }[]>(
+              `SELECT document_id FROM chatbot_documents WHERE chatbot_id = $1`,
+              [chatbotId],
+            )
+          ).map((r) => r.document_id),
+        )
+      : null;
     const citedById = new Map(
       cited.map((row) => [row.documentId, row.citations]),
     );
@@ -531,7 +646,9 @@ export class WhatsAppConversationService {
       includeArchived: true,
     });
 
-    const rows = documents.map((document) => {
+    const rows = documents
+      .filter((document) => !botDocumentIds || botDocumentIds.has(document.id))
+      .map((document) => {
       const citations = citedById.get(document.id) ?? 0;
       // Removed as it is matched, so whatever remains in the map is genuinely orphaned.
       citedById.delete(document.id);

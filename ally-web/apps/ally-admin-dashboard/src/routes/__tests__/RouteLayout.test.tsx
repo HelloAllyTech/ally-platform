@@ -76,6 +76,7 @@ vi.mock("@pages", () => ({
   Logs: () => <div>LogsPage</div>,
   MobileReleases: () => <div>MobileReleasesPage</div>,
   WhatsAppBot: () => <div>WhatsAppBotPage</div>,
+  ChatbotPage: () => <div>ChatbotPage</div>,
   Terms: () => <div>TermsPage</div>,
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,

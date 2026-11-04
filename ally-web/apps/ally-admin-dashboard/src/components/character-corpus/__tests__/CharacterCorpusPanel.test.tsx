@@ -126,6 +126,12 @@ vi.mock("@api", () => ({
   useUpdateKbDocumentMutation: () => [updateSpy, { isLoading: false }],
   useCreateKbDocumentMutation: () => [vi.fn(), { isLoading: false }],
   useReplaceKbDocumentContentMutation: () => [vi.fn(), { isLoading: false }],
+  // An opened document's own fetch, which carries its text. Empty text keeps the earlier
+  // "type a body to replace it" behaviour these tests were written against.
+  useGetKbDocumentQuery: (id: string) => ({
+    data: id ? { id, rawText: "" } : undefined,
+    isFetching: false,
+  }),
   useCreateKbUploadUrlMutation: () => [vi.fn(), { isLoading: false }],
 }));
 

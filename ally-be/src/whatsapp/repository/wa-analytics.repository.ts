@@ -1,12 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import { WaMessage } from '../entity/wa-message.entity';
 import { WaHandledBy, WaMessageDirection } from '../enum/whatsapp.enum';
 
 export interface AnalyticsWindow {
   from: Date;
   to: Date;
+  /** Narrow to one bot's traffic; absent = every bot. */
+  chatbotId?: string;
 }
+
+/**
+ * A message (or conversation) belongs to a bot when its conversation was answered by that bot —
+ * stamped on the thread when it starts, so history stays with the bot that answered it even after
+ * a number moves. `:scopeBot` must be bound.
+ */
+export const conversationInBotSql = (conversationIdColumn: string) =>
+  `${conversationIdColumn} IN (SELECT sc.id FROM wa_conversations sc WHERE sc.chatbot_id = :scopeBot)`;
 
 /**
  * Read-only aggregate queries for the usage dashboard.
@@ -23,12 +33,27 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
     super(WaMessage, dataSource.createEntityManager());
   }
 
+  /** Narrow a messages query (alias `m`) to one bot when the window names one. */
+  private scoped(
+    qb: SelectQueryBuilder<WaMessage>,
+    window: AnalyticsWindow,
+  ): SelectQueryBuilder<WaMessage> {
+    return window.chatbotId
+      ? qb.andWhere(conversationInBotSql('m.conversation_id'), {
+          scopeBot: window.chatbotId,
+        })
+      : qb;
+  }
+
   /** Headline counts for the window. */
   async overview(window: AnalyticsWindow) {
     const base = () =>
-      this.createQueryBuilder('m')
-        .where('m."createdAt" >= :from', { from: window.from })
-        .andWhere('m."createdAt" < :to', { to: window.to });
+      this.scoped(
+        this.createQueryBuilder('m')
+          .where('m."createdAt" >= :from', { from: window.from })
+          .andWhere('m."createdAt" < :to', { to: window.to }),
+        window,
+      );
 
     const [inbound, outbound] = await Promise.all([
       base()
@@ -117,6 +142,9 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
         direction: WaMessageDirection.OUTBOUND,
       })
       .andWhere('m.handled_by IS NOT NULL')
+      .andWhere(window.chatbotId ? conversationInBotSql('m.conversation_id') : '1=1', {
+        scopeBot: window.chatbotId,
+      })
       .groupBy('bucket')
       .addGroupBy('m.handled_by')
       .orderBy('bucket', 'ASC')
@@ -156,6 +184,9 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
       })
       .andWhere('m.handled_by IN (:...outcomes)', {
         outcomes: [WaHandledBy.RAG, WaHandledBy.DECLINED],
+      })
+      .andWhere(window.chatbotId ? conversationInBotSql('m.conversation_id') : '1=1', {
+        scopeBot: window.chatbotId,
       })
       .setParameters({
         unknown: 'unknown',
@@ -202,9 +233,10 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
         WHERE m."createdAt" >= $1
           AND m."createdAt" < $2
           AND m.citations IS NOT NULL
+          AND ($3::uuid IS NULL OR ${conversationInBotSql('m.conversation_id').replace(/:scopeBot/g, '$3')})
         GROUP BY citation->>'document_id'
         ORDER BY citations DESC`,
-      [window.from, window.to],
+      [window.from, window.to, window.chatbotId ?? null],
     );
 
     return rows.map((row) => ({
