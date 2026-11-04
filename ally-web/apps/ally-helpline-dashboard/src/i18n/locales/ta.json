@@ -199,6 +199,8 @@
       "badges": "பதக்கங்கள்",
       "streak": "தொடர்",
       "streakHint": "இதுவரையிலான தற்போதைய பயிற்சித் தொடர்",
+      "xp": "XP",
+      "xpHint": "இந்தக் காலத்தில் பெற்ற XP. தரவரிசை XP அடிப்படையில் அமைகிறது.",
       "streakValue_one": "{{count}} நாள் தொடர்",
       "streakValue_other": "{{count}} நாள் தொடர்",
       "badgeValue_one": "{{count}} பதக்கம்",

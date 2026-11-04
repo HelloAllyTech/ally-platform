@@ -199,6 +199,8 @@
       "badges": "बॅजेस",
       "streak": "स्ट्रीक",
       "streakHint": "अब तक की मौजूदा अभ्यास स्ट्रीक",
+      "xp": "XP",
+      "xpHint": "इस अवधि में अर्जित XP। रैंक XP के आधार पर तय होती है।",
       "streakValue_one": "{{count}} दिन की स्ट्रीक",
       "streakValue_other": "{{count}} दिन की स्ट्रीक",
       "badgeValue_one": "{{count}} बैज",

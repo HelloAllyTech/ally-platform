@@ -47,6 +47,7 @@ jest.mock('@/hooks', () => ({
         name: 'Sarah Johnson',
         profileImageUrl: '',
         minutesPlayed: 1200,
+        xpScore: 940,
         badgeCount: 25,
         isCurrentUser: false,
       },
@@ -56,6 +57,7 @@ jest.mock('@/hooks', () => ({
         name: 'Yedhu Krishnan',
         profileImageUrl: '',
         minutesPlayed: 872,
+        xpScore: 615,
         badgeCount: 12,
         isCurrentUser: true,
       },
@@ -66,6 +68,7 @@ jest.mock('@/hooks', () => ({
       profileImageUrl: '',
       rank: 24,
       minutesPlayed: 872,
+      xpScore: 615,
       badgeCount: 12,
       window: 'LAST_WEEK',
       isCurrentUser: true,
@@ -134,8 +137,17 @@ describe('LeaderboardScreen', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
     expect(getByText('community.table.rank')).toBeTruthy();
     expect(getByText('community.table.user')).toBeTruthy();
-    expect(getByText('community.table.totalDuration')).toBeTruthy();
+    expect(getByText('community.table.xp')).toBeTruthy();
     expect(getByText('community.table.badges')).toBeTruthy();
+  });
+
+  it('shows XP in place of minutes played', () => {
+    const {getByText, queryByText} = renderWithSafeArea(<LeaderboardScreen />);
+    expect(getByText('940')).toBeTruthy();
+    expect(queryByText('community.table.totalDuration')).toBeNull();
+    // 1200 min would render as "20 h" — minutes are no longer shown.
+    expect(queryByText('20 h')).toBeNull();
+    expect(queryByText('14 h 32 min')).toBeNull();
   });
 
   it('renders period dropdown', () => {
@@ -199,11 +211,12 @@ describe('LeaderboardScreen', () => {
     expect(getAllByText(/[A-Z][a-z]+ [A-Z][a-z]+/).length).toBeGreaterThan(0);
   });
 
-  it('renders duration for all entries', () => {
-    const {getAllByText} = renderWithSafeArea(<LeaderboardScreen />);
-    // Duration format: "X h Y min"
-    const durations = getAllByText(/\d+\s+h\s+\d+\s+min/);
-    expect(durations.length).toBeGreaterThan(0);
+  it('renders XP for all entries', () => {
+    const {getByText, queryAllByText} = renderWithSafeArea(<LeaderboardScreen />);
+    expect(getByText('940')).toBeTruthy();
+    expect(getByText('615')).toBeTruthy();
+    // No "X h Y min" duration is rendered any more.
+    expect(queryAllByText(/\d+\s+h(\s+\d+\s+min)?$/)).toHaveLength(0);
   });
 
   it('renders badge counts for all entries', () => {

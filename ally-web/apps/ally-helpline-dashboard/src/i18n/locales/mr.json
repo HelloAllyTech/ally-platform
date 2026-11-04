@@ -199,6 +199,8 @@
       "badges": "बॅजेस",
       "streak": "स्ट्रीक",
       "streakHint": "आतापर्यंतची सध्याची सराव स्ट्रीक",
+      "xp": "XP",
+      "xpHint": "या कालावधीत मिळवलेले XP. रँक XP नुसार ठरते.",
       "streakValue_one": "{{count}} दिवसांची स्ट्रीक",
       "streakValue_other": "{{count}} दिवसांची स्ट्रीक",
       "badgeValue_one": "{{count}} बॅज",
