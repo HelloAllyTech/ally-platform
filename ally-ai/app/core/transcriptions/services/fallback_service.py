@@ -139,12 +139,14 @@ class FallbackTranscriptionService:
                     cid, text = await coro
 
                 # Treat an empty result as a failure worth failing over: a
-                # different engine often transcribes audio the first one gave
-                # up on, and either way an empty transcript must never be
-                # accepted as success.
+                # accepted as success. An empty transcript is a valid outcome for
+                # silent audio and should be treated as a success. Provider
+                # errors (e.g. API failures) are raised as exceptions from the
+                # provider-specific services and are handled as failures below.
                 if not text or not text.strip():
-                    raise TranscriptionFailedException(
-                        f"{name} returned an empty transcript"
+                    logger.info(
+                        f"{name} returned an empty transcript for "
+                        f"chat_id={chat_id}, treating as success."
                     )
 
                 # Success: record it and remember which provider won.

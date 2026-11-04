@@ -96,7 +96,7 @@ class TestFallbackTranscriptionService:
     @pytest.mark.asyncio
     async def test_trail_all_fail_has_no_succeeded_provider(self):
         primary = _service(side_effect=Exception("down"))
-        secondary = _service(return_value=(4, ""))  # empty == failure
+        secondary = _service(side_effect=Exception("down"))
         fb = FallbackTranscriptionService(
             [("deepgram", primary), ("sarvam", secondary)]
         )
@@ -128,9 +128,9 @@ class TestFallbackTranscriptionService:
         assert len(fb.last_attempts) == 1  # reset, not accumulated
 
     @pytest.mark.asyncio
-    async def test_falls_over_on_empty_result(self):
-        # An empty/whitespace transcript from the primary must trigger failover,
-        # not be accepted as success.
+    async def test_does_not_fall_over_on_empty_result(self):
+        # An empty/whitespace transcript from the primary must be accepted as
+        # success, not trigger a failover.
         primary = _service(return_value=(3, "   "))
         secondary = _service(return_value=(3, "real transcript"))
         fb = FallbackTranscriptionService(
@@ -141,13 +141,14 @@ class TestFallbackTranscriptionService:
             audio_url="http://x", chat_id=3, sample_rate=8000
         )
 
-        assert text == "real transcript"
-        secondary.transcribe_audio_from_url.assert_awaited_once()
+        assert text.strip() == ""
+        primary.transcribe_audio_from_url.assert_awaited_once()
+        secondary.transcribe_audio_from_url.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_raises_when_all_providers_fail(self):
         primary = _service(side_effect=Exception("down"))
-        secondary = _service(return_value=(4, ""))  # empty == failure
+        secondary = _service(side_effect=Exception("down"))
         fb = FallbackTranscriptionService(
             [("deepgram", primary), ("sarvam", secondary)]
         )
@@ -291,3 +292,24 @@ class TestFallbackTranscriptionService:
         assert "error" in trail[0]
         assert trail[0]["status_code"] == 500
         assert trail[1] == {"provider": "sarvam", "ok": True}
+
+    @pytest.mark.asyncio
+    async def test_empty_transcript_is_success_not_failure(self):
+        """An empty transcript is a valid result (e.g. for silent audio), not a
+        failure to be retried."""
+        primary = _service(return_value=(8, ""))
+        secondary = _service(return_value=(8, "secondary text"))
+        fb = FallbackTranscriptionService(
+            [("deepgram", primary), ("sarvam", secondary)]
+        )
+
+        cid, text = await fb.transcribe_audio_from_url(
+            audio_url="http://x", chat_id=8, sample_rate=8000
+        )
+
+        assert (cid, text) == (8, "")
+        primary.transcribe_audio_from_url.assert_awaited_once()
+        secondary.transcribe_audio_from_url.assert_not_awaited()
+        assert fb.last_succeeded_provider == "deepgram"
+        assert len(fb.last_attempts) == 1
+        assert fb.last_attempts[0].ok is True
