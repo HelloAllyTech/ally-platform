@@ -2348,6 +2348,16 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       componentFile: f('Analytics/LevelReachCumulativeCard.tsx'),
       note: 'Level dropdown (L1-L5), monthly only: running total of unique learners who first reached the level (line) and the net addition over the previous month (bars). Running sum of /v1/analytics/xp-level-reached levelCounts at range=all, bucket=month',
     },
+    {
+      id: 'AAQ-254',
+      tab: 'Highlights',
+      subTab: 'Goals',
+      title: 'Roadmap votes cast, by admin',
+      kind: 'chart',
+      chartType: 'StackedBarChart',
+      componentFile: f('Analytics/RoadmapVotingCard.tsx'),
+      note: 'Votes each admin with product-roadmap access cast per month (stacked, top 8 + Other admins), with participation (voted / could vote) per month and a who-voted grid that keeps non-voters visible. All-time. /v1/analytics/roadmap-voting',
+    },
   ];
 
 /** Total number of registered charts — handy for the guard test and the UI. */

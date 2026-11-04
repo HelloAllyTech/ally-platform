@@ -143,6 +143,7 @@ import { TrackDropoffAnalyticsService } from '../service/track-dropoff-analytics
 import { UsageLevelAnalyticsService } from '../service/usage-level-analytics.service';
 import { RoleplayVolumeAnalyticsService } from '../service/roleplay-volume-analytics.service';
 import { RoadmapDeliveryAnalyticsService } from '../service/roadmap-delivery-analytics.service';
+import { RoadmapVotingAnalyticsService } from '../service/roadmap-voting-analytics.service';
 import { ShipVolumeAnalyticsService } from '../service/ship-volume-analytics.service';
 import {
   HighlightsAnalyticsService,
@@ -268,6 +269,7 @@ import {
   RoleplayVolumeResponseDto,
 } from '../dto/roleplay-volume-analytics.dto';
 import { RoadmapDeliveryResponseDto } from '../dto/roadmap-delivery-analytics.dto';
+import { RoadmapVotingResponseDto } from '../dto/roadmap-voting-analytics.dto';
 import {
   ShipVolumeQueryDto,
   ShipVolumeResponseDto,
@@ -435,6 +437,7 @@ export class AnalyticsController {
     private readonly xpByTenantAnalyticsService: XpByTenantAnalyticsService,
     private readonly roleplayVolumeAnalyticsService: RoleplayVolumeAnalyticsService,
     private readonly roadmapDeliveryAnalyticsService: RoadmapDeliveryAnalyticsService,
+    private readonly roadmapVotingAnalyticsService: RoadmapVotingAnalyticsService,
     private readonly shipVolumeAnalyticsService: ShipVolumeAnalyticsService,
     private readonly platformAnalyticsService: PlatformAnalyticsService,
     private readonly scribeAnalyticsService: ScribeAnalyticsService,
@@ -1267,6 +1270,33 @@ export class AnalyticsController {
   })
   async getRoadmapDelivery(): Promise<RoadmapDeliveryResponseDto> {
     return this.roadmapDeliveryAnalyticsService.getRoadmapDelivery();
+  }
+
+  @Get('roadmap-voting')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Roadmap votes cast per month, by admin (super-admin)',
+    description:
+      'How many votes each admin with product-roadmap access cast on the ' +
+      'internal roadmap, per calendar month — an adoption measure: is more of ' +
+      'the team shaping the roadmap. A month counts the votes cast in it that ' +
+      'still stand (`roadmap_allocations` by `periodKey`; a vote taken back is ' +
+      'gone). Every month lists every admin who could vote in it, with 0 for ' +
+      'non-voters, so `voters` / `eligible` is participation. Who could vote ' +
+      'is read from the grant ledger (`roadmap_vote_grants`, monthly + daily, ' +
+      'never refunds), plus every current permission holder in the current ' +
+      'month; months before the ledger existed have `eligible: null` rather ' +
+      "than a guess from today's admin list. The current month is kept and " +
+      'flagged `partial`. ALL-TIME and MONTH-GRAINED; no `tenantId` — the ' +
+      "roadmap is Ally's own backlog.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Roadmap voting retrieved successfully',
+    type: RoadmapVotingResponseDto,
+  })
+  async getRoadmapVoting(): Promise<RoadmapVotingResponseDto> {
+    return this.roadmapVotingAnalyticsService.getRoadmapVoting();
   }
 
   @Get('ship-volume')
