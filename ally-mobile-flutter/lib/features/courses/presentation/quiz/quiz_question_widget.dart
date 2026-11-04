@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/localization/localization_controller.dart';
 import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_fonts.dart';
@@ -26,17 +27,23 @@ class QuizQuestionWidget extends StatelessWidget {
     required this.question,
     required this.state,
     required this.onChanged,
+    this.languageCode,
   });
 
   final SanitizedQuizQuestion question;
   final QuizAnswerState state;
   final ValueChanged<QuizAnswerState> onChanged;
 
+  /// The language the course is being read in (`TrackDetail.languageCode`).
+  /// The prompt arrives already translated into it, so True/False follow it
+  /// too instead of the app's UI language. Null → UI language.
+  final String? languageCode;
+
   @override
   Widget build(BuildContext context) {
     return switch (question.type) {
       QuizQuestionType.mcqSingle || QuizQuestionType.mcqMulti => _McqQuestion(question, state, onChanged),
-      QuizQuestionType.trueFalse => _TrueFalseQuestion(state, onChanged),
+      QuizQuestionType.trueFalse => _TrueFalseQuestion(state, onChanged, languageCode),
       QuizQuestionType.ordering => _OrderingQuestion(question, state, onChanged),
       QuizQuestionType.matching => _MatchingQuestion(question, state, onChanged),
       QuizQuestionType.fillBlank => _FillBlankQuestion(question, state, onChanged),
@@ -127,13 +134,22 @@ class _McqQuestion extends StatelessWidget {
 }
 
 class _TrueFalseQuestion extends ConsumerWidget {
-  const _TrueFalseQuestion(this.state, this.onChanged);
+  const _TrueFalseQuestion(this.state, this.onChanged, this.languageCode);
 
   final QuizAnswerState state;
   final ValueChanged<QuizAnswerState> onChanged;
+  final String? languageCode;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Course-language labels when the course has one; the UI language
+    // (`ref.t`) while that bundle is still loading or for an unknown code.
+    final courseLanguage = languageCode;
+    final courseTranslations = courseLanguage == null
+        ? null
+        : ref.watch(bundledTranslationsProvider(courseLanguage)).value;
+    String label(String key) => courseTranslations?.t(key) ?? ref.t(key);
+
     Widget card(bool value, String labelKey, String testId) {
       final isSelected = state.booleanAnswer == value;
       return Expanded(
@@ -145,7 +161,7 @@ class _TrueFalseQuestion extends ConsumerWidget {
             alignment: Alignment.center,
             decoration: _cardDecoration(selected: isSelected, radius: 14),
             child: Text(
-              ref.t(labelKey),
+              label(labelKey),
               style: CourseText.serifMedium(
                 CourseType.bodyLarge,
                 isSelected ? AppColors.primary : AppColors.highEmphasis,

@@ -269,6 +269,7 @@ class _CourseItemPlayerScreenState
                       isTrackError: isTrackError,
                       isTrackLoadPending: isTrackLoadPending,
                       current: current,
+                      languageCode: detail?.languageCode,
                     ),
                   ),
                   if (current?.item.hasDiscussion ?? false)
@@ -324,6 +325,7 @@ class _CourseItemPlayerScreenState
     required bool isTrackError,
     required bool isTrackLoadPending,
     required _FlatTrackItem? current,
+    required String? languageCode,
   }) {
     final errorStyle = CourseText.system(const TextStyle(fontSize: 14), AppColors.mediumEmphasis);
     if (isTrackError && !isTrackLoadPending) {
@@ -371,6 +373,7 @@ class _CourseItemPlayerScreenState
           itemId: _currentItemId,
           alreadyCompleted: alreadyCompleted,
           onCompleted: _handleCompletion,
+          languageCode: languageCode,
         );
       case 'JOURNAL':
         return JournalPlayer(
@@ -389,6 +392,7 @@ class _CourseItemPlayerScreenState
           maxAttempts: payload.maxAttempts,
           onCompleted: _handleCompletion,
           onRequestNext: _goNextOrOverview,
+          languageCode: languageCode,
         );
       case 'GAME':
         if (payload.gameKey == 'BREATHING_EXERCISE' && payload.breathingExercise != null) {

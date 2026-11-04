@@ -31,4 +31,6 @@ export interface ItemAdapterProps<P extends StartTrackItemResponse = StartTrackI
   returnContext: Partial<ActiveTrackContext>;
   /** Video only: the playhead, for "Ask about this moment" (plan §5.8). */
   onPosition?: (seconds: number) => void;
+  /** The course's reading language (`TrackDetail.languageCode`), when loaded. */
+  languageCode?: string | null;
 }

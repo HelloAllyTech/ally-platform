@@ -38,6 +38,7 @@ class QuizPlayer extends ConsumerStatefulWidget {
     required this.maxAttempts,
     required this.onCompleted,
     this.onRequestNext,
+    this.languageCode,
   });
 
   final String itemId;
@@ -48,6 +49,9 @@ class QuizPlayer extends ConsumerStatefulWidget {
 
   /// RN `onRequestNext` (goNextOrOverview), behind the results' Next.
   final VoidCallback? onRequestNext;
+
+  /// The course's reading language — the True/False answer labels follow it.
+  final String? languageCode;
 
   @override
   ConsumerState<QuizPlayer> createState() => _QuizPlayerState();
@@ -237,6 +241,7 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
                   question: question,
                   state: state,
                   onChanged: (next) => setState(() => _answers[question.id] = next),
+                  languageCode: widget.languageCode,
                 ),
               ],
             ),

@@ -197,6 +197,7 @@ export const TrackPlayer: FC = () => {
             itemId={itemId}
             trackId={trackId}
             alreadyCompleted={alreadyCompleted}
+            languageCode={track?.languageCode}
           />
         );
       case TrackItemType.JOURNAL:
@@ -215,6 +216,7 @@ export const TrackPlayer: FC = () => {
             itemId={itemId}
             onCompleted={handleCompletion}
             onRequestNext={goNextOrOverview}
+            languageCode={track?.languageCode}
           />
         );
       case TrackItemType.ANNOTATED_ARTIFACT:

@@ -24,12 +24,16 @@ class VideoItemPlayer extends ConsumerStatefulWidget {
     required this.itemId,
     required this.alreadyCompleted,
     required this.onCompleted,
+    this.languageCode,
   });
 
   final StartItemPayload payload;
   final String itemId;
   final bool alreadyCompleted;
   final void Function(TrackItemCompletionResult result) onCompleted;
+
+  /// The course's reading language — interjection True/False labels follow it.
+  final String? languageCode;
 
   @override
   ConsumerState<VideoItemPlayer> createState() => _VideoItemPlayerState();
@@ -160,6 +164,7 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
       builder: (_) => VideoInterjectionDialog(
         itemId: widget.itemId,
         interjection: interjection,
+        languageCode: widget.languageCode,
       ),
     );
     _answeredInterjectionIds.add(interjection.id);
