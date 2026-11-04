@@ -34,6 +34,8 @@ Examples: `feat/add-user-authentication`, `fix/login-error-handling`, `docs/upda
 - **Keep the root checkout on `master`.** Do feature work in a worktree (`git worktree add ../ally-wt/<branch> -b <branch> origin/master`) so the main checkout never carries a feature branch.
 - **Bots follow the same rules.** Automation (bug hunter, Builder) opens one branch per issue, reuses it on a retry, and closes the PR and deletes the branch when the work is superseded.
 
+**Enforcement.** `.github/workflows/stale-branches.yml` runs every Monday. A branch with no PR and no commit for 7 days is deleted; a PR with no activity for 14 days is closed and its branch deleted. `release/*` and `hotfix/*` are exempt. It only reports (dry run) until the repository variable `STALE_BRANCH_ENFORCE` is set to `true`; the run summary lists every branch it would touch and its last commit.
+
 Anyone may delete a stale branch that is not an open PR under active review: the cleanup is always safe, because the tip commit is recoverable from the PR or the reflog for 90 days. When in doubt, ask in the PR instead of keeping the branch.
 
 ## Commit Messages

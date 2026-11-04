@@ -21,6 +21,7 @@ describe('LeaderboardService', () => {
     status: UserStatus.ACTIVE,
     rank: 1,
     minutesPlayed: 120,
+    xpScore: 360,
     badgeCount: 5,
     daysActiveThisWeek: 4,
     weeklyGoalDays: 4,
@@ -37,6 +38,7 @@ describe('LeaderboardService', () => {
       status: UserStatus.ACTIVE,
       rank: 2,
       minutesPlayed: 100,
+      xpScore: 300,
       badgeCount: 3,
       daysActiveThisWeek: 4,
       weeklyGoalDays: 4,
@@ -50,6 +52,7 @@ describe('LeaderboardService', () => {
       status: UserStatus.ACTIVE,
       rank: 3,
       minutesPlayed: 80,
+      xpScore: 240,
       badgeCount: 1,
       daysActiveThisWeek: 4,
       weeklyGoalDays: 4,
@@ -355,6 +358,7 @@ describe('LeaderboardService', () => {
         status: UserStatus.ACTIVE,
         rank: 5,
         minutesPlayed: 60,
+        xpScore: 180,
         badgeCount: 3,
         daysActiveThisWeek: 4,
         weeklyGoalDays: 4,
@@ -426,6 +430,7 @@ describe('LeaderboardService', () => {
         status: UserStatus.ACTIVE,
         rank: undefined, // rank is hidden
         minutesPlayed: 120,
+        xpScore: 360,
         badgeCount: 3,
         daysActiveThisWeek: 4,
         weeklyGoalDays: 4,
@@ -489,6 +494,7 @@ describe('LeaderboardService', () => {
         status: UserStatus.ACTIVE,
         rank: 10,
         minutesPlayed: 200,
+        xpScore: 600,
         badgeCount: 5,
         daysActiveThisWeek: 4,
         weeklyGoalDays: 4,
@@ -530,6 +536,7 @@ describe('LeaderboardService', () => {
         status: UserStatus.ACTIVE,
         rank: 25,
         minutesPlayed: 500,
+        xpScore: 1500,
         badgeCount: 10,
         daysActiveThisWeek: 4,
         weeklyGoalDays: 4,
@@ -571,6 +578,7 @@ describe('LeaderboardService', () => {
         status: UserStatus.ACTIVE,
         rank: 1,
         minutesPlayed: 1000,
+        xpScore: 3000,
         badgeCount: 20,
         daysActiveThisWeek: 4,
         weeklyGoalDays: 4,
@@ -593,6 +601,8 @@ describe('LeaderboardService', () => {
         ...rankResult,
         window: LeaderboardView.ALL_TIME,
       });
+      // The XP that rank is ordered by reaches the client unchanged.
+      expect(result?.xpScore).toBe(3000);
       expect(
         userDailyScoreRepository.getUserRankWithDetails,
       ).toHaveBeenCalledWith(
@@ -612,6 +622,7 @@ describe('LeaderboardService', () => {
         status: UserStatus.ACTIVE,
         rank: 5,
         minutesPlayed: 60,
+        xpScore: 180,
         badgeCount: 0,
         daysActiveThisWeek: 4,
         weeklyGoalDays: 4,

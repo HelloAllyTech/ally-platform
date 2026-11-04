@@ -199,6 +199,8 @@
       "badges": "Badges",
       "streak": "Streak",
       "streakHint": "Current practice streak, all time",
+      "xp": "XP",
+      "xpHint": "XP earned in this period. Rank is ordered by XP.",
       "streakValue_one": "{{count}}d streak",
       "streakValue_other": "{{count}}d streak",
       "badgeValue_one": "{{count}} badge",

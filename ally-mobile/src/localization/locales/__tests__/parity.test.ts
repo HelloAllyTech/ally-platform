@@ -20,6 +20,7 @@ const ALLOWED_IDENTICAL = new Set([
   'review.details.callTitle', // "CALL-{{id}}" — record identifier
   'review.feedCard.reviewType', // "{{reviewType}}" — bare interpolation
   'drawer.dev', // "(Dev)" — dev-build marker
+  'community.table.xp', // "XP" — the product's points unit, kept as-is in every language
   'TermsAndAgreement.sections.generalTerms.bullets.crisisLink', // "https://findahelpline.com/"
 ]);
 

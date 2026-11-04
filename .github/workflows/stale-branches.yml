@@ -1,0 +1,152 @@
+# Stale branches — enforces the Branch Lifetime rule
+#
+# Rule (wiki: contributing/guide.md#branch-lifetime): branches are short-lived and
+# `master` is the only long-lived branch. This workflow is the enforcement half of
+# that rule. Every Monday it looks at every branch and:
+#
+#   * a branch with NO open pull request and no commit for NO_PR_DAYS (7)
+#       -> deleted
+#   * a branch with an open pull request and NO activity (commit, comment, review)
+#     on that PR for PR_DAYS (14)
+#       -> the PR is closed with an explanation, then the branch is deleted
+#
+# Nothing is lost: a deleted branch's last commit is listed in the run summary (restore
+# with `git push origin <sha>:refs/heads/<branch>`), and a closed PR can be reopened and
+# its branch restored from the PR page. Bots follow the same rules as people, which is
+# the point — bug-hunter and Builder open a branch per finding and never clean up.
+#
+# Never touched: the default branch, `release/*`, `hotfix/*`, and anything matching
+# KEEP_PATTERN. Draft PRs are treated like any other PR.
+#
+# ## Rollout: dry run first
+#
+# Out of the box this only REPORTS what it would do. It starts deleting when the
+# repository variable STALE_BRANCH_ENFORCE is set to `true`. A manual run
+# (Actions -> Stale branches -> Run workflow) can override either way with its
+# `dry_run` input, so it is easy to look before you switch it on.
+#
+# Uses the default GITHUB_TOKEN: deleting a ref and closing a PR need no other
+# workflow to trigger, so none of the cross-workflow-token caveats apply here.
+
+name: Stale branches
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only report what would be deleted (overrides STALE_BRANCH_ENFORCE)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write # delete refs
+  pull-requests: write # close stale PRs
+
+concurrency:
+  group: stale-branches
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      NO_PR_DAYS: "7"
+      PR_DAYS: "14"
+      KEEP_PATTERN: "^(release|hotfix)/"
+      EVENT: ${{ github.event_name }}
+      INPUT_DRY_RUN: ${{ inputs.dry_run }}
+      ENFORCE: ${{ vars.STALE_BRANCH_ENFORCE }}
+    steps:
+      - name: Find and remove stale branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Dry run unless enforcement is on. A manual run's input wins either way.
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            DRY="$INPUT_DRY_RUN"
+          elif [ "$ENFORCE" = "true" ]; then
+            DRY=false
+          else
+            DRY=true
+          fi
+
+          OWNER="${REPO%%/*}"; NAME="${REPO##*/}"
+          DEFAULT=$(gh api "repos/$REPO" --jq .default_branch)
+          NOW=$(date +%s)
+
+          # One query: every branch, its tip date and sha, and its open PRs.
+          gh api graphql --paginate -f owner="$OWNER" -f name="$NAME" -f query='
+            query($owner:String!, $name:String!, $endCursor:String) {
+              repository(owner:$owner, name:$name) {
+                refs(refPrefix:"refs/heads/", first:100, after:$endCursor) {
+                  nodes {
+                    name
+                    target { ... on Commit { oid committedDate } }
+                    associatedPullRequests(states:OPEN, first:5) {
+                      nodes { number updatedAt headRefName }
+                    }
+                  }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }' --jq '.data.repository.refs.nodes[]' > branches.jsonl
+
+          {
+            echo "## Stale branches ($([ "$DRY" = true ] && echo 'DRY RUN — nothing changed' || echo 'enforcing'))"
+            echo
+            echo "Rule: no PR + no commit for ${NO_PR_DAYS}d, or a PR with no activity for ${PR_DAYS}d. Default branch: \`$DEFAULT\`."
+            echo
+            echo "| Branch | Action | Why | Last commit |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          kept=0; acted=0
+          while IFS= read -r row; do
+            branch=$(jq -r .name <<<"$row")
+            sha=$(jq -r .target.oid <<<"$row")
+            committed=$(jq -r .target.committedDate <<<"$row")
+            age=$(( (NOW - $(date -d "$committed" +%s)) / 86400 ))
+
+            [ "$branch" = "$DEFAULT" ] && continue
+            if [[ "$branch" =~ $KEEP_PATTERN ]]; then kept=$((kept+1)); continue; fi
+
+            # Most recently active open PR for this branch (head ref must be this branch).
+            pr=$(jq -c --arg b "$branch" \
+              '[.associatedPullRequests.nodes[] | select(.headRefName==$b)] | sort_by(.updatedAt) | last // empty' <<<"$row")
+
+            if [ -n "$pr" ]; then
+              num=$(jq -r .number <<<"$pr")
+              pr_age=$(( (NOW - $(date -d "$(jq -r .updatedAt <<<"$pr")" +%s)) / 86400 ))
+              if [ "$pr_age" -le "$PR_DAYS" ]; then kept=$((kept+1)); continue; fi
+              action="close PR #$num + delete"
+              why="PR idle ${pr_age}d"
+            else
+              num=""
+              if [ "$age" -le "$NO_PR_DAYS" ]; then kept=$((kept+1)); continue; fi
+              action="delete"
+              why="no PR, last commit ${age}d ago"
+            fi
+
+            acted=$((acted+1))
+            echo "| \`$branch\` | $([ "$DRY" = true ] && echo "would: ")$action | $why | \`${sha:0:9}\` |" >> "$GITHUB_STEP_SUMMARY"
+            echo "$([ "$DRY" = true ] && echo 'would ')$action: $branch ($why, tip $sha)"
+
+            [ "$DRY" = true ] && continue
+
+            if [ -n "$num" ]; then
+              gh pr close "$num" --repo "$REPO" --comment "Closing as stale under the Branch Lifetime rule (no activity for ${PR_DAYS}+ days; see wiki \`contributing/guide.md#branch-lifetime\`). The branch is deleted but can be restored from this PR, or recreated with \`git push origin ${sha}:refs/heads/${branch}\`. Reopen if this is still wanted."
+            fi
+            gh api -X DELETE "repos/$REPO/git/refs/heads/$branch"
+          done < branches.jsonl
+
+          {
+            echo
+            echo "**$acted** to remove, **$kept** kept."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "done: $acted acted, $kept kept (dry_run=$DRY)"

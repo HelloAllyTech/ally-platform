@@ -8,6 +8,9 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-03] update | `contributing/guide.md`: Branch Lifetime enforcement.
+- Added the "Enforcement" paragraph: `.github/workflows/stale-branches.yml` runs weekly, deletes branches with no PR and no commit for 7 days, and closes PRs idle for 14 days (then deletes their branch). It is report-only until the `STALE_BRANCH_ENFORCE` repository variable is `true`.
+
 ## [2026-11-03] update | `contributing/guide.md`: Branch Lifetime rule.
 - Added a "Branch Lifetime" section: branches are short-lived (PR early, merge within 2 working days, nothing older than 7, delete on merge, one branch per change, root checkout stays on `master`, bots follow the same rules). Linked from `platform/agent-guide.md`, and the root `AGENTS.md` branch-naming block now points at the canonical rule instead of the old ticket-id convention.
 
