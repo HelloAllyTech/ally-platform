@@ -15,9 +15,11 @@ import {
   GetDashboardsResponse,
   GetLearnerUsageTableRequest,
   GetLearnerUsageTableResponse,
+  LearnerEnrollment,
   LearnerScenarioAttempt,
   GetOrganizationMetricsRequest,
   GetOrganizationMetricsResponse,
+  RemoveLearnerEnrollmentRequest,
   ResetBranchingAttemptsRequest,
 } from "@types";
 
@@ -150,6 +152,36 @@ const analyticsAPI = baseAPI.injectEndpoints({
         { type: TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS, id: userId },
       ],
     }),
+
+    /**
+     * The courses a learner is enrolled in (trainer view). Tenant-scoped on the
+     * backend; needs `edit:user`.
+     * @param {number} userId - The learner
+     */
+    getLearnerEnrollments: builder.query<LearnerEnrollment[], number>({
+      query: userId => ({
+        url: ApiEndpoints.ANALYTICS.LEARNER_ENROLLMENTS(userId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_result, _error, userId) => [
+        { type: TAG_TYPES.LEARNER_ENROLLMENTS, id: userId },
+      ],
+    }),
+
+    /**
+     * Take a learner out of a course and clear their progress in it. Their
+     * scenario attempts in that course go with it, so both lists refetch.
+     */
+    removeLearnerEnrollment: builder.mutation<{ success: true }, RemoveLearnerEnrollmentRequest>({
+      query: ({ userId, trackEnrollmentId }) => ({
+        url: ApiEndpoints.ANALYTICS.REMOVE_LEARNER_ENROLLMENT(userId, trackEnrollmentId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: (_result, _error, { userId }) => [
+        { type: TAG_TYPES.LEARNER_ENROLLMENTS, id: userId },
+        { type: TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS, id: userId },
+      ],
+    }),
   }),
 });
 
@@ -164,4 +196,6 @@ export const {
   useGetLearnerScenarioAttemptsQuery,
   useResetBranchingAttemptsMutation,
   useReopenRoleplayAssessmentMutation,
+  useGetLearnerEnrollmentsQuery,
+  useRemoveLearnerEnrollmentMutation,
 } = analyticsAPI;

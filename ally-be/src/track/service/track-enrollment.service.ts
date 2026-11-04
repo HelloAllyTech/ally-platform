@@ -1353,6 +1353,97 @@ export class TrackEnrollmentService {
   }
 
   /**
+   * The courses a learner in the caller's organisation is enrolled in, for the
+   * trainer view that can remove them from one.
+   *
+   * `accessDenial` is what would keep the course from them if they were not
+   * enrolled. Non-null means the enrolment is the only reason it is in their
+   * list — the "finish what you started" grace after their group lost the
+   * course, or it was unassigned from the organisation — which is usually the
+   * case a trainer came here to fix.
+   */
+  async listLearnerEnrollmentsForAdmin(userId: number) {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      throw new NotFoundException('Learner not found');
+    }
+    const rows: Array<{
+      trackEnrollmentId: string;
+      trackId: string;
+      trackTitle: string;
+      trackStatus: TrackStatus;
+      totalItems: number | null;
+      completedItems: number;
+      enrolledAt: Date;
+      completedAt: Date | null;
+      lastActivityAt: Date | null;
+    }> = await this.dataSource.query(
+      `SELECT te.id AS "trackEnrollmentId", t.id AS "trackId",
+              t.title AS "trackTitle", t.status AS "trackStatus",
+              t."totalItems" AS "totalItems",
+              te."completedItems" AS "completedItems",
+              te."createdAt" AS "enrolledAt", te."completedAt" AS "completedAt",
+              te."lastActivityAt" AS "lastActivityAt"
+         FROM track_enrollments te
+         JOIN tracks t ON t.id = te."trackId" AND t."deletedAt" IS NULL
+        WHERE te."userId" = $1
+          AND te."tenantId"::text = $2
+          AND te."deletedAt" IS NULL
+        ORDER BY te."lastActivityAt" DESC NULLS LAST, t.title`,
+      [userId, tenantId],
+    );
+
+    // Two lookups per course; a learner holds a handful of enrolments.
+    return Promise.all(
+      rows.map(async (row) => ({
+        ...row,
+        totalItems: Number(row.totalItems ?? 0),
+        completedItems: Number(row.completedItems ?? 0),
+        accessDenial:
+          row.trackStatus === TrackStatus.ACTIVE
+            ? await this.findAccessDenial(row.trackId, userId, false)
+            : TrackAccessDenialReason.NOT_AVAILABLE,
+      })),
+    );
+  }
+
+  /**
+   * Take a learner in the caller's organisation out of a course. Soft-deletes
+   * the enrolment and its item progress together, so the course leaves their
+   * list unless it is still open to them, and re-enrolling starts afresh
+   * rather than finding the old progress rows. Attempts, sessions, journal
+   * entries and XP are left alone: they are the learner's practice history,
+   * not their place in the course.
+   */
+  async removeLearnerEnrollmentForAdmin(
+    userId: number,
+    trackEnrollmentId: string,
+  ) {
+    const tenantId = ExecutionManager.getTenantId();
+    const enrollment = await this.trackEnrollmentRepository.findOne({
+      where: { id: trackEnrollmentId, userId },
+    });
+    // Same answer for "no such enrolment" and "not your organisation", so the
+    // endpoint cannot be used to probe other tenants.
+    if (!tenantId || !enrollment || enrollment.tenantId !== tenantId) {
+      throw new NotFoundException('Enrolment not found');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .getRepository(TrackItemProgress)
+        .softDelete({ trackEnrollmentId });
+      await manager
+        .getRepository(TrackEnrollment)
+        .softDelete(trackEnrollmentId);
+    });
+    this.logger.info(
+      `Enrolment ${trackEnrollmentId} in track ${enrollment.trackId} removed for user ${userId}`,
+    );
+    return { success: true };
+  }
+
+  /**
    * The two access layers as a value: null when the learner may take the
    * course, else the first layer that refuses them. `assertTrackAvailable`
    * turns it into an exception; `getTrackAccess` returns it.

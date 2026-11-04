@@ -19,6 +19,7 @@ import {
 } from "@types";
 import { hasPermissions } from "@utils";
 
+import { LearnerCoursesDrawer } from "./LearnerCoursesDrawer";
 import { ScenarioAttemptsDrawer } from "./ScenarioAttemptsDrawer";
 
 const PAGE_SIZE = 25;
@@ -116,6 +117,7 @@ export const LearnerUsageTable: FunctionComponent<LearnerUsageTableProps> = ({ r
   // `edit:user` the backend enforces — hidden rather than shown-and-403.
   const canEditUsers = hasPermissions(permissions, Permissions.EDIT_USER);
   const [attemptsLearner, setAttemptsLearner] = useState<{ id: number; name: string } | null>(null);
+  const [coursesLearner, setCoursesLearner] = useState<{ id: number; name: string } | null>(null);
   const [rows, setRows] = useState<LearnerUsageRow[]>([]);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState<string | undefined>(undefined);
@@ -406,6 +408,21 @@ export const LearnerUsageTable: FunctionComponent<LearnerUsageTableProps> = ({ r
         </Tooltip>
       ),
     });
+    columns.push({
+      key: "courses",
+      header: "",
+      render: (_value, row) => (
+        <Tooltip label={t("organizationMetrics.learnerCourses.actionTooltip")} align="top">
+          <Button
+            variant="text"
+            onClick={() => setCoursesLearner({ id: row.id, name: row.name })}
+            data-testid={`learner-courses-action-${row.id}`}
+          >
+            {t("organizationMetrics.learnerCourses.action")}
+          </Button>
+        </Tooltip>
+      ),
+    });
   }
 
   if (isError) {
@@ -479,6 +496,14 @@ export const LearnerUsageTable: FunctionComponent<LearnerUsageTableProps> = ({ r
           onClose={() => setAttemptsLearner(null)}
           userId={attemptsLearner.id}
           learnerName={attemptsLearner.name}
+        />
+      )}
+      {coursesLearner && (
+        <LearnerCoursesDrawer
+          open
+          onClose={() => setCoursesLearner(null)}
+          userId={coursesLearner.id}
+          learnerName={coursesLearner.name}
         />
       )}
     </div>
