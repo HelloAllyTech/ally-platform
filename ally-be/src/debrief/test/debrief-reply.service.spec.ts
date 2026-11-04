@@ -41,7 +41,7 @@ function build(opts: {
       return m;
     }),
   };
-  const kept = jest.fn(async (..._a: any[]) => []);
+  const kept = jest.fn(async () => []);
   const chats = {
     findOne: jest.fn(async () => ({ id: 'chat-1' })),
     save: jest.fn(),
