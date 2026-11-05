@@ -109,3 +109,240 @@ All paths are under `ally-web/apps/ally-admin-dashboard/src`.
 9. There was no engine spec. This chunk adds the first, starting with a snapshot of the v1 request.
 10. This checkout had no `node_modules` in ally-be or ally-web. They were installed with `npm ci` from the lockfiles, so no versions changed.
 11. Branch: the work stays on the chunk-1 branch (see the top of this file).
+
+## 2. What was built
+
+All three apps are on the same branch. In review order (see section 7 for the commit list):
+
+| App | File | What it is |
+|---|---|---|
+| ally-ai | `app/schemas/agent_runtime.py`, `app/api/v1/endpoints/agent_runtime.py`, `app/core/knowledge_agent/agent.py`, `nodes/finalize.py`, `nodes/select.py` | The `log_retrieval: bool = True` flag on `/agent/run`, passed through `bot["log_retrieval"]`. When it's false, `decline`/`select` skip `_report_retrieval`. `/knowledge-agent/answer` is unchanged. |
+| ally-be | `src/database/migrations/1980930000000-AddChatbotAgentRuntime.ts` | Adds `chatbots.runtime` (CHECK v1/shadow/v2, default v1) and `features` jsonb, `wa_messages.agent_run_id`/`agent_runtime`, and the `agent_shadow_runs` table. |
+| ally-be | `src/chatbot/engine/knowledge-request.ts` | **The shared builder.** `buildKnowledgeRequest` (today's body, moved here) and `buildAgentRunRequest` (that body plus the 4 run fields, and `log_retrieval:false` for shadow). |
+| ally-be | `src/chatbot/engine/agent-runtime.ts` | Several small helpers:<br>• `effectiveRuntime`<br>• `agentRunIdFor` (uuid v5)<br>• `agentFailureReason`<br>• `shadowSide`<br>• the two event names and payloads |
+| ally-be | `src/chatbot/engine/chatbot-engine.service.ts` | Two entry points, `answerWithV1` and `answerWithAgent` (which includes the fallback). The answer is turned into a reply by `toDecision`, which both paths share, and `shadowRequest` prepares the shadow run. |
+| ally-be | `src/ai/service/ai.service.ts` | `runAgent` (one 25 s attempt, no Slack alert of its own) and `answerKnowledgeQuestionWithin` (v1 inside the remaining budget). `makeRequest` gains `alertOnFailure = true` (see decisions). |
+| ally-be | `src/chatbot/service/agent-runtime-alert-throttle.service.ts` | The fallback alert: at most 1 per bot and reason every 10 minutes, with the number of messages that fell back. |
+| ally-be | `src/chatbot/service/chatbot-shadow.service.ts` | Shadow runs. Capped by `AGENT_SHADOW_MAX_IN_FLIGHT` (default 5; 0 turns them off); extra runs are skipped and counted. |
+| ally-be | `src/whatsapp/service/whatsapp-inbound.service.ts` | Passes `conversationId` and `providerMessageId` to the engine. Stores `agent_run_id`/`agent_runtime` on the outbound row. After the reply it emits `chatbot.agent-fallback` and `chatbot.agent-shadow-run`. |
+| ally-be | `src/chatbot/service/chatbot.service.ts`, `dto/chatbot.dto.ts` | Three API changes:<br>• PATCH `runtime` (platform admin only).<br>• GET adds `runtime`, `effectiveRuntime` and `features`.<br>• Preview accepts `runtime` and `conversationId`, and returns `runtime`, `runId`, `trace`, `fallbackReason`, `runtimeAllowed` and `conversationId`. |
+| ally-be | `whatsapp-settings.type.ts`, `whatsapp.dto.ts`, `chatbot-settings.service.ts` | `agentRuntimeAllowed` (default false), editable in Defaults. `applyOverride` always uses the platform value. |
+| ally-be | `DATA_SCHEMA.md`, `.env.example`, `env.validation.ts`, `config.service.ts`, `ai-task-registry.constants.ts` | Docs, the new env var, and the registry note. |
+| ally-web | `pages/WhatsAppBot/ChatbotEngineCard.tsx`, `ChatbotSettingsTab.tsx` | The Engine card in a bot's Settings, for platform admins only. |
+| ally-web | `pages/WhatsAppBot/BotSettingsTab.tsx` | Defaults → Safety switches → **Allow the new engine**. |
+| ally-web | `pages/WhatsAppBot/ChatbotTestTab.tsx` | Preview gains:<br>• the engine badge, or "v1 (v2 failed: reason)"<br>• the run id with Copy<br>• a collapsible step list with ms per step<br>• **New thread**, which replaces "Start over" and also drops the thread id<br>• an admin-only "Engine for this test" picker |
+
+### Tests added
+
+| App | Spec | Count | Covers |
+|---|---|---|---|
+| ally-be | `src/chatbot/engine/test/chatbot-engine.service.spec.ts` | 25 | The v1 body snapshot (written **before** the refactor, unchanged after it), the kill switch, v2, every fallback case, crisis over v2 and over the fallback, shadow, the run id |
+| ally-be | `src/whatsapp/service/test/whatsapp-inbound-agent-runtime.spec.ts` | 7 | Real event emitter, throttle and shadow service: the stored run link, one reply on fallback, the alert throttled across messages, the shadow run only after the send, no text in the shadow row, failures isolated |
+| ally-be | `src/chatbot/service/test/agent-runtime-alert-throttle.spec.ts` | 5 | The alert throttle |
+| ally-be | `src/chatbot/service/test/chatbot-shadow.spec.ts` | 5 | The concurrency cap, freeing a slot, cap 0, never throwing |
+| ally-be | `src/chatbot/service/test/chatbot.service.spec.ts` | 10 | PATCH/test 403 for non-admins, the GET fields, the Preview response |
+| ally-be | `chatbot-settings.spec.ts` and `ai.service.spec.ts` | +1 and +7 | The kill switch can't be set per bot; `runAgent` doesn't page; the budgeted fallback |
+| ally-web | `ChatbotSettingsTab.test.tsx` | 3 | Engine is hidden for non-admins and selected for admins; the platform-wide note |
+| ally-web | `ChatbotTestTab.test.tsx` | 5 | Badge, run id, steps with ms, fallback badge, New thread, the picker is admin-only |
+| ally-ai | `test_graph.py` and `test_endpoint.py` | +3 | `log_retrieval=false` skips both log paths; the default still logs once |
+
+### Results
+
+| App | Result |
+|---|---|
+| ally-be | **960 suites, 14,018 tests pass** (baseline 955 / 13,958). Lint, typecheck and build are clean. |
+| ally-web | All tests pass: helpline 305, admin 538 files (baseline 536), ui-shared 48. Lint and the CI typecheck are clean. |
+| ally-ai | **1,774 passed**, 31 skipped. flake8 is clean. |
+
+`npm run format:check` fails in ally-web on 93 files, all pre-existing. The count is the same at the commit before this chunk's ally-web change, and none of the files are ones this chunk touched.
+
+## 3. Decisions
+
+- **The kill switch always wins**, including over a forced v2 in Preview (Shehbaz). `effectiveRuntime` = v1 unless `agentRuntimeAllowed`, then Preview's override, then `chatbots.runtime`.
+- **Shadow runs and the fallback alert go through events, not new constructor dependencies.** `WhatsAppInboundService` emits `chatbot.agent-fallback` and `chatbot.agent-shadow-run` on its existing `EventEmitter2`. `AgentRuntimeAlertThrottle` and `ChatbotShadowService` listen with `@OnEvent`.
+  - Why: adding them to the inbound constructor broke the existing `whatsapp-inbound-chatbot.spec.ts` (a hand-built Nest module). The brief says existing tests pass unmodified.
+  - The ordering holds: `emit` runs listeners synchronously after the reply was sent and recorded, and `start()` returns at once and never throws.
+- **`makeRequest` gets `alertOnFailure` (default true, so every existing caller is unchanged); only `runAgent` passes false.** Without it, every failed `/agent/run` would also send `AI Request Error` to Slack, once per message, and the throttle would be pointless. Shadow failures go to their row and the log only, not to Slack.
+- **Fallback budget.** `/agent/run` gets one 25 s attempt. v1 then gets `40 s − elapsed`: each attempt is capped at what's left, and it retries only if the retry still fits (the same rule as `RetryWithinBudget`). The 40 s is the SQS-window budget in `ai.service.ts`. A 404 because the flag is off costs milliseconds, so v1 keeps almost the whole budget.
+- **`run_id`:**
+  - On WhatsApp it is `uuidv5(providerMessageId, AGENT_RUN_NAMESPACE)`, where the namespace `54b53605-2385-4d61-8b44-a7fd03b0d1e9` must never change.
+  - Preview uses a random id.
+  - A shadow run uses the same derivation, since a message is never both shadow and v2.
+- **`conversation_id`:**
+  - WhatsApp: `wa_conversations.id`.
+  - Preview: `preview-<uuid>`, kept by the dashboard until New thread.
+  - **Shadow: `shadow-<wa_conversations.id>`.** This keeps comparison checkpoints out of the conversation's real v2 thread for when the bot switches over. The brief doesn't say which thread shadow should use.
+- **What gets shadowed:** only a message that v1 answered through the answer step (RAG, declined or clarified). Keyword replies, refusals, crisis replies and failed answers aren't shadowed.
+- **What's stored on the reply:**
+  - `agent_runtime` is `v2` or `v2_fallback`, and v1 replies leave both columns unset.
+  - A crisis reply that overrides a v2 answer or a fallback answer still keeps the run link.
+  - `/agent/run`'s debug-only `retrieval.hit_chunk_ids` is stripped before `retrieval_meta` is stored.
+- **Platform-admin-only fields:** PATCH `runtime` and Preview's `runtime` call `assertPlatformAdmin()`, the same pattern as `knowledgeSource = organisation`, so anyone else gets a 403. The UI hides both unless `canCreate`.
+- **Repo convention over the brief:** `agent_shadow_runs` uses the base entity's `"createdAt"`/`"updatedAt"` columns and `uuid_generate_v4()`, like every other chatbot table, instead of the brief's `created_at`.
+- **AI task registry:** no new row, because the registry is per model call and the model calls are unchanged. The `whatsapp-answer` detail now says v2 bots make them through `/agent/run` and shadow bots make them twice.
+- **Prompts:** no new prompts and no prompt text changes.
+
+## 4. How to test (Shehbaz's steps, with real routes, ports and screens)
+
+**Ports:**
+
+| Service | Address |
+|---|---|
+| Admin dashboard | http://localhost:8081 |
+| ally-be | `localhost:8001` (container `ally-be-app-1`, watches the source and runs migrations on start) |
+| ally-ai | `localhost:3001` (container `ally-ai-app-1`, a baked image) |
+| Postgres | `localhost:5477`, databases `ally_local` (ally-be) and `ally_agent_runtime` (checkpoints) |
+
+### 1. Tests, lint and the migration
+```bash
+cd ally-be  && npm test -- --forceExit --detectOpenHandles && npm run lint && npm run typecheck
+cd ally-web && nvm use 22 && npm test && npm run lint && npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json
+cd ally-ai  && poetry run pytest tests/ -q && poetry run flake8
+```
+Focused runs:
+- ally-be: `npx jest src/chatbot src/whatsapp/service/test/whatsapp-inbound-agent-runtime.spec.ts`
+- ally-web: `npx vitest run --project ally-admin-dashboard src/pages/WhatsAppBot`
+
+Migration: the container runs it on start, or run `docker exec ally-be-app-1 npm run migration:run`. Then check:
+```sql
+select runtime, count(*) from chatbots group by 1;                                -- all v1 on a fresh migrate
+select value->'agentRuntimeAllowed' from global_settings where name='whatsapp_bot'; -- null = default off
+```
+
+### 2. Setup
+1. ally-ai must run the new image with the runtime on. `ally-ai/.env` needs `AGENT_RUNTIME__ENABLED=true` and `AGENT_RUNTIME__CHECKPOINT_DB_URL`. Then rebuild:
+   ```bash
+   cd ally-ai && docker compose -f docker-compose.local.yml up -d --build app
+   ```
+2. In the dashboard: **AI Chatbots → Ally FAQ → Knowledge**. Attach all 7 "Ally FAQ –" documents and save.
+3. **AI Chatbots → Defaults → Settings → Safety switches → Allow the new engine: On**, then **Save defaults** in the bar at the bottom.
+
+### 3. Preview, side by side
+1. Open **Ally FAQ → Preview**.
+2. Set **Engine for this test** to **v1** and ask "What does Ally do?". The badge says "Answered by v1", with no run.
+3. Switch it to **v2** and ask the same question. You should get the same decision and similar sources. The badge says "Answered by v2", with a **Run** id and Copy, and "Steps (7)" opens to 7 steps with their ms.
+4. Ask a follow-up, then press **New thread**.
+
+Checked live on 2026-11-05: v1 took 12.6 s and v2 13.9 s, with the same source, and `write` took 11.1 s of v2's time. To confirm the run was stored:
+```bash
+docker exec ally-be-postgres-1 psql -U postgres -d ally_agent_runtime \
+  -c "select thread_id, count(*) from agent_runtime.checkpoints where thread_id like 'preview-%' group by 1;"
+```
+
+### 4. Switch the bot to v2
+Go to **Ally FAQ → Settings → Engine → v2 → Save engine**. With a WhatsApp number connected (tunnel and allow-listed phone), message it. Then:
+```sql
+select handled_by, agent_run_id, agent_runtime from wa_messages
+ where direction = 'outbound' order by "createdAt" desc limit 3;   -- agent_runtime = v2
+```
+
+### 5. Fallback
+1. Set `AGENT_RUNTIME__ENABLED=false` in `ally-ai/.env`, then:
+   ```bash
+   cd ally-ai && docker compose -f docker-compose.local.yml up -d --force-recreate --no-deps app
+   ```
+2. In Preview with **v2** you should see "Answered by v1 (v2 failed: upstream_404)" and "Would alert the team: Chatbot Agent Runtime Degraded".
+3. On WhatsApp:
+   - The reply still arrives, once.
+   - The outbound row has `agent_runtime = v2_fallback`.
+   - Slack gets **one** "Chatbot Agent Runtime Degraded" alert for the first fallback. Later fallbacks within 10 minutes send nothing. The next alert says how many messages fell back.
+4. Put the flag back afterwards.
+
+### 6. Shadow
+1. Go to **Settings → Engine → Shadow → Save engine**.
+2. Send 5 WhatsApp messages. Replies come from v1. Then:
+   ```sql
+   select chatbot_id, run_id, v1, v2, error from agent_shadow_runs order by "createdAt" desc;
+   ```
+   Expect 5 rows: numbers and chunk ids only, no text.
+3. Run the summary query in section 5.
+4. Replaying without a phone needs more setup:
+   - The message has to reach the Ally FAQ bot. With no connector, that means `platformChatbotId` pointing at it.
+   - A new contact first gets the consent prompt, so reply START first.
+   - The queue is `sqs-whatsapp-inbound-queue` in LocalStack. The body is `{"providerMessageId","from","text","isUnsupportedMedia":false,"timestamp"}`.
+   - This path wasn't run here.
+
+### 7. Kill switch
+Go to **Defaults → Allow the new engine: Off → Save defaults**. The v2 bot answers with v1 on its next message (Settings shows "turned off in Defaults"), with no deploy.
+
+## 5. The shadow summary query
+For each shadow bot over 7 days: messages, v2 failures, intent and decline-reason match %, citation overlap % (shared chunks ÷ the larger set), and p50/p90 latency per runtime.
+```sql
+WITH runs AS (
+  SELECT s.*,
+         (SELECT count(*) FROM jsonb_array_elements_text(s.v1->'cited_chunk_ids') a
+           WHERE a IN (SELECT jsonb_array_elements_text(s.v2->'cited_chunk_ids'))) AS shared,
+         greatest(jsonb_array_length(s.v1->'cited_chunk_ids'),
+                  jsonb_array_length(coalesce(s.v2->'cited_chunk_ids', '[]'))) AS widest
+    FROM agent_shadow_runs s
+   WHERE s."createdAt" >= now() - interval '7 days'
+     -- AND s.chatbot_id = '<bot id>'
+)
+SELECT chatbot_id,
+       count(*)                                                        AS messages,
+       count(*) FILTER (WHERE v2 IS NULL)                              AS v2_failed,
+       round(avg((v1->>'intent' = v2->>'intent')::int) * 100, 1)       AS intent_match_pct,
+       round(avg((v1->>'decline_reason' = v2->>'decline_reason')::int) * 100, 1)
+                                                                       AS decline_reason_match_pct,
+       round(avg(CASE WHEN widest > 0 THEN shared::numeric / widest END) * 100, 1)
+                                                                       AS citation_overlap_pct,
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY (v1->>'latency_ms')::int) AS v1_p50_ms,
+       percentile_cont(0.9) WITHIN GROUP (ORDER BY (v1->>'latency_ms')::int) AS v1_p90_ms,
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY (v2->>'latency_ms')::int) AS v2_p50_ms,
+       percentile_cont(0.9) WITHIN GROUP (ORDER BY (v2->>'latency_ms')::int) AS v2_p90_ms
+  FROM runs
+ GROUP BY chatbot_id;
+```
+Checked on a sample row inside a rolled-back transaction: 100% intent match and 50% overlap for `{a,b}` against `{a}`.
+
+## 6. Verified and not verified
+
+| Check | Status |
+|---|---|
+| Migration on the current local database | **Done.** It ran, then `down` and `up` again; both bots are v1. |
+| Migration on a fresh schema | **Done**, on a throwaway database (`pg_dump -s` of the current schema, the migration reverted and re-applied, an existing bot → v1 `{}`), then dropped. |
+| Live Preview, v1 and v2 | **Done** in the real dashboard (section 4.3). The run was stored: 9 checkpoints under its `preview-…` thread. |
+| `log_retrieval` live | **Not verified.** The local stack never delivers retrieval-log messages: `kb_retrievals` is empty for every consumer. It's covered by the ally-ai unit and endpoint tests. |
+| WhatsApp v2, fallback and shadow end to end | **Not verified.** No number is connected locally. They're covered by `whatsapp-inbound-agent-runtime.spec.ts`, which uses the real engine, emitter, throttle and shadow service. |
+
+Running every migration on an **empty** database fails at `1700000000000-AddDialogueLengthToScenarioStates`, because `scenarios` doesn't exist yet. This is pre-existing: the table is created by the later `1757484561931`. Not changed here.
+
+## 7. Commits, in review order
+
+**Chunk 1 (ally-ai: LangGraph runtime with parity)**
+```
+1359fc39c docs: add Agents v2 context, plan and CLAUDE.md
+a49623aab docs(agents-v2): chunk 01 code map
+61bb74a4b test(agent-runtime): parity harness, cases and master baseline
+49601bd29 refactor(knowledge_agent): extract pipeline steps
+a20773377 build(ally-ai): add langgraph, langgraph-checkpoint-postgres and psycopg
+a4983449d feat(agent-runtime): LangGraph graph, /agent/run and Postgres checkpointer
+6b6dd21a7 test(agent-runtime): graph, endpoint, checkpointer and golden parity tests
+f97b90a3b chore(ally-ai): keep local venv out of the image; pin runtime flag in tests
+8b9ef3d2a docs(agents-v2): chunk 01 notes and parity report
+1398d2f78 test(agent-runtime): cited-chunk set is should-match in live parity
+```
+**Chunk 2 (runtime switch: ally-ai, ally-be, ally-web)**
+```
+cdababa96 docs(agents-v2): chunk 2 brief, updated context and chunk plan
+92c6ae9ce docs(agents-v2): chunk 02 code map; current chunk is 02
+6a73b1356 feat(agent-runtime): log_retrieval flag on /agent/run
+6cd9b0b05 test(chatbot-engine): pin the v1 /knowledge-agent/answer request body
+4b0d389b5 feat(chatbot): runtime and features columns, agent run link on messages, shadow table
+ab91867c8 feat(chatbot-engine): answer v2 bots through /agent/run, falling back to v1
+1cf4b2b92 feat(chatbot): shadow runs and the throttled agent-runtime alert
+0e7705652 feat(chatbot): runtime on the chatbot API and Preview
+c47f16998 feat(admin-dashboard): engine setting, kill switch toggle and Preview run details
+```
+The notes commit follows these. Review chunk 1 first: chunk 2's `6cd9b0b05` pins the v1 request before `ab91867c8` refactors it.
+
+## 8. Open items
+
+- **Wiki.** ally-ai's `.docs-map.yml` (`repo-page-architecture`) requires `wiki:repos/ally-ai.md` for `app/api/v1/endpoints/**`, and both chunks touched it. Chunk 1 deferred the wiki update to chunk 2. **The wiki PR (`/agent/run`, its flag and the ally-be integration) has not been opened.** The wiki is public, so it waits for your go-ahead. Until then the PR needs a `Wiki-PR:` trailer or the `docs:skip` label.
+- **The throttle is per instance and in memory.** N instances can each send one alert per window, and a restart resets the counts.
+- **Double retrieval log on a late fallback.** If `/agent/run` fails *after* its select step logged (the write call 502s), the v1 fallback logs again. This is rare and accepted.
+- **Shadow is a sample under load.** Messages past `AGENT_SHADOW_MAX_IN_FLIGHT` have no row, and the skip count is only in the logs. A shadow run in flight during a deploy is lost with no row. The fallback alert is the only Slack signal: shadow failures appear only in `agent_shadow_runs.error`.
+- **Checkpoint retention** (open from chunk 1). Preview and `shadow-…` threads add checkpoint rows, and nothing deletes them yet.
+- **The Defaults PUT** relies on `EDIT_WHATSAPP_BOT` (SUPER_DUPER_ADMIN only) with no `assertPlatformAdmin`. The new toggle inherits that unchanged.
+- **For chunk 2b (streaming):** Preview now carries a stable `conversationId`, and `ChatbotTestTab` renders the trace from the final response. Streaming `step` events can fill the same list.
+- **Model sampling** (from chunk 1) still makes v1 and v2 differ in wording and sometimes in citations. Expect citation overlap in the shadow summary to sit below 100% for that reason alone.
