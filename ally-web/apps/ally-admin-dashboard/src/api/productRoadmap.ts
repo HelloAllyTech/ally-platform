@@ -6,6 +6,8 @@ import {
   RoadmapBugReportBody,
   RoadmapBugReportResponse,
   RoadmapVoteBudget,
+  RoadmapBreadth,
+  RoadmapBreadthRow,
   RoadmapVoter,
   RoadmapComment,
   RoadmapDuplicateMatch,
@@ -207,6 +209,22 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
       }),
       providesTags: [TAG_TYPES.PRODUCT_ROADMAP_VOTE_BUDGET],
+    }),
+
+    getRoadmapBreadth: builder.query<RoadmapBreadth, void>({
+      query: () => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.MY_BREADTH,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_BREADTH],
+    }),
+
+    getRoadmapBreadthEveryone: builder.query<RoadmapBreadthRow[], void>({
+      query: () => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.BREADTH_EVERYONE,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_BREADTH],
     }),
 
     getRoadmapFacets: builder.query<RoadmapFacets, void>({
@@ -928,6 +946,8 @@ export const {
   useMoveRoadmapOpportunityMutation,
   useGetRoadmapOpportunityQuery,
   useGetRoadmapVoteBudgetQuery,
+  useGetRoadmapBreadthQuery,
+  useGetRoadmapBreadthEveryoneQuery,
   useGetRoadmapFacetsQuery,
   useCreateRoadmapOpportunityMutation,
   useQuickAddRoadmapOpportunityMutation,

@@ -6,11 +6,30 @@ import {
   ROADMAP_BOARD_DEFAULTS,
   ROADMAP_EFFORT_UNSIZED,
   ROADMAP_LIST_DEFAULTS,
+  ROADMAP_MULTIPLIER_WINDOW_DAYS,
 } from '../constants/product-roadmap.constants';
+
+/**
+ * True when a vote on `opp` would back a colleague the caller hasn't backed inside the breadth
+ * window: votable (stage new, not a bug), not the caller's own, and no standing vote of theirs
+ * raised within the window on any opportunity by that author. Same author/window rule as
+ * RoadmapMultiplierService, spelled as a fragment so the list and the multiplier can't drift.
+ * Needs :userId and :breadthDays bound.
+ */
+const BREADTH_NEW_SQL = `(opp."createdBy" <> :userId
+  AND opp.stage = 'new' AND opp.type <> 'bug'
+  AND NOT EXISTS (
+    SELECT 1 FROM roadmap_allocations ba
+      JOIN roadmap_opportunities bo ON bo.id = ba."opportunityId"
+     WHERE ba."userId" = :userId AND ba.votes > 0
+       AND bo."deletedAt" IS NULL AND bo."createdBy" = opp."createdBy"
+       AND ba."lastIncreasedAt" >= now() - make_interval(days => :breadthDays)))`;
 
 /** A row as projected by listOpportunities — the entity plus three computed columns. */
 export interface RoadmapOpportunityRow extends RoadmapOpportunity {
   priorityScore: number;
+  /** See OpportunityResponseDto.breadthNew. */
+  breadthNew?: boolean;
   myVotes: number;
   commentCount: number;
   /**
@@ -122,6 +141,8 @@ export interface ListOpportunitiesOptions {
   productGoal?: string[];
   owner?: string[];
   createdBy?: number[];
+  /** Only opportunities that would back a colleague the caller hasn't backed lately. */
+  newToMe?: boolean;
   dateFrom?: string;
   dateTo?: string;
   releasedFrom?: string;
@@ -305,7 +326,7 @@ const queueRankSql = (p: RankPlaceholders): string => `(
          )::int AS rank
     FROM roadmap_opportunities q
     LEFT JOIN (SELECT a."opportunityId",
-                      SUM(a.votes)::int                                   AS score,
+                      ROUND(SUM(a."weightedVotes")::numeric, 1)::float8 AS score,
                       COUNT(DISTINCT a."userId") FILTER (WHERE a.votes > 0)::int AS voters
                  FROM roadmap_allocations a
                 GROUP BY a."opportunityId") qa
@@ -675,7 +696,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
   async getMaxScore(): Promise<number> {
     const [row] = await this.dataSource.query<{ max: string | null }[]>(
       `SELECT COALESCE(MAX(score), 0) AS max
-         FROM (SELECT a."opportunityId", SUM(a.votes) AS score
+         FROM (SELECT a."opportunityId", SUM(a."weightedVotes") AS score
                  FROM roadmap_allocations a
                  JOIN roadmap_opportunities o ON o.id = a."opportunityId"
                 WHERE o."deletedAt" IS NULL
@@ -723,13 +744,22 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
               COALESCE((SELECT a.votes FROM roadmap_allocations a
                          WHERE a."opportunityId" = opp.id
                            AND a."userId" = $2 AND a."periodKey" = $3), 0)   AS "myVotes",
+              (opp."createdBy" <> $2
+                AND opp.stage = 'new' AND opp.type <> 'bug'
+                AND NOT EXISTS (
+                  SELECT 1 FROM roadmap_allocations ba
+                    JOIN roadmap_opportunities bo ON bo.id = ba."opportunityId"
+                   WHERE ba."userId" = $2 AND ba.votes > 0
+                     AND bo."deletedAt" IS NULL AND bo."createdBy" = opp."createdBy"
+                     AND ba."lastIncreasedAt" >= now() - make_interval(days => ${ROADMAP_MULTIPLIER_WINDOW_DAYS}))
+              )                                                              AS "breadthNew",
               COALESCE((SELECT COUNT(*)::int FROM roadmap_opportunity_comments c
                          WHERE c."opportunityId" = opp.id
                            AND c."deletedAt" IS NULL), 0)                    AS "commentCount",
               COALESCE(owner_user.name, opp."owner")                         AS "ownerDisplay",
               qrank.rank                                                     AS "queueRank"
          FROM roadmap_opportunities opp
-         LEFT JOIN (SELECT a."opportunityId", SUM(a.votes)::int AS score
+         LEFT JOIN (SELECT a."opportunityId", ROUND(SUM(a."weightedVotes")::numeric, 1)::float8 AS score
                       FROM roadmap_allocations a
                      GROUP BY a."opportunityId") alloc
                 ON alloc."opportunityId" = opp.id
@@ -834,12 +864,14 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
     return (
       this.createQueryBuilder('opp')
         .select('opp.*')
-        .addSelect('COALESCE(alloc.score, 0)::int', 'priorityScore')
+        .addSelect('COALESCE(alloc.score, 0)::float8', 'priorityScore')
         .addSelect('COALESCE(voters.cnt, 0)::int', 'voterCount')
         .addSelect('COALESCE(gimp.helped, 0)::int', 'goalsHelped')
         .addSelect('COALESCE(gimp.assessed, 0)::int', 'goalsAssessed')
         .addSelect(COMPOSITE_SCORE_SQL, 'compositeScore')
         .addSelect('COALESCE(mine.votes, 0)::int', 'myVotes')
+        .addSelect(BREADTH_NEW_SQL, 'breadthNew')
+        .setParameter('breadthDays', ROADMAP_MULTIPLIER_WINDOW_DAYS)
         .addSelect('COALESCE(cmt.cnt, 0)::int', 'commentCount')
         .addSelect('COALESCE(owner_user.name, opp."owner")', 'ownerDisplay')
         .addSelect('qrank.rank', 'queueRank')
@@ -858,7 +890,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
           totalGoals: rank.bases.totalGoals,
         })
         .leftJoin(
-          `(SELECT a."opportunityId", SUM(a.votes)::int AS score
+          `(SELECT a."opportunityId", ROUND(SUM(a."weightedVotes")::numeric, 1)::float8 AS score
             FROM roadmap_allocations a
            GROUP BY a."opportunityId")`,
           'alloc',
@@ -962,6 +994,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
         { owner: o.owner },
       );
     }
+    if (o.newToMe) qb.andWhere(BREADTH_NEW_SQL);
     if (o.createdBy?.length) {
       qb.andWhere('opp."createdBy" IN (:...createdBy)', {
         createdBy: o.createdBy,

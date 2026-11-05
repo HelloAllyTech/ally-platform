@@ -178,6 +178,7 @@ export class RoadmapOpportunityService {
         name: user.name,
         email: user.email,
         votes: r.votes,
+        weightedVotes: r.weightedVotes,
       };
     });
   }
@@ -741,6 +742,7 @@ export class RoadmapOpportunityService {
       goalsHelped: Number(row.goalsHelped ?? 0),
       goalsAssessed: Number(row.goalsAssessed ?? 0),
       goalsTotal,
+      breadthNew: row.breadthNew === true,
       myVotes: Number(row.myVotes ?? 0),
       commentCount: Number(row.commentCount ?? 0),
       source: row.source,

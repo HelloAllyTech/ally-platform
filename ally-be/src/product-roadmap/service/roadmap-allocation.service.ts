@@ -17,11 +17,13 @@ import { RoadmapAllocationRepository } from '../repository/roadmap-allocation.re
 import { RoadmapVoteGrantRepository } from '../repository/roadmap-vote-grant.repository';
 import { ROADMAP_VOTE_BALANCE_EXCEEDED_MARKER } from '../constants/product-roadmap.constants';
 import { currentPeriodKey } from '../util/roadmap-period.util';
+import { roundPoints } from '../util/roadmap-multiplier.util';
 import {
   VoteBudgetDto,
   SetAllocationResponseDto,
 } from '../dto/roadmap-response.dto';
 import { RoadmapNotificationService } from './roadmap-notification.service';
+import { RoadmapMultiplierService } from './roadmap-multiplier.service';
 
 @Injectable()
 export class RoadmapAllocationService {
@@ -34,6 +36,7 @@ export class RoadmapAllocationService {
     private readonly allocationRepository: RoadmapAllocationRepository,
     private readonly grantRepository: RoadmapVoteGrantRepository,
     private readonly notifications: RoadmapNotificationService,
+    private readonly multipliers: RoadmapMultiplierService,
   ) {}
 
   /** The caller's live, spendable vote balance. */
@@ -124,10 +127,29 @@ export class RoadmapAllocationService {
           }
         }
 
+        // Breadth weighting, FROZEN at cast time: only the votes added now take today's
+        // multiplier; removing votes takes them off at the row's own average weight, so
+        // nobody's old votes are re-weighted by a later change. Computed here, inside the
+        // transaction and after the per-user lock, so it can't race the same user's other write.
+        const multiplier =
+          delta > 0 ? await this.multipliers.multiplierFor(manager, userId) : 1;
+        const previousWeighted = Number(existing?.weightedVotes ?? 0);
+        let weighted = previousWeighted;
+        if (delta > 0) {
+          weighted = previousWeighted + delta * multiplier;
+        } else if (delta < 0 && previousVotes > 0) {
+          weighted =
+            previousWeighted - -delta * (previousWeighted / previousVotes);
+        }
+        weighted =
+          votes === 0 ? 0 : Math.max(0, Math.round(weighted * 1000) / 1000);
+
         if (votes === 0) {
           if (existing) await manager.remove(RoadmapAllocation, existing);
         } else if (existing) {
           existing.votes = votes;
+          existing.weightedVotes = String(weighted);
+          if (delta > 0) existing.lastIncreasedAt = new Date();
           await manager.save(RoadmapAllocation, existing);
         } else {
           await manager.save(
@@ -136,6 +158,8 @@ export class RoadmapAllocationService {
               opportunityId,
               periodKey,
               votes,
+              weightedVotes: String(weighted),
+              lastIncreasedAt: new Date(),
             }),
           );
         }
@@ -147,10 +171,11 @@ export class RoadmapAllocationService {
         }
 
         const [scoreRow] = await manager.query<{ total: string | null }[]>(
-          `SELECT COALESCE(SUM(votes), 0) AS total FROM roadmap_allocations WHERE "opportunityId" = $1`,
+          `SELECT COALESCE(SUM("weightedVotes"), 0) AS total FROM roadmap_allocations WHERE "opportunityId" = $1`,
           [opportunityId],
         );
-        const priorityScore = Number(scoreRow?.total ?? 0);
+        const priorityScore = roundPoints(Number(scoreRow?.total ?? 0));
+        const breadth = await this.multipliers.getBreadthInTx(manager, userId);
 
         const available = await this.grantRepository.availableBalance(
           manager,
@@ -167,7 +192,15 @@ export class RoadmapAllocationService {
           priorityScore,
         });
 
-        return { opportunityId, periodKey, votes, priorityScore, budget };
+        return {
+          opportunityId,
+          periodKey,
+          votes,
+          priorityScore,
+          budget,
+          multiplier: breadth.multiplier,
+          qualifying: breadth.qualifying,
+        };
       });
     } catch (error) {
       throw this.translateBalanceError(error);

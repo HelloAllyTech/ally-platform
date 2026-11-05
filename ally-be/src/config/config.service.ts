@@ -905,6 +905,18 @@ export class AppConfigService {
     };
   }
 
+  /**
+   * Breadth multiplier on roadmap votes. On by default; set ROADMAP_MULTIPLIER_ENABLED=false to
+   * switch it off, which makes a vote always worth 1.0 and hides the UI. `weightedVotes` is
+   * written either way, so the switch can be flipped without losing history.
+   */
+  get roadmapMultiplierEnabled(): boolean {
+    return (
+      this.configService.get<string>('ROADMAP_MULTIPLIER_ENABLED', 'true') !==
+      'false'
+    );
+  }
+
   get builder() {
     return {
       // Model per role in the tiered loop. Defaults live in ONE place

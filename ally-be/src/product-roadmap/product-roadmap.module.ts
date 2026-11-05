@@ -49,6 +49,7 @@ import { RoadmapCopilotToolsService } from './service/roadmap-copilot-tools.serv
 import { RoadmapCopilotService } from './service/roadmap-copilot.service';
 import { GlobalSettings } from 'src/settings/entity/global-settings.entity';
 import { RoadmapAllocationService } from './service/roadmap-allocation.service';
+import { RoadmapMultiplierService } from './service/roadmap-multiplier.service';
 import { RoadmapCommentService } from './service/roadmap-comment.service';
 import { RoadmapInterviewNoteService } from './service/roadmap-content.service';
 import { RoadmapNotificationService } from './service/roadmap-notification.service';
@@ -187,6 +188,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapImportService,
     RoadmapOpportunityService,
     RoadmapAllocationService,
+    RoadmapMultiplierService,
     RoadmapSplitMergeService,
     RoadmapBuilderService,
     RoadmapUpNextService,

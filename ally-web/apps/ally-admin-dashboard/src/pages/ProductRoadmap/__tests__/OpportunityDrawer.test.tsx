@@ -16,6 +16,9 @@ const state = vi.hoisted(() => ({
 }));
 const setVotes = vi.hoisted(() => vi.fn());
 
+// The breadth flag is a server answer behind a cached query; these tests are about the row/panel, so pin it off ("votes").
+vi.mock("../useScoreUnit", () => ({ useScoreUnit: () => ({ enabled: false, unit: "votes" }) }));
+
 vi.mock("@icons", () => ({
   BuilderAgentIcon: () => <span>builder</span>,
   Close: () => <span>close</span>,
@@ -55,6 +58,7 @@ vi.mock("@utils", () => ({ hasFeature: () => false }));
 
 const mutation = vi.hoisted(() => () => [vi.fn(), { isLoading: false }]);
 vi.mock("@api", () => ({
+  useGetRoadmapBreadthQuery: () => ({ data: undefined }),
   useGetRoadmapOpportunityQuery: () => ({
     data: state.opportunity,
     isLoading: false,

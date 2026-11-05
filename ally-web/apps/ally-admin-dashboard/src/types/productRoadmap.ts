@@ -157,8 +157,17 @@ export interface RoadmapOpportunity {
   effectiveMonth: string | null;
   /** True when the lane is a fact rather than a plan, so the card must not be draggable. */
   monthPinned: boolean;
-  /** SUM of every user's votes across every period. Computed in SQL, never stored. */
+  /**
+   * Priority POINTS: every user's votes across every period, each weighted by that voter's
+   * breadth multiplier when they voted. One decimal at most. Computed in SQL, never stored.
+   * Equals the raw vote total while every multiplier is 1.0.
+   */
   priorityScore: number;
+  /**
+   * True when voting here would back a colleague the caller hasn't backed in the breadth window
+   * (votable, not their own). Drives the "New colleague" marker and the "New to you" filter.
+   */
+  breadthNew: boolean;
   /**
    * The weighted four-factor rank, 0-100, and the board's DEFAULT ordering. Computed in SQL per
    * read from the live weights — never stored, so retuning the weights re-ranks immediately.
@@ -212,6 +221,8 @@ export interface RoadmapOpportunitiesQuery {
   productGoal?: string[];
   owner?: string[];
   createdBy?: number[];
+  /** Only opportunities that would back a colleague the caller hasn't backed lately. */
+  newToMe?: boolean;
   dateFrom?: string;
   dateTo?: string;
   releasedFrom?: string;
@@ -327,6 +338,35 @@ export interface SetAllocationResponse {
   votes: number;
   priorityScore: number;
   budget: RoadmapVoteBudget;
+  /** The breadth multiplier this vote was weighted with (1 when the feature is off). */
+  multiplier: number;
+  /** Distinct colleagues now counted toward the caller's breadth. */
+  qualifying: number;
+}
+
+/** The caller's breadth multiplier and what's behind it. */
+export interface RoadmapBreadth {
+  /** False while the feature flag is off — render none of the breadth surface. */
+  enabled: boolean;
+  multiplier: number;
+  /** Distinct colleagues backed in the window. */
+  qualifying: number;
+  /** Colleagues needed for the full bonus today (capped, never more than exist). */
+  target: number;
+  windowDays: number;
+  /** The multiplier at full breadth for this caller today. */
+  maxMultiplier: number;
+  nextDropAt: string | null;
+  nextDropMultiplier: number | null;
+  nextDropAuthorName: string | null;
+}
+
+export interface RoadmapBreadthRow {
+  userId: number;
+  name: string;
+  multiplier: number;
+  qualifying: number;
+  target: number;
 }
 
 export interface RoadmapFacets {
@@ -494,7 +534,10 @@ export interface RoadmapVoter {
   userId: number;
   name: string;
   email: string;
+  /** Votes spent. */
   votes: number;
+  /** What those votes are worth to the score; equals `votes` when no bonus applied. */
+  weightedVotes: number;
 }
 
 export interface RoadmapInterviewNote {
