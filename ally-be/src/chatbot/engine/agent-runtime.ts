@@ -60,6 +60,18 @@ export const effectiveRuntime = (
     ? (requested ?? chatbot.runtime ?? ChatbotRuntime.V1)
     : ChatbotRuntime.V1;
 
+/**
+ * The bot answers with the conversational agent: its effective engine is v2 (kill switch and
+ * Preview override included) and its `features.agent` flag is on.
+ */
+export const isAgentMode = (
+  chatbot: Pick<Chatbot, 'runtime' | 'features'>,
+  settings: Pick<WhatsAppBotSettings, 'agentRuntimeAllowed'>,
+  requested?: ChatbotRuntime | null,
+): boolean =>
+  effectiveRuntime(chatbot, settings, requested) === ChatbotRuntime.V2 &&
+  chatbot.features?.agent === true;
+
 /** `/agent/run` answered 200 with something that is not an answer. */
 export class MalformedAgentResponseError extends Error {
   constructor() {

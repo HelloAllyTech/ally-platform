@@ -35,7 +35,10 @@ export function buildKnowledgeRequest(
   };
 }
 
-/** The v1 body plus the four fields that identify the run. */
+/**
+ * The v1 body plus the four fields that identify the run, and what only v2 reads: the bot's
+ * feature flags and, for the conversational agent, its topics and decline wording.
+ */
 export function buildAgentRunRequest(
   request: KnowledgeAnswerRequest,
   run: {
@@ -43,6 +46,9 @@ export function buildAgentRunRequest(
     runId: string;
     chatbotId: string;
     logRetrieval?: boolean;
+    features?: Record<string, boolean>;
+    knowledgeTopics?: string[];
+    declineText?: string;
   },
 ): AgentRunRequest {
   return {
@@ -52,6 +58,9 @@ export function buildAgentRunRequest(
     chatbot_id: run.chatbotId,
     runtime_version: 'v2',
     ...(run.logRetrieval === false ? { log_retrieval: false } : {}),
+    ...(run.features ? { features: run.features } : {}),
+    ...(run.knowledgeTopics ? { knowledge_topics: run.knowledgeTopics } : {}),
+    ...(run.declineText ? { decline_text: run.declineText } : {}),
   };
 }
 

@@ -297,8 +297,9 @@ export class ChatbotService {
       // Reaches every organisation's targeted documents, so it is a platform decision.
       await this.access.assertPlatformAdmin();
     }
-    if (dto.runtime !== undefined) {
-      // Which engine answers real people is a platform decision while Agents v2 is rolling out.
+    if (dto.runtime !== undefined || dto.features !== undefined) {
+      // Which engine answers real people, and how, is a platform decision while Agents v2 is
+      // rolling out.
       await this.access.assertPlatformAdmin();
     }
     if (dto.model) await this.assertModel(dto.model);
@@ -314,6 +315,10 @@ export class ChatbotService {
     if (dto.knowledgeSource !== undefined)
       patch.knowledgeSource = dto.knowledgeSource;
     if (dto.runtime !== undefined) patch.runtime = dto.runtime;
+    if (dto.features?.agent !== undefined) {
+      // Only known flags are written; the jsonb keeps any others as they were.
+      patch.features = { ...chatbot.features, agent: dto.features.agent };
+    }
     if (dto.model !== undefined) {
       patch.model = dto.model
         ? {
@@ -547,6 +552,8 @@ export class ChatbotService {
       settings,
       text: dto.message,
       history: dto.history ?? [],
+      // An empty Preview chat stands for a new person (see the first reply below).
+      isFirstMessage: !(dto.history ?? []).length,
       sender: {
         externalId: `test:${currentUserId()}`,
         label: 'test console',
@@ -598,6 +605,9 @@ export class ChatbotService {
       runId: decision.agent?.runId ?? null,
       trace: (decision.agent?.trace ?? null) as AgentTraceStep[] | null,
       fallbackReason: decision.agent?.fallbackReason ?? null,
+      // Agent mode: what the agent understood the message to be (smalltalk, about_bot, …).
+      turnType:
+        (decision.retrievalMeta?.turn_type as string | undefined) ?? null,
       runtimeAllowed: settings.agentRuntimeAllowed,
       conversationId,
     };

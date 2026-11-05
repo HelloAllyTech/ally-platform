@@ -1151,6 +1151,37 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'KNOWLEDGE_AGENT__TRANSLATE_MODEL',
   },
   {
+    id: 'whatsapp-agent-contextualize',
+    task: LlmTask.WHATSAPP_AGENT_CONTEXTUALIZE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Someone messages a chatbot that is in Agent mode (Agents v2)',
+    detail:
+      'Reads the message with the recent conversation: is it small talk, a question about the ' +
+      'bot, a question or unclear, and what to search for ("and after that?" becomes a whole ' +
+      'question). One call per message; it replaces the translate call for these bots.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'KNOWLEDGE_AGENT__TRANSLATE_MODEL',
+    promptOverride: 'ally_ai_agent_contextualize',
+  },
+  {
+    id: 'whatsapp-agent-step',
+    task: LlmTask.WHATSAPP_AGENT_STEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: '...and the agent decides what to do or say',
+    detail:
+      'One call per step: either search the bot’s documents again or reply. At most 5 per ' +
+      'message (4 searches, then a reply); usually one. Replaces the answer call for these ' +
+      'bots, so the bot’s own model (chatbots.model) applies here, never to the crisis check.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per bot: chatbots.model',
+    promptOverride: 'ally_ai_agent_system',
+  },
+  {
     id: 'corpus-embedding',
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,

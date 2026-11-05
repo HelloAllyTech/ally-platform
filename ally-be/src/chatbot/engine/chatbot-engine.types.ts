@@ -64,6 +64,11 @@ export interface ChatTurn {
   providerMessageId?: string;
   /** Preview only: answer this one test with this engine. The kill switch still wins. */
   runtime?: ChatbotRuntime.V1 | ChatbotRuntime.V2;
+  /**
+   * The person's first message to this bot (WhatsApp: the contact's first message; Preview: an
+   * empty chat). `history` can't say: on WhatsApp it already holds the message being answered.
+   */
+  isFirstMessage?: boolean;
 }
 
 /** The Agents v2 run behind a reply, for the channel to store and Preview to show. */
@@ -95,7 +100,11 @@ export interface ChatbotDecision {
   handledBy: WaHandledBy;
   body: string;
   templateId?: string;
-  /** The body IS the bot's welcome message (it answered a hello), so it isn't added again. */
+  /**
+   * The body greets the person rather than answering a question: the bot's welcome message (it
+   * answered a hello), or, for an agent bot, its own reply to small talk or "who are you?". On a
+   * first message the first-message notice follows it (`withFirstMessageParts`).
+   */
   isWelcome?: boolean;
   citations?: Record<string, any>[];
   retrievalMeta?: Record<string, any>;

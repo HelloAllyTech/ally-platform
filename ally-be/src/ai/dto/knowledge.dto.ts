@@ -179,7 +179,16 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   runtime_version: 'v2';
   /** False on shadow runs, whose message v1 has already reported to the retrieval log. */
   log_retrieval?: boolean;
+  /** The bot's feature flags. `agent: true` runs the conversational agent. */
+  features?: Record<string, boolean>;
+  /** Agent mode: titles of the bot's documents, so it can say what it covers (≤ 50). */
+  knowledge_topics?: string[];
+  /** Agent mode: the bot's decline wording, whose tone (not words) the agent follows. */
+  decline_text?: string;
 }
+
+/** What the conversational agent understood a message to be. */
+export type AgentTurnType = 'smalltalk' | 'about_bot' | 'question' | 'unclear';
 
 /** One graph node that ran, in order. */
 export interface AgentTraceStep {
@@ -239,6 +248,11 @@ export interface KnowledgeAnswerResponse {
   provider: string;
   model: string;
   prompt_version: string;
+  /**
+   * Agents v2 conversational agent only. A `smalltalk` / `about_bot` reply arrives as intent
+   * `answer` with no citations, so this is what tells it apart from a grounded answer.
+   */
+  turn_type?: AgentTurnType;
 }
 
 export interface CrisisCheckRequest {

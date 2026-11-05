@@ -31,6 +31,7 @@ import {
   agentFailureReason,
   agentRunIdFor,
   effectiveRuntime,
+  isAgentMode,
   MalformedAgentResponseError,
   shadowSide,
 } from './agent-runtime';
@@ -57,6 +58,19 @@ export const KNOWLEDGE_PROMPT_CODES = [
   'ally_ai_knowledge_translate_query',
   'ally_ai_knowledge_crisis_classify',
 ];
+/**
+ * The conversational agent's prompts (Agents v2, `features.agent`). Loaded only for a bot in agent
+ * mode, so every other bot's request is exactly as before.
+ */
+export const AGENT_PROMPT_CODES = [
+  'ally_ai_agent_contextualize',
+  'ally_ai_agent_system',
+];
+/** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
+const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
+/** At most this many document titles are sent as the agent's "what I cover" list. */
+const MAX_KNOWLEDGE_TOPICS = 50;
+
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 /** Used by bots allowed to answer beyond their documents. */
 const GENERAL_ANSWER_PROMPT_CODE = 'ally_ai_knowledge_answer_general';
@@ -83,6 +97,30 @@ export const isGreetingReply = (template: {
   (template.patterns ?? []).some((p) =>
     GREETING_WORDS.has(ChatbotReplyService.normalise(p)),
   );
+
+/**
+ * Whether an agent bot answers this keyword match itself instead of sending the template.
+ *
+ * Only the command and FAQ replies (greeting, help, "what can you do", FAQ answers) give way.
+ * Crisis and consent replies never do. Two command replies stay:
+ * - a bare `help`, which keeps the fixed Help text and its safety wording;
+ * - the bot's own welcome message, on a person's first message only.
+ */
+export const agentAnswersInstead = (
+  template: { kind: WaTemplateKind; patterns: string[] },
+  turn: Pick<ChatTurn, 'text' | 'chatbot' | 'isFirstMessage'>,
+): boolean => {
+  if (
+    template.kind !== WaTemplateKind.COMMAND &&
+    template.kind !== WaTemplateKind.FAQ
+  ) {
+    return false;
+  }
+  if (ChatbotReplyService.normalise(turn.text) === 'help') return false;
+  const welcome = turn.chatbot.persona?.greeting?.trim();
+  if (welcome && turn.isFirstMessage && isGreetingReply(template)) return false;
+  return true;
+};
 
 /** The test console's channel type. */
 const PREVIEW_CHANNEL = 'test';
@@ -174,7 +212,12 @@ export class ChatbotEngineService {
     const usable =
       match &&
       match.bypassRag &&
-      (allowed || match.template.kind !== WaTemplateKind.FAQ);
+      (allowed || match.template.kind !== WaTemplateKind.FAQ) &&
+      // An agent bot answers greetings, help and FAQ-style messages itself.
+      !(
+        isAgentMode(chatbot, settings, turn.runtime) &&
+        agentAnswersInstead(match.template, turn)
+      );
     if (match && usable) {
       const isCrisis = match.template.kind === WaTemplateKind.CRISIS;
       // A bot with its own welcome message greets with THAT, not the generic shared greeting —
@@ -280,7 +323,8 @@ export class ChatbotEngineService {
 
   private async answer(turn: ChatTurn): Promise<ChatbotDecision> {
     const { chatbot, settings, sender } = turn;
-    const { prompts, ran } = await this.loadPromptOverrides(turn);
+    const agentMode = isAgentMode(chatbot, settings, turn.runtime);
+    const { prompts, ran } = await this.loadPromptOverrides(turn, agentMode);
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
     const runtime = effectiveRuntime(chatbot, settings, turn.runtime);
@@ -290,7 +334,7 @@ export class ChatbotEngineService {
     // runs once and exactly as before, whichever engine answers.
     const [answerResult, crisisResult] = await Promise.allSettled([
       runtime === ChatbotRuntime.V2
-        ? this.answerWithAgent(turn, request)
+        ? this.answerWithAgent(turn, request, agentMode, knowledge)
         : this.answerWithV1(request),
       settings.crisisClassifierEnabled
         ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
@@ -410,6 +454,8 @@ export class ChatbotEngineService {
   private async answerWithAgent(
     turn: ChatTurn,
     request: KnowledgeAnswerRequest,
+    agentMode: boolean,
+    knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
   ): Promise<Answered> {
     const runId = agentRunIdFor(turn.providerMessageId);
     const conversationId = turn.conversationId ?? `preview-${randomUUID()}`;
@@ -420,6 +466,15 @@ export class ChatbotEngineService {
           conversationId,
           runId,
           chatbotId: turn.chatbot.id,
+          // Only an agent bot sends these; any other v2 bot's request is the parity request, and
+          // ally-ai reads no features as "agent off".
+          ...(agentMode
+            ? {
+                features: turn.chatbot.features,
+                knowledgeTopics: await this.knowledgeTopics(knowledge),
+                declineText: turn.settings.declineText,
+              }
+            : {}),
         }),
       );
       if (!response?.intent) throw new MalformedAgentResponseError();
@@ -506,6 +561,7 @@ export class ChatbotEngineService {
       settings.maxReplyChars,
       turn.channel.capabilities?.maxReplyChars ?? settings.maxReplyChars,
     );
+    const turnType = answer.turn_type;
     const body = composeReply({
       intent: answer.intent,
       answer: answer.answer,
@@ -533,9 +589,15 @@ export class ChatbotEngineService {
         model: answer.model,
         prompt_version: answer.prompt_version,
         chatbot_id: chatbot.id,
+        ...(turnType ? { turn_type: turnType } : {}),
         ...ran,
       },
       language: answer.language,
+      // The agent's hello or "who I am": on a first message, the notice follows it, as it follows
+      // the welcome message.
+      ...(turnType === 'smalltalk' || turnType === 'about_bot'
+        ? { isWelcome: true }
+        : {}),
       // A CLARIFY is not filed: too vague to retrieve against is not evidence of a gap.
       unanswered:
         answer.intent === 'decline'
@@ -585,6 +647,39 @@ export class ChatbotEngineService {
   }
 
   /**
+   * The titles of the documents an agent bot answers from: its "what I cover" list. A bot that
+   * answers from its organisation's library sends none for now (`knowledge_topics: []`).
+   */
+  private async knowledgeTopics(
+    knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
+  ): Promise<string[]> {
+    const ids = (knowledge.document_ids ?? []).filter(
+      (id) => id !== NO_DOCUMENTS,
+    );
+    if (!ids.length) return [];
+    try {
+      const rows = await this.documentRepository.manager.query<
+        { title: string }[]
+      >(
+        `SELECT title FROM kb_documents
+          WHERE id = ANY($1::uuid[]) AND archived_at IS NULL
+          ORDER BY title
+          LIMIT ${MAX_KNOWLEDGE_TOPICS}`,
+        [ids],
+      );
+      return rows.map((row) => row.title).filter((title) => title?.trim());
+    } catch (error) {
+      // The agent can still answer without the list; it just describes itself less specifically.
+      this.logger.warn(
+        `Could not load document titles for the agent: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return [];
+    }
+  }
+
+  /**
    * Prompt overrides for the knowledge prompts, carrying the selected model.
    *
    * The Skills Store is the source of truth for the text and the platform's model choice. A bot
@@ -594,7 +689,10 @@ export class ChatbotEngineService {
    *
    * Also returns which store version of each prompt was sent, recorded on the reply.
    */
-  private async loadPromptOverrides(turn: ChatTurn): Promise<{
+  private async loadPromptOverrides(
+    turn: ChatTurn,
+    agentMode = false,
+  ): Promise<{
     prompts: Record<string, unknown>;
     ran: PromptsRan;
   }> {
@@ -602,7 +700,9 @@ export class ChatbotEngineService {
     let prompts: Record<string, unknown> = {};
     try {
       const rows = await this.promptSharedService.getPromptsByOptions({
-        promptCode: KNOWLEDGE_PROMPT_CODES,
+        promptCode: agentMode
+          ? [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES]
+          : KNOWLEDGE_PROMPT_CODES,
       });
       prompts = (rows ?? []).reduce<Record<string, unknown>>((acc, row) => {
         const entry: Record<string, unknown> = {};
@@ -635,7 +735,9 @@ export class ChatbotEngineService {
 
     const model = turn.chatbot.model;
     if (model?.provider && model?.model) {
-      for (const code of [ANSWER_PROMPT_CODE, GENERAL_ANSWER_PROMPT_CODE]) {
+      const answering = [ANSWER_PROMPT_CODE, GENERAL_ANSWER_PROMPT_CODE];
+      if (agentMode) answering.push(AGENT_SYSTEM_PROMPT_CODE);
+      for (const code of answering) {
         const current = (prompts[code] ?? {}) as Record<string, unknown>;
         const next: Record<string, unknown> = {
           ...current,

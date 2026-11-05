@@ -117,6 +117,18 @@ export class CreateChatbotDto {
   accessMode?: ChatbotAccessMode;
 }
 
+/** Agents v2 feature flags a platform admin can switch per bot. */
+export class ChatbotFeaturesDto {
+  @ApiPropertyOptional({
+    description:
+      'Agent mode: on a v2 bot, the conversational agent answers greetings, "what can you do?" ' +
+      'and follow-ups itself, and can search again. Facts still need a source.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  agent?: boolean;
+}
+
 export class UpdateChatbotDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -170,6 +182,16 @@ export class UpdateChatbotDto {
   @IsOptional()
   @IsEnum(ChatbotRuntime)
   runtime?: ChatbotRuntime;
+
+  @ApiPropertyOptional({
+    type: ChatbotFeaturesDto,
+    description:
+      'Agents v2 feature flags, merged into the saved ones. Platform admins only.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ChatbotFeaturesDto)
+  features?: ChatbotFeaturesDto;
 }
 
 export class SetChatbotStatusDto {

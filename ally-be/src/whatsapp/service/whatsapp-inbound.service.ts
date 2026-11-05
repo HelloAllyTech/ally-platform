@@ -325,6 +325,7 @@ export class WhatsAppInboundService {
         text: inbound.text,
         language: contact.locale,
         history: await this.recentHistory(conversation.id),
+        isFirstMessage: contact.messageCount === 1,
         sender: {
           externalId: contact.phoneE164,
           label: `contact ending ${contact.phoneLast4}`,
