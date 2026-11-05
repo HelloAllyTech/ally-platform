@@ -379,83 +379,88 @@ class KnowledgeAgentService:
             )
         return resolved
 
-    # ------------------------------------------------------------------ main entry
+    # ------------------------------------------------------------------ pipeline steps
+    #
+    # `answer` is these steps in order. They are separate so the LangGraph runtime
+    # (app/core/agent_runtime) can run each one as a node and stay identical to this
+    # path by construction rather than by copy.
 
-    async def answer(
-        self,
-        question: str,
-        audience: ChunkAudience,
+    @staticmethod
+    def resolve_limits(
         *,
-        history: Optional[List[Dict[str, str]]] = None,
-        prompts: Optional[Dict[str, Any]] = None,
         top_k: Optional[int] = None,
         min_similarity: Optional[float] = None,
         decline_similarity: Optional[float] = None,
         max_passages: Optional[int] = None,
         max_context_tokens: Optional[int] = None,
         similarity_band: Optional[float] = None,
-        max_answer_chars: int = DEFAULT_MAX_ANSWER_CHARS,
-        translate_query: bool = True,
-        document_ids: Optional[List[str]] = None,
-        persona: Optional[Dict[str, Any]] = None,
-        answer_mode: str = "documents_only",
     ) -> Dict[str, Any]:
-        """
-        Answer one question. Every threshold is overridable per request by ally-be,
-        which reads them from the `whatsapp_bot` settings row, so retrieval can be
-        tuned without a deploy.
-
-        `audience` is positional and required for the same reason it is on
-        `KnowledgeChunkService.search`: documents are targetable at one, some or
-        all organisations, and an omitted audience would answer from material the
-        asker may not be entitled to. There is no default — a caller that cannot
-        say who is asking has to decide what to do about that itself.
-        """
+        """The request's retrieval thresholds, with the settings defaults filled in."""
         cfg = settings.KNOWLEDGE_AGENT
-        top_k = top_k or cfg.TOP_K
-        min_similarity = (
-            cfg.MIN_SIMILARITY if min_similarity is None else min_similarity
-        )
-        decline_similarity = (
-            cfg.DECLINE_SIMILARITY
-            if decline_similarity is None
-            else decline_similarity
-        )
-        max_passages = max_passages or cfg.MAX_PASSAGES
-        max_context_tokens = max_context_tokens or cfg.MAX_CONTEXT_TOKENS
-        similarity_band = (
-            cfg.SIMILARITY_BAND if similarity_band is None else similarity_band
-        )
+        return {
+            "top_k": top_k or cfg.TOP_K,
+            "min_similarity": (
+                cfg.MIN_SIMILARITY if min_similarity is None else min_similarity
+            ),
+            "decline_similarity": (
+                cfg.DECLINE_SIMILARITY
+                if decline_similarity is None
+                else decline_similarity
+            ),
+            "max_passages": max_passages or cfg.MAX_PASSAGES,
+            "max_context_tokens": max_context_tokens or cfg.MAX_CONTEXT_TOKENS,
+            "similarity_band": (
+                cfg.SIMILARITY_BAND if similarity_band is None else similarity_band
+            ),
+        }
 
-        search_text, language, translated, translation_degraded = (
-            question,
-            "en",
-            None,
-            False,
-        )
-        if translate_query:
-            (
-                search_text,
-                language,
-                translated,
-                translation_degraded,
-            ) = await self.prepare_query(question, prompts=prompts)
+    async def translate(
+        self,
+        question: str,
+        *,
+        prompts: Optional[Dict[str, Any]] = None,
+        enabled: bool = True,
+    ) -> Tuple[str, str, Optional[str], bool]:
+        """`prepare_query`, or the question as written when translation is off."""
+        if not enabled:
+            return question, "en", None, False
+        return await self.prepare_query(question, prompts=prompts)
 
+    async def retrieve(
+        self,
+        search_text: str,
+        audience: ChunkAudience,
+        *,
+        limits: Dict[str, Any],
+        document_ids: Optional[List[str]] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Search the corpus. Returns ``(hits, latency_ms)``."""
         retrieval_started_at = time.monotonic()
         hits = await self.chunk_service.search(
             query=search_text,
-            limit=top_k,
-            min_similarity=min_similarity,
+            limit=limits["top_k"],
+            min_similarity=limits["min_similarity"],
             document_ids=document_ids,
             audience=audience,
         )
         retrieval_latency_ms = int((time.monotonic() - retrieval_started_at) * 1000)
-        top_similarity = float(hits[0].get("similarity") or 0.0) if hits else 0.0
+        return hits, retrieval_latency_ms
 
-        retrieval: Dict[str, Any] = {
-            "top_k": top_k,
-            "min_similarity": min_similarity,
-            "decline_similarity": decline_similarity,
+    @staticmethod
+    def retrieval_meta(
+        limits: Dict[str, Any],
+        hits: Sequence[Dict[str, Any]],
+        *,
+        language: str,
+        translated: Optional[str],
+        translation_degraded: bool,
+    ) -> Dict[str, Any]:
+        """The `retrieval` block of the response, before passages are selected."""
+        top_similarity = float(hits[0].get("similarity") or 0.0) if hits else 0.0
+        return {
+            "top_k": limits["top_k"],
+            "min_similarity": limits["min_similarity"],
+            "decline_similarity": limits["decline_similarity"],
             "hit_count": len(hits),
             "top_similarity": round(top_similarity, 4),
             "passages_used": 0,
@@ -465,85 +470,132 @@ class KnowledgeAgentService:
             "translation_degraded": translation_degraded,
         }
 
-        # --- Gate 1: deterministic, no LLM call ---
-        #
-        # Answering this in code rather than asking the model is what makes the
-        # threshold auditable and tunable, and it means the common "we simply
-        # don't have this" case costs nothing in generation tokens.
-        # A bot allowed to answer beyond its documents skips this gate: with nothing
-        # relevant retrieved it still goes to the model, with no passages, under the
-        # general-knowledge template (which makes the model say so).
-        general = answer_mode == "documents_and_general"
-        if not general and (not hits or top_similarity < decline_similarity):
-            if translation_degraded:
-                # Retrieval ran on untranslated/original-language text because
-                # query translation failed — a weak or empty result here says
-                # nothing about whether the corpus covers the topic, so it must
-                # not be reported (or answered for) as
-                # NO_HITS/BELOW_THRESHOLD.
-                reason = DeclineReason.TRANSLATION_FAILED
-            else:
-                reason = (
-                    DeclineReason.NO_HITS
-                    if not hits
-                    else DeclineReason.BELOW_THRESHOLD
-                )
-            logger.info(
-                "Declining before generation: reason=%s hits=%d top=%.4f",
-                reason.value,
-                len(hits),
-                top_similarity,
-            )
-            # Report the DECLINE, not just the search. A retrieval that returned
-            # six passages and was refused on all of them looks healthy in every
-            # count except this one, and refusal is what the worker actually
-            # experienced.
-            self._report_retrieval(
-                query=search_text,
-                min_similarity=min_similarity,
-                decline_similarity=decline_similarity,
-                top_k=top_k,
-                hits=hits,
-                returned_count=0,
-                latency_ms=retrieval_latency_ms,
-                language=language,
-                disposition=_DECLINE_DISPOSITIONS.get(
-                    reason, "declined_below_threshold"
-                ),
-            )
-            return {
-                "intent": AnswerIntent.DECLINE,
-                "answer": "",
-                "language": language,
-                "confidence": 0.0,
-                "citations": [],
-                "decline_reason": reason,
-                "retrieval": retrieval,
-                "provider": "",
-                "model": "",
-                "prompt_version": cfg.PROMPT_VERSION,
-            }
+    @staticmethod
+    def gate(
+        hits: Sequence[Dict[str, Any]],
+        *,
+        decline_similarity: float,
+        general: bool,
+        translation_degraded: bool,
+    ) -> Optional[DeclineReason]:
+        """
+        Gate 1: deterministic, no LLM call. Returns the decline reason, or None to
+        go on to the model.
 
-        relevant = hits if hits and top_similarity >= decline_similarity else []
+        Answering this in code rather than asking the model is what makes the
+        threshold auditable and tunable, and it means the common "we simply don't
+        have this" case costs nothing in generation tokens. A bot allowed to answer
+        beyond its documents skips this gate: with nothing relevant retrieved it
+        still goes to the model, with no passages, under the general-knowledge
+        template (which makes the model say so).
+        """
+        top_similarity = float(hits[0].get("similarity") or 0.0) if hits else 0.0
+        if general or (hits and top_similarity >= decline_similarity):
+            return None
+        if translation_degraded:
+            # Retrieval ran on untranslated/original-language text because query
+            # translation failed — a weak or empty result here says nothing about
+            # whether the corpus covers the topic, so it must not be reported (or
+            # answered for) as NO_HITS/BELOW_THRESHOLD.
+            return DeclineReason.TRANSLATION_FAILED
+        return DeclineReason.NO_HITS if not hits else DeclineReason.BELOW_THRESHOLD
+
+    def decline(
+        self,
+        reason: DeclineReason,
+        *,
+        search_text: str,
+        hits: List[Dict[str, Any]],
+        limits: Dict[str, Any],
+        latency_ms: int,
+        language: str,
+        retrieval: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """The result for a gate decline, reported to the retrieval log."""
+        logger.info(
+            "Declining before generation: reason=%s hits=%d top=%.4f",
+            reason.value,
+            len(hits),
+            float(hits[0].get("similarity") or 0.0) if hits else 0.0,
+        )
+        # Report the DECLINE, not just the search. A retrieval that returned six
+        # passages and was refused on all of them looks healthy in every count except
+        # this one, and refusal is what the worker actually experienced.
+        self._report_retrieval(
+            query=search_text,
+            min_similarity=limits["min_similarity"],
+            decline_similarity=limits["decline_similarity"],
+            top_k=limits["top_k"],
+            hits=hits,
+            returned_count=0,
+            latency_ms=latency_ms,
+            language=language,
+            disposition=_DECLINE_DISPOSITIONS.get(reason, "declined_below_threshold"),
+        )
+        return {
+            "intent": AnswerIntent.DECLINE,
+            "answer": "",
+            "language": language,
+            "confidence": 0.0,
+            "citations": [],
+            "decline_reason": reason,
+            "retrieval": retrieval,
+            "provider": "",
+            "model": "",
+            "prompt_version": settings.KNOWLEDGE_AGENT.PROMPT_VERSION,
+        }
+
+    def select(
+        self,
+        hits: List[Dict[str, Any]],
+        *,
+        search_text: str,
+        limits: Dict[str, Any],
+        latency_ms: int,
+        language: str,
+        retrieval: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """
+        Pick the passages for the prompt, set ``retrieval["passages_used"]`` and
+        report the retrieval as answered. Below the decline threshold (general mode
+        only gets here) the model is given no passages.
+        """
+        top_similarity = float(hits[0].get("similarity") or 0.0) if hits else 0.0
+        relevant = (
+            hits if hits and top_similarity >= limits["decline_similarity"] else []
+        )
         passages = self._select_passages(
             relevant,
-            band=similarity_band,
-            max_passages=max_passages,
-            max_context_tokens=max_context_tokens,
+            band=limits["similarity_band"],
+            max_passages=limits["max_passages"],
+            max_context_tokens=limits["max_context_tokens"],
         )
         retrieval["passages_used"] = len(passages)
         self._report_retrieval(
             query=search_text,
-            min_similarity=min_similarity,
-            decline_similarity=decline_similarity,
-            top_k=top_k,
+            min_similarity=limits["min_similarity"],
+            decline_similarity=limits["decline_similarity"],
+            top_k=limits["top_k"],
             hits=hits,
             returned_count=len(passages),
-            latency_ms=retrieval_latency_ms,
+            latency_ms=latency_ms,
             language=language,
             disposition="answered",
         )
+        return passages
 
+    async def write(
+        self,
+        question: str,
+        passages: List[Dict[str, Any]],
+        *,
+        history: Optional[List[Dict[str, str]]] = None,
+        prompts: Optional[Dict[str, Any]] = None,
+        persona: Optional[Dict[str, Any]] = None,
+        general: bool = False,
+        max_answer_chars: int = DEFAULT_MAX_ANSWER_CHARS,
+    ) -> Tuple[KnowledgeAnswer, Dict[str, Any]]:
+        """The answer call. Returns the parsed answer and the dispatch metadata."""
         provider, model, temperature = get_backend_llm_overrides(
             GENERAL_ANSWER_PROMPT_PATH if general else ANSWER_PROMPT_PATH, prompts
         )
@@ -563,7 +615,7 @@ class KnowledgeAgentService:
                 "The knowledge answer prompt template is missing or empty."
             )
 
-        parsed, meta = await generate_structured(
+        return await generate_structured(
             schema=KnowledgeAnswer,
             prompt=prompt,
             task=LLMTask.WHATSAPP_RAG_ANSWER.value,
@@ -572,12 +624,21 @@ class KnowledgeAgentService:
             temperature=temperature if temperature is not None else 0.0,
         )
 
+    def check(
+        self,
+        parsed: KnowledgeAnswer,
+        meta: Dict[str, Any],
+        passages: List[Dict[str, Any]],
+        *,
+        language: str,
+        retrieval: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Gate 2: validate the model's answer and build the result."""
         intent = parsed.intent
         answer_text = (parsed.answer or "").strip()
         citations = self._resolve_citations(parsed.citations, passages)
         decline_reason = DeclineReason.NONE
 
-        # --- Gate 2 post-validation ---
         if intent == AnswerIntent.ANSWER and not answer_text:
             # "I answered" with nothing in it reaches the worker as silence.
             # Treat it as the decline it actually is, so it also lands in the
@@ -612,5 +673,98 @@ class KnowledgeAgentService:
             "retrieval": retrieval,
             "provider": meta.get("provider", ""),
             "model": meta.get("model", ""),
-            "prompt_version": cfg.PROMPT_VERSION,
+            "prompt_version": settings.KNOWLEDGE_AGENT.PROMPT_VERSION,
         }
+
+    # ------------------------------------------------------------------ main entry
+
+    async def answer(
+        self,
+        question: str,
+        audience: ChunkAudience,
+        *,
+        history: Optional[List[Dict[str, str]]] = None,
+        prompts: Optional[Dict[str, Any]] = None,
+        top_k: Optional[int] = None,
+        min_similarity: Optional[float] = None,
+        decline_similarity: Optional[float] = None,
+        max_passages: Optional[int] = None,
+        max_context_tokens: Optional[int] = None,
+        similarity_band: Optional[float] = None,
+        max_answer_chars: int = DEFAULT_MAX_ANSWER_CHARS,
+        translate_query: bool = True,
+        document_ids: Optional[List[str]] = None,
+        persona: Optional[Dict[str, Any]] = None,
+        answer_mode: str = "documents_only",
+    ) -> Dict[str, Any]:
+        """
+        Answer one question. Every threshold is overridable per request by ally-be,
+        which reads them from the `whatsapp_bot` settings row, so retrieval can be
+        tuned without a deploy.
+
+        `audience` is positional and required for the same reason it is on
+        `KnowledgeChunkService.search`: documents are targetable at one, some or
+        all organisations, and an omitted audience would answer from material the
+        asker may not be entitled to. There is no default — a caller that cannot
+        say who is asking has to decide what to do about that itself.
+        """
+        limits = self.resolve_limits(
+            top_k=top_k,
+            min_similarity=min_similarity,
+            decline_similarity=decline_similarity,
+            max_passages=max_passages,
+            max_context_tokens=max_context_tokens,
+            similarity_band=similarity_band,
+        )
+        search_text, language, translated, translation_degraded = await self.translate(
+            question, prompts=prompts, enabled=translate_query
+        )
+        hits, latency_ms = await self.retrieve(
+            search_text, audience, limits=limits, document_ids=document_ids
+        )
+        retrieval = self.retrieval_meta(
+            limits,
+            hits,
+            language=language,
+            translated=translated,
+            translation_degraded=translation_degraded,
+        )
+
+        general = answer_mode == "documents_and_general"
+        reason = self.gate(
+            hits,
+            decline_similarity=limits["decline_similarity"],
+            general=general,
+            translation_degraded=translation_degraded,
+        )
+        if reason is not None:
+            return self.decline(
+                reason,
+                search_text=search_text,
+                hits=hits,
+                limits=limits,
+                latency_ms=latency_ms,
+                language=language,
+                retrieval=retrieval,
+            )
+
+        passages = self.select(
+            hits,
+            search_text=search_text,
+            limits=limits,
+            latency_ms=latency_ms,
+            language=language,
+            retrieval=retrieval,
+        )
+        parsed, meta = await self.write(
+            question,
+            passages,
+            history=history,
+            prompts=prompts,
+            persona=persona,
+            general=general,
+            max_answer_chars=max_answer_chars,
+        )
+        return self.check(
+            parsed, meta, passages, language=language, retrieval=retrieval
+        )
