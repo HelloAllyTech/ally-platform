@@ -1,17 +1,17 @@
 # Store build of the Flutter app: applicationId com.helloally.app, i.e. an
 # UPDATE to the React Native app's Play listing. Mirrors this repo's
 # .github/workflows/build-android-production.yml with the SAME secret names
-# (ally-mobile-flutter/docs/RELEASE.md), signed with RN's upload keystore.
+# (ally-mobile/docs/RELEASE.md), signed with RN's upload keystore.
 #
 # Manual only, and it only ever touches the Play *internal* track. By default
 # the release is left as a draft there; choose `completed` to roll it out to
 # internal testers (whose RN app it then replaces). Production rollout is a
-# separate, manual Play Console step (ally-mobile-flutter/docs/RELEASE.md).
+# separate, manual Play Console step (ally-mobile/docs/RELEASE.md).
 name: 'Build Android app - Production (Flutter, store identity)'
 
 defaults:
   run:
-    working-directory: ally-mobile-flutter
+    working-directory: ally-mobile
 
 on:
   workflow_dispatch:
@@ -36,11 +36,6 @@ on:
         description: 'versionName (blank = pubspec version). Must be above the RN version live in the store.'
         required: false
         type: string
-      continue_rn_version_code:
-        description: 'versionCode = RN''s last + 1, instead of the date-based test-build scheme. Only correct for the one-time real cutover release — see the Compute versionCode step''s comment before using this on a second run.'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   id-token: write
@@ -54,7 +49,7 @@ jobs:
     steps:
       - name: Confirm store identity
         # Runs before checkout, so the job-level working-directory default
-        # (ally-mobile-flutter/, not created until checkout runs) doesn't
+        # (ally-mobile/, not created until checkout runs) doesn't
         # apply here — override back to the workspace root for this one step.
         working-directory: .
         env:
@@ -130,46 +125,22 @@ jobs:
         id: version_info
         env:
           BUILD_NAME: ${{ inputs.build_name }}
-          CONTINUE_RN: ${{ inputs.continue_rn_version_code }}
-        # Two schemes, picked by the continue_rn_version_code input:
+        # yyMMddHH + one digit for the 6-minute slot of the hour, UTC (e.g.
+        # 261028153). Always far above RN's last versionCode (108) and under
+        # Play's 2100000000 cap until 2099. Needs no coordination with any
+        # other number, which is the point for a build that might run many
+        # times.
         #
-        # Default (test builds): yyMMddHH + one digit for the 6-minute slot
-        # of the hour, UTC (e.g. 261028153). Always far above RN's
-        # versionCode (108 at the time of writing) and under Play's
-        # 2100000000 cap until 2099. Needs no coordination with RN's own
-        # number, which is the point for a build that might run many times.
-        #
-        # continue_rn_version_code=true (the real cutover release): RN's own
-        # last versionCode (ally-mobile/android/app/build.gradle) + 1, so the
-        # Play listing's version history reads as one continuous sequence
-        # across the RN -> Flutter switch instead of an arbitrary jump.
-        #
-        # CAUTION: this only reads RN's file, not Play's actual live
-        # versionCode or any Flutter build already uploaded — correct for a
-        # true one-time cutover (RN's scheduled-mobile-release.yml must
-        # already be paused, see AUTO_RELEASE_ENABLED, or it could ship a
-        # build that reuses or exceeds this number). Running this workflow a
-        # second time with this flag on would recompute the SAME versionCode
-        # (RN's file doesn't change itself), which Play would then reject as
-        # not higher than the one already live — a second real release after
-        # cutover needs its own number above whatever Flutter last shipped,
-        # which isn't tracked anywhere yet (left for whenever that's needed).
+        # The one-time cutover release (continuing RN's versionCode + 1
+        # instead of this scheme) already happened — see git history for
+        # that mechanism if a future cutover-style release ever needs it
+        # again.
         run: |
           VERSION_NAME="$BUILD_NAME"
           if [ -z "$VERSION_NAME" ]; then
             VERSION_NAME=$(grep '^version:' pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')
           fi
-          if [ "$CONTINUE_RN" = "true" ]; then
-            RN_VERSION_CODE=$(grep -m1 'versionCode' "$GITHUB_WORKSPACE/ally-mobile/android/app/build.gradle" | awk '{print $2}')
-            if [ -z "$RN_VERSION_CODE" ]; then
-              echo "::error::Could not read RN's versionCode from ally-mobile/android/app/build.gradle"
-              exit 1
-            fi
-            VERSION_CODE=$((RN_VERSION_CODE + 1))
-            echo "Continuing RN's versionCode: $RN_VERSION_CODE -> $VERSION_CODE"
-          else
-            VERSION_CODE="$(date -u +%y%m%d%H)$(( 10#$(date -u +%M) / 6 ))"
-          fi
+          VERSION_CODE="$(date -u +%y%m%d%H)$(( 10#$(date -u +%M) / 6 ))"
           echo "versionCode $VERSION_CODE, versionName $VERSION_NAME"
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
@@ -209,7 +180,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-production-release-${{ steps.version_info.outputs.version_code }}
-          path: ally-mobile-flutter/dist/
+          path: ally-mobile/dist/
           retention-days: 30
 
       - name: Upload to Google Play Console (internal track)
@@ -217,11 +188,11 @@ jobs:
         with:
           serviceAccountJsonPlainText: ${{ secrets.ANDROID_SERVICE_ACCOUNT_JSON }}
           packageName: com.helloally.app
-          releaseFiles: ally-mobile-flutter/dist/ally-production-${{ steps.version_info.outputs.version_code }}.aab
+          releaseFiles: ally-mobile/dist/ally-production-${{ steps.version_info.outputs.version_code }}.aab
           track: internal
           status: ${{ inputs.internal_track_status }}
           releaseName: '${{ steps.version_info.outputs.version_code }} (${{ steps.version_info.outputs.version_name }}) Flutter'
-          whatsNewDirectory: ally-mobile-flutter/distribution/whatsnew
+          whatsNewDirectory: ally-mobile/distribution/whatsnew
 
       - name: Keep Dart debug symbols
         # Obfuscated Dart stack traces can only be read with these; kept so a
@@ -229,7 +200,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dart-symbols-${{ github.run_number }}
-          path: ally-mobile-flutter/build/symbols
+          path: ally-mobile/build/symbols
           retention-days: 90
 
       - name: Upload Crashlytics symbols

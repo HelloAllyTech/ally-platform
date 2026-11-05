@@ -5,7 +5,7 @@
 name: Promote Android release to production
 defaults:
   run:
-    working-directory: ally-mobile
+    working-directory: ally-mobile-rn-archive
 #
 # Manual-only. Takes whatever is currently on the internal track (uploaded by
 # build-android-production.yml) and promotes it to the production track at a staged rollout

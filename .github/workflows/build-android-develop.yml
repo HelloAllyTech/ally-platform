@@ -1,7 +1,7 @@
 name: 'Build Android app - Develop'
 defaults:
   run:
-    working-directory: ally-mobile
+    working-directory: ally-mobile-rn-archive
 
 on:
   workflow_dispatch:
@@ -51,7 +51,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: ally-mobile/package-lock.json
+          cache-dependency-path: ally-mobile-rn-archive/package-lock.json
 
       - name: Install dependencies
         run: |
@@ -72,7 +72,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ally-mobile/android/.gradle
+            ally-mobile-rn-archive/android/.gradle
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
@@ -110,7 +110,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-develop-release-${{ github.run_number }}
-          path: ally-mobile/android/app/build/outputs/apk/dev/release/app-develop-release-${{ github.run_number }}-*.apk
+          path: ally-mobile-rn-archive/android/app/build/outputs/apk/dev/release/app-develop-release-${{ github.run_number }}-*.apk
           retention-days: 7
 
       - name: Send Slack notification

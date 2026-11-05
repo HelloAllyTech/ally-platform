@@ -2,7 +2,7 @@
 # to the React Native app's App Store listing. Mirrors this repo's
 # .github/workflows/build-ios-production.yml step for step, with the SAME
 # secret names, so an admin can copy RN's secrets across
-# (ally-mobile-flutter/docs/RELEASE.md).
+# (ally-mobile/docs/RELEASE.md).
 #
 # Manual only. It uploads to TestFlight and stops there: nothing here
 # submits for App Store review or releases to users. Every TestFlight tester
@@ -12,7 +12,7 @@ name: 'Build & Upload iOS app - Production (Flutter, store identity)'
 
 defaults:
   run:
-    working-directory: ally-mobile-flutter
+    working-directory: ally-mobile
 
 on:
   workflow_dispatch:
@@ -39,7 +39,7 @@ jobs:
     steps:
       - name: Confirm store identity
         # Runs before checkout, so the job-level working-directory default
-        # (ally-mobile-flutter/, not created until checkout runs) doesn't
+        # (ally-mobile/, not created until checkout runs) doesn't
         # apply here — override back to the workspace root for this one step.
         working-directory: .
         env:
@@ -172,7 +172,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dart-symbols-${{ github.run_number }}
-          path: ally-mobile-flutter/build/symbols
+          path: ally-mobile/build/symbols
           retention-days: 90
 
       - name: Upload Crashlytics symbols

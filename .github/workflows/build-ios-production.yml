@@ -5,7 +5,7 @@
 name: 'Build & Upload iOS app - Production'
 defaults:
   run:
-    working-directory: ally-mobile
+    working-directory: ally-mobile-rn-archive
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Set up Xcode version
-        # Runs before checkout, so the ally-mobile default folder does not exist yet.
+        # Runs before checkout, so the ally-mobile-rn-archive default folder does not exist yet.
         working-directory: .
         run: sudo xcode-select --switch /Applications/Xcode_26.2.app
 
@@ -45,7 +45,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: ally-mobile/package-lock.json
+          cache-dependency-path: ally-mobile-rn-archive/package-lock.json
 
       - name: Install npm dependencies
         run: npm ci
@@ -60,9 +60,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ally-mobile/ios/Pods
-            ally-mobile/ios/Podfile.lock
-          key: pods-cache-${{ runner.os }}-${{ hashFiles('ally-mobile/ios/Podfile.lock') }}
+            ally-mobile-rn-archive/ios/Pods
+            ally-mobile-rn-archive/ios/Podfile.lock
+          key: pods-cache-${{ runner.os }}-${{ hashFiles('ally-mobile-rn-archive/ios/Podfile.lock') }}
           restore-keys: |
             pods-cache-${{ runner.os }}-
 
