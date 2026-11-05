@@ -1116,7 +1116,9 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'refusing to answer from outside the passages is an instruction-following problem, ' +
       'until that credential expired and took the bot silent — OpenAI is the one provider ' +
       'whose key is required in that service. Falls back to OpenAI whatever is selected, ' +
-      'and says so in the metadata.',
+      'and says so in the metadata. A bot on the Agents v2 engine (chatbots.runtime = v2) ' +
+      'makes the same calls through /agent/run; a shadow bot makes them twice, once per ' +
+      'engine, so it costs double while it shadows.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',

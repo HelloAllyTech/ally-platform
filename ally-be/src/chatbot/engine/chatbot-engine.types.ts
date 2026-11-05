@@ -1,10 +1,16 @@
+import type {
+  AgentRunRequest,
+  AgentTraceStep,
+} from '../../ai/dto/knowledge.dto';
 import type { NotificationErrorType } from '../../notification/type/notification.error.type';
 import type {
   WaHandledBy,
   WaUnansweredReason,
 } from '../../whatsapp/enum/whatsapp.enum';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
+import type { AgentShadowSide } from '../entity/agent-shadow-run.entity';
 import type { Chatbot } from '../entity/chatbot.entity';
+import type { AgentRuntimeUsed, ChatbotRuntime } from '../enum/chatbot.enum';
 
 /**
  * Who sent a message, as far as the channel can tell. Every field but `externalId` is optional:
@@ -49,6 +55,35 @@ export interface ChatTurn {
    * selection). Otherwise the bot's saved selection is loaded.
    */
   documentIds?: string[];
+  /**
+   * The conversation this message belongs to: the Agents v2 checkpointer's thread id. The channel's
+   * own conversation id (WhatsApp), or Preview's `preview-…` thread.
+   */
+  conversationId?: string;
+  /** The channel's id for this message, from which the run id is derived (WhatsApp). */
+  providerMessageId?: string;
+  /** Preview only: answer this one test with this engine. The kill switch still wins. */
+  runtime?: ChatbotRuntime.V1 | ChatbotRuntime.V2;
+}
+
+/** The Agents v2 run behind a reply, for the channel to store and Preview to show. */
+export interface AgentRunRef {
+  runtime: AgentRuntimeUsed;
+  runId: string;
+  conversationId: string;
+  /** The graph's steps, when the run answered. */
+  trace?: AgentTraceStep[];
+  /** Why the run failed, when v1 answered instead (`timeout`, `upstream_404`, …). */
+  fallbackReason?: string;
+}
+
+/**
+ * What a shadow bot hands its channel: the `/agent/run` request to send AFTER the reply has gone
+ * out, and v1's side of the comparison. Never set for Preview.
+ */
+export interface ShadowRunRequest {
+  request: AgentRunRequest;
+  v1: AgentShadowSide;
 }
 
 /**
@@ -73,4 +108,11 @@ export interface ChatbotDecision {
   };
   /** A human should hear about this (crisis, degraded safety net). */
   alert?: NotificationErrorType;
+  /**
+   * Set when the Agents v2 runtime answered or was tried (`v2_fallback`). The channel stores it on
+   * the reply and, for a fallback, raises the throttled "agent runtime degraded" alert.
+   */
+  agent?: AgentRunRef;
+  /** Set for a shadow bot's answered message: the comparison run the channel starts after sending. */
+  shadow?: ShadowRunRequest;
 }

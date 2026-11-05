@@ -934,4 +934,92 @@ describe('AiService', () => {
       );
     });
   });
+
+  describe('the Agents v2 runtime', () => {
+    const body = {
+      question: 'a question',
+      audience: { unrestricted: true },
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      runtime_version: 'v2' as const,
+    };
+    const status = (code: number) =>
+      Object.assign(new Error(`Request failed with status code ${code}`), {
+        response: { status: code, data: { detail: 'x' }, headers: {} },
+      });
+
+    it('posts to /agent/run once, with a 25s timeout and no retry', async () => {
+      mockedAxios.mockRejectedValue(status(502));
+      await expect(service.runAgent(body)).rejects.toMatchObject({
+        upstreamStatus: 502,
+      });
+      expect(mockedAxios).toHaveBeenCalledTimes(1);
+      expect(mockedAxios.mock.calls[0][0]).toMatchObject({
+        url: 'https://test-ai-api.com/api/v1/agent/run',
+        timeout: 25_000,
+      });
+    });
+
+    it("leaves Slack to the engine's throttled alert when /agent/run fails", async () => {
+      mockedAxios.mockRejectedValue(status(404));
+      await expect(service.runAgent(body)).rejects.toThrow();
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+        'exception',
+        expect.anything(),
+      );
+    });
+
+    it('still alerts on every other failed ally-ai call, as before', async () => {
+      mockedAxios.mockRejectedValue(status(400));
+      await expect(service.answerKnowledgeQuestion(body)).rejects.toThrow();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'exception',
+        expect.objectContaining({ type: 'AI Request Error' }),
+      );
+    });
+
+    describe('answerKnowledgeQuestionWithin', () => {
+      it('caps the attempt at the budget that is left', async () => {
+        mockedAxios.mockResolvedValue({
+          status: 200,
+          data: { intent: 'answer' },
+        });
+        await service.answerKnowledgeQuestionWithin(body, 12_000);
+        expect(mockedAxios.mock.calls[0][0]).toMatchObject({
+          url: 'https://test-ai-api.com/api/v1/knowledge-agent/answer',
+        });
+        expect(mockedAxios.mock.calls[0][0].timeout).toBeLessThanOrEqual(
+          12_000,
+        );
+        expect(mockedAxios.mock.calls[0][0].timeout).toBeGreaterThan(11_000);
+      });
+
+      it('never waits longer than the answer call would', async () => {
+        mockedAxios.mockResolvedValue({
+          status: 200,
+          data: { intent: 'answer' },
+        });
+        await service.answerKnowledgeQuestionWithin(body, 40_000);
+        expect(mockedAxios.mock.calls[0][0].timeout).toBe(25_000);
+      });
+
+      it('retries a fast transient failure once', async () => {
+        mockedAxios
+          .mockRejectedValueOnce(status(502))
+          .mockResolvedValueOnce({ status: 200, data: { intent: 'answer' } });
+        await expect(
+          service.answerKnowledgeQuestionWithin(body, 40_000),
+        ).resolves.toEqual({ intent: 'answer' });
+        expect(mockedAxios).toHaveBeenCalledTimes(2);
+      });
+
+      it('does not retry a request ally-ai will refuse again', async () => {
+        mockedAxios.mockRejectedValue(status(422));
+        await expect(
+          service.answerKnowledgeQuestionWithin(body, 40_000),
+        ).rejects.toThrow();
+        expect(mockedAxios).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
 });

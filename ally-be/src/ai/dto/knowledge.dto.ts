@@ -167,6 +167,34 @@ export interface KnowledgeAnswerRequest {
   channel?: string;
 }
 
+/**
+ * ally-ai's `/agent/run` (Agents v2): every `/knowledge-agent/answer` field plus the run's
+ * identity. Built by `buildAgentRunRequest` from the same body v1 sends, so the two can't drift.
+ */
+export interface AgentRunRequest extends KnowledgeAnswerRequest {
+  /** The checkpointer's thread id: the conversation, or a `preview-…` / `shadow-…` thread. */
+  conversation_id: string;
+  run_id: string;
+  chatbot_id?: string;
+  runtime_version: 'v2';
+  /** False on shadow runs, whose message v1 has already reported to the retrieval log. */
+  log_retrieval?: boolean;
+}
+
+/** One graph node that ran, in order. */
+export interface AgentTraceStep {
+  node: string;
+  ms: number;
+  summary: string;
+}
+
+/** `/agent/run`'s answer: the `/knowledge-agent/answer` response plus the run. */
+export interface AgentRunResponse extends KnowledgeAnswerResponse {
+  run_id: string;
+  runtime: 'v2';
+  trace: AgentTraceStep[];
+}
+
 export interface KnowledgePersonaRequest {
   display_name?: string;
   system_prompt?: string;

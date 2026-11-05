@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 import {
   KnowledgeAnswerRequest,
   KnowledgeAnswerResponse,
   KnowledgeAudienceRequest,
+  KnowledgeRetrievalMeta,
 } from '../../ai/dto/knowledge.dto';
 import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
@@ -18,13 +20,30 @@ import {
 import { composeReply } from '../../whatsapp/util/reply-composer';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import {
-  ChatbotAnswerMode,
+  AgentRuntimeUsed,
   ChatbotKnowledgeSource,
+  ChatbotRuntime,
 } from '../enum/chatbot.enum';
 import { ChatbotAudienceService } from '../service/chatbot-audience.service';
 import { ChatbotReplyService } from '../service/chatbot-reply.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
-import type { ChatbotDecision, ChatTurn } from './chatbot-engine.types';
+import {
+  agentFailureReason,
+  agentRunIdFor,
+  effectiveRuntime,
+  MalformedAgentResponseError,
+  shadowSide,
+} from './agent-runtime';
+import type {
+  AgentRunRef,
+  ChatbotDecision,
+  ChatTurn,
+  ShadowRunRequest,
+} from './chatbot-engine.types';
+import {
+  buildAgentRunRequest,
+  buildKnowledgeRequest,
+} from './knowledge-request';
 
 /**
  * The ally-ai prompt codes the answering path owns.
@@ -64,6 +83,44 @@ export const isGreetingReply = (template: {
   (template.patterns ?? []).some((p) =>
     GREETING_WORDS.has(ChatbotReplyService.normalise(p)),
   );
+
+/** The test console's channel type. */
+const PREVIEW_CHANNEL = 'test';
+
+/**
+ * The answer step's wall-clock budget: `AiService.answerKnowledgeQuestion`'s, derived from the SQS
+ * visibility window. A v2 bot's fallback to v1 gets only what the failed v2 call left of it.
+ */
+const ANSWER_BUDGET_MS = 40_000;
+
+/** An answer from either engine, with the run behind it when v2 was involved. */
+interface Answered {
+  response: KnowledgeAnswerResponse;
+  latencyMs: number;
+  agent?: AgentRunRef;
+}
+
+/** v2 failed and its v1 fallback failed too; carries the run so the reply still records it. */
+class AgentFallbackFailedError extends Error {
+  constructor(
+    readonly cause: unknown,
+    readonly agent: AgentRunRef,
+  ) {
+    super(cause instanceof Error ? cause.message : 'v1 fallback failed');
+    this.name = 'AgentFallbackFailedError';
+  }
+}
+
+/** `/agent/run`'s debug-only list of every retrieved chunk; not stored on the message. */
+const withoutDebugIds = (
+  retrieval: KnowledgeRetrievalMeta,
+): KnowledgeRetrievalMeta => {
+  const copy = { ...retrieval } as KnowledgeRetrievalMeta & {
+    hit_chunk_ids?: string[];
+  };
+  delete copy.hit_chunk_ids;
+  return copy;
+};
 
 /** Store version and content hash of each knowledge prompt sent to ally-ai, by code. */
 type PromptsRan = {
@@ -225,31 +282,28 @@ export class ChatbotEngineService {
     const { chatbot, settings, sender } = turn;
     const { prompts, ran } = await this.loadPromptOverrides(turn);
     const knowledge = await this.knowledgeFor(turn);
+    const request = buildKnowledgeRequest(turn, prompts, knowledge);
+    const runtime = effectiveRuntime(chatbot, settings, turn.runtime);
 
     // Concurrent, not sequential: the classifier adds no latency this way, and `allSettled`
-    // keeps a rejected classifier from taking down an answer that arrived fine.
+    // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
+    // runs once and exactly as before, whichever engine answers.
     const [answerResult, crisisResult] = await Promise.allSettled([
-      this.aiService.answerKnowledgeQuestion({
-        question: turn.text,
-        history: turn.history,
-        prompts,
-        ...knowledge,
-        persona: this.personaRequest(turn),
-        answer_mode: chatbot.answerMode ?? ChatbotAnswerMode.DOCUMENTS_ONLY,
-        channel: turn.channel.type,
-        top_k: settings.retrieval.topK,
-        min_similarity: settings.retrieval.minSimilarity,
-        decline_similarity: settings.retrieval.declineSimilarity,
-        max_passages: settings.retrieval.maxPassages,
-        max_context_tokens: settings.retrieval.maxContextTokens,
-        similarity_band: settings.retrieval.similarityBand,
-        max_answer_chars: settings.maxAnswerChars,
-        translate_query: settings.retrieval.translateQuery,
-      }),
+      runtime === ChatbotRuntime.V2
+        ? this.answerWithAgent(turn, request)
+        : this.answerWithV1(request),
       settings.crisisClassifierEnabled
         ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
         : Promise.resolve(null),
     ]);
+    // The run behind this reply, if the v2 runtime answered or was tried — kept on every outcome,
+    // a crisis override included, so the reply can still be traced to its run.
+    const agent =
+      answerResult.status === 'fulfilled'
+        ? answerResult.value.agent
+        : answerResult.reason instanceof AgentFallbackFailedError
+          ? answerResult.reason.agent
+          : undefined;
 
     // Crisis wins over the answer, unconditionally. Not gated on confidence: the prompt tells the
     // model to choose crisis when uncertain, so re-gating here would undo that instruction.
@@ -271,6 +325,7 @@ export class ChatbotEngineService {
             `"${crisis.signal}"). The fixed safety reply was sent and the answer was discarded.`,
           'Chatbot Crisis Classifier',
         ),
+        ...(agent ? { agent } : {}),
       };
     }
 
@@ -305,10 +360,12 @@ export class ChatbotEngineService {
       // A model or index outage is NOT "the knowledge does not cover this": fallback wording and an
       // ERROR-reason queue row, so a bad afternoon for ally-ai does not fill the unanswered queue
       // with questions the documents answer perfectly well.
+      const failure =
+        answerResult.reason instanceof AgentFallbackFailedError
+          ? answerResult.reason.cause
+          : answerResult.reason;
       const reason =
-        answerResult.reason instanceof Error
-          ? answerResult.reason.message
-          : 'unknown error';
+        failure instanceof Error ? failure.message : 'unknown error';
       this.logger.error(`Knowledge agent call failed: ${reason}`);
       return {
         handledBy: WaHandledBy.ERROR,
@@ -319,10 +376,132 @@ export class ChatbotEngineService {
           hitCount: 0,
         },
         alert: degradedAlert,
+        ...(agent ? { agent } : {}),
       };
     }
 
-    const answer: KnowledgeAnswerResponse = answerResult.value;
+    const { response: answer, latencyMs } = answerResult.value;
+    const decision = this.toDecision(turn, answer, ran, degradedAlert);
+    if (agent) decision.agent = agent;
+    if (runtime === ChatbotRuntime.SHADOW) {
+      const shadow = this.shadowRequest(turn, request, answer, latencyMs);
+      if (shadow) decision.shadow = shadow;
+    }
+    return decision;
+  }
+
+  /** The v1 engine: ally-ai's `/knowledge-agent/answer`, with its own retry budget. */
+  private async answerWithV1(
+    request: KnowledgeAnswerRequest,
+  ): Promise<Answered> {
+    const startedAt = Date.now();
+    const response = await this.aiService.answerKnowledgeQuestion(request);
+    return { response, latencyMs: Date.now() - startedAt };
+  }
+
+  /**
+   * The v2 engine: ally-ai's `/agent/run`, falling back to v1 when it fails before an answer
+   * exists (unreachable, timed out, switched off and 404ing, a 5xx, or a reply that is not an
+   * answer). Both calls happen before the decision is returned, so the channel still sends once.
+   *
+   * The fallback spends only what is left of the answer budget: a 25s v2 timeout followed by a
+   * full v1 budget would outlive the SQS visibility window and get the message redelivered.
+   */
+  private async answerWithAgent(
+    turn: ChatTurn,
+    request: KnowledgeAnswerRequest,
+  ): Promise<Answered> {
+    const runId = agentRunIdFor(turn.providerMessageId);
+    const conversationId = turn.conversationId ?? `preview-${randomUUID()}`;
+    const startedAt = Date.now();
+    try {
+      const response = await this.aiService.runAgent(
+        buildAgentRunRequest(request, {
+          conversationId,
+          runId,
+          chatbotId: turn.chatbot.id,
+        }),
+      );
+      if (!response?.intent) throw new MalformedAgentResponseError();
+      const { trace, run_id, ...answer } = response;
+      return {
+        response: { ...answer, retrieval: withoutDebugIds(answer.retrieval) },
+        latencyMs: Date.now() - startedAt,
+        agent: {
+          runtime: AgentRuntimeUsed.V2,
+          runId: run_id || runId,
+          conversationId,
+          trace: trace ?? [],
+        },
+      };
+    } catch (error) {
+      const fallbackReason = agentFailureReason(error);
+      this.logger.warn(
+        `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}); ` +
+          `answering with v1`,
+      );
+      const agent: AgentRunRef = {
+        runtime: AgentRuntimeUsed.V2_FALLBACK,
+        runId,
+        conversationId,
+        fallbackReason,
+      };
+      const fallbackStartedAt = Date.now();
+      try {
+        const response = await this.aiService.answerKnowledgeQuestionWithin(
+          request,
+          ANSWER_BUDGET_MS - (Date.now() - startedAt),
+        );
+        return {
+          response,
+          latencyMs: Date.now() - fallbackStartedAt,
+          agent,
+        };
+      } catch (v1Error) {
+        throw new AgentFallbackFailedError(v1Error, agent);
+      }
+    }
+  }
+
+  /**
+   * The comparison run for a shadow bot's message, for the channel to start after it has replied.
+   * WhatsApp only: Preview never shadows, and without a provider message id there is no stable
+   * run id to record.
+   */
+  private shadowRequest(
+    turn: ChatTurn,
+    request: KnowledgeAnswerRequest,
+    answer: KnowledgeAnswerResponse,
+    latencyMs: number,
+  ): ShadowRunRequest | undefined {
+    if (
+      turn.channel.type === PREVIEW_CHANNEL ||
+      !turn.providerMessageId ||
+      !turn.conversationId
+    ) {
+      return undefined;
+    }
+    return {
+      // Its own thread, so the comparison runs' checkpoints never mix into the conversation's
+      // real v2 thread once the bot is switched over.
+      request: buildAgentRunRequest(request, {
+        conversationId: `shadow-${turn.conversationId}`,
+        runId: agentRunIdFor(turn.providerMessageId),
+        chatbotId: turn.chatbot.id,
+        logRetrieval: false,
+      }),
+      v1: shadowSide(answer, latencyMs),
+    };
+  }
+
+  /** An answer from either engine, as one reply. */
+  private toDecision(
+    turn: ChatTurn,
+    answer: KnowledgeAnswerResponse,
+    ran: PromptsRan,
+    degradedAlert: NotificationErrorType | undefined,
+  ): ChatbotDecision {
+    const { chatbot, settings } = turn;
     const maxReplyChars = Math.min(
       settings.maxReplyChars,
       turn.channel.capabilities?.maxReplyChars ?? settings.maxReplyChars,
@@ -403,16 +582,6 @@ export class ChatbotEngineService {
       // the whole library. The placeholder means "nothing" to every version.
       document_ids: documentIds.length ? documentIds : [NO_DOCUMENTS],
     };
-  }
-
-  private personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
-    const persona = turn.chatbot.persona ?? {};
-    const out = {
-      display_name: persona.displayName?.trim() || undefined,
-      system_prompt: persona.systemPrompt?.trim() || undefined,
-      tone: persona.tone?.trim() || undefined,
-    };
-    return Object.values(out).some(Boolean) ? out : undefined;
   }
 
   /**
