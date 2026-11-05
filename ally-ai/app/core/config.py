@@ -139,6 +139,9 @@ class AgentRuntimeSettings(BaseModel):
     # "async" keeps a checkpoint per step (needed by "Why?" and approvals later)
     # without blocking the next step on the write; "exit" writes once per run.
     DURABILITY: Literal["sync", "async", "exit"] = Field("async")
+    # Conversational agent (`features.agent`): tool calls allowed per run. Past this
+    # the agent must reply with what it has, or decline.
+    MAX_TOOL_CALLS: int = Field(4, ge=0, le=8)
 
 
 class HelplineSettings(BaseModel):

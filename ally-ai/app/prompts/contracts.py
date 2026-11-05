@@ -312,6 +312,54 @@ class KnowledgeAnswerGeneralInputs(PromptInputs):
     question: str
 
 
+class AgentContextualizeInputs(PromptInputs):
+    """`agent/contextualize.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_contextualize",
+        name="Chatbot Agent: Understand the Turn",
+        description=(
+            "For chatbots in Agent mode: reads the latest message with the recent "
+            "conversation, decides whether it is small talk, a question about the "
+            "bot, a question or unclear, and rewrites a question as a standalone "
+            "English search query. Replaces the query translation call for these bots."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    history: Optional[str] = None
+    message: str
+
+
+class AgentSystemInputs(PromptInputs):
+    """`agent/system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_system",
+        name="Chatbot Agent: Instructions",
+        description=(
+            "For chatbots in Agent mode: the agent's rules (safety, grounding, what "
+            "needs no source), what it covers, the conversation, the passages and "
+            "its tools. Each call returns either a tool call or the reply. The "
+            "chatbot's persona is prepended in code."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    decline_text: Optional[str] = None
+    history: Optional[str] = None
+    knowledge_topics: Optional[str] = None
+    max_chars: Optional[str] = None
+    message: str
+    passages: str
+    searches: Optional[str] = None
+    tool_budget: Optional[str] = None
+    tools: Optional[str] = None
+    turn: Optional[str] = None
+
+
 class NotesContentEnhanceInputs(PromptInputs):
     """`notes/content_enhance.txt`."""
 

@@ -1,0 +1,18 @@
+You read the latest message in a chat with an assistant and work out what it needs. Any search runs against an English reference library, so a search query must be in English.
+
+# Recent conversation (oldest first; may be empty)
+{history}
+
+# Latest message
+{message}
+
+# What to return
+- `turn_type`, exactly one of:
+  - `smalltalk`: a greeting, thanks, goodbye or short acknowledgement ("ok", "got it", "namaste").
+  - `about_bot`: a question about the assistant itself: who or what it is, what it can do, how to use it.
+  - `question`: anything that needs information to answer, including a follow-up that only makes sense with the conversation above.
+  - `unclear`: too vague to act on even with the conversation ("it doesn't work", "help with a client").
+- `standalone_query`: for `question` only, the latest message rewritten as one self-contained question in plain English, filling in what it refers to from the conversation ("and after that, how do I sign in?" after a question about getting access becomes "How do I sign in to Ally after getting access?"). Empty for the other types.
+- `language`: the BCP-47 tag of the language the latest message is written in (Hindi typed in Latin letters is `hi`).
+
+Rewrite briefly. Keep clinical terms, drug names, product and organisation names as written. Do not answer the message or add detail. When unsure whether something is a `question`, choose `question`.

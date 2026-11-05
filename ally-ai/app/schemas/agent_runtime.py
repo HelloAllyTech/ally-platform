@@ -6,9 +6,9 @@ contract grows toward the full v2 shape (contact, features, run_token, resume) i
 later chunks.
 """
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_serializer
 
 from app.schemas.knowledge_agent import (
     KnowledgeAnswerRequest,
@@ -43,6 +43,35 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             "the same message."
         ),
     )
+    features: Dict[str, bool] = Field(
+        default_factory=dict,
+        description=(
+            "The bot's feature flags. `agent: true` runs the conversational agent "
+            "(contextualise, tools, check); absent or false runs the parity graph."
+        ),
+    )
+    knowledge_topics: List[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description=(
+            "Titles of the bot's documents, so the agent can say truthfully what it "
+            "covers. Used only by the conversational agent."
+        ),
+    )
+    decline_text: Optional[str] = Field(
+        None,
+        max_length=500,
+        description=(
+            "The bot's decline wording. The agent takes its tone and where-to-go-next "
+            "from it, not its words."
+        ),
+    )
+
+    @field_validator("knowledge_topics")
+    @classmethod
+    def _trim_topics(cls, topics: List[str]) -> List[str]:
+        """Blank titles dropped; a pathological title cannot crowd the prompt."""
+        return [t.strip()[:200] for t in topics if t and t.strip()]
 
 
 class AgentRetrievalMeta(RetrievalMeta):
@@ -66,3 +95,21 @@ class AgentRunResponse(KnowledgeAnswerResponse):
     run_id: str
     trace: List[TraceStep] = Field(default_factory=list)
     runtime: Literal["v2"] = "v2"
+    turn_type: Optional[Literal["smalltalk", "about_bot", "question", "unclear"]] = (
+        Field(
+            None,
+            description=(
+                "What the conversational agent understood the message to be. None "
+                "when `features.agent` is off. A smalltalk or about_bot reply comes "
+                "back as intent `answer` with no citations."
+            ),
+        )
+    )
+
+    @model_serializer(mode="wrap")
+    def _omit_turn_type_when_off(self, handler):
+        """With the agent off, the response is exactly the chunk 1 shape."""
+        data = handler(self)
+        if data.get("turn_type") is None:
+            data.pop("turn_type", None)
+        return data
