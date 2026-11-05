@@ -494,4 +494,5 @@ export const ROADMAP_OWNER_EMAILS: readonly string[] = [
   'ajey@helloally.ai',
   'shubham.bhoite+admin@helloally.ai',
   'gopikrishnan.sasikumar@helloally.ai',
+  'shehbaz.sayed+admin@helloally.ai',
 ] as const;
