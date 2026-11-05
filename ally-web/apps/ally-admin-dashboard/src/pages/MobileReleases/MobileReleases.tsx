@@ -22,7 +22,6 @@ import {
   useLazyGetIosWhatsNewSuggestionQuery,
   useSubmitIosAppStoreReviewMutation,
   useTriggerAndroidPromotionMutation,
-  useTriggerMobileReleaseMutation,
   useUpdateMinimumAppVersionMutation,
 } from "@api";
 import { ActionConfirmationPopup } from "@components";
@@ -31,7 +30,6 @@ import { formatDateTime } from "@utils";
 
 import { AndroidReleasePipeline } from "./components/AndroidReleasePipeline";
 import { IosReleasePipeline } from "./components/IosReleasePipeline";
-import { NextCheckPanel } from "./components/NextCheckPanel";
 import { PlatformStatusCard } from "./components/PlatformStatusCard";
 import { RecommendedActionBanner } from "./components/RecommendedActionBanner";
 import {
@@ -40,7 +38,6 @@ import {
   findLastSuccessfulRun,
   getAppStoreReviewSubmissionStatusDisplay,
   getTestflightStatusDisplay,
-  isReleaseInProgress,
   isRunAfter,
   isValidVersionFormat,
   isVersionGreaterThan,
@@ -101,7 +98,6 @@ export const MobileReleases: FC = () => {
     ? getTestflightStatusDisplay(testflightStatus)
     : null;
 
-  const releaseInProgress = isReleaseInProgress(runs);
   // While this hasn't finished loading (or failed to), appStoreReviewHistory defaults to []
   // — indistinguishable from "genuinely never submitted" — so matchingSubmission must not be
   // trusted as a real answer yet; treat it as unknown rather than "not submitted".
@@ -143,26 +139,6 @@ export const MobileReleases: FC = () => {
     null;
 
   const [tabIndex, setTabIndex] = useState(0);
-
-  const [isConfirmingTrigger, setIsConfirmingTrigger] = useState(false);
-  const [triggerRelease, { isLoading: isTriggering }] = useTriggerMobileReleaseMutation();
-
-  const handleTrigger = async () => {
-    try {
-      await triggerRelease().unwrap();
-      toast.success("Release triggered — new run should appear in Release History shortly.");
-      setIsConfirmingTrigger(false);
-    } catch (error) {
-      // Leave the dialog open on failure so the operator sees why (e.g. the
-      // GitHub Actions token isn't write-scoped) and can retry, rather than
-      // losing that context to a closed popup — same as RaiseBudgetDialog and
-      // StartBuildDialog elsewhere in Builder.
-      const message =
-        (error as { data?: { message?: string } })?.data?.message ??
-        "Failed to trigger the release. Please try again.";
-      toast.error(message);
-    }
-  };
 
   const [isConfirmingAndroidPromotion, setIsConfirmingAndroidPromotion] = useState(false);
   const [androidRolloutPercentage, setAndroidRolloutPercentage] = useState(
@@ -421,12 +397,6 @@ export const MobileReleases: FC = () => {
             }
             footnote="Reflects the version committed on master — confirm it's actually published in App Store Connect before treating it as live."
           />
-          <NextCheckPanel
-            isVersionsLoading={isVersionsLoading}
-            isVersionsError={isVersionsError}
-            nextEligibleCheckAt={versions?.nextEligibleCheckAt}
-            isReleaseInProgress={releaseInProgress}
-          />
         </div>
 
         <RecommendedActionBanner
@@ -485,31 +455,13 @@ export const MobileReleases: FC = () => {
             a release step. */}
         <div className="flex flex-col gap-3 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
-            {(isTriggering || isPromotingAndroid || isSubmittingAppStoreReview) && (
-              <InlineLoading
-                description={
-                  isTriggering ? "Triggering…" : isPromotingAndroid ? "Promoting…" : "Submitting…"
-                }
-              />
+            {(isPromotingAndroid || isSubmittingAppStoreReview) && (
+              <InlineLoading description={isPromotingAndroid ? "Promoting…" : "Submitting…"} />
             )}
           </div>
           <div>
             <p className="text-xs tracking-wide text-typography-600 mb-1.5">Release actions</p>
             <div className="flex flex-wrap gap-2">
-              <Tooltip
-                label="Skips the 2-day cadence and immediately builds and uploads both platforms to their internal tracks (Play Store internal track, TestFlight). Tests still gate the build."
-                className="max-sm:w-full"
-              >
-                <Button
-                  kind="tertiary"
-                  size="md"
-                  className="max-sm:!w-full max-sm:!max-w-none"
-                  disabled={isTriggering}
-                  onClick={() => setIsConfirmingTrigger(true)}
-                >
-                  Trigger release now
-                </Button>
-              </Tooltip>
               <Tooltip
                 label="Promotes the current internal-track Android build to the Play Store production track at a staged rollout percentage you choose. Real users start receiving it."
                 className="max-sm:w-full"
@@ -635,32 +587,6 @@ export const MobileReleases: FC = () => {
           </TabPanels>
         </Tabs>
       </div>
-
-      {isConfirmingTrigger && (
-        <ActionConfirmationPopup
-          isOpen={isConfirmingTrigger}
-          onClose={() => setIsConfirmingTrigger(false)}
-          title="Trigger mobile release now?"
-          description="This immediately kicks off real production builds for **both Android and iOS** — uploading to the Play Store internal track and TestFlight. This is a real production action and can't be undone once it starts."
-          primaryButton={{
-            label: isTriggering ? "Triggering…" : "Trigger release",
-            onClick: () => void handleTrigger(),
-            disabled: isTriggering,
-          }}
-          secondaryButton={{
-            label: en.common.cancel,
-            onClick: () => setIsConfirmingTrigger(false),
-            disabled: isTriggering,
-          }}
-        >
-          {releaseInProgress && (
-            <p className="w-full mt-2 text-sm text-warning-text">
-              A release is already running — this will queue behind it rather than run concurrently,
-              but confirm that's what you want before proceeding.
-            </p>
-          )}
-        </ActionConfirmationPopup>
-      )}
 
       {isConfirmingAndroidPromotion && (
         <ActionConfirmationPopup

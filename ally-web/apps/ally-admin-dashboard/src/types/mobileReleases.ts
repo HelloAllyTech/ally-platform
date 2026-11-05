@@ -1,16 +1,17 @@
 /**
- * The automated mobile release pipeline (a scheduled job that bumps the app
- * version and triggers the existing App Store / Play Store production build
- * workflows every ~2 days) and the GitHub Actions workflows it drives.
+ * RN's build/promote/submit GitHub Actions workflows, now living in
+ * ally-mobile-rn-archive/ — kept runnable for a manual rollback build, not
+ * anything that ships today. The automated scheduled-bump pipeline this used
+ * to also cover ("Scheduled Check") was retired in the 2026-11 Flutter
+ * rename: it had no Flutter equivalent and isn't being replaced.
  *
  * "Promote Android" is the manually-triggered production-promotion workflow
- * (see triggerAndroidPromotion below) rather than the scheduled pipeline
- * itself. iOS TestFlight-external promotion used to have a matching manual
- * workflow/entry here too; removed once submission became fully automatic
- * and this org's actual testers turned out to all be Internal, not External.
+ * (see triggerAndroidPromotion below). iOS TestFlight-external promotion
+ * used to have a matching manual workflow/entry here too; removed once
+ * submission became fully automatic and this org's actual testers turned out
+ * to all be Internal, not External.
  */
 export type MobileReleaseWorkflowName =
-  | "Scheduled Check"
   | "iOS Build"
   | "Android Build"
   | "Promote Android"
@@ -45,7 +46,12 @@ export interface MobileReleaseRun {
 }
 
 export interface MobileReleaseAndroidVersion {
-  versionCode: number;
+  /**
+   * Always null — Flutter computes the real versionCode per-build in CI, not
+   * from a committed file the way RN's android/app/build.gradle used to
+   * provide one.
+   */
+  versionCode: number | null;
   versionName: string;
 }
 
@@ -57,16 +63,9 @@ export interface MobileReleaseIosVersion {
 export interface CurrentMobileVersionsResponse {
   android: MobileReleaseAndroidVersion;
   ios: MobileReleaseIosVersion;
-  /**
-   * Estimate of when the automated pipeline could next act — `null` when the
-   * backend has no estimate. Not a guarantee: the scheduled check still does
-   * nothing unless there are new commits by then, which the backend can't
-   * know in advance.
-   */
-  nextEligibleCheckAt: string | null;
 }
 
-/** POST /v1/mobile-releases/trigger — fires both platforms' build workflows immediately. */
+/** Shared response shape for every workflow-dispatch mutation below ({ dispatched: boolean }). */
 export interface TriggerMobileReleaseResponse {
   dispatched: boolean;
 }
