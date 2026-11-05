@@ -194,7 +194,7 @@ describe('WebSocketAuthMiddleware', () => {
       });
       const next = createMockNext();
       const authMiddleware = middleware.webSocketMiddleware([
-        PERMISSIONS.VIEW_USER,
+        PERMISSIONS.VIEW_USERS,
       ]);
       const permissionError = new Error('Database connection lost');
 
