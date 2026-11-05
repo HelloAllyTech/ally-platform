@@ -60,14 +60,14 @@ describe('MobileReleasesService in the monorepo', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it("reads the app's version files from its folder of the monorepo", async () => {
+  it('reads the Android versionCode from ally-mobile (RN) but the marketing version from ally-mobile-flutter, both in the monorepo', async () => {
     const encode = (text: string) => Buffer.from(text).toString('base64');
     route({
       [`${MONO}/contents/ally-mobile/android/app/build.gradle`]: {
         content: encode('versionCode 245\n versionName "1.23.45"'),
       },
-      [`${MONO}/contents/ally-mobile/ios/ally.xcodeproj/project.pbxproj`]: {
-        content: encode('MARKETING_VERSION = 1.23.45;'),
+      [`${MONO}/contents/ally-mobile-flutter/pubspec.yaml`]: {
+        content: encode('version: 2.0.0+1'),
       },
       [`${MONO}/commits?path=ally-mobile/android/app/build.gradle`]: [],
       [`${OLD}/commits?path=android/app/build.gradle`]: [
@@ -77,11 +77,14 @@ describe('MobileReleasesService in the monorepo', () => {
 
     const version = await service.getCurrentVersion();
 
+    // versionCode still comes from RN's committed build.gradle (Flutter's real
+    // versionCode is computed per-build by CI, not committed to source), but
+    // versionName/marketingVersion reflect what's actually live post-cutover.
     expect(version.android).toEqual({
       versionCode: 245,
-      versionName: '1.23.45',
+      versionName: '2.0.0',
     });
-    expect(version.ios.marketingVersion).toBe('1.23.45');
+    expect(version.ios.marketingVersion).toBe('2.0.0');
     // The cadence clock runs from the last real bump — in the archived repo
     // until the first release ships from the monorepo.
     expect(version.nextEligibleCheckAt).not.toBeNull();

@@ -190,6 +190,18 @@ export class MobileReleasesService {
   }
 
   /**
+   * `ally-mobile-flutter`'s folder in `repo` — born in the monorepo at the
+   * 2026-10-23 cutover, so unlike `folder` there's no pre-monorepo case.
+   * Both platforms' store-identity (`com.helloally.app`) builds now come
+   * from here, not from `ally-mobile` (RN) — see getCurrentVersion()'s doc
+   * comment for why that app's own build.gradle/pbxproj no longer reflect
+   * what's actually live.
+   */
+  private get flutterFolder(): string {
+    return 'ally-mobile-flutter/';
+  }
+
+  /**
    * The app's own repo (GITHUB_MOBILE_REPO), archived at the cutover. Read
    * only for what happened before it — run history, and the version bumps
    * from before the first one in the monorepo — so the release page and the
@@ -341,10 +353,23 @@ export class MobileReleasesService {
   }
 
   /**
-   * Live version info from `master` — android/app/build.gradle's versionCode
-   * + versionName, and ios/ally.xcodeproj/project.pbxproj's first
-   * MARKETING_VERSION. Regex-extracted rather than parsed: both files are
-   * not valid JSON/YAML, and the pipeline only ever needs these few fields.
+   * Live version info from `master`. Since the Flutter cutover both
+   * platforms' store-identity (`com.helloally.app`) builds come from
+   * `ally-mobile-flutter/pubspec.yaml`'s single `version:` field (its own
+   * comment: "Marketing version ... sits above every React Native
+   * release" — one field drives both `CFBundleShortVersionString` and
+   * `versionName`), so that's the marketing-version source for both
+   * `android.versionName` and `ios.marketingVersion` here. `ally-mobile`
+   * (RN)'s own build.gradle/pbxproj are no longer what's actually shipping
+   * to users and would silently block raising the minimum version above
+   * RN's last release (e.g. "1.23.47") even after a newer Flutter build is
+   * live — android.versionCode still reads RN's build.gradle because
+   * Flutter's real versionCode is computed per-build by CI, not committed
+   * to source; this leaves the admin page's "is this committed build the
+   * one that's live" pipeline indicator still RN-only, unchanged for now.
+   *
+   * Regex-extracted rather than parsed: these files are not valid
+   * JSON/YAML, and the pipeline only ever needs these few fields.
    *
    * Also includes `nextEligibleCheckAt`, a best-effort ETA for the next
    * scheduled-mobile-release.yml run that could actually ship a build. That
@@ -354,22 +379,20 @@ export class MobileReleasesService {
   async getCurrentVersion(): Promise<MobileCurrentVersionResponseDto> {
     const headers = this.headers;
 
-    const [android, pbxproj, nextEligibleCheckAt] = await Promise.all([
-      this.fetchCurrentAndroidVersion(headers),
-      this.fetchFileContent('ios/ally.xcodeproj/project.pbxproj', headers),
-      this.computeNextEligibleCheckAt(headers),
-    ]);
-
-    const marketingVersionMatch = pbxproj.match(
-      /MARKETING_VERSION\s*=\s*([^;]+);/,
-    );
+    const [androidVersionCode, marketingVersion, nextEligibleCheckAt] =
+      await Promise.all([
+        this.fetchCurrentAndroidVersion(headers),
+        this.fetchCurrentFlutterMarketingVersion(headers),
+        this.computeNextEligibleCheckAt(headers),
+      ]);
 
     return {
-      android,
+      android: {
+        versionCode: androidVersionCode.versionCode,
+        versionName: marketingVersion,
+      },
       ios: {
-        marketingVersion: marketingVersionMatch
-          ? marketingVersionMatch[1].trim()
-          : null,
+        marketingVersion,
       },
       nextEligibleCheckAt,
     };
@@ -389,6 +412,19 @@ export class MobileReleasesService {
       versionCode: versionCodeMatch ? Number(versionCodeMatch[1]) : null,
       versionName: versionNameMatch ? versionNameMatch[1] : null,
     };
+  }
+
+  /** Regex-extracted from master's ally-mobile-flutter/pubspec.yaml — the one marketing version that drives both platforms post-cutover. */
+  private async fetchCurrentFlutterMarketingVersion(
+    headers: Record<string, string>,
+  ): Promise<string | null> {
+    const pubspec = await this.fetchFileContent(
+      'pubspec.yaml',
+      headers,
+      this.flutterFolder,
+    );
+    const versionMatch = pubspec.match(/^version:\s*(\d+\.\d+\.\d+)/m);
+    return versionMatch ? versionMatch[1] : null;
   }
 
   /**
@@ -1520,10 +1556,11 @@ export class MobileReleasesService {
   private async fetchFileContent(
     path: string,
     headers: Record<string, string>,
+    folder: string = this.folder,
   ): Promise<string> {
     try {
       const { data } = await axios.get(
-        `${GITHUB_API}/repos/${this.repo}/contents/${this.folder}${path}`,
+        `${GITHUB_API}/repos/${this.repo}/contents/${folder}${path}`,
         { headers, params: { ref: 'master' }, timeout: 15_000 },
       );
       const content = data?.content;
