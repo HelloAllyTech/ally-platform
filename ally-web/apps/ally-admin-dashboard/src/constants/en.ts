@@ -1785,6 +1785,14 @@ export const en = {
         runId: "Run",
         copy: "Copy",
         steps: "Steps ({count})",
+        toolStep: "tool",
+        // What the Agent mode engine understood each message to be.
+        turnTypes: {
+          smalltalk: "Small talk",
+          about_bot: "About the chatbot",
+          question: "Question",
+          unclear: "Unclear",
+        } as Record<string, string>,
         engineLabel: "Engine for this test",
         engineBot: "Chatbot's setting",
         engineV1: "v1",
@@ -1888,6 +1896,11 @@ export const en = {
       engineSave: "Save engine",
       engineSaved: "Engine saved.",
       engineSaveFailed: "Couldn't change the engine.",
+      agentModeLabel: "Agent mode",
+      agentModeHelp:
+        "Answers greetings and questions about itself in its own voice, understands follow-ups and can search again. Facts still need a source.",
+      agentModeTooltip:
+        'Only with the v2 engine. Greeting, help and FAQ keyword replies give way to the agent, except a bare "help". Crisis, STOP and START replies are unchanged.',
       enabledLabel: "Answer messages",
       enabledHelp:
         "Turn off to stop this chatbot replying. Pausing it from Overview does the same.",

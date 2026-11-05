@@ -150,6 +150,8 @@ export interface UpdateChatbotRequest {
   model?: ChatbotModelChoice | null;
   /** Platform admins only. */
   runtime?: ChatbotRuntime;
+  /** Platform admins only. Merged into the saved flags. */
+  features?: { agent?: boolean };
 }
 
 export interface ChatbotDocumentRow {
@@ -235,4 +237,6 @@ export interface TestChatbotResponse {
   /** False while the new engine is turned off in Defaults. */
   runtimeAllowed: boolean;
   conversationId: string;
+  /** Agent mode: what the agent understood the message to be. */
+  turnType?: "smalltalk" | "about_bot" | "question" | "unclear" | null;
 }

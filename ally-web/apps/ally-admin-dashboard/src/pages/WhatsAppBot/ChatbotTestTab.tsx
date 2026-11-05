@@ -11,7 +11,7 @@ import { useGetChatbotsQuery, useTestChatbotMutation } from "@api";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { Chatbot, ChatbotDraft, TestChatbotResponse } from "@types";
+import { AgentTraceStep, Chatbot, ChatbotDraft, TestChatbotResponse } from "@types";
 
 import { Card, copyToClipboard, errorMessage, fill } from "./shared";
 
@@ -212,6 +212,11 @@ const Bubble: React.FC<{ turn: Turn }> = ({ turn }) => {
           )}
           <span>{result.latencyMs} ms</span>
           <EngineBadge result={result} />
+          {result.turnType && (
+            <span data-testid="turn-type" className="rounded-full border border-border-light px-2">
+              {t.turnTypes[result.turnType] ?? result.turnType}
+            </span>
+          )}
           {result.citations.length > 0 && (
             <span>
               {t.sources}: {[...new Set(result.citations.map(c => c.document_title))].join(", ")}
@@ -228,6 +233,15 @@ const Bubble: React.FC<{ turn: Turn }> = ({ turn }) => {
       {result?.runId && <RunDetails result={result} />}
     </div>
   );
+};
+
+/**
+ * One step as a line: its summary when it has one (counts only, e.g. "retrieve: 3 hits, best
+ * 0.71"), else its name; a tool call is marked as one. Then its time.
+ */
+const stepLine = (step: AgentTraceStep): string => {
+  const what = step.summary || step.node;
+  return `${step.node === "tool" ? `${t.toolStep} · ` : ""}${what} · ${step.ms} ms`;
 };
 
 /** Which engine answered this test. */
@@ -271,9 +285,7 @@ const RunDetails: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
           <summary className="cursor-pointer">{fill(t.steps, { count: steps.length })}</summary>
           <ol className="list-decimal pl-5 pt-1">
             {steps.map((step, index) => (
-              <li key={`${step.node}-${index}`}>
-                {step.node} · {step.ms} ms
-              </li>
+              <li key={`${step.node}-${index}`}>{stepLine(step)}</li>
             ))}
           </ol>
         </details>
