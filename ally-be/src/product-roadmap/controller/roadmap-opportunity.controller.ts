@@ -44,6 +44,8 @@ import {
 } from '../dto/roadmap-opportunity.dto';
 import {
   VoteBudgetDto,
+  BreadthDto,
+  BreadthEveryoneRowDto,
   BugReportResponseDto,
   GetOpportunitiesResponseDto,
   MonthBoardMoveResponseDto,
@@ -57,6 +59,7 @@ import {
   OpenBuilderSessionResponseDto,
 } from '../dto/roadmap-response.dto';
 import { RoadmapOpportunityService } from '../service/roadmap-opportunity.service';
+import { RoadmapMultiplierService } from '../service/roadmap-multiplier.service';
 import { RoadmapAllocationService } from '../service/roadmap-allocation.service';
 import { RoadmapSplitMergeService } from '../service/roadmap-split-merge.service';
 import { RoadmapBuilderService } from '../service/roadmap-builder.service';
@@ -83,6 +86,7 @@ export class RoadmapOpportunityController {
     private readonly builderService: RoadmapBuilderService,
     private readonly boardService: RoadmapBoardService,
     private readonly access: RoadmapAccessService,
+    private readonly multiplierService: RoadmapMultiplierService,
   ) {}
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
@@ -173,6 +177,34 @@ export class RoadmapOpportunityController {
   @ApiResponse({ status: 200, type: VoteBudgetDto })
   budget(@CurrentUser() user: TokenUser): Promise<VoteBudgetDto> {
     return this.allocationService.getBudget(user.id);
+  }
+
+  // VIEW tier, not VOTE: every viewer's score label ("points" vs "votes") hangs on `enabled`.
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
+  @Get('me/breadth')
+  @ApiOperation({
+    summary: "The caller's breadth multiplier and what's behind it",
+    description:
+      'A vote is worth 1.0 to 1.3 of a vote by how many different colleagues the caller has ' +
+      'backed in the last 14 days. `enabled` is false while the feature flag is off.',
+  })
+  @ApiResponse({ status: 200, type: BreadthDto })
+  breadth(@CurrentUser() user: TokenUser): Promise<BreadthDto> {
+    return this.multiplierService.getBreadth(user.id);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
+  @Get('breadth')
+  @ApiOperation({
+    summary: "Everyone's breadth multiplier, for the breadth panel",
+  })
+  @ApiResponse({ status: 200, type: [BreadthEveryoneRowDto] })
+  breadthEveryone(): Promise<BreadthEveryoneRowDto[]> {
+    return this.multiplierService.getEveryone();
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {

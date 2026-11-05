@@ -2,6 +2,7 @@ import React from "react";
 
 import { DatePicker, DatePickerInput, NumberInput } from "@ally-ui-mono/ui-shared";
 
+import { useScoreUnit } from "./useScoreUnit";
 import { RoadmapAdvancedFilterValues, toIsoDate } from "./utils/filters";
 
 interface RoadmapAdvancedFiltersProps {
@@ -35,6 +36,7 @@ export const RoadmapAdvancedFilters: React.FC<RoadmapAdvancedFiltersProps> = ({
   values,
   onChange,
 }) => {
+  const { unit } = useScoreUnit();
   if (!isOpen) return null;
 
   const set = (patch: Partial<RoadmapAdvancedFilterValues>) => onChange({ ...values, ...patch });
@@ -105,7 +107,9 @@ export const RoadmapAdvancedFilters: React.FC<RoadmapAdvancedFiltersProps> = ({
 
       <div className="flex flex-wrap items-end gap-3">
         {/* "Total votes", matching the table column it filters. */}
-        <span className="text-typography-secondary w-24 shrink-0 pb-2">Total votes</span>
+        <span className="text-typography-secondary w-24 shrink-0 pb-2">
+          {unit === "points" ? "Points" : "Total votes"}
+        </span>
         {/* `allowEmpty` is load-bearing, not cosmetic. Carbon's NumberInput treats an empty value
             as failing `min={0}` unless told otherwise, so both bounds rendered in the red invalid
             state — complete with error icons — the entire time no score filter was set, which is

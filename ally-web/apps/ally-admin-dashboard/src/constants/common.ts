@@ -370,6 +370,8 @@ export const ApiEndpoints = {
     BOARD_LANE: "/v1/product-roadmap/board/lane",
     ALLOCATIONS: "/v1/product-roadmap/allocations",
     VOTE_BUDGET: "/v1/product-roadmap/me/vote-budget",
+    MY_BREADTH: "/v1/product-roadmap/me/breadth",
+    BREADTH_EVERYONE: "/v1/product-roadmap/breadth",
     FACETS: "/v1/product-roadmap/facets",
     PRODUCT_GOALS: "/v1/product-roadmap/product-goals",
     PRODUCT_GOAL_BY_ID: (id: string) => `/v1/product-roadmap/product-goals/${id}`,
@@ -1195,6 +1197,7 @@ export const TAG_TYPES = {
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
   PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
+  PRODUCT_ROADMAP_BREADTH: "productRoadmapBreadth",
   PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",
   PRODUCT_ROADMAP_GOALS: "productRoadmapGoals",
   PRODUCT_ROADMAP_STRATEGY_GOALS: "productRoadmapStrategyGoals",

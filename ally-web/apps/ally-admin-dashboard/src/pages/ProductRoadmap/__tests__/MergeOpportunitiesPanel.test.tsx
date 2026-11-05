@@ -15,6 +15,9 @@ const mockMerge = vi.fn();
 /** Reassigned mid-test so the mocked search hook can return a different result set per search. */
 let searchResults: RoadmapOpportunity[] = [];
 
+// The breadth flag is a server answer behind a cached query; these tests are about the row/panel, so pin it off ("votes").
+vi.mock("../useScoreUnit", () => ({ useScoreUnit: () => ({ enabled: false, unit: "votes" }) }));
+
 vi.mock("@api", () => ({
   useGetRoadmapOpportunitiesQuery: () => ({ data: { items: searchResults }, isFetching: false }),
   useMergeRoadmapOpportunitiesMutation: () => [mockMerge, { isLoading: false }],

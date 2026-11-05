@@ -10,6 +10,7 @@ import { RoadmapAllocationService } from '../roadmap-allocation.service';
 import { RoadmapAllocationRepository } from '../../repository/roadmap-allocation.repository';
 import { RoadmapVoteGrantRepository } from '../../repository/roadmap-vote-grant.repository';
 import { RoadmapNotificationService } from '../roadmap-notification.service';
+import { RoadmapMultiplierService } from '../roadmap-multiplier.service';
 import { RoadmapAllocation } from '../../entity/roadmap-allocation.entity';
 import { RoadmapOpportunity } from '../../entity/roadmap-opportunity.entity';
 import {
@@ -36,6 +37,7 @@ describe('RoadmapAllocationService', () => {
     refund: jest.Mock;
   };
   let notifications: { emit: jest.Mock };
+  let multipliers: { multiplierFor: jest.Mock; getBreadthInTx: jest.Mock };
 
   /** An existing allocation row for this user/opportunity/period, or none. */
   const givenExistingAllocation = (
@@ -73,6 +75,10 @@ describe('RoadmapAllocationService', () => {
     };
 
     notifications = { emit: jest.fn() };
+    multipliers = {
+      multiplierFor: jest.fn(async () => 1),
+      getBreadthInTx: jest.fn(async () => ({ multiplier: 1, qualifying: 0 })),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -84,6 +90,7 @@ describe('RoadmapAllocationService', () => {
         },
         { provide: RoadmapVoteGrantRepository, useValue: grantRepository },
         { provide: RoadmapNotificationService, useValue: notifications },
+        { provide: RoadmapMultiplierService, useValue: multipliers },
       ],
     }).compile();
 
@@ -332,6 +339,85 @@ describe('RoadmapAllocationService', () => {
       const budget = await service.getBudget(USER);
 
       expect(budget).toMatchObject({ available: 27 });
+    });
+  });
+  describe('breadth weighting (frozen at cast time)', () => {
+    const savedRow = () => {
+      const calls = manager.save.mock.calls;
+      const last = calls[calls.length - 1];
+      return last?.[1] ?? last?.[0];
+    };
+
+    it('weights new votes by the multiplier at cast time', async () => {
+      givenExistingAllocation(null);
+      multipliers.multiplierFor.mockResolvedValue(1.2);
+
+      await service.setVotes(USER, OPP_ID, 5);
+
+      const row = savedRow();
+      expect(row.votes).toBe(5);
+      expect(Number(row.weightedVotes)).toBeCloseTo(6, 3);
+      expect(row.lastIncreasedAt).toBeInstanceOf(Date);
+    });
+
+    it('weights only the ADDED votes; earlier votes keep their weight', async () => {
+      manager.findOne.mockImplementation(async (entity: unknown) =>
+        entity === RoadmapOpportunity
+          ? {
+              id: OPP_ID,
+              stage: RoadmapOpportunityStage.NEW,
+              type: RoadmapOpportunityType.IDEA,
+            }
+          : {
+              id: 'a',
+              votes: 4,
+              weightedVotes: '4.000',
+              lastIncreasedAt: null,
+            },
+      );
+      multipliers.multiplierFor.mockResolvedValue(1.3);
+
+      await service.setVotes(USER, OPP_ID, 6);
+
+      expect(Number(savedRow().weightedVotes)).toBeCloseTo(4 + 2 * 1.3, 3);
+    });
+
+    it('removes votes at the row average weight, without touching lastIncreasedAt', async () => {
+      const last = new Date('2026-11-01T00:00:00Z');
+      manager.findOne.mockImplementation(async (entity: unknown) =>
+        entity === RoadmapOpportunity
+          ? {
+              id: OPP_ID,
+              stage: RoadmapOpportunityStage.NEW,
+              type: RoadmapOpportunityType.IDEA,
+            }
+          : {
+              id: 'a',
+              votes: 4,
+              weightedVotes: '5.000',
+              lastIncreasedAt: last,
+            },
+      );
+
+      await service.setVotes(USER, OPP_ID, 2);
+
+      expect(Number(savedRow().weightedVotes)).toBeCloseTo(2.5, 3);
+      expect(savedRow().lastIncreasedAt).toBe(last);
+      // A decrease never asks for the multiplier.
+      expect(multipliers.multiplierFor).not.toHaveBeenCalled();
+    });
+
+    it('returns the multiplier and qualifying count from the vote response', async () => {
+      givenExistingAllocation(null);
+      multipliers.getBreadthInTx.mockResolvedValue({
+        multiplier: 1.15,
+        qualifying: 4,
+      });
+
+      const result = await service.setVotes(USER, OPP_ID, 1);
+
+      expect(result.multiplier).toBe(1.15);
+      expect(result.qualifying).toBe(4);
     });
   });
 });

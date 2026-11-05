@@ -11,6 +11,9 @@ import {
 
 // The board is a table shell around several heavy children. Stub the ones that pull @api / the
 // store in, so this stays a test of the pagination footer rather than of the whole page.
+// The breadth flag is a server answer behind a cached query; these tests are about the row/panel, so pin it off ("votes").
+vi.mock("../useScoreUnit", () => ({ useScoreUnit: () => ({ enabled: false, unit: "votes" }) }));
+
 vi.mock("../useSetVotes", () => ({
   useSetVotes: () => vi.fn(),
 }));

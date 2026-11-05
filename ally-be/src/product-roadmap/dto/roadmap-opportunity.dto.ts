@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsUrl,
   Max,
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -167,6 +168,16 @@ export class RoadmapOpportunityFiltersDto {
   @IsArray()
   @IsInt({ each: true })
   createdBy?: number[];
+
+  @ApiPropertyOptional({
+    description:
+      "Only opportunities that would back a colleague the caller hasn't backed in the breadth " +
+      'window — votable, not their own. Powers the "New to you" filter.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  newToMe?: boolean;
 
   @ApiPropertyOptional() @IsOptional() @IsISO8601() dateFrom?: string;
   @ApiPropertyOptional() @IsOptional() @IsISO8601() dateTo?: string;
