@@ -2,7 +2,7 @@ import {
   PARENT_COURSE_CODE,
   PARENT_COURSE_OPPORTUNITIES,
   descriptionOf,
-} from './1980940000000-SeedParentCourseRoadmapOpportunities';
+} from '../seed-data/parent-course-roadmap-opportunities.data';
 
 const GOALS = [
   'Roleplay Actor Realism',
