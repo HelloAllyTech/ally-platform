@@ -34,11 +34,20 @@ export class RoadmapVotingAnalyticsService {
   constructor(private readonly repository: RoadmapVotingAnalyticsRepository) {}
 
   async getRoadmapVoting(now = new Date()): Promise<RoadmapVotingResponseDto> {
-    const [cast, granted, eligibleNow] = await Promise.all([
+    const [cast, ownCast, granted, eligibleNow] = await Promise.all([
       this.repository.getVotesCast(),
+      this.repository.getOwnVotesCast(),
       this.repository.getVotesGranted(),
       this.repository.getEligibleUserIds(),
     ]);
+    const ownBy = new Map<string, Map<number, number>>();
+    for (const row of ownCast) {
+      if (row.votes <= 0) continue;
+      const month = periodToMonth(row.periodKey);
+      const users = ownBy.get(month) ?? new Map<number, number>();
+      users.set(row.userId, (users.get(row.userId) ?? 0) + row.votes);
+      ownBy.set(month, users);
+    }
 
     const currentMonth = isoDate(startOfUtcMonth(now));
     const votesBy = new Map<string, Map<number, number>>();
@@ -84,6 +93,10 @@ export class RoadmapVotingAnalyticsService {
         .map((userId) => ({
           userId,
           votes: votes.get(userId) ?? 0,
+          votesOnOthers: Math.max(
+            0,
+            (votes.get(userId) ?? 0) - (ownBy.get(month)?.get(userId) ?? 0),
+          ),
           granted: recorded ? (grants?.get(userId) ?? 0) : null,
         }));
 
