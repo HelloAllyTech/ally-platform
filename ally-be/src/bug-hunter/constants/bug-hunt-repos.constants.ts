@@ -132,18 +132,12 @@ export const BUG_HUNT_REPOS: Record<string, BugHuntRepoConfig> = {
     fixable: true,
     canBotMerge: true,
   },
-  // Fixable, but never auto-merged — see buildFixSessionPrompt's merge-policy
-  // doc: this pipeline only runs Jest, which cannot verify the native /
-  // on-device behaviour a mobile fix actually ships. A fix session opens a PR
-  // for a human to merge; it does not land on its own. `canBotMerge` is false
-  // for that product reason rather than a permissions one, and the two
-  // deliberately produce the same instruction.
-  'ally-mobile': {
-    test: 'npm test',
-    lint: 'npm run lint',
-    fixable: true,
-    canBotMerge: false,
-  },
+  // 'ally-mobile' intentionally has no entry: it held RN (npm test/lint)
+  // until the 2026-11 Flutter rename, and there is no Flutter equivalent
+  // configured yet (flutter test / flutter analyze) pending a deliberate
+  // review of running Bug Hunter against the Flutter codebase. repoCommands()
+  // returning null for it is the actual enforcement of "stays excluded" — see
+  // buildFixPrompt's hard-error-on-null handling.
 };
 
 /** Every repo a sweep may run against. */

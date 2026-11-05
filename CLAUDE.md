@@ -19,7 +19,7 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 | `ally-ai` | FastAPI + Python + Weaviate | AI service: conversation analysis, nudges, summaries, transcription | 8000 |
 | `ally-ai-learn` | FastAPI + LiveKit + LangGraph + Python | Voice-based training agent: simulated client conversations with real-time event detection | 8000 (API) + LiveKit worker |
 | `ally-web` | Nx monorepo: Next.js + 2x Vite+React apps | Landing page (3000), Helpline dashboard (8080), Admin dashboard (8081) | 3000/8080/8081 |
-| `ally-mobile` | React Native + TypeScript | iOS/Android app for counselors: live sessions, reviews, simulations | N/A |
+| `ally-mobile` | Flutter + Dart | iOS/Android app for counselors: live sessions, reviews, simulations. The React Native app it replaced is archived, read-only, at `ally-mobile-rn-archive/` (manual rollback build only — see `ally-mobile/docs/RELEASE.md`) | N/A |
 | `infra` *(standalone repo)* | Ansible + Terraform + Docker | Infrastructure: Hetzner baremetal, AWS (ECR/SQS/S3/CloudWatch), Incus containers (`HelloAllyTech/infra`, kept outside `ally-platform` monorepo to isolate Ansible Vault secrets; `/infra/` is `.gitignore`d) | N/A |
 | `helloallytech.github.io` | Jekyll | Developer hub / docs site on GitHub Pages | 4000 |
 
@@ -35,7 +35,7 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
               |                             |
     +---------v---------+     +-------------v-----------+
     |    ally-mobile     |     |                         |
-    | (React Native app) |     |        ally-be          |
+    |   (Flutter app)    |     |        ally-be          |
     +--------+-----------+     | (NestJS core backend)   |
              |                 | PostgreSQL + Redis       |
              +-------+--------+ SQS queues               |
@@ -131,9 +131,17 @@ npx nx serve ally-web                 # Landing at :3000
 npm run build:prod                    # Build all
 ```
 
-**ally-mobile** (React Native):
+**ally-mobile** (Flutter):
 ```bash
-npm install
+flutter pub get
+flutter run --dart-define-from-file=env/local.env                # dev identity
+flutter run --flavor prod --dart-define-from-file=env/local.env  # store identity
+flutter test
+```
+Archived React Native app, for an emergency rollback build only — see
+`ally-mobile/docs/RELEASE.md`'s Rollback section:
+```bash
+cd ally-mobile-rn-archive && npm install
 npm run android:dev            # Android dev build
 npm run ios                    # iOS build (requires Xcode)
 ```
@@ -152,11 +160,17 @@ ansible-playbook -i inventories/development/hosts.yml <playbook>.yml
 - Testing: pytest + asyncio
 - Pre-commit hooks configured
 
-### TypeScript repos (ally-be, ally-web, ally-mobile)
+### TypeScript repos (ally-be, ally-web)
 - Formatting: Prettier
 - Linting: ESLint
 - Testing: Jest (ally-be), Vitest (ally-web)
 - Git hooks: Husky + lint-staged
+
+### ally-mobile (Flutter + Dart)
+- Linting: `flutter analyze` (flutter_lints)
+- Testing: `flutter test`
+- **Never run `dart format` on this repo** — it isn't dart-formatted, and running it reformats far more than intended
+- The archived RN app (`ally-mobile-rn-archive/`) was TypeScript/Jest/ESLint/Husky, same as the row above — kept only for a manual rollback build
 
 ### Deployment
 - **CI/CD**: GitHub Actions

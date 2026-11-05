@@ -168,10 +168,14 @@ export interface SweepMemoryEntry {
  * `BUG_HUNT_MAX_AUTO_MERGES_PER_RUN` genuinely trivial fixes and leaves
  * everything else as a PR for review. A fix session, by contrast, merges any
  * green fix — because there an admin asked for that bug by name. Guarded paths
- * never merge on either path, and neither does `ally-mobile`: this pipeline
- * only runs Jest, which cannot verify the native/on-device behaviour that
- * actually ships, so every ally-mobile fix — trivial or not — stays a PR for
- * a human to merge.
+ * never merge on either path.
+ *
+ * `ally-mobile` used to carry its own unconditional "never merge" carve-out
+ * here too (this pipeline only ran Jest, which cannot verify the native/
+ * on-device behaviour that actually ships) — removed as dead code once
+ * `ally-mobile` had no entry in `BUG_HUNT_REPOS` at all (see its own
+ * comment there): `repoCommands(repo)` now throws before this function's
+ * body is ever reached for that repo, so the carve-out could never fire.
  */
 export function buildSweepPrompt(ctx: SweepPromptContext): string {
   const {
@@ -231,16 +235,9 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
   // comprehensive table is only useful if it keeps finding bugs regardless of
   // who is allowed to fix them.
   const gated = mode === BugHunterMode.MANUAL;
-  // ally-mobile writes code and opens PRs like any other fixable repo, but
-  // never merges — see the class doc's merge-policy note. The three protected
-  // repos cannot merge either, for an entirely different reason: the bot has
-  // push access and `master` wants a review, so `gh pr merge --admin` fails.
-  // Both end in the same instruction, and the prompt says which applies so
-  // the agent does not read a permissions wall as a policy it could argue
-  // with.
-  const neverMerges = repo === 'ally-mobile' || !commands.canBotMerge;
-  const mergeBlockedByPermissions =
-    repo !== 'ally-mobile' && !commands.canBotMerge;
+  // The protected repos cannot merge: the bot has push access and `master`
+  // wants a review, so `gh pr merge --admin` fails.
+  const mergeBlockedByPermissions = !commands.canBotMerge;
 
   const finderTexts: [BugHunterSense, string][] = [
     [
@@ -434,9 +431,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
           `### Merging — the sweep is deliberately stricter than an on-demand fix`,
           mergeBlockedByPermissions
             ? `Do not attempt to merge anything here, and do not treat that as a failure. "${repo}"'s master requires an approving review and your token has push access only, so "gh pr merge --admin" has no admin rights to bypass it with and will simply fail. Every fix you open stays a green PR; Bug Hunter shows each one to an admin as one click to merge. Leaving a green PR IS the finished outcome on this repo — do not run "gh pr merge" at all.`
-            : neverMerges
-              ? `Never merge here, however trivial the fix looks. This repo's pipeline only runs Jest, which cannot verify the native/on-device behaviour that actually ships, and a released mobile build is a frozen contract real users stay on for a long time. Every fix you open in ally-mobile stays a PR for a human to merge — do not run "gh pr merge" at all.`
-              : `Do not merge anything, however trivial it looks. Since 7 October every fix PR is read by a separate Verifier run on a different model (OPP-0779); Bug Hunter merges it if the verdict is a pass and this repo allows a self-merge, or hands it to a person with the verdict. Leave every PR open, PATCH each to {"status":"pr_opened"} with its prUrl, and report pr_opened. Do not run "gh pr merge" in any form.`,
+            : `Do not merge anything, however trivial it looks. Since 7 October every fix PR is read by a separate Verifier run on a different model (OPP-0779); Bug Hunter merges it if the verdict is a pass and this repo allows a self-merge, or hands it to a person with the verdict. Leave every PR open, PATCH each to {"status":"pr_opened"} with its prUrl, and report pr_opened. Do not run "gh pr merge" in any form.`,
           '',
           '',
           '',

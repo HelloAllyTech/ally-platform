@@ -69,19 +69,19 @@ describe('BugHunterRepoClassifierService', () => {
     expect(result.repo).toBeNull();
   });
 
-  it('recognizes ally-mobile as a dispatchable repo, like any other', async () => {
+  it('recognizes ally-ai-learn as a dispatchable repo, like any other', async () => {
     mockComplete.mockResolvedValue(
       textResponse({
-        repo: 'ally-mobile',
-        rationale: 'Native app screen.',
+        repo: 'ally-ai-learn',
+        rationale: 'Voice session agent.',
       }),
     );
 
     const result = await service.classifyRepo(
-      'The native app crashes on login.',
+      'The roleplay voice agent drops the call mid-session.',
     );
 
-    expect(result.repo).toBe('ally-mobile');
+    expect(result.repo).toBe('ally-ai-learn');
   });
 
   it('degrades to unclassified rather than throwing when the model call fails', async () => {

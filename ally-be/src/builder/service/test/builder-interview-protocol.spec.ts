@@ -50,7 +50,7 @@ const BRIEF = {
   ],
   repos: [
     { repo: 'ally-web', why: 'the web debrief' },
-    { repo: 'ally-mobile', why: 'the mobile DebriefTab' },
+    { repo: 'ally-ai', why: 'the retrieval side' },
   ],
 };
 

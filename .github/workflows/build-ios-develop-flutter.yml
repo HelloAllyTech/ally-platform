@@ -3,13 +3,13 @@
 # replaces the real Ally app. Mirrors this repo's build-ios-develop.yml
 # with the same secret names, plus PROVISION_PROFILE_DEV_BASE64 (this bundle
 # id needs its own App Store profile). Uploads to the TestFlight app of that
-# bundle id; see ally-mobile-flutter/docs/RELEASE.md for the one-time App
+# bundle id; see ally-mobile/docs/RELEASE.md for the one-time App
 # Store Connect setup.
 name: 'Build & Upload iOS app - Develop (Flutter, test identity)'
 
 defaults:
   run:
-    working-directory: ally-mobile-flutter
+    working-directory: ally-mobile
 
 on:
   workflow_dispatch:
@@ -77,7 +77,7 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           if [ -z "$PROVISION_PROFILE_DEV_BASE64" ]; then
-            echo "::error::PROVISION_PROFILE_DEV_BASE64 is not set (App Store profile 'Ally Flutter AppStore Distribution' for com.helloally.allyMobileFlutter; ally-mobile-flutter/docs/RELEASE.md)"
+            echo "::error::PROVISION_PROFILE_DEV_BASE64 is not set (App Store profile 'Ally Flutter AppStore Distribution' for com.helloally.allyMobileFlutter; ally-mobile/docs/RELEASE.md)"
             exit 1
           fi
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
@@ -164,7 +164,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dart-symbols-${{ github.run_number }}
-          path: ally-mobile-flutter/build/symbols
+          path: ally-mobile/build/symbols
           retention-days: 90
 
       - name: Upload Crashlytics symbols

@@ -60,34 +60,24 @@ describe('MobileReleasesService in the monorepo', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('reads the Android versionCode from ally-mobile (RN) but the marketing version from ally-mobile-flutter, both in the monorepo', async () => {
+  it("reads the marketing version from ally-mobile's (Flutter) pubspec.yaml in the monorepo", async () => {
     const encode = (text: string) => Buffer.from(text).toString('base64');
     route({
-      [`${MONO}/contents/ally-mobile/android/app/build.gradle`]: {
-        content: encode('versionCode 245\n versionName "1.23.45"'),
-      },
-      [`${MONO}/contents/ally-mobile-flutter/pubspec.yaml`]: {
+      [`${MONO}/contents/ally-mobile/pubspec.yaml`]: {
         content: encode('version: 2.0.0+1'),
       },
-      [`${MONO}/commits?path=ally-mobile/android/app/build.gradle`]: [],
-      [`${OLD}/commits?path=android/app/build.gradle`]: [
-        commit('bump45', 'chore(release): 1.23.45', 1, '2026-10-22T16:46:54Z'),
-      ],
     });
 
     const version = await service.getCurrentVersion();
 
-    // versionCode still comes from RN's committed build.gradle (Flutter's real
-    // versionCode is computed per-build by CI, not committed to source), but
-    // versionName/marketingVersion reflect what's actually live post-cutover.
+    // versionCode is always null post-rename: Flutter's real versionCode is
+    // computed per-build by CI, not committed to source the way RN's
+    // build.gradle used to provide one.
     expect(version.android).toEqual({
-      versionCode: 245,
+      versionCode: null,
       versionName: '2.0.0',
     });
     expect(version.ios.marketingVersion).toBe('2.0.0');
-    // The cadence clock runs from the last real bump — in the archived repo
-    // until the first release ships from the monorepo.
-    expect(version.nextEligibleCheckAt).not.toBeNull();
   });
 
   /**
@@ -97,7 +87,7 @@ describe('MobileReleasesService in the monorepo', () => {
    */
   it("skips the import merges and drafts What's New from the archived repo until the first monorepo release", async () => {
     route({
-      [`${MONO}/commits?path=ally-mobile/android/app/build.gradle`]: [
+      [`${MONO}/commits?path=ally-mobile/pubspec.yaml`]: [
         commit('import2', "Merge 'ally-mobile/' from commit '34eb25f'", 2),
         commit('import1', "Merge 'ally-mobile/' from commit 'bc73721'", 2),
       ],
@@ -124,7 +114,7 @@ describe('MobileReleasesService in the monorepo', () => {
 
   it("drafts the first monorepo release from the app's own commits, never another service's", async () => {
     route({
-      [`${MONO}/commits?path=ally-mobile/android/app/build.gradle`]: [
+      [`${MONO}/commits?path=ally-mobile/pubspec.yaml`]: [
         commit('bump46', 'chore(release): 1.23.46'),
         commit('import2', "Merge 'ally-mobile/' from commit '34eb25f'", 2),
       ],

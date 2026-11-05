@@ -153,16 +153,11 @@ export const BUILDER_REPOS: BuilderRepoDefinition[] = [
     e2eCapable: false,
     guardedPaths: ['app/auth', 'app/core/config.py'],
   },
-  {
-    repo: 'ally-mobile',
-    description: 'React Native mobile client.',
-    test: 'npm test',
-    singleTest: 'npx jest',
-    lint: 'npm run lint',
-    typecheck: 'npx tsc --noEmit',
-    e2eCapable: false,
-    guardedPaths: ['src/navigation', 'src/api'],
-  },
+  // 'ally-mobile' intentionally has no entry: it held RN (npm/Jest) until the
+  // 2026-11 Flutter rename, and there is no Flutter equivalent configured yet
+  // (flutter test / flutter analyze) pending a deliberate review of running
+  // Builder against the Flutter codebase. isBuilderRepo() returning false for
+  // it is the actual enforcement — see findBuilderRepo/isBuilderRepo below.
 ];
 
 export const BUILDER_REPO_NAMES: string[] = BUILDER_REPOS.map((r) => r.repo);
@@ -178,7 +173,6 @@ export const BUILDER_REPO_BUILD_ORDER: string[] = [
   'ally-ai',
   'ally-ai-learn',
   'ally-web',
-  'ally-mobile',
 ];
 
 /** `repos`, deduplicated, in build order; unknown names last, as given. */

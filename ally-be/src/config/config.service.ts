@@ -191,26 +191,32 @@ export class AppConfigService {
   }
 
   /**
-   * Explicit kill switch for the Android auto-minimum-version-bump task,
-   * default OFF. Unlike the iOS equivalent (safe by construction —
-   * READY_FOR_DISTRIBUTION only ever means genuinely live), the Android
-   * signal this task relies on (production track status: 'completed') is
-   * only trustworthy once Managed Publishing is turned OFF for this app in
-   * Play Console — with it on, a track's status reflects what was
-   * committed, not what Google's review-then-manual-publish gate has
-   * actually released. Flip ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED=true only
-   * after confirming that in Play Console; the task no-ops (not errors)
-   * while this is unset.
+   * UNUSED since the Flutter rename: the task this gated
+   * (autoBumpAndroidMinimumVersionIfLive) matched the live production
+   * versionCode against what was committed to RN's android/app/build.gradle
+   * on master — Flutter has no committed versionCode to match against (it's
+   * computed per-build by CI), so the task was deleted rather than left
+   * broken. Left defined (default OFF, as it always was) in case a
+   * Flutter-compatible redesign of this safety check is wanted later; see
+   * git history for the deleted task if reviving this.
    *
-   * SECOND, SEPARATE PRECONDITION, confirmed live: this task authenticates
+   * Original doc, kept for that context: explicit kill switch for the
+   * Android auto-minimum-version-bump task. Unlike the iOS equivalent (safe
+   * by construction — READY_FOR_DISTRIBUTION only ever means genuinely
+   * live), the Android signal this task relied on (production track status:
+   * 'completed') is only trustworthy once Managed Publishing is turned OFF
+   * for this app in Play Console — with it on, a track's status reflects
+   * what was committed, not what Google's review-then-manual-publish gate
+   * has actually released.
+   *
+   * SECOND, SEPARATE PRECONDITION, confirmed live: this task authenticated
    * as the same ANDROID_SERVICE_ACCOUNT_JSON identity the release pipeline's
    * uploads/promotions use, and the Play Developer API invalidates a service
    * account's other open edits the instant a new one is created (Google's
    * own concurrency-considerations docs). A tick landing mid-upload can kill
    * that upload's edit out from under it — this already broke a real build
    * once, from this same module's read-only status endpoint, before this
-   * task was even enabled. Do not flip this on until ally-be reads via a
-   * SEPARATE, read-only-scoped service account from the one CI writes with.
+   * task was even enabled.
    */
   get androidMinVersionAutoBumpEnabled(): boolean {
     return (

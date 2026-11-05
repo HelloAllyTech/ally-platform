@@ -67,19 +67,19 @@ export interface FixPromptContext {
  *
  * The nightly sweep auto-merges at most three trivial fixes and leaves the
  * rest for review, because nobody asked for any of them. Here an admin asked
- * for this bug by name, so a green fix lands. Two carve-outs stay a reviewed
- * PR no matter who pressed the button: `touchesGuardedPath` (migrations,
- * auth/permission gating, payments, other security-sensitive services), and
- * `ally-mobile` unconditionally — this pipeline only runs Jest, so a green
- * suite here proves nothing about the native/on-device behaviour that
- * actually ships, and ally-mobile's CLAUDE.md gotchas (frozen released
- * builds, Indic glyphs silently missing on some ROMs, native changes needing
- * a rebuild rather than a reload to even test) are exactly the kind of
- * "unresolved, high-consequence, hard-to-verify-automatically" case that
- * belongs in front of a human rather than auto-merged. Either carve-out has a
- * second effect worth knowing: an unmerged fix never reaches MERGED, so the
- * "Release to production" button never appears for it, and it cannot reach
- * production down this path at all.
+ * for this bug by name, so a green fix lands. `touchesGuardedPath` (migrations,
+ * auth/permission gating, payments, other security-sensitive services) always
+ * stays a reviewed PR no matter who pressed the button — an unmerged fix never
+ * reaches MERGED, so the "Release to production" button never appears for it,
+ * and it cannot reach production down this path at all.
+ *
+ * `ally-mobile` used to carry its own unconditional version of this same
+ * carve-out (this pipeline only ran Jest, which proves nothing about the
+ * native/on-device behaviour that actually ships, and a released mobile build
+ * is a frozen contract real users stay on for a long time) — removed as dead
+ * code once `ally-mobile` had no entry in `BUG_HUNT_REPOS` at all (see its
+ * own comment there): `repoCommands(repo)` now throws before this function's
+ * body is ever reached for that repo, so the carve-out could never fire.
  */
 export function buildFixSessionPrompt({
   finding,
@@ -178,17 +178,11 @@ export function buildFixSessionPrompt({
     BUG_HUNT_ESCALATION_ANSWER_TIMEOUT_MS / 60_000,
   );
   const pollSeconds = Math.round(BUG_HUNT_ESCALATION_POLL_INTERVAL_MS / 1000);
-  // ally-mobile never auto-merges, guarded path or not: this pipeline only
-  // runs Jest, so a green suite here does not prove the native/on-device
-  // behaviour that actually ships is fixed — see the class doc above.
-  const mobileNeverMerges = repo === 'ally-mobile';
-  // Three reasons a fix does not merge itself, and they are NOT
+  // Two reasons a fix does not merge itself, and they are NOT
   // interchangeable, because the reviewer needs to know which one applies:
   //
   //  - guarded path — a policy choice about this diff (migrations, auth,
   //    payments), decided per finding;
-  //  - ally-mobile — a policy choice about the platform, since Jest cannot
-  //    prove an on-device fix works;
   //  - `canBotMerge: false` — not a policy at all, just a fact about the
   //    repo. `master` requires a review the bot cannot give, so
   //    `gh pr merge --admin` fails. Telling the agent to merge anyway is what
@@ -198,14 +192,10 @@ export function buildFixSessionPrompt({
   // A data repair is run by a person after they merge it, so it is never
   // merged by the agent that wrote it — see bug-hunter-repair.ts.
   const repair = repairableDataFault(finding.metadata);
-  const allowMerge =
-    !finding.touchesGuardedPath &&
-    !mobileNeverMerges &&
-    botCanMergeHere &&
-    !repair;
+  const allowMerge = !finding.touchesGuardedPath && botCanMergeHere && !repair;
   const runMinutes = BUG_FIX_SESSION_JOB_TIMEOUT_MINUTES;
 
-  // The three Node repos (ally-be, ally-web, ally-mobile) install a husky
+  // The two Node repos (ally-be, ally-web) install a husky
   // pre-commit hook that re-runs lint and the full suite, so `git commit`
   // there routinely takes minutes. The Python two configure `pre-commit` but
   // CI never runs `pre-commit install`, so no hook fires and both branches
@@ -304,11 +294,9 @@ export function buildFixSessionPrompt({
       ? `9. Do NOT merge, even though an admin asked for this fix. Since 7 October every fix PR is read by a separate Verifier run on a different model before anything merges. Make sure the PR is green — run "gh pr checks --watch --fail-fast" and ${report('error', 'PR checks went red after the local suite passed')} if it is not — then ${patch({ status: 'pr_opened', prUrl: '<the PR url>' })} and finish with outcome "pr_opened". Bug Hunter dispatches the Verifier the moment that PATCH lands; on a pass it merges the PR itself (where this repo allows a self-merge), and on a fail it brings the PR to a person with the named failures. Do NOT run "gh pr merge" in any form, and do NOT tag a release or deploy anything.`
       : repair
         ? `9. Do NOT merge. This is a data repair: a person reviews it, merges it, and then runs it — dry run first — using the "How to run it" line in your PR description. Make sure the PR is green (run "gh pr checks --watch --fail-fast" and report if it goes red), then ${patch({ status: 'pr_opened', prUrl: '<the PR url>' })} and finish with outcome "pr_opened".`
-        : mobileNeverMerges
-          ? `9. Do NOT merge. ally-mobile fixes always stay a reviewed PR: this pipeline only runs Jest, which cannot prove a native/on-device fix actually works, and a released mobile build is a frozen contract real users stay on for a long time. Leave the PR open and finish with outcome "pr_opened".`
-          : !botCanMergeHere
-            ? `9. Do NOT attempt to merge — you cannot, and trying wastes the end of your session. "${repo}"'s master requires an approving review and your token has push access only, so "gh pr merge --admin" has no admin rights to bypass it with and will fail. This is not a problem with your fix.${finding.touchesGuardedPath ? ' This fix also touches a guarded path (migrations, auth/permission gating, payments, or another security-sensitive service) — name in your summary which guarded area it touches so the reviewer knows where to look.' : ''} Instead: make sure the PR is green (run "gh pr checks --watch --fail-fast" and report if it goes red), then ${patch({ status: 'pr_opened', prUrl: '<the PR url>' })} — Bug Hunter puts it in front of an admin as one click to merge, so leaving it green and open IS the finished outcome here. Finish with outcome "pr_opened" and say in your summary that it is ready to merge.`
-            : `9. Do NOT merge. This fix touches a guarded path (migrations, auth/permission gating, payments, or another security-sensitive service), which stays a reviewed PR regardless of who asked for it. Leave the PR open and finish with outcome "pr_opened", naming in your summary which guarded area it touches so the reviewer knows where to look.`,
+        : !botCanMergeHere
+          ? `9. Do NOT attempt to merge — you cannot, and trying wastes the end of your session. "${repo}"'s master requires an approving review and your token has push access only, so "gh pr merge --admin" has no admin rights to bypass it with and will fail. This is not a problem with your fix.${finding.touchesGuardedPath ? ' This fix also touches a guarded path (migrations, auth/permission gating, payments, or another security-sensitive service) — name in your summary which guarded area it touches so the reviewer knows where to look.' : ''} Instead: make sure the PR is green (run "gh pr checks --watch --fail-fast" and report if it goes red), then ${patch({ status: 'pr_opened', prUrl: '<the PR url>' })} — Bug Hunter puts it in front of an admin as one click to merge, so leaving it green and open IS the finished outcome here. Finish with outcome "pr_opened" and say in your summary that it is ready to merge.`
+          : `9. Do NOT merge. This fix touches a guarded path (migrations, auth/permission gating, payments, or another security-sensitive service), which stays a reviewed PR regardless of who asked for it. Leave the PR open and finish with outcome "pr_opened", naming in your summary which guarded area it touches so the reviewer knows where to look.`,
     `9a. Tell the notebook which of the entries step 0b returned actually changed what you did, and which proved wrong — send it even when both lists are empty: curl -sS -X POST "${memoryFeedbackUrl}" -H "Content-Type: application/json" ${authHeader} -d '{"runId":"${runId}","applied":["<entry id>"],"contradicted":[]}'`,
     `9b. If this fix taught you something the next session on "${repo}" should know — a trap around this code, a test that had to be written a particular way, a root cause that was not what the description said — write ONE entry, under 600 characters, for a stranger: curl -sS -X POST "${memoryWriteUrl}" -H "Content-Type: application/json" ${authHeader} -d '{"body":"<the lesson>","repos":["${repo}"],"tags":["fix-gotcha"],"runId":"${runId}","findingId":"${finding.id}"}'. Nothing learned is a valid answer; do not write the fix itself, the PR already says that.`,
     `10. Finally, ${phase('pr', 'finished')}, then close the run: curl -sS -X POST "${closeUrl}" -H "Content-Type: application/json" ${authHeader} -d '{"status":"completed","foundCount":1,"autoMergedCount":<1 if you merged else 0>,"prOpenedCount":<1 if you left a PR open or escalated else 0>,"dismissedCount":<1 if you dismissed or failed else 0>}'. Do this exactly once, whatever the outcome — a run left open looks to an admin like a session still working. After it, say in one sentence that you are done and STOP: run no further command, not even to "signal completion" — on some engines every command buys the model another turn, and the runner stops the engine the moment the run is closed.`,

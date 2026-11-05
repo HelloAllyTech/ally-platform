@@ -14,7 +14,7 @@ name: Build iOS Simulator (Flutter)
 
 defaults:
   run:
-    working-directory: ally-mobile-flutter
+    working-directory: ally-mobile
 
 on:
   workflow_dispatch:
@@ -70,6 +70,6 @@ jobs:
       - name: Upload Simulator .app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ally-mobile-flutter-ios-simulator
-          path: ally-mobile-flutter/build/ios/iphonesimulator/Runner.app
+          name: ally-mobile-ios-simulator
+          path: ally-mobile/build/ios/iphonesimulator/Runner.app
           retention-days: 14

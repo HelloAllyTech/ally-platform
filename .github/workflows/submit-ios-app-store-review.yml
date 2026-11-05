@@ -5,7 +5,7 @@
 name: Submit iOS for App Store review
 defaults:
   run:
-    working-directory: ally-mobile
+    working-directory: ally-mobile-rn-archive
 #
 # Manual-only, the highest-stakes workflow in this repo: submits the current App Store Connect
 # listing + latest TestFlight build for Apple's FULL App Store review — real public distribution,

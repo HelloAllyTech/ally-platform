@@ -47,11 +47,13 @@ permissions:
   pull-requests: write
 
 on:
-  # Nightly, staggered per repo so five sweeps do not hit ally-be's pipeline
+  # Nightly, staggered per repo so four sweeps do not hit ally-be's pipeline
   # endpoints and the model API in the same minute. Anchored so the first
   # sweep lands at 06:00 India (00:30 UTC), then twenty minutes apart:
-  # ally-be 00:30, ally-web 00:50, ally-ai 01:10, ally-ai-learn 01:30,
-  # ally-mobile 01:50 UTC.
+  # ally-be 00:30, ally-web 00:50, ally-ai 01:10, ally-ai-learn 01:30.
+  # ally-mobile is deliberately excluded (see the matrix below) —
+  # RN-shaped Jest/lint commands, stale since the Flutter rename, and no
+  # Flutter review has happened yet.
   schedule:
     - cron: "30 0 * * *"
 
@@ -109,7 +111,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        service: ${{ fromJSON(inputs.repo && format('["{0}"]', inputs.repo) || '["ally-be","ally-web","ally-ai","ally-ai-learn","ally-mobile"]') }}
+        service: ${{ fromJSON(inputs.repo && format('["{0}"]', inputs.repo) || '["ally-be","ally-web","ally-ai","ally-ai-learn"]') }}
     # One sweep per service at a time; a PR review or map run never waits on a sweep.
     concurrency:
       group: bug-hunt-sweep-${{ matrix.service }}-${{ inputs.mode || 'sweep' }}-${{ inputs.pr_number || 'all' }}
@@ -138,7 +140,7 @@ jobs:
           echo "Reviewing PR #${{ inputs.pr_number }} at $(git rev-parse --short HEAD)."
 
       - name: Setup Node.js
-        if: env.SERVICE == 'ally-be' || env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile'
+        if: env.SERVICE == 'ally-be' || env.SERVICE == 'ally-web'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.SERVICE == 'ally-be' && '24' || '22' }}

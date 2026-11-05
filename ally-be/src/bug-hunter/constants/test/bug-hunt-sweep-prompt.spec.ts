@@ -557,40 +557,20 @@ describe('buildSweepPrompt', () => {
       expect(mergeable()).not.toContain('gh pr merge --admin');
     });
 
-    it('tells a protected repo it cannot merge, separately from the mobile rule', () => {
+    it('tells a protected repo it cannot merge', () => {
       // Same fix as in the fix-session prompt: the sweep spent its Fix phase
       // opening PRs and then failing at a merge its token could never perform.
       const p = build({ repo: 'ally-be' });
       expect(p).toMatch(/Do not attempt to merge anything here/i);
       expect(p).toMatch(/push access only/i);
       expect(p).not.toMatch(/you may merge at most/i);
-      // The mobile reasoning must not leak onto a backend repo.
-      expect(p).not.toMatch(/frozen contract/i);
     });
   });
 
-  describe('ally-mobile: fixable, but never merged', () => {
-    const mobile = (
-      over: Partial<Parameters<typeof buildSweepPrompt>[0]> = {},
-    ) => build({ repo: 'ally-mobile', ...over });
-
-    it('still runs the finders and the fix phase, unlike a genuinely unfixable repo', () => {
-      expect(mobile()).toMatch(/TEST\/LINT/);
-      expect(mobile()).toMatch(/Apply the MINIMAL fix/);
-      expect(mobile()).toContain('pipeline/approved-findings');
-    });
-
-    it('forbids merging, however trivial the fix', () => {
-      const p = mobile();
-      expect(p).toMatch(/Never merge here/i);
-      expect(p).not.toContain('gh pr merge --admin');
-      expect(p).not.toMatch(/you may merge at most/i);
-      expect(p).not.toMatch(/genuinely trivial/i);
-    });
-
-    it('still closes the run', () => {
-      expect(mobile()).toContain('/close');
-    });
+  it('refuses ally-mobile: no entry in BUG_HUNT_REPOS since the Flutter rename (stays excluded)', () => {
+    expect(() => build({ repo: 'ally-mobile' })).toThrow(
+      /no test\/lint commands/i,
+    );
   });
 
   describe('the progress stages it advertises', () => {
@@ -605,7 +585,7 @@ describe('buildSweepPrompt', () => {
     ][] = [
       ['ally-be, AI', 'ally-be', BugHunterMode.AI],
       ['ally-be, MANUAL', 'ally-be', BugHunterMode.MANUAL],
-      ['ally-mobile (never merges)', 'ally-mobile', BugHunterMode.AI],
+      ['ally-ai-learn (self-merges)', 'ally-ai-learn', BugHunterMode.AI],
       ['ally-ai', 'ally-ai', BugHunterMode.AI],
       ['ally-web (unfixable)', 'ally-web', BugHunterMode.AI],
     ];

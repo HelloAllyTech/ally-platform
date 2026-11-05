@@ -1,7 +1,7 @@
 name: Promote iOS build to TestFlight external group
 defaults:
   run:
-    working-directory: ally-mobile
+    working-directory: ally-mobile-rn-archive
 #
 # On-demand only. Nothing calls this, and nothing should: every tester on this app is in
 # Internal Testers, who get each build straight from the TestFlight upload in

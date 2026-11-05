@@ -9,14 +9,19 @@ import {
 } from 'class-validator';
 
 /**
- * GitHub Actions workflow file names backing the ally-mobile automated
- * release pipeline, and the human labels the Mobile Releases admin page
- * shows for each. File names (not numeric workflow ids) are used because
- * GitHub's REST API accepts either interchangeably for these endpoints, and
- * a file name reads sanely in code without a lookup.
+ * GitHub Actions workflow file names backing the ally-mobile release
+ * pipeline, and the human labels the Mobile Releases admin page shows for
+ * each. File names (not numeric workflow ids) are used because GitHub's
+ * REST API accepts either interchangeably for these endpoints, and a file
+ * name reads sanely in code without a lookup.
+ *
+ * These are RN's workflows, now living in ally-mobile-rn-archive/ — kept
+ * runnable for a manual rollback build, not for anything that ships today.
+ * There is no Flutter equivalent of this run-history/promote/submit UI yet
+ * (Flutter's own release workflows are manual-dispatch with a different
+ * input shape); see mobile-releases.service.ts's top-level doc comment.
  */
 export const MOBILE_WORKFLOW_FILES = [
-  'scheduled-mobile-release.yml',
   'build-ios-production.yml',
   'build-android-production.yml',
   'promote-android-production.yml',
@@ -26,7 +31,6 @@ export const MOBILE_WORKFLOW_FILES = [
 export type MobileWorkflowFile = (typeof MOBILE_WORKFLOW_FILES)[number];
 
 export const MOBILE_WORKFLOW_LABELS: Record<MobileWorkflowFile, string> = {
-  'scheduled-mobile-release.yml': 'Scheduled Check',
   'build-ios-production.yml': 'iOS Build',
   'build-android-production.yml': 'Android Build',
   'promote-android-production.yml': 'Promote Android',
@@ -82,17 +86,23 @@ export class MobileReleaseRunsResponseDto {
 }
 
 export class MobileAndroidVersionDto {
-  @ApiProperty({ nullable: true, description: 'From android/app/build.gradle' })
+  @ApiProperty({
+    nullable: true,
+    description:
+      'Always null — Flutter computes the real versionCode per-build in ' +
+      "CI, not from a committed file the way RN's android/app/build.gradle " +
+      'used to provide one.',
+  })
   versionCode!: number | null;
 
-  @ApiProperty({ nullable: true, description: 'From android/app/build.gradle' })
+  @ApiProperty({ nullable: true, description: 'From ally-mobile/pubspec.yaml' })
   versionName!: string | null;
 }
 
 export class MobileIosVersionDto {
   @ApiProperty({
     nullable: true,
-    description: 'From ios/ally.xcodeproj/project.pbxproj',
+    description: 'From ally-mobile/pubspec.yaml',
   })
   marketingVersion!: string | null;
 }
@@ -103,35 +113,11 @@ export class MobileCurrentVersionResponseDto {
 
   @ApiProperty({ type: MobileIosVersionDto })
   ios!: MobileIosVersionDto;
-
-  @ApiProperty({
-    nullable: true,
-    description:
-      'Estimated ISO timestamp of the next daily 05:00 UTC tick at which ' +
-      'scheduled-mobile-release.yml is eligible to ship (48h+ since the ' +
-      'last android/app/build.gradle version bump). An estimate only: the ' +
-      'workflow still requires new commits on master and green tests at ' +
-      'that tick, neither of which this endpoint can know in advance. ' +
-      'null if the version-bump history could not be read.',
-  })
-  nextEligibleCheckAt!: string | null;
-}
-
-export class MobileTriggerResponseDto {
-  @ApiProperty({
-    description:
-      'true once scheduled-mobile-release.yml has been dispatched via the GitHub API',
-  })
-  dispatched!: boolean;
 }
 
 /**
- * Reused as-is for every other workflow-dispatch endpoint in this module
- * (promote-android, submit-ios-app-store-review, and formerly
- * promote-ios-testflight): shape is identical to MobileTriggerResponseDto
- * ({ dispatched: true }), but named generically here since "trigger"
- * specifically refers to scheduled-mobile-release.yml elsewhere in this
- * module.
+ * Shape shared by every workflow-dispatch endpoint in this module
+ * (promote-android, submit-ios-app-store-review).
  */
 export class MobileDispatchResponseDto {
   @ApiProperty({

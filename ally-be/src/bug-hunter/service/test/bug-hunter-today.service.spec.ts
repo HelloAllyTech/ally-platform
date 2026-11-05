@@ -132,7 +132,7 @@ describe('BugHunterTodayService', () => {
     });
     // every configured repo has a row even on a quiet day
     expect(board.repos.map((r) => r.repo)).toEqual(
-      expect.arrayContaining(['ally-ai', 'ally-ai-learn', 'ally-mobile']),
+      expect.arrayContaining(['ally-ai', 'ally-ai-learn', 'ally-web']),
     );
   });
 });
