@@ -16,6 +16,7 @@ import {
   useGetRoadmapVoteBudgetQuery,
   useGetRoadmapBreadthQuery,
   useGetRoadmapFacetsQuery,
+  useGetRoadmapIdeaDraftsQuery,
   useGetRoadmapInterviewNotesQuery,
   useGetRoadmapOpportunitiesQuery,
   useGetRoadmapProductGoalsQuery,
@@ -26,6 +27,7 @@ import {
   RoadmapBoardGroupBy,
   RoadmapBoardLayout,
   RoadmapBoardQuery,
+  RoadmapIdeaDraft,
   RoadmapOpportunitiesQuery,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
@@ -37,6 +39,7 @@ import { BreadthBadge, BreadthReadout } from "./BreadthBadge";
 import { BreadthPanel } from "./BreadthPanel";
 import { BugsTab } from "./BugsTab";
 import { BuilderSessionDrawer } from "./BuilderSessionDrawer";
+import { IdeaDraftsTab } from "./IdeaDraftsTab";
 import { InterviewsTab } from "./InterviewsTab";
 import { MonthBoard } from "./MonthBoard";
 import { NewToYouChip } from "./NewToYouChip";
@@ -136,6 +139,8 @@ enum RoadmapTab {
   INTERVIEWS = "interviews",
   /** Bug Hunter's table, read-only. See BugsTab for why it is mirrored here. */
   BUGS = "bugs",
+  /** The viewer's own saved raw ideas (see IdeaDraftsTab). Needs VOTE: the endpoints do. */
+  DRAFTS = "drafts",
 }
 
 /**
@@ -225,6 +230,8 @@ export const ProductRoadmap: React.FC = () => {
   const [order, setOrder] = useState<"ASC" | "DESC">("DESC");
   /** The guided interview — the way to file an opportunity from this page, for almost everyone. */
   const [isInterviewOpen, setIsInterviewOpen] = useState(false);
+  /** Set when the interview was opened from a saved draft, so it opens seeded with those words. */
+  const [interviewDraft, setInterviewDraft] = useState<RoadmapIdeaDraft | null>(null);
   /** The quick-add form — the other way, for holders of the quick-add toggle only. */
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
@@ -380,6 +387,7 @@ export const ProductRoadmap: React.FC = () => {
   const { data: facets } = useGetRoadmapFacetsQuery();
   // Counts only — the tab bodies own their own data. Cheap, and the tab strip needs them.
   const { data: interviews } = useGetRoadmapInterviewNotesQuery({ limit: 1 });
+  const { data: ideaDrafts } = useGetRoadmapIdeaDraftsQuery(undefined, { skip: !canVote });
   /**
    * Count only, and skipped entirely without the toggle — the same shape as the
    * two above. `limit: 1` rather than the table's `limit: 100`: this fires on
@@ -694,7 +702,10 @@ export const ProductRoadmap: React.FC = () => {
     // A pasted `?tab=bugs` from someone who holds the toggle must fall back for
     // someone who doesn't, rather than selecting a tab with no strip entry —
     // which would render the page with no tab underlined and no body.
-    (tab !== RoadmapTab.BUGS || canViewBugs);
+    (tab !== RoadmapTab.BUGS || canViewBugs) &&
+    // Drafts are private to the author and the endpoints need VOTE, so a viewer without it
+    // falls back instead of landing on a tab that can only 403.
+    (tab !== RoadmapTab.DRAFTS || canVote);
   /**
    * Queue and Opportunities are the same `?tab=` value split into two strip entries by which
    * view is applied. Queue-ness only overrides Opportunities — a reader on Bugs or User
@@ -1039,6 +1050,10 @@ export const ProductRoadmap: React.FC = () => {
                 },
               ]
             : []),
+          // The viewer's own parked ideas. Only for those who can file, since only they can save one.
+          ...(canVote
+            ? [{ id: RoadmapTab.DRAFTS, label: "My drafts", count: ideaDrafts?.count ?? 0 }]
+            : []),
           {
             id: RoadmapTab.INTERVIEWS,
             label: "User Interviews",
@@ -1048,6 +1063,15 @@ export const ProductRoadmap: React.FC = () => {
         activeId={activeTab}
         onChange={setTab}
       />
+
+      {activeTab === RoadmapTab.DRAFTS && canVote && (
+        <IdeaDraftsTab
+          onContinue={draft => {
+            setInterviewDraft(draft);
+            setIsInterviewOpen(true);
+          }}
+        />
+      )}
 
       {activeTab === RoadmapTab.INTERVIEWS && (
         <InterviewsTab canVote={canVote} canManage={canManage} currentUserId={user?.id} />
@@ -1250,13 +1274,20 @@ export const ProductRoadmap: React.FC = () => {
       */}
       {isInterviewOpen && (
         <OpportunityInterviewDrawer
-          onClose={() => setIsInterviewOpen(false)}
+          seed={interviewDraft?.rawText}
+          draftId={interviewDraft?.id}
+          onClose={() => {
+            setIsInterviewOpen(false);
+            setInterviewDraft(null);
+          }}
           onCreated={id => {
             setIsInterviewOpen(false);
+            setInterviewDraft(null);
             openOpportunity(id);
           }}
           onOpenExisting={id => {
             setIsInterviewOpen(false);
+            setInterviewDraft(null);
             openOpportunity(id);
           }}
         />
