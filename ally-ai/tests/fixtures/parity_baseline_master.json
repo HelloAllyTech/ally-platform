@@ -1,0 +1,784 @@
+{
+  "in-what-is-ally": {
+    "result": {
+      "intent": "answer",
+      "answer": "Ally is a not-for-profit platform that helps people who support others—counsellors, volunteers, teachers and peers—practise hard conversations and get support on the job. It includes tools such as Skills Lab (roleplay with virtual clients by voice or text, with an AI supervisor and a debrief) and Ally Assist (a scribe that transcribes real sessions and drafts notes), plus courses, cases and learning pathways.",
+      "language": "en",
+      "confidence": 0.93,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "5f5297ab-17c1-4485-8305-0ce5880a30cb",
+          "document_id": "6afbcba1-301c-46c8-86e7-1fcc13012b48",
+          "document_title": "Ally FAQ – About Ally",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.6856
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 7,
+        "top_similarity": 0.6856,
+        "passages_used": 4,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 19286
+  },
+  "in-get-access": {
+    "result": {
+      "intent": "answer",
+      "answer": "Ally is provided through partner organisations (a helpline, NGO, school or employer). If your organisation uses Ally, your trainer adds your email and you can sign in. If your organisation doesn’t use Ally, point them to www.helloally.ai or contact Ally yourself through the website. To sign in, enter your email and Ally will email a one-time security code (or choose Continue with Google); there is no password. You must be 18 or older to use Ally.",
+      "language": "en",
+      "confidence": 0.9,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "e6879d98-01be-4319-b55e-b464656d0d88",
+          "document_id": "41053646-499f-428a-aab0-e052c82d19a9",
+          "document_title": "Ally FAQ – Getting Access and Signing In",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.7207
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 7,
+        "top_similarity": 0.7207,
+        "passages_used": 2,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 12890
+  },
+  "in-assist-consent": {
+    "result": {
+      "intent": "answer",
+      "answer": "Yes. By starting Ally Assist you confirm that everyone being transcribed has given consent, and you should use it only for sessions your organization authorizes.",
+      "language": "en",
+      "confidence": 0.86,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "1542c23f-0056-48b4-9ebc-1bdb3242b171",
+          "document_id": "cca393fe-4da9-47c4-bdaa-6ab6cb463b71",
+          "document_title": "Ally FAQ – Ally Assist Scribe",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.6893
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 7,
+        "top_similarity": 0.6893,
+        "passages_used": 2,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 7159
+  },
+  "in-audio-stored": {
+    "result": {
+      "intent": "answer",
+      "answer": "No. For real sessions in Ally Assist, audio recordings are not stored — the audio is deleted after transcription.",
+      "language": "en",
+      "confidence": 0.9,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "6efe9eba-12f1-4584-9093-65ca902b5bfb",
+          "document_id": "88299893-4154-4f2f-a0f1-ed74815fefb2",
+          "document_title": "Ally FAQ – Privacy and Data",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.7129
+        },
+        {
+          "passage_number": 2,
+          "chunk_id": "1542c23f-0056-48b4-9ebc-1bdb3242b171",
+          "document_id": "cca393fe-4da9-47c4-bdaa-6ab6cb463b71",
+          "document_title": "Ally FAQ – Ally Assist Scribe",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.6916
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 7,
+        "top_similarity": 0.7129,
+        "passages_used": 2,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 6047
+  },
+  "in-roleplay": {
+    "result": {
+      "intent": "answer",
+      "answer": "You talk with a virtual client by voice or text while an AI supervisor follows the session, and you receive a debrief afterwards. The debrief is written by the AI from your session transcript, the clients are fictional, and you can pause or leave a roleplay without losing anything. Roleplays use simulation credits and do not provide certification or replace human-supervised training.",
+      "language": "en",
+      "confidence": 0.9,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "981fcc6c-408c-4106-9930-78e997da3427",
+          "document_id": "9ba9b749-9f12-4678-aa1a-4f8b15656643",
+          "document_title": "Ally FAQ – Skills Lab Practice",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.5675
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 1,
+        "top_similarity": 0.5675,
+        "passages_used": 1,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 7383
+  },
+  "in-real-clients": {
+    "result": {
+      "intent": "answer",
+      "answer": "No. In Skills Lab the clients are virtual—all scenarios are fictional and used for training. An AI supervisor follows the session and the debrief is written by AI, not a person.",
+      "language": "en",
+      "confidence": 0.93,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "981fcc6c-408c-4106-9930-78e997da3427",
+          "document_id": "9ba9b749-9f12-4678-aa1a-4f8b15656643",
+          "document_title": "Ally FAQ – Skills Lab Practice",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.4433
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 2,
+        "top_similarity": 0.4433,
+        "passages_used": 2,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 11526
+  },
+  "in-xp-levels": {
+    "result": {
+      "intent": "answer",
+      "answer": "You earn XP by practising. Levels come from practice minutes, completed sessions and course items; XP counts toward your level and is never taken away. Your progress page shows how much XP you need for the next level.",
+      "language": "en",
+      "confidence": 0.92,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "75bce59b-1b02-4e8f-abfe-252e82889ebb",
+          "document_id": "7e50d289-8d6a-43a9-bafb-df22b242d897",
+          "document_title": "Ally FAQ – Progress, Badges and Streaks",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.5923
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 2,
+        "top_similarity": 0.5923,
+        "passages_used": 1,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 7065
+  },
+  "in-report-problem": {
+    "result": {
+      "intent": "answer",
+      "answer": "Open the menu, choose “Report a problem,” and describe what you were trying to do.",
+      "language": "en",
+      "confidence": 0.9,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "feffa0ce-4d8a-4281-b8d2-4ee2e2086842",
+          "document_id": "416e79db-b780-4550-9cb5-42b2b00a57fe",
+          "document_title": "Ally FAQ – Help and Support",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.501
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 1,
+        "top_similarity": 0.501,
+        "passages_used": 1,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 5502
+  },
+  "out-weather": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 1487
+  },
+  "out-recipe": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 2554
+  },
+  "out-football": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 1180
+  },
+  "out-tax": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 3463
+  },
+  "lang-hindi": {
+    "result": {
+      "intent": "answer",
+      "answer": "Ally एक नॉन-प्रॉफिट प्लेटफ़ॉर्म है जो उन लोगों की मदद करता है जो दूसरों का समर्थन करते हैं—काउंसलर, स्वयंसेवक, शिक्षक और समकक्ष—ताकि वे कठिन बातचीत का अभ्यास कर सकें और काम पर समर्थन पा सकें। इसमें Skills Lab (वर्चुअल क्लाइंट के साथ रोलप्ले), Ally Assist (सेшин ट्रांसक्राइब और नोट ड्राफ्ट करना) और कोर्स/लर्निंग पाथवे शामिल हैं। ऐक्सेस आम तौर पर पार्टनर संस्थाओं (हेल्पलाइन, NGO, स्कूल, नियोक्ता) के माध्यम से मिलता है और उपयोगकर्ता कम से कम 18 वर्ष के होने चाहिए; Ally संकट सेवा नहीं है और आपातकाल के लिए नहीं है।",
+      "language": "hi",
+      "confidence": 0.84,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "5f5297ab-17c1-4485-8305-0ce5880a30cb",
+          "document_id": "6afbcba1-301c-46c8-86e7-1fcc13012b48",
+          "document_title": "Ally FAQ – About Ally",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.6897
+        },
+        {
+          "passage_number": 2,
+          "chunk_id": "e6879d98-01be-4319-b55e-b464656d0d88",
+          "document_id": "41053646-499f-428a-aab0-e052c82d19a9",
+          "document_title": "Ally FAQ – Getting Access and Signing In",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.6402
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 7,
+        "top_similarity": 0.6897,
+        "passages_used": 2,
+        "query_language": "hi",
+        "translated_query": "What is Ally and who is it for?",
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 11307
+  },
+  "lang-marathi": {
+    "result": {
+      "intent": "answer",
+      "answer": "स्किल्स लॅबमधील रोलप्ले तुम्ही व्हॉइस किंवा मजकूराद्वारे एका आभासी क्लायंटशी बोलून चालवता. सत्रादरम्यान AI सुपरवायझर सत्राचे अनुसरण करतो आणि नंतर सत्राच्या ट्रान्सक्रिप्टवरून AI कडून तुम्हाला डिब्रीफ दिले जाते. क्लायंट वास्तविक लोक नसतात, आणि तुम्ही कोणतेही रोलप्ले थांबवू किंवा सोडू शकता.",
+      "language": "mr",
+      "confidence": 0.92,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "981fcc6c-408c-4106-9930-78e997da3427",
+          "document_id": "9ba9b749-9f12-4678-aa1a-4f8b15656643",
+          "document_title": "Ally FAQ – Skills Lab Practice",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.5706
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 1,
+        "top_similarity": 0.5706,
+        "passages_used": 1,
+        "query_language": "mr",
+        "translated_query": "How does the role play in the skills lab work?",
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 15317
+  },
+  "lang-hinglish": {
+    "result": {
+      "intent": "answer",
+      "answer": "Nahin. Ally Assist real sessions ka audio store nahi karta — audio transcription banne ke baad audio delete kar diya jata hai.",
+      "language": "hi",
+      "confidence": 0.9,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "1542c23f-0056-48b4-9ebc-1bdb3242b171",
+          "document_id": "cca393fe-4da9-47c4-bdaa-6ab6cb463b71",
+          "document_title": "Ally FAQ – Ally Assist Scribe",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.7153
+        },
+        {
+          "passage_number": 2,
+          "chunk_id": "6efe9eba-12f1-4584-9093-65ca902b5bfb",
+          "document_id": "88299893-4154-4f2f-a0f1-ed74815fefb2",
+          "document_title": "Ally FAQ – Privacy and Data",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.6923
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 7,
+        "top_similarity": 0.7153,
+        "passages_used": 2,
+        "query_language": "hi",
+        "translated_query": "Does Ally Assist store the audio of my session?",
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 10084
+  },
+  "amb-help-client": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 8388
+  },
+  "amb-it-doesnt-work": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 1545
+  },
+  "gen-in-scope": {
+    "result": {
+      "intent": "answer",
+      "answer": "Ally Assist is an AI scribe that listens to real sessions, transcribes them, and drafts session notes in your organization’s format. You must have consent from everyone being transcribed; audio is not stored (it’s deleted after transcription), and the AI-generated notes can contain errors, so check and edit key details before saving.",
+      "language": "en",
+      "confidence": 0.94,
+      "citations": [
+        {
+          "passage_number": 1,
+          "chunk_id": "5f5297ab-17c1-4485-8305-0ce5880a30cb",
+          "document_id": "6afbcba1-301c-46c8-86e7-1fcc13012b48",
+          "document_title": "Ally FAQ – About Ally",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.684
+        },
+        {
+          "passage_number": 2,
+          "chunk_id": "1542c23f-0056-48b4-9ebc-1bdb3242b171",
+          "document_id": "cca393fe-4da9-47c4-bdaa-6ab6cb463b71",
+          "document_title": "Ally FAQ – Ally Assist Scribe",
+          "page_from": 0,
+          "page_to": 0,
+          "section_path": "",
+          "source_url": "",
+          "similarity": 0.6656
+        }
+      ],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 7,
+        "top_similarity": 0.684,
+        "passages_used": 4,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 10371
+  },
+  "gen-out-of-scope": {
+    "result": {
+      "intent": "answer",
+      "answer": "This is general information rather than from your documents. Active listening is a communication skill where the listener fully focuses on, understands, and responds to the speaker. It includes giving undivided attention, using supportive nonverbal cues (eye contact, nodding), reflecting or paraphrasing what the speaker said, asking brief clarifying questions, and avoiding interruption or judgment. Active listening helps the speaker feel heard, reduces misunderstandings, and strengthens trust and rapport.",
+      "language": "en",
+      "confidence": 0.9,
+      "citations": [],
+      "decline_reason": "none",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": true,
+        "translation_degraded": false
+      },
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 5960
+  },
+  "empty-selection": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 1892
+  },
+  "extra-other-tenant-doc": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 1254
+  },
+  "extra-follow-up": {
+    "result": {
+      "intent": "decline",
+      "answer": "",
+      "language": "en",
+      "confidence": 0.0,
+      "citations": [],
+      "decline_reason": "no_hits",
+      "retrieval": {
+        "top_k": 8,
+        "min_similarity": 0.35,
+        "decline_similarity": 0.42,
+        "hit_count": 0,
+        "top_similarity": 0.0,
+        "passages_used": 0,
+        "query_language": "en",
+        "translated_query": null,
+        "unsupported": false,
+        "translation_degraded": false
+      },
+      "provider": "",
+      "model": "",
+      "prompt_version": "v1"
+    },
+    "error": null,
+    "ms": 6159
+  }
+}
