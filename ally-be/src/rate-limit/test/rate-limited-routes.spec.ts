@@ -35,6 +35,7 @@ import { RoadmapAccessService } from 'src/product-roadmap/service/roadmap-access
 import { RoadmapAllocationService } from 'src/product-roadmap/service/roadmap-allocation.service';
 import { RoadmapBoardService } from 'src/product-roadmap/service/roadmap-board.service';
 import { RoadmapBuilderService } from 'src/product-roadmap/service/roadmap-builder.service';
+import { RoadmapMultiplierService } from 'src/product-roadmap/service/roadmap-multiplier.service';
 import { RoadmapOpportunityService } from 'src/product-roadmap/service/roadmap-opportunity.service';
 import { RoadmapSplitMergeService } from 'src/product-roadmap/service/roadmap-split-merge.service';
 import {
@@ -136,6 +137,7 @@ describe('Rate-limited routes', () => {
             useValue: { createBugReport },
           },
           { provide: RoadmapAllocationService, useValue: {} },
+          { provide: RoadmapMultiplierService, useValue: {} },
           { provide: RoadmapSplitMergeService, useValue: {} },
           { provide: RoadmapBuilderService, useValue: {} },
           { provide: RoadmapBoardService, useValue: {} },
