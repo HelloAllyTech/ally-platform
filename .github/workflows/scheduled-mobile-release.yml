@@ -1,0 +1,274 @@
+name: Scheduled mobile release
+defaults:
+  run:
+    working-directory: ally-mobile
+#
+# Runs daily, but only *acts* roughly every 2 days: bumps the Flutter app's marketing version,
+# commits and tags the bump on master, then dispatches the existing production build workflows
+# (build-android-production-flutter.yml, build-ios-production-flutter.yml) unchanged. Release
+# destination is unchanged too — the Play Store internal track (status completed, not a draft)
+# and TestFlight, same as the manual process those workflows already support.
+#
+# A daily check with an internal 48h-elapsed gate is used instead of a `*/2 * *` day-of-month
+# cron, which drifts at month boundaries and doesn't actually mean "every 2 days".
+#
+# "New commits since the last auto-release" alone isn't enough to release — a run of pure
+# chore/docs/ci/style/refactor/test commits has nothing a real user would notice, and burns an
+# App Store + Play Store review cycle (plus Slack noise) for no visible change. The cadence gate
+# additionally requires at least one conventional-commit `feat`/`fix` subject in range; anything
+# else-only skips, same as "no new commits" does today.
+#
+# confirm_store_identity on both build workflows is satisfied programmatically below
+# (com.helloally.app) — that input exists to stop a human from fat-fingering a dispatch during
+# the RN/Flutter cutover window; now that RN is gone and Flutter is the only app, there is no
+# ambiguity left for it to guard against, so the scheduler supplying the fixed string is correct,
+# not a bypass of anything meaningful.
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Skip the 48h/new-commits cadence gate (still requires green tests and the kill switch)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: scheduled-mobile-release
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          # The default GITHUB_TOKEN pushes as the "github-actions" app, which isn't on the
+          # "master: tests, types and lint must pass" ruleset's bypass list (only org admins/
+          # maintainers are) — its direct push of the version-bump commit gets rejected with
+          # "3 of 3 required status checks are expected", which can never be satisfied by a
+          # brand-new commit that was never itself pushed through a checked branch/PR. Using a
+          # PAT from an account with repo Maintain/Admin role instead makes the push authenticate
+          # as an already-bypass-listed identity. This step's checkout token only needs to cover
+          # the raw `git push`/`git tag` calls below — the gh CLI calls elsewhere in this job
+          # (workflow dispatch, run status reads) keep using the default GITHUB_TOKEN via the
+          # job-level GH_TOKEN env var, unaffected by this.
+          token: ${{ secrets.RELEASE_BOT_PAT }}
+
+      - name: Check kill switch
+        id: gate_enabled
+        run: |
+          if [ "${{ vars.AUTO_RELEASE_ENABLED }}" = "false" ]; then
+            echo "Automated release disabled via the AUTO_RELEASE_ENABLED repo variable. Skipping."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check cadence and new commits
+        id: gate_cadence
+        if: steps.gate_enabled.outputs.proceed == 'true'
+        run: |
+          set -e
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+            echo "force=true on a manual dispatch — skipping the cadence/new-commits gate."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A commit counts as user-facing for this gate when its subject is a conventional-commit
+          # `feat`/`fix` (with or without a scope) — chore/docs/ci/style/refactor/test/build/perf/
+          # revert don't, even though some of those (e.g. `perf`) can matter; keeping this to the
+          # two types users actually feel keeps the check simple and matches what the release
+          # notes step already highlights as the interesting part of a release.
+          #
+          # `-- .`: this runs in ally-mobile/ of the monorepo, and only the app's own commits
+          # count. Without it a backend `feat:` releases the app.
+          # --no-merges: PR merges are not work of their own.
+          has_meaningful_commit() {
+            git log --no-merges "$1" --pretty='%s' -- . | grep -v '^Merge pull request' | grep -qiE '^(feat|fix)(\(|:)'
+          }
+
+          LAST_TAG=$(git tag -l 'auto-release/*' --sort=-creatordate | head -1 || true)
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous auto-release tag found (first run)."
+            if has_meaningful_commit "-20"; then
+              echo "proceed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "No feat/fix commits in the last 20 commits. Skipping."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            LAST_SHA=$(git rev-list -n 1 "$LAST_TAG")
+            # The app's commits since the tag, not master's: master moves with every service.
+            APP_NEW=$(git log --no-merges --format=%H "$LAST_TAG..HEAD" -- . | head -1)
+            LAST_TS=$(git log -1 --format=%ct "$LAST_TAG")
+            NOW_TS=$(date +%s)
+            ELAPSED_H=$(( (NOW_TS - LAST_TS) / 3600 ))
+            echo "Last auto-release: $LAST_TAG ($LAST_SHA), ${ELAPSED_H}h ago"
+            if [ -z "$APP_NEW" ]; then
+              echo "No new ally-mobile commits on master since $LAST_TAG. Skipping."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            elif [ "$ELAPSED_H" -lt 48 ]; then
+              echo "Only ${ELAPSED_H}h since $LAST_TAG (need 48h). Skipping."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            elif ! has_meaningful_commit "$LAST_TAG..HEAD"; then
+              echo "Only chore/docs/ci/other commits since $LAST_TAG, no feat/fix. Skipping."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "proceed=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Check master tests are green
+        id: gate_tests
+        if: steps.gate_enabled.outputs.proceed == 'true' && steps.gate_cadence.outputs.proceed == 'true'
+        run: |
+          set -e
+          # The app's tests run only on master pushes that touch ally-mobile/, so master's
+          # head (often another service's commit) has no run at all. What ships is the app as
+          # of its newest commit, and a run on that exact app tree is the one that has to be green.
+          # Matched by tree rather than sha: a push that merges master forward lands the run on
+          # the merge commit, while `git log -- .` names the app commit beneath it.
+          APP_HEAD=$(git log -1 --format=%H -- .)
+          APP_TREE=$(git rev-parse "$APP_HEAD:./")
+          CONCLUSION=""
+          for row in $(gh run list --repo "${{ github.repository }}" --workflow test-ally-mobile.yml --branch master --limit 20 --json headSha,conclusion \
+            --jq '.[] | "\(.headSha):\(.conclusion)"'); do
+            sha=${row%%:*}
+            if [ "$(git rev-parse "$sha:./" 2>/dev/null)" = "$APP_TREE" ]; then
+              CONCLUSION=${row#*:}
+              break
+            fi
+          done
+          echo "Tests conclusion for $APP_HEAD (tree $APP_TREE): '$CONCLUSION'"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack - tests not green
+        if: steps.gate_enabled.outputs.proceed == 'true' && steps.gate_cadence.outputs.proceed == 'true' && steps.gate_tests.outputs.proceed == 'false'
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Scheduled mobile release skipped: the latest master commit does not have a green Tests run.'
+
+      - name: Compute next version
+        id: version
+        if: steps.gate_enabled.outputs.proceed == 'true' && steps.gate_cadence.outputs.proceed == 'true' && steps.gate_tests.outputs.proceed == 'true'
+        run: |
+          set -e
+          CURRENT_VERSION=$(grep '^version:' pubspec.yaml | sed -E 's/version: *([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "Bumping $CURRENT_VERSION -> $NEXT_VERSION"
+          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version file
+        if: steps.version.outputs.next_version != ''
+        run: |
+          set -e
+          NEXT_VERSION="${{ steps.version.outputs.next_version }}"
+          # Keeps whatever build-number suffix (+N) is already there — it's a placeholder RN's
+          # workflows never read anyway (see pubspec.yaml's own comment): the real build-time
+          # identifiers are computed fresh by each build workflow, not read from here.
+          sed -i -E "s/^version: [0-9]+\.[0-9]+\.[0-9]+/version: ${NEXT_VERSION}/" pubspec.yaml
+          grep -n '^version:' pubspec.yaml
+
+      - name: Generate release notes
+        id: notes
+        if: steps.version.outputs.next_version != ''
+        run: |
+          set -e
+          LAST_TAG=$(git tag -l 'auto-release/*' --sort=-creatordate | head -1 || true)
+          if [ -z "$LAST_TAG" ]; then
+            LOG=$(git log --no-merges -20 --pretty='%s' -- . | grep -v '^Merge pull request' || true)
+          else
+            LOG=$(git log --no-merges "$LAST_TAG"..HEAD --pretty='%s' -- . | grep -v '^Merge pull request' || true)
+          fi
+          # `head -c` caps the total byte stream regardless of newlines — Play Store rejects
+          # release notes over 500 characters per language, and several short commit-subject
+          # lines can add up past that even though each individually looks short.
+          NOTES=$(printf '%s\n' "$LOG" | sed 's/^/- /' | head -c 480)
+          {
+            echo "notes<<NOTES_EOF"
+            echo "$NOTES"
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Commit and tag version bump
+        if: steps.version.outputs.next_version != ''
+        run: |
+          set -e
+          git config user.name "ally-release-bot"
+          git config user.email "release-bot@helloally.ai"
+          git add pubspec.yaml
+          git commit -m "chore(release): bump version to ${{ steps.version.outputs.next_version }} [automated]"
+          git push origin HEAD:master
+          git tag "auto-release/${{ steps.version.outputs.next_version }}"
+          git push origin "auto-release/${{ steps.version.outputs.next_version }}"
+
+      - name: Trigger Android production build
+        if: steps.version.outputs.next_version != ''
+        # RELEASE_NOTES goes through env:, never ${{ }} straight into the run: script — commit
+        # subjects can contain double quotes, which breaks the shell's quoting when interpolated
+        # raw. Same safe pattern build-android-production-flutter.yml's own release_notes
+        # handling already uses.
+        env:
+          RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
+        run: |
+          gh workflow run build-android-production-flutter.yml --repo "${{ github.repository }}" --ref master \
+            -f confirm_store_identity="com.helloally.app" \
+            -f internal_track_status="completed" \
+            -f release_notes="$RELEASE_NOTES"
+
+      - name: Trigger iOS production build
+        if: steps.version.outputs.next_version != ''
+        run: |
+          gh workflow run build-ios-production-flutter.yml --repo "${{ github.repository }}" --ref master \
+            -f confirm_store_identity="com.helloally.app"
+
+      - name: Notify Slack - release triggered
+        if: steps.version.outputs.next_version != ''
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: "${{ (github.event_name == 'workflow_dispatch' && inputs.force == true) && 'Manually triggered' || 'Scheduled' }} mobile release: bumped to ${{ steps.version.outputs.next_version }}, triggered Android + iOS production builds."
+          attachments: |
+            [
+              {
+                "color": "good",
+                "fields": [
+                  {
+                    "title": "New version",
+                    "value": "${{ steps.version.outputs.next_version }}"
+                  },
+                  {
+                    "title": "Actions",
+                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions|View Actions>"
+                  }
+                ]
+              }
+            ]
+
+      - name: Write skip summary
+        if: steps.gate_enabled.outputs.proceed == 'false' || steps.gate_cadence.outputs.proceed == 'false'
+        run: echo "Scheduled mobile release skipped this run (see step logs for the reason)." >> "$GITHUB_STEP_SUMMARY"

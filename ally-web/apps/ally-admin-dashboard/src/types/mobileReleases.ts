@@ -1,19 +1,26 @@
 /**
- * The two remaining GitHub Actions workflows this run-history mechanism tracks. RN's own
- * build workflows ("iOS Build"/"Android Build") and ally-mobile-rn-archive/ itself were
- * deleted outright in the 2026-11 Flutter rename — the rollback purpose that folder was kept
- * for never got used. The automated scheduled-bump pipeline this used to also cover
- * ("Scheduled Check") was retired the same rename: it had no Flutter equivalent and isn't
- * being replaced. There is still no Flutter-build equivalent tracked here at all.
+ * The GitHub Actions workflows this run-history mechanism tracks. RN's own build workflows
+ * and ally-mobile-rn-archive/ itself were deleted outright in the 2026-11 Flutter rename — the
+ * rollback purpose that folder was kept for never got used. The automated scheduled-bump
+ * pipeline ("Scheduled Check") was retired the same rename for lack of a Flutter equivalent,
+ * then rebuilt (same workflow name, Flutter-targeted) once that equivalent existed — see
+ * scheduled-mobile-release.yml's own header comment. "iOS Build"/"Android Build" now track
+ * build-ios-production-flutter.yml / build-android-production-flutter.yml, which that
+ * scheduler dispatches and which also remain directly dispatchable by hand.
  *
  * "Promote Android" is the manually-triggered production-promotion workflow
  * (see triggerAndroidPromotion below) — pure Play Developer API orchestration with no
- * dependency on either app's source, so it kept working unchanged through the deletion.
+ * dependency on either app's source, so it kept working unchanged through the RN deletion.
  * iOS TestFlight-external promotion used to have a matching manual workflow/entry here too;
  * removed once submission became fully automatic and this org's actual testers turned out
  * to all be Internal, not External.
  */
-export type MobileReleaseWorkflowName = "Promote Android" | "App Store Review Submission";
+export type MobileReleaseWorkflowName =
+  | "Scheduled Check"
+  | "iOS Build"
+  | "Android Build"
+  | "Promote Android"
+  | "App Store Review Submission";
 
 /** GitHub Actions' own run-status values — not our own enum, so this stays a passthrough of their API. */
 export type MobileReleaseRunStatus = "queued" | "in_progress" | "completed";
@@ -45,9 +52,11 @@ export interface MobileReleaseRun {
 
 export interface MobileReleaseAndroidVersion {
   /**
-   * Always null — Flutter computes the real versionCode per-build in CI, not
-   * from a committed file the way RN's android/app/build.gradle used to
-   * provide one.
+   * From the live Play internal-track release name — Flutter computes the
+   * real versionCode per-build in CI, not from a committed file the way
+   * RN's android/app/build.gradle used to provide one. Null if the internal
+   * track has no release yet, or the backend's Android Publisher isn't
+   * configured.
    */
   versionCode: number | null;
   versionName: string;
@@ -61,9 +70,16 @@ export interface MobileReleaseIosVersion {
 export interface CurrentMobileVersionsResponse {
   android: MobileReleaseAndroidVersion;
   ios: MobileReleaseIosVersion;
+  /**
+   * Estimate of when the automated pipeline could next act — `null` when the
+   * backend has no estimate. Not a guarantee: the scheduled check still does
+   * nothing unless there are new commits by then, which the backend can't
+   * know in advance.
+   */
+  nextEligibleCheckAt: string | null;
 }
 
-/** Shared response shape for every workflow-dispatch mutation below ({ dispatched: boolean }). */
+/** POST /v1/mobile-releases/trigger — fires both platforms' build workflows immediately. */
 export interface TriggerMobileReleaseResponse {
   dispatched: boolean;
 }

@@ -70,9 +70,10 @@ describe('MobileReleasesService in the monorepo', () => {
 
     const version = await service.getCurrentVersion();
 
-    // versionCode is always null post-rename: Flutter's real versionCode is
-    // computed per-build by CI, not committed to source the way RN's
-    // build.gradle used to provide one.
+    // versionCode is null here because this test's config has no Android
+    // Publisher credentials — fetchAndroidInternalRelease() degrades to null
+    // rather than throwing (see its own .catch in getCurrentVersion). With
+    // real credentials it reads the live Play internal track instead.
     expect(version.android).toEqual({
       versionCode: null,
       versionName: '2.0.0',
