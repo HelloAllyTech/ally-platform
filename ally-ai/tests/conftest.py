@@ -54,6 +54,10 @@ os.environ.update(
         "HIPAA_AUDIT__ENABLE_CONSOLE_LOGS": "false",
         "ALLY_CORE__ENDPOINT": "localhost",
         "ALLY_CORE__API_KEY": "test",
+        # Pinned so a developer's .env with the Agents v2 runtime switched on cannot
+        # make the lifespan tests open a real Postgres checkpointer.
+        "AGENT_RUNTIME__ENABLED": "false",
+        "AGENT_RUNTIME__CHECKPOINT_DB_URL": "",
     }
 )
 
