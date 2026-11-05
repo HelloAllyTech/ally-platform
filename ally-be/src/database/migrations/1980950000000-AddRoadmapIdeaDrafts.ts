@@ -25,7 +25,9 @@ export class AddRoadmapIdeaDrafts1980950000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_roadmap_idea_drafts_owner"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_roadmap_idea_drafts_owner"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "roadmap_idea_drafts"`);
   }
 }
