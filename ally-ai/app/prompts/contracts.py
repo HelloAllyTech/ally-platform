@@ -286,7 +286,7 @@ class KnowledgeWhatsappAnswerInputs(PromptInputs):
     output_format: ClassVar[Optional[str]] = "structured"
 
     history: Optional[str] = None
-    max_chars: Optional[str] = None
+    max_chars: int
     passages: str
     question: str
 
@@ -307,7 +307,7 @@ class KnowledgeAnswerGeneralInputs(PromptInputs):
     output_format: ClassVar[Optional[str]] = "structured"
 
     history: Optional[str] = None
-    max_chars: Optional[str] = None
+    max_chars: int
     passages: str
     question: str
 

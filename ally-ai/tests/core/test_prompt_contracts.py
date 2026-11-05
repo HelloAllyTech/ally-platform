@@ -82,6 +82,27 @@ def test_available_variables_carry_required_flags_and_labels():
         PROMPT_CONTRACTS.pop("test_labelled_prompt", None)
 
 
+class TestMaxCharsTypeConsistency:
+    @pytest.mark.parametrize(
+        "prompt_code, expected_type",
+        [
+            ("ally_ai_knowledge_whatsapp_answer", int),
+            ("ally_ai_knowledge_answer_general", int),
+        ],
+    )
+    def test_max_chars_is_int_in_contract(self, prompt_code, expected_type):
+        model = PROMPT_CONTRACTS.get(prompt_code)
+        assert model is not None, f"Prompt contract for {prompt_code} not found"
+        # Check the type annotation directly using __annotations__
+        # For pydantic v2, model_fields provides the field info
+        max_chars_field = model.model_fields.get("max_chars")
+        assert max_chars_field is not None, "`max_chars` field not found in contract"
+        assert max_chars_field.annotation == expected_type, (
+            f"Expected max_chars in {prompt_code} to be {expected_type}, "
+            f"but found {max_chars_field.annotation}"
+        )
+
+
 @pytest.mark.parametrize("code", sorted(DEFAULTS))
 def test_default_contains_every_required_variable(code):
     used = set(PLACEHOLDER.findall(DEFAULTS[code]))
