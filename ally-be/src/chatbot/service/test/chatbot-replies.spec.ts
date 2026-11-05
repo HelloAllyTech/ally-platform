@@ -1,6 +1,9 @@
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { WaKeywordTemplate } from 'src/whatsapp/entity/wa-keyword-template.entity';
-import { WaTemplateKind, WaTemplateMatchType } from 'src/whatsapp/enum/whatsapp.enum';
+import {
+  WaTemplateKind,
+  WaTemplateMatchType,
+} from 'src/whatsapp/enum/whatsapp.enum';
 import { WhatsAppAdminService } from 'src/whatsapp/service/whatsapp-admin.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 
@@ -79,9 +82,10 @@ describe('Per-bot keyword replies', () => {
       expect(
         ChatbotReplyService.resolve(rows, OTHER_BOT).map((t) => t.id),
       ).toEqual(['crisis', 'greeting']);
-      expect(
-        ChatbotReplyService.resolve(rows, null).map((t) => t.id),
-      ).toEqual(['crisis', 'greeting']);
+      expect(ChatbotReplyService.resolve(rows, null).map((t) => t.id)).toEqual([
+        'crisis',
+        'greeting',
+      ]);
     });
 
     it('ignores a row that would switch a required reply off, however it was saved', () => {

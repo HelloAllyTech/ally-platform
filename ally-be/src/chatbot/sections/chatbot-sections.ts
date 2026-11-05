@@ -87,7 +87,8 @@ export const CHATBOT_SECTIONS: ChatbotSectionDefinition[] = [
   {
     key: 'messages',
     label: 'Messages',
-    description: 'What the bot says when it cannot answer, or cannot help this person.',
+    description:
+      'What the bot says when it cannot answer, or cannot help this person.',
     storage: 'settings',
     fields: [
       'declineText',
@@ -115,7 +116,8 @@ export const CHATBOT_SECTIONS: ChatbotSectionDefinition[] = [
   {
     key: 'access',
     label: 'Who can chat',
-    description: 'Anyone, any recognised Ally user, or only the people on the list.',
+    description:
+      'Anyone, any recognised Ally user, or only the people on the list.',
     storage: 'relation',
     fields: ['accessMode', 'audience'],
     editRole: 'editor',

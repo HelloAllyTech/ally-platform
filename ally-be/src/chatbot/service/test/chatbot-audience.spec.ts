@@ -24,7 +24,9 @@ describe('ChatbotAudienceService', () => {
 
   beforeEach(() => {
     entries = [];
-    service = new ChatbotAudienceService({ find: async () => entries } as never);
+    service = new ChatbotAudienceService({
+      find: async () => entries,
+    } as never);
   });
 
   const canChat = (accessMode: ChatbotAccessMode, who: ChatSender = sender) =>
@@ -60,13 +62,22 @@ describe('ChatbotAudienceService', () => {
 
   it('stores phones and emails in one comparable form', () => {
     expect(
-      ChatbotAudienceService.normaliseValue(ChatbotAudienceKind.PHONE, '+91 98765-43210'),
+      ChatbotAudienceService.normaliseValue(
+        ChatbotAudienceKind.PHONE,
+        '+91 98765-43210',
+      ),
     ).toBe('+919876543210');
     expect(
-      ChatbotAudienceService.normaliseValue(ChatbotAudienceKind.EMAIL, ' A@B.org '),
+      ChatbotAudienceService.normaliseValue(
+        ChatbotAudienceKind.EMAIL,
+        ' A@B.org ',
+      ),
     ).toBe('a@b.org');
     expect(() =>
-      ChatbotAudienceService.normaliseValue(ChatbotAudienceKind.PHONE, 'call me'),
+      ChatbotAudienceService.normaliseValue(
+        ChatbotAudienceKind.PHONE,
+        'call me',
+      ),
     ).toThrow(BadRequestException);
   });
 });

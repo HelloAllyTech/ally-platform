@@ -46,12 +46,14 @@ export class ConnectorService {
   ) {}
 
   types() {
-    return this.registry.list().map(({ type, label, description, capabilities }) => ({
-      type,
-      label,
-      description,
-      capabilities,
-    }));
+    return this.registry
+      .list()
+      .map(({ type, label, description, capabilities }) => ({
+        type,
+        label,
+        description,
+        capabilities,
+      }));
   }
 
   /** Called by a connector type once its own connect flow has succeeded. */
@@ -80,7 +82,9 @@ export class ConnectorService {
   }
 
   /** The live bot a connector serves, or null (unbound, or the bot is archived). */
-  async chatbotFor(connectorId: string | null | undefined): Promise<Chatbot | null> {
+  async chatbotFor(
+    connectorId: string | null | undefined,
+  ): Promise<Chatbot | null> {
     if (!connectorId) return null;
     const connector = await this.connectorRepository.findOne({
       where: { id: connectorId, deletedAt: IsNull() },
@@ -198,7 +202,9 @@ export class ConnectorService {
         summaries.set(id, summary);
       }
     }
-    const botIds = [...new Set(rows.map((r) => r.chatbotId).filter(Boolean))] as string[];
+    const botIds = [
+      ...new Set(rows.map((r) => r.chatbotId).filter(Boolean)),
+    ] as string[];
     const bots = botIds.length
       ? await this.chatbotRepository.find({
           where: { id: In(botIds) },

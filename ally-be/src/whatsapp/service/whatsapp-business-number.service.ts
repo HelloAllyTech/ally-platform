@@ -270,7 +270,9 @@ export class WhatsAppBusinessNumberService {
   }
 
   /** By connector, for the connector type's summaries. */
-  async findByConnectorIds(connectorIds: string[]): Promise<WaBusinessNumber[]> {
+  async findByConnectorIds(
+    connectorIds: string[],
+  ): Promise<WaBusinessNumber[]> {
     if (!connectorIds.length) return [];
     return this.numberRepository.find({
       where: { connectorId: In(connectorIds), deletedAt: IsNull() },
@@ -502,8 +504,12 @@ export class WhatsAppBusinessNumberService {
     return (await this.toViews([row]))[0];
   }
 
-  private async toViews(rows: WaBusinessNumber[]): Promise<WaBusinessNumberView[]> {
-    const connectorIds = rows.map((r) => r.connectorId).filter(Boolean) as string[];
+  private async toViews(
+    rows: WaBusinessNumber[],
+  ): Promise<WaBusinessNumberView[]> {
+    const connectorIds = rows
+      .map((r) => r.connectorId)
+      .filter(Boolean) as string[];
     const [tenantNames, lastInbound, connectorRows] = await Promise.all([
       this.tenantNames(rows.map((r) => r.tenantId).filter(Boolean) as string[]),
       this.lastInboundAt(rows.map((r) => r.id)),
@@ -514,15 +520,20 @@ export class WhatsAppBusinessNumberService {
           })
         : Promise.resolve([] as Connector[]),
     ]);
-    const botByConnector = new Map(connectorRows.map((c) => [c.id, c.chatbotId ?? null]));
-    const botIds = [...new Set([...botByConnector.values()].filter(Boolean))] as string[];
+    const botByConnector = new Map(
+      connectorRows.map((c) => [c.id, c.chatbotId ?? null]),
+    );
+    const botIds = [
+      ...new Set([...botByConnector.values()].filter(Boolean)),
+    ] as string[];
     const botNames = new Map<string, string>(
       botIds.length
         ? (
-            await this.numberRepository.manager.query<{ id: string; name: string }[]>(
-              `SELECT id, name FROM chatbots WHERE id = ANY($1::uuid[])`,
-              [botIds],
-            )
+            await this.numberRepository.manager.query<
+              { id: string; name: string }[]
+            >(`SELECT id, name FROM chatbots WHERE id = ANY($1::uuid[])`, [
+              botIds,
+            ])
           ).map((b) => [b.id, b.name])
         : [],
     );
@@ -534,7 +545,9 @@ export class WhatsAppBusinessNumberService {
         ...this.toView(row),
         chatbotId,
         chatbotName: chatbotId ? (botNames.get(chatbotId) ?? null) : null,
-        tenantName: row.tenantId ? (tenantNames.get(row.tenantId) ?? null) : null,
+        tenantName: row.tenantId
+          ? (tenantNames.get(row.tenantId) ?? null)
+          : null,
         lastInboundAt: lastInbound.get(row.id) ?? null,
       };
     });

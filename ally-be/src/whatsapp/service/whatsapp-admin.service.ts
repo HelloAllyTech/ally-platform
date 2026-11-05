@@ -180,7 +180,11 @@ export class WhatsAppAdminService {
     );
 
     const existing = await this.templateRepository.findOne({
-      where: { chatbotId, overridesTemplateId: global.id, archivedAt: IsNull() },
+      where: {
+        chatbotId,
+        overridesTemplateId: global.id,
+        archivedAt: IsNull(),
+      },
     });
     if (existing) {
       await this.templateRepository.update(

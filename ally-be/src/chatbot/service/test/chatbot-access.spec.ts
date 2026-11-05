@@ -26,20 +26,26 @@ describe('ChatbotAccessService', () => {
         find: jest.fn(async () => [{ chatbotId: 'bot-1' }]),
       } as never,
       {
-        resolveTenantIds: jest.fn(async () => (platformWide ? null : ['org-a'])),
+        resolveTenantIds: jest.fn(async () =>
+          platformWide ? null : ['org-a'],
+        ),
       } as never,
     );
   });
 
   it('lets a platform admin act on any bot as owner', async () => {
     platformWide = true;
-    await expect(service.assert('bot-1', ChatbotMemberRole.OWNER)).resolves.toMatchObject({
+    await expect(
+      service.assert('bot-1', ChatbotMemberRole.OWNER),
+    ).resolves.toMatchObject({
       role: ChatbotMemberRole.OWNER,
     });
   });
 
   it('hides a bot from someone who is not on it', async () => {
-    await expect(service.assert('bot-1')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.assert('bot-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('lets a viewer look but not change', async () => {

@@ -78,7 +78,8 @@ export class WhatsAppConversationController {
     @Query('search') search?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortDir') sortDir?: string,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
     await this.bot(chatbotId);
     return this.conversationService.listConversations({
@@ -108,7 +109,8 @@ export class WhatsAppConversationController {
       'pipe.',
   })
   async listLanguages(
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
     return this.conversationService.listLanguages(await this.bot(chatbotId));
   }
@@ -216,7 +218,8 @@ export class WhatsAppConversationController {
     @Query('to') to?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortDir') sortDir?: string,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
     await this.bot(chatbotId);
     return this.conversationService.listUnanswered({
@@ -284,7 +287,8 @@ export class WhatsAppConversationController {
   async overview(
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
     return this.conversationService.overview(
       from,
@@ -301,7 +305,8 @@ export class WhatsAppConversationController {
   async timeseries(
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
     return this.conversationService.timeseries(
       from,
@@ -324,7 +329,8 @@ export class WhatsAppConversationController {
   async languages(
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
     return this.conversationService.languages(
       from,
@@ -346,7 +352,8 @@ export class WhatsAppConversationController {
   async corpusCoverage(
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
     return this.conversationService.corpusCoverage(
       from,

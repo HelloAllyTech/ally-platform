@@ -85,7 +85,8 @@ export class WhatsAppAdminController {
   async listTemplates(
     @Query('kind') kind?: WaTemplateKind,
     @Query('includeArchived') includeArchived?: string,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
     return this.adminService.listTemplates(
       kind,
@@ -103,9 +104,13 @@ export class WhatsAppAdminController {
   @ApiResponse({ status: 400, description: 'No patterns, or an invalid regex' })
   async createTemplate(
     @Body() dto: CreateWaTemplateDto,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
-    return this.adminService.createTemplate(dto, await this.bot(chatbotId, true));
+    return this.adminService.createTemplate(
+      dto,
+      await this.bot(chatbotId, true),
+    );
   }
 
   @Post('templates/:id/customise')
@@ -149,9 +154,14 @@ export class WhatsAppAdminController {
   async updateTemplate(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateWaTemplateDto,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
-    return this.adminService.updateTemplate(id, dto, await this.bot(chatbotId, true));
+    return this.adminService.updateTemplate(
+      id,
+      dto,
+      await this.bot(chatbotId, true),
+    );
   }
 
   @Post('templates/:id/archive')
@@ -166,9 +176,13 @@ export class WhatsAppAdminController {
   })
   async archiveTemplate(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
-    return this.adminService.archiveTemplate(id, await this.bot(chatbotId, true));
+    return this.adminService.archiveTemplate(
+      id,
+      await this.bot(chatbotId, true),
+    );
   }
 
   @Post('templates/reorder')
@@ -184,9 +198,13 @@ export class WhatsAppAdminController {
   })
   async reorderTemplates(
     @Body() dto: ReorderWaTemplatesDto,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
-    return this.adminService.reorderTemplates(dto, await this.bot(chatbotId, true));
+    return this.adminService.reorderTemplates(
+      dto,
+      await this.bot(chatbotId, true),
+    );
   }
 
   @Post('templates/test')
@@ -202,9 +220,13 @@ export class WhatsAppAdminController {
   })
   async testTemplate(
     @Body() dto: TestWaTemplateDto,
-    @Query('chatbotId', new ParseUUIDPipe({ optional: true })) chatbotId?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
-    return this.adminService.testTemplate(dto, await this.bot(chatbotId, false));
+    return this.adminService.testTemplate(
+      dto,
+      await this.bot(chatbotId, false),
+    );
   }
 
   // ── settings ──────────────────────────────────────────────────────────

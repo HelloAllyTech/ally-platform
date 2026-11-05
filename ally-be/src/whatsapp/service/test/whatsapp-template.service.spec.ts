@@ -35,9 +35,7 @@ describe('ChatbotReplyService', () => {
 
   describe('normalise', () => {
     it('folds case, punctuation and whitespace', () => {
-      expect(ChatbotReplyService.normalise('  HELP!!  me?  ')).toBe(
-        'help me',
-      );
+      expect(ChatbotReplyService.normalise('  HELP!!  me?  ')).toBe('help me');
     });
 
     it('applies NFKC so full-width text folds to canonical form', () => {
@@ -53,9 +51,7 @@ describe('ChatbotReplyService', () => {
     });
 
     it('keeps digits', () => {
-      expect(ChatbotReplyService.normalise('PHQ-9 score')).toBe(
-        'phq 9 score',
-      );
+      expect(ChatbotReplyService.normalise('PHQ-9 score')).toBe('phq 9 score');
     });
   });
 

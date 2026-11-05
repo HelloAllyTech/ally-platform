@@ -421,10 +421,7 @@ export class WhatsAppInboundService {
         },
       );
       const template = (
-        await this.templateService.findByKind(
-          WaTemplateKind.CONSENT,
-          chatbotId,
-        )
+        await this.templateService.findByKind(WaTemplateKind.CONSENT, chatbotId)
       ).find((t) => t.patterns.some((p) => OPT_OUT_WORDS.has(p.toLowerCase())));
       await this.reply(
         contact,

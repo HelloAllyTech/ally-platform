@@ -51,7 +51,9 @@ export class ChatbotPersonaDto {
   @MaxLength(120)
   tone?: string;
 
-  @ApiPropertyOptional({ description: 'Sent before the first reply to a new person' })
+  @ApiPropertyOptional({
+    description: 'Sent before the first reply to a new person',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(1000)
@@ -302,7 +304,8 @@ export class TestChatbotDto {
   asTenantId?: string;
 
   @ApiPropertyOptional({
-    description: 'Also apply the "who can chat" check, as if you were the sender',
+    description:
+      'Also apply the "who can chat" check, as if you were the sender',
   })
   @IsOptional()
   @IsBoolean()

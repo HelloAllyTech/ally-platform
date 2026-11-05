@@ -1,7 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
@@ -223,7 +220,8 @@ export class ChatbotService {
     );
     const openBy = new Map(open.map((r) => [r.chatbot_id, Number(r.open)]));
     const out = new Map<string, ChatbotStats>();
-    for (const id of ids) out.set(id, { ...EMPTY_STATS, openUnanswered: openBy.get(id) ?? 0 });
+    for (const id of ids)
+      out.set(id, { ...EMPTY_STATS, openUnanswered: openBy.get(id) ?? 0 });
     for (const row of rows) {
       out.set(row.chatbot_id, {
         messages: Number(row.messages),
@@ -282,11 +280,14 @@ export class ChatbotService {
 
     const patch: Partial<Chatbot> = { updatedBy: currentUserId() };
     if (dto.name !== undefined) patch.name = dto.name.trim();
-    if (dto.description !== undefined) patch.description = dto.description?.trim() || null;
-    if (dto.persona !== undefined) patch.persona = { ...chatbot.persona, ...dto.persona };
+    if (dto.description !== undefined)
+      patch.description = dto.description?.trim() || null;
+    if (dto.persona !== undefined)
+      patch.persona = { ...chatbot.persona, ...dto.persona };
     if (dto.answerMode !== undefined) patch.answerMode = dto.answerMode;
     if (dto.accessMode !== undefined) patch.accessMode = dto.accessMode;
-    if (dto.knowledgeSource !== undefined) patch.knowledgeSource = dto.knowledgeSource;
+    if (dto.knowledgeSource !== undefined)
+      patch.knowledgeSource = dto.knowledgeSource;
     if (dto.model !== undefined) {
       patch.model = dto.model
         ? {
@@ -376,7 +377,10 @@ export class ChatbotService {
   }
 
   /** Replace the bot's document selection. Only knowledge-base documents that exist count. */
-  async setDocuments(id: string, documentIds: string[]): Promise<ChatbotDocumentView[]> {
+  async setDocuments(
+    id: string,
+    documentIds: string[],
+  ): Promise<ChatbotDocumentView[]> {
     await this.access.assert(id, ChatbotMemberRole.EDITOR);
     const unique = [...new Set(documentIds)];
     const existing = unique.length
@@ -396,7 +400,11 @@ export class ChatbotService {
       if (unique.length) {
         await manager.insert(
           ChatbotDocument,
-          unique.map((documentId) => ({ chatbotId: id, documentId, createdBy: userId })),
+          unique.map((documentId) => ({
+            chatbotId: id,
+            documentId,
+            createdBy: userId,
+          })),
         );
       }
     });
@@ -408,7 +416,12 @@ export class ChatbotService {
   async listMembers(id: string): Promise<ChatbotMemberView[]> {
     await this.access.assert(id);
     const rows = await this.chatbotRepository.manager.query<
-      { user_id: number; role: ChatbotMemberRole; name: string | null; email: string | null }[]
+      {
+        user_id: number;
+        role: ChatbotMemberRole;
+        name: string | null;
+        email: string | null;
+      }[]
     >(
       `SELECT m.user_id, m.role, u.name, u.email
          FROM chatbot_members m
@@ -425,17 +438,21 @@ export class ChatbotService {
     }));
   }
 
-  async setMembers(id: string, dto: SetChatbotMembersDto): Promise<ChatbotMemberView[]> {
+  async setMembers(
+    id: string,
+    dto: SetChatbotMembersDto,
+  ): Promise<ChatbotMemberView[]> {
     await this.access.assert(id, ChatbotMemberRole.OWNER);
     const byUser = new Map(dto.members.map((m) => [m.userId, m.role]));
     const userIds = [...byUser.keys()];
     if (userIds.length) {
-      const found = await this.chatbotRepository.manager.query<{ id: number }[]>(
-        `SELECT id FROM users WHERE id = ANY($1::int[])`,
-        [userIds],
-      );
+      const found = await this.chatbotRepository.manager.query<
+        { id: number }[]
+      >(`SELECT id FROM users WHERE id = ANY($1::int[])`, [userIds]);
       if (found.length !== userIds.length) {
-        throw new BadRequestException('Some of those people are not Ally users.');
+        throw new BadRequestException(
+          'Some of those people are not Ally users.',
+        );
       }
     }
     if (![...byUser.values()].includes(ChatbotMemberRole.OWNER)) {
@@ -473,7 +490,9 @@ export class ChatbotService {
 
     const bot: Chatbot = {
       ...chatbot,
-      persona: draft.persona ? { ...chatbot.persona, ...draft.persona } : chatbot.persona,
+      persona: draft.persona
+        ? { ...chatbot.persona, ...draft.persona }
+        : chatbot.persona,
       answerMode: draft.answerMode ?? chatbot.answerMode,
       model:
         draft.model === undefined
@@ -482,12 +501,16 @@ export class ChatbotService {
             ? { ...draft.model, temperature: draft.model.temperature ?? null }
             : null,
       settings: draft.settings ?? chatbot.settings,
-      accessMode: dto.checkAccess ? chatbot.accessMode : ChatbotAccessMode.ANYONE,
+      accessMode: dto.checkAccess
+        ? chatbot.accessMode
+        : ChatbotAccessMode.ANYONE,
     };
     const settings = await this.settingsService.getForChatbot(bot);
     const me = await this.chatbotRepository.manager.query<
       { id: number; email: string; tenant_id: string }[]
-    >(`SELECT id, email, tenant_id FROM users WHERE id = $1`, [currentUserId()]);
+    >(`SELECT id, email, tenant_id FROM users WHERE id = $1`, [
+      currentUserId(),
+    ]);
 
     const startedAt = Date.now();
     const decision = await this.engine.respond({

@@ -41,7 +41,9 @@ export class ChatbotAudienceService {
         const entries = await this.audienceRepository.find({
           where: { chatbotId: chatbot.id },
         });
-        return entries.some((entry) => ChatbotAudienceService.matches(entry, sender));
+        return entries.some((entry) =>
+          ChatbotAudienceService.matches(entry, sender),
+        );
       }
       default:
         return false;
@@ -56,7 +58,9 @@ export class ChatbotAudienceService {
       case ChatbotAudienceKind.USER:
         return sender.userId != null && String(sender.userId) === entry.value;
       case ChatbotAudienceKind.ORGANISATION:
-        return Boolean(sender.tenantId) && String(sender.tenantId) === entry.value;
+        return (
+          Boolean(sender.tenantId) && String(sender.tenantId) === entry.value
+        );
       case ChatbotAudienceKind.PHONE:
         return Boolean(sender.phone) && isSamePhone(sender.phone, entry.value);
       case ChatbotAudienceKind.EMAIL:

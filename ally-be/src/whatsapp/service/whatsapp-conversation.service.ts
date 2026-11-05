@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, Repository } from 'typeorm';
 import { CreateKbDocumentDto } from 'src/knowledge-base/dto/knowledge-base.dto';
@@ -554,7 +550,11 @@ export class WhatsAppConversationService {
       await this.conversationRepository.manager.query(
         `INSERT INTO chatbot_documents (chatbot_id, document_id, created_by)
          VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-        [conversation.chatbotId, document.id, Number(ExecutionManager.getUserId() ?? 0)],
+        [
+          conversation.chatbotId,
+          document.id,
+          Number(ExecutionManager.getUserId() ?? 0),
+        ],
       );
     }
 
@@ -594,7 +594,9 @@ export class WhatsAppConversationService {
   }
 
   timeseries(from?: string, to?: string, chatbotId?: string) {
-    return this.analyticsRepository.timeseries(this.window(from, to, chatbotId));
+    return this.analyticsRepository.timeseries(
+      this.window(from, to, chatbotId),
+    );
   }
 
   languages(from?: string, to?: string, chatbotId?: string) {
@@ -625,7 +627,9 @@ export class WhatsAppConversationService {
     const botDocumentIds = chatbotId
       ? new Set(
           (
-            await this.conversationRepository.manager.query<{ document_id: string }[]>(
+            await this.conversationRepository.manager.query<
+              { document_id: string }[]
+            >(
               `SELECT document_id FROM chatbot_documents WHERE chatbot_id = $1`,
               [chatbotId],
             )
@@ -649,17 +653,17 @@ export class WhatsAppConversationService {
     const rows = documents
       .filter((document) => !botDocumentIds || botDocumentIds.has(document.id))
       .map((document) => {
-      const citations = citedById.get(document.id) ?? 0;
-      // Removed as it is matched, so whatever remains in the map is genuinely orphaned.
-      citedById.delete(document.id);
-      return {
-        documentId: document.id,
-        title: document.title,
-        chunkCount: document.chunkCount,
-        citations,
-        isArchived: document.isArchived,
-      };
-    });
+        const citations = citedById.get(document.id) ?? 0;
+        // Removed as it is matched, so whatever remains in the map is genuinely orphaned.
+        citedById.delete(document.id);
+        return {
+          documentId: document.id,
+          title: document.title,
+          chunkCount: document.chunkCount,
+          citations,
+          isArchived: document.isArchived,
+        };
+      });
 
     // Whatever is left in the map was cited but is not in the corpus listing at all — the document
     // was hard-deleted. Named as such rather than dropped, so the totals still reconcile.

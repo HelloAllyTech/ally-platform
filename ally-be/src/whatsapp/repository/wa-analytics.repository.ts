@@ -142,9 +142,12 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
         direction: WaMessageDirection.OUTBOUND,
       })
       .andWhere('m.handled_by IS NOT NULL')
-      .andWhere(window.chatbotId ? conversationInBotSql('m.conversation_id') : '1=1', {
-        scopeBot: window.chatbotId,
-      })
+      .andWhere(
+        window.chatbotId ? conversationInBotSql('m.conversation_id') : '1=1',
+        {
+          scopeBot: window.chatbotId,
+        },
+      )
       .groupBy('bucket')
       .addGroupBy('m.handled_by')
       .orderBy('bucket', 'ASC')
@@ -185,9 +188,12 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
       .andWhere('m.handled_by IN (:...outcomes)', {
         outcomes: [WaHandledBy.RAG, WaHandledBy.DECLINED],
       })
-      .andWhere(window.chatbotId ? conversationInBotSql('m.conversation_id') : '1=1', {
-        scopeBot: window.chatbotId,
-      })
+      .andWhere(
+        window.chatbotId ? conversationInBotSql('m.conversation_id') : '1=1',
+        {
+          scopeBot: window.chatbotId,
+        },
+      )
       .setParameters({
         unknown: 'unknown',
         declined: WaHandledBy.DECLINED,

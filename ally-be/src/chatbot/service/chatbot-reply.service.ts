@@ -3,7 +3,10 @@ import { IsNull, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LoggerService } from '../../logger/logger.service';
 import { WaKeywordTemplate } from '../../whatsapp/entity/wa-keyword-template.entity';
-import { WaTemplateKind, WaTemplateMatchType } from '../../whatsapp/enum/whatsapp.enum';
+import {
+  WaTemplateKind,
+  WaTemplateMatchType,
+} from '../../whatsapp/enum/whatsapp.enum';
 
 /** The outcome of one matching pass. */
 export interface TemplateMatch {
@@ -16,9 +19,7 @@ export interface TemplateMatch {
 
 @Injectable()
 export class ChatbotReplyService {
-  private readonly logger = LoggerService.getInstance(
-    ChatbotReplyService.name,
-  );
+  private readonly logger = LoggerService.getInstance(ChatbotReplyService.name);
 
   constructor(
     @InjectRepository(WaKeywordTemplate)
@@ -182,7 +183,11 @@ export class ChatbotReplyService {
     );
     const overrides = new Map<string, WaKeywordTemplate>();
     for (const row of rows) {
-      if (!chatbotId || row.chatbotId !== chatbotId || !row.overridesTemplateId) {
+      if (
+        !chatbotId ||
+        row.chatbotId !== chatbotId ||
+        !row.overridesTemplateId
+      ) {
         continue;
       }
       const global = globals.get(row.overridesTemplateId);

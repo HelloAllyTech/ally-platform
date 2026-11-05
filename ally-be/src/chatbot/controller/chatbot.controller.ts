@@ -67,7 +67,10 @@ export class ChatbotController {
 
   @Get()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
-  @ApiOperation({ summary: 'Chatbots you can see, with their connectors and last-30-day activity' })
+  @ApiOperation({
+    summary:
+      'Chatbots you can see, with their connectors and last-30-day activity',
+  })
   async list() {
     return {
       chatbots: await this.chatbots.list(),
@@ -77,7 +80,9 @@ export class ChatbotController {
 
   @Post()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
-  @ApiOperation({ summary: 'Create a chatbot (platform admins). It starts as a draft.' })
+  @ApiOperation({
+    summary: 'Create a chatbot (platform admins). It starts as a draft.',
+  })
   create(@Body() dto: CreateChatbotDto) {
     return this.chatbots.create(dto);
   }
@@ -91,21 +96,29 @@ export class ChatbotController {
   @Patch(':id')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Change name, persona, modes or model' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateChatbotDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateChatbotDto,
+  ) {
     return this.chatbots.update(id, dto);
   }
 
   @Patch(':id/status')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Go live, pause, or back to draft' })
-  setStatus(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetChatbotStatusDto) {
+  setStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetChatbotStatusDto,
+  ) {
     return this.chatbots.setStatus(id, dto.status);
   }
 
   @Post(':id/archive')
   @HttpCode(204)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
-  @ApiOperation({ summary: 'Archive a chatbot; its connectors are freed for another bot' })
+  @ApiOperation({
+    summary: 'Archive a chatbot; its connectors are freed for another bot',
+  })
   async archive(@Param('id', ParseUUIDPipe) id: string) {
     await this.chatbots.archive(id);
   }
@@ -145,7 +158,9 @@ export class ChatbotController {
 
   @Put(':id/documents')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
-  @ApiOperation({ summary: 'Replace the library documents this bot answers from' })
+  @ApiOperation({
+    summary: 'Replace the library documents this bot answers from',
+  })
   setDocuments(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetChatbotDocumentsDto,
@@ -182,7 +197,9 @@ export class ChatbotController {
 
   @Post(':id/audience')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
-  @ApiOperation({ summary: 'Add people, organisations, phones or emails who may chat' })
+  @ApiOperation({
+    summary: 'Add people, organisations, phones or emails who may chat',
+  })
   async addAudience(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AddChatbotAudienceDto,

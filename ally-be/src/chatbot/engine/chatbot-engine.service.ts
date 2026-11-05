@@ -45,7 +45,15 @@ const GENERAL_ANSWER_PROMPT_CODE = 'ally_ai_knowledge_answer_general';
 const NO_DOCUMENTS = '00000000-0000-0000-0000-000000000000';
 
 /** Words that make a command reply the "say hello" reply (the shared Greeting). */
-const GREETING_WORDS = new Set(['hi', 'hello', 'hey', 'hii', 'namaste', 'hola', 'good morning']);
+const GREETING_WORDS = new Set([
+  'hi',
+  'hello',
+  'hey',
+  'hii',
+  'namaste',
+  'hola',
+  'good morning',
+]);
 
 /** The shared reply to a bare hello: a command reply triggered by greeting words. */
 export const isGreetingReply = (template: {
@@ -107,7 +115,9 @@ export class ChatbotEngineService {
       chatbot.id,
     );
     const usable =
-      match && match.bypassRag && (allowed || match.template.kind !== WaTemplateKind.FAQ);
+      match &&
+      match.bypassRag &&
+      (allowed || match.template.kind !== WaTemplateKind.FAQ);
     if (match && usable) {
       const isCrisis = match.template.kind === WaTemplateKind.CRISIS;
       // A bot with its own welcome message greets with THAT, not the generic shared greeting —
@@ -370,9 +380,7 @@ export class ChatbotEngineService {
    */
   private async knowledgeFor(
     turn: ChatTurn,
-  ): Promise<
-    Pick<KnowledgeAnswerRequest, 'audience' | 'document_ids'>
-  > {
+  ): Promise<Pick<KnowledgeAnswerRequest, 'audience' | 'document_ids'>> {
     if (turn.chatbot.knowledgeSource === ChatbotKnowledgeSource.ORGANISATION) {
       const audience: KnowledgeAudienceRequest = {
         tenant_id: turn.sender.tenantId ?? null,
@@ -433,11 +441,13 @@ export class ChatbotEngineService {
         if (content) {
           entry.prompt = content;
           ran.prompt_versions[row.promptCode] = row.version ?? null;
-          if (row.contentHash) ran.prompt_hashes[row.promptCode] = row.contentHash;
+          if (row.contentHash)
+            ran.prompt_hashes[row.promptCode] = row.contentHash;
         }
         if (row.provider) entry.provider = row.provider;
         if (row.model) entry.model = row.model;
-        if (typeof row.temperature === 'number') entry.temperature = row.temperature;
+        if (typeof row.temperature === 'number')
+          entry.temperature = row.temperature;
         if (row.availableVariables) {
           entry.availableVariables = row.availableVariables;
         }
@@ -463,7 +473,8 @@ export class ChatbotEngineService {
           provider: model.provider,
           model: model.model,
         };
-        if (typeof model.temperature === 'number') next.temperature = model.temperature;
+        if (typeof model.temperature === 'number')
+          next.temperature = model.temperature;
         else delete next.temperature;
         prompts = { ...prompts, [code]: next };
       }

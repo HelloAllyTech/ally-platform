@@ -298,9 +298,9 @@ class KnowledgeAnswerGeneralInputs(PromptInputs):
         code="ally_ai_knowledge_answer_general",
         name="Chatbot Answer (documents + general knowledge)",
         description=(
-            "Answers a chatbot question from the bot's documents first and, when they do "
-            "not cover it, from general knowledge — saying so. Used only by bots set to "
-            "'Documents + general knowledge'."
+            "Answers a chatbot question from the bot's documents first and, when "
+            "they do not cover it, from general knowledge, saying so. Used only by "
+            "bots set to 'Documents + general knowledge'."
         ),
     )
 

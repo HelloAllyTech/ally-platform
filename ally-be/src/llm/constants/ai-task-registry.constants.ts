@@ -1107,7 +1107,8 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'whatsapp-answer',
     task: null,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Someone asks a chatbot a question (WhatsApp, or the test console)',
+    trigger:
+      'Someone asks a chatbot a question (WhatsApp, or the test console)',
     detail:
       'Answers from the bot’s documents, or declines — or, for a bot in "documents + general ' +
       'knowledge" mode, answers generally and says so. A bot may pick its own model from the ' +

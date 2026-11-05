@@ -352,7 +352,11 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
   it('gives FAQ keyword replies only to people the bot is for', async () => {
     templateService.match.mockResolvedValue({
       bypassRag: true,
-      template: { id: 'faq-1', kind: WaTemplateKind.FAQ, responseText: 'Internal FAQ' },
+      template: {
+        id: 'faq-1',
+        kind: WaTemplateKind.FAQ,
+        responseText: 'Internal FAQ',
+      },
     });
 
     await service.handle(inbound('leave policy'));
@@ -471,7 +475,8 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
   });
 
   describe("on a bot's own number", () => {
-    const onNumber = () => service.handle({ ...inbound(), phoneNumberId: 'org-number' });
+    const onNumber = () =>
+      service.handle({ ...inbound(), phoneNumberId: 'org-number' });
 
     beforeEach(() => {
       numberService.resolveForInbound.mockResolvedValue({
@@ -481,13 +486,18 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
         creds: { phoneNumberId: 'org-number', accessToken: 'org-token' },
       });
       contact = { ...contact, businessNumberId: 'number-1' };
-      audienceRows = [{ kind: ChatbotAudienceKind.ORGANISATION, value: TENANT_A }];
+      audienceRows = [
+        { kind: ChatbotAudienceKind.ORGANISATION, value: TENANT_A },
+      ];
       documentRows = [{ documentId: 'doc-1' }, { documentId: 'doc-2' }];
       aiService.answerKnowledgeQuestion.mockResolvedValue(ANSWER);
     });
 
     it('answers with the bot the number is bound to', async () => {
-      identityService.identify.mockResolvedValue({ ...contact, tenantId: TENANT_A });
+      identityService.identify.mockResolvedValue({
+        ...contact,
+        tenantId: TENANT_A,
+      });
 
       await onNumber();
 
@@ -501,7 +511,10 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
     it("answers only from the bot's own documents", async () => {
       // Always the explicit list: ally-ai reads an omitted list as "search everything".
-      identityService.identify.mockResolvedValue({ ...contact, tenantId: TENANT_A });
+      identityService.identify.mockResolvedValue({
+        ...contact,
+        tenantId: TENANT_A,
+      });
 
       await onNumber();
 
@@ -511,17 +524,25 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
     });
 
     it('searches nothing for a bot with no documents, never the whole library', async () => {
-      identityService.identify.mockResolvedValue({ ...contact, tenantId: TENANT_A });
+      identityService.identify.mockResolvedValue({
+        ...contact,
+        tenantId: TENANT_A,
+      });
       documentRows = [];
 
       await onNumber();
 
       const request = aiService.answerKnowledgeQuestion.mock.calls[0][0];
-      expect(request.document_ids).toEqual(['00000000-0000-0000-0000-000000000000']);
+      expect(request.document_ids).toEqual([
+        '00000000-0000-0000-0000-000000000000',
+      ]);
     });
 
     it('refuses someone who is not on the bot’s list, in the bot’s own words', async () => {
-      identityService.identify.mockResolvedValue({ ...contact, tenantId: TENANT_B });
+      identityService.identify.mockResolvedValue({
+        ...contact,
+        tenantId: TENANT_B,
+      });
 
       await onNumber();
 
@@ -534,7 +555,11 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
         ...ACME_BOT,
         accessMode: ChatbotAccessMode.ANYONE,
         persona: { displayName: 'Ava', systemPrompt: 'Be brief.' },
-        model: { provider: 'gemini', model: 'gemini-2.5-flash', temperature: 0.2 },
+        model: {
+          provider: 'gemini',
+          model: 'gemini-2.5-flash',
+          temperature: 0.2,
+        },
       });
 
       await onNumber();
@@ -584,13 +609,19 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
           id: 'greet',
           kind: WaTemplateKind.COMMAND,
           patterns: ['hi', 'hello'],
-          responseText: 'Hello. Ask me a question about our reference material.',
+          responseText:
+            'Hello. Ask me a question about our reference material.',
         },
       });
 
-      await service.handle({ ...inbound('Hello'), phoneNumberId: 'org-number' });
+      await service.handle({
+        ...inbound('Hello'),
+        phoneNumberId: 'org-number',
+      });
 
-      expect(sentBody()).toBe(`Hi, I am Ava.\n\n${DEFAULT_WHATSAPP_SETTINGS.disclaimerText}`);
+      expect(sentBody()).toBe(
+        `Hi, I am Ava.\n\n${DEFAULT_WHATSAPP_SETTINGS.disclaimerText}`,
+      );
     });
 
     it('adds nothing to a returning person’s reply', async () => {
@@ -614,7 +645,11 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       contact = { ...contact, messageCount: 0 };
       templateService.match.mockResolvedValue({
         bypassRag: true,
-        template: { id: 't', kind: WaTemplateKind.CRISIS, responseText: 'Call now.' },
+        template: {
+          id: 't',
+          kind: WaTemplateKind.CRISIS,
+          responseText: 'Call now.',
+        },
       });
 
       await onNumber();

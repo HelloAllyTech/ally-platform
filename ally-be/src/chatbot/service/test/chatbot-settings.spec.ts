@@ -1,5 +1,8 @@
 import { DEFAULT_WHATSAPP_SETTINGS } from 'src/whatsapp/type/whatsapp-settings.type';
-import { ChatbotSettingsService, cleanOverride } from '../chatbot-settings.service';
+import {
+  ChatbotSettingsService,
+  cleanOverride,
+} from '../chatbot-settings.service';
 
 jest.mock('src/common/execution/execution-manager', () => ({
   ExecutionManager: { getUserId: () => 7, getExecutionId: () => undefined },
@@ -65,7 +68,11 @@ describe('ChatbotSettingsService', () => {
 
   it('treats a cleared field as "follow the default"', () => {
     expect(
-      cleanOverride({ declineText: '  ', helplineNumbers: '112', rateLimit: {} }),
+      cleanOverride({
+        declineText: '  ',
+        helplineNumbers: '112',
+        rateLimit: {},
+      }),
     ).toEqual({ helplineNumbers: '112' });
   });
 
