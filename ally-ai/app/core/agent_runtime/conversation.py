@@ -111,5 +111,6 @@ async def agent_step(
         provider=provider,
         model=model,
         temperature=temperature if temperature is not None else 0.0,
+        reasoning_effort=settings.AGENT_RUNTIME.AGENT_REASONING_EFFORT,
     )
     return parsed.model_dump(mode="json"), dict(meta or {})

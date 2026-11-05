@@ -142,6 +142,10 @@ class AgentRuntimeSettings(BaseModel):
     # Conversational agent (`features.agent`): tool calls allowed per run. Past this
     # the agent must reply with what it has, or decline.
     MAX_TOOL_CALLS: int = Field(4, ge=0, le=8)
+    # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and
+    # o-series; ignored for others). Unset = the provider default ("medium"). The
+    # latency lever if the agent step is too slow; see CHUNK-03A-NOTES.md.
+    AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = None
 
 
 class HelplineSettings(BaseModel):

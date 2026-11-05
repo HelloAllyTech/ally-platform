@@ -362,3 +362,23 @@ class TestFlag:
         assert state["tool_calls"] is None
         assert state["turn_type"] is None
         assert nodes(state) == ["translate", "retrieve", "gate", "finalize"]
+
+
+class TestReasoningEffort:
+    """AGENT_RUNTIME__AGENT_REASONING_EFFORT reaches the agent step, and only it."""
+
+    async def test_unset_sends_none(self, agent_run, chunk_service, monkeypatch):
+        # Explicitly unset: a developer's ally-ai/.env may set it.
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "AGENT_REASONING_EFFORT", None)
+        llm = FakeLLM(turn("smalltalk"), reply("smalltalk", "Hi!"))
+        await agent_run("hi", llm)
+        assert llm.agent_calls[0]["reasoning_effort"] is None
+
+    async def test_setting_reaches_the_agent_step_only(
+        self, agent_run, chunk_service, monkeypatch
+    ):
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "AGENT_REASONING_EFFORT", "low")
+        llm = FakeLLM(turn("smalltalk"), reply("smalltalk", "Hi!"))
+        await agent_run("hi", llm)
+        assert llm.agent_calls[0]["reasoning_effort"] == "low"
+        assert "reasoning_effort" not in llm.calls[0]  # contextualise
