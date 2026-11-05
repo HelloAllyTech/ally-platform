@@ -59,7 +59,7 @@ const goodBrief = {
   ],
   repos: [
     { repo: 'ally-web', why: 'the web debrief' },
-    { repo: 'ally-mobile', why: 'the mobile DebriefTab' },
+    { repo: 'ally-ai', why: 'the retrieval side' },
     { repo: 'ally-web', why: 'twice' },
     { repo: 'not-a-repo', why: 'x' },
   ],
@@ -96,7 +96,7 @@ describe('the situation brief', () => {
       brief.lines
         .filter((line) => line.kind === 'repo')
         .map((line) => line.repo),
-    ).toEqual(['ally-web', 'ally-mobile']);
+    ).toEqual(['ally-web', 'ally-ai']);
     expect(brief.id).toBeTruthy();
   });
 

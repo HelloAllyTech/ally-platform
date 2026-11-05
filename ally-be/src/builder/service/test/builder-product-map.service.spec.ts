@@ -146,7 +146,7 @@ describe('BuilderProductMapService', () => {
     expect(text).not.toContain('Done.');
     expect(text).toMatch(/### ally-ai-learn\n\nNo usable knowledge pack/);
     // A repo with no row at all reads the same way.
-    expect(text).toMatch(/### ally-mobile\n\nNo usable knowledge pack/);
+    expect(text).toMatch(/### ally-be\n\nNo usable knowledge pack/);
   });
 
   it('keeps the head of a long pack and marks the cut', async () => {

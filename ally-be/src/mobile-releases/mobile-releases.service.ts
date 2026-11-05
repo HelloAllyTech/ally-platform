@@ -20,21 +20,15 @@ import {
   MobileCurrentVersionResponseDto,
   MobileDispatchResponseDto,
   MobileReleaseRunDto,
-  MobileTriggerResponseDto,
   MobileWorkflowFile,
   WhatsNewSuggestionResponseDto,
 } from './dto/mobile-releases.dto';
 
 const GITHUB_API = 'https://api.github.com';
-const RELEASE_WORKFLOW_FILE: MobileWorkflowFile =
-  'scheduled-mobile-release.yml';
 const PROMOTE_ANDROID_WORKFLOW_FILE: MobileWorkflowFile =
   'promote-android-production.yml';
 const SUBMIT_IOS_APP_STORE_REVIEW_WORKFLOW_FILE: MobileWorkflowFile =
   'submit-ios-app-store-review.yml';
-const MS_PER_HOUR = 60 * 60 * 1000;
-const CADENCE_GATE_HOURS = 48;
-const DAILY_CHECK_UTC_HOUR = 5; // matches scheduled-mobile-release.yml's `cron: '0 5 * * *'`
 
 const APPSTORE_CONNECT_API = 'https://api.appstoreconnect.apple.com/v1';
 const APPSTORE_BUNDLE_ID = 'com.helloally.app';
@@ -176,6 +170,12 @@ export class MobileReleasesService {
    * `ally-mobile/` folder of the monorepo (GITHUB_MONOREPO): its workflows,
    * its version files and every release from then on are there. With no
    * monorepo configured, the app's own repo, as before.
+   *
+   * That folder held the React Native app until the Flutter rename — it now
+   * holds the Flutter app that took over the same store identity
+   * (`com.helloally.app`). RN itself moved to `ally-mobile-rn-archive/`,
+   * kept for a manual rollback build only (see `ally-mobile/docs/RELEASE.md`'s
+   * Rollback section) and deliberately untouched by this service.
    */
   private get repo(): string {
     const monorepo = this.configService.githubMonorepo;
@@ -190,22 +190,16 @@ export class MobileReleasesService {
   }
 
   /**
-   * `ally-mobile-flutter`'s folder in `repo` — born in the monorepo at the
-   * 2026-10-23 cutover, so unlike `folder` there's no pre-monorepo case.
-   * Both platforms' store-identity (`com.helloally.app`) builds now come
-   * from here, not from `ally-mobile` (RN) — see getCurrentVersion()'s doc
-   * comment for why that app's own build.gradle/pbxproj no longer reflect
-   * what's actually live.
-   */
-  private get flutterFolder(): string {
-    return 'ally-mobile-flutter/';
-  }
-
-  /**
    * The app's own repo (GITHUB_MOBILE_REPO), archived at the cutover. Read
    * only for what happened before it — run history, and the version bumps
    * from before the first one in the monorepo — so the release page and the
    * What's New draft keep their past instead of starting empty on 10-23.
+   *
+   * This is the standalone pre-monorepo `HelloAllyTech/ally-mobile` GitHub
+   * repo (RN's own repo, archived read-only at the GitHub-org level before
+   * the 2026-10-23 monorepo cutover) — unrelated to, and unaffected by, the
+   * later in-monorepo archive-and-rename that moved `ally-mobile/` to
+   * `ally-mobile-rn-archive/`.
    */
   private get legacyRepo(): string {
     return this.configService.githubMobileRepo;
@@ -234,12 +228,12 @@ export class MobileReleasesService {
   }
 
   /**
-   * Recent runs of all three release workflows, merged into one array and
+   * Recent runs of all of MOBILE_WORKFLOW_FILES, merged into one array and
    * sorted by createdAt descending.
    *
    * Uses allSettled, not all: this is polled every 30s from the admin page,
    * and GitHub's REST API occasionally throws a transient secondary-rate-limit
-   * 403 on one of the three parallel per-workflow calls. With Promise.all,
+   * 403 on one of the parallel per-workflow calls. With Promise.all,
    * that one flaky call used to fail the whole merged list — which the
    * frontend's polling then rendered as a "Failed to load run history"
    * screen replacing an otherwise-healthy table every time it happened. A
@@ -353,76 +347,45 @@ export class MobileReleasesService {
   }
 
   /**
-   * Live version info from `master`. Since the Flutter cutover both
-   * platforms' store-identity (`com.helloally.app`) builds come from
-   * `ally-mobile-flutter/pubspec.yaml`'s single `version:` field (its own
-   * comment: "Marketing version ... sits above every React Native
-   * release" — one field drives both `CFBundleShortVersionString` and
-   * `versionName`), so that's the marketing-version source for both
-   * `android.versionName` and `ios.marketingVersion` here. `ally-mobile`
-   * (RN)'s own build.gradle/pbxproj are no longer what's actually shipping
-   * to users and would silently block raising the minimum version above
-   * RN's last release (e.g. "1.23.47") even after a newer Flutter build is
-   * live — android.versionCode still reads RN's build.gradle because
-   * Flutter's real versionCode is computed per-build by CI, not committed
-   * to source; this leaves the admin page's "is this committed build the
-   * one that's live" pipeline indicator still RN-only, unchanged for now.
+   * Live version info from `master`. Both platforms' store-identity
+   * (`com.helloally.app`) builds come from `ally-mobile/pubspec.yaml`'s
+   * single `version:` field (its own comment: "Marketing version ... sits
+   * above every React Native release" — one field drives both
+   * `CFBundleShortVersionString` and `versionName`), so that's the
+   * marketing-version source for both `android.versionName` and
+   * `ios.marketingVersion` here.
    *
-   * Regex-extracted rather than parsed: these files are not valid
-   * JSON/YAML, and the pipeline only ever needs these few fields.
+   * `android.versionCode` is always `null`: Flutter's real versionCode is
+   * computed per-build by CI (see build-android-production-flutter.yml),
+   * not committed to source, so there's no file to read it from the way RN's
+   * `build.gradle` used to provide one. This also means the admin page's
+   * "is this committed build the one that's live" pipeline indicator has no
+   * signal to compare against for Android — a known, flagged gap, not
+   * something this method can resolve.
    *
-   * Also includes `nextEligibleCheckAt`, a best-effort ETA for the next
-   * scheduled-mobile-release.yml run that could actually ship a build. That
-   * sub-fetch is allowed to fail independently — it's a nice-to-have, not
-   * the reason this endpoint exists.
+   * Regex-extracted rather than parsed: `pubspec.yaml` isn't a format this
+   * service otherwise needs a real YAML parser for just one field.
    */
   async getCurrentVersion(): Promise<MobileCurrentVersionResponseDto> {
     const headers = this.headers;
-
-    const [androidVersionCode, marketingVersion, nextEligibleCheckAt] =
-      await Promise.all([
-        this.fetchCurrentAndroidVersion(headers),
-        this.fetchCurrentFlutterMarketingVersion(headers),
-        this.computeNextEligibleCheckAt(headers),
-      ]);
+    const marketingVersion = await this.fetchCurrentMarketingVersion(headers);
 
     return {
       android: {
-        versionCode: androidVersionCode.versionCode,
+        versionCode: null,
         versionName: marketingVersion,
       },
       ios: {
         marketingVersion,
       },
-      nextEligibleCheckAt,
     };
   }
 
-  /** Regex-extracted from master's android/app/build.gradle — shared by getCurrentVersion() and the Android auto-bump task below. */
-  private async fetchCurrentAndroidVersion(
-    headers: Record<string, string>,
-  ): Promise<{ versionCode: number | null; versionName: string | null }> {
-    const gradle = await this.fetchFileContent(
-      'android/app/build.gradle',
-      headers,
-    );
-    const versionCodeMatch = gradle.match(/versionCode\s+(\d+)/);
-    const versionNameMatch = gradle.match(/versionName\s+"([^"]+)"/);
-    return {
-      versionCode: versionCodeMatch ? Number(versionCodeMatch[1]) : null,
-      versionName: versionNameMatch ? versionNameMatch[1] : null,
-    };
-  }
-
-  /** Regex-extracted from master's ally-mobile-flutter/pubspec.yaml — the one marketing version that drives both platforms post-cutover. */
-  private async fetchCurrentFlutterMarketingVersion(
+  /** Regex-extracted from master's ally-mobile/pubspec.yaml — the one marketing version that drives both platforms. */
+  private async fetchCurrentMarketingVersion(
     headers: Record<string, string>,
   ): Promise<string | null> {
-    const pubspec = await this.fetchFileContent(
-      'pubspec.yaml',
-      headers,
-      this.flutterFolder,
-    );
+    const pubspec = await this.fetchFileContent('pubspec.yaml', headers);
     const versionMatch = pubspec.match(/^version:\s*(\d+\.\d+\.\d+)/m);
     return versionMatch ? versionMatch[1] : null;
   }
@@ -594,15 +557,17 @@ export class MobileReleasesService {
   }
 
   /**
-   * The most recent release points, newest first: commits that changed
-   * android/app/build.gradle on master, i.e. version bumps (automated or,
-   * historically, manual).
+   * The most recent release points, newest first: commits that changed the
+   * app's marketing-version file on master, i.e. version bumps.
    *
-   * In the monorepo the file is `ally-mobile/android/app/build.gradle`, and
-   * its history there starts at the cutover — the first commits it shows are
-   * the import merges, which bumped nothing. So merge commits are skipped,
-   * and when the monorepo has fewer bumps than asked for, the rest come from
-   * the archived repo's history, where every release before 2026-10-23 is.
+   * In the monorepo that file is `ally-mobile/pubspec.yaml` (Flutter — all
+   * bumps there are manual now; there's no automated scheduled-bump
+   * equivalent to RN's old one), and its history there starts at the
+   * Flutter rename — the first commits it shows are the import/rename
+   * merges, which bumped nothing. So merge commits are skipped, and when
+   * the monorepo has fewer bumps than asked for, the rest come from the
+   * archived repo's history (RN's own `android/app/build.gradle` bumps),
+   * where every release before 2026-10-23 is.
    */
   private async fetchReleasePoints(
     headers: Record<string, string>,
@@ -611,7 +576,7 @@ export class MobileReleasesService {
     const points: { sha: string; repo: string; at: string | null }[] = [];
     const sources = this.hasLegacyHistory
       ? [
-          { repo: this.repo, path: `${this.folder}android/app/build.gradle` },
+          { repo: this.repo, path: `${this.folder}pubspec.yaml` },
           { repo: this.legacyRepo, path: 'android/app/build.gradle' },
         ]
       : [{ repo: this.repo, path: 'android/app/build.gradle' }];
@@ -645,104 +610,9 @@ export class MobileReleasesService {
       }
     }
     if (!points.length) {
-      throw new Error(
-        'No commits found for android/app/build.gradle on master',
-      );
+      throw new Error('No release-point commits found on master');
     }
     return points;
-  }
-
-  /**
-   * ESTIMATE only, not a guarantee. scheduled-mobile-release.yml ships a
-   * build once 48h+ have passed since the last version bump AND there are
-   * new commits on master AND tests are green when its daily 05:00 UTC
-   * cron tick fires — this method can only account for the 48h cadence
-   * gate and the cron cadence, since "are there new commits" and "are
-   * tests green" are unknowable in advance.
-   *
-   * "Last version bump" is the most recent release point (see
-   * fetchReleasePoints), which changes whenever a release actually lands.
-   *
-   * Returns null (rather than throwing) if that history can't be read, so
-   * a GitHub hiccup here never takes down the primary version payload.
-   */
-  private async computeNextEligibleCheckAt(
-    headers: Record<string, string>,
-  ): Promise<string | null> {
-    try {
-      const [lastBump] = await this.fetchReleasePoints(headers, 1);
-      if (!lastBump?.at) {
-        return null;
-      }
-
-      const eligibleAt = new Date(
-        new Date(lastBump.at).getTime() + CADENCE_GATE_HOURS * MS_PER_HOUR,
-      );
-      const now = new Date();
-      const referencePoint =
-        eligibleAt.getTime() > now.getTime() ? eligibleAt : now;
-
-      return this.firstDailyCheckAtOrAfter(referencePoint).toISOString();
-    } catch (error) {
-      this.logger.warn(
-        `Could not compute nextEligibleCheckAt for ${this.repo}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      return null;
-    }
-  }
-
-  /** First scheduled-mobile-release.yml cron tick (05:00 UTC daily) at or after `from`. */
-  private firstDailyCheckAtOrAfter(from: Date): Date {
-    const tick = new Date(
-      Date.UTC(
-        from.getUTCFullYear(),
-        from.getUTCMonth(),
-        from.getUTCDate(),
-        DAILY_CHECK_UTC_HOUR,
-        0,
-        0,
-        0,
-      ),
-    );
-    if (tick.getTime() < from.getTime()) {
-      tick.setUTCDate(tick.getUTCDate() + 1);
-    }
-    return tick;
-  }
-
-  /**
-   * Manually dispatches scheduled-mobile-release.yml with `force: 'true'`,
-   * which skips the 48h cadence gate but still requires green tests before
-   * anything ships — safe to call anytime.
-   *
-   * DEPLOYMENT PREREQUISITE: dispatching a workflow requires `Actions: write`
-   * scope on the GitHub token, but GITHUB_ACTIONS_TOKEN was originally
-   * provisioned read-only (`Actions: read` + `Contents: read`) for
-   * listRuns()/getCurrentVersion(). That token must be upgraded to
-   * `Actions: read and write` in GitHub's PAT settings for this endpoint to
-   * work — this is not fixable in code. A 403 or 404 from GitHub here is the
-   * likely symptom of a still-read-only token.
-   */
-  async triggerRelease(): Promise<MobileTriggerResponseDto> {
-    const headers = this.headers;
-
-    try {
-      // GitHub returns 204 No Content with an empty body on success — do not
-      // attempt to read/parse `data` from this response.
-      await axios.post(
-        `${GITHUB_API}/repos/${this.repo}/actions/workflows/${RELEASE_WORKFLOW_FILE}/dispatches`,
-        { ref: 'master', inputs: { force: 'true' } },
-        { headers, timeout: 15_000 },
-      );
-      return { dispatched: true };
-    } catch (error) {
-      throw this.toReadableError(
-        error,
-        `Could not dispatch ${RELEASE_WORKFLOW_FILE} on ${this.repo}`,
-      );
-    }
   }
 
   /**
@@ -1175,68 +1045,6 @@ export class MobileReleasesService {
       versionCodes: release?.versionCodes ?? [],
       userFraction: release?.userFraction ?? null,
     };
-  }
-
-  /**
-   * AUTONOMOUS, REAL-PRODUCTION ACTION — Android's counterpart to
-   * autoBumpIosMinimumVersionIfLive() above, run on the same 30-minute
-   * schedule. Only safe to enable once Managed Publishing is OFF for this
-   * app in Play Console: with it on, a track's release `status` reflects
-   * what was last *committed*, not whether Google's review-then-manual-
-   * publish gate has actually let it through — confirmed by checking
-   * Google's own Play Developer API reference before building this, the
-   * same discipline as the iOS side. With Managed Publishing off, `status:
-   * 'completed'` on the production track is a trustworthy "this is really
-   * live" signal, the same role READY_FOR_DISTRIBUTION plays for iOS.
-   *
-   * Matches the production release to the *current* build by exact
-   * versionCode equality against what's committed on master right now —
-   * deliberately strict, not a "close enough" heuristic: if master has
-   * already moved on to a newer versionCode this promotion doesn't cover,
-   * the match simply fails and this is a no-op until the production track
-   * catches up, rather than bumping to a version the resolved versionCode
-   * doesn't actually correspond to.
-   *
-   * A staged rollout (status 'inProgress' with userFraction < 1) is
-   * deliberately NOT treated as live — raising the minimum version while
-   * only a fraction of users can download the build would lock out
-   * everyone else, the exact failure mode this whole feature exists to
-   * prevent.
-   */
-  async autoBumpAndroidMinimumVersionIfLive(): Promise<void> {
-    if (!this.configService.androidMinVersionAutoBumpEnabled) {
-      this.logger.debug(
-        'Skipping Android min-version auto-bump — ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED is not true.',
-      );
-      return;
-    }
-
-    const headers = this.headers;
-    const { versionCode, versionName } =
-      await this.fetchCurrentAndroidVersion(headers);
-    if (!versionCode || !versionName) return;
-
-    const release = await this.fetchAndroidProductionRelease();
-    if (!release || release.status !== 'completed') return;
-    if (!release.versionCodes.includes(versionCode)) return;
-
-    const current =
-      await this.appVersionSettingsService.getAppVersionSettings('android');
-    if (current.minimumSupportedVersion === versionName) return;
-
-    await this.appVersionSettingsService.updateAppVersionSettings({
-      android: versionName,
-    });
-
-    this.logger.info(
-      `Auto-raised Android minimum supported version from ${current.minimumSupportedVersion} to ` +
-        `${versionName} — production track confirmed status: completed for versionCode ${versionCode}.`,
-    );
-    await this.slackService.sendMessage(
-      `Android minimum supported version auto-raised to ${versionName} — the production track ` +
-        `confirmed this build is fully live (not a staged rollout). Previous minimum was ` +
-        `${current.minimumSupportedVersion}. No human action taken; this ran on schedule.`,
-    );
   }
 
   /**

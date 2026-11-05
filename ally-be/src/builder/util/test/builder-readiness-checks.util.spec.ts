@@ -13,9 +13,9 @@ describe('builder readiness checks', () => {
     it('reads the repos a section gives a line of work to', () => {
       expect(
         reposOwningALine(
-          '- **ally-web**: the rating control.\n- `ally-mobile` — the same, in the app.',
+          '- **ally-web**: the rating control.\n- `ally-ai` — the same, in retrieval.',
         ),
-      ).toEqual(['ally-web', 'ally-mobile']);
+      ).toEqual(['ally-web', 'ally-ai']);
     });
 
     it('ignores a repo named only to rule it out', () => {
