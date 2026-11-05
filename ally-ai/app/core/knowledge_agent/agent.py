@@ -43,16 +43,16 @@ from app.core.knowledge_agent.schemas import (
     KnowledgeAnswer,
     TranslatedQuery,
 )
+from app.core.knowledge_base.corpus import KbCorpus
 from app.core.knowledge_base.knowledge_chunk_service import (
     ChunkAudience,
     KnowledgeChunkService,
 )
 from app.core.llm.dispatch import generate_structured
 from app.core.llm_usage.tasks import LLMTask
-from app.core.knowledge_base.corpus import KbCorpus
 from app.core.phi_events import PHIEvents
-from app.core.retrieval_log.emitter import emit_retrieval_log
 from app.core.phi_logger import PHILogEvent, phi_logger
+from app.core.retrieval_log.emitter import emit_retrieval_log
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
 from app.prompts.resolver import get_backend_llm_overrides
 from app.utils.logger import get_logger
@@ -510,8 +510,12 @@ class KnowledgeAgentService:
         latency_ms: int,
         language: str,
         retrieval: Dict[str, Any],
+        log_retrieval: bool = True,
     ) -> Dict[str, Any]:
-        """The result for a gate decline, reported to the retrieval log."""
+        """
+        The result for a gate decline, reported to the retrieval log unless
+        ``log_retrieval`` is false (a shadow run whose message was already logged).
+        """
         logger.info(
             "Declining before generation: reason=%s hits=%d top=%.4f",
             reason.value,
@@ -521,17 +525,20 @@ class KnowledgeAgentService:
         # Report the DECLINE, not just the search. A retrieval that returned six
         # passages and was refused on all of them looks healthy in every count except
         # this one, and refusal is what the worker actually experienced.
-        self._report_retrieval(
-            query=search_text,
-            min_similarity=limits["min_similarity"],
-            decline_similarity=limits["decline_similarity"],
-            top_k=limits["top_k"],
-            hits=hits,
-            returned_count=0,
-            latency_ms=latency_ms,
-            language=language,
-            disposition=_DECLINE_DISPOSITIONS.get(reason, "declined_below_threshold"),
-        )
+        if log_retrieval:
+            self._report_retrieval(
+                query=search_text,
+                min_similarity=limits["min_similarity"],
+                decline_similarity=limits["decline_similarity"],
+                top_k=limits["top_k"],
+                hits=hits,
+                returned_count=0,
+                latency_ms=latency_ms,
+                language=language,
+                disposition=_DECLINE_DISPOSITIONS.get(
+                    reason, "declined_below_threshold"
+                ),
+            )
         return {
             "intent": AnswerIntent.DECLINE,
             "answer": "",
@@ -554,11 +561,13 @@ class KnowledgeAgentService:
         latency_ms: int,
         language: str,
         retrieval: Dict[str, Any],
+        log_retrieval: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Pick the passages for the prompt, set ``retrieval["passages_used"]`` and
-        report the retrieval as answered. Below the decline threshold (general mode
-        only gets here) the model is given no passages.
+        report the retrieval as answered (unless ``log_retrieval`` is false). Below
+        the decline threshold (general mode only gets here) the model is given no
+        passages.
         """
         top_similarity = float(hits[0].get("similarity") or 0.0) if hits else 0.0
         relevant = (
@@ -571,17 +580,18 @@ class KnowledgeAgentService:
             max_context_tokens=limits["max_context_tokens"],
         )
         retrieval["passages_used"] = len(passages)
-        self._report_retrieval(
-            query=search_text,
-            min_similarity=limits["min_similarity"],
-            decline_similarity=limits["decline_similarity"],
-            top_k=limits["top_k"],
-            hits=hits,
-            returned_count=len(passages),
-            latency_ms=latency_ms,
-            language=language,
-            disposition="answered",
-        )
+        if log_retrieval:
+            self._report_retrieval(
+                query=search_text,
+                min_similarity=limits["min_similarity"],
+                decline_similarity=limits["decline_similarity"],
+                top_k=limits["top_k"],
+                hits=hits,
+                returned_count=len(passages),
+                latency_ms=latency_ms,
+                language=language,
+                disposition="answered",
+            )
         return passages
 
     async def write(

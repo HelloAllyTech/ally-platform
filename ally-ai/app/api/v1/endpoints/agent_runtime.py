@@ -78,6 +78,7 @@ async def run(
         "answer_mode": payload.answer_mode,
         "channel": payload.channel,
         "audience": payload.audience.model_dump(mode="json"),
+        "log_retrieval": payload.log_retrieval,
     }
     try:
         state = await run_agent(

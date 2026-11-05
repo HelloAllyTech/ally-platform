@@ -101,6 +101,19 @@ class TestRun:
         assert response.json()["decline_reason"] == "no_hits"
         assert len(response.json()["trace"]) == 4
 
+    def test_log_retrieval_defaults_to_true_and_can_be_switched_off(
+        self, client, chunk_service
+    ):
+        with patch(f"{AGENT}.emit_retrieval_log") as emit:
+            client.post(URL, json=BODY)
+            assert emit.call_count == 1
+            response = client.post(
+                URL, json={**BODY, "conversation_id": "c2", "log_retrieval": False}
+            )
+            assert emit.call_count == 1
+        assert response.status_code == 200
+        assert response.json()["decline_reason"] == "no_hits"
+
     def test_conversation_id_is_required(self, client):
         body = {k: v for k, v in BODY.items() if k != "conversation_id"}
         assert client.post(URL, json=body).status_code == 422

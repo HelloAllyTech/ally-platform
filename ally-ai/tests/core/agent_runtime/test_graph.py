@@ -223,6 +223,24 @@ class TestRetrievalLog:
             await run("q")
         assert retrieval_log.call_count - old == old == 1
 
+    async def test_log_retrieval_false_skips_a_gate_decline(
+        self, run, chunk_service, retrieval_log
+    ):
+        chunk_service.search.return_value = []
+        result = await run("q", log_retrieval=False)
+        assert retrieval_log.call_count == 0
+        assert result["result"]["decline_reason"] == "no_hits"
+
+    async def test_log_retrieval_false_skips_an_answer(
+        self, run, chunk_service, retrieval_log
+    ):
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        gen = stub_generate(KnowledgeAnswer(intent=AnswerIntent.ANSWER, answer="A."))
+        with patch(f"{AGENT}.generate_structured", gen):
+            result = await run("q", log_retrieval=False)
+        assert retrieval_log.call_count == 0
+        assert result["result"]["intent"] == "answer"
+
 
 class TestTracingAndState:
     async def test_runs_are_never_traced_to_langsmith(

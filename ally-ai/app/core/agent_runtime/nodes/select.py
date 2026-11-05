@@ -26,6 +26,7 @@ def make_select_node(service: KnowledgeAgentService) -> Node:
             latency_ms=state["retrieval_latency_ms"],
             language=state["language"],
             retrieval=retrieval,
+            log_retrieval=state["bot"].get("log_retrieval", True),
         )
         return {"passages": passages, "retrieval": retrieval}
 

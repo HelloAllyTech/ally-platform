@@ -30,6 +30,7 @@ def make_finalize_node(service: KnowledgeAgentService) -> Node:
             latency_ms=state["retrieval_latency_ms"],
             language=state["language"],
             retrieval=dict(state["retrieval"]),
+            log_retrieval=state["bot"].get("log_retrieval", True),
         )
         return {"result": json_safe(result)}
 

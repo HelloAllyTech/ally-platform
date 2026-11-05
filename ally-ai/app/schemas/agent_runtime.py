@@ -35,6 +35,14 @@ class AgentRunRequest(KnowledgeAnswerRequest):
         None, max_length=200, description="Recorded with the run; not used to answer"
     )
     runtime_version: str = Field("v2", max_length=16)
+    log_retrieval: bool = Field(
+        True,
+        description=(
+            "False skips the retrieval log for this run. ally-be sends false when it "
+            "runs a bot in shadow beside /knowledge-agent/answer, which already logged "
+            "the same message."
+        ),
+    )
 
 
 class AgentRetrievalMeta(RetrievalMeta):

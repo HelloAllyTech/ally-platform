@@ -234,6 +234,6 @@ Run from `ally-platform/ally-ai`. ally-ai is on host port **3001** (`docker-comp
 
 ### Open for chunk 2
 
-- **Shadow mode will double-log retrieval.** If ally-be calls both endpoints for one message, `emit_retrieval_log` fires once per path. Decide on a suppress flag (for example, on `/agent/run` while shadowing) then. Local parity runs already double-log.
+- ~~**Shadow mode will double-log retrieval.**~~ **Resolved in chunk 2.** `/agent/run` accepts `log_retrieval: false`, which skips `_report_retrieval` in both the gate-decline and answer paths. ally-be sends it on shadow runs. Local parity runs still double-log, because they don't send the flag.
 - Map `intent` (not `decision`) and the new `run_id` onto the outbound message. `retrieval.hit_chunk_ids` is debug only and shouldn't be stored.
 - Add the AI task registry row if ally-be's call is registered per endpoint.
