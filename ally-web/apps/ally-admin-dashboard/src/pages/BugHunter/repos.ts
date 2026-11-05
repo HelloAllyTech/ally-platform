@@ -14,9 +14,4 @@
  * review of running Bug Hunter against it — see ally-be's own comment on
  * BUG_HUNT_REPOS.
  */
-export const BUG_HUNTER_REPOS = [
-  "ally-be",
-  "ally-web",
-  "ally-ai",
-  "ally-ai-learn",
-] as const;
+export const BUG_HUNTER_REPOS = ["ally-be", "ally-web", "ally-ai", "ally-ai-learn"] as const;
