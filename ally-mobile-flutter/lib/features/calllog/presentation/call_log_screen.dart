@@ -113,7 +113,7 @@ class CallLogScreen extends ConsumerStatefulWidget {
   ConsumerState<CallLogScreen> createState() => _CallLogScreenState();
 }
 
-class _CallLogScreenState extends ConsumerState<CallLogScreen> {
+class _CallLogScreenState extends ConsumerState<CallLogScreen> with WidgetsBindingObserver {
   _LogTab? _activeTab;
   bool _isViewingArchive = false;
   bool _isStartingScribe = false;
@@ -122,9 +122,41 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
   final ValueNotifier<Object?> _expandedLogKey = ValueNotifier(null);
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _expandedLogKey.dispose();
     super.dispose();
+  }
+
+  /// Web's call-log list carries RTK Query's `refetchOnFocus`/
+  /// `refetchOnReconnect` (`UserLogsTable.tsx`/`AdminLogsTable.tsx`), so a
+  /// Scribe note that finishes AI processing while the counsellor is looking
+  /// elsewhere appears populated the moment they tab back in — with no
+  /// backend push behind it, it's purely "the list refetches when you look
+  /// at it again." The app-backgrounded equivalent of a browser tab regaining
+  /// focus is [AppLifecycleState.resumed]; [ScreenFocusListener] below only
+  /// covers *in-app* navigation (leaving and returning to this screen), not
+  /// the OS backgrounding the whole app, so without this the same finished
+  /// note would sit stale until a manual pull-to-refresh.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshLists();
+  }
+
+  void _refreshLists() {
+    ref.invalidate(realCallLogsControllerProvider);
+    ref.invalidate(archivedCallLogsControllerProvider);
+    ref.invalidate(simulationLogsControllerProvider);
+    final permissions = ref.read(userPermissionsProvider).value ?? const <String>[];
+    if (permissions.contains(UserPermissions.startMicrophoneChat)) {
+      ref.invalidate(visibleChatTypesProvider);
+    }
   }
 
   /// Mirrors RN's `StartSessionModal`: Start Scribe Mode is offered as the
@@ -388,12 +420,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     // RN `useFocusEffect`s: coming back to Call Logs reloads every log
     // list from page 0 and (for call starters) re-asks the chat types.
     return ScreenFocusListener(
-      onFocus: () {
-        ref.invalidate(realCallLogsControllerProvider);
-        ref.invalidate(archivedCallLogsControllerProvider);
-        ref.invalidate(simulationLogsControllerProvider);
-        if (canStartCall) ref.invalidate(visibleChatTypesProvider);
-      },
+      onFocus: _refreshLists,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Stack(
