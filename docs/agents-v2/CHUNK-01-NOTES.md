@@ -162,12 +162,18 @@ All paths are under `ally-ai/`.
 
 ## 5. Parity results
 
-Report: [CHUNK-01-PARITY-REPORT.md](./CHUNK-01-PARITY-REPORT.md) (22 cases, local stack, rebuilt image).
+Report: [CHUNK-01-PARITY-REPORT.md](./CHUNK-01-PARITY-REPORT.md) (22 cases, local stack, rebuilt image, run after the decision below).
 
-- **Every deterministic must-match field matched on all comparable cases:** intent, decline reason, hit count, top similarity and passages used. The gate, empty-selection, general-mode and out-of-scope cases all match.
-- **Latency:** p50 v1 5812 ms, v2 5779 ms, **−0.6%** (budget +15%).
-- **Two must-match failures, both on the set of cited chunk ids only** (`in-get-access`, `lang-hindi`). Retrieval and passages were identical; the model chose different citations. The old endpoint alone does the same. Three back-to-back calls to `/knowledge-agent/answer` gave `{Access, Help}`, `{Access}`, `{Access, Help}` for one question and `{About, Access}`, `{About}`, `{About, Access}` for the other. The same case also mismatches between today's v1 and the master baseline.
-- **Refactor check (v1 now vs the master baseline):** matched on every case whose translation was the same. The one mismatch is the citation variance above.
+- **0 must-match failures** (exit code 0).
+  - Must-match fields: intent, decline reason, hit count, top similarity (3 dp) and passages used.
+  - They matched on every case where both paths searched the same translation, which was 21 of 22. `lang-marathi` translated differently, so its retrieval comparison was skipped.
+- **0 baseline failures.** Today's v1 matched the master baseline on every case, so the refactor changed nothing measurable.
+- **Latency:** p50 v1 5879 ms, v2 5934 ms, **+0.9%** (budget +15%). An earlier run gave −0.6%.
+- **Citation overlap (should match):** 100% on every answered case except `lang-hindi` (50%), where the model cited one passage on one path and two on the other.
+- **Decision (Shehbaz, 2026-11-05): the cited-chunk set is "should match" in live parity**, reported as overlap %.
+  - Why: the answer model samples, so v1 by itself cites different chunks from identical passages run to run. Three back-to-back `/knowledge-agent/answer` calls gave `{Access, Help}`, `{Access}`, `{Access, Help}`.
+  - Exact, ordered citations remain a hard check in the mocked golden test (`tests/core/agent_runtime/test_golden.py`).
+  - The first run, which still had citations as must-match, failed only on this: `in-get-access` and `lang-hindi`.
 
 ## 6. How to test (the six checks, with real paths, env names and port)
 
@@ -209,7 +215,7 @@ Run from `ally-platform/ally-ai`. ally-ai is on host port **3001** (`docker-comp
      --cases tests/fixtures/agent_parity_cases.yaml --base-url http://localhost:3001 \
      --baseline tests/fixtures/parity_baseline_master.json
    ```
-   Read the "translation differs", citation-overlap and baseline columns in `parity_report.md`. See section 5 for why `cited_chunk_ids` can differ.
+   Expect exit code 0 and `must-match failures: 0`. In `parity_report.md`, read the "translation differs" rows, the citation-overlap column (should match; see section 5) and the baseline column.
 5. **Stored state:**
    ```bash
    docker exec ally-be-postgres-1 psql -U postgres -d ally_agent_runtime \
@@ -218,11 +224,13 @@ Run from `ally-platform/ally-ai`. ally-ai is on host port **3001** (`docker-comp
    `test-1` should be listed with checkpoints.
 6. **Flag off:** set `AGENT_RUNTIME__ENABLED=false`, then run `docker compose -f docker-compose.local.yml up -d --force-recreate --no-deps app`. `/api/v1/agent/run` should return 404, and `/api/v1/knowledge-agent/answer` should still return 200.
 
-## 7. Open questions
+## 7. Open items
 
-- **Live citation must-match (decision needed).** As specified, it can't pass reliably while the answer model samples. Either make the citation set "should match" live (overlap %, still exact in the golden test), or keep it must-match but only fail when v2's set is outside the sets v1 produces over N repeats.
-- **The wiki rule.** `.docs-map.yml` flags `app/main.py` and `app/api/v1/endpoints/**`. The PR body needs `Wiki-PR: none — dark-launched behind AGENT_RUNTIME__ENABLED; documented when ally-be integrates in chunk 2`, or a wiki PR.
-- **Checkpoint retention.** Every run is kept forever; it needs a retention policy before production volume.
+- **Model sampling.** `app/core/llm/dispatch.py` never sends `temperature` to gpt-5 models, and drops `0.0` for every OpenAI model (it sends only truthy values). So answers, citations and translations are sampled. Not changing it in this chunk; revisit before the eval set in chunk 25.
+- **Checkpoint retention.** Every run is kept forever. A retention policy is needed before production. Proposal: 30 days, plus a cleanup job.
+- **Follow-up questions.** `extra-follow-up` ("And is it free?" after "What is Ally?") declines with `no_hits` on both paths: questions that depend on history don't retrieve well today. Revisit in chunk 3, when the agent can search again with a better query.
+- **Production database.** Ops must provision a separate production database, or at least a role, before the flag goes on (see section 3).
+- **Wiki rule.** `.docs-map.yml` flags `app/main.py` and `app/api/v1/endpoints/**`. The PR carries `Wiki-PR: none — dark-launched behind AGENT_RUNTIME__ENABLED; wiki updated in chunk 2 when ally-be integrates`.
 
 ### Open for chunk 2
 

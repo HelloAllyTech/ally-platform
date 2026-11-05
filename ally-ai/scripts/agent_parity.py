@@ -5,10 +5,14 @@ conversation_id for /agent/run), and the two results are compared:
 
 - MUST match, when both paths searched the same translated query: intent,
   decline_reason, retrieval.hit_count, retrieval.top_similarity (3 dp),
-  retrieval.passages_used, and the SET of cited chunk ids.
+  retrieval.passages_used.
 - If the translation differs, retrieval is not comparable, so the case is
   reported as "translation differs" and not failed.
-- Report only: citation overlap, answer text similarity (difflib) and latency.
+- Should match: the set of cited chunk ids, reported as overlap %. Not a failure:
+  the answer model samples (dispatch sends no temperature to gpt-5 models), so v1
+  alone cites different chunks from the same passages run to run. Exact citations
+  are asserted in the mocked golden test (tests/core/agent_runtime/test_golden.py).
+- Report only: answer text similarity (difflib) and latency.
 
 `--record-baseline FILE` runs only the v1 endpoint and saves its results; take
 one on master before touching knowledge_agent. `--baseline FILE` then also
@@ -72,9 +76,6 @@ def must_match_fields(result: Dict[str, Any]) -> Dict[str, Any]:
         "hit_count": retrieval.get("hit_count"),
         "top_similarity": round(float(retrieval.get("top_similarity") or 0.0), 3),
         "passages_used": retrieval.get("passages_used"),
-        "cited_chunk_ids": sorted(
-            {str(c.get("chunk_id")) for c in result.get("citations") or []}
-        ),
     }
 
 
@@ -185,8 +186,9 @@ def run(client: httpx.Client, cases, baseline: Optional[Dict], out: Path) -> int
         f"p50 latency: v1 {p50_v1:.0f} ms · v2 {p50_v2:.0f} ms · delta {delta:+.1f}% "
         "(budget +15%)",
         "",
-        "| Case | Kind | Status | Diffs | Intent v1 / v2 | Citation overlap "
-        "| Answer similarity | ms v1 / v2 | Trace steps"
+        "| Case | Kind | Status | Diffs | Intent v1 / v2 "
+        "| Citation overlap (should match) | Answer similarity "
+        "| ms v1 / v2 | Trace steps"
         + (" | v1 vs master baseline" if baseline is not None else "")
         + " |",
         "|---|---|---|---|---|---|---|---|---|"
