@@ -13,6 +13,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -24,6 +25,7 @@ import {
   ChatbotAudienceKind,
   ChatbotKnowledgeSource,
   ChatbotMemberRole,
+  ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
 import { MAX_SYSTEM_PROMPT_CHARS } from '../type/chatbot.type';
@@ -159,6 +161,15 @@ export class UpdateChatbotDto {
   @ValidateNested()
   @Type(() => ChatbotModelDto)
   model?: ChatbotModelDto | null;
+
+  @ApiPropertyOptional({
+    enum: ChatbotRuntime,
+    description:
+      'Which engine answers (Agents v2). Platform admins only; the platform kill switch can still force v1.',
+  })
+  @IsOptional()
+  @IsEnum(ChatbotRuntime)
+  runtime?: ChatbotRuntime;
 }
 
 export class SetChatbotStatusDto {
@@ -310,6 +321,25 @@ export class TestChatbotDto {
   @IsOptional()
   @IsBoolean()
   checkAccess?: boolean;
+
+  @ApiPropertyOptional({
+    enum: [ChatbotRuntime.V1, ChatbotRuntime.V2],
+    description:
+      'Answer this one test with this engine, to compare. Platform admins only; the platform kill switch still wins.',
+  })
+  @IsOptional()
+  @IsIn([ChatbotRuntime.V1, ChatbotRuntime.V2])
+  runtime?: ChatbotRuntime.V1 | ChatbotRuntime.V2;
+
+  @ApiPropertyOptional({
+    description:
+      'The Preview thread (`preview-<uuid>`), kept until "New thread". A new one is made when absent.',
+  })
+  @IsOptional()
+  @Matches(
+    /^preview-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+  )
+  conversationId?: string;
 }
 
 export class BindConnectorDto {

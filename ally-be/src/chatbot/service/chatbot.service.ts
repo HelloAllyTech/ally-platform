@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import type { AgentTraceStep } from '../../ai/dto/knowledge.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
@@ -16,6 +18,7 @@ import {
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
   ChatbotMemberRole,
+  ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
 import {
@@ -24,9 +27,11 @@ import {
   TestChatbotDto,
   UpdateChatbotDto,
 } from '../dto/chatbot.dto';
+import { effectiveRuntime } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import { withFirstMessageParts } from '../engine/first-reply';
 import type { ChatbotModelChoice } from '../type/chatbot.type';
+import { AGENT_RUNTIME_DEGRADED_TYPE } from './agent-runtime-alert-throttle.service';
 import { ChatbotAccessService } from './chatbot-access.service';
 import { ChatbotSettingsService } from './chatbot-settings.service';
 import { ConnectorService, ConnectorView } from './connector.service';
@@ -53,6 +58,11 @@ export interface ChatbotSummary {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: Chatbot['persona'];
   model: ChatbotModelChoice | null;
+  /** The engine the bot is set to (Agents v2). */
+  runtime: ChatbotRuntime;
+  /** What actually answers: v1 whenever the platform kill switch is off. */
+  effectiveRuntime: ChatbotRuntime;
+  features: Record<string, boolean>;
   myRole: ChatbotMemberRole;
   connectors: ConnectorView[];
   documentCount: number;
@@ -138,15 +148,23 @@ export class ChatbotService {
   private async summarise(bots: Chatbot[]): Promise<ChatbotSummary[]> {
     if (!bots.length) return [];
     const ids = bots.map((b) => b.id);
-    const [roles, connectors, docCounts, audienceCounts, memberCounts, stats] =
-      await Promise.all([
-        this.access.rolesFor(ids),
-        this.connectors.summariesForBots(ids),
-        this.countBy(this.documentRepository, ids),
-        this.countBy(this.audienceRepository, ids),
-        this.countBy(this.memberRepository, ids),
-        this.stats(ids),
-      ]);
+    const [
+      roles,
+      connectors,
+      docCounts,
+      audienceCounts,
+      memberCounts,
+      stats,
+      defaults,
+    ] = await Promise.all([
+      this.access.rolesFor(ids),
+      this.connectors.summariesForBots(ids),
+      this.countBy(this.documentRepository, ids),
+      this.countBy(this.audienceRepository, ids),
+      this.countBy(this.memberRepository, ids),
+      this.stats(ids),
+      this.settingsService.get(),
+    ]);
     return bots.map((bot) => ({
       id: bot.id,
       name: bot.name,
@@ -157,6 +175,9 @@ export class ChatbotService {
       knowledgeSource: bot.knowledgeSource,
       persona: bot.persona ?? {},
       model: bot.model ?? null,
+      runtime: bot.runtime ?? ChatbotRuntime.V1,
+      effectiveRuntime: effectiveRuntime(bot, defaults),
+      features: bot.features ?? {},
       myRole: roles.get(bot.id) ?? ChatbotMemberRole.VIEWER,
       connectors: connectors.get(bot.id) ?? [],
       documentCount: docCounts.get(bot.id) ?? 0,
@@ -276,6 +297,10 @@ export class ChatbotService {
       // Reaches every organisation's targeted documents, so it is a platform decision.
       await this.access.assertPlatformAdmin();
     }
+    if (dto.runtime !== undefined) {
+      // Which engine answers real people is a platform decision while Agents v2 is rolling out.
+      await this.access.assertPlatformAdmin();
+    }
     if (dto.model) await this.assertModel(dto.model);
 
     const patch: Partial<Chatbot> = { updatedBy: currentUserId() };
@@ -288,6 +313,7 @@ export class ChatbotService {
     if (dto.accessMode !== undefined) patch.accessMode = dto.accessMode;
     if (dto.knowledgeSource !== undefined)
       patch.knowledgeSource = dto.knowledgeSource;
+    if (dto.runtime !== undefined) patch.runtime = dto.runtime;
     if (dto.model !== undefined) {
       patch.model = dto.model
         ? {
@@ -485,8 +511,11 @@ export class ChatbotService {
    */
   async test(id: string, dto: TestChatbotDto) {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
+    // Comparing engines is for platform admins, like choosing one.
+    if (dto.runtime !== undefined) await this.access.assertPlatformAdmin();
     const draft = dto.draft ?? {};
     if (draft.model) await this.assertModel(draft.model);
+    const conversationId = dto.conversationId ?? `preview-${randomUUID()}`;
 
     const bot: Chatbot = {
       ...chatbot,
@@ -527,6 +556,8 @@ export class ChatbotService {
       },
       channel: { type: 'test' },
       documentIds: draft.documentIds,
+      conversationId,
+      runtime: dto.runtime,
     });
 
     // Remembered so the setup checklist can show the bot has been tried; Preview stores nothing else.
@@ -555,9 +586,20 @@ export class ChatbotService {
       language: decision.language ?? null,
       wouldFileUnanswered: decision.unanswered ?? null,
       // Shown rather than sent: the console must never page anyone.
-      wouldAlert: decision.alert ? decision.alert.type : null,
+      wouldAlert: decision.alert
+        ? decision.alert.type
+        : decision.agent?.fallbackReason
+          ? AGENT_RUNTIME_DEGRADED_TYPE
+          : null,
       latencyMs: Date.now() - startedAt,
       usedDraft: Boolean(dto.draft),
+      // Agents v2: which engine answered this test, and the run behind it.
+      runtime: decision.agent?.runtime ?? ChatbotRuntime.V1,
+      runId: decision.agent?.runId ?? null,
+      trace: (decision.agent?.trace ?? null) as AgentTraceStep[] | null,
+      fallbackReason: decision.agent?.fallbackReason ?? null,
+      runtimeAllowed: settings.agentRuntimeAllowed,
+      conversationId,
     };
   }
 }
