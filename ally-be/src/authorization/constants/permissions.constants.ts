@@ -6,6 +6,14 @@ const PERMISSIONS = {
   EDIT_USER_STATUS: 'edit:user:status',
   VIEW_USER_ROLES: 'view:user:roles',
   VIEW_USER_TENANT: 'view:user:tenant',
+  /**
+   * Fix up a learner's course progress from the consumer web app's Org Metrics
+   * learner table: remove them from a course, reopen scenario-quiz or
+   * assessment attempts. Held by the tenant ADMIN group and platform admins.
+   * Deliberately NOT EDIT_USER, which also opens user and role editing. Every
+   * route behind it acts only on learners in the caller's own organisation.
+   */
+  EDIT_LEARNER_PROGRESS: 'edit:learner-progress',
 
   // === CHAT MANAGEMENT ===
   VIEW_CHAT: 'view:chat',
@@ -445,6 +453,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   // Full administrative access
   PERMISSIONS.SYSTEM_ACCESS,
   PERMISSIONS.EDIT_USER,
+  PERMISSIONS.EDIT_LEARNER_PROGRESS,
   PERMISSIONS.EDIT_USER_ROLE,
   PERMISSIONS.VIEW_USERS,
   PERMISSIONS.EDIT_USER_STATUS,
@@ -712,6 +721,10 @@ const ADMIN_PERMISSIONS = [
   // switch itself is EDIT_TENANT. Granted by
   // 1980850000000-AddOrgAdminBrandingPermission.
   PERMISSIONS.EDIT_TENANT_BRANDING,
+
+  // Remove a learner from a course / reopen their attempts, from the Org
+  // Metrics learner table. Granted by 1980880000000-GrantLearnerProgressPermission.
+  PERMISSIONS.EDIT_LEARNER_PROGRESS,
 
   // start:microphone-chat / start:cloud-telephony-chat are intentionally NOT
   // granted here — initiating a recording (scribe/dictation/telephony) is a
