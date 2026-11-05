@@ -277,6 +277,7 @@ const mockOnClose = vi.fn();
 
 // Import component and types after mocks are set up
 import NavSideBar from "../NavSideBar";
+import { useGetLogoUrlQuery } from "@api";
 import { ALLY_BRANDING, BrandingContext } from "../../../branding";
 import { NavSideBarProps } from "../types";
 
@@ -895,10 +896,10 @@ describe("NavSideBar", () => {
 });
 
 describe("NavSideBar — organization branding", () => {
-  it("shows the org's display name beside the logo and a Powered by Ally line when branded", () => {
+  it("shows a Powered by Ally line, and no org name beside the logo, when branded", () => {
     renderBranded(true);
 
-    expect(screen.getByTestId("nav-sidebar-org-name")).toHaveTextContent("Acme Helpline");
+    expect(screen.queryByTestId("nav-sidebar-org-name")).not.toBeInTheDocument();
     expect(screen.getByTestId("nav-sidebar-powered-by")).toHaveTextContent(/powered by ally/i);
   });
 
@@ -907,5 +908,46 @@ describe("NavSideBar — organization branding", () => {
 
     expect(screen.queryByTestId("nav-sidebar-org-name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("nav-sidebar-powered-by")).not.toBeInTheDocument();
+  });
+});
+
+describe("NavSideBar — tenant logo", () => {
+  const setLogo = (logoUrl: string | null) =>
+    vi.mocked(useGetLogoUrlQuery).mockReturnValue({
+      data: logoUrl === null ? null : { name: "Acme", logoUrl },
+    } as never);
+
+  afterEach(() => setLogo(null));
+
+  it("renders the logo at a fixed height with a free width", () => {
+    setLogo("https://cdn.example.com/acme.png");
+    renderComponent();
+
+    const logo = screen.getByTestId("nav-sidebar-logo");
+    expect(logo).toHaveAttribute("src", "https://cdn.example.com/acme.png");
+    expect(logo).toHaveClass("h-16", "w-auto", "object-contain");
+    expect(screen.getByTestId("nav-sidebar-header")).toHaveClass("h-[72px]");
+  });
+
+  it("shows nothing, and a compact header row, when the org has no logo", () => {
+    for (const none of [null, ""]) {
+      setLogo(none);
+      const { unmount } = renderComponent();
+
+      expect(screen.queryByTestId("nav-sidebar-logo")).not.toBeInTheDocument();
+      expect(screen.queryByAltText("org-logo")).not.toBeInTheDocument();
+      expect(screen.getByTestId("nav-sidebar-header")).toHaveClass("h-12");
+      expect(screen.getByTestId("nav-sidebar-toggle")).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("drops a logo that fails to load instead of showing a broken image", () => {
+    setLogo("https://cdn.example.com/dead.png");
+    renderComponent();
+
+    fireEvent.error(screen.getByTestId("nav-sidebar-logo"));
+
+    expect(screen.queryByTestId("nav-sidebar-logo")).not.toBeInTheDocument();
   });
 });
