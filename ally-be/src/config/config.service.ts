@@ -105,6 +105,10 @@ export class AppConfigService {
    * - `digestTo` is who gets the daily email (comma-separated). Empty means no
    *   email, even when enabled.
    * - `digestHour` is the business-timezone (IST) hour it goes out.
+   * - `digestAllowed` is true only on the production database (`*_prd`). Env
+   *   files get copied between environments, and a staging copy that kept
+   *   `PRODUCT_UPDATES_DIGEST_TO` sent a second, differently-formatted digest
+   *   to the same people on 2026-11-05.
    */
   get productUpdates() {
     const start = new Date(
@@ -131,6 +135,7 @@ export class AppConfigService {
         .map((address) => address.trim())
         .filter(Boolean),
       digestHour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 18,
+      digestAllowed: (this.database.database ?? '').endsWith('_prd'),
     };
   }
 
