@@ -53,3 +53,11 @@ LLM__MAX_CONCURRENT_LLM_CALLS=10
 
 ALLY_CORE__ENDPOINT=http://localhost:8001
 ALLY_CORE__API_KEY=<ally-core-api-key>
+
+# Agents v2 runtime (POST /api/v1/agent/run). Off by default: the route answers 404.
+AGENT_RUNTIME__ENABLED=false
+# Postgres for LangGraph checkpoints, in its own database (never ally-be's). Unset =
+# in-memory checkpoints. Locally: create the database once with
+#   docker exec ally-be-postgres-1 createdb -U postgres ally_agent_runtime
+# AGENT_RUNTIME__CHECKPOINT_DB_URL=postgresql://postgres:<password>@host.docker.internal:5477/ally_agent_runtime
+# AGENT_RUNTIME__CHECKPOINT_SCHEMA=agent_runtime
