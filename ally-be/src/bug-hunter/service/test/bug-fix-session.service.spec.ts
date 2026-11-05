@@ -533,17 +533,17 @@ describe('BugFixSessionService', () => {
       expect(github.dispatchWorkflow).not.toHaveBeenCalled();
     });
 
-    it('dispatches to ally-mobile when the classifier recognizes a native-app bug', async () => {
+    it('dispatches to ally-ai-learn when the classifier recognizes a voice-agent bug', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow({ repo: null }));
       repoClassifier.classifyRepo.mockResolvedValue({
-        repo: 'ally-mobile',
-        rationale: 'Native terms screen.',
+        repo: 'ally-ai-learn',
+        rationale: 'Voice session agent.',
       });
 
       await service.start('finding-1', 42);
 
       expect(github.dispatchWorkflow).toHaveBeenCalledWith(
-        expect.objectContaining({ repo: 'ally-mobile' }),
+        expect.objectContaining({ repo: 'ally-ai-learn' }),
       );
     });
 
@@ -569,14 +569,13 @@ describe('BugFixSessionService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('accepts an admin-supplied ally-mobile repo and dispatches it', async () => {
+    it('rejects ally-mobile: no fix-session workflow since the Flutter rename (stays excluded)', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow({ repo: null }));
 
-      await service.start('finding-1', 42, 'ally-mobile');
-
-      expect(github.dispatchWorkflow).toHaveBeenCalledWith(
-        expect.objectContaining({ repo: 'ally-mobile' }),
-      );
+      await expect(
+        service.start('finding-1', 42, 'ally-mobile'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(github.dispatchWorkflow).not.toHaveBeenCalled();
     });
 
     it('closes the run it opened when the dispatch itself fails', async () => {
@@ -2064,15 +2063,15 @@ describe('BugFixSessionService — coordinated multi-repo fixes', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('accepts a plan whose step lands in ally-mobile', async () => {
+    it('accepts a plan whose step lands in ally-web', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow());
       await service.recordPlan('finding-1', [
         { repo: 'ally-be', summary: 'add the field' },
-        { repo: 'ally-mobile', summary: 'render the field' },
+        { repo: 'ally-web', summary: 'render the field' },
       ]);
       expect(findingRepository.create).toHaveBeenNthCalledWith(
         2,
-        expect.objectContaining({ repo: 'ally-mobile', stepIndex: 1 }),
+        expect.objectContaining({ repo: 'ally-web', stepIndex: 1 }),
       );
     });
   });

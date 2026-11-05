@@ -229,7 +229,7 @@ describe('BugHunterFeatureMapService', () => {
   it('refreshes every repo once a week and survives one failing', async () => {
     github.dispatchWorkflow.mockRejectedValueOnce(new Error('boom'));
     await service.refreshAll();
-    expect(github.dispatchWorkflow).toHaveBeenCalledTimes(5);
+    expect(github.dispatchWorkflow).toHaveBeenCalledTimes(4);
   });
 
   it("finds cards by the bug's words, and by a file the bug names", async () => {

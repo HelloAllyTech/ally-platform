@@ -29,7 +29,7 @@ describe('the toolbox every protocol renders', () => {
     );
     expect(text).toContain('scenario-translations');
     expect(text).toContain(
-      '/tmp/siblings/<repo> (ally-be, ally-ai, ally-ai-learn, ally-mobile)',
+      '/tmp/siblings/<repo> (ally-be, ally-ai, ally-ai-learn)',
     );
     expect(text).not.toMatch(/\(ally-web,/);
     expect(text).toContain('pipeline/precedents?findingId=f-1&runId=run-1');
