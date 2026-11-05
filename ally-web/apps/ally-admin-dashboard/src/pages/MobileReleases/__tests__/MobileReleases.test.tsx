@@ -14,6 +14,7 @@ vi.mock("@api", () => ({
   useGetMinimumAndroidVersionQuery: () => ({ data: undefined, isLoading: false }),
   useUpdateMinimumAppVersionMutation: () => [vi.fn(), { isLoading: false }],
   useTriggerAndroidPromotionMutation: () => [vi.fn(), { isLoading: false }],
+  useTriggerMobileReleaseMutation: () => [vi.fn(), { isLoading: false }],
   useSubmitIosAppStoreReviewMutation: () => [vi.fn(), { isLoading: false }],
   useLazyGetIosWhatsNewSuggestionQuery: () => [vi.fn(), { isFetching: false }],
   useLazyGetAndroidWhatsNewSuggestionQuery: () => [vi.fn(), { isFetching: false }],
@@ -41,6 +42,9 @@ vi.mock("../tabs/AndroidReleasesTab", () => ({ AndroidReleasesTab: () => null })
 vi.mock("../tabs/IosTestflightTab", () => ({ IosTestflightTab: () => null }));
 vi.mock("../tabs/AppStoreSubmissionsTab", () => ({ AppStoreSubmissionsTab: () => null }));
 vi.mock("../tabs/ReleaseHistoryTab", () => ({ ReleaseHistoryTab: () => null }));
+
+// Pulls in @icons/@assets dependencies irrelevant to the overview panel this test covers.
+vi.mock("../components/NextCheckPanel", () => ({ NextCheckPanel: () => null }));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
   Button: ({ children, onClick, disabled }: any) => (

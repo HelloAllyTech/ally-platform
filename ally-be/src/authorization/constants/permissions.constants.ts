@@ -307,12 +307,13 @@ const PERMISSIONS = {
   // VIEW_AWS_LOGS. Backs the Mobile Releases admin page (ally-mobile CI
   // build/release status + current app version).
   VIEW_MOBILE_RELEASES: 'view:mobile-releases',
-  // UNUSED since scheduled-mobile-release.yml (RN's auto-bump-and-ship cron,
-  // the only thing this gated) was retired — no Flutter equivalent exists,
-  // releases are manual via Play Console/App Store Connect now. Left defined
-  // rather than removed: a migration already seeded it into group_permissions
+  // Narrower than VIEW_MOBILE_RELEASES: dispatches a real production release
+  // pipeline run (scheduled-mobile-release.yml with force: true), so it is
+  // gated separately even though both are SUPER_DUPER_ADMIN-only today.
+  // Briefly unused between the RN retirement and the Flutter rebuild of this
+  // workflow — a migration had already seeded it into group_permissions
   // (never recomputed from this file — see ally-be/CLAUDE.md's roles gotcha),
-  // so deleting the constant would just dangle that seeded row's meaning.
+  // which is why reviving it needed no new migration.
   TRIGGER_MOBILE_RELEASES: 'trigger:mobile-releases',
   // Narrower still: promotes an already-shipped build further into
   // production (Play Store staged rollout increase, or TestFlight external

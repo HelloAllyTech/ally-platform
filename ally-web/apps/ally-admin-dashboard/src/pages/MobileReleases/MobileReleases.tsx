@@ -22,6 +22,7 @@ import {
   useLazyGetIosWhatsNewSuggestionQuery,
   useSubmitIosAppStoreReviewMutation,
   useTriggerAndroidPromotionMutation,
+  useTriggerMobileReleaseMutation,
   useUpdateMinimumAppVersionMutation,
 } from "@api";
 import { ActionConfirmationPopup } from "@components";
@@ -30,13 +31,17 @@ import { formatDateTime } from "@utils";
 
 import { AndroidReleasePipeline } from "./components/AndroidReleasePipeline";
 import { IosReleasePipeline } from "./components/IosReleasePipeline";
+import { NextCheckPanel } from "./components/NextCheckPanel";
 import { PlatformStatusCard } from "./components/PlatformStatusCard";
 import { RecommendedActionBanner } from "./components/RecommendedActionBanner";
 import {
   deriveRecommendedAction,
   findLastRun,
+  findLastSuccessfulRun,
   getAppStoreReviewSubmissionStatusDisplay,
   getTestflightStatusDisplay,
+  isReleaseInProgress,
+  isRunAfter,
   isValidVersionFormat,
   isVersionGreaterThan,
 } from "./mobileReleaseStatus";
@@ -124,20 +129,34 @@ export const MobileReleases: FC = () => {
     null;
 
   const lastAndroidPromoteRun = findLastRun(runs, "Promote Android");
-  // Validation signal for the promotion dialog: warn, don't block, since re-promoting the same
-  // build (e.g. to raise the rollout percentage) is a legitimate, common thing to do. Used to
-  // also check the promote run happened after the current build's own upload (isRunAfter against
-  // an "Android Build" run) — that build-run tracking no longer exists since ally-mobile-rn-archive/
-  // (and its build-android-production.yml) was deleted, so this can only say "a promotion
-  // happened recently", not "...for this specific build". A false-positive warning here is
-  // harmless (the operator can just proceed); losing the warning entirely would not be.
-  const isAndroidAlreadyPromoted = lastAndroidPromoteRun?.conclusion === "success";
-  // No tracked build-run source exists for Flutter's Android releases (see above) — there is no
-  // longer any "last release date" to show here.
-  const androidLastReleaseDate: string | null = null;
+  const lastAndroidBuildRun = findLastSuccessfulRun(runs, "Android Build");
+  // A promotion only counts as "already done" for the current build if it happened after that
+  // build's own upload — otherwise it's a promotion of some earlier version.
+  const isAndroidAlreadyPromoted =
+    isRunAfter(lastAndroidPromoteRun, lastAndroidBuildRun) &&
+    lastAndroidPromoteRun?.conclusion === "success";
+  const androidLastReleaseDate = lastAndroidBuildRun?.updatedAt ?? null;
   const iosLastReleaseDate = testflightHistory[0]?.uploadedDate ?? null;
+  const releaseInProgress = isReleaseInProgress(runs);
 
   const [tabIndex, setTabIndex] = useState(0);
+
+  const [isConfirmingTrigger, setIsConfirmingTrigger] = useState(false);
+  const [triggerRelease, { isLoading: isTriggering }] = useTriggerMobileReleaseMutation();
+
+  const handleTrigger = async () => {
+    try {
+      await triggerRelease().unwrap();
+      toast.success("Release dispatched — new run should appear in Release History shortly.");
+      setIsConfirmingTrigger(false);
+    } catch (error) {
+      // Leave the dialog open on failure so the operator can see the error message and retry.
+      const message =
+        (error as { data?: { message?: string } })?.data?.message ??
+        "Failed to dispatch the release. Please try again.";
+      toast.error(message);
+    }
+  };
 
   const [isConfirmingAndroidPromotion, setIsConfirmingAndroidPromotion] = useState(false);
   const [androidRolloutPercentage, setAndroidRolloutPercentage] = useState(
@@ -396,6 +415,12 @@ export const MobileReleases: FC = () => {
             }
             footnote="Reflects the version committed on master — confirm it's actually published in App Store Connect before treating it as live."
           />
+          <NextCheckPanel
+            isVersionsLoading={isVersionsLoading}
+            isVersionsError={isVersionsError}
+            nextEligibleCheckAt={versions?.nextEligibleCheckAt ?? null}
+            isReleaseInProgress={releaseInProgress}
+          />
         </div>
 
         <RecommendedActionBanner
@@ -415,6 +440,7 @@ export const MobileReleases: FC = () => {
               <AndroidReleasePipeline
                 androidVersionName={versions.android.versionName}
                 androidVersionCode={versions.android.versionCode}
+                lastBuildRun={lastAndroidBuildRun}
                 lastPromoteRun={lastAndroidPromoteRun}
                 productionStatus={androidProductionStatus}
                 isProductionStatusLoading={isAndroidProductionStatusLoading}
@@ -453,13 +479,31 @@ export const MobileReleases: FC = () => {
             a release step. */}
         <div className="flex flex-col gap-3 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
-            {(isPromotingAndroid || isSubmittingAppStoreReview) && (
-              <InlineLoading description={isPromotingAndroid ? "Promoting…" : "Submitting…"} />
+            {(isTriggering || isPromotingAndroid || isSubmittingAppStoreReview) && (
+              <InlineLoading
+                description={
+                  isTriggering ? "Dispatching…" : isPromotingAndroid ? "Promoting…" : "Submitting…"
+                }
+              />
             )}
           </div>
           <div>
             <p className="text-xs tracking-wide text-typography-600 mb-1.5">Release actions</p>
             <div className="flex flex-wrap gap-2">
+              <Tooltip
+                label="Immediately dispatches the scheduled release pipeline — skips the 48h cadence wait, but tests still have to be green and there still have to be new commits to ship."
+                className="max-sm:w-full"
+              >
+                <Button
+                  kind="tertiary"
+                  size="md"
+                  className="max-sm:!w-full max-sm:!max-w-none"
+                  disabled={isTriggering}
+                  onClick={() => setIsConfirmingTrigger(true)}
+                >
+                  Trigger release now
+                </Button>
+              </Tooltip>
               <Tooltip
                 label="Promotes the current internal-track Android build to the Play Store production track at a staged rollout percentage you choose. Real users start receiving it."
                 className="max-sm:w-full"
@@ -551,6 +595,10 @@ export const MobileReleases: FC = () => {
                   testflightHistory={testflightHistory}
                   isTestflightHistoryLoading={isTestflightHistoryLoading}
                   isTestflightHistoryError={isTestflightHistoryError}
+                  runs={runs}
+                  isRunsLoading={isRunsLoading}
+                  isRunsFetching={isRunsFetching}
+                  isRunsError={isRunsError}
                 />
               )}
             </TabPanel>
@@ -581,6 +629,32 @@ export const MobileReleases: FC = () => {
           </TabPanels>
         </Tabs>
       </div>
+
+      {isConfirmingTrigger && (
+        <ActionConfirmationPopup
+          isOpen={isConfirmingTrigger}
+          onClose={() => setIsConfirmingTrigger(false)}
+          title="Trigger mobile release now?"
+          description="This immediately dispatches the scheduled release pipeline instead of waiting for its next automatic check. It still only ships something if there are new commits since the last release and tests are green."
+          primaryButton={{
+            label: isTriggering ? "Dispatching…" : "Trigger release",
+            onClick: () => void handleTrigger(),
+            disabled: isTriggering,
+          }}
+          secondaryButton={{
+            label: en.common.cancel,
+            onClick: () => setIsConfirmingTrigger(false),
+            disabled: isTriggering,
+          }}
+        >
+          {releaseInProgress && (
+            <p className="text-sm text-warning-text mt-2">
+              A release appears to be running right now — triggering another one may overlap with
+              it. Check Release History before proceeding.
+            </p>
+          )}
+        </ActionConfirmationPopup>
+      )}
 
       {isConfirmingAndroidPromotion && (
         <ActionConfirmationPopup

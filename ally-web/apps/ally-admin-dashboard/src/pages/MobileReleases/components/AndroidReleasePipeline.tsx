@@ -7,12 +7,15 @@ import { formatDateTime } from "@utils";
 import {
   getAndroidProductionStatusDisplay,
   getMobileReleaseRunStatusDisplay,
+  isRunAfter,
   MobileReleaseStatusDisplay,
 } from "../mobileReleaseStatus";
 
 interface AndroidReleasePipelineProps {
   androidVersionName?: string | null;
   androidVersionCode?: number | null;
+  /** Most recent SUCCESSFUL "Android Build" run — the current build's own upload. */
+  lastBuildRun?: MobileReleaseRun | null;
   /** Most recent "Promote Android" run, any outcome — a still-running or failed attempt matters too. */
   lastPromoteRun?: MobileReleaseRun | null;
   /** Live Play Developer API production-track state — see AndroidProductionStatusResponse's own doc comment for what "completed" does and doesn't guarantee. */
@@ -39,17 +42,11 @@ interface Stage {
  * actually proves: `status: 'completed'` only means genuinely live to every user once Managed
  * Publishing is off for this app; with it on, this can still read "completed" while Google is
  * still holding the change for review or a manual publish click.
- *
- * No "Build" stage: that used to read the last successful "Android Build" GitHub Actions run
- * (RN's build-android-production.yml, kept alive in ally-mobile-rn-archive/ for a possible
- * rollback), deleted along with that folder in the 2026-11 Flutter rename. Flutter's own build
- * workflow isn't tracked by this run-history mechanism at all, so there's no equivalent "build
- * finished uploading" timestamp to show — androidVersionName/Code (from pubspec.yaml) is the
- * only signal this page has that a build exists.
  */
 export const AndroidReleasePipeline: FC<AndroidReleasePipelineProps> = ({
   androidVersionName,
   androidVersionCode,
+  lastBuildRun,
   lastPromoteRun,
   productionStatus,
   isProductionStatusLoading,
@@ -58,9 +55,17 @@ export const AndroidReleasePipeline: FC<AndroidReleasePipelineProps> = ({
   isMinAndroidVersionLoading,
   onUpdateMinVersion,
 }) => {
-  if (!androidVersionName) {
-    return <p className="text-sm text-typography-700">No Android version information yet.</p>;
+  if (!androidVersionName || !lastBuildRun) {
+    return (
+      <p className="text-sm text-typography-700">
+        No successful Android build yet — this fills in once the next build finishes uploading.
+      </p>
+    );
   }
+
+  // A promote run only counts as being "for" the current build if it happened after that build's
+  // own upload finished — otherwise it's a promotion of some earlier version, not this one.
+  const isPromoteForCurrentBuild = isRunAfter(lastPromoteRun, lastBuildRun);
 
   // The production track's release only counts as being "for" the current build if its
   // versionCodes actually include this build's versionCode — unlike the promote-run check above,
@@ -72,27 +77,26 @@ export const AndroidReleasePipeline: FC<AndroidReleasePipelineProps> = ({
 
   const isMinVersionCurrent = currentMinAndroidVersion === androidVersionName;
 
-  // Without a tracked build-run to correlate against (see class doc above), this can only say
-  // "a promote run exists", not "...for this specific version" — a promote of an older version
-  // would still show here as if it were current. Harmless: this stage is informational, nothing
-  // blocks on it.
-  const promoteStage: Stage = lastPromoteRun
-    ? {
-        title: "Promote to Production",
-        tag: getMobileReleaseRunStatusDisplay(lastPromoteRun.status, lastPromoteRun.conclusion),
-        date: lastPromoteRun.runStartedAt,
-        description:
-          lastPromoteRun.conclusion === "success"
-            ? "Submitted to Google for review. See the Publish stage below for the real production-track state."
-            : lastPromoteRun.status === "completed"
-              ? "The last promotion attempt didn't succeed — see Release History for details."
-              : "Promotion is running now.",
-      }
-    : {
-        title: "Promote to Production",
-        tag: { type: "cool-gray", label: "Not yet promoted" },
-        description: "This build hasn't been promoted to the production track yet.",
-      };
+  const promoteStage: Stage =
+    lastPromoteRun && isPromoteForCurrentBuild
+      ? {
+          title: "Promote to Production",
+          tag: getMobileReleaseRunStatusDisplay(lastPromoteRun.status, lastPromoteRun.conclusion),
+          date: lastPromoteRun.runStartedAt,
+          description:
+            lastPromoteRun.conclusion === "success"
+              ? "Submitted to Google for review. See the Publish stage below for the real production-track state."
+              : lastPromoteRun.status === "completed"
+                ? "The last promotion attempt didn't succeed — see Release History for details."
+                : "Promotion is running now.",
+        }
+      : {
+          title: "Promote to Production",
+          tag: { type: "cool-gray", label: "Not yet promoted" },
+          description: lastPromoteRun
+            ? "The last promotion predates this build — it hasn't been promoted to production yet."
+            : "This build hasn't been promoted to the production track yet.",
+        };
 
   const publishStage: Stage = isProductionStatusLoading
     ? {
@@ -130,6 +134,14 @@ export const AndroidReleasePipeline: FC<AndroidReleasePipelineProps> = ({
           };
 
   const stages: Stage[] = [
+    {
+      title: "Auto Build",
+      tag: { type: "cool-gray", label: "Uploaded" },
+      date: lastBuildRun.runStartedAt,
+      description: `Build ${androidVersionName}${
+        androidVersionCode ? ` (${androidVersionCode})` : ""
+      } finished uploading to the Play Store internal track.`,
+    },
     promoteStage,
     publishStage,
     {

@@ -78,9 +78,23 @@ const mobileReleasesAPI = baseAPI.injectEndpoints({
         response.submissions,
     }),
 
+    // Manually dispatches the release pipeline for both platforms right now —
+    // gated on the backend by a separate, stricter permission than viewing
+    // this page. Re-fetches the run list on success so the new run shows up
+    // without waiting on the next 30s poll; a failed dispatch (e.g. the
+    // GitHub Actions token isn't write-scoped) leaves the list untouched.
+    triggerMobileRelease: builder.mutation<TriggerMobileReleaseResponse, void>({
+      query: () => ({
+        url: ApiEndpoints.MOBILE_RELEASES.TRIGGER,
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.MOBILE_RELEASE_RUNS],
+    }),
+
     // Promotes the current internal-track Android build to the Play Store
-    // production track at a staged rollout — a real production action.
-    // Re-fetches the run list on success for the same reason as above.
+    // production track at a staged rollout — a real production action, and
+    // gated on the backend by a stricter permission than triggerMobileRelease
+    // above. Re-fetches the run list on success for the same reason as above.
     triggerAndroidPromotion: builder.mutation<
       TriggerMobileReleaseResponse,
       TriggerAndroidPromotionRequest
@@ -149,6 +163,7 @@ export const {
   useGetIosTestflightStatusQuery,
   useGetIosTestflightHistoryQuery,
   useGetIosAppStoreReviewHistoryQuery,
+  useTriggerMobileReleaseMutation,
   useTriggerAndroidPromotionMutation,
   useSubmitIosAppStoreReviewMutation,
   useLazyGetIosWhatsNewSuggestionQuery,

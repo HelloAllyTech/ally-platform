@@ -1,0 +1,59 @@
+name: Tests (ally-mobile)
+
+# `flutter test`/`flutter analyze` on the Flutter app. Re-created (the original, same name, ran
+# RN's Jest/ESLint before the 2026-11 rename) — this is the test-gate
+# scheduled-mobile-release.yml polls before shipping an automated build, so it has to exist and
+# go green on master before that pipeline can ever ship anything.
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "ally-mobile/**"
+  push:
+    branches: [master]
+    paths:
+      - "ally-mobile/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-ally-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: ally-mobile
+
+jobs:
+  test:
+    name: flutter test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Run tests
+        run: flutter test
+
+  analyze:
+    name: flutter analyze
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze

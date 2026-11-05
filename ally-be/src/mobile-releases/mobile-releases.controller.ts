@@ -18,31 +18,32 @@ import {
   MobileCurrentVersionResponseDto,
   MobileDispatchResponseDto,
   MobileReleaseRunsResponseDto,
+  MobileTriggerResponseDto,
   PromoteAndroidRequestDto,
   SubmitIosAppStoreReviewRequestDto,
   WhatsNewSuggestionResponseDto,
 } from './dto/mobile-releases.dto';
 
 /**
- * GitHub Actions release/build status for ally-mobile's release pipeline,
- * plus a read-only App Store Connect TestFlight status view. Gated ONLY to
- * SUPER_DUPER_ADMIN — view:mobile-releases (migration 1941000000000) for the
- * read endpoints (GitHub-backed and the App Store Connect-backed
- * ios-testflight-status below), promote:mobile-releases (migration
- * 1944000000000) for the manual Android production-promotion endpoint, and
- * submit-app-store-review:mobile-releases (migration 1944300000000) for the
- * manual, full App Store review submission endpoint below — same divergence
- * pattern as the AWS Logs viewer. (iOS external-TestFlight promotion used to
- * have a matching manual endpoint here too; removed once submission became
- * fully automatic and this repo's actual testers turned out to all be
- * Internal, not External — see git history if it's ever needed again. The
- * manual scheduled-release dispatch endpoint that used to sit here, gated on
- * trigger:mobile-releases, was removed the same way when
- * scheduled-mobile-release.yml itself was retired, and RN's own build/test
- * workflows plus the archived app they built (ally-mobile-rn-archive/) were
- * deleted outright shortly after the 2026-11 cutover, once the rollback path
- * they were kept for was confirmed unneeded. Releases are manual via Play
- * Console/App Store Connect now, as they already were.)
+ * GitHub Actions release/build status for ally-mobile's automated release
+ * pipeline, plus a read-only App Store Connect TestFlight status view. Gated
+ * ONLY to SUPER_DUPER_ADMIN — view:mobile-releases (migration 1941000000000)
+ * for the read endpoints (GitHub-backed and the App Store Connect-backed
+ * ios-testflight-status below), trigger:mobile-releases (migration
+ * 1943000000000) for the manual scheduled-release dispatch endpoint,
+ * promote:mobile-releases (migration 1944000000000) for the manual Android
+ * production-promotion endpoint, and submit-app-store-review:mobile-releases
+ * (migration 1944300000000) for the manual, full App Store review submission
+ * endpoint below — same divergence pattern as the AWS Logs viewer. (iOS
+ * external-TestFlight promotion used to have a matching manual endpoint here
+ * too; removed once submission became fully automatic and this repo's
+ * actual testers turned out to all be Internal, not External — see git
+ * history if it's ever needed again. RN's own build/test workflows plus the
+ * archived app they built (ally-mobile-rn-archive/) were deleted outright
+ * after the 2026-11 cutover, once the rollback path they were kept for was
+ * confirmed unneeded; the scheduled-release mechanism itself was rebuilt on
+ * Flutter afterward rather than left retired — see
+ * scheduled-mobile-release.yml's own header comment.)
  *
  * ios-whats-new-suggestion below is also read-only, but is gated to the
  * narrower submit-app-store-review:mobile-releases permission rather than
@@ -79,6 +80,20 @@ export class MobileReleasesController {
   @Get('current-version')
   getCurrentVersion(): Promise<MobileCurrentVersionResponseDto> {
     return this.mobileReleasesService.getCurrentVersion();
+  }
+
+  @ApiOperation({
+    summary:
+      'Manually dispatch scheduled-mobile-release.yml (force: skips the 48h cadence gate, tests still gate the actual build)',
+  })
+  @ApiResponse({ status: 200, type: MobileTriggerResponseDto })
+  @RequireFeatureToggle(FeatureToggleKey.MOBILE_RELEASES, {
+    permissions: [PERMISSIONS.TRIGGER_MOBILE_RELEASES],
+  })
+  @HttpCode(200)
+  @Post('trigger')
+  triggerRelease(): Promise<MobileTriggerResponseDto> {
+    return this.mobileReleasesService.triggerRelease();
   }
 
   @ApiOperation({
