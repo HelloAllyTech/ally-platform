@@ -188,6 +188,25 @@ describe('WebSocketAuthMiddleware', () => {
       );
     });
 
+    it('should log and forward an unexpected error during permission checking', async () => {
+      const socket = createMockSocket({
+        handshake: { auth: { token: mockValidToken } },
+      });
+      const next = createMockNext();
+      const authMiddleware = middleware.webSocketMiddleware([
+        PERMISSIONS.VIEW_USER,
+      ]);
+      const permissionError = new Error('Database connection lost');
+
+      jwtService.verifyAsync.mockResolvedValue(mockValidPayload);
+      permissionsService.getUserPermissions.mockRejectedValue(permissionError);
+
+      await authMiddleware(socket, next);
+
+      expect(permissionsService.getUserPermissions).toHaveBeenCalledWith(123);
+      expect(next).toHaveBeenCalledWith(permissionError);
+    });
+
     it('should reject connection on unexpected JWT verification error', async () => {
       const socket = createMockSocket({
         handshake: {
