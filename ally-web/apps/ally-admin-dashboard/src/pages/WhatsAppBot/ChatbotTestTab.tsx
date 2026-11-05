@@ -1,18 +1,27 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { Checkbox, InlineNotification, TextArea } from "@ally-ui-mono/ui-shared";
-import { useTestChatbotMutation } from "@api";
+import {
+  Checkbox,
+  InlineNotification,
+  Select,
+  SelectItem,
+  TextArea,
+} from "@ally-ui-mono/ui-shared";
+import { useGetChatbotsQuery, useTestChatbotMutation } from "@api";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { Chatbot, ChatbotDraft, TestChatbotResponse } from "@types";
 
-import { Card, errorMessage, fill } from "./shared";
+import { Card, copyToClipboard, errorMessage, fill } from "./shared";
 
 import type { PersonaDraft } from "./PersonaTab";
 
 const t = en.whatsappBot.bots.test;
 const handledLabels = en.whatsappBot.conversations.handledBy as Record<string, string>;
+
+/** Preview's engine choice for the next test: the chatbot's own setting, or one forced engine. */
+type EngineChoice = "bot" | "v1" | "v2";
 
 type Turn =
   | { role: "user"; content: string }
@@ -41,6 +50,13 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [message, setMessage] = useState("");
   const [checkAccess, setCheckAccess] = useState(false);
+  // The thread the new engine keeps for this chat, until "New thread".
+  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [engine, setEngine] = useState<EngineChoice>("bot");
+  const [runtimeAllowed, setRuntimeAllowed] = useState(true);
+  // Comparing engines is for platform admins, like choosing one.
+  const { data: list } = useGetChatbotsQuery();
+  const canCompare = Boolean(list?.canCreate);
   const [test, { isLoading }] = useTestChatbotMutation();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -61,7 +77,11 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
         history,
         draft,
         checkAccess,
+        conversationId,
+        ...(canCompare && engine !== "bot" ? { runtime: engine } : {}),
       }).unwrap();
+      setConversationId(result.conversationId);
+      setRuntimeAllowed(result.runtimeAllowed !== false);
       setTurns(current => [...current, { role: "assistant", content: result.reply, result }]);
     } catch (err) {
       setTurns(current => [
@@ -77,14 +97,38 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
       subtitle={t.intro}
       action={
         turns.length > 0 && (
-          <Button variant={ButtonVariant.SECONDARY} onClick={() => setTurns([])}>
-            {t.reset}
+          <Button
+            variant={ButtonVariant.SECONDARY}
+            onClick={() => {
+              setTurns([]);
+              setConversationId(undefined);
+            }}
+          >
+            {t.newThread}
           </Button>
         )
       }
     >
       {draft && (
         <InlineNotification kind="info" title={t.draftBanner} lowContrast hideCloseButton />
+      )}
+      {canCompare && (
+        <div className="flex flex-col gap-2 max-w-xs">
+          <Select
+            id="chatbot-test-engine"
+            labelText={t.engineLabel}
+            size="sm"
+            value={engine}
+            onChange={e => setEngine(e.target.value as EngineChoice)}
+          >
+            <SelectItem value="bot" text={t.engineBot} />
+            <SelectItem value="v1" text={t.engineV1} />
+            <SelectItem value="v2" text={t.engineV2} />
+          </Select>
+        </div>
+      )}
+      {canCompare && !runtimeAllowed && (
+        <InlineNotification kind="info" title={t.engineDisabled} lowContrast hideCloseButton />
       )}
       <div className="flex flex-col gap-3 min-h-[16rem] max-h-[32rem] overflow-y-auto bg-background-100 rounded-md p-4">
         {turns.length === 0 ? (
@@ -167,6 +211,7 @@ const Bubble: React.FC<{ turn: Turn }> = ({ turn }) => {
             </span>
           )}
           <span>{result.latencyMs} ms</span>
+          <EngineBadge result={result} />
           {result.citations.length > 0 && (
             <span>
               {t.sources}: {[...new Set(result.citations.map(c => c.document_title))].join(", ")}
@@ -179,6 +224,59 @@ const Bubble: React.FC<{ turn: Turn }> = ({ turn }) => {
             </span>
           )}
         </div>
+      )}
+      {result?.runId && <RunDetails result={result} />}
+    </div>
+  );
+};
+
+/** Which engine answered this test. */
+const EngineBadge: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
+  const runtime = result.runtime ?? "v1";
+  const label =
+    runtime === "v2_fallback"
+      ? fill(t.fellBack, { reason: result.fallbackReason ?? "unknown" })
+      : fill(t.answeredBy, { engine: runtime });
+  const tone =
+    runtime === "v2"
+      ? "border-primary-300 text-primary-700"
+      : runtime === "v2_fallback"
+        ? "border-warning-300 text-warning-700"
+        : "border-border-light text-typography-600";
+  return (
+    <span data-testid="engine-badge" className={`rounded-full border px-2 ${tone}`}>
+      {label}
+    </span>
+  );
+};
+
+/** The run behind a v2 answer: its id, to find it later, and the steps it took. */
+const RunDetails: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
+  const steps = result.trace ?? [];
+  return (
+    <div className="flex flex-col gap-1 text-xs text-typography-500 px-1">
+      <div className="flex items-center gap-2">
+        <span>{t.runId}:</span>
+        <code className="break-all">{result.runId}</code>
+        <button
+          type="button"
+          className="text-primary-600 hover:underline"
+          onClick={() => void copyToClipboard(result.runId ?? "")}
+        >
+          {t.copy}
+        </button>
+      </div>
+      {steps.length > 0 && (
+        <details>
+          <summary className="cursor-pointer">{fill(t.steps, { count: steps.length })}</summary>
+          <ol className="list-decimal pl-5 pt-1">
+            {steps.map((step, index) => (
+              <li key={`${step.node}-${index}`}>
+                {step.node} · {step.ms} ms
+              </li>
+            ))}
+          </ol>
+        </details>
       )}
     </div>
   );

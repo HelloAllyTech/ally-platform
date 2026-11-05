@@ -85,6 +85,19 @@ export interface ChatbotStats {
   lastMessageAt: string | null;
 }
 
+/** Which engine answers a chatbot (Agents v2). */
+export type ChatbotRuntime = "v1" | "shadow" | "v2";
+
+/** The engine that answered one Preview test; `v2_fallback` means v2 failed and v1 answered. */
+export type ChatbotRuntimeUsed = "v1" | "v2" | "v2_fallback";
+
+/** One step the new engine took, in order. */
+export interface AgentTraceStep {
+  node: string;
+  ms: number;
+  summary: string;
+}
+
 export interface Chatbot {
   id: string;
   name: string;
@@ -95,6 +108,11 @@ export interface Chatbot {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: ChatbotPersona;
   model: ChatbotModelChoice | null;
+  /** The engine it is set to. Only platform admins can change it. */
+  runtime: ChatbotRuntime;
+  /** What actually answers: v1 whenever the new engine is turned off in Defaults. */
+  effectiveRuntime: ChatbotRuntime;
+  features: Record<string, boolean>;
   myRole: ChatbotMemberRole;
   connectors: Connector[];
   documentCount: number;
@@ -130,6 +148,8 @@ export interface UpdateChatbotRequest {
   accessMode?: ChatbotAccessMode;
   knowledgeSource?: ChatbotKnowledgeSource;
   model?: ChatbotModelChoice | null;
+  /** Platform admins only. */
+  runtime?: ChatbotRuntime;
 }
 
 export interface ChatbotDocumentRow {
@@ -186,6 +206,10 @@ export interface TestChatbotRequest {
   draft?: ChatbotDraft;
   asTenantId?: string;
   checkAccess?: boolean;
+  /** Platform admins only: answer this one test with this engine. */
+  runtime?: "v1" | "v2";
+  /** The Preview thread (`preview-<uuid>`), kept until "New thread". */
+  conversationId?: string;
 }
 
 export interface TestChatbotResponse {
@@ -203,4 +227,12 @@ export interface TestChatbotResponse {
   wouldAlert: string | null;
   latencyMs: number;
   usedDraft: boolean;
+  runtime: ChatbotRuntimeUsed;
+  runId: string | null;
+  trace: AgentTraceStep[] | null;
+  /** Why the new engine failed, when v1 answered instead. */
+  fallbackReason: string | null;
+  /** False while the new engine is turned off in Defaults. */
+  runtimeAllowed: boolean;
+  conversationId: string;
 }

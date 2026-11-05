@@ -360,6 +360,8 @@ export interface WaBotSettings {
   retentionDays: number;
   /** Run the LLM crisis classifier alongside retrieval. Keyword rules are unaffected by this. */
   crisisClassifierEnabled: boolean;
+  /** The platform kill switch for the new engine (Agents v2). Off: every chatbot answers with v1. */
+  agentRuntimeAllowed: boolean;
   helplineNumbers: string;
 }
 

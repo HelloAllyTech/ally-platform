@@ -1689,6 +1689,9 @@ export const en = {
         enabledLabel: "Chatbots can reply",
         enabledHelp:
           "Turn off to stop every chatbot replying at once, for example during an incident. Messages are still recorded.",
+        agentRuntimeLabel: "Allow the new engine",
+        agentRuntimeHelp:
+          "Lets chatbots set to v2 or Shadow use the new engine. Turn off to put every chatbot back on v1 at once, with no deploy.",
         crisisCheckLabel: "Extra AI crisis check",
         crisisCheckHelp:
           "Keyword replies catch messages that say it outright. This also catches ones that don't, like “I can't keep doing this”. Chatbots can't turn it off.",
@@ -1776,6 +1779,17 @@ export const en = {
         placeholder: "Type a question…",
         send: "Send",
         reset: "Start over",
+        newThread: "New thread",
+        answeredBy: "Answered by {engine}",
+        fellBack: "Answered by v1 (v2 failed: {reason})",
+        runId: "Run",
+        copy: "Copy",
+        steps: "Steps ({count})",
+        engineLabel: "Engine for this test",
+        engineBot: "Chatbot's setting",
+        engineV1: "v1",
+        engineV2: "v2",
+        engineDisabled: "The new engine is off in Defaults, so every test answers with v1.",
         handledBy: "Handled by",
         model: "Model",
         sources: "Sources",
@@ -1859,6 +1873,21 @@ export const en = {
       groupSafety: "Safety and limits",
       groupAdvanced: "Advanced",
       advancedHint: "Rarely needed. Ask Ally before changing these.",
+      engineTitle: "Engine",
+      engineIntro: "Which engine answers this chatbot's questions. Only platform admins see this.",
+      engineV1: "v1",
+      engineV1Help: "The current engine. Answers exactly as today.",
+      engineShadow: "Shadow",
+      engineShadowHelp:
+        "v1 answers. The new engine answers the same question in the background so the two can be compared. Nobody sees its answers.",
+      engineV2: "v2",
+      engineV2Help:
+        "The new engine answers. If it fails, v1 answers that message instead and the team is alerted.",
+      engineDisabled:
+        "The new engine is turned off in Defaults, so this chatbot answers with v1 for now.",
+      engineSave: "Save engine",
+      engineSaved: "Engine saved.",
+      engineSaveFailed: "Couldn't change the engine.",
       enabledLabel: "Answer messages",
       enabledHelp:
         "Turn off to stop this chatbot replying. Pausing it from Overview does the same.",
