@@ -425,7 +425,7 @@ applied to an artefact people will screenshot.
 
 ### Phase 5 — Mobile parity + reporting (1 PR)
 
-`ally-mobile` mirrors `ally-web` file-for-file (`ally-mobile/src/services/coursesApi.ts` is commented as mirroring
+`ally-mobile` mirrors `ally-web` file-for-file (`ally-mobile/src/services/coursesApi.ts` is commented as mirroring <!-- docs-path-lint: ignore -->
 `ally-web/apps/ally-helpline-dashboard/src/api/tracks.ts`). Port: credentials list, certificate detail with native share sheet, assessment-mode player chrome,
 certificate reveal on completion. The PDF opens in the system viewer via the presigned URL — do not build an
 in-app renderer.

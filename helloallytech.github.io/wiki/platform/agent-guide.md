@@ -54,7 +54,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 ### [ally-mobile](../repos/ally-mobile.md) — Mobile App
 - **Stack**: React Native 0.79 / TypeScript 5 / React 19 / Redux Toolkit + RTK Query
-- **Entry**: `index.js` → `ally-mobile/src/App.tsx`; navigation via React Navigation 7 (native-stack + bottom-tabs + drawer)
+- **Entry**: `index.js` → `ally-mobile/src/App.tsx`; navigation via React Navigation 7 (native-stack + bottom-tabs + drawer) <!-- docs-path-lint: ignore -->
 - **Services**: RTK Query slices in `src/services/`; custom hooks in `src/hooks/`
 - **Real-time**: Socket.IO + LiveKit React Native; `react-native-live-audio-stream` for recording
 - **Key patterns**: Dual listening modes (microphone + conference), AsyncStorage for tokens, Firebase Crashlytics
