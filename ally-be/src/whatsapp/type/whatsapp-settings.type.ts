@@ -114,6 +114,13 @@ export interface WhatsAppBotSettings {
    * row. Unset: the platform number does not reply.
    */
   platformChatbotId?: string | null;
+
+  /**
+   * The platform kill switch for the Agents v2 engine. Off, every bot answers with v1 whatever its
+   * own `runtime` says — rollback is this switch, not a deploy. Platform-wide only: a bot's settings
+   * cannot turn it on.
+   */
+  agentRuntimeAllowed: boolean;
 }
 
 export const WHATSAPP_SETTINGS_NAME = 'whatsapp_bot';
@@ -167,4 +174,5 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
   retentionDays: 180,
   crisisClassifierEnabled: true,
   helplineNumbers: '',
+  agentRuntimeAllowed: false,
 };

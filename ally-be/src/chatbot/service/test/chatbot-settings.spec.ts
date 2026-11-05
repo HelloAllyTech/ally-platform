@@ -66,6 +66,20 @@ describe('ChatbotSettingsService', () => {
     expect(merged.enabled).toBe(false);
   });
 
+  it('never lets a bot turn the new engine on past the platform kill switch', () => {
+    const off = service.applyOverride(
+      { ...global, agentRuntimeAllowed: false },
+      { agentRuntimeAllowed: true } as never,
+    );
+    expect(off.agentRuntimeAllowed).toBe(false);
+
+    const on = service.applyOverride({ ...global, agentRuntimeAllowed: true }, {
+      agentRuntimeAllowed: false,
+      declineText: 'x',
+    } as never);
+    expect(on.agentRuntimeAllowed).toBe(true);
+  });
+
   it('treats a cleared field as "follow the default"', () => {
     expect(
       cleanOverride({

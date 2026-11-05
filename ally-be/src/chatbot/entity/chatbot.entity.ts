@@ -4,6 +4,7 @@ import {
   ChatbotAccessMode,
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
+  ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
 import type {
@@ -64,6 +65,17 @@ export class Chatbot extends BaseWithoutTenantEntity {
 
   @Column({ type: 'jsonb', default: () => "'{}'" })
   settings!: ChatbotSettingsOverride;
+
+  /**
+   * Which engine answers. Only a platform admin can change it, and the defaults'
+   * `agentRuntimeAllowed` overrides it to v1 platform-wide.
+   */
+  @Column({ type: 'varchar', length: 16, default: ChatbotRuntime.V1 })
+  runtime!: ChatbotRuntime;
+
+  /** Agents v2 feature flags (context files, tools, memory, …). Empty until later chunks. */
+  @Column({ type: 'jsonb', default: () => "'{}'" })
+  features!: Record<string, boolean>;
 
   @Column({ name: 'created_by', type: 'int' })
   createdBy!: number;
