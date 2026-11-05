@@ -82,7 +82,7 @@ const ABOUT_BOT = {
   turn_type: 'about_bot',
   run_id: 'run-from-ally-ai',
   runtime: 'v2',
-  trace: [{ node: 'contextualize', ms: 300, summary: 'about_bot' }],
+  trace: [{ node: 'agent', ms: 300, summary: 'about_bot' }],
 };
 
 /**

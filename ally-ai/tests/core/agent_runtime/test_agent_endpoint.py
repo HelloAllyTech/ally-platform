@@ -8,7 +8,13 @@ from fastapi.testclient import TestClient
 from app.api.v1.endpoints.agent_runtime import get_graph
 from app.core.config import settings
 from app.main import app
-from tests.core.agent_runtime.test_agent_graph import CONVERSATION, FakeLLM, reply, turn
+from tests.core.agent_runtime.test_agent_graph import (
+    CONVERSATION,
+    FakeLLM,
+    chat,
+    reply,
+    search,
+)
 from tests.core.agent_runtime.test_endpoint import BODY, URL
 from tests.core.knowledge_agent.test_agent import CHUNK_A, passage
 
@@ -39,7 +45,7 @@ class TestAgentRun:
     def test_smalltalk_comes_back_as_an_uncited_answer_with_turn_type(
         self, client, chunk_service
     ):
-        llm = FakeLLM(turn("smalltalk"), reply("smalltalk", "Hi there!"))
+        llm = FakeLLM(chat("Hi there!"))
         with patch(f"{CONVERSATION}.generate_structured", llm):
             response = client.post(URL, json={**AGENT_BODY, "question": "hi"})
 
@@ -50,19 +56,14 @@ class TestAgentRun:
         assert data["citations"] == []
         assert data["turn_type"] == "smalltalk"
         assert data["retrieval"]["hit_chunk_ids"] == []
-        assert [s["node"] for s in data["trace"]] == [
-            "contextualize",
-            "agent",
-            "check",
-            "finalize",
-        ]
+        assert [s["node"] for s in data["trace"]] == ["agent", "check", "finalize"]
         chunk_service.search.assert_not_called()
 
     def test_topics_are_trimmed_and_reach_the_prompt(self, client, chunk_service):
-        llm = FakeLLM(turn("about_bot"), reply("smalltalk", "I'm a helper."))
+        llm = FakeLLM(chat("I'm a helper.", turn_type="about_bot"))
         with patch(f"{CONVERSATION}.generate_structured", llm):
             client.post(URL, json={**AGENT_BODY, "question": "who are you?"})
-        prompt = llm.agent_calls[0]["prompt"]
+        prompt = llm.calls[0]["prompt"]
         assert "- Ally FAQ – About Ally" in prompt
         assert "- " + "x" * 200 + "\n" in prompt  # capped at 200 characters
         assert "x" * 201 not in prompt
@@ -70,7 +71,7 @@ class TestAgentRun:
 
     def test_cited_answer(self, client, chunk_service):
         chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
-        llm = FakeLLM(turn("question", "What is Ally?"), reply(citations=[1]))
+        llm = FakeLLM(search("What is Ally?"), reply(citations=[1]))
         with patch(f"{CONVERSATION}.generate_structured", llm):
             data = client.post(URL, json=AGENT_BODY).json()
         assert data["turn_type"] == "question"

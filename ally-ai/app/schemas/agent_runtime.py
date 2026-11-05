@@ -47,7 +47,7 @@ class AgentRunRequest(KnowledgeAnswerRequest):
         default_factory=dict,
         description=(
             "The bot's feature flags. `agent: true` runs the conversational agent "
-            "(contextualise, tools, check); absent or false runs the parity graph."
+            "(agent step, tools, check); absent or false runs the parity graph."
         ),
     )
     knowledge_topics: List[str] = Field(

@@ -95,9 +95,11 @@ describe("ChatbotTestTab — Agent mode", () => {
     nextResult = result({
       turnType: "question",
       trace: [
-        { node: "contextualize", ms: 410, summary: "contextualize: question, en, rewritten" },
-        { node: "prefetch", ms: 150, summary: "prefetch: 0 hits, 0 passages" },
-        { node: "agent", ms: 1900, summary: "agent: calls search_knowledge via gpt-5-mini" },
+        {
+          node: "agent",
+          ms: 1900,
+          summary: "agent: question, calls search_knowledge via gpt-5-mini",
+        },
         {
           node: "tool",
           ms: 640,
@@ -113,7 +115,9 @@ describe("ChatbotTestTab — Agent mode", () => {
     expect(
       screen.getByText("tool · search_knowledge: 2 hits, 2 new passages, best 0.61 · 640 ms"),
     ).toBeInTheDocument();
-    expect(screen.getByText("contextualize: question, en, rewritten · 410 ms")).toBeInTheDocument();
+    expect(
+      screen.getByText("agent: question, calls search_knowledge via gpt-5-mini · 1900 ms"),
+    ).toBeInTheDocument();
   });
 
   it("shows the turn type next to the engine badge", async () => {

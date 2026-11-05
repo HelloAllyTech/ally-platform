@@ -130,7 +130,11 @@ const SMALLTALK = {
   run_id: 'run-1',
   runtime: 'v2',
   trace: [
-    { node: 'contextualize', ms: 400, summary: 'contextualize: smalltalk' },
+    {
+      node: 'agent',
+      ms: 400,
+      summary: 'agent: smalltalk, smalltalk via gpt-5-mini',
+    },
   ],
 };
 
@@ -354,8 +358,6 @@ describe('ChatbotEngineService in Agent mode', () => {
         provider: 'anthropic',
         model: 'claude-sonnet-4-6',
       });
-      // The contextualise call keeps the platform's (cheap) model.
-      expect(prompts.ally_ai_agent_contextualize).toBeUndefined();
     });
 
     it('sends none of it for a v2 bot with the flag off', async () => {

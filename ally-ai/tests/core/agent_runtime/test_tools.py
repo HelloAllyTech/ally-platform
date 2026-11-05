@@ -49,12 +49,13 @@ class TestSearchKnowledge:
     def tool(self):
         return REGISTRY["search_knowledge"]
 
-    def ctx(self, chunk_service, passages, **bot):
+    def ctx(self, chunk_service, passages, log_retrieval=False, **bot):
         return ToolContext(
             service=KnowledgeAgentService(chunk_service),
             bot=make_bot(features={"agent": True}, **bot),
             limits=LIMITS,
             passages=passages,
+            log_retrieval=log_retrieval,
         )
 
     async def test_new_passages_continue_the_numbering(self, tool):
@@ -91,6 +92,8 @@ class TestSearchKnowledge:
         )
         assert result.passages == []
         assert result.record["hits"] == 1
+        assert result.gate == "below_threshold"
+        assert result.retrieval["top_similarity"] == 0.1
 
     async def test_empty_query_searches_nothing(self, tool):
         chunk_service = AsyncMock()
@@ -100,8 +103,36 @@ class TestSearchKnowledge:
         chunk_service.search.assert_not_called()
         assert result.passages == []
 
-    async def test_never_writes_the_retrieval_log(self, tool, retrieval_log):
+    async def test_reports_the_retrieval_block(self, tool):
+        chunk_service = AsyncMock()
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        result = await tool.handler(
+            SearchKnowledgeInput(query="sign in"), self.ctx(chunk_service, [])
+        )
+        assert result.gate is None
+        assert result.retrieval["translated_query"] == "sign in"
+        assert result.retrieval["hit_count"] == 1
+        assert result.retrieval["passages_used"] == 1
+
+    async def test_logs_only_when_told_to(self, tool, retrieval_log):
         chunk_service = AsyncMock()
         chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
         await tool.handler(SearchKnowledgeInput(query="q"), self.ctx(chunk_service, []))
         retrieval_log.assert_not_called()
+        await tool.handler(
+            SearchKnowledgeInput(query="q"),
+            self.ctx(chunk_service, [], log_retrieval=True),
+        )
+        assert retrieval_log.call_count == 1
+        assert retrieval_log.call_args.kwargs["disposition"] == "answered"
+
+    async def test_logs_a_search_that_found_nothing_as_its_decline(
+        self, tool, retrieval_log
+    ):
+        chunk_service = AsyncMock()
+        chunk_service.search.return_value = []
+        await tool.handler(
+            SearchKnowledgeInput(query="q"),
+            self.ctx(chunk_service, [], log_retrieval=True),
+        )
+        assert retrieval_log.call_args.kwargs["disposition"] == "declined_no_hits"

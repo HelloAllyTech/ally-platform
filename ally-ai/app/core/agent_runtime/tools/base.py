@@ -8,7 +8,7 @@ and a registry line, with no change to the graph.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Literal, Type
+from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Type
 
 from pydantic import BaseModel
 
@@ -26,6 +26,11 @@ class ToolContext:
     limits: Dict[str, Any]
     #: Every passage already offered to the model, in prompt order.
     passages: List[Dict[str, Any]]
+    #: The language the agent says the latest message is in.
+    language: str = "en"
+    #: True for the run's first search only (and only when the bot logs
+    #: retrieval), so each message is logged once, as in the parity path.
+    log_retrieval: bool = False
 
 
 @dataclass(frozen=True)
@@ -38,6 +43,14 @@ class ToolResult:
     #: JSON-safe record kept in the run's state; the prompt shows it back to the
     #: model as "searches already made".
     record: Dict[str, Any] = field(default_factory=dict)
+    #: A search tool's `retrieval` block. The run's first search sets the
+    #: response's block, so it reads like the parity path's.
+    retrieval: Optional[Dict[str, Any]] = None
+    #: A search tool's hits, best first, before selection (debug output only).
+    hits: List[Dict[str, Any]] = field(default_factory=list)
+    #: A search tool's gate verdict (a DeclineReason value, or None when it found
+    #: something relevant). A decline with nothing found reports it as its reason.
+    gate: Optional[str] = None
 
 
 @dataclass(frozen=True)

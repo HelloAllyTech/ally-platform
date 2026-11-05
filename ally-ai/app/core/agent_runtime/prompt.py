@@ -17,7 +17,6 @@ from app.core.knowledge_agent.prompt import (
 )
 from app.prompts.resolver import load_and_format
 
-CONTEXTUALIZE_PROMPT_PATH = "agent/contextualize"
 AGENT_PROMPT_PATH = "agent/system"
 
 NO_TOPICS = (
@@ -32,16 +31,15 @@ def format_topics(topics: Optional[Sequence[str]]) -> str:
     return "\n".join(lines) or NO_TOPICS
 
 
-def format_turn(turn_type: Optional[str], standalone_query: Optional[str]) -> str:
-    if not turn_type:
+def format_feedback(feedback: Optional[str]) -> str:
+    """Why check sent the previous draft back; empty on a first draft."""
+    if not feedback:
         return ""
-    if turn_type == "question" and standalone_query:
-        return f'(Understood as: question — "{standalone_query}")'
-    return f"(Understood as: {turn_type.replace('_', ' ')})"
+    return f"\n# Your previous draft was not sent\n{feedback}\n"
 
 
 def format_searches(records: Sequence[Dict[str, Any]]) -> str:
-    """Searches this run has made, so the model does not repeat one."""
+    """Searches made for this message, so the model does not repeat one."""
     if not records:
         return "(none yet)"
     lines: List[str] = []
@@ -50,7 +48,7 @@ def format_searches(records: Sequence[Dict[str, Any]]) -> str:
         found = (
             f"added passages {', '.join(str(n) for n in added)}"
             if added
-            else "nothing new"
+            else "nothing relevant or new"
         )
         lines.append(f'- {record.get("tool")}: "{record.get("query", "")}" → {found}')
     return "\n".join(lines)
@@ -70,28 +68,13 @@ def format_tools(tools: Sequence[Any]) -> str:
     return "\n".join(blocks)
 
 
-def build_contextualize_prompt(
-    message: str,
-    *,
-    history: Optional[List[Dict[str, str]]] = None,
-    prompts: Optional[Dict[str, Any]] = None,
-) -> str:
-    return load_and_format(
-        CONTEXTUALIZE_PROMPT_PATH,
-        prompts=prompts,
-        message=message.strip(),
-        history=format_history(history),
-    )
-
-
 def build_agent_prompt(
     message: str,
     *,
     passages: List[Dict[str, Any]],
     history: Optional[List[Dict[str, str]]] = None,
-    turn_type: Optional[str] = None,
-    standalone_query: Optional[str] = None,
     searches: Sequence[Dict[str, Any]] = (),
+    feedback: Optional[str] = None,
     tools: Sequence[Any] = (),
     tool_budget: int = 0,
     knowledge_topics: Optional[Sequence[str]] = None,
@@ -108,7 +91,7 @@ def build_agent_prompt(
         message=message.strip(),
         passages=format_passages(passages),
         history=format_history(history),
-        turn=format_turn(turn_type, standalone_query),
+        feedback=format_feedback(feedback),
         searches=format_searches(searches),
         tools=format_tools(tools),
         tool_budget=tool_budget,

@@ -18,22 +18,12 @@ from typing import Any, Dict, List, Literal, Sequence, Tuple, Type
 
 from pydantic import BaseModel, Field, create_model
 
-#: What the contextualise call decided the latest message is.
+#: What the agent decided the latest message is. Reported to ally-be, which shows it
+#: in Preview and treats small talk and questions about the bot like a welcome.
 TurnType = Literal["smalltalk", "about_bot", "question", "unclear"]
 
 #: The `action` value that ends the loop with a reply.
 REPLY_ACTION = "reply"
-
-
-class TurnUnderstanding(BaseModel):
-    """The contextualise call's output. It replaces the translate call."""
-
-    turn_type: TurnType = "question"
-    # The latest message as one self-contained English question, using the
-    # conversation for what it refers to. Empty unless turn_type is "question".
-    standalone_query: str = ""
-    # BCP-47 tag of the latest message (romanised Hindi is `hi`).
-    language: str = "en"
 
 
 class AgentIntent(str, Enum):
@@ -46,6 +36,8 @@ class AgentIntent(str, Enum):
 
 
 _REPLY_FIELDS: Dict[str, Any] = {
+    # Set on every step, so the last one says what the latest message was.
+    "turn_type": (TurnType, "question"),
     "intent": (AgentIntent, AgentIntent.DECLINE),
     # The reply text. Plain text: WhatsApp renders only *bold* and _italic_.
     "answer": (str, ""),

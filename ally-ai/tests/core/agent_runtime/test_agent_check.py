@@ -10,7 +10,19 @@ META = {"provider": "openai", "model": "gpt-5-mini"}
 RETRIEVAL = {"hit_count": 2, "top_similarity": 0.7, "unsupported": False}
 
 
-def check(intent="answer", answer="Text.", citations=(), action="reply", **kw):
+def check(*args, **kw):
+    return review(*args, **kw)[0]
+
+
+def review(
+    intent="answer",
+    answer="Text.",
+    citations=(),
+    action="reply",
+    passages=PASSAGES,
+    **kw,
+):
+    """``(result, rejection)``."""
     step = {
         "action": action,
         "intent": intent,
@@ -23,11 +35,10 @@ def check(intent="answer", answer="Text.", citations=(), action="reply", **kw):
         language="en",
         retrieval=dict(RETRIEVAL),
         general=False,
-        prefetch_gate=None,
-        tool_passages=0,
+        search_gate=None,
     )
     args.update(kw)
-    return check_reply(step, META, PASSAGES, **args)
+    return check_reply(step, META, list(passages), **args)
 
 
 class TestAnswer:
@@ -39,10 +50,14 @@ class TestAnswer:
         assert result["retrieval"]["passages_used"] == 2
 
     def test_uncited_answer_becomes_a_decline_with_no_text(self):
-        result = check(answer="Refunds take 5 days.")
+        result, rejection = review(answer="Refunds take 5 days.")
         assert result["intent"] == "decline"
         assert result["decline_reason"] == "model_declined"
         assert result["answer"] == ""
+        assert rejection == "uncited"
+
+    def test_a_cited_answer_is_not_rejected(self):
+        assert review(citations=[1])[1] is None
 
     def test_out_of_range_citations_are_dropped(self):
         result = check(citations=[9, 1, 1])
@@ -52,17 +67,23 @@ class TestAnswer:
         assert check(citations=[7])["intent"] == "decline"
 
     def test_general_bot_keeps_an_uncited_answer_flagged(self):
-        result = check(answer="General info: …", general=True)
+        result, rejection = review(answer="General info: …", general=True)
         assert result["intent"] == "answer"
         assert result["retrieval"]["unsupported"] is True
+        assert rejection is None
 
     def test_empty_answer_is_a_decline(self):
-        assert check(answer="  ", citations=[1])["intent"] == "decline"
+        result, rejection = review(answer="  ", citations=[1])
+        assert result["intent"] == "decline"
+        assert rejection == "empty"
 
 
 class TestSmalltalk:
     def test_passes_without_citations_as_an_answer(self):
-        result = check("smalltalk", "Hi! I'm here to help.", turn_type="smalltalk")
+        result, rejection = review(
+            "smalltalk", "Hi! I'm here to help.", turn_type="smalltalk", passages=[]
+        )
+        assert rejection is None
         assert result["intent"] == "answer"
         assert result["decline_reason"] == "none"
         assert result["citations"] == []
@@ -70,7 +91,8 @@ class TestSmalltalk:
         assert result["retrieval"]["unsupported"] is False
 
     def test_citations_on_smalltalk_are_cleared(self):
-        assert check("smalltalk", "Hello!", citations=[1])["citations"] == []
+        result = check("smalltalk", "Hello!", citations=[1], passages=[])
+        assert result["citations"] == []
 
     @pytest.mark.parametrize(
         "text",
@@ -83,9 +105,10 @@ class TestSmalltalk:
         ],
     )
     def test_factual_looking_smalltalk_must_be_cited(self, text):
-        result = check("smalltalk", text)
+        result, rejection = review("smalltalk", text, passages=[])
         assert result["intent"] == "decline"
         assert result["answer"] == ""
+        assert rejection == "unsourced_detail"
 
     def test_factual_looking_smalltalk_with_a_citation_is_an_answer(self):
         result = check("smalltalk", "Plans start at ₹500.", citations=[1])
@@ -93,7 +116,7 @@ class TestSmalltalk:
         assert len(result["citations"]) == 1
 
     def test_smalltalk_after_a_search_that_found_something_must_be_cited(self):
-        result = check("smalltalk", "Sure, happy to help.", tool_passages=1)
+        result = check("smalltalk", "Sure, happy to help.")
         assert result["intent"] == "decline"
 
     def test_plain_greeting_is_not_factual(self):
@@ -107,20 +130,23 @@ class TestClarifyAndDecline:
         assert result["citations"] == []
 
     def test_model_decline_keeps_its_own_words(self):
-        result = check("decline", "I don't have that, but I can help with sign-in.")
+        result, rejection = review(
+            "decline", "I don't have that, but I can help with sign-in."
+        )
         assert result["answer"].startswith("I don't have that")
         assert result["decline_reason"] == "model_declined"
+        assert rejection is None
 
-    def test_decline_after_a_weak_prefetch_keeps_the_gate_reason(self):
-        assert check("decline", "No.", prefetch_gate="no_hits")["decline_reason"] == (
-            "no_hits"
-        )
+    def test_decline_after_a_search_that_found_nothing_keeps_the_gate_reason(self):
+        result = check("decline", "No.", search_gate="no_hits", passages=[])
+        assert result["decline_reason"] == "no_hits"
 
-    def test_gate_reason_dropped_once_a_tool_found_passages(self):
-        result = check("decline", "No.", prefetch_gate="no_hits", tool_passages=1)
+    def test_gate_reason_dropped_once_a_later_search_found_passages(self):
+        result = check("decline", "No.", search_gate="no_hits")
         assert result["decline_reason"] == "model_declined"
 
     def test_a_tool_call_past_the_budget_is_a_decline(self):
-        result = check(action="search_knowledge", answer="")
+        result, rejection = review(action="search_knowledge", answer="")
         assert result["intent"] == "decline"
         assert result["decline_reason"] == "model_declined"
+        assert rejection == "empty"
