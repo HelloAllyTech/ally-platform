@@ -11,7 +11,12 @@ interface ReleaseHistoryTabProps {
   isRunsError: boolean;
 }
 
-/** Every run from every release workflow, unfiltered — the detailed record behind the summarised platform tabs. */
+/**
+ * Every run from every tracked release workflow, unfiltered — the detailed record behind the
+ * summarised platform tabs. Only Android promotion and iOS App Store review submission runs are
+ * tracked here (see MobileReleaseWorkflowName's own comment) — there's no Flutter-build
+ * equivalent, and RN's build/scheduled-check workflows were deleted in the 2026-11 rename.
+ */
 export const ReleaseHistoryTab: FC<ReleaseHistoryTabProps> = ({
   runs,
   isRunsLoading,
@@ -21,8 +26,7 @@ export const ReleaseHistoryTab: FC<ReleaseHistoryTabProps> = ({
   return (
     <div>
       <p className="text-sm text-typography-700 mb-3">
-        Every run of every release workflow — scheduled checks, builds, promotions, and submissions
-        — across both platforms, newest first.
+        Every Android promotion and iOS App Store review submission run, newest first.
       </p>
       <RunsTable
         runs={runs}

@@ -1,9 +1,9 @@
 # ally-mobile — start here
 
 Flutter app for counsellors and community health workers: the client for Scribe (recorded
-sessions and summaries) and for practice simulations. Replaces the React Native app, now
-archived, read-only, at `ally-platform/ally-mobile-rn-archive/` (see that folder's own
-CLAUDE.md and `docs/RELEASE.md`'s Rollback section before touching it).
+sessions and summaries) and for practice simulations. Replaces the original React Native app
+(deleted outright in the 2026-11 rename, after a short-lived archive turned out never to be
+needed — see git history before that date if you need it for reference).
 
 This file is a **router**: find your task below, read what it points at, skip the rest.
 Conventions with a canonical home are linked, never restated — if you find a rule written
@@ -11,8 +11,7 @@ twice anywhere in this platform, that's a bug worth fixing.
 
 > **Stacks is not wired up in this repo yet** (no `.mcp.json`/`.claude/skills/stacks`,
 > unlike every other service here — `ally-be/.mcp.json`, `ally-web/.mcp.json`, etc.). Until
-> it is, get product-judgement context the way the RN app's own CLAUDE.md describes
-> (`ally-mobile-rn-archive/CLAUDE.md`) by asking in conversation rather than via the
+> it is, get product-judgement context by asking in conversation rather than via the
 > `search_chunks` tool other repos use directly.
 
 ## What am I doing?

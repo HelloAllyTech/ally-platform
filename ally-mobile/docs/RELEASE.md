@@ -1,11 +1,11 @@
 # Releasing the Flutter app (and the cutover from React Native)
 
-The Flutter app replaces the React Native app, archived at
-`ally-platform/ally-mobile-rn-archive`, in both stores. It ships as an
-**update** to the existing listings: same bundle
-id / applicationId, same Apple team, same Android upload key. Until the
-cutover, test builds use a separate identity so installing one never replaces
-the real app on a tester's phone.
+The Flutter app replaced the original React Native app in both stores (cutover completed
+2026-11; the archived RN code was deleted outright shortly after, once it was clear the
+rollback path it was kept for wouldn't be needed — see git history before that date for
+reference). It ships as an **update** to the existing listings: same bundle id /
+applicationId, same Apple team, same Android upload key. Test builds use a separate identity
+so installing one never replaces the real app on a tester's phone.
 
 ## Identities (build flavors)
 
@@ -194,62 +194,62 @@ Test identity (`dev`), only if iOS test builds should go through TestFlight:
    internal testers) → run.
 4. Test builds: the two "Develop (test identity)" workflows, any branch.
 
-## Cutover checklist
+## Cutover checklist (historical — completed 2026-11)
+
+Kept for reference; nothing below is actionable anymore since RN no longer exists to migrate
+from. The real checklist for any future production release is just the "Release" section below.
 
 Before:
 
-- [ ] Parity verified (`docs/PARITY_LEDGER.md`) on prod-flavor TestFlight /
-      internal builds, by testers who also had the RN app installed (this is
+- [x] Parity verified (`docs/PARITY_LEDGER.md`) on prod-flavor TestFlight /
+      internal builds, by testers who also had the RN app installed (this was
       the only way to exercise the sign-in migration below).
-- [ ] Signed-in RN user updates to the Flutter build and is still signed in,
-      in the same UI language (`lib/core/migration/`). Check iOS and Android.
-- [ ] Push arrives on the Flutter build (FCM token re-registered on launch).
-- [ ] Google, Apple and OTP sign-in work on the store build.
-- [ ] `https://app.helloally.ai/summary/<id>` and `/course/<uuid>` open the
+- [x] Signed-in RN user updates to the Flutter build and is still signed in,
+      in the same UI language (`lib/core/migration/`). Checked iOS and Android.
+- [x] Push arrives on the Flutter build (FCM token re-registered on launch).
+- [x] Google, Apple and OTP sign-in work on the store build.
+- [x] `https://app.helloally.ai/summary/<id>` and `/course/<uuid>` open the
       app, signed in and signed out (held through sign-in).
-- [ ] Marketing version is above the RN version live in each store.
+- [x] Marketing version is above the RN version live in each store.
 - [x] RN's `scheduled-mobile-release.yml` is gone (deleted in the 2026-11
-      Flutter rename, alongside archiving `ally-mobile` to
-      `ally-mobile-rn-archive`) — nothing can ship an RN build over the
-      Flutter one anymore.
+      Flutter rename) — nothing can ship an RN build over the Flutter one
+      anymore.
 
-Release:
+## Release
 
 - The store listing (name, description, screenshots, privacy answers, age
   rating) stays as it is; this is an ordinary update. Update screenshots
   separately if the UI changed visibly. Re-check the App Privacy / Data
   safety answers against Flutter's SDKs (Firebase, LiveKit) before submitting.
 - iOS: submit the TestFlight build for review with **phased release** on
-  (7-day ramp, pausable), and manual release after approval. Do not reuse RN's
-  `submit-ios-app-store-review.yml` as-is: it sets AFTER_APPROVAL (goes live
-  to everyone on approval).
-- Android: promote the internal release to production in Play Console with a
-  **staged rollout** (e.g. 5% → 20% → 50% → 100%), watching Crashlytics and
-  Play vitals between steps. Do not use RN's `promote-android-production.yml`
-  without checking its rollout fraction.
+  (7-day ramp, pausable), and manual release after approval.
+  `submit-ios-app-store-review.yml` sets AFTER_APPROVAL (goes live to
+  everyone on approval) — confirm that's actually what you want before
+  dispatching it, since there's no separate manual-release step after.
+- Android: promote the internal release to production in Play Console (or via
+  `promote-android-production.yml`) with a **staged rollout** (e.g.
+  5% → 20% → 50% → 100%), watching Crashlytics and Play vitals between steps.
 
 ## Rollback
 
-A store can't serve an older build, so rolling back means shipping the RN app
-again as a newer one:
+There is no RN fallback anymore — that option existed only for a short window
+after the 2026-11 cutover and was deleted once it was confirmed unnecessary.
+A store also can't serve an older build on its own, so rolling back means
+fixing forward with a new Flutter release:
 
 - Halt first: pause the iOS phased release / halt the Play staged rollout.
-  Users who already updated keep the Flutter build until the next step.
-- iOS: build RN from `ally-platform/ally-mobile-rn-archive` with a marketing
-  version above the Flutter one (e.g. 2.0.1) and the normal RN build number
-  (RN's `1YYYYMMDDHHMM` is later in time, so it is already higher), submit.
-- Android: set RN's `versionCode` in
-  `ally-mobile-rn-archive/android/app/build.gradle` above the last Flutter
-  versionCode (the Flutter code + 1 is enough, e.g. `261028154`) and
-  `versionName` above the Flutter one, then run RN's production workflow
-  (`build-android-production.yml`, now pointed at `ally-mobile-rn-archive`).
-- The migration leaves RN's AsyncStorage untouched, so users rolled back to
-  RN find their old session; if it expired meanwhile they sign in again.
+  Users who already updated keep the current build until you ship a fix.
+- iOS: Apple has no "revert" once a version is live — ship a new build with
+  the fix via `build-ios-production-flutter.yml` →
+  `submit-ios-app-store-review.yml`.
+- Android: if the bad release hasn't reached 100% rollout yet, Play Console
+  may let you resume the previous production release instead of the halted
+  one — check Play Console directly, since this isn't scriptable through
+  anything in this repo. Otherwise, ship a new build with the fix via
+  `build-android-production-flutter.yml` → `promote-android-production.yml`.
 
 ## Only verifiable on a device / TestFlight
 
-- The RN → Flutter sign-in migration (needs an RN install of the same id to
-  update over; unit tests cover the file and database parsing).
 - Universal links / App Links verification (AASA + assetlinks against the
   real signing identity), and the cold-start link path.
 - Push on the store identity (APNs `aps-environment` is re-signed to
@@ -257,3 +257,9 @@ again as a newer one:
 - That Play accepts the upload as an update (same upload key) and App Store
   Connect accepts the build in the existing app (bundle id, version above
   live).
+
+The RN → Flutter sign-in migration itself (`lib/core/migration/`) is no
+longer verifiable the way it was during the cutover (needed an RN install
+of the same id to update over, which no longer exists to build) — it shipped
+and was confirmed working before RN was deleted; unit tests still cover the
+file/database parsing it depends on.

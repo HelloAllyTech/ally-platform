@@ -167,35 +167,11 @@ export const getAndroidProductionStatusDisplay = (
   }
 };
 
-/**
- * Most recent *successful* run of a given workflow, or null if none exists
- * yet — used to derive a platform's "last release" date without a dedicated
- * backend field, since the run history already carries it.
- */
-export const findLastSuccessfulRun = (
-  runs: MobileReleaseRun[],
-  workflowName: MobileReleaseWorkflowName,
-): MobileReleaseRun | null =>
-  runs.find(run => run.workflowName === workflowName && run.conclusion === "success") ?? null;
-
-/** Most recent run of a workflow regardless of outcome — unlike findLastSuccessfulRun above, this surfaces a still-running or failed attempt too. */
+/** Most recent run of a workflow regardless of outcome — surfaces a still-running or failed attempt too. */
 export const findLastRun = (
   runs: MobileReleaseRun[],
   workflowName: MobileReleaseWorkflowName,
 ): MobileReleaseRun | null => runs.find(run => run.workflowName === workflowName) ?? null;
-
-/**
- * True if `laterRun`'s createdAt is strictly after `earlierRun`'s — used to approximate "this
- * run is for the build that just happened," since Android runs carry no version string to match
- * on directly the way iOS's App Store Connect resources do.
- */
-export const isRunAfter = (
-  laterRun: MobileReleaseRun | null | undefined,
-  earlierRun: MobileReleaseRun | null | undefined,
-): boolean => {
-  if (!laterRun || !earlierRun) return false;
-  return new Date(laterRun.createdAt).getTime() > new Date(earlierRun.createdAt).getTime();
-};
 
 /**
  * The single most useful thing to tell an admin about what to do next,

@@ -1,15 +1,13 @@
-# Touched on 2026-10-23 so GitHub registers this workflow in ally-platform: the files
-# imported with the monorepo were never pushed on their own, and a workflow_dispatch-only
-# workflow is not listed (nor dispatchable) until one is. ally-be's mobile release page
-# dispatches it, or scheduled-mobile-release.yml does.
 name: Submit iOS for App Store review
-defaults:
-  run:
-    working-directory: ally-mobile-rn-archive
 #
 # Manual-only, the highest-stakes workflow in this repo: submits the current App Store Connect
 # listing + latest TestFlight build for Apple's FULL App Store review — real public distribution,
 # not TestFlight. Never auto-triggered by anything else here.
+#
+# scripts/submit-ios-app-store-review.mjs lives at the repo root (not inside ally-mobile/):
+# it reads ally-mobile/pubspec.yaml for the current marketing version (used to read RN's
+# ios/ally.xcodeproj/project.pbxproj before the 2026-11 Flutter rename), so it runs from the
+# repo root rather than either app's folder.
 #
 # If no version is ready in App Store Connect, the script creates the next one and carries the
 # previous version's en-US listing forward onto it (text fields as-is, screenshots re-uploaded

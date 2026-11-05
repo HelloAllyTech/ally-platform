@@ -190,7 +190,7 @@ rules:
     why: Worker lifecycle and entry points are what the platform-level docs describe.
 
   # ── ally-mobile (Flutter — repoints to its own paths since the 2026-11 rename,
-  #    which also archived RN at ally-mobile-rn-archive) ─────────────────────
+  #    which also deleted the archived RN app) ─────────────────────────────
   - id: ally-mobile-repo-page-shape
     watch:
       - "ally-mobile/lib/core/routing/**"
@@ -198,7 +198,7 @@ rules:
     requires: helloallytech.github.io/wiki/repos/ally-mobile.md
     why: >
       Routing and the API-client layer are what the repo page describes. The wiki page
-      itself still describes the archived RN app — rewriting it for Flutter is a
+      itself still describes the now-deleted RN app — rewriting it for Flutter is a
       separate, not-yet-done task.
 
   - id: ally-mobile-release-process

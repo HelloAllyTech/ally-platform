@@ -15,15 +15,20 @@ import {
  * REST API accepts either interchangeably for these endpoints, and a file
  * name reads sanely in code without a lookup.
  *
- * These are RN's workflows, now living in ally-mobile-rn-archive/ — kept
- * runnable for a manual rollback build, not for anything that ships today.
- * There is no Flutter equivalent of this run-history/promote/submit UI yet
- * (Flutter's own release workflows are manual-dispatch with a different
- * input shape); see mobile-releases.service.ts's top-level doc comment.
+ * RN's own build workflows (build-ios-production.yml, build-android-
+ * production.yml) and ally-mobile-rn-archive/ itself were deleted outright
+ * in the 2026-11 Flutter rename — the folder's rollback purpose never got
+ * used, so there was nothing left worth keeping it for. The two remaining
+ * entries are pure API-orchestration scripts (now at the repo root, not
+ * inside either app's folder — see scripts/promote-android-release.mjs and
+ * scripts/submit-ios-app-store-review.mjs) with no dependency on RN's
+ * source, so they kept working through the deletion unchanged by name.
+ * There is still no Flutter equivalent of this run-history UI's *build*
+ * tracking (Flutter's own build workflows are manual-dispatch with a
+ * different input shape); see mobile-releases.service.ts's top-level doc
+ * comment.
  */
 export const MOBILE_WORKFLOW_FILES = [
-  'build-ios-production.yml',
-  'build-android-production.yml',
   'promote-android-production.yml',
   'submit-ios-app-store-review.yml',
 ] as const;
@@ -31,8 +36,6 @@ export const MOBILE_WORKFLOW_FILES = [
 export type MobileWorkflowFile = (typeof MOBILE_WORKFLOW_FILES)[number];
 
 export const MOBILE_WORKFLOW_LABELS: Record<MobileWorkflowFile, string> = {
-  'build-ios-production.yml': 'iOS Build',
-  'build-android-production.yml': 'Android Build',
   'promote-android-production.yml': 'Promote Android',
   'submit-ios-app-store-review.yml': 'App Store Review Submission',
 };

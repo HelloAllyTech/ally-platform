@@ -1,8 +1,8 @@
 # ally_mobile_flutter
 
 The Flutter rewrite of the Ally mobile app — now `ally-platform/ally-mobile`
-itself, replacing the React Native app archived at
-`ally-platform/ally-mobile-rn-archive`.
+itself, replacing the original React Native app (deleted outright after the
+2026-11 cutover).
 
 Build flavors, environment values, CI release workflows and the cutover from
 the React Native app: see [docs/RELEASE.md](docs/RELEASE.md). In short:

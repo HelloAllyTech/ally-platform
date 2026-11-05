@@ -171,11 +171,12 @@ export class MobileReleasesService {
    * its version files and every release from then on are there. With no
    * monorepo configured, the app's own repo, as before.
    *
-   * That folder held the React Native app until the Flutter rename — it now
-   * holds the Flutter app that took over the same store identity
-   * (`com.helloally.app`). RN itself moved to `ally-mobile-rn-archive/`,
-   * kept for a manual rollback build only (see `ally-mobile/docs/RELEASE.md`'s
-   * Rollback section) and deliberately untouched by this service.
+   * That folder held the React Native app until the 2026-11 Flutter rename —
+   * it now holds the Flutter app that took over the same store identity
+   * (`com.helloally.app`). RN itself was archived to `ally-mobile-rn-archive/`
+   * for a possible rollback, then deleted outright shortly after once that
+   * turned out not to be needed (see `ally-mobile/docs/RELEASE.md`'s
+   * Rollback section for what's left).
    */
   private get repo(): string {
     const monorepo = this.configService.githubMonorepo;
@@ -198,8 +199,8 @@ export class MobileReleasesService {
    * This is the standalone pre-monorepo `HelloAllyTech/ally-mobile` GitHub
    * repo (RN's own repo, archived read-only at the GitHub-org level before
    * the 2026-10-23 monorepo cutover) — unrelated to, and unaffected by, the
-   * later in-monorepo archive-and-rename that moved `ally-mobile/` to
-   * `ally-mobile-rn-archive/`.
+   * later 2026-11 Flutter rename that archived and then deleted RN's
+   * in-monorepo folder.
    */
   private get legacyRepo(): string {
     return this.configService.githubMobileRepo;

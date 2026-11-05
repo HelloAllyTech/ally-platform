@@ -1,1 +1,0 @@
-export {TranscriptTab} from './TranscriptTab';

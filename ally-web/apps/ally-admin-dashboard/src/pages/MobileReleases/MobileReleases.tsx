@@ -35,10 +35,8 @@ import { RecommendedActionBanner } from "./components/RecommendedActionBanner";
 import {
   deriveRecommendedAction,
   findLastRun,
-  findLastSuccessfulRun,
   getAppStoreReviewSubmissionStatusDisplay,
   getTestflightStatusDisplay,
-  isRunAfter,
   isValidVersionFormat,
   isVersionGreaterThan,
 } from "./mobileReleaseStatus";
@@ -125,18 +123,19 @@ export const MobileReleases: FC = () => {
     testflightHistory.find(entry => entry.buildId === testflightStatus?.buildId)?.uploadedDate ??
     null;
 
-  const lastAndroidBuildRun = findLastSuccessfulRun(runs, "Android Build");
   const lastAndroidPromoteRun = findLastRun(runs, "Promote Android");
   // Validation signal for the promotion dialog: warn, don't block, since re-promoting the same
-  // build (e.g. to raise the rollout percentage) is a legitimate, common thing to do.
-  const isAndroidAlreadyPromoted =
-    isRunAfter(lastAndroidPromoteRun, lastAndroidBuildRun) &&
-    lastAndroidPromoteRun?.conclusion === "success";
-  const androidLastReleaseDate = lastAndroidBuildRun?.updatedAt ?? null;
-  const iosLastReleaseDate =
-    testflightHistory[0]?.uploadedDate ??
-    findLastSuccessfulRun(runs, "iOS Build")?.updatedAt ??
-    null;
+  // build (e.g. to raise the rollout percentage) is a legitimate, common thing to do. Used to
+  // also check the promote run happened after the current build's own upload (isRunAfter against
+  // an "Android Build" run) — that build-run tracking no longer exists since ally-mobile-rn-archive/
+  // (and its build-android-production.yml) was deleted, so this can only say "a promotion
+  // happened recently", not "...for this specific build". A false-positive warning here is
+  // harmless (the operator can just proceed); losing the warning entirely would not be.
+  const isAndroidAlreadyPromoted = lastAndroidPromoteRun?.conclusion === "success";
+  // No tracked build-run source exists for Flutter's Android releases (see above) — there is no
+  // longer any "last release date" to show here.
+  const androidLastReleaseDate: string | null = null;
+  const iosLastReleaseDate = testflightHistory[0]?.uploadedDate ?? null;
 
   const [tabIndex, setTabIndex] = useState(0);
 
@@ -416,7 +415,6 @@ export const MobileReleases: FC = () => {
               <AndroidReleasePipeline
                 androidVersionName={versions.android.versionName}
                 androidVersionCode={versions.android.versionCode}
-                lastBuildRun={lastAndroidBuildRun}
                 lastPromoteRun={lastAndroidPromoteRun}
                 productionStatus={androidProductionStatus}
                 isProductionStatusLoading={isAndroidProductionStatusLoading}
@@ -553,10 +551,6 @@ export const MobileReleases: FC = () => {
                   testflightHistory={testflightHistory}
                   isTestflightHistoryLoading={isTestflightHistoryLoading}
                   isTestflightHistoryError={isTestflightHistoryError}
-                  runs={runs}
-                  isRunsLoading={isRunsLoading}
-                  isRunsFetching={isRunsFetching}
-                  isRunsError={isRunsError}
                 />
               )}
             </TabPanel>

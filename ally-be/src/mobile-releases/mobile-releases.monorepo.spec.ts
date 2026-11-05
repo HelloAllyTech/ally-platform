@@ -141,7 +141,9 @@ describe('MobileReleasesService in the monorepo', () => {
   it('shows one run history across the cutover, even before a workflow is registered in the monorepo', async () => {
     mockedAxios.get.mockImplementation(async (url: string) => {
       if (
-        url.startsWith(`${MONO}/actions/workflows/build-android-production.yml`)
+        url.startsWith(
+          `${MONO}/actions/workflows/promote-android-production.yml`,
+        )
       ) {
         return {
           data: {
@@ -153,7 +155,9 @@ describe('MobileReleasesService in the monorepo', () => {
       }
       if (url.startsWith(MONO)) throw notFound;
       if (
-        url.startsWith(`${OLD}/actions/workflows/build-android-production.yml`)
+        url.startsWith(
+          `${OLD}/actions/workflows/promote-android-production.yml`,
+        )
       ) {
         return {
           data: {
@@ -167,7 +171,9 @@ describe('MobileReleasesService in the monorepo', () => {
     });
 
     const runs = await service.listRuns();
-    const android = runs.filter((run) => run.workflowName === 'Android Build');
+    const android = runs.filter(
+      (run) => run.workflowName === 'Promote Android',
+    );
 
     expect(android.map((run) => run.createdAt)).toEqual([
       '2026-10-24T05:00:00Z',

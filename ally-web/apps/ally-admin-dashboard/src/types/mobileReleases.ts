@@ -1,21 +1,19 @@
 /**
- * RN's build/promote/submit GitHub Actions workflows, now living in
- * ally-mobile-rn-archive/ — kept runnable for a manual rollback build, not
- * anything that ships today. The automated scheduled-bump pipeline this used
- * to also cover ("Scheduled Check") was retired in the 2026-11 Flutter
- * rename: it had no Flutter equivalent and isn't being replaced.
+ * The two remaining GitHub Actions workflows this run-history mechanism tracks. RN's own
+ * build workflows ("iOS Build"/"Android Build") and ally-mobile-rn-archive/ itself were
+ * deleted outright in the 2026-11 Flutter rename — the rollback purpose that folder was kept
+ * for never got used. The automated scheduled-bump pipeline this used to also cover
+ * ("Scheduled Check") was retired the same rename: it had no Flutter equivalent and isn't
+ * being replaced. There is still no Flutter-build equivalent tracked here at all.
  *
  * "Promote Android" is the manually-triggered production-promotion workflow
- * (see triggerAndroidPromotion below). iOS TestFlight-external promotion
- * used to have a matching manual workflow/entry here too; removed once
- * submission became fully automatic and this org's actual testers turned out
+ * (see triggerAndroidPromotion below) — pure Play Developer API orchestration with no
+ * dependency on either app's source, so it kept working unchanged through the deletion.
+ * iOS TestFlight-external promotion used to have a matching manual workflow/entry here too;
+ * removed once submission became fully automatic and this org's actual testers turned out
  * to all be Internal, not External.
  */
-export type MobileReleaseWorkflowName =
-  | "iOS Build"
-  | "Android Build"
-  | "Promote Android"
-  | "App Store Review Submission";
+export type MobileReleaseWorkflowName = "Promote Android" | "App Store Review Submission";
 
 /** GitHub Actions' own run-status values — not our own enum, so this stays a passthrough of their API. */
 export type MobileReleaseRunStatus = "queued" | "in_progress" | "completed";
