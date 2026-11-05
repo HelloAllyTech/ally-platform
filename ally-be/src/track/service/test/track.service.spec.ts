@@ -14,11 +14,17 @@ import { TenantScopeService } from 'src/authorization/service/tenant-scope.servi
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UpsertTrackStructureDto } from '../../dto/upsert-track-structure.dto';
-import { TrackItemType } from '../../type/track.type';
+import { TrackItemType, TrackStatus } from '../../type/track.type';
 import { QuizQuestionType } from '../../type/quiz.type';
 import { Track } from '../../entity/track.entity';
 
+const mockItemRepository = {
+  findOne: jest.fn(),
+  update: jest.fn(),
+};
+
 const mockDataSource = {
+  getRepository: jest.fn(() => mockItemRepository),
   transaction: jest.fn(),
   query: jest.fn(),
 };
@@ -706,6 +712,98 @@ describe('TrackService', () => {
         service.assertCallerMayDeleteMedia('https://b/track-media/e.png'),
       ).resolves.toBeUndefined();
       expect(mockDataSource.query).not.toHaveBeenCalled();
+    });
+  });
+  describe('updateQuizSettings', () => {
+    const itemId = 'item-1';
+    const quizItem = (maxAttempts: number | null | undefined) => ({
+      id: itemId,
+      trackId: 'track-1',
+      type: TrackItemType.QUIZ,
+      content: { settings: { passScore: 70, maxAttempts }, questions: [] },
+    });
+    const published = (status = TrackStatus.ACTIVE) =>
+      mockTrackRepository.findOne.mockResolvedValue({
+        id: 'track-1',
+        createdBy: 1,
+        status,
+      });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockDataSource.getRepository.mockReturnValue(mockItemRepository);
+      published();
+    });
+
+    it('increases maxAttempts and keeps the other settings', async () => {
+      mockItemRepository.findOne.mockResolvedValue(quizItem(3));
+      const result = await service.updateQuizSettings(itemId, {
+        maxAttempts: 5,
+      });
+      expect(result).toEqual({ trackItemId: itemId, maxAttempts: 5 });
+      expect(mockItemRepository.update).toHaveBeenCalledWith(
+        { id: itemId },
+        {
+          content: {
+            settings: { passScore: 70, maxAttempts: 5 },
+            questions: [],
+          },
+        },
+      );
+    });
+
+    it.each([2, 3])('rejects %i when the limit is 3', async (next) => {
+      mockItemRepository.findOne.mockResolvedValue(quizItem(3));
+      await expect(
+        service.updateQuizSettings(itemId, { maxAttempts: next }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockItemRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('changes a numeric limit to unlimited', async () => {
+      mockItemRepository.findOne.mockResolvedValue(quizItem(3));
+      const result = await service.updateQuizSettings(itemId, {
+        maxAttempts: null,
+      });
+      expect(result.maxAttempts).toBeNull();
+    });
+
+    it.each([null, undefined])(
+      'rejects any change when the quiz is already unlimited (%s)',
+      async (current) => {
+        mockItemRepository.findOne.mockResolvedValue(quizItem(current));
+        await expect(
+          service.updateQuizSettings(itemId, { maxAttempts: 9 }),
+        ).rejects.toThrow(BadRequestException);
+        await expect(
+          service.updateQuizSettings(itemId, { maxAttempts: null }),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it('throws NotFoundException for an unknown item', async () => {
+      mockItemRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.updateQuizSettings(itemId, { maxAttempts: 5 }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException for a non-quiz item', async () => {
+      mockItemRepository.findOne.mockResolvedValue({
+        ...quizItem(3),
+        type: TrackItemType.ARTICLE,
+      });
+      await expect(
+        service.updateQuizSettings(itemId, { maxAttempts: 5 }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws ForbiddenException when the course is not published', async () => {
+      mockItemRepository.findOne.mockResolvedValue(quizItem(3));
+      published(TrackStatus.DRAFT);
+      await expect(
+        service.updateQuizSettings(itemId, { maxAttempts: 5 }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

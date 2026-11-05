@@ -22,6 +22,9 @@ export const ANALYTICS_EVENTS = {
   SIMULATION_STARTED: "simulation_started",
   SIMULATION_COMPLETED: "simulation_completed",
   SIMULATION_CREDITS_USED: "simulation_credits_used",
+
+  // Admin: raised a quiz's attempt limit on a published course. Carries trackItemId + maxAttempts.
+  LIVE_QUIZ_ATTEMPTS_INCREASED: "live_quiz_attempts_increased",
   // Diagnostic: how long after the agent joins can the learner actually hear it.
   // Splits the wait into "we were told about the track" vs "we subscribed to it",
   // so a silent-agent report can be attributed instead of guessed at.
