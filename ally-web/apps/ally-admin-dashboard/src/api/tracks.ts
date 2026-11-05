@@ -68,6 +68,18 @@ const tracksApi = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.TRACKS_V2],
     }),
 
+    updateLiveQuizSettings: builder.mutation<
+      { trackItemId: string; maxAttempts: number | null },
+      { trackItemId: string; maxAttempts: number | null }
+    >({
+      query: ({ trackItemId, maxAttempts }) => ({
+        url: ApiEndpoints.TRACKS.QUIZ_SETTINGS(trackItemId),
+        method: HttpMethod.PATCH,
+        body: { maxAttempts },
+      }),
+      invalidatesTags: [TAG_TYPES.TRACKS_V2],
+    }),
+
     deleteTrackById: builder.mutation<void, string>({
       query: id => ({
         url: ApiEndpoints.TRACKS.BY_ID(id),
@@ -256,6 +268,7 @@ export const {
   useCreateTrackMutation,
   useUpdateTrackByIdMutation,
   useUpdateTrackStructureMutation,
+  useUpdateLiveQuizSettingsMutation,
   useDeleteTrackByIdMutation,
   useDuplicateTrackMutation,
   useAddTracksToTenantMutation,

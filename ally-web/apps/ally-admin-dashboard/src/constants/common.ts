@@ -187,6 +187,8 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
+    // Raise a live quiz's attempt limit; the structure PUT is locked once learners enrol.
+    QUIZ_SETTINGS: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/quiz/settings`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,

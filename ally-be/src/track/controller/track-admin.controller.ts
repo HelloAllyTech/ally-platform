@@ -7,6 +7,7 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  Patch,
   ParseEnumPipe,
   ParseIntPipe,
   ParseUUIDPipe,
@@ -34,6 +35,10 @@ import {
   TrackSummaryResponseDto,
 } from '../dto/create-track.dto';
 import { UpdateTrackDto } from '../dto/update-track.dto';
+import {
+  UpdateQuizSettingsDto,
+  UpdateQuizSettingsResponseDto,
+} from '../dto/update-quiz-settings.dto';
 import { UpsertTrackStructureDto } from '../dto/upsert-track-structure.dto';
 import {
   CreateTrackTenantDto,
@@ -228,6 +233,23 @@ export class TrackAdminController {
   ): Promise<SuccessResponse> {
     await this.trackService.assertCallerMayEdit(id);
     return this.trackService.upsertStructure(id, dto);
+  }
+
+  @ApiOperation({
+    summary: "Raise a live quiz's attempt limit",
+    description:
+      'Works on a published course with learners enrolled, where the ' +
+      'structure is locked. The limit can only go up (or to null for ' +
+      'unlimited); learners who used every attempt can retry at once.',
+  })
+  @ApiResponse({ status: 200, type: UpdateQuizSettingsResponseDto })
+  @AuthPermissions([PERMISSIONS.EDIT_ADMIN_TRACK])
+  @Patch('tracks/items/:trackItemId/quiz/settings')
+  async updateQuizSettings(
+    @Param('trackItemId', ParseUUIDPipe) trackItemId: string,
+    @Body() dto: UpdateQuizSettingsDto,
+  ): Promise<UpdateQuizSettingsResponseDto> {
+    return this.trackService.updateQuizSettings(trackItemId, dto);
   }
 
   /* ---------------------------------------------------------------- *
