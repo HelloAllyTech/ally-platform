@@ -55,7 +55,7 @@ vi.mock("@api", () => ({
   useRemoveLearnerEnrollmentMutation: () => [mockRemove, { isLoading: false }],
 }));
 
-vi.mock("@constants", () => ({ Permissions: { EDIT_USER: "edit:user" } }));
+vi.mock("@constants", () => ({ Permissions: { EDIT_LEARNER_PROGRESS: "edit:learner-progress" } }));
 vi.mock("@utils", () => ({
   hasPermissions: (perms: string[], p: string) => perms.includes(p),
 }));
@@ -102,7 +102,7 @@ const renderDrawer = () =>
 describe("LearnerCoursesDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPermissions.mockReturnValue(["edit:user"]);
+    mockPermissions.mockReturnValue(["edit:learner-progress"]);
   });
 
   it("lists each course with progress, and no flag while it is still open to them", () => {
@@ -212,14 +212,14 @@ describe("LearnerUsageTable courses action", () => {
   });
 
   it("opens the drawer for the learner when the user can edit users", () => {
-    mockPermissions.mockReturnValue(["edit:user"]);
+    mockPermissions.mockReturnValue(["edit:learner-progress"]);
     render(<LearnerUsageTable range="30d" />);
 
     fireEvent.click(screen.getByTestId("learner-courses-action-7"));
     expect(mockEnrollmentsQuery).toHaveBeenCalledWith(7, { skip: false });
   });
 
-  it("hides the action without edit:user", () => {
+  it("hides the action without edit:learner-progress", () => {
     mockPermissions.mockReturnValue([]);
     render(<LearnerUsageTable range="30d" />);
 

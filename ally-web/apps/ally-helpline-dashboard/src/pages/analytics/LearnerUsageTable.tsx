@@ -113,9 +113,10 @@ interface LearnerUsageTableProps {
 export const LearnerUsageTable: FunctionComponent<LearnerUsageTableProps> = ({ range }) => {
   const { t } = useTranslation();
   const { permissions } = useUser();
-  // Reopening attempts edits another user's progress, so it follows the same
-  // `edit:user` the backend enforces — hidden rather than shown-and-403.
-  const canEditUsers = hasPermissions(permissions, Permissions.EDIT_USER);
+  // Reopening attempts and removing a learner from a course edit another
+  // user's progress, so they follow the same `edit:learner-progress` the
+  // backend enforces — hidden rather than shown-and-403.
+  const canEditUsers = hasPermissions(permissions, Permissions.EDIT_LEARNER_PROGRESS);
   const [attemptsLearner, setAttemptsLearner] = useState<{ id: number; name: string } | null>(null);
   const [coursesLearner, setCoursesLearner] = useState<{ id: number; name: string } | null>(null);
   const [rows, setRows] = useState<LearnerUsageRow[]>([]);

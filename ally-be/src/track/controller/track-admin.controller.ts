@@ -430,7 +430,7 @@ export class TrackAdminController {
       'started but not passed, with attempts used and when a paused round ' +
       'reopens. What the "reopen attempts" action acts on.',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
   @Get('learners/:userId/scenario-attempts')
   async listLearnerScenarioAttempts(
     @Param('userId', ParseIntPipe) userId: number,
@@ -445,7 +445,7 @@ export class TrackAdminController {
       'round to open by itself. This opens it immediately. Only learners in ' +
       "the caller's own organisation can be reset.",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
   @Post('tracks/items/:trackItemId/branching-reset')
   async resetBranchingAttempts(
     @Param('trackItemId', ParseUUIDPipe) trackItemId: string,
@@ -461,7 +461,7 @@ export class TrackAdminController {
       'it again; the earlier session and its report are kept. Only learners ' +
       "in the caller's own organisation can be reopened.",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
   @Post('tracks/items/:trackItemId/assessment-reopen')
   async reopenRoleplayAssessment(
     @Param('trackItemId', ParseUUIDPipe) trackItemId: string,
@@ -486,7 +486,7 @@ export class TrackAdminController {
       'them if they were not enrolled (null when it is still open to them). ' +
       'What the "remove from course" action acts on.',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
   @Get('learners/:userId/enrollments')
   async listLearnerEnrollments(@Param('userId', ParseIntPipe) userId: number) {
     return this.trackEnrollmentService.listLearnerEnrollmentsForAdmin(userId);
@@ -500,7 +500,7 @@ export class TrackAdminController {
       'they can start it again from the beginning. Only learners in the ' +
       "caller's own organisation can be removed.",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
   @Delete('learners/:userId/enrollments/:trackEnrollmentId')
   async removeLearnerEnrollment(
     @Param('userId', ParseIntPipe) userId: number,

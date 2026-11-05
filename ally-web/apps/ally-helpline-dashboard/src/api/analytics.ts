@@ -110,7 +110,7 @@ const analyticsAPI = baseAPI.injectEndpoints({
 
     /**
      * Scenario quizzes a learner has started but not passed (trainer view).
-     * Tenant-scoped on the backend; needs `edit:user`.
+     * Tenant-scoped on the backend; needs `edit:learner-progress`.
      * @param {number} userId - The learner
      */
     getLearnerScenarioAttempts: builder.query<LearnerScenarioAttempt[], number>({
@@ -155,7 +155,7 @@ const analyticsAPI = baseAPI.injectEndpoints({
 
     /**
      * The courses a learner is enrolled in (trainer view). Tenant-scoped on the
-     * backend; needs `edit:user`.
+     * backend; needs `edit:learner-progress`.
      * @param {number} userId - The learner
      */
     getLearnerEnrollments: builder.query<LearnerEnrollment[], number>({
