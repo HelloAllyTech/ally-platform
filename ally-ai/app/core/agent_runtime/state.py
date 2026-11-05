@@ -50,6 +50,18 @@ class AgentState(TypedDict, total=False):
     answer_raw: Optional[Dict[str, Any]]  # the model's structured output
     answer_meta: Optional[Dict[str, Any]]
 
+    # --- working: conversational agent (`features.agent`)
+    turn_type: Optional[str]  # smalltalk | about_bot | question | unclear
+    standalone_query: Optional[str]
+    # The decline reason the up-front search would have given in parity mode;
+    # None when it cleared the threshold or did not run.
+    prefetch_gate: Optional[str]
+    agent_step: Optional[Dict[str, Any]]  # the latest structured step
+    agent_meta: Optional[Dict[str, Any]]
+    agent_calls: int
+    tool_calls: List[Dict[str, Any]]  # one record per tool call (tools/base.py)
+    tool_passages: int  # passages added by tools
+
     # --- output: the `/knowledge-agent/answer` response, field for field
     result: Optional[Dict[str, Any]]
     trace: Annotated[List[Dict[str, Any]], add_trace]
@@ -70,6 +82,14 @@ RUN_SCOPED_KEYS = (
     "passages",
     "answer_raw",
     "answer_meta",
+    "turn_type",
+    "standalone_query",
+    "prefetch_gate",
+    "agent_step",
+    "agent_meta",
+    "agent_calls",
+    "tool_calls",
+    "tool_passages",
     "result",
 )
 

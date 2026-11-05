@@ -59,9 +59,11 @@ _REPLY_FIELDS: Dict[str, Any] = {
 @lru_cache(maxsize=32)
 def _step_schema(tools: Tuple[Tuple[str, Type[BaseModel]], ...]) -> Type[BaseModel]:
     names = (REPLY_ACTION, *(name for name, _ in tools))
-    fields: Dict[str, Any] = {
-        "action": (Literal[names], REPLY_ACTION),  # type: ignore[valid-type]
-    }
+    # An Enum rather than a Literal: a one-value Literal renders as JSON Schema
+    # `const`, which not every provider's structured output accepts; an enum
+    # renders as `enum` whatever its size.
+    action = Enum("AgentAction", {name: name for name in names}, type=str)
+    fields: Dict[str, Any] = {"action": (action, action(REPLY_ACTION))}
     # One input field per tool, named after it. Defaults rather than Optional, so
     # the model may leave the fields of tools it is not calling at their empty
     # defaults.

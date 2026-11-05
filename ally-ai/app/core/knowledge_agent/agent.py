@@ -526,18 +526,13 @@ class KnowledgeAgentService:
         # passages and was refused on all of them looks healthy in every count except
         # this one, and refusal is what the worker actually experienced.
         if log_retrieval:
-            self._report_retrieval(
-                query=search_text,
-                min_similarity=limits["min_similarity"],
-                decline_similarity=limits["decline_similarity"],
-                top_k=limits["top_k"],
+            self.report_gate_decline(
+                reason,
+                search_text=search_text,
                 hits=hits,
-                returned_count=0,
+                limits=limits,
                 latency_ms=latency_ms,
                 language=language,
-                disposition=_DECLINE_DISPOSITIONS.get(
-                    reason, "declined_below_threshold"
-                ),
             )
         return {
             "intent": AnswerIntent.DECLINE,
@@ -551,6 +546,33 @@ class KnowledgeAgentService:
             "model": "",
             "prompt_version": settings.KNOWLEDGE_AGENT.PROMPT_VERSION,
         }
+
+    def report_gate_decline(
+        self,
+        reason: DeclineReason,
+        *,
+        search_text: str,
+        hits: List[Dict[str, Any]],
+        limits: Dict[str, Any],
+        latency_ms: int,
+        language: str,
+    ) -> None:
+        """Report a search the gate refused to the retrieval log.
+
+        The conversational agent's up-front search calls this without declining:
+        the run goes on to the agent, but the search is logged the same way.
+        """
+        self._report_retrieval(
+            query=search_text,
+            min_similarity=limits["min_similarity"],
+            decline_similarity=limits["decline_similarity"],
+            top_k=limits["top_k"],
+            hits=hits,
+            returned_count=0,
+            latency_ms=latency_ms,
+            language=language,
+            disposition=_DECLINE_DISPOSITIONS.get(reason, "declined_below_threshold"),
+        )
 
     def select(
         self,
