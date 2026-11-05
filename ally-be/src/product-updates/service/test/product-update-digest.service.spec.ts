@@ -195,7 +195,7 @@ describe('ProductUpdateDigestService', () => {
     );
   });
 
-  it("adds this month's roadmap votes by name: voters highest first, then who has not voted", async () => {
+  it("adds this month's roadmap votes by name: voters highest first", async () => {
     updateRepository.find
       .mockResolvedValueOnce([update({})])
       .mockResolvedValueOnce([]);
@@ -203,18 +203,14 @@ describe('ProductUpdateDigestService', () => {
     await service.sendIfDue(IN_DIGEST_HOUR);
 
     const body: string = sesService.sendEmail.mock.calls[0][0].body;
-    expect(body).toContain('Roadmap votes in September so far');
-    expect(body).toContain(
-      '2 of 4 admins have voted · 15 of 800 votes issued used',
-    );
+    expect(body).toContain('Roadmap votes in September so far:');
+    expect(body).not.toContain('admins have voted');
     expect(body.indexOf('Bea')).toBeLessThan(body.indexOf('Asha'));
-    expect(body).toContain('Not voted yet: Cy, Dev');
+    expect(body).not.toContain('Not voted yet');
     expect(body.indexOf('Roadmap votes in September')).toBeLessThan(
       body.indexOf('Live for customers'),
     );
-    expect(body).toContain(
-      'https://admin.example.com/analytics?tab=highlights',
-    );
+    expect(body).not.toContain('analytics?tab=highlights');
   });
 
   it('still sends the digest when the roadmap votes cannot be read', async () => {
