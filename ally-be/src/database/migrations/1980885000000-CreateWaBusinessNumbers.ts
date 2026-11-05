@@ -17,8 +17,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * separate consent and rate limits. Every existing row is a platform-number contact (NULL), and
  * the original index name is kept for exactly those rows, so nothing already stored changes.
  */
-export class CreateWaBusinessNumbers1980880000000 implements MigrationInterface {
-  name = 'CreateWaBusinessNumbers1980880000000';
+export class CreateWaBusinessNumbers1980885000000 implements MigrationInterface {
+  name = 'CreateWaBusinessNumbers1980885000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

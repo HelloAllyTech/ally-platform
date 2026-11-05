@@ -3,7 +3,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /**
  * Per-organisation WhatsApp bot settings, moved off the connected number.
  *
- * CreateWaBusinessNumbers1980880000000 kept an organisation's overrides on its number row. That
+ * CreateWaBusinessNumbers1980885000000 kept an organisation's overrides on its number row. That
  * tied wording and helplines to having a number: an organisation could not prepare them before
  * connecting, and a disconnect discarded what its admins wrote. They now live one row per
  * organisation, and the number keeps only what it needs to send and receive.
