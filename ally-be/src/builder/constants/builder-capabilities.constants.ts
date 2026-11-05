@@ -572,14 +572,24 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   },
   {
     id: 'whatsapp',
-    name: 'WhatsApp bot',
+    name: 'AI chatbots (WhatsApp and other channels)',
     whatItIs:
-      'The WhatsApp Q&A bot over a knowledge-base corpus, with number and identity gating.',
+      'Configurable AI chatbots — instructions, model, picked knowledge-base documents, quick replies, ' +
+      'who can chat and a dashboard team — reached through connectors (a WhatsApp number today), ' +
+      'with a channel-agnostic engine and a Preview console.',
     reuseWhen:
-      'A request wants to reach users on WhatsApp or answer questions there.',
-    modules: ['ally-be:src/whatsapp'],
-    adminRoute: '/whatsapp-bot',
-    keywords: ['whatsapp', 'chat bot', 'messaging'],
+      'A request wants a bot that answers questions from documents, or to reach users on WhatsApp ' +
+      'or another messaging channel.',
+    modules: ['ally-be:src/chatbot', 'ally-be:src/whatsapp'],
+    adminRoute: '/chatbots',
+    keywords: [
+      'whatsapp',
+      'chatbot',
+      'chat bot',
+      'faq bot',
+      'messaging',
+      'connector',
+    ],
   },
   {
     id: 'file-storage',

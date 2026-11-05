@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -9,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { isUUID } from 'class-validator';
 import { In, Repository } from 'typeorm';
 import { Tenant } from 'src/tenant/entity/tenant.entity';
+import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
 import { AiService } from 'src/ai/service/ai.service';
 import {
   KnowledgeAudienceRequest,
@@ -142,7 +144,41 @@ export class KnowledgeBaseService {
     // otherwise share nothing (and this codebase has a live circular-import DI trap).
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    private readonly tenantScope: TenantScopeService,
   ) {}
+
+  /**
+   * The organisations an org-restricted admin may manage documents for; `null` for everyone
+   * else. Keyed on `restricted`, not on the tenant list, so a background caller with no user (the
+   * WhatsApp "create from unanswered" path runs inside an admin request, but ingest does not) is
+   * never narrowed to whatever tenant the execution context happens to carry.
+   */
+  private async managedTenantIds(): Promise<string[] | null> {
+    const scope = await this.tenantScope.resolveScope();
+    return scope.restricted ? (scope.tenantIds ?? []) : null;
+  }
+
+  /**
+   * An org-restricted admin may only target their own organisations: never the global corpus,
+   * never nobody, never an organisation outside their allowlist.
+   */
+  private async assertAudienceManageable(
+    isGlobal: boolean,
+    tenantIds: string[],
+  ): Promise<void> {
+    const managed = await this.managedTenantIds();
+    if (managed === null) return;
+    if (isGlobal || !tenantIds.length) {
+      throw new ForbiddenException(
+        'Documents you add must be targeted at your organisation.',
+      );
+    }
+    if (tenantIds.some((id) => !managed.includes(id))) {
+      throw new ForbiddenException(
+        'You can only target documents at your own organisations.',
+      );
+    }
+  }
 
   private getBucket(): string {
     const bucket = this.configService.s3.assetsBucket;
@@ -312,6 +348,7 @@ export class KnowledgeBaseService {
 
     const isGlobal = dto.isGlobal ?? false;
     const tenantIds = isGlobal ? [] : (dto.tenantIds ?? []);
+    await this.assertAudienceManageable(isGlobal, tenantIds);
     await this.assertTenantsExist(tenantIds);
 
     return this.insertAndQueue(
@@ -449,7 +486,9 @@ export class KnowledgeBaseService {
   }
 
   async list(dto: GetKbDocumentsQueryDto) {
+    const managed = await this.managedTenantIds();
     const { documents, count } = await this.documentRepository.list({
+      ...(managed === null ? {} : { ownedByTenantIds: managed }),
       corpus: dto.corpus,
       limit: dto.limit,
       offset: dto.offset,
@@ -458,6 +497,7 @@ export class KnowledgeBaseService {
       sourceType: dto.sourceType,
       tags: dto.tags,
       tenantId: dto.tenantId,
+      excludeGlobal: dto.excludeGlobal,
       includeArchived: dto.includeArchived,
       sortBy: dto.sortBy,
       sortDir: dto.sortDir,
@@ -477,8 +517,16 @@ export class KnowledgeBaseService {
     };
   }
 
+  /**
+   * One document WITH its text, so the edit panel can show what the passages were cut from and
+   * an admin can correct pasted text rather than retyping it. The list omits it.
+   */
   async get(id: string): Promise<KbDocumentResponseDto> {
-    return this.respond(await this.findOrFail(id));
+    const document = await this.findOrFail(id);
+    return {
+      ...(await this.respond(document)),
+      rawText: document.rawText ?? '',
+    };
   }
 
   /**
@@ -509,6 +557,7 @@ export class KnowledgeBaseService {
     const userId = this.currentUserId();
 
     const tenantIds = dto.isGlobal ? [] : (dto.tenantIds ?? []);
+    await this.assertAudienceManageable(dto.isGlobal, tenantIds);
     await this.assertTenantsExist(tenantIds);
 
     const { added, removed } =
@@ -539,10 +588,27 @@ export class KnowledgeBaseService {
     return this.toResponse(updated, tenantIds);
   }
 
+  /**
+   * Load a document the caller may act on. For an org-restricted admin, a document that is
+   * global or reaches any organisation outside their allowlist answers exactly like a missing
+   * one — every per-document route goes through here, so none can touch another customer's.
+   */
   private async findOrFail(id: string): Promise<KbDocument> {
     const document = await this.documentRepository.findOne({ where: { id } });
     if (!document) {
       throw new NotFoundException(`Document ${id} was not found`);
+    }
+    const managed = await this.managedTenantIds();
+    if (managed !== null) {
+      const audience = document.isGlobal
+        ? []
+        : await this.documentTenantRepository.tenantIdsForDocument(id);
+      if (
+        !audience.length ||
+        audience.some((tenantId) => !managed.includes(tenantId))
+      ) {
+        throw new NotFoundException(`Document ${id} was not found`);
+      }
     }
     return document;
   }

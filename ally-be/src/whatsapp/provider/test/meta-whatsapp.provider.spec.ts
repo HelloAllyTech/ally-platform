@@ -293,11 +293,35 @@ describe('MetaWhatsAppProvider', () => {
       expect(provider.parseInbound(toNumber('123'))).toHaveLength(1);
     });
 
-    it('skips messages sent to another number on the same Meta app', () => {
-      // The test number and the real number share one webhook during setup. A reply always goes
-      // out from the configured number, so answering the other one's traffic would reach the
-      // worker from a number they never wrote to.
-      expect(provider.parseInbound(toNumber('999'))).toEqual([]);
+    it('tags each message with the number it was sent to', () => {
+      // Several numbers share one Meta app's webhook. The parser keeps them all and says which
+      // number each was for; the webhook decides which of those numbers are answered.
+      expect(provider.parseInbound(toNumber('999'))).toEqual([
+        expect.objectContaining({
+          providerMessageId: 'm',
+          phoneNumberId: '999',
+        }),
+      ]);
+    });
+
+    it('sends with the credentials it is given, not the env number', async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { messages: [{ id: 'wamid.org' }] },
+      });
+      await provider.sendText('91', 'hi', {
+        phoneNumberId: '555',
+        accessToken: 'org-token',
+      });
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/555/messages'),
+        expect.anything(),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer org-token',
+          }),
+        }),
+      );
+      mockedAxios.post.mockReset();
     });
   });
 

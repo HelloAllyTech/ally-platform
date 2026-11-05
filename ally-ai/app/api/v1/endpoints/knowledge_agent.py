@@ -66,9 +66,16 @@ async def answer_knowledge_question(
             similarity_band=payload.similarity_band,
             max_answer_chars=payload.max_answer_chars,
             translate_query=payload.translate_query,
+            # `is not None`, not truthiness: an EMPTY list is "this bot has no
+            # documents" and must search nothing. Collapsing it to None would mean
+            # "search everything" — answering a bot from documents it was never given.
             document_ids=(
-                [str(d) for d in payload.document_ids] if payload.document_ids else None
+                [str(d) for d in payload.document_ids]
+                if payload.document_ids is not None
+                else None
             ),
+            persona=payload.persona.model_dump() if payload.persona else None,
+            answer_mode=payload.answer_mode,
         )
         return KnowledgeAnswerResponse(**result)
 

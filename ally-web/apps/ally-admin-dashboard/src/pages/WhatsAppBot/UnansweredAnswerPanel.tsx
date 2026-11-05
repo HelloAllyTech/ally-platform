@@ -8,6 +8,8 @@ import { EntityField, EntitySidePanel } from "@components";
 import { en } from "@constants";
 import { WaUnansweredQuestion } from "@types";
 
+import { useChatbotId } from "./chatbotContext";
+
 interface UnansweredAnswerPanelProps {
   /** Null closes the panel. */
   question: WaUnansweredQuestion | null;
@@ -31,6 +33,7 @@ export const UnansweredAnswerPanel: React.FC<UnansweredAnswerPanelProps> = ({
 }) => {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
+  const chatbotId = useChatbotId();
   const [createDocument, { isLoading }] = useCreateDocumentFromWaUnansweredMutation();
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export const UnansweredAnswerPanel: React.FC<UnansweredAnswerPanelProps> = ({
     if (!question || saveDisabledReason) return;
     try {
       await createDocument({
+        chatbotId,
         id: question.id,
         title: trimmedTitle,
         text: trimmedText,

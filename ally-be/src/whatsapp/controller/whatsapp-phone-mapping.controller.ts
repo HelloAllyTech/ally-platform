@@ -17,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decorator';
+import { OrgScopedRoute } from '../../auth/decorators/org-scoped-route.decorator';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import {
@@ -38,6 +39,9 @@ import { WhatsAppPhoneMappingService } from '../service/whatsapp-phone-mapping.s
  * can be answered from, so it belongs to whoever runs the bot, not to whoever can rename an
  * account. No NEW permission was minted for it — a new permission needs its grants cloned into
  * every future role migration and sits behind a 30-minute Redis cache that raw SQL cannot bust.
+ *
+ * Every route is @OrgScopedRoute: an org-restricted admin passes `?tenantId=` naming one of their
+ * organisations, and the service confines every read and write to their organisations.
  */
 @ApiTags('WhatsApp Bot')
 @ApiBearerAuth()
@@ -47,6 +51,7 @@ export class WhatsAppPhoneMappingController {
   constructor(private readonly service: WhatsAppPhoneMappingService) {}
 
   @Get()
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -65,6 +70,7 @@ export class WhatsAppPhoneMappingController {
   }
 
   @Post()
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -87,6 +93,7 @@ export class WhatsAppPhoneMappingController {
   }
 
   @Post('bulk')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -105,6 +112,7 @@ export class WhatsAppPhoneMappingController {
   }
 
   @Patch(':id')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -118,6 +126,7 @@ export class WhatsAppPhoneMappingController {
   }
 
   @Delete(':id')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })

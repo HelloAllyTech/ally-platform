@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
+import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { LoggerService } from 'src/logger/logger.service';
 import { Tenant } from 'src/tenant/entity/tenant.entity';
@@ -29,6 +31,10 @@ import { PHONE_MATCH_DIGITS, phoneDigits, phoneKey } from '../util/phone';
  * The corpus is targeted per organisation, so a sender whose organisation cannot be resolved is
  * refused. Resolution has two sources — a number on somebody's Ally profile, or a mapping here —
  * and this is the only one an admin can actually create in the product.
+ *
+ * ORGANISATION-SCOPED. An org-restricted admin sees and changes only mappings in their own
+ * organisations, and cannot move a number out of another organisation: "add this number" moves an
+ * existing mapping, which across organisations would let one organisation take another's worker.
  */
 @Injectable()
 export class WhatsAppPhoneMappingService {
@@ -43,7 +49,31 @@ export class WhatsAppPhoneMappingService {
     private readonly tenantRepository: Repository<Tenant>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly tenantScope: TenantScopeService,
   ) {}
+
+  /** The caller's organisations; `null` means unrestricted. */
+  private scope(): Promise<string[] | null> {
+    return this.tenantScope.resolveTenantIds();
+  }
+
+  private static inScope(scope: string[] | null, tenantId: string): boolean {
+    return scope === null || scope.includes(tenantId);
+  }
+
+  /** A live mapping the caller may see; another organisation's answers like a missing one. */
+  private async findInScope(id: string): Promise<WaPhoneMapping> {
+    const row = await this.mappingRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
+    if (
+      !row ||
+      !WhatsAppPhoneMappingService.inScope(await this.scope(), row.tenantId)
+    ) {
+      throw new NotFoundException(`Mapping ${id} was not found`);
+    }
+    return row;
+  }
 
   private currentUserId(): number {
     const userId = ExecutionManager.getUserId();
@@ -119,9 +149,14 @@ export class WhatsAppPhoneMappingService {
   async list(
     dto: GetWaPhoneMappingsQueryDto,
   ): Promise<{ mappings: WaPhoneMappingResponseDto[]; count: number }> {
+    const scope = await this.scope();
+    if (scope !== null && !scope.length) return { mappings: [], count: 0 };
     const query = this.mappingRepository
       .createQueryBuilder('m')
       .where('m.deletedAt IS NULL');
+    if (scope !== null) {
+      query.andWhere('m.tenantId IN (:...scope)', { scope });
+    }
 
     if (dto.tenantId) {
       query.andWhere('m.tenantId = :tenantId', { tenantId: dto.tenantId });
@@ -169,7 +204,9 @@ export class WhatsAppPhoneMappingService {
           label: row.label ?? null,
           userId: row.userId ?? null,
           conflictingTenantName: conflicts
-            ? (conflictNames.get(user!.tenantId) ?? null)
+            ? WhatsAppPhoneMappingService.inScope(scope, user!.tenantId)
+              ? (conflictNames.get(user!.tenantId) ?? null)
+              : 'another organisation'
             : null,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
@@ -200,12 +237,24 @@ export class WhatsAppPhoneMappingService {
           `digits are needed.`,
       );
     }
+    await this.tenantScope.assertTenantInScope(dto.tenantId);
     await this.assertTenantExists(dto.tenantId);
 
     const matchedUser = (await this.usersByPhoneKey([key])).get(key);
     const existing = await this.mappingRepository.findOne({
       where: { phoneKey: key, deletedAt: IsNull() },
     });
+    if (
+      existing &&
+      !WhatsAppPhoneMappingService.inScope(
+        await this.scope(),
+        existing.tenantId,
+      )
+    ) {
+      throw new ConflictException(
+        'That number is already mapped to another organisation.',
+      );
+    }
 
     if (existing) {
       await this.mappingRepository.update(
@@ -241,11 +290,7 @@ export class WhatsAppPhoneMappingService {
   }
 
   async get(id: string): Promise<WaPhoneMappingResponseDto> {
-    const row = await this.mappingRepository.findOne({
-      where: { id, deletedAt: IsNull() },
-    });
-    if (!row) throw new NotFoundException(`Mapping ${id} was not found`);
-    return this.toResponse(row);
+    return this.toResponse(await this.findInScope(id));
   }
 
   /**
@@ -266,6 +311,7 @@ export class WhatsAppPhoneMappingService {
     const conflictNames = conflicts
       ? await this.tenantNames([user!.tenantId])
       : new Map<string, string>();
+    const scope = conflicts ? await this.scope() : null;
 
     return {
       id: row.id,
@@ -275,7 +321,9 @@ export class WhatsAppPhoneMappingService {
       label: row.label ?? null,
       userId: row.userId ?? null,
       conflictingTenantName: conflicts
-        ? (conflictNames.get(user!.tenantId) ?? null)
+        ? WhatsAppPhoneMappingService.inScope(scope, user!.tenantId)
+          ? (conflictNames.get(user!.tenantId) ?? null)
+          : 'another organisation'
         : null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -286,11 +334,11 @@ export class WhatsAppPhoneMappingService {
     id: string,
     dto: UpdateWaPhoneMappingDto,
   ): Promise<WaPhoneMappingResponseDto> {
-    const row = await this.mappingRepository.findOne({
-      where: { id, deletedAt: IsNull() },
-    });
-    if (!row) throw new NotFoundException(`Mapping ${id} was not found`);
-    if (dto.tenantId) await this.assertTenantExists(dto.tenantId);
+    await this.findInScope(id);
+    if (dto.tenantId) {
+      await this.tenantScope.assertTenantInScope(dto.tenantId);
+      await this.assertTenantExists(dto.tenantId);
+    }
 
     await this.mappingRepository.update(
       { id },
@@ -310,10 +358,7 @@ export class WhatsAppPhoneMappingService {
    * the admin's statement, it does not blacklist the number.
    */
   async remove(id: string): Promise<{ id: string; removed: boolean }> {
-    const row = await this.mappingRepository.findOne({
-      where: { id, deletedAt: IsNull() },
-    });
-    if (!row) throw new NotFoundException(`Mapping ${id} was not found`);
+    await this.findInScope(id);
 
     await this.mappingRepository.update(
       { id },
@@ -348,7 +393,10 @@ export class WhatsAppPhoneMappingService {
         ),
       ),
     ];
-    const knownTenants = await this.tenantNames(requestedTenantIds);
+    const [knownTenants, scope] = await Promise.all([
+      this.tenantNames(requestedTenantIds),
+      this.scope(),
+    ]);
 
     // Everything the batch needs, read up front: one users scan, one mappings read.
     const keys = dto.rows.map((row) => phoneKey(row.phone));
@@ -418,11 +466,26 @@ export class WhatsAppPhoneMappingService {
         record(line, row.phone, 'invalid', 'That organisation does not exist');
         continue;
       }
+      if (!WhatsAppPhoneMappingService.inScope(scope, tenantId)) {
+        record(line, row.phone, 'invalid', 'Not one of your organisations');
+        continue;
+      }
 
       const current = existing.get(key);
       if (current) {
         if (current.tenantId === tenantId) {
           record(line, row.phone, 'unchanged', 'Already mapped here');
+          continue;
+        }
+        // Never overwritten across organisations the caller cannot reach, and that
+        // organisation is not named to them.
+        if (!WhatsAppPhoneMappingService.inScope(scope, current.tenantId)) {
+          record(
+            line,
+            row.phone,
+            'conflict',
+            'Already mapped to another organisation',
+          );
           continue;
         }
         if (!dto.overwriteConflicts) {

@@ -159,6 +159,18 @@ export interface KnowledgeAnswerRequest {
   document_ids?: string[];
   /** REQUIRED by ally-ai. A request without it is refused with a 422 rather than defaulted. */
   audience: KnowledgeAudienceRequest;
+  /** The answering bot's persona. Absent: the prompt is exactly as before chatbots. */
+  persona?: KnowledgePersonaRequest;
+  /** `documents_only` (default) declines what the documents miss; the other may answer generally. */
+  answer_mode?: 'documents_only' | 'documents_and_general';
+  /** The channel the question came in on (`whatsapp`, `test`, …), for format adaptation. */
+  channel?: string;
+}
+
+export interface KnowledgePersonaRequest {
+  display_name?: string;
+  system_prompt?: string;
+  tone?: string;
 }
 
 export interface KnowledgeCitation {

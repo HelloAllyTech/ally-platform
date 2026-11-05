@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decorator';
+import { CallerScopedRoute } from '../../auth/decorators/caller-scoped-route.decorator';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import {
@@ -39,10 +40,20 @@ import { WhatsAppConversationService } from '../service/whatsapp-conversation.se
 @ApiBearerAuth()
 @ApiSecurity('access-token')
 @Controller('v1/whatsapp')
+@CallerScopedRoute()
 export class WhatsAppConversationController {
   constructor(
     private readonly conversationService: WhatsAppConversationService,
   ) {}
+
+  /**
+   * A list route names one bot (`?chatbotId=`); a member must name one of theirs, a platform admin
+   * may leave it out for every bot. Row routes re-check the row itself in the service.
+   */
+  private async bot(chatbotId?: string): Promise<string | undefined> {
+    await this.conversationService.assertListScope(chatbotId);
+    return chatbotId || undefined;
+  }
 
   // ── conversations ─────────────────────────────────────────────────────
 
@@ -56,7 +67,7 @@ export class WhatsAppConversationController {
       'Newest activity first. Message-level filters are applied as EXISTS subqueries so a thread ' +
       'appears once regardless of how many of its messages match.',
   })
-  listConversations(
+  async listConversations(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('from') from?: string,
@@ -67,8 +78,12 @@ export class WhatsAppConversationController {
     @Query('search') search?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortDir') sortDir?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
+    await this.bot(chatbotId);
     return this.conversationService.listConversations({
+      chatbotId,
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined,
       from: from ? new Date(from) : undefined,
@@ -93,8 +108,11 @@ export class WhatsAppConversationController {
       'first — otherwise "languages" is read as a conversation id and the request 400s on the UUID ' +
       'pipe.',
   })
-  listLanguages() {
-    return this.conversationService.listLanguages();
+  async listLanguages(
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
+  ) {
+    return this.conversationService.listLanguages(await this.bot(chatbotId));
   }
 
   @Get('conversations/:id')
@@ -191,7 +209,7 @@ export class WhatsAppConversationController {
       'Defaults to open items. Clarification requests are deliberately absent — a vague question is ' +
       'not evidence of a corpus gap, and including them would bury the real gaps.',
   })
-  listUnanswered(
+  async listUnanswered(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('status') status?: WaUnansweredStatus,
@@ -200,8 +218,12 @@ export class WhatsAppConversationController {
     @Query('to') to?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortDir') sortDir?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
   ) {
+    await this.bot(chatbotId);
     return this.conversationService.listUnanswered({
+      chatbotId,
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined,
       status,
@@ -262,8 +284,17 @@ export class WhatsAppConversationController {
       'Latency is p50/p95 rather than a mean: one slow outlier drags an average enough to hide that ' +
       'the typical reply is fast, and p95 is what a waiting worker actually experiences.',
   })
-  overview(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.conversationService.overview(from, to);
+  async overview(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
+  ) {
+    return this.conversationService.overview(
+      from,
+      to,
+      await this.bot(chatbotId),
+    );
   }
 
   @Get('analytics/timeseries')
@@ -271,8 +302,17 @@ export class WhatsAppConversationController {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })
   @ApiOperation({ summary: 'Daily outcome counts for the trend chart' })
-  timeseries(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.conversationService.timeseries(from, to);
+  async timeseries(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
+  ) {
+    return this.conversationService.timeseries(
+      from,
+      to,
+      await this.bot(chatbotId),
+    );
   }
 
   @Get('analytics/languages')
@@ -286,8 +326,17 @@ export class WhatsAppConversationController {
       'if Hindi or Tamil declines far more than English, retrieval is failing before the answer is ' +
       'written. Rates are null below a minimum sample rather than computed from a handful.',
   })
-  languages(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.conversationService.languages(from, to);
+  async languages(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
+  ) {
+    return this.conversationService.languages(
+      from,
+      to,
+      await this.bot(chatbotId),
+    );
   }
 
   @Get('analytics/corpus-coverage')
@@ -300,7 +349,16 @@ export class WhatsAppConversationController {
       'The never-cited half is the useful half: such a document is either badly chunked, badly ' +
       'titled for retrieval, or about something nobody asks.',
   })
-  corpusCoverage(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.conversationService.corpusCoverage(from, to);
+  async corpusCoverage(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
+    chatbotId?: string,
+  ) {
+    return this.conversationService.corpusCoverage(
+      from,
+      to,
+      await this.bot(chatbotId),
+    );
   }
 }

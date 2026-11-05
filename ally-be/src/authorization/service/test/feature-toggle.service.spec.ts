@@ -101,19 +101,22 @@ describe('FeatureToggleService — toggles for organization-restricted admins', 
     FeatureToggleKey.ANALYTICS_AGENT,
     FeatureToggleKey.ANALYTICS_SUGGESTIONS,
     FeatureToggleKey.ROLEPLAY_SESSION_LOGS,
-    FeatureToggleKey.WHATSAPP_BOT,
     FeatureToggleKey.LOGS,
     FeatureToggleKey.ADMIN_USER_MANAGEMENT,
     FeatureToggleKey.MULTI_TENANT_ALLOWLIST_MANAGEMENT,
     FeatureToggleKey.UX_SIGNALS,
-    FeatureToggleKey.KNOWLEDGE_BASE,
   ])('withholds %s from a restricted admin', async (key) => {
     tenantScopeService.isRestricted.mockResolvedValue(true);
 
     await expect(service.isWithheld(USER_ID, key)).resolves.toBe(true);
   });
 
-  it.each([FeatureToggleKey.CONTENT_MANAGEMENT, FeatureToggleKey.ANALYTICS])(
+  it.each([
+    FeatureToggleKey.CONTENT_MANAGEMENT,
+    FeatureToggleKey.ANALYTICS,
+    FeatureToggleKey.WHATSAPP_BOT,
+    FeatureToggleKey.KNOWLEDGE_BASE,
+  ])(
     'never withholds %s, which can be scoped to an organization',
     async (key) => {
       tenantScopeService.isRestricted.mockResolvedValue(true);

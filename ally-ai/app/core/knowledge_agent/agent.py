@@ -30,6 +30,7 @@ from app.core.config import settings
 from app.core.knowledge_agent.prompt import (
     ANSWER_PROMPT_PATH,
     CRISIS_PROMPT_PATH,
+    GENERAL_ANSWER_PROMPT_PATH,
     TRANSLATE_PROMPT_PATH,
     build_answer_prompt,
     build_crisis_prompt,
@@ -396,6 +397,8 @@ class KnowledgeAgentService:
         max_answer_chars: int = DEFAULT_MAX_ANSWER_CHARS,
         translate_query: bool = True,
         document_ids: Optional[List[str]] = None,
+        persona: Optional[Dict[str, Any]] = None,
+        answer_mode: str = "documents_only",
     ) -> Dict[str, Any]:
         """
         Answer one question. Every threshold is overridable per request by ally-be,
@@ -467,7 +470,11 @@ class KnowledgeAgentService:
         # Answering this in code rather than asking the model is what makes the
         # threshold auditable and tunable, and it means the common "we simply
         # don't have this" case costs nothing in generation tokens.
-        if not hits or top_similarity < decline_similarity:
+        # A bot allowed to answer beyond its documents skips this gate: with nothing
+        # relevant retrieved it still goes to the model, with no passages, under the
+        # general-knowledge template (which makes the model say so).
+        general = answer_mode == "documents_and_general"
+        if not general and (not hits or top_similarity < decline_similarity):
             if translation_degraded:
                 # Retrieval ran on untranslated/original-language text because
                 # query translation failed — a weak or empty result here says
@@ -517,8 +524,9 @@ class KnowledgeAgentService:
                 "prompt_version": cfg.PROMPT_VERSION,
             }
 
+        relevant = hits if hits and top_similarity >= decline_similarity else []
         passages = self._select_passages(
-            hits,
+            relevant,
             band=similarity_band,
             max_passages=max_passages,
             max_context_tokens=max_context_tokens,
@@ -537,7 +545,7 @@ class KnowledgeAgentService:
         )
 
         provider, model, temperature = get_backend_llm_overrides(
-            ANSWER_PROMPT_PATH, prompts
+            GENERAL_ANSWER_PROMPT_PATH if general else ANSWER_PROMPT_PATH, prompts
         )
         prompt = build_answer_prompt(
             question,
@@ -545,6 +553,8 @@ class KnowledgeAgentService:
             history=history,
             max_chars=max_answer_chars,
             prompts=prompts,
+            persona=persona,
+            general=general,
         )
         if not prompt:
             # A missing template must not become an unguided free-text answer.

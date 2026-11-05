@@ -34,6 +34,7 @@ import { en, TooltipLocation } from "@constants";
 import { WaConversationSummary, WaHandledBy } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
+import { useChatbotId } from "./chatbotContext";
 import { ConversationDrawer } from "./ConversationDrawer";
 
 const PAGE_SIZE = 25;
@@ -101,7 +102,11 @@ export const ConversationsTab: React.FC = () => {
   /** Numbers revealed in THIS session only. Never persisted, never sent back. */
   const [revealed, setRevealed] = useState<Record<string, string>>({});
 
+  // The organisation in view; undefined on the all-organisations view.
+  const chatbotId = useChatbotId();
+
   const { data, isLoading, isFetching, isError } = useGetWaConversationsQuery({
+    chatbotId,
     limit: PAGE_SIZE,
     offset,
     search: search.trim() || undefined,
@@ -116,7 +121,7 @@ export const ConversationsTab: React.FC = () => {
     sortDir: sort.direction,
   });
 
-  const { data: languages = [] } = useGetWaConversationLanguagesQuery();
+  const { data: languages = [] } = useGetWaConversationLanguagesQuery({ chatbotId });
 
   const [revealPhone] = useRevealWaContactPhoneMutation();
   const [blockContact] = useBlockWaContactMutation();
@@ -148,7 +153,7 @@ export const ConversationsTab: React.FC = () => {
   const handleReveal = useCallback(
     async (row: WaConversationSummary) => {
       try {
-        const { phoneE164 } = await revealPhone(row.contactId).unwrap();
+        const { phoneE164 } = await revealPhone({ id: row.contactId, chatbotId }).unwrap();
         setRevealed(current => ({ ...current, [row.contactId]: phoneE164 }));
         // Told plainly that this was recorded — an admin should know the action left a trace.
         toast.success(en.whatsappBot.conversations.revealed);
@@ -156,16 +161,16 @@ export const ConversationsTab: React.FC = () => {
         toast.error(en.whatsappBot.conversations.revealFailed);
       }
     },
-    [revealPhone],
+    [revealPhone, chatbotId],
   );
 
   const handleBlockConfirmed = useCallback(async () => {
     if (!blockTarget) return;
     try {
       if (blockTarget.blockedAt) {
-        await unblockContact(blockTarget.contactId).unwrap();
+        await unblockContact({ id: blockTarget.contactId, chatbotId }).unwrap();
       } else {
-        await blockContact({ id: blockTarget.contactId }).unwrap();
+        await blockContact({ id: blockTarget.contactId, chatbotId }).unwrap();
       }
       toast.success(en.whatsappBot.conversations.blocked);
     } catch {
@@ -173,7 +178,7 @@ export const ConversationsTab: React.FC = () => {
     } finally {
       setBlockTarget(null);
     }
-  }, [blockTarget, blockContact, unblockContact]);
+  }, [blockTarget, blockContact, unblockContact, chatbotId]);
 
   const columns: EntityTableColumn<WaConversationSummary>[] = useMemo(
     () => [

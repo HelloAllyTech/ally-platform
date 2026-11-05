@@ -770,6 +770,23 @@ export const ApiEndpoints = {
     TRACK_ALLY_NOTES_DRAFT: (trackId: string) =>
       `/v1/course-copilot/tracks/${trackId}/ally-notes-draft`,
   },
+  CHATBOTS: {
+    LIST: "/v1/chatbots",
+    SECTIONS: "/v1/chatbots/sections",
+    BY_ID: (id: string) => `/v1/chatbots/${id}`,
+    STATUS: (id: string) => `/v1/chatbots/${id}/status`,
+    ARCHIVE: (id: string) => `/v1/chatbots/${id}/archive`,
+    SETTINGS: (id: string) => `/v1/chatbots/${id}/settings`,
+    DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents`,
+    MEMBERS: (id: string) => `/v1/chatbots/${id}/members`,
+    AUDIENCE: (id: string) => `/v1/chatbots/${id}/audience`,
+    AUDIENCE_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/audience/${entryId}`,
+    TEST: (id: string) => `/v1/chatbots/${id}/test`,
+    CONNECTORS: "/v1/connectors",
+    CONNECTOR_TYPES: "/v1/connectors/types",
+    CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
+    CONNECTOR_BY_ID: (id: string) => `/v1/connectors/${id}`,
+  },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
     DOCUMENTS: "/v1/knowledge-base/documents",
@@ -795,12 +812,19 @@ export const ApiEndpoints = {
     TEMPLATE_ARCHIVE: (id: string) => `/v1/whatsapp/templates/${id}/archive`,
     TEMPLATES_REORDER: "/v1/whatsapp/templates/reorder",
     TEMPLATES_TEST: "/v1/whatsapp/templates/test",
+    TEMPLATE_CUSTOMISE: (id: string) => `/v1/whatsapp/templates/${id}/customise`,
     SETTINGS: "/v1/whatsapp/settings",
     PROVIDER_HEALTH: "/v1/whatsapp/settings/provider-health",
     PROVIDER_CHECK: "/v1/whatsapp/settings/provider-check",
     PROVIDER_REGISTER: "/v1/whatsapp/settings/provider-register",
     PROVIDER_SUBSCRIBE: "/v1/whatsapp/settings/provider-subscribe",
     PREVIEW_ASK: "/v1/whatsapp/preview/ask",
+    // Organisations' own numbers
+    NUMBERS: "/v1/whatsapp/numbers",
+    NUMBERS_MANUAL: "/v1/whatsapp/numbers/manual",
+    NUMBER_CHECK: (id: string) => `/v1/whatsapp/numbers/${id}/check`,
+    NUMBER_SUBSCRIBE: (id: string) => `/v1/whatsapp/numbers/${id}/subscribe`,
+    NUMBER_BY_ID: (id: string) => `/v1/whatsapp/numbers/${id}`,
     // Conversations, unanswered queue and usage dashboard
     CONVERSATIONS: "/v1/whatsapp/conversations",
     CONVERSATION_BY_ID: (id: string) => `/v1/whatsapp/conversations/${id}`,
@@ -987,7 +1011,10 @@ export const ROUTES = {
   SETTINGS: "/settings",
   LOGS: "/logs",
   MOBILE_RELEASES: "/mobile-releases",
-  WHATSAPP_BOT: "/whatsapp-bot",
+  WHATSAPP_BOT: "/chatbots",
+  /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
+  WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
+  CHATBOT_DETAIL: "/chatbots/:botId",
   TERMS: "/terms",
   PRIVACY: "/privacy",
   // Fully public, no-login gallery of the centralised design-system components.
@@ -1136,6 +1163,10 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_UNANSWERED: "whatsAppBotUnanswered",
   WHATSAPP_BOT_ANALYTICS: "whatsAppBotAnalytics",
   WHATSAPP_BOT_PHONE_MAPPINGS: "whatsAppBotPhoneMappings",
+  WHATSAPP_BOT_NUMBERS: "whatsAppBotNumbers",
+  CHATBOTS: "chatbots",
+  CHATBOT_DETAIL: "chatbotDetail",
+  CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so
   // a restriction edit refreshes the content tab without refetching the roster.

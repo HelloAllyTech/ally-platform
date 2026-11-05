@@ -560,6 +560,13 @@ export class AppConfigService {
         'WHATSAPP_GRAPH_API_VERSION',
         'v25.0',
       ),
+      /**
+       * 64 hex chars (AES-256-GCM). Encrypts organisations' own access tokens and app secrets in
+       * wa_business_numbers. Without it a number cannot be connected — never stored in plaintext.
+       */
+      credentialsEncryptionKey: this.configService.get<string>(
+        'WHATSAPP_CREDENTIALS_ENCRYPTION_KEY',
+      ),
     };
   }
   get s3() {
