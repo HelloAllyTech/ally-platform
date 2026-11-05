@@ -1,7 +1,8 @@
 # Releasing the Flutter app (and the cutover from React Native)
 
-The Flutter app replaces the React Native app (`ally-platform/ally-mobile`) in
-both stores. It ships as an **update** to the existing listings: same bundle
+The Flutter app replaces the React Native app, archived at
+`ally-platform/ally-mobile-rn-archive`, in both stores. It ships as an
+**update** to the existing listings: same bundle
 id / applicationId, same Apple team, same Android upload key. Until the
 cutover, test builds use a separate identity so installing one never replaces
 the real app on a tester's phone.
@@ -207,8 +208,10 @@ Before:
 - [ ] `https://app.helloally.ai/summary/<id>` and `/course/<uuid>` open the
       app, signed in and signed out (held through sign-in).
 - [ ] Marketing version is above the RN version live in each store.
-- [ ] Turn off RN's `scheduled-mobile-release.yml` in `ally-platform` so it
-      doesn't ship an RN build over the Flutter one.
+- [x] RN's `scheduled-mobile-release.yml` is gone (deleted in the 2026-11
+      Flutter rename, alongside archiving `ally-mobile` to
+      `ally-mobile-rn-archive`) — nothing can ship an RN build over the
+      Flutter one anymore.
 
 Release:
 
@@ -232,13 +235,14 @@ again as a newer one:
 
 - Halt first: pause the iOS phased release / halt the Play staged rollout.
   Users who already updated keep the Flutter build until the next step.
-- iOS: build RN from `ally-platform` with a marketing version above the
-  Flutter one (e.g. 2.0.1) and the normal RN build number (RN's
-  `1YYYYMMDDHHMM` is later in time, so it is already higher), submit.
-- Android: set RN's `versionCode` in `ally-mobile/android/app/build.gradle`
-  above the last Flutter versionCode (the Flutter code + 1 is enough, e.g.
-  `261028154`) and `versionName` above the Flutter one, then run RN's
-  production workflow.
+- iOS: build RN from `ally-platform/ally-mobile-rn-archive` with a marketing
+  version above the Flutter one (e.g. 2.0.1) and the normal RN build number
+  (RN's `1YYYYMMDDHHMM` is later in time, so it is already higher), submit.
+- Android: set RN's `versionCode` in
+  `ally-mobile-rn-archive/android/app/build.gradle` above the last Flutter
+  versionCode (the Flutter code + 1 is enough, e.g. `261028154`) and
+  `versionName` above the Flutter one, then run RN's production workflow
+  (`build-android-production.yml`, now pointed at `ally-mobile-rn-archive`).
 - The migration leaves RN's AsyncStorage untouched, so users rolled back to
   RN find their old session; if it expired meanwhile they sign in again.
 

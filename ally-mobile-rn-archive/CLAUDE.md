@@ -1,4 +1,9 @@
-# ally-mobile — start here
+# ally-mobile-rn-archive — start here
+
+> **ARCHIVED as of the 2026-11 Flutter rename — read-only except for a manual rollback
+> build.** The live app is now the Flutter rewrite at `ally-mobile/`; see
+> `ally-mobile/docs/RELEASE.md`'s Rollback section for when and how to rebuild from here.
+> Do not make ordinary feature changes in this folder.
 
 React Native app for counsellors and community health workers: the client for Scribe
 (recorded sessions and summaries) and for practice simulations.

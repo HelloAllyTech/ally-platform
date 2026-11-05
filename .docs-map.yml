@@ -189,22 +189,26 @@ rules:
     requires: helloallytech.github.io/wiki/repos/ally-ai-learn.md
     why: Worker lifecycle and entry points are what the platform-level docs describe.
 
-  # ── ally-mobile ─────────────────────────────────────────────────────────
+  # ── ally-mobile (Flutter — repoints to its own paths since the 2026-11 rename,
+  #    which also archived RN at ally-mobile-rn-archive) ─────────────────────
   - id: ally-mobile-repo-page-shape
     watch:
-      - "ally-mobile/src/navigation/**"
-      - "ally-mobile/src/services/**"
+      - "ally-mobile/lib/core/routing/**"
+      - "ally-mobile/lib/core/network/**"
     requires: helloallytech.github.io/wiki/repos/ally-mobile.md
     why: >
-      Navigation structure and the service layer are what the repo page describes.
+      Routing and the API-client layer are what the repo page describes. The wiki page
+      itself still describes the archived RN app — rewriting it for Flutter is a
+      separate, not-yet-done task.
 
   - id: ally-mobile-release-process
     watch:
-      - "ally-mobile/android/app/build.gradle"
+      - "ally-mobile/android/app/build.gradle.kts"
       - "ally-mobile/ios/**/Info.plist"
+      - "ally-mobile/pubspec.yaml"
     requires:
       any_of:
         - ally-mobile/README.md
-        - ally-mobile/CONTRIBUTING.md
+        - ally-mobile/docs/RELEASE.md
     why: >
       Version and build-number handling is the step people get wrong at release time.
