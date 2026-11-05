@@ -6,6 +6,8 @@ export interface LeaderboardEntry {
   profileImageUrl: string;
   rank: number;
   minutesPlayed: number;
+  /** XP earned in the window — the value rank is ordered by. Absent on older APIs. */
+  xpScore?: number;
   badgeCount: number;
 }
 
@@ -21,6 +23,8 @@ export interface MyRankResponse {
   profileImageUrl: string;
   rank: number;
   minutesPlayed: number;
+  /** XP earned in the window — the value rank is ordered by. Absent on older APIs. */
+  xpScore?: number;
   badgeCount: number;
   window: string;
   hideRankInCommunity: boolean;

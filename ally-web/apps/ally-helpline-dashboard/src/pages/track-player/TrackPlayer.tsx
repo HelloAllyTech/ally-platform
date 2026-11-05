@@ -1,7 +1,7 @@
 import { FC, useCallback, useEffect, useRef, useState } from "react";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useTranslation } from "react-i18next";
+import { I18nextProvider, useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useGetLearnTrackDetailQuery, useStartTrackItemMutation } from "@api";
@@ -30,6 +30,7 @@ import { VideoItemPlayer } from "./components/players/VideoItemPlayer";
 import { PlayerTopBar } from "./components/PlayerTopBar";
 import { DiscussionThread } from "./discussion/DiscussionThread";
 import { DISCUSSION_POST_QUERY_PARAM } from "./discussion/discussionUtils";
+import { useCourseI18n } from "./useCourseI18n";
 import { useTrackPlayerNavigation } from "./useTrackPlayerNavigation";
 
 /** Arrow-key page turning must not fire while the learner is typing. */
@@ -50,7 +51,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
  * completion triggers the celebration overlays.
  */
 export const TrackPlayer: FC = () => {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const navigate = useNavigate();
   const { trackId = "", itemId = "" } = useParams<{ trackId: string; itemId: string }>();
   // `?post=<id>` — set by a discussion-reply notification; the thread
@@ -63,6 +64,10 @@ export const TrackPlayer: FC = () => {
     isError: isTrackError,
     refetch: refetchTrack,
   } = useGetLearnTrackDetailQuery({ trackId, languageCode: i18n.language }, { skip: !trackId });
+  // The whole player reads in the course's language (see useCourseI18n):
+  // our own strings below and every child under the provider at the bottom.
+  const courseI18n = useCourseI18n(track?.languageCode);
+  const { t } = useTranslation(undefined, { i18n: courseI18n });
   const [startTrackItem] = useStartTrackItemMutation();
 
   // Items completed in this player session (drives Next gating optimistically).
@@ -197,6 +202,7 @@ export const TrackPlayer: FC = () => {
             itemId={itemId}
             trackId={trackId}
             alreadyCompleted={alreadyCompleted}
+            languageCode={track?.languageCode}
           />
         );
       case TrackItemType.JOURNAL:
@@ -215,6 +221,7 @@ export const TrackPlayer: FC = () => {
             itemId={itemId}
             onCompleted={handleCompletion}
             onRequestNext={goNextOrOverview}
+            languageCode={track?.languageCode}
           />
         );
       case TrackItemType.ANNOTATED_ARTIFACT:
@@ -285,80 +292,82 @@ export const TrackPlayer: FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex h-[100dvh] w-full flex-col bg-white font-primary">
-      <PlayerTopBar
-        sectionTitle={nav.current?.sectionTitle ?? ""}
-        itemTitle={nav.current?.item.title ?? ""}
-        itemDescription={nav.current?.item.description ?? null}
-        sectionItems={sectionItems}
-        currentItemId={itemId}
-        overallPct={nav.overallPct}
-        onExit={nav.exitToOverview}
-        onSegmentClick={nav.goToItem}
-      />
+    <I18nextProvider i18n={courseI18n}>
+      <div className="fixed inset-0 z-40 flex h-[100dvh] w-full flex-col bg-white font-primary">
+        <PlayerTopBar
+          sectionTitle={nav.current?.sectionTitle ?? ""}
+          itemTitle={nav.current?.item.title ?? ""}
+          itemDescription={nav.current?.item.description ?? null}
+          sectionItems={sectionItems}
+          currentItemId={itemId}
+          overallPct={nav.overallPct}
+          onExit={nav.exitToOverview}
+          onSegmentClick={nav.goToItem}
+        />
 
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <AnimatePresence mode="wait" custom={directionRef.current}>
-          <motion.div
-            key={itemId}
-            custom={directionRef.current}
-            initial={{ opacity: 0, x: directionRef.current * 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: directionRef.current * -40 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.15}
-            onDragEnd={(_, info) => {
-              if (info.offset.x < -80 && nav.canAdvance && nav.hasNext) nav.goNext();
-              else if (info.offset.x > 80 && nav.hasPrev) nav.goPrev();
-            }}
-            className="h-full min-h-0"
-          >
-            {hasDiscussion ? (
-              <div data-testid="track-item-scroll" className="h-full min-h-0 overflow-y-auto">
-                <div className="min-h-0">
-                  <ErrorBoundary variant="panel" resetKey={itemId}>
-                    {renderItem()}
-                  </ErrorBoundary>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <AnimatePresence mode="wait" custom={directionRef.current}>
+            <motion.div
+              key={itemId}
+              custom={directionRef.current}
+              initial={{ opacity: 0, x: directionRef.current * 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: directionRef.current * -40 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.15}
+              onDragEnd={(_, info) => {
+                if (info.offset.x < -80 && nav.canAdvance && nav.hasNext) nav.goNext();
+                else if (info.offset.x > 80 && nav.hasPrev) nav.goPrev();
+              }}
+              className="h-full min-h-0"
+            >
+              {hasDiscussion ? (
+                <div data-testid="track-item-scroll" className="h-full min-h-0 overflow-y-auto">
+                  <div className="min-h-0">
+                    <ErrorBoundary variant="panel" resetKey={itemId}>
+                      {renderItem()}
+                    </ErrorBoundary>
+                  </div>
+                  {isItemReady && (
+                    <ErrorBoundary variant="panel" resetKey={`discussion-${itemId}`}>
+                      <DiscussionThread itemId={itemId} highlightPostId={highlightPostId} />
+                    </ErrorBoundary>
+                  )}
                 </div>
-                {isItemReady && (
-                  <ErrorBoundary variant="panel" resetKey={`discussion-${itemId}`}>
-                    <DiscussionThread itemId={itemId} highlightPostId={highlightPostId} />
-                  </ErrorBoundary>
-                )}
-              </div>
-            ) : (
-              <ErrorBoundary variant="panel" resetKey={itemId}>
-                {renderItem()}
-              </ErrorBoundary>
-            )}
-          </motion.div>
-        </AnimatePresence>
+              ) : (
+                <ErrorBoundary variant="panel" resetKey={itemId}>
+                  {renderItem()}
+                </ErrorBoundary>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <PlayerBottomNav
+          hasPrev={nav.hasPrev}
+          hasNext={nav.hasNext}
+          canAdvance={nav.canAdvance}
+          onPrev={nav.goPrev}
+          onNext={goNextOrOverview}
+          isLastItem={!nav.hasNext}
+        />
+
+        <CelebrationOverlay
+          kind={celebration}
+          completedCount={completedCount}
+          onContinue={() => {
+            setCelebration(null);
+            goNextOrOverview();
+          }}
+          onBackToLearn={() => {
+            setCelebration(null);
+            navigate(`${ROUTES.LEARN}?tab=courses`);
+          }}
+        />
       </div>
-
-      <PlayerBottomNav
-        hasPrev={nav.hasPrev}
-        hasNext={nav.hasNext}
-        canAdvance={nav.canAdvance}
-        onPrev={nav.goPrev}
-        onNext={goNextOrOverview}
-        isLastItem={!nav.hasNext}
-      />
-
-      <CelebrationOverlay
-        kind={celebration}
-        completedCount={completedCount}
-        onContinue={() => {
-          setCelebration(null);
-          goNextOrOverview();
-        }}
-        onBackToLearn={() => {
-          setCelebration(null);
-          navigate(`${ROUTES.LEARN}?tab=courses`);
-        }}
-      />
-    </div>
+    </I18nextProvider>
   );
 };
 

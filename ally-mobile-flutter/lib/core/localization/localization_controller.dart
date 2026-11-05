@@ -202,16 +202,7 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
   /// The bundled locale file over the English one — RN's i18next
   /// `fallbackLng: 'en'`: a key a language file lacks shows English, not
   /// the raw key.
-  Future<Translations> _loadBundled(String language) async {
-    final english = Translations(await _loadBundledAsset(_defaultLanguage), language: language);
-    if (language == _defaultLanguage) return english;
-    return english.mergedWith(await _loadBundledAsset(language));
-  }
-
-  Future<Map<String, dynamic>> _loadBundledAsset(String language) async {
-    final raw = await rootBundle.loadString('assets/locales/$language.json');
-    return jsonDecode(raw) as Map<String, dynamic>;
-  }
+  Future<Translations> _loadBundled(String language) => loadBundledTranslations(language);
 
   String _cacheKey(String version, String language) => 'i18n_resource_${version}_$language';
 
@@ -242,3 +233,30 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
 
 final localizationControllerProvider =
     AsyncNotifierProvider<LocalizationController, Translations>(LocalizationController.new);
+
+/// The bundled (asset) translations for [language], English underneath as
+/// the fallback — the same base [LocalizationController] starts from.
+Future<Translations> loadBundledTranslations(String language) async {
+  final english = Translations(await _loadBundledAsset(_defaultLanguage), language: language);
+  if (language == _defaultLanguage) return english;
+  return english.mergedWith(await _loadBundledAsset(language));
+}
+
+Future<Map<String, dynamic>> _loadBundledAsset(String language) async {
+  final raw = await rootBundle.loadString('assets/locales/$language.json');
+  return jsonDecode(raw) as Map<String, dynamic>;
+}
+
+/// Translations for one language regardless of the UI language — for the few
+/// strings that must follow the language a *course* is being read in rather
+/// than the app (a quiz's True/False labels sit under an already-translated
+/// prompt). Resolves to null for a code the app has no bundle for, so callers
+/// fall back to [TranslateRef.t]. Cached per code for the app's lifetime.
+final bundledTranslationsProvider = FutureProvider.family<Translations?, String>((
+  ref,
+  languageCode,
+) {
+  final language = languageCode.split('-').first.toLowerCase();
+  if (!_supportedLanguages.contains(language)) return Future<Translations?>.value(null);
+  return loadBundledTranslations(language);
+});

@@ -199,6 +199,8 @@
       "badges": "बॅजेस",
       "streak": "स्ट्रीक",
       "streakHint": "आतापर्यंतची सध्याची सराव स्ट्रीक",
+      "xp": "XP",
+      "xpHint": "या कालावधीत मिळवलेले XP. रँक XP नुसार ठरते.",
       "streakValue_one": "{{count}} दिवसांची स्ट्रीक",
       "streakValue_other": "{{count}} दिवसांची स्ट्रीक",
       "badgeValue_one": "{{count}} बॅज",
@@ -684,6 +686,31 @@
       "assessmentReopen": "Give another attempt",
       "assessmentConfirm": "Give {{name}} another attempt at {{scenario}}? Their earlier attempt and its report are kept.",
       "assessmentReopenSuccess": "Assessment reopened"
+    },
+    "learnerCourses": {
+      "action": "Courses",
+      "actionTooltip": "Shows the courses this learner is enrolled in, so you can remove them from one.",
+      "title": "Courses: {{name}}",
+      "empty": "This learner isn't enrolled in any courses.",
+      "errorTitle": "Couldn't load courses",
+      "errorSubtitle": "There was a problem fetching the data.",
+      "progress": "{{completed}} of {{total}} items done",
+      "completedOn": "Completed {{when}}",
+      "enrolledOn": "Enrolled {{when}}",
+      "denial": {
+        "NOT_IN_GROUP": "Not open to their group",
+        "NOT_IN_ORGANIZATION": "No longer assigned to your organisation",
+        "NOT_AVAILABLE": "Archived",
+        "other": "Not open to them"
+      },
+      "enrolmentOnlyHint": "They see this course only because they're enrolled in it.",
+      "remove": "Remove from course",
+      "confirmHidden": "Remove {{name}} from {{course}}? It will disappear from their course list and their progress in it will be cleared.",
+      "confirmOpen": "Remove {{name}} from {{course}}? Their progress will be cleared. The course is still open to them, so they can start it again from the beginning.",
+      "confirmButton": "Remove",
+      "cancel": "Cancel",
+      "removeSuccess": "Removed from course",
+      "removeError": "Couldn't remove them from the course. Please try again."
     },
     "courseUsage": {
       "title": "कोर्स वापर",

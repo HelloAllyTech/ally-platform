@@ -26,10 +26,14 @@ class VideoInterjectionDialog extends ConsumerStatefulWidget {
     super.key,
     required this.itemId,
     required this.interjection,
+    this.languageCode,
   });
 
   final String itemId;
   final VideoInterjection interjection;
+
+  /// The course's reading language — the True/False answer labels follow it.
+  final String? languageCode;
 
   @override
   ConsumerState<VideoInterjectionDialog> createState() => _VideoInterjectionDialogState();
@@ -97,6 +101,7 @@ class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialo
                     question: question,
                     state: _answerState,
                     onChanged: (next) => setState(() => _answerState = next),
+                    languageCode: widget.languageCode,
                   ),
               ],
             ),

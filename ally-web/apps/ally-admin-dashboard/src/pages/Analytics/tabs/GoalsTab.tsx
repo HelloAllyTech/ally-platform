@@ -11,6 +11,7 @@ import { LevelReachCumulativeCard } from "../LevelReachCumulativeCard";
 import { NewUsersCard } from "../NewUsersCard";
 import { NewVsReturningUsersCard } from "../NewVsReturningUsersCard";
 import { PlayTimeCard } from "../PlayTimeCard";
+import { RoadmapVotingCard } from "../RoadmapVotingCard";
 import { RoleplayMinutesCard } from "../RoleplayMinutesCard";
 import { RoleplayQualityCard } from "../RoleplayQualityCard";
 import { RoleplaySessionCostCard } from "../RoleplaySessionCostCard";
@@ -75,6 +76,10 @@ import { XpPerMinuteCard } from "../XpPerMinuteCard";
  *    skills by practice volume, scored against one fixed rubric independent of
  *    every scenario's competencies. The scenario-specific counterpart is the
  *    Skill growth sub-tab.
+ *  - `RoadmapVotingCard` — new (AAQ-254): roadmap votes cast per month by each
+ *    admin with access, plus a who-voted grid that keeps non-voters visible. An
+ *    adoption chart for our own team, so it sits with the other internal
+ *    pace-of-the-business cards (`ShipVolumeCard`, `BugHunterVolumeCard`).
  *
  * Each relocated card lost the page-level filter its old tab offered (a
  * tenant filter for Practice minutes, a language filter for voice latency) —
@@ -100,6 +105,7 @@ export const GoalsTab = () => (
       <XpLevelReachedCard />
       <LevelReachCumulativeCard />
       <ShipVolumeCard />
+      <RoadmapVotingCard />
       <BugHunterVolumeCard />
       <XpByTenantCard />
       <NewUsersCard />

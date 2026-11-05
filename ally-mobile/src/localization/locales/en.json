@@ -591,6 +591,7 @@
       "rank": "Rank",
       "user": "User",
       "totalDuration": "Total duration",
+      "xp": "XP",
       "badges": "Badges"
     }
   },

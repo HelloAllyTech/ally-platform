@@ -39,6 +39,8 @@ interface QuizItemPlayerProps {
   itemId: string;
   onCompleted: (result: TrackItemCompletionResult) => void;
   onRequestNext: () => void;
+  /** The course's reading language — the True/False answer labels follow it. */
+  languageCode?: string | null;
 }
 
 type Phase = "intro" | "questions" | "results";
@@ -64,6 +66,7 @@ export const QuizItemPlayer: FC<QuizItemPlayerProps> = ({
   itemId,
   onCompleted,
   onRequestNext,
+  languageCode,
 }) => {
   const { t } = useTranslation();
 
@@ -233,7 +236,13 @@ export const QuizItemPlayer: FC<QuizItemPlayerProps> = ({
           />
         );
       case "true_false":
-        return <TrueFalseQuestion state={answerState} onChange={s => setAnswer(question.id, s)} />;
+        return (
+          <TrueFalseQuestion
+            state={answerState}
+            languageCode={languageCode}
+            onChange={s => setAnswer(question.id, s)}
+          />
+        );
       case "ordering":
         return (
           <OrderingQuestion

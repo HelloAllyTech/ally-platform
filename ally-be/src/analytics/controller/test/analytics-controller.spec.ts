@@ -12,6 +12,7 @@ import { BugHunterVolumeAnalyticsService } from '../../service/bug-hunter-volume
 import { XpByTenantAnalyticsService } from '../../service/xp-by-tenant-analytics.service';
 import { RoleplayVolumeAnalyticsService } from '../../service/roleplay-volume-analytics.service';
 import { RoadmapDeliveryAnalyticsService } from '../../service/roadmap-delivery-analytics.service';
+import { RoadmapVotingAnalyticsService } from '../../service/roadmap-voting-analytics.service';
 import { ShipVolumeAnalyticsService } from '../../service/ship-volume-analytics.service';
 import { HighlightsAnalyticsService } from '../../service/highlights-analytics.service';
 import { PlatformAnalyticsService } from '../../service/platform-analytics.service';
@@ -178,6 +179,10 @@ describe('AnalyticsController', () => {
         {
           provide: RoadmapDeliveryAnalyticsService,
           useValue: { getRoadmapDelivery: jest.fn() },
+        },
+        {
+          provide: RoadmapVotingAnalyticsService,
+          useValue: { getRoadmapVoting: jest.fn() },
         },
         {
           provide: ShipVolumeAnalyticsService,
