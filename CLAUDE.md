@@ -16,7 +16,7 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 | Repo | Tech | Purpose | Port (dev) |
 |------|------|---------|------------|
 | `ally-be` | NestJS + TypeScript + PostgreSQL + Redis | Core backend API, auth, multi-tenant, RBAC, WebSocket gateways | 8001 |
-| `ally-ai` | FastAPI + Python + Weaviate | AI service: conversation analysis, nudges, summaries, transcription | 8000 |
+| `ally-ai` | FastAPI + Python + Weaviate | AI service: conversation analysis, nudges, summaries, transcription, chatbot knowledge answers | 8000 in the container; 3001 on the host in the local Docker stack (`docker-compose.local.yml`) |
 | `ally-ai-learn` | FastAPI + LiveKit + LangGraph + Python | Voice-based training agent: simulated client conversations with real-time event detection | 8000 (API) + LiveKit worker |
 | `ally-web` | Nx monorepo: Next.js + 2x Vite+React apps | Landing page (3000), Helpline dashboard (8080), Admin dashboard (8081) | 3000/8080/8081 |
 | `ally-mobile` | React Native + TypeScript | iOS/Android app for counselors: live sessions, reviews, simulations | N/A |
@@ -122,7 +122,7 @@ poetry run uvicorn app.main:app --reload --port 8000  # API (Terminal 2)
 # Or: ./start.sh
 ```
 
-**ally-web** (Node.js 20):
+**ally-web** (Node.js 22, per `ally-web/.nvmrc`):
 ```bash
 npm install
 npx nx serve ally-helpline-dashboard  # Helpline at :8080
@@ -178,3 +178,67 @@ ansible-playbook -i inventories/development/hosts.yml <playbook>.yml
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` - AWS services
 - `DEEPGRAM_API_KEY` - Speech-to-text
 - See each repo's `env_sample` or `.env.example` for full list
+
+## Monorepo map (short)
+
+| Path | What it is | Local port |
+|------|-----------|------------|
+| `ally-ai/` | FastAPI, Python 3.12, Poetry, Weaviate. Knowledge answers, crisis check, judges, transcription | 3001 (Docker) |
+| `ally-be/` | NestJS, Node 24, Postgres 14 (host :5477), Redis. Chatbot engine, WhatsApp connector, Skills Store | 8001 |
+| `ally-web/` | Nx: `ally-admin-dashboard`, `ally-helpline-dashboard`, `ui-shared` | 8081 / 8080 |
+| `ally-ai-learn/` | LiveKit voice-training agent (LangGraph) | 8002 (Docker) |
+| `ally-mobile/`, `ally-mobile-flutter/` | Counselor apps | none |
+| `infra/` | Separate repo, gitignored here; `./infra/dev_env.sh` starts the local stack | none |
+| `docs/` | Cross-repo docs, including `docs/agents-v2/` | none |
+
+Each app directory has its own `CLAUDE.md` (mirrored with `AGENTS.md`). Read it before working there.
+
+## Verified commands
+
+These come from each app's CI workflow (`.github/workflows/test-*.yml`) and `package.json`. Where they differ from the older per-repo list above, these win.
+
+**ally-ai**: Python 3.12 + Poetry. Locally, use a 3.12 venv (`uv python install 3.12 && poetry env use "$(uv python find 3.12)"`). The host Python may be newer, and the Docker image has no dev dependencies.
+```bash
+cd ally-ai
+poetry install --no-interaction --with dev   # make install
+poetry run pytest tests/ -v                  # make test (CI)
+poetry run flake8                            # CI lint (blocking)
+make migrate                                 # Weaviate migrations
+make sync-prompts                            # push default prompts to ally-be
+```
+
+**ally-be**: Node 24.
+```bash
+cd ally-be
+npm run start:dev
+npm test -- --forceExit --detectOpenHandles   # as CI runs it
+npm run test:e2e
+npm run lint && npm run typecheck && npm run build
+npm run migration:run
+```
+
+**ally-web**: Node 22.
+```bash
+cd ally-web
+npm run start:admin        # :8081
+npm run start:helpline     # :8080
+npm test                   # nx test (all projects)
+npm run lint && npm run format:check
+npm run build:admin && npm run build:helpline
+npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json   # CI typecheck
+```
+
+## Agents v2
+
+Agents v2 turns Stage 1 chatbots into a LangGraph agent workspace, built in chunks. Before any Agents v2 work, **always read `docs/agents-v2/CONTEXT.md` and the current chunk brief first.**
+
+**Current chunk: 01 — `docs/agents-v2/chunk-01.md`**
+
+Always (from `CONTEXT.md`):
+
+- Work only on the current chunk. If you notice something for a later chunk, write it in the notes; don't build it.
+- Read the real code before you design. Match each repo's existing conventions.
+- Keep v1 behaviour and the existing tests unchanged. If an existing test fails, stop and report it.
+- Don't upgrade existing dependencies without asking.
+- Run tests and lint before saying anything is done. Commit after each milestone.
+- End each chunk with `CHUNK-NN-NOTES.md`: code map, decisions, how to test, open questions.

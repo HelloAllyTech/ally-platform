@@ -1,0 +1,94 @@
+# Agents v2 — build chunks
+
+Read `CONTEXT.md` first. Product spec: `agents-v2-spec.md`. Engineering detail: `three-stage-plan.md`. What exists today: `stage1-build.md`. All are in this folder.
+
+## How to use this file
+
+- Each chunk is sized for **one Claude Code loop**: a single branch, roughly 1–3 days of work, one PR.
+- Each chunk **ships dark**. It sits behind the per-bot `runtime: v2` setting or a feature flag, so Stage 1 bots never change until you switch them over.
+- Each chunk ends with **"You test"**: the exact checks you run before moving on. Don't start chunk N+1 until chunk N passes.
+- Give Claude Code one chunk brief at a time (`chunk-01.md`, then `chunk-02.md`, and so on). Ask for the next brief once a chunk passes.
+- Repos: **ally-ai** (Python, LangGraph), **ally-be** (TypeScript, migrations, WhatsApp, engine), **ally-web** (admin dashboard, RTK Query).
+
+## Rules that hold for every chunk
+
+1. Don't change v1 behaviour. Every new path is opt-in per bot.
+2. Graph decides, ally-be executes. ally-ai never writes to the database or sends messages. It calls the ally-be tool gateway.
+3. Every send and every tool call has an idempotency key. A retry must never message a person twice.
+4. Safety only tightens. The crisis check, consent and STOP behave exactly as in Stage 1, or stricter.
+5. Each chunk adds its own tests, and leaves CI and flake8/lint green.
+6. Each chunk ends with a short `CHUNK-NN-NOTES.md` in the PR: what changed, how to test, and anything left open.
+
+---
+
+## Phase A — New engine (epic 1)
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 1 | **LangGraph runtime with parity.** The current knowledge pipeline rebuilt as a LangGraph graph behind `POST /agent/run`, with a Postgres checkpointer and a parity script | ally-ai | `curl /agent/run` answers like `/knowledge-agent/answer`; the parity script shows matching decisions and citations on 20+ cases |
+| 2 | **Runtime switch in ally-be.** Per-bot `runtime: v1 \| v2` plus feature flags; the engine's answer step calls `/agent/run` for v2 bots; Preview shows the runtime and run id; the run id is stored on the outbound message | ally-be, ally-web | Flip one bot to v2 in the dashboard, chat on WhatsApp, and get the same answers; flip back with no residue |
+| 3 | **Tool gateway and tool loop.** Internal routes `GET /internal/agent/context` and `POST /internal/agent/tools/:name`, with a per-run token, idempotency and a `tool_runs` table. The graph gets an agent node with a tool loop; first tool: `search_knowledge` | ally-be, ally-ai | A v2 bot answers through the tool loop; every tool call shows up in `tool_runs`; a replayed call returns the stored result |
+
+## Phase B — Memory you can read (epics 2 and 3)
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 4 | **Layered context files.** `context_files` and versions tables; the `load_context` node merges platform > org > agent > role; About and Agent pages in the dashboard with edit, version history and restore | all three | Edit the Agent page and the next reply follows it; restoring an old version brings the old behaviour back |
+| 5 | **Facts.** `data_tables` and `data_rows`, a `look_up_facts` tool, and a Facts screen with a table editor and CSV import | all three | Add a price list; "how much is a haircut?" answers from the row and the reply cites it |
+| 6 | **Contact profiles and notebook.** A channel-agnostic `agent_contacts` identity (linked to `wa_contacts`, ready for the web widget later); `contact_memory`; `remember` and `recall` tools; USER.md view; profile panel in Conversations with sources, edit and forget; the agent notebook | all three | Tell the bot your name and preference; it remembers next time; Forget removes it, and the next run shows it's gone |
+| 7 | **Configurable fields and file types.** Per-bot field schema; file storage; `save_file` and `read_file`; reading invoices and business cards into fields; the Direction setting | all three | Send a business-card photo and the fields fill in, each with a source; a field marked "never store" is never saved |
+| 8 | **Documents the business sends.** Attach a file to a profile and send it from the dashboard or by forwarding on WhatsApp; delivery tracking; a template outside the 24-hour window | all three | Send a sample invoice to a test contact; it arrives and the status turns delivered |
+
+## Phase C — History and "Why?" (epic 4)
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 9 | **History search and summaries.** Search across conversations, a summary per conversation, and unanswered chats grouped into topics | all three | Search "insurance" and find the right threads; the topics list groups similar unanswered questions |
+| 10 | **"Why?" card.** Run trace from the checkpointer, turned into a plain-language card on every reply (sources used, facts, memory, rules, abilities) | ally-ai, ally-web | Click Why? on any v2 reply; the card matches what actually happened in the run |
+
+## Phase D — Abilities and trust (epics 7 and 9)
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 11 | **Abilities with Do it, Ask me first and Never.** Ability registry for the eight built-in abilities; per-bot setting; LangGraph `interrupt` for Ask me first; approvals inbox on the web | all three | Set "hand over" to Ask me first; the run pauses, you approve on the web, and it resumes in the same conversation |
+| 12 | **Owner on WhatsApp: approvals, handover and notify team.** Register an owner number; approve or deny with WhatsApp buttons; handover promises with tracked reply times | ally-be, ally-ai | Approve a pending action from your phone; a handover shows a promised time and an alert fires when it's missed |
+| 13 | **Never check and learning mode.** Pre-send check against the Never list; learning mode sends unsure answers to the owner as drafts | ally-ai, ally-be | A reply that breaks a Never rule is blocked and logged; in learning mode, an unsure answer reaches you as a draft first |
+
+## Phase E — Scheduler and flows (epic 8)
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 14 | **Scheduler core.** `scheduled_jobs` and a worker with keys; quiet hours; opt-out checked at send time; the 24-hour rule with template choice; a `schedule` tool for follow-ups and reminders; smart wake-ups | ally-be, ally-ai | "Remind me tomorrow at 10" arrives once at 10 (after quiet hours); STOP before then cancels it; restarting the worker doesn't double-send |
+| 15 | **Schedules screen, owner scheduling, announcements and templates.** Calendar and list view; the owner creates schedules in plain words with a preview and Confirm; announcements to opted-in people; template submission to Meta | all three | From your phone, "remind everyone who asked about X on Friday" shows a preview with the count, then sends on Friday |
+| 16 | **Flows engine.** Flow definitions and runs; triggers from profile dates, conversation events, tags and files; steps, caps, priority and exits; five ready-made flows | ally-be, ally-ai | Switch on Collect reviews; a completed visit triggers the rating request; a 5 gets the link and a 2 goes to Needs you |
+| 17 | **Flow builder, plain-words flows and flow pages.** Step-list builder; describe a flow on WhatsApp and get a preview; dry run; a results page per flow | all three | Build a reminder flow in plain words; the dry run lists who would get what this week; the flow page shows live numbers |
+
+## Phase F — Onboarding (epics 5 and 6)
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 18 | **Sandbox number with join codes.** An Ally-owned number; a join code routes a phone to a draft bot | ally-be | Text the join code from any phone and chat with your draft bot before connecting a number |
+| 19 | **Onboarding and self-drafting.** Website, documents or a description in; drafted pages, facts, abilities and a starter flow out; review, try and go live in under 10 minutes | all three | A new user goes from nothing to a live test chat in under 10 minutes, timed |
+
+## Phase G — Website widget (epic 13)
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 20 | **Shared conversation store.** Channel-agnostic conversations and messages tables, with WhatsApp data backfilled and writes going to both during the switch | ally-be | Existing WhatsApp history shows unchanged; new messages land in the shared tables |
+| 21 | **Website chat widget.** Embed script, `web` connector, branding, page rules, Continue on WhatsApp with memory carried over | all three | Paste the snippet on a test page and chat; continue on WhatsApp and the agent knows the earlier chat |
+
+## Phase H — Learning, owner mode and home (epics 10, 11 and 12)
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 22 | **Self-learning loop.** Nightly reflection; lessons inbox; impact preview; apply and undo; owner locks | all three | After a day of test chats, lessons appear the next morning; apply one and the behaviour changes; undo reverts it |
+| 23 | **Owner manager mode and daily digest.** Teach, ask, pause and resume from WhatsApp; daily digest | ally-be, ally-ai | Text "we're closed Monday" and the About page updates (after you confirm); the digest arrives each evening |
+| 24 | **Home, insights and cost cap.** Needs-you list, five weekly numbers, what it learned; per-bot monthly cost cap | ally-web, ally-be | Home matches the data; hitting the cap switches to the fallback behaviour and alerts you |
+| 25 | **Hardening and rollout.** Eval set in CI, load test, alerts, a migration tool to move v1 bots to v2, and docs | all three | Eval and load reports pass the quality bars; one real bot runs on v2 for a week with no regressions |
+
+## Order and parallel work
+
+- **Do these strictly in order:** 1 → 2 → 3. Everything else needs the gateway.
+- **After 3, they can run in parallel:** 4–5 (context), 6–8 (profiles), 9–10 (history), 18 (sandbox), 20 (shared store).
+- **Next:** 11–13 (abilities), then 14–17 (scheduler and flows), then 19 (onboarding needs pages, facts, abilities and flows), then 21, 22, 23, 24 and 25.
+- With one person driving Claude Code, plan on about one chunk every 2–4 days including your testing, so roughly 15–17 weeks. That matches the spec's estimate.
