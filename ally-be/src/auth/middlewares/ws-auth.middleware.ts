@@ -103,8 +103,8 @@ export class WebSocketAuthMiddleware {
         next(); // Allow connection to proceed
       } catch (error) {
         this.logger.error(
-          `WebSocket authentication failed for socket ${socket.id}:`,
-          error,
+          `WebSocket authentication failed for socket ${socket.id}: ${error.message}`,
+          error.stack,
         );
         if (
           error instanceof TokenExpiredError ||
