@@ -18,10 +18,7 @@ import { PromptResponse } from '../type/prompt-response.type';
 import { standardizePromptCode } from '../util/prompt-code.util';
 import { parseVariablesFromPrompt } from '../util/parse-variables.util';
 import { reconcileAvailableVariables } from '../util/normalize-available-variable.util';
-import {
-  REMOVED_PROMPT_CODES,
-  TRANSLATABLE_PROMPT_TYPES,
-} from '../constants/prompt.constants';
+import { TRANSLATABLE_PROMPT_TYPES } from '../constants/prompt.constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { PromptTranslationService } from './prompt-translation.service';
 import { PromptVersioningService } from './prompt-versioning.service';
@@ -50,7 +47,6 @@ export class PromptsService {
         name: promptDto.name,
         description: promptDto.description || '',
         category: promptDto.category,
-        useDashboardOverride: true,
       }),
     );
 
@@ -456,7 +452,6 @@ export class PromptsService {
         description: source.description,
         category: source.category,
         defaultPrompt: source.defaultPrompt,
-        useDashboardOverride: true,
         isObsolete: false,
         // A new variant is offered in the studio picker immediately. Hiding is
         // an explicit, deliberate act — never the starting state — so an admin
@@ -558,12 +553,6 @@ export class PromptsService {
 
     for (const item of syncPromptsDto.prompts) {
       const promptCode = standardizePromptCode(item.promptCode);
-      if (REMOVED_PROMPT_CODES.has(promptCode)) {
-        this.logger.warn(
-          `[PROMPT_SYNC] ignored promptCode=${promptCode}: removed from the Skills Store; an older build of its service is still syncing it`,
-        );
-        continue;
-      }
       try {
         const result = await this.syncOne(promptCode, item);
         if (result === 'added') added++;
@@ -651,7 +640,6 @@ export class PromptsService {
         description: item.description || '',
         category: item.category,
         defaultPrompt: item.prompt,
-        useDashboardOverride: true,
         kind: item.kind,
         promptType: item.promptType,
         hasStates: item.hasStates,

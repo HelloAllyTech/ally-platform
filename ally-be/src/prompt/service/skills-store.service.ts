@@ -310,7 +310,6 @@ export class SkillsStoreService {
           hasStates: item.hasStates,
           translationEnabled: item.translationEnabled,
           contract: item.contract,
-          useDashboardOverride: true,
         }),
       );
       result.created.push(item.promptCode);

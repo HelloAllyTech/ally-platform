@@ -9,7 +9,6 @@ export type PromptResponse = {
   createdAt: Date;
   prompt: string;
   defaultPrompt?: string;
-  useDashboardOverride?: boolean;
   /**
    * Variable placeholders for this prompt. May be either bare strings
    * (legacy) or `{ name, label?, required? }` objects. Studio readers
@@ -57,7 +56,6 @@ export type PromptDetailResponse = {
   updatedAt: Date;
   prompt?: string;
   defaultPrompt?: string;
-  useDashboardOverride?: boolean;
   availableVariables?: AvailableVariableEntry[];
   isObsolete?: boolean;
   kind?: string;
@@ -99,11 +97,6 @@ export type PromptSearchOptions = {
   promptCode?: string[];
   /** When set, fetches prompts where promptCode LIKE 'prefix%' (e.g. ally_ai_learn_) */
   promptCodePrefix?: string;
-  /**
-   * Retired with `useDashboardOverride`: ignored. Every prompt in the store is
-   * served, so there is nothing left to filter on.
-   */
-  useDashboardOverrideOnly?: boolean;
 };
 
 /** A prompt's live text and settings from one lookup (see PromptSharedService.resolvePrompt). */
