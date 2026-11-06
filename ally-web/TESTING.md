@@ -35,9 +35,7 @@ We provide two approaches for running tests:
 >
 > Prefer scoping to what you changed — `npm run test:admin` for one project, or
 > `npx vitest run --project ally-admin-dashboard src/components/competency` for one
-> directory. `npm test` is `nx run-many --target=test --all`, which runs three
-> projects at once by default; the pre-commit hook pins it to `--parallel=1` for
-> exactly this reason, and so does `test:coverage`.
+> directory. `npm test` runs the test suites for all projects sequentially. `test:coverage` and the pre-commit hook run the tests in parallel but with `--parallel=1` to avoid resource exhaustion.
 
 ### Run All Tests (Recommended)
 
