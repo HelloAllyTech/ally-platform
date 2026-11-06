@@ -1,3 +1,5 @@
+import type { AgentTurnType } from "@types";
+
 /** How "How it plays" names each kind of course item, singular then plural. Keyed by TrackItemType. */
 const LANDING_ITEM_NOUNS: Record<string, [string, string]> = {
   ROLEPLAY: ["roleplay", "roleplays"],
@@ -1791,7 +1793,6 @@ export const en = {
           "Chat with the chatbot as a user would. Say hello first to see what a new person gets. Nothing is sent or saved, and no one is alerted.",
         placeholder: "Type a question…",
         send: "Send",
-        reset: "Start over",
         newThread: "New thread",
         answeredBy: "Answered by {engine}",
         fellBack: "Answered by v1 (v2 failed: {reason})",
@@ -1805,7 +1806,7 @@ export const en = {
           about_bot: "About the chatbot",
           question: "Question",
           unclear: "Unclear",
-        } as Record<string, string>,
+        } satisfies Record<AgentTurnType, string>,
         engineDisabled: "The new engine is off in Defaults, so every test answers with v1.",
         handledBy: "Handled by",
         model: "Model",

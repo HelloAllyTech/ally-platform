@@ -98,6 +98,14 @@ export interface AgentTraceStep {
   summary: string;
 }
 
+/** A chatbot's feature flags (Agents v2). `agent`: answers with the conversational agent on v2. */
+export interface ChatbotFeatures {
+  agent?: boolean;
+}
+
+/** What the conversational agent understood a message to be (ally-be `AgentTurnType`). */
+export type AgentTurnType = "smalltalk" | "about_bot" | "question" | "unclear";
+
 export interface Chatbot {
   id: string;
   name: string;
@@ -112,7 +120,7 @@ export interface Chatbot {
   runtime: ChatbotRuntime;
   /** What actually answers: v1 whenever the new engine is turned off in Defaults. */
   effectiveRuntime: ChatbotRuntime;
-  features: Record<string, boolean>;
+  features: ChatbotFeatures;
   myRole: ChatbotMemberRole;
   connectors: Connector[];
   documentCount: number;
@@ -151,7 +159,7 @@ export interface UpdateChatbotRequest {
   /** Platform admins only. */
   runtime?: ChatbotRuntime;
   /** Platform admins only. Merged into the saved flags. */
-  features?: { agent?: boolean };
+  features?: ChatbotFeatures;
 }
 
 export interface ChatbotDocumentRow {
@@ -238,5 +246,5 @@ export interface TestChatbotResponse {
   runtimeAllowed: boolean;
   conversationId: string;
   /** Agent mode: what the agent understood the message to be. */
-  turnType?: "smalltalk" | "about_bot" | "question" | "unclear" | null;
+  turnType?: AgentTurnType | null;
 }
