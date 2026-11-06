@@ -248,3 +248,7 @@ Always (from `CONTEXT.md`):
 - Don't upgrade existing dependencies without asking.
 - Run tests and lint before saying anything is done. Commit after each milestone.
 - End each chunk with `CHUNK-NN-NOTES.md`: code map, decisions, how to test, open questions.
+
+## Bug Hunter v2
+
+Before any Bug Hunter v2 work, **always read `docs/bug-hunter/CONTEXT.md` and the current chunk brief first.**
