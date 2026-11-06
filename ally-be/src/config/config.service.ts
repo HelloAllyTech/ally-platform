@@ -190,8 +190,6 @@ export class AppConfigService {
     };
   }
 
-
-
   /**
    * Base URL a GitHub-hosted runner can reach this API on, handed to the
    * fix-session workflow so it can report progress back. Falls back to the

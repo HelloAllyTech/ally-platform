@@ -25,7 +25,6 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     MobileReleasesService,
     MobileReleaseWhatsNewAiService,
     IosMinVersionAutoBumpSchedulerRegistrationService,
-
   ],
   exports: [MobileReleasesService],
 })

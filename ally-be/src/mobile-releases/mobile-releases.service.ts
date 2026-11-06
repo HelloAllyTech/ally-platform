@@ -1095,8 +1095,6 @@ export class MobileReleasesService {
     );
   }
 
-
-
   /** null if no appStoreVersions resource matches `versionString` yet (e.g. not created, or already replaced). */
   private async fetchAppStoreVersionState(
     appId: string,
