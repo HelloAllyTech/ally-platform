@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.core.agent_runtime.schemas import REPLY_ACTION, AgentIntent
@@ -303,45 +304,62 @@ def detail_kinds(text: str) -> List[str]:
     return [kind for kind, pattern in _DETAIL_KINDS if pattern.search(text or "")]
 
 
+class Rejection(StrEnum):
+    """Why the check sent a draft back to the agent (told to it as REJECTIONS).
+
+    Stored in the run's state as its plain value, which the state requires."""
+
+    UNCITED = "uncited"
+    UNSOURCED_DETAIL = "unsourced_detail"
+    EMPTY = "empty"
+    SEARCH_FIRST = "search_first"
+    MENTIONS_SOURCES = "mentions_sources"
+    USE_FOUND = "use_found"
+
+
 def rejection_feedback(
-    rejection: str, step: Dict[str, Any], *, searched: bool = True
+    rejection: Rejection, step: Dict[str, Any], *, searched: bool = True
 ) -> str:
     """What the rewrite is told: the reason, naming the kinds of unsourced detail,
     and to search first when the refused draft was written without searching."""
     feedback = REJECTIONS[rejection]
-    if rejection == "unsourced_detail":
+    if rejection == Rejection.UNSOURCED_DETAIL:
         kinds = detail_kinds(step.get("answer") or "")
         if kinds:
             feedback += f" It contained {' and '.join(kinds)}."
-    if not searched and rejection not in ("empty", "search_first", "mentions_sources"):
+    if not searched and rejection not in (
+        Rejection.EMPTY,
+        Rejection.SEARCH_FIRST,
+        Rejection.MENTIONS_SOURCES,
+    ):
         feedback += " You haven't searched yet: search before you reply."
     return feedback
 
 
 #: Why a draft was refused, as told to the agent when it rewrites it. Plain
 #: guidance, never the refused text.
-REJECTIONS: Dict[str, str] = {
-    "uncited": (
+REJECTIONS: Dict[Rejection, str] = {
+    Rejection.UNCITED: (
         "It stated something about the organisation without citing a passage. "
         "Cite the passages that support it; if none do and searches are left, "
         "search; otherwise tell the person, in your own words, that you don't have "
         "that information and where they could go instead."
     ),
-    "unsourced_detail": (
+    Rejection.UNSOURCED_DETAIL: (
         "It included a specific detail (a phone number, link, email or price) that "
         "no passage offered here contains word for word. Leave it out, or use it "
         "only as a passage gives it."
     ),
-    "empty": "It was empty. Write the reply the person should get.",
-    "search_first": (
+    Rejection.EMPTY: "It was empty. Write the reply the person should get.",
+    Rejection.SEARCH_FIRST: (
         "It said it doesn't have this without searching. Search first: the answer "
         "may be in the library."
     ),
-    "mentions_sources": (
+    Rejection.MENTIONS_SOURCES: (
         "It talked about its reference material, documents or passages. Say the same "
         "as someone who simply knows, or doesn't: no talk of sources."
     ),
-    "use_found": (
+    Rejection.USE_FOUND: (
         "A search found passages. If they answer what was asked, answer from them "
         "and cite them. If they are about something else, say plainly what you don't "
         "have and what you can help with."
@@ -379,8 +397,8 @@ def check_reply(
     searched: bool = False,
     organisation: Organisation = Organisation(),
     history: Sequence[Dict[str, str]] = (),
-) -> Tuple[AnswerResult, Optional[str]]:
-    """The run's result, and the rejection reason (a `REJECTIONS` key) when the
+) -> Tuple[AnswerResult, Optional[Rejection]]:
+    """The run's result, and the rejection reason when the
     check refused the draft; None when it went through as the model meant it.
 
     `search_gate` is the gate verdict on the run's first search (None when it
@@ -397,7 +415,7 @@ def check_reply(
     answer_text = plain_text(step.get("answer") or "")
     citations = resolve_citations(list(step.get("citations") or []), passages)
     unsupported = False
-    rejection: Optional[str] = None
+    rejection: Optional[Rejection] = None
     # A refusal that keeps the model's text if the rewrite doesn't fix it (wording,
     # a nudge, or details removed sentence by sentence), rather than clearing it.
     keeps_text = False
@@ -421,10 +439,10 @@ def check_reply(
         # nothing it is willing to answer with.
         logger.info("Agent asked for a tool past its budget; declining")
         intent = AgentIntent.DECLINE
-        rejection = "empty"
+        rejection = Rejection.EMPTY
     elif not answer_text:
         intent = AgentIntent.DECLINE
-        rejection = "empty"
+        rejection = Rejection.EMPTY
     elif (
         intent == AgentIntent.ANSWER
         and not step.get("citations")
@@ -446,12 +464,12 @@ def check_reply(
         # for every reply below.
         logger.info("Small talk looks factual; treating it as an answer")
         intent = AgentIntent.ANSWER
-        rejection = "unsourced_detail"
+        rejection = Rejection.UNSOURCED_DETAIL
     elif intent == AgentIntent.SMALLTALK and about_organisation:
         # "What is Ally?" answered as small talk is an answer about the
         # organisation: it needs a source like any other.
         intent = AgentIntent.ANSWER
-        rejection = "uncited"
+        rejection = Rejection.UNCITED
 
     if intent == AgentIntent.ANSWER and not citations:
         if general and searched and not passages and not about_organisation:
@@ -463,32 +481,32 @@ def check_reply(
         else:
             logger.info("Agent answer with no valid citations; declining")
             intent = AgentIntent.DECLINE
-            rejection = rejection or "uncited"
+            rejection = rejection or Rejection.UNCITED
     elif intent != AgentIntent.DECLINE:
         rejection = None
     elif model_declined and rejection is None:
         if organisation.named_in(question) and not searched:
             # "Does Ally store audio?" → "I don't have that": it never looked.
             logger.info("Agent declined about the organisation without searching")
-            rejection = "search_first"
+            rejection = Rejection.SEARCH_FIRST
         elif passages and organisation.named_in(question):
             # It searched, found passages about the organisation, and still said
             # it doesn't have it.
             logger.info("Agent declined although a search found passages")
             # A nudge: the passages may be about something else, so a decline the
             # rewrite still chooses is kept in its own words.
-            rejection, keeps_text = "use_found", True
+            rejection, keeps_text = Rejection.USE_FOUND, True
 
     # Fixes that keep the rest of the reply: sent back once, and if the rewrite
     # still needs them, applied to the text (sentences removed) rather than
     # refusing the reply.
     if intent != AgentIntent.DECLINE or model_declined:
         unsourced = unsupported_details(answer_text, passages)
-        if unsourced and rejection in (None, "unsourced_detail"):
+        if unsourced and rejection in (None, Rejection.UNSOURCED_DETAIL):
             # Any reply type: a phone number, link or email must be in a passage
             # offered this run, word for word.
             logger.info("Reply carries %d unsourced contact detail(s)", len(unsourced))
-            rejection, keeps_text = "unsourced_detail", True
+            rejection, keeps_text = Rejection.UNSOURCED_DETAIL, True
             answer_text = without_details(answer_text, unsourced)
         if repeated_crisis_wording(answer_text, turn_type, history):
             # Trimmed here, not sent back: a rewrite costs a model call for what a
@@ -517,7 +535,7 @@ def check_reply(
         answer_text = without_source_phrases(answer_text) or answer_text
         if rejection is None and mentions_sources(answer_text):
             # Wording, not safety: kept as written if the rewrite still does it.
-            rejection, keeps_text = "mentions_sources", True
+            rejection, keeps_text = Rejection.MENTIONS_SOURCES, True
         if keeps_text and not answer_text:
             # Nothing left once the unsourced details were removed.
             intent, keeps_text = AgentIntent.DECLINE, False

@@ -6,11 +6,12 @@ from __future__ import annotations
 import time
 from typing import Dict, List, Optional, Sequence
 
+from app.core.agent_runtime.check import Rejection
 from app.core.agent_runtime.state import AgentState
 from app.core.config import settings
 
 #: Refusals after which, if nothing has been searched, the next step must search.
-MUST_SEARCH_AFTER = ("uncited", "search_first")
+MUST_SEARCH_AFTER = (Rejection.UNCITED, Rejection.SEARCH_FIRST)
 
 #: Rewrites allowed per message. One is enough to turn an uncited claim into an
 #: honest reply; more would only add latency.

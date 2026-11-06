@@ -64,7 +64,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
                 # trimmed). Kept so a rewrite that is refused outright falls back to
                 # it rather than to the bot's fixed decline wording.
                 "fallback_result": json_safe(result) if result["answer"] else None,
-                "feedback": rejection,
+                "feedback": rejection.value,
                 "feedback_text": rejection_feedback(
                     rejection,
                     state["agent_step"],
