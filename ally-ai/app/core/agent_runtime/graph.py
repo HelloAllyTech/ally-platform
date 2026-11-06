@@ -141,6 +141,10 @@ async def run_agent(
         "run_name": "agent_run",
         "metadata": {"run_id": run_id, "chatbot_id": chatbot_id},
     }
+    # recursion_limit is LangGraph's default of 25 supersteps. A run takes at most
+    # about 21: MAX_TOOL_CALLS (bounded at 8) agent→tools rounds, then the agent,
+    # check, one rewrite and finalize. Raising that bound means setting
+    # recursion_limit here too, or the run fails with GraphRecursionError (a 500).
     # Never traced to LangSmith. The knowledge path this replaces sends nothing
     # there (its model calls use the provider SDKs directly), and a traced graph run
     # would upload the question and passages — a new PHI destination.
