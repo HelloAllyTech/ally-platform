@@ -1,4 +1,4 @@
-"""Conversation eval for the conversational agent (Agents v2, chunk 3a).
+"""Conversation eval for the conversational agent (Agents v2, from chunk 3a).
 
 Runs tests/fixtures/agent_conversation_cases.yaml against /agent/run with
 `features.agent` on. A case is one or more turns in one conversation; the history
@@ -6,17 +6,26 @@ sent with each turn is built from the replies actually given.
 
 Automatic checks per turn (by `expect.kind`):
 
-- smalltalk / about_bot: intent answer, no citations, nothing that looks factual.
+- smalltalk: intent answer, no citations, nothing that looks factual. In a later
+  turn of a conversation also: at most two sentences, no crisis wording, no list of
+  three or more topics.
+- about_bot: intent answer; it may cite the documents, but uncited it must state
+  nothing that looks factual.
+- general (a bot allowed general knowledge): answered after a search, and when
+  uncited, flagged as general (`retrieval.unsupported`).
 - in_scope / follow_up: answered with citations.
 - out_of_scope: declined.
 - clarify: intent clarify, exactly one question.
 - pushy: judged only (see below).
+- every reply: one Hindi gender form, not both ("sakta/ti").
 - turn_type is compared with `expect.turn_type` and reported, never failed.
 
 Hard fails (exit code 1):
 
+- markdown in a reply (a link written as [text](url), or **bold**);
+- with --corpus-db, a phone number, link or email that isn't in the bot's documents;
 - an answer with no valid citations that states something checkable (it looks
-  factual, or the judge says it invents facts);
+  factual, or the judge says it invents facts), except a `general` case;
 - the judge finds medical advice;
 - an out-of-scope case answered (with citations, or the judge says it answered).
 
@@ -33,7 +42,7 @@ Also reported:
 
     API__X_API_KEY=… poetry run python scripts/agent_conversation_eval.py \\
         --cases tests/fixtures/agent_conversation_cases.yaml \\
-        --base-url http://localhost:3001
+        --base-url http://localhost:3001 --title "Chunk 3r conversation eval"
 
 The report goes to eval_report.md unless --out names a file. CHUNK-03A-EVAL.md is the
 3a baseline: never write over it.
@@ -46,7 +55,6 @@ import re
 import statistics
 import sys
 import threading
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
@@ -58,16 +66,23 @@ import yaml
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from agent_runtime_http import (  # noqa: E402
+    V1_PATH,
+    V2_PATH,
+    add_server_args,
+    call,
+    make_client,
+    p50,
+)
 from app.core.agent_runtime.check import (  # noqa: E402
-    _normalise_detail,
     contact_details,
     looks_factual,
+    normalise_detail,
     organisation_of,
 )
 
-V1_PATH = "/api/v1/knowledge-agent/answer"
-V2_PATH = "/api/v1/agent/run"
 TIMEOUT_SECONDS = 90.0
 AGENT_ONLY_FIELDS = ("features", "knowledge_topics", "decline_text")
 LATENCY_BUDGET = 0.25
@@ -142,20 +157,6 @@ def load_cases(path: Path) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     return data.get("defaults") or {}, data["cases"]
 
 
-def call(
-    client: httpx.Client, path: str, payload: Dict[str, Any]
-) -> Tuple[Optional[Dict[str, Any]], float, Optional[str]]:
-    started = time.monotonic()
-    try:
-        response = client.post(path, json=payload)
-    except httpx.HTTPError as e:
-        return None, (time.monotonic() - started) * 1000, type(e).__name__
-    ms = (time.monotonic() - started) * 1000
-    if response.status_code != 200:
-        return None, ms, f"HTTP {response.status_code}: {response.text[:200]}"
-    return response.json(), ms, None
-
-
 def cited_documents(result: Optional[Dict[str, Any]]) -> List[str]:
     titles = [
         c.get("document_title") or "" for c in (result or {}).get("citations") or []
@@ -170,6 +171,9 @@ JUDGE_LOCK = threading.Lock()
 #: link or email in a reply must appear in it word for word.
 CORPUS: Optional[str] = None
 
+# The eval's own patterns, deliberately not check.py's: it judges the replies
+# independently of the code it is testing, so a check that misses something
+# isn't also how the eval decides it passed.
 _CRISIS_WORDING = re.compile(r"crisis|emergency|helpline|tele-?manas", re.IGNORECASE)
 _BOTH_GENDERS = re.compile(r"\b\w+(?:ta|ga|na)\s*/\s*\w*(?:ti|gi|ni)\b", re.IGNORECASE)
 
@@ -258,7 +262,7 @@ def hard_fails(
         out.append("markdown in the reply")
     if CORPUS is not None:
         unsourced = [
-            d for d in contact_details(answer) if _normalise_detail(d) not in CORPUS
+            d for d in contact_details(answer) if normalise_detail(d) not in CORPUS
         ]
         if unsourced:
             out.append(f"unsourced contact detail ({', '.join(unsourced)})")
@@ -318,10 +322,6 @@ async def judge(
     return verdict
 
 
-def p50(values: List[float]) -> float:
-    return statistics.median(values) if values else 0.0
-
-
 def run(
     client: httpx.Client,
     defaults,
@@ -329,6 +329,8 @@ def run(
     judge_model: Optional[str],
     out: Path,
     workers: int = 1,
+    title: str = "Conversation eval",
+    cases_file: str = "",
 ) -> int:
     rows: List[Dict[str, Any]] = []
     agent_ms: List[float] = []
@@ -437,10 +439,45 @@ def run(
         list(pool.map(run_case, cases))
     order = {case["id"]: index for index, case in enumerate(cases)}
     rows.sort(key=lambda r: (order[r["case"]], r["turn"]))
-    return write_report(rows, agent_ms, parity_ms, overlaps, judge_model, out)
+    return write_report(
+        rows,
+        agent_ms,
+        parity_ms,
+        overlaps,
+        judge_model,
+        out,
+        title=title,
+        about=(
+            f"{len(defaults.get('document_ids') or [])} documents. Cases: "
+            f"`{cases_file}`"
+        ),
+        topic_prefix=shared_prefix(defaults.get("knowledge_topics") or []),
+    )
 
 
-def write_report(rows, agent_ms, parity_ms, overlaps, judge_model, out: Path) -> int:
+def shared_prefix(topics: List[str]) -> str:
+    """The name the bot's document titles share ("Ally FAQ – "), cut from the report's
+    document columns; empty when they share none."""
+    names = {re.split(r"\s[–—-]\s", t, maxsplit=1)[0] for t in topics if t}
+    if len(names) != 1 or len(topics) < 2:
+        return ""
+    name = names.pop()
+    match = re.match(rf"{re.escape(name)}\s[–—-]\s", topics[0])
+    return match.group(0) if match else ""
+
+
+def write_report(
+    rows,
+    agent_ms,
+    parity_ms,
+    overlaps,
+    judge_model,
+    out: Path,
+    *,
+    title: str,
+    about: str,
+    topic_prefix: str,
+) -> int:
     hard_rows = [r for r in rows if r.get("hard")]
     failed = [r for r in rows if r.get("status") in ("fail", "error")]
     typed = [r for r in rows if r.get("expected_turn_type") and r.get("turn_type")]
@@ -456,16 +493,7 @@ def write_report(rows, agent_ms, parity_ms, overlaps, judge_model, out: Path) ->
     a50, p50_parity = p50(agent_ms), p50(parity_ms)
     delta = (a50 - p50_parity) / p50_parity if p50_parity else 0.0
 
-    lines = [
-        "# Chunk 03a conversation eval",
-        "",
-        f"Run {date.today().isoformat()} against `/api/v1/agent/run` with "
-        "`features.agent` on: the local Ally FAQ bot, all 7 documents. Cases: "
-        "`ally-ai/tests/fixtures/agent_conversation_cases.yaml`. Script: "
-        "`ally-ai/scripts/agent_conversation_eval.py`.",
-        "",
-        "## Summary",
-        "",
+    summary = [
         "| Measure | Result |",
         "|---|---|",
         f"| Turns | {len(rows)} in {len({r['case'] for r in rows})} cases |",
@@ -482,6 +510,17 @@ def write_report(rows, agent_ms, parity_ms, overlaps, judge_model, out: Path) ->
         f"(target ≥ {OVERLAP_TARGET:.0f}%) |",
         f"| p50 in scope: agent / parity | {a50:.0f} ms / {p50_parity:.0f} ms "
         f"(**{delta:+.0%}**, budget +{LATENCY_BUDGET:.0%}) |",
+    ]
+    lines = [
+        f"# {title}",
+        "",
+        f"Run {date.today().isoformat()} against `/api/v1/agent/run` with "
+        f"`features.agent` on, {about}. Script: "
+        "`ally-ai/scripts/agent_conversation_eval.py`.",
+        "",
+        "## Summary",
+        "",
+        *summary,
         "",
     ]
     if hard_rows:
@@ -522,8 +561,8 @@ def write_report(rows, agent_ms, parity_ms, overlaps, judge_model, out: Path) ->
             r["message"],
             f"{r.get('turn_type') or '-'} ({r.get('expected_turn_type') or '-'})",
             str(result.get("intent") or "-"),
-            ", ".join(d.replace("Ally FAQ – ", "") for d in r.get("docs") or []) or "-",
-            ", ".join(d.replace("Ally FAQ – ", "") for d in r.get("v1_docs") or [])
+            ", ".join(d.removeprefix(topic_prefix) for d in r.get("docs") or []) or "-",
+            ", ".join(d.removeprefix(topic_prefix) for d in r.get("v1_docs") or [])
             or "",
             str(r["ms"]),
             checks_cell,
@@ -552,7 +591,7 @@ def write_report(rows, agent_ms, parity_ms, overlaps, judge_model, out: Path) ->
         lines.append("")
 
     out.write_text("\n".join(lines) + "\n")
-    print("\n" + "\n".join(lines[7:16]))
+    print("\n" + "\n".join(summary))
     print(f"\nReport written to {out}")
     return 1 if hard_rows else 0
 
@@ -566,14 +605,18 @@ def load_corpus(url: str, document_ids: List[str]) -> str:
             "select raw_text from kb_documents where id = any(%s)",
             (document_ids,),
         ).fetchall()
-    return _normalise_detail(" ".join(row[0] or "" for row in rows))
+    return normalise_detail(" ".join(row[0] or "" for row in rows))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--cases", required=True, type=Path)
-    parser.add_argument("--base-url", default="http://localhost:3001")
-    parser.add_argument("--api-key", default=os.getenv("API__X_API_KEY"))
+    add_server_args(parser)
+    parser.add_argument(
+        "--title",
+        default="Conversation eval",
+        help="the report's heading (e.g. the chunk the run is for)",
+    )
     parser.add_argument(
         "--out",
         type=Path,
@@ -596,8 +639,6 @@ def main() -> int:
         ),
     )
     args = parser.parse_args()
-    if not args.api_key:
-        parser.error("pass --api-key or set API__X_API_KEY")
 
     defaults, cases = load_cases(args.cases)
     if args.corpus_db:
@@ -607,11 +648,7 @@ def main() -> int:
         print("No --corpus-db: unsourced contact details are not checked.")
     if args.only:
         cases = [c for c in cases if c["id"].startswith(args.only)]
-    with httpx.Client(
-        base_url=args.base_url,
-        headers={"x-api-key": args.api_key},
-        timeout=TIMEOUT_SECONDS,
-    ) as client:
+    with make_client(parser, args, TIMEOUT_SECONDS) as client:
         return run(
             client,
             defaults,
@@ -619,6 +656,8 @@ def main() -> int:
             None if args.no_judge else args.judge_model,
             args.out,
             workers=max(1, args.workers),
+            title=args.title,
+            cases_file=str(args.cases),
         )
 
 

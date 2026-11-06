@@ -60,7 +60,9 @@ _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _PHONE = re.compile(r"\+?\d(?:[\s-]?\d){2,}")
 
 
-def _normalise_detail(detail: str) -> str:
+def normalise_detail(detail: str) -> str:
+    """A phone number, link or email as compared with passage text: lower case, no
+    scheme, no trailing punctuation, no spaces or dashes."""
     detail = re.sub(r"^https?://", "", detail.lower()).rstrip(".,;:!?/'\"")
     return re.sub(r"[\s+-]", "", detail)
 
@@ -84,8 +86,8 @@ def without_contact_details(text: str) -> str:
 
 def unsupported_details(text: str, passages: Sequence[Dict[str, Any]]) -> List[str]:
     """Phone numbers, links and emails in `text` that no passage contains."""
-    corpus = _normalise_detail(" ".join(str(p.get("text") or "") for p in passages))
-    return [d for d in contact_details(text) if _normalise_detail(d) not in corpus]
+    corpus = normalise_detail(" ".join(str(p.get("text") or "") for p in passages))
+    return [d for d in contact_details(text) if normalise_detail(d) not in corpus]
 
 
 _SENTENCE_END = re.compile(r"(?<=[.!?।])\s+")

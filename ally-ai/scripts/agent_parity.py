@@ -29,19 +29,25 @@ must-match check fails.
 import argparse
 import difflib
 import json
-import os
-import statistics
 import sys
-import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import httpx
 import yaml
 
-V1_PATH = "/api/v1/knowledge-agent/answer"
-V2_PATH = "/api/v1/agent/run"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from agent_runtime_http import (  # noqa: E402
+    V1_PATH,
+    V2_PATH,
+    add_server_args,
+    call,
+    make_client,
+    p50,
+)
+
 TIMEOUT_SECONDS = 60.0
 
 
@@ -52,20 +58,6 @@ def load_cases(path: Path) -> List[Dict[str, Any]]:
     for case in data["cases"]:
         cases.append({**case, "request": {**defaults, **case["request"]}})
     return cases
-
-
-def call(
-    client: httpx.Client, path: str, payload: Dict[str, Any]
-) -> Tuple[Optional[Dict[str, Any]], float, Optional[str]]:
-    started = time.monotonic()
-    try:
-        response = client.post(path, json=payload)
-    except httpx.HTTPError as e:
-        return None, (time.monotonic() - started) * 1000, type(e).__name__
-    ms = (time.monotonic() - started) * 1000
-    if response.status_code != 200:
-        return None, ms, f"HTTP {response.status_code}: {response.text[:200]}"
-    return response.json(), ms, None
 
 
 def must_match_fields(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -102,10 +94,6 @@ def answer_similarity(a: Dict[str, Any], b: Dict[str, Any]) -> float:
     return difflib.SequenceMatcher(
         None, a.get("answer") or "", b.get("answer") or ""
     ).ratio()
-
-
-def p50(values: List[float]) -> float:
-    return statistics.median(values) if values else 0.0
 
 
 def record_baseline(client: httpx.Client, cases, out: Path) -> int:
@@ -218,8 +206,7 @@ def run(client: httpx.Client, cases, baseline: Optional[Dict], out: Path) -> int
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--cases", required=True, type=Path)
-    parser.add_argument("--base-url", default="http://localhost:3001")
-    parser.add_argument("--api-key", default=os.getenv("API__X_API_KEY"))
+    add_server_args(parser)
     parser.add_argument("--out", type=Path, default=Path("parity_report.md"))
     parser.add_argument("--baseline", type=Path, help="Compare v1 against this file")
     parser.add_argument(
@@ -230,20 +217,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.api_key:
-        parser.error("pass --api-key or set API__X_API_KEY")
-
     cases = load_cases(args.cases)
     if args.prompts:
         prompts = json.loads(args.prompts.read_text())
         for case in cases:
             case["request"]["prompts"] = prompts
 
-    with httpx.Client(
-        base_url=args.base_url,
-        headers={"x-api-key": args.api_key},
-        timeout=TIMEOUT_SECONDS,
-    ) as client:
+    with make_client(parser, args, TIMEOUT_SECONDS) as client:
         if args.record_baseline:
             return record_baseline(client, cases, args.record_baseline)
         baseline = json.loads(args.baseline.read_text()) if args.baseline else None
