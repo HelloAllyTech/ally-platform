@@ -1,6 +1,6 @@
 # Conversation eval for the conversational agent (chunk 3a): scripts/agent_conversation_eval.py.
 #
-# The local Ally FAQ bot with all seven "Ally FAQ –" documents and features.agent on.
+# The local Ally FAQ bot with all seven "Ally FAQ –" documents.
 # The persona and decline wording are the bot's own (ally_local `chatbots`, 2026-11-05).
 # `defaults` is merged under every turn's request. A case is one or more turns sent in
 # order in one conversation; history is built from the replies actually given.
@@ -35,7 +35,6 @@ defaults:
     - "Ally FAQ – Skills Lab Practice"
   answer_mode: documents_only
   channel: whatsapp
-  features: {agent: true}
   decline_text: >-
     My reference material does not cover that. A colleague or supervisor is the better
     route for this one.

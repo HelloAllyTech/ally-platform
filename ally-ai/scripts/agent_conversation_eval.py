@@ -1,8 +1,8 @@
 """Conversation eval for the conversational agent (Agents v2, from chunk 3a).
 
-Runs tests/fixtures/agent_conversation_cases.yaml against /agent/run with
-`features.agent` on. A case is one or more turns in one conversation; the history
-sent with each turn is built from the replies actually given.
+Runs tests/fixtures/agent_conversation_cases.yaml against /agent/run. A case is one
+or more turns in one conversation; the history sent with each turn is built from the
+replies actually given.
 
 Automatic checks per turn (by `expect.kind`):
 
@@ -37,8 +37,7 @@ the report then lists the replies to read by hand.
 Also reported:
 - in-scope cases are sent to /knowledge-agent/answer (v1) and the cited documents
   compared (target: the same documents at least 80% of the time);
-- p50 latency on in-scope cases against /agent/run with the agent off (parity),
-  budget +25%.
+- p50 latency on in-scope cases against v1 on the same messages, budget +25%.
 
     API__X_API_KEY=… poetry run python scripts/agent_conversation_eval.py \\
         --cases tests/fixtures/agent_conversation_cases.yaml \\
@@ -84,7 +83,7 @@ from app.core.agent_runtime.check import (  # noqa: E402
 )
 
 TIMEOUT_SECONDS = 90.0
-AGENT_ONLY_FIELDS = ("features", "knowledge_topics", "decline_text")
+AGENT_ONLY_FIELDS = ("knowledge_topics", "decline_text")
 LATENCY_BUDGET = 0.25
 OVERLAP_TARGET = 80.0
 
@@ -334,7 +333,7 @@ def run(
 ) -> int:
     rows: List[Dict[str, Any]] = []
     agent_ms: List[float] = []
-    parity_ms: List[float] = []
+    v1_ms: List[float] = []
     overlaps: List[bool] = []
     v1_defaults = {k: v for k, v in defaults.items() if k not in AGENT_ONLY_FIELDS}
 
@@ -400,23 +399,13 @@ def run(
 
             if kind == "in_scope" and len(case["turns"]) == 1:
                 agent_ms.append(ms)
-                v1, _, v1_error = call(
+                v1, one_ms, v1_error = call(
                     client,
                     V1_PATH,
                     {**v1_bot, "question": turn["say"]},
                 )
-                parity, p_ms, p_error = call(
-                    client,
-                    V2_PATH,
-                    {
-                        **v1_bot,
-                        "question": turn["say"],
-                        "conversation_id": f"{conversation_id}-parity",
-                    },
-                )
-                if not p_error:
-                    parity_ms.append(p_ms)
                 if not v1_error:
+                    v1_ms.append(one_ms)
                     row["v1_docs"] = cited_documents(v1)
                     if row["v1_docs"]:
                         overlaps.append(bool(set(row["docs"]) & set(row["v1_docs"])))
@@ -442,7 +431,7 @@ def run(
     return write_report(
         rows,
         agent_ms,
-        parity_ms,
+        v1_ms,
         overlaps,
         judge_model,
         out,
@@ -469,7 +458,7 @@ def shared_prefix(topics: List[str]) -> str:
 def write_report(
     rows,
     agent_ms,
-    parity_ms,
+    v1_ms,
     overlaps,
     judge_model,
     out: Path,
@@ -490,8 +479,8 @@ def write_report(
     )
     scores = [r["verdict"].natural_on_persona for r in rows if r.get("verdict")]
     overlap = 100.0 * sum(overlaps) / len(overlaps) if overlaps else 0.0
-    a50, p50_parity = p50(agent_ms), p50(parity_ms)
-    delta = (a50 - p50_parity) / p50_parity if p50_parity else 0.0
+    a50, p50_v1 = p50(agent_ms), p50(v1_ms)
+    delta = (a50 - p50_v1) / p50_v1 if p50_v1 else 0.0
 
     summary = [
         "| Measure | Result |",
@@ -508,14 +497,14 @@ def write_report(
         ),
         f"| In scope: same documents as v1 | {overlap:.0f}% of {len(overlaps)} "
         f"(target ≥ {OVERLAP_TARGET:.0f}%) |",
-        f"| p50 in scope: agent / parity | {a50:.0f} ms / {p50_parity:.0f} ms "
+        f"| p50 in scope: agent / v1 | {a50:.0f} ms / {p50_v1:.0f} ms "
         f"(**{delta:+.0%}**, budget +{LATENCY_BUDGET:.0%}) |",
     ]
     lines = [
         f"# {title}",
         "",
-        f"Run {date.today().isoformat()} against `/api/v1/agent/run` with "
-        f"`features.agent` on, {about}. Script: "
+        f"Run {date.today().isoformat()} against `/api/v1/agent/run`, "
+        f"{about}. Script: "
         "`ally-ai/scripts/agent_conversation_eval.py`.",
         "",
         "## Summary",

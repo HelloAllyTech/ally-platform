@@ -1,6 +1,6 @@
-"""The conversational agent path (`features.agent`) through the graph.
+"""The conversational agent through the graph.
 
-The real KnowledgeAgentService over a mocked chunk service, as in test_graph.py,
+The real KnowledgeAgentService over a mocked chunk service,
 with the agent's `generate_structured` replaced by a fake that returns the next
 scripted step.
 """
@@ -43,10 +43,9 @@ TEST_PROMPTS = {"ally_ai_agent_system": {"prompt": TEST_TEMPLATE}}
 
 @pytest.fixture
 def agent_run(run):
-    """`run` with the agent on and the fake model patched in."""
+    """`run` with the fake model patched in."""
 
     async def _run(question, llm, **bot):
-        bot.setdefault("features", {"agent": True})
         with patch(f"{CONVERSATION}.generate_structured", llm):
             return await run(question, **bot)
 
@@ -65,7 +64,7 @@ class TestTheAgentDecides:
         retrieval_log.assert_not_called()
         # One model call: no classifier, no translate, no up-front search.
         assert len(llm.calls) == 1
-        assert nodes(state) == ["agent", "check", "finalize"]
+        assert nodes(state) == ["agent", "check"]
         assert state["result"]["turn_type"] == turn_type
 
     async def test_it_writes_the_search_query_from_the_conversation(
@@ -92,7 +91,7 @@ class TestTheAgentDecides:
         assert result["retrieval"]["hit_count"] == 1
         assert result["turn_type"] == "question"
         assert result["intent"] == "answer"
-        assert nodes(state) == ["agent", "tool", "agent", "check", "finalize"]
+        assert nodes(state) == ["agent", "tool", "agent", "check"]
 
     async def test_language_is_the_agents(self, agent_run, chunk_service):
         chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
@@ -179,7 +178,6 @@ class TestToolLoop:
             "tool",
             "agent",
             "check",
-            "finalize",
         ]
 
     async def test_tool_step_has_counts_only(self, agent_run, chunk_service):
@@ -258,7 +256,7 @@ class TestToolLoop:
         assert "search_knowledge" not in llm.calls[1]["schema"].model_fields
         # Final: declined with no text rather than a rewrite past ally-be's timeout.
         assert state["result"]["intent"] == "decline"
-        assert nodes(state)[-2:] == ["check", "finalize"]
+        assert nodes(state)[-1] == "check"
 
     async def test_reads_only_the_last_ten_messages(self, agent_run, chunk_service):
         history = [
@@ -314,7 +312,6 @@ class TestRevision:
             "tool",
             "agent",
             "check",
-            "finalize",
         ]
         check = state["trace"][1]
         assert check["summary"] == "check: sent back (uncited)"
@@ -561,29 +558,7 @@ class TestModelAndTracing:
         json.dumps(state)
 
 
-class TestFlag:
-    async def test_off_runs_the_parity_graph(self, run, chunk_service):
-        chunk_service.search.return_value = []
-        with patch(f"{CONVERSATION}.generate_structured") as gen:
-            state = await run("hello", features={"agent": False})
-        gen.assert_not_called()
-        assert nodes(state) == ["translate", "retrieve", "gate", "finalize"]
-        assert "turn_type" not in state["result"]
-
-    async def test_a_thread_can_switch_between_paths(
-        self, run, agent_run, chunk_service
-    ):
-        """Run-scoped keys reset, so an agent run leaves nothing for a parity run."""
-        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
-        llm = FakeLLM(search("q"), reply(citations=[1]))
-        await agent_run("q", llm)
-        chunk_service.search.return_value = []
-        # A new run id: the same id in the same thread returns the stored run.
-        state = await run("hello", run_id="run-2")
-        assert state["tool_calls"] is None
-        assert state["turn_type"] is None
-        assert nodes(state) == ["translate", "retrieve", "gate", "finalize"]
-
+class TestEachRunStartsClean:
     async def test_an_agent_run_after_another_starts_clean(
         self, agent_run, chunk_service
     ):

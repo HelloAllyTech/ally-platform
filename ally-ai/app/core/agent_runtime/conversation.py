@@ -1,6 +1,6 @@
 """The conversational agent's model call: one agent step.
 
-It goes through `generate_structured`, the same dispatch as the parity path, so it
+It goes through `generate_structured`, the same dispatch as v1, so it
 gets its provider fallback, usage accounting and temperature rules, and sends
 nothing anywhere new.
 """
@@ -43,7 +43,7 @@ async def agent_step(
     """
     prompts = bot.get("prompts")
     # The bot's model override is merged into this prompt's entry by ally-be, as it
-    # is for the parity path's answer prompt.
+    # is for v1's answer prompt.
     provider, model, temperature = get_backend_llm_overrides(AGENT_PROMPT_PATH, prompts)
     prompt = build_agent_prompt(
         message,

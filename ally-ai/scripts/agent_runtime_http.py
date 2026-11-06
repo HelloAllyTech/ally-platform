@@ -1,4 +1,4 @@
-"""What the Agents v2 scripts share (agent_parity.py, agent_conversation_eval.py):
+"""What the Agents v2 scripts share (agent_conversation_eval.py):
 the two endpoints, one timed POST, p50, and the server options and client."""
 
 import argparse

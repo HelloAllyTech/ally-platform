@@ -1,6 +1,6 @@
 """Check for the conversational agent: what the model replied → what ally-be gets.
 
-Deterministic, like the parity path's check. The model may chat freely, but a fact
+Deterministic, like v1's check. The model may chat freely, but a fact
 about the organisation reaches a person only with a citation that resolves to a
 passage this run actually offered.
 
@@ -667,7 +667,7 @@ def _build_result(
         citations = []
         if not verdict.model_declined or (verdict.rejection and not verdict.keeps_text):
             answer = ""
-        # The parity path's reason when searching found nothing at all, so the
+        # v1's reason when searching found nothing at all, so the
         # unanswered queue reads the same as in v1.
         decline_reason = (
             DeclineReason(ctx.search_gate)

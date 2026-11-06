@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal
 
+from langgraph.graph import END
+
 from app.core.agent_runtime.budget import MAX_REVISIONS, over_time, recent
 from app.core.agent_runtime.check import (
     check_reply,
@@ -81,5 +83,5 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
     return agent_check
 
 
-def route_after_check(state: AgentState) -> Literal["agent", "finalize"]:
-    return "agent" if state.get("feedback") else "finalize"
+def route_after_check(state: AgentState) -> Literal["agent", "__end__"]:
+    return "agent" if state.get("feedback") else END

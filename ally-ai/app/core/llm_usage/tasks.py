@@ -69,7 +69,7 @@ class LLMTask(str, Enum):
     WHATSAPP_RAG_ANSWER = "whatsapp_rag_answer"
     WHATSAPP_QUERY_TRANSLATE = "whatsapp_query_translate"
     WHATSAPP_CRISIS_CLASSIFY = "whatsapp_crisis_classify"
-    # Conversational agent (Agents v2, `features.agent`): one call per loop
+    # Conversational agent (Agents v2): one call per loop
     # iteration, on the bot's answer model. It reads the turn and writes its own
     # search queries, so these bots make no translate call.
     WHATSAPP_AGENT_STEP = "whatsapp_agent_step"

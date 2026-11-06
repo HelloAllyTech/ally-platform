@@ -18,20 +18,20 @@ from app.core.agent_runtime.graph import (
 )
 from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState, RunInput
 from app.core.config import settings
-from app.core.knowledge_agent.schemas import AnswerIntent, KnowledgeAnswer
-from tests.core.agent_runtime.conftest import AGENT, make_bot
-from tests.core.knowledge_agent.test_agent import CHUNK_A, passage, stub_generate
+from tests.core.agent_runtime.conftest import make_bot
+from tests.core.agent_runtime.steps import CONVERSATION, FakeLLM, chat, reply, search
+from tests.core.knowledge_agent.test_agent import CHUNK_A, passage
 
 pytestmark = pytest.mark.asyncio
 
 
 async def _two_runs(graph, chunk_service, conversation_id):
-    """Run 1 answers; run 2, in the same conversation, declines at the gate."""
+    """Run 1 answers from a search; run 2, in the same conversation, is smalltalk."""
     chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
-    gen = stub_generate(
-        KnowledgeAnswer(intent=AnswerIntent.ANSWER, answer="A.", citations=[1])
-    )
-    with patch(f"{AGENT}.generate_structured", gen):
+    with patch(
+        f"{CONVERSATION}.generate_structured",
+        FakeLLM(search("q1"), reply(citations=[1]), chat("Bye!")),
+    ):
         first = await run_agent(
             graph,
             run_id="run-1",
@@ -41,16 +41,15 @@ async def _two_runs(graph, chunk_service, conversation_id):
             history=[],
             bot=make_bot(),
         )
-    chunk_service.search.return_value = []
-    second = await run_agent(
-        graph,
-        run_id="run-2",
-        conversation_id=conversation_id,
-        chatbot_id="bot-1",
-        question="q2",
-        history=[],
-        bot=make_bot(),
-    )
+        second = await run_agent(
+            graph,
+            run_id="run-2",
+            conversation_id=conversation_id,
+            chatbot_id="bot-1",
+            question="bye",
+            history=[],
+            bot=make_bot(),
+        )
     return first, second
 
 
@@ -63,18 +62,19 @@ async def test_two_runs_in_one_conversation_are_both_stored(graph, chunk_service
 
     stored_second = await get_run_state("conv-1", "run-2", graph=graph)
     stored_first = await get_run_state("conv-1", "run-1", graph=graph)
-    assert stored_second["result"]["intent"] == "decline"
-    assert stored_first["result"]["intent"] == "answer"
+    assert stored_second["result"]["turn_type"] == "smalltalk"
+    assert stored_first["result"]["citations"][0]["chunk_id"] == CHUNK_A
     assert await get_run_state("conv-1", "no-such-run", graph=graph) is None
 
 
 async def test_each_run_starts_clean(graph, chunk_service):
     """Nothing from run 1 (trace, passages, answer) leaks into run 2's state."""
     first, second = await _two_runs(graph, chunk_service, "conv-1")
-    assert len(first["trace"]) == 7
-    assert len(second["trace"]) == 4
-    assert second["passages"] is None
-    assert second["answer_raw"] is None
+    assert len(first["trace"]) == 4
+    assert len(second["trace"]) == 2
+    assert second["passages"] == []
+    assert second["tool_calls"] == []
+    assert second["retrieval"] is None
 
 
 async def test_every_working_key_is_cleared_between_runs():
@@ -116,7 +116,7 @@ async def test_postgres_checkpoints_land_in_their_own_schema(
         graph = build_graph(service, saver)
         await _two_runs(graph, chunk_service, "conv-pg")
         stored = await get_run_state("conv-pg", "run-2", graph=graph)
-        assert stored["result"]["intent"] == "decline"
+        assert stored["result"]["turn_type"] == "smalltalk"
 
         from psycopg import AsyncConnection
 

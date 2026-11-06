@@ -1,7 +1,7 @@
 """Tools: run the tool the agent asked for, and add one trace step for it.
 
 The run's first search sets the response's `retrieval` block and is the one
-logged to the retrieval log, as the parity path's single search is.
+logged to the retrieval log, as v1's single search is.
 """
 
 from __future__ import annotations

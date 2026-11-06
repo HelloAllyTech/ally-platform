@@ -1,4 +1,4 @@
-"""POST /api/v1/agent/run with the conversational agent on."""
+"""POST /api/v1/agent/run: what the conversational agent adds to the response."""
 
 from unittest.mock import patch
 
@@ -10,7 +10,6 @@ from tests.core.knowledge_agent.test_agent import CHUNK_A, passage
 
 AGENT_BODY = {
     **BODY,
-    "features": {"agent": True},
     "knowledge_topics": ["Ally FAQ – About Ally", "  ", "x" * 300],
     "decline_text": "A colleague or supervisor is the better route.",
 }
@@ -32,7 +31,7 @@ class TestAgentRun:
         assert data["citations"] == []
         assert data["turn_type"] == "smalltalk"
         assert data["retrieval"]["hit_chunk_ids"] == []
-        assert [s["node"] for s in data["trace"]] == ["agent", "check", "finalize"]
+        assert [s["node"] for s in data["trace"]] == ["agent", "check"]
         chunk_service.search.assert_not_called()
 
     def test_topics_are_trimmed_and_reach_the_prompt(self, client, chunk_service):

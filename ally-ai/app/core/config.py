@@ -139,7 +139,7 @@ class AgentRuntimeSettings(BaseModel):
     # "async" keeps a checkpoint per step (needed by "Why?" and approvals later)
     # without blocking the next step on the write; "exit" writes once per run.
     DURABILITY: Literal["sync", "async", "exit"] = Field("async")
-    # Conversational agent (`features.agent`): tool calls allowed per run. Past this
+    # Conversational agent: tool calls allowed per run. Past this
     # the agent must reply with what it has, or decline. Two: a second search with
     # different words helps; more only repeated the same miss and ran past ally-be's
     # 25-second timeout.

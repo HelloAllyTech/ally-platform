@@ -28,14 +28,12 @@ class TestRegistry:
             assert tool.description
             tool.input_model()  # every input field has a default
 
-    async def test_only_an_agent_bot_gets_tools(self):
-        assert allowed_tools(make_bot()) == []
-        assert allowed_tools(make_bot(features={"agent": False})) == []
-        names = [t.name for t in allowed_tools(make_bot(features={"agent": True}))]
+    async def test_every_bot_gets_every_tool(self):
+        names = [t.name for t in allowed_tools(make_bot())]
         assert names == ["search_knowledge"]
 
     async def test_the_step_schema_names_only_offered_tools(self):
-        tools = allowed_tools(make_bot(features={"agent": True}))
+        tools = allowed_tools(make_bot())
         schema = step_schema(tools).model_json_schema()
         assert actions(schema) == ["reply", "search_knowledge"]
         reply_only = step_schema([]).model_json_schema()
@@ -56,7 +54,7 @@ class TestSearchKnowledge:
     def ctx(self, chunk_service, passages, log_retrieval=False, **bot):
         return ToolContext(
             service=KnowledgeAgentService(chunk_service),
-            bot=make_bot(features={"agent": True}, **bot),
+            bot=make_bot(**bot),
             limits=LIMITS,
             passages=passages,
             log_retrieval=log_retrieval,

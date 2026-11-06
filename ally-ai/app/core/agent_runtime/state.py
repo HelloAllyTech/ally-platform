@@ -43,7 +43,6 @@ class BotConfig(TypedDict, total=False):
     audience: Dict[str, Any]
     log_retrieval: bool
     # --- conversational agent
-    features: Dict[str, bool]
     knowledge_topics: List[str]
     decline_text: Optional[str]
 
@@ -62,25 +61,15 @@ class RunWorking(TypedDict, total=False):
     """Working and output keys, cleared at the start of every run (see
     RUN_SCOPED_KEYS)."""
 
-    # --- working (the parity path; the agent path uses limits, language, hits,
-    # retrieval and passages of these)
+    # --- working
     limits: Dict[str, Any]
-    search_text: str
     language: str
-    translated_query: Optional[str]
-    translation_degraded: bool
-    hits: List[Dict[str, Any]]
-    retrieval_latency_ms: int
+    hits: List[Dict[str, Any]]  # the run's first search, best first
     retrieval: Dict[str, Any]
-    gate_reason: Optional[str]  # a DeclineReason value, or None to answer
     passages: List[Dict[str, Any]]
-    answer_raw: Optional[Dict[str, Any]]  # the model's structured output
-    answer_meta: Optional[Dict[str, Any]]
-
-    # --- working: conversational agent (`features.agent`)
     turn_type: Optional[TurnType]
-    # The gate verdict on the run's first search, as the parity path's gate would
-    # have given it; None when it found something relevant or no search ran.
+    # The gate verdict on the run's first search (a DeclineReason value); None when
+    # it found something relevant or no search ran.
     search_gate: Optional[str]
     agent_step: Optional[Dict[str, Any]]  # the latest structured step
     agent_meta: Optional[Dict[str, Any]]

@@ -1,10 +1,9 @@
-"""Agents v2 runtime endpoint — the knowledge pipeline run as a LangGraph graph.
+"""Agents v2 runtime endpoint — the conversational agent, run as a LangGraph loop.
 
 Dark until AGENT_RUNTIME__ENABLED: every route here answers 404 while it is off, so
 shipping this changes nothing in production, and 503 if it is on but its checkpoint
-database could not be opened at startup. With `features.agent` off the graph answers
-exactly as /knowledge-agent/answer does; either way it adds a run id, a per-step
-trace and a stored checkpoint per run.
+database could not be opened at startup. Every run adds a run id, a per-step trace
+and a stored checkpoint to what /knowledge-agent/answer returns.
 """
 
 from uuid import uuid4

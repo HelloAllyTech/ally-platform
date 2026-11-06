@@ -21,7 +21,7 @@ from app.core.knowledge_agent.schemas import is_general
 from app.prompts.resolver import load_and_format
 
 AGENT_PROMPT_PATH = "agent/system"
-#: Characters of conversation the agent reads (the parity path keeps 1,500 over six
+#: Characters of conversation the agent reads (v1 keeps 1,500 over six
 #: messages); ten messages of a WhatsApp chat fit.
 AGENT_HISTORY_CHARS = 3000
 
@@ -130,5 +130,5 @@ def build_agent_prompt(
     if not body:
         return body
     # The persona goes first, fenced and ranked below the rules that follow, as in
-    # the parity path's answer prompt.
+    # v1's answer prompt.
     return format_persona(persona) + body

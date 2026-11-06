@@ -14,11 +14,9 @@ REGISTRY: Dict[str, Tool] = {tool.name: tool for tool in (search_knowledge.TOOL,
 def allowed_tools(bot: BotConfig) -> List[Tool]:
     """The tools this bot's agent may call.
 
-    Every registered tool, for a bot with the agent on. A per-bot allow-list comes
-    with the ally-be tool gateway (chunk 3b).
+    Every registered tool. A per-bot allow-list comes with the ally-be tool gateway
+    (chunk 3b).
     """
-    if not (bot.get("features") or {}).get("agent"):
-        return []
     return list(REGISTRY.values())
 
 

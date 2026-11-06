@@ -74,11 +74,11 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
     return agent
 
 
-def route_after_agent(state: AgentState) -> Literal["tools", "agent_check"]:
+def route_after_agent(state: AgentState) -> Literal["tools", "check"]:
     # Only the cap here: a step that was offered a search runs it, even if the time
     # budget ran out while the model was deciding.
     action = (state.get("agent_step") or {}).get("action", REPLY_ACTION)
     calls = len(state.get("tool_calls") or [])
     if action != REPLY_ACTION and calls < settings.AGENT_RUNTIME.MAX_TOOL_CALLS:
         return "tools"
-    return "agent_check"
+    return "check"
