@@ -1158,7 +1158,8 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     detail:
       'One call per step: the agent reads the conversation and either searches the bot’s ' +
       'documents (writing its own query) or replies. Small talk takes one call, a question ' +
-      'usually two; at most 4 searches plus one rewrite of a reply the check refused. Replaces ' +
+      'usually two; at most 2 searches (none after one that found nothing new) and one rewrite ' +
+      'of a reply the check refused, within a 15-second run budget. Replaces ' +
       'the translate and answer calls for these bots, so the bot’s own model (chatbots.model) ' +
       'applies here, never to the crisis check.',
     kind: AiTaskKind.COMPLETION,
