@@ -4312,6 +4312,8 @@ class AgentWorker:
             else:
                 _room_input_options = RoomInputOptions(
                     noise_cancellation=None if _is_v2v_room else bvc,
+                    sample_rate=16000,
+                    num_channels=1,
                 )
 
             await self.session.start(
