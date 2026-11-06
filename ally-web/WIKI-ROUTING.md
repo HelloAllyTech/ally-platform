@@ -4,7 +4,7 @@
 [wiki repo](https://github.com/helloallytech/helloallytech.github.io) from each page's
 frontmatter, and copied into every code repo.
 
-One line per page, so you can pick the right one *before* spending a fetch. Read the
+One line per page, so you can pick the right one _before_ spending a fetch. Read the
 page, not the section. Word counts distinguish a rule set from a reference.
 
 Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://tech.helloally.ai/wiki/<path>`.
@@ -38,7 +38,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 ## Per-repo pages
 
 - `repos/ally-ai-learn.md` (3483w) — A LiveKit-based voice AI agent (FastAPI + LangGraph) that simulates mental-health client conversations, detecting counseling…
-- `repos/ally-ai.md` (3931w) — ally-ai (internally "Lifeline AI") is the FastAPI AI copilot service that provides conversation analysis, summaries…
+- `repos/ally-ai.md` (3916w) — ally-ai (internally "Lifeline AI") is the FastAPI AI copilot service that provides conversation analysis, summaries…
 - `repos/ally-be.md` (4617w) — ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth…
 - `repos/ally-changelog.md` (420w) — Holds the auto-written CHANGELOG.md fed by merges across every Ally repo, via a shared dispatch…
 - `repos/ally-mobile.md` (1721w) — Flutter iOS/Android app for counsellors and community health workers, covering Scribe (recorded sessions with transcription…
@@ -77,4 +77,4 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `index.md` — human navigation catalog — ROUTING.md supersedes it for agents
 - `log.md` — append-only history — read only when auditing what changed
 
-_44 pages, 83,829 words total. Loading all of it would cost roughly 111,772 tokens — which is the entire reason this index exists._
+_44 pages, 83,814 words total. Loading all of it would cost roughly 111,752 tokens — which is the entire reason this index exists._
