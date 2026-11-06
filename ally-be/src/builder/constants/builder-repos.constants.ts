@@ -153,15 +153,25 @@ export const BUILDER_REPOS: BuilderRepoDefinition[] = [
     e2eCapable: false,
     guardedPaths: ['app/auth', 'app/core/config.py'],
   },
+  // Onboarded 2026-11-06, after the Flutter rename's deliberate review.
+  // `flutter analyze` is Dart's own type-checking analyzer, not a separate
+  // step, so typecheck is null here for the same reason as the two Python
+  // services above. No e2e harness exists for a device/emulator build in a
+  // runner, same as them — e2eCapable: false.
   {
     repo: 'ally-mobile',
-    description: 'React Native mobile client.',
-    test: 'npm test',
-    singleTest: 'npx jest',
-    lint: 'npm run lint',
-    typecheck: 'npx tsc --noEmit',
+    description:
+      'Flutter app (iOS and Android) for counselors: live sessions, reviews, simulations.',
+    test: 'flutter test',
+    singleTest: 'flutter test',
+    lint: 'flutter analyze',
+    typecheck: null,
     e2eCapable: false,
-    guardedPaths: ['src/navigation', 'src/api'],
+    guardedPaths: [
+      'lib/core/auth',
+      'lib/core/app_update',
+      'lib/core/migration',
+    ],
   },
 ];
 

@@ -14,7 +14,9 @@ import {
   useGetBugFindingsQuery,
   useGetRoadmapBoardQuery,
   useGetRoadmapVoteBudgetQuery,
+  useGetRoadmapBreadthQuery,
   useGetRoadmapFacetsQuery,
+  useGetRoadmapIdeaDraftsQuery,
   useGetRoadmapInterviewNotesQuery,
   useGetRoadmapOpportunitiesQuery,
   useGetRoadmapProductGoalsQuery,
@@ -25,6 +27,7 @@ import {
   RoadmapBoardGroupBy,
   RoadmapBoardLayout,
   RoadmapBoardQuery,
+  RoadmapIdeaDraft,
   RoadmapOpportunitiesQuery,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
@@ -32,10 +35,14 @@ import {
   RoadmapViewState,
 } from "@types";
 
+import { BreadthBadge, BreadthReadout } from "./BreadthBadge";
+import { BreadthPanel } from "./BreadthPanel";
 import { BugsTab } from "./BugsTab";
 import { BuilderSessionDrawer } from "./BuilderSessionDrawer";
+import { IdeaDraftsTab } from "./IdeaDraftsTab";
 import { InterviewsTab } from "./InterviewsTab";
 import { MonthBoard } from "./MonthBoard";
+import { NewToYouChip } from "./NewToYouChip";
 import { OpportunitiesBoard } from "./OpportunitiesBoard";
 import { OpportunitiesListView } from "./OpportunitiesListView";
 import { OpportunityDrawer } from "./OpportunityDrawer";
@@ -132,6 +139,8 @@ enum RoadmapTab {
   INTERVIEWS = "interviews",
   /** Bug Hunter's table, read-only. See BugsTab for why it is mirrored here. */
   BUGS = "bugs",
+  /** The viewer's own saved raw ideas (see IdeaDraftsTab). Needs VOTE: the endpoints do. */
+  DRAFTS = "drafts",
 }
 
 /**
@@ -159,6 +168,18 @@ export const ProductRoadmap: React.FC = () => {
   const { permissions, features, user } = useUser();
 
   const canVote = !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP);
+  // Breadth multiplier. `enabled` comes from the server so the UI and the flag can't disagree;
+  // while it is loading (or off, or failed) none of the badge renders — a skeleton here would
+  // flash on every load for the people the flag is still off for.
+  const {
+    data: breadth,
+    isError: isBreadthError,
+    refetch: refetchBreadth,
+  } = useGetRoadmapBreadthQuery();
+  const isBreadthOn = canVote && !!breadth?.enabled;
+  const [isBreadthPanelOpen, setIsBreadthPanelOpen] = useState(false);
+  // Page-level shortcut, not a saved-view filter — see NewToYouChip.
+  const [newToMe, setNewToMe] = useState(false);
   /**
    * The permission AND the `product_roadmap_manage` toggle — see canManageRoadmap for why the
    * permission alone stopped meaning anything, and for the fail-closed rule.
@@ -209,6 +230,8 @@ export const ProductRoadmap: React.FC = () => {
   const [order, setOrder] = useState<"ASC" | "DESC">("DESC");
   /** The guided interview — the way to file an opportunity from this page, for almost everyone. */
   const [isInterviewOpen, setIsInterviewOpen] = useState(false);
+  /** Set when the interview was opened from a saved draft, so it opens seeded with those words. */
+  const [interviewDraft, setInterviewDraft] = useState<RoadmapIdeaDraft | null>(null);
   /** The quick-add form — the other way, for holders of the quick-add toggle only. */
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
@@ -292,6 +315,7 @@ export const ProductRoadmap: React.FC = () => {
       productGoal: goalFilter.length ? goalFilter : undefined,
       owner: ownerFilter.length ? ownerFilter : undefined,
       createdBy: advanced.createdBy.length ? advanced.createdBy : undefined,
+      newToMe: newToMe && isBreadthOn ? true : undefined,
       // Empty string means "no bound" — sending it would fail @IsISO8601 / @IsInt.
       dateFrom: advanced.dateFrom || undefined,
       dateTo: advanced.dateTo || undefined,
@@ -316,6 +340,8 @@ export const ProductRoadmap: React.FC = () => {
       goalFilter,
       ownerFilter,
       advanced,
+      newToMe,
+      isBreadthOn,
       sortBy,
       order,
       isList,
@@ -361,6 +387,7 @@ export const ProductRoadmap: React.FC = () => {
   const { data: facets } = useGetRoadmapFacetsQuery();
   // Counts only — the tab bodies own their own data. Cheap, and the tab strip needs them.
   const { data: interviews } = useGetRoadmapInterviewNotesQuery({ limit: 1 });
+  const { data: ideaDrafts } = useGetRoadmapIdeaDraftsQuery(undefined, { skip: !canVote });
   /**
    * Count only, and skipped entirely without the toggle — the same shape as the
    * two above. `limit: 1` rather than the table's `limit: 100`: this fires on
@@ -675,7 +702,10 @@ export const ProductRoadmap: React.FC = () => {
     // A pasted `?tab=bugs` from someone who holds the toggle must fall back for
     // someone who doesn't, rather than selecting a tab with no strip entry —
     // which would render the page with no tab underlined and no body.
-    (tab !== RoadmapTab.BUGS || canViewBugs);
+    (tab !== RoadmapTab.BUGS || canViewBugs) &&
+    // Drafts are private to the author and the endpoints need VOTE, so a viewer without it
+    // falls back instead of landing on a tab that can only 403.
+    (tab !== RoadmapTab.DRAFTS || canVote);
   /**
    * Queue and Opportunities are the same `?tab=` value split into two strip entries by which
    * view is applied. Queue-ness only overrides Opportunities — a reader on Bugs or User
@@ -764,12 +794,14 @@ export const ProductRoadmap: React.FC = () => {
               The icon keeps its tooltip while collapsed, so the control is not a mystery glyph
               — hovering says what it is, clicking shows the numbers. */}
           {budget && (
-            <div className="text-typography-secondary flex items-center gap-1.5 text-sm">
+            <div className="text-typography-secondary flex max-w-full flex-wrap items-center gap-1.5 text-sm">
               <Tooltip
                 label={
                   isBudgetOpen
                     ? `Your available votes. Use them on what matters most — votes go to new opportunities only. You get 50 at the start of each month plus 5 every day, and each of those expires 30 days after it's issued if unused.`
-                    : `${budget.available} votes available. Click for detail.`
+                    : isBreadthOn && breadth
+                      ? `${budget.available} votes available · Breadth ×${breadth.multiplier}. Click for detail.`
+                      : `${budget.available} votes available. Click for detail.`
                 }
                 align="bottom"
               >
@@ -828,6 +860,14 @@ export const ProductRoadmap: React.FC = () => {
                 </button>
               </Tooltip>
 
+              {isBreadthOn && (
+                <BreadthBadge
+                  breadth={breadth}
+                  availableVotes={budget.available}
+                  onClick={() => setIsBudgetOpen(open => !open)}
+                />
+              )}
+
               {isBudgetOpen && (
                 <span className="text-typography-primary tabular-nums text-base">
                   {budget.available}
@@ -836,6 +876,19 @@ export const ProductRoadmap: React.FC = () => {
                     votes available
                   </span>
                 </span>
+              )}
+
+              {isBudgetOpen && canVote && (breadth?.enabled || isBreadthError) && (
+                // Its own line: the readout is a short paragraph, and inline beside four icons it
+                // squeezed the whole header into a narrow wrapped column.
+                <div className="basis-full pt-1">
+                  <BreadthReadout
+                    breadth={breadth}
+                    isError={isBreadthError}
+                    onRetry={() => refetchBreadth()}
+                    onSeeEveryone={() => setIsBreadthPanelOpen(true)}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -997,6 +1050,10 @@ export const ProductRoadmap: React.FC = () => {
                 },
               ]
             : []),
+          // The viewer's own parked ideas. Only for those who can file, since only they can save one.
+          ...(canVote
+            ? [{ id: RoadmapTab.DRAFTS, label: "My drafts", count: ideaDrafts?.count ?? 0 }]
+            : []),
           {
             id: RoadmapTab.INTERVIEWS,
             label: "User Interviews",
@@ -1006,6 +1063,15 @@ export const ProductRoadmap: React.FC = () => {
         activeId={activeTab}
         onChange={setTab}
       />
+
+      {activeTab === RoadmapTab.DRAFTS && canVote && (
+        <IdeaDraftsTab
+          onContinue={draft => {
+            setInterviewDraft(draft);
+            setIsInterviewOpen(true);
+          }}
+        />
+      )}
 
       {activeTab === RoadmapTab.INTERVIEWS && (
         <InterviewsTab canVote={canVote} canManage={canManage} currentUserId={user?.id} />
@@ -1039,6 +1105,12 @@ export const ProductRoadmap: React.FC = () => {
           onDelete={savedViews.removeView}
           onReorder={savedViews.reorderViews}
         />
+      )}
+
+      {isOpportunitiesTab && isBreadthOn && (
+        <div className="flex flex-col gap-1">
+          <NewToYouChip active={newToMe} onToggle={() => withPagingReset(setNewToMe)(!newToMe)} />
+        </div>
       )}
 
       {isOpportunitiesTab && isBoard && (
@@ -1169,6 +1241,10 @@ export const ProductRoadmap: React.FC = () => {
 
       {/* Gated here as well as on the gear that opens it: the drawer holds three write surfaces,
           and a read-only voter should not be able to mount it by any route. */}
+      {isBreadthPanelOpen && isBreadthOn && (
+        <BreadthPanel currentUserId={user?.id} onClose={() => setIsBreadthPanelOpen(false)} />
+      )}
+
       {isSettingsOpen && canManage && (
         <RoadmapSettingsDrawer
           goals={goals ?? []}
@@ -1198,13 +1274,20 @@ export const ProductRoadmap: React.FC = () => {
       */}
       {isInterviewOpen && (
         <OpportunityInterviewDrawer
-          onClose={() => setIsInterviewOpen(false)}
+          seed={interviewDraft?.rawText}
+          draftId={interviewDraft?.id}
+          onClose={() => {
+            setIsInterviewOpen(false);
+            setInterviewDraft(null);
+          }}
           onCreated={id => {
             setIsInterviewOpen(false);
+            setInterviewDraft(null);
             openOpportunity(id);
           }}
           onOpenExisting={id => {
             setIsInterviewOpen(false);
+            setInterviewDraft(null);
             openOpportunity(id);
           }}
         />

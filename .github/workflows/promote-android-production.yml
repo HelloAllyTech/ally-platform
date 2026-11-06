@@ -1,17 +1,14 @@
-# Touched on 2026-10-23 so GitHub registers this workflow in ally-platform: the files
-# imported with the monorepo were never pushed on their own, and a workflow_dispatch-only
-# workflow is not listed (nor dispatchable) until one is. ally-be's mobile release page
-# dispatches it, or scheduled-mobile-release.yml does.
 name: Promote Android release to production
-defaults:
-  run:
-    working-directory: ally-mobile
 #
 # Manual-only. Takes whatever is currently on the internal track (uploaded by
-# build-android-production.yml) and promotes it to the production track at a staged rollout
-# percentage, without re-uploading a binary. Deliberately never auto-triggered by
-# scheduled-mobile-release.yml — releasing to real users is a distinct, higher-stakes decision
-# that should always be an explicit human click.
+# build-android-production-flutter.yml) and promotes it to the production track at a staged
+# rollout percentage, without re-uploading a binary. Deliberately never auto-triggered —
+# releasing to real users is a distinct, higher-stakes decision that should always be an
+# explicit human click.
+#
+# scripts/promote-android-release.mjs lives at the repo root (not inside ally-mobile/): it's
+# pure Play Developer API orchestration with no dependency on either app's source, so this
+# workflow runs from the repo root rather than any one app's folder.
 
 on:
   workflow_dispatch:

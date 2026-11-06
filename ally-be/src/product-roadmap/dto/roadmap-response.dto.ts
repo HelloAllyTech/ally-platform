@@ -175,8 +175,17 @@ export class OpportunityResponseDto {
    */
   @ApiProperty() monthPinned!: boolean;
 
-  /** SUM(votes) over ALL users and ALL periods. Computed in SQL, never stored. */
+  /**
+   * SUM(weightedVotes) over ALL users and ALL periods — votes weighted by each voter's breadth
+   * multiplier when they voted. One decimal at most. Computed in SQL, never stored.
+   */
   @ApiProperty() priorityScore!: number;
+  /**
+   * True when voting here would back a colleague the caller has not backed inside the breadth
+   * window: votable, not the caller's own, and no standing recent vote on that author. Drives
+   * the "New colleague" marker and the "New to you" filter.
+   */
+  @ApiProperty() breadthNew!: boolean;
   /** The CALLER's votes on this opportunity in the CURRENT period only. */
   @ApiProperty() myVotes!: number;
   @ApiProperty() commentCount!: number;
@@ -349,6 +358,10 @@ export class SetAllocationResponseDto {
   @ApiProperty() votes!: number;
   @ApiProperty() priorityScore!: number;
   @ApiProperty({ type: VoteBudgetDto }) budget!: VoteBudgetDto;
+  /** The breadth multiplier this vote was weighted with (1 when the feature is off). */
+  @ApiProperty() multiplier!: number;
+  /** Distinct colleagues now counted toward the caller's breadth. */
+  @ApiProperty() qualifying!: number;
 }
 
 /** One admin's vote total on one opportunity, across every period. */
@@ -356,7 +369,37 @@ export class RoadmapVoterDto {
   @ApiProperty() userId!: number;
   @ApiProperty() name!: string;
   @ApiProperty() email!: string;
+  /** Votes spent. */
   @ApiProperty() votes!: number;
+  /** What those votes are worth to the score; equals `votes` when no breadth bonus applied. */
+  @ApiProperty() weightedVotes!: number;
+}
+
+/** The caller's breadth multiplier and what's behind it. */
+export class BreadthDto {
+  /** False when the feature flag is off — the UI renders none of the breadth surface. */
+  @ApiProperty() enabled!: boolean;
+  @ApiProperty() multiplier!: number;
+  /** Distinct colleagues backed inside the window. */
+  @ApiProperty() qualifying!: number;
+  /** Colleagues needed for the full bonus right now (capped, and never more than exist). */
+  @ApiProperty() target!: number;
+  @ApiProperty() windowDays!: number;
+  /** The multiplier at full breadth, i.e. the ceiling for this caller today. */
+  @ApiProperty() maxMultiplier!: number;
+  /** When the multiplier will next fall from votes ageing out; null if nothing is due. */
+  @ApiPropertyOptional({ nullable: true }) nextDropAt!: string | null;
+  @ApiPropertyOptional({ nullable: true }) nextDropMultiplier!: number | null;
+  /** The colleague whose vote is ageing out, for the "why" line. */
+  @ApiPropertyOptional({ nullable: true }) nextDropAuthorName!: string | null;
+}
+
+export class BreadthEveryoneRowDto {
+  @ApiProperty() userId!: number;
+  @ApiProperty() name!: string;
+  @ApiProperty() multiplier!: number;
+  @ApiProperty() qualifying!: number;
+  @ApiProperty() target!: number;
 }
 
 export class RoadmapFacetsDto {

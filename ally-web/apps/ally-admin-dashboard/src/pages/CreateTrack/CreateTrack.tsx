@@ -4,13 +4,14 @@ import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { Tooltip } from "@ally-ui-mono/ui-shared";
+import { ANALYTICS_EVENTS, Tooltip, useAnalytics } from "@ally-ui-mono/ui-shared";
 import {
   useCreateTrackMutation,
   useGetTrackTranslationsQuery,
   useLazyGetTrackByIdQuery,
   useUpdateTrackByIdMutation,
   useUpdateTrackStructureMutation,
+  useUpdateLiveQuizSettingsMutation,
 } from "@api";
 import { WandStars, WarningAlt } from "@assets";
 import { ActionConfirmationPopup, Button, Header } from "@components";
@@ -44,6 +45,7 @@ import {
   createItemOfType,
   deserializeTrack,
   extractTrackMetadata,
+  getLiveQuizAttemptChanges,
   serializeTrackForm,
   validateTrackForPublish,
 } from "./trackFormUtils";
@@ -79,6 +81,8 @@ export const CreateTrack: FC = () => {
   const [createTrack] = useCreateTrackMutation();
   const [updateTrackMetadata] = useUpdateTrackByIdMutation();
   const [updateTrackStructure] = useUpdateTrackStructureMutation();
+  const [updateLiveQuizSettings] = useUpdateLiveQuizSettingsMutation();
+  const { track } = useAnalytics();
 
   const formMethods = useForm<TrackFormValues>({
     defaultValues: DEFAULT_TRACK_FORM_VALUES,
@@ -214,6 +218,19 @@ export const CreateTrack: FC = () => {
         setTrackId(created.id);
       }
 
+      // A raised attempt limit on a live course goes through its own endpoint: the
+      // structure PUT treats `maxAttempts` as structural and 409s once learners are
+      // enrolled. Sent first, so the PUT below then matches what is stored.
+      if (trackId && trackDetail?.status === SimulationStatus.ACTIVE) {
+        for (const change of getLiveQuizAttemptChanges(trackDetail, values)) {
+          await updateLiveQuizSettings(change).unwrap();
+          track(ANALYTICS_EVENTS.LIVE_QUIZ_ATTEMPTS_INCREASED, {
+            trackItemId: change.trackItemId,
+            maxAttempts: change.maxAttempts,
+          });
+        }
+      }
+
       await updateTrackStructure({
         id: currentId,
         data: serializeTrackForm(values),
@@ -327,6 +344,7 @@ export const CreateTrack: FC = () => {
         itemIndex={itemIndex}
         type={item.type}
         onDelete={() => handleDeleteItem(sectionIndex, itemIndex)}
+        isPublished={trackDetail?.status === SimulationStatus.ACTIVE}
       />
     );
   };

@@ -25,6 +25,7 @@ interface QuizItemEditorProps {
   sectionIndex: number;
   itemIndex: number;
   onDelete: () => void;
+  isPublished?: boolean;
 }
 
 /**
@@ -80,7 +81,12 @@ export const renderTypeBody = (
   }
 };
 
-export const QuizItemEditor: FC<QuizItemEditorProps> = ({ sectionIndex, itemIndex, onDelete }) => {
+export const QuizItemEditor: FC<QuizItemEditorProps> = ({
+  sectionIndex,
+  itemIndex,
+  onDelete,
+  isPublished = false,
+}) => {
   const { control, setValue } = useFormContext<TrackFormValues>();
   const base = `sections.${sectionIndex}.items.${itemIndex}` as const;
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -353,7 +359,11 @@ export const QuizItemEditor: FC<QuizItemEditorProps> = ({ sectionIndex, itemInde
 
         <div className="border-t border-border-light pt-4">
           <p className="text-sm font-semibold text-typography-900 mb-2">Quiz settings</p>
-          <QuizSettingsFields sectionIndex={sectionIndex} itemIndex={itemIndex} />
+          <QuizSettingsFields
+            sectionIndex={sectionIndex}
+            itemIndex={itemIndex}
+            isPublished={isPublished}
+          />
         </div>
       </div>
     </ItemEditorFrame>

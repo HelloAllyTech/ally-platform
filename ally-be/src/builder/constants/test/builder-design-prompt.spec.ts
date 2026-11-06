@@ -40,7 +40,7 @@ const design = (
     {
       name: 'payload.promptHtml',
       change: 'new optional key',
-      readers: ['ally-mobile:src/screens/Quiz.tsx:88'],
+      readers: ['ally-web:src/screens/Quiz.tsx:88'],
     },
   ],
   compatibilityMd: 'Old clients keep reading prompt.',
@@ -56,7 +56,7 @@ const design = (
 });
 
 const repos = BUILDER_REPOS.filter((repo) =>
-  ['ally-be', 'ally-mobile'].includes(repo.repo),
+  ['ally-be', 'ally-web'].includes(repo.repo),
 );
 
 describe('buildDesignPrompt', () => {
@@ -75,7 +75,7 @@ describe('buildDesignPrompt', () => {
 
   it('carries the PRD and every cloned repo', () => {
     expect(prompt).toContain('# PRD — Rich question prompts');
-    expect(prompt).toContain('`repos/ally-mobile`');
+    expect(prompt).toContain('`repos/ally-web`');
   });
 
   it('spells out the `design` tool contract, field by field', () => {
@@ -202,7 +202,7 @@ describe('buildDesignReviewPrompt', () => {
 
     expect(prompt.startsWith('## Platform rules')).toBe(true);
     expect(prompt).toContain('`design_review`');
-    expect(prompt).toContain('ally-mobile:src/screens/Quiz.tsx:88');
+    expect(prompt).toContain('ally-web:src/screens/Quiz.tsx:88');
     expect(prompt).toContain('Rename it?');
     expect(flat(prompt)).toContain('Missed readers.');
     expect(prompt).toContain('# PRD — Rich question prompts');
@@ -216,7 +216,7 @@ describe('renderPrd and the technical design', () => {
     expect(text).toContain('## Technical design (approved)');
     expect(text).toContain('Add an optional promptHtml beside prompt');
     expect(text).toContain('`src/quiz/**/*.ts`');
-    expect(text).toContain('`ally-mobile:src/screens/Quiz.tsx:88`');
+    expect(text).toContain('`ally-web:src/screens/Quiz.tsx:88`');
     expect(text).toContain('Old clients keep reading prompt.');
     expect(text).toContain('**R1** — `ally-be:src/quiz/test/quiz.spec.ts`');
   });

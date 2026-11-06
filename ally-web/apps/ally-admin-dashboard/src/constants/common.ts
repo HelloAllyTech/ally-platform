@@ -187,6 +187,8 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
+    // Raise a live quiz's attempt limit; the structure PUT is locked once learners enrol.
+    QUIZ_SETTINGS: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/quiz/settings`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
@@ -370,6 +372,8 @@ export const ApiEndpoints = {
     BOARD_LANE: "/v1/product-roadmap/board/lane",
     ALLOCATIONS: "/v1/product-roadmap/allocations",
     VOTE_BUDGET: "/v1/product-roadmap/me/vote-budget",
+    MY_BREADTH: "/v1/product-roadmap/me/breadth",
+    BREADTH_EVERYONE: "/v1/product-roadmap/breadth",
     FACETS: "/v1/product-roadmap/facets",
     PRODUCT_GOALS: "/v1/product-roadmap/product-goals",
     PRODUCT_GOAL_BY_ID: (id: string) => `/v1/product-roadmap/product-goals/${id}`,
@@ -390,6 +394,8 @@ export const ApiEndpoints = {
     OWNER_BY_ID: (id: string) => `/v1/product-roadmap/opportunity-owners/${id}`,
     OWNERS_ORDER: "/v1/product-roadmap/opportunity-owners/order",
     OWNERS_USAGE: "/v1/product-roadmap/opportunity-owners/usage",
+    IDEA_DRAFTS: "/v1/product-roadmap/idea-drafts",
+    IDEA_DRAFT_BY_ID: (id: string) => `/v1/product-roadmap/idea-drafts/${id}`,
     INTERVIEW_NOTES: "/v1/product-roadmap/interview-notes",
     INTERVIEW_NOTE_BY_ID: (id: string) => `/v1/product-roadmap/interview-notes/${id}`,
     VIEWS: "/v1/product-roadmap/views",
@@ -1199,6 +1205,7 @@ export const TAG_TYPES = {
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
   PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
+  PRODUCT_ROADMAP_BREADTH: "productRoadmapBreadth",
   PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",
   PRODUCT_ROADMAP_GOALS: "productRoadmapGoals",
   PRODUCT_ROADMAP_STRATEGY_GOALS: "productRoadmapStrategyGoals",
@@ -1209,6 +1216,7 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_COMMENTS: "productRoadmapComments",
   PRODUCT_ROADMAP_VOTERS: "productRoadmapVoters",
   PRODUCT_ROADMAP_INTERVIEWS: "productRoadmapInterviews",
+  PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
   // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.

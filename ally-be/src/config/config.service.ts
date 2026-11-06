@@ -105,6 +105,10 @@ export class AppConfigService {
    * - `digestTo` is who gets the daily email (comma-separated). Empty means no
    *   email, even when enabled.
    * - `digestHour` is the business-timezone (IST) hour it goes out.
+   * - `digestAllowed` is true only on the production database (`*_prd`). Env
+   *   files get copied between environments, and a staging copy that kept
+   *   `PRODUCT_UPDATES_DIGEST_TO` sent a second, differently-formatted digest
+   *   to the same people on 2026-11-05.
    */
   get productUpdates() {
     const start = new Date(
@@ -131,6 +135,7 @@ export class AppConfigService {
         .map((address) => address.trim())
         .filter(Boolean),
       digestHour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 18,
+      digestAllowed: (this.database.database ?? '').endsWith('_prd'),
     };
   }
 
@@ -201,6 +206,14 @@ export class AppConfigService {
    * actually released. Flip ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED=true only
    * after confirming that in Play Console; the task no-ops (not errors)
    * while this is unset.
+   *
+   * Since the Flutter rename, the task this gates
+   * (autoBumpAndroidMinimumVersionIfLive) matches the production track
+   * against the live Play *internal* track's release (via
+   * fetchAndroidInternalRelease()) instead of a committed versionCode —
+   * Flutter computes its real versionCode per-build in CI, never commits
+   * it. Sanity-check that parsing against Play Console after a real
+   * automated build before flipping this on.
    *
    * SECOND, SEPARATE PRECONDITION, confirmed live: this task authenticates
    * as the same ANDROID_SERVICE_ACCOUNT_JSON identity the release pipeline's
@@ -914,6 +927,18 @@ export class AppConfigService {
         'gemini-2.5-pro',
       ),
     };
+  }
+
+  /**
+   * Breadth multiplier on roadmap votes. On by default; set ROADMAP_MULTIPLIER_ENABLED=false to
+   * switch it off, which makes a vote always worth 1.0 and hides the UI. `weightedVotes` is
+   * written either way, so the switch can be flipped without losing history.
+   */
+  get roadmapMultiplierEnabled(): boolean {
+    return (
+      this.configService.get<string>('ROADMAP_MULTIPLIER_ENABLED', 'true') !==
+      'false'
+    );
   }
 
   get builder() {

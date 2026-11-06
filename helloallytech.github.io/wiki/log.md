@@ -8,6 +8,9 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-06] update | `repos/ally-mobile.md`: rewritten for the Flutter app.
+- The page described the retired React Native app (deleted in the 2026-11 rename). Rewrote Tech Stack, Architecture & Feature Areas, Integration Points, Local Setup, Testing and Key Documentation from the Flutter code in `ally-mobile/lib/` and `pubspec.yaml`; `last_reconciled` set to today. Also repointed the `ally-mobile` entry in `platform/agent-guide.md` and the index line.
+
 ## [2026-11-03] update | `contributing/guide.md`: Branch Lifetime enforcement.
 - Added the "Enforcement" paragraph: `.github/workflows/stale-branches.yml` runs weekly, deletes branches with no PR and no commit for 7 days, and closes PRs idle for 14 days (then deletes their branch). It is report-only until the `STALE_BRANCH_ENFORCE` repository variable is `true`.
 

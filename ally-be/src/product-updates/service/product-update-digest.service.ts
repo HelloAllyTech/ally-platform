@@ -22,6 +22,14 @@ import { ProductUpdateLivenessService } from './product-update-liveness.service'
 const REPORT_WINDOW_MS = 36 * 60 * 60 * 1000;
 const LAST_SENT_KEY = 'product-updates:digest:last-sent';
 
+/** Email-safe design tokens: inline styles only, serif throughout. */
+const FONT = "Georgia,'Times New Roman',Times,serif";
+const INK = '#29261F';
+const MUTED = '#6E6656';
+const RULE = '#E3DBCE';
+const ACCENT = '#8A4B14';
+const linkStyle = `color:${ACCENT};text-decoration:underline`;
+
 /** What a waiting deployable is called in an email a non-engineer reads. */
 const DEPLOYABLE_LABELS: Record<string, string> = {
   'ally-be': 'backend',
@@ -43,6 +51,7 @@ export type DigestOutcome =
   | 'disabled'
   | 'not-due'
   | 'already-sent'
+  | 'not-production'
   | 'nothing-to-report'
   | 'sent'
   | 'failed';
@@ -81,10 +90,18 @@ export class ProductUpdateDigestService {
 
   /** The hourly tick: sends once, in the configured business hour, if there is anything to report. */
   async sendIfDue(now: Date = new Date()): Promise<DigestOutcome> {
-    const { digestTo, digestHour } = this.configService.productUpdates;
+    const { digestTo, digestHour, digestAllowed } =
+      this.configService.productUpdates;
     if (digestTo.length === 0) return 'disabled';
     if (dayjs(now).tz(BUSINESS_TIMEZONE).hour() !== digestHour)
       return 'not-due';
+    if (!digestAllowed) {
+      // After the hour check, so this is one line a day, not one an hour.
+      this.logger.warn(
+        '[PRODUCT-UPDATES] Digest skipped: PRODUCT_UPDATES_DIGEST_TO is set but this is not the production database (*_prd).',
+      );
+      return 'not-production';
+    }
 
     const lockKey = `product-updates:digest:${toBusinessDateString(now)}`;
     if (!(await this.redisService.acquireLock(lockKey, 20 * 60 * 60))) {
@@ -204,7 +221,7 @@ export class ProductUpdateDigestService {
     // putting them here at all, and a section below the release cards is one
     // most readers never scroll to.
     const sections: string[] = [];
-    const votes = await this.roadmapVotesSection(now, adminBase);
+    const votes = await this.roadmapVotesSection(now);
     if (votes) sections.push(votes);
     sections.push(
       section(
@@ -221,7 +238,7 @@ export class ProductUpdateDigestService {
           worthALook,
           '',
           (update) =>
-            `<p style="margin:0 0 8px"><a href="${editLink(update)}">${escapeHtml(update.title)}</a>, published automatically with low confidence (${Math.round(update.confidence * 100)}%). ${escapeHtml(update.decisionReason ?? '')}</p>`,
+            `<p style="margin:0 0 10px;font-size:15px;line-height:1.6"><a href="${editLink(update)}" style="${linkStyle}">${escapeHtml(update.title)}</a>, published automatically with low confidence (${Math.round(update.confidence * 100)}%). ${escapeHtml(update.decisionReason ?? '')}</p>`,
         ),
       );
     }
@@ -256,20 +273,25 @@ export class ProductUpdateDigestService {
       backlog
         ? `${backlog} merge(s) are still being read and grouped; they will appear in a later digest.`
         : null,
-      `Public updates appear on the changelog as soon as they are live. Edit or hide any of them in <a href="${adminBase}/product-updates">Admin → Product updates</a>.`,
+      `Public updates appear on the changelog as soon as they are live. Edit or hide any of them in <a href="${adminBase}/product-updates" style="${linkStyle}">Admin → Product updates</a>.`,
     ]
       .filter(Boolean)
       .map(
         (line) =>
-          `<p style="margin:0 0 6px;color:#6E6656;font-size:13px">${line}</p>`,
+          `<p style="margin:0 0 8px;color:${MUTED};font-size:13px;line-height:1.6">${line}</p>`,
       )
       .join('');
 
-    const html = `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#29261F;max-width:680px">
-<h1 style="font-size:20px;margin:0 0 16px">${escapeHtml(subject)}</h1>
+    const html = `<div style="background:#FAF7F1;padding:24px 12px;font-family:${FONT}">
+<div style="font-family:${FONT};color:${INK};max-width:640px;margin:0 auto;background:#FFFFFF;border:1px solid ${RULE};border-radius:6px;padding:32px 36px;line-height:1.6">
+<p style="margin:0 0 6px;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:${ACCENT}">Ally · Product updates</p>
+<h1 style="font-family:${FONT};font-size:26px;line-height:1.25;font-weight:normal;margin:0 0 6px">${escapeHtml(date)}</h1>
+<p style="margin:0;color:${MUTED};font-size:15px">${live.length} live · ${waiting.length} waiting on a release</p>
+<hr style="border:none;border-top:2px solid ${INK};margin:20px 0 0">
 ${sections.join('\n')}
-<hr style="border:none;border-top:1px solid #E3DBCE;margin:24px 0 12px">
+<hr style="border:none;border-top:1px solid ${RULE};margin:32px 0 16px">
 ${footer}
+</div>
 </div>`;
 
     return { subject, html, live, waiting };
@@ -281,17 +303,13 @@ ${footer}
    * which reads the same service.
    *
    * Voters lead, highest first, as recognition (Stacks: *Social Presence and
-   * Recognition in Crowdsourced Work*); admins with access who have not voted
-   * yet follow on one quiet line in name order — the nudge, without ranking
-   * anyone at the bottom of a table.
+   * Recognition in Crowdsourced Work*). Admins who have not voted are left off,
+   * so nobody is ranked at the bottom of a table.
    *
    * First section of the email, but a rider on one that is going out anyway: it never makes a digest send
    * on its own, and a failure here drops the section rather than the email.
    */
-  private async roadmapVotesSection(
-    now: Date,
-    adminBase: string,
-  ): Promise<string> {
+  private async roadmapVotesSection(now: Date): Promise<string> {
     try {
       const data = await this.roadmapVoting.getRoadmapVoting(now);
       const month = data.months.find((m) => m.partial);
@@ -305,38 +323,27 @@ ${footer}
           (a, b) =>
             b.votes - a.votes || name(a.userId).localeCompare(name(b.userId)),
         );
-      const notYet = month.users
-        .filter((u) => u.votes === 0)
-        .map((u) => name(u.userId))
-        .sort((a, b) => a.localeCompare(b));
 
       const monthName = dayjs(now).tz(BUSINESS_TIMEZONE).format('MMMM');
-      const share =
-        month.eligible !== null
-          ? `${month.voters} of ${month.eligible} admins have voted`
-          : `${month.voters} admins have voted`;
-      const issued = month.granted
-        ? ` · ${month.votes.toLocaleString('en-IN')} of ${month.granted.toLocaleString('en-IN')} votes issued used`
-        : ` · ${month.votes.toLocaleString('en-IN')} votes`;
-
+      const th = (label: string, align: 'left' | 'right') =>
+        `<th style="padding:0 ${align === 'left' ? '16px' : '0'} 6px ${align === 'left' ? '0' : '16px'};border-bottom:1px solid ${RULE};text-align:${align};font-size:12px;font-weight:normal;color:${MUTED}">${label}</th>`;
+      const cell = (content: string, last = false) =>
+        `<td style="padding:7px ${last ? '0' : '16px'} 7px 0;border-bottom:1px solid ${RULE};text-align:right;font-size:15px;font-variant-numeric:tabular-nums">${content}</td>`;
       const rows = voters
-        .map(
-          (u) =>
-            `<tr><td style="padding:2px 16px 2px 0">${escapeHtml(name(u.userId))}</td><td style="padding:2px 0;text-align:right;font-variant-numeric:tabular-nums">${u.votes.toLocaleString('en-IN')}</td></tr>`,
-        )
+        .map((u) => {
+          // Share of this person's votes that went to colleagues' ideas.
+          const othersShare = `${Math.round(
+            ((u.votesOnOthers ?? u.votes) / u.votes) * 100,
+          )}%`;
+          return `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid ${RULE};font-size:15px">${escapeHtml(name(u.userId))}</td>${cell(u.votes.toLocaleString('en-IN'))}${cell(othersShare, true)}</tr>`;
+        })
         .join('');
       const table = rows
-        ? `<table style="border-collapse:collapse;margin:0 0 8px">${rows}</table>`
-        : `<p style="margin:0 0 8px;color:#6E6656">No votes cast yet this month.</p>`;
-      const pending = notYet.length
-        ? `<p style="margin:0 0 6px;color:#6E6656;font-size:13px">Not voted yet: ${escapeHtml(notYet.join(', '))}</p>`
-        : '';
+        ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}"><tr>${th('Name', 'left')}${th('Votes cast', 'right')}${th('Voters voted others share', 'right')}</tr>${rows}</table>`
+        : `<p style="margin:0;color:${MUTED}">No votes cast yet this month.</p>`;
 
-      return `<h2 style="font-size:16px;margin:24px 0 10px">Roadmap votes in ${escapeHtml(monthName)} so far</h2>
-<p style="margin:0 0 8px">${escapeHtml(share + issued)}</p>
-${table}
-${pending}
-<p style="margin:0;font-size:12px;color:#6E6656"><a href="${escapeHtml(`${adminBase}/analytics?tab=highlights`)}">Month by month in Analytics → Highlights → Priority</a></p>`;
+      return `${heading(`Roadmap votes in ${monthName} so far:`)}
+${table}`;
     } catch (error) {
       this.logger.error(
         `[PRODUCT-UPDATES] Roadmap votes section skipped: ${
@@ -348,6 +355,10 @@ ${pending}
   }
 }
 
+function heading(text: string): string {
+  return `<h2 style="font-family:${FONT};font-size:13px;font-weight:normal;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};margin:32px 0 6px;padding-bottom:8px;border-bottom:1px solid ${RULE}">${escapeHtml(text)}</h2>`;
+}
+
 function section<T>(
   title: string,
   items: T[],
@@ -357,12 +368,11 @@ function section<T>(
   if (items.length === 0 && !empty) return '';
   const body = items.length
     ? items.map(render).join('\n')
-    : `<p style="margin:0;color:#6E6656">${escapeHtml(empty)}</p>`;
-  return `<h2 style="font-size:16px;margin:24px 0 10px">${escapeHtml(title)}${
-    items.length ? ` (${items.length})` : ''
-  }</h2>\n${body}`;
+    : `<p style="margin:12px 0 0;color:${MUTED};font-style:italic">${escapeHtml(empty)}</p>`;
+  return `${heading(`${title}${items.length ? ` (${items.length})` : ''}`)}\n${body}`;
 }
 
+/** One update: no box, just a hairline above every entry after the heading's own rule. */
 function card(
   update: ProductUpdate,
   editLink: string,
@@ -378,7 +388,7 @@ function card(
     .split('\n')
     .map((line) => line.replace(/^\s*[-*]\s*/, '').trim())
     .filter(Boolean)
-    .map((line) => `<li>${escapeHtml(line)}</li>`)
+    .map((line) => `<li style="margin:0 0 4px">${escapeHtml(line)}</li>`)
     .join('');
   const links = (update.sources ?? [])
     .map((source) => {
@@ -387,20 +397,20 @@ function card(
           ? `${source.repo}#${source.prNumber}`
           : `${source.repo} push`;
       return source.prUrl
-        ? `<a href="${escapeHtml(source.prUrl)}">${escapeHtml(label)}</a>`
+        ? `<a href="${escapeHtml(source.prUrl)}" style="${linkStyle}">${escapeHtml(label)}</a>`
         : escapeHtml(label);
     })
     .join(' · ');
-  return `<div style="border:1px solid #E3DBCE;border-radius:8px;padding:12px 14px;margin:0 0 10px">
-<p style="margin:0 0 4px;font-weight:600">${escapeHtml(update.title)}</p>
-<p style="margin:0 0 6px;color:#6E6656;font-size:13px">${escapeHtml(meta)}${
+  return `<div style="padding:18px 0;border-bottom:1px solid ${RULE}">
+<p style="margin:0 0 2px;font-size:18px;line-height:1.35;font-weight:bold">${escapeHtml(update.title)}</p>
+<p style="margin:0 0 10px;color:${MUTED};font-size:13px;font-style:italic">${escapeHtml(meta)}${
     options.waitingOn?.length
       ? ` · waiting on the ${escapeHtml(options.waitingOn.join(' and '))}`
       : ''
   }</p>
-${options.showPublicSummary ? `<p style="margin:0 0 6px">${escapeHtml(update.summary)}</p>` : ''}
-${notes ? `<ul style="margin:0 0 6px;padding-left:18px">${notes}</ul>` : ''}
-<p style="margin:0;font-size:12px;color:#6E6656">${links}${links ? ' · ' : ''}<a href="${escapeHtml(editLink)}">Edit</a></p>
+${options.showPublicSummary ? `<p style="margin:0 0 10px;font-size:16px">${escapeHtml(update.summary)}</p>` : ''}
+${notes ? `<ul style="margin:0 0 10px;padding-left:20px;font-size:14px;color:#4A4538">${notes}</ul>` : ''}
+<p style="margin:0;font-size:13px;color:${MUTED}">${links}${links ? ' · ' : ''}<a href="${escapeHtml(editLink)}" style="${linkStyle}">Edit</a></p>
 </div>`;
 }
 

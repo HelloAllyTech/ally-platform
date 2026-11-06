@@ -38,7 +38,7 @@ Superseded by the **Stacks MCP** — see [Planning with the Stacks MCP](contribu
 - [ally-ai](repos/ally-ai.md) — AI copilot service (FastAPI + Weaviate)
 - [ally-ai-learn](repos/ally-ai-learn.md) — Voice training agent (LiveKit + LangGraph)
 - [ally-web](repos/ally-web.md) — Web apps (Nx: Next.js + Vite/React)
-- [ally-mobile](repos/ally-mobile.md) — Mobile app (React Native)
+- [ally-mobile](repos/ally-mobile.md) — Mobile app (Flutter)
 - [infra](repos/infra.md) — Infrastructure & dev environment (Ansible + Terraform)
 - [calibrate](repos/calibrate.md) — Voice-agent evaluation framework (open-source, Python)
 - [calibrate-backend](repos/calibrate-backend.md) — Calibrate API service (FastAPI)

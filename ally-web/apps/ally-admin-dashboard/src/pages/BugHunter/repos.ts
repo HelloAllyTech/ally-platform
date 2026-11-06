@@ -7,6 +7,10 @@
  * Lived in `SweepPanel` until the on-demand sweep control came off the page
  * (2026-10-01, sweeps are scheduled only); the notebook's repo filter is what
  * still needs it.
+ *
+ * 'ally-mobile' was re-onboarded 2026-11-06 with its own Flutter commands,
+ * after the deliberate post-rename review this comment used to say was
+ * pending — see ally-be's own comment on BUG_HUNT_REPOS.
  */
 export const BUG_HUNTER_REPOS = [
   "ally-be",

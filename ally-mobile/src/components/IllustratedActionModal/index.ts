@@ -1,1 +1,0 @@
-export {IllustratedActionModal} from './IllustratedActionModal';

@@ -1,1 +1,0 @@
-export {BadgePopup} from './BadgePopup';

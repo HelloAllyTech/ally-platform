@@ -3397,7 +3397,7 @@ export const en = {
     faqEscalationBody:
       'Under Needs you, the first tab of my bugs table. A bug that needs your approval waits there, and so does one where I\'ve asked you a question — it reads "Needs input", and its Answer button opens it so you can reply. Anything of mine that went red is under Failed. The count beside Bug Hunter in the sidebar is my unread notifications. A quiet, successful night gets no message at all, on purpose.',
     faqReposTitle: "Which repos do you touch?",
-    faqReposBody: "ally-be, ally-web, ally-ai, ally-ai-learn and ally-mobile.",
+    faqReposBody: "ally-be, ally-web, ally-ai and ally-ai-learn.",
     faqCostTitle: "What does a night of your work cost?",
     faqCostBody:
       "Every sweep's estimated token cost is in my shift log on Analytics → Bug Agent, from the same LLM usage data the platform's cost analytics use. What my fix sessions on one bug have cost is on that bug.",
@@ -4903,7 +4903,7 @@ export const en = {
       retryIntro: "The last attempt failed:",
       reposLabel: "Repos to change",
       reposHintIssue:
-        "Each service the approved design changes is built one after another, in the order ally-be → ally-ai → ally-ai-learn → ally-web → ally-mobile, with one pull request per service — each a folder of the ally-platform repository. The next service starts once the previous one's CI passes.",
+        "Each service the approved design changes is built one after another, in the order ally-be → ally-ai → ally-ai-learn → ally-web, with one pull request per service — each a folder of the ally-platform repository. The next service starts once the previous one's CI passes.",
       issueModelNote:
         "The model is set once for every service, on GitHub, with the BUILDER_MODEL variable (default Gemini 3 Flash). Cost isn't tracked for opencode builds.",
       reposPlaceholder: "Choose repos…",

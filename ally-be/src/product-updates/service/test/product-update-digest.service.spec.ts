@@ -49,7 +49,11 @@ describe('ProductUpdateDigestService', () => {
     set: jest.Mock;
   };
   let config: {
-    productUpdates: { digestTo: string[]; digestHour: number };
+    productUpdates: {
+      digestTo: string[];
+      digestHour: number;
+      digestAllowed: boolean;
+    };
     email: { sourceEmail: string };
     adminBaseUrl: string;
   };
@@ -70,7 +74,11 @@ describe('ProductUpdateDigestService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     };
     config = {
-      productUpdates: { digestTo: ['team@example.com'], digestHour: 18 },
+      productUpdates: {
+        digestTo: ['team@example.com'],
+        digestHour: 18,
+        digestAllowed: true,
+      },
       email: { sourceEmail: 'no-reply@example.com' },
       adminBaseUrl: 'https://admin.example.com/',
     };
@@ -100,10 +108,10 @@ describe('ProductUpdateDigestService', () => {
             eligible: 4,
             granted: 800,
             users: [
-              { userId: 1, votes: 3, granted: 200 },
-              { userId: 2, votes: 12, granted: 200 },
-              { userId: 3, votes: 0, granted: 200 },
-              { userId: 4, votes: 0, granted: 200 },
+              { userId: 1, votes: 3, votesOnOthers: 3, granted: 200 },
+              { userId: 2, votes: 12, votesOnOthers: 9, granted: 200 },
+              { userId: 3, votes: 0, votesOnOthers: 0, granted: 200 },
+              { userId: 4, votes: 0, votesOnOthers: 0, granted: 200 },
             ],
           },
         ],
@@ -126,6 +134,14 @@ describe('ProductUpdateDigestService', () => {
       redis as unknown as RedisService,
       roadmapVoting as unknown as RoadmapVotingAnalyticsService,
     );
+  });
+
+  it('never sends from a database that is not production, and never takes the lock', async () => {
+    config.productUpdates.digestAllowed = false;
+
+    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('not-production');
+    expect(redis.acquireLock).not.toHaveBeenCalled();
+    expect(sesService.sendEmail).not.toHaveBeenCalled();
   });
 
   it('does nothing without recipients, or outside its business hour', async () => {
@@ -195,7 +211,7 @@ describe('ProductUpdateDigestService', () => {
     );
   });
 
-  it("adds this month's roadmap votes by name: voters highest first, then who has not voted", async () => {
+  it("adds this month's roadmap votes by name: voters highest first", async () => {
     updateRepository.find
       .mockResolvedValueOnce([update({})])
       .mockResolvedValueOnce([]);
@@ -203,18 +219,17 @@ describe('ProductUpdateDigestService', () => {
     await service.sendIfDue(IN_DIGEST_HOUR);
 
     const body: string = sesService.sendEmail.mock.calls[0][0].body;
-    expect(body).toContain('Roadmap votes in September so far');
-    expect(body).toContain(
-      '2 of 4 admins have voted · 15 of 800 votes issued used',
-    );
+    expect(body).toContain('Roadmap votes in September so far:');
+    expect(body).toContain('Voters voted others share');
+    expect(body).toContain('75%'); // Bea: 9 of 12 on colleagues' ideas
+    expect(body).toContain('100%'); // Asha: 3 of 3
+    expect(body).not.toContain('admins have voted');
     expect(body.indexOf('Bea')).toBeLessThan(body.indexOf('Asha'));
-    expect(body).toContain('Not voted yet: Cy, Dev');
+    expect(body).not.toContain('Not voted yet');
     expect(body.indexOf('Roadmap votes in September')).toBeLessThan(
       body.indexOf('Live for customers'),
     );
-    expect(body).toContain(
-      'https://admin.example.com/analytics?tab=highlights',
-    );
+    expect(body).not.toContain('analytics?tab=highlights');
   });
 
   it('still sends the digest when the roadmap votes cannot be read', async () => {

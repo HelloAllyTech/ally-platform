@@ -13,3 +13,12 @@ path/to/doc.md
 # A gitignored secret in ally-mobile, named on its repo page; absent from a clean checkout
 # by design.
 android/app/google-services.json
+
+# React Native source paths cited on wiki/repos/ally-mobile.md and wiki/platform/agent-guide.md.
+# The RN app was deleted in the 2026-11 Flutter rename, so these files no longer exist; the
+# pages still describe the old app and need a rewrite for Flutter, which is tracked separately.
+ally-mobile/src/App.tsx
+src/config/env.ts
+utils/articleSegments.ts
+utils/activeTrackContext.ts
+services/api.ts

@@ -1399,3 +1399,44 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
         }),
     })),
 });
+
+export interface LiveQuizAttemptChange {
+  trackItemId: string;
+  /** The new total limit; `null` = unlimited. */
+  maxAttempts: number | null;
+}
+
+/**
+ * The quizzes on a published course whose attempt limit the admin raised in
+ * the form. Compared against what the server holds, not the form's defaults,
+ * so a change is only ever an increase: a numeric limit that went up, or one
+ * that went to unlimited. An already-unlimited quiz never appears.
+ */
+export const getLiveQuizAttemptChanges = (
+  saved: TrackDetail,
+  values: TrackFormValues,
+): LiveQuizAttemptChange[] => {
+  const savedLimits = new Map<string, number | null>();
+  for (const section of saved.sections ?? []) {
+    for (const item of section.items ?? []) {
+      if (item.type !== TrackItemType.QUIZ) continue;
+      const quiz = item.content as QuizContent | null | undefined;
+      savedLimits.set(item.id, quiz?.settings?.maxAttempts ?? null);
+    }
+  }
+
+  const changes: LiveQuizAttemptChange[] = [];
+  for (const section of values.sections ?? []) {
+    for (const item of section.items ?? []) {
+      if (item.type !== TrackItemType.QUIZ || !item.serverId) continue;
+      if (!savedLimits.has(item.serverId)) continue;
+      const current = savedLimits.get(item.serverId) ?? null;
+      const next = item.quiz?.settings?.maxAttempts ?? null;
+      if (current === null || next === current) continue;
+      if (next === null || next > current) {
+        changes.push({ trackItemId: item.serverId, maxAttempts: next });
+      }
+    }
+  }
+  return changes;
+};

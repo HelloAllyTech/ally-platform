@@ -1,1 +1,0 @@
-export {CallLogItem} from './CallLogItem';

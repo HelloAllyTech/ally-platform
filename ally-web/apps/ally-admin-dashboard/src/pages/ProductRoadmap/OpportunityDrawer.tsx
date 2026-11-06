@@ -37,9 +37,11 @@ import { hasFeature } from "@utils";
 import { CopilotBrief } from "./CopilotBrief";
 import { RankBreakdownPanel } from "./RankBreakdown";
 import { ReferenceImagesField } from "./ReferenceImagesField";
+import { useScoreUnit } from "./useScoreUnit";
 import { AllocationTarget, useSetVotes } from "./useSetVotes";
 import { monthKeyOf, monthLabel, shiftMonthKey } from "./utils/monthBoard";
 import { personName } from "./utils/people";
+import { formatPoints } from "./utils/points";
 import { sameReferenceImages } from "./utils/referenceImages";
 import { EFFORT_LABEL, STAGE_LABEL } from "./utils/stages";
 import { isVotable } from "./utils/votes";
@@ -135,6 +137,7 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
   const { data: eligibleOwners } = useGetRoadmapEligibleOwnersQuery();
   const { data: comments } = useGetRoadmapCommentsQuery(opportunityId);
   // Bugs don't show the votes line at all (see isBug below), so there is nothing to hover.
+  const { unit } = useScoreUnit();
   const { data: voters } = useGetRoadmapVotersQuery(opportunityId, {
     skip: opportunity?.type === RoadmapOpportunityType.BUG,
   });
@@ -584,7 +587,12 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
                         {voters.map(voter => (
                           <li key={voter.userId} className="flex justify-between gap-3">
                             <span>{personName(voter)}</span>
-                            <span className="tabular-nums">{voter.votes}</span>
+                            <span className="tabular-nums">
+                              {voter.votes}
+                              {voter.weightedVotes > voter.votes + 0.05
+                                ? ` ×${(Math.round((voter.weightedVotes / voter.votes) * 100) / 100).toString()}`
+                                : ""}
+                            </span>
                           </li>
                         ))}
                       </ul>
@@ -596,7 +604,11 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
                     tabIndex={0}
                     className="tabular-nums underline decoration-dotted underline-offset-2 cursor-help"
                   >
-                    {opportunity.priorityScore} total votes
+                    {unit === "points"
+                      ? voters
+                        ? `${formatPoints(opportunity.priorityScore)} points from ${voters.reduce((sum, v) => sum + v.votes, 0)} votes`
+                        : `${formatPoints(opportunity.priorityScore)} points`
+                      : `${formatPoints(opportunity.priorityScore)} total votes`}
                   </span>
                 </Tooltip>{" "}
                 · <span className="tabular-nums">{opportunity.myVotes}</span> yours · Filed by{" "}

@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Locked } from "@icons";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import { Tooltip } from "@ally-ui-mono/ui-shared";
+import { useGetRoadmapBreadthQuery } from "@api";
 import { RoadmapVoteBudget, RoadmapOpportunity, RoadmapOpportunityType } from "@types";
 
 import { clampVotes, isVotable, remainingWithPending } from "./utils/votes";
@@ -102,6 +103,10 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
     [],
   );
 
+  const { data: breadth } = useGetRoadmapBreadthQuery();
+  // Only worth saying when it differs from a plain vote.
+  const worthNote =
+    breadth?.enabled && breadth.multiplier > 1 ? ` (worth ×${breadth.multiplier} right now)` : "";
   const locked = disabled || !isVotable(opportunity);
   const remaining = remainingWithPending(budget, pending, serverVotes);
 
@@ -215,7 +220,11 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
         gates on, so the label cannot drift from the behaviour.
       */
       aria-label={`Add a vote — you have ${pending} on this, ${remaining} available`}
-      title={remaining === 0 ? "No votes available" : "Add a vote"}
+      title={
+        remaining === 0
+          ? "No votes available"
+          : `Add a vote${worthNote}${opportunity.breadthNew ? " — backs a new colleague, which raises your breadth" : ""}`
+      }
       disabled={remaining === 0}
       onClick={() => step(1)}
       className={`border-border-light hover:bg-background-secondary flex items-center justify-center rounded-full border disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${buttonSize}`}

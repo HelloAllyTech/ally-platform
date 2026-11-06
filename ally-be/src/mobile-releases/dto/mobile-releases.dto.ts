@@ -14,11 +14,22 @@ import {
  * shows for each. File names (not numeric workflow ids) are used because
  * GitHub's REST API accepts either interchangeably for these endpoints, and
  * a file name reads sanely in code without a lookup.
+ *
+ * RN's own build workflows and ally-mobile-rn-archive/ itself were deleted
+ * outright in the 2026-11 Flutter rename; scheduled-mobile-release.yml was
+ * retired at the same time for lack of a Flutter equivalent, then rebuilt
+ * (same name) once that equivalent existed — see that workflow's own header
+ * comment for the Flutter-specific version-bump and dispatch logic.
+ * build-android-production-flutter.yml / build-ios-production-flutter.yml
+ * are what it dispatches, and what this run-history UI now tracks as
+ * "Android Build"/"iOS Build" (both also remain directly
+ * `workflow_dispatch`-able by hand with their own `confirm_store_identity`
+ * input, independent of the scheduler).
  */
 export const MOBILE_WORKFLOW_FILES = [
   'scheduled-mobile-release.yml',
-  'build-ios-production.yml',
-  'build-android-production.yml',
+  'build-ios-production-flutter.yml',
+  'build-android-production-flutter.yml',
   'promote-android-production.yml',
   'submit-ios-app-store-review.yml',
 ] as const;
@@ -27,8 +38,8 @@ export type MobileWorkflowFile = (typeof MOBILE_WORKFLOW_FILES)[number];
 
 export const MOBILE_WORKFLOW_LABELS: Record<MobileWorkflowFile, string> = {
   'scheduled-mobile-release.yml': 'Scheduled Check',
-  'build-ios-production.yml': 'iOS Build',
-  'build-android-production.yml': 'Android Build',
+  'build-ios-production-flutter.yml': 'iOS Build',
+  'build-android-production-flutter.yml': 'Android Build',
   'promote-android-production.yml': 'Promote Android',
   'submit-ios-app-store-review.yml': 'App Store Review Submission',
 };
@@ -76,23 +87,32 @@ export class MobileReleaseRunsResponseDto {
     type: MobileReleaseRunDto,
     isArray: true,
     description:
-      'Runs from all three release workflows, merged and sorted by createdAt descending',
+      'Runs from all of MOBILE_WORKFLOW_FILES, merged and sorted by createdAt descending',
   })
   runs!: MobileReleaseRunDto[];
 }
 
 export class MobileAndroidVersionDto {
-  @ApiProperty({ nullable: true, description: 'From android/app/build.gradle' })
+  @ApiProperty({
+    nullable: true,
+    description:
+      'From the live Play internal-track release name (see ' +
+      'MobileReleasesService.fetchAndroidInternalRelease) — Flutter computes ' +
+      'the real versionCode per-build in CI, not from a committed file the ' +
+      "way RN's android/app/build.gradle used to provide one. null if the " +
+      'internal track has no release yet, or Android Publisher is not ' +
+      'configured in this environment.',
+  })
   versionCode!: number | null;
 
-  @ApiProperty({ nullable: true, description: 'From android/app/build.gradle' })
+  @ApiProperty({ nullable: true, description: 'From ally-mobile/pubspec.yaml' })
   versionName!: string | null;
 }
 
 export class MobileIosVersionDto {
   @ApiProperty({
     nullable: true,
-    description: 'From ios/ally.xcodeproj/project.pbxproj',
+    description: 'From ally-mobile/pubspec.yaml',
   })
   marketingVersion!: string | null;
 }
@@ -109,10 +129,10 @@ export class MobileCurrentVersionResponseDto {
     description:
       'Estimated ISO timestamp of the next daily 05:00 UTC tick at which ' +
       'scheduled-mobile-release.yml is eligible to ship (48h+ since the ' +
-      'last android/app/build.gradle version bump). An estimate only: the ' +
-      'workflow still requires new commits on master and green tests at ' +
-      'that tick, neither of which this endpoint can know in advance. ' +
-      'null if the version-bump history could not be read.',
+      'last ally-mobile/pubspec.yaml version bump). An estimate only: the ' +
+      'workflow still requires new feat/fix commits on master and green ' +
+      'tests at that tick, neither of which this endpoint can know in ' +
+      'advance. null if the version-bump history could not be read.',
   })
   nextEligibleCheckAt!: string | null;
 }
@@ -127,11 +147,10 @@ export class MobileTriggerResponseDto {
 
 /**
  * Reused as-is for every other workflow-dispatch endpoint in this module
- * (promote-android, submit-ios-app-store-review, and formerly
- * promote-ios-testflight): shape is identical to MobileTriggerResponseDto
- * ({ dispatched: true }), but named generically here since "trigger"
- * specifically refers to scheduled-mobile-release.yml elsewhere in this
- * module.
+ * (promote-android, submit-ios-app-store-review): shape is identical to
+ * MobileTriggerResponseDto ({ dispatched: true }), but named generically
+ * here since "trigger" specifically refers to scheduled-mobile-release.yml
+ * elsewhere in this module.
  */
 export class MobileDispatchResponseDto {
   @ApiProperty({

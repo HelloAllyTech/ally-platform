@@ -113,7 +113,7 @@
       "summary": "",
       "tags": [],
       "last_reconciled": "",
-      "words": 733,
+      "words": 732,
       "url": "https://tech.helloally.ai/#/wiki/index.md",
       "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
     },
@@ -126,7 +126,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 12388,
+      "words": 12450,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -168,7 +168,7 @@
         "reference"
       ],
       "last_reconciled": "2026-07-28",
-      "words": 1312,
+      "words": 1317,
       "url": "https://tech.helloally.ai/#/wiki/platform/agent-guide.md",
       "skip_reason": ""
     },
@@ -562,16 +562,16 @@
     {
       "path": "repos/ally-mobile.md",
       "title": "ally-mobile — Mobile App",
-      "summary": "React Native iOS/Android app for mental-health counsellors, covering live sessions with transcription, peer reviews, voice-based AI simulations, and Scribe voice-dictation notes.",
+      "summary": "Flutter iOS/Android app for counsellors and community health workers, covering Scribe (recorded sessions with transcription and AI summaries), peer reviews, voice-based AI simulations, courses, and gamification.",
       "tags": [
         "repo",
         "mobile",
-        "react-native",
+        "flutter",
         "ios",
         "android"
       ],
-      "last_reconciled": "2026-07-28",
-      "words": 1941,
+      "last_reconciled": "2026-11-06",
+      "words": 1721,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-mobile.md",
       "skip_reason": ""
     },

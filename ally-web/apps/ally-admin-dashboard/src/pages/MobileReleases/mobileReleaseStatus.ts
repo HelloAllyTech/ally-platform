@@ -167,10 +167,6 @@ export const getAndroidProductionStatusDisplay = (
   }
 };
 
-/** True while any run from any of the three release workflows is still queued or executing. */
-export const isReleaseInProgress = (runs: MobileReleaseRun[]): boolean =>
-  runs.some(run => run.status === "queued" || run.status === "in_progress");
-
 /**
  * Most recent *successful* run of a given workflow, or null if none exists
  * yet — used to derive a platform's "last release" date without a dedicated
@@ -200,6 +196,10 @@ export const isRunAfter = (
   if (!laterRun || !earlierRun) return false;
   return new Date(laterRun.createdAt).getTime() > new Date(earlierRun.createdAt).getTime();
 };
+
+/** True while any run from any of the tracked release workflows is still queued or executing. */
+export const isReleaseInProgress = (runs: MobileReleaseRun[]): boolean =>
+  runs.some(run => run.status === "queued" || run.status === "in_progress");
 
 /**
  * The single most useful thing to tell an admin about what to do next,
@@ -286,8 +286,9 @@ export const deriveRecommendedAction = (
 };
 
 /**
- * X.Y.Z is the only format ally-mobile's build.gradle/pbxproj ever produce —
- * same format ally-be's app-version DTOs now require at the API boundary.
+ * X.Y.Z is the only format ally-mobile's pubspec.yaml marketing version ever
+ * produces — same format ally-be's app-version DTOs now require at the API
+ * boundary.
  * Validating it here too means a typo is caught before the confirmation
  * dialog's primary button even goes live, not after a failed request.
  */
