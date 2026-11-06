@@ -100,7 +100,7 @@ class Sandbox:
         self.app_path = self.app_config.path
         self.limits = self.config.limits.sandbox
 
-    # --- image -------------------------------------------------------------------------
+    # --- image ----
 
     @property
     def dockerfile(self) -> Path:
@@ -136,7 +136,7 @@ class Sandbox:
             raise SandboxError(f"docker build {tag} failed: {result.stderr[-2000:]}")
         return tag
 
-    # --- dependency volumes --------------------------------------------------------------
+    # --- dependency volumes ----
 
     def lockfile_hash(self) -> str:
         lockfile = self.worktree / self.app_path / self.app_config.lockfile

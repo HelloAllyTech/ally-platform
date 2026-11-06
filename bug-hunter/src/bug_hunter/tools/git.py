@@ -19,7 +19,8 @@ from bug_hunter.safety.phi import scrub_code
 BRANCH_PREFIX = "bughunter"
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CONVENTIONAL = re.compile(
-    r"^(feat|fix|chore|docs|refactor|test|perf|build|ci|style|revert)(\([\w./-]+\))?!?: \S"
+    r"^(feat|fix|chore|docs|refactor|test|perf|build|ci|style|revert)"
+    r"(\([\w./-]+\))?!?: \S"
 )
 
 

@@ -78,7 +78,7 @@ def single_test_command(app: AppConfig, file: str, name: str | None) -> str:
     return template.format(**values)
 
 
-# --- output parsing ---------------------------------------------------------------------
+# --- output parsing ----
 
 _JEST_FAIL = re.compile(r"^\s*● (.+?)(?: › (.+))?$", re.MULTILINE)
 _JEST_FAIL_SUITE = re.compile(r"^\s*FAIL\s+(\S+)", re.MULTILINE)
@@ -133,7 +133,7 @@ def make_excerpt(result: ExecResult) -> str:
     return scrub(excerpt)
 
 
-# --- runner -----------------------------------------------------------------------------------
+# --- runner ----
 
 
 class Runner:
@@ -164,7 +164,7 @@ class Runner:
     def run_tests(
         self, target: str | None = None, name: str | None = None
     ) -> RunResult:
-        """Full suite, or one file (``target``, app-relative) and optionally one test."""
+        """Full suite, or one file (``target``, app-relative), optionally one test."""
         if target is None:
             return self._run("test", self.app_config.test)
         return self._run("test", single_test_command(self.app_config, target, name))
