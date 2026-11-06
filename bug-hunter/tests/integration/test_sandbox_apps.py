@@ -25,7 +25,8 @@ KNOWN_PASSING = {
         "apps/ally-admin-dashboard/src/utils/__tests__/promptVersionText.test.ts"
     ),
     "ally-ai": "tests/prompts/test_resolver.py",
-    "ally-ai-learn": "tests/unit/test_download_files.py",
+    # not test_download_files.py: it loads the Silero VAD from Hugging Face (network)
+    "ally-ai-learn": "tests/unit/test_makefile.py",
     "ally-mobile": "test/features/account/presentation/profile_image_format_test.dart",
 }
 RUNS_DIR = PACKAGE_ROOT / "runs"

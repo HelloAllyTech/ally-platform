@@ -46,14 +46,18 @@ def test_single_test_commands(config: BugHunterConfig) -> None:
     web = config.app("ally-web")
     web_file = "apps/ally-admin-dashboard/src/utils/__tests__/a.test.ts"
     assert single_test_command(web, web_file, None) == (
-        f"npx nx test ally-admin-dashboard --testFile={web_file}"
+        f"npx nx test ally-admin-dashboard -- {web_file}"
+    )
+    assert single_test_command(web, web_file, "formats a version") == (
+        f"npx nx test ally-admin-dashboard -- {web_file} "
+        "--testNamePattern='formats a version'"
     )
     assert single_test_command(config.app("ally-ai"), "tests/test_a.py", "test_b") == (
         "poetry run pytest tests/test_a.py -k test_b -v"
     )
     assert single_test_command(
         config.app("ally-mobile"), "test/a_test.dart", "renders"
-    ) == ("flutter test test/a_test.dart --name renders")
+    ) == ("flutter test --no-pub test/a_test.dart --name renders")
 
 
 def test_nx_project() -> None:

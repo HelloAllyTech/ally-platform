@@ -39,7 +39,9 @@ apps:
     lang: typescript
     test: "npm test"
     # {project} is derived from {file}: apps/<name>/... -> <name>, libs/<name>/... -> <name>.
-    test_one: "npx nx test {project} --testFile={file} -t {name}"
+    # Args after -- go to Vitest: the file is a positional filter (TESTING.md's --testFile
+    # is not a Vitest option; verified in the sandbox).
+    test_one: "npx nx test {project} -- {file} --testNamePattern={name}"
     lint: "npm run lint && npm run format:check && npm run lint:colors"
     typecheck: >-
       npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json
@@ -102,9 +104,11 @@ apps:
   ally-mobile:
     path: ally-mobile
     lang: dart
-    test: "flutter test"
-    test_one: "flutter test {file} --name {name}"
-    lint: "flutter analyze"
+    # --no-pub: dependencies come from the install step; without it `flutter test`
+    # re-resolves packages and, offline, fails looking up pub.dev.
+    test: "flutter test --no-pub"
+    test_one: "flutter test --no-pub {file} --name {name}"
+    lint: "flutter analyze --no-pub"
     test_dirs: ["test/"]
     image: flutter
     install: "flutter pub get"
