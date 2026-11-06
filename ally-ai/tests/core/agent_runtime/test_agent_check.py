@@ -13,6 +13,7 @@ from app.core.agent_runtime.check import (
     rejection_feedback,
     unsupported_details,
 )
+from app.core.agent_runtime.prompt import NO_TOPICS, format_topics
 from tests.core.knowledge_agent.test_agent import CHUNK_A, CHUNK_B, passage
 
 PASSAGES = [passage(CHUNK_A, 0.7), passage(CHUNK_B, 0.6)]
@@ -397,6 +398,11 @@ class TestDeclineWithoutSearching:
 
 
 class TestTalkAboutSources:
+    def test_the_no_topics_line_does_not_lead_to_talk_about_sources(self):
+        """Whatever the prompt tells the model to say, the check must let through."""
+        assert format_topics([]) == NO_TOPICS
+        assert not mentions_sources(NO_TOPICS)
+
     @pytest.mark.parametrize(
         "text",
         [

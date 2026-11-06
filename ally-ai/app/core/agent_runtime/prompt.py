@@ -25,10 +25,9 @@ AGENT_PROMPT_PATH = "agent/system"
 #: messages); ten messages of a WhatsApp chat fit.
 AGENT_HISTORY_CHARS = 3000
 
-NO_TOPICS = (
-    "(no topics listed: say you answer questions from the organisation's reference "
-    "material)"
-)
+#: Not "reference material": the check refuses a reply that talks about sources, so
+#: this line must not lead the model into saying it.
+NO_TOPICS = "(no topics listed: say you answer questions about the organisation)"
 
 
 def format_topics(topics: Optional[Sequence[str]]) -> str:
