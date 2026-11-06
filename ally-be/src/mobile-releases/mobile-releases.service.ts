@@ -1095,66 +1095,7 @@ export class MobileReleasesService {
     );
   }
 
-  /**
-   * AUTONOMOUS, REAL-PRODUCTION ACTION — Android's counterpart to
-   * autoBumpIosMinimumVersionIfLive() above, run on the same 30-minute
-   * schedule. Only safe to enable once Managed Publishing is OFF for this
-   * app in Play Console: with it on, a track's release `status` reflects
-   * what was last *committed*, not whether Google's review-then-manual-
-   * publish gate has actually let it through — confirmed by checking
-   * Google's own Play Developer API reference before building this, the
-   * same discipline as the iOS side. With Managed Publishing off, `status:
-   * 'completed'` on the production track is a trustworthy "this is really
-   * live" signal, the same role READY_FOR_DISTRIBUTION plays for iOS.
-   *
-   * Matches the production release to the *current* build by exact
-   * versionCode equality against the internal track's latest release
-   * (fetchAndroidInternalRelease() — see its own doc comment for why that's
-   * the Flutter-era source of truth instead of a committed file) —
-   * deliberately strict, not a "close enough" heuristic: if a newer build
-   * has already landed on internal since this production release went out,
-   * the match simply fails and this is a no-op until production catches up.
-   *
-   * A staged rollout (status 'inProgress' with userFraction < 1) is
-   * deliberately NOT treated as live — raising the minimum version while
-   * only a fraction of users can download the build would lock out
-   * everyone else, the exact failure mode this whole feature exists to
-   * prevent.
-   */
-  async autoBumpAndroidMinimumVersionIfLive(): Promise<void> {
-    if (!this.configService.androidMinVersionAutoBumpEnabled) {
-      this.logger.debug(
-        'Skipping Android min-version auto-bump — ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED is not true.',
-      );
-      return;
-    }
 
-    const internalRelease = await this.fetchAndroidInternalRelease();
-    if (!internalRelease) return;
-    const { versionCode, versionName } = internalRelease;
-
-    const release = await this.fetchAndroidProductionRelease();
-    if (!release || release.status !== 'completed') return;
-    if (!release.versionCodes.includes(versionCode)) return;
-
-    const current =
-      await this.appVersionSettingsService.getAppVersionSettings('android');
-    if (current.minimumSupportedVersion === versionName) return;
-
-    await this.appVersionSettingsService.updateAppVersionSettings({
-      android: versionName,
-    });
-
-    this.logger.info(
-      `Auto-raised Android minimum supported version from ${current.minimumSupportedVersion} to ` +
-        `${versionName} — production track confirmed status: completed for versionCode ${versionCode}.`,
-    );
-    await this.slackService.sendMessage(
-      `Android minimum supported version auto-raised to ${versionName} — the production track ` +
-        `confirmed this build is fully live (not a staged rollout). Previous minimum was ` +
-        `${current.minimumSupportedVersion}. No human action taken; this ran on schedule.`,
-    );
-  }
 
   /** null if no appStoreVersions resource matches `versionString` yet (e.g. not created, or already replaced). */
   private async fetchAppStoreVersionState(

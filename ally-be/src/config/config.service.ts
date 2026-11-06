@@ -190,44 +190,7 @@ export class AppConfigService {
     };
   }
 
-  /**
-   * Explicit kill switch for the Android auto-minimum-version-bump task,
-   * default OFF. Unlike the iOS equivalent (safe by construction —
-   * READY_FOR_DISTRIBUTION only ever means genuinely live), the Android
-   * signal this task relies on (production track status: 'completed') is
-   * only trustworthy once Managed Publishing is turned OFF for this app in
-   * Play Console — with it on, a track's status reflects what was
-   * committed, not what Google's review-then-manual-publish gate has
-   * actually released. Flip ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED=true only
-   * after confirming that in Play Console; the task no-ops (not errors)
-   * while this is unset.
-   *
-   * Since the Flutter rename, the task this gates
-   * (autoBumpAndroidMinimumVersionIfLive) matches the production track
-   * against the live Play *internal* track's release (via
-   * fetchAndroidInternalRelease()) instead of a committed versionCode —
-   * Flutter computes its real versionCode per-build in CI, never commits
-   * it. Sanity-check that parsing against Play Console after a real
-   * automated build before flipping this on.
-   *
-   * SECOND, SEPARATE PRECONDITION, confirmed live: this task authenticates
-   * as the same ANDROID_SERVICE_ACCOUNT_JSON identity the release pipeline's
-   * uploads/promotions use, and the Play Developer API invalidates a service
-   * account's other open edits the instant a new one is created (Google's
-   * own concurrency-considerations docs). A tick landing mid-upload can kill
-   * that upload's edit out from under it — this already broke a real build
-   * once, from this same module's read-only status endpoint, before this
-   * task was even enabled. Do not flip this on until ally-be reads via a
-   * SEPARATE, read-only-scoped service account from the one CI writes with.
-   */
-  get androidMinVersionAutoBumpEnabled(): boolean {
-    return (
-      this.configService.get<string>(
-        'ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED',
-        'false',
-      ) === 'true'
-    );
-  }
+
 
   /**
    * Base URL a GitHub-hosted runner can reach this API on, handed to the

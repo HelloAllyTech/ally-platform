@@ -4,7 +4,7 @@ import { AppConfigModule } from '../config/config.module';
 import { NotificationModule } from '../notification/notification.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { LlmUsageModule } from '../analytics/llm-usage.module';
-import { AndroidMinVersionAutoBumpSchedulerRegistrationService } from './android-min-version-auto-bump-scheduler-registration.service';
+
 import { IosMinVersionAutoBumpSchedulerRegistrationService } from './ios-min-version-auto-bump-scheduler-registration.service';
 import { MobileReleaseWhatsNewAiService } from './mobile-release-whats-new-ai.service';
 import { MobileReleasesController } from './mobile-releases.controller';
@@ -25,7 +25,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     MobileReleasesService,
     MobileReleaseWhatsNewAiService,
     IosMinVersionAutoBumpSchedulerRegistrationService,
-    AndroidMinVersionAutoBumpSchedulerRegistrationService,
+
   ],
   exports: [MobileReleasesService],
 })
