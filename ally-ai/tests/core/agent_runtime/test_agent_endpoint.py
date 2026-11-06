@@ -3,19 +3,9 @@
 from unittest.mock import patch
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.api.v1.endpoints.agent_runtime import get_graph
-from app.core.config import settings
-from app.main import app
-from tests.core.agent_runtime.test_agent_graph import (
-    CONVERSATION,
-    FakeLLM,
-    chat,
-    reply,
-    search,
-)
-from tests.core.agent_runtime.test_endpoint import BODY, URL
+from tests.core.agent_runtime.conftest import BODY, URL
+from tests.core.agent_runtime.steps import CONVERSATION, FakeLLM, chat, reply, search
 from tests.core.knowledge_agent.test_agent import CHUNK_A, passage
 
 AGENT_BODY = {
@@ -24,20 +14,6 @@ AGENT_BODY = {
     "knowledge_topics": ["Ally FAQ – About Ally", "  ", "x" * 300],
     "decline_text": "A colleague or supervisor is the better route.",
 }
-
-
-@pytest.fixture
-def enabled(monkeypatch):
-    monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", True)
-
-
-@pytest.fixture
-def client(graph):
-    app.dependency_overrides[get_graph] = lambda: graph
-    test_client = TestClient(app)
-    test_client.headers.update({"x-api-key": settings.API.X_API_KEY})
-    yield test_client
-    app.dependency_overrides.pop(get_graph, None)
 
 
 @pytest.mark.usefixtures("enabled")

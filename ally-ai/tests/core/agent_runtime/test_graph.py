@@ -23,6 +23,7 @@ from app.core.knowledge_base.knowledge_chunk_service import (
     KnowledgeChunkService,
 )
 from tests.core.agent_runtime.conftest import AGENT, make_bot
+from tests.core.agent_runtime.steps import nodes
 from tests.core.knowledge_agent.test_agent import (
     CHUNK_A,
     CHUNK_B,
@@ -33,10 +34,6 @@ from tests.core.knowledge_agent.test_agent import (
 pytestmark = pytest.mark.asyncio
 
 NO_DOCUMENTS = "00000000-0000-0000-0000-000000000000"
-
-
-def nodes(state):
-    return [step["node"] for step in state["trace"]]
 
 
 class TestGate:

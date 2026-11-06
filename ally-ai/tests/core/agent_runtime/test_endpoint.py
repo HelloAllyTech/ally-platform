@@ -8,9 +8,7 @@ status codes, and a 404 for everything while the runtime is switched off.
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.api.v1.endpoints.agent_runtime import get_graph
 from app.core.agent_runtime import checkpointer as checkpointer_module
 from app.core.config import settings
 from app.core.knowledge_agent.schemas import AnswerIntent, KnowledgeAnswer
@@ -19,32 +17,9 @@ from app.exceptions.custom_exceptions import (
     LLMInvocationFailedException,
     VectorDBSearchFailedException,
 )
-from app.main import app
 from app.schemas.knowledge_agent import KnowledgeAnswerResponse
-from tests.core.agent_runtime.conftest import AGENT
+from tests.core.agent_runtime.conftest import AGENT, BODY, URL
 from tests.core.knowledge_agent.test_agent import CHUNK_A, passage, stub_generate
-
-URL = "/api/v1/agent/run"
-BODY = {
-    "question": "What is Ally?",
-    "conversation_id": "conv-1",
-    "audience": {"unrestricted": True},
-    "translate_query": False,
-}
-
-
-@pytest.fixture
-def enabled(monkeypatch):
-    monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", True)
-
-
-@pytest.fixture
-def client(graph):
-    app.dependency_overrides[get_graph] = lambda: graph
-    test_client = TestClient(app)
-    test_client.headers.update({"x-api-key": settings.API.X_API_KEY})
-    yield test_client
-    app.dependency_overrides.pop(get_graph, None)
 
 
 class TestFlag:
