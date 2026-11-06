@@ -6,8 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Chatbot, TestChatbotResponse } from "@types";
 
 /**
- * Preview says which engine answered each test, shows the new engine's run id and steps, keeps the
- * engine's thread until "New thread", and lets only platform admins force an engine for one test.
+ * Preview says which engine answered each test, shows the new engine's run id and steps, and keeps
+ * the engine's thread until "New thread". In Agent mode each step reads as its summary (tool calls
+ * marked as such), and each reply says what the agent understood the message to be.
  */
 
 let canCreate = false;
@@ -162,5 +163,52 @@ describe("ChatbotTestTab — engine and run", () => {
     expect(screen.queryByLabelText("Engine for this test")).not.toBeInTheDocument();
     await ask("q");
     expect(testSpy.mock.calls[0][0]).not.toHaveProperty("runtime");
+  });
+});
+
+describe("ChatbotTestTab — Agent mode", () => {
+  beforeEach(() => {
+    canCreate = false;
+    testSpy.mockClear();
+    nextResult = result({
+      turnType: "question",
+      trace: [
+        {
+          node: "agent",
+          ms: 1900,
+          summary: "agent: question, calls search_knowledge via gpt-5-mini",
+        },
+        {
+          node: "tool",
+          ms: 640,
+          summary: "search_knowledge: 2 hits, 2 new passages, best 0.61",
+        },
+      ],
+    });
+  });
+
+  it("shows tool steps with their summary and time", async () => {
+    render(<ChatbotTestTab bot={BOT} />);
+    await ask("and after that, how do I sign in?");
+    expect(
+      screen.getByText("tool · search_knowledge: 2 hits, 2 new passages, best 0.61 · 640 ms"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("agent: question, calls search_knowledge via gpt-5-mini · 1900 ms"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the turn type next to the engine badge", async () => {
+    nextResult = result({ turnType: "smalltalk", trace: [], reply: "Hi there!" });
+    render(<ChatbotTestTab bot={BOT} />);
+    await ask("hello");
+    expect(screen.getByTestId("turn-type")).toHaveTextContent("Small talk");
+  });
+
+  it("shows no turn type when the agent did not answer", async () => {
+    nextResult = result({ turnType: null });
+    render(<ChatbotTestTab bot={BOT} />);
+    await ask("What does Ally do?");
+    expect(screen.queryByTestId("turn-type")).not.toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
 import React from "react";
 
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /**
  * The Engine field moved to the Agent tab: Settings no longer shows it, even to platform admins.
@@ -28,9 +28,6 @@ const settingsResult = {
   isError: false,
   refetch: () => undefined,
 };
-
-let canCreate = false;
-let bot: Record<string, unknown> = {};
 
 // The real copy, without the whole constants barrel (which cannot load in isolation).
 vi.mock("@constants", async () => ({
@@ -63,9 +60,6 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("@api", () => ({
   useGetChatbotSettingsQuery: () => settingsResult,
   useUpdateChatbotSettingsMutation: () => [vi.fn(), { isLoading: false }],
-  useGetChatbotsQuery: () => ({ data: { chatbots: [], canCreate } }),
-  useGetChatbotQuery: () => ({ data: bot }),
-  useUpdateChatbotMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 const { ChatbotSettingsTab } = await import("../ChatbotSettingsTab");
@@ -74,11 +68,6 @@ const renderTab = () =>
   render(<ChatbotSettingsTab chatbotId="bot-1" chatbotName="Ally FAQ" canEdit />);
 
 describe("ChatbotSettingsTab — Engine", () => {
-  beforeEach(() => {
-    canCreate = true;
-    bot = { id: "bot-1", runtime: "v2", effectiveRuntime: "v2", features: {} };
-  });
-
   it("is not here: it lives on the Agent tab", () => {
     renderTab();
     expect(screen.queryByText("Engine")).not.toBeInTheDocument();
