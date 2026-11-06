@@ -1,0 +1,132 @@
+# The five apps the bug hunter works on. Paths are relative to the ally-platform root.
+# Commands copy the root CLAUDE.md "Verified commands" and the test-*.yml workflows;
+# where the spec (docs/bug-hunter/spec.md §9) differed from CI, CI won. See
+# docs/bug-hunter/notes/CHUNK-01-NOTES.md for the list of corrections.
+#
+# Placeholders in test_one: {file} = test file path relative to the app, {name} = test name,
+# {project} = the Nx project that owns {file} (ally-web only).
+#
+# Sandbox (chunk 02): `image` names a Dockerfile in bug-hunter/sandbox/, `install` runs once
+# per lockfile hash with network on, `cache_dirs` are mounted from a per-lockfile Docker
+# volume so later runs skip the install, `env` is set for every command.
+apps:
+  ally-be:
+    path: ally-be
+    lang: typescript
+    test: "npm test -- --forceExit --detectOpenHandles"
+    test_one: "npx jest {file} -t {name} --forceExit"
+    lint: "npm run lint"
+    typecheck: "npm run typecheck"
+    # Jest rootDir is src with testRegex .*\.spec\.ts$; there is no top-level test/.
+    test_dirs: ["src/**/test/", "src/**/*.spec.ts"]
+    image: node24
+    install: "npm ci"
+    lockfile: package-lock.json
+    cache_dirs: [node_modules]
+    env: { CI: "true", JEST_MAX_WORKERS: "4" }
+    risk_paths:
+      - src/auth/
+      - src/authorization/
+      - src/tenant/
+      - src/user/
+      - src/audit/
+      - src/database/migrations/
+      - src/config/
+      - src/rate-limit/
+      - src/conversational-guardrails/
+  ally-web:
+    path: ally-web
+    lang: typescript
+    test: "npm test"
+    # {project} is derived from {file}: apps/<name>/... -> <name>, libs/<name>/... -> <name>.
+    # Args after -- go to Vitest: the file is a positional filter (TESTING.md's --testFile
+    # is not a Vitest option; verified in the sandbox).
+    test_one: "npx nx test {project} -- {file} --testNamePattern={name}"
+    lint: "npm run lint && npm run format:check && npm run lint:colors"
+    typecheck: >-
+      npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json
+      && npx tsc --noEmit -p apps/ally-helpline-dashboard/tsconfig.app.json
+      && npx tsc --noEmit -p libs/ui-shared/tsconfig.lib.json
+    test_dirs: ["**/__tests__/", "**/*.test.ts", "**/*.test.tsx"]
+    image: node22
+    install: "npm ci"
+    lockfile: package-lock.json
+    cache_dirs: [node_modules]
+    env: { CI: "true", NX_NO_CLOUD: "true", NX_DAEMON: "false", VITEST_MAX_WORKERS: "2" }
+    # Concrete auth and permission files rather than **/*Auth*, which also matched
+    # agentAuthored.ts and useContentAuthoring.ts.
+    risk_paths:
+      - "**/auth/**"
+      - "**/api/auth.ts"
+      - "**/types/auth.ts"
+      - "**/routes/PrivateRouteLayout*"
+      - "**/routes/**/PermissionGuardedRoute*"
+      - "**/permission-guard/**"
+      - "**/constants/permissions.ts"
+      - "**/utils/permission.ts"
+      - "**/utils/permissions.ts"
+  ally-ai:
+    path: ally-ai
+    lang: python
+    test: "poetry run pytest tests/ -v"
+    test_one: "poetry run pytest {file} -k {name} -v"
+    lint: "poetry run flake8"
+    test_dirs: ["tests/"]
+    image: python312
+    install: "poetry install --no-interaction --with dev"
+    lockfile: poetry.lock
+    cache_dirs: [.venv]
+    env: { CI: "true", POETRY_VIRTUALENVS_IN_PROJECT: "true" }
+    risk_paths:
+      - app/core/phi_logger.py
+      - app/core/phi_events.py
+      - app/core/config.py
+      - app/migrations/
+      - app/middleware.py
+      - app/core/transcriptions/utils/phi_logger.py
+      - app/core/transcriptions/utils/phi_events.py
+  ally-ai-learn:
+    path: ally-ai-learn
+    lang: python
+    test: "poetry run python -m pytest tests/ -v"
+    test_one: "poetry run python -m pytest {file} -k {name} -v"
+    lint: "poetry run flake8"
+    test_dirs: ["tests/"]
+    image: python312
+    install: "poetry install --no-interaction --with dev"
+    lockfile: poetry.lock
+    cache_dirs: [.venv]
+    env: { CI: "true", POETRY_VIRTUALENVS_IN_PROJECT: "true" }
+    risk_paths:
+      - app/core/config.py
+      - app/middleware.py
+      - app/core/emergency_finalize.py
+  ally-mobile:
+    path: ally-mobile
+    lang: dart
+    # --no-pub: dependencies come from the install step; without it `flutter test`
+    # re-resolves packages and, offline, fails looking up pub.dev.
+    test: "flutter test --no-pub"
+    test_one: "flutter test --no-pub {file} --name {name}"
+    lint: "flutter analyze --no-pub"
+    test_dirs: ["test/"]
+    image: flutter
+    install: "flutter pub get"
+    lockfile: pubspec.lock
+    cache_dirs: [.dart_tool, /root/.pub-cache]
+    env: { CI: "true" }
+    risk_paths:
+      - lib/core/auth/
+      - lib/core/network/
+      - lib/core/config/
+      - ios/
+      - android/
+    notes: "Never run dart format on this app."
+
+global_risk_paths:
+  - "**/package.json"
+  - "**/pyproject.toml"
+  - "**/pubspec.yaml"
+  - "**/Dockerfile*"
+  - "**/*compose*.y*ml"
+  - ".github/**"
