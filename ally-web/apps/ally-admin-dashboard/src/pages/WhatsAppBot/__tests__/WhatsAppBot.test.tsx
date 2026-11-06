@@ -47,16 +47,19 @@ vi.mock("@constants", async () => {
     tabs: {
       overview: "Overview",
       persona: "Persona",
-      agent: "Agent",
       knowledge: "Knowledge",
-      replies: "Replies",
-      people: "People",
-      connectors: "Connectors",
-      settings: "Settings",
       test: "Test",
       conversations: "Conversations",
       unanswered: "Unanswered",
       usage: "Usage",
+      settings: "Settings",
+    },
+    settingsSections: {
+      agent: "Agent",
+      replies: "Replies",
+      people: "People",
+      connectors: "Connectors",
+      general: "General",
     },
   };
   return {
@@ -232,13 +235,40 @@ describe("Chatbot page", () => {
     expect(screen.getByTestId("persona").dataset.edit).toBe("false");
   });
 
-  it("has an Agent tab after Instructions", () => {
-    renderAt("/chatbots/bot-1?tab=agent");
-    expect(screen.getByTestId("agent").dataset.edit).toBe("true");
+  it("keeps the tab row short: configuration lives under Settings", () => {
+    renderAt("/chatbots/bot-1");
     const ids = Array.from(screen.getByTestId("tabs").children).map(tab =>
       tab.getAttribute("data-testid"),
     );
-    expect(ids.indexOf("tab-agent")).toBe(ids.indexOf("tab-persona") + 1);
+    expect(ids).toEqual([
+      "tab-overview",
+      "tab-persona",
+      "tab-knowledge",
+      "tab-test",
+      "tab-conversations",
+      "tab-unanswered",
+      "tab-usage",
+      "tab-settings",
+    ]);
+  });
+
+  it("opens Settings on Agent, with the other sections beside it", () => {
+    renderAt("/chatbots/bot-1?tab=settings");
+    expect(screen.getByTestId("agent").dataset.edit).toBe("true");
+    for (const id of ["agent", "replies", "people", "connectors", "general"]) {
+      expect(screen.getByTestId(`tab-${id}`)).toBeTruthy();
+    }
+  });
+
+  it("opens a section of Settings from its own link", () => {
+    renderAt("/chatbots/bot-1?tab=settings&section=general");
+    expect(screen.getByTestId("settings")).toBeTruthy();
+  });
+
+  it("still opens a section from an older link to it as a tab", () => {
+    renderAt("/chatbots/bot-1?tab=people");
+    expect(screen.getByTestId("people")).toBeTruthy();
+    expect(screen.getByTestId("tab-general")).toBeTruthy();
   });
 
   it("keeps team and numbers to owners", () => {

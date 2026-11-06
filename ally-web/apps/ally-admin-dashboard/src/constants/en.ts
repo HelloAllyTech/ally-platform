@@ -1500,16 +1500,20 @@ export const en = {
       tabs: {
         overview: "Overview",
         persona: "Instructions",
-        agent: "Agent",
         knowledge: "Knowledge",
-        replies: "Quick replies",
-        people: "Access",
-        connectors: "Channels",
-        settings: "Settings",
         test: "Preview",
         conversations: "Conversations",
         unanswered: "Knowledge gaps",
         usage: "Analytics",
+        settings: "Settings",
+      },
+      // The sections inside Settings, in their own row of tabs.
+      settingsSections: {
+        agent: "Agent",
+        replies: "Quick replies",
+        people: "Access",
+        connectors: "Channels",
+        general: "General",
       },
       createPanel: {
         title: "New chatbot",

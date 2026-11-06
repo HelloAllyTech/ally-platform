@@ -26,21 +26,29 @@ import { ChatbotStatusPill } from "./WhatsAppBot";
 const t = en.whatsappBot.bots;
 
 export type ChatbotTabId = keyof typeof t.tabs;
+export type ChatbotSettingsSectionId = keyof typeof t.settingsSections;
 
 const TAB_ORDER: ChatbotTabId[] = [
   "overview",
   "persona",
-  "agent",
   "knowledge",
-  "replies",
-  "people",
-  "connectors",
-  "settings",
   "test",
   "conversations",
   "unanswered",
   "usage",
+  "settings",
 ];
+
+const SECTION_ORDER: ChatbotSettingsSectionId[] = [
+  "agent",
+  "replies",
+  "people",
+  "connectors",
+  "general",
+];
+
+const isSection = (id: string | null): id is ChatbotSettingsSectionId =>
+  Boolean(id) && SECTION_ORDER.includes(id as ChatbotSettingsSectionId);
 
 const RANK: Record<ChatbotMemberRole, number> = {
   [ChatbotMemberRole.VIEWER]: 1,
@@ -52,7 +60,8 @@ export const canDo = (bot: Pick<Chatbot, "myRole">, role: ChatbotMemberRole) =>
   RANK[bot.myRole] >= RANK[role];
 
 /**
- * One chatbot: the same tabs for every bot, in the order you set one up. Everything inside reads
+ * One chatbot: the same tabs for every bot, with its configuration (agent, quick replies, access,
+ * channels, general settings) as sections of Settings so the tab row stays short. Everything inside reads
  * the bot from ChatbotContext, and every action is offered only to the roles the backend accepts
  * it from — a viewer sees the bot and can test it, an editor changes it, an owner also manages its
  * team and numbers.
@@ -70,12 +79,28 @@ export const ChatbotPage: React.FC = () => {
     }));
   }, [bot?.stats.openUnanswered]);
 
-  const requested = searchParams.get("tab") as ChatbotTabId | null;
-  const activeTab: ChatbotTabId =
-    requested && TAB_ORDER.includes(requested) ? requested : "overview";
+  const requested = searchParams.get("tab");
+  // A section id as the tab (an older link, or the Overview checklist) opens that section of
+  // Settings.
+  const activeTab: ChatbotTabId = isSection(requested)
+    ? "settings"
+    : requested && TAB_ORDER.includes(requested as ChatbotTabId)
+      ? (requested as ChatbotTabId)
+      : "overview";
+  const requestedSection = isSection(requested) ? requested : searchParams.get("section");
+  const activeSection: ChatbotSettingsSectionId = isSection(requestedSection)
+    ? requestedSection
+    : "agent";
   const goToTab = useCallback(
-    (id: string) => setSearchParams(id === "overview" ? {} : { tab: id }),
+    (id: string) => {
+      if (isSection(id)) setSearchParams({ tab: "settings", section: id });
+      else setSearchParams(id === "overview" ? {} : { tab: id });
+    },
     [setSearchParams],
+  );
+  const sectionItems = useMemo(
+    () => SECTION_ORDER.map(id => ({ id, label: t.settingsSections[id] })),
+    [],
   );
 
   if (isLoading) return <SkeletonText paragraph lineCount={8} />;
@@ -86,22 +111,40 @@ export const ChatbotPage: React.FC = () => {
   const canEdit = canDo(bot, ChatbotMemberRole.EDITOR);
   const canManage = canDo(bot, ChatbotMemberRole.OWNER);
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case "persona":
-        return <PersonaTab bot={bot} canEdit={canEdit} onTest={() => goToTab("test")} />;
-      case "agent":
-        return <AgentTab bot={bot} canEdit={canEdit} onTest={() => goToTab("test")} />;
-      case "knowledge":
-        return <KnowledgeTab bot={bot} canEdit={canEdit} />;
+  const renderSection = () => {
+    switch (activeSection) {
       case "replies":
         return <TemplatesTab />;
       case "people":
         return <PeopleTab bot={bot} canEdit={canEdit} canManage={canManage} />;
       case "connectors":
         return <BotConnectorsTab bot={bot} canManage={canManage} />;
-      case "settings":
+      case "general":
         return <ChatbotSettingsTab chatbotId={bot.id} chatbotName={bot.name} canEdit={canEdit} />;
+      case "agent":
+      default:
+        return <AgentTab bot={bot} canEdit={canEdit} onTest={() => goToTab("test")} />;
+    }
+  };
+
+  const renderTab = () => {
+    switch (activeTab) {
+      case "persona":
+        return <PersonaTab bot={bot} canEdit={canEdit} onTest={() => goToTab("test")} />;
+      case "knowledge":
+        return <KnowledgeTab bot={bot} canEdit={canEdit} />;
+      case "settings":
+        return (
+          <div className="flex flex-col gap-6">
+            <Tabs
+              items={sectionItems}
+              activeId={activeSection}
+              onChange={goToTab}
+              showCount={false}
+            />
+            {renderSection()}
+          </div>
+        );
       case "test":
         return <ChatbotTestTab bot={bot} />;
       case "conversations":

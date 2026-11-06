@@ -11,7 +11,10 @@ import { Chatbot, ChatbotAccessMode, ChatbotKnowledgeSource, ChatbotStatus } fro
 
 import { Card, errorMessage, fill, StatCard } from "./shared";
 
-import type { ChatbotTabId } from "./ChatbotPage";
+import type { ChatbotSettingsSectionId, ChatbotTabId } from "./ChatbotPage";
+
+/** A tab, or a section of Settings (which opens Settings on it). */
+type Destination = ChatbotTabId | ChatbotSettingsSectionId;
 
 const t = en.whatsappBot.bots.overview;
 const statusWord = en.whatsappBot.bots.status;
@@ -19,7 +22,7 @@ const statusWord = en.whatsappBot.bots.status;
 interface Step {
   label: string;
   done: boolean;
-  tab: ChatbotTabId;
+  tab: Destination;
 }
 
 /**
@@ -30,7 +33,7 @@ export const ChatbotOverviewTab: React.FC<{
   bot: Chatbot;
   canEdit: boolean;
   canManage: boolean;
-  onGo: (tab: ChatbotTabId) => void;
+  onGo: (tab: Destination) => void;
 }> = ({ bot, canEdit, canManage, onGo }) => {
   const navigate = useNavigate();
   const [setStatus, { isLoading: isChanging }] = useSetChatbotStatusMutation();
