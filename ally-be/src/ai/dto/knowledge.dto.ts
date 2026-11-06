@@ -302,3 +302,25 @@ export interface CrisisCheckResponse {
   provider?: string;
   model?: string;
 }
+
+/** What a streamed run is doing now (ally-ai `trace.STATUS_LABELS`). */
+export type AgentStatusCode =
+  | 'thinking'
+  | 'searching'
+  | 'found'
+  | 'checking'
+  | 'rewriting'
+  | 'writing';
+
+/**
+ * One live event of `/agent/run/stream`, before its `final` (the `AgentRunResponse`). `token`s
+ * carry reply text the check has passed; ally-be still holds them until its crisis check clears.
+ */
+export type AgentStreamEvent =
+  | { event: 'run_started'; data: { run_id: string } }
+  | {
+      event: 'status';
+      data: { code: AgentStatusCode; label: string; detail?: string };
+    }
+  | { event: 'step'; data: AgentTraceStep }
+  | { event: 'token'; data: { text: string } };

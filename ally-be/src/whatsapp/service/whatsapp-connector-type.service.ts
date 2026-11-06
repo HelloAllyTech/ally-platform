@@ -24,7 +24,7 @@ export class WhatsAppConnectorType implements OnModuleInit {
       description:
         'A WhatsApp Business number from a Meta app. People message the number and the bot replies.',
       // Meta's limit is 4096; replies are composed well inside it by the bot's own maxReplyChars.
-      capabilities: { maxReplyChars: 4096 },
+      capabilities: { maxReplyChars: 4096, streaming: false },
       summarise: (ids) => this.summarise(ids),
       disconnect: (id) => this.numbers.wipeForConnector(id),
     });

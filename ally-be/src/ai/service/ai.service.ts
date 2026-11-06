@@ -9,6 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import axios, { AxiosError } from 'axios';
 import {
   aiFailureToHttpException,
+  AiUpstreamError,
   classifyAiFailure,
   isRetryableAiFailure,
 } from '../exception/ai-upstream.exception';
@@ -25,6 +26,7 @@ import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
 import { ENDPOINTS } from '../constants/endpoints.constants';
 import { KNOWLEDGE_ANSWER_LIMITS } from '../constants/knowledge-answer.constants';
+import { SseParser } from '../util/sse-parser';
 import {
   HelplineRiskRequest,
   HelplineRiskResponse,
@@ -34,6 +36,7 @@ import {
 import {
   AgentRunRequest,
   AgentRunResponse,
+  AgentStreamEvent,
   CrisisCheckRequest,
   CrisisCheckResponse,
   KnowledgeAnswerRequest,
@@ -722,6 +725,87 @@ export class AiService {
         alertOnFailure: false,
       },
     );
+  }
+
+  /**
+   * `runAgent`, streamed (ally-ai `/agent/run/stream`): the run's live events go to `onEvent` as
+   * they arrive, and the stream's `final` is returned — the same body `runAgent` returns, so the
+   * caller treats both alike. Preview only; WhatsApp can't show a stream.
+   *
+   * Fails like `runAgent` does, as an `AiUpstreamError`, so the same v1 fallback follows: ally-ai's
+   * `error: timeout` or our own 22s deadline is `AI_SERVICE_TIMEOUT`, any other error event or a
+   * stream that ends without `final` is a 502. `signal` (the client went away) cancels the request,
+   * and with it the run.
+   *
+   * The body is the person's question, so it is never logged.
+   */
+  async runAgentStreaming(
+    request: AgentRunRequest,
+    onEvent: (event: AgentStreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<AgentRunResponse> {
+    const deadline = AbortSignal.timeout(KNOWLEDGE_ANSWER_LIMITS.streamMs);
+    const startedAt = Date.now();
+    const endpoint = ENDPOINTS.AGENT_RUN_STREAM;
+    try {
+      const response = await axios({
+        method: 'post',
+        url: `${this.config.ai.apiUrl}/${endpoint}`,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+          'x-api-key': this.config.ai.outboundApiKey,
+        },
+        data: request,
+        responseType: 'stream',
+        signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+      });
+      const parser = new SseParser();
+      for await (const chunk of response.data as AsyncIterable<Buffer>) {
+        for (const message of parser.push(chunk.toString('utf8'))) {
+          const data = JSON.parse(message.data);
+          if (message.event === 'final') {
+            this.logger.info(
+              `AI stream DONE | endpoint=${endpoint} | elapsedMs=${Date.now() - startedAt}`,
+            );
+            return data as AgentRunResponse;
+          }
+          if (message.event === 'error') {
+            const code = String(data?.code ?? 'internal');
+            throw code === 'timeout'
+              ? new AiUpstreamError(
+                  'The agent run timed out',
+                  ErrorCode.AI_SERVICE_TIMEOUT,
+                  504,
+                )
+              : new AiUpstreamError(
+                  `The agent run failed (${code})`,
+                  ErrorCode.AI_SERVICE_UNAVAILABLE,
+                  502,
+                );
+          }
+          onEvent({ event: message.event, data } as AgentStreamEvent);
+        }
+      }
+      throw new AiUpstreamError(
+        'The agent stream ended without a final event',
+        ErrorCode.AI_SERVICE_UNAVAILABLE,
+        502,
+      );
+    } catch (error) {
+      const failure =
+        deadline.aborted && !(error instanceof AiUpstreamError)
+          ? new AiUpstreamError(
+              'The agent stream timed out',
+              ErrorCode.AI_SERVICE_TIMEOUT,
+            )
+          : classifyAiFailure(error);
+      this.logger.warn(
+        `AI stream FAILED | endpoint=${endpoint} | elapsedMs=${Date.now() - startedAt} | ` +
+          `code=${failure.errorCode} | status=${failure.upstreamStatus ?? '-'}`,
+      );
+      throw failure;
+    }
   }
 
   /**

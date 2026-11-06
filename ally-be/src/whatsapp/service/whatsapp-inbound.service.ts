@@ -18,6 +18,7 @@ import {
 } from '../enum/whatsapp.enum';
 import { InboundWhatsAppMessage } from '../type/whatsapp-provider.interface';
 import {
+  WaNumberCredentials,
   WHATSAPP_PROVIDER,
   WhatsAppProvider,
 } from '../type/whatsapp-provider.interface';
@@ -265,10 +266,15 @@ export class WhatsAppInboundService {
       // Every path from here replies — a keyword reply at once, the others after a model call.
       // Placed HERE and no earlier because Meta's guidance is to show typing only when a reply is
       // coming: the silent exits above (opted out, blocked, rate-limited) must not leave a bubble
-      // that never resolves. Not awaited; the catch covers any implementation that rejects.
-      void this.provider
-        .showTypingIndicator?.(inbound.providerMessageId, number.creds)
-        ?.catch(() => undefined);
+      // that never resolves. Not awaited, so it never delays the reply.
+      void this.showTyping(
+        inbound.providerMessageId,
+        inbound.text,
+        contact.locale,
+        chatbot.id,
+        settings,
+        number.creds,
+      );
 
       // ── 6. Identity ──────────────────────────────────────────────────────
       // Who is asking, for the bot's "who can chat" list and per-organisation knowledge.
@@ -301,7 +307,10 @@ export class WhatsAppInboundService {
           userId: identified.userId ?? null,
           tenantId: identified.tenantId ?? null,
         },
-        channel: { type: 'whatsapp', capabilities: { maxReplyChars: 4096 } },
+        channel: {
+          type: 'whatsapp',
+          capabilities: { maxReplyChars: 4096, streaming: false },
+        },
         // The Agents v2 run's thread and the message its run id is derived from.
         conversationId: conversation.id,
         providerMessageId: inbound.providerMessageId,
@@ -556,6 +565,37 @@ export class WhatsAppInboundService {
     return this.chatbotRepository.findOne({
       where: { id: platformChatbotId, archivedAt: IsNull() },
     });
+  }
+
+  /**
+   * Meta's typing indicator for this message (it also marks it read), unless the bot has "Show
+   * typing" off. Skipped for a crisis keyword: that reply goes out at once, and dots before a safety
+   * message add nothing. Best effort: any failure, the keyword lookup's included, is swallowed — a
+   * lookup that fails shows the dots, as before this setting existed.
+   */
+  private async showTyping(
+    providerMessageId: string,
+    text: string,
+    language: string | null | undefined,
+    chatbotId: string,
+    settings: WhatsAppBotSettings,
+    creds: WaNumberCredentials | undefined,
+  ): Promise<void> {
+    if (settings.showTyping === false) return;
+    let crisis = false;
+    try {
+      crisis = await this.templateService.isCrisisKeyword(
+        text,
+        language,
+        chatbotId,
+      );
+    } catch {
+      // Unknown: show the dots, as before.
+    }
+    if (crisis) return;
+    await this.provider
+      .showTypingIndicator?.(providerMessageId, creds)
+      ?.catch(() => undefined);
   }
 
   private async recentHistory(
