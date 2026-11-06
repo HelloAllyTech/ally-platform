@@ -1,0 +1,130 @@
+[
+  {
+    "name": "nest json log with user fields",
+    "text": "{\"level\":\"error\",\"context\":\"UserService\",\"message\":\"Failed to update profile\",\"userId\":\"3f1c2a9e-1111-4a2b-9c3d-ab12cd34ef56\",\"firstName\":\"Priya\",\"lastName\":\"Sharma\",\"email\":\"priya.sharma@gmail.com\",\"phoneNumber\":\"+91 98765 43210\",\"tenantId\":42}",
+    "leaks": [
+      "3f1c2a9e-1111-4a2b-9c3d-ab12cd34ef56",
+      "Priya",
+      "Sharma",
+      "priya.sharma@gmail.com",
+      "98765"
+    ],
+    "keeps": [
+      "Failed to update profile",
+      "UserService",
+      "tenantId"
+    ]
+  },
+  {
+    "name": "stack trace with an email in the error and a bearer token",
+    "text": "TypeError: Cannot read properties of undefined (reading 'id')\n    at UserService.findByEmail (src/user/user.service.ts:88:21)\n    at async AuthController.login (src/auth/auth.controller.ts:41:5)\nerror: user ravi.k@helloally.ai not found; headers: Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+    "leaks": [
+      "ravi.k@helloally.ai",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+    ],
+    "keeps": [
+      "Cannot read properties of undefined",
+      "src/user/user.service.ts:88:21",
+      "auth.controller.ts:41:5",
+      "not found"
+    ]
+  },
+  {
+    "text": "Steps to reproduce:\n1. Log in as Mehul (mehul.p@example.org, WhatsApp 9876501234)\n2. Open the session for client Asha, DOB 1994-03-12, address: 14 MG Road, Pune\n3. case_notes: feeling hopeless since the layoff\nExpected: notes saved. Actual: 500 from POST /api/scribe/sessions",
+    "name": "issue body from staff",
+    "leaks": [
+      "mehul.p@example.org",
+      "9876501234",
+      "14 MG Road",
+      "feeling hopeless"
+    ],
+    "keeps": [
+      "Steps to reproduce",
+      "POST /api/scribe/sessions",
+      "Expected: notes saved"
+    ]
+  },
+  {
+    "name": "pytest output with phi audit details",
+    "text": "FAILED tests/core/test_phi_logger.py::test_log_event - AssertionError\n{'event_type': 'DATA_ACCESSED', 'chat_id': 'c0ffee00-0000-4000-8000-000000000042', 'details': {'ip': '203.0.113.7', 'user_agent': 'Mozilla/5.0 (iPhone)', 'audio_url': 's3://ally-audio/tenant-9/chat-c0ffee00/segment-1.wav', 'error': 'boom'}}",
+    "leaks": [
+      "c0ffee00-0000-4000-8000-000000000042",
+      "203.0.113.7",
+      "Mozilla/5.0",
+      "s3://ally-audio"
+    ],
+    "keeps": [
+      "FAILED tests/core/test_phi_logger.py::test_log_event",
+      "DATA_ACCESSED",
+      "boom"
+    ]
+  },
+  {
+    "name": "env dump and api keys",
+    "text": "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz0123456789ABCD\nAWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\nDEEPGRAM header: Token 0123456789abcdef0123456789abcdef01234567\nGOOGLE_API_KEY=AIzaSyA1234567890abcdefghijklmnopqrstuv\nGITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789\nDB_HOST=postgres-test",
+    "leaks": [
+      "sk-proj-abcdefghijklmnopqrstuvwxyz0123456789ABCD",
+      "AKIAIOSFODNN7EXAMPLE",
+      "wJalrXUtnFEMI",
+      "0123456789abcdef0123456789abcdef01234567",
+      "AIzaSyA1234567890abcdefghijklmnopqrstuv",
+      "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+    ],
+    "keeps": [
+      "DB_HOST=postgres-test"
+    ]
+  },
+  {
+    "name": "whatsapp webhook payload",
+    "text": "{\"entry\":[{\"changes\":[{\"value\":{\"contacts\":[{\"profile\":{\"name\":\"Asha D\"},\"wa_id\":\"919812345678\"}],\"messages\":[{\"from\":\"919812345678\",\"text\":{\"body\":\"I need help\"},\"type\":\"text\"}]}}]}]}",
+    "leaks": [
+      "Asha D",
+      "919812345678"
+    ],
+    "keeps": [
+      "\"type\":\"text\"",
+      "entry",
+      "I need help"
+    ]
+  },
+  {
+    "name": "cloudwatch logs insights row",
+    "text": "2026-11-05T09:14:22.511Z ERROR [ScribeSessionReviewService] session_notes=\"client reported panic attacks at night\" caller_id=+91-98111-22233 ip_address=49.37.12.201 request_id=req-7f3a\nmessage=\"upstream timeout after 30000ms\"",
+    "leaks": [
+      "panic attacks",
+      "98111",
+      "49.37.12.201",
+      "req-7f3a"
+    ],
+    "keeps": [
+      "ScribeSessionReviewService",
+      "upstream timeout after 30000ms",
+      "2026-11-05T09:14:22.511Z"
+    ]
+  },
+  {
+    "name": "query string secrets and signed urls",
+    "text": "GET https://ally-prd-s3.s3.amazonaws.com/audio/abc.wav?X-Amz-Signature=deadbeef1234&token=supersecrettoken123&expires=1762448400 -> 403",
+    "leaks": [
+      "supersecrettoken123"
+    ],
+    "keeps": [
+      "audio/abc.wav",
+      "-> 403",
+      "expires=1762448400"
+    ]
+  },
+  {
+    "name": "ordinary test output stays readable",
+    "text": "PASS src/progress/progress.constants.spec.ts\nTest Suites: 1 passed, 1 total\nTests:       4 passed, 4 total\nTime:        2.31 s\nconnect ECONNREFUSED 127.0.0.1:5432 at 2026-11-06 22:30:15 (epoch 1762448400) port 8001 version 1.169.10",
+    "leaks": [],
+    "keeps": [
+      "PASS src/progress/progress.constants.spec.ts",
+      "4 passed, 4 total",
+      "127.0.0.1:5432",
+      "2026-11-06 22:30:15",
+      "1762448400",
+      "1.169.10"
+    ]
+  }
+]

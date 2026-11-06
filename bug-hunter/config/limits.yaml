@@ -10,8 +10,10 @@ approval:
   expiry_days: 7
 sandbox:
   cpus: 2
-  memory_mb: 6144
+  memory_mb: 8192            # ally-web's three Vitest suites run a 5 GB Node heap each
   timeout_s: 1800             # per command inside the container
+  install_timeout_s: 1800     # dependency install (network on), per app
+  pids_limit: 2048
 # Per-node token budgets for prompt assembly (spec §7). Nodes without a model have none.
 nodes:
   triage: 12000

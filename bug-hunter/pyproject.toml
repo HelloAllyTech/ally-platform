@@ -65,4 +65,5 @@ ensure_newline_before_comments = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "--tb=short --strict-markers"
+addopts = "--tb=short --strict-markers -m 'not docker'"
+markers = ["docker: needs a Docker daemon; runs the real sandbox (slow)"]

@@ -7,6 +7,7 @@ help:
 	@echo "  make lint        Run flake8, isort check, and black check"
 	@echo "  make format      Run isort and black"
 	@echo "  make check       Validate config and app paths (bug-hunter config check)"
+	@echo "  make test-docker Integration: run one test file per app in the real sandbox"
 
 # Install dependencies (same flags as the CI step for the Python apps)
 .PHONY: install
@@ -29,6 +30,11 @@ lint:
 format:
 	@poetry run isort src tests
 	@poetry run black src tests
+
+# Real sandbox against every app (needs Docker; slow). BUGHUNTER_IT_APPS=ally-ai,ally-be to limit.
+.PHONY: test-docker
+test-docker:
+	@poetry run pytest tests/integration -m docker -v -s
 
 .PHONY: check
 check:
