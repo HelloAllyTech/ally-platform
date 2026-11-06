@@ -569,13 +569,14 @@ describe('BugFixSessionService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('rejects ally-mobile: no fix-session workflow since the Flutter rename (stays excluded)', async () => {
+    it('dispatches to ally-mobile (re-onboarded 2026-11-06 with its Flutter commands)', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow({ repo: null }));
 
-      await expect(
-        service.start('finding-1', 42, 'ally-mobile'),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(github.dispatchWorkflow).not.toHaveBeenCalled();
+      await service.start('finding-1', 42, 'ally-mobile');
+
+      expect(github.dispatchWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ repo: 'ally-mobile' }),
+      );
     });
 
     it('closes the run it opened when the dispatch itself fails', async () => {

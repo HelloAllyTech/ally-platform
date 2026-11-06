@@ -51,6 +51,7 @@ export type DigestOutcome =
   | 'disabled'
   | 'not-due'
   | 'already-sent'
+  | 'not-production'
   | 'nothing-to-report'
   | 'sent'
   | 'failed';
@@ -89,10 +90,18 @@ export class ProductUpdateDigestService {
 
   /** The hourly tick: sends once, in the configured business hour, if there is anything to report. */
   async sendIfDue(now: Date = new Date()): Promise<DigestOutcome> {
-    const { digestTo, digestHour } = this.configService.productUpdates;
+    const { digestTo, digestHour, digestAllowed } =
+      this.configService.productUpdates;
     if (digestTo.length === 0) return 'disabled';
     if (dayjs(now).tz(BUSINESS_TIMEZONE).hour() !== digestHour)
       return 'not-due';
+    if (!digestAllowed) {
+      // After the hour check, so this is one line a day, not one an hour.
+      this.logger.warn(
+        '[PRODUCT-UPDATES] Digest skipped: PRODUCT_UPDATES_DIGEST_TO is set but this is not the production database (*_prd).',
+      );
+      return 'not-production';
+    }
 
     const lockKey = `product-updates:digest:${toBusinessDateString(now)}`;
     if (!(await this.redisService.acquireLock(lockKey, 20 * 60 * 60))) {
@@ -316,14 +325,21 @@ ${footer}
         );
 
       const monthName = dayjs(now).tz(BUSINESS_TIMEZONE).format('MMMM');
+      const th = (label: string, align: 'left' | 'right') =>
+        `<th style="padding:0 ${align === 'left' ? '16px' : '0'} 6px ${align === 'left' ? '0' : '16px'};border-bottom:1px solid ${RULE};text-align:${align};font-size:12px;font-weight:normal;color:${MUTED}">${label}</th>`;
+      const cell = (content: string, last = false) =>
+        `<td style="padding:7px ${last ? '0' : '16px'} 7px 0;border-bottom:1px solid ${RULE};text-align:right;font-size:15px;font-variant-numeric:tabular-nums">${content}</td>`;
       const rows = voters
-        .map(
-          (u) =>
-            `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid ${RULE};font-size:15px">${escapeHtml(name(u.userId))}</td><td style="padding:7px 0;border-bottom:1px solid ${RULE};text-align:right;font-size:15px;font-variant-numeric:tabular-nums">${u.votes.toLocaleString('en-IN')}</td></tr>`,
-        )
+        .map((u) => {
+          // Share of this person's votes that went to colleagues' ideas.
+          const othersShare = `${Math.round(
+            ((u.votesOnOthers ?? u.votes) / u.votes) * 100,
+          )}%`;
+          return `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid ${RULE};font-size:15px">${escapeHtml(name(u.userId))}</td>${cell(u.votes.toLocaleString('en-IN'))}${cell(othersShare, true)}</tr>`;
+        })
         .join('');
       const table = rows
-        ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}">${rows}</table>`
+        ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}"><tr>${th('Name', 'left')}${th('Votes cast', 'right')}${th('Voters voted others share', 'right')}</tr>${rows}</table>`
         : `<p style="margin:0;color:${MUTED}">No votes cast yet this month.</p>`;
 
       return `${heading(`Roadmap votes in ${monthName} so far:`)}

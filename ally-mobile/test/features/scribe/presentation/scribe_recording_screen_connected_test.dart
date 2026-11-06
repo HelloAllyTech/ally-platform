@@ -145,15 +145,9 @@ void main() {
       final tiredY = tester.getTopLeft(find.textContaining('I feel tired')).dy;
       expect(tiredY, greaterThan(helloY));
 
-      // Pause starts `true` (matching RN) — resume, then push a chunk and
-      // confirm it's actually emitted with the real RN-shaped payload.
-      // RN starts paused with the "Resume to let it listen" tooltip up.
-      expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('pause-resume-button')));
-      // Debounced 500 ms (RN useDebounce).
-      await tester.pump();
-      expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
-      await tester.pump(const Duration(milliseconds: 600));
+      // Starts actively listening, not paused (no "Resume to let it
+      // listen" tooltip up front — see `_isCallPaused`'s field doc) — a
+      // chunk is emitted immediately with the real RN-shaped payload.
       expect(find.byKey(const ValueKey('mute-tooltip')), findsNothing);
       chunkController.add(Uint8List.fromList(List.filled(10, 0)));
       await tester.pump();
@@ -164,6 +158,25 @@ void main() {
       final payload = emittedCalls.captured.single as Map<String, dynamic>;
       expect(payload['chatId'], 42);
       expect(payload['audioData'], isA<String>());
+
+      // Pausing (debounced 500 ms, RN useDebounce) brings the tooltip up
+      // and stops emission — toggling the other direction from the old
+      // paused-by-default start still exercises the same gate.
+      await tester.tap(find.byKey(const ValueKey('pause-resume-button')));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('mute-tooltip')), findsNothing);
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
+      chunkController.add(Uint8List.fromList(List.filled(10, 0)));
+      await tester.pump();
+      // mocktail's verify() only counts calls not already claimed by an
+      // earlier verify — paused must add none new.
+      verifyNever(() => socketService.emit(SocketEvent.audioMessage, any()));
+
+      // Resume again so the waveform's redraw timer is active for the rest
+      // of the test, same as before this change.
+      await tester.tap(find.byKey(const ValueKey('pause-resume-button')));
+      await tester.pump(const Duration(milliseconds: 600));
 
       // `pumpAndSettle()` is unusable from here on: resuming above started
       // `AudioWaveformContainer`'s own 120ms `Timer.periodic` redraw loop,

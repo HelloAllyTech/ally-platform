@@ -15,6 +15,13 @@ export class RoadmapVotingUserMonthDto {
 
   @ApiProperty({
     description:
+      'Of `votes`, how many were cast on opportunities authored by someone ' +
+      'else (a colleague). `votes` minus the votes on their own ideas.',
+  })
+  votesOnOthers!: number;
+
+  @ApiProperty({
+    description:
       'Votes issued to them for this month (monthly + daily grants, never ' +
       'refunds). Null before the grant ledger existed.',
     nullable: true,

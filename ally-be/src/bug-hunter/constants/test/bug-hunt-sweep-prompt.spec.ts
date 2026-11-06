@@ -567,10 +567,11 @@ describe('buildSweepPrompt', () => {
     });
   });
 
-  it('refuses ally-mobile: no entry in BUG_HUNT_REPOS since the Flutter rename (stays excluded)', () => {
-    expect(() => build({ repo: 'ally-mobile' })).toThrow(
-      /no test\/lint commands/i,
-    );
+  it('sweeps ally-mobile like any other canBotMerge: false repo (re-onboarded 2026-11-06)', () => {
+    const p = build({ repo: 'ally-mobile' });
+    expect(p).toMatch(/flutter test/);
+    expect(p).toMatch(/flutter analyze/);
+    expect(p).toMatch(/Do not attempt to merge anything here/i);
   });
 
   describe('the progress stages it advertises', () => {
