@@ -54,12 +54,7 @@ export interface ListBugHunterFeatureMapsResponse {
  * 'ally-mobile' has no entry since the 2026-11 Flutter rename — see ally-be's
  * own comment on BUG_FIX_SESSION_REPOS.
  */
-export const BUG_FIX_SESSION_REPOS = [
-  "ally-be",
-  "ally-web",
-  "ally-ai",
-  "ally-ai-learn",
-] as const;
+export const BUG_FIX_SESSION_REPOS = ["ally-be", "ally-web", "ally-ai", "ally-ai-learn"] as const;
 
 export enum BugHuntRunStatus {
   RUNNING = "running",
