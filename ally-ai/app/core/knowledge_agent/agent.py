@@ -24,7 +24,7 @@ all.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, TypedDict
 
 from app.core.config import settings
 from app.core.knowledge_agent.prompt import (
@@ -73,6 +73,104 @@ _DECLINE_DISPOSITIONS = {
     DeclineReason.BELOW_THRESHOLD: "declined_below_threshold",
     DeclineReason.TRANSLATION_FAILED: "declined_translation_failed",
 }
+
+
+class AnswerResult(TypedDict, total=False):
+    """The `/knowledge-agent/answer` response, before validation. The agent path adds
+    `turn_type`."""
+
+    intent: AnswerIntent
+    answer: str
+    language: str
+    confidence: float
+    citations: List[Dict[str, Any]]
+    decline_reason: DeclineReason
+    retrieval: Dict[str, Any]
+    provider: str
+    model: str
+    prompt_version: str
+    turn_type: str
+
+
+def build_result(
+    *,
+    intent: AnswerIntent,
+    answer: str,
+    language: str,
+    confidence: float,
+    citations: List[Dict[str, Any]],
+    decline_reason: DeclineReason,
+    retrieval: Dict[str, Any],
+    meta: Optional[Dict[str, Any]] = None,
+) -> AnswerResult:
+    """One answer result; `meta` is the model call's dispatch metadata (none for a
+    decline made before any model call)."""
+    meta = meta or {}
+    return {
+        "intent": intent,
+        "answer": answer,
+        "language": language,
+        "confidence": confidence,
+        "citations": citations,
+        "decline_reason": decline_reason,
+        "retrieval": retrieval,
+        "provider": meta.get("provider", ""),
+        "model": meta.get("model", ""),
+        "prompt_version": settings.KNOWLEDGE_AGENT.PROMPT_VERSION,
+    }
+
+
+def resolve_citations(
+    numbers: List[int], passages: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Map the model's passage numbers back to real chunk metadata, dropping
+    anything bogus.
+
+    Validated in code rather than trusted, on the same principle as
+    validate_chart() in the analytics agent: a citation pointing at passage 9
+    when 5 were supplied would render as a source line the reader cannot check,
+    and an answer that cites something is read as more trustworthy than one
+    that does not. Out-of-range numbers are dropped rather than clamped —
+    clamping would silently attribute the claim to a real but wrong passage,
+    which is worse than losing the citation.
+
+    Order is preserved and duplicates collapsed, so the rendered source list
+    matches the order the model reasoned in.
+    """
+    resolved: List[Dict[str, Any]] = []
+    seen: set[int] = set()
+
+    for number in numbers:
+        try:
+            index = int(number)
+        except (TypeError, ValueError):
+            continue
+        if index < 1 or index > len(passages) or index in seen:
+            continue
+        seen.add(index)
+        passage = passages[index - 1]
+        resolved.append(
+            {
+                "passage_number": index,
+                "chunk_id": passage.get("chunk_id"),
+                "document_id": passage.get("document_id"),
+                "document_title": passage.get("document_title") or "",
+                "page_from": int(passage.get("page_from") or 0),
+                "page_to": int(passage.get("page_to") or 0),
+                "section_path": passage.get("section_path") or "",
+                "source_url": passage.get("source_url") or "",
+                "similarity": float(passage.get("similarity") or 0.0),
+            }
+        )
+
+    if len(resolved) < len(numbers):
+        logger.warning(
+            "Dropped %d invalid citation number(s) out of %d",
+            len(numbers) - len(resolved),
+            len(numbers),
+        )
+    return resolved
 
 
 class KnowledgeAgentService:
@@ -324,61 +422,6 @@ class KnowledgeAgentService:
             budget -= tokens
         return selected
 
-    # ------------------------------------------------------------------ citations
-
-    @staticmethod
-    def _resolve_citations(
-        numbers: List[int], passages: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Map the model's passage numbers back to real chunk metadata, dropping
-        anything bogus.
-
-        Validated in code rather than trusted, on the same principle as
-        validate_chart() in the analytics agent: a citation pointing at passage 9
-        when 5 were supplied would render as a source line the reader cannot check,
-        and an answer that cites something is read as more trustworthy than one
-        that does not. Out-of-range numbers are dropped rather than clamped —
-        clamping would silently attribute the claim to a real but wrong passage,
-        which is worse than losing the citation.
-
-        Order is preserved and duplicates collapsed, so the rendered source list
-        matches the order the model reasoned in.
-        """
-        resolved: List[Dict[str, Any]] = []
-        seen: set[int] = set()
-
-        for number in numbers:
-            try:
-                index = int(number)
-            except (TypeError, ValueError):
-                continue
-            if index < 1 or index > len(passages) or index in seen:
-                continue
-            seen.add(index)
-            passage = passages[index - 1]
-            resolved.append(
-                {
-                    "passage_number": index,
-                    "chunk_id": passage.get("chunk_id"),
-                    "document_id": passage.get("document_id"),
-                    "document_title": passage.get("document_title") or "",
-                    "page_from": int(passage.get("page_from") or 0),
-                    "page_to": int(passage.get("page_to") or 0),
-                    "section_path": passage.get("section_path") or "",
-                    "source_url": passage.get("source_url") or "",
-                    "similarity": float(passage.get("similarity") or 0.0),
-                }
-            )
-
-        if len(resolved) < len(numbers):
-            logger.warning(
-                "Dropped %d invalid citation number(s) out of %d",
-                len(numbers) - len(resolved),
-                len(numbers),
-            )
-        return resolved
-
     # ------------------------------------------------------------------ pipeline steps
     #
     # `answer` is these steps in order. They are separate so the LangGraph runtime
@@ -511,7 +554,7 @@ class KnowledgeAgentService:
         language: str,
         retrieval: Dict[str, Any],
         log_retrieval: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> AnswerResult:
         """
         The result for a gate decline, reported to the retrieval log unless
         ``log_retrieval`` is false (a shadow run whose message was already logged).
@@ -534,18 +577,15 @@ class KnowledgeAgentService:
                 latency_ms=latency_ms,
                 language=language,
             )
-        return {
-            "intent": AnswerIntent.DECLINE,
-            "answer": "",
-            "language": language,
-            "confidence": 0.0,
-            "citations": [],
-            "decline_reason": reason,
-            "retrieval": retrieval,
-            "provider": "",
-            "model": "",
-            "prompt_version": settings.KNOWLEDGE_AGENT.PROMPT_VERSION,
-        }
+        return build_result(
+            intent=AnswerIntent.DECLINE,
+            answer="",
+            language=language,
+            confidence=0.0,
+            citations=[],
+            decline_reason=reason,
+            retrieval=retrieval,
+        )
 
     def report_gate_decline(
         self,
@@ -664,11 +704,11 @@ class KnowledgeAgentService:
         *,
         language: str,
         retrieval: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> AnswerResult:
         """Gate 2: validate the model's answer and build the result."""
         intent = parsed.intent
         answer_text = (parsed.answer or "").strip()
-        citations = self._resolve_citations(parsed.citations, passages)
+        citations = resolve_citations(parsed.citations, passages)
         decline_reason = DeclineReason.NONE
 
         if intent == AnswerIntent.ANSWER and not answer_text:
@@ -695,18 +735,16 @@ class KnowledgeAgentService:
             retrieval["unsupported"] = True
             logger.info("Answer returned with no usable citations")
 
-        return {
-            "intent": intent,
-            "answer": answer_text,
-            "language": (parsed.language or language or "en").strip(),
-            "confidence": float(parsed.confidence or 0.0),
-            "citations": citations,
-            "decline_reason": decline_reason,
-            "retrieval": retrieval,
-            "provider": meta.get("provider", ""),
-            "model": meta.get("model", ""),
-            "prompt_version": settings.KNOWLEDGE_AGENT.PROMPT_VERSION,
-        }
+        return build_result(
+            intent=intent,
+            answer=answer_text,
+            language=(parsed.language or language or "en").strip(),
+            confidence=float(parsed.confidence or 0.0),
+            citations=citations,
+            decline_reason=decline_reason,
+            retrieval=retrieval,
+            meta=meta,
+        )
 
     # ------------------------------------------------------------------ main entry
 

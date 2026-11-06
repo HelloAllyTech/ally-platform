@@ -20,8 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.core.agent_runtime.schemas import REPLY_ACTION, AgentIntent
-from app.core.config import settings
-from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.knowledge_agent.agent import AnswerResult, build_result, resolve_citations
 from app.core.knowledge_agent.schemas import AnswerIntent, DeclineReason
 from app.utils.logger import get_logger
 
@@ -386,7 +385,7 @@ def check_reply(
     searched: bool = False,
     organisation: Organisation = Organisation(),
     history: Sequence[Dict[str, str]] = (),
-) -> Tuple[Dict[str, Any], Optional[str]]:
+) -> Tuple[AnswerResult, Optional[str]]:
     """The run's result, and the rejection reason (a `REJECTIONS` key) when the
     check refused the draft; None when it went through as the model meant it.
 
@@ -402,9 +401,7 @@ def check_reply(
     action = step.get("action") or REPLY_ACTION
     intent = AgentIntent(step.get("intent") or AgentIntent.DECLINE)
     answer_text = plain_text(step.get("answer") or "")
-    citations = KnowledgeAgentService._resolve_citations(
-        list(step.get("citations") or []), passages
-    )
+    citations = resolve_citations(list(step.get("citations") or []), passages)
     unsupported = False
     rejection: Optional[str] = None
     # A refusal that keeps the model's text if the rewrite doesn't fix it (wording,
@@ -559,17 +556,15 @@ def check_reply(
         "unsupported": unsupported,
     }
 
-    result = {
-        "intent": response_intent,
-        "answer": answer_text,
-        "language": (step.get("language") or language or "en").strip(),
-        "confidence": 0.0,
-        "citations": citations,
-        "decline_reason": decline_reason,
-        "retrieval": retrieval,
-        "provider": meta.get("provider", ""),
-        "model": meta.get("model", ""),
-        "prompt_version": settings.KNOWLEDGE_AGENT.PROMPT_VERSION,
-        "turn_type": turn_type,
-    }
+    result = build_result(
+        intent=response_intent,
+        answer=answer_text,
+        language=(step.get("language") or language or "en").strip(),
+        confidence=0.0,
+        citations=citations,
+        decline_reason=decline_reason,
+        retrieval=retrieval,
+        meta=meta,
+    )
+    result["turn_type"] = turn_type
     return result, rejection
