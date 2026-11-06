@@ -142,6 +142,20 @@ describe("ChatbotTestTab — engine and run", () => {
     expect(testSpy.mock.calls[2][0]).toMatchObject({ conversationId: undefined });
   });
 
+  it("sends only the last 10 messages of a long thread", async () => {
+    render(<ChatbotTestTab bot={BOT} />);
+    for (let i = 0; i < 8; i++) {
+      nextResult = result({ reply: `reply ${i}` });
+      await ask(`question ${i}`);
+    }
+    // 16 messages on screen; the 9th test sends only the most recent 10.
+    await ask("question 8");
+    const history = testSpy.mock.calls[8][0].history;
+    expect(history).toHaveLength(10);
+    expect(history[0]).toEqual({ role: "user", content: "question 3" });
+    expect(history[9]).toEqual({ role: "assistant", content: "reply 7" });
+  });
+
   it("has no engine picker and always tests the chatbot's own engine", async () => {
     canCreate = true;
     render(<ChatbotTestTab bot={BOT} />);

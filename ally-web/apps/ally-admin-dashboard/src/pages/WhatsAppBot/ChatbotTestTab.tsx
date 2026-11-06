@@ -12,6 +12,8 @@ import { Card, copyToClipboard, errorMessage, fill } from "./shared";
 import type { PersonaDraft } from "./PersonaTab";
 
 const t = en.whatsappBot.bots.test;
+/** Messages of the thread sent with each test, most recent last (ally-be keeps the same 10). */
+const MAX_HISTORY_MESSAGES = 10;
 const handledLabels = en.whatsappBot.conversations.handledBy as Record<string, string>;
 
 type Turn =
@@ -58,7 +60,11 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   const send = async () => {
     const text = message.trim();
     if (!text) return;
-    const history = turns.map(turn => ({ role: turn.role, content: turn.content }));
+    // The thread on screen keeps everything; the request carries only the most recent
+    // messages, as WhatsApp does (the API accepts at most 20).
+    const history = turns
+      .slice(-MAX_HISTORY_MESSAGES)
+      .map(turn => ({ role: turn.role, content: turn.content }));
     setTurns(current => [...current, { role: "user", content: text }]);
     setMessage("");
     try {
