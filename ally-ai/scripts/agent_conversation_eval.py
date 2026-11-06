@@ -33,7 +33,10 @@ Also reported:
 
     API__X_API_KEY=… poetry run python scripts/agent_conversation_eval.py \\
         --cases tests/fixtures/agent_conversation_cases.yaml \\
-        --base-url http://localhost:3001 --out ../docs/agents-v2/CHUNK-03A-EVAL.md
+        --base-url http://localhost:3001
+
+The report goes to eval_report.md unless --out names a file. CHUNK-03A-EVAL.md is the
+3a baseline: never write over it.
 """
 
 import argparse
@@ -572,7 +575,11 @@ def main() -> int:
     parser.add_argument("--base-url", default="http://localhost:3001")
     parser.add_argument("--api-key", default=os.getenv("API__X_API_KEY"))
     parser.add_argument(
-        "--out", type=Path, default=Path("../docs/agents-v2/CHUNK-03A-EVAL.md")
+        "--out",
+        type=Path,
+        default=Path("eval_report.md"),
+        help="report file (default eval_report.md, gitignored); a chunk's committed "
+        "report is written with an explicit --out",
     )
     parser.add_argument("--judge-model", default="gpt-5-mini")
     parser.add_argument("--no-judge", action="store_true")
