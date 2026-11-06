@@ -12,6 +12,13 @@ import type { ChatTurn } from './chatbot-engine.types';
 export const MAX_HISTORY_MESSAGES = 10;
 
 /**
+ * The longest decline wording `/agent/run` accepts (ally-ai `AgentRunRequest.decline_text`, a 422
+ * past it). The agent takes only its tone and where-to-go-next, so a longer wording — valid for v1,
+ * which sends it as the reply — is cut rather than failing every message over to v1.
+ */
+export const MAX_DECLINE_TEXT_CHARS = 500;
+
+/**
  * The ONE place the knowledge request is built. v1 sends it to `/knowledge-agent/answer` as is;
  * v2 and shadow send it to `/agent/run` with the run's identity added (`buildAgentRunRequest`). A
  * field added here reaches both engines, so they cannot drift apart.
@@ -66,7 +73,9 @@ export function buildAgentRunRequest(
     ...(run.logRetrieval === false ? { log_retrieval: false } : {}),
     ...(run.features ? { features: run.features } : {}),
     ...(run.knowledgeTopics ? { knowledge_topics: run.knowledgeTopics } : {}),
-    ...(run.declineText ? { decline_text: run.declineText } : {}),
+    ...(run.declineText
+      ? { decline_text: run.declineText.slice(0, MAX_DECLINE_TEXT_CHARS) }
+      : {}),
   };
 }
 
