@@ -170,20 +170,34 @@ export interface KnowledgeAnswerRequest {
 /**
  * ally-ai's `/agent/run` (Agents v2): every `/knowledge-agent/answer` field plus the run's
  * identity. Built by `buildAgentRunRequest` from the same body v1 sends, so the two can't drift.
+ *
+ * Mirrors ally-ai `app/schemas/agent_runtime.py::AgentRunRequest`; the limits noted here are its
+ * validation (a 422 past them).
  */
 export interface AgentRunRequest extends KnowledgeAnswerRequest {
-  /** The checkpointer's thread id: the conversation, or a `preview-…` / `shadow-…` thread. */
+  /**
+   * The checkpointer's thread id: the conversation, or a `preview-…` / `shadow-…` thread.
+   * 1–200 characters.
+   */
   conversation_id: string;
+  /** At most 200 characters. */
   run_id: string;
+  /** At most 200 characters. */
   chatbot_id?: string;
   runtime_version: 'v2';
   /** False on shadow runs, whose message v1 has already reported to the retrieval log. */
   log_retrieval?: boolean;
   /** The bot's feature flags. `agent: true` runs the conversational agent. */
   features?: Record<string, boolean>;
-  /** Agent mode: titles of the bot's documents, so it can say what it covers (≤ 50). */
+  /**
+   * Agent mode: titles of the bot's documents, so it can say what it covers. At most 50; ally-ai
+   * cuts each title to 200 characters.
+   */
   knowledge_topics?: string[];
-  /** Agent mode: the bot's decline wording, whose tone (not words) the agent follows. */
+  /**
+   * Agent mode: the bot's decline wording, whose tone (not words) the agent follows. At most 500
+   * characters (`MAX_DECLINE_TEXT_CHARS`).
+   */
   decline_text?: string;
 }
 
@@ -197,11 +211,27 @@ export interface AgentTraceStep {
   summary: string;
 }
 
-/** `/agent/run`'s answer: the `/knowledge-agent/answer` response plus the run. */
+/** `/agent/run`'s retrieval block: v1's plus a debug list (ally-ai `AgentRetrievalMeta`). */
+export interface AgentRetrievalMeta extends KnowledgeRetrievalMeta {
+  /** Debug only: every retrieved chunk id, best first, before selection. Never stored. */
+  hit_chunk_ids?: string[];
+}
+
+/**
+ * `/agent/run`'s answer: the `/knowledge-agent/answer` response plus the run (ally-ai
+ * `AgentRunResponse`).
+ */
 export interface AgentRunResponse extends KnowledgeAnswerResponse {
+  retrieval: AgentRetrievalMeta;
   run_id: string;
   runtime: 'v2';
   trace: AgentTraceStep[];
+  /**
+   * Conversational agent only (absent when `features.agent` is off). A `smalltalk` / `about_bot`
+   * reply arrives as intent `answer` with no citations, so this is what tells it apart from a
+   * grounded answer.
+   */
+  turn_type?: AgentTurnType;
 }
 
 export interface KnowledgePersonaRequest {
@@ -248,11 +278,6 @@ export interface KnowledgeAnswerResponse {
   provider: string;
   model: string;
   prompt_version: string;
-  /**
-   * Agents v2 conversational agent only. A `smalltalk` / `about_bot` reply arrives as intent
-   * `answer` with no citations, so this is what tells it apart from a grounded answer.
-   */
-  turn_type?: AgentTurnType;
 }
 
 export interface CrisisCheckRequest {

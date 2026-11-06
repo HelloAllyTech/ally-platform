@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import {
+  AgentRetrievalMeta,
+  AgentRunResponse,
   KnowledgeAnswerRequest,
   KnowledgeAnswerResponse,
   KnowledgeAudienceRequest,
@@ -66,7 +68,10 @@ export const KNOWLEDGE_PROMPT_CODES = [
 /** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
 const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
 export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
-/** At most this many document titles are sent as the agent's "what I cover" list. */
+/**
+ * At most this many document titles are sent as the agent's "what I cover" list: ally-ai's limit on
+ * `AgentRunRequest.knowledge_topics` (see `AgentRunRequest`).
+ */
 const MAX_KNOWLEDGE_TOPICS = 50;
 
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
@@ -84,9 +89,13 @@ const PREVIEW_CHANNEL = 'test';
  */
 const ANSWER_BUDGET_MS = 40_000;
 
+/** A reply from either engine: v1's response, or v2's without the run fields. */
+type EngineAnswer = KnowledgeAnswerResponse &
+  Pick<AgentRunResponse, 'turn_type'>;
+
 /** An answer from either engine, with the run behind it when v2 was involved. */
 interface Answered {
-  response: KnowledgeAnswerResponse;
+  response: EngineAnswer;
   latencyMs: number;
   agent?: AgentRunRef;
 }
@@ -104,11 +113,9 @@ class AgentFallbackFailedError extends Error {
 
 /** `/agent/run`'s debug-only list of every retrieved chunk; not stored on the message. */
 const withoutDebugIds = (
-  retrieval: KnowledgeRetrievalMeta,
+  retrieval: AgentRetrievalMeta,
 ): KnowledgeRetrievalMeta => {
-  const copy = { ...retrieval } as KnowledgeRetrievalMeta & {
-    hit_chunk_ids?: string[];
-  };
+  const copy = { ...retrieval };
   delete copy.hit_chunk_ids;
   return copy;
 };
@@ -505,7 +512,7 @@ export class ChatbotEngineService {
   /** An answer from either engine, as one reply. */
   private toDecision(
     turn: ChatTurn,
-    answer: KnowledgeAnswerResponse,
+    answer: EngineAnswer,
     ran: PromptsRan,
     degradedAlert: NotificationErrorType | undefined,
   ): ChatbotDecision {
