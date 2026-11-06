@@ -10,6 +10,7 @@ import {
   KnowledgeAudienceRequest,
   KnowledgeRetrievalMeta,
 } from '../../ai/dto/knowledge.dto';
+import { KNOWLEDGE_ANSWER_LIMITS } from '../../ai/constants/knowledge-answer.constants';
 import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
@@ -84,10 +85,10 @@ const NO_DOCUMENTS = '00000000-0000-0000-0000-000000000000';
 const PREVIEW_CHANNEL = 'test';
 
 /**
- * The answer step's wall-clock budget: `AiService.answerKnowledgeQuestion`'s, derived from the SQS
- * visibility window. A v2 bot's fallback to v1 gets only what the failed v2 call left of it.
+ * The answer step's wall-clock budget, derived from the SQS visibility window. A v2 bot's fallback
+ * to v1 gets only what the failed v2 call left of it.
  */
-const ANSWER_BUDGET_MS = 40_000;
+const ANSWER_BUDGET_MS = KNOWLEDGE_ANSWER_LIMITS.budgetMs;
 
 /** A reply from either engine: v1's response, or v2's without the run fields. */
 type EngineAnswer = KnowledgeAnswerResponse &

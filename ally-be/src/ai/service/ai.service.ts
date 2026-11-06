@@ -24,6 +24,7 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
 import { ENDPOINTS } from '../constants/endpoints.constants';
+import { KNOWLEDGE_ANSWER_LIMITS } from '../constants/knowledge-answer.constants';
 import {
   HelplineRiskRequest,
   HelplineRiskResponse,
@@ -650,22 +651,17 @@ export class AiService {
    * cost the window.
    */
   @RetryWithinBudget({
-    attempts: 2,
-    delayMs: 500,
-    budgetMs: 40_000,
+    attempts: KNOWLEDGE_ANSWER_LIMITS.attempts,
+    delayMs: KNOWLEDGE_ANSWER_LIMITS.delayMs,
+    budgetMs: KNOWLEDGE_ANSWER_LIMITS.budgetMs,
     shouldRetry: isRetryableAiFailure,
     label: 'answerKnowledgeQuestion',
   })
   async answerKnowledgeQuestion(request: KnowledgeAnswerRequest) {
-    return this.makeRequest<KnowledgeAnswerResponse, KnowledgeAnswerRequest>(
+    return this.postKnowledge<KnowledgeAnswerResponse, KnowledgeAnswerRequest>(
       ENDPOINTS.KNOWLEDGE_AGENT_ANSWER,
       request,
-      true,
-      'post',
-      undefined,
-      false,
-      25_000,
-      true,
+      { timeoutMs: KNOWLEDGE_ANSWER_LIMITS.attemptMs },
     );
   }
 
@@ -698,15 +694,10 @@ export class AiService {
     label: 'checkWhatsAppCrisis',
   })
   async checkWhatsAppCrisis(request: CrisisCheckRequest) {
-    return this.makeRequest<CrisisCheckResponse, CrisisCheckRequest>(
+    return this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
       ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
       request,
-      true,
-      'post',
-      undefined,
-      false,
-      15_000,
-      true,
+      { timeoutMs: 15_000 },
     );
   }
 
@@ -723,17 +714,14 @@ export class AiService {
    *
    * redactBody=true: the payload is the person's question.
    */
-  async runAgent(request: AgentRunRequest, timeoutMs = 25_000) {
-    return this.makeRequest<AgentRunResponse, AgentRunRequest>(
+  async runAgent(
+    request: AgentRunRequest,
+    timeoutMs: number = KNOWLEDGE_ANSWER_LIMITS.attemptMs,
+  ) {
+    return this.postKnowledge<AgentRunResponse, AgentRunRequest>(
       ENDPOINTS.AGENT_RUN,
       request,
-      true,
-      'post',
-      undefined,
-      false,
-      timeoutMs,
-      true,
-      false,
+      { timeoutMs, alertOnFailure: false },
     );
   }
 
@@ -751,26 +739,22 @@ export class AiService {
     request: KnowledgeAnswerRequest,
     budgetMs: number,
   ): Promise<KnowledgeAnswerResponse> {
-    const attempts = 2;
-    const delayMs = 500;
+    const {
+      attempts,
+      delayMs,
+      attemptMs: maxAttemptMs,
+    } = KNOWLEDGE_ANSWER_LIMITS;
     const startedAt = Date.now();
     for (let attempt = 1; ; attempt++) {
       const remainingMs = budgetMs - (Date.now() - startedAt);
       const attemptStartedAt = Date.now();
       try {
-        return await this.makeRequest<
+        return await this.postKnowledge<
           KnowledgeAnswerResponse,
           KnowledgeAnswerRequest
-        >(
-          ENDPOINTS.KNOWLEDGE_AGENT_ANSWER,
-          request,
-          true,
-          'post',
-          undefined,
-          false,
-          Math.max(1, Math.min(25_000, remainingMs)),
-          true,
-        );
+        >(ENDPOINTS.KNOWLEDGE_AGENT_ANSWER, request, {
+          timeoutMs: Math.max(1, Math.min(maxAttemptMs, remainingMs)),
+        });
       } catch (error) {
         const attemptMs = Date.now() - attemptStartedAt;
         const elapsedMs = Date.now() - startedAt;
@@ -976,6 +960,32 @@ export class AiService {
           `${request.scenario_session_id}; it will simply remain un-evaluated.`,
       );
     }
+  }
+
+  /**
+   * A POST to one of ally-ai's knowledge endpoints: throws on failure (the caller decides what a
+   * failure means) and logs the body's size only, never the person's message.
+   * `alertOnFailure: false` where the caller raises its own, throttled alert.
+   */
+  private postKnowledge<R, T>(
+    endpoint: string,
+    body: T,
+    {
+      timeoutMs,
+      alertOnFailure = true,
+    }: { timeoutMs: number; alertOnFailure?: boolean },
+  ): Promise<R> {
+    return this.makeRequest<R, T>(
+      endpoint,
+      body,
+      true,
+      'post',
+      undefined,
+      false,
+      timeoutMs,
+      true,
+      alertOnFailure,
+    );
   }
 
   private async makeRequest<R, T>(
