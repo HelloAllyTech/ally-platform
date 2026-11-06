@@ -1,8 +1,8 @@
 # Chunk 02 notes: sandbox and tools
 
-Branch `feat/bug-hunter-v2`, commits `1acb3d625` + `f5754a0f2`. `make lint` and
-`make test` pass (155 offline tests). The Docker integration run is recorded in
-"Sandbox timings" below.
+Branch `feat/bug-hunter-v2`, commits `1acb3d625`, `f5754a0f2`, `68067292d` and the
+notes commit. `make lint` and `make test` pass (155 offline tests). The Docker
+integration run passed for all five apps; numbers in "Sandbox timings" below.
 
 ## Code map
 
@@ -97,16 +97,49 @@ Only field values and recognisable patterns are. A model-based redactor is out o
 
 ## Sandbox timings
 
-CI wall-clock from the last six green runs on master (install included) is the
-reference: ally-be 4–7.5 min, ally-web 12–19 min, ally-ai 1.5–2 min, ally-ai-learn
-2–2.7 min, ally-mobile 6–7.5 min.
+Measured on this Mac (10 cores, 16 GB; Docker Desktop VM 10 CPU / 8 GB) with
+`make test-docker` and `BUGHUNTER_IT_FULL=1`. "Image" is the one-time `docker build`;
+"install" is the one-time dependency install into the lockfile-hash volume (network
+on); the test columns are warm-volume runs with `--network none`. CI wall-clock from
+the last six green master runs (install included) is in the last column for reference.
 
-Real sandbox numbers on this Mac (10 cores, 16 GB; Docker VM 10 CPU / 8 GB):
+| App | Image | Install | One test file | Full suite | Full suite result | CI reference |
+|---|---|---|---|---|---|---|
+| ally-be | 84 s | 73 s (`npm ci`) | 2.5 s | 190 s | pass | 4–7.5 min |
+| ally-web | 43 s | 176 s (`npm ci`) | 6.6 s | 548 s | pass | 12–19 min |
+| ally-ai | 74 s | 28 s (poetry) | 4.5 s | 49 s | pass | 1.5–2 min |
+| ally-ai-learn | (shared) | 68 s (poetry) | 13 s | 306 s | 4 failures, see below | 2–2.7 min |
+| ally-mobile | 27 s build after a ~6 min SDK clone | 30 s (`pub get`) | 12–15 s | **not measured locally** | — | 6–7.5 min |
 
-PENDING — the integration run needs Docker disk reclaimed first (5.5 GB free on the
-host; `docker system df` showed 25.5 GB of images and 14 GB of build cache). This
-section is filled in by `make test-docker`, which writes
-`bug-hunter/runs/integration-timings.json`.
+Every app runs one known-passing test file in the sandbox and reports pass; that is
+the chunk's acceptance test. Notes per app:
+
+- **ally-ai-learn offline failures (4 of the full suite).** Two need the network and
+  will always fail under `--network none`: `test_download_files.py::test_download_required_files_uses_default_threshold`
+  (loads the Silero VAD from Hugging Face) and `test_openai_embeddings.py::…::test_token_count_matches_tiktoken_for_the_model`
+  (tiktoken downloads its BPE file). One needs git inside the container:
+  `test_delivery_openers.py::TestSessionCatalog::test_the_catalog_file_ships` runs
+  `git check-ignore`, and a worktree's `.git` is a pointer to the host's `.git/worktrees/…`
+  path that does not exist in the container. One is order-dependent:
+  `test_main.py::TestMain::test_health_endpoint_returns_ok_and_trace_id_header` fails in
+  the full run but passes alone in the same sandbox. Also, its `pytest.ini` turns on
+  coverage for every run, which is why a 1-test file takes 13 s here against 4.5 s for
+  ally-ai. Chunk 06's `verify` must compare against a baseline run of the same suite
+  rather than expecting zero failures, or ally-ai-learn fixes can never verify.
+- **ally-mobile** runs on linux/arm64 in the custom Flutter 3.47.7 image (Dart 3.13.5,
+  the version `pubspec.yaml` pins), so the arm64 question is settled: it works. The full
+  suite was **not measured**: `flutter test` compiles every test into `.dart_tool`, and
+  with the host at under 3 GB free the disk guard killed the run after 31 s. Marked
+  blocked locally for the full suite only; it will run on the GitHub runner in chunk 08.
+  `--no-pub` is required on `flutter test`/`flutter analyze`: without it Flutter
+  re-resolves packages and, offline, fails on `pub.dev`.
+- **ally-web** single-file runs need the file as a positional Vitest filter after `--`;
+  `TESTING.md`'s `--testFile` is not a Vitest 3 option and crashes the CLI.
+- **Disk.** The dependency volumes total about 4 GB (ally-web 1.3 GB, ally-be 1 GB,
+  ally-ai-learn 1.2 GB, ally-ai 0.4 GB, mobile 0.3 GB) and the four images 5.1 GB. Each
+  image build also leaves its layers in Docker's build cache (5 GB for the four), so run
+  `docker builder prune` after building. The host was at 5.5 GB free when this chunk
+  started and hit 0 twice during the runs; the sandbox is usable here only with care.
 
 ## How to test
 
@@ -127,4 +160,9 @@ BUGHUNTER_IT_FULL=1 make test-docker         # also the full suite per app (slow
   code) belongs to `risk_precheck` in chunk 05 and is not here.
 - `Runner` parses Jest, Vitest, pytest and `flutter test` output by regex; a JSON
   reporter per framework would be more robust and is worth doing when a parse misses.
+- Tests that shell out to `git` fail in the container (worktree `.git` pointer). If more
+  turn up, mount the main repo's `.git` read-only at the same absolute path, or
+  `git worktree repair` inside the container.
+- Network-dependent tests (Hugging Face, tiktoken) mean "full suite passes" is not a
+  usable gate for ally-ai-learn offline; `verify` needs a baseline (chunk 06).
 - Root `.pre-commit-config.yaml` still does not cover `bug-hunter/`.
