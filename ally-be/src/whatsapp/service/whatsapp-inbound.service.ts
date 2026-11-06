@@ -35,7 +35,10 @@ import {
   type AgentFallbackEvent,
   type AgentShadowRunEvent,
 } from 'src/chatbot/type/agent-runtime.event';
-import type { AgentRunRef } from 'src/chatbot/engine/chatbot-engine.types';
+import type {
+  AgentRunRef,
+  ChatbotDecision,
+} from 'src/chatbot/engine/chatbot-engine.types';
 import { ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
 import { ConnectorService } from 'src/chatbot/service/connector.service';
@@ -391,25 +394,7 @@ export class WhatsAppInboundService {
         );
       }
       if (decision.alert) this.eventEmitter.emit('exception', decision.alert);
-      // Agents v2. The fallback alert is throttled per bot and reason by its listener
-      // (AgentRuntimeAlertThrottle), so it is announced here rather than emitted as an alert.
-      if (isFallback(decision.agent)) {
-        this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
-          chatbot: { id: chatbot.id, name: chatbot.name },
-          reason: decision.agent.fallbackReason,
-        } satisfies AgentFallbackEvent);
-      }
-      // Only now — the reply has been sent and recorded. Its listener (ChatbotShadowService) runs
-      // asynchronously and never throws, so a shadow run cannot delay this message, fail it, or
-      // have it redelivered.
-      if (decision.shadow) {
-        this.eventEmitter.emit(AGENT_SHADOW_RUN_EVENT, {
-          chatbotId: chatbot.id,
-          conversationId: conversation.id,
-          inboundMessageId: inboundId,
-          shadow: decision.shadow,
-        } satisfies AgentShadowRunEvent);
-      }
+      this.announceAgentOutcome(chatbot, conversation.id, inboundId, decision);
     } catch (error) {
       // Reached only when nothing has been sent — every send path above returns. Recorded on the
       // message and swallowed: rethrowing would redeliver and risk a second reply.
@@ -434,6 +419,35 @@ export class WhatsAppInboundService {
    * standalone message. A bare disclaimer reads as a bot that ignored you, and it costs the worker a
    * round trip to ask again.
    */
+  /**
+   * After the reply has been sent and recorded, tell the Agents v2 listeners. The fallback alert is
+   * throttled per bot and reason by its listener (AgentRuntimeAlertThrottle), so it is announced
+   * here rather than emitted as an alert. The shadow listener (ChatbotShadowService) runs
+   * asynchronously and never throws, so a shadow run cannot delay this message, fail it, or have
+   * it redelivered.
+   */
+  private announceAgentOutcome(
+    chatbot: Pick<Chatbot, 'id' | 'name'>,
+    conversationId: string,
+    inboundMessageId: string,
+    decision: Pick<ChatbotDecision, 'agent' | 'shadow'>,
+  ): void {
+    if (isFallback(decision.agent)) {
+      this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
+        chatbot: { id: chatbot.id, name: chatbot.name },
+        reason: decision.agent.fallbackReason,
+      } satisfies AgentFallbackEvent);
+    }
+    if (decision.shadow) {
+      this.eventEmitter.emit(AGENT_SHADOW_RUN_EVENT, {
+        chatbotId: chatbot.id,
+        conversationId,
+        inboundMessageId,
+        shadow: decision.shadow,
+      } satisfies AgentShadowRunEvent);
+    }
+  }
+
   private async handleConsent(
     contact: WaContact,
     conversation: WaConversation,
