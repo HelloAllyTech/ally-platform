@@ -62,34 +62,6 @@ async def run(
     caller can switch between the two without new error handling.
     """
     run_id = payload.run_id or str(uuid4())
-    bot = {
-        "prompts": payload.prompts,
-        "limits": {
-            "top_k": payload.top_k,
-            "min_similarity": payload.min_similarity,
-            "decline_similarity": payload.decline_similarity,
-            "max_passages": payload.max_passages,
-            "max_context_tokens": payload.max_context_tokens,
-            "similarity_band": payload.similarity_band,
-        },
-        "max_answer_chars": payload.max_answer_chars,
-        "translate_query": payload.translate_query,
-        # `is not None`, not truthiness, as in the old route: an EMPTY list is "this
-        # bot has no documents" and must search nothing, never everything.
-        "document_ids": (
-            [str(d) for d in payload.document_ids]
-            if payload.document_ids is not None
-            else None
-        ),
-        "persona": payload.persona.model_dump() if payload.persona else None,
-        "answer_mode": payload.answer_mode,
-        "channel": payload.channel,
-        "audience": payload.audience.model_dump(mode="json"),
-        "log_retrieval": payload.log_retrieval,
-        "features": dict(payload.features),
-        "knowledge_topics": list(payload.knowledge_topics),
-        "decline_text": payload.decline_text,
-    }
     with knowledge_errors("Unexpected error in an agent run"):
         state = await run_agent(
             graph,
@@ -98,7 +70,7 @@ async def run(
             chatbot_id=payload.chatbot_id,
             question=payload.question,
             history=[turn.model_dump() for turn in payload.history],
-            bot=bot,
+            bot=payload.to_bot(),
         )
         result = state["result"]
         retrieval = {

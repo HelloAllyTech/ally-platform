@@ -46,7 +46,7 @@ from app.core.agent_runtime.nodes import (
     route_after_check,
     route_after_gate,
 )
-from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState
+from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState, BotConfig
 from app.core.agent_runtime.trace import summarise_run
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
@@ -123,7 +123,7 @@ async def run_agent(
     chatbot_id: Optional[str],
     question: str,
     history: List[Dict[str, str]],
-    bot: Dict[str, Any],
+    bot: BotConfig,
 ) -> AgentState:
     """Run the graph once for one message. Returns the final state."""
     inputs: Dict[str, Any] = {key: None for key in RUN_SCOPED_KEYS}

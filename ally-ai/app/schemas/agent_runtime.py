@@ -11,6 +11,7 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator, model_serializer
 
 from app.core.agent_runtime.schemas import TurnType
+from app.core.agent_runtime.state import BotConfig
 from app.schemas.knowledge_agent import (
     KnowledgeAnswerRequest,
     KnowledgeAnswerResponse,
@@ -67,6 +68,37 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             "from it, not its words."
         ),
     )
+
+    def to_bot(self) -> BotConfig:
+        """The `bot` block of the run's state."""
+        return {
+            "prompts": self.prompts,
+            "limits": {
+                "top_k": self.top_k,
+                "min_similarity": self.min_similarity,
+                "decline_similarity": self.decline_similarity,
+                "max_passages": self.max_passages,
+                "max_context_tokens": self.max_context_tokens,
+                "similarity_band": self.similarity_band,
+            },
+            "max_answer_chars": self.max_answer_chars,
+            "translate_query": self.translate_query,
+            # `is not None`, not truthiness, as in the old route: an EMPTY list is
+            # "this bot has no documents" and must search nothing, never everything.
+            "document_ids": (
+                [str(d) for d in self.document_ids]
+                if self.document_ids is not None
+                else None
+            ),
+            "persona": self.persona.model_dump() if self.persona else None,
+            "answer_mode": self.answer_mode,
+            "channel": self.channel,
+            "audience": self.audience.model_dump(mode="json"),
+            "log_retrieval": self.log_retrieval,
+            "features": dict(self.features),
+            "knowledge_topics": list(self.knowledge_topics),
+            "decline_text": self.decline_text,
+        }
 
     @field_validator("knowledge_topics")
     @classmethod

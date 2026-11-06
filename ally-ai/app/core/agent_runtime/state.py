@@ -11,6 +11,7 @@ import json
 from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
 from app.core.agent_runtime.schemas import TurnType
+from app.core.knowledge_agent.schemas import AnswerMode
 
 
 def add_trace(
@@ -26,6 +27,27 @@ def add_trace(
     return (left or []) + right
 
 
+class BotConfig(TypedDict, total=False):
+    """The bot a run answers for: everything `/knowledge-agent/answer` takes besides
+    the question and history, plus the agent's own inputs. Built from the request by
+    `AgentRunRequest.to_bot()`."""
+
+    prompts: Optional[Dict[str, Any]]  # with the bot's model override
+    limits: Dict[str, Any]  # retrieval thresholds; None = the settings default
+    max_answer_chars: int
+    translate_query: bool
+    document_ids: Optional[List[str]]  # [] searches nothing; None searches all
+    persona: Optional[Dict[str, Any]]
+    answer_mode: AnswerMode
+    channel: Optional[str]
+    audience: Dict[str, Any]
+    log_retrieval: bool
+    # --- conversational agent
+    features: Dict[str, bool]
+    knowledge_topics: List[str]
+    decline_text: Optional[str]
+
+
 class RunInput(TypedDict, total=False):
     # --- input
     run_id: str
@@ -33,10 +55,7 @@ class RunInput(TypedDict, total=False):
     conversation_id: str  # also the checkpointer thread_id
     question: str
     history: List[Dict[str, str]]
-    # documents, persona, answer mode, prompts (with the bot's model override),
-    # thresholds, audience: everything `/knowledge-agent/answer` takes besides the
-    # question and history.
-    bot: Dict[str, Any]
+    bot: BotConfig
 
 
 class RunWorking(TypedDict, total=False):
