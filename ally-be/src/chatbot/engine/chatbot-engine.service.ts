@@ -41,6 +41,7 @@ import type {
   ChatTurn,
   ShadowRunRequest,
 } from './chatbot-engine.types';
+import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import {
   buildAgentRunRequest,
   buildKnowledgeRequest,
@@ -62,9 +63,9 @@ export const KNOWLEDGE_PROMPT_CODES = [
  * The conversational agent's prompts (Agents v2, `features.agent`). Loaded only for a bot in agent
  * mode, so every other bot's request is exactly as before.
  */
-export const AGENT_PROMPT_CODES = ['ally_ai_agent_system'];
 /** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
 const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
+export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
 /** At most this many document titles are sent as the agent's "what I cover" list. */
 const MAX_KNOWLEDGE_TOPICS = 50;
 
@@ -73,51 +74,6 @@ const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 const GENERAL_ANSWER_PROMPT_CODE = 'ally_ai_knowledge_answer_general';
 /** A document id no document has: the "search nothing" filter. */
 const NO_DOCUMENTS = '00000000-0000-0000-0000-000000000000';
-
-/** Words that make a command reply the "say hello" reply (the shared Greeting). */
-const GREETING_WORDS = new Set([
-  'hi',
-  'hello',
-  'hey',
-  'hii',
-  'namaste',
-  'hola',
-  'good morning',
-]);
-
-/** The shared reply to a bare hello: a command reply triggered by greeting words. */
-export const isGreetingReply = (template: {
-  kind: WaTemplateKind;
-  patterns: string[];
-}): boolean =>
-  template.kind === WaTemplateKind.COMMAND &&
-  (template.patterns ?? []).some((p) =>
-    GREETING_WORDS.has(ChatbotReplyService.normalise(p)),
-  );
-
-/**
- * Whether an agent bot answers this keyword match itself instead of sending the template.
- *
- * Only the command and FAQ replies (greeting, help, "what can you do", FAQ answers) give way.
- * Crisis and consent replies never do. Two command replies stay:
- * - a bare `help`, which keeps the fixed Help text and its safety wording;
- * - the bot's own welcome message, on a person's first message only.
- */
-export const agentAnswersInstead = (
-  template: { kind: WaTemplateKind; patterns: string[] },
-  turn: Pick<ChatTurn, 'text' | 'chatbot' | 'isFirstMessage'>,
-): boolean => {
-  if (
-    template.kind !== WaTemplateKind.COMMAND &&
-    template.kind !== WaTemplateKind.FAQ
-  ) {
-    return false;
-  }
-  if (ChatbotReplyService.normalise(turn.text) === 'help') return false;
-  const welcome = turn.chatbot.persona?.greeting?.trim();
-  if (welcome && turn.isFirstMessage && isGreetingReply(template)) return false;
-  return true;
-};
 
 /** The test console's channel type. */
 const PREVIEW_CHANNEL = 'test';
