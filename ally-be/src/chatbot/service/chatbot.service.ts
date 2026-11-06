@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import type { AgentTraceStep } from '../../ai/dto/knowledge.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
@@ -14,6 +13,7 @@ import { ChatbotAudience } from '../entity/chatbot-audience.entity';
 import { Chatbot } from '../entity/chatbot.entity';
 import { Connector } from '../entity/connector.entity';
 import {
+  AgentRuntimeUsed,
   ChatbotAccessMode,
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
@@ -27,7 +27,7 @@ import {
   TestChatbotDto,
   UpdateChatbotDto,
 } from '../dto/chatbot.dto';
-import { effectiveRuntime } from '../engine/agent-runtime';
+import { effectiveRuntime, isFallback } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import { withFirstMessageParts } from '../engine/first-reply';
 import type { ChatbotModelChoice } from '../type/chatbot.type';
@@ -595,7 +595,7 @@ export class ChatbotService {
       // Shown rather than sent: the console must never page anyone.
       wouldAlert: decision.alert
         ? decision.alert.type
-        : decision.agent?.fallbackReason
+        : isFallback(decision.agent)
           ? AGENT_RUNTIME_DEGRADED_TYPE
           : null,
       latencyMs: Date.now() - startedAt,
@@ -603,8 +603,13 @@ export class ChatbotService {
       // Agents v2: which engine answered this test, and the run behind it.
       runtime: decision.agent?.runtime ?? ChatbotRuntime.V1,
       runId: decision.agent?.runId ?? null,
-      trace: (decision.agent?.trace ?? null) as AgentTraceStep[] | null,
-      fallbackReason: decision.agent?.fallbackReason ?? null,
+      trace:
+        decision.agent?.runtime === AgentRuntimeUsed.V2
+          ? decision.agent.trace
+          : null,
+      fallbackReason: isFallback(decision.agent)
+        ? decision.agent.fallbackReason
+        : null,
       // Agent mode: what the agent understood the message to be (smalltalk, about_bot, …).
       turnType:
         (decision.retrievalMeta?.turn_type as string | undefined) ?? null,

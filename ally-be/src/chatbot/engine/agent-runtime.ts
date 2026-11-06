@@ -6,8 +6,12 @@ import { ErrorCode } from '../../exception/error-code.enum';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 import type { Chatbot } from '../entity/chatbot.entity';
 import type { AgentShadowSide } from '../entity/agent-shadow-run.entity';
-import type { ShadowRunRequest } from './chatbot-engine.types';
-import { ChatbotRuntime } from '../enum/chatbot.enum';
+import type {
+  AgentFailureReason,
+  AgentRunRef,
+  ShadowRunRequest,
+} from './chatbot-engine.types';
+import { AgentRuntimeUsed, ChatbotRuntime } from '../enum/chatbot.enum';
 
 /**
  * A v2 bot's message fell back to v1. Emitted by the channel after it replied; the listener raises
@@ -16,7 +20,7 @@ import { ChatbotRuntime } from '../enum/chatbot.enum';
 export const AGENT_FALLBACK_EVENT = 'chatbot.agent-fallback';
 export interface AgentFallbackEvent {
   chatbot: Pick<Chatbot, 'id' | 'name'>;
-  reason: string;
+  reason: AgentFailureReason;
 }
 
 /**
@@ -80,11 +84,8 @@ export class MalformedAgentResponseError extends Error {
   }
 }
 
-/**
- * A short, stable key for why `/agent/run` failed: what the degraded alert is throttled on, and
- * what a shadow row records. Codes and statuses only — never a message that could echo the request.
- */
-export const agentFailureReason = (error: unknown): string => {
+/** Why `/agent/run` failed, as an {@link AgentFailureReason}. */
+export const agentFailureReason = (error: unknown): AgentFailureReason => {
   if (error instanceof MalformedAgentResponseError) return 'malformed';
   if (error instanceof AiUpstreamError) {
     if (error.errorCode === ErrorCode.AI_SERVICE_TIMEOUT) return 'timeout';
@@ -93,6 +94,12 @@ export const agentFailureReason = (error: unknown): string => {
   }
   return 'unknown';
 };
+
+/** v1 answered because the v2 run failed. */
+export const isFallback = (
+  ref: AgentRunRef | undefined,
+): ref is Extract<AgentRunRef, { runtime: AgentRuntimeUsed.V2_FALLBACK }> =>
+  ref?.runtime === AgentRuntimeUsed.V2_FALLBACK;
 
 /** One side of a shadow comparison: the fields the parity script compares, and no text. */
 export const shadowSide = (

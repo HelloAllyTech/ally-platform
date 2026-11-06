@@ -384,7 +384,7 @@ describe('ChatbotEngineService', () => {
         expect(aiService.answerKnowledgeQuestionWithin).toHaveBeenCalledTimes(
           1,
         );
-        expect(decision.agent?.fallbackReason).toBe('malformed');
+        expect(decision.agent).toMatchObject({ fallbackReason: 'malformed' });
       });
 
       it('sends the fallback text, still linked to the run, when v1 fails too', async () => {

@@ -28,12 +28,12 @@ import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
-import { AgentRuntimeUsed } from 'src/chatbot/enum/chatbot.enum';
 import {
   AGENT_FALLBACK_EVENT,
   AGENT_SHADOW_RUN_EVENT,
   type AgentFallbackEvent,
   type AgentShadowRunEvent,
+  isFallback,
 } from 'src/chatbot/engine/agent-runtime';
 import type { AgentRunRef } from 'src/chatbot/engine/chatbot-engine.types';
 import { ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
@@ -393,10 +393,10 @@ export class WhatsAppInboundService {
       if (decision.alert) this.eventEmitter.emit('exception', decision.alert);
       // Agents v2. The fallback alert is throttled per bot and reason by its listener
       // (AgentRuntimeAlertThrottle), so it is announced here rather than emitted as an alert.
-      if (decision.agent?.runtime === AgentRuntimeUsed.V2_FALLBACK) {
+      if (isFallback(decision.agent)) {
         this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
           chatbot: { id: chatbot.id, name: chatbot.name },
-          reason: decision.agent.fallbackReason ?? 'unknown',
+          reason: decision.agent.fallbackReason,
         } satisfies AgentFallbackEvent);
       }
       // Only now — the reply has been sent and recorded. Its listener (ChatbotShadowService) runs

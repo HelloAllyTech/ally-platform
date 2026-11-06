@@ -71,16 +71,28 @@ export interface ChatTurn {
   isFirstMessage?: boolean;
 }
 
-/** The Agents v2 run behind a reply, for the channel to store and Preview to show. */
-export interface AgentRunRef {
-  runtime: AgentRuntimeUsed;
-  runId: string;
-  conversationId: string;
-  /** The graph's steps, when the run answered. */
-  trace?: AgentTraceStep[];
-  /** Why the run failed, when v1 answered instead (`timeout`, `upstream_404`, …). */
-  fallbackReason?: string;
-}
+/**
+ * Why a v2 run failed, as a short stable key: what the degraded alert is throttled on and a shadow
+ * row records. Codes and statuses only, never a message that could echo the request.
+ */
+export type AgentFailureReason =
+  | 'malformed'
+  | 'timeout'
+  | 'unavailable'
+  | 'unknown'
+  | `upstream_${number}`;
+
+/**
+ * The Agents v2 run behind a reply, for the channel to store and Preview to show: the run that
+ * answered, with its steps, or the run that failed and v1 answered instead (see `isFallback`).
+ */
+export type AgentRunRef = { runId: string; conversationId: string } & (
+  | { runtime: AgentRuntimeUsed.V2; trace: AgentTraceStep[] }
+  | {
+      runtime: AgentRuntimeUsed.V2_FALLBACK;
+      fallbackReason: AgentFailureReason;
+    }
+);
 
 /**
  * What a shadow bot hands its channel: the `/agent/run` request to send AFTER the reply has gone
