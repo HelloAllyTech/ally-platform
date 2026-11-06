@@ -42,7 +42,9 @@ export type SpeechStatus =
   /** The browser has no speech recognition. Typing only. */
   | "unsupported"
   /** The user (or policy) refused the mic. Typing only until they allow it. */
-  | "denied";
+  | "denied"
+  /** No mic found, or the browser's speech service can't be reached. Typing only; can retry. */
+  | "unavailable";
 
 interface UseSpeechCaptureOptions {
   /** Called with each FINAL phrase, ready to append to the text. */
@@ -145,13 +147,25 @@ export const useSpeechCapture = ({ onFinal, lang = "en-US" }: UseSpeechCaptureOp
       setInterim(partial);
     };
     recognition.onerror = event => {
+      if (recognitionRef.current !== recognition) return;
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         setBoth("denied");
+        stopMeter();
+      } else if (
+        event.error === "audio-capture" ||
+        event.error === "network" ||
+        event.error === "language-not-supported"
+      ) {
+        // No mic, or the browser's speech service is unreachable. Restarting would loop forever
+        // while the screen claims to be listening, so stop and say so.
+        setBoth("unavailable");
         stopMeter();
       }
       // "no-speech" and "aborted" are normal; onend decides about restarting.
     };
     recognition.onend = () => {
+      // A replaced instance must never restart itself over the new one.
+      if (recognitionRef.current !== recognition) return;
       setInterim("");
       if (statusRef.current === "listening") {
         try {
@@ -167,7 +181,9 @@ export const useSpeechCapture = ({ onFinal, lang = "en-US" }: UseSpeechCaptureOp
 
   const start = useCallback(() => {
     if (statusRef.current === "unsupported") return;
-    recognitionRef.current?.abort();
+    const previous = recognitionRef.current;
+    recognitionRef.current = null; // detaches the old instance's handlers (see build)
+    previous?.abort();
     const recognition = build();
     if (!recognition) return;
     recognitionRef.current = recognition;
