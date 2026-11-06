@@ -10,19 +10,15 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal
 
+from app.core.agent_runtime.budget import MAX_REVISIONS, over_time, recent
 from app.core.agent_runtime.check import (
     check_reply,
     organisation_of,
     rejection_feedback,
 )
-from app.core.agent_runtime.nodes.agent import over_time, recent
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
-
-#: Rewrites allowed per message. One is enough to turn an uncited claim into an
-#: honest reply; more would only add latency.
-MAX_REVISIONS = 1
 
 
 def _summary(_: AgentState, update: Dict[str, Any]) -> str:

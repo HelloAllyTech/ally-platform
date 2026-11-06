@@ -8,6 +8,7 @@ import time
 from typing import Any, Dict, Literal
 
 from app.core.agent_runtime import conversation
+from app.core.agent_runtime.budget import MUST_SEARCH_AFTER, recent, tool_budget
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import allowed_tools
@@ -22,35 +23,6 @@ def _summary(_: AgentState, update: Dict[str, Any]) -> str:
     if step.get("action", REPLY_ACTION) != REPLY_ACTION:
         return f"{step.get('turn_type')}, calls {step['action']} via {model}"
     return f"{step.get('turn_type')}, {step.get('intent')} via {model}"
-
-
-#: Refusals after which, if nothing has been searched, the next step must search.
-MUST_SEARCH_AFTER = ("uncited", "search_first")
-
-
-def recent(history: Any) -> Any:
-    """The last MAX_HISTORY_MESSAGES of the conversation; None when empty."""
-    keep = settings.AGENT_RUNTIME.MAX_HISTORY_MESSAGES
-    return list(history or [])[-keep:] if history and keep else None
-
-
-def over_time(state: AgentState) -> bool:
-    """Whether the run has used its time budget (RUN_BUDGET_SECONDS)."""
-    started = state.get("started_at")
-    return bool(
-        started and time.time() - started > settings.AGENT_RUNTIME.RUN_BUDGET_SECONDS
-    )
-
-
-def tool_budget(state: AgentState) -> int:
-    """Searches left: none past the cap, past the time budget, or once a search
-    added nothing new (another phrasing of the same miss only costs time)."""
-    calls = state.get("tool_calls") or []
-    if calls and not calls[-1].get("added") and not calls[-1].get("refused"):
-        return 0
-    if over_time(state):
-        return 0
-    return max(0, settings.AGENT_RUNTIME.MAX_TOOL_CALLS - len(calls))
 
 
 def make_agent_node(service: KnowledgeAgentService) -> Node:
