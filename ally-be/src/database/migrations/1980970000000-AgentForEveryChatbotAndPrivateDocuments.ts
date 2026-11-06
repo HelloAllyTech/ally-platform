@@ -13,8 +13,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * `down` restores the column defaults and drops ownership. It can't know which bots were on v1 or
  * shadow before, so they stay on v2 with Agent mode, which the chunk 3a code also handles.
  */
-export class AgentForEveryChatbotAndPrivateDocuments1980940000000 implements MigrationInterface {
-  name = 'AgentForEveryChatbotAndPrivateDocuments1980940000000';
+export class AgentForEveryChatbotAndPrivateDocuments1980970000000 implements MigrationInterface {
+  name = 'AgentForEveryChatbotAndPrivateDocuments1980970000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

@@ -304,7 +304,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 - **Ratings:** value low · effort S · risk low · **should**
 
 **39. No CHECK constraint on `wa_messages.agent_runtime`** (6 Migration)
-- **Where:** `1980930000000-AddChatbotAgentRuntime.ts:33`, unlike `chatbots.runtime`.
+- **Where:** `1980960000000-AddChatbotAgentRuntime.ts:33`, unlike `chatbots.runtime`.
 - **Proposed change:** add `CHECK (agent_runtime IN ('v2','v2_fallback'))`. Edit the migration in place only if it hasn't run outside local databases; otherwise add a new migration.
 - **Ratings:** value low · effort S · risk low · **should**
 

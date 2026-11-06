@@ -29,7 +29,7 @@ Brief: [chunk-03d.md](./chunk-03d.md). Built 2026-11-06 on `feat/agents-v2-chunk
 | `knowledge-base/entity/kb-document.entity.ts` | `ownerChatbotId`. |
 | `knowledge-base/repository/kb-document.repository.ts` | `list` leaves out documents that belong to a chatbot (the library and every picker). |
 | `knowledge-base/service/knowledge-base.service.ts` | `createChatbotUploadUrl`, `createForChatbot` and `archiveForChatbot`, detailed below. |
-| `database/migrations/1980940000000-AgentForEveryChatbotAndPrivateDocuments.ts` | Existing bots → v2 + `agent: true`; column defaults; `kb_documents.owner_chatbot_id` (FK, index with `corpus`). `down` restores the defaults and drops the column; it can't restore each bot's old runtime. |
+| `database/migrations/1980970000000-AgentForEveryChatbotAndPrivateDocuments.ts` | Existing bots → v2 + `agent: true`; column defaults; `kb_documents.owner_chatbot_id` (FK, index with `corpus`). `down` restores the defaults and drops the column; it can't restore each bot's old runtime. |
 | `DATA_SCHEMA.md` | The `kb_documents` and `chatbots` rows. |
 
 `chatbot/service/chatbot.service.ts`:

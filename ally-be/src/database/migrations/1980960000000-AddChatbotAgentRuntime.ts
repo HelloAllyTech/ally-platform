@@ -12,8 +12,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * The platform kill switch (`agentRuntimeAllowed`, off) needs no data change: settings defaults are
  * merged over the stored `whatsapp_bot` row field by field.
  */
-export class AddChatbotAgentRuntime1980930000000 implements MigrationInterface {
-  name = 'AddChatbotAgentRuntime1980930000000';
+export class AddChatbotAgentRuntime1980960000000 implements MigrationInterface {
+  name = 'AddChatbotAgentRuntime1980960000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
