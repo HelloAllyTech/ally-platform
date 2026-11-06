@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-
 # Set test environment variables before importing anything
 os.environ.update(
     {
@@ -58,8 +57,25 @@ os.environ.update(
         # make the lifespan tests open a real Postgres checkpointer.
         "AGENT_RUNTIME__ENABLED": "false",
         "AGENT_RUNTIME__CHECKPOINT_DB_URL": "",
+        # The agent's run limits at their defaults, whatever a local .env says: the
+        # agent graph tests count searches and steps against them.
+        "AGENT_RUNTIME__MAX_TOOL_CALLS": "2",
+        "AGENT_RUNTIME__RUN_BUDGET_SECONDS": "15",
+        "AGENT_RUNTIME__MAX_HISTORY_MESSAGES": "10",
     }
 )
+
+
+@pytest.fixture(autouse=True)
+def agent_reasoning_effort_unset(monkeypatch):
+    """AGENT_RUNTIME__AGENT_REASONING_EFFORT at its default (unset) in every test.
+
+    Reset here rather than pinned above: an empty value is not a valid setting, and
+    the 3a notes have developers set it in their own .env.
+    """
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings.AGENT_RUNTIME, "AGENT_REASONING_EFFORT", None)
 
 
 @pytest.fixture

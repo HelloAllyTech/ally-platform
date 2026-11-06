@@ -616,9 +616,7 @@ class TestFlag:
 class TestReasoningEffort:
     """AGENT_RUNTIME__AGENT_REASONING_EFFORT reaches the agent step."""
 
-    async def test_unset_sends_none(self, agent_run, chunk_service, monkeypatch):
-        # Explicitly unset: a developer's ally-ai/.env may set it.
-        monkeypatch.setattr(settings.AGENT_RUNTIME, "AGENT_REASONING_EFFORT", None)
+    async def test_unset_sends_none(self, agent_run, chunk_service):
         llm = FakeLLM(chat("Hi!"))
         await agent_run("hi", llm)
         assert llm.calls[0]["reasoning_effort"] is None
