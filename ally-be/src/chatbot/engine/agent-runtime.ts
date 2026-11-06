@@ -6,34 +6,8 @@ import { ErrorCode } from '../../exception/error-code.enum';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 import type { Chatbot } from '../entity/chatbot.entity';
 import type { AgentShadowSide } from '../entity/agent-shadow-run.entity';
-import type {
-  AgentFailureReason,
-  AgentRunRef,
-  ShadowRunRequest,
-} from './chatbot-engine.types';
+import type { AgentFailureReason, AgentRunRef } from './chatbot-engine.types';
 import { AgentRuntimeUsed, ChatbotRuntime } from '../enum/chatbot.enum';
-
-/**
- * A v2 bot's message fell back to v1. Emitted by the channel after it replied; the listener raises
- * the throttled "agent runtime degraded" alert.
- */
-export const AGENT_FALLBACK_EVENT = 'chatbot.agent-fallback';
-export interface AgentFallbackEvent {
-  chatbot: Pick<Chatbot, 'id' | 'name'>;
-  reason: AgentFailureReason;
-}
-
-/**
- * A shadow bot's message has been answered by v1 and the reply recorded. The listener runs the same
- * request through the Agents v2 engine and stores the comparison.
- */
-export const AGENT_SHADOW_RUN_EVENT = 'chatbot.agent-shadow-run';
-export interface AgentShadowRunEvent {
-  chatbotId: string;
-  conversationId: string;
-  inboundMessageId: string;
-  shadow: ShadowRunRequest;
-}
 
 /**
  * The namespace Agents v2 run ids are derived under. Never change it: a run id stored on a message

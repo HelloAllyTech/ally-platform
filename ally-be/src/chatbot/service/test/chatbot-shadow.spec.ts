@@ -1,6 +1,6 @@
 import { LoggerService } from '../../../logger/logger.service';
 import { ChatbotShadowService } from '../chatbot-shadow.service';
-import type { AgentShadowRunEvent } from '../../engine/agent-runtime';
+import type { AgentShadowRunEvent } from '../../type/agent-runtime.event';
 
 const event = (n: number): AgentShadowRunEvent => ({
   chatbotId: 'bot-1',

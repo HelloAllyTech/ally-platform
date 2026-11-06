@@ -4,7 +4,7 @@ import type { NotificationErrorType } from '../../notification/type/notification
 import {
   AGENT_FALLBACK_EVENT,
   type AgentFallbackEvent,
-} from '../engine/agent-runtime';
+} from '../type/agent-runtime.event';
 import type { Chatbot } from '../entity/chatbot.entity';
 
 export const AGENT_RUNTIME_DEGRADED_TYPE = 'Chatbot Agent Runtime Degraded';

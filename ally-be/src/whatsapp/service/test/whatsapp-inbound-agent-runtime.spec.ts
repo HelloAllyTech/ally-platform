@@ -20,11 +20,11 @@ import { WhatsAppBusinessNumberService } from '../whatsapp-business-number.servi
 import { WhatsAppIdentityService } from '../whatsapp-identity.service';
 import { WhatsAppInboundService } from '../whatsapp-inbound.service';
 import { WhatsAppRateLimitService } from '../whatsapp-rate-limit.service';
+import { agentRunIdFor } from 'src/chatbot/engine/agent-runtime';
 import {
   AGENT_FALLBACK_EVENT,
   AGENT_SHADOW_RUN_EVENT,
-  agentRunIdFor,
-} from 'src/chatbot/engine/agent-runtime';
+} from 'src/chatbot/type/agent-runtime.event';
 import { AgentRuntimeRunner } from 'src/chatbot/engine/agent-runtime-runner.service';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';

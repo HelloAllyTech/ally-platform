@@ -6,12 +6,14 @@ import { AiService } from '../../ai/service/ai.service';
 import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import {
-  AGENT_SHADOW_RUN_EVENT,
   agentFailureReason,
-  type AgentShadowRunEvent,
   MalformedAgentResponseError,
   shadowSide,
 } from '../engine/agent-runtime';
+import {
+  AGENT_SHADOW_RUN_EVENT,
+  type AgentShadowRunEvent,
+} from '../type/agent-runtime.event';
 import {
   AgentShadowRun,
   AgentShadowSide,
