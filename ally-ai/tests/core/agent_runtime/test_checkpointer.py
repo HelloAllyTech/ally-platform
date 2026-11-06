@@ -16,6 +16,7 @@ from app.core.agent_runtime.graph import (
     open_agent_runtime,
     run_agent,
 )
+from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState, RunInput
 from app.core.config import settings
 from app.core.knowledge_agent.schemas import AnswerIntent, KnowledgeAnswer
 from tests.core.agent_runtime.conftest import AGENT, make_bot
@@ -74,6 +75,13 @@ async def test_each_run_starts_clean(graph, chunk_service):
     assert len(second["trace"]) == 4
     assert second["passages"] is None
     assert second["answer_raw"] is None
+
+
+async def test_every_working_key_is_cleared_between_runs():
+    """A state key is run input, cleared per run, or the trace: none can leak."""
+    inputs = set(RunInput.__annotations__)
+    assert set(AgentState.__annotations__) == inputs | set(RUN_SCOPED_KEYS) | {"trace"}
+    assert not inputs & set(RUN_SCOPED_KEYS)
 
 
 async def test_conversations_are_separate_threads(graph, chunk_service):

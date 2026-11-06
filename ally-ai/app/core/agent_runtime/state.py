@@ -24,7 +24,7 @@ def add_trace(
     return (left or []) + right
 
 
-class AgentState(TypedDict, total=False):
+class RunInput(TypedDict, total=False):
     # --- input
     run_id: str
     chatbot_id: Optional[str]
@@ -35,6 +35,11 @@ class AgentState(TypedDict, total=False):
     # thresholds, audience: everything `/knowledge-agent/answer` takes besides the
     # question and history.
     bot: Dict[str, Any]
+
+
+class RunWorking(TypedDict, total=False):
+    """Working and output keys, cleared at the start of every run (see
+    RUN_SCOPED_KEYS)."""
 
     # --- working (the parity path; the agent path uses limits, language, hits,
     # retrieval and passages of these)
@@ -72,37 +77,15 @@ class AgentState(TypedDict, total=False):
 
     # --- output: the `/knowledge-agent/answer` response, field for field
     result: Optional[Dict[str, Any]]
+
+
+class AgentState(RunInput, RunWorking, total=False):
     trace: Annotated[List[Dict[str, Any]], add_trace]
 
 
-#: Working and output keys, cleared at the start of every run so nothing from the
-#: previous run in the same thread can leak into this one.
-RUN_SCOPED_KEYS = (
-    "limits",
-    "search_text",
-    "language",
-    "translated_query",
-    "translation_degraded",
-    "hits",
-    "retrieval_latency_ms",
-    "retrieval",
-    "gate_reason",
-    "passages",
-    "answer_raw",
-    "answer_meta",
-    "turn_type",
-    "search_gate",
-    "agent_step",
-    "agent_meta",
-    "agent_calls",
-    "tool_calls",
-    "feedback",
-    "feedback_text",
-    "revisions",
-    "started_at",
-    "fallback_result",
-    "result",
-)
+#: Cleared at the start of every run so nothing from the previous run in the same
+#: thread can leak into this one. Derived, so a new working key is cleared too.
+RUN_SCOPED_KEYS = tuple(RunWorking.__annotations__)
 
 
 def json_safe(value: Any) -> Any:
