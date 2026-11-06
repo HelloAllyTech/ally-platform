@@ -374,6 +374,8 @@ export class KnowledgeBaseService {
       isGlobal: boolean;
       tenantIds: string[];
       ownerTenantId: string | null;
+      /** The chatbot the document belongs to (chunk 3d); absent for every other document. */
+      ownerChatbotId?: string;
     },
   ): Promise<KbDocumentResponseDto> {
     const { isGlobal, tenantIds } = audience;
@@ -394,6 +396,7 @@ export class KnowledgeBaseService {
       tags: dto.tags ?? [],
       isGlobal,
       ownerTenantId: audience.ownerTenantId,
+      ownerChatbotId: audience.ownerChatbotId ?? null,
       // Pasted text is stored up front so the row is self-sufficient; the extractor still runs over
       // it to derive sections, and every other source type fills this in during ingest.
       rawText:
@@ -720,7 +723,13 @@ export class KnowledgeBaseService {
   async archive(id: string): Promise<KbDocumentResponseDto> {
     const document = await this.findOrFail(id);
     if (document.archivedAt) return this.respond(document);
+    await this.archiveFound(document);
+    return this.get(id);
+  }
 
+  /** Archive a document the caller has already found and checked. */
+  private async archiveFound(document: KbDocument): Promise<void> {
+    const { id } = document;
     try {
       await this.aiService.deleteKnowledgeChunksByDocument(id, document.corpus);
     } catch (error) {
@@ -741,7 +750,6 @@ export class KnowledgeBaseService {
         updatedBy: this.currentUserId(),
       },
     );
-    return this.get(id);
   }
 
   /** Unarchive and re-index, since archiving deleted the vectors. */
@@ -1173,6 +1181,68 @@ export class KnowledgeBaseService {
             ownerTenantId: owner.tenantId,
           },
     );
+  }
+
+  // ─────────────────────────────────────────────── a chatbot's own documents (chunk 3d)
+  //
+  // Uploaded on a chatbot's Knowledge tab, in the WhatsApp corpus, and seen and managed there
+  // only. The caller (ChatbotService) checks that the user may edit that chatbot; these methods
+  // only keep a document tied to its chatbot.
+
+  private chatbotFolder(chatbotId: string): string {
+    return `${KB_DOCUMENT_S3_PREFIX}/chatbots/${chatbotId}`;
+  }
+
+  /** Presigned upload into this chatbot's folder. */
+  async createChatbotUploadUrl(chatbotId: string, dto: CreateKbUploadUrlDto) {
+    return this.createUploadUrl(dto, this.chatbotFolder(chatbotId));
+  }
+
+  /**
+   * Create a document that belongs to one chatbot and queue its ingest. Its audience is nobody
+   * by targeting (not global, no organisations): it is reached only through the chatbot's own
+   * `document_ids`, which is how a chatbot that answers from selected documents searches.
+   */
+  async createForChatbot(
+    chatbotId: string,
+    dto: CreateKbOwnedDocumentDto,
+  ): Promise<KbDocumentResponseDto> {
+    const userId = this.currentUserId();
+    this.validateSource(dto);
+    if (
+      dto.sourceType !== KbDocumentSourceType.PASTE &&
+      dto.sourceType !== KbDocumentSourceType.URL
+    ) {
+      this.assertIssuedFileUrl(
+        dto.fileUrl ?? '',
+        this.chatbotFolder(chatbotId),
+      );
+    }
+    return this.insertAndQueue(
+      userId,
+      dto,
+      { corpus: KbCorpus.WHATSAPP_QA, characterTopics: [] },
+      {
+        isGlobal: false,
+        tenantIds: [],
+        ownerTenantId: null,
+        ownerChatbotId: chatbotId,
+      },
+    );
+  }
+
+  /**
+   * Remove one of this chatbot's own documents: an archive, as everywhere in this module. A
+   * shared document, or another chatbot's, is the same 404 as a missing id.
+   */
+  async archiveForChatbot(chatbotId: string, id: string): Promise<void> {
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document || document.ownerChatbotId !== chatbotId) {
+      throw new NotFoundException(`Document ${id} was not found`);
+    }
+    // Not `archive(id)`: its organisation check would refuse an organisation's editor, and a
+    // chatbot's own document is targeted at no organisation. The chatbot check is the gate here.
+    if (!document.archivedAt) await this.archiveFound(document);
   }
 
   private assertIssuedFileUrl(fileUrl: string, folder: string): void {

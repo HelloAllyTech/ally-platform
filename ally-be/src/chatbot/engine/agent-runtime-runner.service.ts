@@ -115,7 +115,8 @@ export class AgentRuntimeRunner {
           // ally-ai reads no features as "agent off".
           ...(agentMode
             ? {
-                features: turn.chatbot.features,
+                // Every bot answers with the agent now (chunk 3d), whatever it stored.
+                features: { ...turn.chatbot.features, agent: true },
                 knowledgeTopics: await this.knowledgeTopics(knowledge),
                 declineText: turn.settings.declineText,
               }

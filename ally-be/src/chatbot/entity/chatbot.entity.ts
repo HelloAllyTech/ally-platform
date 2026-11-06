@@ -67,14 +67,17 @@ export class Chatbot extends BaseWithoutTenantEntity {
   settings!: ChatbotSettingsOverride;
 
   /**
-   * Which engine answers. Only a platform admin can change it, and the defaults'
-   * `agentRuntimeAllowed` overrides it to v1 platform-wide.
+   * v2 for every bot since chunk 3d, and no longer read: the engine follows the platform switch
+   * (`agentRuntimeAllowed`) alone. Kept until v1 is deleted.
    */
-  @Column({ type: 'varchar', length: 16, default: ChatbotRuntime.V1 })
+  @Column({ type: 'varchar', length: 16, default: ChatbotRuntime.V2 })
   runtime!: ChatbotRuntime;
 
-  /** Agents v2 feature flags (context files, tools, memory, …). Empty until later chunks. */
-  @Column({ type: 'jsonb', default: () => "'{}'" })
+  /**
+   * Agents v2 feature flags (context files, tools, memory, …). `agent` is on for every bot since
+   * chunk 3d, and the engine no longer reads it.
+   */
+  @Column({ type: 'jsonb', default: () => `'{"agent": true}'` })
   features!: Record<string, boolean>;
 
   @Column({ name: 'created_by', type: 'int' })

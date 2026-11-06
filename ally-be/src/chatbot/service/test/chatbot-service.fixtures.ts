@@ -113,6 +113,7 @@ export function buildChatbotService({
     } as never,
     { respond } as never,
     { getModels: jest.fn(async () => []) } as never,
+    {} as never,
   );
   return { service, respond };
 }

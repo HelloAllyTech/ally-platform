@@ -118,7 +118,7 @@ export class ChatbotEngineService {
   async respond(turn: ChatTurn): Promise<ChatbotDecision> {
     const { chatbot, settings, sender } = turn;
     const allowed = await this.audienceService.canChat(chatbot, sender);
-    const engine = resolveEngine(chatbot, settings, turn.runtime);
+    const engine = resolveEngine(settings);
 
     // ── 1. Keyword replies ───────────────────────────────────────────────
     const match = await this.replyService.match(
@@ -278,18 +278,9 @@ export class ChatbotEngineService {
       };
     }
 
-    const { response: answer, latencyMs } = answerResult.value;
+    const { response: answer } = answerResult.value;
     const decision = this.toDecision(turn, answer, ran, degradedAlert);
     if (agent) decision.agent = agent;
-    if (engine.kind === ChatbotRuntime.SHADOW) {
-      const shadow = this.agentRuntime.shadowFor(
-        turn,
-        request,
-        answer,
-        latencyMs,
-      );
-      if (shadow) decision.shadow = shadow;
-    }
     return decision;
   }
 

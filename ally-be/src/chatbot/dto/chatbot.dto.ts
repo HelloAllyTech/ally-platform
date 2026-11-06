@@ -177,7 +177,7 @@ export class UpdateChatbotDto {
   @ApiPropertyOptional({
     enum: ChatbotRuntime,
     description:
-      'Which engine answers (Agents v2). Platform admins only; the platform kill switch can still force v1.',
+      'Ignored since chunk 3d: every chatbot answers with the agent (v2), unless the platform switch sends all of them to v1. Accepted so an older dashboard does not break.',
   })
   @IsOptional()
   @IsEnum(ChatbotRuntime)
@@ -186,7 +186,7 @@ export class UpdateChatbotDto {
   @ApiPropertyOptional({
     type: ChatbotFeaturesDto,
     description:
-      'Agents v2 feature flags, merged into the saved ones. Platform admins only.',
+      'Ignored since chunk 3d (Agent mode is always on). Accepted so an older dashboard does not break.',
   })
   @IsOptional()
   @ValidateNested()
@@ -347,7 +347,7 @@ export class TestChatbotDto {
   @ApiPropertyOptional({
     enum: [ChatbotRuntime.V1, ChatbotRuntime.V2],
     description:
-      'Answer this one test with this engine, to compare. Platform admins only; the platform kill switch still wins.',
+      'Ignored since chunk 3d: a test uses the same engine as every message.',
   })
   @IsOptional()
   @IsIn([ChatbotRuntime.V1, ChatbotRuntime.V2])

@@ -4,7 +4,6 @@ import type { KnowledgeAnswerResponse } from '../../ai/dto/knowledge.dto';
 import { AiUpstreamError } from '../../ai/exception/ai-upstream.exception';
 import { ErrorCode } from '../../exception/error-code.enum';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
-import type { Chatbot } from '../entity/chatbot.entity';
 import type { AgentShadowSide } from '../entity/agent-shadow-run.entity';
 import type { AgentFailureReason, AgentRunRef } from './chatbot-engine.types';
 import { AgentRuntimeUsed, ChatbotRuntime } from '../enum/chatbot.enum';
@@ -26,41 +25,30 @@ export const agentRunIdFor = (providerMessageId?: string | null): string =>
     : randomUUID();
 
 /**
- * The engine that answers: the bot's own `runtime` (or Preview's one-test override), unless the
- * platform kill switch is off — then v1, for every bot and every caller, Preview included.
+ * The engine that answers every chatbot: v2 with the conversational agent, unless the platform's
+ * emergency switch (`agentRuntimeAllowed`, Defaults) is off — then v1, for every bot and every
+ * caller, Preview included. A bot's stored `runtime` and `features` no longer choose (chunk 3d).
  */
 export const effectiveRuntime = (
-  chatbot: Pick<Chatbot, 'runtime'>,
   settings: Pick<WhatsAppBotSettings, 'agentRuntimeAllowed'>,
-  requested?: ChatbotRuntime | null,
-): ChatbotRuntime =>
-  settings.agentRuntimeAllowed
-    ? (requested ?? chatbot.runtime ?? ChatbotRuntime.V1)
-    : ChatbotRuntime.V1;
+): ChatbotRuntime.V1 | ChatbotRuntime.V2 =>
+  settings.agentRuntimeAllowed ? ChatbotRuntime.V2 : ChatbotRuntime.V1;
 
 /**
- * Which engine answers one message, decided once: v1, v1 with a shadow run, or v2 — with the
- * conversational agent when the bot's `features.agent` flag is on.
+ * Which engine answers one message, decided once: v2 (always with the conversational agent), or
+ * v1 while the emergency switch is off.
  */
 export type EngineChoice =
   | { kind: ChatbotRuntime.V1 }
-  | { kind: ChatbotRuntime.SHADOW }
-  | { kind: ChatbotRuntime.V2; agent: boolean };
+  | { kind: ChatbotRuntime.V2 };
 
 export const resolveEngine = (
-  chatbot: Pick<Chatbot, 'runtime' | 'features'>,
   settings: Pick<WhatsAppBotSettings, 'agentRuntimeAllowed'>,
-  requested?: ChatbotRuntime | null,
-): EngineChoice => {
-  const runtime = effectiveRuntime(chatbot, settings, requested);
-  return runtime === ChatbotRuntime.V2
-    ? { kind: runtime, agent: chatbot.features?.agent === true }
-    : { kind: runtime };
-};
+): EngineChoice => ({ kind: effectiveRuntime(settings) });
 
-/** The engine is v2 with the conversational agent on. */
+/** The engine is v2, which always answers with the conversational agent. */
 export const isAgentEngine = (engine: EngineChoice): boolean =>
-  engine.kind === ChatbotRuntime.V2 && engine.agent;
+  engine.kind === ChatbotRuntime.V2;
 
 /** `/agent/run` answered 200 with something that is not an answer. */
 export class MalformedAgentResponseError extends Error {

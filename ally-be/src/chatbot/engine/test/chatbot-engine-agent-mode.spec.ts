@@ -261,41 +261,34 @@ describe('ChatbotEngineService in Agent mode', () => {
       expect(aiService.runAgent).toHaveBeenCalledTimes(1);
     });
 
-    it.each([
-      ['a v1 bot', { runtime: ChatbotRuntime.V1 }, {}],
-      ['a v2 bot with the flag off', { features: { agent: false } }, {}],
-      ['a v2 bot with no features', { features: {} }, {}],
-      ['an agent bot on shadow', { runtime: ChatbotRuntime.SHADOW }, {}],
-      [
-        'an agent bot under the kill switch',
-        {},
-        { agentRuntimeAllowed: false },
-      ],
-    ])('gives %s every template', async (_label, botOver, settingsOver) => {
-      settings = { ...settings, ...settingsOver };
+    it('gives every bot every template under the kill switch', async () => {
+      settings = { ...settings, agentRuntimeAllowed: false };
       for (const [text, id] of [
         ['hello', 'greeting'],
         ['what can you do', 'help'],
         ['opening hours', 'faq'],
       ]) {
-        const decision = await engine.respond(
-          turn({ chatbot: bot(botOver), settings, text }),
-        );
+        const decision = await engine.respond(turn({ settings, text }));
         expect(decision.templateId).toBe(id);
       }
       expect(aiService.runAgent).not.toHaveBeenCalled();
     });
 
-    it('lets Preview force v2 for an agent bot that is saved on v1', async () => {
-      await engine.respond(
-        turn({
-          chatbot: bot({ runtime: ChatbotRuntime.V1 }),
-          runtime: ChatbotRuntime.V2,
-          channel: { type: 'test' },
-        }),
-      );
-      expect(aiService.runAgent).toHaveBeenCalledTimes(1);
-    });
+    it.each([
+      ['a bot saved on v1', { runtime: ChatbotRuntime.V1 }],
+      ['a bot saved on shadow', { runtime: ChatbotRuntime.SHADOW }],
+      ['a bot saved with Agent mode off', { features: { agent: false } }],
+      ['a bot saved with no features', { features: {} }],
+    ])(
+      'lets the agent answer greetings for %s: every bot is in Agent mode',
+      async (_label, botOver) => {
+        const decision = await engine.respond(
+          turn({ chatbot: bot(botOver), text: 'hello' }),
+        );
+        expect(decision.templateId).toBeUndefined();
+        expect(aiService.runAgent).toHaveBeenCalledTimes(1);
+      },
+    );
   });
 
   describe('the request', () => {
@@ -361,21 +354,17 @@ describe('ChatbotEngineService in Agent mode', () => {
       expect(sent[9].content).toBe('message 13');
     });
 
-    it('sends none of it for a v2 bot with the flag off', async () => {
+    it('sends Agent mode on for a bot saved with it off', async () => {
       await engine.respond(
         turn({
-          chatbot: bot({ features: { agent: false } }),
+          chatbot: bot({ features: { agent: false, other: true } }),
           text: 'who are you?',
         }),
       );
       const body = aiService.runAgent.mock.calls[0][0];
-      expect(body).not.toHaveProperty('features');
-      expect(body).not.toHaveProperty('knowledge_topics');
-      expect(body).not.toHaveProperty('decline_text');
-      expect(body.prompts).not.toHaveProperty('ally_ai_agent_system');
-      expect(promptShared.getPromptsByOptions).toHaveBeenCalledWith({
-        promptCode: KNOWLEDGE_PROMPT_CODES,
-      });
+      expect(body.features).toEqual({ agent: true, other: true });
+      expect(body.knowledge_topics).toBeDefined();
+      expect(body.prompts).toHaveProperty('ally_ai_agent_system');
     });
   });
 

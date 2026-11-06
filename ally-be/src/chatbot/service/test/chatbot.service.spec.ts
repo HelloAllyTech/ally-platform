@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common';
 import { WaHandledBy } from 'src/whatsapp/enum/whatsapp.enum';
 import { Chatbot } from '../../entity/chatbot.entity';
 import { AgentRuntimeUsed, ChatbotRuntime } from '../../enum/chatbot.enum';
@@ -38,20 +37,18 @@ describe('ChatbotService and the runtime switch', () => {
   });
 
   describe('PATCH runtime', () => {
-    it('refuses anyone but a platform admin, even a bot owner', async () => {
-      await expect(
-        service.update('bot-1', { runtime: ChatbotRuntime.V1 }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(updates).toEqual([]);
-    });
-
-    it('lets a platform admin set it', async () => {
+    it('ignores it, from anyone: every bot answers with the agent', async () => {
       platformWide = true;
       const bot = await service.update('bot-1', {
         runtime: ChatbotRuntime.SHADOW,
       });
-      expect(updates[0]).toMatchObject({ runtime: ChatbotRuntime.SHADOW });
-      expect(bot.runtime).toBe(ChatbotRuntime.SHADOW);
+      expect(updates[0]).not.toHaveProperty('runtime');
+      expect(bot.runtime).toBe(ChatbotRuntime.V2);
+
+      platformWide = false;
+      await expect(
+        service.update('bot-1', { runtime: ChatbotRuntime.V1 }),
+      ).resolves.toMatchObject({ runtime: ChatbotRuntime.V2 });
     });
 
     it('leaves the other fields to editors as before', async () => {
@@ -130,15 +127,10 @@ describe('ChatbotService and the runtime switch', () => {
       });
     });
 
-    it('lets only a platform admin force an engine for one test', async () => {
-      await expect(
-        service.test('bot-1', { message: 'q', runtime: ChatbotRuntime.V1 }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(respond).not.toHaveBeenCalled();
-
-      platformWide = true;
+    it('ignores an engine asked for in the test: a test runs as every message does', async () => {
       await service.test('bot-1', { message: 'q', runtime: ChatbotRuntime.V1 });
-      expect(respond.mock.calls[0][0].runtime).toBe(ChatbotRuntime.V1);
+      expect(respond).toHaveBeenCalledTimes(1);
+      expect(respond.mock.calls[0][0]).not.toHaveProperty('runtime');
     });
   });
 });

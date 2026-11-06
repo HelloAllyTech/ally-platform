@@ -6,6 +6,11 @@ import { ExecutionManager } from '../../common/execution/execution-manager';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
 import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
+import {
+  CreateKbOwnedDocumentDto,
+  CreateKbUploadUrlDto,
+} from '../../knowledge-base/dto/knowledge-base.dto';
+import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { LoggerService } from '../../logger/logger.service';
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
@@ -108,6 +113,8 @@ export interface ChatbotDocumentView {
   title: string;
   status: string;
   isGlobal: boolean;
+  /** The bot's own document, uploaded on its Knowledge tab; false for a library document. */
+  private: boolean;
   archived: boolean;
   updatedAt: Date;
 }
@@ -154,6 +161,7 @@ export class ChatbotService {
     private readonly settingsService: ChatbotSettingsService,
     private readonly engine: ChatbotEngineService,
     private readonly llmModels: LlmModelService,
+    private readonly knowledgeBase: KnowledgeBaseService,
   ) {}
 
   // ───────────────────────────────────────────────────────────── read
@@ -204,7 +212,7 @@ export class ChatbotService {
       persona: bot.persona ?? {},
       model: bot.model ?? null,
       runtime: bot.runtime ?? ChatbotRuntime.V1,
-      effectiveRuntime: effectiveRuntime(bot, defaults),
+      effectiveRuntime: effectiveRuntime(defaults),
       features: bot.features ?? {},
       myRole: roles.get(bot.id) ?? ChatbotMemberRole.VIEWER,
       connectors: connectors.get(bot.id) ?? [],
@@ -325,11 +333,6 @@ export class ChatbotService {
       // Reaches every organisation's targeted documents, so it is a platform decision.
       await this.access.assertPlatformAdmin();
     }
-    if (dto.runtime !== undefined || dto.features !== undefined) {
-      // Which engine answers real people, and how, is a platform decision while Agents v2 is
-      // rolling out.
-      await this.access.assertPlatformAdmin();
-    }
     if (dto.model) await this.assertModel(dto.model);
 
     const patch: Partial<Chatbot> = { updatedBy: currentUserId() };
@@ -342,11 +345,7 @@ export class ChatbotService {
     if (dto.accessMode !== undefined) patch.accessMode = dto.accessMode;
     if (dto.knowledgeSource !== undefined)
       patch.knowledgeSource = dto.knowledgeSource;
-    if (dto.runtime !== undefined) patch.runtime = dto.runtime;
-    if (dto.features?.agent !== undefined) {
-      // Only known flags are written; the jsonb keeps any others as they were.
-      patch.features = { ...chatbot.features, agent: dto.features.agent };
-    }
+    // `runtime` and `features.agent` are ignored: every bot answers with the agent (chunk 3d).
     if (dto.model !== undefined) {
       patch.model = dto.model
         ? {
@@ -380,6 +379,10 @@ export class ChatbotService {
       { chatbotId: id },
       { chatbotId: null, updatedBy: currentUserId() },
     );
+    // Its own documents go with it: archived, so citations in its old conversations still resolve.
+    for (const documentId of await this.ownDocumentIds(id)) {
+      await this.knowledgeBase.archiveForChatbot(id, documentId);
+    }
     await this.chatbotRepository.update(
       { id },
       {
@@ -414,11 +417,12 @@ export class ChatbotService {
         title: string;
         status: string;
         is_global: boolean;
+        owner_chatbot_id: string | null;
         archived_at: Date | null;
         updatedAt: Date;
       }[]
     >(
-      `SELECT d.id, d.title, d.status, d.is_global, d.archived_at, d."updatedAt"
+      `SELECT d.id, d.title, d.status, d.is_global, d.owner_chatbot_id, d.archived_at, d."updatedAt"
          FROM chatbot_documents cd
          JOIN kb_documents d ON d.id = cd.document_id
         WHERE cd.chatbot_id = $1
@@ -430,22 +434,29 @@ export class ChatbotService {
       title: r.title,
       status: r.status,
       isGlobal: r.is_global,
+      private: r.owner_chatbot_id === id,
       archived: Boolean(r.archived_at),
       updatedAt: r.updatedAt,
     }));
   }
 
-  /** Replace the bot's document selection. Only knowledge-base documents that exist count. */
+  /**
+   * Replace the bot's shared library documents. Only library documents that exist count, plus
+   * the bot's own (which stay attached whatever is sent); another bot's own documents are refused.
+   */
   async setDocuments(
     id: string,
     documentIds: string[],
   ): Promise<ChatbotDocumentView[]> {
     await this.access.assert(id, ChatbotMemberRole.EDITOR);
-    const unique = [...new Set(documentIds)];
+    const own = await this.ownDocumentIds(id);
+    const unique = [...new Set([...documentIds, ...own])];
     const existing = unique.length
       ? await this.chatbotRepository.manager.query<{ id: string }[]>(
-          `SELECT id FROM kb_documents WHERE id = ANY($1::uuid[]) AND corpus = 'whatsapp_qa'`,
-          [unique],
+          `SELECT id FROM kb_documents
+            WHERE id = ANY($1::uuid[]) AND corpus = 'whatsapp_qa'
+              AND (owner_chatbot_id IS NULL OR owner_chatbot_id = $2)`,
+          [unique, id],
         )
       : [];
     if (existing.length !== unique.length) {
@@ -468,6 +479,55 @@ export class ChatbotService {
       }
     });
     return this.listDocuments(id);
+  }
+
+  /** Presigned upload for a document of the bot's own (its Knowledge tab). */
+  async createDocumentUploadUrl(id: string, dto: CreateKbUploadUrlDto) {
+    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    return this.knowledgeBase.createChatbotUploadUrl(id, dto);
+  }
+
+  /**
+   * Add a document of the bot's own: created in the WhatsApp corpus, owned by this bot (so the
+   * library and other bots don't list it), attached, and queued for indexing.
+   */
+  async addOwnDocument(
+    id: string,
+    dto: CreateKbOwnedDocumentDto,
+  ): Promise<ChatbotDocumentView[]> {
+    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    const document = await this.knowledgeBase.createForChatbot(id, dto);
+    await this.documentRepository.insert({
+      chatbotId: id,
+      documentId: document.id,
+      createdBy: currentUserId(),
+    });
+    return this.listDocuments(id);
+  }
+
+  /**
+   * Take a document off the bot. The bot's own document is archived as well (citations in old
+   * conversations still resolve); a shared one stays in the library.
+   */
+  async removeDocument(
+    id: string,
+    documentId: string,
+  ): Promise<ChatbotDocumentView[]> {
+    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    if ((await this.ownDocumentIds(id)).includes(documentId)) {
+      await this.knowledgeBase.archiveForChatbot(id, documentId);
+    }
+    await this.documentRepository.delete({ chatbotId: id, documentId });
+    return this.listDocuments(id);
+  }
+
+  /** The ids of the bot's own documents that aren't archived. */
+  private async ownDocumentIds(id: string): Promise<string[]> {
+    const rows = await this.chatbotRepository.manager.query<{ id: string }[]>(
+      `SELECT id FROM kb_documents WHERE owner_chatbot_id = $1 AND archived_at IS NULL`,
+      [id],
+    );
+    return rows.map((r) => r.id);
   }
 
   // ───────────────────────────────────────────────────────────── team
@@ -544,8 +604,6 @@ export class ChatbotService {
    */
   async test(id: string, dto: TestChatbotDto): Promise<ChatbotTestResult> {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
-    // Comparing engines is for platform admins, like choosing one.
-    if (dto.runtime !== undefined) await this.access.assertPlatformAdmin();
     const draft = dto.draft ?? {};
     if (draft.model) await this.assertModel(draft.model);
     const conversationId = dto.conversationId ?? `preview-${randomUUID()}`;
@@ -592,7 +650,6 @@ export class ChatbotService {
       channel: { type: 'test' },
       documentIds: draft.documentIds,
       conversationId,
-      runtime: dto.runtime,
     });
 
     // Remembered so the setup checklist can show the bot has been tried; Preview stores nothing else.

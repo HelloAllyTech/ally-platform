@@ -24,6 +24,7 @@ import { ChatbotReplyService } from './service/chatbot-reply.service';
 import { ChatbotSettingsService } from './service/chatbot-settings.service';
 import { ChatbotShadowService } from './service/chatbot-shadow.service';
 import { ChatbotService } from './service/chatbot.service';
+import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
 import { ConnectorService } from './service/connector.service';
 
 /**
@@ -52,6 +53,7 @@ import { ConnectorService } from './service/connector.service';
     AiModule,
     PromptModule,
     LlmModule,
+    KnowledgeBaseModule,
   ],
   controllers: [ChatbotController, ConnectorController],
   providers: [

@@ -11,7 +11,7 @@ import type {
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 import type { AgentShadowSide } from '../entity/agent-shadow-run.entity';
 import type { Chatbot } from '../entity/chatbot.entity';
-import type { AgentRuntimeUsed, ChatbotRuntime } from '../enum/chatbot.enum';
+import type { AgentRuntimeUsed } from '../enum/chatbot.enum';
 
 /**
  * Who sent a message, as far as the channel can tell. Every field but `externalId` is optional:
@@ -63,8 +63,6 @@ export interface ChatTurn {
   conversationId?: string;
   /** The channel's id for this message, from which the run id is derived (WhatsApp). */
   providerMessageId?: string;
-  /** Preview only: answer this one test with this engine. The kill switch still wins. */
-  runtime?: ChatbotRuntime.V1 | ChatbotRuntime.V2;
   /**
    * The person's first message to this bot (WhatsApp: the contact's first message; Preview: an
    * empty chat). `history` can't say: on WhatsApp it already holds the message being answered.

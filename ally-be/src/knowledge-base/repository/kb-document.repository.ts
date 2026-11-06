@@ -96,6 +96,9 @@ export class KbDocumentRepository extends Repository<KbDocument> {
     const query = this.createQueryBuilder('doc');
 
     query.andWhere('doc.corpus = :corpus', { corpus });
+    // A chatbot's own documents (chunk 3d) are listed on that chatbot's Knowledge tab only, never
+    // in the library or another bot's picker.
+    query.andWhere('doc.ownerChatbotId IS NULL');
 
     if (!includeArchived) {
       query.andWhere('doc.archivedAt IS NULL');

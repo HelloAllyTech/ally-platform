@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common';
 import { DEFAULT_WHATSAPP_SETTINGS } from 'src/whatsapp/type/whatsapp-settings.type';
 import { WaHandledBy } from 'src/whatsapp/enum/whatsapp.enum';
 import { Chatbot } from '../../entity/chatbot.entity';
@@ -39,29 +38,17 @@ describe('ChatbotService and Agent mode', () => {
   });
 
   describe('PATCH features', () => {
-    it('refuses anyone but a platform admin, even a bot owner', async () => {
-      await expect(
-        service.update('bot-1', { features: { agent: true } }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(updates).toHaveLength(0);
-    });
-
-    it('lets a platform admin switch Agent mode, keeping the other flags', async () => {
+    it('ignores Agent mode in a PATCH, from anyone: it is always on', async () => {
       platformWide = true;
-      stored = { ...stored, features: { other: true } } as Chatbot;
-      await service.update('bot-1', { features: { agent: true } });
-      expect(updates[0].features).toEqual({ other: true, agent: true });
-
+      stored = { ...stored, features: { agent: true, other: true } } as Chatbot;
       await service.update('bot-1', { features: { agent: false } });
-      expect(stored.features).toEqual({ other: true, agent: false });
-    });
+      expect(updates[0]).not.toHaveProperty('features');
+      expect(stored.features).toEqual({ agent: true, other: true });
 
-    it('writes only known flags', async () => {
-      platformWide = true;
-      await service.update('bot-1', {
-        features: { agent: true, tools: true } as never,
-      });
-      expect(updates[0].features).toEqual({ agent: true });
+      platformWide = false;
+      await expect(
+        service.update('bot-1', { features: { agent: false } }),
+      ).resolves.toBeDefined();
     });
 
     it('leaves the flags alone when the PATCH has none', async () => {
