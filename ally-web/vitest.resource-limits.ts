@@ -37,7 +37,6 @@ export const testResourceLimits = MAX_TEST_WORKERS
       minWorkers: 1,
       poolOptions: {
         forks: { maxForks: MAX_TEST_WORKERS, minForks: 1 },
-        threads: { maxThreads: MAX_TEST_WORKERS, minThreads: 1 },
       },
     }
   : {};
