@@ -59,7 +59,20 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             records.append(json_safe(result.record))
             summary = result.summary
             added = json_safe(result.passages)
-            status("found", f"{len(added)} passages" if added else "nothing new")
+            titles = list(
+                dict.fromkeys(
+                    p.get("document_title") for p in added if p.get("document_title")
+                )
+            )[:3]
+            status(
+                "found",
+                (
+                    (f"{len(added)} passage" + ("" if len(added) == 1 else "s"))
+                    if added
+                    else "nothing new"
+                ),
+                titles or None,
+            )
             if result.retrieval is not None and first_search:
                 update = {
                     "retrieval": json_safe(result.retrieval),

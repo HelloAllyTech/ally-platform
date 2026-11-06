@@ -320,7 +320,14 @@ export type AgentStreamEvent =
   | { event: 'run_started'; data: { run_id: string } }
   | {
       event: 'status';
-      data: { code: AgentStatusCode; label: string; detail?: string };
+      data: {
+        code: AgentStatusCode;
+        label: string;
+        /** The search query, "N passages", or why a draft went back (a rejection code). */
+        detail?: string;
+        /** Where found passages came from: document titles, at most 3. */
+        documents?: string[];
+      };
     }
   | { event: 'step'; data: AgentTraceStep }
   | { event: 'token'; data: { text: string } };

@@ -90,7 +90,10 @@ class TestStream:
             d for n, d in evts if n == "status" and d["code"] == "searching"
         )
         assert searching["detail"] == "What is Ally?"
-        assert searching["label"] == "Looking up “What is Ally?”…"
+        assert searching["label"] == "Searching the knowledge base for “What is Ally?”"
+        found = next(d for n, d in evts if n == "status" and d["code"] == "found")
+        assert found["detail"] == "1 passage"
+        assert found["documents"] == [found["label"].split(" in ", 1)[1]]
 
     @pytest.mark.usefixtures("frozen_clock")
     def test_final_is_exactly_what_run_returns(self, client, chunk_service):
@@ -131,8 +134,9 @@ class TestStream:
             i for i, (n, d) in enumerate(evts) if n == "step" and d["node"] == "check"
         )
         assert order.index("token") > last_check
-        codes = [d["code"] for n, d in evts if n == "status"]
-        assert "rewriting" in codes
+        rewriting = [d for n, d in evts if n == "status" and d["code"] == "rewriting"]
+        # Why it went back, as a code the client words.
+        assert [d["detail"] for d in rewriting] == ["uncited"]
 
     def test_a_decline_without_text_streams_no_tokens(self, client):
         # Sent back once, then final with no text: ally-be sends its decline wording.

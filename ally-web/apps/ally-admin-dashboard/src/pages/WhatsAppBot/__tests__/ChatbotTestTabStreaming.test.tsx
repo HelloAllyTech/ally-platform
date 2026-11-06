@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Chatbot, TestChatbotResponse } from "@types";
 
 /**
- * Preview over the stream: a live status line under the reply being made, the steps filling in
- * (platform admins), the checked text revealed as it arrives, then the final reply in its place —
- * replacing whatever was shown. A stream that never starts falls back to /test; one that started
+ * Preview over the stream: the agent's activity in words as it happens (searching for what, found
+ * where, checking, rewriting and why), the raw steps for platform admins, the checked text typed
+ * out, then the final reply in its place — replacing whatever was shown — with the activity
+ * folded into "Worked for … · N steps". A stream that never starts falls back to /test; one that started
  * is never re-sent.
  */
 
@@ -124,22 +125,42 @@ describe("ChatbotTestTab — streamed replies", () => {
     render(<ChatbotTestTab bot={BOT} />);
     ask("how do I get access?");
 
-    expect(await screen.findByTestId("status-line")).toHaveTextContent("Thinking…");
+    expect(await screen.findByTestId("status-line")).toHaveTextContent("Reading your question");
 
     stream.send("run_started", { run_id: "run-1" });
+    stream.send("status", { code: "thinking", label: "x" });
     stream.send("status", { code: "searching", label: "x", detail: "getting access" });
     await waitFor(() =>
-      expect(screen.getByTestId("status-line")).toHaveTextContent("Looking up “getting access”…"),
+      expect(screen.getByTestId("status-line")).toHaveTextContent(
+        "Searching the knowledge base for “getting access”",
+      ),
     );
 
     stream.send("step", { node: "tool", ms: 140, summary: "search_knowledge: 3 hits" });
     expect(await screen.findByTestId("live-steps")).toHaveTextContent(
       "tool · search_knowledge: 3 hits · 140 ms",
     );
-
+    stream.send("status", {
+      code: "found",
+      label: "x",
+      detail: "2 passages",
+      documents: ["Getting Access and Signing In"],
+    });
+    stream.send("status", { code: "thinking", label: "x" });
+    stream.send("status", { code: "rewriting", label: "x", detail: "search_first" });
     stream.send("status", { code: "checking", label: "x" });
     await waitFor(() =>
-      expect(screen.getByTestId("status-line")).toHaveTextContent("Checking the answer…"),
+      expect(screen.getByTestId("status-line")).toHaveTextContent(
+        "Checking the answer against the sources",
+      ),
+    );
+    // Every line so far, done ones included, in words.
+    expect(screen.getByTestId("activity")).toHaveTextContent(
+      "Found 2 passages in Getting Access and Signing In",
+    );
+    expect(screen.getByTestId("activity")).toHaveTextContent("Working out the answer");
+    expect(screen.getByTestId("activity")).toHaveTextContent(
+      "Rewriting: it answered before searching",
     );
 
     stream.send("token", { text: "Ally trains" });
@@ -153,6 +174,8 @@ describe("ChatbotTestTab — streamed replies", () => {
     await waitFor(() => expect(screen.queryByTestId("pending-reply")).toBeNull());
     expect(screen.getByText("Ally trains counsellors.")).toBeInTheDocument();
     expect(screen.queryByTestId("replaced-note")).toBeNull();
+    // The activity stays with the reply, folded away.
+    expect(screen.getByTestId("worked")).toHaveTextContent(/Worked for \d+\.\d s · 6 steps/);
     expect(testSpy).not.toHaveBeenCalled();
 
     const [url, init] = fetchMock.mock.calls[0];
@@ -186,8 +209,11 @@ describe("ChatbotTestTab — streamed replies", () => {
 
     stream.send("step", { node: "agent", ms: 10, summary: "agent: smalltalk" });
     stream.send("status", { code: "checking", label: "x" });
+    // Everyone sees the activity in words; only the raw steps are for platform admins.
     await waitFor(() =>
-      expect(screen.getByTestId("status-line")).toHaveTextContent("Checking the answer…"),
+      expect(screen.getByTestId("status-line")).toHaveTextContent(
+        "Checking the answer against the sources",
+      ),
     );
     expect(screen.queryByTestId("live-steps")).toBeNull();
     stream.send("final", result());

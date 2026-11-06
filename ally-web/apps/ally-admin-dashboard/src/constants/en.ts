@@ -1866,16 +1866,29 @@ export const en = {
         wouldFile: "Would be logged as a knowledge gap",
         failed: "The test failed.",
         thinking: "Thinking…",
-        // The live line under a reply being made, by what the agent is doing.
-        status: {
-          thinking: "Thinking…",
-          searching: "Looking things up…",
-          searchingFor: "Looking up “{detail}”…",
+        // What the agent is doing while a reply is made, one line per step.
+        activity: {
+          thinking: "Reading your question",
+          thinkingAgain: "Working out the answer",
+          searching: "Searching the knowledge base",
+          searchingFor: "Searching the knowledge base for “{detail}”",
           found: "Found {detail}",
-          foundAny: "Found what to use",
-          checking: "Checking the answer…",
-          rewriting: "Improving the answer…",
-          writing: "Writing the reply…",
+          foundIn: "Found {detail} in {documents}",
+          foundNothing: "Found nothing new",
+          checking: "Checking the answer against the sources",
+          rewriting: "Rewriting the answer",
+          rewritingBecause: "Rewriting: {reason}",
+          // Why the check sent a draft back (ally-ai's rejection codes).
+          rewriteReasons: {
+            uncited: "the draft wasn't backed by a source",
+            unsourced_detail: "it gave a contact detail no source has",
+            empty: "the draft was empty",
+            search_first: "it answered before searching",
+            mentions_sources: "it talked about its sources",
+            use_found: "it didn't use what it found",
+          },
+          writing: "Writing the reply",
+          worked: "Worked for {seconds} s · {count} steps",
         },
         replaced: "Updated with the final reply",
         empty: "Start a conversation to see how it answers.",

@@ -5,7 +5,7 @@ before it, so whether to search, and for what, is its decision."""
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, Literal
+from typing import Any, Dict, Literal, Tuple, Union
 
 from app.core.agent_runtime import conversation
 from app.core.agent_runtime.budget import MUST_SEARCH_AFTER, recent, tool_budget
@@ -25,8 +25,10 @@ def _summary(_: AgentState, update: Dict[str, Any]) -> str:
     return f"{step.get('turn_type')}, {step.get('intent')} via {model}"
 
 
-def _announce(state: AgentState) -> StatusCode:
-    return "rewriting" if state.get("feedback") else "thinking"
+def _announce(state: AgentState) -> Union[StatusCode, Tuple[StatusCode, str]]:
+    # A rewrite says why the draft went back (a rejection code; clients word it).
+    feedback = state.get("feedback")
+    return ("rewriting", feedback) if feedback else "thinking"
 
 
 def make_agent_node(service: KnowledgeAgentService) -> Node:

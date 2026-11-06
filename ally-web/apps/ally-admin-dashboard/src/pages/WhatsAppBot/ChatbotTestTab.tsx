@@ -22,10 +22,14 @@ const t = en.whatsappBot.bots.test;
 const MAX_HISTORY_MESSAGES = 10;
 const handledLabels = en.whatsappBot.conversations.handledBy as Record<string, string>;
 
-/** How fast streamed text is revealed: it arrives in one burst once the reply is checked. */
-const REVEAL_MS = 25;
-/** The longest a reveal may hold back the final reply. */
-const MAX_REVEAL_MS = 3000;
+/**
+ * The checked reply arrives in one burst, so it is typed out at a reading pace: at least
+ * MIN_CHARS_PER_TICK characters every REVEAL_MS (about 65 a second), faster for a long reply so
+ * the whole of it never takes more than MAX_REVEAL_MS.
+ */
+const REVEAL_MS = 30;
+const MIN_CHARS_PER_TICK = 2;
+const MAX_REVEAL_MS = 4000;
 
 type Turn =
   | { role: "user"; content: string }
@@ -36,11 +40,14 @@ type Turn =
       error?: boolean;
       /** The final reply differs from the text revealed while it was made. */
       replaced?: boolean;
+      /** What the agent did on the way to this reply, and how long it took. */
+      activity?: ChatbotTestStatus[];
+      workedMs?: number;
     };
 
-/** The reply being made: what the agent is doing, its steps so far, and the text revealed. */
+/** The reply being made: what the agent has done so far, its steps, and the text revealed. */
 interface Pending {
-  status?: ChatbotTestStatus;
+  activity: ChatbotTestStatus[];
   steps: AgentTraceStep[];
   text: string;
 }
@@ -67,8 +74,11 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   const [test] = useTestChatbotMutation();
   const stream = useChatbotTestStream();
   const [pending, setPending] = useState<Pending | null>(null);
-  // Text that has arrived but is not shown yet: revealed a piece at a time.
-  const toReveal = useRef<string[]>([]);
+  // The checked text that has arrived, and how much of it is on screen.
+  const arrived = useRef("");
+  const shownChars = useRef(0);
+  // What the agent has done for the reply being made, kept for the finished reply.
+  const activity = useRef<ChatbotTestStatus[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
   const isLoading = pending !== null;
 
@@ -79,20 +89,27 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   useEffect(() => {
     if (!pending) return undefined;
     const timer = setInterval(() => {
-      const next = toReveal.current.shift();
-      if (next !== undefined) {
-        setPending(current => current && { ...current, text: current.text + next });
-      }
+      const full = arrived.current;
+      if (shownChars.current >= full.length) return;
+      const step = Math.max(
+        MIN_CHARS_PER_TICK,
+        Math.ceil(full.length / (MAX_REVEAL_MS / REVEAL_MS)),
+      );
+      shownChars.current = Math.min(full.length, shownChars.current + step);
+      const text = full.slice(0, shownChars.current);
+      setPending(current => current && { ...current, text });
     }, REVEAL_MS);
     return () => clearInterval(timer);
   }, [pending !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Resolves once everything that arrived has been revealed (or after MAX_REVEAL_MS). */
+  /** Resolves once everything that arrived is on screen (or after MAX_REVEAL_MS). */
   const revealed = () =>
     new Promise<void>(resolve => {
-      const until = Date.now() + MAX_REVEAL_MS;
+      const until = Date.now() + MAX_REVEAL_MS + 500;
       const check = () =>
-        toReveal.current.length && Date.now() < until ? setTimeout(check, REVEAL_MS) : resolve();
+        shownChars.current < arrived.current.length && Date.now() < until
+          ? setTimeout(check, REVEAL_MS)
+          : resolve();
       check();
     });
 
@@ -106,9 +123,11 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
       .map(turn => ({ role: turn.role, content: turn.content }));
     setTurns(current => [...current, { role: "user", content: text }]);
     setMessage("");
-    toReveal.current = [];
-    setPending({ steps: [], text: "" });
-    let shown = "";
+    arrived.current = "";
+    shownChars.current = 0;
+    activity.current = [];
+    const startedAt = Date.now();
+    setPending({ activity: [], steps: [], text: "" });
     const request = {
       id: bot.id,
       message: text,
@@ -121,12 +140,15 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
       let result: TestChatbotResponse;
       try {
         result = await stream.run(request, {
-          onStatus: status => setPending(current => current && { ...current, status }),
+          onStatus: status => {
+            activity.current = [...activity.current, status];
+            const entries = activity.current;
+            setPending(current => current && { ...current, activity: entries });
+          },
           onStep: step =>
             setPending(current => current && { ...current, steps: [...current.steps, step] }),
           onToken: piece => {
-            shown += piece;
-            toReveal.current.push(piece);
+            arrived.current += piece;
           },
         });
         await revealed();
@@ -138,10 +160,18 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
       setConversationId(result.conversationId);
       setRuntimeAllowed(result.runtimeAllowed);
       // The final reply always wins: a crisis reply, a fallback or added wording replaces the text.
-      const replaced = Boolean(shown.trim()) && !result.reply.startsWith(shown.trim());
+      const shown = arrived.current.trim();
+      const replaced = Boolean(shown) && !result.reply.startsWith(shown);
+      const entries = activity.current;
       setTurns(current => [
         ...current,
-        { role: "assistant", content: result.reply, result, replaced },
+        {
+          role: "assistant",
+          content: result.reply,
+          result,
+          replaced,
+          ...(entries.length ? { activity: entries, workedMs: Date.now() - startedAt } : {}),
+        },
       ]);
     } catch (err) {
       setTurns(current => [
@@ -149,7 +179,8 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
         { role: "assistant", content: errorMessage(err, t.failed), error: true },
       ]);
     } finally {
-      toReveal.current = [];
+      arrived.current = "";
+      shownChars.current = 0;
       setPending(null);
     }
   };
@@ -224,15 +255,66 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   );
 };
 
-/** The live line under a reply being made, from what the agent is doing. */
-const statusLabel = (status?: ChatbotTestStatus): string => {
-  if (!status) return t.status.thinking;
-  const { code, detail } = status;
-  if (code === "searching")
-    return detail ? fill(t.status.searchingFor, { detail }) : t.status.searching;
-  if (code === "found") return detail ? fill(t.status.found, { detail }) : t.status.foundAny;
-  return t.status[code] ?? t.status.thinking;
+/**
+ * One thing the agent did, in words: "Searching the knowledge base for “getting access”",
+ * "Found 2 passages in Progress, Badges and Streaks", "Rewriting: it answered before searching".
+ * A second "thinking" (after a search) is the agent working out its answer.
+ */
+const activityLabel = (entry: ChatbotTestStatus, before?: ChatbotTestStatus): string => {
+  const a = t.activity;
+  const { code, detail, documents } = entry;
+  switch (code) {
+    case "thinking":
+      return before ? a.thinkingAgain : a.thinking;
+    case "searching":
+      return detail ? fill(a.searchingFor, { detail }) : a.searching;
+    case "found":
+      if (!detail || detail === "nothing new") return a.foundNothing;
+      return documents?.length
+        ? fill(a.foundIn, { detail, documents: documents.join(", ") })
+        : fill(a.found, { detail });
+    case "rewriting": {
+      const reason = detail && (a.rewriteReasons as Record<string, string>)[detail];
+      return reason ? fill(a.rewritingBecause, { reason }) : a.rewriting;
+    }
+    default:
+      return a[code] ?? entry.label;
+  }
 };
+
+/**
+ * What the agent did, one line each. While the reply is being made the last line is the current
+ * one (animated); the lines before it are done.
+ */
+const ActivityFeed: React.FC<{ entries: ChatbotTestStatus[]; live: boolean }> = ({
+  entries,
+  live,
+}) => (
+  <ul className="flex flex-col gap-1 text-xs text-typography-600" data-testid="activity">
+    {entries.map((entry, index) => {
+      const current = live && index === entries.length - 1;
+      return (
+        <li
+          key={`${entry.code}-${index}`}
+          className="flex items-start gap-2"
+          {...(current
+            ? { "data-testid": "status-line", role: "status", "aria-live": "polite" }
+            : {})}
+        >
+          <span
+            aria-hidden="true"
+            className={`mt-[3px] inline-block h-2 w-2 shrink-0 rounded-full ${
+              current ? "bg-primary-500 animate-pulse" : "bg-typography-300"
+            }`}
+          />
+          <span className={current ? "text-typography-900" : undefined}>
+            {activityLabel(entry, index > 0 ? entries[index - 1] : undefined)}
+          </span>
+        </li>
+      );
+    })}
+  </ul>
+);
 
 /** Three bouncing dots, as WhatsApp shows while someone types. */
 const TypingDots: React.FC = () => (
@@ -248,14 +330,21 @@ const TypingDots: React.FC = () => (
 );
 
 /**
- * The reply while it is being made: what the agent is doing now, the text revealed so far, and
- * (platform admins) the steps as they finish.
+ * The reply while it is being made: what the agent is doing, line by line, then the checked text
+ * typed out. Platform admins also see the raw steps as they finish.
  */
 const PendingBubble: React.FC<{ pending: Pending; showSteps: boolean }> = ({
   pending,
   showSteps,
 }) => (
-  <div className="self-start max-w-[85%] flex flex-col gap-1" data-testid="pending-reply">
+  <div className="self-start max-w-[85%] flex flex-col gap-2" data-testid="pending-reply">
+    {pending.activity.length > 0 ? (
+      <ActivityFeed entries={pending.activity} live={!pending.text} />
+    ) : (
+      <div className="text-xs text-typography-500 px-1" data-testid="status-line" role="status">
+        {t.activity.thinking}
+      </div>
+    )}
     <div className="rounded-lg px-3 py-2 text-sm whitespace-pre-wrap border border-border-light bg-white text-typography-900">
       {pending.text ? (
         <span data-testid="revealed-text">
@@ -265,14 +354,6 @@ const PendingBubble: React.FC<{ pending: Pending; showSteps: boolean }> = ({
       ) : (
         <TypingDots />
       )}
-    </div>
-    <div
-      className="flex items-center gap-2 text-xs text-typography-500 px-1"
-      role="status"
-      aria-live="polite"
-      data-testid="status-line"
-    >
-      {statusLabel(pending.status)}
     </div>
     {showSteps && pending.steps.length > 0 && (
       <ol className="list-decimal pl-6 text-xs text-typography-500" data-testid="live-steps">
@@ -297,6 +378,19 @@ const Bubble: React.FC<{ turn: Turn; showRun: boolean }> = ({ turn, showRun }) =
   const model = result?.retrieval?.model as string | undefined;
   return (
     <div className="self-start max-w-[85%] flex flex-col gap-1">
+      {turn.activity && (
+        <details className="text-xs text-typography-500 px-1" data-testid="worked">
+          <summary className="cursor-pointer">
+            {fill(t.activity.worked, {
+              seconds: ((turn.workedMs ?? 0) / 1000).toFixed(1),
+              count: turn.activity.length,
+            })}
+          </summary>
+          <div className="pt-1">
+            <ActivityFeed entries={turn.activity} live={false} />
+          </div>
+        </details>
+      )}
       <div
         className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap border ${
           turn.error

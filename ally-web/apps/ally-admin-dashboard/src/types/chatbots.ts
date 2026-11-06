@@ -265,8 +265,10 @@ export type ChatbotTestStatusCode =
 export interface ChatbotTestStatus {
   code: ChatbotTestStatusCode;
   label: string;
-  /** The search query, or "3 passages". */
+  /** The search query, "3 passages", or why a draft went back (a rejection code). */
   detail?: string;
+  /** Where found passages came from: document titles, at most 3. */
+  documents?: string[];
 }
 
 export interface TestChatbotResponse {
