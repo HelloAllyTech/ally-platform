@@ -26,20 +26,6 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Small talk that carries a number, a price, a percentage, a link or an email is
-# asserting something checkable, so it has to be grounded like an answer. Errs on
-# the side of treating harmless text as factual: the cost is a decline, the
-# alternative an invented price.
-_LOOKS_FACTUAL = re.compile(
-    r"\d|[₹$€£%]|\b(?:rs|inr|usd|eur)\b|https?://|www\.|[\w.+-]+@[\w-]+\.\w+",
-    re.IGNORECASE,
-)
-
-
-def looks_factual(text: str) -> bool:
-    return bool(_LOOKS_FACTUAL.search(text or ""))
-
-
 # What kind of checkable detail a text carries, in the words the rewrite is told.
 # Kinds only: the refused text itself is never shown back to the model.
 _DETAIL_KINDS = (
@@ -51,6 +37,14 @@ _DETAIL_KINDS = (
     ),
     ("a number", re.compile(r"\d")),
 )
+
+
+def looks_factual(text: str) -> bool:
+    """Whether `text` carries any checkable detail (a number, a price, a percentage,
+    a link or an email). Small talk that does is asserting something, so it has to
+    be grounded like an answer. Errs on the side of treating harmless text as
+    factual: the cost is a decline, the alternative an invented price."""
+    return any(pattern.search(text or "") for _, pattern in _DETAIL_KINDS)
 
 
 _URL = re.compile(
