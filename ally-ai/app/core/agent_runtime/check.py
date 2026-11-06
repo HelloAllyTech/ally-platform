@@ -54,23 +54,63 @@ _DETAIL_KINDS = (
 )
 
 
-_URL = re.compile(r"(?:https?://|www\.)[^\s<>()\[\]]+", re.IGNORECASE)
+_URL = re.compile(
+    r"(?:https?://|www\.)[^\s<>()\[\]]+|\b[\w-]+(?:\.[\w-]+)*\.(?:ai|com|org|net|in|io)"
+    r"(?:/[^\s<>()\[\]]*)?",
+    re.IGNORECASE,
+)
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-_NUMBER = re.compile(r"\d[\d\s-]*\d|\d")
+# A phone-like number: three or more digits, spaces or dashes allowed between them.
+# "Step 1" or "5 days" is not a contact; "112", "14416" and "1800-123-456" are.
+_PHONE = re.compile(r"\+?\d(?:[\s-]?\d){2,}")
 
 
 def _normalise_detail(detail: str) -> str:
     detail = re.sub(r"^https?://", "", detail.lower()).rstrip(".,;:!?/'\"")
-    return re.sub(r"[\s-]", "", detail)
+    return re.sub(r"[\s+-]", "", detail)
+
+
+def contact_details(text: str) -> List[str]:
+    """Phone numbers, links and emails in `text`, as written."""
+    text = text or ""
+    emails = _EMAIL.findall(text)
+    without_emails = _EMAIL.sub(" ", text)
+    links = _URL.findall(without_emails)
+    without_links = _URL.sub(" ", without_emails)
+    return [*emails, *links, *_PHONE.findall(without_links)]
+
+
+def without_contact_details(text: str) -> str:
+    """`text` with its phone numbers, links and emails blanked out."""
+    for detail in contact_details(text):
+        text = text.replace(detail, " ")
+    return text
 
 
 def unsupported_details(text: str, passages: Sequence[Dict[str, Any]]) -> List[str]:
-    """Links, emails and numbers in `text` that no passage contains."""
+    """Phone numbers, links and emails in `text` that no passage contains."""
     corpus = _normalise_detail(" ".join(str(p.get("text") or "") for p in passages))
-    found = [*_URL.findall(text or ""), *_EMAIL.findall(text or "")]
-    without_links = _EMAIL.sub(" ", _URL.sub(" ", text or ""))
-    found += _NUMBER.findall(without_links)
-    return [d for d in found if _normalise_detail(d) not in corpus]
+    return [d for d in contact_details(text) if _normalise_detail(d) not in corpus]
+
+
+_SENTENCE_END = re.compile(r"(?<=[.!?।])\s+")
+
+
+def without_sentences(text: str, keep: Any) -> str:
+    """`text` with the sentences `keep(sentence)` rejects removed, line by line."""
+    lines = []
+    for line in (text or "").split("\n"):
+        kept = [s for s in _SENTENCE_END.split(line) if s.strip() and keep(s)]
+        if kept or not line.strip():
+            lines.append(" ".join(kept))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def without_details(text: str, details: Sequence[str]) -> str:
+    """`text` without the sentences that carry any of `details`."""
+    return without_sentences(
+        text, lambda sentence: not any(d in sentence for d in details)
+    )
 
 
 # Markdown the model sometimes writes anyway. WhatsApp shows it as literal symbols, so
@@ -81,12 +121,54 @@ _MD_STAR = re.compile(r"(?<![\w*])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![\w*])")
 _MD_HEADING = re.compile(r"^[ \t]*#{1,6}[ \t]+", re.MULTILINE)
 
 
+# Both grammatical genders written at once in Hindi ("sakta/ti", "karunga/karungi"):
+# a person writes one form, so the first is kept.
+_BOTH_GENDERS = re.compile(
+    r"\b(\w+?(?:ta|ga|ra|la|na|ya|aa))\s*/\s*\w*?(?:ti|gi|ri|li|ni|yi|ii)\b",
+    re.IGNORECASE,
+)
+
+
 def plain_text(text: str) -> str:
-    """`text` without markdown: ``[text](url)`` → ``url``; bold and headings dropped."""
+    """`text` as one person would write it on WhatsApp: no markdown (``[text](url)``
+    → ``url``; bold and headings dropped) and one gender form in Hindi."""
     text = _MD_LINK.sub(lambda m: m.group(2), text or "")
     text = _MD_BOLD.sub(lambda m: m.group(2), text)
     text = _MD_STAR.sub(lambda m: m.group(1), text)
+    text = _BOTH_GENDERS.sub(lambda m: m.group(1), text)
     return _MD_HEADING.sub("", text).strip()
+
+
+# Crisis wording. Said once, when the bot introduces itself; small talk later in a
+# conversation doesn't repeat it, and nothing repeats "not a crisis service".
+_CRISIS = re.compile(r"crisis|emergency|helpline|tele-?manas", re.IGNORECASE)
+_NOT_A_CRISIS_SERVICE = re.compile(
+    r"not a crisis|crisis service nahi|crisis service nahin|crisis line nahi",
+    re.IGNORECASE,
+)
+
+
+def repeated_crisis_wording(
+    text: str, turn_type: str, history: Sequence[Dict[str, str]]
+) -> bool:
+    """Whether `text` repeats crisis wording the conversation doesn't need again."""
+    earlier = " ".join(
+        turn.get("content") or "" for turn in history if turn.get("role") == "assistant"
+    )
+    if (
+        earlier
+        and _NOT_A_CRISIS_SERVICE.search(earlier)
+        and (_NOT_A_CRISIS_SERVICE.search(text))
+    ):
+        return True
+    return bool(earlier and turn_type == "smalltalk" and _CRISIS.search(text))
+
+
+def without_repeated_crisis_wording(
+    text: str, turn_type: str, history: Sequence[Dict[str, str]]
+) -> str:
+    pattern = _CRISIS if turn_type == "smalltalk" else _NOT_A_CRISIS_SERVICE
+    return without_sentences(text, lambda sentence: not pattern.search(sentence))
 
 
 #: Words in a bot's or a document's name that don't identify an organisation.
@@ -120,6 +202,22 @@ class Organisation:
     self_names: Tuple[str, ...] = ()
     #: Names that mean the organisation or its product.
     terms: Tuple[str, ...] = field(default_factory=tuple)
+    #: What the bot covers, by document title ("About Ally", "Privacy and Data").
+    topics: Tuple[str, ...] = field(default_factory=tuple)
+
+    def topics_named_in(self, text: str) -> int:
+        """How many topics `text` mentions, by any of a topic's distinctive words
+        ("Getting Access and Signing In" by "access" or "signing"): a topic list
+        when three or more."""
+        lowered = (text or "").lower()
+        return sum(
+            1
+            for topic in self.topics
+            if any(
+                re.search(rf"\b{re.escape(word)}", lowered)
+                for word in _topic_words(topic)
+            )
+        )
 
     def named_in(self, text: str) -> bool:
         if not self.terms or not text:
@@ -132,6 +230,18 @@ class Organisation:
         )
 
 
+_TOPIC_STOPWORDS = {"about", "getting", "using", "where", "what", "with", "their"}
+
+
+def _topic_words(topic: str) -> List[str]:
+    """A topic's distinctive words: five letters or more, not filler."""
+    return [
+        word
+        for word in re.findall(r"[a-z]+", topic.lower())
+        if len(word) >= 5 and word not in _TOPIC_STOPWORDS
+    ]
+
+
 def organisation_of(bot: Dict[str, Any]) -> Organisation:
     """The organisation's names, from the bot: its display name and the name its
     documents share ("Ally FAQ – About Ally" → "Ally FAQ"), plus their distinctive
@@ -139,10 +249,12 @@ def organisation_of(bot: Dict[str, Any]) -> Organisation:
     persona = bot.get("persona") or {}
     display = (persona.get("display_name") or "").strip()
     names: List[str] = [display] if display else []
+    topics: List[str] = []
     for topic in bot.get("knowledge_topics") or []:
         prefix = re.split(r"\s[–—-]\s", topic, maxsplit=1)
         if len(prefix) == 2 and prefix[0].strip():
             names.append(prefix[0].strip())
+        topics.append(prefix[-1].strip())
     terms: List[str] = []
     for name in names:
         terms.append(name)
@@ -154,7 +266,11 @@ def organisation_of(bot: Dict[str, Any]) -> Organisation:
             and word.lower() not in _GENERIC_NAME_WORDS
         ]
     unique = tuple(dict.fromkeys(t for t in terms if t))
-    return Organisation(self_names=(display,) if display else (), terms=unique)
+    return Organisation(
+        self_names=(display,) if display else (),
+        terms=unique,
+        topics=tuple(t for t in topics if t),
+    )
 
 
 # Talk about where answers come from ("my reference material", "the documents"),
@@ -202,14 +318,22 @@ REJECTIONS: Dict[str, str] = {
         "that information and where they could go instead."
     ),
     "unsourced_detail": (
-        "It included a specific detail (a number, price, link, email or contact) "
-        "that no passage supports. Leave the detail out, or cite the passage it "
-        "comes from."
+        "It included a specific detail (a phone number, link, email or price) that "
+        "no passage offered here contains word for word. Leave it out, or use it "
+        "only as a passage gives it."
     ),
     "empty": "It was empty. Write the reply the person should get.",
     "search_first": (
         "It said it doesn't have this without searching. Search first: the answer "
         "may be in the library."
+    ),
+    "repeats_crisis": (
+        "It repeated crisis wording. Say you're not a crisis service only the first "
+        "time you introduce yourself, and keep small talk to the point."
+    ),
+    "repeats_topics": (
+        "It listed your topics again. They were offered earlier in the conversation: "
+        "keep small talk to one or two sentences."
     ),
     "mentions_sources": (
         "It talked about its reference material, documents or passages. Say the same "
@@ -220,6 +344,22 @@ REJECTIONS: Dict[str, str] = {
         "from those passages and cite them."
     ),
 }
+
+
+# A reply that opens by saying it doesn't have the information is a decline, even
+# when it cites a passage for where to go instead: it is what the unanswered queue
+# is for.
+_NO_INFORMATION = re.compile(
+    r"^\W*(?:sorry\W+)?(?:i\s+)?(?:don'?t|do not|can'?t find|couldn'?t find|"
+    r"have no)\s+(?:have\s+)?(?:any\s+)?(?:information|info|details|anything)"
+    r"|^\W*(?:mere paas|mujhe)\b.{0,40}\b(?:jaankari|jankari)\b.{0,20}\bnahi",
+    re.IGNORECASE,
+)
+
+
+def says_it_has_nothing(text: str) -> bool:
+    first = _SENTENCE_END.split((text or "").strip(), maxsplit=1)[0]
+    return bool(_NO_INFORMATION.search(first))
 
 
 def check_reply(
@@ -235,6 +375,7 @@ def check_reply(
     question: str = "",
     searched: bool = False,
     organisation: Organisation = Organisation(),
+    history: Sequence[Dict[str, str]] = (),
 ) -> Tuple[Dict[str, Any], Optional[str]]:
     """The run's result, and the rejection reason (a `REJECTIONS` key) when the
     check refused the draft; None when it went through as the model meant it.
@@ -259,6 +400,13 @@ def check_reply(
     # The model chose to decline, so its text is a decline written for the person.
     # A decline forced here replaces whatever the model wrote, which may be the
     # very claim being refused; ally-be then sends the bot's decline wording.
+    if (
+        action == REPLY_ACTION
+        and intent == AgentIntent.ANSWER
+        and says_it_has_nothing(answer_text)
+    ):
+        logger.info("Answer opens by saying it has nothing; treating it as a decline")
+        intent = AgentIntent.DECLINE
     model_declined = action == REPLY_ACTION and intent == AgentIntent.DECLINE
     about_organisation = organisation.named_in(question) or (
         turn_type == "question" and organisation.named_in(answer_text)
@@ -278,17 +426,20 @@ def check_reply(
         and not step.get("citations")
         and turn_type in ("smalltalk", "about_bot")
         and not passages
-        and not looks_factual(answer_text)
+        and not looks_factual(without_contact_details(answer_text))
         and not about_organisation
     ):
         # A reply to a greeting or to "what can you do?", labelled `answer` with
         # nothing searched or cited, is small talk: the same text sent as
         # `smalltalk` would pass, so refusing it only swaps in the fixed wording.
         intent = AgentIntent.SMALLTALK
-    elif intent == AgentIntent.SMALLTALK and (looks_factual(answer_text) or passages):
+    elif intent == AgentIntent.SMALLTALK and (
+        looks_factual(without_contact_details(answer_text)) or passages
+    ):
         # Small talk does not need a source, but this one either states something
-        # checkable or was written after a search found passages: ground it like
-        # an answer.
+        # checkable (a time, a price) or was written after a search found passages:
+        # ground it like an answer. Phone numbers, links and emails are checked
+        # for every reply below.
         logger.info("Small talk looks factual; treating it as an answer")
         intent = AgentIntent.ANSWER
         rejection = "unsourced_detail"
@@ -321,22 +472,54 @@ def check_reply(
             # it doesn't have it.
             logger.info("Agent declined although a search found passages")
             rejection = "use_found"
-        elif unsupported_details(answer_text, passages):
-            # A decline is the model's own words, but a link, email or number in
-            # it still needs a passage that says it.
-            logger.info("Agent decline carries an unsourced detail")
-            rejection = "unsourced_detail"
 
-    style_only = False
-    if rejection is None and mentions_sources(answer_text):
-        # Wording, not safety: sent back once to rephrase, and kept as written if
-        # the rewrite still does it.
-        rejection = "mentions_sources"
-        style_only = True
+    # Fixes that keep the rest of the reply: sent back once, and if the rewrite
+    # still needs them, applied to the text (sentences removed) rather than
+    # refusing the reply.
+    keeps_text = False
+    if intent != AgentIntent.DECLINE or model_declined:
+        unsourced = unsupported_details(answer_text, passages)
+        if unsourced and rejection in (None, "unsourced_detail"):
+            # Any reply type: a phone number, link or email must be in a passage
+            # offered this run, word for word.
+            logger.info("Reply carries %d unsourced contact detail(s)", len(unsourced))
+            rejection, keeps_text = "unsourced_detail", True
+            answer_text = without_details(answer_text, unsourced)
+        if repeated_crisis_wording(answer_text, turn_type, history):
+            if rejection is None:
+                rejection, keeps_text = "repeats_crisis", True
+            # Wording only: if trimming would leave nothing, the reply stays as is.
+            answer_text = (
+                without_repeated_crisis_wording(answer_text, turn_type, history)
+                or answer_text
+            )
+        earlier = any(turn.get("role") == "assistant" for turn in history)
+        if earlier and turn_type == "smalltalk":
+            # The topics were offered once; later small talk doesn't list them again.
+            listed = [
+                sentence
+                for sentence in _SENTENCE_END.split(answer_text)
+                if organisation.topics_named_in(sentence) >= 3
+            ]
+            if listed:
+                if rejection is None:
+                    rejection, keeps_text = "repeats_topics", True
+                answer_text = (
+                    without_sentences(
+                        answer_text, lambda sentence: sentence not in listed
+                    )
+                    or answer_text
+                )
+        if rejection is None and mentions_sources(answer_text):
+            # Wording, not safety: kept as written if the rewrite still does it.
+            rejection, keeps_text = "mentions_sources", True
+        if keeps_text and not answer_text:
+            # Nothing left once the unsourced details were removed.
+            intent, keeps_text = AgentIntent.DECLINE, False
 
     if intent == AgentIntent.DECLINE:
         citations = []
-        if not model_declined or (rejection and not style_only):
+        if not model_declined or (rejection and not keeps_text):
             answer_text = ""
         # The parity path's reason when searching found nothing at all, so the
         # unanswered queue reads the same as in v1.

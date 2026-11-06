@@ -340,3 +340,33 @@ Latency outliers (18–76 s) in runs B and C were OpenAI retrying requests (`Ret
 **Eval:** cases may override the bot (`bot:` in a case); four cases on a documents_and_general copy: "Ally kya hai?", "What is Ally?", "who made Ally?" (cited answers) and "What is CBT?" (new kind `general`: answered after a search, flagged as general information). A reply with markdown is a hard fail. `about_bot` cases may now be answered with citations. The script runs 6 cases side by side (`--workers`), so a full run takes about 3 minutes instead of about 8; judge calls are serialised.
 
 **Full eval:** 38 turns, **0 hard fails, 0 check fails**, every documents_and_general case as intended, in-scope documents the same as v1 100% of 12, p50 −12% vs parity. One reply still mentions "reference material" (`out-refund`, after one rewrite): the phrase is in Ally FAQ's own decline text, "My reference material does not cover that…", which the prompt quotes for tone.
+
+## 11. Closing checks (2026-11-06)
+
+**1. Phone numbers, links and emails, in every reply type** (`check.py`: `contact_details`, `unsupported_details`, `without_details`).
+- A phone-like number (three or more digits, spaces or dashes allowed: "112", "14416", "1800-123-456"), a link (`https://…`, `www.…`, or a bare domain such as `helloally.ai`) or an email must appear word for word (case, spaces and dashes ignored) in a passage offered this run. This applies to answers, small talk, clarifying questions and declines alike.
+- An unsourced one sends the draft back once; if the rewrite still has it, the **sentence carrying it is removed** and the rest is sent. A reply with nothing left becomes a decline. "Step 1" and "5 minutes" are not contacts. Small talk with any other checkable detail (a time, a price) still needs a citation, as before.
+- Tests: `TestContactDetailsInEveryReply::test_a_cited_answer_with_unsourced_helplines` (a cited answer with "Tele-MANAS 14416 or 112" whose passage doesn't contain them → that sentence removed, the answer and its citation kept), `test_the_same_numbers_from_a_passage_stay`, `test_every_reply_type` (small talk, clarify, decline), `test_nothing_left_is_a_decline`, `test_step_numbers_and_short_counts_are_not_contacts`, `test_a_bare_domain_counts_as_a_link`.
+- Eval: with `--corpus-db` (or `EVAL_CORPUS_DB_URL`), any phone number, link or email in a reply that is not in the bot's documents (`kb_documents.raw_text`) is a **hard fail**.
+
+**2. Greetings, thanks, ok and bye.** Prompt: one or two sentences, no crisis line and no topic list unless it's the first message or they asked what it can do; "not a crisis service" at most once per conversation, only when introducing itself. Check (needs `history`, now passed in):
+- later small talk: sentences with crisis wording (crisis, emergency, helpline, Tele-MANAS) removed (`TestCrisisWordingOncePerConversation::test_later_small_talk_drops_crisis_lines`);
+- any reply: "not a crisis service" removed if an earlier reply said it (`test_not_a_crisis_service_is_said_once`); kept the first time (`test_the_first_introduction_keeps_it`);
+- later small talk: a sentence naming three or more topics (by a topic's distinctive words: "access", "privacy", "skills"…) removed (`TestTopicsOfferedOnce`).
+
+Each is sent back once first. These trims are wording, not safety: if trimming would leave nothing, the reply is sent as written rather than replaced by the decline wording. Eval: new case `st-conversation` (hi → ok → thanks → bye); turns after the first fail on more than two sentences, crisis wording, or a topic list.
+
+**3. Hindi/Hinglish: one form.** Prompt: one natural form, never "sakta/ti". Check: both genders written together ("sakta/ti", "sakta / sakti", "batata/batati", "karunga/karungi") become the first form (`TestOneHindiForm`); other slashes are kept. Eval: a reply with both forms fails its check.
+
+**Also:** an `answer` whose first sentence says it doesn't have the information ("I don't have information on refunds…") is treated as the decline it is, in its own words, so it is filed as unanswered (`TestAnswerThatHasNothing`). The eval judge's rubric now says when a bot may answer general topics, and "medical advice" means advice about a specific person's diagnosis, treatment, care or medication, not explaining what a therapy is (the CBT case was flagged otherwise).
+
+**5. The organisation-names heuristic is fragile.** `organisation_of(bot)` derives the organisation's names from the bot's display name, the shared prefix of its document titles ("Ally FAQ – …") and their distinctive capitalised words ("Ally"). It works for Ally FAQ because the bot, its documents and the product share one short, distinctive name. For another business it can miss (a bot called "Help Desk" with documents titled "Returns", "Shipping": no names at all, so only citations apply) or over-match (a common word as the name). **Chunk 4 (ORG.md) should give the organisation's name, and its product names, explicitly**, and the check should read them from there instead.
+
+**4. Two full eval runs** (42 turns in 37 cases, `--corpus-db` on; the report in [CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md) is run 2):
+
+| Run | Hard fails | Check fails | In scope: same documents as v1 | p50 vs parity |
+|---|---|---|---|---|
+| 1 | 1: `gen-what-is-cbt`, OpenAI returned HTTP 500 (no reply to judge) | 2: that error; `cl-doesnt-work` asked one question with two question marks | 100% of 12 | −23% |
+| 2 | **0** | **0** | 100% of 12 | −24% |
+
+No reply in either run has markdown, an unsourced phone number, link or email, or "sakta/ti". In the hi → ok → thanks → bye conversation, every turn after the first is one or two sentences with no crisis line or topic list. Single-turn "ok" and "thanks" are a conversation's first message, so they may introduce the topics. `out-refund` is now a decline (filed as unanswered); it still says "reference material", which is in Ally FAQ's own decline text.

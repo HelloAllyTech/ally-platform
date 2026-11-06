@@ -134,7 +134,10 @@ class TestSmalltalk:
         assert rejection == "unsourced_detail"
 
     def test_factual_looking_smalltalk_with_a_citation_is_an_answer(self):
-        result = check("smalltalk", "Plans start at ₹500.", citations=[1])
+        priced = [passage(CHUNK_A, 0.7, text="Plans start at ₹500 a month.")]
+        result = check(
+            "smalltalk", "Plans start at ₹500.", citations=[1], passages=priced
+        )
         assert result["intent"] == "answer"
         assert len(result["citations"]) == 1
 
@@ -157,7 +160,7 @@ class TestSmalltalk:
         about = review(
             "answer", "Visit www.example.org", turn_type="about_bot", passages=[]
         )
-        assert about[1] == "uncited"
+        assert about[1] == "unsourced_detail"
         assert review("answer", "Refunds take days.", passages=[])[1] == "uncited"
 
     def test_plain_greeting_is_not_factual(self):
@@ -324,7 +327,9 @@ class TestDeclineThatIgnoresWhatWasFound:
             passages=[],
         )
         assert rejection == "unsourced_detail"
-        assert result["answer"] == ""
+        # If the rewrite still has it, the sentence carrying it is removed.
+        assert result["answer"] == "I don't have that."
+        assert result["intent"] == "decline"
 
     def test_a_link_a_passage_gives_is_fine(self):
         found = [passage(CHUNK_A, 0.7, text="Contact us at www.helloally.ai.")]
@@ -350,10 +355,12 @@ class TestPlainText:
         )
 
     def test_every_reply_goes_out_as_plain_text(self):
+        policy = [passage(CHUNK_A, 0.7, text="See app.helloally.ai/privacy.")]
         result = check(
             "answer",
             "**Yes.** See [the policy](https://app.helloally.ai/privacy).",
             citations=[1],
+            passages=policy,
         )
         assert result["answer"] == "Yes. See https://app.helloally.ai/privacy."
 
@@ -422,3 +429,208 @@ class TestTalkAboutSources:
         assert rejection == "mentions_sources"
         assert result["intent"] == "answer"
         assert len(result["citations"]) == 1
+
+
+class TestContactDetailsInEveryReply:
+    """Phone numbers, links and emails must be in a passage offered this run, word
+    for word: sent back once, then the sentence carrying one is removed."""
+
+    def test_a_cited_answer_with_unsourced_helplines(self):
+        found = [passage(CHUNK_A, 0.7, text="Ally is a not-for-profit platform.")]
+        result, rejection = review(
+            "answer",
+            "Ally is a not-for-profit platform. In a crisis call Tele-MANAS 14416 "
+            "or 112.",
+            citations=[1],
+            passages=found,
+        )
+        assert rejection == "unsourced_detail"
+        assert result["intent"] == "answer"
+        assert result["answer"] == "Ally is a not-for-profit platform."
+        assert len(result["citations"]) == 1
+
+    def test_the_same_numbers_from_a_passage_stay(self):
+        found = [passage(CHUNK_A, 0.7, text="Call Tele-MANAS on 14416, or 112.")]
+        result, rejection = review(
+            "answer", "Call Tele-MANAS on 14416, or 112.", citations=[1], passages=found
+        )
+        assert rejection is None
+        assert "14416" in result["answer"]
+
+    @pytest.mark.parametrize(
+        "intent,turn_type",
+        [("smalltalk", "smalltalk"), ("clarify", "unclear"), ("decline", "question")],
+    )
+    def test_every_reply_type(self, intent, turn_type):
+        result, rejection = review(
+            intent,
+            "Happy to help. Write to help@example.org or call 1800-123-456.",
+            turn_type=turn_type,
+            passages=[],
+        )
+        assert rejection == "unsourced_detail"
+        assert result["answer"] == "Happy to help."
+
+    def test_nothing_left_is_a_decline(self):
+        result, _ = review("smalltalk", "Call 1800 123 456.", passages=[])
+        assert result["intent"] == "decline"
+        assert result["answer"] == ""
+
+    def test_step_numbers_and_short_counts_are_not_contacts(self):
+        result, rejection = review(
+            "answer", "1. Open the app.\n2. Wait 5 minutes.", citations=[1]
+        )
+        assert rejection is None
+        assert result["answer"] == "1. Open the app.\n2. Wait 5 minutes."
+
+    def test_a_bare_domain_counts_as_a_link(self):
+        assert unsupported_details("Visit helloally.ai today.", []) == ["helloally.ai"]
+
+
+class TestCrisisWordingOncePerConversation:
+    INTRO = [
+        {"role": "user", "content": "hi"},
+        {
+            "role": "assistant",
+            "content": "Hi, I'm Ally FAQ. I'm not a crisis service. How can I help?",
+        },
+    ]
+
+    def test_later_small_talk_drops_crisis_lines(self):
+        result, rejection = review(
+            "smalltalk",
+            "You're welcome! If you're in crisis, call your local helpline.",
+            turn_type="smalltalk",
+            passages=[],
+            history=self.INTRO,
+        )
+        assert rejection == "repeats_crisis"
+        assert result["answer"] == "You're welcome!"
+
+    def test_not_a_crisis_service_is_said_once(self):
+        result, _ = review(
+            "smalltalk",
+            "I'm Ally FAQ, here for questions about Ally. I'm not a crisis service.",
+            turn_type="about_bot",
+            passages=[],
+            history=self.INTRO,
+        )
+        assert result["answer"] == "I'm Ally FAQ, here for questions about Ally."
+
+    def test_the_first_introduction_keeps_it(self):
+        _, rejection = review(
+            "smalltalk",
+            "Hi, I'm Ally FAQ. I'm not a crisis service.",
+            turn_type="smalltalk",
+            passages=[],
+        )
+        assert rejection is None
+
+
+class TestOneHindiForm:
+    @pytest.mark.parametrize(
+        "written,sent",
+        [
+            ("Main madad kar sakta/ti hoon.", "Main madad kar sakta hoon."),
+            ("Main bata sakta / sakti hoon.", "Main bata sakta hoon."),
+            ("Main batata/batati hoon.", "Main batata hoon."),
+            ("Main help karunga/karungi.", "Main help karunga."),
+        ],
+    )
+    def test_both_genders_become_one(self, written, sent):
+        assert plain_text(written) == sent
+
+    def test_ordinary_slashes_stay(self):
+        assert plain_text("Use sign-in/sign-up.") == "Use sign-in/sign-up."
+
+
+class TestAnswerThatHasNothing:
+    def test_is_a_decline_in_its_own_words(self):
+        result, rejection = review(
+            "answer",
+            "I don't have information on refunds. Ask your organisation.",
+            citations=[1],
+            question="what's your refund policy?",
+        )
+        assert rejection is None
+        assert result["intent"] == "decline"
+        assert result["citations"] == []
+        assert result["answer"].startswith("I don't have information on refunds.")
+
+    def test_a_real_answer_is_not(self):
+        result, _ = review("answer", "Yes, sign-in uses a code.", citations=[1])
+        assert result["intent"] == "answer"
+
+
+class TestTopicsOfferedOnce:
+    HI = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "Hi, I'm Ally FAQ. What can I help with?"},
+    ]
+    BOT = organisation_of(
+        {
+            "persona": {"display_name": "Ally FAQ"},
+            "knowledge_topics": [
+                "Ally FAQ – Skills Lab Practice",
+                "Ally FAQ – Privacy and Data",
+                "Ally FAQ – Getting Access and Signing In",
+            ],
+        }
+    )
+
+    def test_later_small_talk_drops_the_list(self):
+        result, rejection = review(
+            "smalltalk",
+            "Great! I can help with Skills Lab practice, privacy and getting access.",
+            turn_type="smalltalk",
+            passages=[],
+            history=self.HI,
+            organisation=self.BOT,
+        )
+        assert rejection == "repeats_topics"
+        assert result["answer"] == "Great!"
+
+    def test_a_list_and_nothing_else_is_kept_rather_than_declined(self):
+        result, rejection = review(
+            "smalltalk",
+            "I can help with Skills Lab practice, privacy and getting access.",
+            turn_type="smalltalk",
+            passages=[],
+            history=self.HI,
+            organisation=self.BOT,
+        )
+        # Sent back once; a rewrite that still lists them is better than the
+        # bot's decline wording in reply to "ok".
+        assert rejection == "repeats_topics"
+        assert result["intent"] == "answer"
+        assert result["answer"].startswith("I can help with Skills Lab")
+
+    def test_keeps_the_rest(self):
+        result, _ = review(
+            "smalltalk",
+            "Sure. I can help with Skills Lab practice, privacy and getting access.",
+            turn_type="smalltalk",
+            passages=[],
+            history=self.HI,
+            organisation=self.BOT,
+        )
+        assert result["answer"] == "Sure."
+
+    def test_a_list_in_other_words_counts(self):
+        assert (
+            self.BOT.topics_named_in(
+                "Tell me what you need: Skills Lab practice, privacy, or access?"
+            )
+            == 3
+        )
+        assert self.BOT.topics_named_in("Anything else you need with Ally?") == 0
+
+    def test_the_first_message_may_list_them(self):
+        _, rejection = review(
+            "smalltalk",
+            "Hi! I can help with Skills Lab practice, privacy and getting access.",
+            turn_type="smalltalk",
+            passages=[],
+            organisation=self.BOT,
+        )
+        assert rejection is None

@@ -10,6 +10,8 @@
 #         | general (a general topic on a documents_and_general bot: answered after a
 #           search, flagged as general information)
 # A case's `bot` is merged over `defaults` for that case only.
+# Hard fails include any phone number, link or email not in the bot's documents, when
+# the script is given --corpus-db.
 #   turn_type: the expected turn type (soft: reported, not failed)
 
 defaults:
@@ -72,6 +74,14 @@ cases:
   - {id: st-bye, turns: [{say: "bye", expect: {kind: smalltalk, turn_type: smalltalk}}]}
   - {id: st-namaste, turns: [{say: "namaste", expect: {kind: smalltalk, turn_type: smalltalk}}]}
   - {id: st-dhanyavaad, turns: [{say: "dhanyavaad", expect: {kind: smalltalk, turn_type: smalltalk}}]}
+  # A conversation: after the first message, small talk is one or two sentences, with
+  # no crisis line and no topic list.
+  - id: st-conversation
+    turns:
+      - {say: "hi", expect: {kind: smalltalk, turn_type: smalltalk}}
+      - {say: "ok", expect: {kind: smalltalk, turn_type: smalltalk}}
+      - {say: "thanks", expect: {kind: smalltalk, turn_type: smalltalk}}
+      - {say: "bye", expect: {kind: smalltalk, turn_type: smalltalk}}
 
   # --- about the bot: names itself; lists real topics; no invented features ----------
   - {id: ab-who, turns: [{say: "who are you?", expect: {kind: about_bot, turn_type: about_bot}}]}

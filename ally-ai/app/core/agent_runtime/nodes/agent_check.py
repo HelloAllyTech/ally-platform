@@ -56,6 +56,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             question=state["question"],
             searched=bool(state.get("tool_calls")),
             organisation=organisation_of(state["bot"]),
+            history=state.get("history") or (),
         )
         revisions = state.get("revisions") or 0
         if rejection and revisions < MAX_REVISIONS:
