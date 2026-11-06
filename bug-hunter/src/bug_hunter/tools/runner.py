@@ -70,8 +70,9 @@ def single_test_command(app: AppConfig, file: str, name: str | None) -> str:
         )
     template = app.test_one
     if name is None:
-        # drop the flag that carries {name}: "-t {name}", "-k {name}", "--name {name}"
-        template = re.sub(r"\s+\S+\s+\{name\}", "", template)
+        # drop the flag that carries {name}: "-t {name}", "--name {name}",
+        # "--testNamePattern={name}"
+        template = re.sub(r"\s+(?:\S+\s+\{name\}|\S*\{name\}\S*)", "", template)
     values = {"file": shlex.quote(file), "name": shlex.quote(name) if name else ""}
     if "{project}" in template:
         values["project"] = nx_project(file)
