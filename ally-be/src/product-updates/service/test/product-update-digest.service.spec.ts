@@ -225,7 +225,7 @@ describe('ProductUpdateDigestService', () => {
     expect(body).toContain('100%'); // Asha: 3 of 3
     expect(body).not.toContain('admins have voted');
     expect(body.indexOf('Bea')).toBeLessThan(body.indexOf('Asha'));
-    expect(body).not.toContain('Not voted yet');
+    expect(body).toContain('Not yet voted: Cy, Dev');
     expect(body.indexOf('Roadmap votes in September')).toBeLessThan(
       body.indexOf('Live for customers'),
     );
