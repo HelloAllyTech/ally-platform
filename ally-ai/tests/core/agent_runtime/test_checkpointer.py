@@ -2,12 +2,20 @@
 
 import os
 import uuid
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from psycopg_pool import AsyncConnectionPool
 
 from app.core.agent_runtime import checkpointer as checkpointer_module
-from app.core.agent_runtime.graph import build_graph, get_run_state, run_agent
+from app.core.agent_runtime.graph import (
+    build_graph,
+    close_agent_runtime,
+    get_agent_graph,
+    get_run_state,
+    open_agent_runtime,
+    run_agent,
+)
 from app.core.config import settings
 from app.core.knowledge_agent.schemas import AnswerIntent, KnowledgeAnswer
 from tests.core.agent_runtime.conftest import AGENT, make_bot
@@ -121,3 +129,116 @@ async def test_postgres_checkpoints_land_in_their_own_schema(
 
         async with await AsyncConnection.connect(url, autocommit=True) as conn:
             await conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+
+
+class FakePool:
+    """Stands in for psycopg_pool.AsyncConnectionPool; records how it was built."""
+
+    instances: list = []
+    check_connection = staticmethod(AsyncConnectionPool.check_connection)
+
+    def __init__(self, *args, **kwargs):
+        self.kwargs = kwargs
+        self.open = AsyncMock()
+        self.close = AsyncMock()
+        FakePool.instances.append(self)
+
+
+def _fake_connection():
+    conn = MagicMock()
+    conn.__aenter__ = AsyncMock(return_value=conn)
+    conn.__aexit__ = AsyncMock(return_value=False)
+    conn.execute = AsyncMock()
+    return conn
+
+
+@pytest.fixture
+def postgres_configured(monkeypatch):
+    monkeypatch.setattr(
+        settings.AGENT_RUNTIME, "CHECKPOINT_DB_URL", "postgresql://u@db/agent"
+    )
+    monkeypatch.setattr(checkpointer_module, "_saver", None)
+    monkeypatch.setattr(checkpointer_module, "_pool", None)
+    monkeypatch.setattr(checkpointer_module, "_unavailable", False)
+    FakePool.instances = []
+
+
+class TestStartupWithoutItsDatabase:
+    async def test_an_unreachable_database_leaves_the_runtime_off(
+        self, postgres_configured
+    ):
+        connect = AsyncMock(side_effect=OSError("connection refused"))
+        with (
+            patch("psycopg.AsyncConnection.connect", connect),
+            patch.object(checkpointer_module.logger, "error") as error,
+        ):
+            saver = await checkpointer_module.open_checkpointer()
+        assert saver is None
+        assert checkpointer_module.checkpointer_available() is False
+        error.assert_called_once()
+        assert "connection refused" not in str(error.call_args)
+        await checkpointer_module.close_checkpointer()
+        assert checkpointer_module.checkpointer_available() is True
+
+    async def test_a_failed_setup_closes_the_pool(self, postgres_configured):
+        saver = MagicMock()
+        saver.setup = AsyncMock(side_effect=RuntimeError("no permission"))
+        with (
+            patch(
+                "psycopg.AsyncConnection.connect",
+                AsyncMock(return_value=_fake_connection()),
+            ),
+            patch("psycopg_pool.AsyncConnectionPool", FakePool),
+            patch(
+                "langgraph.checkpoint.postgres.aio.AsyncPostgresSaver",
+                MagicMock(return_value=saver),
+            ),
+        ):
+            assert await checkpointer_module.open_checkpointer() is None
+        (pool,) = FakePool.instances
+        pool.open.assert_awaited_once()
+        pool.close.assert_awaited_once()
+        assert checkpointer_module.checkpointer_available() is False
+        await checkpointer_module.close_checkpointer()
+
+    async def test_pooled_connections_are_checked_before_use(self, postgres_configured):
+        saver = MagicMock()
+        saver.setup = AsyncMock()
+        with (
+            patch(
+                "psycopg.AsyncConnection.connect",
+                AsyncMock(return_value=_fake_connection()),
+            ),
+            patch("psycopg_pool.AsyncConnectionPool", FakePool),
+            patch(
+                "langgraph.checkpoint.postgres.aio.AsyncPostgresSaver",
+                MagicMock(return_value=saver),
+            ),
+        ):
+            assert await checkpointer_module.open_checkpointer() is saver
+        (pool,) = FakePool.instances
+        assert pool.kwargs["check"] == AsyncConnectionPool.check_connection
+        assert checkpointer_module.checkpointer_available() is True
+        await checkpointer_module.close_checkpointer()
+        pool.close.assert_awaited_once()
+
+
+class TestTheCachedGraph:
+    async def test_the_memory_fallback_is_not_kept(self, monkeypatch):
+        monkeypatch.setattr(checkpointer_module, "_saver", None)
+        checkpointer_module.get_checkpointer()
+        assert checkpointer_module._saver is None
+
+    async def test_startup_and_shutdown_drop_the_compiled_graph(
+        self, service, monkeypatch
+    ):
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "CHECKPOINT_DB_URL", None)
+        monkeypatch.setattr(checkpointer_module, "_saver", None)
+        before = get_agent_graph(service)
+        await open_agent_runtime()
+        opened = get_agent_graph(service)
+        assert opened is not before
+        assert opened.checkpointer is checkpointer_module._saver
+        await close_agent_runtime()
+        assert get_agent_graph(service) is not opened
+        get_agent_graph.cache_clear()

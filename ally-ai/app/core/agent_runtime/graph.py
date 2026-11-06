@@ -26,7 +26,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langsmith.run_helpers import tracing_context
 
-from app.core.agent_runtime.checkpointer import get_checkpointer
+from app.core.agent_runtime.checkpointer import (
+    close_checkpointer,
+    get_checkpointer,
+    open_checkpointer,
+)
 from app.core.agent_runtime.nodes import (
     make_agent_check_node,
     make_agent_node,
@@ -90,13 +94,25 @@ def route_at_start(state: AgentState) -> str:
 
 
 @lru_cache(maxsize=1)
-def get_agent_graph() -> CompiledStateGraph:
-    """Compiled once, on first use, against whichever checkpointer startup opened."""
-    # Imported here: dependencies imports the API layer's services, and this module
-    # must stay importable on its own.
-    from app.core.dependencies import _get_knowledge_agent_service_cached
+def get_agent_graph(service: KnowledgeAgentService) -> CompiledStateGraph:
+    """Compiled once, on first use, against whichever checkpointer is open then.
 
-    return build_graph(_get_knowledge_agent_service_cached(), get_checkpointer())
+    `open_agent_runtime` and `close_agent_runtime` clear it, so a graph compiled
+    before startup (or after shutdown) never keeps the wrong checkpointer.
+    """
+    return build_graph(service, get_checkpointer())
+
+
+async def open_agent_runtime() -> None:
+    """Startup: open the checkpointer, and compile the graph against it on first use."""
+    await open_checkpointer()
+    get_agent_graph.cache_clear()
+
+
+async def close_agent_runtime() -> None:
+    """Shutdown: close the checkpointer and drop the graph that held it."""
+    await close_checkpointer()
+    get_agent_graph.cache_clear()
 
 
 async def run_agent(
@@ -142,13 +158,12 @@ async def run_agent(
 
 
 async def get_run_state(
-    conversation_id: str, run_id: str, graph: Optional[CompiledStateGraph] = None
+    conversation_id: str, run_id: str, *, graph: CompiledStateGraph
 ) -> Optional[Dict[str, Any]]:
     """The final stored state of one run in a conversation, or None.
 
     Internal for now; "Why?" (chunk 10) puts a route on it.
     """
-    graph = graph or get_agent_graph()
     config = {"configurable": {"thread_id": conversation_id}}
     # Newest first, so the first checkpoint of this run is its final state.
     async for snapshot in graph.aget_state_history(config):

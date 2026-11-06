@@ -1,8 +1,9 @@
 """Agents v2 runtime endpoint — the knowledge pipeline run as a LangGraph graph.
 
 Dark until AGENT_RUNTIME__ENABLED: every route here answers 404 while it is off, so
-shipping this changes nothing in production. In chunk 1 the graph is parity only:
-it answers exactly as /knowledge-agent/answer does, and adds a run id, a per-step
+shipping this changes nothing in production, and 503 if it is on but its checkpoint
+database could not be opened at startup. With `features.agent` off the graph answers
+exactly as /knowledge-agent/answer does; either way it adds a run id, a per-step
 trace and a stored checkpoint per run.
 """
 
@@ -11,13 +12,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from langgraph.graph.state import CompiledStateGraph
 
+from app.api.v1.endpoints.knowledge_agent import knowledge_errors
+from app.core.agent_runtime.checkpointer import checkpointer_available
 from app.core.agent_runtime.graph import get_agent_graph, run_agent
 from app.core.config import settings
-from app.exceptions.custom_exceptions import (
-    EmbeddingFailedException,
-    LLMInvocationFailedException,
-    VectorDBSearchFailedException,
-)
+from app.core.dependencies import get_knowledge_agent_service
+from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.schemas.agent_runtime import AgentRunRequest, AgentRunResponse
 from app.utils.logger import get_logger
 
@@ -28,10 +28,17 @@ def require_agent_runtime() -> None:
     """404, not 403: while the runtime is off the route should not appear to exist."""
     if not settings.AGENT_RUNTIME.ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+    if not checkpointer_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The agent runtime is unavailable",
+        )
 
 
-async def get_graph() -> CompiledStateGraph:
-    return get_agent_graph()
+async def get_graph(
+    service: KnowledgeAgentService = Depends(get_knowledge_agent_service),
+) -> CompiledStateGraph:
+    return get_agent_graph(service)
 
 
 router = APIRouter(dependencies=[Depends(require_agent_runtime)])
@@ -83,7 +90,7 @@ async def run(
         "knowledge_topics": list(payload.knowledge_topics),
         "decline_text": payload.decline_text,
     }
-    try:
+    with knowledge_errors("Unexpected error in an agent run"):
         state = await run_agent(
             graph,
             run_id=run_id,
@@ -93,32 +100,15 @@ async def run(
             history=[turn.model_dump() for turn in payload.history],
             bot=bot,
         )
-    except EmbeddingFailedException:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to embed the question",
+        result = state["result"]
+        retrieval = {
+            **result["retrieval"],
+            "hit_chunk_ids": [
+                str(hit.get("chunk_id")) for hit in state.get("hits") or []
+            ],
+        }
+        return AgentRunResponse(
+            **{**result, "retrieval": retrieval},
+            run_id=run_id,
+            trace=state.get("trace") or [],
         )
-    except VectorDBSearchFailedException:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The knowledge index is unavailable",
-        )
-    except LLMInvocationFailedException as e:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
-    except Exception:
-        logger.exception("Unexpected error in an agent run")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to answer the question",
-        )
-
-    result = state["result"]
-    retrieval = {
-        **result["retrieval"],
-        "hit_chunk_ids": [str(hit.get("chunk_id")) for hit in state.get("hits") or []],
-    }
-    return AgentRunResponse(
-        **{**result, "retrieval": retrieval},
-        run_id=run_id,
-        trace=state.get("trace") or [],
-    )

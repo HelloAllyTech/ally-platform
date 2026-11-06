@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1.endpoints.agent_runtime import get_graph
+from app.core.agent_runtime import checkpointer as checkpointer_module
 from app.core.config import settings
 from app.core.knowledge_agent.schemas import AnswerIntent, KnowledgeAnswer
 from app.exceptions.custom_exceptions import (
@@ -145,3 +146,27 @@ class TestRun:
         gen = AsyncMock(side_effect=LLMInvocationFailedException("model down"))
         with patch(f"{AGENT}.generate_structured", gen):
             assert client.post(URL, json=BODY).status_code == 502
+
+    def test_a_bad_final_state_is_a_mapped_500(self, client, monkeypatch):
+        """Building the response is inside the error mapping too."""
+        monkeypatch.setattr(
+            "app.api.v1.endpoints.agent_runtime.run_agent",
+            AsyncMock(return_value={"trace": []}),
+        )
+        response = client.post(URL, json=BODY)
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to answer the question"
+
+
+class TestUnavailable:
+    def test_on_but_without_its_database_is_503(self, client, monkeypatch):
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", True)
+        monkeypatch.setattr(checkpointer_module, "_unavailable", True)
+        response = client.post(URL, json=BODY)
+        assert response.status_code == 503
+        assert response.json()["detail"] == "The agent runtime is unavailable"
+
+    def test_off_is_still_404_when_its_database_is_down(self, client, monkeypatch):
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", False)
+        monkeypatch.setattr(checkpointer_module, "_unavailable", True)
+        assert client.post(URL, json=BODY).status_code == 404

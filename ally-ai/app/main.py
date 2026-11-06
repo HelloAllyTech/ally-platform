@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.api import root
 from app.api.v1.api import api_router
-from app.core.agent_runtime.checkpointer import close_checkpointer, open_checkpointer
+from app.core.agent_runtime.graph import close_agent_runtime, open_agent_runtime
 from app.core.ally_core.client import AllyCoreClient
 from app.core.config import settings
 from app.core.constants import APISettings
@@ -30,12 +30,13 @@ async def lifespan(_: FastAPI):
     logger.info("OpenAI clients initialized")
 
     # Agents v2 runtime: only opened when switched on, so a deploy with it off
-    # touches no new database.
+    # touches no new database. Never raises: if its database is unreachable the
+    # runtime stays off and everything else starts.
     if settings.AGENT_RUNTIME.ENABLED:
-        await open_checkpointer()
+        await open_agent_runtime()
 
     yield
-    await close_checkpointer()
+    await close_agent_runtime()
     await WeaviateClient.close(WeaviateClient.get_client())
     await AllyCoreClient.close(AllyCoreClient.get_client())
     logger.info("Shutting down application...")
