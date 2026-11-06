@@ -58,12 +58,23 @@ import 'scribe_reference_search.dart';
 ///   where waiting for the GET left a live session showing "Microphone
 ///   failure" at 5 s), then the chat is hydrated from
 ///   `GET /chats/counsellor-chat`.
-/// - The session starts PAUSED with the "Resume to let it listen" tooltip
-///   on the controls; pause/resume is debounced 500 ms.
+/// - The session starts actively listening, not paused (changed from RN —
+///   see the `_isCallPaused` field doc); pause/resume is debounced 500 ms,
+///   and pausing shows the "Resume to let it listen" tooltip.
 /// - Offline (connectivity_plus) shows the NETWORK view; a socket drop is
 ///   NETWORK when offline, SOCKET otherwise. The socket reconnects when the
 ///   app returns to the foreground, which also re-checks the chat: if it
 ///   ended meanwhile the counsellor goes to box breathing.
+/// - "Try again" reconnects in place rather than leaving the screen: a
+///   counsellor who hasn't started a chat yet gets a fresh attempt (the
+///   start-gate flags reset and the 5s chatId timeout re-arms), and one
+///   already mid-session just gets the socket back, with the existing
+///   chatId resuming audio — a reconnect that lands on a chat the gap
+///   quietly ended is caught the same way foregrounding catches it. Fixed
+///   2026-11: it used to be wired to the exact same handler as "Go back",
+///   so a transient blip forced a full manual round trip through Call Log
+///   for a brand-new connection — slow enough that a counsellor could give
+///   up mid-loop, which is what "chats sometimes not even starting" was.
 /// - A web-microphone session (started on the web app) is shown but not
 ///   streamed: no local audio, pause disabled, no disconnect states.
 /// - Ending goes to box breathing whether or not `POST /chats/:id/end`
@@ -109,7 +120,21 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
   int? _chatId;
   Chat? _chat;
 
-  bool _isCallPaused = true;
+  // Starts actively listening, not paused. Consent is already confirmed on
+  // the "Start Session" modal (Call Log's own copy: "By starting, you
+  // confirm everyone being transcribed has given consent") before this
+  // screen is ever reached, so a muted start serves no consent purpose —
+  // it only risks a counsellor who doesn't notice the dismissible tooltip
+  // (or has the controls collapsed) running part or all of a real session
+  // with nothing reaching the backend, which transcribes and summarizes
+  // nothing. Fixed 2026-11 after exactly that: a session caught on video
+  // sitting "Taking Notes" for 24+s with the mute tooltip still up. RN
+  // started paused too (no comment there explaining why); not carried
+  // forward deliberately.
+  bool _isCallPaused = false;
+  // Still starts `true`: shown the first time a session (new or manually
+  // paused later) IS muted, never reset back once dismissed/resumed (see
+  // `_onPauseResumePressed`) — unrelated to the starting value above.
   bool _isMuteTooltipOpen = true;
   Timer? _pauseDebounceTimer;
 
@@ -270,7 +295,13 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     return _socketService.connect(
       namespacePath: AppConfig.microphoneSocketPath,
       userId: widget.userId,
-      onConnect: () {},
+      // A reconnect after a chat was already known: the gap may have outlived
+      // it server-side (ended by the other party, or by the disconnect itself
+      // via handleDisconnect). Same staleness check foregrounding already
+      // runs — reuse it rather than silently resuming a dead chat.
+      onConnect: () {
+        if (_chatId != null) _checkChatStillActive();
+      },
       onDisconnect: (reason) {
         if (!mounted || _isIntentionalDisconnect || _isWebMicrophoneMode) return;
         setState(() => _disconnectedType = _isOffline ? DisconnectedType.network : DisconnectedType.socket);
@@ -557,9 +588,22 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     }
   }
 
+  /// Reconnects in place instead of leaving the screen (RN's own
+  /// `handleTryAgain` just left, which this deliberately no longer matches —
+  /// see the class doc comment). No chat yet: reset the start gate so a
+  /// fresh `SESSION_CREATED` emits a new `startAudioChat`, same as the first
+  /// mount. A chat already underway: leave those flags alone so reconnecting
+  /// can't double-emit `startAudioChat` for it — the socket coming back is
+  /// enough, since `_onAudioChunk` already keys every frame on `_chatId`
+  /// rather than the socket's connected state.
   void _handleTryAgain() {
+    if (_chatId == null) {
+      _isMicrophoneModeSessionCreated = false;
+      _isAudioChatEmitted = false;
+      _armChatIdTimeout();
+    }
     setState(() => _disconnectedType = null);
-    _handleGoBack();
+    _connectSocket();
   }
 
   bool get _hasLiveSession => _chatId != null && _disconnectedType == null;

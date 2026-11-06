@@ -26,6 +26,7 @@ describe('RoadmapVotingAnalyticsService', () => {
     grants: RoadmapVotesGrantedRow[] = [],
     eligibleNow: number[] = [],
     names: RoadmapVoterRow[] = [],
+    ownVotes: RoadmapVotesCastRow[] = [],
   ) => {
     const module = await Test.createTestingModule({
       providers: [
@@ -34,6 +35,7 @@ describe('RoadmapVotingAnalyticsService', () => {
           provide: RoadmapVotingAnalyticsRepository,
           useValue: {
             getVotesCast: jest.fn().mockResolvedValue(votes),
+            getOwnVotesCast: jest.fn().mockResolvedValue(ownVotes),
             getVotesGranted: jest.fn().mockResolvedValue(grants),
             getEligibleUserIds: jest.fn().mockResolvedValue(eligibleNow),
             getUserNames: jest
@@ -83,8 +85,8 @@ describe('RoadmapVotingAnalyticsService', () => {
     expect(oct.eligible).toBe(2);
     expect(oct.granted).toBe(400);
     expect(oct.users).toEqual([
-      { userId: 1, votes: 7, granted: 200 },
-      { userId: 2, votes: 0, granted: 200 },
+      { userId: 1, votes: 7, votesOnOthers: 7, granted: 200 },
+      { userId: 2, votes: 0, votesOnOthers: 0, granted: 200 },
     ]);
   });
 
@@ -97,7 +99,9 @@ describe('RoadmapVotingAnalyticsService', () => {
     const aug = result.months[0];
     expect(aug.eligible).toBeNull();
     expect(aug.granted).toBeNull();
-    expect(aug.users).toEqual([{ userId: 1, votes: 3, granted: null }]);
+    expect(aug.users).toEqual([
+      { userId: 1, votes: 3, votesOnOthers: 3, granted: null },
+    ]);
     expect(result.accessRecordedFrom).toBe('2026-10-01');
   });
 
@@ -182,5 +186,18 @@ describe('RoadmapVotingAnalyticsService', () => {
       expect(m.votes).toBe(m.users.reduce((s, u) => s + u.votes, 0));
     }
     expect(result.users.reduce((s, u) => s + u.votes, 0)).toBe(13);
+  });
+
+  it("splits each voter's votes into those on colleagues' ideas", async () => {
+    const result = await build(
+      [cast(1, '2026-11', 10), cast(2, '2026-11', 4)],
+      [],
+      [],
+      [],
+      [cast(1, '2026-11', 3)],
+    );
+    const users = result.months[0].users;
+    expect(users.find((u) => u.userId === 1)?.votesOnOthers).toBe(7);
+    expect(users.find((u) => u.userId === 2)?.votesOnOthers).toBe(4);
   });
 });
