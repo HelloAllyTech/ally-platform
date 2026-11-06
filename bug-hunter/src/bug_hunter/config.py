@@ -56,6 +56,12 @@ class AppConfig(_Strict):
     test_dirs: list[str] = Field(default_factory=list)
     risk_paths: list[str] = Field(default_factory=list)
     notes: str | None = None
+    # Sandbox (chunk 02)
+    image: str = Field(min_length=1)
+    install: str = Field(min_length=1)
+    lockfile: str = Field(min_length=1)
+    cache_dirs: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("path")
     @classmethod
@@ -151,6 +157,8 @@ class SandboxLimits(_Strict):
     cpus: float = Field(gt=0)
     memory_mb: int = Field(gt=0)
     timeout_s: int = Field(gt=0)
+    install_timeout_s: int = Field(default=1800, gt=0)
+    pids_limit: int = Field(default=2048, gt=0)
 
 
 class LimitsConfig(_Strict):

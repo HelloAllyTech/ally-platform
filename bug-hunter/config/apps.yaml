@@ -3,7 +3,12 @@
 # where the spec (docs/bug-hunter/spec.md §9) differed from CI, CI won. See
 # docs/bug-hunter/notes/CHUNK-01-NOTES.md for the list of corrections.
 #
-# Placeholders in test_one: {file} = test file path relative to the app, {name} = test name.
+# Placeholders in test_one: {file} = test file path relative to the app, {name} = test name,
+# {project} = the Nx project that owns {file} (ally-web only).
+#
+# Sandbox (chunk 02): `image` names a Dockerfile in bug-hunter/sandbox/, `install` runs once
+# per lockfile hash with network on, `cache_dirs` are mounted from a per-lockfile Docker
+# volume so later runs skip the install, `env` is set for every command.
 apps:
   ally-be:
     path: ally-be
@@ -14,6 +19,11 @@ apps:
     typecheck: "npm run typecheck"
     # Jest rootDir is src with testRegex .*\.spec\.ts$; there is no top-level test/.
     test_dirs: ["src/**/test/", "src/**/*.spec.ts"]
+    image: node24
+    install: "npm ci"
+    lockfile: package-lock.json
+    cache_dirs: [node_modules]
+    env: { CI: "true", JEST_MAX_WORKERS: "4" }
     risk_paths:
       - src/auth/
       - src/authorization/
@@ -28,13 +38,19 @@ apps:
     path: ally-web
     lang: typescript
     test: "npm test"
-    # Single-test command for Vitest-under-Nx is project-specific; chunk 02 (runner) decides it.
+    # {project} is derived from {file}: apps/<name>/... -> <name>, libs/<name>/... -> <name>.
+    test_one: "npx nx test {project} --testFile={file} -t {name}"
     lint: "npm run lint && npm run format:check && npm run lint:colors"
     typecheck: >-
       npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json
       && npx tsc --noEmit -p apps/ally-helpline-dashboard/tsconfig.app.json
       && npx tsc --noEmit -p libs/ui-shared/tsconfig.lib.json
     test_dirs: ["**/__tests__/", "**/*.test.ts", "**/*.test.tsx"]
+    image: node22
+    install: "npm ci"
+    lockfile: package-lock.json
+    cache_dirs: [node_modules]
+    env: { CI: "true", NX_NO_CLOUD: "true", NX_DAEMON: "false", VITEST_MAX_WORKERS: "2" }
     # Concrete auth and permission files rather than **/*Auth*, which also matched
     # agentAuthored.ts and useContentAuthoring.ts.
     risk_paths:
@@ -54,6 +70,11 @@ apps:
     test_one: "poetry run pytest {file} -k {name} -v"
     lint: "poetry run flake8"
     test_dirs: ["tests/"]
+    image: python312
+    install: "poetry install --no-interaction --with dev"
+    lockfile: poetry.lock
+    cache_dirs: [.venv]
+    env: { CI: "true", POETRY_VIRTUALENVS_IN_PROJECT: "true" }
     risk_paths:
       - app/core/phi_logger.py
       - app/core/phi_events.py
@@ -69,6 +90,11 @@ apps:
     test_one: "poetry run python -m pytest {file} -k {name} -v"
     lint: "poetry run flake8"
     test_dirs: ["tests/"]
+    image: python312
+    install: "poetry install --no-interaction --with dev"
+    lockfile: poetry.lock
+    cache_dirs: [.venv]
+    env: { CI: "true", POETRY_VIRTUALENVS_IN_PROJECT: "true" }
     risk_paths:
       - app/core/config.py
       - app/middleware.py
@@ -80,6 +106,11 @@ apps:
     test_one: "flutter test {file} --name {name}"
     lint: "flutter analyze"
     test_dirs: ["test/"]
+    image: flutter
+    install: "flutter pub get"
+    lockfile: pubspec.lock
+    cache_dirs: [.dart_tool, /root/.pub-cache]
+    env: { CI: "true" }
     risk_paths:
       - lib/core/auth/
       - lib/core/network/

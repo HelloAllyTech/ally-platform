@@ -21,3 +21,6 @@ docker.env
 
 # Skills Store working copy pulled by the prompts CLI: real prompt text, never committed.
 /.prompts/
+
+# Bug Hunter v2 per-run worktrees and artefacts
+/bug-hunter/runs/
