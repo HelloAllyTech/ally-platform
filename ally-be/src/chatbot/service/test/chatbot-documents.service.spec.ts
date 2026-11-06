@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { KbDocumentSourceType } from '../../../knowledge-base/enum/knowledge-base.enum';
 import { ChatbotService } from '../chatbot.service';
 
@@ -18,6 +18,7 @@ describe("ChatbotService and a chatbot's own documents", () => {
   /** chatbot_documents rows for BOT. */
   let attached: Set<string>;
   let knowledgeBase: {
+    getForChatbot: jest.Mock;
     createChatbotUploadUrl: jest.Mock;
     createForChatbot: jest.Mock;
     archiveForChatbot: jest.Mock;
@@ -62,6 +63,17 @@ describe("ChatbotService and a chatbot's own documents", () => {
     attached = new Set(['shared-1', 'own-1']);
     query.mockClear();
     knowledgeBase = {
+      getForChatbot: jest.fn(async (id: string) => ({
+        id,
+        title: id,
+        status: 'indexed',
+        isArchived: false,
+        sourceType: 'pdf',
+        fileName: null,
+        statusMessage: null,
+        updatedAt: new Date(0),
+        rawText: 'text',
+      })),
       createChatbotUploadUrl: jest.fn(async () => ({
         presignedUrl: 'put',
         fileUrl: 'file',
@@ -90,6 +102,9 @@ describe("ChatbotService and a chatbot's own documents", () => {
       ),
       delete: jest.fn(async (where: { documentId: string }) =>
         attached.delete(where.documentId),
+      ),
+      count: jest.fn(async ({ where }: { where: { documentId: string } }) =>
+        attached.has(where.documentId) ? 1 : 0,
       ),
     };
     const chatbotRepository = { manager, update: jest.fn() };
@@ -155,5 +170,18 @@ describe("ChatbotService and a chatbot's own documents", () => {
     await service.archive(BOT);
     expect(knowledgeBase.archiveForChatbot).toHaveBeenCalledWith(BOT, 'own-1');
     expect(knowledgeBase.archiveForChatbot).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows one of its documents, marked as its own or the library's", async () => {
+    const own = await service.getDocument(BOT, 'own-1');
+    const shared = await service.getDocument(BOT, 'shared-1');
+    expect(own).toMatchObject({ id: 'own-1', private: true, rawText: 'text' });
+    expect(shared.private).toBe(false);
+  });
+
+  it('refuses a document that is not on the bot', async () => {
+    await expect(service.getDocument(BOT, 'other-bots')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

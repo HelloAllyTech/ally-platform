@@ -172,6 +172,29 @@ export interface ChatbotDocumentRow {
   updatedAt: string;
 }
 
+/** One document attached to a chatbot, with its text: what the Knowledge tab's View panel shows. */
+export interface ChatbotDocumentDetail {
+  id: string;
+  title: string;
+  status: string;
+  private: boolean;
+  archived: boolean;
+  sourceType: string;
+  fileName: string | null;
+  /** Why it failed, when it did. */
+  statusMessage: string | null;
+  updatedAt: string;
+  rawText: string;
+}
+
+/** Edit one of a chatbot's own documents. A changed `text` retrains the chatbot on it. */
+export interface UpdateChatbotDocumentRequest {
+  id: string;
+  documentId: string;
+  title?: string;
+  text?: string;
+}
+
 /** A file to upload as one of a chatbot's own documents. */
 export interface CreateChatbotUploadUrlRequest {
   id: string;

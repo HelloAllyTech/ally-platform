@@ -29,6 +29,7 @@ import {
   TestChatbotDto,
   UpdateChatbotDto,
   UpdateChatbotSettingsDto,
+  UpdateChatbotDocumentDto,
 } from '../dto/chatbot.dto';
 import { ChatbotMemberRole } from '../enum/chatbot.enum';
 import { CHATBOT_SECTIONS } from '../sections/chatbot-sections';
@@ -197,6 +198,31 @@ export class ChatbotController {
     @Body() dto: CreateKbOwnedDocumentDto,
   ) {
     return this.chatbots.addOwnDocument(id, dto);
+  }
+
+  @Get(':id/documents/:documentId')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({ summary: "One of the bot's documents, with its text" })
+  getDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.chatbots.getDocument(id, documentId);
+  }
+
+  @Patch(':id/documents/:documentId')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: "Rename one of the bot's own documents, or replace its text",
+    description:
+      'New text retrains the bot on the document. Library documents are edited in the library.',
+  })
+  updateOwnDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Body() dto: UpdateChatbotDocumentDto,
+  ) {
+    return this.chatbots.updateOwnDocument(id, documentId, dto);
   }
 
   @Delete(':id/documents/:documentId')

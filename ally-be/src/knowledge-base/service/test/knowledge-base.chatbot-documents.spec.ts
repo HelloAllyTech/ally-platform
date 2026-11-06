@@ -36,7 +36,10 @@ describe("KnowledgeBaseService — a chatbot's own documents", () => {
     service = new KnowledgeBaseService(
       documentRepository as any,
       {} as any,
-      { replaceForDocument: jest.fn() } as any,
+      {
+        replaceForDocument: jest.fn(),
+        tenantIdsForDocument: jest.fn().mockResolvedValue([]),
+      } as any,
       ingestProducer as any,
       aiService as any,
       s3Service as any,
@@ -115,6 +118,59 @@ describe("KnowledgeBaseService — a chatbot's own documents", () => {
       });
       await expect(
         service.archiveForChatbot(BOT, 'doc'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(documentRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateForChatbot', () => {
+    const own = (over: Record<string, unknown> = {}) => ({
+      id: 'doc',
+      ownerChatbotId: BOT,
+      archivedAt: null,
+      contentHash: 'old-hash',
+      rawText: 'old text',
+      ...over,
+    });
+
+    it('renames it without retraining', async () => {
+      documentRepository.findOne.mockResolvedValue(own());
+      await service.updateForChatbot(BOT, 'doc', { title: ' New title ' });
+      expect(documentRepository.update).toHaveBeenCalledWith(
+        { id: 'doc' },
+        expect.objectContaining({ title: 'New title' }),
+      );
+      expect(ingestProducer.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('stores new text and trains the bot on it again', async () => {
+      documentRepository.findOne.mockResolvedValue(own());
+      await service.updateForChatbot(BOT, 'doc', { text: ' New text ' });
+      expect(documentRepository.update).toHaveBeenCalledWith(
+        { id: 'doc' },
+        expect.objectContaining({ rawText: 'New text', status: 'pending' }),
+      );
+      expect(ingestProducer.enqueue).toHaveBeenCalledWith({
+        documentId: 'doc',
+        action: 'reindex',
+      });
+    });
+
+    it('does nothing to the index when the text is unchanged', async () => {
+      const { KbIngestService } = await import('../kb-ingest.service');
+      documentRepository.findOne.mockResolvedValue(
+        own({ contentHash: KbIngestService.hash('same text') }),
+      );
+      await service.updateForChatbot(BOT, 'doc', { text: 'same text' });
+      expect(ingestProducer.enqueue).not.toHaveBeenCalled();
+    });
+
+    it("treats another bot's or a library document as not found", async () => {
+      documentRepository.findOne.mockResolvedValue(
+        own({ ownerChatbotId: null }),
+      );
+      await expect(
+        service.updateForChatbot(BOT, 'doc', { title: 'x' }),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(documentRepository.update).not.toHaveBeenCalled();
     });

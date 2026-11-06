@@ -22,13 +22,14 @@ import {
   KbDocumentStatus,
 } from "@types";
 
+import { DocumentStatusTag, KnowledgeDocumentPanel } from "./KnowledgeDocumentPanel";
 import { KnowledgeUploadPanel } from "./KnowledgeUploadPanel";
 import { Card, errorMessage, fill, LoadError, StatusPill, timeAgo } from "./shared";
 
 const t = en.whatsappBot.bots.knowledge;
 /** The library list endpoint accepts at most 100 per request. */
 const PICKER_LIMIT = 100;
-/** How often the list refreshes while a document is still being indexed. */
+/** How often the list refreshes while a document is still training (being indexed). */
 const POLL_INTERVAL_MS = 4000;
 
 const isIndexing = (doc: ChatbotDocumentRow) =>
@@ -52,6 +53,7 @@ export const KnowledgeTab: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot
   const [updateBot] = useUpdateChatbotMutation();
   const [picking, setPicking] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
 
   const indexing = docs.some(isIndexing);
   useEffect(() => {
@@ -142,13 +144,13 @@ export const KnowledgeTab: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot
                   doc.archived && <span className="text-xs text-warning-700">{t.archivedHint}</span>
                 )}
               </div>
-              {isIndexing(doc) && <StatusPill tone="neutral">{t.indexing}</StatusPill>}
-              {doc.status === KbDocumentStatus.FAILED && (
-                <StatusPill tone="danger">{t.failed}</StatusPill>
-              )}
+              <DocumentStatusTag status={doc.status} archived={doc.archived} />
               {doc.private && <StatusPill tone="neutral">{t.private}</StatusPill>}
               {doc.isGlobal && <StatusPill tone="neutral">{t.shared}</StatusPill>}
               {doc.archived && <StatusPill tone="warning">{t.archived}</StatusPill>}
+              <Button variant={ButtonVariant.SECONDARY} onClick={() => setViewing(doc.id)}>
+                {t.view}
+              </Button>
               {canEdit && (
                 <Button
                   variant={ButtonVariant.SECONDARY}
@@ -179,6 +181,12 @@ export const KnowledgeTab: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot
         }}
       />
       <KnowledgeUploadPanel botId={bot.id} isOpen={uploading} onClose={() => setUploading(false)} />
+      <KnowledgeDocumentPanel
+        botId={bot.id}
+        documentId={viewing}
+        canEdit={canEdit}
+        onClose={() => setViewing(null)}
+      />
     </Card>
   );
 };

@@ -28,6 +28,7 @@ import {
   ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
+import { KB_MAX_PASTE_CHARS } from '../../knowledge-base/constants/knowledge-base.constants';
 import { MAX_SYSTEM_PROMPT_CHARS } from '../type/chatbot.type';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 
@@ -369,4 +370,24 @@ export class BindConnectorDto {
   @IsOptional()
   @IsUUID()
   chatbotId!: string | null;
+}
+
+/** A rename, or new text, for one of a chatbot's own documents. */
+export class UpdateChatbotDocumentDto {
+  @ApiPropertyOptional({ maxLength: 300 })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(300)
+  title?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "The document's new text. Changing it trains the chatbot on it again.",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(KB_MAX_PASTE_CHARS)
+  text?: string;
 }

@@ -3,6 +3,7 @@ import {
   Chatbot,
   ChatbotAudienceEntry,
   ChatbotAudienceKind,
+  ChatbotDocumentDetail,
   ChatbotDocumentRow,
   ChatbotMember,
   ChatbotMemberRole,
@@ -18,6 +19,7 @@ import {
   GetChatbotsResponse,
   TestChatbotRequest,
   TestChatbotResponse,
+  UpdateChatbotDocumentRequest,
   UpdateChatbotRequest,
 } from "@types";
 
@@ -30,6 +32,7 @@ import { baseAPI } from "./baseApi";
  * counts (documents, people, connectors) the detail tabs change. Connector moves invalidate both
  * bots' views and the WhatsApp numbers, whose cards show which bot they serve.
  */
+const documentTag = (id: string, documentId: string) => `${id}:document:${documentId}`;
 const botTags = (id: string) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }, TAG_TYPES.CHATBOTS];
 
 export const chatbotsApi = baseAPI.injectEndpoints({
@@ -143,6 +146,30 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, { id }) => botTags(id),
     }),
 
+    /** One document on this chatbot, with its text. */
+    getChatbotDocument: builder.query<ChatbotDocumentDetail, { id: string; documentId: string }>({
+      query: ({ id, documentId }) => ({
+        url: ApiEndpoints.CHATBOTS.DOCUMENT_BY_ID(id, documentId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_r, _e, { id, documentId }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: documentTag(id, documentId) },
+      ],
+    }),
+
+    /** Edits one of the chatbot's own documents; a changed text queues it for training again. */
+    updateChatbotDocument: builder.mutation<ChatbotDocumentDetail, UpdateChatbotDocumentRequest>({
+      query: ({ id, documentId, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.DOCUMENT_BY_ID(id, documentId),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id, documentId }) => [
+        ...botTags(id),
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: documentTag(id, documentId) },
+      ],
+    }),
+
     getChatbotMembers: builder.query<ChatbotMember[], string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.MEMBERS(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
@@ -252,6 +279,8 @@ export const {
   useCreateChatbotDocumentUploadUrlMutation,
   useCreatePrivateChatbotDocumentMutation,
   useRemoveChatbotDocumentMutation,
+  useGetChatbotDocumentQuery,
+  useUpdateChatbotDocumentMutation,
   useGetChatbotMembersQuery,
   useSetChatbotMembersMutation,
   useGetChatbotAudienceQuery,

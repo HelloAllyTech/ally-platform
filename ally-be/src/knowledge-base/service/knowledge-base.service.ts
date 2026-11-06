@@ -1245,6 +1245,60 @@ export class KnowledgeBaseService {
     if (!document.archivedAt) await this.archiveFound(document);
   }
 
+  /**
+   * One document with its text, for a chatbot's Knowledge tab. The caller (ChatbotService) has
+   * checked the document is on that chatbot, so the library's organisation check doesn't apply.
+   */
+  async getForChatbot(id: string): Promise<KbDocumentResponseDto> {
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document) throw new NotFoundException(`Document ${id} was not found`);
+    return {
+      ...(await this.respond(document)),
+      rawText: document.rawText ?? '',
+    };
+  }
+
+  /**
+   * Rename one of this chatbot's own documents, or replace its text. New text is stored as the
+   * document's text and it is trained again (re-chunked and re-indexed); unchanged text does
+   * nothing. A PDF edited this way keeps no page numbers for its citations.
+   */
+  async updateForChatbot(
+    chatbotId: string,
+    id: string,
+    dto: { title?: string; text?: string },
+  ): Promise<KbDocumentResponseDto> {
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document || document.ownerChatbotId !== chatbotId) {
+      throw new NotFoundException(`Document ${id} was not found`);
+    }
+    if (document.archivedAt) {
+      throw new BadRequestException('This document has been removed.');
+    }
+    const userId = this.currentUserId();
+    const patch: Partial<KbDocument> = { updatedBy: userId };
+    if (dto.title !== undefined) patch.title = dto.title.trim();
+    let retrain = false;
+    if (dto.text !== undefined) {
+      const text = dto.text.trim();
+      const hash = KbIngestService.hash(text);
+      if (hash !== document.contentHash) {
+        Object.assign(patch, {
+          rawText: text,
+          contentHash: hash,
+          status: KbDocumentStatus.PENDING,
+          statusMessage: null,
+        });
+        retrain = true;
+      }
+    }
+    await this.documentRepository.update({ id }, patch);
+    if (retrain) {
+      await this.ingestProducer.enqueue({ documentId: id, action: 'reindex' });
+    }
+    return this.getForChatbot(id);
+  }
+
   private assertIssuedFileUrl(fileUrl: string, folder: string): void {
     const parsed = this.s3Service.parseS3Url(fileUrl);
     if (

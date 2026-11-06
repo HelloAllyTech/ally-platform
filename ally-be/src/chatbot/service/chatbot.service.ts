@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
@@ -9,6 +13,7 @@ import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
 import {
   CreateKbOwnedDocumentDto,
   CreateKbUploadUrlDto,
+  KbDocumentResponseDto,
 } from '../../knowledge-base/dto/knowledge-base.dto';
 import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { LoggerService } from '../../logger/logger.service';
@@ -119,6 +124,20 @@ export interface ChatbotDocumentView {
   private: boolean;
   archived: boolean;
   updatedAt: Date;
+}
+
+/** One of a bot's documents with its text, as the Knowledge tab's panel shows it. */
+export interface ChatbotDocumentDetail {
+  id: string;
+  title: string;
+  status: string;
+  private: boolean;
+  archived: boolean;
+  sourceType: string;
+  fileName: string | null;
+  statusMessage: string | null;
+  updatedAt: Date;
+  rawText: string;
 }
 
 export interface ChatbotMemberView {
@@ -542,6 +561,54 @@ export class ChatbotService {
     }
     await this.documentRepository.delete({ chatbotId: id, documentId });
     return this.listDocuments(id);
+  }
+
+  /** One of the bot's documents with its text, for viewing (and editing its own). */
+  async getDocument(
+    id: string,
+    documentId: string,
+  ): Promise<ChatbotDocumentDetail> {
+    await this.access.assert(id);
+    const attached = await this.documentRepository.count({
+      where: { chatbotId: id, documentId },
+    });
+    if (!attached) {
+      throw new NotFoundException(`Document ${documentId} was not found`);
+    }
+    return this.toDocumentDetail(
+      id,
+      await this.knowledgeBase.getForChatbot(documentId),
+    );
+  }
+
+  /** Rename one of the bot's own documents, or replace its text (it is then trained again). */
+  async updateOwnDocument(
+    id: string,
+    documentId: string,
+    dto: { title?: string; text?: string },
+  ): Promise<ChatbotDocumentDetail> {
+    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    await this.knowledgeBase.updateForChatbot(id, documentId, dto);
+    return this.getDocument(id, documentId);
+  }
+
+  private async toDocumentDetail(
+    id: string,
+    document: KbDocumentResponseDto,
+  ): Promise<ChatbotDocumentDetail> {
+    const own = await this.ownDocumentIds(id);
+    return {
+      id: document.id,
+      title: document.title,
+      status: document.status,
+      private: own.includes(document.id),
+      archived: document.isArchived,
+      sourceType: document.sourceType,
+      fileName: document.fileName ?? null,
+      statusMessage: document.statusMessage ?? null,
+      updatedAt: document.updatedAt,
+      rawText: document.rawText ?? '',
+    };
   }
 
   /** The ids of the bot's own documents that aren't archived. */
