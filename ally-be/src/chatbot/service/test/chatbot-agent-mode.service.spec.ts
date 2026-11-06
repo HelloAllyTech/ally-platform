@@ -160,6 +160,7 @@ describe('ChatbotService and Agent mode', () => {
         citations: [],
         isWelcome: true,
         retrievalMeta: { turn_type: 'smalltalk' },
+        turnType: 'smalltalk',
         agent: {
           runtime: AgentRuntimeUsed.V2,
           runId: 'run-1',

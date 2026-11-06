@@ -1,6 +1,7 @@
 import type {
   AgentRunRequest,
   AgentTraceStep,
+  AgentTurnType,
 } from '../../ai/dto/knowledge.dto';
 import type { NotificationErrorType } from '../../notification/type/notification.error.type';
 import type {
@@ -120,6 +121,8 @@ export interface ChatbotDecision {
   isWelcome?: boolean;
   citations?: Record<string, any>[];
   retrievalMeta?: Record<string, any>;
+  /** Agent mode: what the agent understood the message to be (also stored in `retrievalMeta`). */
+  turnType?: AgentTurnType;
   language?: string | null;
   /** Set when the knowledge did not cover the question (or answering failed). */
   unanswered?: {

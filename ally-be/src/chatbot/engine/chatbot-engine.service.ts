@@ -416,6 +416,7 @@ export class ChatbotEngineService {
         ...ran,
       },
       language: answer.language,
+      ...(turnType ? { turnType } : {}),
       // The agent's hello or "who I am": on a first message, the notice follows it, as it follows
       // the welcome message.
       ...(turnType === 'smalltalk' || turnType === 'about_bot'

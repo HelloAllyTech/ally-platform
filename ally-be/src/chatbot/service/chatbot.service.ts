@@ -5,8 +5,10 @@ import { In, IsNull, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
+import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
 import { LoggerService } from '../../logger/logger.service';
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
+import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import { ChatbotMember } from '../entity/chatbot-member.entity';
 import { ChatbotAudience } from '../entity/chatbot-audience.entity';
@@ -29,6 +31,10 @@ import {
 } from '../dto/chatbot.dto';
 import { effectiveRuntime, isFallback } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
+import type {
+  AgentFailureReason,
+  ChatbotDecision,
+} from '../engine/chatbot-engine.types';
 import { withFirstMessageParts } from '../engine/first-reply';
 import type { ChatbotModelChoice } from '../type/chatbot.type';
 import { AGENT_RUNTIME_DEGRADED_TYPE } from './agent-runtime-alert-throttle.service';
@@ -72,6 +78,28 @@ export interface ChatbotSummary {
   lastTestedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** What Preview shows for one test message. Nothing is sent or stored. */
+export interface ChatbotTestResult {
+  reply: string;
+  handledBy: WaHandledBy;
+  citations: Record<string, any>[];
+  retrieval: Record<string, any> | null;
+  language: string | null;
+  wouldFileUnanswered: ChatbotDecision['unanswered'] | null;
+  /** The alert a real message would raise (its type), or null. */
+  wouldAlert: string | null;
+  latencyMs: number;
+  usedDraft: boolean;
+  /** The engine that answered: v1, v2, or v1 after v2 failed. */
+  runtime: ChatbotRuntime.V1 | AgentRuntimeUsed;
+  runId: string | null;
+  trace: AgentTraceStep[] | null;
+  fallbackReason: AgentFailureReason | null;
+  turnType: AgentTurnType | null;
+  runtimeAllowed: boolean;
+  conversationId: string;
 }
 
 /** A bot's documents as the knowledge tab lists them. */
@@ -514,7 +542,7 @@ export class ChatbotService {
    * model or document selection before saving it. The sender is the admin themselves; the "who can
    * chat" check is skipped unless asked for, since testing is about the answers.
    */
-  async test(id: string, dto: TestChatbotDto) {
+  async test(id: string, dto: TestChatbotDto): Promise<ChatbotTestResult> {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
     // Comparing engines is for platform admins, like choosing one.
     if (dto.runtime !== undefined) await this.access.assertPlatformAdmin();
@@ -585,6 +613,33 @@ export class ChatbotService {
         })
       : decision.body;
 
+    return this.toTestResult(decision, {
+      reply,
+      settings,
+      conversationId,
+      latencyMs: Date.now() - startedAt,
+      usedDraft: Boolean(dto.draft),
+    });
+  }
+
+  /** One Preview test as the console shows it. */
+  private toTestResult(
+    decision: ChatbotDecision,
+    {
+      reply,
+      settings,
+      conversationId,
+      latencyMs,
+      usedDraft,
+    }: {
+      reply: string;
+      settings: WhatsAppBotSettings;
+      conversationId: string;
+      latencyMs: number;
+      usedDraft: boolean;
+    },
+  ): ChatbotTestResult {
+    const { agent } = decision;
     return {
       reply,
       handledBy: decision.handledBy,
@@ -595,24 +650,18 @@ export class ChatbotService {
       // Shown rather than sent: the console must never page anyone.
       wouldAlert: decision.alert
         ? decision.alert.type
-        : isFallback(decision.agent)
+        : isFallback(agent)
           ? AGENT_RUNTIME_DEGRADED_TYPE
           : null,
-      latencyMs: Date.now() - startedAt,
-      usedDraft: Boolean(dto.draft),
+      latencyMs,
+      usedDraft,
       // Agents v2: which engine answered this test, and the run behind it.
-      runtime: decision.agent?.runtime ?? ChatbotRuntime.V1,
-      runId: decision.agent?.runId ?? null,
-      trace:
-        decision.agent?.runtime === AgentRuntimeUsed.V2
-          ? decision.agent.trace
-          : null,
-      fallbackReason: isFallback(decision.agent)
-        ? decision.agent.fallbackReason
-        : null,
+      runtime: agent?.runtime ?? ChatbotRuntime.V1,
+      runId: agent?.runId ?? null,
+      trace: agent?.runtime === AgentRuntimeUsed.V2 ? agent.trace : null,
+      fallbackReason: isFallback(agent) ? agent.fallbackReason : null,
       // Agent mode: what the agent understood the message to be (smalltalk, about_bot, …).
-      turnType:
-        (decision.retrievalMeta?.turn_type as string | undefined) ?? null,
+      turnType: decision.turnType ?? null,
       runtimeAllowed: settings.agentRuntimeAllowed,
       conversationId,
     };
