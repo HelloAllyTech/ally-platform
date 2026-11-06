@@ -77,6 +77,8 @@ export interface ChatbotSummary {
   myRole: ChatbotMemberRole;
   connectors: ConnectorView[];
   documentCount: number;
+  /** Documents it can answer from now: indexed and not archived. */
+  readyDocumentCount: number;
   audienceCount: number;
   memberCount: number;
   stats: ChatbotStats;
@@ -188,6 +190,7 @@ export class ChatbotService {
       roles,
       connectors,
       docCounts,
+      readyDocCounts,
       audienceCounts,
       memberCounts,
       stats,
@@ -196,6 +199,7 @@ export class ChatbotService {
       this.access.rolesFor(ids),
       this.connectors.summariesForBots(ids),
       this.countBy(this.documentRepository, ids),
+      this.readyDocumentCounts(ids),
       this.countBy(this.audienceRepository, ids),
       this.countBy(this.memberRepository, ids),
       this.stats(ids),
@@ -217,6 +221,7 @@ export class ChatbotService {
       myRole: roles.get(bot.id) ?? ChatbotMemberRole.VIEWER,
       connectors: connectors.get(bot.id) ?? [],
       documentCount: docCounts.get(bot.id) ?? 0,
+      readyDocumentCount: readyDocCounts.get(bot.id) ?? 0,
       audienceCount: audienceCounts.get(bot.id) ?? 0,
       memberCount: memberCounts.get(bot.id) ?? 0,
       stats: stats.get(bot.id) ?? EMPTY_STATS,
@@ -224,6 +229,24 @@ export class ChatbotService {
       createdAt: bot.createdAt,
       updatedAt: bot.updatedAt,
     }));
+  }
+
+  /** Per bot, the documents it can answer from now: indexed and not archived. */
+  private async readyDocumentCounts(
+    ids: string[],
+  ): Promise<Map<string, number>> {
+    const rows = await this.chatbotRepository.manager.query<
+      { chatbot_id: string; count: string }[]
+    >(
+      `SELECT cd.chatbot_id, COUNT(*) AS count
+         FROM chatbot_documents cd
+         JOIN kb_documents d ON d.id = cd.document_id
+        WHERE cd.chatbot_id = ANY($1::uuid[])
+          AND d.status = 'indexed' AND d.archived_at IS NULL
+        GROUP BY cd.chatbot_id`,
+      [ids],
+    );
+    return new Map(rows.map((r) => [r.chatbot_id, Number(r.count)]));
   }
 
   private async countBy(

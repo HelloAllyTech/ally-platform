@@ -10,7 +10,7 @@ import { en } from "@constants";
 import { Chatbot, ChatbotPersona } from "@types";
 
 import { handOverToPreview, PreviewDraft } from "./previewDraft";
-import { Card, errorMessage, fill } from "./shared";
+import { Card, errorMessage, fill, missingPersonaFields } from "./shared";
 
 const t = en.whatsappBot.bots.persona;
 const MAX_PROMPT = 4000;
@@ -64,6 +64,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
   };
 
   const promptLength = draft.persona.systemPrompt?.length ?? 0;
+  const missing = missingPersonaFields(draft.persona);
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -90,7 +91,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
             onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
           />
         </EntityField>
-        <EntityField label={t.displayNameLabel} help={t.displayNameHelp}>
+        <EntityField label={t.displayNameLabel} help={t.displayNameHelp} required>
           <TextInput
             id="persona-display-name"
             labelText=""
@@ -101,7 +102,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
             onChange={e => setPersona({ displayName: e.target.value })}
           />
         </EntityField>
-        <EntityField label={t.toneLabel}>
+        <EntityField label={t.toneLabel} required>
           <TextInput
             id="persona-tone"
             labelText=""
@@ -116,6 +117,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
         <EntityField
           label={t.promptLabel}
           help={`${t.promptHelp} ${fill(t.promptCount, { count: promptLength, max: MAX_PROMPT })}`}
+          required
         >
           <TextArea
             id="persona-prompt"
@@ -128,7 +130,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
             onChange={e => setPersona({ systemPrompt: e.target.value })}
           />
         </EntityField>
-        <EntityField label={t.greetingLabel} help={t.greetingHelp}>
+        <EntityField label={t.greetingLabel} help={t.greetingHelp} required>
           <TextArea
             id="persona-greeting"
             labelText=""
@@ -147,10 +149,15 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
           <Button
             variant={ButtonVariant.PRIMARY}
             onClick={() => void handleSave()}
-            disabled={!dirty || !draft.name.trim() || isSaving}
+            disabled={!dirty || !draft.name.trim() || missing.length > 0 || isSaving}
           >
             {t.save}
           </Button>
+        )}
+        {canEdit && missing.length > 0 && (
+          <span className="self-center text-sm text-typography-500">
+            {fill(t.stillToFill, { fields: missing.join(", ") })}
+          </span>
         )}
         <Button variant={ButtonVariant.SECONDARY} onClick={tryIt}>
           {t.tryIt}

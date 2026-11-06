@@ -125,6 +125,8 @@ export interface Chatbot {
   myRole: ChatbotMemberRole;
   connectors: Connector[];
   documentCount: number;
+  /** Documents it can answer from now: indexed and not archived. */
+  readyDocumentCount: number;
   audienceCount: number;
   memberCount: number;
   stats: ChatbotStats;

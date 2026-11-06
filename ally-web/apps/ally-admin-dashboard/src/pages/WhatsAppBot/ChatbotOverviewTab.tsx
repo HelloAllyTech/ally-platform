@@ -9,7 +9,7 @@ import { ButtonVariant } from "@components/types";
 import { en, ROUTES } from "@constants";
 import { Chatbot, ChatbotAccessMode, ChatbotKnowledgeSource, ChatbotStatus } from "@types";
 
-import { Card, errorMessage, fill, StatCard } from "./shared";
+import { Card, errorMessage, fill, missingPersonaFields, StatCard } from "./shared";
 
 import type { ChatbotSettingsSectionId, ChatbotTabId } from "./ChatbotPage";
 
@@ -23,6 +23,8 @@ interface Step {
   label: string;
   done: boolean;
   tab: Destination;
+  /** Why it isn't done yet, when that isn't obvious from the label. */
+  hint?: string;
 }
 
 /**
@@ -39,16 +41,28 @@ export const ChatbotOverviewTab: React.FC<{
   const [setStatus, { isLoading: isChanging }] = useSetChatbotStatusMutation();
   const [archive, { isLoading: isArchiving }] = useArchiveChatbotMutation();
 
+  const missingInstructions = missingPersonaFields(bot.persona);
   const steps: Step[] = [
     {
       label: t.stepPersona,
-      done: Boolean(bot.persona.systemPrompt || bot.persona.tone),
+      done: missingInstructions.length === 0,
       tab: "persona",
+      hint: missingInstructions.length
+        ? fill(en.whatsappBot.bots.persona.stillToFill, { fields: missingInstructions.join(", ") })
+        : undefined,
     },
     {
       label: t.stepKnowledge,
-      done: bot.knowledgeSource === ChatbotKnowledgeSource.ORGANISATION || bot.documentCount > 0,
+      // Only documents it can answer from count: still indexing, failed or archived ones don't.
+      done:
+        bot.knowledgeSource === ChatbotKnowledgeSource.ORGANISATION || bot.readyDocumentCount > 0,
       tab: "knowledge",
+      hint:
+        bot.knowledgeSource !== ChatbotKnowledgeSource.ORGANISATION &&
+        bot.documentCount > 0 &&
+        bot.readyDocumentCount === 0
+          ? t.knowledgePreparing
+          : undefined,
     },
     {
       label: t.stepAccess,
@@ -136,16 +150,24 @@ export const ChatbotOverviewTab: React.FC<{
                 >
                   {step.done ? "✓" : index + 1}
                 </span>
-                <span
-                  className={`flex-1 text-sm ${
-                    step.done ? "text-typography-500 line-through" : "text-typography-900"
-                  }`}
-                >
-                  {step.label}
+                <span className="flex-1 flex flex-col">
+                  <span
+                    className={`text-sm ${
+                      step.done ? "text-typography-500 line-through" : "text-typography-900"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                  {!step.done && step.hint && (
+                    <span className="text-xs text-typography-500">{step.hint}</span>
+                  )}
                 </span>
-                {!step.done && step.tab !== "overview" && (
-                  <Button variant={ButtonVariant.SECONDARY} onClick={() => onGo(step.tab)}>
-                    {t.open}
+                {step.tab !== "overview" && (
+                  <Button
+                    variant={step.done ? ButtonVariant.TEXT : ButtonVariant.SECONDARY}
+                    onClick={() => onGo(step.tab)}
+                  >
+                    {step.done ? t.view : t.open}
                   </Button>
                 )}
               </li>
