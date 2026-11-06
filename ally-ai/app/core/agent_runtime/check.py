@@ -21,6 +21,7 @@ from enum import StrEnum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from app.core.agent_runtime.schemas import REPLY_ACTION, AgentIntent
+from app.core.agent_runtime.state import BotConfig
 from app.core.knowledge_agent.agent import AnswerResult, build_result, resolve_citations
 from app.core.knowledge_agent.schemas import AnswerIntent, DeclineReason
 from app.utils.logger import get_logger
@@ -90,7 +91,7 @@ def unsupported_details(text: str, passages: Sequence[Dict[str, Any]]) -> List[s
 _SENTENCE_END = re.compile(r"(?<=[.!?।])\s+")
 
 
-def without_sentences(text: str, keep: Any) -> str:
+def without_sentences(text: str, keep: Callable[[str], bool]) -> str:
     """`text` with the sentences `keep(sentence)` rejects removed, line by line."""
     lines = []
     for line in (text or "").split("\n"):
@@ -236,7 +237,7 @@ def _topic_words(topic: str) -> List[str]:
     ]
 
 
-def organisation_of(bot: Dict[str, Any]) -> Organisation:
+def organisation_of(bot: BotConfig) -> Organisation:
     """The organisation's names, from the bot: its display name and the name its
     documents share ("Ally FAQ – About Ally" → "Ally FAQ"), plus their distinctive
     words ("Ally"). A bot with neither has no names, and only citations apply."""

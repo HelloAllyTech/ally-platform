@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.core.agent_runtime.prompt import AGENT_PROMPT_PATH, build_agent_prompt
 from app.core.agent_runtime.schemas import step_schema
+from app.core.agent_runtime.state import BotConfig
+from app.core.agent_runtime.tools.base import Tool
 from app.core.config import settings
 from app.core.llm.dispatch import generate_structured
 from app.core.llm_usage.tasks import LLMTask
@@ -25,9 +27,9 @@ async def agent_step(
     message: str,
     *,
     passages: List[Dict[str, Any]],
-    tools: Sequence[Any],
+    tools: Sequence[Tool],
     tool_budget: int,
-    bot: Dict[str, Any],
+    bot: BotConfig,
     history: Optional[List[Dict[str, str]]] = None,
     searches: Sequence[Dict[str, Any]] = (),
     feedback: Optional[str] = None,

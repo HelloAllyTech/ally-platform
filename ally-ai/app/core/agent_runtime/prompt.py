@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence
 
+from app.core.agent_runtime.tools.base import Tool
 from app.core.config import settings
 from app.core.knowledge_agent.prompt import (
     format_history,
@@ -76,7 +77,7 @@ def format_searches(records: Sequence[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def format_tools(tools: Sequence[Any]) -> str:
+def format_tools(tools: Sequence[Tool]) -> str:
     """Each tool's name, what it does and its input fields: the step schema's fields."""
     if not tools:
         return "(no tools left: reply now with what you have)"
@@ -98,7 +99,7 @@ def build_agent_prompt(
     searches: Sequence[Dict[str, Any]] = (),
     feedback: Optional[str] = None,
     answer_mode: Optional[str] = None,
-    tools: Sequence[Any] = (),
+    tools: Sequence[Tool] = (),
     tool_budget: int = 0,
     knowledge_topics: Optional[Sequence[str]] = None,
     decline_text: Optional[str] = None,

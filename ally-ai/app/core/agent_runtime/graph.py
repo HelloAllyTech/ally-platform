@@ -19,7 +19,7 @@ search; a draft the check refuses goes back to it once.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -87,7 +87,7 @@ def build_graph(
     return graph.compile(checkpointer=checkpointer)
 
 
-def route_at_start(state: AgentState) -> str:
+def route_at_start(state: AgentState) -> Literal["agent", "translate"]:
     """The conversational agent when the bot has it on; the parity path otherwise."""
     features = (state.get("bot") or {}).get("features") or {}
     return "agent" if features.get("agent") else "translate"

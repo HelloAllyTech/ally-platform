@@ -8,21 +8,91 @@ and a registry line, with no change to the graph.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Type
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Type,
+)
 
 from pydantic import BaseModel
 
+from app.core.agent_runtime.state import BotConfig
+from app.core.knowledge_agent.schemas import DeclineReason
+
 Risk = Literal["low", "medium", "high"]
+
+
+class KnowledgeSearch(Protocol):
+    """The KnowledgeAgentService steps a search tool uses. A Protocol, so this module
+    imports without the knowledge agent and its clients."""
+
+    async def retrieve(
+        self,
+        search_text: str,
+        audience: Any,
+        *,
+        limits: Dict[str, Any],
+        document_ids: Optional[List[str]] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]: ...
+
+    def retrieval_meta(
+        self,
+        limits: Dict[str, Any],
+        hits: Sequence[Dict[str, Any]],
+        *,
+        language: str,
+        translated: Optional[str],
+        translation_degraded: bool,
+    ) -> Dict[str, Any]: ...
+
+    def gate(
+        self,
+        hits: Sequence[Dict[str, Any]],
+        *,
+        decline_similarity: float,
+        general: bool,
+        translation_degraded: bool,
+    ) -> Optional[DeclineReason]: ...
+
+    def select(
+        self,
+        hits: List[Dict[str, Any]],
+        *,
+        search_text: str,
+        limits: Dict[str, Any],
+        latency_ms: int,
+        language: str,
+        retrieval: Dict[str, Any],
+        log_retrieval: bool = True,
+    ) -> List[Dict[str, Any]]: ...
+
+    def report_gate_decline(
+        self,
+        reason: DeclineReason,
+        *,
+        search_text: str,
+        hits: List[Dict[str, Any]],
+        limits: Dict[str, Any],
+        latency_ms: int,
+        language: str,
+    ) -> None: ...
 
 
 @dataclass(frozen=True)
 class ToolContext:
     """What a handler may read: the bot's settings and the run's passages so far."""
 
-    #: The KnowledgeAgentService (retrieval, selection). Typed loosely so this
-    #: module imports without the knowledge agent.
-    service: Any
-    bot: Dict[str, Any]
+    #: The KnowledgeAgentService (retrieval, selection).
+    service: KnowledgeSearch
+    bot: BotConfig
     limits: Dict[str, Any]
     #: Every passage already offered to the model, in prompt order.
     passages: List[Dict[str, Any]]
