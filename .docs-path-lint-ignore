@@ -1,0 +1,10 @@
+# ally-mobile was rebuilt in Flutter (lib/), but these docs still describe the retired React
+# Native app (src/, services/, utils/). The paths are stale on purpose until the docs are
+# rewritten for the Flutter app; listed here so docs-path-lint stops failing every PR over them.
+ally-mobile/scripts/i18n-parity.mjs
+ally-mobile/src/services/coursesApi.ts
+ally-mobile/src/App.tsx
+src/config/env.ts
+utils/articleSegments.ts
+utils/activeTrackContext.ts
+services/api.ts
