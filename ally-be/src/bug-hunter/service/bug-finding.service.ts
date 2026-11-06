@@ -648,7 +648,7 @@ export class BugFindingService {
           ? shipped
           : null;
 
-      let saved: BugFinding;
+      let saved: BugFinding | null = null;
       try {
         saved = await this.findingRepository.save(
           this.findingRepository.create({
@@ -661,9 +661,6 @@ export class BugFindingService {
             symbol: finding.symbol ?? null,
             evidence: finding.evidence ?? null,
             severity: finding.severity ?? null,
-            // Same rows as before — the column defaults these to false, so an
-            // omitted value already landed as false. Naming it just stops the
-            // insert depending on TypeORM skipping an undefined.
             proven: finding.proven ?? false,
             touchesGuardedPath: finding.touchesGuardedPath ?? false,
             reportedBugId: finding.reportedBugId ?? null,
@@ -687,44 +684,61 @@ export class BugFindingService {
           this.logger.warn(
             `Foreign key violation for reportedBugId ${finding.reportedBugId}. Retrying with null.`,
           );
-          saved = await this.findingRepository.save(
-            this.findingRepository.create({
-              runId,
-              repo,
-              source: finding.source,
-              title: truncateTitle(finding.description),
-              description: finding.description,
-              file: finding.file ?? null,
-              symbol: finding.symbol ?? null,
-              evidence: finding.evidence ?? null,
-              severity: finding.severity ?? null,
-              proven: finding.proven ?? false,
-              touchesGuardedPath: finding.touchesGuardedPath ?? false,
-              reportedBugId: null,
-              dedupeKey,
-              status: BugFindingStatus.NEW,
-              ...(regressionOf || finding.pr
-                ? {
-                    metadata: {
-                      ...(regressionOf
-                        ? { regressionOf: regressionOf.id }
-                        : {}),
-                      ...(finding.pr ? { pr: finding.pr } : {}),
-                    },
-                  }
-                : {}),
-            }),
-          );
+          try {
+            saved = await this.findingRepository.save(
+              this.findingRepository.create({
+                runId,
+                repo,
+                source: finding.source,
+                title: truncateTitle(finding.description),
+                description: finding.description,
+                file: finding.file ?? null,
+                symbol: finding.symbol ?? null,
+                evidence: finding.evidence ?? null,
+                severity: finding.severity ?? null,
+                proven: finding.proven ?? false,
+                touchesGuardedPath: finding.touchesGuardedPath ?? false,
+                reportedBugId: null,
+                dedupeKey,
+                status: BugFindingStatus.NEW,
+                ...(regressionOf || finding.pr
+                  ? {
+                      metadata: {
+                        ...(regressionOf
+                          ? { regressionOf: regressionOf.id }
+                          : {}),
+                        ...(finding.pr ? { pr: finding.pr } : {}),
+                      },
+                    }
+                  : {}),
+              }),
+            );
+          } catch (retryError) {
+            this.logger.error(
+              `Failed to save bug finding after retrying with null reportedBugId: ${
+                retryError instanceof Error
+                  ? retryError.message
+                  : String(retryError)
+              }`,
+            );
+            saved = null; // Ensure saved is null if retry also fails
+          }
         } else {
-          throw error;
+          this.logger.error(
+            `Failed to save bug finding: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+          saved = null; // Ensure saved is null if initial save fails for other reasons
         }
       }
 
-      if (regressionOf) {
-        await this.markRegression(saved, regressionOf, runId);
+      if (saved) {
+        if (regressionOf) {
+          await this.markRegression(saved, regressionOf, runId);
+        }
+        results.push(saved);
       }
-
-      results.push(saved);
     }
 
     return results;
