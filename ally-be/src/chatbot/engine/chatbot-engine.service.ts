@@ -33,9 +33,10 @@ import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import {
   agentFailureReason,
   agentRunIdFor,
-  effectiveRuntime,
-  isAgentMode,
+  type EngineChoice,
+  isAgentEngine,
   MalformedAgentResponseError,
+  resolveEngine,
   shadowSide,
 } from './agent-runtime';
 import type {
@@ -44,6 +45,7 @@ import type {
   ChatTurn,
   ShadowRunRequest,
 } from './chatbot-engine.types';
+import type { CrisisCheckResponse } from '../../ai/dto/knowledge.dto';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import {
   buildAgentRunRequest,
@@ -62,12 +64,12 @@ export const KNOWLEDGE_PROMPT_CODES = [
   'ally_ai_knowledge_translate_query',
   'ally_ai_knowledge_crisis_classify',
 ];
+/** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
+const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
 /**
  * The conversational agent's prompts (Agents v2, `features.agent`). Loaded only for a bot in agent
  * mode, so every other bot's request is exactly as before.
  */
-/** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
-const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
 export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
 /**
  * At most this many document titles are sent as the agent's "what I cover" list: ally-ai's limit on
@@ -121,6 +123,19 @@ const withoutDebugIds = (
   return copy;
 };
 
+/**
+ * The run behind a reply, if the v2 runtime answered or was tried — kept on every outcome, a crisis
+ * override included, so the reply can still be traced to its run.
+ */
+const runBehind = (
+  answerResult: PromiseSettledResult<Answered>,
+): AgentRunRef | undefined =>
+  answerResult.status === 'fulfilled'
+    ? answerResult.value.agent
+    : answerResult.reason instanceof AgentFallbackFailedError
+      ? answerResult.reason.agent
+      : undefined;
+
 /** Store version and content hash of each knowledge prompt sent to ally-ai, by code. */
 type PromptsRan = {
   prompt_versions: Record<string, number | null>;
@@ -163,6 +178,7 @@ export class ChatbotEngineService {
   async respond(turn: ChatTurn): Promise<ChatbotDecision> {
     const { chatbot, settings, sender } = turn;
     const allowed = await this.audienceService.canChat(chatbot, sender);
+    const engine = resolveEngine(chatbot, settings, turn.runtime);
 
     // ── 1. Keyword replies ───────────────────────────────────────────────
     const match = await this.replyService.match(
@@ -175,10 +191,7 @@ export class ChatbotEngineService {
       match.bypassRag &&
       (allowed || match.template.kind !== WaTemplateKind.FAQ) &&
       // An agent bot answers greetings, help and FAQ-style messages itself.
-      !(
-        isAgentMode(chatbot, settings, turn.runtime) &&
-        agentAnswersInstead(match.template, turn)
-      );
+      !(isAgentEngine(engine) && agentAnswersInstead(match.template, turn));
     if (match && usable) {
       const isCrisis = match.template.kind === WaTemplateKind.CRISIS;
       // A bot with its own welcome message greets with THAT, not the generic shared greeting —
@@ -225,7 +238,7 @@ export class ChatbotEngineService {
     }
 
     // ── 3. Answer ────────────────────────────────────────────────────────
-    return this.answer(turn);
+    return this.answer(turn, engine);
   }
 
   /**
@@ -236,7 +249,7 @@ export class ChatbotEngineService {
    * Nothing is filed as unanswered: that queue records what the KNOWLEDGE failed to cover.
    */
   private async refuse(turn: ChatTurn): Promise<ChatbotDecision> {
-    const { chatbot, settings, sender } = turn;
+    const { settings, sender } = turn;
     if (settings.crisisClassifierEnabled) {
       try {
         const { prompts, ran } = await this.loadPromptOverrides(turn);
@@ -245,24 +258,7 @@ export class ChatbotEngineService {
           prompts,
         });
         if (crisis?.is_crisis) {
-          return {
-            handledBy: WaHandledBy.CRISIS,
-            body: this.settingsService.renderPlaceholders(
-              settings.crisisEscalationText,
-              settings,
-            ),
-            retrievalMeta: { ...ran },
-            alert: this.alert(
-              200,
-              'crisis',
-              `The crisis classifier fired on chatbot "${chatbot.name}" for a sender who is not ` +
-                `on its list (${turn.channel.type}, sender ${sender.label}, confidence ` +
-                `${crisis.confidence.toFixed(2)}, signal "${crisis.signal}"). The fixed safety ` +
-                `reply was sent. The sender is not linked to an Ally account, so the sender id is ` +
-                `the only handle to follow up through.`,
-              'Chatbot Crisis Classifier',
-            ),
-          };
+          return this.crisisDecision(turn, crisis, ran, { notOnList: true });
         }
       } catch (error) {
         // Swallowed on purpose: the refusal still has to go out.
@@ -282,33 +278,28 @@ export class ChatbotEngineService {
     };
   }
 
-  private async answer(turn: ChatTurn): Promise<ChatbotDecision> {
-    const { chatbot, settings, sender } = turn;
-    const agentMode = isAgentMode(chatbot, settings, turn.runtime);
+  private async answer(
+    turn: ChatTurn,
+    engine: EngineChoice,
+  ): Promise<ChatbotDecision> {
+    const { settings } = turn;
+    const agentMode = isAgentEngine(engine);
     const { prompts, ran } = await this.loadPromptOverrides(turn, agentMode);
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
-    const runtime = effectiveRuntime(chatbot, settings, turn.runtime);
 
     // Concurrent, not sequential: the classifier adds no latency this way, and `allSettled`
     // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
     // runs once and exactly as before, whichever engine answers.
     const [answerResult, crisisResult] = await Promise.allSettled([
-      runtime === ChatbotRuntime.V2
+      engine.kind === ChatbotRuntime.V2
         ? this.answerWithAgent(turn, request, agentMode, knowledge)
         : this.answerWithV1(request),
       settings.crisisClassifierEnabled
         ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
         : Promise.resolve(null),
     ]);
-    // The run behind this reply, if the v2 runtime answered or was tried — kept on every outcome,
-    // a crisis override included, so the reply can still be traced to its run.
-    const agent =
-      answerResult.status === 'fulfilled'
-        ? answerResult.value.agent
-        : answerResult.reason instanceof AgentFallbackFailedError
-          ? answerResult.reason.agent
-          : undefined;
+    const agent = runBehind(answerResult);
 
     // Crisis wins over the answer, unconditionally. Not gated on confidence: the prompt tells the
     // model to choose crisis when uncertain, so re-gating here would undo that instruction.
@@ -316,50 +307,12 @@ export class ChatbotEngineService {
       crisisResult.status === 'fulfilled' ? crisisResult.value : null;
     if (crisis?.is_crisis) {
       return {
-        handledBy: WaHandledBy.CRISIS,
-        body: this.settingsService.renderPlaceholders(
-          settings.crisisEscalationText,
-          settings,
-        ),
-        retrievalMeta: { ...ran },
-        alert: this.alert(
-          200,
-          'crisis',
-          `The crisis classifier fired on chatbot "${chatbot.name}" (${turn.channel.type}, ` +
-            `sender ${sender.label}, confidence ${crisis.confidence.toFixed(2)}, signal ` +
-            `"${crisis.signal}"). The fixed safety reply was sent and the answer was discarded.`,
-          'Chatbot Crisis Classifier',
-        ),
+        ...this.crisisDecision(turn, crisis, ran, { notOnList: false }),
         ...(agent ? { agent } : {}),
       };
     }
 
-    // A classifier that did not run is a degraded safety net held up by keywords alone — and
-    // indistinguishable from a quiet day on every dashboard, so it is alerted, not just logged.
-    const degraded =
-      settings.crisisClassifierEnabled &&
-      (crisisResult.status === 'rejected' || Boolean(crisis?.failed));
-    let degradedAlert: NotificationErrorType | undefined;
-    if (degraded) {
-      const reason =
-        crisisResult.status === 'rejected'
-          ? crisisResult.reason instanceof Error
-            ? crisisResult.reason.message
-            : 'unknown error'
-          : 'ally-ai reported failed=true on the crisis check';
-      this.logger.warn(
-        `Crisis classifier did not run for this message; keyword rules only (${reason})`,
-      );
-      degradedAlert = this.alert(
-        500,
-        'crisis-classifier-degraded',
-        `The crisis classifier did not run for a message to chatbot "${chatbot.name}" ` +
-          `(sender ${sender.label}). Reason: ${reason}. The keyword rules ran and are holding ` +
-          `the safety net alone — check ally-ai's crisis-check route and its model provider key. ` +
-          `Expect NO crisis alerts while this persists.`,
-        'Chatbot Crisis Classifier Degraded',
-      );
-    }
+    const degradedAlert = this.degradedAlertFor(turn, crisisResult);
 
     if (answerResult.status === 'rejected') {
       // A model or index outage is NOT "the knowledge does not cover this": fallback wording and an
@@ -388,11 +341,81 @@ export class ChatbotEngineService {
     const { response: answer, latencyMs } = answerResult.value;
     const decision = this.toDecision(turn, answer, ran, degradedAlert);
     if (agent) decision.agent = agent;
-    if (runtime === ChatbotRuntime.SHADOW) {
+    if (engine.kind === ChatbotRuntime.SHADOW) {
       const shadow = this.shadowRequest(turn, request, answer, latencyMs);
       if (shadow) decision.shadow = shadow;
     }
     return decision;
+  }
+
+  /**
+   * The fixed safety reply for a message the crisis classifier flagged, with its Slack alert. For a
+   * sender not on the bot's list (`notOnList`) the alert says so; otherwise it says the answer that
+   * came back alongside was discarded.
+   */
+  private crisisDecision(
+    turn: ChatTurn,
+    crisis: CrisisCheckResponse,
+    ran: PromptsRan,
+    { notOnList }: { notOnList: boolean },
+  ): ChatbotDecision {
+    const { chatbot, settings, sender } = turn;
+    const who = notOnList ? ' for a sender who is not on its list' : '';
+    const outcome = notOnList
+      ? 'The fixed safety reply was sent. The sender is not linked to an Ally account, so the ' +
+        'sender id is the only handle to follow up through.'
+      : 'The fixed safety reply was sent and the answer was discarded.';
+    return {
+      handledBy: WaHandledBy.CRISIS,
+      body: this.settingsService.renderPlaceholders(
+        settings.crisisEscalationText,
+        settings,
+      ),
+      retrievalMeta: { ...ran },
+      alert: this.alert(
+        200,
+        'crisis',
+        `The crisis classifier fired on chatbot "${chatbot.name}"${who} (${turn.channel.type}, ` +
+          `sender ${sender.label}, confidence ${crisis.confidence.toFixed(2)}, signal ` +
+          `"${crisis.signal}"). ${outcome}`,
+        'Chatbot Crisis Classifier',
+      ),
+    };
+  }
+
+  /**
+   * A classifier that did not run is a degraded safety net held up by keywords alone — and
+   * indistinguishable from a quiet day on every dashboard, so it is alerted, not just logged.
+   */
+  private degradedAlertFor(
+    turn: ChatTurn,
+    crisisResult: PromiseSettledResult<CrisisCheckResponse | null>,
+  ): NotificationErrorType | undefined {
+    const { chatbot, settings, sender } = turn;
+    const crisis =
+      crisisResult.status === 'fulfilled' ? crisisResult.value : null;
+    const degraded =
+      settings.crisisClassifierEnabled &&
+      (crisisResult.status === 'rejected' || Boolean(crisis?.failed));
+    if (!degraded) return undefined;
+    const reason =
+      crisisResult.status === 'rejected'
+        ? crisisResult.reason instanceof Error
+          ? crisisResult.reason.message
+          : 'unknown error'
+        : 'ally-ai reported failed=true on the crisis check';
+    this.logger.warn(
+      `Crisis classifier did not run for this message; keyword rules only (${reason})`,
+    );
+    return this.alert(
+      500,
+      'crisis-classifier-degraded',
+      `The crisis classifier did not run for a message to chatbot "${chatbot.name}" ` +
+        `(sender ${sender.label}). Reason: ${reason}. The keyword rules ran and are holding ` +
+        `the safety net alone — check ally-ai's crisis-check route and its model provider key. ` +
+        `Expect NO crisis alerts while this persists.`,
+      'Chatbot Crisis Classifier Degraded',
+    );
   }
 
   /** The v1 engine: ally-ai's `/knowledge-agent/answer`, with its own retry budget. */

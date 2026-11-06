@@ -65,16 +65,28 @@ export const effectiveRuntime = (
     : ChatbotRuntime.V1;
 
 /**
- * The bot answers with the conversational agent: its effective engine is v2 (kill switch and
- * Preview override included) and its `features.agent` flag is on.
+ * Which engine answers one message, decided once: v1, v1 with a shadow run, or v2 — with the
+ * conversational agent when the bot's `features.agent` flag is on.
  */
-export const isAgentMode = (
+export type EngineChoice =
+  | { kind: ChatbotRuntime.V1 }
+  | { kind: ChatbotRuntime.SHADOW }
+  | { kind: ChatbotRuntime.V2; agent: boolean };
+
+export const resolveEngine = (
   chatbot: Pick<Chatbot, 'runtime' | 'features'>,
   settings: Pick<WhatsAppBotSettings, 'agentRuntimeAllowed'>,
   requested?: ChatbotRuntime | null,
-): boolean =>
-  effectiveRuntime(chatbot, settings, requested) === ChatbotRuntime.V2 &&
-  chatbot.features?.agent === true;
+): EngineChoice => {
+  const runtime = effectiveRuntime(chatbot, settings, requested);
+  return runtime === ChatbotRuntime.V2
+    ? { kind: runtime, agent: chatbot.features?.agent === true }
+    : { kind: runtime };
+};
+
+/** The engine is v2 with the conversational agent on. */
+export const isAgentEngine = (engine: EngineChoice): boolean =>
+  engine.kind === ChatbotRuntime.V2 && engine.agent;
 
 /** `/agent/run` answered 200 with something that is not an answer. */
 export class MalformedAgentResponseError extends Error {
