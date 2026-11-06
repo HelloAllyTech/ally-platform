@@ -72,7 +72,7 @@ describe("AgentTab — no Engine card", () => {
   beforeEach(() => {
     canCreate = true;
     updateSpy.mockClear();
-    bot = { id: "bot-1", runtime: "v2", effectiveRuntime: "v2", features: {}, ...ANSWERS };
+    bot = { id: "bot-1", effectiveRuntime: "v2", ...ANSWERS };
   });
 
   it("shows no engine choice or Agent mode toggle, even to platform admins", () => {
@@ -108,7 +108,7 @@ describe("AgentTab — How it answers", () => {
   beforeEach(() => {
     canCreate = false;
     updateSpy.mockClear();
-    bot = { id: "bot-1", runtime: "v2", effectiveRuntime: "v2", features: {}, ...ANSWERS };
+    bot = { id: "bot-1", effectiveRuntime: "v2", ...ANSWERS };
   });
 
   it("shows what it can answer from and saves only that and the model", () => {

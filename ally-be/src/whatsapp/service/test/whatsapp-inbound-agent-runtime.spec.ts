@@ -5,10 +5,7 @@ import { WaHandledBy } from '../../enum/whatsapp.enum';
 import { WhatsAppInboundService } from '../whatsapp-inbound.service';
 import { agentRunIdFor } from 'src/chatbot/engine/agent-runtime';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
-import {
-  AgentRuntimeUsed,
-  ChatbotRuntime,
-} from 'src/chatbot/enum/chatbot.enum';
+import { AgentRuntimeUsed } from 'src/chatbot/enum/chatbot.enum';
 import { AGENT_FALLBACK_EVENT } from 'src/chatbot/type/agent-runtime.event';
 import {
   agentBot as bot,
@@ -33,11 +30,11 @@ const AGENT_ANSWER = {
 };
 
 /**
- * The WhatsApp path with the Agents v2 runtime switch: what is stored on the reply, the throttled
- * fallback alert, and a shadow run that starts only after the reply and can never hurt it.
+ * The WhatsApp path with the Agents v2 runtime switch: what is stored on the reply, and the
+ * throttled fallback alert.
  *
- * The real event emitter, throttle and shadow service are wired in, so the hand-off from the
- * inbound handler to its listeners is tested as it runs.
+ * The real event emitter and throttle are wired in, so the hand-off from the inbound handler to
+ * its listener is tested as it runs.
  */
 describe('WhatsAppInboundService with the Agents v2 runtime', () => {
   let service: WhatsAppInboundService;
@@ -54,7 +51,7 @@ describe('WhatsAppInboundService with the Agents v2 runtime', () => {
     (emitter.emit as jest.Mock).mock.calls.filter(([name]) => name === event);
 
   beforeEach(async () => {
-    chatbot = bot(ChatbotRuntime.V1);
+    chatbot = bot();
     ({ service, emitter, provider, aiService, savedMessages } =
       await buildInboundHarness({
         chatbot: () => chatbot,
@@ -80,11 +77,7 @@ describe('WhatsAppInboundService with the Agents v2 runtime', () => {
     });
   });
 
-  describe('a v2 bot', () => {
-    beforeEach(() => {
-      chatbot = bot(ChatbotRuntime.V2);
-    });
-
+  describe('with the switch on', () => {
     it('answers through /agent/run and links the reply to its run', async () => {
       await service.handle(inbound());
 

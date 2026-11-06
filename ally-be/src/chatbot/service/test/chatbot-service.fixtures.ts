@@ -6,7 +6,6 @@ import {
   ChatbotAccessMode,
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
-  ChatbotRuntime,
   ChatbotStatus,
 } from '../../enum/chatbot.enum';
 import { ChatbotAccessService } from '../chatbot-access.service';
@@ -18,7 +17,7 @@ import { ChatbotService } from '../chatbot.service';
  * `jest.mock` of the execution manager.
  */
 
-/** The saved bot every test starts from: on v2, Agent mode off. */
+/** The saved bot every test starts from. */
 export const storedBot = (): Chatbot =>
   ({
     id: 'bot-1',
@@ -30,8 +29,6 @@ export const storedBot = (): Chatbot =>
     persona: {},
     model: null,
     settings: {},
-    runtime: ChatbotRuntime.V2,
-    features: {},
   }) as Chatbot;
 
 const countRepository = () => ({
@@ -48,21 +45,18 @@ const countRepository = () => ({
 });
 
 /**
- * Build the service. Each option is read when it's needed, so a test can change the caller's
- * reach, the kill switch or the saved bot after building it.
+ * Build the service. Each option is read when it's needed, so a test can change the emergency
+ * switch or the saved bot after building it. The caller is not a platform admin.
  */
 export function buildChatbotService({
-  platformWide,
-  agentRuntimeAllowed,
-  stored,
-  onUpdate,
+  agentRuntimeAllowed = () => true,
+  stored = storedBot,
+  onUpdate = () => undefined,
 }: {
-  /** The caller is a platform admin. */
-  platformWide: () => boolean;
-  agentRuntimeAllowed: () => boolean;
-  stored: () => Chatbot;
-  onUpdate: (patch: Partial<Chatbot>) => void;
-}): { service: ChatbotService; respond: jest.Mock } {
+  agentRuntimeAllowed?: () => boolean;
+  stored?: () => Chatbot;
+  onUpdate?: (patch: Partial<Chatbot>) => void;
+} = {}): { service: ChatbotService; respond: jest.Mock } {
   const chatbotRepository = {
     findOne: jest.fn(async () => stored()),
     find: jest.fn(async () => [stored()]),
@@ -78,9 +72,7 @@ export function buildChatbotService({
       find: jest.fn(async () => [{ chatbotId: 'bot-1', role: 'owner' }]),
     } as never,
     {
-      resolveTenantIds: jest.fn(async () =>
-        platformWide() ? null : ['org-a'],
-      ),
+      resolveTenantIds: jest.fn(async () => ['org-a']),
     } as never,
   );
   const settings = () => ({

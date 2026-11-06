@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect } from "react";
  * closing the page) asks first. Outside the chatbot page nothing is listening, and reporting is a
  * no-op.
  */
-export type ReportUnsaved = (source: string, dirty: boolean) => void;
+type ReportUnsaved = (source: string, dirty: boolean) => void;
 
 export const UnsavedChangesContext = createContext<ReportUnsaved>(() => undefined);
 

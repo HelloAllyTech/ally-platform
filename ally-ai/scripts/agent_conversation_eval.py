@@ -1,8 +1,8 @@
 """Conversation eval for the conversational agent (Agents v2, from chunk 3a).
 
-Runs tests/fixtures/agent_conversation_cases.yaml against /agent/run with
-`features.agent` on. A case is one or more turns in one conversation; the history
-sent with each turn is built from the replies actually given.
+Runs tests/fixtures/agent_conversation_cases.yaml against /agent/run. A case is one
+or more turns in one conversation; the history sent with each turn is built from the
+replies actually given.
 
 Automatic checks per turn (by `expect.kind`):
 
@@ -37,8 +37,7 @@ the report then lists the replies to read by hand.
 Also reported:
 - in-scope cases are sent to /knowledge-agent/answer (v1) and the cited documents
   compared (target: the same documents at least 80% of the time);
-- p50 latency on in-scope cases against /agent/run with the agent off (parity),
-  budget +25%.
+- p50 latency on in-scope cases against v1 on the same messages, budget +25%.
 
     API__X_API_KEY=… poetry run python scripts/agent_conversation_eval.py \\
         --cases tests/fixtures/agent_conversation_cases.yaml \\
@@ -55,6 +54,7 @@ import re
 import statistics
 import sys
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
@@ -66,16 +66,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from agent_runtime_http import (  # noqa: E402
-    V1_PATH,
-    V2_PATH,
-    add_server_args,
-    call,
-    make_client,
-    p50,
-)
 from app.core.agent_runtime.check import (  # noqa: E402
     contact_details,
     looks_factual,
@@ -83,8 +74,10 @@ from app.core.agent_runtime.check import (  # noqa: E402
     organisation_of,
 )
 
+V1_PATH = "/api/v1/knowledge-agent/answer"
+V2_PATH = "/api/v1/agent/run"
 TIMEOUT_SECONDS = 90.0
-AGENT_ONLY_FIELDS = ("features", "knowledge_topics", "decline_text")
+AGENT_ONLY_FIELDS = ("knowledge_topics", "decline_text")
 LATENCY_BUDGET = 0.25
 OVERLAP_TARGET = 80.0
 
@@ -150,6 +143,25 @@ medical advice and must decline what its topics do not cover. {scope}
 Score `natural_on_persona` 1-5 (5 = a warm, natural, brief reply in this assistant's \
 voice; 1 = robotic, off-persona or confusing). Set the three flags only when clearly \
 true."""
+
+
+def call(
+    client: httpx.Client, path: str, payload: Dict[str, Any]
+) -> Tuple[Optional[Dict[str, Any]], float, Optional[str]]:
+    """POST `payload`. Returns ``(result, ms, error)``; `result` is None on error."""
+    started = time.monotonic()
+    try:
+        response = client.post(path, json=payload)
+    except httpx.HTTPError as e:
+        return None, (time.monotonic() - started) * 1000, type(e).__name__
+    ms = (time.monotonic() - started) * 1000
+    if response.status_code != 200:
+        return None, ms, f"HTTP {response.status_code}: {response.text[:200]}"
+    return response.json(), ms, None
+
+
+def p50(values: List[float]) -> float:
+    return statistics.median(values) if values else 0.0
 
 
 def load_cases(path: Path) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -334,7 +346,7 @@ def run(
 ) -> int:
     rows: List[Dict[str, Any]] = []
     agent_ms: List[float] = []
-    parity_ms: List[float] = []
+    v1_ms: List[float] = []
     overlaps: List[bool] = []
     v1_defaults = {k: v for k, v in defaults.items() if k not in AGENT_ONLY_FIELDS}
 
@@ -400,23 +412,13 @@ def run(
 
             if kind == "in_scope" and len(case["turns"]) == 1:
                 agent_ms.append(ms)
-                v1, _, v1_error = call(
+                v1, one_ms, v1_error = call(
                     client,
                     V1_PATH,
                     {**v1_bot, "question": turn["say"]},
                 )
-                parity, p_ms, p_error = call(
-                    client,
-                    V2_PATH,
-                    {
-                        **v1_bot,
-                        "question": turn["say"],
-                        "conversation_id": f"{conversation_id}-parity",
-                    },
-                )
-                if not p_error:
-                    parity_ms.append(p_ms)
                 if not v1_error:
+                    v1_ms.append(one_ms)
                     row["v1_docs"] = cited_documents(v1)
                     if row["v1_docs"]:
                         overlaps.append(bool(set(row["docs"]) & set(row["v1_docs"])))
@@ -442,7 +444,7 @@ def run(
     return write_report(
         rows,
         agent_ms,
-        parity_ms,
+        v1_ms,
         overlaps,
         judge_model,
         out,
@@ -469,7 +471,7 @@ def shared_prefix(topics: List[str]) -> str:
 def write_report(
     rows,
     agent_ms,
-    parity_ms,
+    v1_ms,
     overlaps,
     judge_model,
     out: Path,
@@ -490,8 +492,8 @@ def write_report(
     )
     scores = [r["verdict"].natural_on_persona for r in rows if r.get("verdict")]
     overlap = 100.0 * sum(overlaps) / len(overlaps) if overlaps else 0.0
-    a50, p50_parity = p50(agent_ms), p50(parity_ms)
-    delta = (a50 - p50_parity) / p50_parity if p50_parity else 0.0
+    a50, p50_v1 = p50(agent_ms), p50(v1_ms)
+    delta = (a50 - p50_v1) / p50_v1 if p50_v1 else 0.0
 
     summary = [
         "| Measure | Result |",
@@ -508,14 +510,14 @@ def write_report(
         ),
         f"| In scope: same documents as v1 | {overlap:.0f}% of {len(overlaps)} "
         f"(target ≥ {OVERLAP_TARGET:.0f}%) |",
-        f"| p50 in scope: agent / parity | {a50:.0f} ms / {p50_parity:.0f} ms "
+        f"| p50 in scope: agent / v1 | {a50:.0f} ms / {p50_v1:.0f} ms "
         f"(**{delta:+.0%}**, budget +{LATENCY_BUDGET:.0%}) |",
     ]
     lines = [
         f"# {title}",
         "",
-        f"Run {date.today().isoformat()} against `/api/v1/agent/run` with "
-        f"`features.agent` on, {about}. Script: "
+        f"Run {date.today().isoformat()} against `/api/v1/agent/run`, "
+        f"{about}. Script: "
         "`ally-ai/scripts/agent_conversation_eval.py`.",
         "",
         "## Summary",
@@ -611,7 +613,8 @@ def load_corpus(url: str, document_ids: List[str]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--cases", required=True, type=Path)
-    add_server_args(parser)
+    parser.add_argument("--base-url", default="http://localhost:3001")
+    parser.add_argument("--api-key", default=os.getenv("API__X_API_KEY"))
     parser.add_argument(
         "--title",
         default="Conversation eval",
@@ -648,7 +651,13 @@ def main() -> int:
         print("No --corpus-db: unsourced contact details are not checked.")
     if args.only:
         cases = [c for c in cases if c["id"].startswith(args.only)]
-    with make_client(parser, args, TIMEOUT_SECONDS) as client:
+    if not args.api_key:
+        parser.error("pass --api-key or set API__X_API_KEY")
+    with httpx.Client(
+        base_url=args.base_url,
+        headers={"x-api-key": args.api_key},
+        timeout=TIMEOUT_SECONDS,
+    ) as client:
         return run(
             client,
             defaults,

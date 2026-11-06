@@ -22,7 +22,10 @@ import {
   WhatsAppProvider,
 } from '../type/whatsapp-provider.interface';
 import { WhatsAppBotSettings } from '../type/whatsapp-settings.type';
-import { WhatsAppBusinessNumberService } from './whatsapp-business-number.service';
+import {
+  ResolvedWaNumber,
+  WhatsAppBusinessNumberService,
+} from './whatsapp-business-number.service';
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
 import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
@@ -31,9 +34,7 @@ import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { isFallback } from 'src/chatbot/engine/agent-runtime';
 import {
   AGENT_FALLBACK_EVENT,
-  AGENT_SHADOW_RUN_EVENT,
   type AgentFallbackEvent,
-  type AgentShadowRunEvent,
 } from 'src/chatbot/type/agent-runtime.event';
 import type {
   AgentRunRef,
@@ -150,31 +151,10 @@ export class WhatsAppInboundService {
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
-    // Which number the worker wrote to decides whose bot this is: the settings, the organisation
-    // whose documents answer, and the credentials the reply goes out with. A number disconnected
-    // while its message sat in the queue is dropped — there are no credentials left to reply with.
-    const number = await this.numberService.resolveForInbound(
-      inbound.phoneNumberId,
-    );
-    if (!number) {
-      this.logger.warn(
-        `Dropping message ${inbound.providerMessageId}: phone number id ` +
-          `${inbound.phoneNumberId} is not connected`,
-      );
-      return;
-    }
-    // Which bot answers: the one the number's connector is bound to, or for the env-configured
-    // platform number the platform chatbot. A number bound to no bot is not answered — and not
-    // recorded, since there is no bot whose conversations it would belong to.
-    const chatbot = number.connectorId
-      ? await this.connectorService.chatbotFor(number.connectorId)
-      : await this.platformChatbot();
-    if (!chatbot) {
-      this.logger.warn(
-        `Dropping message ${inbound.providerMessageId}: the number is not bound to a chatbot`,
-      );
-      return;
-    }
+    // ── 0. Bot ─────────────────────────────────────────────────────────────
+    const resolved = await this.resolveBot(inbound);
+    if (!resolved) return;
+    const { number, chatbot } = resolved;
     const settings = await this.settingsService.getForChatbot(chatbot);
 
     // ── 1. Dedupe ──────────────────────────────────────────────────────────
@@ -260,31 +240,15 @@ export class WhatsAppInboundService {
       }
 
       // ── 4. Rate limit ────────────────────────────────────────────────────
-      // Keyed per (number, sender): a worker's budget on one organisation's bot is not spent by
-      // their questions to another's. The platform number keeps its original keys.
-      const rateKey = number.id
-        ? `${number.id}:${contact.phoneE164}`
-        : contact.phoneE164;
-      const limit = await this.rateLimitService.check(rateKey, settings);
-      if (!limit.allowed) {
-        const notify = await this.rateLimitService.shouldNotify(
-          rateKey,
-          limit.window ?? 'minute',
-        );
-        if (notify) {
-          await this.reply(
-            contact,
-            conversation,
-            inboundId,
-            settings.rateLimitText,
-            WaHandledBy.RATE_LIMITED,
-            startedAt,
-          );
-        } else {
-          await this.discard(inboundId, 'rate limited (already notified)');
-        }
-        return;
-      }
+      const rateLimited = await this.handleRateLimit(
+        number,
+        contact,
+        conversation,
+        inboundId,
+        settings,
+        startedAt,
+      );
+      if (rateLimited) return;
 
       // ── 5. Consent / opt-out ─────────────────────────────────────────────
       const consentHandled = await this.handleConsent(
@@ -394,7 +358,7 @@ export class WhatsAppInboundService {
         );
       }
       if (decision.alert) this.eventEmitter.emit('exception', decision.alert);
-      this.announceAgentOutcome(chatbot, conversation.id, inboundId, decision);
+      this.announceAgentOutcome(chatbot, decision);
     } catch (error) {
       // Reached only when nothing has been sent — every send path above returns. Recorded on the
       // message and swallowed: rethrowing would redeliver and risk a second reply.
@@ -408,6 +372,82 @@ export class WhatsAppInboundService {
     }
   }
 
+  /**
+   * The number the worker wrote to and the bot that answers it, or null when the message is
+   * dropped unrecorded.
+   *
+   * The number decides whose bot this is: the settings, the organisation whose documents answer,
+   * and the credentials the reply goes out with. A number disconnected while its message sat in the
+   * queue is dropped — there are no credentials left to reply with.
+   *
+   * The bot is the one the number's connector is bound to, or for the env-configured platform
+   * number the platform chatbot. A number bound to no bot is not answered — and not recorded,
+   * since there is no bot whose conversations it would belong to.
+   */
+  private async resolveBot(
+    inbound: InboundWhatsAppMessage,
+  ): Promise<{ number: ResolvedWaNumber; chatbot: Chatbot } | null> {
+    const number = await this.numberService.resolveForInbound(
+      inbound.phoneNumberId,
+    );
+    if (!number) {
+      this.logger.warn(
+        `Dropping message ${inbound.providerMessageId}: phone number id ` +
+          `${inbound.phoneNumberId} is not connected`,
+      );
+      return null;
+    }
+    const chatbot = number.connectorId
+      ? await this.connectorService.chatbotFor(number.connectorId)
+      : await this.platformChatbot();
+    if (!chatbot) {
+      this.logger.warn(
+        `Dropping message ${inbound.providerMessageId}: the number is not bound to a chatbot`,
+      );
+      return null;
+    }
+    return { number, chatbot };
+  }
+
+  /**
+   * Over the limit: told once per window, then discarded in silence. Returns true when the message
+   * was rate-limited.
+   *
+   * Keyed per (number, sender): a worker's budget on one organisation's bot is not spent by their
+   * questions to another's. The platform number keeps its original keys.
+   */
+  private async handleRateLimit(
+    number: ResolvedWaNumber,
+    contact: WaContact,
+    conversation: WaConversation,
+    inboundId: string,
+    settings: WhatsAppBotSettings,
+    startedAt: number,
+  ): Promise<boolean> {
+    const rateKey = number.id
+      ? `${number.id}:${contact.phoneE164}`
+      : contact.phoneE164;
+    const limit = await this.rateLimitService.check(rateKey, settings);
+    if (limit.allowed) return false;
+    const notify = await this.rateLimitService.shouldNotify(
+      rateKey,
+      limit.window ?? 'minute',
+    );
+    if (notify) {
+      await this.reply(
+        contact,
+        conversation,
+        inboundId,
+        settings.rateLimitText,
+        WaHandledBy.RATE_LIMITED,
+        startedAt,
+      );
+    } else {
+      await this.discard(inboundId, 'rate limited (already notified)');
+    }
+    return true;
+  }
+
   // ─────────────────────────────────────────────────────────────── consent
 
   /**
@@ -419,35 +459,6 @@ export class WhatsAppInboundService {
    * standalone message. A bare disclaimer reads as a bot that ignored you, and it costs the worker a
    * round trip to ask again.
    */
-  /**
-   * After the reply has been sent and recorded, tell the Agents v2 listeners. The fallback alert is
-   * throttled per bot and reason by its listener (AgentRuntimeAlertThrottle), so it is announced
-   * here rather than emitted as an alert. The shadow listener (ChatbotShadowService) runs
-   * asynchronously and never throws, so a shadow run cannot delay this message, fail it, or have
-   * it redelivered.
-   */
-  private announceAgentOutcome(
-    chatbot: Pick<Chatbot, 'id' | 'name'>,
-    conversationId: string,
-    inboundMessageId: string,
-    decision: Pick<ChatbotDecision, 'agent' | 'shadow'>,
-  ): void {
-    if (isFallback(decision.agent)) {
-      this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
-        chatbot: { id: chatbot.id, name: chatbot.name },
-        reason: decision.agent.fallbackReason,
-      } satisfies AgentFallbackEvent);
-    }
-    if (decision.shadow) {
-      this.eventEmitter.emit(AGENT_SHADOW_RUN_EVENT, {
-        chatbotId: chatbot.id,
-        conversationId,
-        inboundMessageId,
-        shadow: decision.shadow,
-      } satisfies AgentShadowRunEvent);
-    }
-  }
-
   private async handleConsent(
     contact: WaContact,
     conversation: WaConversation,
@@ -516,6 +527,23 @@ export class WhatsAppInboundService {
     }
 
     return false;
+  }
+
+  /**
+   * After the reply has been sent and recorded, tell the Agents v2 listener. The fallback alert is
+   * throttled per bot and reason by its listener (AgentRuntimeAlertThrottle), so it is announced
+   * here rather than emitted as an alert.
+   */
+  private announceAgentOutcome(
+    chatbot: Pick<Chatbot, 'id' | 'name'>,
+    decision: Pick<ChatbotDecision, 'agent'>,
+  ): void {
+    if (isFallback(decision.agent)) {
+      this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
+        chatbot: { id: chatbot.id, name: chatbot.name },
+        reason: decision.agent.fallbackReason,
+      } satisfies AgentFallbackEvent);
+    }
   }
 
   /**
@@ -680,11 +708,10 @@ export class WhatsAppInboundService {
     let sent = false;
     let lastReason = 'unknown error';
 
-    // RETRY the send, then ALERT if it still fails. Neither existed before: a provider send failure
-    // marked the row FAILED and returned, so the worker who asked a question — possibly a CRISIS
-    // question, since the crisis paths reply through this same method — simply never heard back, and
-    // nobody was told. The crisis branches emit an `exception` event when a crisis FIRES; the reply
-    // that carries the safety number to the worker had no such coverage.
+    // RETRY the send, then ALERT if it still fails. Otherwise a worker who asked a question —
+    // possibly a CRISIS question, since the crisis paths reply through this same method — would
+    // simply never hear back, and nobody would be told. The crisis branches alert when a crisis
+    // FIRES; this covers the reply that carries the safety number to the worker.
     //
     // Budget: SEND_MAX_ATTEMPTS × the provider's own 15s timeout + the pauses between them, which is
     // sized to stay inside the inbound consumer's 60s SQS visibility window alongside the retrieval
@@ -789,10 +816,6 @@ export class WhatsAppInboundService {
 
     // Record consent on the first successful exchange, not before: a disclaimer that failed to send
     // has not been shown, and marking it granted would mean the worker never sees it.
-    //
-    // NOTE this predates the retry above and is unchanged in spirit, but it was already only
-    // loosely honouring its own comment — it runs whether or not the send succeeded. Gated on `sent`
-    // now, which is what the comment says.
     if (sent && contact.consentStatus === WaConsentStatus.PENDING) {
       await this.contactRepository.update(
         { id: contact.id },

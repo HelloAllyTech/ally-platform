@@ -16,6 +16,12 @@ Node = Callable[[AgentState], Awaitable[Dict[str, Any]]]
 Summary = Callable[[AgentState, Dict[str, Any]], str]
 
 
+def trace_step(node: str, started: float, summary: str) -> Dict[str, Any]:
+    """One trace step for a node that began at `started` (time.monotonic())."""
+    ms = int((time.monotonic() - started) * 1000)
+    return {"node": node, "ms": ms, "summary": summary}
+
+
 def traced(name: str, summary: Summary) -> Callable[[Node], Node]:
     """Wrap a node so its update also appends one trace step."""
 
@@ -24,12 +30,7 @@ def traced(name: str, summary: Summary) -> Callable[[Node], Node]:
         async def wrapper(state: AgentState) -> Dict[str, Any]:
             started = time.monotonic()
             update = await node(state)
-            ms = int((time.monotonic() - started) * 1000)
-            step = {
-                "node": name,
-                "ms": ms,
-                "summary": f"{name}: {summary(state, update)}",
-            }
+            step = trace_step(name, started, f"{name}: {summary(state, update)}")
             return {**update, "trace": [step]}
 
         return wrapper

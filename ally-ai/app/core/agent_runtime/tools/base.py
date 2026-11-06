@@ -99,7 +99,7 @@ class ToolContext:
     #: The language the agent says the latest message is in.
     language: str = "en"
     #: True for the run's first search only (and only when the bot logs
-    #: retrieval), so each message is logged once, as in the parity path.
+    #: retrieval), so each message is logged once, as in v1.
     log_retrieval: bool = False
 
 
@@ -114,7 +114,7 @@ class ToolResult:
     #: model as "searches already made".
     record: Dict[str, Any] = field(default_factory=dict)
     #: A search tool's `retrieval` block. The run's first search sets the
-    #: response's block, so it reads like the parity path's.
+    #: response's block, so it reads like v1's.
     retrieval: Optional[Dict[str, Any]] = None
     #: A search tool's hits, best first, before selection (debug output only).
     hits: List[Dict[str, Any]] = field(default_factory=list)

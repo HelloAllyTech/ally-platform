@@ -18,13 +18,8 @@ import {
   agentFailureReason,
   agentRunIdFor,
   MalformedAgentResponseError,
-  shadowSide,
 } from './agent-runtime';
-import type {
-  AgentRunRef,
-  ChatTurn,
-  ShadowRunRequest,
-} from './chatbot-engine.types';
+import type { AgentRunRef, ChatTurn } from './chatbot-engine.types';
 import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
 
 /**
@@ -33,12 +28,9 @@ import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
  */
 const MAX_KNOWLEDGE_TOPICS = 50;
 
-/** The test console's channel type. */
-const PREVIEW_CHANNEL = 'test';
-
 /**
- * The answer step's wall-clock budget, derived from the SQS visibility window. A v2 bot's fallback
- * to v1 gets only what the failed v2 call left of it.
+ * The answer step's wall-clock budget, derived from the SQS visibility window. The fallback to v1
+ * gets only what the failed v2 call left of it.
  */
 const ANSWER_BUDGET_MS = KNOWLEDGE_ANSWER_LIMITS.budgetMs;
 
@@ -74,9 +66,9 @@ const withoutDebugIds = (
 };
 
 /**
- * The Agents v2 engine, as the chatbot engine uses it: a v2 bot's answer through ally-ai's
- * `/agent/run` with its fallback to v1, and a shadow bot's comparison run. The chatbot engine keeps
- * the order of steps and turns the answer into a reply; everything about running v2 is here.
+ * The Agents v2 engine, as the chatbot engine uses it: the answer through ally-ai's `/agent/run`,
+ * with its fallback to v1. The chatbot engine keeps the order of steps and turns the answer into a
+ * reply; everything about running v2 is here.
  */
 @Injectable()
 export class AgentRuntimeRunner {
@@ -99,7 +91,6 @@ export class AgentRuntimeRunner {
   async answer(
     turn: ChatTurn,
     request: KnowledgeAnswerRequest,
-    agentMode: boolean,
     knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
   ): Promise<Answered> {
     const runId = agentRunIdFor(turn.providerMessageId);
@@ -111,16 +102,8 @@ export class AgentRuntimeRunner {
           conversationId,
           runId,
           chatbotId: turn.chatbot.id,
-          // Only an agent bot sends these; any other v2 bot's request is the parity request, and
-          // ally-ai reads no features as "agent off".
-          ...(agentMode
-            ? {
-                // Every bot answers with the agent now (chunk 3d), whatever it stored.
-                features: { ...turn.chatbot.features, agent: true },
-                knowledgeTopics: await this.knowledgeTopics(knowledge),
-                declineText: turn.settings.declineText,
-              }
-            : {}),
+          knowledgeTopics: await this.knowledgeTopics(knowledge),
+          declineText: turn.settings.declineText,
         }),
       );
       if (!response?.intent) throw new MalformedAgentResponseError();
@@ -165,38 +148,7 @@ export class AgentRuntimeRunner {
   }
 
   /**
-   * The comparison run for a shadow bot's message, for the channel to start after it has replied.
-   * WhatsApp only: Preview never shadows, and without a provider message id there is no stable
-   * run id to record.
-   */
-  shadowFor(
-    turn: ChatTurn,
-    request: KnowledgeAnswerRequest,
-    answer: KnowledgeAnswerResponse,
-    latencyMs: number,
-  ): ShadowRunRequest | undefined {
-    if (
-      turn.channel.type === PREVIEW_CHANNEL ||
-      !turn.providerMessageId ||
-      !turn.conversationId
-    ) {
-      return undefined;
-    }
-    return {
-      // Its own thread, so the comparison runs' checkpoints never mix into the conversation's
-      // real v2 thread once the bot is switched over.
-      request: buildAgentRunRequest(request, {
-        conversationId: `shadow-${turn.conversationId}`,
-        runId: agentRunIdFor(turn.providerMessageId),
-        chatbotId: turn.chatbot.id,
-        logRetrieval: false,
-      }),
-      v1: shadowSide(answer, latencyMs),
-    };
-  }
-
-  /**
-   * The titles of the documents an agent bot answers from: its "what I cover" list. A bot that
+   * The titles of the documents the bot answers from: its "what I cover" list. A bot that
    * answers from its organisation's library sends none for now (`knowledge_topics: []`).
    */
   private async knowledgeTopics(

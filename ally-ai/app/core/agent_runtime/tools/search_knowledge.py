@@ -2,9 +2,9 @@
 
 The agent decides when to search and writes the query itself, using the
 conversation for what a follow-up refers to. It is the same retrieval, gate and
-selection as the parity path (the bot's documents, audience and thresholds), so a
-passage found here is one the parity path could have found. The run's first search
-is logged to the retrieval log exactly as the parity path logs its one search.
+selection as v1 (the bot's documents, audience and thresholds), so a
+passage found here is one v1 could have found. The run's first search
+is logged to the retrieval log exactly as v1 logs its one search.
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ async def search_knowledge(args: SearchKnowledgeInput, ctx: ToolContext) -> Tool
             log_retrieval=ctx.log_retrieval,
         )
     else:
-        # Nothing relevant. Logged as the decline the parity path would have
+        # Nothing relevant. Logged as the decline v1 would have
         # given, so the threshold is still calibrated against what was found; the
         # agent decides what to say.
         selected = []

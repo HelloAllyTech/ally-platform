@@ -1,6 +1,6 @@
 """Check for the conversational agent: what the model replied → what ally-be gets.
 
-Deterministic, like the parity path's check. The model may chat freely, but a fact
+Deterministic, like v1's check. The model may chat freely, but a fact
 about the organisation reaches a person only with a citation that resolves to a
 passage this run actually offered.
 
@@ -16,7 +16,7 @@ becomes a decline with no text, which ally-be sends as the bot's decline wording
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -152,18 +152,14 @@ def repeated_crisis_wording(
     earlier = " ".join(
         turn.get("content") or "" for turn in history if turn.get("role") == "assistant"
     )
-    if (
-        earlier
-        and _NOT_A_CRISIS_SERVICE.search(earlier)
-        and (_NOT_A_CRISIS_SERVICE.search(text))
-    ):
+    if not earlier:
+        return False
+    if _NOT_A_CRISIS_SERVICE.search(earlier) and _NOT_A_CRISIS_SERVICE.search(text):
         return True
-    return bool(earlier and turn_type == "smalltalk" and _CRISIS.search(text))
+    return turn_type == "smalltalk" and bool(_CRISIS.search(text))
 
 
-def without_repeated_crisis_wording(
-    text: str, turn_type: str, history: Sequence[Dict[str, str]]
-) -> str:
+def without_repeated_crisis_wording(text: str, turn_type: str) -> str:
     pattern = _CRISIS if turn_type == "smalltalk" else _NOT_A_CRISIS_SERVICE
     return without_sentences(text, lambda sentence: not pattern.search(sentence))
 
@@ -198,9 +194,9 @@ class Organisation:
     #: organisation.
     self_names: Tuple[str, ...] = ()
     #: Names that mean the organisation or its product.
-    terms: Tuple[str, ...] = field(default_factory=tuple)
+    terms: Tuple[str, ...] = ()
     #: What the bot covers, by document title ("About Ally", "Privacy and Data").
-    topics: Tuple[str, ...] = field(default_factory=tuple)
+    topics: Tuple[str, ...] = ()
 
     def topics_named_in(self, text: str) -> int:
         """How many topics `text` mentions, by any of a topic's distinctive words
@@ -464,11 +460,10 @@ def check_reply(
     # still needs them, applied to the text (sentences removed) rather than
     # refusing the reply.
     if verdict.intent != AgentIntent.DECLINE or verdict.model_declined:
-        for _, fix in WORDING_FIXES:
+        for fix in WORDING_FIXES:
             fix(verdict, ctx)
-    return _build_result(verdict, step, meta, ctx, language, retrieval), (
-        verdict.rejection
-    )
+    result = _build_result(verdict, step, meta, ctx, language, retrieval)
+    return result, verdict.rejection
 
 
 # ------------------------------------------------------------------ 1. read the draft
@@ -592,7 +587,7 @@ def _trim_repeated_crisis_wording(verdict: Verdict, ctx: CheckContext) -> None:
     trim does. If trimming would leave nothing, the reply stays as is."""
     if repeated_crisis_wording(verdict.answer, ctx.turn_type, ctx.history):
         verdict.answer = (
-            without_repeated_crisis_wording(verdict.answer, ctx.turn_type, ctx.history)
+            without_repeated_crisis_wording(verdict.answer, ctx.turn_type)
             or verdict.answer
         )
 
@@ -632,13 +627,13 @@ def _decline_if_nothing_left(verdict: Verdict, ctx: CheckContext) -> None:
 
 
 #: Applied in this order to every reply that isn't a decline the check forced.
-WORDING_FIXES: Tuple[Tuple[str, Callable[[Verdict, CheckContext], None]], ...] = (
-    ("unsourced details", _drop_unsourced_details),
-    ("repeated crisis wording", _trim_repeated_crisis_wording),
-    ("repeated topic list", _trim_repeated_topic_list),
-    ("source phrases", _cut_source_phrases),
-    ("talk about sources", _flag_source_talk),
-    ("nothing left", _decline_if_nothing_left),
+WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
+    _drop_unsourced_details,
+    _trim_repeated_crisis_wording,
+    _trim_repeated_topic_list,
+    _cut_source_phrases,
+    _flag_source_talk,
+    _decline_if_nothing_left,
 )
 
 
@@ -667,7 +662,7 @@ def _build_result(
         citations = []
         if not verdict.model_declined or (verdict.rejection and not verdict.keeps_text):
             answer = ""
-        # The parity path's reason when searching found nothing at all, so the
+        # v1's reason when searching found nothing at all, so the
         # unanswered queue reads the same as in v1.
         decline_reason = (
             DeclineReason(ctx.search_gate)

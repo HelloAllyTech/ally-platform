@@ -1,14 +1,13 @@
 """Request/response shapes for `/agent/run`, the Agents v2 runtime.
 
 Deliberately a superset of `/knowledge-agent/answer` in both directions, so ally-be
-can switch a bot between the two endpoints with almost no mapping (chunk 2). The
-contract grows toward the full v2 shape (contact, features, run_token, resume) in
-later chunks.
+can fall back to that endpoint (v1) with almost no mapping. The contract grows
+toward the full v2 shape (contact, run_token, resume) in later chunks.
 """
 
-from typing import Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_serializer
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.agent_runtime.schemas import TurnType
 from app.core.agent_runtime.state import BotConfig
@@ -40,16 +39,8 @@ class AgentRunRequest(KnowledgeAnswerRequest):
     log_retrieval: bool = Field(
         True,
         description=(
-            "False skips the retrieval log for this run. ally-be sends false when it "
-            "runs a bot in shadow beside /knowledge-agent/answer, which already logged "
-            "the same message."
-        ),
-    )
-    features: Dict[str, bool] = Field(
-        default_factory=dict,
-        description=(
-            "The bot's feature flags. `agent: true` runs the conversational agent "
-            "(agent step, tools, check); absent or false runs the parity graph."
+            "False skips the retrieval log for this run, for a caller that has "
+            "already logged the same message."
         ),
     )
     knowledge_topics: List[str] = Field(
@@ -95,7 +86,6 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             "channel": self.channel,
             "audience": self.audience.model_dump(mode="json"),
             "log_retrieval": self.log_retrieval,
-            "features": dict(self.features),
             "knowledge_topics": list(self.knowledge_topics),
             "decline_text": self.decline_text,
         }
@@ -131,16 +121,8 @@ class AgentRunResponse(KnowledgeAnswerResponse):
     turn_type: Optional[TurnType] = Field(
         None,
         description=(
-            "What the conversational agent understood the message to be. None "
-            "when `features.agent` is off. A smalltalk or about_bot reply comes "
-            "back as intent `answer` with no citations."
+            "What the conversational agent understood the message to be. A "
+            "smalltalk or about_bot reply comes back as intent `answer` with no "
+            "citations."
         ),
     )
-
-    @model_serializer(mode="wrap")
-    def _omit_turn_type_when_off(self, handler):
-        """With the agent off, the response is exactly the chunk 1 shape."""
-        data = handler(self)
-        if data.get("turn_type") is None:
-            data.pop("turn_type", None)
-        return data

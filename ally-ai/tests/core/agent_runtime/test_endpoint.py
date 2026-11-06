@@ -11,7 +11,6 @@ import pytest
 
 from app.core.agent_runtime import checkpointer as checkpointer_module
 from app.core.config import settings
-from app.core.knowledge_agent.schemas import AnswerIntent, KnowledgeAnswer
 from app.exceptions.custom_exceptions import (
     EmbeddingFailedException,
     LLMInvocationFailedException,
@@ -19,7 +18,14 @@ from app.exceptions.custom_exceptions import (
 )
 from app.schemas.knowledge_agent import KnowledgeAnswerResponse
 from tests.core.agent_runtime.conftest import AGENT, BODY, URL
-from tests.core.knowledge_agent.test_agent import CHUNK_A, passage, stub_generate
+from tests.core.agent_runtime.steps import CONVERSATION, FakeLLM, chat, reply, search
+from tests.core.knowledge_agent.test_agent import CHUNK_A, passage
+
+AGENT_BODY = {
+    **BODY,
+    "knowledge_topics": ["Ally FAQ – About Ally", "  ", "x" * 300],
+    "decline_text": "A colleague or supervisor is the better route.",
+}
 
 
 class TestFlag:
@@ -40,47 +46,45 @@ class TestFlag:
 class TestRun:
     def test_answer_returns_the_old_fields_plus_run_fields(self, client, chunk_service):
         chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
-        gen = stub_generate(
-            KnowledgeAnswer(intent=AnswerIntent.ANSWER, answer="A.", citations=[1])
-        )
-        with patch(f"{AGENT}.generate_structured", gen):
+        llm = FakeLLM(search("What is Ally?"), reply(answer="A.", citations=[1]))
+        with patch(f"{CONVERSATION}.generate_structured", llm):
             response = client.post(URL, json=BODY)
 
         assert response.status_code == 200
         data = response.json()
         old_fields = set(KnowledgeAnswerResponse.model_fields)
         assert old_fields <= set(data)
-        assert set(data) - old_fields == {"run_id", "trace", "runtime"}
+        assert set(data) - old_fields == {"run_id", "trace", "runtime", "turn_type"}
         assert data["runtime"] == "v2"
         assert data["intent"] == "answer"
         assert data["citations"][0]["chunk_id"] == CHUNK_A
         assert data["retrieval"]["hit_chunk_ids"] == [CHUNK_A]
-        assert [s["node"] for s in data["trace"]] == [
-            "translate",
-            "retrieve",
-            "gate",
-            "select",
-            "write",
-            "check",
-            "finalize",
-        ]
+        assert [s["node"] for s in data["trace"]] == ["agent", "tool", "agent", "check"]
 
     def test_run_id_is_echoed_or_generated(self, client):
-        given = client.post(URL, json={**BODY, "run_id": "run-42"}).json()
-        generated = client.post(URL, json={**BODY, "conversation_id": "c2"}).json()
+        with patch(f"{CONVERSATION}.generate_structured", FakeLLM(chat(), chat())):
+            given = client.post(URL, json={**BODY, "run_id": "run-42"}).json()
+            generated = client.post(URL, json={**BODY, "conversation_id": "c2"}).json()
         assert given["run_id"] == "run-42"
         assert len(generated["run_id"]) == 36
 
     def test_decline_is_200(self, client):
-        response = client.post(URL, json=BODY)
+        llm = FakeLLM(
+            search("What is Ally?"), reply("decline", "Not something I cover.")
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            response = client.post(URL, json=BODY)
         assert response.status_code == 200
         assert response.json()["decline_reason"] == "no_hits"
-        assert len(response.json()["trace"]) == 4
 
     def test_log_retrieval_defaults_to_true_and_can_be_switched_off(
         self, client, chunk_service
     ):
-        with patch(f"{AGENT}.emit_retrieval_log") as emit:
+        steps = [search("q"), reply("decline", "No.")] * 2
+        with (
+            patch(f"{AGENT}.emit_retrieval_log") as emit,
+            patch(f"{CONVERSATION}.generate_structured", FakeLLM(*steps)),
+        ):
             client.post(URL, json=BODY)
             assert emit.call_count == 1
             response = client.post(
@@ -114,12 +118,12 @@ class TestRun:
         self, client, chunk_service, error, status_code
     ):
         chunk_service.search.side_effect = error
-        assert client.post(URL, json=BODY).status_code == status_code
+        with patch(f"{CONVERSATION}.generate_structured", FakeLLM(search("q"))):
+            assert client.post(URL, json=BODY).status_code == status_code
 
     def test_llm_failure_is_502_not_a_decline(self, client, chunk_service):
-        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
         gen = AsyncMock(side_effect=LLMInvocationFailedException("model down"))
-        with patch(f"{AGENT}.generate_structured", gen):
+        with patch(f"{CONVERSATION}.generate_structured", gen):
             assert client.post(URL, json=BODY).status_code == 502
 
     def test_a_bad_final_state_is_a_mapped_500(self, client, monkeypatch):
@@ -131,6 +135,49 @@ class TestRun:
         response = client.post(URL, json=BODY)
         assert response.status_code == 500
         assert response.json()["detail"] == "Failed to answer the question"
+
+
+@pytest.mark.usefixtures("enabled")
+class TestAgentRun:
+    def test_smalltalk_comes_back_as_an_uncited_answer_with_turn_type(
+        self, client, chunk_service
+    ):
+        llm = FakeLLM(chat("Hi there!"))
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            response = client.post(URL, json={**AGENT_BODY, "question": "hi"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["intent"] == "answer"
+        assert data["decline_reason"] == "none"
+        assert data["citations"] == []
+        assert data["turn_type"] == "smalltalk"
+        assert data["retrieval"]["hit_chunk_ids"] == []
+        assert [s["node"] for s in data["trace"]] == ["agent", "check"]
+        chunk_service.search.assert_not_called()
+
+    def test_topics_are_trimmed_and_reach_the_prompt(self, client, chunk_service):
+        llm = FakeLLM(chat("I'm a helper.", turn_type="about_bot"))
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            client.post(URL, json={**AGENT_BODY, "question": "who are you?"})
+        prompt = llm.calls[0]["prompt"]
+        assert "- Ally FAQ – About Ally" in prompt
+        assert "- " + "x" * 200 + "\n" in prompt  # capped at 200 characters
+        assert "x" * 201 not in prompt
+        assert "\n-   \n" not in prompt  # blank titles dropped
+
+    def test_cited_answer(self, client, chunk_service):
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        llm = FakeLLM(search("What is Ally?"), reply(citations=[1]))
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            data = client.post(URL, json=AGENT_BODY).json()
+        assert data["turn_type"] == "question"
+        assert data["citations"][0]["chunk_id"] == CHUNK_A
+        assert data["retrieval"]["hit_chunk_ids"] == [CHUNK_A]
+
+    def test_too_many_topics_is_422(self, client):
+        body = {**AGENT_BODY, "knowledge_topics": ["t"] * 51}
+        assert client.post(URL, json=body).status_code == 422
 
 
 class TestUnavailable:

@@ -25,7 +25,6 @@ import {
   ChatbotAudienceKind,
   ChatbotKnowledgeSource,
   ChatbotMemberRole,
-  ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
 import { KB_MAX_PASTE_CHARS } from '../../knowledge-base/constants/knowledge-base.constants';
@@ -118,18 +117,6 @@ export class CreateChatbotDto {
   accessMode?: ChatbotAccessMode;
 }
 
-/** Agents v2 feature flags a platform admin can switch per bot. */
-export class ChatbotFeaturesDto {
-  @ApiPropertyOptional({
-    description:
-      'Agent mode: on a v2 bot, the conversational agent answers greetings, "what can you do?" ' +
-      'and follow-ups itself, and can search again. Facts still need a source.',
-  })
-  @IsOptional()
-  @IsBoolean()
-  agent?: boolean;
-}
-
 export class UpdateChatbotDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -174,25 +161,6 @@ export class UpdateChatbotDto {
   @ValidateNested()
   @Type(() => ChatbotModelDto)
   model?: ChatbotModelDto | null;
-
-  @ApiPropertyOptional({
-    enum: ChatbotRuntime,
-    description:
-      'Ignored since chunk 3d: every chatbot answers with the agent (v2), unless the platform switch sends all of them to v1. Accepted so an older dashboard does not break.',
-  })
-  @IsOptional()
-  @IsEnum(ChatbotRuntime)
-  runtime?: ChatbotRuntime;
-
-  @ApiPropertyOptional({
-    type: ChatbotFeaturesDto,
-    description:
-      'Ignored since chunk 3d (Agent mode is always on). Accepted so an older dashboard does not break.',
-  })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => ChatbotFeaturesDto)
-  features?: ChatbotFeaturesDto;
 }
 
 export class SetChatbotStatusDto {
@@ -344,15 +312,6 @@ export class TestChatbotDto {
   @IsOptional()
   @IsBoolean()
   checkAccess?: boolean;
-
-  @ApiPropertyOptional({
-    enum: [ChatbotRuntime.V1, ChatbotRuntime.V2],
-    description:
-      'Ignored since chunk 3d: a test uses the same engine as every message.',
-  })
-  @IsOptional()
-  @IsIn([ChatbotRuntime.V1, ChatbotRuntime.V2])
-  runtime?: ChatbotRuntime.V1 | ChatbotRuntime.V2;
 
   @ApiPropertyOptional({
     description:

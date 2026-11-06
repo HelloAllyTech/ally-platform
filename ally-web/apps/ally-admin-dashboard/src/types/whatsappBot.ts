@@ -365,25 +365,6 @@ export interface WaBotSettings {
   helplineNumbers: string;
 }
 
-/** Booleans and counts only — the endpoint never returns a secret's value. */
-export interface WaProviderHealth {
-  enabled: boolean;
-  provider: string;
-  verifyTokenConfigured: boolean;
-  appSecretConfigured: boolean;
-  phoneNumberIdConfigured: boolean;
-  accessTokenConfigured: boolean;
-  inboundQueueConfigured: boolean;
-  // Optional: a backend one release behind this build does not send them, and "unknown" must not
-  // render as "missing".
-  businessAccountIdConfigured?: boolean;
-  inboundDlqConfigured?: boolean;
-  kbIngestQueueConfigured?: boolean;
-  helplineNumbersSet?: boolean;
-  mappedNumbers?: number;
-  indexedDocuments?: number;
-}
-
 export enum WaBusinessNumberStatus {
   /** Checked with Meta, but Meta has not called the webhook yet. */
   AWAITING_WEBHOOK = "awaiting_webhook",
@@ -472,7 +453,7 @@ export interface WaConnectionCheck {
   subscriptionError?: string;
 }
 
-// ── Preview console ──────────────────────────────────────────────────────────
+// ── Citations and retrieval (on a conversation's replies) ────────────────────
 
 export interface WaPreviewCitation {
   passage_number: number;
@@ -497,33 +478,6 @@ export interface WaPreviewRetrieval {
   translated_query: string | null;
   /** True when the model answered but cited nothing. */
   unsupported: boolean;
-}
-
-export interface WaPreviewResponse {
-  intent: "answer" | "decline" | "clarify";
-  declineReason: string;
-  /** The exact message a worker would receive, including source lines and truncation. */
-  reply: string;
-  replyLength: number;
-  language: string;
-  citations: WaPreviewCitation[];
-  retrieval: WaPreviewRetrieval;
-  provider: string;
-  model: string;
-  promptVersion: string;
-  latencyMs: number;
-  /**
-   * Which corpus answered. Echoed back because "the bot found this fine" from an unscoped
-   * preview is otherwise indistinguishable from what one customer's worker would actually get.
-   */
-  audience: { tenantId: string | null; includesGlobal: boolean };
-}
-
-export interface WaPreviewRequest {
-  question: string;
-  retrieval?: Partial<WaRetrievalSettings>;
-  /** Answer as a worker from this organisation would be. Omitted searches the whole corpus. */
-  tenantId?: string;
 }
 
 // ── Conversation log ─────────────────────────────────────────────────────────

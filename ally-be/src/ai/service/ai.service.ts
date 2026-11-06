@@ -704,24 +704,23 @@ export class AiService {
   /**
    * Answer through the Agents v2 engine (ally-ai `/agent/run`).
    *
-   * ONE attempt, 25s (the answer call's per-attempt timeout). A v2 bot falls back to
+   * ONE attempt, 25s (the answer call's per-attempt timeout). The engine falls back to
    * `/knowledge-agent/answer` when this fails, and that fallback IS the retry — retrying here too
    * would spend the SQS window twice before v1 even started.
    *
    * No Slack alert from here (`alertOnFailure=false`): the engine raises one throttled
-   * "agent runtime degraded" alert per bot and reason, and shadow runs record their failure in
-   * `agent_shadow_runs`. The failure is still logged.
+   * "agent runtime degraded" alert per bot and reason. The failure is still logged.
    *
    * redactBody=true: the payload is the person's question.
    */
-  async runAgent(
-    request: AgentRunRequest,
-    timeoutMs: number = KNOWLEDGE_ANSWER_LIMITS.attemptMs,
-  ) {
+  async runAgent(request: AgentRunRequest) {
     return this.postKnowledge<AgentRunResponse, AgentRunRequest>(
       ENDPOINTS.AGENT_RUN,
       request,
-      { timeoutMs, alertOnFailure: false },
+      {
+        timeoutMs: KNOWLEDGE_ANSWER_LIMITS.attemptMs,
+        alertOnFailure: false,
+      },
     );
   }
 

@@ -1,10 +1,8 @@
 import { randomUUID } from 'crypto';
 import { v5 as uuidv5 } from 'uuid';
-import type { KnowledgeAnswerResponse } from '../../ai/dto/knowledge.dto';
 import { AiUpstreamError } from '../../ai/exception/ai-upstream.exception';
 import { ErrorCode } from '../../exception/error-code.enum';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
-import type { AgentShadowSide } from '../entity/agent-shadow-run.entity';
 import type { AgentFailureReason, AgentRunRef } from './chatbot-engine.types';
 import { AgentRuntimeUsed, ChatbotRuntime } from '../enum/chatbot.enum';
 
@@ -27,28 +25,12 @@ export const agentRunIdFor = (providerMessageId?: string | null): string =>
 /**
  * The engine that answers every chatbot: v2 with the conversational agent, unless the platform's
  * emergency switch (`agentRuntimeAllowed`, Defaults) is off — then v1, for every bot and every
- * caller, Preview included. A bot's stored `runtime` and `features` no longer choose (chunk 3d).
+ * caller, Preview included.
  */
 export const effectiveRuntime = (
   settings: Pick<WhatsAppBotSettings, 'agentRuntimeAllowed'>,
 ): ChatbotRuntime.V1 | ChatbotRuntime.V2 =>
   settings.agentRuntimeAllowed ? ChatbotRuntime.V2 : ChatbotRuntime.V1;
-
-/**
- * Which engine answers one message, decided once: v2 (always with the conversational agent), or
- * v1 while the emergency switch is off.
- */
-export type EngineChoice =
-  | { kind: ChatbotRuntime.V1 }
-  | { kind: ChatbotRuntime.V2 };
-
-export const resolveEngine = (
-  settings: Pick<WhatsAppBotSettings, 'agentRuntimeAllowed'>,
-): EngineChoice => ({ kind: effectiveRuntime(settings) });
-
-/** The engine is v2, which always answers with the conversational agent. */
-export const isAgentEngine = (engine: EngineChoice): boolean =>
-  engine.kind === ChatbotRuntime.V2;
 
 /** `/agent/run` answered 200 with something that is not an answer. */
 export class MalformedAgentResponseError extends Error {
@@ -74,16 +56,3 @@ export const isFallback = (
   ref: AgentRunRef | undefined,
 ): ref is Extract<AgentRunRef, { runtime: AgentRuntimeUsed.V2_FALLBACK }> =>
   ref?.runtime === AgentRuntimeUsed.V2_FALLBACK;
-
-/** One side of a shadow comparison: the fields the parity script compares, and no text. */
-export const shadowSide = (
-  response: KnowledgeAnswerResponse,
-  latencyMs: number,
-): AgentShadowSide => ({
-  intent: response.intent,
-  decline_reason: response.decline_reason,
-  cited_chunk_ids: (response.citations ?? []).map((c) => c.chunk_id),
-  hit_count: response.retrieval?.hit_count ?? null,
-  top_similarity: response.retrieval?.top_similarity ?? null,
-  latency_ms: latencyMs,
-});

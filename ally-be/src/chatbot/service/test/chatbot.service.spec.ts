@@ -9,11 +9,10 @@ jest.mock('src/common/execution/execution-manager', () => ({
 }));
 
 /**
- * The Agents v2 engine switch on the chatbot API: only a platform admin chooses or compares
- * engines, GET says which engine actually answers, and Preview reports the run behind a test.
+ * The Agents v2 engine switch on the chatbot API: GET says which engine actually answers, and
+ * Preview reports the run behind a test.
  */
 describe('ChatbotService and the runtime switch', () => {
-  let platformWide: boolean;
   let agentRuntimeAllowed: boolean;
   let stored: Chatbot;
   let updates: Partial<Chatbot>[];
@@ -21,12 +20,10 @@ describe('ChatbotService and the runtime switch', () => {
   let service: ChatbotService;
 
   beforeEach(() => {
-    platformWide = false;
     agentRuntimeAllowed = true;
     updates = [];
     stored = storedBot();
     ({ service, respond } = buildChatbotService({
-      platformWide: () => platformWide,
       agentRuntimeAllowed: () => agentRuntimeAllowed,
       stored: () => stored,
       onUpdate: (patch) => {
@@ -36,41 +33,24 @@ describe('ChatbotService and the runtime switch', () => {
     }));
   });
 
-  describe('PATCH runtime', () => {
-    it('ignores it, from anyone: every bot answers with the agent', async () => {
-      platformWide = true;
-      const bot = await service.update('bot-1', {
-        runtime: ChatbotRuntime.SHADOW,
-      });
-      expect(updates[0]).not.toHaveProperty('runtime');
-      expect(bot.runtime).toBe(ChatbotRuntime.V2);
-
-      platformWide = false;
-      await expect(
-        service.update('bot-1', { runtime: ChatbotRuntime.V1 }),
-      ).resolves.toMatchObject({ runtime: ChatbotRuntime.V2 });
-    });
-
-    it('leaves the other fields to editors as before', async () => {
+  describe('PATCH', () => {
+    it('leaves the fields to editors as before', async () => {
       await service.update('bot-1', { name: 'Renamed' });
       expect(updates[0]).toMatchObject({ name: 'Renamed' });
-      expect(updates[0]).not.toHaveProperty('runtime');
     });
   });
 
   describe('GET', () => {
-    it('returns the runtime, the features and what actually answers', async () => {
-      await expect(service.get('bot-1')).resolves.toMatchObject({
-        runtime: ChatbotRuntime.V2,
-        effectiveRuntime: ChatbotRuntime.V2,
-        features: {},
-      });
+    it('returns what actually answers, and no stored engine', async () => {
+      const bot = await service.get('bot-1');
+      expect(bot.effectiveRuntime).toBe(ChatbotRuntime.V2);
+      expect(bot).not.toHaveProperty('runtime');
+      expect(bot).not.toHaveProperty('features');
     });
 
     it('shows v1 as effective while the kill switch is off', async () => {
       agentRuntimeAllowed = false;
       await expect(service.get('bot-1')).resolves.toMatchObject({
-        runtime: ChatbotRuntime.V2,
         effectiveRuntime: ChatbotRuntime.V1,
       });
     });
@@ -125,12 +105,6 @@ describe('ChatbotService and the runtime switch', () => {
         fallbackReason: 'upstream_404',
         wouldAlert: 'Chatbot Agent Runtime Degraded',
       });
-    });
-
-    it('ignores an engine asked for in the test: a test runs as every message does', async () => {
-      await service.test('bot-1', { message: 'q', runtime: ChatbotRuntime.V1 });
-      expect(respond).toHaveBeenCalledTimes(1);
-      expect(respond.mock.calls[0][0]).not.toHaveProperty('runtime');
     });
   });
 });

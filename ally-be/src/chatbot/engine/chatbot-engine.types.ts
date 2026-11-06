@@ -1,15 +1,10 @@
-import type {
-  AgentRunRequest,
-  AgentTraceStep,
-  AgentTurnType,
-} from '../../ai/dto/knowledge.dto';
+import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
 import type { NotificationErrorType } from '../../notification/type/notification.error.type';
 import type {
   WaHandledBy,
   WaUnansweredReason,
 } from '../../whatsapp/enum/whatsapp.enum';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
-import type { AgentShadowSide } from '../entity/agent-shadow-run.entity';
 import type { Chatbot } from '../entity/chatbot.entity';
 import type { AgentRuntimeUsed } from '../enum/chatbot.enum';
 
@@ -71,8 +66,8 @@ export interface ChatTurn {
 }
 
 /**
- * Why a v2 run failed, as a short stable key: what the degraded alert is throttled on and a shadow
- * row records. Codes and statuses only, never a message that could echo the request.
+ * Why a v2 run failed, as a short stable key: what the degraded alert is throttled on. Codes and
+ * statuses only, never a message that could echo the request.
  */
 export type AgentFailureReason =
   | 'malformed'
@@ -94,15 +89,6 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
 );
 
 /**
- * What a shadow bot hands its channel: the `/agent/run` request to send AFTER the reply has gone
- * out, and v1's side of the comparison. Never set for Preview.
- */
-export interface ShadowRunRequest {
-  request: AgentRunRequest;
-  v1: AgentShadowSide;
-}
-
-/**
  * What to reply and how it was decided. The channel sends it, records it, files `unanswered` and
  * raises `alert`; the engine itself sends and stores nothing, which is what lets the test console
  * run the exact production path without side effects.
@@ -113,13 +99,13 @@ export interface ChatbotDecision {
   templateId?: string;
   /**
    * The body greets the person rather than answering a question: the bot's welcome message (it
-   * answered a hello), or, for an agent bot, its own reply to small talk or "who are you?". On a
+   * answered a hello), or the agent's own reply to small talk or "who are you?". On a
    * first message the first-message notice follows it (`withFirstMessageParts`).
    */
   isWelcome?: boolean;
   citations?: Record<string, any>[];
   retrievalMeta?: Record<string, any>;
-  /** Agent mode: what the agent understood the message to be (also stored in `retrievalMeta`). */
+  /** What the agent understood the message to be (also stored in `retrievalMeta`). */
   turnType?: AgentTurnType;
   language?: string | null;
   /** Set when the knowledge did not cover the question (or answering failed). */
@@ -135,6 +121,4 @@ export interface ChatbotDecision {
    * the reply and, for a fallback, raises the throttled "agent runtime degraded" alert.
    */
   agent?: AgentRunRef;
-  /** Set for a shadow bot's answered message: the comparison run the channel starts after sending. */
-  shadow?: ShadowRunRequest;
 }

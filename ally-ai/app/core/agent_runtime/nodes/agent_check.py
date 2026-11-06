@@ -1,4 +1,4 @@
-"""Check (agent): citations resolved against every passage offered; a fact without
+"""Check: citations resolved against every passage offered; a fact without
 one is refused. See agent_runtime/check.py for the rules.
 
 A refused draft goes back to the agent once, with the reason, so the person gets a
@@ -9,6 +9,8 @@ than the bot's fixed decline wording. A second refusal is final.
 from __future__ import annotations
 
 from typing import Any, Dict, Literal
+
+from langgraph.graph import END
 
 from app.core.agent_runtime.budget import MAX_REVISIONS, over_time, recent
 from app.core.agent_runtime.check import (
@@ -42,17 +44,18 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             translated=None,
             translation_degraded=False,
         )
+        searched = bool(state.get("tool_calls"))
         result, rejection = check_reply(
             state.get("agent_step") or {},
             state.get("agent_meta") or {},
             state.get("passages") or [],
             turn_type=state["turn_type"],
             language=state["language"],
-            retrieval=dict(retrieval),
+            retrieval=retrieval,
             general=is_general(state["bot"].get("answer_mode")),
             search_gate=state.get("search_gate"),
             question=state["question"],
-            searched=bool(state.get("tool_calls")),
+            searched=searched,
             organisation=organisation_of(state["bot"]),
             history=recent(state.get("history")) or (),
         )
@@ -67,9 +70,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
                 "fallback_result": json_safe(result) if result["answer"] else None,
                 "feedback": rejection.value,
                 "feedback_text": rejection_feedback(
-                    rejection,
-                    state["agent_step"],
-                    searched=bool(state.get("tool_calls")),
+                    rejection, state["agent_step"], searched=searched
                 ),
                 "revisions": revisions + 1,
             }
@@ -81,5 +82,5 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
     return agent_check
 
 
-def route_after_check(state: AgentState) -> Literal["agent", "finalize"]:
-    return "agent" if state.get("feedback") else "finalize"
+def route_after_check(state: AgentState) -> Literal["agent", "__end__"]:
+    return "agent" if state.get("feedback") else END

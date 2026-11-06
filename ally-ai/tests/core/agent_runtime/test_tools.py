@@ -1,7 +1,5 @@
 """The tool registry and search_knowledge."""
 
-from unittest.mock import AsyncMock
-
 import pytest
 
 from app.core.agent_runtime.schemas import step_schema
@@ -28,14 +26,12 @@ class TestRegistry:
             assert tool.description
             tool.input_model()  # every input field has a default
 
-    async def test_only_an_agent_bot_gets_tools(self):
-        assert allowed_tools(make_bot()) == []
-        assert allowed_tools(make_bot(features={"agent": False})) == []
-        names = [t.name for t in allowed_tools(make_bot(features={"agent": True}))]
+    async def test_every_bot_gets_every_tool(self):
+        names = [t.name for t in allowed_tools(make_bot())]
         assert names == ["search_knowledge"]
 
     async def test_the_step_schema_names_only_offered_tools(self):
-        tools = allowed_tools(make_bot(features={"agent": True}))
+        tools = allowed_tools(make_bot())
         schema = step_schema(tools).model_json_schema()
         assert actions(schema) == ["reply", "search_knowledge"]
         reply_only = step_schema([]).model_json_schema()
@@ -56,14 +52,13 @@ class TestSearchKnowledge:
     def ctx(self, chunk_service, passages, log_retrieval=False, **bot):
         return ToolContext(
             service=KnowledgeAgentService(chunk_service),
-            bot=make_bot(features={"agent": True}, **bot),
+            bot=make_bot(**bot),
             limits=LIMITS,
             passages=passages,
             log_retrieval=log_retrieval,
         )
 
-    async def test_new_passages_continue_the_numbering(self, tool):
-        chunk_service = AsyncMock()
+    async def test_new_passages_continue_the_numbering(self, tool, chunk_service):
         chunk_service.search.return_value = [
             passage(CHUNK_A, 0.7),
             passage(CHUNK_B, 0.68),
@@ -76,9 +71,7 @@ class TestSearchKnowledge:
         assert result.record["added"] == [2]
         assert result.summary == "search_knowledge: 2 hits, 1 new passages, best 0.70"
 
-    async def test_uses_the_bots_documents_and_thresholds(self, tool):
-        chunk_service = AsyncMock()
-        chunk_service.search.return_value = []
+    async def test_uses_the_bots_documents_and_thresholds(self, tool, chunk_service):
         await tool.handler(
             SearchKnowledgeInput(query="q"),
             self.ctx(chunk_service, [], document_ids=["doc-1"]),
@@ -88,8 +81,7 @@ class TestSearchKnowledge:
         assert kwargs["min_similarity"] == LIMITS["min_similarity"]
         assert kwargs["limit"] == LIMITS["top_k"]
 
-    async def test_below_the_decline_threshold_adds_nothing(self, tool):
-        chunk_service = AsyncMock()
+    async def test_below_the_decline_threshold_adds_nothing(self, tool, chunk_service):
         chunk_service.search.return_value = [passage(CHUNK_A, 0.1)]
         result = await tool.handler(
             SearchKnowledgeInput(query="q"), self.ctx(chunk_service, [])
@@ -99,16 +91,14 @@ class TestSearchKnowledge:
         assert result.gate == "below_threshold"
         assert result.retrieval["top_similarity"] == 0.1
 
-    async def test_empty_query_searches_nothing(self, tool):
-        chunk_service = AsyncMock()
+    async def test_empty_query_searches_nothing(self, tool, chunk_service):
         result = await tool.handler(
             SearchKnowledgeInput(query="  "), self.ctx(chunk_service, [])
         )
         chunk_service.search.assert_not_called()
         assert result.passages == []
 
-    async def test_reports_the_retrieval_block(self, tool):
-        chunk_service = AsyncMock()
+    async def test_reports_the_retrieval_block(self, tool, chunk_service):
         chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
         result = await tool.handler(
             SearchKnowledgeInput(query="sign in"), self.ctx(chunk_service, [])
@@ -118,8 +108,7 @@ class TestSearchKnowledge:
         assert result.retrieval["hit_count"] == 1
         assert result.retrieval["passages_used"] == 1
 
-    async def test_logs_only_when_told_to(self, tool, retrieval_log):
-        chunk_service = AsyncMock()
+    async def test_logs_only_when_told_to(self, tool, chunk_service, retrieval_log):
         chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
         await tool.handler(SearchKnowledgeInput(query="q"), self.ctx(chunk_service, []))
         retrieval_log.assert_not_called()
@@ -131,10 +120,8 @@ class TestSearchKnowledge:
         assert retrieval_log.call_args.kwargs["disposition"] == "answered"
 
     async def test_logs_a_search_that_found_nothing_as_its_decline(
-        self, tool, retrieval_log
+        self, tool, chunk_service, retrieval_log
     ):
-        chunk_service = AsyncMock()
-        chunk_service.search.return_value = []
         await tool.handler(
             SearchKnowledgeInput(query="q"),
             self.ctx(chunk_service, [], log_retrieval=True),

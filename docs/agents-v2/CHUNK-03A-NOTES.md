@@ -173,7 +173,7 @@ First design's report (since replaced by the run above): [CHUNK-03A-EVAL.md](./C
 | In scope: same documents as v1 | **100%** of 9 | ≥ 80% |
 | p50 in scope: agent / parity mode | 6,561 ms / 8,133 ms, **−19%** | ≤ +25% |
 
-**Parity with Agent mode off** (`scripts/agent_parity.py`, 22 cases, master baseline): **0 must-match failures**, 0 baseline failures, 2 "translation differs" (`lang-marathi`, `lang-hinglish`; sampling, as in chunk 1), p50 v1 6,282 ms / v2 6,109 ms (−2.8%).
+**Parity with Agent mode off** (`scripts/agent_parity.py`, 22 cases, master baseline): **0 must-match failures**, 0 baseline failures, 2 "translation differs" (`lang-marathi`, `lang-hinglish`; sampling, as in chunk 1), p50 v1 6,282 ms / v2 6,109 ms (−2.8%). <!-- docs-path-lint: ignore -->
 
 What reading the replies shows (not failures, worth knowing):
 - **It over-introduces itself.** Most small talk and some answers add "I'm Ally FAQ (not a crisis service)" and the topic list, even on "thanks" and "bye", despite the rule. Brief and safe, but repetitive. Tune the live prompt text in Manage Prompts if it bothers you; it's not a code change.

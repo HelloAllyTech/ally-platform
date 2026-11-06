@@ -21,11 +21,7 @@ import { ChatbotKnowledgeSource, ChatbotRuntime } from '../enum/chatbot.enum';
 import { ChatbotAudienceService } from '../service/chatbot-audience.service';
 import { ChatbotReplyService } from '../service/chatbot-reply.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
-import {
-  type EngineChoice,
-  isAgentEngine,
-  resolveEngine,
-} from './agent-runtime';
+import { effectiveRuntime } from './agent-runtime';
 import {
   AgentFallbackFailedError,
   AgentRuntimeRunner,
@@ -55,8 +51,8 @@ export const KNOWLEDGE_PROMPT_CODES = [
 /** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
 const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
 /**
- * The conversational agent's prompts (Agents v2, `features.agent`). Loaded only for a bot in agent
- * mode, so every other bot's request is exactly as before.
+ * The conversational agent's prompts (Agents v2). Loaded only when the agent answers, so a v1
+ * request (the emergency switch off) is exactly as before.
  */
 export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
@@ -118,7 +114,8 @@ export class ChatbotEngineService {
   async respond(turn: ChatTurn): Promise<ChatbotDecision> {
     const { chatbot, settings, sender } = turn;
     const allowed = await this.audienceService.canChat(chatbot, sender);
-    const engine = resolveEngine(settings);
+    // v2 (the conversational agent) unless the platform's emergency switch is off.
+    const useAgent = effectiveRuntime(settings) === ChatbotRuntime.V2;
 
     // ── 1. Keyword replies ───────────────────────────────────────────────
     const match = await this.replyService.match(
@@ -130,8 +127,8 @@ export class ChatbotEngineService {
       match &&
       match.bypassRag &&
       (allowed || match.template.kind !== WaTemplateKind.FAQ) &&
-      // An agent bot answers greetings, help and FAQ-style messages itself.
-      !(isAgentEngine(engine) && agentAnswersInstead(match.template, turn));
+      // The agent answers greetings, help and FAQ-style messages itself.
+      !(useAgent && agentAnswersInstead(match.template, turn));
     if (match && usable) {
       const isCrisis = match.template.kind === WaTemplateKind.CRISIS;
       // A bot with its own welcome message greets with THAT, not the generic shared greeting —
@@ -178,7 +175,7 @@ export class ChatbotEngineService {
     }
 
     // ── 3. Answer ────────────────────────────────────────────────────────
-    return this.answer(turn, engine);
+    return this.answer(turn, useAgent);
   }
 
   /**
@@ -220,11 +217,10 @@ export class ChatbotEngineService {
 
   private async answer(
     turn: ChatTurn,
-    engine: EngineChoice,
+    useAgent: boolean,
   ): Promise<ChatbotDecision> {
     const { settings } = turn;
-    const agentMode = isAgentEngine(engine);
-    const { prompts, ran } = await this.loadPromptOverrides(turn, agentMode);
+    const { prompts, ran } = await this.loadPromptOverrides(turn, useAgent);
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
 
@@ -232,8 +228,8 @@ export class ChatbotEngineService {
     // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
     // runs once and exactly as before, whichever engine answers.
     const [answerResult, crisisResult] = await Promise.allSettled([
-      engine.kind === ChatbotRuntime.V2
-        ? this.agentRuntime.answer(turn, request, agentMode, knowledge)
+      useAgent
+        ? this.agentRuntime.answer(turn, request, knowledge)
         : this.answerWithV1(request),
       settings.crisisClassifierEnabled
         ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
@@ -469,11 +465,13 @@ export class ChatbotEngineService {
    * only — translation and the crisis classifier keep the platform's choice, so a bot's model can
    * never weaken the safety check.
    *
+   * The agent's prompt is loaded (and takes the bot's model) only when the agent answers.
+   *
    * Also returns which store version of each prompt was sent, recorded on the reply.
    */
   private async loadPromptOverrides(
     turn: ChatTurn,
-    agentMode = false,
+    useAgent = false,
   ): Promise<{
     prompts: Record<string, unknown>;
     ran: PromptsRan;
@@ -482,7 +480,7 @@ export class ChatbotEngineService {
     let prompts: Record<string, unknown> = {};
     try {
       const rows = await this.promptSharedService.getPromptsByOptions({
-        promptCode: agentMode
+        promptCode: useAgent
           ? [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES]
           : KNOWLEDGE_PROMPT_CODES,
       });
@@ -518,7 +516,7 @@ export class ChatbotEngineService {
     const model = turn.chatbot.model;
     if (model?.provider && model?.model) {
       const answering = [ANSWER_PROMPT_CODE, GENERAL_ANSWER_PROMPT_CODE];
-      if (agentMode) answering.push(AGENT_SYSTEM_PROMPT_CODE);
+      if (useAgent) answering.push(AGENT_SYSTEM_PROMPT_CODE);
       for (const code of answering) {
         const current = (prompts[code] ?? {}) as Record<string, unknown>;
         const next: Record<string, unknown> = {

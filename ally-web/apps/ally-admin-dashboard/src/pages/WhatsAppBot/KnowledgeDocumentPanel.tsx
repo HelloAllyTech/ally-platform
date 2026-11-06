@@ -14,6 +14,10 @@ const t = en.whatsappBot.bots.knowledge;
 /** ally-be refuses a longer title. */
 const TITLE_MAX = 300;
 
+/** Still being trained (indexed). */
+export const isTraining = (status: string) =>
+  KB_IN_FLIGHT_STATUSES.includes(status as KbDocumentStatus);
+
 /**
  * A document's training state in words an owner knows: "Trained", not "indexed". Archived
  * documents carry their own Archived tag, so they get no status tag here.
@@ -24,8 +28,7 @@ export const DocumentStatusTag: React.FC<{ status: string; archived: boolean }> 
 }) => {
   if (archived) return null;
   if (status === KbDocumentStatus.FAILED) return <StatusPill tone="danger">{t.failed}</StatusPill>;
-  if (KB_IN_FLIGHT_STATUSES.includes(status as KbDocumentStatus))
-    return <StatusPill tone="neutral">{t.training}</StatusPill>;
+  if (isTraining(status)) return <StatusPill tone="neutral">{t.training}</StatusPill>;
   if (status === KbDocumentStatus.INDEXED)
     return <StatusPill tone="success">{t.trained}</StatusPill>;
   return null;

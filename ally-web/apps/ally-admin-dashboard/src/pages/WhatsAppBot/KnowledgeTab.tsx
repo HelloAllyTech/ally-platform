@@ -17,12 +17,11 @@ import {
   Chatbot,
   ChatbotDocumentRow,
   ChatbotKnowledgeSource,
-  KB_IN_FLIGHT_STATUSES,
   KbCorpus,
   KbDocumentStatus,
 } from "@types";
 
-import { DocumentStatusTag, KnowledgeDocumentPanel } from "./KnowledgeDocumentPanel";
+import { DocumentStatusTag, isTraining, KnowledgeDocumentPanel } from "./KnowledgeDocumentPanel";
 import { KnowledgeUploadPanel } from "./KnowledgeUploadPanel";
 import { Card, errorMessage, fill, LoadError, StatusPill, timeAgo } from "./shared";
 
@@ -31,9 +30,6 @@ const t = en.whatsappBot.bots.knowledge;
 const PICKER_LIMIT = 100;
 /** How often the list refreshes while a document is still training (being indexed). */
 const POLL_INTERVAL_MS = 4000;
-
-const isIndexing = (doc: ChatbotDocumentRow) =>
-  KB_IN_FLIGHT_STATUSES.includes(doc.status as KbDocumentStatus);
 
 /**
  * The documents a bot answers from: its own (uploaded here, private to it) and any picked from the
@@ -55,7 +51,7 @@ export const KnowledgeTab: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot
   const [uploading, setUploading] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
 
-  const indexing = docs.some(isIndexing);
+  const indexing = docs.some(doc => isTraining(doc.status));
   useEffect(() => {
     setPollInterval(indexing ? POLL_INTERVAL_MS : 0);
   }, [indexing]);

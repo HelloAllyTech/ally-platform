@@ -104,6 +104,6 @@ Follow [chunk-03d.md](./chunk-03d.md), "How Shehbaz tests it". Refresh the dashb
 ## Open items
 
 - **The crisis classifier fires too often for a clinic.** "bye" (0.2), "18 & not studying & anxiety" (0.6) and a dose question (0.7) all came back `is_crisis`, and ally-be acts on any verdict whatever the confidence. It's the safety net for every bot, so it needs Shehbaz's decision: the prompt, a confidence floor, or a per-bot setting.
-- **Shadow and v1 leftovers.** `AgentRuntimeRunner.shadowFor`, `ChatbotShadowService`, the `agent_shadow_runs` table, `chatbots.runtime` and `features.agent` stay until v1 is deleted (chunk 25).
+- **Shadow and v1 leftovers: removed.** Shadow mode (`AgentRuntimeRunner.shadowFor`, `ChatbotShadowService`, the `agent_shadow_runs` table, `AGENT_SHADOW_MAX_IN_FLIGHT`) and the per-bot `chatbots.runtime` / `features` columns are gone (migration `1980980000000`), and `/agent/run` is no longer sent `features`. v1 stays only as the emergency switch's engine (`agentRuntimeAllowed` off) and as v2's fallback.
 - **The knowledge-base console's search** (an admin tool) can still return passages from a chatbot's own documents. Only the list and the pickers leave them out.
 - **The emergency switch in production:** turn it on (Defaults → "Answer with the agent") once ally-ai there has `AGENT_RUNTIME__ENABLED=true` and the checkpoint database.
