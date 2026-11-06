@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 
-import { Menu } from "@icons";
 import { useDispatch } from "react-redux";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -12,6 +11,7 @@ import {
   useGetCharacterLibraryEnabledQuery,
 } from "@api";
 import { Sidebar, AccessDenied, ErrorBoundary } from "@components";
+import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import {
@@ -22,6 +22,7 @@ import {
   en,
   normalizeEmailForAllowlist,
 } from "@constants";
+import { Menu } from "@icons";
 import { setUser, setPermissions, setFeatures } from "@reducer";
 import { hasPermissions, hasFeature } from "@utils";
 
@@ -250,7 +251,9 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
             scroll height far past the content, producing a phantom second
             scrollbar and empty white space you can scroll into below the page. */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:hidden">
+          {/* The app-wide top bar. On a phone it carries the menu button; from md up it exists for the
+              global idea-capture mic, pinned top-right on every screen. */}
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:h-12 md:px-4">
             {/* 44px target: the only way into navigation on a phone. */}
             <button
               type="button"
@@ -259,10 +262,13 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
               aria-expanded={isMobileNavOpen}
               aria-controls="admin-nav-sidebar"
               data-testid="admin-mobile-menu-button"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 md:hidden"
             >
               <Menu size={24} aria-hidden="true" />
             </button>
+            <div className="ml-auto flex items-center">
+              <IdeaCaptureLauncher />
+            </div>
           </div>
           {/* The barrier sits inside the shell, not around it: a page that
               throws during render should cost the admin that page, not the

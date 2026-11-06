@@ -394,6 +394,8 @@ export const ApiEndpoints = {
     OWNER_BY_ID: (id: string) => `/v1/product-roadmap/opportunity-owners/${id}`,
     OWNERS_ORDER: "/v1/product-roadmap/opportunity-owners/order",
     OWNERS_USAGE: "/v1/product-roadmap/opportunity-owners/usage",
+    IDEA_DRAFTS: "/v1/product-roadmap/idea-drafts",
+    IDEA_DRAFT_BY_ID: (id: string) => `/v1/product-roadmap/idea-drafts/${id}`,
     INTERVIEW_NOTES: "/v1/product-roadmap/interview-notes",
     INTERVIEW_NOTE_BY_ID: (id: string) => `/v1/product-roadmap/interview-notes/${id}`,
     VIEWS: "/v1/product-roadmap/views",
@@ -1210,6 +1212,7 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_COMMENTS: "productRoadmapComments",
   PRODUCT_ROADMAP_VOTERS: "productRoadmapVoters",
   PRODUCT_ROADMAP_INTERVIEWS: "productRoadmapInterviews",
+  PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
   // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.

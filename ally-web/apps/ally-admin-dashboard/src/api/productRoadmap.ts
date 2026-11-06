@@ -12,6 +12,7 @@ import {
   RoadmapComment,
   RoadmapDuplicateMatch,
   RoadmapFacets,
+  RoadmapIdeaDraft,
   RoadmapInterviewMessage,
   RoadmapInterviewNote,
   RoadmapListEnvelope,
@@ -761,6 +762,44 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       ],
     }),
 
+    // ── idea drafts (private, pre-interview) ──────────────────────────────────
+    getRoadmapIdeaDrafts: builder.query<RoadmapListEnvelope<RoadmapIdeaDraft>, void>({
+      query: () => ({ url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFTS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
+    }),
+
+    createRoadmapIdeaDraft: builder.mutation<
+      RoadmapIdeaDraft,
+      { rawText: string; captureMode?: "voice" | "typed" }
+    >({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFTS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
+    }),
+
+    updateRoadmapIdeaDraft: builder.mutation<
+      RoadmapIdeaDraft,
+      { id: string; body: { rawText?: string; captureMode?: "voice" | "typed" } }
+    >({
+      query: ({ id, body }) => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFT_BY_ID(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
+    }),
+
+    deleteRoadmapIdeaDraft: builder.mutation<void, string>({
+      query: id => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFT_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
+    }),
+
     // ── interview notes ───────────────────────────────────────────────────────
     getRoadmapInterviewNotes: builder.query<
       RoadmapListEnvelope<RoadmapInterviewNote>,
@@ -985,6 +1024,10 @@ export const {
   useCreateRoadmapOwnerMutation,
   useRenameRoadmapOwnerMutation,
   useDeleteRoadmapOwnerMutation,
+  useGetRoadmapIdeaDraftsQuery,
+  useCreateRoadmapIdeaDraftMutation,
+  useUpdateRoadmapIdeaDraftMutation,
+  useDeleteRoadmapIdeaDraftMutation,
   useGetRoadmapInterviewNotesQuery,
   useCreateRoadmapInterviewNoteMutation,
   useUpdateRoadmapInterviewNoteMutation,

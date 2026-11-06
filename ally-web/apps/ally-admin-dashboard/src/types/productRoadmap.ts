@@ -654,3 +654,19 @@ export interface RoadmapReadinessChecklist {
   criteria: RoadmapReadinessCriterion[];
   fileableEfforts: RoadmapOpportunityEffort[];
 }
+
+/**
+ * A private, unpublished raw idea (spoken or typed) saved before the guided interview. Not an
+ * opportunity: no code, votes or rank, and invisible to everyone but its author. Mirrors
+ * ally-be's RoadmapIdeaDraft.
+ */
+export interface RoadmapIdeaDraft {
+  id: string;
+  rawText: string;
+  captureMode: "voice" | "typed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Longest draft the server accepts — the interview's per-message cap, since a draft seeds it. */
+export const IDEA_DRAFT_TEXT_MAX = 4000;

@@ -53,11 +53,11 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 - **Key patterns**: RTK Query for API calls, path aliases (`@api`, `@components`), permission-based routing, i18next
 
 ### [ally-mobile](../repos/ally-mobile.md) — Mobile App
-- **Stack**: React Native 0.79 / TypeScript 5 / React 19 / Redux Toolkit + RTK Query
-- **Entry**: `index.js` → `ally-mobile/src/App.tsx`; navigation via React Navigation 7 (native-stack + bottom-tabs + drawer) <!-- docs-path-lint: ignore -->
-- **Services**: RTK Query slices in `src/services/`; custom hooks in `src/hooks/`
-- **Real-time**: Socket.IO + LiveKit React Native; `react-native-live-audio-stream` for recording
-- **Key patterns**: Dual listening modes (microphone + conference), AsyncStorage for tokens, Firebase Crashlytics
+- **Stack**: Flutter / Dart 3 / Riverpod / go_router / dio
+- **Entry**: `ally-mobile/lib/main.dart`; navigation via go_router with an auth-gated redirect, a drawer plus permission-gated bottom tabs
+- **Services**: one dio client for all API access in `ally-mobile/lib/core/network/`; features in `ally-mobile/lib/features/<feature>/`
+- **Real-time**: Socket.IO (`socket_io_client`) + LiveKit (`livekit_client`); `record` for audio capture
+- **Key patterns**: Dual listening modes (microphone + conference), secure storage for tokens, Firebase Crashlytics, two build flavors (`dev`/`prod`)
 
 ### [infra](../repos/infra.md) — Infrastructure *(Standalone Repo — Outside `ally-platform`)*
 - **Repository**: `HelloAllyTech/infra` (intentionally kept **outside** the `ally-platform` monorepo as a standalone private repository to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d at the `ally-platform` root)
