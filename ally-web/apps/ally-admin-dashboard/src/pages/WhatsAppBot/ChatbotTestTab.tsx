@@ -138,6 +138,8 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
     };
     try {
       let result: TestChatbotResponse;
+      // When the reply arrived: "Worked for" measures the agent, not the typing that follows.
+      let workedMs = 0;
       try {
         result = await stream.run(request, {
           onStatus: status => {
@@ -151,6 +153,7 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
             arrived.current += piece;
           },
         });
+        workedMs = Date.now() - startedAt;
         await revealed();
       } catch (err) {
         // The stream never started: ask the plain endpoint. Once it has started, never re-send.
@@ -170,7 +173,7 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
           content: result.reply,
           result,
           replaced,
-          ...(entries.length ? { activity: entries, workedMs: Date.now() - startedAt } : {}),
+          ...(entries.length ? { activity: entries, workedMs } : {}),
         },
       ]);
     } catch (err) {
