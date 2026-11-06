@@ -172,7 +172,7 @@ def runner_tools(runner: Runner) -> list[StructuredTool]:
         _tool(
             lambda target=None, name=None: _result_text(runner.run_tests(target, name)),
             "run_tests",
-            "Run the app's tests in the sandbox: the whole suite, one file, or one test.",
+            "Run the app's tests in the sandbox: whole suite, one file, or one test.",
             RunTestsArgs,
         ),
         _tool(

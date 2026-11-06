@@ -53,7 +53,7 @@ class Workspace:
     # --- helpers ---------------------------------------------------------------------
 
     def _abs(self, path: str) -> Path:
-        """Resolve an agent-supplied path: app-relative first, worktree-relative next."""
+        """Resolve an agent path: app-relative first, then worktree-relative."""
         raw = Path(path)
         if raw.is_absolute():
             return self.policy.resolve(raw)
@@ -206,7 +206,7 @@ class Workspace:
         header = f"{self._display(file)} lines {start}-{end} of {len(lines)}"
         return scrub_code(f"{header}\n{body}")
 
-    # --- write (app-scoped) ------------------------------------------------------------
+    # --- write (app-scoped) ----
 
     def edit_file(self, path: str, old_str: str, new_str: str) -> str:
         file = self.policy.check_write(self._abs(path), self.app)
