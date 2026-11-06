@@ -120,7 +120,7 @@ Also decided at plan time:
 
 | File | What it is |
 |---|---|
-| `pages/WhatsAppBot/ChatbotEngineCard.tsx` | **Agent mode** toggle (with a tooltip), shown to platform admins while the engine is v2; saved with **Save engine**, sending only what changed. *Now on Settings → Agent (section 13).* |
+| `pages/WhatsAppBot/ChatbotEngineCard.tsx` | **Agent mode** toggle (with a tooltip), shown to platform admins while the engine is v2; saved with **Save engine**, sending only what changed. *Now on Settings → Agent (section 13).* | <!-- docs-path-lint: ignore -->
 | `pages/WhatsAppBot/ChatbotTestTab.tsx` | Steps read `summary · ms` (falling back to `node · ms`), tool steps prefixed `tool ·`; a turn-type chip next to the engine badge. |
 | `constants/en.ts`, `types/chatbots.ts` | Copy and types. |
 

@@ -49,7 +49,7 @@ Brief: [chunk-03d.md](./chunk-03d.md). Built 2026-11-06 on `feat/agents-v2-chunk
 
 | File | What changed |
 |---|---|
-| `pages/WhatsAppBot/ChatbotEngineCard.tsx` | **Deleted.** |
+| `pages/WhatsAppBot/ChatbotEngineCard.tsx` | **Deleted.** | <!-- docs-path-lint: ignore -->
 | `pages/WhatsAppBot/AgentTab.tsx` | No Engine card. Platform admins see a note when the switch is off ("…answers with the backup engine"). |
 | `pages/WhatsAppBot/ChatbotTestTab.tsx` | Badge: "Answered by the agent", "Answered by the backup engine (the agent failed: …)" or "Answered by the backup engine". |
 | `pages/WhatsAppBot/KnowledgeTab.tsx`, `KnowledgeUploadPanel.tsx` (new) | Covered in detail below. |
