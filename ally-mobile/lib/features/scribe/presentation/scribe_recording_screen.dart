@@ -15,6 +15,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
+import '../../../core/realtime/battery_optimization.dart';
 import '../../../core/realtime/connectivity.dart';
 import '../../../core/realtime/foreground_recording_service.dart';
 import '../../../core/realtime/keep_awake.dart';
@@ -369,6 +370,9 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
       notificationTitle: ref.tr('scribe.notificationTitle'),
       notificationText: ref.tr('scribe.notificationText'),
     );
+    // Fire-and-forget — see the doc comment on why this must never gate
+    // recording start.
+    unawaited(requestBatteryOptimizationExemptionOnce());
     if (!mounted) return;
     // MICROPHONE_AUDIO_SAMPLE_RATE / channels / bitsPerSample in RN's
     // constants/general.ts — the backend's audio pipeline expects this.
