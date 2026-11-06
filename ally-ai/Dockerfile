@@ -27,6 +27,12 @@ COPY pyproject.toml poetry.lock* /app/
 # Install only the production dependencies (adjust flags as needed)
 RUN poetry install --no-root --only main
 
+# The tokenizer LangChain's OpenAIEmbeddings loads on first use (tiktoken cl100k_base, 1.7 MB).
+# Fetched here, at build time: otherwise every new container downloads it into /tmp on the first
+# question it searches for, which took 4-18 s and could push that run past the agent's 20 s cap.
+ENV TIKTOKEN_CACHE_DIR=/app/.tiktoken-cache
+RUN poetry run python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
+
 # Copy the entire application code to the container
 COPY . .
 

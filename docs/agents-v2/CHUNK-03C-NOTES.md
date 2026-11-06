@@ -274,7 +274,12 @@ Not checked: WhatsApp's typing dots (no number is connected locally). Covered by
 - **Text arrives at the end of the run.** Status and steps are live within about 1 s; the reply's text appears once the run is done, revealed over up to 3 s. "Time to the first event" is 8 ms, but the time to the first word is the run's length.
 - **The local ally-be container runs out of memory** under `nest start --watch` (`Dockerfile.dev` caps Node at 4 GB). It crashed once during this chunk after a large `git pull`, and the cold compile peaks at about 4.6 GB. Raise `--max-old-space-size` locally, or watch with SWC. This is not changed here, since it affects every developer.
 - **`BaseHTTPMiddleware`** (ally-ai's two middlewares): a disconnect does cancel the run in the unit test (the generator's `finally`). Uvicorn behind the middlewares wasn't exercised with a real dropped connection. If an abandoned Preview run is ever seen finishing in the logs, convert the middlewares to pure ASGI.
-- **Cold first call:** the first v1 call after ally-ai restarts can take over 25 s (an 18 s embeddings request was seen), which turns a fallback into the error reply. This predates this chunk.
+- **Cold first call (fixed in this chunk):**
+  - **Cause:** the first question after an ally-ai container started took 4–18 s longer. LangChain's `OpenAIEmbeddings` downloads tiktoken's `cl100k_base` tokenizer (1.7 MB) into `/tmp` on first use, and every new container, every deploy included, did that on the first question it searched.
+  - **Effect:** with the 20 s cap, that first run could fall back to v1. Once, with the runtime off, it turned v1 itself into the error reply.
+  - **Fix:** both `Dockerfile` and `Dockerfile.baremetal` now fetch the tokenizer at build time into `TIKTOKEN_CACHE_DIR=/app/.tiktoken-cache`.
+  - **Checked:** on a freshly recreated container, the first searching question took 9.6 s, with no download.
+  - **Not done:** a startup warm-up call, which would also open the OpenAI connection early.
 - **The 504 under load:** two eval turns hit the 20 s cap while the machine was busy. In production, watch for `Agent stream ended with timeout` and `/agent/run` 504s; if they show up, the cap or `RUN_BUDGET_SECONDS` (15) may need tuning.
 - **Wiki:** `/agent/run/stream` and `/test/stream` belong on the ally-ai and ally-be wiki pages (same `Wiki-PR:` trailer as before).
 
