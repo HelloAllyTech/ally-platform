@@ -174,6 +174,24 @@ Labels are plain English. The dashboard maps `code` (and `detail`) to its own co
 | `pages/WhatsAppBot/ChatbotSettingsTab.tsx`, `ChatbotPage.tsx` | "Show typing on WhatsApp" in General → Basics, shown only to platform admins (`isPlatformAdmin`, passed from the page), with help text naming the read receipts |
 | `constants/en.ts`, `constants/common.ts`, `types/*` | Copy (`bots.test.status.*`, `replaced`, `orgSettings.showTyping*`), `TEST_STREAM`, `ChatbotTestStatus`, `WaOrgSettings.showTyping` |
 
+### After review: the activity feed (Shehbaz, 2026-11-06)
+
+Shehbaz watched a recording and said it didn't feel like an agent at work. Two ways to make it feel live were offered: a rich activity feed, or true streaming of the draft. **Decision: the activity feed only.** "No unchecked text" stays everywhere; streaming the draft remains a later option.
+- **ally-ai:** status events carry more.
+  - `found` names the documents its passages came from (`documents`, titles only, at most 3).
+  - `rewriting` carries why the draft went back (`detail` = the rejection code).
+  - Labels are plain English.
+- **Preview:** everyone sees one line per step, in words, with the current line animated. For example:
+  - "Searching the knowledge base for “…”"
+  - "Found 2 passages in …"
+  - "Working out the answer"
+  - "Checking the answer against the sources"
+  - "Rewriting: it answered before searching"
+
+  The raw steps stay admin-only.
+- **Reveal:** the checked reply is typed out at about 65 characters a second, at most 4 s.
+- **Finished reply:** it keeps its activity folded as "Worked for 6.1 s · 4 steps", measured to the reply's arrival, not to the end of the typing.
+
 ## 4. Decisions
 
 - **Shehbaz, at plan time:** "Show typing" defaults on; the timeouts are 20 s (ally-ai), 22 s (ally-be's stream) and 25 s (`/agent/run`); one shared runner per app, with `final` equal to the plain response.
@@ -281,6 +299,7 @@ Not checked: WhatsApp's typing dots (no number is connected locally). Covered by
   - **Checked:** on a freshly recreated container, the first searching question took 9.6 s, with no download.
   - **Not done:** a startup warm-up call, which would also open the OpenAI connection early.
 - **The 504 under load:** two eval turns hit the 20 s cap while the machine was busy. In production, watch for `Agent stream ended with timeout` and `/agent/run` 504s; if they show up, the cap or `RUN_BUDGET_SECONDS` (15) may need tuning.
+- **The crisis classifier misfires on ordinary follow-ups.** While the demo was being recorded, "and what if I miss a day?" (about streaks) was flagged as a crisis and got the crisis reply. Streaming behaved correctly: no agent text was shown. The misfire itself is the classifier problem already open in CHUNK-03D-NOTES. It needs a decision before real users: a confidence floor, a prompt change, or a per-bot setting.
 - **Wiki:** `/agent/run/stream` and `/test/stream` belong on the ally-ai and ally-be wiki pages (same `Wiki-PR:` trailer as before).
 
 ## 10. Commits, in review order
@@ -291,5 +310,9 @@ Not checked: WhatsApp's typing dots (no number is connected locally). Covered by
 c6c8bc3ec feat(agent-runtime): /agent/run/stream on one shared runner; hard run timeout
 852238543 feat(chatbot): Preview streams the agent's steps and checked reply; per-bot Show typing
 4bc860489 feat(admin-dashboard): Preview streams the agent at work; Show typing toggle
-(this commit) docs(agents-v2): chunk 03c notes and conversation evals
+bc695b7ac docs(agents-v2): chunk 03c notes and conversation evals
+1b4f58f7c build(ally-ai): bake the embeddings tokenizer into the image
+b95b0f367 feat(preview): the agent's work as a live activity feed; reply typed at reading pace
+987e77c83 fix(admin-dashboard): "Worked for" stops when the reply arrives, not after it is typed out
+(this commit) docs(agents-v2): chunk 03c notes: the activity feed and the classifier misfire
 ```
