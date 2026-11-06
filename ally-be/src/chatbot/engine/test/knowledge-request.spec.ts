@@ -1,8 +1,61 @@
 import type { KnowledgeAnswerRequest } from '../../../ai/dto/knowledge.dto';
+import { DEFAULT_WHATSAPP_SETTINGS } from '../../../whatsapp/type/whatsapp-settings.type';
+import type { Chatbot } from '../../entity/chatbot.entity';
+import type { ChatTurn } from '../chatbot-engine.types';
 import {
   buildAgentRunRequest,
+  buildKnowledgeRequest,
   MAX_DECLINE_TEXT_CHARS,
+  MAX_HISTORY_MESSAGES,
 } from '../knowledge-request';
+import { chatbotFixture } from './engine.fixtures';
+
+const turn = (over: Partial<ChatTurn> = {}): ChatTurn => ({
+  chatbot: chatbotFixture(),
+  settings: DEFAULT_WHATSAPP_SETTINGS,
+  text: 'How do I sign in?',
+  history: [],
+  sender: { externalId: '919876543210', label: '…3210' },
+  channel: { type: 'whatsapp' },
+  ...over,
+});
+
+const KNOWLEDGE = {
+  audience: { unrestricted: true },
+  document_ids: ['doc-1'],
+};
+
+describe('buildKnowledgeRequest', () => {
+  it('sends only the last MAX_HISTORY_MESSAGES of a long conversation (v1 too)', () => {
+    const history = Array.from({ length: 15 }, (_, i) => ({
+      role: i % 2 ? 'assistant' : 'user',
+      content: `message ${i}`,
+    }));
+    const body = buildKnowledgeRequest(turn({ history }), {}, KNOWLEDGE);
+    expect(MAX_HISTORY_MESSAGES).toBe(10);
+    expect(body.history).toEqual(history.slice(-10));
+  });
+
+  it('sends the persona trimmed, without its blank parts', () => {
+    const chatbot = chatbotFixture({
+      persona: { displayName: ' Ally ', systemPrompt: '   ', tone: 'warm' },
+    } as Partial<Chatbot>);
+    const body = buildKnowledgeRequest(turn({ chatbot }), {}, KNOWLEDGE);
+    expect(body.persona).toEqual({
+      display_name: 'Ally',
+      system_prompt: undefined,
+      tone: 'warm',
+    });
+  });
+
+  it('sends no persona at all when every part is blank', () => {
+    const chatbot = chatbotFixture({
+      persona: { displayName: ' ' },
+    } as Partial<Chatbot>);
+    const body = buildKnowledgeRequest(turn({ chatbot }), {}, KNOWLEDGE);
+    expect(body.persona).toBeUndefined();
+  });
+});
 
 const REQUEST: KnowledgeAnswerRequest = {
   question: 'How do I sign in?',
@@ -13,6 +66,25 @@ const REQUEST: KnowledgeAnswerRequest = {
 const RUN = { conversationId: 'conv-1', runId: 'run-1', chatbotId: 'bot-1' };
 
 describe('buildAgentRunRequest', () => {
+  it('leaves the agent fields out, rather than null, when they are not given', () => {
+    const body = buildAgentRunRequest(REQUEST, RUN);
+    expect(body).toEqual({
+      ...REQUEST,
+      conversation_id: 'conv-1',
+      run_id: 'run-1',
+      chatbot_id: 'bot-1',
+      runtime_version: 'v2',
+    });
+    for (const field of [
+      'log_retrieval',
+      'features',
+      'knowledge_topics',
+      'decline_text',
+    ]) {
+      expect(body).not.toHaveProperty(field);
+    }
+  });
+
   it('sends a decline wording within the limit as it is', () => {
     const body = buildAgentRunRequest(REQUEST, {
       ...RUN,
