@@ -1,3 +1,4 @@
+import type { AgentRunResponse } from '../../../ai/dto/knowledge.dto';
 import { AiUpstreamError } from '../../../ai/exception/ai-upstream.exception';
 import { ErrorCode } from '../../../exception/error-code.enum';
 import { WaHandledBy } from '../../../whatsapp/enum/whatsapp.enum';
@@ -6,55 +7,30 @@ import type { WhatsAppBotSettings } from '../../../whatsapp/type/whatsapp-settin
 import { Chatbot } from '../../entity/chatbot.entity';
 import {
   AgentRuntimeUsed,
-  ChatbotAccessMode,
-  ChatbotAnswerMode,
   ChatbotKnowledgeSource,
   ChatbotRuntime,
-  ChatbotStatus,
 } from '../../enum/chatbot.enum';
 import { agentRunIdFor } from '../agent-runtime';
 import { ChatbotEngineService } from '../chatbot-engine.service';
-import { AgentRuntimeRunner } from '../agent-runtime-runner.service';
 import type { ChatTurn } from '../chatbot-engine.types';
+import {
+  ANSWER,
+  chatbotFixture,
+  type EngineAiService,
+  engineAiService,
+  makeEngine,
+} from './engine.fixtures';
 
 const bot = (over: Partial<Chatbot> = {}): Chatbot =>
-  ({
-    id: 'bot-1',
-    name: 'Bot',
-    status: ChatbotStatus.LIVE,
-    accessMode: ChatbotAccessMode.ANYONE,
-    answerMode: ChatbotAnswerMode.DOCUMENTS_ONLY,
-    knowledgeSource: ChatbotKnowledgeSource.SELECTED,
+  chatbotFixture({
     persona: {
       displayName: ' Ally ',
       systemPrompt: 'Be brief.',
       tone: 'warm',
     },
     model: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-    settings: {},
     ...over,
-  }) as Chatbot;
-
-const ANSWER = {
-  intent: 'answer',
-  answer: 'Ally trains counsellors.',
-  language: 'en',
-  confidence: 0.8,
-  citations: [
-    {
-      passage_number: 1,
-      chunk_id: 'chunk-1',
-      document_id: 'doc-1',
-      document_title: 'Ally FAQ',
-      similarity: 0.71,
-    },
-  ],
-  decline_reason: 'none',
-  retrieval: { hit_count: 3, top_similarity: 0.71, passages_used: 1 },
-  provider: 'anthropic',
-  model: 'claude-sonnet-4-6',
-  prompt_version: 'v1',
-};
+  });
 
 const TRACE = [
   { node: 'resolve_limits', ms: 0, summary: 'top_k=8' },
@@ -73,7 +49,7 @@ const AGENT_ANSWER = {
   run_id: 'run-from-ally-ai',
   runtime: 'v2',
   trace: TRACE,
-};
+} satisfies AgentRunResponse;
 
 const upstream = (status: number, code: ErrorCode) =>
   new AiUpstreamError(
@@ -91,12 +67,7 @@ const upstream = (status: number, code: ErrorCode) =>
  */
 describe('ChatbotEngineService', () => {
   let engine: ChatbotEngineService;
-  let aiService: {
-    answerKnowledgeQuestion: jest.Mock;
-    answerKnowledgeQuestionWithin: jest.Mock;
-    checkWhatsAppCrisis: jest.Mock;
-    runAgent: jest.Mock;
-  };
+  let aiService: EngineAiService;
   let promptShared: { getPromptsByOptions: jest.Mock };
   let settings: WhatsAppBotSettings;
 
@@ -116,14 +87,7 @@ describe('ChatbotEngineService', () => {
       ...DEFAULT_WHATSAPP_SETTINGS,
       retrieval: { ...DEFAULT_WHATSAPP_SETTINGS.retrieval },
     };
-    aiService = {
-      answerKnowledgeQuestion: jest.fn().mockResolvedValue(ANSWER),
-      answerKnowledgeQuestionWithin: jest.fn().mockResolvedValue(ANSWER),
-      runAgent: jest.fn().mockResolvedValue(AGENT_ANSWER),
-      checkWhatsAppCrisis: jest
-        .fn()
-        .mockResolvedValue({ is_crisis: false, confidence: 0, signal: '' }),
-    };
+    aiService = engineAiService(ANSWER, AGENT_ANSWER);
     promptShared = {
       getPromptsByOptions: jest.fn().mockResolvedValue([
         {
@@ -137,18 +101,7 @@ describe('ChatbotEngineService', () => {
         },
       ]),
     };
-    const documents = {
-      find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
-    } as never;
-    engine = new ChatbotEngineService(
-      documents,
-      { match: jest.fn().mockResolvedValue(null) } as never,
-      { renderPlaceholders: (text: string) => text } as never,
-      { canChat: jest.fn().mockResolvedValue(true) } as never,
-      aiService as never,
-      promptShared as never,
-      new AgentRuntimeRunner(documents, aiService as never),
-    );
+    engine = makeEngine({ aiService, promptShared });
   });
 
   describe('the v1 request body (snapshot)', () => {

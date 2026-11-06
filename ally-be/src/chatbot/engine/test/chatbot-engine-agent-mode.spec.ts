@@ -1,3 +1,4 @@
+import type { AgentRunResponse } from '../../../ai/dto/knowledge.dto';
 import { WaKeywordTemplate } from '../../../whatsapp/entity/wa-keyword-template.entity';
 import {
   WaHandledBy,
@@ -9,11 +10,8 @@ import { DEFAULT_WHATSAPP_SETTINGS } from '../../../whatsapp/type/whatsapp-setti
 import type { WhatsAppBotSettings } from '../../../whatsapp/type/whatsapp-settings.type';
 import { Chatbot } from '../../entity/chatbot.entity';
 import {
-  ChatbotAccessMode,
-  ChatbotAnswerMode,
   ChatbotKnowledgeSource,
   ChatbotRuntime,
-  ChatbotStatus,
 } from '../../enum/chatbot.enum';
 import { ChatbotReplyService } from '../../service/chatbot-reply.service';
 import { withFirstMessageParts } from '../first-reply';
@@ -22,8 +20,14 @@ import {
   ChatbotEngineService,
   KNOWLEDGE_PROMPT_CODES,
 } from '../chatbot-engine.service';
-import { AgentRuntimeRunner } from '../agent-runtime-runner.service';
 import type { ChatTurn } from '../chatbot-engine.types';
+import {
+  chatbotFixture,
+  type EngineAiService,
+  engineAiService,
+  makeEngine,
+  retrievalFixture,
+} from './engine.fixtures';
 
 const row = (over: Partial<WaKeywordTemplate>): WaKeywordTemplate =>
   ({
@@ -101,20 +105,14 @@ const TEMPLATES = [
 ];
 
 const bot = (over: Partial<Chatbot> = {}): Chatbot =>
-  ({
-    id: 'bot-1',
+  chatbotFixture({
     name: 'Ally FAQ',
-    status: ChatbotStatus.LIVE,
-    accessMode: ChatbotAccessMode.ANYONE,
-    answerMode: ChatbotAnswerMode.DOCUMENTS_ONLY,
-    knowledgeSource: ChatbotKnowledgeSource.SELECTED,
     persona: { displayName: 'Ally Helper' },
     model: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-    settings: {},
     runtime: ChatbotRuntime.V2,
     features: { agent: true },
     ...over,
-  }) as Chatbot;
+  });
 
 const SMALLTALK = {
   intent: 'answer',
@@ -123,7 +121,11 @@ const SMALLTALK = {
   confidence: 0,
   citations: [],
   decline_reason: 'none',
-  retrieval: { hit_count: 0, top_similarity: 0, passages_used: 0 },
+  retrieval: retrievalFixture({
+    hit_count: 0,
+    top_similarity: 0,
+    passages_used: 0,
+  }),
   provider: 'openai',
   model: 'gpt-5-mini',
   prompt_version: 'v1',
@@ -137,7 +139,7 @@ const SMALLTALK = {
       summary: 'agent: smalltalk, smalltalk via gpt-5-mini',
     },
   ],
-};
+} satisfies AgentRunResponse;
 
 /**
  * A bot in Agent mode (Agents v2, `features.agent`): which keyword replies give way to the agent,
@@ -145,12 +147,7 @@ const SMALLTALK = {
  */
 describe('ChatbotEngineService in Agent mode', () => {
   let engine: ChatbotEngineService;
-  let aiService: {
-    answerKnowledgeQuestion: jest.Mock;
-    answerKnowledgeQuestionWithin: jest.Mock;
-    checkWhatsAppCrisis: jest.Mock;
-    runAgent: jest.Mock;
-  };
+  let aiService: EngineAiService;
   let promptShared: { getPromptsByOptions: jest.Mock };
   let titles: jest.Mock;
   let settings: WhatsAppBotSettings;
@@ -175,14 +172,7 @@ describe('ChatbotEngineService in Agent mode', () => {
       agentRuntimeAllowed: true,
       retrieval: { ...DEFAULT_WHATSAPP_SETTINGS.retrieval },
     };
-    aiService = {
-      answerKnowledgeQuestion: jest.fn().mockResolvedValue(SMALLTALK),
-      answerKnowledgeQuestionWithin: jest.fn().mockResolvedValue(SMALLTALK),
-      runAgent: jest.fn().mockResolvedValue(SMALLTALK),
-      checkWhatsAppCrisis: jest
-        .fn()
-        .mockResolvedValue({ is_crisis: false, confidence: 0, signal: '' }),
-    };
+    aiService = engineAiService(SMALLTALK, SMALLTALK);
     const storeRows = [
       {
         promptCode: 'ally_ai_agent_system',
@@ -206,21 +196,17 @@ describe('ChatbotEngineService in Agent mode', () => {
         { title: 'Ally FAQ – About Ally' },
         { title: 'Ally FAQ – Privacy and Data' },
       ]);
-    const documents = {
-      find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
-      manager: { query: titles },
-    } as never;
-    engine = new ChatbotEngineService(
-      documents,
-      new ChatbotReplyService({
+    engine = makeEngine({
+      aiService,
+      promptShared,
+      replyService: new ChatbotReplyService({
         find: jest.fn().mockResolvedValue(TEMPLATES),
       } as never),
-      { renderPlaceholders: (text: string) => text } as never,
-      { canChat: jest.fn().mockResolvedValue(true) } as never,
-      aiService as never,
-      promptShared as never,
-      new AgentRuntimeRunner(documents, aiService as never),
-    );
+      documents: {
+        find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
+        manager: { query: titles },
+      },
+    });
   });
 
   describe('keyword replies', () => {
