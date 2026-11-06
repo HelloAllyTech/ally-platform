@@ -43,7 +43,7 @@ There is **no tool-calling path**. It owns usage emission (`_emit_usage`), the p
 **Prompts and `make sync-prompts`.**
 - `ally-ai/Makefile` → `scripts/sync_prompts.py` scans `app/prompts/<folder>/<name>.txt`. The code becomes `ally_ai_<folder>_<name>`, the metadata comes from `app/prompts/contracts.py` (`PromptInputs` subclasses), and it POSTs to ally-be `/api/v1/prompts/sync`.
 - ally-be sends ally-ai only the codes in `KNOWLEDGE_PROMPT_CODES` (`chatbot-engine.service.ts:54-59`, loaded by `loadPromptOverrides` :597-652). The bot's model is merged into the answer and general codes only.
-- So `agent/contextualize.txt` → `ally_ai_agent_contextualize` and `agent/system.txt` → `ally_ai_agent_system`, which matches the brief's names.
+- So `agent/contextualize.txt` → `ally_ai_agent_contextualize` and `agent/system.txt` → `ally_ai_agent_system`, which matches the brief's names. <!-- docs-path-lint: ignore -->
 
 **Judge pattern.** It exists: `app/core/{filler,rag,debrief}_quality/judge.py`. Each calls `generate_structured(..., never_fallback=True)` with a pinned `settings.<X>_JUDGE.MODEL` and a `PROMPT_VERSION`. The eval reuses that call pattern with a rubric local to the script (eval-only, not a Skills Store prompt).
 
@@ -302,7 +302,7 @@ Chunks 1 and 2 are listed in `CHUNK-02-NOTES.md` §7. One PR for all three, as d
 2. The agent design itself was a fixed pipeline: a classifier call, an up-front search for every question, and a refused draft replaced by the bot's fixed decline wording. So "not found" read the same every time.
 
 **What changed** (Shehbaz: "RAG should just be one tool… the rules & defaults should be in the agent prompt… respond like a real person… not the same response again and again"):
-- **The agent step is the first step.** It reads the conversation, sets `turn_type`, and calls `search_knowledge` with its own English query when it needs a fact. Small talk and "who are you?" take one model call, no search. Removed: the contextualise call, `agent/contextualize.txt` (`ally_ai_agent_contextualize`), `LLMTask.WHATSAPP_AGENT_CONTEXTUALIZE` in both repos, its AI task registry row, and the prefetch node.
+- **The agent step is the first step.** It reads the conversation, sets `turn_type`, and calls `search_knowledge` with its own English query when it needs a fact. Small talk and "who are you?" take one model call, no search. Removed: the contextualise call, `agent/contextualize.txt` (`ally_ai_agent_contextualize`), `LLMTask.WHATSAPP_AGENT_CONTEXTUALIZE` in both repos, its AI task registry row, and the prefetch node. <!-- docs-path-lint: ignore -->
 - **The run's first search** sets the `retrieval` block and `hit_chunk_ids`, and is logged to the retrieval log once (as the parity path's search is). Its gate verdict (`no_hits` / `below_threshold`) is the decline reason when nothing was found.
 - **A refused draft is rewritten once.** `check_reply` returns a rejection reason; the agent gets one more step with plain feedback (never the refused text): why it was refused, which kinds of detail had no source ("a link", "a number"), and "you haven't searched yet: search before you reply" when it hadn't. Only a second refusal sends no text (ally-be then sends `declineText`).
 - **An uncited `answer` to a small-talk or about-the-bot turn**, with nothing searched and no link, number, price or email, is treated as small talk (the same text labelled `smalltalk` would pass; refusing it only swapped in the fixed wording).

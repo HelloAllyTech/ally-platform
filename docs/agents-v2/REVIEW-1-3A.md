@@ -295,7 +295,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 
 **37. The events don't follow the repo's event convention** (6 ally-be)
 - **What's wrong:** the repo keeps events in `src/<domain>/type/*.event.ts` (for example `notification/type/email-send-failed.event.ts`). `agent-runtime.ts:16-32` mixes the two event constants and payloads with run ids, runtime selection and an error class.
-- **Proposed change:** move them to `chatbot/type/agent-runtime.events.ts`. Renaming the strings to dotted names is later (74).
+- **Proposed change:** move them to `chatbot/type/agent-runtime.event.ts`. Renaming the strings to dotted names is later (74).
 - **Ratings:** value low · effort S · risk low · **should**
 
 **38. The agent's post-send emits sit inline in a 288-line `handle()`**
@@ -320,7 +320,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 
 **41. About 200 lines of TestingModule setup are copied between the inbound agent specs** (8 Tests)
 - **Where:** `whatsapp-inbound-agent-first-message.spec.ts:93-316` and `whatsapp-inbound-agent-runtime.spec.ts:102-316` differ by only 38 lines.
-- **Proposed change:** a `whatsapp/service/test/whatsapp-inbound.fixtures.ts` with `buildInboundHarness(...)`. This follows the repo's existing `*.fixtures.ts` pattern (`content-access.fixtures.ts`, `course-copilot-test.fixtures.ts`). Assertions stay untouched.
+- **Proposed change:** a `whatsapp/service/test/whatsapp-inbound-agent.fixtures.ts` with `buildInboundHarness(...)`. This follows the repo's existing `*.fixtures.ts` pattern (`content-access.fixtures.ts`, `course-copilot-test.fixtures.ts`). Assertions stay untouched.
 - **Ratings:** value high · effort M · risk low · **should**
 
 **42. 115 near-identical setup lines in the two chatbot service specs**
