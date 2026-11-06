@@ -59,8 +59,6 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     "retrieval": json_safe(result.retrieval),
                     "hits": json_safe(result.hits),
                     "search_gate": result.gate,
-                    "search_text": result.record.get("query"),
-                    "translated_query": result.record.get("query"),
                 }
 
         ms = int((time.monotonic() - started) * 1000)
@@ -68,7 +66,6 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             **update,
             "tool_calls": records,
             "passages": passages + added,
-            "tool_passages": (state.get("tool_passages") or 0) + len(added),
             "trace": [{"node": "tool", "ms": ms, "summary": summary}],
         }
 

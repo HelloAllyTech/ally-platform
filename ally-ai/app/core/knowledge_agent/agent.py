@@ -559,8 +559,8 @@ class KnowledgeAgentService:
     ) -> None:
         """Report a search the gate refused to the retrieval log.
 
-        The conversational agent's up-front search calls this without declining:
-        the run goes on to the agent, but the search is logged the same way.
+        The conversational agent's first `search_knowledge` call uses this without
+        declining: the run goes on to the agent, but the search is logged the same way.
         """
         self._report_retrieval(
             query=search_text,

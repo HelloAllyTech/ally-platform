@@ -1,7 +1,8 @@
-"""Agents v2 runtime: the knowledge pipeline as a LangGraph graph.
+"""Agents v2 runtime: one LangGraph graph for every bot, served at `/agent/run`.
 
-Chunk 1 is parity only. The graph runs the same KnowledgeAgentService steps as
-`/knowledge-agent/answer`, one node per step, and checkpoints every run under the
-conversation id so the run can be read back later ("Why?", approvals). Nothing new
-is decided here yet; flags switch new nodes on in later chunks.
+With `features.agent` off the graph runs the same KnowledgeAgentService steps as
+`/knowledge-agent/answer`, one node per step (parity mode). With it on, the
+conversational agent decides when to search, and its reply is checked before it is
+sent. Every run is checkpointed under the conversation id so it can be read back
+later ("Why?", approvals).
 """

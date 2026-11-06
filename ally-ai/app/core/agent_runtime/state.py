@@ -36,7 +36,8 @@ class AgentState(TypedDict, total=False):
     # question and history.
     bot: Dict[str, Any]
 
-    # --- working
+    # --- working (the parity path; the agent path uses limits, language, hits,
+    # retrieval and passages of these)
     limits: Dict[str, Any]
     search_text: str
     language: str
@@ -59,7 +60,6 @@ class AgentState(TypedDict, total=False):
     agent_meta: Optional[Dict[str, Any]]
     agent_calls: int
     tool_calls: List[Dict[str, Any]]  # one record per tool call (tools/base.py)
-    tool_passages: int  # passages added by tools
     # Why check sent the last draft back (None: not sent back), and how many
     # times it has; see nodes/agent_check.py.
     feedback: Optional[str]
@@ -96,7 +96,6 @@ RUN_SCOPED_KEYS = (
     "agent_meta",
     "agent_calls",
     "tool_calls",
-    "tool_passages",
     "feedback",
     "feedback_text",
     "revisions",

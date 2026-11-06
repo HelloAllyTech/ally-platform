@@ -39,7 +39,7 @@ _REPLY_FIELDS: Dict[str, Any] = {
     # Set on every step, so the last one says what the latest message was.
     "turn_type": (TurnType, "question"),
     "intent": (AgentIntent, AgentIntent.DECLINE),
-    # The reply text. Plain text: WhatsApp renders only *bold* and _italic_.
+    # The reply text, plain: any markdown is stripped by check.plain_text.
     "answer": (str, ""),
     # 1-based passage numbers, as presented in the prompt. Numbers, not ids: an
     # out-of-range integer can be detected and dropped, a made-up id cannot.

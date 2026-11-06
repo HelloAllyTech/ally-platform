@@ -64,9 +64,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 "limits": service.resolve_limits(**bot.get("limits", {})),
                 "passages": [],
                 "tool_calls": [],
-                "tool_passages": 0,
                 "revisions": 0,
-                "translation_degraded": False,
                 "started_at": time.time(),
             }
         budget = tool_budget(state)

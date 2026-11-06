@@ -122,7 +122,7 @@ class KnowledgeAgentSettings(BaseModel):
 
 
 class AgentRuntimeSettings(BaseModel):
-    """Agents v2 runtime: the knowledge pipeline as a LangGraph graph (`/agent/run`).
+    """Agents v2 runtime: the LangGraph agent graph behind `/agent/run`.
 
     Dark until ENABLED: the route answers 404 and nothing is opened at startup, so
     deploying the code changes nothing until it is switched on.
