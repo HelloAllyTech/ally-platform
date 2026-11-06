@@ -58,7 +58,7 @@ const RANK: Record<ChatbotMemberRole, number> = {
   [ChatbotMemberRole.OWNER]: 3,
 };
 
-export const canDo = (bot: Pick<Chatbot, "myRole">, role: ChatbotMemberRole) =>
+const canDo = (bot: Pick<Chatbot, "myRole">, role: ChatbotMemberRole) =>
   RANK[bot.myRole] >= RANK[role];
 
 /**

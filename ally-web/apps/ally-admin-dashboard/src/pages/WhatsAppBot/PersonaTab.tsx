@@ -9,14 +9,7 @@ import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { Chatbot, ChatbotPersona } from "@types";
 
-import {
-  handOverToPreview,
-  PreviewDraft,
-  readStoredDraft,
-  savedDraftOf,
-  settlePreviewDraft,
-  useTabDraft,
-} from "./previewDraft";
+import { handOverPart, PreviewDraft, settlePreviewDraft, useTabDraft } from "./previewDraft";
 import { Card, errorMessage, fill, missingPersonaFields } from "./shared";
 import { useReportUnsaved } from "./unsavedChanges";
 
@@ -71,7 +64,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
   };
 
   const tryIt = () => {
-    handOverToPreview(bot, { ...(readStoredDraft(bot.id) ?? savedDraftOf(bot)), ...draft });
+    handOverPart(bot, draft);
     onTest();
   };
 

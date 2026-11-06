@@ -248,7 +248,7 @@ const MessageBubble: React.FC<{
                 </p>
               )}
               {meta.unsupported && (
-                <p className="text-amber-700">{en.whatsappBot.testConsole.unsupportedWarning}</p>
+                <p className="text-amber-700">{en.whatsappBot.conversations.unsupportedWarning}</p>
               )}
             </div>
           )}

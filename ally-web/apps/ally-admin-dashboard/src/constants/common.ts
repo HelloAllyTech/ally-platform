@@ -778,7 +778,6 @@ export const ApiEndpoints = {
   },
   CHATBOTS: {
     LIST: "/v1/chatbots",
-    SECTIONS: "/v1/chatbots/sections",
     BY_ID: (id: string) => `/v1/chatbots/${id}`,
     STATUS: (id: string) => `/v1/chatbots/${id}/status`,
     ARCHIVE: (id: string) => `/v1/chatbots/${id}/archive`,
@@ -792,10 +791,7 @@ export const ApiEndpoints = {
     AUDIENCE: (id: string) => `/v1/chatbots/${id}/audience`,
     AUDIENCE_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/audience/${entryId}`,
     TEST: (id: string) => `/v1/chatbots/${id}/test`,
-    CONNECTORS: "/v1/connectors",
-    CONNECTOR_TYPES: "/v1/connectors/types",
     CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
-    CONNECTOR_BY_ID: (id: string) => `/v1/connectors/${id}`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
@@ -824,11 +820,6 @@ export const ApiEndpoints = {
     TEMPLATES_TEST: "/v1/whatsapp/templates/test",
     TEMPLATE_CUSTOMISE: (id: string) => `/v1/whatsapp/templates/${id}/customise`,
     SETTINGS: "/v1/whatsapp/settings",
-    PROVIDER_HEALTH: "/v1/whatsapp/settings/provider-health",
-    PROVIDER_CHECK: "/v1/whatsapp/settings/provider-check",
-    PROVIDER_REGISTER: "/v1/whatsapp/settings/provider-register",
-    PROVIDER_SUBSCRIBE: "/v1/whatsapp/settings/provider-subscribe",
-    PREVIEW_ASK: "/v1/whatsapp/preview/ask",
     // Organisations' own numbers
     NUMBERS: "/v1/whatsapp/numbers",
     NUMBERS_MANUAL: "/v1/whatsapp/numbers/manual",

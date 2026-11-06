@@ -64,7 +64,7 @@ const ChannelStatus: React.FC<{ number: WaBusinessNumber }> = ({ number }) => {
  * and what you can do with it. A number whose setup stopped half-way offers "Finish setup", which
  * opens the remaining step in place.
  */
-export const ChannelRow: React.FC<{
+const ChannelRow: React.FC<{
   number: WaBusinessNumber;
   canManage: boolean;
   /** Extra controls on the right — the chatbot picker, or "Remove from chatbot". */

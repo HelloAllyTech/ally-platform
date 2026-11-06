@@ -24,6 +24,8 @@ export interface PreviewDraft {
 
 const storageKey = (botId: string) => `chatbot-draft:${botId}`;
 
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
 const store = (botId: string, draft: PreviewDraft): void => {
   try {
     sessionStorage.setItem(storageKey(botId), JSON.stringify(draft));
@@ -42,7 +44,7 @@ export const clearPreviewDraft = (botId: string): void => {
 };
 
 /** The bot as saved, in the draft's shape. */
-export const savedDraftOf = (bot: Chatbot): PreviewDraft => ({
+const savedDraftOf = (bot: Chatbot): PreviewDraft => ({
   name: bot.name,
   description: bot.description ?? "",
   persona: { ...bot.persona },
@@ -54,8 +56,8 @@ export const savedDraftOf = (bot: Chatbot): PreviewDraft => ({
  * Leave the draft for Preview in session storage — or nothing, when it is just the saved bot. If
  * storage is refused, Preview tests the saved bot.
  */
-export const handOverToPreview = (bot: Chatbot, draft: PreviewDraft): void => {
-  if (JSON.stringify(draft) === JSON.stringify(savedDraftOf(bot))) {
+const handOverToPreview = (bot: Chatbot, draft: PreviewDraft): void => {
+  if (same(draft, savedDraftOf(bot))) {
     clearPreviewDraft(bot.id);
     return;
   }
@@ -63,7 +65,7 @@ export const handOverToPreview = (bot: Chatbot, draft: PreviewDraft): void => {
 };
 
 /** The whole draft left for this bot, if there is one. */
-export const readStoredDraft = (botId: string): PreviewDraft | undefined => {
+const readStoredDraft = (botId: string): PreviewDraft | undefined => {
   try {
     const raw = sessionStorage.getItem(storageKey(botId));
     return raw ? (JSON.parse(raw) as PreviewDraft) : undefined;
@@ -71,6 +73,10 @@ export const readStoredDraft = (botId: string): PreviewDraft | undefined => {
     return undefined;
   }
 };
+
+/** Hand one tab's unsaved part to Preview, with the rest of any stored draft, else as saved. */
+export const handOverPart = (bot: Chatbot, part: Partial<PreviewDraft>): void =>
+  handOverToPreview(bot, { ...(readStoredDraft(bot.id) ?? savedDraftOf(bot)), ...part });
 
 /**
  * After one tab saves its part: the stored draft takes the saved values for that part, and is
@@ -80,7 +86,7 @@ export const settlePreviewDraft = (bot: Chatbot, saved: Partial<PreviewDraft>): 
   const stored = readStoredDraft(bot.id);
   if (!stored) return;
   const next = { ...stored, ...saved };
-  if (JSON.stringify(next) === JSON.stringify({ ...savedDraftOf(bot), ...saved })) {
+  if (same(next, { ...savedDraftOf(bot), ...saved })) {
     clearPreviewDraft(bot.id);
   } else {
     store(bot.id, next);
@@ -94,8 +100,6 @@ export const readPreviewDraft = (botId: string): ChatbotDraft | undefined => {
     ? { persona: draft.persona, answerMode: draft.answerMode, model: draft.model }
     : undefined;
 };
-
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * One tab's part of the draft: it starts from the stored draft when there is one (edits handed to

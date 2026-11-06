@@ -5,7 +5,7 @@ import { useGetChatbotsQuery, useTestChatbotMutation } from "@api";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { AgentTraceStep, Chatbot, TestChatbotResponse } from "@types";
+import { AgentTraceStep, Chatbot, ChatbotRuntimeUsed, TestChatbotResponse } from "@types";
 
 import { readPreviewDraft } from "./previewDraft";
 import { Card, copyToClipboard, errorMessage, fill } from "./shared";
@@ -35,7 +35,7 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [runtimeAllowed, setRuntimeAllowed] = useState(true);
   // Only platform admins see which engine answered and the run behind it, and are told when the
-  // emergency switch in Defaults has every chatbot in safe mode.
+  // emergency switch in Defaults has every chatbot on the backup engine.
   const { data: list } = useGetChatbotsQuery();
   const isPlatformAdmin = Boolean(list?.canCreate);
   const [test, { isLoading }] = useTestChatbotMutation();
@@ -65,7 +65,7 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
         conversationId,
       }).unwrap();
       setConversationId(result.conversationId);
-      setRuntimeAllowed(result.runtimeAllowed !== false);
+      setRuntimeAllowed(result.runtimeAllowed);
       setTurns(current => [...current, { role: "assistant", content: result.reply, result }]);
     } catch (err) {
       setTurns(current => [
@@ -220,23 +220,24 @@ const stepLine = (step: AgentTraceStep): string => {
   return `${step.node === "tool" ? `${t.toolStep} · ` : ""}${what} · ${step.ms} ms`;
 };
 
-/** Who answered this test: the agent, or safe mode (and why, when the agent failed). */
+const ENGINE_TONE: Record<ChatbotRuntimeUsed, string> = {
+  v2: "border-primary-300 text-primary-700",
+  v2_fallback: "border-warning-300 text-warning-700",
+  v1: "border-border-light text-typography-600",
+};
+
+/** Who answered this test: the agent, or the backup engine (and why, when the agent failed). */
 const EngineBadge: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
-  const runtime = result.runtime ?? "v1";
-  const label =
-    runtime === "v2"
-      ? t.answeredByAgent
-      : runtime === "v2_fallback"
-        ? fill(t.fellBack, { reason: result.fallbackReason ?? "unknown" })
-        : t.answeredByBackup;
-  const tone =
-    runtime === "v2"
-      ? "border-primary-300 text-primary-700"
-      : runtime === "v2_fallback"
-        ? "border-warning-300 text-warning-700"
-        : "border-border-light text-typography-600";
+  const label = {
+    v2: t.answeredByAgent,
+    v2_fallback: fill(t.fellBack, { reason: result.fallbackReason ?? "unknown" }),
+    v1: t.answeredByBackup,
+  }[result.runtime];
   return (
-    <span data-testid="engine-badge" className={`rounded-full border px-2 ${tone}`}>
+    <span
+      data-testid="engine-badge"
+      className={`rounded-full border px-2 ${ENGINE_TONE[result.runtime]}`}
+    >
       {label}
     </span>
   );

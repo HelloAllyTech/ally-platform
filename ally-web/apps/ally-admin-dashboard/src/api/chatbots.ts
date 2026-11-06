@@ -11,7 +11,6 @@ import {
   ChatbotSettingsView,
   ChatbotStatus,
   Connector,
-  ConnectorType,
   CreateChatbotRequest,
   CreateChatbotUploadUrlRequest,
   CreateKbUploadUrlResponse,
@@ -225,36 +224,12 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, { id }) => botTags(id),
     }),
 
-    getConnectorTypes: builder.query<ConnectorType[], void>({
-      query: () => ({ url: ApiEndpoints.CHATBOTS.CONNECTOR_TYPES, method: HttpMethod.GET }),
-    }),
-
-    /** One bot's connectors, or (platform admins) every connector including free ones. */
-    getConnectors: builder.query<Connector[], { chatbotId?: string } | void>({
-      query: params => ({
-        url: ApiEndpoints.CHATBOTS.CONNECTORS,
-        method: HttpMethod.GET,
-        params: params && params.chatbotId ? { chatbotId: params.chatbotId } : undefined,
-      }),
-      providesTags: [TAG_TYPES.CONNECTORS],
-    }),
-
     bindConnector: builder.mutation<Connector, { id: string; chatbotId: string | null }>({
       query: ({ id, chatbotId }) => ({
         url: ApiEndpoints.CHATBOTS.CONNECTOR_BIND(id),
         method: HttpMethod.PATCH,
         body: { chatbotId },
       }),
-      invalidatesTags: [
-        TAG_TYPES.CONNECTORS,
-        TAG_TYPES.CHATBOTS,
-        TAG_TYPES.CHATBOT_DETAIL,
-        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
-      ],
-    }),
-
-    disconnectConnector: builder.mutation<void, string>({
-      query: id => ({ url: ApiEndpoints.CHATBOTS.CONNECTOR_BY_ID(id), method: HttpMethod.DELETE }),
       invalidatesTags: [
         TAG_TYPES.CONNECTORS,
         TAG_TYPES.CHATBOTS,
@@ -287,8 +262,5 @@ export const {
   useAddChatbotAudienceMutation,
   useRemoveChatbotAudienceMutation,
   useTestChatbotMutation,
-  useGetConnectorTypesQuery,
-  useGetConnectorsQuery,
   useBindConnectorMutation,
-  useDisconnectConnectorMutation,
 } = chatbotsApi;

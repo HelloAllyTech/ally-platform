@@ -20,7 +20,7 @@ import {
 } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { WaTemplate, WaTemplateKind, WaTemplateMatchType, WaTemplateState } from "@types";
+import { WaTemplate, WaTemplateKind, WaTemplateState } from "@types";
 
 import { useChatbotId } from "./chatbotContext";
 import { fill, StatusPill } from "./shared";
@@ -437,6 +437,3 @@ export const TemplatesTab: React.FC<{ canEdit?: boolean }> = ({ canEdit = true }
     </div>
   );
 };
-
-/** Re-exported so the matcher's default is documented next to the UI that sets it. */
-export const DEFAULT_MATCH_TYPE = WaTemplateMatchType.ANY_OF;

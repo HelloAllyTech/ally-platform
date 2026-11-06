@@ -96,7 +96,7 @@ export const BotSettingsTab: React.FC = () => {
         {!draft.crisisClassifierEnabled && (
           <InlineNotification
             kind="warning"
-            title={en.whatsappBot.settings.crisisClassifierOffWarning}
+            title={t.crisisClassifierOffWarning}
             lowContrast
             hideCloseButton
           />
@@ -106,7 +106,7 @@ export const BotSettingsTab: React.FC = () => {
           id="wa-agent-runtime"
           label={t.agentRuntimeLabel}
           help={t.agentRuntimeHelp}
-          value={draft.agentRuntimeAllowed ?? false}
+          value={draft.agentRuntimeAllowed}
           onChange={value => set("agentRuntimeAllowed", value)}
         />
       </Card>
@@ -167,24 +167,15 @@ export const BotSettingsTab: React.FC = () => {
       <Card title={t.limitsTitle} subtitle={t.limitsIntro}>
         <div className="flex flex-col gap-1">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Num
-              label={t.perMinute}
-              value={draft.rateLimit.perMinute}
-              min={0}
-              onChange={value => setRateLimit("perMinute", value)}
-            />
-            <Num
-              label={t.perHour}
-              value={draft.rateLimit.perHour}
-              min={0}
-              onChange={value => setRateLimit("perHour", value)}
-            />
-            <Num
-              label={t.perDay}
-              value={draft.rateLimit.perDay}
-              min={0}
-              onChange={value => setRateLimit("perDay", value)}
-            />
+            {(["perMinute", "perHour", "perDay"] as const).map(key => (
+              <Num
+                key={key}
+                label={t[key]}
+                value={draft.rateLimit[key]}
+                min={0}
+                onChange={value => setRateLimit(key, value)}
+              />
+            ))}
           </div>
           <span className="text-xs text-typography-500">{t.perPersonHelp}</span>
         </div>
@@ -211,7 +202,7 @@ export const BotSettingsTab: React.FC = () => {
         {draft.retentionDays === 0 && (
           <InlineNotification
             kind="warning"
-            title={en.whatsappBot.settings.retentionOffWarning}
+            title={t.retentionOffWarning}
             lowContrast
             hideCloseButton
           />
@@ -403,8 +394,8 @@ const Toggle: React.FC<{
       id={id}
       labelText=""
       aria-label={label}
-      labelA={en.whatsappBot.bots.defaults.off}
-      labelB={en.whatsappBot.bots.defaults.on}
+      labelA={t.off}
+      labelB={t.on}
       size="sm"
       toggled={value}
       onToggle={(checked: boolean) => onChange(checked)}

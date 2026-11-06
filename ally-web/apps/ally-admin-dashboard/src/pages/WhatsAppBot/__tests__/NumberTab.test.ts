@@ -6,7 +6,6 @@ vi.mock("@api", () => ({}));
 vi.mock("@components", () => ({}));
 vi.mock("@components/types", () => ({ ButtonVariant: {} }));
 vi.mock("@ally-ui-mono/ui-shared", () => ({}));
-vi.mock("../ProviderConnectionSection", () => ({}));
 vi.mock("../shared", () => ({}));
 vi.mock("@constants", () => ({
   en: {

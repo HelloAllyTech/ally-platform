@@ -28,10 +28,7 @@ import {
   TestWaTemplateResponse,
   UpdateWaTemplateRequest,
   WaBotSettings,
-  WaPreviewRequest,
-  WaPreviewResponse,
   WaConnectionCheck,
-  WaProviderHealth,
   WaBusinessNumber,
   ConnectWaNumberRequest,
   WaTemplate,
@@ -457,42 +454,6 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_SETTINGS],
     }),
 
-    getWaProviderHealth: builder.query<WaProviderHealth, void>({
-      query: () => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PROVIDER_HEALTH,
-        method: HttpMethod.GET,
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_SETTINGS],
-    }),
-
-    /**
-     * Ask Meta, live, whether the token and number work.
-     *
-     * A mutation so it runs only when the admin presses the button: as a query it would call out to
-     * Meta on every mount of the settings tab and on every settings save.
-     */
-    checkWaProviderConnection: builder.mutation<WaConnectionCheck, void>({
-      query: () => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PROVIDER_CHECK,
-        method: HttpMethod.POST,
-      }),
-    }),
-
-    registerWaPhoneNumber: builder.mutation<WaConnectionCheck, { pin: string }>({
-      query: body => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PROVIDER_REGISTER,
-        method: HttpMethod.POST,
-        body,
-      }),
-    }),
-
-    subscribeWaProviderApp: builder.mutation<WaConnectionCheck, void>({
-      query: () => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PROVIDER_SUBSCRIBE,
-        method: HttpMethod.POST,
-      }),
-    }),
-
     // ---- Organisations' own numbers ----
     //
     // WhatsApp numbers are the WhatsApp connector's store. Access follows the bot each number
@@ -521,7 +482,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
       ],
     }),
 
-    /** A mutation for the same reason as the provider check: it calls Meta only when pressed. */
+    /** A mutation so it calls Meta only when pressed, never on mount or after a save. */
     checkWaNumber: builder.mutation<
       { number: WaBusinessNumber; check: WaConnectionCheck },
       { id: string }
@@ -562,23 +523,6 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         TAG_TYPES.CHATBOTS,
         TAG_TYPES.CHATBOT_DETAIL,
       ],
-    }),
-
-    // ---- Preview console ----
-
-    /**
-     * Ask a question and get back the exact reply a worker would receive.
-     *
-     * A mutation rather than a query even though it reads nothing: it must run only when the admin
-     * presses Ask. As a query, RTK Query would refetch it on mount and on cache invalidation, which
-     * would silently spend generation tokens.
-     */
-    previewWaAsk: builder.mutation<WaPreviewResponse, WaPreviewRequest>({
-      query: body => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PREVIEW_ASK,
-        method: HttpMethod.POST,
-        body,
-      }),
     }),
 
     // ---- Conversation log ----
@@ -856,17 +800,12 @@ export const {
   useTestWaTemplateMutation,
   useGetWaSettingsQuery,
   useUpdateWaSettingsMutation,
-  useGetWaProviderHealthQuery,
-  useCheckWaProviderConnectionMutation,
-  useRegisterWaPhoneNumberMutation,
-  useSubscribeWaProviderAppMutation,
   useGetWaNumbersQuery,
   useConnectWaNumberMutation,
   useCheckWaNumberMutation,
   useSubscribeWaNumberMutation,
   useDisconnectWaNumberMutation,
   useCustomiseWaTemplateMutation,
-  usePreviewWaAskMutation,
   useGetWaConversationsQuery,
   useGetWaConversationQuery,
   useGetWaConversationLanguagesQuery,

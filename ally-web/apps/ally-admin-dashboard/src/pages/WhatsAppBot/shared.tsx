@@ -6,7 +6,7 @@ import { InlineNotification } from "@ally-ui-mono/ui-shared";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { ChatbotPersona, WaBusinessNumberStatus } from "@types";
+import { ChatbotPersona } from "@types";
 import { formatRelativeTime } from "@utils";
 
 /** ally-be puts the human-readable reason (Meta's own, for the number endpoints) in `data.message`. */
@@ -97,21 +97,6 @@ export const StatusPill: React.FC<{ tone: PillTone; children: React.ReactNode }>
     {children}
   </span>
 );
-
-/** How an organisation's number reads in a list: connected, half-way, or not there at all. */
-export const NumberStatusPill: React.FC<{ status?: WaBusinessNumberStatus | null }> = ({
-  status,
-}) => {
-  const t = en.whatsappBot.scope;
-  if (!status) return <StatusPill tone="neutral">{t.statusNoNumber}</StatusPill>;
-  if (status === WaBusinessNumberStatus.CONNECTED) {
-    return <StatusPill tone="success">{t.statusConnected}</StatusPill>;
-  }
-  if (status === WaBusinessNumberStatus.ERROR) {
-    return <StatusPill tone="danger">{en.whatsappBot.connection.status.error}</StatusPill>;
-  }
-  return <StatusPill tone="warning">{t.statusSettingUp}</StatusPill>;
-};
 
 /** A titled block with the page's usual card border. */
 export const Card: React.FC<{

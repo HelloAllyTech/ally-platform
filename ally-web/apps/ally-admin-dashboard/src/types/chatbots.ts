@@ -70,12 +70,6 @@ export interface Connector {
   createdAt: string;
 }
 
-export interface ConnectorType {
-  type: string;
-  label: string;
-  description: string;
-}
-
 export interface ChatbotStats {
   messages: number;
   people: number;
