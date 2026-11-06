@@ -217,10 +217,10 @@ export const IdeaCaptureLauncher: React.FC = () => {
           : status === "unavailable"
             ? "Can't reach the microphone"
             : status === "unsupported"
-            ? "Voice isn't available in this browser"
-            : text.trim()
-              ? "Mic is off"
-              : "Ready when you are";
+              ? "Voice isn't available in this browser"
+              : text.trim()
+                ? "Mic is off"
+                : "Ready when you are";
   const subline =
     status === "listening"
       ? "Capturing the absolute first, raw version of your idea. No structure needed — just talk."
@@ -231,8 +231,8 @@ export const IdeaCaptureLauncher: React.FC = () => {
           : status === "unavailable"
             ? "No microphone was found, or speech recognition couldn't connect. Tap the mic to retry, or type below."
             : status === "unsupported"
-            ? "Type your idea below — it saves exactly the same."
-            : "Tap the mic to talk again, or keep typing.";
+              ? "Type your idea below — it saves exactly the same."
+              : "Tap the mic to talk again, or keep typing.";
 
   const canMic = status !== "unsupported" && status !== "denied";
   const orbScale = 1 + (isListening ? speech.level * 0.45 : 0);
