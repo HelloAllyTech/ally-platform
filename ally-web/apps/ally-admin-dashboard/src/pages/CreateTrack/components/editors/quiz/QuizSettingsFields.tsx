@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, useState } from "react";
 
 import { Controller, useFormContext } from "react-hook-form";
 
@@ -20,6 +20,48 @@ const rowClass = "flex items-center justify-between gap-4 py-2";
 const labelClass = "text-sm text-typography-800";
 const numberInput =
   "w-24 border border-border-light rounded-md px-2 py-1 text-sm outline-none focus:border-primary-400";
+
+interface AttemptsInputProps {
+  value: number | null | undefined;
+  onChange: (value: number | null) => void;
+  min: number;
+  disabled: boolean;
+  /** Called on blur with the committed value, to enforce the live-course floor. */
+  onCommit: () => void;
+}
+
+/**
+ * The number box for Max attempts. Emptying it while retyping must not read as
+ * "Unlimited" (that is the checkbox's job), so an empty box is only a local
+ * draft: the form keeps its last number until a new one is typed, and blur
+ * restores it.
+ */
+const AttemptsInput: FC<AttemptsInputProps> = ({ value, onChange, min, disabled, onCommit }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      type="number"
+      min={min}
+      disabled={disabled}
+      className={`${numberInput} disabled:opacity-50`}
+      value={draft ?? value ?? ""}
+      onChange={event => {
+        const text = event.target.value;
+        if (text === "") {
+          setDraft("");
+          return;
+        }
+        setDraft(null);
+        onChange(Number(text));
+      }}
+      onBlur={() => {
+        setDraft(null);
+        onCommit();
+      }}
+      onWheel={event => event.currentTarget.blur()}
+    />
+  );
+};
 
 /** Quiz-level settings. `passScore` is authoritative here; the server mirrors it. */
 export const QuizSettingsFields: FC<QuizSettingsFieldsProps> = ({
@@ -108,22 +150,17 @@ export const QuizSettingsFields: FC<QuizSettingsFieldsProps> = ({
                 />
                 Unlimited
               </label>
-              <input
-                type="number"
+              <AttemptsInput
+                value={field.value}
+                onChange={field.onChange}
                 min={minAttempts}
                 disabled={field.value == null || attemptsLocked}
-                className={`${numberInput} disabled:opacity-50`}
-                value={field.value ?? ""}
-                onChange={event =>
-                  field.onChange(event.target.value === "" ? null : Number(event.target.value))
-                }
-                onBlur={() => {
+                onCommit={() => {
                   // `min` only constrains the spinner and validity, not typing.
                   if (isLive && field.value != null && field.value < minAttempts) {
                     field.onChange(savedMaxAttempts);
                   }
                 }}
-                onWheel={event => event.currentTarget.blur()}
               />
             </div>
           )}

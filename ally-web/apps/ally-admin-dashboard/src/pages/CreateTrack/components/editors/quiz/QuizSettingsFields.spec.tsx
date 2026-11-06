@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -74,5 +74,31 @@ describe("QuizSettingsFields max attempts on a published course", () => {
     render(<Harness maxAttempts={3} isPublished={false} />);
     expect(attemptsInput().min).toBe("1");
     expect(unlimited()).toBeEnabled();
+  });
+
+  it("does not read an emptied box as Unlimited while retyping", () => {
+    render(<Harness maxAttempts={3} isPublished />);
+    fireEvent.change(attemptsInput(), { target: { value: "" } });
+    expect(attemptsInput().value).toBe("");
+    expect(attemptsInput()).toBeEnabled();
+    expect(unlimited().checked).toBe(false);
+    fireEvent.change(attemptsInput(), { target: { value: "6" } });
+    expect(attemptsInput().value).toBe("6");
+    expect(unlimited().checked).toBe(false);
+  });
+
+  it("restores the last number when the box is left empty", () => {
+    render(<Harness maxAttempts={3} isPublished={false} />);
+    fireEvent.change(attemptsInput(), { target: { value: "" } });
+    fireEvent.blur(attemptsInput());
+    expect(attemptsInput().value).toBe("3");
+    expect(unlimited().checked).toBe(false);
+  });
+
+  it("still goes Unlimited from the checkbox", () => {
+    render(<Harness maxAttempts={3} isPublished={false} />);
+    fireEvent.click(unlimited());
+    expect(unlimited().checked).toBe(true);
+    expect(attemptsInput()).toBeDisabled();
   });
 });
