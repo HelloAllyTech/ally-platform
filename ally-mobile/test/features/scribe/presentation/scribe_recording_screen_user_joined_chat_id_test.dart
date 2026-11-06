@@ -78,7 +78,8 @@ void main() {
     await tester.pump(const Duration(seconds: 6));
     expect(find.text('Microphone failure'), findsNothing);
     expect(find.byKey(const ValueKey('audio-waveform-container')), findsOneWidget);
-    expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
+    // Starts actively listening, not paused — no mute tooltip up front.
+    expect(find.byKey(const ValueKey('mute-tooltip')), findsNothing);
 
     // A socket drop while online is SOCKET ("Something went wrong!").
     onDisconnect!('transport close');

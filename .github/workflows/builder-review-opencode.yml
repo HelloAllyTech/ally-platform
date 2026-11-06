@@ -128,7 +128,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ (env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile') && '22' || '24' }}
+          node-version: ${{ env.SERVICE == 'ally-web' && '22' || '24' }}
       - uses: actions/setup-python@v5
         if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         with:
@@ -139,10 +139,17 @@ jobs:
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
+      # ally-mobile is Flutter, not Node — its own runtime, matching
+      # test-ally-mobile.yml exactly.
+      - uses: subosito/flutter-action@v2
+        if: env.SERVICE == 'ally-mobile'
+        with:
+          channel: stable
+          flutter-version: 3.47.7
       - name: Install dependencies
         working-directory: ${{ env.SERVICE }}
         run: |
-          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; fi
+          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; elif [ -f pubspec.yaml ]; then flutter pub get; fi
       - name: Put the virtualenv on PATH
         if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         run: echo "${GITHUB_WORKSPACE}/${SERVICE}/.venv/bin" >> "$GITHUB_PATH"
@@ -287,7 +294,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ (env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile') && '22' || '24' }}
+          node-version: ${{ env.SERVICE == 'ally-web' && '22' || '24' }}
       - uses: actions/setup-python@v5
         if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         with:
@@ -298,10 +305,17 @@ jobs:
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
+      # ally-mobile is Flutter, not Node — its own runtime, matching
+      # test-ally-mobile.yml exactly.
+      - uses: subosito/flutter-action@v2
+        if: env.SERVICE == 'ally-mobile'
+        with:
+          channel: stable
+          flutter-version: 3.47.7
       - name: Install dependencies
         working-directory: ${{ env.SERVICE }}
         run: |
-          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; fi
+          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; elif [ -f pubspec.yaml ]; then flutter pub get; fi
       - name: Put the virtualenv on PATH
         if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         run: echo "${GITHUB_WORKSPACE}/${SERVICE}/.venv/bin" >> "$GITHUB_PATH"
