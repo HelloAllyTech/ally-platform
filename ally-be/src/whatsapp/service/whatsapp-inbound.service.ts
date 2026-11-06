@@ -28,10 +28,22 @@ import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
+import { isFallback } from 'src/chatbot/engine/agent-runtime';
+import {
+  AGENT_FALLBACK_EVENT,
+  AGENT_SHADOW_RUN_EVENT,
+  type AgentFallbackEvent,
+  type AgentShadowRunEvent,
+} from 'src/chatbot/type/agent-runtime.event';
+import type {
+  AgentRunRef,
+  ChatbotDecision,
+} from 'src/chatbot/engine/chatbot-engine.types';
 import { ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
 import { ConnectorService } from 'src/chatbot/service/connector.service';
 import { withFirstMessageParts } from 'src/chatbot/engine/first-reply';
+import { MAX_HISTORY_MESSAGES } from 'src/chatbot/engine/knowledge-request';
 
 /**
  * Opt-out / opt-in words, recognised in code regardless of what templates exist.
@@ -317,6 +329,7 @@ export class WhatsAppInboundService {
         text: inbound.text,
         language: contact.locale,
         history: await this.recentHistory(conversation.id),
+        isFirstMessage: contact.messageCount === 1,
         sender: {
           externalId: contact.phoneE164,
           label: `contact ending ${contact.phoneLast4}`,
@@ -325,6 +338,9 @@ export class WhatsAppInboundService {
           tenantId: identified.tenantId ?? null,
         },
         channel: { type: 'whatsapp', capabilities: { maxReplyChars: 4096 } },
+        // The Agents v2 run's thread and the message its run id is derived from.
+        conversationId: conversation.id,
+        providerMessageId: inbound.providerMessageId,
       });
 
       // ── 8. Send and record ───────────────────────────────────────────────
@@ -363,6 +379,7 @@ export class WhatsAppInboundService {
           citations: decision.citations,
           retrievalMeta: decision.retrievalMeta,
           language: decision.language ?? undefined,
+          agent: decision.agent,
         },
       );
       if (decision.unanswered) {
@@ -377,6 +394,7 @@ export class WhatsAppInboundService {
         );
       }
       if (decision.alert) this.eventEmitter.emit('exception', decision.alert);
+      this.announceAgentOutcome(chatbot, conversation.id, inboundId, decision);
     } catch (error) {
       // Reached only when nothing has been sent — every send path above returns. Recorded on the
       // message and swallowed: rethrowing would redeliver and risk a second reply.
@@ -401,6 +419,35 @@ export class WhatsAppInboundService {
    * standalone message. A bare disclaimer reads as a bot that ignored you, and it costs the worker a
    * round trip to ask again.
    */
+  /**
+   * After the reply has been sent and recorded, tell the Agents v2 listeners. The fallback alert is
+   * throttled per bot and reason by its listener (AgentRuntimeAlertThrottle), so it is announced
+   * here rather than emitted as an alert. The shadow listener (ChatbotShadowService) runs
+   * asynchronously and never throws, so a shadow run cannot delay this message, fail it, or have
+   * it redelivered.
+   */
+  private announceAgentOutcome(
+    chatbot: Pick<Chatbot, 'id' | 'name'>,
+    conversationId: string,
+    inboundMessageId: string,
+    decision: Pick<ChatbotDecision, 'agent' | 'shadow'>,
+  ): void {
+    if (isFallback(decision.agent)) {
+      this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
+        chatbot: { id: chatbot.id, name: chatbot.name },
+        reason: decision.agent.fallbackReason,
+      } satisfies AgentFallbackEvent);
+    }
+    if (decision.shadow) {
+      this.eventEmitter.emit(AGENT_SHADOW_RUN_EVENT, {
+        chatbotId: chatbot.id,
+        conversationId,
+        inboundMessageId,
+        shadow: decision.shadow,
+      } satisfies AgentShadowRunEvent);
+    }
+  }
+
   private async handleConsent(
     contact: WaContact,
     conversation: WaConversation,
@@ -489,7 +536,7 @@ export class WhatsAppInboundService {
     const rows = await this.messageRepository.find({
       where: { conversationId },
       order: { createdAt: 'DESC' },
-      take: 6,
+      take: MAX_HISTORY_MESSAGES,
       select: ['direction', 'body', 'createdAt'],
     });
     return rows
@@ -603,6 +650,8 @@ export class WhatsAppInboundService {
       citations?: Record<string, any>[];
       retrievalMeta?: Record<string, any>;
       language?: string;
+      /** The Agents v2 run behind this reply; v1 replies leave the run columns unset. */
+      agent?: AgentRunRef;
     } = {},
   ): Promise<void> {
     const outbound = await this.messageRepository.save(
@@ -619,6 +668,12 @@ export class WhatsAppInboundService {
         latencyMs: Date.now() - startedAt,
         status: WaMessageStatus.QUEUED,
         inReplyToId,
+        ...(extra.agent
+          ? {
+              agentRunId: extra.agent.runId,
+              agentRuntime: extra.agent.runtime,
+            }
+          : {}),
       }),
     );
 

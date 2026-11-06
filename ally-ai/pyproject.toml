@@ -35,6 +35,13 @@ google-genai = "^1.0.0"
 # expose cleanly. Imported lazily in app/core/llm/dispatch.py so a missing key degrades to the
 # other provider rather than breaking startup.
 anthropic = "^0.121.0"
+# Agents v2 runtime (app/core/agent_runtime): the graph and its Postgres checkpointer.
+langgraph = "^1.2.0"
+langgraph-checkpoint-postgres = "^3.2.0"
+psycopg = {version = "^3.3.0", extras = ["binary", "pool"]}
+# Transitive (langsmith, langgraph-checkpoint-postgres), pinned here only to hold it at
+# a patch bump: the checkpointer needs >=3.11.5 and the lock was on 3.11.2.
+orjson = "~3.11.9"
 
 [tool.poetry.group.dev.dependencies]
 aiohttp = "^3.13.3"

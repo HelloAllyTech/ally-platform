@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
+import type {
+  CrisisCheckResponse,
   KnowledgeAnswerRequest,
-  KnowledgeAnswerResponse,
   KnowledgeAudienceRequest,
 } from '../../ai/dto/knowledge.dto';
 import { AiService } from '../../ai/service/ai.service';
@@ -17,14 +17,28 @@ import {
 } from '../../whatsapp/enum/whatsapp.enum';
 import { composeReply } from '../../whatsapp/util/reply-composer';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
-import {
-  ChatbotAnswerMode,
-  ChatbotKnowledgeSource,
-} from '../enum/chatbot.enum';
+import { ChatbotKnowledgeSource, ChatbotRuntime } from '../enum/chatbot.enum';
 import { ChatbotAudienceService } from '../service/chatbot-audience.service';
 import { ChatbotReplyService } from '../service/chatbot-reply.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
-import type { ChatbotDecision, ChatTurn } from './chatbot-engine.types';
+import {
+  type EngineChoice,
+  isAgentEngine,
+  resolveEngine,
+} from './agent-runtime';
+import {
+  AgentFallbackFailedError,
+  AgentRuntimeRunner,
+  type Answered,
+  type EngineAnswer,
+} from './agent-runtime-runner.service';
+import type {
+  AgentRunRef,
+  ChatbotDecision,
+  ChatTurn,
+} from './chatbot-engine.types';
+import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
+import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 
 /**
  * The ally-ai prompt codes the answering path owns.
@@ -38,32 +52,28 @@ export const KNOWLEDGE_PROMPT_CODES = [
   'ally_ai_knowledge_translate_query',
   'ally_ai_knowledge_crisis_classify',
 ];
+/** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
+const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
+/**
+ * The conversational agent's prompts (Agents v2, `features.agent`). Loaded only for a bot in agent
+ * mode, so every other bot's request is exactly as before.
+ */
+export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 /** Used by bots allowed to answer beyond their documents. */
 const GENERAL_ANSWER_PROMPT_CODE = 'ally_ai_knowledge_answer_general';
-/** A document id no document has: the "search nothing" filter. */
-const NO_DOCUMENTS = '00000000-0000-0000-0000-000000000000';
-
-/** Words that make a command reply the "say hello" reply (the shared Greeting). */
-const GREETING_WORDS = new Set([
-  'hi',
-  'hello',
-  'hey',
-  'hii',
-  'namaste',
-  'hola',
-  'good morning',
-]);
-
-/** The shared reply to a bare hello: a command reply triggered by greeting words. */
-export const isGreetingReply = (template: {
-  kind: WaTemplateKind;
-  patterns: string[];
-}): boolean =>
-  template.kind === WaTemplateKind.COMMAND &&
-  (template.patterns ?? []).some((p) =>
-    GREETING_WORDS.has(ChatbotReplyService.normalise(p)),
-  );
+/**
+ * The run behind a reply, if the v2 runtime answered or was tried — kept on every outcome, a crisis
+ * override included, so the reply can still be traced to its run.
+ */
+const runBehind = (
+  answerResult: PromiseSettledResult<Answered>,
+): AgentRunRef | undefined =>
+  answerResult.status === 'fulfilled'
+    ? answerResult.value.agent
+    : answerResult.reason instanceof AgentFallbackFailedError
+      ? answerResult.reason.agent
+      : undefined;
 
 /** Store version and content hash of each knowledge prompt sent to ally-ai, by code. */
 type PromptsRan = {
@@ -102,11 +112,13 @@ export class ChatbotEngineService {
     private readonly audienceService: ChatbotAudienceService,
     private readonly aiService: AiService,
     private readonly promptSharedService: PromptSharedService,
+    private readonly agentRuntime: AgentRuntimeRunner,
   ) {}
 
   async respond(turn: ChatTurn): Promise<ChatbotDecision> {
     const { chatbot, settings, sender } = turn;
     const allowed = await this.audienceService.canChat(chatbot, sender);
+    const engine = resolveEngine(settings);
 
     // ── 1. Keyword replies ───────────────────────────────────────────────
     const match = await this.replyService.match(
@@ -117,7 +129,9 @@ export class ChatbotEngineService {
     const usable =
       match &&
       match.bypassRag &&
-      (allowed || match.template.kind !== WaTemplateKind.FAQ);
+      (allowed || match.template.kind !== WaTemplateKind.FAQ) &&
+      // An agent bot answers greetings, help and FAQ-style messages itself.
+      !(isAgentEngine(engine) && agentAnswersInstead(match.template, turn));
     if (match && usable) {
       const isCrisis = match.template.kind === WaTemplateKind.CRISIS;
       // A bot with its own welcome message greets with THAT, not the generic shared greeting —
@@ -164,7 +178,7 @@ export class ChatbotEngineService {
     }
 
     // ── 3. Answer ────────────────────────────────────────────────────────
-    return this.answer(turn);
+    return this.answer(turn, engine);
   }
 
   /**
@@ -175,7 +189,7 @@ export class ChatbotEngineService {
    * Nothing is filed as unanswered: that queue records what the KNOWLEDGE failed to cover.
    */
   private async refuse(turn: ChatTurn): Promise<ChatbotDecision> {
-    const { chatbot, settings, sender } = turn;
+    const { settings, sender } = turn;
     if (settings.crisisClassifierEnabled) {
       try {
         const { prompts, ran } = await this.loadPromptOverrides(turn);
@@ -184,24 +198,7 @@ export class ChatbotEngineService {
           prompts,
         });
         if (crisis?.is_crisis) {
-          return {
-            handledBy: WaHandledBy.CRISIS,
-            body: this.settingsService.renderPlaceholders(
-              settings.crisisEscalationText,
-              settings,
-            ),
-            retrievalMeta: { ...ran },
-            alert: this.alert(
-              200,
-              'crisis',
-              `The crisis classifier fired on chatbot "${chatbot.name}" for a sender who is not ` +
-                `on its list (${turn.channel.type}, sender ${sender.label}, confidence ` +
-                `${crisis.confidence.toFixed(2)}, signal "${crisis.signal}"). The fixed safety ` +
-                `reply was sent. The sender is not linked to an Ally account, so the sender id is ` +
-                `the only handle to follow up through.`,
-              'Chatbot Crisis Classifier',
-            ),
-          };
+          return this.crisisDecision(turn, crisis, ran, { notOnList: true });
         }
       } catch (error) {
         // Swallowed on purpose: the refusal still has to go out.
@@ -221,35 +218,28 @@ export class ChatbotEngineService {
     };
   }
 
-  private async answer(turn: ChatTurn): Promise<ChatbotDecision> {
-    const { chatbot, settings, sender } = turn;
-    const { prompts, ran } = await this.loadPromptOverrides(turn);
+  private async answer(
+    turn: ChatTurn,
+    engine: EngineChoice,
+  ): Promise<ChatbotDecision> {
+    const { settings } = turn;
+    const agentMode = isAgentEngine(engine);
+    const { prompts, ran } = await this.loadPromptOverrides(turn, agentMode);
     const knowledge = await this.knowledgeFor(turn);
+    const request = buildKnowledgeRequest(turn, prompts, knowledge);
 
     // Concurrent, not sequential: the classifier adds no latency this way, and `allSettled`
-    // keeps a rejected classifier from taking down an answer that arrived fine.
+    // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
+    // runs once and exactly as before, whichever engine answers.
     const [answerResult, crisisResult] = await Promise.allSettled([
-      this.aiService.answerKnowledgeQuestion({
-        question: turn.text,
-        history: turn.history,
-        prompts,
-        ...knowledge,
-        persona: this.personaRequest(turn),
-        answer_mode: chatbot.answerMode ?? ChatbotAnswerMode.DOCUMENTS_ONLY,
-        channel: turn.channel.type,
-        top_k: settings.retrieval.topK,
-        min_similarity: settings.retrieval.minSimilarity,
-        decline_similarity: settings.retrieval.declineSimilarity,
-        max_passages: settings.retrieval.maxPassages,
-        max_context_tokens: settings.retrieval.maxContextTokens,
-        similarity_band: settings.retrieval.similarityBand,
-        max_answer_chars: settings.maxAnswerChars,
-        translate_query: settings.retrieval.translateQuery,
-      }),
+      engine.kind === ChatbotRuntime.V2
+        ? this.agentRuntime.answer(turn, request, agentMode, knowledge)
+        : this.answerWithV1(request),
       settings.crisisClassifierEnabled
         ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
         : Promise.resolve(null),
     ]);
+    const agent = runBehind(answerResult);
 
     // Crisis wins over the answer, unconditionally. Not gated on confidence: the prompt tells the
     // model to choose crisis when uncertain, so re-gating here would undo that instruction.
@@ -257,58 +247,23 @@ export class ChatbotEngineService {
       crisisResult.status === 'fulfilled' ? crisisResult.value : null;
     if (crisis?.is_crisis) {
       return {
-        handledBy: WaHandledBy.CRISIS,
-        body: this.settingsService.renderPlaceholders(
-          settings.crisisEscalationText,
-          settings,
-        ),
-        retrievalMeta: { ...ran },
-        alert: this.alert(
-          200,
-          'crisis',
-          `The crisis classifier fired on chatbot "${chatbot.name}" (${turn.channel.type}, ` +
-            `sender ${sender.label}, confidence ${crisis.confidence.toFixed(2)}, signal ` +
-            `"${crisis.signal}"). The fixed safety reply was sent and the answer was discarded.`,
-          'Chatbot Crisis Classifier',
-        ),
+        ...this.crisisDecision(turn, crisis, ran, { notOnList: false }),
+        ...(agent ? { agent } : {}),
       };
     }
 
-    // A classifier that did not run is a degraded safety net held up by keywords alone — and
-    // indistinguishable from a quiet day on every dashboard, so it is alerted, not just logged.
-    const degraded =
-      settings.crisisClassifierEnabled &&
-      (crisisResult.status === 'rejected' || Boolean(crisis?.failed));
-    let degradedAlert: NotificationErrorType | undefined;
-    if (degraded) {
-      const reason =
-        crisisResult.status === 'rejected'
-          ? crisisResult.reason instanceof Error
-            ? crisisResult.reason.message
-            : 'unknown error'
-          : 'ally-ai reported failed=true on the crisis check';
-      this.logger.warn(
-        `Crisis classifier did not run for this message; keyword rules only (${reason})`,
-      );
-      degradedAlert = this.alert(
-        500,
-        'crisis-classifier-degraded',
-        `The crisis classifier did not run for a message to chatbot "${chatbot.name}" ` +
-          `(sender ${sender.label}). Reason: ${reason}. The keyword rules ran and are holding ` +
-          `the safety net alone — check ally-ai's crisis-check route and its model provider key. ` +
-          `Expect NO crisis alerts while this persists.`,
-        'Chatbot Crisis Classifier Degraded',
-      );
-    }
+    const degradedAlert = this.degradedAlertFor(turn, crisisResult);
 
     if (answerResult.status === 'rejected') {
       // A model or index outage is NOT "the knowledge does not cover this": fallback wording and an
       // ERROR-reason queue row, so a bad afternoon for ally-ai does not fill the unanswered queue
       // with questions the documents answer perfectly well.
+      const failure =
+        answerResult.reason instanceof AgentFallbackFailedError
+          ? answerResult.reason.cause
+          : answerResult.reason;
       const reason =
-        answerResult.reason instanceof Error
-          ? answerResult.reason.message
-          : 'unknown error';
+        failure instanceof Error ? failure.message : 'unknown error';
       this.logger.error(`Knowledge agent call failed: ${reason}`);
       return {
         handledBy: WaHandledBy.ERROR,
@@ -319,14 +274,108 @@ export class ChatbotEngineService {
           hitCount: 0,
         },
         alert: degradedAlert,
+        ...(agent ? { agent } : {}),
       };
     }
 
-    const answer: KnowledgeAnswerResponse = answerResult.value;
+    const { response: answer } = answerResult.value;
+    const decision = this.toDecision(turn, answer, ran, degradedAlert);
+    if (agent) decision.agent = agent;
+    return decision;
+  }
+
+  /**
+   * The fixed safety reply for a message the crisis classifier flagged, with its Slack alert. For a
+   * sender not on the bot's list (`notOnList`) the alert says so; otherwise it says the answer that
+   * came back alongside was discarded.
+   */
+  private crisisDecision(
+    turn: ChatTurn,
+    crisis: CrisisCheckResponse,
+    ran: PromptsRan,
+    { notOnList }: { notOnList: boolean },
+  ): ChatbotDecision {
+    const { chatbot, settings, sender } = turn;
+    const who = notOnList ? ' for a sender who is not on its list' : '';
+    const outcome = notOnList
+      ? 'The fixed safety reply was sent. The sender is not linked to an Ally account, so the ' +
+        'sender id is the only handle to follow up through.'
+      : 'The fixed safety reply was sent and the answer was discarded.';
+    return {
+      handledBy: WaHandledBy.CRISIS,
+      body: this.settingsService.renderPlaceholders(
+        settings.crisisEscalationText,
+        settings,
+      ),
+      retrievalMeta: { ...ran },
+      alert: this.alert(
+        200,
+        'crisis',
+        `The crisis classifier fired on chatbot "${chatbot.name}"${who} (${turn.channel.type}, ` +
+          `sender ${sender.label}, confidence ${crisis.confidence.toFixed(2)}, signal ` +
+          `"${crisis.signal}"). ${outcome}`,
+        'Chatbot Crisis Classifier',
+      ),
+    };
+  }
+
+  /**
+   * A classifier that did not run is a degraded safety net held up by keywords alone — and
+   * indistinguishable from a quiet day on every dashboard, so it is alerted, not just logged.
+   */
+  private degradedAlertFor(
+    turn: ChatTurn,
+    crisisResult: PromiseSettledResult<CrisisCheckResponse | null>,
+  ): NotificationErrorType | undefined {
+    const { chatbot, settings, sender } = turn;
+    const crisis =
+      crisisResult.status === 'fulfilled' ? crisisResult.value : null;
+    const degraded =
+      settings.crisisClassifierEnabled &&
+      (crisisResult.status === 'rejected' || Boolean(crisis?.failed));
+    if (!degraded) return undefined;
+    const reason =
+      crisisResult.status === 'rejected'
+        ? crisisResult.reason instanceof Error
+          ? crisisResult.reason.message
+          : 'unknown error'
+        : 'ally-ai reported failed=true on the crisis check';
+    this.logger.warn(
+      `Crisis classifier did not run for this message; keyword rules only (${reason})`,
+    );
+    return this.alert(
+      500,
+      'crisis-classifier-degraded',
+      `The crisis classifier did not run for a message to chatbot "${chatbot.name}" ` +
+        `(sender ${sender.label}). Reason: ${reason}. The keyword rules ran and are holding ` +
+        `the safety net alone — check ally-ai's crisis-check route and its model provider key. ` +
+        `Expect NO crisis alerts while this persists.`,
+      'Chatbot Crisis Classifier Degraded',
+    );
+  }
+
+  /** The v1 engine: ally-ai's `/knowledge-agent/answer`, with its own retry budget. */
+  private async answerWithV1(
+    request: KnowledgeAnswerRequest,
+  ): Promise<Answered> {
+    const startedAt = Date.now();
+    const response = await this.aiService.answerKnowledgeQuestion(request);
+    return { response, latencyMs: Date.now() - startedAt };
+  }
+
+  /** An answer from either engine, as one reply. */
+  private toDecision(
+    turn: ChatTurn,
+    answer: EngineAnswer,
+    ran: PromptsRan,
+    degradedAlert: NotificationErrorType | undefined,
+  ): ChatbotDecision {
+    const { chatbot, settings } = turn;
     const maxReplyChars = Math.min(
       settings.maxReplyChars,
       turn.channel.capabilities?.maxReplyChars ?? settings.maxReplyChars,
     );
+    const turnType = answer.turn_type;
     const body = composeReply({
       intent: answer.intent,
       answer: answer.answer,
@@ -354,9 +403,16 @@ export class ChatbotEngineService {
         model: answer.model,
         prompt_version: answer.prompt_version,
         chatbot_id: chatbot.id,
+        ...(turnType ? { turn_type: turnType } : {}),
         ...ran,
       },
       language: answer.language,
+      ...(turnType ? { turnType } : {}),
+      // The agent's hello or "who I am": on a first message, the notice follows it, as it follows
+      // the welcome message.
+      ...(turnType === 'smalltalk' || turnType === 'about_bot'
+        ? { isWelcome: true }
+        : {}),
       // A CLARIFY is not filed: too vague to retrieve against is not evidence of a gap.
       unanswered:
         answer.intent === 'decline'
@@ -405,16 +461,6 @@ export class ChatbotEngineService {
     };
   }
 
-  private personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
-    const persona = turn.chatbot.persona ?? {};
-    const out = {
-      display_name: persona.displayName?.trim() || undefined,
-      system_prompt: persona.systemPrompt?.trim() || undefined,
-      tone: persona.tone?.trim() || undefined,
-    };
-    return Object.values(out).some(Boolean) ? out : undefined;
-  }
-
   /**
    * Prompt overrides for the knowledge prompts, carrying the selected model.
    *
@@ -425,7 +471,10 @@ export class ChatbotEngineService {
    *
    * Also returns which store version of each prompt was sent, recorded on the reply.
    */
-  private async loadPromptOverrides(turn: ChatTurn): Promise<{
+  private async loadPromptOverrides(
+    turn: ChatTurn,
+    agentMode = false,
+  ): Promise<{
     prompts: Record<string, unknown>;
     ran: PromptsRan;
   }> {
@@ -433,7 +482,9 @@ export class ChatbotEngineService {
     let prompts: Record<string, unknown> = {};
     try {
       const rows = await this.promptSharedService.getPromptsByOptions({
-        promptCode: KNOWLEDGE_PROMPT_CODES,
+        promptCode: agentMode
+          ? [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES]
+          : KNOWLEDGE_PROMPT_CODES,
       });
       prompts = (rows ?? []).reduce<Record<string, unknown>>((acc, row) => {
         const entry: Record<string, unknown> = {};
@@ -466,7 +517,9 @@ export class ChatbotEngineService {
 
     const model = turn.chatbot.model;
     if (model?.provider && model?.model) {
-      for (const code of [ANSWER_PROMPT_CODE, GENERAL_ANSWER_PROMPT_CODE]) {
+      const answering = [ANSWER_PROMPT_CODE, GENERAL_ANSWER_PROMPT_CODE];
+      if (agentMode) answering.push(AGENT_SYSTEM_PROMPT_CODE);
+      for (const code of answering) {
         const current = (prompts[code] ?? {}) as Record<string, unknown>;
         const next: Record<string, unknown> = {
           ...current,

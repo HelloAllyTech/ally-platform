@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -119,6 +119,41 @@ class KnowledgeAgentSettings(BaseModel):
     # to ally-be and stored per message so a behaviour change can be traced to its
     # instructions.
     PROMPT_VERSION: str = Field("v1")
+
+
+class AgentRuntimeSettings(BaseModel):
+    """Agents v2 runtime: the LangGraph agent graph behind `/agent/run`.
+
+    Dark until ENABLED: the route answers 404 and nothing is opened at startup, so
+    deploying the code changes nothing until it is switched on.
+    """
+
+    ENABLED: bool = Field(False)
+    # Postgres for LangGraph's checkpoint tables, in their own database — ally-be's
+    # database is never written to. Unset = in-memory checkpoints (lost on restart),
+    # with a warning at startup.
+    CHECKPOINT_DB_URL: Optional[str] = None
+    # The tables are created in this schema (search_path), never in `public`.
+    CHECKPOINT_SCHEMA: str = Field("agent_runtime", pattern=r"^[a-z_][a-z0-9_]*$")
+    CHECKPOINT_POOL_MAX_SIZE: int = Field(10, ge=1)
+    # "async" keeps a checkpoint per step (needed by "Why?" and approvals later)
+    # without blocking the next step on the write; "exit" writes once per run.
+    DURABILITY: Literal["sync", "async", "exit"] = Field("async")
+    # Conversational agent (`features.agent`): tool calls allowed per run. Past this
+    # the agent must reply with what it has, or decline. Two: a second search with
+    # different words helps; more only repeated the same miss and ran past ally-be's
+    # 25-second timeout.
+    MAX_TOOL_CALLS: int = Field(2, ge=0, le=8)
+    # Seconds into a run after which the agent stops searching and its reply is
+    # final (no rewrite), so it answers inside ally-be's 25-second timeout rather
+    # than falling back to v1.
+    RUN_BUDGET_SECONDS: float = Field(15.0, gt=0, le=60)
+    # Conversation messages the agent reads, most recent last.
+    MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
+    # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and
+    # o-series; ignored for others). Unset = the provider default ("medium"). The
+    # latency lever if the agent step is too slow; see CHUNK-03A-NOTES.md.
+    AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = None
 
 
 class HelplineSettings(BaseModel):
@@ -411,6 +446,7 @@ class AppSettings(BaseSettings):
     KNOWLEDGE_AGENT: KnowledgeAgentSettings = Field(
         default_factory=KnowledgeAgentSettings
     )
+    AGENT_RUNTIME: AgentRuntimeSettings = Field(default_factory=AgentRuntimeSettings)
     HELPLINE: HelplineSettings = Field(default_factory=HelplineSettings)
     DRIFT_JUDGE: DriftJudgeSettings = Field(default_factory=DriftJudgeSettings)
     LANGUAGE_JUDGE: LanguageJudgeSettings = Field(default_factory=LanguageJudgeSettings)

@@ -1,21 +1,36 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
+import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
+import {
+  CreateKbOwnedDocumentDto,
+  CreateKbUploadUrlDto,
+  KbDocumentResponseDto,
+} from '../../knowledge-base/dto/knowledge-base.dto';
+import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { LoggerService } from '../../logger/logger.service';
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
+import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import { ChatbotMember } from '../entity/chatbot-member.entity';
 import { ChatbotAudience } from '../entity/chatbot-audience.entity';
 import { Chatbot } from '../entity/chatbot.entity';
 import { Connector } from '../entity/connector.entity';
 import {
+  AgentRuntimeUsed,
   ChatbotAccessMode,
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
   ChatbotMemberRole,
+  ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
 import {
@@ -24,9 +39,15 @@ import {
   TestChatbotDto,
   UpdateChatbotDto,
 } from '../dto/chatbot.dto';
+import { effectiveRuntime, isFallback } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
+import type {
+  AgentFailureReason,
+  ChatbotDecision,
+} from '../engine/chatbot-engine.types';
 import { withFirstMessageParts } from '../engine/first-reply';
 import type { ChatbotModelChoice } from '../type/chatbot.type';
+import { AGENT_RUNTIME_DEGRADED_TYPE } from './agent-runtime-alert-throttle.service';
 import { ChatbotAccessService } from './chatbot-access.service';
 import { ChatbotSettingsService } from './chatbot-settings.service';
 import { ConnectorService, ConnectorView } from './connector.service';
@@ -53,9 +74,16 @@ export interface ChatbotSummary {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: Chatbot['persona'];
   model: ChatbotModelChoice | null;
+  /** The engine the bot is set to (Agents v2). */
+  runtime: ChatbotRuntime;
+  /** What actually answers: v1 whenever the platform kill switch is off. */
+  effectiveRuntime: ChatbotRuntime;
+  features: Record<string, boolean>;
   myRole: ChatbotMemberRole;
   connectors: ConnectorView[];
   documentCount: number;
+  /** Documents it can answer from now: indexed and not archived. */
+  readyDocumentCount: number;
   audienceCount: number;
   memberCount: number;
   stats: ChatbotStats;
@@ -64,14 +92,52 @@ export interface ChatbotSummary {
   updatedAt: Date;
 }
 
+/** What Preview shows for one test message. Nothing is sent or stored. */
+export interface ChatbotTestResult {
+  reply: string;
+  handledBy: WaHandledBy;
+  citations: Record<string, any>[];
+  retrieval: Record<string, any> | null;
+  language: string | null;
+  wouldFileUnanswered: ChatbotDecision['unanswered'] | null;
+  /** The alert a real message would raise (its type), or null. */
+  wouldAlert: string | null;
+  latencyMs: number;
+  usedDraft: boolean;
+  /** The engine that answered: v1, v2, or v1 after v2 failed. */
+  runtime: ChatbotRuntime.V1 | AgentRuntimeUsed;
+  runId: string | null;
+  trace: AgentTraceStep[] | null;
+  fallbackReason: AgentFailureReason | null;
+  turnType: AgentTurnType | null;
+  runtimeAllowed: boolean;
+  conversationId: string;
+}
+
 /** A bot's documents as the knowledge tab lists them. */
 export interface ChatbotDocumentView {
   id: string;
   title: string;
   status: string;
   isGlobal: boolean;
+  /** The bot's own document, uploaded on its Knowledge tab; false for a library document. */
+  private: boolean;
   archived: boolean;
   updatedAt: Date;
+}
+
+/** One of a bot's documents with its text, as the Knowledge tab's panel shows it. */
+export interface ChatbotDocumentDetail {
+  id: string;
+  title: string;
+  status: string;
+  private: boolean;
+  archived: boolean;
+  sourceType: string;
+  fileName: string | null;
+  statusMessage: string | null;
+  updatedAt: Date;
+  rawText: string;
 }
 
 export interface ChatbotMemberView {
@@ -116,6 +182,7 @@ export class ChatbotService {
     private readonly settingsService: ChatbotSettingsService,
     private readonly engine: ChatbotEngineService,
     private readonly llmModels: LlmModelService,
+    private readonly knowledgeBase: KnowledgeBaseService,
   ) {}
 
   // ───────────────────────────────────────────────────────────── read
@@ -138,15 +205,25 @@ export class ChatbotService {
   private async summarise(bots: Chatbot[]): Promise<ChatbotSummary[]> {
     if (!bots.length) return [];
     const ids = bots.map((b) => b.id);
-    const [roles, connectors, docCounts, audienceCounts, memberCounts, stats] =
-      await Promise.all([
-        this.access.rolesFor(ids),
-        this.connectors.summariesForBots(ids),
-        this.countBy(this.documentRepository, ids),
-        this.countBy(this.audienceRepository, ids),
-        this.countBy(this.memberRepository, ids),
-        this.stats(ids),
-      ]);
+    const [
+      roles,
+      connectors,
+      docCounts,
+      readyDocCounts,
+      audienceCounts,
+      memberCounts,
+      stats,
+      defaults,
+    ] = await Promise.all([
+      this.access.rolesFor(ids),
+      this.connectors.summariesForBots(ids),
+      this.countBy(this.documentRepository, ids),
+      this.readyDocumentCounts(ids),
+      this.countBy(this.audienceRepository, ids),
+      this.countBy(this.memberRepository, ids),
+      this.stats(ids),
+      this.settingsService.get(),
+    ]);
     return bots.map((bot) => ({
       id: bot.id,
       name: bot.name,
@@ -157,9 +234,13 @@ export class ChatbotService {
       knowledgeSource: bot.knowledgeSource,
       persona: bot.persona ?? {},
       model: bot.model ?? null,
+      runtime: bot.runtime ?? ChatbotRuntime.V1,
+      effectiveRuntime: effectiveRuntime(defaults),
+      features: bot.features ?? {},
       myRole: roles.get(bot.id) ?? ChatbotMemberRole.VIEWER,
       connectors: connectors.get(bot.id) ?? [],
       documentCount: docCounts.get(bot.id) ?? 0,
+      readyDocumentCount: readyDocCounts.get(bot.id) ?? 0,
       audienceCount: audienceCounts.get(bot.id) ?? 0,
       memberCount: memberCounts.get(bot.id) ?? 0,
       stats: stats.get(bot.id) ?? EMPTY_STATS,
@@ -167,6 +248,24 @@ export class ChatbotService {
       createdAt: bot.createdAt,
       updatedAt: bot.updatedAt,
     }));
+  }
+
+  /** Per bot, the documents it can answer from now: indexed and not archived. */
+  private async readyDocumentCounts(
+    ids: string[],
+  ): Promise<Map<string, number>> {
+    const rows = await this.chatbotRepository.manager.query<
+      { chatbot_id: string; count: string }[]
+    >(
+      `SELECT cd.chatbot_id, COUNT(*) AS count
+         FROM chatbot_documents cd
+         JOIN kb_documents d ON d.id = cd.document_id
+        WHERE cd.chatbot_id = ANY($1::uuid[])
+          AND d.status = 'indexed' AND d.archived_at IS NULL
+        GROUP BY cd.chatbot_id`,
+      [ids],
+    );
+    return new Map(rows.map((r) => [r.chatbot_id, Number(r.count)]));
   }
 
   private async countBy(
@@ -288,6 +387,7 @@ export class ChatbotService {
     if (dto.accessMode !== undefined) patch.accessMode = dto.accessMode;
     if (dto.knowledgeSource !== undefined)
       patch.knowledgeSource = dto.knowledgeSource;
+    // `runtime` and `features.agent` are ignored: every bot answers with the agent (chunk 3d).
     if (dto.model !== undefined) {
       patch.model = dto.model
         ? {
@@ -321,6 +421,10 @@ export class ChatbotService {
       { chatbotId: id },
       { chatbotId: null, updatedBy: currentUserId() },
     );
+    // Its own documents go with it: archived, so citations in its old conversations still resolve.
+    for (const documentId of await this.ownDocumentIds(id)) {
+      await this.knowledgeBase.archiveForChatbot(id, documentId);
+    }
     await this.chatbotRepository.update(
       { id },
       {
@@ -355,11 +459,12 @@ export class ChatbotService {
         title: string;
         status: string;
         is_global: boolean;
+        owner_chatbot_id: string | null;
         archived_at: Date | null;
         updatedAt: Date;
       }[]
     >(
-      `SELECT d.id, d.title, d.status, d.is_global, d.archived_at, d."updatedAt"
+      `SELECT d.id, d.title, d.status, d.is_global, d.owner_chatbot_id, d.archived_at, d."updatedAt"
          FROM chatbot_documents cd
          JOIN kb_documents d ON d.id = cd.document_id
         WHERE cd.chatbot_id = $1
@@ -371,22 +476,29 @@ export class ChatbotService {
       title: r.title,
       status: r.status,
       isGlobal: r.is_global,
+      private: r.owner_chatbot_id === id,
       archived: Boolean(r.archived_at),
       updatedAt: r.updatedAt,
     }));
   }
 
-  /** Replace the bot's document selection. Only knowledge-base documents that exist count. */
+  /**
+   * Replace the bot's shared library documents. Only library documents that exist count, plus
+   * the bot's own (which stay attached whatever is sent); another bot's own documents are refused.
+   */
   async setDocuments(
     id: string,
     documentIds: string[],
   ): Promise<ChatbotDocumentView[]> {
     await this.access.assert(id, ChatbotMemberRole.EDITOR);
-    const unique = [...new Set(documentIds)];
+    const own = await this.ownDocumentIds(id);
+    const unique = [...new Set([...documentIds, ...own])];
     const existing = unique.length
       ? await this.chatbotRepository.manager.query<{ id: string }[]>(
-          `SELECT id FROM kb_documents WHERE id = ANY($1::uuid[]) AND corpus = 'whatsapp_qa'`,
-          [unique],
+          `SELECT id FROM kb_documents
+            WHERE id = ANY($1::uuid[]) AND corpus = 'whatsapp_qa'
+              AND (owner_chatbot_id IS NULL OR owner_chatbot_id = $2)`,
+          [unique, id],
         )
       : [];
     if (existing.length !== unique.length) {
@@ -409,6 +521,103 @@ export class ChatbotService {
       }
     });
     return this.listDocuments(id);
+  }
+
+  /** Presigned upload for a document of the bot's own (its Knowledge tab). */
+  async createDocumentUploadUrl(id: string, dto: CreateKbUploadUrlDto) {
+    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    return this.knowledgeBase.createChatbotUploadUrl(id, dto);
+  }
+
+  /**
+   * Add a document of the bot's own: created in the WhatsApp corpus, owned by this bot (so the
+   * library and other bots don't list it), attached, and queued for indexing.
+   */
+  async addOwnDocument(
+    id: string,
+    dto: CreateKbOwnedDocumentDto,
+  ): Promise<ChatbotDocumentView[]> {
+    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    const document = await this.knowledgeBase.createForChatbot(id, dto);
+    await this.documentRepository.insert({
+      chatbotId: id,
+      documentId: document.id,
+      createdBy: currentUserId(),
+    });
+    return this.listDocuments(id);
+  }
+
+  /**
+   * Take a document off the bot. The bot's own document is archived as well (citations in old
+   * conversations still resolve); a shared one stays in the library.
+   */
+  async removeDocument(
+    id: string,
+    documentId: string,
+  ): Promise<ChatbotDocumentView[]> {
+    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    if ((await this.ownDocumentIds(id)).includes(documentId)) {
+      await this.knowledgeBase.archiveForChatbot(id, documentId);
+    }
+    await this.documentRepository.delete({ chatbotId: id, documentId });
+    return this.listDocuments(id);
+  }
+
+  /** One of the bot's documents with its text, for viewing (and editing its own). */
+  async getDocument(
+    id: string,
+    documentId: string,
+  ): Promise<ChatbotDocumentDetail> {
+    await this.access.assert(id);
+    const attached = await this.documentRepository.count({
+      where: { chatbotId: id, documentId },
+    });
+    if (!attached) {
+      throw new NotFoundException(`Document ${documentId} was not found`);
+    }
+    return this.toDocumentDetail(
+      id,
+      await this.knowledgeBase.getForChatbot(documentId),
+    );
+  }
+
+  /** Rename one of the bot's own documents, or replace its text (it is then trained again). */
+  async updateOwnDocument(
+    id: string,
+    documentId: string,
+    dto: { title?: string; text?: string },
+  ): Promise<ChatbotDocumentDetail> {
+    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    await this.knowledgeBase.updateForChatbot(id, documentId, dto);
+    return this.getDocument(id, documentId);
+  }
+
+  private async toDocumentDetail(
+    id: string,
+    document: KbDocumentResponseDto,
+  ): Promise<ChatbotDocumentDetail> {
+    const own = await this.ownDocumentIds(id);
+    return {
+      id: document.id,
+      title: document.title,
+      status: document.status,
+      private: own.includes(document.id),
+      archived: document.isArchived,
+      sourceType: document.sourceType,
+      fileName: document.fileName ?? null,
+      statusMessage: document.statusMessage ?? null,
+      updatedAt: document.updatedAt,
+      rawText: document.rawText ?? '',
+    };
+  }
+
+  /** The ids of the bot's own documents that aren't archived. */
+  private async ownDocumentIds(id: string): Promise<string[]> {
+    const rows = await this.chatbotRepository.manager.query<{ id: string }[]>(
+      `SELECT id FROM kb_documents WHERE owner_chatbot_id = $1 AND archived_at IS NULL`,
+      [id],
+    );
+    return rows.map((r) => r.id);
   }
 
   // ───────────────────────────────────────────────────────────── team
@@ -483,10 +692,11 @@ export class ChatbotService {
    * model or document selection before saving it. The sender is the admin themselves; the "who can
    * chat" check is skipped unless asked for, since testing is about the answers.
    */
-  async test(id: string, dto: TestChatbotDto) {
+  async test(id: string, dto: TestChatbotDto): Promise<ChatbotTestResult> {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
     const draft = dto.draft ?? {};
     if (draft.model) await this.assertModel(draft.model);
+    const conversationId = dto.conversationId ?? `preview-${randomUUID()}`;
 
     const bot: Chatbot = {
       ...chatbot,
@@ -518,6 +728,8 @@ export class ChatbotService {
       settings,
       text: dto.message,
       history: dto.history ?? [],
+      // An empty Preview chat stands for a new person (see the first reply below).
+      isFirstMessage: !(dto.history ?? []).length,
       sender: {
         externalId: `test:${currentUserId()}`,
         label: 'test console',
@@ -527,6 +739,7 @@ export class ChatbotService {
       },
       channel: { type: 'test' },
       documentIds: draft.documentIds,
+      conversationId,
     });
 
     // Remembered so the setup checklist can show the bot has been tried; Preview stores nothing else.
@@ -547,6 +760,33 @@ export class ChatbotService {
         })
       : decision.body;
 
+    return this.toTestResult(decision, {
+      reply,
+      settings,
+      conversationId,
+      latencyMs: Date.now() - startedAt,
+      usedDraft: Boolean(dto.draft),
+    });
+  }
+
+  /** One Preview test as the console shows it. */
+  private toTestResult(
+    decision: ChatbotDecision,
+    {
+      reply,
+      settings,
+      conversationId,
+      latencyMs,
+      usedDraft,
+    }: {
+      reply: string;
+      settings: WhatsAppBotSettings;
+      conversationId: string;
+      latencyMs: number;
+      usedDraft: boolean;
+    },
+  ): ChatbotTestResult {
+    const { agent } = decision;
     return {
       reply,
       handledBy: decision.handledBy,
@@ -555,9 +795,22 @@ export class ChatbotService {
       language: decision.language ?? null,
       wouldFileUnanswered: decision.unanswered ?? null,
       // Shown rather than sent: the console must never page anyone.
-      wouldAlert: decision.alert ? decision.alert.type : null,
-      latencyMs: Date.now() - startedAt,
-      usedDraft: Boolean(dto.draft),
+      wouldAlert: decision.alert
+        ? decision.alert.type
+        : isFallback(agent)
+          ? AGENT_RUNTIME_DEGRADED_TYPE
+          : null,
+      latencyMs,
+      usedDraft,
+      // Agents v2: which engine answered this test, and the run behind it.
+      runtime: agent?.runtime ?? ChatbotRuntime.V1,
+      runId: agent?.runId ?? null,
+      trace: agent?.runtime === AgentRuntimeUsed.V2 ? agent.trace : null,
+      fallbackReason: isFallback(agent) ? agent.fallbackReason : null,
+      // Agent mode: what the agent understood the message to be (smalltalk, about_bot, …).
+      turnType: decision.turnType ?? null,
+      runtimeAllowed: settings.agentRuntimeAllowed,
+      conversationId,
     };
   }
 }

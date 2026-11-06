@@ -1,78 +1,69 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 
 import { toast } from "sonner";
 
-import {
-  RadioButton,
-  RadioButtonGroup,
-  Select,
-  SelectItem,
-  Slider,
-  TextArea,
-  TextInput,
-} from "@ally-ui-mono/ui-shared";
-import { useGetLlmModelsQuery, useUpdateChatbotMutation } from "@api";
+import { TextArea, TextInput } from "@ally-ui-mono/ui-shared";
+import { useUpdateChatbotMutation } from "@api";
 import { Button, EntityField } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { Chatbot, ChatbotAnswerMode, ChatbotModelChoice, ChatbotPersona } from "@types";
+import { Chatbot, ChatbotPersona } from "@types";
 
-import { Card, errorMessage, fill } from "./shared";
+import {
+  handOverToPreview,
+  PreviewDraft,
+  readStoredDraft,
+  savedDraftOf,
+  settlePreviewDraft,
+  useTabDraft,
+} from "./previewDraft";
+import { Card, errorMessage, fill, missingPersonaFields } from "./shared";
+import { useReportUnsaved } from "./unsavedChanges";
 
 const t = en.whatsappBot.bots.persona;
 const MAX_PROMPT = 4000;
-/** The runtime that answers chatbot questions; only its models are offered. */
-const ANSWER_RUNTIME = "ally-ai";
 
-export interface PersonaDraft {
-  name: string;
-  description: string;
-  persona: ChatbotPersona;
-  answerMode: ChatbotAnswerMode;
-  model: ChatbotModelChoice | null;
-}
+type PersonaDraft = Pick<PreviewDraft, "name" | "description" | "persona">;
 
-const draftOf = (bot: Chatbot): PersonaDraft => ({
-  name: bot.name,
-  description: bot.description ?? "",
-  persona: { ...bot.persona },
-  answerMode: bot.answerMode,
-  model: bot.model,
+/** The part of the bot this tab edits. Answer mode and model are edited on the Agent tab. */
+const personaPart = (draft: PreviewDraft): PersonaDraft => ({
+  name: draft.name,
+  description: draft.description,
+  persona: draft.persona,
 });
 
 /**
- * Who the bot is and how it answers: name, instructions, tone, greeting, answer mode and model.
- * Unsaved changes can be tried in the test console before saving (they travel as a draft).
+ * Who the bot is and what it says: name, instructions, tone and greeting. How it answers (answer
+ * mode, model) is on the Agent tab. Unsaved changes can be tried in Preview before saving
+ * (they travel as a draft, and are still here on coming back).
  */
 export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => void }> = ({
   bot,
   canEdit,
   onTest,
 }) => {
-  const [draft, setDraft] = useState<PersonaDraft>(() => draftOf(bot));
-  useEffect(() => {
-    setDraft(draftOf(bot));
-  }, [bot]);
+  const { draft, setDraft, dirty } = useTabDraft(bot, personaPart);
+  useReportUnsaved("persona", dirty);
   const [save, { isLoading: isSaving }] = useUpdateChatbotMutation();
-  const { data: models = [] } = useGetLlmModelsQuery(ANSWER_RUNTIME);
 
-  const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(draftOf(bot)), [draft, bot]);
   const setPersona = (patch: Partial<ChatbotPersona>) =>
     setDraft(current => ({ ...current, persona: { ...current.persona, ...patch } }));
-  const selectedModel = models.find(
-    m => m.provider === draft.model?.provider && m.model === draft.model?.model,
-  );
 
   const handleSave = async () => {
+    const saved: PersonaDraft = {
+      name: draft.name.trim(),
+      description: draft.description.trim(),
+      persona: draft.persona,
+    };
     try {
       await save({
         id: bot.id,
-        name: draft.name.trim(),
-        description: draft.description.trim() || null,
-        persona: draft.persona,
-        answerMode: draft.answerMode,
-        model: draft.model,
+        name: saved.name,
+        description: saved.description || null,
+        persona: saved.persona,
       }).unwrap();
+      setDraft(saved);
+      settlePreviewDraft(bot, saved);
       toast.success(t.saved);
     } catch (err) {
       toast.error(errorMessage(err, t.saveFailed));
@@ -80,16 +71,12 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
   };
 
   const tryIt = () => {
-    // The test tab picks the draft up from session storage, so unsaved changes can be tried there.
-    try {
-      sessionStorage.setItem(`chatbot-draft:${bot.id}`, JSON.stringify(draft));
-    } catch {
-      // Storage refused: the test runs against the saved bot instead.
-    }
+    handOverToPreview(bot, { ...(readStoredDraft(bot.id) ?? savedDraftOf(bot)), ...draft });
     onTest();
   };
 
   const promptLength = draft.persona.systemPrompt?.length ?? 0;
+  const missing = missingPersonaFields(draft.persona);
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -116,7 +103,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
             onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
           />
         </EntityField>
-        <EntityField label={t.displayNameLabel} help={t.displayNameHelp}>
+        <EntityField label={t.displayNameLabel} help={t.displayNameHelp} required>
           <TextInput
             id="persona-display-name"
             labelText=""
@@ -127,7 +114,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
             onChange={e => setPersona({ displayName: e.target.value })}
           />
         </EntityField>
-        <EntityField label={t.toneLabel}>
+        <EntityField label={t.toneLabel} required>
           <TextInput
             id="persona-tone"
             labelText=""
@@ -142,6 +129,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
         <EntityField
           label={t.promptLabel}
           help={`${t.promptHelp} ${fill(t.promptCount, { count: promptLength, max: MAX_PROMPT })}`}
+          required
         >
           <TextArea
             id="persona-prompt"
@@ -154,7 +142,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
             onChange={e => setPersona({ systemPrompt: e.target.value })}
           />
         </EntityField>
-        <EntityField label={t.greetingLabel} help={t.greetingHelp}>
+        <EntityField label={t.greetingLabel} help={t.greetingHelp} required>
           <TextArea
             id="persona-greeting"
             labelText=""
@@ -168,83 +156,20 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
         </EntityField>
       </Card>
 
-      <Card>
-        <EntityField label={t.answerModeLabel}>
-          <RadioButtonGroup
-            name="persona-answer-mode"
-            orientation="vertical"
-            valueSelected={draft.answerMode}
-            disabled={!canEdit}
-            onChange={value => setDraft(d => ({ ...d, answerMode: value as ChatbotAnswerMode }))}
-          >
-            <RadioButton
-              id="answer-mode-docs"
-              value={ChatbotAnswerMode.DOCUMENTS_ONLY}
-              labelText={`${t.answerModeDocs} — ${t.answerModeDocsHint}`}
-            />
-            <RadioButton
-              id="answer-mode-general"
-              value={ChatbotAnswerMode.DOCUMENTS_AND_GENERAL}
-              labelText={`${t.answerModeGeneral} — ${t.answerModeGeneralHint}`}
-            />
-          </RadioButtonGroup>
-        </EntityField>
-        <EntityField label={t.modelLabel} help={t.modelHelp}>
-          <Select
-            id="persona-model"
-            labelText=""
-            hideLabel
-            disabled={!canEdit}
-            value={draft.model ? `${draft.model.provider}::${draft.model.model}` : ""}
-            onChange={e => {
-              const [provider, model] = e.target.value.split("::");
-              setDraft(d => ({
-                ...d,
-                model:
-                  provider && model
-                    ? { provider, model, temperature: d.model?.temperature ?? null }
-                    : null,
-              }));
-            }}
-          >
-            <SelectItem value="" text={t.modelDefault} />
-            {models.map(m => (
-              <SelectItem
-                key={`${m.provider}::${m.model}`}
-                value={`${m.provider}::${m.model}`}
-                text={`${m.label} (${m.provider})`}
-              />
-            ))}
-          </Select>
-        </EntityField>
-        {draft.model && selectedModel?.supportsTemperature && (
-          <EntityField label={t.temperatureLabel}>
-            <Slider
-              id="persona-temperature"
-              labelText=""
-              hideLabel
-              min={0}
-              max={1}
-              step={0.1}
-              value={draft.model.temperature ?? 0}
-              disabled={!canEdit}
-              onChange={({ value }: { value: number }) =>
-                setDraft(d => (d.model ? { ...d, model: { ...d.model, temperature: value } } : d))
-              }
-            />
-          </EntityField>
-        )}
-      </Card>
-
       <div className="flex flex-wrap gap-2">
         {canEdit && (
           <Button
             variant={ButtonVariant.PRIMARY}
             onClick={() => void handleSave()}
-            disabled={!dirty || !draft.name.trim() || isSaving}
+            disabled={!dirty || !draft.name.trim() || missing.length > 0 || isSaving}
           >
             {t.save}
           </Button>
+        )}
+        {canEdit && missing.length > 0 && (
+          <span className="self-center text-sm text-typography-500">
+            {fill(t.stillToFill, { fields: missing.join(", ") })}
+          </span>
         )}
         <Button variant={ButtonVariant.SECONDARY} onClick={tryIt}>
           {t.tryIt}

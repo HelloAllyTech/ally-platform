@@ -71,6 +71,9 @@ export const validationSchema = Joi.object({
     .length(64)
     .pattern(/^[a-f0-9]+$/i)
     .optional(),
+  // Agents v2: how many shadow comparison runs one instance may have in flight. 0 turns shadow
+  // runs off without touching any bot.
+  AGENT_SHADOW_MAX_IN_FLIGHT: Joi.number().integer().min(0).default(5),
   // Organisations' own WhatsApp access tokens and app secrets (wa_business_numbers).
   WHATSAPP_CREDENTIALS_ENCRYPTION_KEY: Joi.string()
     .length(64)

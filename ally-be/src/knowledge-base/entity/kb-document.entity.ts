@@ -43,6 +43,7 @@ import {
  */
 @Entity('kb_documents')
 @Index('idx_kb_documents_corpus_owner', ['corpus', 'ownerTenantId'])
+@Index('idx_kb_documents_corpus_owner_chatbot', ['corpus', 'ownerChatbotId'])
 export class KbDocument extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -158,6 +159,16 @@ export class KbDocument extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'uuid', name: 'owner_tenant_id', nullable: true })
   ownerTenantId?: string | null;
+
+  /**
+   * The chatbot this document belongs to, when it was uploaded on that chatbot's Knowledge tab
+   * (`whatsapp_qa` only, chunk 3d). Null is a shared library document. Like `ownerTenantId`, it
+   * says who may SEE and MANAGE the document: the library and every other bot's picker leave it
+   * out, and only its chatbot's editors change it. What a bot answers from is still
+   * `chatbot_documents`, where an owned document is attached when it is created.
+   */
+  @Column({ type: 'uuid', name: 'owner_chatbot_id', nullable: true })
+  ownerChatbotId?: string | null;
 
   /**
    * Clinical content (plan §8.5): served to the Debrief agent only once the

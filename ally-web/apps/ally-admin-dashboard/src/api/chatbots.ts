@@ -3,6 +3,7 @@ import {
   Chatbot,
   ChatbotAudienceEntry,
   ChatbotAudienceKind,
+  ChatbotDocumentDetail,
   ChatbotDocumentRow,
   ChatbotMember,
   ChatbotMemberRole,
@@ -12,9 +13,13 @@ import {
   Connector,
   ConnectorType,
   CreateChatbotRequest,
+  CreateChatbotUploadUrlRequest,
+  CreateKbUploadUrlResponse,
+  CreatePrivateChatbotDocumentRequest,
   GetChatbotsResponse,
   TestChatbotRequest,
   TestChatbotResponse,
+  UpdateChatbotDocumentRequest,
   UpdateChatbotRequest,
 } from "@types";
 
@@ -27,6 +32,7 @@ import { baseAPI } from "./baseApi";
  * counts (documents, people, connectors) the detail tabs change. Connector moves invalidate both
  * bots' views and the WhatsApp numbers, whose cards show which bot they serve.
  */
+const documentTag = (id: string, documentId: string) => `${id}:document:${documentId}`;
 const botTags = (id: string) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }, TAG_TYPES.CHATBOTS];
 
 export const chatbotsApi = baseAPI.injectEndpoints({
@@ -101,6 +107,67 @@ export const chatbotsApi = baseAPI.injectEndpoints({
         body: { documentIds },
       }),
       invalidatesTags: (_r, _e, { id }) => botTags(id),
+    }),
+
+    /** Presign a file for one of the chatbot's own documents; the browser PUTs it there. */
+    createChatbotDocumentUploadUrl: builder.mutation<
+      CreateKbUploadUrlResponse,
+      CreateChatbotUploadUrlRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.DOCUMENT_UPLOAD_URL(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /** A document only this chatbot sees: attached and queued for indexing. Returns its list. */
+    createPrivateChatbotDocument: builder.mutation<
+      ChatbotDocumentRow[],
+      CreatePrivateChatbotDocumentRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.PRIVATE_DOCUMENTS(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id }) => botTags(id),
+    }),
+
+    /** Archives a private document; takes a shared one off this chatbot only. Returns its list. */
+    removeChatbotDocument: builder.mutation<
+      ChatbotDocumentRow[],
+      { id: string; documentId: string }
+    >({
+      query: ({ id, documentId }) => ({
+        url: ApiEndpoints.CHATBOTS.DOCUMENT_BY_ID(id, documentId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: (_r, _e, { id }) => botTags(id),
+    }),
+
+    /** One document on this chatbot, with its text. */
+    getChatbotDocument: builder.query<ChatbotDocumentDetail, { id: string; documentId: string }>({
+      query: ({ id, documentId }) => ({
+        url: ApiEndpoints.CHATBOTS.DOCUMENT_BY_ID(id, documentId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_r, _e, { id, documentId }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: documentTag(id, documentId) },
+      ],
+    }),
+
+    /** Edits one of the chatbot's own documents; a changed text queues it for training again. */
+    updateChatbotDocument: builder.mutation<ChatbotDocumentDetail, UpdateChatbotDocumentRequest>({
+      query: ({ id, documentId, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.DOCUMENT_BY_ID(id, documentId),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id, documentId }) => [
+        ...botTags(id),
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: documentTag(id, documentId) },
+      ],
     }),
 
     getChatbotMembers: builder.query<ChatbotMember[], string>({
@@ -209,6 +276,11 @@ export const {
   useUpdateChatbotSettingsMutation,
   useGetChatbotDocumentsQuery,
   useSetChatbotDocumentsMutation,
+  useCreateChatbotDocumentUploadUrlMutation,
+  useCreatePrivateChatbotDocumentMutation,
+  useRemoveChatbotDocumentMutation,
+  useGetChatbotDocumentQuery,
+  useUpdateChatbotDocumentMutation,
   useGetChatbotMembersQuery,
   useSetChatbotMembersMutation,
   useGetChatbotAudienceQuery,

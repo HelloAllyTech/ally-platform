@@ -62,3 +62,23 @@ export enum ChatbotAudienceKind {
   /** An email address, for channels that identify people by email. */
   EMAIL = 'email',
 }
+
+/**
+ * Which engine answers a bot's questions (Agents v2). A platform kill switch,
+ * `agentRuntimeAllowed` on the shared defaults, turns every bot back to v1 without a deploy.
+ */
+export enum ChatbotRuntime {
+  /** ally-ai's `/knowledge-agent/answer`, as Stage 1 built it. */
+  V1 = 'v1',
+  /** v1 answers; the same request also goes to `/agent/run` afterwards, for comparison only. */
+  SHADOW = 'shadow',
+  /** ally-ai's `/agent/run` (LangGraph), falling back to v1 if it fails before answering. */
+  V2 = 'v2',
+}
+
+/** Which engine produced a reply that came from the agent runtime, as stored on the message. */
+export enum AgentRuntimeUsed {
+  V2 = 'v2',
+  /** `/agent/run` failed before an answer existed, so v1 answered instead. */
+  V2_FALLBACK = 'v2_fallback',
+}

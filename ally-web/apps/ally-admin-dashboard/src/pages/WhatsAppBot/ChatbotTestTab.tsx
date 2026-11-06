@@ -1,35 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import { Checkbox, InlineNotification, TextArea } from "@ally-ui-mono/ui-shared";
-import { useTestChatbotMutation } from "@api";
+import { useGetChatbotsQuery, useTestChatbotMutation } from "@api";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { Chatbot, ChatbotDraft, TestChatbotResponse } from "@types";
+import { AgentTraceStep, Chatbot, TestChatbotResponse } from "@types";
 
-import { Card, errorMessage, fill } from "./shared";
-
-import type { PersonaDraft } from "./PersonaTab";
+import { readPreviewDraft } from "./previewDraft";
+import { Card, copyToClipboard, errorMessage, fill } from "./shared";
 
 const t = en.whatsappBot.bots.test;
+/** Messages of the thread sent with each test, most recent last (ally-be keeps the same 10). */
+const MAX_HISTORY_MESSAGES = 10;
 const handledLabels = en.whatsappBot.conversations.handledBy as Record<string, string>;
 
 type Turn =
   | { role: "user"; content: string }
   | { role: "assistant"; content: string; result?: TestChatbotResponse; error?: boolean };
-
-/** Unsaved persona changes handed over by the Persona tab's "Try these changes", read once. */
-const takeDraft = (botId: string): ChatbotDraft | undefined => {
-  try {
-    const raw = sessionStorage.getItem(`chatbot-draft:${botId}`);
-    if (!raw) return undefined;
-    sessionStorage.removeItem(`chatbot-draft:${botId}`);
-    const draft = JSON.parse(raw) as PersonaDraft;
-    return { persona: draft.persona, answerMode: draft.answerMode, model: draft.model };
-  } catch {
-    return undefined;
-  }
-};
 
 /**
  * A chat with the bot that sends nothing and stores nothing. It runs the same decision path as a
@@ -37,10 +25,19 @@ const takeDraft = (botId: string): ChatbotDraft | undefined => {
  * model, with the crisis check beside it — and shows how each reply was decided.
  */
 export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
-  const [draft] = useState(() => takeDraft(bot.id));
+  // Unsaved changes handed over by "Preview these changes" on the Persona or Agent tab. They stay
+  // stored, so those tabs still have them when the person goes back.
+  const [draft] = useState(() => readPreviewDraft(bot.id));
   const [turns, setTurns] = useState<Turn[]>([]);
   const [message, setMessage] = useState("");
   const [checkAccess, setCheckAccess] = useState(false);
+  // The thread the agent keeps for this chat, until "New thread".
+  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [runtimeAllowed, setRuntimeAllowed] = useState(true);
+  // Only platform admins see which engine answered and the run behind it, and are told when the
+  // emergency switch in Defaults has every chatbot in safe mode.
+  const { data: list } = useGetChatbotsQuery();
+  const isPlatformAdmin = Boolean(list?.canCreate);
   const [test, { isLoading }] = useTestChatbotMutation();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +48,11 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   const send = async () => {
     const text = message.trim();
     if (!text) return;
-    const history = turns.map(turn => ({ role: turn.role, content: turn.content }));
+    // The thread on screen keeps everything; the request carries only the most recent
+    // messages, as WhatsApp does (the API accepts at most 20).
+    const history = turns
+      .slice(-MAX_HISTORY_MESSAGES)
+      .map(turn => ({ role: turn.role, content: turn.content }));
     setTurns(current => [...current, { role: "user", content: text }]);
     setMessage("");
     try {
@@ -61,7 +62,10 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
         history,
         draft,
         checkAccess,
+        conversationId,
       }).unwrap();
+      setConversationId(result.conversationId);
+      setRuntimeAllowed(result.runtimeAllowed !== false);
       setTurns(current => [...current, { role: "assistant", content: result.reply, result }]);
     } catch (err) {
       setTurns(current => [
@@ -77,8 +81,14 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
       subtitle={t.intro}
       action={
         turns.length > 0 && (
-          <Button variant={ButtonVariant.SECONDARY} onClick={() => setTurns([])}>
-            {t.reset}
+          <Button
+            variant={ButtonVariant.SECONDARY}
+            onClick={() => {
+              setTurns([]);
+              setConversationId(undefined);
+            }}
+          >
+            {t.newThread}
           </Button>
         )
       }
@@ -86,11 +96,14 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
       {draft && (
         <InlineNotification kind="info" title={t.draftBanner} lowContrast hideCloseButton />
       )}
+      {isPlatformAdmin && !runtimeAllowed && (
+        <InlineNotification kind="info" title={t.agentOff} lowContrast hideCloseButton />
+      )}
       <div className="flex flex-col gap-3 min-h-[16rem] max-h-[32rem] overflow-y-auto bg-background-100 rounded-md p-4">
         {turns.length === 0 ? (
           <EmptyState title={t.empty} hideActionButton />
         ) : (
-          turns.map((turn, index) => <Bubble key={index} turn={turn} />)
+          turns.map((turn, index) => <Bubble key={index} turn={turn} showRun={isPlatformAdmin} />)
         )}
         {isLoading && (
           <div className="self-start rounded-lg px-3 py-2 text-sm border border-border-light bg-white text-typography-500">
@@ -135,7 +148,8 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   );
 };
 
-const Bubble: React.FC<{ turn: Turn }> = ({ turn }) => {
+/** One message. `showRun`: the engine and the run behind an answer, for platform admins only. */
+const Bubble: React.FC<{ turn: Turn; showRun: boolean }> = ({ turn, showRun }) => {
   if (turn.role === "user") {
     return (
       <div className="self-end max-w-[80%] rounded-lg bg-primary-500 text-white px-3 py-2 text-sm whitespace-pre-wrap">
@@ -167,6 +181,18 @@ const Bubble: React.FC<{ turn: Turn }> = ({ turn }) => {
             </span>
           )}
           <span>{result.latencyMs} ms</span>
+          {showRun ? (
+            <EngineBadge result={result} />
+          ) : (
+            result.runtime === "v2_fallback" && (
+              <span data-testid="fallback-note">{t.fellBackPlain}</span>
+            )
+          )}
+          {result.turnType && (
+            <span data-testid="turn-type" className="rounded-full border border-border-light px-2">
+              {t.turnTypes[result.turnType] ?? result.turnType}
+            </span>
+          )}
           {result.citations.length > 0 && (
             <span>
               {t.sources}: {[...new Set(result.citations.map(c => c.document_title))].join(", ")}
@@ -179,6 +205,68 @@ const Bubble: React.FC<{ turn: Turn }> = ({ turn }) => {
             </span>
           )}
         </div>
+      )}
+      {showRun && result?.runId && <RunDetails result={result} />}
+    </div>
+  );
+};
+
+/**
+ * One step as a line: its summary when it has one (counts only, e.g. "retrieve: 3 hits, best
+ * 0.71"), else its name; a tool call is marked as one. Then its time.
+ */
+const stepLine = (step: AgentTraceStep): string => {
+  const what = step.summary || step.node;
+  return `${step.node === "tool" ? `${t.toolStep} · ` : ""}${what} · ${step.ms} ms`;
+};
+
+/** Who answered this test: the agent, or safe mode (and why, when the agent failed). */
+const EngineBadge: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
+  const runtime = result.runtime ?? "v1";
+  const label =
+    runtime === "v2"
+      ? t.answeredByAgent
+      : runtime === "v2_fallback"
+        ? fill(t.fellBack, { reason: result.fallbackReason ?? "unknown" })
+        : t.answeredByBackup;
+  const tone =
+    runtime === "v2"
+      ? "border-primary-300 text-primary-700"
+      : runtime === "v2_fallback"
+        ? "border-warning-300 text-warning-700"
+        : "border-border-light text-typography-600";
+  return (
+    <span data-testid="engine-badge" className={`rounded-full border px-2 ${tone}`}>
+      {label}
+    </span>
+  );
+};
+
+/** The run behind an agent answer: its id, to find it later, and the steps it took. */
+const RunDetails: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
+  const steps = result.trace ?? [];
+  return (
+    <div className="flex flex-col gap-1 text-xs text-typography-500 px-1">
+      <div className="flex items-center gap-2">
+        <span>{t.runId}:</span>
+        <code className="break-all">{result.runId}</code>
+        <button
+          type="button"
+          className="text-primary-600 hover:underline"
+          onClick={() => void copyToClipboard(result.runId ?? "")}
+        >
+          {t.copy}
+        </button>
+      </div>
+      {steps.length > 0 && (
+        <details>
+          <summary className="cursor-pointer">{fill(t.steps, { count: steps.length })}</summary>
+          <ol className="list-decimal pl-5 pt-1">
+            {steps.map((step, index) => (
+              <li key={`${step.node}-${index}`}>{stepLine(step)}</li>
+            ))}
+          </ol>
+        </details>
       )}
     </div>
   );

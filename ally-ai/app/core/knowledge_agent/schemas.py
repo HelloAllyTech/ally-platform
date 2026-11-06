@@ -8,9 +8,17 @@ comes back as the empty default rather than null, which keeps the parsed object 
 from __future__ import annotations
 
 from enum import Enum
-from typing import List
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+#: How far a bot may answer: only from its documents, or beyond them, saying so.
+AnswerMode = Literal["documents_only", "documents_and_general"]
+
+
+def is_general(answer_mode: Optional[str]) -> bool:
+    """Whether a bot may answer beyond its documents (`documents_and_general`)."""
+    return answer_mode == "documents_and_general"
 
 
 class AnswerIntent(str, Enum):

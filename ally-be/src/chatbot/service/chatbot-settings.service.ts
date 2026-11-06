@@ -113,6 +113,9 @@ export class ChatbotSettingsService {
         override.crisisClassifierEnabled === true,
       consentRequired:
         global.consentRequired || override.consentRequired === true,
+      // Platform-wide only. The per-bot settings body is not checked key by key, so a bot's jsonb
+      // could otherwise switch the new engine on for itself past the kill switch.
+      agentRuntimeAllowed: global.agentRuntimeAllowed,
       rateLimit: {
         perMinute: tighter(global.rateLimit.perMinute, rateLimit?.perMinute),
         perHour: tighter(global.rateLimit.perHour, rateLimit?.perHour),

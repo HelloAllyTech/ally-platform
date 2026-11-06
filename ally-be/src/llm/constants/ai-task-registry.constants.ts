@@ -1116,7 +1116,9 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'refusing to answer from outside the passages is an instruction-following problem, ' +
       'until that credential expired and took the bot silent — OpenAI is the one provider ' +
       'whose key is required in that service. Falls back to OpenAI whatever is selected, ' +
-      'and says so in the metadata.',
+      'and says so in the metadata. A bot on the Agents v2 engine (chatbots.runtime = v2) ' +
+      'makes the same calls through /agent/run; a shadow bot makes them twice, once per ' +
+      'engine, so it costs double while it shadows.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
@@ -1147,6 +1149,25 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     provider: 'openai',
     defaultModel: 'gpt-4o-mini',
     configuredBy: 'KNOWLEDGE_AGENT__TRANSLATE_MODEL',
+  },
+  {
+    id: 'whatsapp-agent-step',
+    task: LlmTask.WHATSAPP_AGENT_STEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Someone messages a chatbot that is in Agent mode (Agents v2)',
+    detail:
+      'One call per step: the agent reads the conversation and either searches the bot’s ' +
+      'documents (writing its own query) or replies. Small talk takes one call, a question ' +
+      'usually two; at most 2 searches (none after one that found nothing new) and one rewrite ' +
+      'of a reply the check refused, within a 15-second run budget. Replaces ' +
+      'the translate and answer calls for these bots, so the bot’s own model (chatbots.model) ' +
+      'applies here, never to the crisis check.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per bot: chatbots.model',
+    promptOverride: 'ally_ai_agent_system',
   },
   {
     id: 'corpus-embedding',

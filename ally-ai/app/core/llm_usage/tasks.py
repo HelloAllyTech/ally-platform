@@ -69,6 +69,10 @@ class LLMTask(str, Enum):
     WHATSAPP_RAG_ANSWER = "whatsapp_rag_answer"
     WHATSAPP_QUERY_TRANSLATE = "whatsapp_query_translate"
     WHATSAPP_CRISIS_CLASSIFY = "whatsapp_crisis_classify"
+    # Conversational agent (Agents v2, `features.agent`): one call per loop
+    # iteration, on the bot's answer model. It reads the turn and writes its own
+    # search queries, so these bots make no translate call.
+    WHATSAPP_AGENT_STEP = "whatsapp_agent_step"
     # Text helpline copilot. Two labels because they differ in volume and shape: the
     # risk classifier runs on every talker message with a tiny output, the turn call
     # runs once per (debounced) talker turn and writes the suggestions. Must have the

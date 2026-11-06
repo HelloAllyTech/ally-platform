@@ -196,6 +196,10 @@ export enum LlmTask {
   HELPLINE_RISK_CLASSIFY = 'helpline_risk_classify',
   HELPLINE_COPILOT_TURN = 'helpline_copilot_turn',
   HELPLINE_QA_JUDGE = 'helpline_qa_judge',
+  // Chatbots in Agent mode (Agents v2, `features.agent`), made by ally-ai's /agent/run: one call
+  // per loop iteration on the bot's answer model. Chatbot spend, not a learner practising, so
+  // absent from TASK_AREA like the helpline's.
+  WHATSAPP_AGENT_STEP = 'whatsapp_agent_step',
   // Feedback → skill mapping (src/foundational-skills): one call per completed
   // session whose debrief names areas of growth, filing each under one
   // foundational helping skill (or none) for the Helping skills "named

@@ -29,12 +29,17 @@ import {
   TestChatbotDto,
   UpdateChatbotDto,
   UpdateChatbotSettingsDto,
+  UpdateChatbotDocumentDto,
 } from '../dto/chatbot.dto';
 import { ChatbotMemberRole } from '../enum/chatbot.enum';
 import { CHATBOT_SECTIONS } from '../sections/chatbot-sections';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { ChatbotAudienceService } from '../service/chatbot-audience.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
+import {
+  CreateKbOwnedDocumentDto,
+  CreateKbUploadUrlDto,
+} from '../../knowledge-base/dto/knowledge-base.dto';
 import { ChatbotService } from '../service/chatbot.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
@@ -166,6 +171,72 @@ export class ChatbotController {
     @Body() dto: SetChatbotDocumentsDto,
   ) {
     return this.chatbots.setDocuments(id, dto.documentIds);
+  }
+
+  @Post(':id/documents/upload-url')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: "Presigned S3 PUT for a document of the bot's own (pdf/docx/epub)",
+  })
+  createDocumentUploadUrl(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateKbUploadUrlDto,
+  ) {
+    return this.chatbots.createDocumentUploadUrl(id, dto);
+  }
+
+  @Post(':id/documents/private')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: "Add a document of the bot's own",
+    description:
+      'Only this bot sees and answers from it; it is not listed in the knowledge library. ' +
+      "Queued for indexing; returns the bot's documents.",
+  })
+  addOwnDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateKbOwnedDocumentDto,
+  ) {
+    return this.chatbots.addOwnDocument(id, dto);
+  }
+
+  @Get(':id/documents/:documentId')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({ summary: "One of the bot's documents, with its text" })
+  getDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.chatbots.getDocument(id, documentId);
+  }
+
+  @Patch(':id/documents/:documentId')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: "Rename one of the bot's own documents, or replace its text",
+    description:
+      'New text retrains the bot on the document. Library documents are edited in the library.',
+  })
+  updateOwnDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Body() dto: UpdateChatbotDocumentDto,
+  ) {
+    return this.chatbots.updateOwnDocument(id, documentId, dto);
+  }
+
+  @Delete(':id/documents/:documentId')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Take a document off the bot',
+    description:
+      "The bot's own document is archived as well; a library document stays in the library.",
+  })
+  removeDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.chatbots.removeDocument(id, documentId);
   }
 
   // ── team ──────────────────────────────────────────────────────────────

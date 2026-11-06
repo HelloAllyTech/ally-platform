@@ -48,14 +48,18 @@ vi.mock("@constants", async () => {
       overview: "Overview",
       persona: "Persona",
       knowledge: "Knowledge",
-      replies: "Replies",
-      people: "People",
-      connectors: "Connectors",
-      settings: "Settings",
       test: "Test",
       conversations: "Conversations",
       unanswered: "Unanswered",
       usage: "Usage",
+      settings: "Settings",
+    },
+    settingsSections: {
+      agent: "Agent",
+      replies: "Replies",
+      people: "People",
+      connectors: "Connectors",
+      general: "General",
     },
   };
   return {
@@ -79,7 +83,14 @@ const bot = (over: Partial<Chatbot> = {}): Chatbot => ({
   documentCount: 3,
   audienceCount: 1,
   memberCount: 1,
-  stats: { messages: 5, people: 2, answered: 4, declined: 1, openUnanswered: 0, lastMessageAt: null },
+  stats: {
+    messages: 5,
+    people: 2,
+    answered: 4,
+    declined: 1,
+    openUnanswered: 0,
+    lastMessageAt: null,
+  },
   createdAt: "2026-11-04T00:00:00Z",
   updatedAt: "2026-11-04T00:00:00Z",
   ...over,
@@ -137,6 +148,7 @@ vi.mock("../CorpusTab", () => ({ CorpusTab: stub("library") }));
 vi.mock("../CreateChatbotPanel", () => ({ CreateChatbotPanel: () => null }));
 vi.mock("../TemplatesTab", () => ({ TemplatesTab: stub("replies") }));
 vi.mock("../ChatbotOverviewTab", () => ({ ChatbotOverviewTab: withRoles("overview") }));
+vi.mock("../AgentTab", () => ({ AgentTab: withRoles("agent") }));
 vi.mock("../ChatbotSettingsTab", () => ({ ChatbotSettingsTab: withRoles("settings") }));
 vi.mock("../ChatbotTestTab", () => ({ ChatbotTestTab: stub("test") }));
 vi.mock("../ConversationsTab", () => ({ ConversationsTab: stub("conversations") }));
@@ -221,6 +233,42 @@ describe("Chatbot page", () => {
     mockBot = bot({ myRole: ChatbotMemberRole.VIEWER });
     renderAt("/chatbots/bot-1?tab=persona");
     expect(screen.getByTestId("persona").dataset.edit).toBe("false");
+  });
+
+  it("keeps the tab row short: configuration lives under Settings", () => {
+    renderAt("/chatbots/bot-1");
+    const ids = Array.from(screen.getByTestId("tabs").children).map(tab =>
+      tab.getAttribute("data-testid"),
+    );
+    expect(ids).toEqual([
+      "tab-overview",
+      "tab-persona",
+      "tab-knowledge",
+      "tab-test",
+      "tab-conversations",
+      "tab-unanswered",
+      "tab-usage",
+      "tab-settings",
+    ]);
+  });
+
+  it("opens Settings on Agent, with the other sections beside it", () => {
+    renderAt("/chatbots/bot-1?tab=settings");
+    expect(screen.getByTestId("agent").dataset.edit).toBe("true");
+    for (const id of ["agent", "replies", "people", "connectors", "general"]) {
+      expect(screen.getByTestId(`tab-${id}`)).toBeTruthy();
+    }
+  });
+
+  it("opens a section of Settings from its own link", () => {
+    renderAt("/chatbots/bot-1?tab=settings&section=general");
+    expect(screen.getByTestId("settings")).toBeTruthy();
+  });
+
+  it("still opens a section from an older link to it as a tab", () => {
+    renderAt("/chatbots/bot-1?tab=people");
+    expect(screen.getByTestId("people")).toBeTruthy();
+    expect(screen.getByTestId("tab-general")).toBeTruthy();
   });
 
   it("keeps team and numbers to owners", () => {

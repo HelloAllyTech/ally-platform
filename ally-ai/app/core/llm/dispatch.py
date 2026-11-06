@@ -466,6 +466,7 @@ async def _generate_anthropic(
     max_tokens: Optional[int],
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,  # OpenAI reasoning models only
 ) -> TSchema:
     """
     Structured output from Claude, enforced by the API rather than requested in prose.
@@ -575,6 +576,7 @@ async def _generate_gemini(
     max_tokens: Optional[int],
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,  # OpenAI reasoning models only
 ) -> TSchema:
     """
     Structured output from Gemini via `response_schema`, as the analytics agent does.
@@ -657,6 +659,7 @@ async def _generate_openai(
     max_tokens: Optional[int],
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,
 ) -> TSchema:
     """
     Structured output from OpenAI via a json_schema response format.
@@ -698,8 +701,12 @@ async def _generate_openai(
         kwargs["max_completion_tokens"] = max_tokens
     # The reasoning family accepts only the default temperature, and passing one
     # is a 400 rather than something it ignores.
-    if temperature and not re.match(r"^(o\d|gpt-5)", model.strip().lower()):
+    reasoning = bool(re.match(r"^(o\d|gpt-5)", model.strip().lower()))
+    if temperature and not reasoning:
         kwargs["temperature"] = temperature
+    # Only the reasoning family takes it; anything else would reject the field.
+    if reasoning_effort and reasoning:
+        kwargs["reasoning_effort"] = reasoning_effort
 
     response = await client.chat.completions.create(**kwargs)
 
@@ -783,6 +790,7 @@ async def generate_structured(
     system: Optional[str] = None,
     max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
     never_fallback: bool = False,
+    reasoning_effort: Optional[str] = None,
 ) -> Tuple[TSchema, Dict[str, Any]]:
     """
     Generate a validated instance of `schema` from whichever provider is selected.
@@ -813,6 +821,9 @@ async def generate_structured(
             validation failure rather than as "too long". Anthropic has no way
             to express it and gets UNCAPPED_ANTHROPIC_MAX_TOKENS instead.
 
+        reasoning_effort: OpenAI reasoning models (gpt-5, o-series) only:
+            `minimal` / `low` / `medium` / `high`. Ignored for every other
+            model and provider. None sends nothing (the provider default).
         never_fallback: Refuse to run anywhere but the selected provider —
             neither substituting for a missing key nor retrying elsewhere after
             a failure; the call fails instead. For a call whose whole point is
@@ -854,6 +865,7 @@ async def generate_structured(
             max_tokens=max_tokens,
             task=task,
             scenario_session_id=scenario_session_id,
+            reasoning_effort=reasoning_effort,
         )
 
     try:

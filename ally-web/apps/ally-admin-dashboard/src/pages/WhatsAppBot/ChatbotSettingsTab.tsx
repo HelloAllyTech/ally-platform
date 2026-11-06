@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -15,8 +15,11 @@ import { en } from "@constants";
 import { WaBotSettings, WaOrgSettings } from "@types";
 
 import { Card, errorMessage, fill, StatusPill, LoadError } from "./shared";
+import { useReportUnsaved } from "./unsavedChanges";
 
 const t = en.whatsappBot.orgSettings;
+/** The same message reads the same here as in Defaults. */
+const d = en.whatsappBot.bots.defaults;
 
 type TextKey =
   | "helplineNumbers"
@@ -29,13 +32,13 @@ type TextKey =
   | "rateLimitText";
 
 const MESSAGE_FIELDS: { key: TextKey; label: string }[] = [
-  { key: "disclaimerText", label: t.disclaimerLabel },
-  { key: "crisisEscalationText", label: t.crisisLabel },
-  { key: "declineText", label: t.declineLabel },
-  { key: "unrecognisedNumberText", label: t.unrecognisedLabel },
-  { key: "fallbackText", label: t.fallbackLabel },
-  { key: "unsupportedMediaText", label: t.unsupportedMediaLabel },
-  { key: "rateLimitText", label: t.rateLimitTextLabel },
+  { key: "disclaimerText", label: d.disclaimerLabel },
+  { key: "crisisEscalationText", label: d.crisisReplyLabel },
+  { key: "declineText", label: d.declineLabel },
+  { key: "unrecognisedNumberText", label: d.notListedLabel },
+  { key: "fallbackText", label: d.fallbackLabel },
+  { key: "unsupportedMediaText", label: d.mediaLabel },
+  { key: "rateLimitText", label: d.tooManyLabel },
 ];
 
 /**
@@ -59,14 +62,23 @@ export const ChatbotSettingsTab: React.FC<{
   const [draft, setDraft] = useState<WaOrgSettings>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Follow the saved settings as they load or change, unless there are edits of our own: a refetch
+  // must never wipe what someone is typing.
+  const baseline = useRef<WaOrgSettings>({});
   useEffect(() => {
-    if (data) setDraft(data.overrides);
+    if (!data) return;
+    const previous = baseline.current;
+    baseline.current = data.overrides;
+    setDraft(current =>
+      JSON.stringify(current) === JSON.stringify(previous) ? data.overrides : current,
+    );
   }, [data]);
 
   const dirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(data?.overrides ?? {}),
     [draft, data],
   );
+  useReportUnsaved("general", canEdit && dirty);
 
   if (isLoading) return <SkeletonText paragraph lineCount={10} />;
   if (isError || !data) {
@@ -98,6 +110,7 @@ export const ChatbotSettingsTab: React.FC<{
       help={help}
       defaultValue={String(defaults[key] ?? "")}
       value={draft[key]}
+      canEdit={canEdit}
       onCustomise={() => set({ [key]: String(defaults[key] ?? "") })}
       onChange={value => set({ [key]: value })}
       onReset={() => unset(key)}
@@ -120,13 +133,13 @@ export const ChatbotSettingsTab: React.FC<{
             labelText={t.enabledLabel}
             size="sm"
             toggled={draft.enabled !== false && defaults.enabled}
-            disabled={!defaults.enabled}
+            disabled={!canEdit || !defaults.enabled}
             // Off is the only change an organisation can make; on is simply "follow Ally".
             onToggle={(checked: boolean) => (checked ? unset("enabled") : set({ enabled: false }))}
           />
           <span className="text-xs text-typography-500">{t.enabledHelp}</span>
         </div>
-        {text("helplineNumbers", t.helplineLabel, t.helplineHelp)}
+        {text("helplineNumbers", d.helplineLabel, t.helplineHelp)}
       </Card>
 
       <Card title={t.groupMessages}>
@@ -136,8 +149,9 @@ export const ChatbotSettingsTab: React.FC<{
       <Card title={t.groupSafety}>
         <TightenToggle
           id="wa-org-classifier"
-          label={t.crisisClassifierLabel}
+          label={d.crisisCheckLabel}
           help={t.crisisClassifierHelp}
+          canEdit={canEdit}
           platformOn={defaults.crisisClassifierEnabled}
           value={draft.crisisClassifierEnabled}
           onChange={on =>
@@ -148,11 +162,17 @@ export const ChatbotSettingsTab: React.FC<{
           id="wa-org-consent"
           label={t.consentLabel}
           help={t.consentHelp}
+          canEdit={canEdit}
           platformOn={defaults.consentRequired}
           value={draft.consentRequired}
           onChange={on => (on ? set({ consentRequired: true }) : unset("consentRequired"))}
         />
-        <RateLimits defaults={defaults} draft={draft} onChange={rateLimit => set({ rateLimit })} />
+        <RateLimits
+          defaults={defaults}
+          draft={draft}
+          canEdit={canEdit}
+          onChange={rateLimit => set({ rateLimit })}
+        />
       </Card>
 
       <section className="flex flex-col gap-3">
@@ -168,7 +188,8 @@ export const ChatbotSettingsTab: React.FC<{
           <Card subtitle={t.advancedHint}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <InheritedNumber
-                label={t.minSimilarityLabel}
+                label={d.floorLabel}
+                canEdit={canEdit}
                 defaultValue={defaults.retrieval.minSimilarity}
                 value={draft.retrieval?.minSimilarity}
                 step={0.01}
@@ -179,7 +200,8 @@ export const ChatbotSettingsTab: React.FC<{
                 }
               />
               <InheritedNumber
-                label={t.declineSimilarityLabel}
+                label={d.thresholdLabel}
+                canEdit={canEdit}
                 defaultValue={defaults.retrieval.declineSimilarity}
                 value={draft.retrieval?.declineSimilarity}
                 step={0.01}
@@ -190,7 +212,8 @@ export const ChatbotSettingsTab: React.FC<{
                 }
               />
               <InheritedNumber
-                label={t.maxCitationsLabel}
+                label={d.sourcesLabel}
+                canEdit={canEdit}
                 defaultValue={defaults.maxCitations}
                 value={draft.maxCitations}
                 min={0}
@@ -200,7 +223,8 @@ export const ChatbotSettingsTab: React.FC<{
                 }
               />
               <InheritedNumber
-                label={t.idleLabel}
+                label={d.idleLabel}
+                canEdit={canEdit}
                 defaultValue={defaults.conversationIdleMinutes}
                 value={draft.conversationIdleMinutes}
                 min={5}
@@ -216,15 +240,17 @@ export const ChatbotSettingsTab: React.FC<{
         )}
       </section>
 
-      <div className="flex items-center gap-3">
-        <Button
-          variant={ButtonVariant.PRIMARY}
-          onClick={() => void handleSave()}
-          disabled={!canEdit || !dirty || isSaving}
-        >
-          {isSaving ? t.saving : t.save}
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button
+            variant={ButtonVariant.PRIMARY}
+            onClick={() => void handleSave()}
+            disabled={!dirty || isSaving}
+          >
+            {isSaving ? t.saving : t.save}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
@@ -258,10 +284,11 @@ const InheritedText: React.FC<{
   help?: string;
   defaultValue: string;
   value: string | undefined;
+  canEdit: boolean;
   onCustomise: () => void;
   onChange: (value: string) => void;
   onReset: () => void;
-}> = ({ label, help, defaultValue, value, onCustomise, onChange, onReset }) => {
+}> = ({ label, help, defaultValue, value, canEdit, onCustomise, onChange, onReset }) => {
   const customised = value !== undefined;
   return (
     <div className="flex flex-col gap-2 py-1">
@@ -270,19 +297,21 @@ const InheritedText: React.FC<{
           <span className="text-sm text-typography-800">{label}</span>
           <StateLabel customised={customised} />
         </span>
-        <button
-          type="button"
-          className="text-sm text-primary-600 hover:underline shrink-0"
-          onClick={customised ? onReset : onCustomise}
-        >
-          {customised ? t.reset : t.customise}
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            className="text-sm text-primary-600 hover:underline shrink-0"
+            onClick={customised ? onReset : onCustomise}
+          >
+            {customised ? t.reset : t.customise}
+          </button>
+        )}
       </div>
-      {customised ? (
+      {customised && canEdit ? (
         <AutoExpandableTextarea value={value} onChange={onChange} minHeight={60} />
       ) : (
         <p className="text-sm text-typography-500 whitespace-pre-wrap border border-dashed border-border-light rounded px-3 py-2">
-          {defaultValue || "—"}
+          {(customised ? value : defaultValue) || "—"}
         </p>
       )}
       {help && <span className="text-xs text-typography-500">{help}</span>}
@@ -300,15 +329,16 @@ const TightenToggle: React.FC<{
   help: string;
   platformOn: boolean;
   value: boolean | undefined;
+  canEdit: boolean;
   onChange: (on: boolean) => void;
-}> = ({ id, label, help, platformOn, value, onChange }) => (
+}> = ({ id, label, help, platformOn, value, canEdit, onChange }) => (
   <div className="flex flex-col gap-1">
     <CarbonToggle
       id={id}
       labelText={label}
       size="sm"
       toggled={platformOn || value === true}
-      disabled={platformOn}
+      disabled={!canEdit || platformOn}
       onToggle={onChange}
     />
     <span className="text-xs text-typography-500">{help}</span>
@@ -318,19 +348,21 @@ const TightenToggle: React.FC<{
 const RateLimits: React.FC<{
   defaults: WaBotSettings;
   draft: WaOrgSettings;
+  canEdit: boolean;
   onChange: (rateLimit: WaOrgSettings["rateLimit"]) => void;
-}> = ({ defaults, draft, onChange }) => (
+}> = ({ defaults, draft, canEdit, onChange }) => (
   <div className="flex flex-col gap-2">
     <span className="text-sm text-typography-800">{t.rateLimitLabel}</span>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {(["perMinute", "perHour", "perDay"] as const).map(key => (
         <InheritedNumber
           key={key}
-          label={t[key]}
+          label={d[key]}
           defaultValue={defaults.rateLimit[key]}
           value={draft.rateLimit?.[key]}
           min={1}
           max={defaults.rateLimit[key]}
+          canEdit={canEdit}
           onChange={value => onChange(withValue(draft.rateLimit, key, value))}
         />
       ))}
@@ -349,8 +381,9 @@ const InheritedNumber: React.FC<{
   min?: number;
   max?: number;
   step?: number;
+  canEdit: boolean;
   onChange: (value: number | undefined) => void;
-}> = ({ label, defaultValue, value, min, max, step, onChange }) => (
+}> = ({ label, defaultValue, value, min, max, step, canEdit, onChange }) => (
   <div className="flex flex-col gap-1">
     <NumberInput
       id={`wa-org-${label.replace(/\s+/g, "-").toLowerCase()}`}
@@ -363,6 +396,7 @@ const InheritedNumber: React.FC<{
       step={step}
       hideSteppers
       allowEmpty
+      disabled={!canEdit}
       onChange={(_event: unknown, state: { value: number | string } | undefined) => {
         const raw = state?.value;
         if (raw === "" || raw === undefined) return onChange(undefined);

@@ -13,6 +13,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -24,8 +25,10 @@ import {
   ChatbotAudienceKind,
   ChatbotKnowledgeSource,
   ChatbotMemberRole,
+  ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
+import { KB_MAX_PASTE_CHARS } from '../../knowledge-base/constants/knowledge-base.constants';
 import { MAX_SYSTEM_PROMPT_CHARS } from '../type/chatbot.type';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 
@@ -115,6 +118,18 @@ export class CreateChatbotDto {
   accessMode?: ChatbotAccessMode;
 }
 
+/** Agents v2 feature flags a platform admin can switch per bot. */
+export class ChatbotFeaturesDto {
+  @ApiPropertyOptional({
+    description:
+      'Agent mode: on a v2 bot, the conversational agent answers greetings, "what can you do?" ' +
+      'and follow-ups itself, and can search again. Facts still need a source.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  agent?: boolean;
+}
+
 export class UpdateChatbotDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -159,6 +174,25 @@ export class UpdateChatbotDto {
   @ValidateNested()
   @Type(() => ChatbotModelDto)
   model?: ChatbotModelDto | null;
+
+  @ApiPropertyOptional({
+    enum: ChatbotRuntime,
+    description:
+      'Ignored since chunk 3d: every chatbot answers with the agent (v2), unless the platform switch sends all of them to v1. Accepted so an older dashboard does not break.',
+  })
+  @IsOptional()
+  @IsEnum(ChatbotRuntime)
+  runtime?: ChatbotRuntime;
+
+  @ApiPropertyOptional({
+    type: ChatbotFeaturesDto,
+    description:
+      'Ignored since chunk 3d (Agent mode is always on). Accepted so an older dashboard does not break.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ChatbotFeaturesDto)
+  features?: ChatbotFeaturesDto;
 }
 
 export class SetChatbotStatusDto {
@@ -310,6 +344,25 @@ export class TestChatbotDto {
   @IsOptional()
   @IsBoolean()
   checkAccess?: boolean;
+
+  @ApiPropertyOptional({
+    enum: [ChatbotRuntime.V1, ChatbotRuntime.V2],
+    description:
+      'Ignored since chunk 3d: a test uses the same engine as every message.',
+  })
+  @IsOptional()
+  @IsIn([ChatbotRuntime.V1, ChatbotRuntime.V2])
+  runtime?: ChatbotRuntime.V1 | ChatbotRuntime.V2;
+
+  @ApiPropertyOptional({
+    description:
+      'The Preview thread (`preview-<uuid>`), kept until "New thread". A new one is made when absent.',
+  })
+  @IsOptional()
+  @Matches(
+    /^preview-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+  )
+  conversationId?: string;
 }
 
 export class BindConnectorDto {
@@ -317,4 +370,24 @@ export class BindConnectorDto {
   @IsOptional()
   @IsUUID()
   chatbotId!: string | null;
+}
+
+/** A rename, or new text, for one of a chatbot's own documents. */
+export class UpdateChatbotDocumentDto {
+  @ApiPropertyOptional({ maxLength: 300 })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(300)
+  title?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "The document's new text. Changing it trains the chatbot on it again.",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(KB_MAX_PASTE_CHARS)
+  text?: string;
 }

@@ -66,7 +66,8 @@ export const BotConnectorsTab: React.FC<{ bot: Chatbot; canManage: boolean }> = 
             numbers={numbers}
             canManage={canManage}
             emptyTitle={ch.agentEmpty}
-            emptyHint={ch.agentEmptyHint}
+            // Only owners can connect a number, so everyone else is told who to ask.
+            emptyHint={canManage ? ch.agentEmptyHint : t.ownerOnlyHint}
             trailing={number =>
               canManage && (
                 <Button

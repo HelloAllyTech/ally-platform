@@ -324,6 +324,17 @@ export class AppConfigService {
     };
   }
 
+  /** Agents v2 shadow runs (`chatbots.runtime = shadow`): a cap on concurrent comparison runs. */
+  get agentShadow() {
+    const configured = Number(
+      this.configService.get<number>('AGENT_SHADOW_MAX_IN_FLIGHT'),
+    );
+    return {
+      maxInFlight:
+        Number.isInteger(configured) && configured >= 0 ? configured : 5,
+    };
+  }
+
   get jwt() {
     return {
       accessToken: {

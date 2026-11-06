@@ -784,6 +784,10 @@ export const ApiEndpoints = {
     ARCHIVE: (id: string) => `/v1/chatbots/${id}/archive`,
     SETTINGS: (id: string) => `/v1/chatbots/${id}/settings`,
     DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents`,
+    DOCUMENT_UPLOAD_URL: (id: string) => `/v1/chatbots/${id}/documents/upload-url`,
+    PRIVATE_DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents/private`,
+    DOCUMENT_BY_ID: (id: string, documentId: string) =>
+      `/v1/chatbots/${id}/documents/${documentId}`,
     MEMBERS: (id: string) => `/v1/chatbots/${id}/members`,
     AUDIENCE: (id: string) => `/v1/chatbots/${id}/audience`,
     AUDIENCE_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/audience/${entryId}`,

@@ -312,6 +312,36 @@ class KnowledgeAnswerGeneralInputs(PromptInputs):
     question: str
 
 
+class AgentSystemInputs(PromptInputs):
+    """`agent/system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_system",
+        name="Chatbot Agent: Instructions",
+        description=(
+            "For chatbots in Agent mode: the agent's rules (safety, grounding, what "
+            "needs no source), how it searches and declines, how it should sound, "
+            "what it covers, the conversation, the passages and its tools. Each call "
+            "reads the turn and returns either a tool call or the reply. The "
+            "chatbot's persona is prepended in code."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    answer_scope: Optional[str] = None
+    decline_text: Optional[str] = None
+    feedback: Optional[str] = None
+    history: Optional[str] = None
+    knowledge_topics: Optional[str] = None
+    max_chars: Optional[str] = None
+    message: str
+    passages: str
+    searches: Optional[str] = None
+    tool_budget: Optional[str] = None
+    tools: Optional[str] = None
+
+
 class NotesContentEnhanceInputs(PromptInputs):
     """`notes/content_enhance.txt`."""
 

@@ -24,6 +24,7 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
 import { ENDPOINTS } from '../constants/endpoints.constants';
+import { KNOWLEDGE_ANSWER_LIMITS } from '../constants/knowledge-answer.constants';
 import {
   HelplineRiskRequest,
   HelplineRiskResponse,
@@ -31,6 +32,8 @@ import {
   HelplineTurnResponse,
 } from '../dto/helpline-copilot.dto';
 import {
+  AgentRunRequest,
+  AgentRunResponse,
   CrisisCheckRequest,
   CrisisCheckResponse,
   KnowledgeAnswerRequest,
@@ -648,22 +651,17 @@ export class AiService {
    * cost the window.
    */
   @RetryWithinBudget({
-    attempts: 2,
-    delayMs: 500,
-    budgetMs: 40_000,
+    attempts: KNOWLEDGE_ANSWER_LIMITS.attempts,
+    delayMs: KNOWLEDGE_ANSWER_LIMITS.delayMs,
+    budgetMs: KNOWLEDGE_ANSWER_LIMITS.budgetMs,
     shouldRetry: isRetryableAiFailure,
     label: 'answerKnowledgeQuestion',
   })
   async answerKnowledgeQuestion(request: KnowledgeAnswerRequest) {
-    return this.makeRequest<KnowledgeAnswerResponse, KnowledgeAnswerRequest>(
+    return this.postKnowledge<KnowledgeAnswerResponse, KnowledgeAnswerRequest>(
       ENDPOINTS.KNOWLEDGE_AGENT_ANSWER,
       request,
-      true,
-      'post',
-      undefined,
-      false,
-      25_000,
-      true,
+      { timeoutMs: KNOWLEDGE_ANSWER_LIMITS.attemptMs },
     );
   }
 
@@ -696,16 +694,84 @@ export class AiService {
     label: 'checkWhatsAppCrisis',
   })
   async checkWhatsAppCrisis(request: CrisisCheckRequest) {
-    return this.makeRequest<CrisisCheckResponse, CrisisCheckRequest>(
+    return this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
       ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
       request,
-      true,
-      'post',
-      undefined,
-      false,
-      15_000,
-      true,
+      { timeoutMs: 15_000 },
     );
+  }
+
+  /**
+   * Answer through the Agents v2 engine (ally-ai `/agent/run`).
+   *
+   * ONE attempt, 25s (the answer call's per-attempt timeout). A v2 bot falls back to
+   * `/knowledge-agent/answer` when this fails, and that fallback IS the retry — retrying here too
+   * would spend the SQS window twice before v1 even started.
+   *
+   * No Slack alert from here (`alertOnFailure=false`): the engine raises one throttled
+   * "agent runtime degraded" alert per bot and reason, and shadow runs record their failure in
+   * `agent_shadow_runs`. The failure is still logged.
+   *
+   * redactBody=true: the payload is the person's question.
+   */
+  async runAgent(
+    request: AgentRunRequest,
+    timeoutMs: number = KNOWLEDGE_ANSWER_LIMITS.attemptMs,
+  ) {
+    return this.postKnowledge<AgentRunResponse, AgentRunRequest>(
+      ENDPOINTS.AGENT_RUN,
+      request,
+      { timeoutMs, alertOnFailure: false },
+    );
+  }
+
+  /**
+   * `answerKnowledgeQuestion` inside whatever is LEFT of its 40s budget — the v1 fallback after a
+   * failed `/agent/run`.
+   *
+   * The budget is the SQS visibility window's (see `answerKnowledgeQuestion`), and the failed v2
+   * attempt already spent part of it. So each attempt's timeout is capped at the time remaining,
+   * and the retry follows `RetryWithinBudget`'s rule (only when elapsed + delay + the last
+   * attempt's duration still fits). The usual failure — `/agent/run` 404ing because the runtime
+   * is off — costs milliseconds, which leaves v1 nearly the whole budget.
+   */
+  async answerKnowledgeQuestionWithin(
+    request: KnowledgeAnswerRequest,
+    budgetMs: number,
+  ): Promise<KnowledgeAnswerResponse> {
+    const {
+      attempts,
+      delayMs,
+      attemptMs: maxAttemptMs,
+    } = KNOWLEDGE_ANSWER_LIMITS;
+    const startedAt = Date.now();
+    for (let attempt = 1; ; attempt++) {
+      const remainingMs = budgetMs - (Date.now() - startedAt);
+      const attemptStartedAt = Date.now();
+      try {
+        return await this.postKnowledge<
+          KnowledgeAnswerResponse,
+          KnowledgeAnswerRequest
+        >(ENDPOINTS.KNOWLEDGE_AGENT_ANSWER, request, {
+          timeoutMs: Math.max(1, Math.min(maxAttemptMs, remainingMs)),
+        });
+      } catch (error) {
+        const attemptMs = Date.now() - attemptStartedAt;
+        const elapsedMs = Date.now() - startedAt;
+        if (
+          attempt >= attempts ||
+          !isRetryableAiFailure(error) ||
+          elapsedMs + delayMs + attemptMs > budgetMs
+        ) {
+          throw error;
+        }
+        this.logger.warn(
+          `answerKnowledgeQuestionWithin: retrying after a ${attemptMs}ms failure; ` +
+            `elapsed ${elapsedMs}ms of ${budgetMs}ms budget`,
+        );
+        await new Promise((res) => setTimeout(res, delayMs));
+      }
+    }
   }
 
   /** Backfill/reindex batches. 60s because a batch embeds up to 64 items in one call. */
@@ -896,6 +962,32 @@ export class AiService {
     }
   }
 
+  /**
+   * A POST to one of ally-ai's knowledge endpoints: throws on failure (the caller decides what a
+   * failure means) and logs the body's size only, never the person's message.
+   * `alertOnFailure: false` where the caller raises its own, throttled alert.
+   */
+  private postKnowledge<R, T>(
+    endpoint: string,
+    body: T,
+    {
+      timeoutMs,
+      alertOnFailure = true,
+    }: { timeoutMs: number; alertOnFailure?: boolean },
+  ): Promise<R> {
+    return this.makeRequest<R, T>(
+      endpoint,
+      body,
+      true,
+      'post',
+      undefined,
+      false,
+      timeoutMs,
+      true,
+      alertOnFailure,
+    );
+  }
+
   private async makeRequest<R, T>(
     endpoint: string,
     data: T,
@@ -915,6 +1007,10 @@ export class AiService {
     // outside the designated audit logger. Callers on those paths pass redactBody=true, which
     // logs the size only. Opt-IN rather than opt-out so existing endpoints keep their traces.
     redactBody = false,
+    // Whether a failure also goes to Slack ('AI Request Error'). Every existing caller keeps it.
+    // Off only where the caller raises its own, throttled alert — otherwise a dependency that is
+    // down by design (the Agents v2 runtime switched off) pages once per message.
+    alertOnFailure = true,
   ): Promise<R> {
     const requestTimeout = timeoutMs ?? this.maxTimeout;
     const execId = uuidv4();
@@ -1036,18 +1132,20 @@ export class AiService {
           `dataSize=${dataSize}B | requestData=${requestDataForLog}`,
         error.stack,
       );
-      this.eventEmitter.emit('exception', {
-        statusCode: 500,
-        timestamp: new Date().toISOString(),
-        path: endpoint,
-        message:
-          `${execId} | startTime: ${startTime} | elapsedMs=${elapsedMs} | ` +
-          `category=${failureCategory} | ${error.message} | ` +
-          `errCode=${errCode} | upstreamStatus=${upstreamStatus} | ` +
-          `upstreamTraceId=${upstreamTraceId ?? 'none'} | ` +
-          `upstreamDetail=${JSON.stringify(upstreamDetail)}`,
-        type: 'AI Request Error',
-      } as NotificationErrorType);
+      if (alertOnFailure) {
+        this.eventEmitter.emit('exception', {
+          statusCode: 500,
+          timestamp: new Date().toISOString(),
+          path: endpoint,
+          message:
+            `${execId} | startTime: ${startTime} | elapsedMs=${elapsedMs} | ` +
+            `category=${failureCategory} | ${error.message} | ` +
+            `errCode=${errCode} | upstreamStatus=${upstreamStatus} | ` +
+            `upstreamTraceId=${upstreamTraceId ?? 'none'} | ` +
+            `upstreamDetail=${JSON.stringify(upstreamDetail)}`,
+          type: 'AI Request Error',
+        } as NotificationErrorType);
+      }
       if (throwError) {
         // Classified rather than flattened. `AiUpstreamError.message` is still
         // the raw axios message, so existing callers that log `error.message`

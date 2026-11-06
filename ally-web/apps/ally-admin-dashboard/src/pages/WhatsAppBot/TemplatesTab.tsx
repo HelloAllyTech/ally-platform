@@ -23,7 +23,7 @@ import { en } from "@constants";
 import { WaTemplate, WaTemplateKind, WaTemplateMatchType, WaTemplateState } from "@types";
 
 import { useChatbotId } from "./chatbotContext";
-import { StatusPill } from "./shared";
+import { fill, StatusPill } from "./shared";
 import { TemplatePanel } from "./TemplatePanel";
 
 /**
@@ -61,7 +61,11 @@ const STATE_PILL: Record<
   own: { tone: "success", label: en.whatsappBot.templates.stateOwn },
 };
 
-export const TemplatesTab: React.FC = () => {
+/**
+ * `canEdit`: false for a chatbot's viewers, who see the replies and can try the tester but get no
+ * add, edit, reorder, switch-off, remove or reset (the backend refuses those from them).
+ */
+export const TemplatesTab: React.FC<{ canEdit?: boolean }> = ({ canEdit = true }) => {
   // On one organisation's page the list is what THAT organisation's bot uses: the shared replies
   // (as they stand for it) plus its own, each labelled with where it comes from.
   const chatbotId = useChatbotId();
@@ -228,22 +232,24 @@ export const TemplatesTab: React.FC = () => {
         {chatbotId ? en.whatsappBot.templates.orgIntro : en.whatsappBot.templates.subtitle}
       </p>
 
-      <div className="flex justify-end pb-3">
-        <Button
-          variant={ButtonVariant.PRIMARY}
-          onClick={() => {
-            setEditing(null);
-            setIsPanelOpen(true);
-          }}
-        >
-          {en.whatsappBot.templates.create}
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex justify-end pb-3">
+          <Button
+            variant={ButtonVariant.PRIMARY}
+            onClick={() => {
+              setEditing(null);
+              setIsPanelOpen(true);
+            }}
+          >
+            {en.whatsappBot.templates.create}
+          </Button>
+        </div>
+      )}
 
       {isError && (
         <InlineNotification
           kind="error"
-          title={en.whatsappBot.templates.saveFailed}
+          title={en.whatsappBot.templates.loadFailed}
           lowContrast
           hideCloseButton
         />
@@ -264,6 +270,7 @@ export const TemplatesTab: React.FC = () => {
             setEditing(null);
             setIsPanelOpen(true);
           }}
+          hideActionButton={!canEdit}
         />
       )}
 
@@ -272,60 +279,69 @@ export const TemplatesTab: React.FC = () => {
           columns={columns}
           rows={templates}
           rowClassName={row => (row.active ? "" : "opacity-60")}
-          actions={[
-            {
-              key: "up",
-              label: en.whatsappBot.templates.moveUp,
-              icon: <ArrowUp size={16} />,
-              hidden: row => Boolean(chatbotId) && row.state !== "own",
-              onClick: row => void handleMove(row, -1),
-            },
-            {
-              key: "down",
-              label: en.whatsappBot.templates.moveDown,
-              icon: <ArrowDown size={16} />,
-              hidden: row => Boolean(chatbotId) && row.state !== "own",
-              onClick: row => void handleMove(row, 1),
-            },
-            {
-              key: "turn-off",
-              label: en.whatsappBot.templates.turnOff,
-              icon: <PauseIcon size={16} />,
-              // Required safety replies are never offered "off" — not even as a button that 403s.
-              hidden: row =>
-                !chatbotId ||
-                row.mandatory ||
-                !(row.state === "default" || row.state === "customised"),
-              onClick: row => void handleToggle(row, false),
-            },
-            {
-              key: "turn-on",
-              label: en.whatsappBot.templates.turnOn,
-              icon: <PlayIcon size={16} />,
-              hidden: row => !chatbotId || row.state !== "off",
-              onClick: row => void handleToggle(row, true),
-            },
-            {
-              key: "remove",
-              label: en.whatsappBot.templates.archived,
-              icon: <TrashCan size={16} />,
-              // Shown only where removing works: never on a required safety reply, and on an
-              // organisation's page only on its OWN replies (a shared one is reset or switched off).
-              hidden: row => row.mandatory || (Boolean(chatbotId) && row.state !== "own"),
-              onClick: row => setArchiveTarget(row),
-            },
-            {
-              key: "reset",
-              label: en.whatsappBot.templates.resetToDefault,
-              icon: <Refresh size={16} />,
-              hidden: row => !chatbotId || !(row.state === "customised" || row.state === "off"),
-              onClick: row => void handleReset(row),
-            },
-          ]}
-          onEdit={row => {
-            setEditing(row);
-            setIsPanelOpen(true);
-          }}
+          actions={
+            canEdit
+              ? [
+                  {
+                    key: "up",
+                    label: en.whatsappBot.templates.moveUp,
+                    icon: <ArrowUp size={16} />,
+                    hidden: row => Boolean(chatbotId) && row.state !== "own",
+                    onClick: row => void handleMove(row, -1),
+                  },
+                  {
+                    key: "down",
+                    label: en.whatsappBot.templates.moveDown,
+                    icon: <ArrowDown size={16} />,
+                    hidden: row => Boolean(chatbotId) && row.state !== "own",
+                    onClick: row => void handleMove(row, 1),
+                  },
+                  {
+                    key: "turn-off",
+                    label: en.whatsappBot.templates.turnOff,
+                    icon: <PauseIcon size={16} />,
+                    // Required safety replies are never offered "off" — not even as a button that 403s.
+                    hidden: row =>
+                      !chatbotId ||
+                      row.mandatory ||
+                      !(row.state === "default" || row.state === "customised"),
+                    onClick: row => void handleToggle(row, false),
+                  },
+                  {
+                    key: "turn-on",
+                    label: en.whatsappBot.templates.turnOn,
+                    icon: <PlayIcon size={16} />,
+                    hidden: row => !chatbotId || row.state !== "off",
+                    onClick: row => void handleToggle(row, true),
+                  },
+                  {
+                    key: "remove",
+                    label: en.whatsappBot.templates.remove,
+                    icon: <TrashCan size={16} />,
+                    // Shown only where removing works: never on a required safety reply, and on an
+                    // organisation's page only on its OWN replies (a shared one is reset or switched off).
+                    hidden: row => row.mandatory || (Boolean(chatbotId) && row.state !== "own"),
+                    onClick: row => setArchiveTarget(row),
+                  },
+                  {
+                    key: "reset",
+                    label: en.whatsappBot.templates.resetToDefault,
+                    icon: <Refresh size={16} />,
+                    hidden: row =>
+                      !chatbotId || !(row.state === "customised" || row.state === "off"),
+                    onClick: row => void handleReset(row),
+                  },
+                ]
+              : []
+          }
+          onEdit={
+            canEdit
+              ? row => {
+                  setEditing(row);
+                  setIsPanelOpen(true);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -408,10 +424,12 @@ export const TemplatesTab: React.FC = () => {
       <ActionConfirmationPopup
         isOpen={Boolean(archiveTarget)}
         onClose={() => setArchiveTarget(null)}
-        title={`Remove “${archiveTarget?.name ?? ""}”?`}
-        description="The bot will stop using this reply. Messages that matched it will go to the corpus instead."
+        title={fill(en.whatsappBot.templates.removeConfirmTitle, {
+          name: archiveTarget?.name ?? "",
+        })}
+        description={en.whatsappBot.templates.removeConfirmBody}
         primaryButton={{
-          label: en.whatsappBot.templates.archived,
+          label: en.whatsappBot.templates.remove,
           onClick: () => void handleArchiveConfirmed(),
         }}
         secondaryButton={{ label: en.common.cancel, onClick: () => setArchiveTarget(null) }}

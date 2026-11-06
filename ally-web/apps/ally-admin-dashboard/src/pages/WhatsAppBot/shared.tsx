@@ -6,7 +6,7 @@ import { InlineNotification } from "@ally-ui-mono/ui-shared";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { WaBusinessNumberStatus } from "@types";
+import { ChatbotPersona, WaBusinessNumberStatus } from "@types";
 import { formatRelativeTime } from "@utils";
 
 /** ally-be puts the human-readable reason (Meta's own, for the number endpoints) in `data.message`. */
@@ -143,3 +143,18 @@ export const LoadError: React.FC<{ title: string; onRetry: () => void }> = ({ ti
     </Button>
   </div>
 );
+
+/**
+ * The Instructions fields still empty, by their labels: the name it introduces itself with, tone,
+ * instructions and welcome message are all needed before the chatbot's instructions count as done.
+ */
+export const missingPersonaFields = (persona: ChatbotPersona | null | undefined): string[] => {
+  const p = en.whatsappBot.bots.persona;
+  const fields: [string | undefined, string][] = [
+    [persona?.displayName, p.displayNameLabel],
+    [persona?.tone, p.toneLabel],
+    [persona?.systemPrompt, p.promptLabel],
+    [persona?.greeting, p.greetingLabel],
+  ];
+  return fields.filter(([value]) => !value?.trim()).map(([, label]) => label);
+};

@@ -53,3 +53,26 @@ LLM__MAX_CONCURRENT_LLM_CALLS=10
 
 ALLY_CORE__ENDPOINT=http://localhost:8001
 ALLY_CORE__API_KEY=<ally-core-api-key>
+
+# Agents v2 runtime (POST /api/v1/agent/run). Off by default: the route answers 404.
+AGENT_RUNTIME__ENABLED=false
+# Postgres for LangGraph checkpoints, in its own database (never ally-be's). Unset =
+# in-memory checkpoints. Locally: create the database once with
+#   docker exec ally-be-postgres-1 createdb -U postgres ally_agent_runtime
+# AGENT_RUNTIME__CHECKPOINT_DB_URL=postgresql://postgres:<password>@host.docker.internal:5477/ally_agent_runtime
+# AGENT_RUNTIME__CHECKPOINT_SCHEMA=agent_runtime
+# AGENT_RUNTIME__CHECKPOINT_POOL_MAX_SIZE=10
+# Checkpoint writes: async (per step, not blocking the next one), sync, or exit (once
+# per run).
+# AGENT_RUNTIME__DURABILITY=async
+# Conversational agent (features.agent): searches per run, and seconds into a run
+# after which it stops searching and its reply is final.
+# AGENT_RUNTIME__MAX_TOOL_CALLS=2
+# AGENT_RUNTIME__RUN_BUDGET_SECONDS=15
+# Conversation messages the agent reads.
+# AGENT_RUNTIME__MAX_HISTORY_MESSAGES=10
+# Reasoning effort for the agent step on gpt-5/o-series models (minimal, low, medium,
+# high; unset = the provider default, medium). Set to low in production: the 3a
+# latency numbers were measured with it, and unset the agent is about 25% slower
+# than parity mode (CHUNK-03A-NOTES.md).
+# AGENT_RUNTIME__AGENT_REASONING_EFFORT=low

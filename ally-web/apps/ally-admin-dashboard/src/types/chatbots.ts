@@ -85,6 +85,27 @@ export interface ChatbotStats {
   lastMessageAt: string | null;
 }
 
+/** Which engine answers a chatbot (Agents v2). */
+export type ChatbotRuntime = "v1" | "shadow" | "v2";
+
+/** The engine that answered one Preview test; `v2_fallback` means v2 failed and v1 answered. */
+export type ChatbotRuntimeUsed = "v1" | "v2" | "v2_fallback";
+
+/** One step the new engine took, in order. */
+export interface AgentTraceStep {
+  node: string;
+  ms: number;
+  summary: string;
+}
+
+/** A chatbot's feature flags (Agents v2). `agent`: answers with the conversational agent on v2. */
+export interface ChatbotFeatures {
+  agent?: boolean;
+}
+
+/** What the conversational agent understood a message to be (ally-be `AgentTurnType`). */
+export type AgentTurnType = "smalltalk" | "about_bot" | "question" | "unclear";
+
 export interface Chatbot {
   id: string;
   name: string;
@@ -95,9 +116,17 @@ export interface Chatbot {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: ChatbotPersona;
   model: ChatbotModelChoice | null;
+  /** The stored engine. Read-only: every chatbot answers with v2 and the agent. */
+  runtime: ChatbotRuntime;
+  /** What actually answers: v2, or v1 (the backup engine) while the agent is off in Defaults. */
+  effectiveRuntime: ChatbotRuntime;
+  /** The stored flags. Read-only: the agent is always on. */
+  features: ChatbotFeatures;
   myRole: ChatbotMemberRole;
   connectors: Connector[];
   documentCount: number;
+  /** Documents it can answer from now: indexed and not archived. */
+  readyDocumentCount: number;
   audienceCount: number;
   memberCount: number;
   stats: ChatbotStats;
@@ -138,7 +167,56 @@ export interface ChatbotDocumentRow {
   status: string;
   isGlobal: boolean;
   archived: boolean;
+  /** True when the document belongs to this chatbot only (uploaded on its Knowledge tab). */
+  private: boolean;
   updatedAt: string;
+}
+
+/** One document attached to a chatbot, with its text: what the Knowledge tab's View panel shows. */
+export interface ChatbotDocumentDetail {
+  id: string;
+  title: string;
+  status: string;
+  private: boolean;
+  archived: boolean;
+  sourceType: string;
+  fileName: string | null;
+  /** Why it failed, when it did. */
+  statusMessage: string | null;
+  updatedAt: string;
+  rawText: string;
+}
+
+/** Edit one of a chatbot's own documents. A changed `text` retrains the chatbot on it. */
+export interface UpdateChatbotDocumentRequest {
+  id: string;
+  documentId: string;
+  title?: string;
+  text?: string;
+}
+
+/** A file to upload as one of a chatbot's own documents. */
+export interface CreateChatbotUploadUrlRequest {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+}
+
+/**
+ * A document private to one chatbot: created, attached and queued for indexing in one call.
+ * Files carry what the presigned upload returned; pasted text carries `text`.
+ */
+export interface CreatePrivateChatbotDocumentRequest {
+  id: string;
+  title: string;
+  sourceType: "pdf" | "docx" | "epub" | "paste" | "url";
+  fileUrl?: string;
+  fileName?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  text?: string;
+  sourceUrl?: string;
 }
 
 export interface ChatbotMember {
@@ -186,6 +264,10 @@ export interface TestChatbotRequest {
   draft?: ChatbotDraft;
   asTenantId?: string;
   checkAccess?: boolean;
+  /** Ignored by the API: every test answers with the chatbot's own engine. */
+  runtime?: "v1" | "v2";
+  /** The Preview thread (`preview-<uuid>`), kept until "New thread". */
+  conversationId?: string;
 }
 
 export interface TestChatbotResponse {
@@ -203,4 +285,14 @@ export interface TestChatbotResponse {
   wouldAlert: string | null;
   latencyMs: number;
   usedDraft: boolean;
+  runtime: ChatbotRuntimeUsed;
+  runId: string | null;
+  trace: AgentTraceStep[] | null;
+  /** Why the new engine failed, when v1 answered instead. */
+  fallbackReason: string | null;
+  /** False while the new engine is turned off in Defaults. */
+  runtimeAllowed: boolean;
+  conversationId: string;
+  /** Agent mode: what the agent understood the message to be. */
+  turnType?: AgentTurnType | null;
 }

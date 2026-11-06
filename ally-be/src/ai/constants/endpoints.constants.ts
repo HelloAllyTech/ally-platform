@@ -65,6 +65,8 @@ export const ENDPOINTS = {
   KNOWLEDGE_CHUNK_SET_AUDIENCE: 'api/v1/knowledge-chunks/document',
   KNOWLEDGE_AGENT_ANSWER: 'api/v1/knowledge-agent/answer',
   KNOWLEDGE_AGENT_CRISIS_CHECK: 'api/v1/knowledge-agent/crisis-check',
+  /** Agents v2: the LangGraph runtime. 404 while ally-ai's AGENT_RUNTIME__ENABLED is off. */
+  AGENT_RUN: 'api/v1/agent/run',
 
   // ── Text helpline copilot (docs/text-helpline.md §9.1) ────────────────────
   // Both always answer 200 and report `failed` rather than erroring, so a caller

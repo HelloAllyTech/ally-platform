@@ -40,7 +40,11 @@ vi.mock("@constants", () => ({
         empty: "No keyword replies yet",
         emptySubtitle: "Add one.",
         archived: "Reply removed",
+        remove: "Remove",
+        removeConfirmTitle: "Remove “{name}”?",
+        removeConfirmBody: "The chatbot will stop using this reply.",
         saveFailed: "Could not save the reply",
+        loadFailed: "Could not load the replies",
         tester: "Test a message",
         testerPlaceholder: "Type a message",
         testerRun: "Check",
@@ -55,7 +59,12 @@ vi.mock("@constants", () => ({
   },
 }));
 
-const capturedTableProps: { rows?: unknown[]; onDelete?: (row: unknown) => void }[] = [];
+const capturedTableProps: {
+  rows?: unknown[];
+  onDelete?: (row: unknown) => void;
+  onEdit?: (row: unknown) => void;
+  actions?: { key: string; label: string }[];
+}[] = [];
 
 vi.mock("@api", () => ({
   useGetWaTemplatesQuery: () => mockTemplatesResult,
@@ -114,6 +123,8 @@ vi.mock("@icons", () => ({
 }));
 vi.mock("../shared", () => ({
   StatusPill: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  fill: (text: string, values: Record<string, string>) =>
+    text.replace(/\{(\w+)\}/g, (_m, key: string) => values[key] ?? ""),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -191,6 +202,28 @@ describe("TemplatesTab", () => {
     expect(props.onDelete?.(row)).toBeUndefined();
   });
 
+  it("gives viewers nothing to add, edit, reorder, switch off, remove or reset", () => {
+    mockTemplatesResult.data = { templates: [template()], count: 1 };
+
+    render(<TemplatesTab canEdit={false} />);
+
+    expect(screen.queryByRole("button", { name: "Add reply" })).not.toBeInTheDocument();
+    const props = capturedTableProps[capturedTableProps.length - 1];
+    expect(props.actions).toEqual([]);
+    expect(props.onEdit).toBeUndefined();
+  });
+
+  it("labels the remove action Remove, not with its toast", () => {
+    mockTemplatesResult.data = { templates: [template()], count: 1 };
+
+    render(<TemplatesTab />);
+
+    expect(screen.getByRole("button", { name: "Add reply" })).toBeInTheDocument();
+    const props = capturedTableProps[capturedTableProps.length - 1];
+    expect(props.actions?.find(action => action.key === "remove")?.label).toBe("Remove");
+    expect(props.onEdit).toBeDefined();
+  });
+
   it("shows the empty state when there are no templates", () => {
     render(<TemplatesTab />);
     expect(screen.getByText("No keyword replies yet")).toBeTruthy();
@@ -202,6 +235,6 @@ describe("TemplatesTab", () => {
 
     render(<TemplatesTab />);
 
-    expect(screen.getByRole("alert").textContent).toContain("Could not save the reply");
+    expect(screen.getByRole("alert").textContent).toContain("Could not load the replies");
   });
 });
