@@ -1866,6 +1866,18 @@ export const en = {
         wouldFile: "Would be logged as a knowledge gap",
         failed: "The test failed.",
         thinking: "Thinking…",
+        // The live line under a reply being made, by what the agent is doing.
+        status: {
+          thinking: "Thinking…",
+          searching: "Looking things up…",
+          searchingFor: "Looking up “{detail}”…",
+          found: "Found {detail}",
+          foundAny: "Found what to use",
+          checking: "Checking the answer…",
+          rewriting: "Improving the answer…",
+          writing: "Writing the reply…",
+        },
+        replaced: "Updated with the final reply",
         empty: "Start a conversation to see how it answers.",
         checkAccess: "Apply “who can use it” to me",
         draftBanner: "Previewing your unsaved instructions.",
@@ -1915,6 +1927,9 @@ export const en = {
       enabledLabel: "Answer messages",
       enabledHelp:
         "Turn off to stop this chatbot replying. Unpublishing it from Overview does the same.",
+      showTypingLabel: "Show typing on WhatsApp",
+      showTypingHelp:
+        "Shows the typing dots while the chatbot works on a reply. WhatsApp also marks the person's message as read (blue ticks). Only Ally admins can change this.",
       helplineHelp: "Shown in the crisis reply wherever it says {helpline_numbers}.",
       crisisClassifierHelp:
         "Can only be turned on here. Ally keeps it on for everyone who needs it.",

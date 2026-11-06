@@ -418,6 +418,11 @@ export interface WaOrgSettings {
   conversationIdleMinutes?: number;
   crisisClassifierEnabled?: boolean;
   consentRequired?: boolean;
+  /**
+   * WhatsApp's typing dots while the bot works on a reply (they also mark the message read). On
+   * unless `false`; platform admins only.
+   */
+  showTyping?: boolean;
   rateLimit?: { perMinute?: number; perHour?: number; perDay?: number };
   retrieval?: {
     minSimilarity?: number;

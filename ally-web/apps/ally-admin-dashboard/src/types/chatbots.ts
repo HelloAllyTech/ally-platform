@@ -253,6 +253,22 @@ export interface TestChatbotRequest {
   conversationId?: string;
 }
 
+/** What a streamed Preview reply is doing now (ally-be relays ally-ai's codes). */
+export type ChatbotTestStatusCode =
+  | "thinking"
+  | "searching"
+  | "found"
+  | "checking"
+  | "rewriting"
+  | "writing";
+
+export interface ChatbotTestStatus {
+  code: ChatbotTestStatusCode;
+  label: string;
+  /** The search query, or "3 passages". */
+  detail?: string;
+}
+
 export interface TestChatbotResponse {
   reply: string;
   handledBy: WaHandledBy;
