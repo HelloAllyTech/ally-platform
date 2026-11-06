@@ -160,7 +160,9 @@ Every existing test is unmodified.
 
 ## 4. Conversation eval and parity (the results)
 
-Full report: [CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md) (every turn, every reply, judge notes). Local stack, rebuilt ally-ai image, Ally FAQ persona and decline wording, all 7 documents, `features.agent` on, `AGENT_RUNTIME__AGENT_REASONING_EFFORT=low`.
+> **Baseline for later runs** (chunk 3r and on): the last full run, in [CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md) and section 12. 42 turns in 37 cases, **0 hard fails**, 1 check fail, judge mean **4.45** (min 3), agent p50 **7,274 ms** against 8,909 ms in parity mode (**−18%**), same documents as v1 100% of 12. The table below and section 5 are from the first design (before section 9) and are kept as history; compare new runs with these numbers, not with them.
+
+First design's report (since replaced by the run above): [CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md) (every turn, every reply, judge notes). Local stack, rebuilt ally-ai image, Ally FAQ persona and decline wording, all 7 documents, `features.agent` on, `AGENT_RUNTIME__AGENT_REASONING_EFFORT=low`.
 
 | Measure | Result | Bar |
 |---|---|---|
@@ -307,7 +309,7 @@ Chunks 1 and 2 are listed in `CHUNK-02-NOTES.md` §7. One PR for all three, as d
 - **The agent prompt holds the rules and defaults** and asks for an assistant's manner: answer first, then the most useful next step; use the conversation; never reuse an opening, sign-off or offer; introduce itself (and "not a crisis service") only once; say what it doesn't have in its own words, naming the topic, with where to go and one thing it can help with; never mention passages, documents or reference material. Out-of-scope requests (weather, news, general knowledge) are declined without a search or clarifying question; a question about the organisation or product ("what is Ally?") is a question to search, not about the bot; `decline` whenever it isn't giving what was asked, even when it cites where to go.
 - Preview steps now read e.g. `agent: question, calls search_knowledge via gpt-5-mini` · `tool · search_knowledge: 3 hits, 2 new passages, best 0.61` · `agent: question, answer via …` · `check: answer (question), 1 citations`; a rewrite shows `check: sent back (uncited)`.
 
-**Eval** ([CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md) is the last full run, before the last two fixes):
+**Eval** (runs A and B of the redesign; the last full run, now in [CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md), is in section 12):
 
 | Run | Hard fails | Notes | p50 vs parity |
 |---|---|---|---|
@@ -362,7 +364,7 @@ Each is sent back once first. These trims are wording, not safety: if trimming w
 
 **5. The organisation-names heuristic is fragile.** `organisation_of(bot)` derives the organisation's names from the bot's display name, the shared prefix of its document titles ("Ally FAQ – …") and their distinctive capitalised words ("Ally"). It works for Ally FAQ because the bot, its documents and the product share one short, distinctive name. For another business it can miss (a bot called "Help Desk" with documents titled "Returns", "Shipping": no names at all, so only citations apply) or over-match (a common word as the name). **Chunk 4 (ORG.md) should give the organisation's name, and its product names, explicitly**, and the check should read them from there instead.
 
-**4. Two full eval runs** (42 turns in 37 cases, `--corpus-db` on; the report in [CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md) is run 2):
+**4. Two full eval runs** (42 turns in 37 cases, `--corpus-db` on; [CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md) has since been replaced by section 12's run, which is the baseline):
 
 | Run | Hard fails | Check fails | In scope: same documents as v1 | p50 vs parity |
 |---|---|---|---|---|
