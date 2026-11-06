@@ -41,8 +41,10 @@ import asyncio
 import os
 import statistics
 import sys
+import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -149,19 +151,38 @@ def cited_documents(result: Optional[Dict[str, Any]]) -> List[str]:
     return sorted(set(titles))
 
 
+JUDGE_LOCK = threading.Lock()
+
+
 def checks(kind: str, result: Dict[str, Any]) -> Tuple[str, List[str]]:
     """(`pass` | `fail` | `judge`, problems) from the reply alone."""
     intent = result.get("intent")
     answer = result.get("answer") or ""
     citations = result.get("citations") or []
     problems: List[str] = []
-    if kind in ("smalltalk", "about_bot"):
+    if kind == "smalltalk":
         if intent != "answer":
             problems.append(f"intent {intent}")
         if citations:
             problems.append("has citations")
         if looks_factual(answer):
             problems.append("looks factual")
+    elif kind == "about_bot":
+        # Saying what it is may also be answered from the documents, with citations.
+        if intent != "answer":
+            problems.append(f"intent {intent}")
+        if not citations and looks_factual(answer):
+            problems.append("looks factual")
+    elif kind == "general":
+        # A general topic on a bot allowed general knowledge: answered, flagged as
+        # ungrounded, and only after a search.
+        searched = any(s.get("node") == "tool" for s in result.get("trace") or [])
+        if intent != "answer":
+            problems.append(f"intent {intent}")
+        elif not citations and not result["retrieval"].get("unsupported"):
+            problems.append("uncited but not flagged as general")
+        if not searched:
+            problems.append("answered without searching")
     elif kind in ("in_scope", "follow_up"):
         if intent != "answer" or not citations:
             problems.append(f"not answered with citations ({intent})")
@@ -187,7 +208,9 @@ def hard_fails(
     answer = result.get("answer") or ""
     citations = result.get("citations") or []
     out: List[str] = []
-    if intent == "answer" and not citations:
+    if "](" in answer or "**" in answer:
+        out.append("markdown in the reply")
+    if intent == "answer" and not citations and kind != "general":
         if looks_factual(answer) or (verdict and verdict.invents_facts):
             out.append("factual answer without citations")
     if verdict and verdict.medical_advice:
@@ -240,7 +263,12 @@ def p50(values: List[float]) -> float:
 
 
 def run(
-    client: httpx.Client, defaults, cases, judge_model: Optional[str], out: Path
+    client: httpx.Client,
+    defaults,
+    cases,
+    judge_model: Optional[str],
+    out: Path,
+    workers: int = 1,
 ) -> int:
     rows: List[Dict[str, Any]] = []
     agent_ms: List[float] = []
@@ -248,13 +276,16 @@ def run(
     overlaps: List[bool] = []
     v1_defaults = {k: v for k, v in defaults.items() if k not in AGENT_ONLY_FIELDS}
 
-    for case in cases:
+    def run_case(case: Dict[str, Any]) -> None:
         conversation_id = f"eval-{case['id']}-{uuid.uuid4().hex[:8]}"
+        # A case may change the bot, e.g. `bot: {answer_mode: documents_and_general}`.
+        bot = {**defaults, **(case.get("bot") or {})}
+        v1_bot = {**v1_defaults, **(case.get("bot") or {})}
         history: List[Dict[str, str]] = []
         for index, turn in enumerate(case["turns"], start=1):
             kind = turn["expect"]["kind"]
             payload = {
-                **defaults,
+                **bot,
                 "question": turn["say"],
                 "history": list(history),
                 "conversation_id": conversation_id,
@@ -279,16 +310,17 @@ def run(
             verdict = None
             if judge_model:
                 try:
-                    verdict = asyncio.run(
-                        judge(
-                            judge_model,
-                            defaults=defaults,
-                            history=history,
-                            kind=kind,
-                            message=turn["say"],
-                            result=result,
+                    with JUDGE_LOCK:  # the provider client is shared
+                        verdict = asyncio.run(
+                            judge(
+                                judge_model,
+                                defaults=bot,
+                                history=history,
+                                kind=kind,
+                                message=turn["say"],
+                                result=result,
+                            )
                         )
-                    )
                 except Exception as e:  # noqa: BLE001 — a judge failure is reported
                     problems.append(f"judge failed: {type(e).__name__}")
             hard = hard_fails(kind, result, verdict)
@@ -307,13 +339,13 @@ def run(
                 v1, _, v1_error = call(
                     client,
                     V1_PATH,
-                    {**v1_defaults, "question": turn["say"]},
+                    {**v1_bot, "question": turn["say"]},
                 )
                 parity, p_ms, p_error = call(
                     client,
                     V2_PATH,
                     {
-                        **v1_defaults,
+                        **v1_bot,
                         "question": turn["say"],
                         "conversation_id": f"{conversation_id}-parity",
                     },
@@ -337,6 +369,12 @@ def run(
                 {"role": "assistant", "content": result.get("answer") or ""},
             ]
 
+    # Cases run side by side (turns within a case stay in order); the report keeps
+    # the cases file's order.
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(run_case, cases))
+    order = {case["id"]: index for index, case in enumerate(cases)}
+    rows.sort(key=lambda r: (order[r["case"]], r["turn"]))
     return write_report(rows, agent_ms, parity_ms, overlaps, judge_model, out)
 
 
@@ -468,6 +506,9 @@ def main() -> int:
     parser.add_argument("--judge-model", default="gpt-5-mini")
     parser.add_argument("--no-judge", action="store_true")
     parser.add_argument("--only", help="Run only cases whose id starts with this")
+    parser.add_argument(
+        "--workers", type=int, default=6, help="Cases run side by side (default 6)"
+    )
     args = parser.parse_args()
     if not args.api_key:
         parser.error("pass --api-key or set API__X_API_KEY")
@@ -486,6 +527,7 @@ def main() -> int:
             cases,
             None if args.no_judge else args.judge_model,
             args.out,
+            workers=max(1, args.workers),
         )
 
 

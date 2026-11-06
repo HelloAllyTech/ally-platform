@@ -329,6 +329,7 @@ class AgentSystemInputs(PromptInputs):
 
     output_format: ClassVar[Optional[str]] = "structured"
 
+    answer_scope: Optional[str] = None
     decline_text: Optional[str] = None
     feedback: Optional[str] = None
     history: Optional[str] = None

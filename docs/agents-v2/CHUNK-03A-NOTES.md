@@ -319,3 +319,24 @@ Chunks 1 and 2 are listed in `CHUNK-02-NOTES.md` §7. One PR for all three, as d
 Latency outliers (18–76 s) in runs B and C were OpenAI retrying requests (`Retrying request to /chat/completions` in the ally-ai log), not agent loops: across the runs only a handful of messages used a rewrite.
 
 **Still open:** the refund reply still says "in my reference material" on some runs, despite the rule; the eval script runs every call in sequence (about 8 minutes a run, 100+ model calls) and prints nothing until the end: parallel cases and per-turn output would make iteration much faster; the eval's expected `turn_type` for "how does this work?" should accept a cited answer.
+
+## 10. The organisation is never general knowledge (2026-11-06)
+
+**Preview finding.** "Ally kya hai?" on Ally FAQ got "Yeh general jankari hai — hamare diye gaye documents mein iska poora varnan nahi hai. Ally ek not-for-profit platform hai… [www.helloally.ai](https://www.helloally.ai)".
+- Ally FAQ was on **documents_and_general** in `ally_local` (last updated 05:39:16, two seconds after the run; the run used it too). Now set back to **documents_only**.
+- Stored run `3c94618a` (05:39:14): it **did** search. The first search found passage [1] (About Ally); three more searches with longer queries found nothing new; it then replied `decline`, no citations. A decline the model chose was sent as written, so its uncited facts, markdown link and "documents don't cover it" went out.
+
+**Check rules added** (`app/core/agent_runtime/check.py`), whatever the answer mode:
+- **The organisation's names** come from the bot: its display name and the name its documents share ("Ally FAQ – …"), plus their distinctive words ("Ally"; generic words like FAQ, Bot, Help are skipped). The bot's own name is masked first, so "I'm Ally FAQ" is not about the organisation. A message naming it, or an answer to a question that names it, is about the organisation. A bot with no display name and no titled documents has no names; only citations apply.
+- **General knowledge** (documents_and_general) is allowed uncited only when the subject isn't the organisation **and** a search this run found nothing relevant. Otherwise an uncited answer is sent back ("search first" when nothing was searched), then declined.
+- **Small talk answering a question that names the organisation** ("What is Ally?" labelled about_bot) needs a citation like any answer.
+- **A decline is checked too:** about the organisation with no search → sent back, "search first"; a question naming the organisation, passages found, and still a decline → sent back, "use the passages"; a link, email or number not in any passage → sent back. A second refusal sends no text (the bot's decline wording).
+- **After "search first", the next step can only search** (`step_schema(tools, reply=False)`): asking alone was not enough in the eval ("Does Ally store audio?" and "What is CBT?" declined without searching).
+- **Talk about sources** ("reference material", "the documents", "passages", "diye gaye documents") is sent back once to rephrase; if the rewrite still does it, the text is kept (wording, not safety).
+- **Plain text:** every reply has markdown removed in check: `[text](url)` → the bare URL, `**bold**` / `__bold__` / `*bold*` → text, headings dropped. The link rule still applies to declines: a URL must appear in a passage.
+
+**Prompt** (`agent/system.txt`, new optional variable `{answer_scope}`, rendered in code from `answer_mode`): documents-only bots are told they don't answer from general knowledge; documents_and_general bots that general topics may be answered after a search found nothing, saying it's general information, and never anything about the organisation. Also: never say you don't have what a passage gives you; links as bare addresses.
+
+**Eval:** cases may override the bot (`bot:` in a case); four cases on a documents_and_general copy: "Ally kya hai?", "What is Ally?", "who made Ally?" (cited answers) and "What is CBT?" (new kind `general`: answered after a search, flagged as general information). A reply with markdown is a hard fail. `about_bot` cases may now be answered with citations. The script runs 6 cases side by side (`--workers`), so a full run takes about 3 minutes instead of about 8; judge calls are serialised.
+
+**Full eval:** 38 turns, **0 hard fails, 0 check fails**, every documents_and_general case as intended, in-scope documents the same as v1 100% of 12, p50 −12% vs parity. One reply still mentions "reference material" (`out-refund`, after one rewrite): the phrase is in Ally FAQ's own decline text, "My reference material does not cover that…", which the prompt quotes for tone.

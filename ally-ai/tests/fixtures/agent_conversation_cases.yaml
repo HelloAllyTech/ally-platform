@@ -7,6 +7,9 @@
 #
 # `expect` per turn:
 #   kind: smalltalk | about_bot | in_scope | follow_up | out_of_scope | pushy | clarify
+#         | general (a general topic on a documents_and_general bot: answered after a
+#           search, flagged as general information)
+# A case's `bot` is merged over `defaults` for that case only.
 #   turn_type: the expected turn type (soft: reported, not failed)
 
 defaults:
@@ -110,3 +113,18 @@ cases:
 
   # --- clarify: asks one clarifying question ------------------------------------------
   - {id: cl-doesnt-work, turns: [{say: "it doesn't work", expect: {kind: clarify, turn_type: unclear}}]}
+
+  # --- documents_and_general copy of the bot: the organisation is never general
+  # knowledge (searched and cited); other topics may be, after a search ----------------
+  - id: gen-ally-kya-hai
+    bot: {answer_mode: documents_and_general}
+    turns: [{say: "Ally kya hai?", expect: {kind: in_scope, turn_type: question}}]
+  - id: gen-what-is-ally
+    bot: {answer_mode: documents_and_general}
+    turns: [{say: "What is Ally?", expect: {kind: in_scope, turn_type: question}}]
+  - id: gen-who-made-ally
+    bot: {answer_mode: documents_and_general}
+    turns: [{say: "who made Ally?", expect: {kind: in_scope, turn_type: question}}]
+  - id: gen-what-is-cbt
+    bot: {answer_mode: documents_and_general}
+    turns: [{say: "What is CBT?", expect: {kind: general, turn_type: question}}]

@@ -49,13 +49,15 @@ _REPLY_FIELDS: Dict[str, Any] = {
 
 
 @lru_cache(maxsize=32)
-def _step_schema(tools: Tuple[Tuple[str, Type[BaseModel]], ...]) -> Type[BaseModel]:
-    names = (REPLY_ACTION, *(name for name, _ in tools))
+def _step_schema(
+    tools: Tuple[Tuple[str, Type[BaseModel]], ...], reply: bool = True
+) -> Type[BaseModel]:
+    names = ((REPLY_ACTION,) if reply else ()) + tuple(name for name, _ in tools)
     # An Enum rather than a Literal: a one-value Literal renders as JSON Schema
     # `const`, which not every provider's structured output accepts; an enum
     # renders as `enum` whatever its size.
     action = Enum("AgentAction", {name: name for name in names}, type=str)
-    fields: Dict[str, Any] = {"action": (action, action(REPLY_ACTION))}
+    fields: Dict[str, Any] = {"action": (action, action(names[0]))}
     # One input field per tool, named after it. Defaults rather than Optional, so
     # the model may leave the fields of tools it is not calling at their empty
     # defaults.
@@ -65,10 +67,13 @@ def _step_schema(tools: Tuple[Tuple[str, Type[BaseModel]], ...]) -> Type[BaseMod
     return create_model("AgentStep", **fields)
 
 
-def step_schema(tools: Sequence[Any]) -> Type[BaseModel]:
-    """The step schema for these tools (`Tool` objects); reply-only when empty.
+def step_schema(tools: Sequence[Any], *, reply: bool = True) -> Type[BaseModel]:
+    """The step schema for these tools (`Tool` objects); reply-only when empty, and
+    tools-only when `reply` is false.
 
     The schema is passed to the provider, so a tool that is not offered cannot be
     named in `action` at all.
     """
-    return _step_schema(tuple((tool.name, tool.input_model) for tool in tools))
+    return _step_schema(
+        tuple((tool.name, tool.input_model) for tool in tools), reply=reply or not tools
+    )

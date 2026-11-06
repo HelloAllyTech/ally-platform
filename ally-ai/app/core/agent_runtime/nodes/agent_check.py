@@ -10,7 +10,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal
 
-from app.core.agent_runtime.check import check_reply, rejection_feedback
+from app.core.agent_runtime.check import (
+    check_reply,
+    organisation_of,
+    rejection_feedback,
+)
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
@@ -49,6 +53,9 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             retrieval=dict(retrieval),
             general=state["bot"].get("answer_mode") == "documents_and_general",
             search_gate=state.get("search_gate"),
+            question=state["question"],
+            searched=bool(state.get("tool_calls")),
+            organisation=organisation_of(state["bot"]),
         )
         revisions = state.get("revisions") or 0
         if rejection and revisions < MAX_REVISIONS:

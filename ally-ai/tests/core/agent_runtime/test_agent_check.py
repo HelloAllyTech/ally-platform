@@ -7,11 +7,21 @@ from app.core.agent_runtime.check import (
     check_reply,
     detail_kinds,
     looks_factual,
+    mentions_sources,
+    organisation_of,
+    plain_text,
     rejection_feedback,
+    unsupported_details,
 )
 from tests.core.knowledge_agent.test_agent import CHUNK_A, CHUNK_B, passage
 
 PASSAGES = [passage(CHUNK_A, 0.7), passage(CHUNK_B, 0.6)]
+ALLY = organisation_of(
+    {
+        "persona": {"display_name": "Ally FAQ"},
+        "knowledge_topics": ["Ally FAQ – About Ally", "Ally FAQ – Privacy and Data"],
+    }
+)
 META = {"provider": "openai", "model": "gpt-5-mini"}
 RETRIEVAL = {"hit_count": 2, "top_similarity": 0.7, "unsupported": False}
 
@@ -72,11 +82,18 @@ class TestAnswer:
     def test_only_out_of_range_citations_is_uncited(self):
         assert check(citations=[7])["intent"] == "decline"
 
-    def test_general_bot_keeps_an_uncited_answer_flagged(self):
-        result, rejection = review(answer="General info: …", general=True)
+    def test_general_bot_answers_a_general_topic_after_a_search_found_nothing(self):
+        result, rejection = review(
+            answer="CBT is a talking therapy…",
+            general=True,
+            searched=True,
+            passages=[],
+            question="What is CBT?",
+            organisation=ALLY,
+        )
+        assert rejection is None
         assert result["intent"] == "answer"
         assert result["retrieval"]["unsupported"] is True
-        assert rejection is None
 
     def test_empty_answer_is_a_decline(self):
         result, rejection = review(answer="  ", citations=[1])
@@ -193,3 +210,215 @@ class TestRejectionFeedback:
         assert rejection_feedback("uncited", {"answer": "5 days"}) == (
             REJECTIONS["uncited"]
         )
+
+
+class TestGeneralKnowledgeNeverCoversTheOrganisation:
+    """documents_and_general: uncited only for other topics, only after a search."""
+
+    def general(self, *args, **kw):
+        options = dict(general=True, organisation=ALLY)
+        if not args:
+            options["answer"] = "Ally is a platform…"
+        options.update(kw)
+        return review(*args, **options)
+
+    def test_the_organisations_names_come_from_the_bot(self):
+        assert ALLY.terms == ("Ally FAQ", "Ally")
+        assert ALLY.named_in("Ally kya hai?")
+        assert ALLY.named_in("who made ally?")
+        assert not ALLY.named_in("who are you, Ally FAQ?")  # the bot itself
+        assert not ALLY.named_in("What is CBT?")
+
+    def test_a_question_naming_it_with_no_search_is_sent_back_to_search(self):
+        result, rejection = self.general(
+            question="Ally kya hai?", searched=False, passages=[]
+        )
+        assert result["intent"] == "decline"
+        assert result["answer"] == ""
+        assert rejection == "uncited"
+        feedback = rejection_feedback(rejection, {}, searched=False)
+        assert feedback.endswith("You haven't searched yet: search before you reply.")
+
+    def test_not_even_after_a_search_that_found_nothing(self):
+        result, rejection = self.general(
+            question="who made Ally?", searched=True, passages=[]
+        )
+        assert result["intent"] == "decline"
+        assert rejection == "uncited"
+
+    def test_nor_when_a_search_found_passages(self):
+        result, rejection = self.general(question="What is Ally?", searched=True)
+        assert rejection == "uncited"
+        assert result["retrieval"]["unsupported"] is False
+
+    def test_an_answer_to_a_question_that_names_it_counts_too(self):
+        _, rejection = self.general(
+            question="who runs this?", searched=True, passages=[], turn_type="question"
+        )
+        assert rejection == "uncited"
+
+    def test_a_general_topic_needs_a_search_first(self):
+        _, rejection = self.general(
+            question="What is CBT?", answer="CBT is…", searched=False, passages=[]
+        )
+        assert rejection == "uncited"
+
+    def test_a_general_topic_with_passages_found_must_cite_them(self):
+        _, rejection = self.general(
+            question="What is CBT?", answer="CBT is…", searched=True
+        )
+        assert rejection == "uncited"
+
+    def test_small_talk_answering_a_question_about_it_needs_a_source(self):
+        result, rejection = self.general(
+            "smalltalk",
+            "Ally is a not-for-profit platform.",
+            question="What is Ally?",
+            turn_type="about_bot",
+            passages=[],
+        )
+        assert result["intent"] == "decline"
+        assert rejection == "uncited"
+
+    def test_saying_who_it_is_stays_small_talk(self):
+        result, rejection = review(
+            "answer",
+            "I'm Ally FAQ. I can help with questions about Ally.",
+            question="who are you?",
+            turn_type="about_bot",
+            passages=[],
+            organisation=ALLY,
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"
+
+
+class TestDeclineThatIgnoresWhatWasFound:
+    def test_is_sent_back_to_use_the_passages(self):
+        result, rejection = review(
+            "decline",
+            "Yeh general jankari hai — documents mein iska varnan nahi hai.",
+            question="Ally kya hai?",
+            organisation=ALLY,
+            searched=True,
+        )
+        assert rejection == "use_found"
+        # If the rewrite fails too, nothing of this text is sent.
+        assert result["answer"] == ""
+
+    def test_a_decline_about_something_else_keeps_its_words(self):
+        result, rejection = review(
+            "decline",
+            "I can't help with weather forecasts.",
+            question="weather tomorrow?",
+            organisation=ALLY,
+            searched=True,
+        )
+        assert rejection is None
+        assert result["answer"] == "I can't help with weather forecasts."
+
+    def test_a_link_in_a_decline_needs_a_passage(self):
+        result, rejection = review(
+            "decline",
+            "I don't have that. Try www.example.org or call 1800 123 456.",
+            passages=[],
+        )
+        assert rejection == "unsourced_detail"
+        assert result["answer"] == ""
+
+    def test_a_link_a_passage_gives_is_fine(self):
+        found = [passage(CHUNK_A, 0.7, text="Contact us at www.helloally.ai.")]
+        _, rejection = review(
+            "decline",
+            "Refunds aren't covered here; ask through www.helloally.ai.",
+            passages=found,
+            question="refund policy?",
+        )
+        assert rejection is None
+
+
+class TestPlainText:
+    def test_a_markdown_link_becomes_its_bare_url(self):
+        assert (
+            plain_text("Visit [www.helloally.ai](https://www.helloally.ai) today.")
+            == "Visit https://www.helloally.ai today."
+        )
+
+    def test_bold_and_headings_are_dropped(self):
+        assert plain_text("## Steps\n**Open** the app and tap *Sign in*.") == (
+            "Steps\nOpen the app and tap Sign in."
+        )
+
+    def test_every_reply_goes_out_as_plain_text(self):
+        result = check(
+            "answer",
+            "**Yes.** See [the policy](https://app.helloally.ai/privacy).",
+            citations=[1],
+        )
+        assert result["answer"] == "Yes. See https://app.helloally.ai/privacy."
+
+    def test_unsupported_details_checks_links_emails_and_numbers(self):
+        found = [passage(CHUNK_A, 0.7, text="Call Tele-MANAS on 14416.")]
+        assert unsupported_details("Call 14416 or 112.", found) == ["112"]
+        assert unsupported_details("Email a@b.org", []) == ["a@b.org"]
+
+
+class TestDeclineWithoutSearching:
+    def test_about_the_organisation_is_sent_back_to_search(self):
+        result, rejection = review(
+            "decline",
+            "I don't have that information.",
+            question="Does Ally store the audio of my real sessions?",
+            organisation=ALLY,
+            searched=False,
+            passages=[],
+        )
+        assert rejection == "search_first"
+        assert result["answer"] == ""
+
+    def test_about_something_else_keeps_its_words(self):
+        _, rejection = review(
+            "decline",
+            "I can't help with the weather.",
+            question="weather tomorrow?",
+            organisation=ALLY,
+            searched=False,
+            passages=[],
+        )
+        assert rejection is None
+
+
+class TestTalkAboutSources:
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "I don't have a refund policy in my reference material.",
+            "The documents don't cover this.",
+            "Hamare diye gaye documents mein iska varnan nahi hai.",
+            "Based on the passages, yes.",
+        ],
+    )
+    def test_is_recognised(self, text):
+        assert mentions_sources(text)
+
+    def test_a_product_feature_named_documents_is_not(self):
+        assert not mentions_sources("Upload documents to Ally Assist to share notes.")
+
+    def test_is_sent_back_but_kept_if_the_rewrite_still_does_it(self):
+        result, rejection = review(
+            "decline",
+            "I don't have that in my reference material.",
+            passages=[],
+            question="refund policy?",
+        )
+        assert rejection == "mentions_sources"
+        # Wording, not safety: the final pass keeps the text.
+        assert result["answer"] == "I don't have that in my reference material."
+
+    def test_a_cited_answer_keeps_its_citations(self):
+        result, rejection = review(
+            "answer", "Per the documents I have, sign-in uses a code.", citations=[1]
+        )
+        assert rejection == "mentions_sources"
+        assert result["intent"] == "answer"
+        assert len(result["citations"]) == 1

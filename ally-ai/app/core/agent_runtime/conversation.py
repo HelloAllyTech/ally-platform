@@ -31,11 +31,13 @@ async def agent_step(
     history: Optional[List[Dict[str, str]]] = None,
     searches: Sequence[Dict[str, Any]] = (),
     feedback: Optional[str] = None,
+    must_search: bool = False,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """One agent call. Returns ``(step, meta)``: the step as a plain dict.
 
     `tools` are those still callable; empty means the model can only reply.
     `feedback` is why check refused the previous draft, when it did.
+    `must_search` leaves `reply` out of the schema, so this step can only search.
     """
     prompts = bot.get("prompts")
     # The bot's model override is merged into this prompt's entry by ally-be, as it
@@ -47,6 +49,7 @@ async def agent_step(
         history=history,
         searches=searches,
         feedback=feedback,
+        answer_mode=bot.get("answer_mode"),
         tools=tools,
         tool_budget=tool_budget,
         knowledge_topics=bot.get("knowledge_topics"),
@@ -62,7 +65,7 @@ async def agent_step(
             "The agent prompt template is missing or empty."
         )
     parsed, meta = await generate_structured(
-        schema=step_schema(tools),
+        schema=step_schema(tools, reply=not must_search),
         prompt=prompt,
         task=LLMTask.WHATSAPP_AGENT_STEP.value,
         provider=provider,

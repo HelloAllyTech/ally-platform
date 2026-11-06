@@ -253,8 +253,10 @@ class TestRevision:
     async def test_an_uncited_claim_is_rewritten_in_the_agents_words(
         self, agent_run, chunk_service
     ):
+        chunk_service.search.return_value = []
         llm = FakeLLM(
             reply("answer", "Refunds take 5 days."),
+            search("refund policy"),
             reply("decline", "I don't have anything on refunds — your admin would."),
         )
         state = await agent_run("refund policy?", llm)
@@ -270,7 +272,19 @@ class TestRevision:
         assert REJECTIONS["uncited"] in second
         assert "You haven't searched yet: search before you reply." in second
         assert "Refunds take 5 days." not in second
-        assert nodes(state) == ["agent", "check", "agent", "check", "finalize"]
+        # Nothing searched yet: that step could only search.
+        assert "reply" not in [
+            a.value for a in llm.calls[1]["schema"].model_fields["action"].annotation
+        ]
+        assert nodes(state) == [
+            "agent",
+            "check",
+            "agent",
+            "tool",
+            "agent",
+            "check",
+            "finalize",
+        ]
         check = state["trace"][1]
         assert check["summary"] == "check: sent back (uncited)"
 
@@ -288,15 +302,16 @@ class TestRevision:
     async def test_a_second_refusal_is_final_and_sends_no_text(
         self, agent_run, chunk_service
     ):
+        chunk_service.search.return_value = []
         llm = FakeLLM(
             reply("answer", "Refunds take 5 days."),
+            search("refund policy"),
             reply("answer", "Refunds take five days."),
         )
         state = await agent_run("refund policy?", llm)
         result = state["result"]
-        assert len(llm.calls) == 2
+        assert len(llm.calls) == 3
         assert result["intent"] == "decline"
-        assert result["decline_reason"] == "model_declined"
         # The refused claim never reaches the person; ally-be sends its decline text.
         assert result["answer"] == ""
 
@@ -321,6 +336,93 @@ class TestRevision:
         state = await agent_run("what dose?", llm)
         assert len(llm.calls) == 1
         assert state["result"]["answer"] == "I can't help with medication questions."
+
+
+class TestTheOrganisationIsNeverGeneralKnowledge:
+    """The Preview finding: "Ally kya hai?" on a documents_and_general bot."""
+
+    BOT = dict(
+        answer_mode="documents_and_general",
+        persona={"display_name": "Ally FAQ"},
+        knowledge_topics=["Ally FAQ – About Ally"],
+    )
+
+    async def test_a_decline_that_ignores_the_found_passage_is_rewritten(
+        self, agent_run, chunk_service
+    ):
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        llm = FakeLLM(
+            search("What is Ally?", language="hi"),
+            reply(
+                "decline",
+                "Yeh general jankari hai — documents mein iska varnan nahi hai. "
+                "[www.helloally.ai](https://www.helloally.ai)",
+                language="hi",
+            ),
+            reply(citations=[1], answer="Ally ek platform hai.", language="hi"),
+        )
+        state = await agent_run("Ally kya hai?", llm, **self.BOT)
+
+        assert REJECTIONS["use_found"] in llm.calls[2]["prompt"]
+        result = state["result"]
+        assert result["intent"] == "answer"
+        assert [c["chunk_id"] for c in result["citations"]] == [CHUNK_A]
+        assert result["retrieval"]["unsupported"] is False
+
+    async def test_an_uncited_answer_without_a_search_is_sent_to_search(
+        self, agent_run, chunk_service
+    ):
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        llm = FakeLLM(
+            reply("answer", "Ally is a not-for-profit platform."),
+            search("What is Ally?"),
+            reply(citations=[1], answer="Ally is a practice platform."),
+        )
+        state = await agent_run("What is Ally?", llm, **self.BOT)
+
+        assert "You haven't searched yet: search before you reply." in (
+            llm.calls[1]["prompt"]
+        )
+        assert state["result"]["citations"][0]["chunk_id"] == CHUNK_A
+
+    async def test_a_decline_without_searching_must_search(
+        self, agent_run, chunk_service
+    ):
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        llm = FakeLLM(
+            reply("decline", "I don't have that information."),
+            search("Does Ally store audio of real sessions?"),
+            reply(
+                citations=[1], answer="No: the audio is deleted after transcription."
+            ),
+        )
+        state = await agent_run(
+            "Does Ally store the audio of my real sessions?", llm, **self.BOT
+        )
+        assert REJECTIONS["search_first"] in llm.calls[1]["prompt"]
+        assert state["result"]["intent"] == "answer"
+        assert state["result"]["citations"][0]["chunk_id"] == CHUNK_A
+
+    async def test_a_general_topic_is_answered_after_a_search_found_nothing(
+        self, agent_run, chunk_service
+    ):
+        chunk_service.search.return_value = []
+        llm = FakeLLM(
+            search("What is CBT?"),
+            reply("answer", "CBT is a talking therapy. This is general information."),
+        )
+        state = await agent_run("What is CBT?", llm, **self.BOT)
+        result = state["result"]
+        assert result["intent"] == "answer"
+        assert result["retrieval"]["unsupported"] is True
+        assert "general knowledge" in llm.calls[0]["prompt"]
+
+    async def test_a_documents_only_bot_is_told_it_has_no_general_knowledge(
+        self, agent_run, chunk_service
+    ):
+        llm = FakeLLM(chat())
+        await agent_run("hi", llm)
+        assert "you don't answer from general knowledge" in llm.calls[0]["prompt"]
 
 
 class TestDeclineReason:

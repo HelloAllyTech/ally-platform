@@ -42,6 +42,10 @@ class TestRegistry:
         # An `enum` even with one value: not every provider accepts `const`.
         assert actions(reply_only) == ["reply"]
         assert "search_knowledge" not in reply_only["properties"]
+        search_only = step_schema(tools, reply=False).model_json_schema()
+        assert actions(search_only) == ["search_knowledge"]
+        # Nothing to search with: replying stays possible.
+        assert actions(step_schema([], reply=False).model_json_schema()) == ["reply"]
 
 
 class TestSearchKnowledge:

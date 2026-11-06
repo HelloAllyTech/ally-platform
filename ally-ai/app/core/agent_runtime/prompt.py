@@ -31,6 +31,23 @@ def format_topics(topics: Optional[Sequence[str]]) -> str:
     return "\n".join(lines) or NO_TOPICS
 
 
+GENERAL_SCOPE = (
+    "You may also answer general questions that aren't about the organisation (for "
+    "example, what CBT is) from general knowledge, but only after a search found "
+    "nothing relevant, and say in a few words that it's general information. "
+    "Anything about the organisation, its product, people, policies, prices or "
+    "contacts never comes from general knowledge: search, and cite what you find."
+)
+DOCUMENTS_SCOPE = (
+    "Everything you state must come from the passages; you don't answer from "
+    "general knowledge."
+)
+
+
+def format_answer_scope(answer_mode: Optional[str]) -> str:
+    return GENERAL_SCOPE if answer_mode == "documents_and_general" else DOCUMENTS_SCOPE
+
+
 def format_feedback(feedback: Optional[str]) -> str:
     """Why check sent the previous draft back; empty on a first draft."""
     if not feedback:
@@ -75,6 +92,7 @@ def build_agent_prompt(
     history: Optional[List[Dict[str, str]]] = None,
     searches: Sequence[Dict[str, Any]] = (),
     feedback: Optional[str] = None,
+    answer_mode: Optional[str] = None,
     tools: Sequence[Any] = (),
     tool_budget: int = 0,
     knowledge_topics: Optional[Sequence[str]] = None,
@@ -92,6 +110,7 @@ def build_agent_prompt(
         passages=format_passages(passages),
         history=format_history(history),
         feedback=format_feedback(feedback),
+        answer_scope=format_answer_scope(answer_mode),
         searches=format_searches(searches),
         tools=format_tools(tools),
         tool_budget=tool_budget,

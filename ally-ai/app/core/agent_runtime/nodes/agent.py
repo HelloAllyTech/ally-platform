@@ -23,6 +23,10 @@ def _summary(_: AgentState, update: Dict[str, Any]) -> str:
     return f"{step.get('turn_type')}, {step.get('intent')} via {model}"
 
 
+#: Refusals after which, if nothing has been searched, the next step must search.
+MUST_SEARCH_AFTER = ("uncited", "search_first")
+
+
 def tool_budget(state: AgentState) -> int:
     return max(
         0, settings.AGENT_RUNTIME.MAX_TOOL_CALLS - len(state.get("tool_calls") or [])
@@ -47,6 +51,13 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         budget = tool_budget(state)
         # Past the cap the schema itself offers only `reply`.
         tools = allowed_tools(bot) if budget > 0 else []
+        # Sent back for not searching, and still nothing searched: this step can
+        # only search. Asking alone was not enough in the eval.
+        must_search = bool(
+            tools
+            and state.get("feedback") in MUST_SEARCH_AFTER
+            and not state.get("tool_calls")
+        )
         step, meta = await conversation.agent_step(
             state["question"],
             passages=state.get("passages") or [],
@@ -56,6 +67,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             history=state.get("history") or None,
             searches=state.get("tool_calls") or [],
             feedback=state.get("feedback_text"),
+            must_search=must_search,
         )
         return {
             **start,
