@@ -142,20 +142,11 @@ describe("ChatbotTestTab — engine and run", () => {
     expect(testSpy.mock.calls[2][0]).toMatchObject({ conversationId: undefined });
   });
 
-  it("offers the engine picker to platform admins only", async () => {
+  it("has no engine picker and always tests the chatbot's own engine", async () => {
+    canCreate = true;
     render(<ChatbotTestTab bot={BOT} />);
     expect(screen.queryByLabelText("Engine for this test")).not.toBeInTheDocument();
     await ask("q");
     expect(testSpy.mock.calls[0][0]).not.toHaveProperty("runtime");
-  });
-
-  it("sends the forced engine for a platform admin's test", async () => {
-    canCreate = true;
-    render(<ChatbotTestTab bot={BOT} />);
-    fireEvent.change(screen.getByLabelText("Engine for this test"), {
-      target: { value: "v1" },
-    });
-    await ask("q");
-    expect(testSpy.mock.calls[0][0]).toMatchObject({ runtime: "v1" });
   });
 });

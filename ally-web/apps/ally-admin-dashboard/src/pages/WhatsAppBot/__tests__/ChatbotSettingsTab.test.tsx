@@ -4,9 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The Engine field (v1 / Shadow / v2) changes who answers real people, so only platform admins see
- * it — the API refuses everyone else too. It also says when the platform kill switch is holding a
- * v2 bot on v1.
+ * The Engine field moved to the Agent tab: Settings no longer shows it, even to platform admins.
  */
 
 // Stable across renders, as RTK Query's cached result is.
@@ -77,31 +75,14 @@ const renderTab = () =>
 
 describe("ChatbotSettingsTab — Engine", () => {
   beforeEach(() => {
-    canCreate = false;
-    bot = { id: "bot-1", runtime: "v1", effectiveRuntime: "v1", features: {} };
+    canCreate = true;
+    bot = { id: "bot-1", runtime: "v2", effectiveRuntime: "v2", features: {} };
   });
 
-  it("is hidden from anyone who is not a platform admin", () => {
+  it("is not here: it lives on the Agent tab", () => {
     renderTab();
     expect(screen.queryByText("Engine")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Shadow/)).not.toBeInTheDocument();
-  });
-
-  it("shows platform admins v1, Shadow and v2 with the bot's setting selected", () => {
-    canCreate = true;
-    bot = { ...bot, runtime: "shadow", effectiveRuntime: "shadow" };
-    renderTab();
-    expect(screen.getByText("Engine")).toBeInTheDocument();
-    expect(screen.getByLabelText(/^v1 —/)).not.toBeChecked();
-    expect(screen.getByLabelText(/^Shadow —/)).toBeChecked();
-    expect(screen.getByLabelText(/^v2 —/)).not.toBeChecked();
-    expect(screen.queryByText(/turned off in Defaults/)).not.toBeInTheDocument();
-  });
-
-  it("says when the new engine is turned off platform-wide", () => {
-    canCreate = true;
-    bot = { ...bot, runtime: "v2", effectiveRuntime: "v1" };
-    renderTab();
-    expect(screen.getByText(/turned off in Defaults/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Agent mode")).not.toBeInTheDocument();
   });
 });

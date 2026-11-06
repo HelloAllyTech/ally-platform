@@ -47,6 +47,7 @@ vi.mock("@constants", async () => {
     tabs: {
       overview: "Overview",
       persona: "Persona",
+      agent: "Agent",
       knowledge: "Knowledge",
       replies: "Replies",
       people: "People",
@@ -79,7 +80,14 @@ const bot = (over: Partial<Chatbot> = {}): Chatbot => ({
   documentCount: 3,
   audienceCount: 1,
   memberCount: 1,
-  stats: { messages: 5, people: 2, answered: 4, declined: 1, openUnanswered: 0, lastMessageAt: null },
+  stats: {
+    messages: 5,
+    people: 2,
+    answered: 4,
+    declined: 1,
+    openUnanswered: 0,
+    lastMessageAt: null,
+  },
   createdAt: "2026-11-04T00:00:00Z",
   updatedAt: "2026-11-04T00:00:00Z",
   ...over,
@@ -137,6 +145,7 @@ vi.mock("../CorpusTab", () => ({ CorpusTab: stub("library") }));
 vi.mock("../CreateChatbotPanel", () => ({ CreateChatbotPanel: () => null }));
 vi.mock("../TemplatesTab", () => ({ TemplatesTab: stub("replies") }));
 vi.mock("../ChatbotOverviewTab", () => ({ ChatbotOverviewTab: withRoles("overview") }));
+vi.mock("../AgentTab", () => ({ AgentTab: withRoles("agent") }));
 vi.mock("../ChatbotSettingsTab", () => ({ ChatbotSettingsTab: withRoles("settings") }));
 vi.mock("../ChatbotTestTab", () => ({ ChatbotTestTab: stub("test") }));
 vi.mock("../ConversationsTab", () => ({ ConversationsTab: stub("conversations") }));
@@ -221,6 +230,15 @@ describe("Chatbot page", () => {
     mockBot = bot({ myRole: ChatbotMemberRole.VIEWER });
     renderAt("/chatbots/bot-1?tab=persona");
     expect(screen.getByTestId("persona").dataset.edit).toBe("false");
+  });
+
+  it("has an Agent tab after Instructions", () => {
+    renderAt("/chatbots/bot-1?tab=agent");
+    expect(screen.getByTestId("agent").dataset.edit).toBe("true");
+    const ids = Array.from(screen.getByTestId("tabs").children).map(tab =>
+      tab.getAttribute("data-testid"),
+    );
+    expect(ids.indexOf("tab-agent")).toBe(ids.indexOf("tab-persona") + 1);
   });
 
   it("keeps team and numbers to owners", () => {

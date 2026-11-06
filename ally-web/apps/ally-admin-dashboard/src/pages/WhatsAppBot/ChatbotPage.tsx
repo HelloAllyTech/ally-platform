@@ -7,6 +7,7 @@ import { useGetChatbotQuery } from "@api";
 import { en, ROUTES } from "@constants";
 import { Chatbot, ChatbotMemberRole } from "@types";
 
+import { AgentTab } from "./AgentTab";
 import { ChatbotContext } from "./chatbotContext";
 import { ChatbotOverviewTab } from "./ChatbotOverviewTab";
 import { ChatbotSettingsTab } from "./ChatbotSettingsTab";
@@ -29,6 +30,7 @@ export type ChatbotTabId = keyof typeof t.tabs;
 const TAB_ORDER: ChatbotTabId[] = [
   "overview",
   "persona",
+  "agent",
   "knowledge",
   "replies",
   "people",
@@ -88,6 +90,8 @@ export const ChatbotPage: React.FC = () => {
     switch (activeTab) {
       case "persona":
         return <PersonaTab bot={bot} canEdit={canEdit} onTest={() => goToTab("test")} />;
+      case "agent":
+        return <AgentTab bot={bot} canEdit={canEdit} onTest={() => goToTab("test")} />;
       case "knowledge":
         return <KnowledgeTab bot={bot} canEdit={canEdit} />;
       case "replies":

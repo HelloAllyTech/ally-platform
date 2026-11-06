@@ -8,17 +8,12 @@ import {
   NumberInput,
   SkeletonText,
 } from "@ally-ui-mono/ui-shared";
-import {
-  useGetChatbotSettingsQuery,
-  useGetChatbotsQuery,
-  useUpdateChatbotSettingsMutation,
-} from "@api";
+import { useGetChatbotSettingsQuery, useUpdateChatbotSettingsMutation } from "@api";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { WaBotSettings, WaOrgSettings } from "@types";
 
-import { ChatbotEngineCard } from "./ChatbotEngineCard";
 import { Card, errorMessage, fill, StatusPill, LoadError } from "./shared";
 
 const t = en.whatsappBot.orgSettings;
@@ -60,8 +55,6 @@ export const ChatbotSettingsTab: React.FC<{
   canEdit: boolean;
 }> = ({ chatbotId, chatbotName, canEdit }) => {
   const { data, isLoading, isError, refetch } = useGetChatbotSettingsQuery(chatbotId);
-  // Platform admins only: the same signal the chatbot pages use for every platform-wide control.
-  const { data: list } = useGetChatbotsQuery();
   const [save, { isLoading: isSaving }] = useUpdateChatbotSettingsMutation();
   const [draft, setDraft] = useState<WaOrgSettings>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -119,8 +112,6 @@ export const ChatbotSettingsTab: React.FC<{
         </h2>
         <p className="text-sm text-typography-600">{t.intro}</p>
       </div>
-
-      {list?.canCreate && <ChatbotEngineCard chatbotId={chatbotId} />}
 
       <Card title={t.groupBasics}>
         <div className="flex flex-col gap-1">

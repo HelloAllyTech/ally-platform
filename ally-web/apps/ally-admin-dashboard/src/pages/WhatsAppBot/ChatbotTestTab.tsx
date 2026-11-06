@@ -1,12 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import {
-  Checkbox,
-  InlineNotification,
-  Select,
-  SelectItem,
-  TextArea,
-} from "@ally-ui-mono/ui-shared";
+import { Checkbox, InlineNotification, TextArea } from "@ally-ui-mono/ui-shared";
 import { useGetChatbotsQuery, useTestChatbotMutation } from "@api";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
@@ -19,9 +13,6 @@ import type { PersonaDraft } from "./PersonaTab";
 
 const t = en.whatsappBot.bots.test;
 const handledLabels = en.whatsappBot.conversations.handledBy as Record<string, string>;
-
-/** Preview's engine choice for the next test: the chatbot's own setting, or one forced engine. */
-type EngineChoice = "bot" | "v1" | "v2";
 
 type Turn =
   | { role: "user"; content: string }
@@ -52,11 +43,11 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   const [checkAccess, setCheckAccess] = useState(false);
   // The thread the new engine keeps for this chat, until "New thread".
   const [conversationId, setConversationId] = useState<string | undefined>();
-  const [engine, setEngine] = useState<EngineChoice>("bot");
   const [runtimeAllowed, setRuntimeAllowed] = useState(true);
-  // Comparing engines is for platform admins, like choosing one.
+  // The engine is the chatbot's own (Agent tab); only platform admins are told when the platform
+  // switch is holding it on v1.
   const { data: list } = useGetChatbotsQuery();
-  const canCompare = Boolean(list?.canCreate);
+  const isPlatformAdmin = Boolean(list?.canCreate);
   const [test, { isLoading }] = useTestChatbotMutation();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -78,7 +69,6 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
         draft,
         checkAccess,
         conversationId,
-        ...(canCompare && engine !== "bot" ? { runtime: engine } : {}),
       }).unwrap();
       setConversationId(result.conversationId);
       setRuntimeAllowed(result.runtimeAllowed !== false);
@@ -112,22 +102,7 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
       {draft && (
         <InlineNotification kind="info" title={t.draftBanner} lowContrast hideCloseButton />
       )}
-      {canCompare && (
-        <div className="flex flex-col gap-2 max-w-xs">
-          <Select
-            id="chatbot-test-engine"
-            labelText={t.engineLabel}
-            size="sm"
-            value={engine}
-            onChange={e => setEngine(e.target.value as EngineChoice)}
-          >
-            <SelectItem value="bot" text={t.engineBot} />
-            <SelectItem value="v1" text={t.engineV1} />
-            <SelectItem value="v2" text={t.engineV2} />
-          </Select>
-        </div>
-      )}
-      {canCompare && !runtimeAllowed && (
+      {isPlatformAdmin && !runtimeAllowed && (
         <InlineNotification kind="info" title={t.engineDisabled} lowContrast hideCloseButton />
       )}
       <div className="flex flex-col gap-3 min-h-[16rem] max-h-[32rem] overflow-y-auto bg-background-100 rounded-md p-4">
