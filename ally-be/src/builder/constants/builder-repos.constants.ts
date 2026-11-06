@@ -153,11 +153,26 @@ export const BUILDER_REPOS: BuilderRepoDefinition[] = [
     e2eCapable: false,
     guardedPaths: ['app/auth', 'app/core/config.py'],
   },
-  // 'ally-mobile' intentionally has no entry: it held RN (npm/Jest) until the
-  // 2026-11 Flutter rename, and there is no Flutter equivalent configured yet
-  // (flutter test / flutter analyze) pending a deliberate review of running
-  // Builder against the Flutter codebase. isBuilderRepo() returning false for
-  // it is the actual enforcement — see findBuilderRepo/isBuilderRepo below.
+  // Onboarded 2026-11-06, after the Flutter rename's deliberate review.
+  // `flutter analyze` is Dart's own type-checking analyzer, not a separate
+  // step, so typecheck is null here for the same reason as the two Python
+  // services above. No e2e harness exists for a device/emulator build in a
+  // runner, same as them — e2eCapable: false.
+  {
+    repo: 'ally-mobile',
+    description:
+      'Flutter app (iOS and Android) for counselors: live sessions, reviews, simulations.',
+    test: 'flutter test',
+    singleTest: 'flutter test',
+    lint: 'flutter analyze',
+    typecheck: null,
+    e2eCapable: false,
+    guardedPaths: [
+      'lib/core/auth',
+      'lib/core/app_update',
+      'lib/core/migration',
+    ],
+  },
 ];
 
 export const BUILDER_REPO_NAMES: string[] = BUILDER_REPOS.map((r) => r.repo);
@@ -173,6 +188,7 @@ export const BUILDER_REPO_BUILD_ORDER: string[] = [
   'ally-ai',
   'ally-ai-learn',
   'ally-web',
+  'ally-mobile',
 ];
 
 /** `repos`, deduplicated, in build order; unknown names last, as given. */

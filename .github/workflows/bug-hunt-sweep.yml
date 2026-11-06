@@ -47,13 +47,13 @@ permissions:
   pull-requests: write
 
 on:
-  # Nightly, staggered per repo so four sweeps do not hit ally-be's pipeline
-  # endpoints and the model API in the same minute. Anchored so the first
-  # sweep lands at 06:00 India (00:30 UTC), then twenty minutes apart:
-  # ally-be 00:30, ally-web 00:50, ally-ai 01:10, ally-ai-learn 01:30.
-  # ally-mobile is deliberately excluded (see the matrix below) —
-  # RN-shaped Jest/lint commands, stale since the Flutter rename, and no
-  # Flutter review has happened yet.
+  # Nightly, staggered per repo (`max-parallel: 1` below) so five sweeps do
+  # not hit ally-be's pipeline endpoints and the model API in the same
+  # minute. Anchored so the first sweep lands at 06:00 India (00:30 UTC):
+  # ally-be, ally-web, ally-ai, ally-ai-learn, then ally-mobile — re-added
+  # 2026-11-06 with its own `flutter test`/`flutter analyze` commands after
+  # the deliberate post-Flutter-rename review this comment used to say was
+  # pending.
   schedule:
     - cron: "30 0 * * *"
 
@@ -111,7 +111,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        service: ${{ fromJSON(inputs.repo && format('["{0}"]', inputs.repo) || '["ally-be","ally-web","ally-ai","ally-ai-learn"]') }}
+        service: ${{ fromJSON(inputs.repo && format('["{0}"]', inputs.repo) || '["ally-be","ally-web","ally-ai","ally-ai-learn","ally-mobile"]') }}
     # One sweep per service at a time; a PR review or map run never waits on a sweep.
     concurrency:
       group: bug-hunt-sweep-${{ matrix.service }}-${{ inputs.mode || 'sweep' }}-${{ inputs.pr_number || 'all' }}
@@ -139,12 +139,19 @@ jobs:
           git checkout bug-hunter-pr-review
           echo "Reviewing PR #${{ inputs.pr_number }} at $(git rev-parse --short HEAD)."
 
+      # ally-mobile keeps a place in this condition even though it is Flutter,
+      # not Node, below: Node is still needed here for the coding engine
+      # itself (gemini-cli/opencode-ai, installed via npm further down),
+      # same reason ally-ai/ally-ai-learn get their own dedicated Node setup.
       - name: Setup Node.js
-        if: env.SERVICE == 'ally-be' || env.SERVICE == 'ally-web'
+        if: env.SERVICE == 'ally-be' || env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.SERVICE == 'ally-be' && '24' || '22' }}
-          cache: "npm"
+          # ally-mobile has no package-lock.json (Flutter, not npm) — caching
+          # against one would fail setup-node outright ("Some specified paths
+          # were not resolved"), not just skip the cache.
+          cache: ${{ env.SERVICE != 'ally-mobile' && 'npm' || '' }}
           cache-dependency-path: ${{ env.SERVICE }}/package-lock.json
 
       - name: Setup Python
@@ -167,12 +174,21 @@ jobs:
         with:
           node-version: "24"
 
+      # ally-mobile's own runtime — matching test-ally-mobile.yml exactly, so
+      # what the sweep runs here is what the pull request's checks will run.
+      - name: Setup Flutter
+        if: env.SERVICE == 'ally-mobile'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+
       - name: Install dependencies
         working-directory: ${{ env.SERVICE }}
         env:
           NX_NO_CLOUD: "true"
         run: |
-          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; fi
+          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; elif [ -f pubspec.yaml ]; then flutter pub get; fi
 
       - name: Configure git identity
         run: |

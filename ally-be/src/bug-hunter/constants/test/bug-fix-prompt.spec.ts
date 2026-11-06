@@ -199,12 +199,13 @@ describe('buildFixSessionPrompt', () => {
   });
 
   it('still flags the guarded path on a repo the bot cannot merge to at all', () => {
-    // ally-be, ally-web and ally-ai all have canBotMerge: false, so a
-    // guarded-path finding on any of them hit the "cannot merge here" branch
-    // before ever reaching the guarded-path-specific one — the reviewer got
-    // told the bot has no merge rights but never which sensitive area to look
-    // at, even though the finding genuinely touches one.
-    for (const repo of ['ally-be', 'ally-web', 'ally-ai']) {
+    // ally-be, ally-web, ally-ai and ally-mobile all have canBotMerge: false,
+    // so a guarded-path finding on any of them hit the "cannot merge here"
+    // branch before ever reaching the guarded-path-specific one — the
+    // reviewer got told the bot has no merge rights but never which
+    // sensitive area to look at, even though the finding genuinely touches
+    // one.
+    for (const repo of ['ally-be', 'ally-web', 'ally-ai', 'ally-mobile']) {
       const prompt = build({ touchesGuardedPath: true }, repo);
 
       expect(prompt).toMatch(/Do NOT attempt to merge/i);
@@ -213,14 +214,16 @@ describe('buildFixSessionPrompt', () => {
     }
   });
 
-  // The dedicated "ally-mobile never merges" carve-out was removed once
-  // ally-mobile had no entry in BUG_HUNT_REPOS at all (2026-11 Flutter
-  // rename) — repoCommands(repo) now throws before this function's body is
-  // ever reached for that repo, so the carve-out could never fire.
-  it('refuses ally-mobile: no entry in BUG_HUNT_REPOS since the Flutter rename (stays excluded)', () => {
-    expect(() => build({}, 'ally-mobile')).toThrow(
-      /No test\/lint commands configured for repo "ally-mobile"/,
-    );
+  // ally-mobile was re-onboarded into BUG_HUNT_REPOS 2026-11-06 (it used to
+  // have no entry at all, since the 2026-11 Flutter rename, and this threw
+  // before the fix prompt's own canBotMerge logic was ever reached) — it now
+  // behaves like any other canBotMerge: false repo, covered by the loop above.
+  it('fixes ally-mobile like any other canBotMerge: false repo', () => {
+    const prompt = build({}, 'ally-mobile');
+
+    expect(prompt).toMatch(/flutter test/);
+    expect(prompt).toMatch(/flutter analyze/);
+    expect(prompt).toMatch(/Do NOT attempt to merge/i);
   });
 
   // ── cross-repo guard ─────────────────────────────────────────────────────
