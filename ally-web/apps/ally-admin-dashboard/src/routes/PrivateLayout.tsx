@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 
+import { Menu } from "@icons";
 import { useDispatch } from "react-redux";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -22,7 +23,6 @@ import {
   en,
   normalizeEmailForAllowlist,
 } from "@constants";
-import { Menu } from "@icons";
 import { setUser, setPermissions, setFeatures } from "@reducer";
 import { hasPermissions, hasFeature } from "@utils";
 
