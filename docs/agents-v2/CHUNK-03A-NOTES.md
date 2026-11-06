@@ -88,19 +88,19 @@ Also decided at plan time:
 | File | What it is |
 |---|---|
 | `app/schemas/agent_runtime.py` | The request adds `features`, `knowledge_topics` (at most 50, each trimmed to 200 characters) and `decline_text`. The response adds `turn_type`, which is **omitted** (not null) while the agent is off, so the flag-off response is byte-for-byte the chunk 1 shape. |
-| `app/core/agent_runtime/graph.py` | One graph, routed at `START` on `bot.features.agent`: `translate → …` (unchanged) or `contextualize → [prefetch] → agent ⇄ tools → agent_check → finalize`. |
-| `app/core/agent_runtime/conversation.py` | The two model calls, both through `generate_structured`: `contextualize()` and `agent_step()`. |
-| `app/core/agent_runtime/schemas.py` | `TurnUnderstanding`, `AgentIntent`, and `step_schema(tools)`, which builds `AgentStep` from the registry. `action` is a str **Enum** (not a Literal, so a one-value schema renders `enum`, not `const`), plus one input field per tool, plus the reply fields. |
+| `app/core/agent_runtime/graph.py` | One graph, routed at `START` on `bot.features.agent`: `translate → …` (unchanged) or `agent ⇄ tools → agent_check (→ agent once, if it refused the draft) → finalize`. *Revised, section 9: no contextualise or prefetch step.* |
+| `app/core/agent_runtime/conversation.py` | The model call, through `generate_structured`: `agent_step()`. |
+| `app/core/agent_runtime/schemas.py` | `AgentIntent`, and `step_schema(tools)`, which builds `AgentStep` from the registry. `action` is a str **Enum** (not a Literal, so a one-value schema renders `enum`, not `const`), plus one input field per tool, plus `turn_type` and the reply fields. |
 | `app/core/agent_runtime/tools/` | The registry: `base.py` (`Tool`, `ToolContext`, `ToolResult`), `search_knowledge.py`, and `__init__.py` (`REGISTRY`, `allowed_tools(bot)`). |
-| `app/core/agent_runtime/check.py` | `check_reply()`, the rules in section 1 / plan, as a pure function; `looks_factual()`. |
-| `app/core/agent_runtime/prompt.py` | Renders topics, the turn line, searches and tools; prepends the persona with the existing `format_persona`. |
-| `app/core/agent_runtime/nodes/{contextualize,prefetch,agent,tools,agent_check}.py` | The new nodes. Every node, and each tool call, adds a trace step with counts only. A tool step is `{node: "tool", summary: "search_knowledge: 2 hits, 1 new passages, best 0.61"}`. |
+| `app/core/agent_runtime/check.py` | `check_reply()`, the rules in section 1 / plan, as a pure function, returning the result and a rejection reason; `looks_factual()`; `REJECTIONS`. |
+| `app/core/agent_runtime/prompt.py` | Renders topics, searches, tools and the rewrite feedback; prepends the persona with the existing `format_persona`. |
+| `app/core/agent_runtime/nodes/{agent,tools,agent_check}.py` | The new nodes. Every node, and each tool call, adds a trace step with counts only. A tool step is `{node: "tool", summary: "search_knowledge: 2 hits, 1 new passages, best 0.61"}`. |
 | `app/core/agent_runtime/state.py` | New run-scoped keys (reset on every run). |
-| `app/core/knowledge_agent/agent.py` | **Refactor only:** `decline()`'s retrieval-log call is extracted as `report_gate_decline()`, so the prefetch can log a weak search without declining. |
+| `app/core/knowledge_agent/agent.py` | **Refactor only:** `decline()`'s retrieval-log call is extracted as `report_gate_decline()`, so the agent's first search can log a weak result without declining. |
 | `app/core/llm/dispatch.py` | Optional `reasoning_effort` on `generate_structured`, sent to OpenAI gpt-5/o-series only; None (the default) sends nothing, so every existing caller is unchanged. |
 | `app/core/config.py` | `AGENT_RUNTIME__MAX_TOOL_CALLS` (4) and `AGENT_RUNTIME__AGENT_REASONING_EFFORT` (unset). |
-| `app/core/llm_usage/tasks.py` | `WHATSAPP_AGENT_CONTEXTUALIZE`, `WHATSAPP_AGENT_STEP`. |
-| `app/prompts/agent/contextualize.txt`, `app/prompts/agent/system.txt`, `app/prompts/contracts.py` | **New seed prompts** `ally_ai_agent_contextualize` and `ally_ai_agent_system`, with contracts. No existing prompt text changed. |
+| `app/core/llm_usage/tasks.py` | `WHATSAPP_AGENT_STEP`. |
+| `app/prompts/agent/system.txt`, `app/prompts/contracts.py` | **New seed prompt** `ally_ai_agent_system`, with its contract. No existing prompt text changed. |
 | `scripts/agent_conversation_eval.py`, `tests/fixtures/agent_conversation_cases.yaml` | The conversation eval (32 cases, 34 turns). |
 
 ### ally-be
@@ -113,7 +113,7 @@ Also decided at plan time:
 | `chatbot/engine/knowledge-request.ts` | `buildAgentRunRequest` adds `features`, `knowledge_topics`, `decline_text` **only when given** (agent mode). |
 | `chatbot/engine/chatbot-engine.types.ts`, `whatsapp/service/whatsapp-inbound.service.ts` | `ChatTurn.isFirstMessage`, set from the contact's `messageCount === 1` on WhatsApp. |
 | `ai/dto/knowledge.dto.ts` | The new request fields and `turn_type`. |
-| `learn/enum/llm-task.enum.ts`, `llm/constants/ai-task-registry.constants.ts` | Two `LlmTask` members and two registry rows (`whatsapp-agent-contextualize`, `whatsapp-agent-step`). |
+| `learn/enum/llm-task.enum.ts`, `llm/constants/ai-task-registry.constants.ts` | One `LlmTask` member and one registry row (`whatsapp-agent-step`). |
 | `DATA_SCHEMA.md` | The `features.agent` key (no migration). |
 
 ### ally-web (`apps/ally-admin-dashboard/src`)
@@ -150,10 +150,9 @@ Every existing test is unmodified.
 - **The model call is a structured step** (Shehbaz). `step_schema(tools)` makes a tool that isn't offered impossible to name; past the cap the schema is reply-only.
 - **`features` is sent only in agent mode.** The chunk 2 engine spec pins the v2 body to "v1's body plus four run fields". ally-ai reads no `features` as "agent off", so the flag-off request is unchanged.
 - **The `turn_type` key is omitted when the agent is off**, rather than null, for the same reason: the chunk 1 endpoint test pins the response's extra fields.
-- **A forced decline clears the reply text.** When check turns an uncited answer (or factual-looking small talk) into a decline, the model's text is the very claim being refused; ally-be then sends the bot's `declineText`. A decline the model chose keeps its own words.
-- **The prefetch logs retrieval exactly as the parity path would** (once per message: "answered" when it clears the threshold, else `declined_no_hits` / `declined_below_threshold`), even though the run goes on. Small talk logs nothing (no search). Tool searches aren't logged (chunk 3b).
+- **A refused draft is rewritten once, then cleared** (*revised, section 9*). When check refuses an uncited answer (or small talk with an unsourced detail), the agent is told why and writes the reply again; only a second refusal clears the text, and ally-be then sends the bot's `declineText`. A decline the model chose keeps its own words.
+- **The agent's first search logs retrieval exactly as the parity path would** (once per message: "answered" when it clears the threshold, else `declined_no_hits` / `declined_below_threshold`), even though the run goes on. Small talk logs nothing (no search). Later searches in the same message aren't logged (chunk 3b).
 - **`isFirstMessage` on `ChatTurn`.** WhatsApp's `history` already contains the message being answered (it's stored at dedupe, before the engine runs), so `history` can't tell a first message.
-- **Contextualise always runs in agent mode**, even with `translate_query: false`: the turn type needs it.
 - **The step schema's `action` is an Enum**, not a Literal: a one-value Literal renders JSON Schema `const`.
 - **The eval judge** follows the repo pattern (`generate_structured(never_fallback=True)`, pinned model, default gpt-5-mini) with a script-local rubric; it's not a Skills Store prompt.
 - **The agent system prompt was revised once after the first eval run** (it's a new seed from this chunk, never released): persona facts and links need a passage too; no jokes or off-topic tasks; "not a crisis service" only when saying who it is; `decline` whenever it isn't doing what was asked. See section 5.
@@ -217,7 +216,7 @@ ALLY_CORE__ENDPOINT=http://localhost:8001 ALLY_CORE__API_KEY=$KEY poetry run pyt
 docker compose -f docker-compose.local.yml up -d --build app
 ```
 - `make sync-prompts` is the same script, but it reads the two variables from the environment, not from `.env`, and `.env`'s endpoint is the in-Docker `host.docker.internal`; hence the override above.
-- Expect `2 added` the first time (both **Manage Prompts → "Chatbot Agent: Understand the Turn"** and **"Chatbot Agent: Instructions"** appear). Sync never overwrites an existing prompt's text: to change it later, publish a new version in Manage Prompts.
+- Expect `1 added` the first time (**Manage Prompts → "Chatbot Agent: Instructions"** appears). Sync never overwrites an existing prompt's text: to change it later, publish a new version in Manage Prompts.
 - `ally-ai/.env` needs `AGENT_RUNTIME__ENABLED=true`, the checkpoint URL (chunk 1), and now `AGENT_RUNTIME__AGENT_REASONING_EFFORT=low` (added locally).
 - ally-be: if it was already running, `docker restart ally-be-app-1` (its file watcher missed this chunk's changes here).
 
@@ -230,11 +229,11 @@ docker compose -f docker-compose.local.yml up -d --build app
 | # | Send | Expect |
 |---|---|---|
 | 1 | `Hello` | Ally FAQ has a welcome message, so this first hello gets **the welcome plus the notice** (a fixed template, no run, no chip): the first-message welcome is kept. |
-| 2 | `who are you?` | A short reply naming Ally FAQ, listing its topics, saying it isn't a crisis service. Chip **About the chatbot**; Handled by RAG; no sources. Steps: `contextualize … · agent … · check … · finalize` (no prefetch). |
+| 2 | `who are you?` | A short reply naming Ally FAQ, listing its topics, saying it isn't a crisis service. Chip **About the chatbot**; Handled by RAG; no sources. Steps: `agent: about_bot, smalltalk via … · check … · finalize` — one model call, no search. |
 | 3 | `what can you do?` | The agent, not the Help template: the 7 topics in its own words. Chip **About the chatbot**. |
-| 4 | `how do I get access?` | A cited answer (source: Getting Access and Signing In). Chip **Question**; steps include `prefetch: N hits, best 0.xx, N passages`. |
-| 5 | `and after that, how do I sign in?` | Understood from turn 4: a cited sign-in answer. Step 1 reads `contextualize: question, en, rewritten`. If it searched again you'll see `tool · search_knowledge: … · ms`. |
-| 6 | `what's your refund policy?` | A polite decline that offers what it can help with; no refund policy, no link. Handled by **Declined**, *Would be filed as unanswered*. |
+| 4 | `how do I get access?` | A cited answer (source: Getting Access and Signing In). Chip **Question**; steps: `agent: question, calls search_knowledge` · `tool · search_knowledge: N hits, N new passages, best 0.xx` · `agent: question, answer` · check · finalize. |
+| 5 | `and after that, how do I sign in?` | Understood from turn 4: a cited sign-in answer. The agent searches with its own rewritten query (not the literal message). |
+| 6 | `what's your refund policy?` | It searches, finds nothing, and says so in its own words (naming refunds), suggesting where to go and one thing it can help with; no refund policy, no link. Handled by **Declined**, *Would be filed as unanswered*. |
 | 7 | `thanks!` | A warm one-liner. Chip **Small talk**; Handled by RAG; **not** filed as unanswered. |
 | 8 | `help` | The fixed **Help** template (kept on purpose), no run. |
 
@@ -293,3 +292,30 @@ Chunks 1 and 2 are listed in `CHUNK-02-NOTES.md` §7. One PR for all three, as d
 - **Reasoning effort** is a platform setting (`AGENT_RUNTIME__AGENT_REASONING_EFFORT`), unset in code. Production needs it set to match what was measured here.
 - **Helpline snapshot failures** (section 2).
 - **Checkpoint retention** (from chunk 1) still open; eval threads (`eval-…`) add rows.
+
+## 9. Revision after Preview feedback (2026-11-06)
+
+**What Shehbaz saw.** `who are you?` in Preview came back "My reference material does not cover that…". Two causes:
+1. Ally FAQ's `features` was `{}` in `ally_local`, so the run took the parity path (trace `translate → retrieve → gate → finalize`, `turnType: null`), where 0 hits is a fixed decline. The toggle code is correct; Agent mode had not been saved. It is now on locally (`features = {"agent": true}`).
+2. The agent design itself was a fixed pipeline: a classifier call, an up-front search for every question, and a refused draft replaced by the bot's fixed decline wording. So "not found" read the same every time.
+
+**What changed** (Shehbaz: "RAG should just be one tool… the rules & defaults should be in the agent prompt… respond like a real person… not the same response again and again"):
+- **The agent step is the first step.** It reads the conversation, sets `turn_type`, and calls `search_knowledge` with its own English query when it needs a fact. Small talk and "who are you?" take one model call, no search. Removed: the contextualise call, `agent/contextualize.txt` (`ally_ai_agent_contextualize`), `LLMTask.WHATSAPP_AGENT_CONTEXTUALIZE` in both repos, its AI task registry row, and the prefetch node.
+- **The run's first search** sets the `retrieval` block and `hit_chunk_ids`, and is logged to the retrieval log once (as the parity path's search is). Its gate verdict (`no_hits` / `below_threshold`) is the decline reason when nothing was found.
+- **A refused draft is rewritten once.** `check_reply` returns a rejection reason; the agent gets one more step with plain feedback (never the refused text): why it was refused, which kinds of detail had no source ("a link", "a number"), and "you haven't searched yet: search before you reply" when it hadn't. Only a second refusal sends no text (ally-be then sends `declineText`).
+- **An uncited `answer` to a small-talk or about-the-bot turn**, with nothing searched and no link, number, price or email, is treated as small talk (the same text labelled `smalltalk` would pass; refusing it only swapped in the fixed wording).
+- **The agent prompt holds the rules and defaults** and asks for an assistant's manner: answer first, then the most useful next step; use the conversation; never reuse an opening, sign-off or offer; introduce itself (and "not a crisis service") only once; say what it doesn't have in its own words, naming the topic, with where to go and one thing it can help with; never mention passages, documents or reference material. Out-of-scope requests (weather, news, general knowledge) are declined without a search or clarifying question; a question about the organisation or product ("what is Ally?") is a question to search, not about the bot; `decline` whenever it isn't giving what was asked, even when it cites where to go.
+- Preview steps now read e.g. `agent: question, calls search_knowledge via gpt-5-mini` · `tool · search_knowledge: 3 hits, 2 new passages, best 0.61` · `agent: question, answer via …` · `check: answer (question), 1 citations`; a rewrite shows `check: sent back (uncited)`.
+
+**Eval** ([CHUNK-03A-EVAL.md](./CHUNK-03A-EVAL.md) is the last full run, before the last two fixes):
+
+| Run | Hard fails | Notes | p50 vs parity |
+|---|---|---|---|
+| A: new design | 2 | refund reply right but labelled `answer` (cited a passage for the website); "kal mausam kaisa hai?" asked which city | −17% |
+| B: out-of-scope and decline-labelling rules | 2 | one request timed out (OpenAI retries); refund still labelled `answer`; "hi, ye kya hai?" refused twice → fixed wording | −22% |
+| C: rewrite feedback names the detail kinds | **0** | "What is Ally?" and "how does this work?" answered from the persona without searching, refused twice → fixed wording | −10% |
+| targeted re-runs after "search first" + about-bot rule | 0 | `in-what-is-ally`, `fu-is-it-free`, `out-refund`, `ab-*` all as intended; "how does this work?" and "hi, ye kya hai?" now search and answer with citations (the eval still expects an uncited intro for them, so it marks them "fail"; the cited answer is the better reply) | |
+
+Latency outliers (18–76 s) in runs B and C were OpenAI retrying requests (`Retrying request to /chat/completions` in the ally-ai log), not agent loops: across the runs only a handful of messages used a rewrite.
+
+**Still open:** the refund reply still says "in my reference material" on some runs, despite the rule; the eval script runs every call in sequence (about 8 minutes a run, 100+ model calls) and prints nothing until the end: parallel cases and per-turn output would make iteration much faster; the eval's expected `turn_type` for "how does this work?" should accept a cited answer.

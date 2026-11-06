@@ -268,6 +268,7 @@ class TestRevision:
         second = llm.calls[1]["prompt"]
         assert "# Your previous draft was not sent" in second
         assert REJECTIONS["uncited"] in second
+        assert "You haven't searched yet: search before you reply." in second
         assert "Refunds take 5 days." not in second
         assert nodes(state) == ["agent", "check", "agent", "check", "finalize"]
         check = state["trace"][1]
@@ -307,7 +308,9 @@ class TestRevision:
             chat("Hi! What can I help you with today?"),
         )
         state = await agent_run("hi", llm)
-        assert REJECTIONS["unsourced_detail"] in llm.calls[1]["prompt"]
+        second = llm.calls[1]["prompt"]
+        assert REJECTIONS["unsourced_detail"] + " It contained a number." in second
+        assert "1800-123-456" not in second
         assert state["result"]["answer"] == "Hi! What can I help you with today?"
         assert state["result"]["intent"] == "answer"
 

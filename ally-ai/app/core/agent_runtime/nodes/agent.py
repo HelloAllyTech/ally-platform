@@ -7,7 +7,6 @@ from __future__ import annotations
 from typing import Any, Dict, Literal
 
 from app.core.agent_runtime import conversation
-from app.core.agent_runtime.check import REJECTIONS
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import allowed_tools
@@ -48,7 +47,6 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         budget = tool_budget(state)
         # Past the cap the schema itself offers only `reply`.
         tools = allowed_tools(bot) if budget > 0 else []
-        feedback = state.get("feedback")
         step, meta = await conversation.agent_step(
             state["question"],
             passages=state.get("passages") or [],
@@ -57,7 +55,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             bot=bot,
             history=state.get("history") or None,
             searches=state.get("tool_calls") or [],
-            feedback=REJECTIONS.get(feedback) if feedback else None,
+            feedback=state.get("feedback_text"),
         )
         return {
             **start,
@@ -67,6 +65,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             "turn_type": step.get("turn_type") or "question",
             "language": (step.get("language") or "en").strip() or "en",
             "feedback": None,
+            "feedback_text": None,
         }
 
     return agent

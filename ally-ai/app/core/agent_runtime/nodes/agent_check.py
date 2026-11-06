@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal
 
-from app.core.agent_runtime.check import check_reply
+from app.core.agent_runtime.check import check_reply, rejection_feedback
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
@@ -52,8 +52,16 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
         )
         revisions = state.get("revisions") or 0
         if rejection and revisions < MAX_REVISIONS:
-            return {"feedback": rejection, "revisions": revisions + 1}
-        return {"result": json_safe(result), "feedback": None}
+            return {
+                "feedback": rejection,
+                "feedback_text": rejection_feedback(
+                    rejection,
+                    state["agent_step"],
+                    searched=bool(state.get("tool_calls")),
+                ),
+                "revisions": revisions + 1,
+            }
+        return {"result": json_safe(result), "feedback": None, "feedback_text": None}
 
     return agent_check
 

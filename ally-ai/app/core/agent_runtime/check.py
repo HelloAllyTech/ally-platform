@@ -40,6 +40,39 @@ def looks_factual(text: str) -> bool:
     return bool(_LOOKS_FACTUAL.search(text or ""))
 
 
+# What kind of checkable detail a text carries, in the words the rewrite is told.
+# Kinds only: the refused text itself is never shown back to the model.
+_DETAIL_KINDS = (
+    ("a link", re.compile(r"https?://|www\.", re.IGNORECASE)),
+    ("an email address", re.compile(r"[\w.+-]+@[\w-]+\.\w+")),
+    (
+        "a price or percentage",
+        re.compile(r"[₹$€£%]|\b(?:rs|inr|usd|eur)\b", re.IGNORECASE),
+    ),
+    ("a number", re.compile(r"\d")),
+)
+
+
+def detail_kinds(text: str) -> List[str]:
+    """The kinds of checkable detail in `text`, e.g. ``["a link", "a number"]``."""
+    return [kind for kind, pattern in _DETAIL_KINDS if pattern.search(text or "")]
+
+
+def rejection_feedback(
+    rejection: str, step: Dict[str, Any], *, searched: bool = True
+) -> str:
+    """What the rewrite is told: the reason, naming the kinds of unsourced detail,
+    and to search first when the refused draft was written without searching."""
+    feedback = REJECTIONS[rejection]
+    if rejection == "unsourced_detail":
+        kinds = detail_kinds(step.get("answer") or "")
+        if kinds:
+            feedback += f" It contained {' and '.join(kinds)}."
+    if not searched and rejection != "empty":
+        feedback += " You haven't searched yet: search before you reply."
+    return feedback
+
+
 #: Why a draft was refused, as told to the agent when it rewrites it. Plain
 #: guidance, never the refused text.
 REJECTIONS: Dict[str, str] = {
@@ -97,6 +130,17 @@ def check_reply(
     elif not answer_text:
         intent = AgentIntent.DECLINE
         rejection = "empty"
+    elif (
+        intent == AgentIntent.ANSWER
+        and not step.get("citations")
+        and turn_type in ("smalltalk", "about_bot")
+        and not passages
+        and not looks_factual(answer_text)
+    ):
+        # A reply to a greeting or to "what can you do?", labelled `answer` with
+        # nothing searched or cited, is small talk: the same text sent as
+        # `smalltalk` would pass, so refusing it only swaps in the fixed wording.
+        intent = AgentIntent.SMALLTALK
     elif intent == AgentIntent.SMALLTALK and (looks_factual(answer_text) or passages):
         # Small talk does not need a source, but this one either states something
         # checkable or was written after a search found passages: ground it like

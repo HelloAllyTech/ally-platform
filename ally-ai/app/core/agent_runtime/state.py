@@ -63,6 +63,7 @@ class AgentState(TypedDict, total=False):
     # Why check sent the last draft back (None: not sent back), and how many
     # times it has; see nodes/agent_check.py.
     feedback: Optional[str]
+    feedback_text: Optional[str]  # what the rewrite is told (check.py)
     revisions: int
 
     # --- output: the `/knowledge-agent/answer` response, field for field
@@ -93,6 +94,7 @@ RUN_SCOPED_KEYS = (
     "tool_calls",
     "tool_passages",
     "feedback",
+    "feedback_text",
     "revisions",
     "result",
 )

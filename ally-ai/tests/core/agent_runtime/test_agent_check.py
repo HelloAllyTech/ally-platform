@@ -2,7 +2,13 @@
 
 import pytest
 
-from app.core.agent_runtime.check import check_reply, looks_factual
+from app.core.agent_runtime.check import (
+    REJECTIONS,
+    check_reply,
+    detail_kinds,
+    looks_factual,
+    rejection_feedback,
+)
 from tests.core.knowledge_agent.test_agent import CHUNK_A, CHUNK_B, passage
 
 PASSAGES = [passage(CHUNK_A, 0.7), passage(CHUNK_B, 0.6)]
@@ -119,6 +125,24 @@ class TestSmalltalk:
         result = check("smalltalk", "Sure, happy to help.")
         assert result["intent"] == "decline"
 
+    def test_an_uncited_answer_to_about_bot_is_smalltalk(self):
+        result, rejection = review(
+            "answer",
+            "I help with questions about Ally.",
+            turn_type="about_bot",
+            passages=[],
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"
+        assert result["turn_type"] == "about_bot"
+
+    def test_but_not_with_a_detail_or_to_a_question(self):
+        about = review(
+            "answer", "Visit www.example.org", turn_type="about_bot", passages=[]
+        )
+        assert about[1] == "uncited"
+        assert review("answer", "Refunds take days.", passages=[])[1] == "uncited"
+
     def test_plain_greeting_is_not_factual(self):
         assert not looks_factual("Namaste! How can I help you today?")
 
@@ -150,3 +174,22 @@ class TestClarifyAndDecline:
         assert result["intent"] == "decline"
         assert result["decline_reason"] == "model_declined"
         assert rejection == "empty"
+
+
+class TestRejectionFeedback:
+    def test_names_the_kinds_of_unsourced_detail(self):
+        step = {"answer": "See www.example.org or call 1800 123."}
+        assert detail_kinds(step["answer"]) == ["a link", "a number"]
+        feedback = rejection_feedback("unsourced_detail", step)
+        assert feedback.endswith("It contained a link and a number.")
+        assert "example.org" not in feedback
+
+    def test_asks_for_a_search_when_none_was_made(self):
+        feedback = rejection_feedback("uncited", {"answer": "x"}, searched=False)
+        assert feedback.endswith("You haven't searched yet: search before you reply.")
+        assert "searched yet" not in rejection_feedback("empty", {}, searched=False)
+
+    def test_other_reasons_are_plain(self):
+        assert rejection_feedback("uncited", {"answer": "5 days"}) == (
+            REJECTIONS["uncited"]
+        )
