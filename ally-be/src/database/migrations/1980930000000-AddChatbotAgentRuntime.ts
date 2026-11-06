@@ -32,6 +32,9 @@ export class AddChatbotAgentRuntime1980930000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "wa_messages" ADD "agent_runtime" character varying(16)`,
     );
+    await queryRunner.query(
+      `ALTER TABLE "wa_messages" ADD CONSTRAINT "chk_wa_messages_agent_runtime" CHECK ("agent_runtime" IN ('v2', 'v2_fallback'))`,
+    );
 
     await queryRunner.query(
       `CREATE TABLE "agent_shadow_runs" ("createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "id" uuid NOT NULL DEFAULT uuid_generate_v4(), "chatbot_id" uuid NOT NULL, "conversation_id" uuid NOT NULL, "inbound_message_id" uuid NOT NULL, "run_id" uuid NOT NULL, "v1" jsonb NOT NULL, "v2" jsonb, "error" text, CONSTRAINT "PK_agent_shadow_runs_id" PRIMARY KEY ("id"), CONSTRAINT "FK_agent_shadow_runs_chatbot" FOREIGN KEY ("chatbot_id") REFERENCES "chatbots"("id") ON DELETE CASCADE)`,
@@ -46,6 +49,9 @@ export class AddChatbotAgentRuntime1980930000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE "agent_shadow_runs"`);
+    await queryRunner.query(
+      `ALTER TABLE "wa_messages" DROP CONSTRAINT "chk_wa_messages_agent_runtime"`,
+    );
     await queryRunner.query(
       `ALTER TABLE "wa_messages" DROP COLUMN "agent_runtime"`,
     );
