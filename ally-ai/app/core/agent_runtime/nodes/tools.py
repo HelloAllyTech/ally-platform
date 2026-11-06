@@ -11,7 +11,7 @@ from typing import Any, Dict
 
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import ToolContext, allowed_tools
-from app.core.agent_runtime.trace import Node
+from app.core.agent_runtime.trace import Node, trace_step
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.utils.logger import get_logger
 
@@ -61,12 +61,11 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     "search_gate": result.gate,
                 }
 
-        ms = int((time.monotonic() - started) * 1000)
         return {
             **update,
             "tool_calls": records,
             "passages": passages + added,
-            "trace": [{"node": "tool", "ms": ms, "summary": summary}],
+            "trace": [trace_step("tool", started, summary)],
         }
 
     return tools

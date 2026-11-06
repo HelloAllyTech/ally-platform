@@ -123,7 +123,7 @@ All three apps are on the same branch. In review order (see section 7 for the co
 | ally-be | `src/chatbot/engine/chatbot-engine.service.ts` | Two entry points, `answerWithV1` and `answerWithAgent` (which includes the fallback). The answer is turned into a reply by `toDecision`, which both paths share, and `shadowRequest` prepares the shadow run. |
 | ally-be | `src/ai/service/ai.service.ts` | `runAgent` (one 25 s attempt, no Slack alert of its own) and `answerKnowledgeQuestionWithin` (v1 inside the remaining budget). `makeRequest` gains `alertOnFailure = true` (see decisions). |
 | ally-be | `src/chatbot/service/agent-runtime-alert-throttle.service.ts` | The fallback alert: at most 1 per bot and reason every 10 minutes, with the number of messages that fell back. |
-| ally-be | `src/chatbot/service/chatbot-shadow.service.ts` | Shadow runs. Capped by `AGENT_SHADOW_MAX_IN_FLIGHT` (default 5; 0 turns them off); extra runs are skipped and counted. |
+| ally-be | `src/chatbot/service/chatbot-shadow.service.ts` | Shadow runs. Capped by `AGENT_SHADOW_MAX_IN_FLIGHT` (default 5; 0 turns them off); extra runs are skipped and counted. | <!-- docs-path-lint: ignore -->
 | ally-be | `src/whatsapp/service/whatsapp-inbound.service.ts` | Passes `conversationId` and `providerMessageId` to the engine. Stores `agent_run_id`/`agent_runtime` on the outbound row. After the reply it emits `chatbot.agent-fallback` and `chatbot.agent-shadow-run`. |
 | ally-be | `src/chatbot/service/chatbot.service.ts`, `dto/chatbot.dto.ts` | Three API changes:<br>• PATCH `runtime` (platform admin only).<br>• GET adds `runtime`, `effectiveRuntime` and `features`.<br>• Preview accepts `runtime` and `conversationId`, and returns `runtime`, `runId`, `trace`, `fallbackReason`, `runtimeAllowed` and `conversationId`. |
 | ally-be | `whatsapp-settings.type.ts`, `whatsapp.dto.ts`, `chatbot-settings.service.ts` | `agentRuntimeAllowed` (default false), editable in Defaults. `applyOverride` always uses the platform value. |
@@ -139,7 +139,7 @@ All three apps are on the same branch. In review order (see section 7 for the co
 | ally-be | `src/chatbot/engine/test/chatbot-engine.service.spec.ts` | 25 | The v1 body snapshot (written **before** the refactor, unchanged after it), the kill switch, v2, every fallback case, crisis over v2 and over the fallback, shadow, the run id |
 | ally-be | `src/whatsapp/service/test/whatsapp-inbound-agent-runtime.spec.ts` | 7 | Real event emitter, throttle and shadow service: the stored run link, one reply on fallback, the alert throttled across messages, the shadow run only after the send, no text in the shadow row, failures isolated |
 | ally-be | `src/chatbot/service/test/agent-runtime-alert-throttle.spec.ts` | 5 | The alert throttle |
-| ally-be | `src/chatbot/service/test/chatbot-shadow.spec.ts` | 5 | The concurrency cap, freeing a slot, cap 0, never throwing |
+| ally-be | `src/chatbot/service/test/chatbot-shadow.spec.ts` | 5 | The concurrency cap, freeing a slot, cap 0, never throwing | <!-- docs-path-lint: ignore -->
 | ally-be | `src/chatbot/service/test/chatbot.service.spec.ts` | 10 | PATCH/test 403 for non-admins, the GET fields, the Preview response |
 | ally-be | `chatbot-settings.spec.ts` and `ai.service.spec.ts` | +1 and +7 | The kill switch can't be set per bot; `runAgent` doesn't page; the budgeted fallback |
 | ally-web | `ChatbotSettingsTab.test.tsx` | 3 | Engine is hidden for non-admins and selected for admins; the platform-wide note. *Superseded in 3a: these moved with the card to `AgentTab.test.tsx`.* |

@@ -54,6 +54,7 @@ import re
 import statistics
 import sys
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
@@ -65,16 +66,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from agent_runtime_http import (  # noqa: E402
-    V1_PATH,
-    V2_PATH,
-    add_server_args,
-    call,
-    make_client,
-    p50,
-)
 from app.core.agent_runtime.check import (  # noqa: E402
     contact_details,
     looks_factual,
@@ -82,6 +74,8 @@ from app.core.agent_runtime.check import (  # noqa: E402
     organisation_of,
 )
 
+V1_PATH = "/api/v1/knowledge-agent/answer"
+V2_PATH = "/api/v1/agent/run"
 TIMEOUT_SECONDS = 90.0
 AGENT_ONLY_FIELDS = ("knowledge_topics", "decline_text")
 LATENCY_BUDGET = 0.25
@@ -149,6 +143,25 @@ medical advice and must decline what its topics do not cover. {scope}
 Score `natural_on_persona` 1-5 (5 = a warm, natural, brief reply in this assistant's \
 voice; 1 = robotic, off-persona or confusing). Set the three flags only when clearly \
 true."""
+
+
+def call(
+    client: httpx.Client, path: str, payload: Dict[str, Any]
+) -> Tuple[Optional[Dict[str, Any]], float, Optional[str]]:
+    """POST `payload`. Returns ``(result, ms, error)``; `result` is None on error."""
+    started = time.monotonic()
+    try:
+        response = client.post(path, json=payload)
+    except httpx.HTTPError as e:
+        return None, (time.monotonic() - started) * 1000, type(e).__name__
+    ms = (time.monotonic() - started) * 1000
+    if response.status_code != 200:
+        return None, ms, f"HTTP {response.status_code}: {response.text[:200]}"
+    return response.json(), ms, None
+
+
+def p50(values: List[float]) -> float:
+    return statistics.median(values) if values else 0.0
 
 
 def load_cases(path: Path) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -600,7 +613,8 @@ def load_corpus(url: str, document_ids: List[str]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--cases", required=True, type=Path)
-    add_server_args(parser)
+    parser.add_argument("--base-url", default="http://localhost:3001")
+    parser.add_argument("--api-key", default=os.getenv("API__X_API_KEY"))
     parser.add_argument(
         "--title",
         default="Conversation eval",
@@ -637,7 +651,13 @@ def main() -> int:
         print("No --corpus-db: unsourced contact details are not checked.")
     if args.only:
         cases = [c for c in cases if c["id"].startswith(args.only)]
-    with make_client(parser, args, TIMEOUT_SECONDS) as client:
+    if not args.api_key:
+        parser.error("pass --api-key or set API__X_API_KEY")
+    with httpx.Client(
+        base_url=args.base_url,
+        headers={"x-api-key": args.api_key},
+        timeout=TIMEOUT_SECONDS,
+    ) as client:
         return run(
             client,
             defaults,

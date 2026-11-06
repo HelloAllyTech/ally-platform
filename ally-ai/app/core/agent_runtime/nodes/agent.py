@@ -1,6 +1,6 @@
 """Agent: one model call that reads the conversation and either asks for a tool or
-replies. It is the first step of the agent path: there is no classifier or
-up-front search before it, so whether to search, and for what, is its decision."""
+replies. It is the run's first step: there is no classifier or up-front search
+before it, so whether to search, and for what, is its decision."""
 
 from __future__ import annotations
 

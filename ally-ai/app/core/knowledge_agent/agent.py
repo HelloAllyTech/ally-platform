@@ -554,12 +554,8 @@ class KnowledgeAgentService:
         latency_ms: int,
         language: str,
         retrieval: Dict[str, Any],
-        log_retrieval: bool = True,
     ) -> AnswerResult:
-        """
-        The result for a gate decline, reported to the retrieval log unless
-        ``log_retrieval`` is false (a shadow run whose message was already logged).
-        """
+        """The result for a gate decline, reported to the retrieval log."""
         logger.info(
             "Declining before generation: reason=%s hits=%d top=%.4f",
             reason.value,
@@ -569,15 +565,14 @@ class KnowledgeAgentService:
         # Report the DECLINE, not just the search. A retrieval that returned six
         # passages and was refused on all of them looks healthy in every count except
         # this one, and refusal is what the worker actually experienced.
-        if log_retrieval:
-            self.report_gate_decline(
-                reason,
-                search_text=search_text,
-                hits=hits,
-                limits=limits,
-                latency_ms=latency_ms,
-                language=language,
-            )
+        self.report_gate_decline(
+            reason,
+            search_text=search_text,
+            hits=hits,
+            limits=limits,
+            latency_ms=latency_ms,
+            language=language,
+        )
         return build_result(
             intent=AnswerIntent.DECLINE,
             answer="",

@@ -2,9 +2,11 @@
 
 import os
 import uuid
+from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
 
 from app.core.agent_runtime import checkpointer as checkpointer_module
@@ -28,33 +30,24 @@ pytestmark = pytest.mark.asyncio
 async def _two_runs(graph, chunk_service, conversation_id):
     """Run 1 answers from a search; run 2, in the same conversation, is smalltalk."""
     chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
-    with patch(
-        f"{CONVERSATION}.generate_structured",
-        FakeLLM(search("q1"), reply(citations=[1]), chat("Bye!")),
-    ):
-        first = await run_agent(
-            graph,
-            run_id="run-1",
-            conversation_id=conversation_id,
-            chatbot_id="bot-1",
-            question="q1",
-            history=[],
-            bot=make_bot(),
-        )
-        second = await run_agent(
-            graph,
-            run_id="run-2",
-            conversation_id=conversation_id,
-            chatbot_id="bot-1",
-            question="bye",
-            history=[],
-            bot=make_bot(),
-        )
-    return first, second
+    llm = FakeLLM(search("q1"), reply(citations=[1]), chat("Bye!"))
+    with patch(f"{CONVERSATION}.generate_structured", llm):
+        return [
+            await run_agent(
+                graph,
+                run_id=run_id,
+                conversation_id=conversation_id,
+                chatbot_id="bot-1",
+                question=question,
+                history=[],
+                bot=make_bot(),
+            )
+            for run_id, question in (("run-1", "q1"), ("run-2", "bye"))
+        ]
 
 
 async def test_two_runs_in_one_conversation_are_both_stored(graph, chunk_service):
-    first, second = await _two_runs(graph, chunk_service, "conv-1")
+    await _two_runs(graph, chunk_service, "conv-1")
 
     config = {"configurable": {"thread_id": "conv-1"}}
     run_ids = {s.values.get("run_id") async for s in graph.aget_state_history(config)}
@@ -118,8 +111,6 @@ async def test_postgres_checkpoints_land_in_their_own_schema(
         stored = await get_run_state("conv-pg", "run-2", graph=graph)
         assert stored["result"]["turn_type"] == "smalltalk"
 
-        from psycopg import AsyncConnection
-
         async with await AsyncConnection.connect(url) as conn:
             cur = await conn.execute(
                 f'SELECT count(*) FROM "{schema}".checkpoints WHERE thread_id = %s',
@@ -133,8 +124,6 @@ async def test_postgres_checkpoints_land_in_their_own_schema(
             assert (await cur.fetchone())[0] == 0
     finally:
         await checkpointer_module.close_checkpointer()
-        from psycopg import AsyncConnection
-
         async with await AsyncConnection.connect(url, autocommit=True) as conn:
             await conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
 
@@ -158,6 +147,23 @@ def _fake_connection():
     conn.__aexit__ = AsyncMock(return_value=False)
     conn.execute = AsyncMock()
     return conn
+
+
+@contextmanager
+def _postgres_reachable(saver):
+    """Postgres connects, with the pool and saver replaced by fakes."""
+    with (
+        patch(
+            "psycopg.AsyncConnection.connect",
+            AsyncMock(return_value=_fake_connection()),
+        ),
+        patch("psycopg_pool.AsyncConnectionPool", FakePool),
+        patch(
+            "langgraph.checkpoint.postgres.aio.AsyncPostgresSaver",
+            MagicMock(return_value=saver),
+        ),
+    ):
+        yield
 
 
 @pytest.fixture
@@ -191,17 +197,7 @@ class TestStartupWithoutItsDatabase:
     async def test_a_failed_setup_closes_the_pool(self, postgres_configured):
         saver = MagicMock()
         saver.setup = AsyncMock(side_effect=RuntimeError("no permission"))
-        with (
-            patch(
-                "psycopg.AsyncConnection.connect",
-                AsyncMock(return_value=_fake_connection()),
-            ),
-            patch("psycopg_pool.AsyncConnectionPool", FakePool),
-            patch(
-                "langgraph.checkpoint.postgres.aio.AsyncPostgresSaver",
-                MagicMock(return_value=saver),
-            ),
-        ):
+        with _postgres_reachable(saver):
             assert await checkpointer_module.open_checkpointer() is None
         (pool,) = FakePool.instances
         pool.open.assert_awaited_once()
@@ -212,17 +208,7 @@ class TestStartupWithoutItsDatabase:
     async def test_pooled_connections_are_checked_before_use(self, postgres_configured):
         saver = MagicMock()
         saver.setup = AsyncMock()
-        with (
-            patch(
-                "psycopg.AsyncConnection.connect",
-                AsyncMock(return_value=_fake_connection()),
-            ),
-            patch("psycopg_pool.AsyncConnectionPool", FakePool),
-            patch(
-                "langgraph.checkpoint.postgres.aio.AsyncPostgresSaver",
-                MagicMock(return_value=saver),
-            ),
-        ):
+        with _postgres_reachable(saver):
             assert await checkpointer_module.open_checkpointer() is saver
         (pool,) = FakePool.instances
         assert pool.kwargs["check"] == AsyncConnectionPool.check_connection
