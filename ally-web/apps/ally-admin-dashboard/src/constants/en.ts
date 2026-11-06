@@ -1615,15 +1615,37 @@ export const en = {
         saved: "Saved.",
         saveFailed: "Could not save these settings.",
         tryIt: "Preview these changes",
+        agentOff:
+          "The agent is switched off in Defaults, so this chatbot answers with the backup engine.",
       },
       knowledge: {
         title: "Knowledge",
         intro:
-          "The documents this chatbot answers from, picked from the knowledge library. Editing a document there updates every chatbot that uses it.",
+          "The documents this chatbot answers from: its own, and any picked from the knowledge library. Editing a library document updates every chatbot that uses it.",
         empty: "No knowledge yet. This chatbot will decline every question.",
         add: "Add from library",
+        upload: "Upload a document",
         remove: "Remove",
         removed: "Removed from this chatbot.",
+        private: "Private to this chatbot",
+        indexing: "Indexing…",
+        failed: "Failed",
+        removePrivateConfirm:
+          "Delete “{title}”? It belongs to this chatbot only, so removing it deletes it.",
+        privateRemoved: "Document deleted.",
+        uploadTitle: "Upload a document",
+        uploadIntro:
+          "Only this chatbot sees it. It can answer from it once indexing finishes, usually within a minute.",
+        uploadSourceLabel: "Source",
+        uploadSourceFile: "File (PDF, Word or EPUB)",
+        uploadSourcePaste: "Paste text",
+        uploadFileLabel: "File",
+        uploadFileType: "Choose a PDF, Word (.docx) or EPUB file.",
+        uploadTitleLabel: "Title",
+        uploadTextLabel: "Text",
+        uploadTextPlaceholder: "Paste the document text here",
+        uploadSaved: "Document added. It is being indexed.",
+        uploadFailed: "Could not add the document.",
         saved: "Documents updated.",
         saveFailed: "Could not update the documents.",
         pickerTitle: "Add documents",
@@ -1704,9 +1726,9 @@ export const en = {
         enabledLabel: "Chatbots can reply",
         enabledHelp:
           "Turn off to stop every chatbot replying at once, for example during an incident. Messages are still recorded.",
-        agentRuntimeLabel: "Allow the new engine",
+        agentRuntimeLabel: "Answer with the agent",
         agentRuntimeHelp:
-          "Lets chatbots set to v2 or Shadow use the new engine. Turn off to put every chatbot back on v1 at once, with no deploy.",
+          "Turn off only in an emergency: every chatbot then answers with the backup engine.",
         crisisCheckLabel: "Extra AI crisis check",
         crisisCheckHelp:
           "Keyword replies catch messages that say it outright. This also catches ones that don't, like “I can't keep doing this”. Chatbots can't turn it off.",
@@ -1794,20 +1816,22 @@ export const en = {
         placeholder: "Type a question…",
         send: "Send",
         newThread: "New thread",
-        answeredBy: "Answered by {engine}",
-        fellBack: "Answered by v1 (v2 failed: {reason})",
+        answeredByAgent: "Answered by the agent",
+        answeredByBackup: "Answered by the backup engine",
+        fellBack: "Answered by the backup engine (the agent failed: {reason})",
         runId: "Run",
         copy: "Copy",
         steps: "Steps ({count})",
         toolStep: "tool",
-        // What the Agent mode engine understood each message to be.
+        // What the agent understood each message to be.
         turnTypes: {
           smalltalk: "Small talk",
           about_bot: "About the chatbot",
           question: "Question",
           unclear: "Unclear",
         } satisfies Record<AgentTurnType, string>,
-        engineDisabled: "The new engine is off in Defaults, so every test answers with v1.",
+        agentOff:
+          "The agent is switched off in Defaults, so every test answers with the backup engine.",
         handledBy: "Handled by",
         model: "Model",
         sources: "Sources",
@@ -1891,26 +1915,6 @@ export const en = {
       groupSafety: "Safety and limits",
       groupAdvanced: "Advanced",
       advancedHint: "Rarely needed. Ask Ally before changing these.",
-      engineTitle: "Engine",
-      engineIntro: "Which engine answers this chatbot's questions. Only platform admins see this.",
-      engineV1: "v1",
-      engineV1Help: "The current engine. Answers exactly as today.",
-      engineShadow: "Shadow",
-      engineShadowHelp:
-        "v1 answers. The new engine answers the same question in the background so the two can be compared. Nobody sees its answers.",
-      engineV2: "v2",
-      engineV2Help:
-        "The new engine answers. If it fails, v1 answers that message instead and the team is alerted.",
-      engineDisabled:
-        "The new engine is turned off in Defaults, so this chatbot answers with v1 for now.",
-      engineSave: "Save engine",
-      engineSaved: "Engine saved.",
-      engineSaveFailed: "Couldn't change the engine.",
-      agentModeLabel: "Agent mode",
-      agentModeHelp:
-        "Answers greetings and questions about itself in its own voice, understands follow-ups and can search again. Facts still need a source.",
-      agentModeTooltip:
-        'Only with the v2 engine. Greeting, help and FAQ keyword replies give way to the agent, except a bare "help". Crisis, STOP and START replies are unchanged.',
       enabledLabel: "Answer messages",
       enabledHelp:
         "Turn off to stop this chatbot replying. Pausing it from Overview does the same.",

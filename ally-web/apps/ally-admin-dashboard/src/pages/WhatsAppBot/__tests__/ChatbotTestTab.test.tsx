@@ -100,7 +100,7 @@ describe("ChatbotTestTab — engine and run", () => {
     render(<ChatbotTestTab bot={BOT} />);
     await ask("What does Ally do?");
 
-    expect(screen.getByTestId("engine-badge")).toHaveTextContent("Answered by v2");
+    expect(screen.getByTestId("engine-badge")).toHaveTextContent("Answered by the agent");
     expect(screen.getByText(nextResult.runId!)).toBeInTheDocument();
     expect(screen.getByText("Steps (3)")).toBeInTheDocument();
     expect(screen.getByText("retrieve · 120 ms")).toBeInTheDocument();
@@ -111,7 +111,7 @@ describe("ChatbotTestTab — engine and run", () => {
     nextResult = result({ runtime: "v1", runId: null, trace: null, reply: "From v1." });
     render(<ChatbotTestTab bot={BOT} />);
     await ask("q1");
-    expect(screen.getByTestId("engine-badge")).toHaveTextContent("Answered by v1");
+    expect(screen.getByTestId("engine-badge")).toHaveTextContent("Answered by the backup engine");
     expect(screen.queryByText(/^Steps/)).not.toBeInTheDocument();
 
     nextResult = result({
@@ -122,8 +122,25 @@ describe("ChatbotTestTab — engine and run", () => {
     });
     await ask("q2");
     expect(screen.getAllByTestId("engine-badge")[1]).toHaveTextContent(
-      "Answered by v1 (v2 failed: upstream_404)",
+      "Answered by the backup engine (the agent failed: upstream_404)",
     );
+  });
+
+  it("tells platform admins, and only them, when the agent is switched off", async () => {
+    nextResult = result({ runtime: "v1", runtimeAllowed: false, runId: null, trace: null });
+    const { unmount } = render(<ChatbotTestTab bot={BOT} />);
+    await ask("q");
+    expect(screen.queryByText(/switched off in Defaults/)).not.toBeInTheDocument();
+    unmount();
+
+    canCreate = true;
+    render(<ChatbotTestTab bot={BOT} />);
+    await ask("q");
+    expect(
+      screen.getByText(
+        "The agent is switched off in Defaults, so every test answers with the backup engine.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("keeps the thread across a conversation and drops it on New thread", async () => {

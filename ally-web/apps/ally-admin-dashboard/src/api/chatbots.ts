@@ -12,6 +12,9 @@ import {
   Connector,
   ConnectorType,
   CreateChatbotRequest,
+  CreateChatbotUploadUrlRequest,
+  CreateKbUploadUrlResponse,
+  CreatePrivateChatbotDocumentRequest,
   GetChatbotsResponse,
   TestChatbotRequest,
   TestChatbotResponse,
@@ -99,6 +102,43 @@ export const chatbotsApi = baseAPI.injectEndpoints({
         url: ApiEndpoints.CHATBOTS.DOCUMENTS(id),
         method: HttpMethod.PUT,
         body: { documentIds },
+      }),
+      invalidatesTags: (_r, _e, { id }) => botTags(id),
+    }),
+
+    /** Presign a file for one of the chatbot's own documents; the browser PUTs it there. */
+    createChatbotDocumentUploadUrl: builder.mutation<
+      CreateKbUploadUrlResponse,
+      CreateChatbotUploadUrlRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.DOCUMENT_UPLOAD_URL(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /** A document only this chatbot sees: attached and queued for indexing. Returns its list. */
+    createPrivateChatbotDocument: builder.mutation<
+      ChatbotDocumentRow[],
+      CreatePrivateChatbotDocumentRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.PRIVATE_DOCUMENTS(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id }) => botTags(id),
+    }),
+
+    /** Archives a private document; takes a shared one off this chatbot only. Returns its list. */
+    removeChatbotDocument: builder.mutation<
+      ChatbotDocumentRow[],
+      { id: string; documentId: string }
+    >({
+      query: ({ id, documentId }) => ({
+        url: ApiEndpoints.CHATBOTS.DOCUMENT_BY_ID(id, documentId),
+        method: HttpMethod.DELETE,
       }),
       invalidatesTags: (_r, _e, { id }) => botTags(id),
     }),
@@ -209,6 +249,9 @@ export const {
   useUpdateChatbotSettingsMutation,
   useGetChatbotDocumentsQuery,
   useSetChatbotDocumentsMutation,
+  useCreateChatbotDocumentUploadUrlMutation,
+  useCreatePrivateChatbotDocumentMutation,
+  useRemoveChatbotDocumentMutation,
   useGetChatbotMembersQuery,
   useSetChatbotMembersMutation,
   useGetChatbotAudienceQuery,

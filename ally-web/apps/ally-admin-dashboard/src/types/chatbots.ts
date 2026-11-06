@@ -116,10 +116,11 @@ export interface Chatbot {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: ChatbotPersona;
   model: ChatbotModelChoice | null;
-  /** The engine it is set to. Only platform admins can change it. */
+  /** The stored engine. Read-only: every chatbot answers with v2 and the agent. */
   runtime: ChatbotRuntime;
-  /** What actually answers: v1 whenever the new engine is turned off in Defaults. */
+  /** What actually answers: v2, or v1 (the backup engine) while the agent is off in Defaults. */
   effectiveRuntime: ChatbotRuntime;
+  /** The stored flags. Read-only: the agent is always on. */
   features: ChatbotFeatures;
   myRole: ChatbotMemberRole;
   connectors: Connector[];
@@ -156,10 +157,6 @@ export interface UpdateChatbotRequest {
   accessMode?: ChatbotAccessMode;
   knowledgeSource?: ChatbotKnowledgeSource;
   model?: ChatbotModelChoice | null;
-  /** Platform admins only. */
-  runtime?: ChatbotRuntime;
-  /** Platform admins only. Merged into the saved flags. */
-  features?: ChatbotFeatures;
 }
 
 export interface ChatbotDocumentRow {
@@ -168,7 +165,33 @@ export interface ChatbotDocumentRow {
   status: string;
   isGlobal: boolean;
   archived: boolean;
+  /** True when the document belongs to this chatbot only (uploaded on its Knowledge tab). */
+  private: boolean;
   updatedAt: string;
+}
+
+/** A file to upload as one of a chatbot's own documents. */
+export interface CreateChatbotUploadUrlRequest {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+}
+
+/**
+ * A document private to one chatbot: created, attached and queued for indexing in one call.
+ * Files carry what the presigned upload returned; pasted text carries `text`.
+ */
+export interface CreatePrivateChatbotDocumentRequest {
+  id: string;
+  title: string;
+  sourceType: "pdf" | "docx" | "epub" | "paste" | "url";
+  fileUrl?: string;
+  fileName?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  text?: string;
+  sourceUrl?: string;
 }
 
 export interface ChatbotMember {
@@ -216,7 +239,7 @@ export interface TestChatbotRequest {
   draft?: ChatbotDraft;
   asTenantId?: string;
   checkAccess?: boolean;
-  /** Platform admins only: answer this one test with this engine. */
+  /** Ignored by the API: every test answers with the chatbot's own engine. */
   runtime?: "v1" | "v2";
   /** The Preview thread (`preview-<uuid>`), kept until "New thread". */
   conversationId?: string;

@@ -30,11 +30,11 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [message, setMessage] = useState("");
   const [checkAccess, setCheckAccess] = useState(false);
-  // The thread the new engine keeps for this chat, until "New thread".
+  // The thread the agent keeps for this chat, until "New thread".
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [runtimeAllowed, setRuntimeAllowed] = useState(true);
-  // The engine is the chatbot's own (Agent tab); only platform admins are told when the platform
-  // switch is holding it on v1.
+  // Only platform admins are told when the emergency switch in Defaults has every chatbot on the
+  // backup engine.
   const { data: list } = useGetChatbotsQuery();
   const isPlatformAdmin = Boolean(list?.canCreate);
   const [test, { isLoading }] = useTestChatbotMutation();
@@ -96,7 +96,7 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
         <InlineNotification kind="info" title={t.draftBanner} lowContrast hideCloseButton />
       )}
       {isPlatformAdmin && !runtimeAllowed && (
-        <InlineNotification kind="info" title={t.engineDisabled} lowContrast hideCloseButton />
+        <InlineNotification kind="info" title={t.agentOff} lowContrast hideCloseButton />
       )}
       <div className="flex flex-col gap-3 min-h-[16rem] max-h-[32rem] overflow-y-auto bg-background-100 rounded-md p-4">
         {turns.length === 0 ? (
@@ -212,13 +212,15 @@ const stepLine = (step: AgentTraceStep): string => {
   return `${step.node === "tool" ? `${t.toolStep} · ` : ""}${what} · ${step.ms} ms`;
 };
 
-/** Which engine answered this test. */
+/** Who answered this test: the agent, or the backup engine (and why, when the agent failed). */
 const EngineBadge: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
   const runtime = result.runtime ?? "v1";
   const label =
-    runtime === "v2_fallback"
-      ? fill(t.fellBack, { reason: result.fallbackReason ?? "unknown" })
-      : fill(t.answeredBy, { engine: runtime });
+    runtime === "v2"
+      ? t.answeredByAgent
+      : runtime === "v2_fallback"
+        ? fill(t.fellBack, { reason: result.fallbackReason ?? "unknown" })
+        : t.answeredByBackup;
   const tone =
     runtime === "v2"
       ? "border-primary-300 text-primary-700"
@@ -232,7 +234,7 @@ const EngineBadge: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
   );
 };
 
-/** The run behind a v2 answer: its id, to find it later, and the steps it took. */
+/** The run behind an agent answer: its id, to find it later, and the steps it took. */
 const RunDetails: React.FC<{ result: TestChatbotResponse }> = ({ result }) => {
   const steps = result.trace ?? [];
   return (

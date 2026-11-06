@@ -25,8 +25,8 @@ const draftOf = (bot: Chatbot): PreviewDraft => ({
 });
 
 /**
- * Who the bot is and what it says: name, instructions, tone and greeting. How it answers (engine,
- * answer mode, model) is on the Agent tab. Unsaved changes can be tried in Preview before saving
+ * Who the bot is and what it says: name, instructions, tone and greeting. How it answers (answer
+ * mode, model) is on the Agent tab. Unsaved changes can be tried in Preview before saving
  * (they travel as a draft).
  */
 export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => void }> = ({

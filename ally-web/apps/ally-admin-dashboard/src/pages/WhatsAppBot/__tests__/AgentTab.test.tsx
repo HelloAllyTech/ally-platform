@@ -6,8 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Chatbot } from "@types";
 
 /**
- * The Agent tab: everything about how the chatbot answers. Platform admins get the Engine card
- * (v1 / Shadow / v2, and Agent mode on v2); editors get what it can answer from and the model.
+ * The Agent tab: everything about how the chatbot answers. There is no Engine card: every chatbot
+ * answers with the agent, and platform admins are told when the switch in Defaults is off.
+ * Editors get what it can answer from and the model.
  */
 
 const ANSWERS = {
@@ -67,76 +68,39 @@ const { AgentTab } = await import("../AgentTab");
 const renderTab = (canEdit = true) =>
   render(<AgentTab bot={bot as unknown as Chatbot} canEdit={canEdit} onTest={vi.fn()} />);
 
-describe("AgentTab — Engine", () => {
-  beforeEach(() => {
-    canCreate = false;
-    bot = { id: "bot-1", runtime: "v1", effectiveRuntime: "v1", features: {}, ...ANSWERS };
-  });
-
-  it("is hidden from anyone who is not a platform admin", () => {
-    renderTab();
-    expect(screen.queryByText("Engine")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Shadow/)).not.toBeInTheDocument();
-    // Editors still get how it answers.
-    expect(screen.getByText("How it answers")).toBeInTheDocument();
-  });
-
-  it("shows platform admins v1, Shadow and v2 with the bot's setting selected", () => {
-    canCreate = true;
-    bot = { ...bot, runtime: "shadow", effectiveRuntime: "shadow" };
-    renderTab();
-    expect(screen.getByText("Engine")).toBeInTheDocument();
-    expect(screen.getByLabelText(/^v1 —/)).not.toBeChecked();
-    expect(screen.getByLabelText(/^Shadow —/)).toBeChecked();
-    expect(screen.getByLabelText(/^v2 —/)).not.toBeChecked();
-    expect(screen.queryByText(/turned off in Defaults/)).not.toBeInTheDocument();
-  });
-
-  it("says when the new engine is turned off platform-wide", () => {
-    canCreate = true;
-    bot = { ...bot, runtime: "v2", effectiveRuntime: "v1" };
-    renderTab();
-    expect(screen.getByText(/turned off in Defaults/)).toBeInTheDocument();
-  });
-});
-
-describe("AgentTab — Agent mode", () => {
+describe("AgentTab — no Engine card", () => {
   beforeEach(() => {
     canCreate = true;
     updateSpy.mockClear();
     bot = { id: "bot-1", runtime: "v2", effectiveRuntime: "v2", features: {}, ...ANSWERS };
   });
 
-  it("is hidden from anyone who is not a platform admin", () => {
+  it("shows no engine choice or Agent mode toggle, even to platform admins", () => {
+    renderTab();
+    expect(screen.queryByText("Engine")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Shadow/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^v2 —/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Agent mode")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save engine" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/switched off in Defaults/)).not.toBeInTheDocument();
+    expect(screen.getByText("How it answers")).toBeInTheDocument();
+  });
+
+  it("tells platform admins when the agent is switched off in Defaults", () => {
+    bot = { ...bot, effectiveRuntime: "v1" };
+    renderTab();
+    expect(
+      screen.getByText(
+        "The agent is switched off in Defaults, so this chatbot answers with the backup engine.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not tell anyone else", () => {
     canCreate = false;
+    bot = { ...bot, effectiveRuntime: "v1" };
     renderTab();
-    expect(screen.queryByLabelText("Agent mode")).not.toBeInTheDocument();
-  });
-
-  it("is shown only while the engine is v2", () => {
-    bot = { ...bot, runtime: "v1", effectiveRuntime: "v1" };
-    renderTab();
-    expect(screen.queryByLabelText("Agent mode")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(/^v2 —/));
-    expect(screen.getByLabelText("Agent mode")).toBeInTheDocument();
-  });
-
-  it("shows the saved flag and saves only what changed", () => {
-    renderTab();
-    const toggle = screen.getByLabelText("Agent mode");
-    expect(toggle).not.toBeChecked();
-    const save = screen.getByRole("button", { name: "Save engine" });
-    expect(save).toBeDisabled();
-
-    fireEvent.click(toggle);
-    fireEvent.click(save);
-    expect(updateSpy).toHaveBeenCalledWith({ id: "bot-1", features: { agent: true } });
-  });
-
-  it("starts on when the bot already has it", () => {
-    bot = { ...bot, features: { agent: true } };
-    renderTab();
-    expect(screen.getByLabelText("Agent mode")).toBeChecked();
+    expect(screen.queryByText(/switched off in Defaults/)).not.toBeInTheDocument();
   });
 });
 

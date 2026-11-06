@@ -2,14 +2,20 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { toast } from "sonner";
 
-import { RadioButton, RadioButtonGroup, Select, SelectItem, Slider } from "@ally-ui-mono/ui-shared";
+import {
+  InlineNotification,
+  RadioButton,
+  RadioButtonGroup,
+  Select,
+  SelectItem,
+  Slider,
+} from "@ally-ui-mono/ui-shared";
 import { useGetChatbotsQuery, useGetLlmModelsQuery, useUpdateChatbotMutation } from "@api";
 import { Button, EntityField } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { Chatbot, ChatbotAnswerMode, ChatbotModelChoice } from "@types";
 
-import { ChatbotEngineCard } from "./ChatbotEngineCard";
 import { handOverToPreview } from "./previewDraft";
 import { Card, errorMessage } from "./shared";
 
@@ -28,9 +34,10 @@ const draftOf = (bot: Chatbot): AnswersDraft => ({
 });
 
 /**
- * Everything about how the chatbot answers, in one place: the engine (v1, Shadow or v2, and Agent
- * mode on v2) for platform admins, then what it can answer from and the model that writes the
- * answers. Who it is and what it says stay on Instructions.
+ * Everything about how the chatbot answers, in one place: what it can answer from and the model
+ * that writes the answers. Every chatbot answers with the agent; platform admins are told when the
+ * emergency switch in Defaults has it on the backup engine. Who it is and what it says stay on
+ * Instructions.
  */
 export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => void }> = ({
   bot,
@@ -72,7 +79,9 @@ export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => 
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
-      {list?.canCreate && <ChatbotEngineCard bot={bot} />}
+      {list?.canCreate && bot.effectiveRuntime === "v1" && (
+        <InlineNotification kind="info" title={t.agentOff} lowContrast hideCloseButton />
+      )}
 
       <Card title={t.answersTitle} subtitle={t.answersIntro}>
         <EntityField label={t.answerModeLabel}>
