@@ -232,7 +232,7 @@ npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json   # CI typecheck
 
 Agents v2 turns Stage 1 chatbots into a LangGraph agent workspace, built in chunks. Before any Agents v2 work, **always read `docs/agents-v2/CONTEXT.md` and the current chunk brief first.**
 
-**Current chunk: 03a — `docs/agents-v2/chunk-03a.md`**
+**Current chunk: 03r — `docs/agents-v2/chunk-03r.md`**
 
 Always (from `CONTEXT.md`):
 

@@ -64,7 +64,7 @@ There is **no tool-calling path**. It owns usage emission (`_emit_usage`), the p
 7. ally-be would never send a new prompt code unless it is added to the code list. 3a loads the 2 agent codes **only for agent-mode runs**, so the v1 request snapshot is unchanged.
 8. The brief puts persona inside the instructions at position 4. The existing `format_persona` *prepends* a fenced persona block that explicitly ranks itself below the rules that follow. 3a reuses it, so the effective order still has rules winning.
 9. `documents_and_general` bots: the brief is silent. In agent mode they keep strict grounding, and an uncited answer is allowed only as today's "general information" path (see check rules). This is listed as an open item.
-10. Two new model calls (contextualise, agent step) need 2 `LLMTask` values plus 2 ally-be registry rows. The registry is per call (CLAUDE.md rule), which the brief doesn't mention.
+10. Two new model calls (contextualise, agent step) need 2 `LLMTask` values plus 2 ally-be registry rows. The registry is per call (CLAUDE.md rule), which the brief doesn't mention. *Superseded (section 9): the contextualise call was removed; the agent step is the one new call, with one task and one registry row.*
 
 ### Decisions taken at plan time (Shehbaz, 2026-11-05)
 1. `documents_and_general` bots in agent mode: as planned (strict grounding plus today's uncited "general information" exception).
@@ -120,7 +120,7 @@ Also decided at plan time:
 
 | File | What it is |
 |---|---|
-| `pages/WhatsAppBot/ChatbotEngineCard.tsx` | **Agent mode** toggle (with a tooltip), shown to platform admins while the engine is v2; saved with **Save engine**, sending only what changed. |
+| `pages/WhatsAppBot/ChatbotEngineCard.tsx` | **Agent mode** toggle (with a tooltip), shown to platform admins while the engine is v2; saved with **Save engine**, sending only what changed. *Now on Settings → Agent (section 13).* |
 | `pages/WhatsAppBot/ChatbotTestTab.tsx` | Steps read `summary · ms` (falling back to `node · ms`), tool steps prefixed `tool ·`; a turn-type chip next to the engine badge. |
 | `constants/en.ts`, `types/chatbots.ts` | Copy and types. |
 
@@ -128,12 +128,12 @@ Also decided at plan time:
 
 | App | Spec | Count | Covers |
 |---|---|---|---|
-| ally-ai | `tests/core/agent_runtime/test_agent_graph.py` | 24 | contextualise and follow-ups (mocked), degrade, smalltalk/about_bot/unclear skip retrieval, persona/topics/decline in the prompt, numbering continues, tool step counts only, cap at 4 (5th call reply-only), lower cap, uncited answer → decline with no text, gate reason kept, retrieval log once / skipped, the bot's model on the agent step, tracing disabled, JSON state, flag off = chunk 1 graph, a thread switching paths, reasoning effort |
-| ally-ai | `test_agent_check.py`, `test_tools.py`, `test_agent_endpoint.py`, `tests/core/llm/test_dispatch_reasoning_effort.py` | 25 + 9 + 4 + 5 | check rules; registry and `search_knowledge`; endpoint shape; `reasoning_effort` only to reasoning models |
+| ally-ai | `tests/core/agent_runtime/test_agent_graph.py` | 24 (38 by section 12) | *as first built; the contextualise tests went with it in section 9:* contextualise and follow-ups (mocked), degrade, smalltalk/about_bot/unclear skip retrieval, persona/topics/decline in the prompt, numbering continues, tool step counts only, cap at 4 (5th call reply-only), lower cap, uncited answer → decline with no text, gate reason kept, retrieval log once / skipped, the bot's model on the agent step, tracing disabled, JSON state, flag off = chunk 1 graph, a thread switching paths, reasoning effort |
+| ally-ai | `test_agent_check.py`, `test_tools.py`, `test_agent_endpoint.py`, `tests/core/llm/test_dispatch_reasoning_effort.py` | 25 + 9 + 4 + 5 (65 + 10 + … by section 12) | check rules; registry and `search_knowledge`; endpoint shape; `reasoning_effort` only to reasoning models |
 | ally-be | `chatbot/engine/test/chatbot-engine-agent-mode.spec.ts` | 28 | templates skipped / kept (crisis, consent, bare `help`, first-message welcome), every template for v1 / flag off / shadow / kill switch, request fields, prompts and model, titles (draft, organisation, failure), small talk not filed, first-message notice flag, crisis overrides small talk |
 | ally-be | `chatbot/service/test/chatbot-agent-mode.service.spec.ts` | 8 | features PATCH admin-only and merged, unknown keys dropped, GET, Preview `turnType` and `isFirstMessage` |
 | ally-be | `whatsapp/service/test/whatsapp-inbound-agent-first-message.spec.ts` | 5 | the notice after the agent's "who I am" on message 1; crisis alone; first question no notice; later messages; v1 unchanged |
-| ally-web | `ChatbotAgentMode.test.tsx`, `ChatbotTestTabAgentMode.test.tsx` | 4 + 3 | toggle admin-only, v2-only, saves only what changed; tool step summary; turn-type chip |
+| ally-web | `AgentTab.test.tsx` (was `ChatbotAgentMode.test.tsx`), `ChatbotTestTab.test.tsx` (the Agent mode tests were `ChatbotTestTabAgentMode.test.tsx`) | 4 + 3 | toggle admin-only, v2-only, saves only what changed; tool step summary; turn-type chip |
 
 Every existing test is unmodified.
 
@@ -223,7 +223,7 @@ docker compose -f docker-compose.local.yml up -d --build app
 - ally-be: if it was already running, `docker restart ally-be-app-1` (its file watcher missed this chunk's changes here).
 
 ### 3. Switch on Agent mode
-**Dashboard → AI Chatbots → Ally FAQ → Settings → Engine** (platform admins only): choose **v2**; the **Agent mode** toggle appears under the options; turn it **On**; **Save engine**. Defaults → Safety switches → *Allow the new engine* must be On (chunk 2). Ally FAQ must have all 7 "Ally FAQ –" documents under **Knowledge**.
+**Dashboard → AI Chatbots → Ally FAQ → Settings → Agent → Engine card** (platform admins only): choose **v2**; the **Agent mode** toggle appears under the options; turn it **On**; **Save engine**. Defaults → Safety switches → *Allow the new engine* must be On (chunk 2). Ally FAQ must have all 7 "Ally FAQ –" documents under **Knowledge**.
 
 ### 4. Preview script
 **Ally FAQ → Preview → New thread**, then send these in order. Under each reply read: the text, **Handled by**, the engine badge (**Answered by v2**), the **turn-type chip** next to it, and **Steps (n)** (open it).
@@ -244,7 +244,7 @@ Then **New thread** and send `hi, ye kya hai?`: a Hindi/Hinglish reply naming th
 To force a tool step: **New thread**, `What are streaks?` then `and do they reset?`.
 
 ### 5. Agent mode off
-**Settings → Engine → Agent mode Off → Save engine.** New thread in Preview, send `what can you do?` → the fixed **Help** template is back; then `Hello` → Ally FAQ's welcome message again (v1 behaviour: a bot with a welcome answers every hello with it). v2 answers exactly as chunk 2.
+**Settings → Agent → Engine card → Agent mode Off → Save engine.** New thread in Preview, send `what can you do?` → the fixed **Help** template is back; then `Hello` → Ally FAQ's welcome message again (v1 behaviour: a bot with a welcome answers every hello with it). v2 answers exactly as chunk 2.
 
 ### 6. Eval and parity
 ```bash
@@ -399,3 +399,12 @@ No reply in either run has markdown, an unsourced phone number, link or email, o
 - Tests: `test_no_search_after_one_that_added_nothing`, `test_past_the_time_budget_it_replies_and_is_not_rewritten`, `test_reads_only_the_last_ten_messages`, `test_a_refused_rewrite_falls_back_to_the_first_draft`, `test_loop_stops_at_the_cap` (2), `TestTalkAboutSources::test_the_common_phrase_is_cut_without_a_rewrite`; ally-be `sends only the last 10 messages of a long conversation`.
 
 **To do on your side:** re-attach the six "Ally FAQ –" documents to Ally FAQ (Knowledge tab) if they were removed by accident; with only the Progress document, "What is Ally?" can only be answered from Progress, or declined.
+
+## 13. Dashboard: the Agent tab and Settings sections (2026-11-06)
+
+Two dashboard changes after the Preview feedback (commits `de911e390`, `02c58ce95`); sections 2 and 6 point here.
+
+- **One Agent tab for how a chatbot answers** (`pages/WhatsAppBot/AgentTab.tsx`): the Engine card (v1 / Shadow / v2 and Agent mode; platform admins only), then "How it answers": answer mode, model and temperature, with its own Save and "Preview these changes". Instructions keeps who the bot is and what it says. Settings no longer shows the engine, and Preview's "Engine for this test" picker is gone: a test always uses the chatbot's own engine. Tests: `__tests__/AgentTab.test.tsx`.
+- **Configuration as sections of Settings**: Agent, Quick replies, Access, Channels, General, leaving 8 tabs (Overview, Instructions, Knowledge, Preview, Conversations, Knowledge gaps, Analytics, Settings). Settings opens on Agent; `?tab=settings&section=<id>` opens a section, and older `?tab=agent` / `people` / `connectors` / `replies` links still land on it.
+- "Preview these changes" on the Instructions and Agent tabs hands unsaved changes to Preview through `pages/WhatsAppBot/previewDraft.ts` (chunk 3r, finding 49).
+

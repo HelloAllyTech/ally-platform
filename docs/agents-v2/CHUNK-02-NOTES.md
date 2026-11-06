@@ -128,9 +128,9 @@ All three apps are on the same branch. In review order (see section 7 for the co
 | ally-be | `src/chatbot/service/chatbot.service.ts`, `dto/chatbot.dto.ts` | Three API changes:<br>• PATCH `runtime` (platform admin only).<br>• GET adds `runtime`, `effectiveRuntime` and `features`.<br>• Preview accepts `runtime` and `conversationId`, and returns `runtime`, `runId`, `trace`, `fallbackReason`, `runtimeAllowed` and `conversationId`. |
 | ally-be | `whatsapp-settings.type.ts`, `whatsapp.dto.ts`, `chatbot-settings.service.ts` | `agentRuntimeAllowed` (default false), editable in Defaults. `applyOverride` always uses the platform value. |
 | ally-be | `DATA_SCHEMA.md`, `.env.example`, `env.validation.ts`, `config.service.ts`, `ai-task-registry.constants.ts` | Docs, the new env var, and the registry note. |
-| ally-web | `pages/WhatsAppBot/ChatbotEngineCard.tsx`, `ChatbotSettingsTab.tsx` | The Engine card in a bot's Settings, for platform admins only. |
+| ally-web | `pages/WhatsAppBot/ChatbotEngineCard.tsx`, `ChatbotSettingsTab.tsx` | The Engine card in a bot's Settings, for platform admins only. *Superseded in 3a: the card is on Settings → Agent (CHUNK-03A-NOTES section 13).* |
 | ally-web | `pages/WhatsAppBot/BotSettingsTab.tsx` | Defaults → Safety switches → **Allow the new engine**. |
-| ally-web | `pages/WhatsAppBot/ChatbotTestTab.tsx` | Preview gains:<br>• the engine badge, or "v1 (v2 failed: reason)"<br>• the run id with Copy<br>• a collapsible step list with ms per step<br>• **New thread**, which replaces "Start over" and also drops the thread id<br>• an admin-only "Engine for this test" picker |
+| ally-web | `pages/WhatsAppBot/ChatbotTestTab.tsx` | Preview gains:<br>• the engine badge, or "v1 (v2 failed: reason)"<br>• the run id with Copy<br>• a collapsible step list with ms per step<br>• **New thread**, which replaces "Start over" and also drops the thread id<br>• an admin-only "Engine for this test" picker *(removed in 3a: a test always uses the bot's own engine)* |
 
 ### Tests added
 
@@ -142,8 +142,8 @@ All three apps are on the same branch. In review order (see section 7 for the co
 | ally-be | `src/chatbot/service/test/chatbot-shadow.spec.ts` | 5 | The concurrency cap, freeing a slot, cap 0, never throwing |
 | ally-be | `src/chatbot/service/test/chatbot.service.spec.ts` | 10 | PATCH/test 403 for non-admins, the GET fields, the Preview response |
 | ally-be | `chatbot-settings.spec.ts` and `ai.service.spec.ts` | +1 and +7 | The kill switch can't be set per bot; `runAgent` doesn't page; the budgeted fallback |
-| ally-web | `ChatbotSettingsTab.test.tsx` | 3 | Engine is hidden for non-admins and selected for admins; the platform-wide note |
-| ally-web | `ChatbotTestTab.test.tsx` | 5 | Badge, run id, steps with ms, fallback badge, New thread, the picker is admin-only |
+| ally-web | `ChatbotSettingsTab.test.tsx` | 3 | Engine is hidden for non-admins and selected for admins; the platform-wide note. *Superseded in 3a: these moved with the card to `AgentTab.test.tsx`.* |
+| ally-web | `ChatbotTestTab.test.tsx` | 5 | Badge, run id, steps with ms, fallback badge, New thread, the picker is admin-only. *The picker test went with the picker in 3a.* |
 | ally-ai | `test_graph.py` and `test_endpoint.py` | +3 | `log_retrieval=false` skips both log paths; the default still logs once |
 
 ### Results
@@ -218,6 +218,8 @@ select value->'agentRuntimeAllowed' from global_settings where name='whatsapp_bo
 3. **AI Chatbots → Defaults → Settings → Safety switches → Allow the new engine: On**, then **Save defaults** in the bar at the bottom.
 
 ### 3. Preview, side by side
+*Superseded in 3a: there is no per-test engine picker; switch the bot's engine on Settings → Agent instead.*
+
 1. Open **Ally FAQ → Preview**.
 2. Set **Engine for this test** to **v1** and ask "What does Ally do?". The badge says "Answered by v1", with no run.
 3. Switch it to **v2** and ask the same question. You should get the same decision and similar sources. The badge says "Answered by v2", with a **Run** id and Copy, and "Steps (7)" opens to 7 steps with their ms.
@@ -230,7 +232,7 @@ docker exec ally-be-postgres-1 psql -U postgres -d ally_agent_runtime \
 ```
 
 ### 4. Switch the bot to v2
-Go to **Ally FAQ → Settings → Engine → v2 → Save engine**. With a WhatsApp number connected (tunnel and allow-listed phone), message it. Then:
+Go to **Ally FAQ → Settings → Engine → v2 → Save engine** (since 3a: **Settings → Agent → Engine card**). With a WhatsApp number connected (tunnel and allow-listed phone), message it. Then:
 ```sql
 select handled_by, agent_run_id, agent_runtime from wa_messages
  where direction = 'outbound' order by "createdAt" desc limit 3;   -- agent_runtime = v2
@@ -249,7 +251,7 @@ select handled_by, agent_run_id, agent_runtime from wa_messages
 4. Put the flag back afterwards.
 
 ### 6. Shadow
-1. Go to **Settings → Engine → Shadow → Save engine**.
+1. Go to **Settings → Engine → Shadow → Save engine** (since 3a: **Settings → Agent → Engine card**).
 2. Send 5 WhatsApp messages. Replies come from v1. Then:
    ```sql
    select chatbot_id, run_id, v1, v2, error from agent_shadow_runs order by "createdAt" desc;
