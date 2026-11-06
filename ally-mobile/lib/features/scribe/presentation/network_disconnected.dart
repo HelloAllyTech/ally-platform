@@ -19,8 +19,9 @@ enum DisconnectedType { socket, network, microphoneFailure }
 /// white) for the [type], then two 60%-wide pill buttons — "Try again"
 /// (white, black label; hidden while offline, RN reading
 /// `useNetworkConnectivity` itself) and "Go back" (`darkGray7`, white).
-/// "Try again" doesn't reconnect in place — the caller clears the state and
-/// leaves, exactly as RN's `handleTryAgain` does.
+/// [onTryAgain] and [onGoBack] are the caller's own callbacks: this widget
+/// has no opinion on what either does. `ScribeRecordingScreen` retries the
+/// connection in place rather than leaving, unlike RN's own `handleTryAgain`.
 class NetworkDisconnected extends ConsumerWidget {
   const NetworkDisconnected({
     super.key,
