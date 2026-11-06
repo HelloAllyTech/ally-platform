@@ -709,8 +709,7 @@ export class AiService {
    * would spend the SQS window twice before v1 even started.
    *
    * No Slack alert from here (`alertOnFailure=false`): the engine raises one throttled
-   * "agent runtime degraded" alert per bot and reason, and shadow runs record their failure in
-   * `agent_shadow_runs`. The failure is still logged.
+   * "agent runtime degraded" alert per bot and reason. The failure is still logged.
    *
    * redactBody=true: the payload is the person's question.
    */

@@ -85,8 +85,8 @@ export interface ChatbotStats {
   lastMessageAt: string | null;
 }
 
-/** Which engine answers a chatbot (Agents v2). */
-export type ChatbotRuntime = "v1" | "shadow" | "v2";
+/** Which engine answers chatbots (Agents v2): v2, or v1 while the agent is off in Defaults. */
+export type ChatbotRuntime = "v1" | "v2";
 
 /** The engine that answered one Preview test; `v2_fallback` means v2 failed and v1 answered. */
 export type ChatbotRuntimeUsed = "v1" | "v2" | "v2_fallback";
@@ -96,11 +96,6 @@ export interface AgentTraceStep {
   node: string;
   ms: number;
   summary: string;
-}
-
-/** A chatbot's feature flags (Agents v2). `agent`: answers with the conversational agent on v2. */
-export interface ChatbotFeatures {
-  agent?: boolean;
 }
 
 /** What the conversational agent understood a message to be (ally-be `AgentTurnType`). */
@@ -116,12 +111,8 @@ export interface Chatbot {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: ChatbotPersona;
   model: ChatbotModelChoice | null;
-  /** The stored engine. Read-only: every chatbot answers with v2 and the agent. */
-  runtime: ChatbotRuntime;
   /** What actually answers: v2, or v1 (the backup engine) while the agent is off in Defaults. */
   effectiveRuntime: ChatbotRuntime;
-  /** The stored flags. Read-only: the agent is always on. */
-  features: ChatbotFeatures;
   myRole: ChatbotMemberRole;
   connectors: Connector[];
   documentCount: number;
@@ -264,8 +255,6 @@ export interface TestChatbotRequest {
   draft?: ChatbotDraft;
   asTenantId?: string;
   checkAccess?: boolean;
-  /** Ignored by the API: every test answers with the chatbot's own engine. */
-  runtime?: "v1" | "v2";
   /** The Preview thread (`preview-<uuid>`), kept until "New thread". */
   conversationId?: string;
 }

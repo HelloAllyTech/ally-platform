@@ -117,7 +117,7 @@ All paths are under `ally-ai/`.
 | `app/core/config.py` | `AgentRuntimeSettings`: `ENABLED`, `CHECKPOINT_DB_URL`, `CHECKPOINT_SCHEMA`, `CHECKPOINT_POOL_MAX_SIZE`, `DURABILITY` |
 | `app/main.py` | The lifespan opens the checkpointer only when enabled, and closes it on shutdown |
 | `.dockerignore` | New: keeps a local `.venv/` out of the image (see section 4) |
-| `scripts/agent_parity.py`, `tests/fixtures/agent_parity_cases.yaml`, `tests/fixtures/parity_baseline_master.json` | The parity harness, 22 cases, and the master baseline |
+| `scripts/agent_parity.py`, `tests/fixtures/agent_parity_cases.yaml`, `tests/fixtures/parity_baseline_master.json` | The parity harness, 22 cases, and the master baseline | <!-- docs-path-lint: ignore -->
 | `tests/core/agent_runtime/` | 39 tests: graph, endpoint, checkpointer, golden parity. The Postgres test runs only when `AGENT_RUNTIME_TEST_DB_URL` is set. |
 
 ### Contract
@@ -172,7 +172,7 @@ Report: [CHUNK-01-PARITY-REPORT.md](./CHUNK-01-PARITY-REPORT.md) (22 cases, loca
 - **Citation overlap (should match):** 100% on every answered case except `lang-hindi` (50%), where the model cited one passage on one path and two on the other.
 - **Decision (Shehbaz, 2026-11-05): the cited-chunk set is "should match" in live parity**, reported as overlap %.
   - Why: the answer model samples, so v1 by itself cites different chunks from identical passages run to run. Three back-to-back `/knowledge-agent/answer` calls gave `{Access, Help}`, `{Access}`, `{Access, Help}`.
-  - Exact, ordered citations remain a hard check in the mocked golden test (`tests/core/agent_runtime/test_golden.py`).
+  - Exact, ordered citations remain a hard check in the mocked golden test (`tests/core/agent_runtime/test_golden.py`). <!-- docs-path-lint: ignore -->
   - The first run, which still had citations as must-match, failed only on this: `in-get-access` and `lang-hindi`.
 
 ## 6. How to test (the six checks, with real paths, env names and port)

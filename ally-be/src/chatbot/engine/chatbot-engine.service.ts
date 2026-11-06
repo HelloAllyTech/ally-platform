@@ -55,8 +55,8 @@ export const KNOWLEDGE_PROMPT_CODES = [
 /** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
 const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
 /**
- * The conversational agent's prompts (Agents v2, `features.agent`). Loaded only for a bot in agent
- * mode, so every other bot's request is exactly as before.
+ * The conversational agent's prompts (Agents v2). Loaded only when the agent answers, so a v1
+ * request (the emergency switch off) is exactly as before.
  */
 export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';

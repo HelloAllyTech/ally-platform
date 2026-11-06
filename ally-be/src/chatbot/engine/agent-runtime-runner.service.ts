@@ -18,13 +18,8 @@ import {
   agentFailureReason,
   agentRunIdFor,
   MalformedAgentResponseError,
-  shadowSide,
 } from './agent-runtime';
-import type {
-  AgentRunRef,
-  ChatTurn,
-  ShadowRunRequest,
-} from './chatbot-engine.types';
+import type { AgentRunRef, ChatTurn } from './chatbot-engine.types';
 import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
 
 /**
@@ -32,9 +27,6 @@ import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
  * `AgentRunRequest.knowledge_topics` (see `AgentRunRequest`).
  */
 const MAX_KNOWLEDGE_TOPICS = 50;
-
-/** The test console's channel type. */
-const PREVIEW_CHANNEL = 'test';
 
 /**
  * The answer step's wall-clock budget, derived from the SQS visibility window. A v2 bot's fallback
@@ -75,7 +67,7 @@ const withoutDebugIds = (
 
 /**
  * The Agents v2 engine, as the chatbot engine uses it: a v2 bot's answer through ally-ai's
- * `/agent/run` with its fallback to v1, and a shadow bot's comparison run. The chatbot engine keeps
+ * `/agent/run` with its fallback to v1. The chatbot engine keeps
  * the order of steps and turns the answer into a reply; everything about running v2 is here.
  */
 @Injectable()
@@ -111,12 +103,8 @@ export class AgentRuntimeRunner {
           conversationId,
           runId,
           chatbotId: turn.chatbot.id,
-          // Only an agent bot sends these; any other v2 bot's request is the parity request, and
-          // ally-ai reads no features as "agent off".
           ...(agentMode
             ? {
-                // Every bot answers with the agent now (chunk 3d), whatever it stored.
-                features: { ...turn.chatbot.features, agent: true },
                 knowledgeTopics: await this.knowledgeTopics(knowledge),
                 declineText: turn.settings.declineText,
               }
@@ -162,37 +150,6 @@ export class AgentRuntimeRunner {
         throw new AgentFallbackFailedError(v1Error, agent);
       }
     }
-  }
-
-  /**
-   * The comparison run for a shadow bot's message, for the channel to start after it has replied.
-   * WhatsApp only: Preview never shadows, and without a provider message id there is no stable
-   * run id to record.
-   */
-  shadowFor(
-    turn: ChatTurn,
-    request: KnowledgeAnswerRequest,
-    answer: KnowledgeAnswerResponse,
-    latencyMs: number,
-  ): ShadowRunRequest | undefined {
-    if (
-      turn.channel.type === PREVIEW_CHANNEL ||
-      !turn.providerMessageId ||
-      !turn.conversationId
-    ) {
-      return undefined;
-    }
-    return {
-      // Its own thread, so the comparison runs' checkpoints never mix into the conversation's
-      // real v2 thread once the bot is switched over.
-      request: buildAgentRunRequest(request, {
-        conversationId: `shadow-${turn.conversationId}`,
-        runId: agentRunIdFor(turn.providerMessageId),
-        chatbotId: turn.chatbot.id,
-        logRetrieval: false,
-      }),
-      v1: shadowSide(answer, latencyMs),
-    };
   }
 
   /**

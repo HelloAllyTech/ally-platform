@@ -8,7 +8,6 @@ import { Chatbot } from '../../entity/chatbot.entity';
 import {
   AgentRuntimeUsed,
   ChatbotKnowledgeSource,
-  ChatbotRuntime,
 } from '../../enum/chatbot.enum';
 import { agentRunIdFor } from '../agent-runtime';
 import { ChatbotEngineService } from '../chatbot-engine.service';
@@ -188,15 +187,12 @@ describe('ChatbotEngineService', () => {
         providerMessageId: 'wamid.1',
       });
 
-    it('answers v2 and shadow bots with v1 while the kill switch is off', async () => {
+    it('answers with v1 while the kill switch is off', async () => {
       allowed(false);
-      for (const runtime of [ChatbotRuntime.V2, ChatbotRuntime.SHADOW]) {
-        const decision = await engine.respond(whatsapp({ runtime }));
-        expect(decision.agent).toBeUndefined();
-        expect(decision.shadow).toBeUndefined();
-      }
+      const decision = await engine.respond(whatsapp());
+      expect(decision.agent).toBeUndefined();
       expect(aiService.runAgent).not.toHaveBeenCalled();
-      expect(aiService.answerKnowledgeQuestion).toHaveBeenCalledTimes(2);
+      expect(aiService.answerKnowledgeQuestion).toHaveBeenCalledTimes(1);
     });
 
     it('answers Preview with v1 too while the kill switch is off', async () => {
@@ -208,32 +204,15 @@ describe('ChatbotEngineService', () => {
       expect(decision.agent).toBeUndefined();
     });
 
-    it('answers every bot with v2 once the kill switch is on, whatever runtime it stored', async () => {
-      allowed();
-      for (const runtime of [
-        ChatbotRuntime.V1,
-        ChatbotRuntime.SHADOW,
-        ChatbotRuntime.V2,
-      ]) {
-        const decision = await engine.respond(whatsapp({ runtime }));
-        expect(decision.agent?.runtime).toBe(AgentRuntimeUsed.V2);
-        expect(decision.shadow).toBeUndefined();
-      }
-      expect(aiService.runAgent).toHaveBeenCalledTimes(3);
-      expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
-    });
-
     describe('a v2 bot', () => {
       beforeEach(() => allowed());
 
       it("calls /agent/run once with v1's body plus the run's fields and the agent's", async () => {
-        const decision = await engine.respond(
-          whatsapp({ runtime: ChatbotRuntime.V2 }),
-        );
+        const decision = await engine.respond(whatsapp());
 
         // The v1 body, from the same bot on the same turn.
         allowed(false);
-        await engine.respond(whatsapp({ runtime: ChatbotRuntime.V2 }));
+        await engine.respond(whatsapp());
         const v1Body = aiService.answerKnowledgeQuestion.mock.calls[0][0];
 
         expect(aiService.runAgent).toHaveBeenCalledTimes(1);
@@ -245,7 +224,6 @@ describe('ChatbotEngineService', () => {
           run_id: agentRunIdFor('wamid.1'),
           chatbot_id: 'bot-1',
           runtime_version: 'v2',
-          features: { agent: true },
           knowledge_topics: [],
           decline_text: settings.declineText,
         });
@@ -269,15 +247,13 @@ describe('ChatbotEngineService', () => {
       });
 
       it('does not call /knowledge-agent/answer when v2 answers', async () => {
-        await engine.respond(whatsapp({ runtime: ChatbotRuntime.V2 }));
+        await engine.respond(whatsapp());
         expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
         expect(aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
       });
 
       it("keeps ally-ai's debug-only chunk list off the stored retrieval", async () => {
-        const decision = await engine.respond(
-          whatsapp({ runtime: ChatbotRuntime.V2 }),
-        );
+        const decision = await engine.respond(whatsapp());
         expect(decision.retrievalMeta).not.toHaveProperty('hit_chunk_ids');
         expect(decision.retrievalMeta?.hit_count).toBe(3);
       });
@@ -317,9 +293,7 @@ describe('ChatbotEngineService', () => {
         'falls back to v1 exactly once on %s',
         async (_label, error, reason) => {
           aiService.runAgent.mockRejectedValueOnce(error);
-          const decision = await engine.respond(
-            whatsapp({ runtime: ChatbotRuntime.V2 }),
-          );
+          const decision = await engine.respond(whatsapp());
 
           expect(aiService.runAgent).toHaveBeenCalledTimes(1);
           expect(aiService.answerKnowledgeQuestionWithin).toHaveBeenCalledTimes(
@@ -344,9 +318,7 @@ describe('ChatbotEngineService', () => {
 
       it('falls back on a 200 that is not an answer', async () => {
         aiService.runAgent.mockResolvedValueOnce({ detail: 'nope' });
-        const decision = await engine.respond(
-          whatsapp({ runtime: ChatbotRuntime.V2 }),
-        );
+        const decision = await engine.respond(whatsapp());
         expect(aiService.answerKnowledgeQuestionWithin).toHaveBeenCalledTimes(
           1,
         );
@@ -360,9 +332,7 @@ describe('ChatbotEngineService', () => {
         aiService.answerKnowledgeQuestionWithin.mockRejectedValueOnce(
           new Error('ally-ai down'),
         );
-        const decision = await engine.respond(
-          whatsapp({ runtime: ChatbotRuntime.V2 }),
-        );
+        const decision = await engine.respond(whatsapp());
         expect(decision.handledBy).toBe(WaHandledBy.ERROR);
         expect(decision.body).toBe(settings.fallbackText);
         expect(decision.agent?.runtime).toBe(AgentRuntimeUsed.V2_FALLBACK);
@@ -374,9 +344,7 @@ describe('ChatbotEngineService', () => {
           confidence: 0.9,
           signal: 'end it',
         });
-        const decision = await engine.respond(
-          whatsapp({ runtime: ChatbotRuntime.V2 }),
-        );
+        const decision = await engine.respond(whatsapp());
         expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
         expect(decision.body).toBe(settings.crisisEscalationText);
         expect(decision.alert?.type).toBe('Chatbot Crisis Classifier');
@@ -392,9 +360,7 @@ describe('ChatbotEngineService', () => {
           confidence: 0.9,
           signal: 'end it',
         });
-        const decision = await engine.respond(
-          whatsapp({ runtime: ChatbotRuntime.V2 }),
-        );
+        const decision = await engine.respond(whatsapp());
         expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
         expect(decision.agent?.runtime).toBe(AgentRuntimeUsed.V2_FALLBACK);
       });
@@ -403,7 +369,7 @@ describe('ChatbotEngineService', () => {
         aiService.runAgent.mockRejectedValueOnce(
           upstream(404, ErrorCode.AI_REQUEST_REJECTED),
         );
-        await engine.respond(whatsapp({ runtime: ChatbotRuntime.V2 }));
+        await engine.respond(whatsapp());
         expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(1);
         expect(aiService.checkWhatsAppCrisis.mock.calls[0][0].prompts).toEqual(
           aiService.runAgent.mock.calls[0][0].prompts,
@@ -413,14 +379,14 @@ describe('ChatbotEngineService', () => {
       it('gives Preview a fresh run id and its own thread', async () => {
         await engine.respond(
           turn({
-            chatbot: bot({ runtime: ChatbotRuntime.V2 }),
+            chatbot: bot(),
             channel: { type: 'test' },
             conversationId: 'preview-7b0c1b8e-8a43-4f61-9a43-3a2d5c0f9e11',
           }),
         );
         await engine.respond(
           turn({
-            chatbot: bot({ runtime: ChatbotRuntime.V2 }),
+            chatbot: bot(),
             channel: { type: 'test' },
           }),
         );

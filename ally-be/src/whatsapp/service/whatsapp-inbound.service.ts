@@ -31,9 +31,7 @@ import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { isFallback } from 'src/chatbot/engine/agent-runtime';
 import {
   AGENT_FALLBACK_EVENT,
-  AGENT_SHADOW_RUN_EVENT,
   type AgentFallbackEvent,
-  type AgentShadowRunEvent,
 } from 'src/chatbot/type/agent-runtime.event';
 import type {
   AgentRunRef,
@@ -394,7 +392,7 @@ export class WhatsAppInboundService {
         );
       }
       if (decision.alert) this.eventEmitter.emit('exception', decision.alert);
-      this.announceAgentOutcome(chatbot, conversation.id, inboundId, decision);
+      this.announceAgentOutcome(chatbot, decision);
     } catch (error) {
       // Reached only when nothing has been sent — every send path above returns. Recorded on the
       // message and swallowed: rethrowing would redeliver and risk a second reply.
@@ -420,31 +418,19 @@ export class WhatsAppInboundService {
    * round trip to ask again.
    */
   /**
-   * After the reply has been sent and recorded, tell the Agents v2 listeners. The fallback alert is
+   * After the reply has been sent and recorded, tell the Agents v2 listener. The fallback alert is
    * throttled per bot and reason by its listener (AgentRuntimeAlertThrottle), so it is announced
-   * here rather than emitted as an alert. The shadow listener (ChatbotShadowService) runs
-   * asynchronously and never throws, so a shadow run cannot delay this message, fail it, or have
-   * it redelivered.
+   * here rather than emitted as an alert.
    */
   private announceAgentOutcome(
     chatbot: Pick<Chatbot, 'id' | 'name'>,
-    conversationId: string,
-    inboundMessageId: string,
-    decision: Pick<ChatbotDecision, 'agent' | 'shadow'>,
+    decision: Pick<ChatbotDecision, 'agent'>,
   ): void {
     if (isFallback(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },
         reason: decision.agent.fallbackReason,
       } satisfies AgentFallbackEvent);
-    }
-    if (decision.shadow) {
-      this.eventEmitter.emit(AGENT_SHADOW_RUN_EVENT, {
-        chatbotId: chatbot.id,
-        conversationId,
-        inboundMessageId,
-        shadow: decision.shadow,
-      } satisfies AgentShadowRunEvent);
     }
   }
 

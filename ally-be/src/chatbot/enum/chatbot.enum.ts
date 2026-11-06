@@ -70,8 +70,6 @@ export enum ChatbotAudienceKind {
 export enum ChatbotRuntime {
   /** ally-ai's `/knowledge-agent/answer`, as Stage 1 built it. */
   V1 = 'v1',
-  /** v1 answers; the same request also goes to `/agent/run` afterwards, for comparison only. */
-  SHADOW = 'shadow',
   /** ally-ai's `/agent/run` (LangGraph), falling back to v1 if it fails before answering. */
   V2 = 'v2',
 }

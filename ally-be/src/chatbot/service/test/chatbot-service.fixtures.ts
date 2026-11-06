@@ -6,7 +6,6 @@ import {
   ChatbotAccessMode,
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
-  ChatbotRuntime,
   ChatbotStatus,
 } from '../../enum/chatbot.enum';
 import { ChatbotAccessService } from '../chatbot-access.service';
@@ -18,7 +17,7 @@ import { ChatbotService } from '../chatbot.service';
  * `jest.mock` of the execution manager.
  */
 
-/** The saved bot every test starts from: on v2, Agent mode off. */
+/** The saved bot every test starts from. */
 export const storedBot = (): Chatbot =>
   ({
     id: 'bot-1',
@@ -30,8 +29,6 @@ export const storedBot = (): Chatbot =>
     persona: {},
     model: null,
     settings: {},
-    runtime: ChatbotRuntime.V2,
-    features: {},
   }) as Chatbot;
 
 const countRepository = () => ({

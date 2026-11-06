@@ -2,12 +2,9 @@ import { WaHandledBy } from '../../enum/whatsapp.enum';
 import { DEFAULT_WHATSAPP_SETTINGS } from '../../type/whatsapp-settings.type';
 import { WhatsAppInboundService } from '../whatsapp-inbound.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
+import { AgentRuntimeUsed } from 'src/chatbot/enum/chatbot.enum';
 import {
-  AgentRuntimeUsed,
-  ChatbotRuntime,
-} from 'src/chatbot/enum/chatbot.enum';
-import {
-  agentBot,
+  agentBot as bot,
   ANSWER,
   buildInboundHarness,
   type InboundAiService,
@@ -17,12 +14,6 @@ import {
 const QUESTION = 'who are you?';
 const NOTICE =
   'Automated assistant. Not medical advice. Reply STOP to opt out.';
-
-/** The platform bot, in Agent mode unless told otherwise. */
-const bot = (
-  runtime: ChatbotRuntime,
-  features: Record<string, boolean> = { agent: true },
-): Chatbot => agentBot(runtime, features);
 
 const ABOUT_BOT = {
   ...ANSWER,
@@ -54,7 +45,7 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
 
   beforeEach(async () => {
     messageCount = 0;
-    chatbot = bot(ChatbotRuntime.V2);
+    chatbot = bot();
     ({ service, provider, aiService, savedMessages } =
       await buildInboundHarness({
         chatbot: () => chatbot,
@@ -76,9 +67,7 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
     await service.handle(inbound());
 
     expect(aiService.runAgent).toHaveBeenCalledTimes(1);
-    expect(aiService.runAgent.mock.calls[0][0].features).toEqual({
-      agent: true,
-    });
+    expect(aiService.runAgent.mock.calls[0][0]).not.toHaveProperty('features');
     expect(sent()).toBe(`${ABOUT_BOT.answer}\n\n${NOTICE}`);
     expect(outbound()).toMatchObject({
       handledBy: WaHandledBy.RAG,

@@ -74,11 +74,8 @@ export interface ChatbotSummary {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: Chatbot['persona'];
   model: ChatbotModelChoice | null;
-  /** The engine the bot is set to (Agents v2). */
-  runtime: ChatbotRuntime;
   /** What actually answers: v1 whenever the platform kill switch is off. */
   effectiveRuntime: ChatbotRuntime;
-  features: Record<string, boolean>;
   myRole: ChatbotMemberRole;
   connectors: ConnectorView[];
   documentCount: number;
@@ -234,9 +231,7 @@ export class ChatbotService {
       knowledgeSource: bot.knowledgeSource,
       persona: bot.persona ?? {},
       model: bot.model ?? null,
-      runtime: bot.runtime ?? ChatbotRuntime.V1,
       effectiveRuntime: effectiveRuntime(defaults),
-      features: bot.features ?? {},
       myRole: roles.get(bot.id) ?? ChatbotMemberRole.VIEWER,
       connectors: connectors.get(bot.id) ?? [],
       documentCount: docCounts.get(bot.id) ?? 0,
@@ -387,7 +382,6 @@ export class ChatbotService {
     if (dto.accessMode !== undefined) patch.accessMode = dto.accessMode;
     if (dto.knowledgeSource !== undefined)
       patch.knowledgeSource = dto.knowledgeSource;
-    // `runtime` and `features.agent` are ignored: every bot answers with the agent (chunk 3d).
     if (dto.model !== undefined) {
       patch.model = dto.model
         ? {

@@ -1,15 +1,10 @@
-import type {
-  AgentRunRequest,
-  AgentTraceStep,
-  AgentTurnType,
-} from '../../ai/dto/knowledge.dto';
+import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
 import type { NotificationErrorType } from '../../notification/type/notification.error.type';
 import type {
   WaHandledBy,
   WaUnansweredReason,
 } from '../../whatsapp/enum/whatsapp.enum';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
-import type { AgentShadowSide } from '../entity/agent-shadow-run.entity';
 import type { Chatbot } from '../entity/chatbot.entity';
 import type { AgentRuntimeUsed } from '../enum/chatbot.enum';
 
@@ -71,8 +66,8 @@ export interface ChatTurn {
 }
 
 /**
- * Why a v2 run failed, as a short stable key: what the degraded alert is throttled on and a shadow
- * row records. Codes and statuses only, never a message that could echo the request.
+ * Why a v2 run failed, as a short stable key: what the degraded alert is throttled on. Codes and
+ * statuses only, never a message that could echo the request.
  */
 export type AgentFailureReason =
   | 'malformed'
@@ -92,15 +87,6 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
       fallbackReason: AgentFailureReason;
     }
 );
-
-/**
- * What a shadow bot hands its channel: the `/agent/run` request to send AFTER the reply has gone
- * out, and v1's side of the comparison. Never set for Preview.
- */
-export interface ShadowRunRequest {
-  request: AgentRunRequest;
-  v1: AgentShadowSide;
-}
 
 /**
  * What to reply and how it was decided. The channel sends it, records it, files `unanswered` and
@@ -135,6 +121,4 @@ export interface ChatbotDecision {
    * the reply and, for a fallback, raises the throttled "agent runtime degraded" alert.
    */
   agent?: AgentRunRef;
-  /** Set for a shadow bot's answered message: the comparison run the channel starts after sending. */
-  shadow?: ShadowRunRequest;
 }

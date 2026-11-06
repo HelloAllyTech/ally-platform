@@ -9,10 +9,7 @@ import {
 import { DEFAULT_WHATSAPP_SETTINGS } from '../../../whatsapp/type/whatsapp-settings.type';
 import type { WhatsAppBotSettings } from '../../../whatsapp/type/whatsapp-settings.type';
 import { Chatbot } from '../../entity/chatbot.entity';
-import {
-  ChatbotKnowledgeSource,
-  ChatbotRuntime,
-} from '../../enum/chatbot.enum';
+import { ChatbotKnowledgeSource } from '../../enum/chatbot.enum';
 import { ChatbotReplyService } from '../../service/chatbot-reply.service';
 import { withFirstMessageParts } from '../first-reply';
 import {
@@ -109,8 +106,6 @@ const bot = (over: Partial<Chatbot> = {}): Chatbot =>
     name: 'Ally FAQ',
     persona: { displayName: 'Ally Helper' },
     model: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-    runtime: ChatbotRuntime.V2,
-    features: { agent: true },
     ...over,
   });
 
@@ -142,7 +137,7 @@ const SMALLTALK = {
 } satisfies AgentRunResponse;
 
 /**
- * A bot in Agent mode (Agents v2, `features.agent`): which keyword replies give way to the agent,
+ * A bot in Agent mode (Agents v2, every bot while the platform switch is on): which keyword replies give way to the agent,
  * what it sends ally-ai, and how its small talk is recorded.
  */
 describe('ChatbotEngineService in Agent mode', () => {
@@ -273,29 +268,13 @@ describe('ChatbotEngineService in Agent mode', () => {
       }
       expect(aiService.runAgent).not.toHaveBeenCalled();
     });
-
-    it.each([
-      ['a bot saved on v1', { runtime: ChatbotRuntime.V1 }],
-      ['a bot saved on shadow', { runtime: ChatbotRuntime.SHADOW }],
-      ['a bot saved with Agent mode off', { features: { agent: false } }],
-      ['a bot saved with no features', { features: {} }],
-    ])(
-      'lets the agent answer greetings for %s: every bot is in Agent mode',
-      async (_label, botOver) => {
-        const decision = await engine.respond(
-          turn({ chatbot: bot(botOver), text: 'hello' }),
-        );
-        expect(decision.templateId).toBeUndefined();
-        expect(aiService.runAgent).toHaveBeenCalledTimes(1);
-      },
-    );
   });
 
   describe('the request', () => {
-    it('sends features, the document titles and the decline wording', async () => {
+    it('sends the document titles and the decline wording, and no features', async () => {
       await engine.respond(turn({ text: 'who are you?' }));
       const body = aiService.runAgent.mock.calls[0][0];
-      expect(body.features).toEqual({ agent: true });
+      expect(body).not.toHaveProperty('features');
       expect(body.knowledge_topics).toEqual([
         'Ally FAQ – About Ally',
         'Ally FAQ – Privacy and Data',
@@ -352,19 +331,6 @@ describe('ChatbotEngineService in Agent mode', () => {
       expect(sent).toHaveLength(10);
       expect(sent[0].content).toBe('message 4');
       expect(sent[9].content).toBe('message 13');
-    });
-
-    it('sends Agent mode on for a bot saved with it off', async () => {
-      await engine.respond(
-        turn({
-          chatbot: bot({ features: { agent: false, other: true } }),
-          text: 'who are you?',
-        }),
-      );
-      const body = aiService.runAgent.mock.calls[0][0];
-      expect(body.features).toEqual({ agent: true, other: true });
-      expect(body.knowledge_topics).toBeDefined();
-      expect(body.prompts).toHaveProperty('ally_ai_agent_system');
     });
   });
 

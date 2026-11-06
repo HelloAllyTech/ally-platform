@@ -125,7 +125,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 - **Ratings:** value med · effort M · risk low · **should**
 
 **11. `answer_mode == "documents_and_general"` is written six times**
-- **Where:** `nodes/gate.py:23`, `nodes/write.py:27`, `nodes/agent_check.py:55`, `tools/search_knowledge.py:59`, `prompt.py:52`, `knowledge_agent/agent.py:765`.
+- **Where:** `nodes/gate.py:23`, `nodes/write.py:27`, `nodes/agent_check.py:55`, `tools/search_knowledge.py:59`, `prompt.py:52`, `knowledge_agent/agent.py:765`. <!-- docs-path-lint: ignore -->
 - **Proposed change:** one `is_general(answer_mode)` helper next to the `Literal` in `schemas/knowledge_agent.py`.
 - **Ratings:** value low · effort S · risk low · **should**
 
@@ -449,7 +449,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 | 62 | 10 Ops | `nodes/agent.py:37-53`, `llm/dispatch.py:408` | The budget is only checked between steps, and the OpenAI client defaults to a 600 s timeout with 2 retries. So a run can outlive ally-be's 25 s, still spending tokens and writing checkpoints. Wrap `ainvoke` in `asyncio.timeout` and map it to 504. ⚠ approval (new status code); fits chunk 3b. | med / S / med |
 | 63 | 4 LangGraph | `config.py` `MAX_TOOL_CALLS le=8` | Cap 8 plus one rewrite gives about 21 supersteps, against the default `recursion_limit` of 25. Set `recursion_limit` from the cap, or add a comment. | low / S / none |
 | 64 | 5 Check, fragile beyond Ally (report only; chunk 4 makes the org name explicit) | `check.py` | <ul><li>`organisation_of` (`:245-273`) assumes titles shaped "Name – Topic" and masks the bot name with a substring.</li><li>`_CRISIS` hard-codes Tele-MANAS (`:144`).</li><li>`_NOT_A_CRISIS_SERVICE`, `_NO_INFORMATION`, `_SOURCE_PHRASE` and `_BOTH_GENDERS` cover English and Hinglish only.</li><li>The bare-domain `_URL` regex (`:57-61`) only knows six TLDs.</li><li>`_PHONE` (`:65`) treats years and amounts ("2024", "1500") as contact numbers.</li><li>`:439` vs `:465`: the small-talk relabel tests raw citations, but grounding tests resolved ones.</li></ul> | — |
-| 65 | 2 Naming | `check.py`, `nodes/check.py`, `nodes/agent_check.py`, `conversation.py` | The module names are confusing (`check.py` holds the reply rules; `conversation.py` holds only `agent_step`). Consider `reply_rules.py` / `agent_call.py`. | low / S / none |
+| 65 | 2 Naming | `check.py`, `nodes/check.py`, `nodes/agent_check.py`, `conversation.py` | The module names are confusing (`check.py` holds the reply rules; `conversation.py` holds only `agent_step`). Consider `reply_rules.py` / `agent_call.py`. | low / S / none | <!-- docs-path-lint: ignore -->
 | 66 | 2 Readability | `schemas/agent_runtime.py:37` `runtime_version`, endpoint `:79` `bot["channel"]`, `tools/base.py:63` `Tool.risk` | Contract fields nothing reads yet. Keep them, since the shape is frozen, and add "unused until chunk N" comments. | low / S / none |
 | 67 | 1 Structure | `nodes/tools.py:72` | Trace step built by hand. Add a `trace_step()` helper in `trace.py`. | low / S / low |
 | 68 | 3 Types | `agent_runtime/`, `schemas/agent_runtime.py` | Uses `Optional`/`Dict`, which matches the repo (91 files vs 12) but not the 3.12 rubric. Modernise only these packages, mechanically, if wanted. | low / S / none |

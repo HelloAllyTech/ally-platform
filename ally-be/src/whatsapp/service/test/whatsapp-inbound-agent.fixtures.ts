@@ -26,23 +26,18 @@ import {
   ChatbotAccessMode,
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
-  ChatbotRuntime,
   ChatbotStatus,
 } from 'src/chatbot/enum/chatbot.enum';
 import { AgentRuntimeAlertThrottle } from 'src/chatbot/service/agent-runtime-alert-throttle.service';
 import { ChatbotAudienceService } from 'src/chatbot/service/chatbot-audience.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
-import { ChatbotShadowService } from 'src/chatbot/service/chatbot-shadow.service';
 import { ConnectorService } from 'src/chatbot/service/connector.service';
-import {
-  AGENT_FALLBACK_EVENT,
-  AGENT_SHADOW_RUN_EVENT,
-} from 'src/chatbot/type/agent-runtime.event';
+import { AGENT_FALLBACK_EVENT } from 'src/chatbot/type/agent-runtime.event';
 
 /**
  * The WhatsApp inbound path with the Agents v2 runtime, wired as the app wires it: the real engine,
- * runner, event emitter, alert throttle and shadow service, with repositories, the provider and
+ * runner, event emitter and alert throttle, with repositories, the provider and
  * ally-ai mocked. Shared by the inbound Agents v2 specs.
  */
 
@@ -64,11 +59,8 @@ export const ANSWER = {
   prompt_version: 'v1',
 };
 
-/** The platform bot on the given engine. */
-export const agentBot = (
-  runtime: ChatbotRuntime,
-  features: Record<string, boolean> = {},
-): Chatbot =>
+/** The platform bot. */
+export const agentBot = (): Chatbot =>
   ({
     id: 'bot-1',
     name: 'Ally FAQ',
@@ -79,8 +71,6 @@ export const agentBot = (
     persona: {},
     model: null,
     settings: {},
-    runtime,
-    features,
   }) as Chatbot;
 
 /** One inbound WhatsApp text from the same sender. */
@@ -91,9 +81,6 @@ export const inboundText = (text: string) => ({
   isUnsupportedMedia: false,
   timestamp: new Date(),
 });
-
-/** Lets the shadow listener's background run (and its insert) finish. */
-export const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 export interface InboundAiService {
   answerKnowledgeQuestion: jest.Mock;
@@ -110,9 +97,6 @@ export interface InboundHarness {
   /** Every message row saved, inbound and outbound. */
   savedMessages: Record<string, unknown>[];
   messageUpdates: jest.Mock;
-  shadowRows: Record<string, unknown>[];
-  shadowInsert: jest.Mock;
-  shadow: ChatbotShadowService;
 }
 
 /**
@@ -135,7 +119,6 @@ export async function buildInboundHarness({
   documents?: Record<string, unknown>;
 }): Promise<InboundHarness> {
   const savedMessages: Record<string, unknown>[] = [];
-  const shadowRows: Record<string, unknown>[] = [];
   const provider = {
     sendText: jest.fn().mockResolvedValue({ providerMessageId: 'wamid.out' }),
     showTypingIndicator: jest.fn().mockResolvedValue(undefined),
@@ -191,19 +174,6 @@ export async function buildInboundHarness({
     create: (row: Record<string, unknown>) => row,
     save: async (row: Record<string, unknown>) => ({ ...row, id: 'conv-1' }),
     update: jest.fn().mockResolvedValue(undefined),
-  };
-  const shadowInsert = jest.fn(async () => ({ raw: [] }));
-  const shadowRepository = {
-    createQueryBuilder: () => ({
-      insert: () => ({
-        into: () => ({
-          values: (row: Record<string, unknown>) => {
-            shadowRows.push(row);
-            return { orIgnore: () => ({ execute: shadowInsert }) };
-          },
-        }),
-      }),
-    }),
   };
 
   const emitter = new EventEmitter2();
@@ -304,15 +274,9 @@ export async function buildInboundHarness({
     ],
   }).compile();
 
-  // The listeners, as @OnEvent registers them in the app.
+  // The listener, as @OnEvent registers it in the app.
   const throttle = new AgentRuntimeAlertThrottle(emitter);
   emitter.on(AGENT_FALLBACK_EVENT, (event) => throttle.onFallback(event));
-  const shadow = new ChatbotShadowService(
-    shadowRepository as never,
-    aiService as never,
-    { agentShadow: { maxInFlight: 5 } } as never,
-  );
-  emitter.on(AGENT_SHADOW_RUN_EVENT, (event) => shadow.start(event));
 
   return {
     service: module.get(WhatsAppInboundService),
@@ -321,8 +285,5 @@ export async function buildInboundHarness({
     aiService,
     savedMessages,
     messageUpdates,
-    shadowRows,
-    shadowInsert,
-    shadow,
   };
 }

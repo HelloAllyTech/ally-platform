@@ -176,7 +176,7 @@ export interface KnowledgeAnswerRequest {
  */
 export interface AgentRunRequest extends KnowledgeAnswerRequest {
   /**
-   * The checkpointer's thread id: the conversation, or a `preview-…` / `shadow-…` thread.
+   * The checkpointer's thread id: the conversation, or a `preview-…` thread.
    * 1–200 characters.
    */
   conversation_id: string;
@@ -185,10 +185,6 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   /** At most 200 characters. */
   chatbot_id?: string;
   runtime_version: 'v2';
-  /** False on shadow runs, whose message v1 has already reported to the retrieval log. */
-  log_retrieval?: boolean;
-  /** The bot's feature flags. `agent: true` runs the conversational agent. */
-  features?: Record<string, boolean>;
   /**
    * Agent mode: titles of the bot's documents, so it can say what it covers. At most 50; ally-ai
    * cuts each title to 200 characters.
@@ -227,7 +223,7 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
   runtime: 'v2';
   trace: AgentTraceStep[];
   /**
-   * Conversational agent only (absent when `features.agent` is off). A `smalltalk` / `about_bot`
+   * Set by the conversational agent. A `smalltalk` / `about_bot`
    * reply arrives as intent `answer` with no citations, so this is what tells it apart from a
    * grounded answer.
    */

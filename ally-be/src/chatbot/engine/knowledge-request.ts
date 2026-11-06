@@ -23,7 +23,7 @@ export const MAX_DECLINE_TEXT_CHARS = 500;
 
 /**
  * The ONE place the knowledge request is built. v1 sends it to `/knowledge-agent/answer` as is;
- * v2 and shadow send it to `/agent/run` with the run's identity added (`buildAgentRunRequest`). A
+ * v2 sends it to `/agent/run` with the run's identity added (`buildAgentRunRequest`). A
  * field added here reaches both engines, so they cannot drift apart.
  */
 export function buildKnowledgeRequest(
@@ -52,8 +52,8 @@ export function buildKnowledgeRequest(
 }
 
 /**
- * The v1 body plus the four fields that identify the run, and what only v2 reads: the bot's
- * feature flags and, for the conversational agent, its topics and decline wording.
+ * The v1 body plus the four fields that identify the run, and what only v2 reads: the
+ * conversational agent's topics and decline wording.
  */
 export function buildAgentRunRequest(
   request: KnowledgeAnswerRequest,
@@ -61,8 +61,6 @@ export function buildAgentRunRequest(
     conversationId: string;
     runId: string;
     chatbotId: string;
-    logRetrieval?: boolean;
-    features?: Record<string, boolean>;
     knowledgeTopics?: string[];
     declineText?: string;
   },
@@ -73,8 +71,6 @@ export function buildAgentRunRequest(
     run_id: run.runId,
     chatbot_id: run.chatbotId,
     runtime_version: 'v2',
-    ...(run.logRetrieval === false ? { log_retrieval: false } : {}),
-    ...(run.features ? { features: run.features } : {}),
     ...(run.knowledgeTopics ? { knowledge_topics: run.knowledgeTopics } : {}),
     ...(run.declineText
       ? { decline_text: run.declineText.slice(0, MAX_DECLINE_TEXT_CHARS) }

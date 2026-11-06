@@ -116,7 +116,7 @@ All three apps are on the same branch. In review order (see section 7 for the co
 
 | App | File | What it is |
 |---|---|---|
-| ally-ai | `app/schemas/agent_runtime.py`, `app/api/v1/endpoints/agent_runtime.py`, `app/core/knowledge_agent/agent.py`, `nodes/finalize.py`, `nodes/select.py` | The `log_retrieval: bool = True` flag on `/agent/run`, passed through `bot["log_retrieval"]`. When it's false, `decline`/`select` skip `_report_retrieval`. `/knowledge-agent/answer` is unchanged. |
+| ally-ai | `app/schemas/agent_runtime.py`, `app/api/v1/endpoints/agent_runtime.py`, `app/core/knowledge_agent/agent.py`, `nodes/finalize.py`, `nodes/select.py` | The `log_retrieval: bool = True` flag on `/agent/run`, passed through `bot["log_retrieval"]`. When it's false, `decline`/`select` skip `_report_retrieval`. `/knowledge-agent/answer` is unchanged. | <!-- docs-path-lint: ignore -->
 | ally-be | `src/database/migrations/1980960000000-AddChatbotAgentRuntime.ts` | Adds `chatbots.runtime` (CHECK v1/shadow/v2, default v1) and `features` jsonb, `wa_messages.agent_run_id`/`agent_runtime`, and the `agent_shadow_runs` table. |
 | ally-be | `src/chatbot/engine/knowledge-request.ts` | **The shared builder.** `buildKnowledgeRequest` (today's body, moved here) and `buildAgentRunRequest` (that body plus the 4 run fields, and `log_retrieval:false` for shadow). |
 | ally-be | `src/chatbot/engine/agent-runtime.ts` | Several small helpers:<br>• `effectiveRuntime`<br>• `agentRunIdFor` (uuid v5)<br>• `agentFailureReason`<br>• `shadowSide`<br>• the two event names and payloads |

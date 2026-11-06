@@ -10,8 +10,8 @@ jest.mock('src/common/execution/execution-manager', () => ({
 }));
 
 /**
- * Agent mode on the chatbot API (Agents v2 chunk 3a): only a platform admin switches it, it is
- * merged into the saved flags, and Preview reports what the agent understood the message to be.
+ * Agent mode on the chatbot API (Agents v2): Preview reports what the agent understood the message
+ * to be.
  */
 describe('ChatbotService and Agent mode', () => {
   let platformWide: boolean;
@@ -35,33 +35,6 @@ describe('ChatbotService and Agent mode', () => {
         stored = { ...stored, ...patch } as Chatbot;
       },
     }));
-  });
-
-  describe('PATCH features', () => {
-    it('ignores Agent mode in a PATCH, from anyone: it is always on', async () => {
-      platformWide = true;
-      stored = { ...stored, features: { agent: true, other: true } } as Chatbot;
-      await service.update('bot-1', { features: { agent: false } });
-      expect(updates[0]).not.toHaveProperty('features');
-      expect(stored.features).toEqual({ agent: true, other: true });
-
-      platformWide = false;
-      await expect(
-        service.update('bot-1', { features: { agent: false } }),
-      ).resolves.toBeDefined();
-    });
-
-    it('leaves the flags alone when the PATCH has none', async () => {
-      await service.update('bot-1', { name: 'Renamed' });
-      expect(updates[0]).not.toHaveProperty('features');
-    });
-
-    it('returns the flags on GET', async () => {
-      stored = { ...stored, features: { agent: true } } as Chatbot;
-      await expect(service.get('bot-1')).resolves.toMatchObject({
-        features: { agent: true },
-      });
-    });
   });
 
   describe('Preview', () => {
