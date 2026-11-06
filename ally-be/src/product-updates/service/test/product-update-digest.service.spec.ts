@@ -49,7 +49,11 @@ describe('ProductUpdateDigestService', () => {
     set: jest.Mock;
   };
   let config: {
-    productUpdates: { digestTo: string[]; digestHour: number };
+    productUpdates: {
+      digestTo: string[];
+      digestHour: number;
+      digestAllowed: boolean;
+    };
     email: { sourceEmail: string };
     adminBaseUrl: string;
   };
@@ -70,7 +74,11 @@ describe('ProductUpdateDigestService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     };
     config = {
-      productUpdates: { digestTo: ['team@example.com'], digestHour: 18 },
+      productUpdates: {
+        digestTo: ['team@example.com'],
+        digestHour: 18,
+        digestAllowed: true,
+      },
       email: { sourceEmail: 'no-reply@example.com' },
       adminBaseUrl: 'https://admin.example.com/',
     };
@@ -126,6 +134,14 @@ describe('ProductUpdateDigestService', () => {
       redis as unknown as RedisService,
       roadmapVoting as unknown as RoadmapVotingAnalyticsService,
     );
+  });
+
+  it('never sends from a database that is not production, and never takes the lock', async () => {
+    config.productUpdates.digestAllowed = false;
+
+    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('not-production');
+    expect(redis.acquireLock).not.toHaveBeenCalled();
+    expect(sesService.sendEmail).not.toHaveBeenCalled();
   });
 
   it('does nothing without recipients, or outside its business hour', async () => {

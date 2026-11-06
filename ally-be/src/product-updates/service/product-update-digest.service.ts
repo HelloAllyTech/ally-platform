@@ -51,6 +51,7 @@ export type DigestOutcome =
   | 'disabled'
   | 'not-due'
   | 'already-sent'
+  | 'not-production'
   | 'nothing-to-report'
   | 'sent'
   | 'failed';
@@ -89,10 +90,18 @@ export class ProductUpdateDigestService {
 
   /** The hourly tick: sends once, in the configured business hour, if there is anything to report. */
   async sendIfDue(now: Date = new Date()): Promise<DigestOutcome> {
-    const { digestTo, digestHour } = this.configService.productUpdates;
+    const { digestTo, digestHour, digestAllowed } =
+      this.configService.productUpdates;
     if (digestTo.length === 0) return 'disabled';
     if (dayjs(now).tz(BUSINESS_TIMEZONE).hour() !== digestHour)
       return 'not-due';
+    if (!digestAllowed) {
+      // After the hour check, so this is one line a day, not one an hour.
+      this.logger.warn(
+        '[PRODUCT-UPDATES] Digest skipped: PRODUCT_UPDATES_DIGEST_TO is set but this is not the production database (*_prd).',
+      );
+      return 'not-production';
+    }
 
     const lockKey = `product-updates:digest:${toBusinessDateString(now)}`;
     if (!(await this.redisService.acquireLock(lockKey, 20 * 60 * 60))) {
