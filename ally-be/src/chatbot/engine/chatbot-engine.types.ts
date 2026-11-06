@@ -99,13 +99,13 @@ export interface ChatbotDecision {
   templateId?: string;
   /**
    * The body greets the person rather than answering a question: the bot's welcome message (it
-   * answered a hello), or, for an agent bot, its own reply to small talk or "who are you?". On a
+   * answered a hello), or the agent's own reply to small talk or "who are you?". On a
    * first message the first-message notice follows it (`withFirstMessageParts`).
    */
   isWelcome?: boolean;
   citations?: Record<string, any>[];
   retrievalMeta?: Record<string, any>;
-  /** Agent mode: what the agent understood the message to be (also stored in `retrievalMeta`). */
+  /** What the agent understood the message to be (also stored in `retrievalMeta`). */
   turnType?: AgentTurnType;
   language?: string | null;
   /** Set when the knowledge did not cover the question (or answering failed). */

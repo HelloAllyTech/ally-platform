@@ -186,12 +186,12 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   chatbot_id?: string;
   runtime_version: 'v2';
   /**
-   * Agent mode: titles of the bot's documents, so it can say what it covers. At most 50; ally-ai
+   * Titles of the bot's documents, so the agent can say what it covers. At most 50; ally-ai
    * cuts each title to 200 characters.
    */
   knowledge_topics?: string[];
   /**
-   * Agent mode: the bot's decline wording, whose tone (not words) the agent follows. At most 500
+   * The bot's decline wording, whose tone (not words) the agent follows. At most 500
    * characters (`MAX_DECLINE_TEXT_CHARS`).
    */
   decline_text?: string;

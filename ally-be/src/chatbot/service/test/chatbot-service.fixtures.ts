@@ -45,21 +45,18 @@ const countRepository = () => ({
 });
 
 /**
- * Build the service. Each option is read when it's needed, so a test can change the caller's
- * reach, the kill switch or the saved bot after building it.
+ * Build the service. Each option is read when it's needed, so a test can change the emergency
+ * switch or the saved bot after building it. The caller is not a platform admin.
  */
 export function buildChatbotService({
-  platformWide,
-  agentRuntimeAllowed,
-  stored,
-  onUpdate,
+  agentRuntimeAllowed = () => true,
+  stored = storedBot,
+  onUpdate = () => undefined,
 }: {
-  /** The caller is a platform admin. */
-  platformWide: () => boolean;
-  agentRuntimeAllowed: () => boolean;
-  stored: () => Chatbot;
-  onUpdate: (patch: Partial<Chatbot>) => void;
-}): { service: ChatbotService; respond: jest.Mock } {
+  agentRuntimeAllowed?: () => boolean;
+  stored?: () => Chatbot;
+  onUpdate?: (patch: Partial<Chatbot>) => void;
+} = {}): { service: ChatbotService; respond: jest.Mock } {
   const chatbotRepository = {
     findOne: jest.fn(async () => stored()),
     find: jest.fn(async () => [stored()]),
@@ -75,9 +72,7 @@ export function buildChatbotService({
       find: jest.fn(async () => [{ chatbotId: 'bot-1', role: 'owner' }]),
     } as never,
     {
-      resolveTenantIds: jest.fn(async () =>
-        platformWide() ? null : ['org-a'],
-      ),
+      resolveTenantIds: jest.fn(async () => ['org-a']),
     } as never,
   );
   const settings = () => ({

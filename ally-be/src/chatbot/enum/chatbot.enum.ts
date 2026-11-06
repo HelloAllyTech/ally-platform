@@ -64,7 +64,7 @@ export enum ChatbotAudienceKind {
 }
 
 /**
- * Which engine answers a bot's questions (Agents v2). A platform kill switch,
+ * Which engine answers (Agents v2): v2 for every bot, unless the platform's emergency switch,
  * `agentRuntimeAllowed` on the shared defaults, turns every bot back to v1 without a deploy.
  */
 export enum ChatbotRuntime {

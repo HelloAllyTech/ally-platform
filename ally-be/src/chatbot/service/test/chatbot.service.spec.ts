@@ -13,7 +13,6 @@ jest.mock('src/common/execution/execution-manager', () => ({
  * Preview reports the run behind a test.
  */
 describe('ChatbotService and the runtime switch', () => {
-  let platformWide: boolean;
   let agentRuntimeAllowed: boolean;
   let stored: Chatbot;
   let updates: Partial<Chatbot>[];
@@ -21,12 +20,10 @@ describe('ChatbotService and the runtime switch', () => {
   let service: ChatbotService;
 
   beforeEach(() => {
-    platformWide = false;
     agentRuntimeAllowed = true;
     updates = [];
     stored = storedBot();
     ({ service, respond } = buildChatbotService({
-      platformWide: () => platformWide,
       agentRuntimeAllowed: () => agentRuntimeAllowed,
       stored: () => stored,
       onUpdate: (patch) => {

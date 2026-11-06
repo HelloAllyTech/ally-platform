@@ -74,7 +74,7 @@ export interface ChatbotSummary {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: Chatbot['persona'];
   model: ChatbotModelChoice | null;
-  /** What actually answers: v1 whenever the platform kill switch is off. */
+  /** What actually answers: v1 whenever the platform's emergency switch is off. */
   effectiveRuntime: ChatbotRuntime;
   myRole: ChatbotMemberRole;
   connectors: ConnectorView[];
@@ -716,14 +716,16 @@ export class ChatbotService {
       currentUserId(),
     ]);
 
+    // An empty Preview chat stands for a new person, so its first reply looks exactly like the
+    // first reply on WhatsApp: a hello gets the welcome message and the first-message notice.
+    const isFirstMessage = !(dto.history ?? []).length;
     const startedAt = Date.now();
     const decision = await this.engine.respond({
       chatbot: bot,
       settings,
       text: dto.message,
       history: dto.history ?? [],
-      // An empty Preview chat stands for a new person (see the first reply below).
-      isFirstMessage: !(dto.history ?? []).length,
+      isFirstMessage,
       sender: {
         externalId: `test:${currentUserId()}`,
         label: 'test console',
@@ -739,10 +741,7 @@ export class ChatbotService {
     // Remembered so the setup checklist can show the bot has been tried; Preview stores nothing else.
     await this.chatbotRepository.update({ id }, { lastTestedAt: new Date() });
 
-    // An empty Preview chat stands for a new person, so its first reply looks exactly like the
-    // first reply on WhatsApp: a hello gets the welcome message and the first-message notice.
-    const isFirst = !(dto.history ?? []).length;
-    const reply = isFirst
+    const reply = isFirstMessage
       ? withFirstMessageParts({
           body: decision.body,
           handledBy: decision.handledBy,
@@ -801,7 +800,7 @@ export class ChatbotService {
       runId: agent?.runId ?? null,
       trace: agent?.runtime === AgentRuntimeUsed.V2 ? agent.trace : null,
       fallbackReason: isFallback(agent) ? agent.fallbackReason : null,
-      // Agent mode: what the agent understood the message to be (smalltalk, about_bot, …).
+      // What the agent understood the message to be (smalltalk, about_bot, …).
       turnType: decision.turnType ?? null,
       runtimeAllowed: settings.agentRuntimeAllowed,
       conversationId,

@@ -32,22 +32,6 @@ export const effectiveRuntime = (
 ): ChatbotRuntime.V1 | ChatbotRuntime.V2 =>
   settings.agentRuntimeAllowed ? ChatbotRuntime.V2 : ChatbotRuntime.V1;
 
-/**
- * Which engine answers one message, decided once: v2 (always with the conversational agent), or
- * v1 while the emergency switch is off.
- */
-export type EngineChoice =
-  | { kind: ChatbotRuntime.V1 }
-  | { kind: ChatbotRuntime.V2 };
-
-export const resolveEngine = (
-  settings: Pick<WhatsAppBotSettings, 'agentRuntimeAllowed'>,
-): EngineChoice => ({ kind: effectiveRuntime(settings) });
-
-/** The engine is v2, which always answers with the conversational agent. */
-export const isAgentEngine = (engine: EngineChoice): boolean =>
-  engine.kind === ChatbotRuntime.V2;
-
 /** `/agent/run` answered 200 with something that is not an answer. */
 export class MalformedAgentResponseError extends Error {
   constructor() {

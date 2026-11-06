@@ -116,9 +116,8 @@ export interface WhatsAppBotSettings {
   platformChatbotId?: string | null;
 
   /**
-   * The platform kill switch for the Agents v2 engine. Off, every bot answers with v1 whatever its
-   * own `runtime` says — rollback is this switch, not a deploy. Platform-wide only: a bot's settings
-   * cannot turn it on.
+   * The platform's emergency switch for the Agents v2 engine. Off, every bot answers with v1 —
+   * rollback is this switch, not a deploy. Platform-wide only: a bot's settings cannot turn it on.
    */
   agentRuntimeAllowed: boolean;
 }

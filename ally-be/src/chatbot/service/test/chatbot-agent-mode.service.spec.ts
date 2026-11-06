@@ -1,40 +1,23 @@
 import { DEFAULT_WHATSAPP_SETTINGS } from 'src/whatsapp/type/whatsapp-settings.type';
 import { WaHandledBy } from 'src/whatsapp/enum/whatsapp.enum';
-import { Chatbot } from '../../entity/chatbot.entity';
 import { AgentRuntimeUsed } from '../../enum/chatbot.enum';
 import { ChatbotService } from '../chatbot.service';
-import { buildChatbotService, storedBot } from './chatbot-service.fixtures';
+import { buildChatbotService } from './chatbot-service.fixtures';
 
 jest.mock('src/common/execution/execution-manager', () => ({
   ExecutionManager: { getUserId: () => 7, getExecutionId: () => undefined },
 }));
 
 /**
- * Agent mode on the chatbot API (Agents v2): Preview reports what the agent understood the message
+ * The agent on the chatbot API (Agents v2): Preview reports what the agent understood the message
  * to be.
  */
 describe('ChatbotService and Agent mode', () => {
-  let platformWide: boolean;
-  let agentRuntimeAllowed: boolean;
-  let stored: Chatbot;
-  let updates: Partial<Chatbot>[];
   let respond: jest.Mock;
   let service: ChatbotService;
 
   beforeEach(() => {
-    platformWide = false;
-    agentRuntimeAllowed = true;
-    updates = [];
-    stored = storedBot();
-    ({ service, respond } = buildChatbotService({
-      platformWide: () => platformWide,
-      agentRuntimeAllowed: () => agentRuntimeAllowed,
-      stored: () => stored,
-      onUpdate: (patch) => {
-        updates.push(patch);
-        stored = { ...stored, ...patch } as Chatbot;
-      },
-    }));
+    ({ service, respond } = buildChatbotService());
   });
 
   describe('Preview', () => {

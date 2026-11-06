@@ -400,7 +400,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 
 **54. The parity and eval scripts duplicate their helpers** (9 Scripts)
 - **Where:** `call()`, `p50()`, `V1_PATH`/`V2_PATH` and the server CLI and client setup (`agent_parity.py:57-68, 107, 218-246`; `agent_conversation_eval.py:142-153, 318, 569-607`).
-- **Proposed change:** a `scripts/agent_runtime_http.py` with `add_server_args` and `make_client`, imported the way `scripts/jev_bakeoff/report.py:29` does it.
+- **Proposed change:** a `scripts/agent_runtime_http.py` with `add_server_args` and `make_client`, imported the way `scripts/jev_bakeoff/report.py:29` does it. <!-- docs-path-lint: ignore -->
 - **Ratings:** value med · effort S · risk low · **should**
 
 **55. The eval imports a private name and copies two check regexes inconsistently**
