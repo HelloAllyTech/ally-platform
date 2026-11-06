@@ -535,4 +535,4 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 | `ally-ai/.../agent_runtime/check.py` | 575 | 697. `check_reply` went from 201 lines to about 30, plus named phases |
 | `ally-ai/.../endpoints/agent_runtime.py` | 124 | 86 |
 | `whatsapp-inbound-agent-runtime.spec.ts` / `-first-message.spec.ts` | 460 / 365 | 224 / 123, plus 304 in the shared fixtures |
-| `ally-ai/scripts/agent_parity.py` / `agent_conversation_eval.py` | 254 / 619 | 234 / 665, plus 50 in the shared `agent_runtime_http.py` |
+| `ally-ai/scripts/agent_parity.py` / `agent_conversation_eval.py` | 254 / 619 | 234 / 665, plus 50 in the shared `agent_runtime_http.py` (the parity script was removed later) | <!-- docs-path-lint: ignore -->
