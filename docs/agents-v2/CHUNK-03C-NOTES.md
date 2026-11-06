@@ -8,9 +8,9 @@ Plan approved 2026-11-06 at `~/.claude/plans/pasted-content-id-053d-we-re-starti
 
 ### LangGraph's custom stream writer (installed langgraph 1.2.20)
 
-- **`get_stream_writer`**: `langgraph/config.py:126` returns the run's writer: `get_config()[CONF][CONFIG_KEY_RUNTIME].stream_writer`.
+- **`get_stream_writer`**: `langgraph/config.py:126` returns the run's writer: `get_config()[CONF][CONFIG_KEY_RUNTIME].stream_writer`. <!-- docs-path-lint: ignore -->
   - Called outside a graph it **raises** `RuntimeError("Called get_config outside of a runnable context")` (`config.py:26-29`). The helper that emits must guard it.
-  - The writer only forwards when `"custom"` is among the requested stream modes. Otherwise it is a no-op (`pregel/main.py:3368-3388`). `/agent/run` therefore pays nothing for emitting.
+  - The writer only forwards when `"custom"` is among the requested stream modes. Otherwise it is a no-op (`pregel/main.py:3368-3388`). `/agent/run` therefore pays nothing for emitting. <!-- docs-path-lint: ignore -->
   - On Python 3.12, contextvars reach async nodes. LangGraph's warning only covers versions before 3.11 (`config.py:132-135`).
 - **`astream`**: `Pregel.astream(input, config, *, stream_mode, durability, …, version="v1")` (`main.py:3156`). Given a list of modes, it yields `(mode, chunk)` tuples.
 - **`ainvoke`** is itself `astream(stream_mode=["updates","values"])`, keeping the last `values` chunk (`main.py:4100-4205`). A runner on `astream(["custom","values"])` that keeps the last `values` behaves the same way.
@@ -121,3 +121,170 @@ Plan approved 2026-11-06 at `~/.claude/plans/pasted-content-id-053d-we-re-starti
   Why: ally-ai always ends first. Its 504 or `error {timeout}` reaches ally-be before ally-be gives up, so the fallback reason is a clean `timeout`, no run is left spending tokens after ally-be has moved on, and v1 keeps about 18 s.
 - **One shared runner per app,** and `final` equals the non-stream response, each enforced by a test.
 - `v2-chunks.md` lists 3d in its progress table.
+
+## 2. The event contract
+
+Server-Sent Events: `event: <name>` and a JSON `data:` line, plus a `: ping` comment line every 10 s.
+
+| Event | Data | When |
+|---|---|---|
+| `run_started` | `{run_id}` | First |
+| `status` | `{code, label, detail?}`. `code` is one of `thinking`, `searching`, `found`, `checking`, `rewriting`, `writing` | As a node starts (agent: `thinking`, or `rewriting` after a refusal; check: `checking`), around every tool (`searching` with the input's `query`, then `found` with "N passages" / "nothing new"), and `writing` before the text |
+| `step` | `{node, summary, ms}`: exactly the trace step | The moment each step is recorded |
+| `token` | `{text}`: about 3 words each, whitespace kept, joining to exactly the answer | Only after the run has ended, so only text the check passed (only the rewrite, when the first draft was sent back). ally-be holds them again until its crisis check clears |
+| `final` | ally-ai: `/agent/run`'s body. ally-be: `/test`'s body | Last |
+| `error` | `{code}`: `timeout`, `upstream` or `internal`. No message text | ally-ai only, instead of `final`. ally-be turns it into a v1 fallback `final`. ally-be sends `error {internal}` only if something fails after the stream began |
+
+Labels are plain English. The dashboard maps `code` (and `detail`) to its own copy in `en.ts`.
+
+## 3. What was built
+
+### ally-ai
+
+| File | What |
+|---|---|
+| `app/core/agent_runtime/runner.py` | **The one run path.** `execute(graph, payload, on_event=None)` runs under `asyncio.timeout(RUN_TIMEOUT_SECONDS)` and builds the response; with `on_event` it also sends `run_started`, then `writing` and the `token`s after the run. `stream()` turns it into SSE: a queue, the 10 s ping, `final` = `response.model_dump(mode="json")`, `error {code}` (the exception type is logged, never its message), and a `finally` that cancels the run and waits for it to stop |
+| `app/core/agent_runtime/trace.py` | `emit()` (a guarded `get_stream_writer`, a no-op outside a streamed run), `status()`, `status_event()`. `trace_step()` now also emits the step, and `traced(name, summary, announce)` emits the node's status as it starts |
+| `app/core/agent_runtime/graph.py` | `run_agent(..., on_event=None)` runs `astream(["values"] (+ "custom"))` and keeps the last `values`, as `ainvoke` did |
+| `nodes/agent.py`, `nodes/agent_check.py`, `nodes/tools.py` | `thinking`/`rewriting`, `checking`, and `searching`/`found` around every tool, generic over the registry. The agent step's model call gets `_time_left()` |
+| `conversation.py`, `app/core/llm/dispatch.py` | `generate_structured(timeout=)`: passed to OpenAI's and Anthropic's `create(timeout=)` and to Gemini's `http_options`; the provider fallback gets what is left (at least 1 s). None (every other caller) sends nothing |
+| `app/api/v1/endpoints/agent_runtime.py` | `/run` = `execute()`, with `TimeoutError` → **504** (outside `knowledge_errors`, which would make it a 500). `/run/stream` = `StreamingResponse(stream())` with `Cache-Control: no-cache` and `X-Accel-Buffering: no`, on the same router, so the same auth, 404 and 503 apply |
+| `app/core/config.py`, `env_sample`, `tests/conftest.py` | `AGENT_RUNTIME__RUN_TIMEOUT_SECONDS` (20), documented and pinned |
+| `scripts/agent_conversation_eval.py` | `--stream`: asks through the stream, runs the same checks on `final`, adds the stream's own checks (`run_started` first, `final` last, no token before the last check step, tokens spell the answer), and reports p50 time to the first event |
+
+### ally-be
+
+| File | What |
+|---|---|
+| `ai/service/ai.service.ts` | `runAgentStreaming(request, onEvent, signal)`: axios `responseType: 'stream'`, a 22 s deadline (`KNOWLEDGE_ANSWER_LIMITS.streamMs`) combined with the client's signal. Returns `final` as the same `AgentRunResponse` `runAgent` returns. Failures are `AiUpstreamError`s: `error {timeout}` or the deadline → `AI_SERVICE_TIMEOUT`; another error, or no `final` → 502; an error status is classified as `runAgent`'s is (404 while off) |
+| `ai/util/sse-parser.ts` | `SseParser`: messages split anywhere across chunks; comments skipped |
+| `chatbot/engine/chatbot-engine.types.ts` | `ChannelCapabilities.streaming`, `PREVIEW_CHANNEL` (`{type:'test', capabilities:{streaming:true}}`), `LiveReply {onEvent, signal}` |
+| `chatbot/engine/live-reply.ts` | `holdTextUntilCleared(live, crisisCheck)`: status and steps pass at once; tokens are held until the crisis check clears (a failed or disabled classifier clears, as it does for the reply), then flushed in order; dropped on a crisis verdict |
+| `chatbot/engine/agent-runtime-runner.service.ts` | `answer(..., live?)`: the stream only when `live` and `channel.capabilities.streaming`; otherwise `runAgent` exactly as before. The existing catch is the fallback for both; no fallback once the client has gone |
+| `chatbot/engine/chatbot-engine.service.ts` | `respond(turn, live?)`. The crisis promise is created first and gates the live reply |
+| `chatbot/service/chatbot.service.ts`, `chatbot/controller/chatbot.controller.ts` | `test(id, dto, live?)` with `PREVIEW_CHANNEL`. `POST /v1/chatbots/:id/test/stream`: the same decorators as `/test`; headers go out with the first event (so a refusal before the run stays a plain HTTP error); `final` = `test()`'s result; a 10 s ping; `res.on('close')` aborts the run |
+| WhatsApp | `streaming: false` on the connector registration and the inbound channel. "Show typing": `showTyping?: boolean` on the settings type and the per-bot override (**not** in `DEFAULT_WHATSAPP_SETTINGS`, so every settings snapshot is unchanged; on unless `false`). `WhatsAppInboundService.showTyping()` runs fire-and-forget at the same point as before: skipped when off, or when `ChatbotReplyService.isCrisisKeyword()` says the message is a crisis keyword; a failed lookup shows the dots, as before. `changesAdminOnlySetting()` + `assertPlatformAdmin()` on `PUT :id/settings` when `showTyping` changes. `DATA_SCHEMA.md` documents the key |
+
+### ally-web (`apps/ally-admin-dashboard/src`)
+
+| File | What |
+|---|---|
+| `hooks/useChatbotTestStream.ts` | `run(request, {onStatus, onStep, onToken})` → `/test`'s result from `final`; `ChatbotTestStreamUnavailable` when the stream never started (network error, error status, closed before an event); `cancel()`. Same bearer and 401 refresh as the other SSE hooks; reuses the tested `parseCopilotSse` |
+| `pages/WhatsAppBot/ChatbotTestTab.tsx` | The pending reply: typing dots, then the revealed text with a caret; a live status line (`role="status"`); live steps for platform admins (as `RunDetails` is admin-only). Tokens arrive in one burst after the check, so they are revealed at 25 ms a piece, and `final` waits for the reveal (at most 3 s). `final` then replaces the bubble with the normal one, with "Updated with the final reply" when the final text doesn't start with what was shown. Falls back to `/test` only before the first event. New thread cancels the run |
+| `pages/WhatsAppBot/ChatbotSettingsTab.tsx`, `ChatbotPage.tsx` | "Show typing on WhatsApp" in General → Basics, shown only to platform admins (`isPlatformAdmin`, passed from the page), with help text naming the read receipts |
+| `constants/en.ts`, `constants/common.ts`, `types/*` | Copy (`bots.test.status.*`, `replaced`, `orgSettings.showTyping*`), `TEST_STREAM`, `ChatbotTestStatus`, `WaOrgSettings.showTyping` |
+
+## 4. Decisions
+
+- **Shehbaz, at plan time:** "Show typing" defaults on; the timeouts are 20 s (ally-ai), 22 s (ally-be's stream) and 25 s (`/agent/run`); one shared runner per app, with `final` equal to the plain response.
+- **Tokens are cut after the run, not as nodes finish.** That is the simplest way to guarantee no unchecked text, and it needs no node of its own (there is no `finalize` node since #223). The cost is that text appears only at the end of the run; the status line and steps carry the live feel, and the dashboard paces the reveal.
+- **The same runner for both endpoints**, so `final` is `/agent/run`'s body by construction; a test checks the JSON is equal with the clock frozen. In ally-be, `final` is the very object `test()` returns.
+- **The crisis gate lives in the engine,** where the crisis check runs (difference 4).
+- **`showTyping` is not in the defaults object,** so `effective` and every existing settings fixture are unchanged; "on" is "not false".
+- **The admin-only rule lives on the route,** as a pure helper (`changesAdminOnlySetting`), since `ChatbotSettingsService` has no access service and adding one would change every spec that builds it. A bot editor's save round-trips the stored value, so it isn't a change.
+- **Live steps are for platform admins only,** matching the finished reply's Steps list.
+
+## 5. Existing tests touched (assertions unchanged)
+
+- `ally-ai/tests/core/agent_runtime/test_endpoint.py::test_a_bad_final_state_is_a_mapped_500` patches `run_agent` where the runner now calls it (`app.core.agent_runtime.runner.run_agent`), not on the endpoint module. Same assertion.
+- `ally-be/src/whatsapp/service/test/whatsapp-inbound-agent.fixtures.ts` gained an optional `replies` override for the reply-service mock; its default is unchanged.
+- No other existing test changed. `whatsapp-inbound-chatbot.spec.ts:457` (typing on a v1 bot) still passes: the default is on.
+
+## 6. Tests added
+
+| App | Spec | Count | Covers |
+|---|---|---|---|
+| ally-ai | `tests/core/agent_runtime/test_stream.py` | 17 | event order and headers; tokens spell the answer; **`final` equals `/agent/run`**; a refused draft streams only the rewrite, and no token before the last check; a textless decline streams none; a model failure is `error {upstream}` with no text; 404 when off; 504 and `error {timeout}` past the cap, with the model call cancelled; the agent step's timeout within the cap; closing the stream cancels the run; a new tool streams `searching`/step/`found` with no code of its own; `emit` outside a run; `chunk_reply` |
+| ally-ai | `tests/core/llm/test_dispatch_timeout.py` | 4 | OpenAI and Anthropic get the timeout; none by default; the provider fallback gets what is left |
+| ally-be | `chatbot/engine/test/chatbot-engine-streaming.spec.ts` | 9 | relay order; **decides exactly as without streaming**; text held until the crisis check clears; dropped on a crisis verdict; sent when the classifier fails; stream failure → v1 `v2_fallback`; no fallback once the client left; no events for v1; never streams to a channel that can't |
+| ally-be | `chatbot/controller/test/chatbot-test-stream.controller.spec.ts` | 5 | events then **`final` = `/test`'s result**; `final` alone when nothing streams; a refusal before the run is a plain HTTP error; closing stops the run |
+| ally-be | `ai/service/test/ai-agent-stream.spec.ts`, `ai/util/test/sse-parser.spec.ts` | 4 + 2 | relays and returns `final`; timeout → `AI_SERVICE_TIMEOUT`; other error or no `final` → 502; 404 classified; the parser across chunk boundaries |
+| ally-be | `whatsapp/service/test/whatsapp-inbound-typing.spec.ts`, `chatbot/service/test/chatbot-settings-admin-only.spec.ts` | 6 + 6 | typing once, before the reply; off when `showTyping:false`; none for a crisis keyword; shown when the lookup fails; never holds up or fails the reply; none on STOP; what counts as changing the admin-only key |
+| ally-web | `__tests__/ChatbotTestTabStreaming.test.tsx` | 6 | status line updates; steps live (admins only); text revealed; `final` replaces it, with the note when it differs; fallback to `/test` on an error status and on a network failure; never re-sent after the stream started |
+| ally-web | `__tests__/ChatbotSettingsShowTyping.test.tsx` | 2 | hidden from non-admins; on by default; switching off saves `showTyping: false` |
+
+## 7. Results
+
+| Check | Result |
+|---|---|
+| ally-ai `pytest tests/` and `flake8` | **1,922 passed**, 32 skipped; flake8 clean |
+| ally-be: chatbot, whatsapp, ai and llm specs; typecheck; lint on the touched folders | **874 tests** in the touched domains pass; typecheck and lint clean. The pre-commit hook ran the full suite on the ally-be commit, and it passed |
+| ally-web: whole admin project (Node 22); CI typecheck; lint | **547 files, 8,399 tests pass**; typecheck clean; lint 0 errors (3 warnings in untouched files) |
+| Conversation eval ([CHUNK-03C-EVAL.md](./CHUNK-03C-EVAL.md)) | 42 turns: **0 hard fails**, 0 check fails, judge mean **4.50** (3r: 4.50), agent p50 **7,221 ms** against v1's 9,335 ms (−23%; 3r: 6,878 ms) |
+| Eval `--stream` ([CHUNK-03C-EVAL-STREAM.md](./CHUNK-03C-EVAL-STREAM.md)) | 42 turns: **0 hard fails**, no stream problems (order, text before the check, tokens against `final`); 3 check fails of known kinds (`out-mausam` a polite weather decline labelled small talk; a topic list in later small talk; `gen-what-is-cbt` declined); judge mean 4.50; p50 7,470 ms; **p50 time to the first event: 8 ms** |
+| Parity | **Not run:** #223 removed the parity path and `scripts/agent_parity.py` with it, so there's nothing left to compare | <!-- docs-path-lint: ignore -->
+
+**The first plain eval run had 2 hard fails, both 504s from the new 20 s cap** (`ab-how-works`, `ab-hinglish`). Those cases normally take 7–9 s: 7.4 s and 7.1 s in 3r, 12.8 s and 13.8 s in the streamed run, and 8.2 s and 8.9 s when re-run alone. The run overlapped with the local ally-be container compiling at about 490% CPU on the same machine. The full re-run above is clean. On a real message, a 504 there means ally-be answers with v1, which is what the cap is for.
+
+**Live checks in the dashboard (local stack, Ally FAQ, which locally has one document attached):**
+- "how do I get access?":
+  - typing dots at 1 s;
+  - the agent's and the tool's steps filling in by 4 s;
+  - "Writing the reply…" and the text revealing by 10 s;
+  - then the finished reply, with Steps (4), "Answered by the agent" and Question.
+- "I want to kill myself" (a crisis keyword): the fixed crisis reply alone, in 4 ms; nothing streamed.
+- "honestly I can't go on anymore, there is no point to anything" (no keyword; the classifier catches it): only the crisis reply, with "Would alert: Chatbot Crisis Classifier". No agent text was shown, and there was no "Updated" note, so none had been revealed.
+- `AGENT_RUNTIME__ENABLED=false`:
+  - The stream returns 404, recorded as `upstream_404`, and ally-be answers with v1, marked "Answered in safe mode (the agent failed: upstream_404)", with the degraded alert.
+  - The first try after recreating ally-ai timed out in v1 itself: an 18 s OpenAI embeddings call on a cold container. It showed the error reply with the same fallback badge, which is chunk 2's rule.
+  - The second try returned v1's cited answer in 10.6 s.
+- Settings → General → Basics: "Show typing on WhatsApp", on, with its help text, for a platform admin.
+- ally-ai alone (`curl -N` on `/api/v1/agent/run/stream`): `run_started`, `thinking`, the `agent` step, `checking`, the `check` step, `writing`, 11 `token`s, then `final`, in 6.8 s.
+
+Not checked: WhatsApp's typing dots (no number is connected locally). Covered by `whatsapp-inbound-typing.spec.ts` and the existing provider spec.
+
+## 8. How Shehbaz tests it
+
+**Ports:**
+- dashboard: http://localhost:8081
+- ally-be: `localhost:8001` (`ally-be-app-1`)
+- ally-ai: `localhost:3001` (`ally-ai-app-1`, a baked image)
+
+1. **Suites and lint:**
+   ```bash
+   cd ally-ai  && poetry run pytest tests/ -q && poetry run flake8
+   cd ally-be  && npm test -- --forceExit --detectOpenHandles && npm run lint && npm run typecheck
+   cd ally-web && nvm use 22 && npm test && npm run lint && npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json
+   ```
+   Focused runs:
+   - `poetry run pytest tests/core/agent_runtime/test_stream.py tests/core/llm/test_dispatch_timeout.py -q`
+   - `npx jest src/chatbot src/whatsapp/service/test/whatsapp-inbound-typing.spec.ts src/ai`
+   - `npx vitest run --project ally-admin-dashboard src/pages/WhatsAppBot`
+2. **Rebuild ally-ai:** `cd ally-ai && docker compose -f docker-compose.local.yml up -d --build app`. Restart `ally-be-app-1` if it was running (see open items on its memory).
+3. **Preview** (Ally FAQ → Preview → New thread): send "how do I get access?" and watch the dots, the status line ("Looking up …", "Checking the answer…", "Writing the reply…"), the steps (platform admins) and the text revealing. Then send "and after that, how do I sign in?", "what's your refund policy?" and "thanks".
+4. **Crisis:** a keyword ("I want to kill myself") and a phrase only the classifier catches. Expect only the crisis reply and no revealed text.
+5. **Fallback:**
+   - Set `AGENT_RUNTIME__ENABLED=false` in `ally-ai/.env`.
+   - Run `docker compose -f docker-compose.local.yml up -d --force-recreate --no-deps app` and ask a question. Expect "Answered in safe mode (the agent failed: upstream_404)".
+   - Put the flag back.
+6. **Settings → General:** "Show typing on WhatsApp" for platform admins only. With a WhatsApp number connected, the dots show right after you send, unless it is off or the message is a crisis keyword.
+7. **Eval:**
+   ```bash
+   cd ally-ai
+   KEY=$(grep '^API__X_API_KEY=' .env | cut -d= -f2-)
+   API__X_API_KEY=$KEY poetry run python scripts/agent_conversation_eval.py --cases tests/fixtures/agent_conversation_cases.yaml --out eval_report.md
+   API__X_API_KEY=$KEY poetry run python scripts/agent_conversation_eval.py --cases tests/fixtures/agent_conversation_cases.yaml --out eval_stream.md --stream
+   ```
+   Add `--corpus-db postgresql://postgres:<pw>@localhost:5477/ally_local` to check contact details against the documents.
+
+## 9. Open items
+
+- **True token streaming of drafts** (out of scope): streaming the model's words as they're written would need the draft to pass the check first, which it can't. A possible later option, for low-risk bots only.
+- **The website widget** reuses `/test/stream`'s pattern and the `streaming` capability: chunk 13 in `v2-chunks.md` (the brief says 21).
+- **Text arrives at the end of the run.** Status and steps are live within about 1 s; the reply's text appears once the run is done, revealed over up to 3 s. "Time to the first event" is 8 ms, but the time to the first word is the run's length.
+- **The local ally-be container runs out of memory** under `nest start --watch` (`Dockerfile.dev` caps Node at 4 GB). It crashed once during this chunk after a large `git pull`, and the cold compile peaks at about 4.6 GB. Raise `--max-old-space-size` locally, or watch with SWC. This is not changed here, since it affects every developer.
+- **`BaseHTTPMiddleware`** (ally-ai's two middlewares): a disconnect does cancel the run in the unit test (the generator's `finally`). Uvicorn behind the middlewares wasn't exercised with a real dropped connection. If an abandoned Preview run is ever seen finishing in the logs, convert the middlewares to pure ASGI.
+- **Cold first call:** the first v1 call after ally-ai restarts can take over 25 s (an 18 s embeddings request was seen), which turns a fallback into the error reply. This predates this chunk.
+- **The 504 under load:** two eval turns hit the 20 s cap while the machine was busy. In production, watch for `Agent stream ended with timeout` and `/agent/run` 504s; if they show up, the cap or `RUN_BUDGET_SECONDS` (15) may need tuning.
+- **Wiki:** `/agent/run/stream` and `/test/stream` belong on the ally-ai and ally-be wiki pages (same `Wiki-PR:` trailer as before).
+
+## 10. Commits, in review order
+
+```
+5942cc564 docs(agents-v2): chunk 3c brief, building blocks, revised chunk plan with 3d; current chunk 03c
+0e6cf8cb2 docs(agents-v2): chunk 03c code map
+c6c8bc3ec feat(agent-runtime): /agent/run/stream on one shared runner; hard run timeout
+852238543 feat(chatbot): Preview streams the agent's steps and checked reply; per-bot Show typing
+4bc860489 feat(admin-dashboard): Preview streams the agent at work; Show typing toggle
+(this commit) docs(agents-v2): chunk 03c notes and conversation evals
+```
