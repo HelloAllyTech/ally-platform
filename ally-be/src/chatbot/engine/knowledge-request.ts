@@ -6,6 +6,12 @@ import { ChatbotAnswerMode } from '../enum/chatbot.enum';
 import type { ChatTurn } from './chatbot-engine.types';
 
 /**
+ * Messages of conversation sent with a question, most recent last. Older ones are dropped: a long
+ * Preview thread otherwise sends everything, and a follow-up depends on what was just said.
+ */
+export const MAX_HISTORY_MESSAGES = 10;
+
+/**
  * The ONE place the knowledge request is built. v1 sends it to `/knowledge-agent/answer` as is;
  * v2 and shadow send it to `/agent/run` with the run's identity added (`buildAgentRunRequest`). A
  * field added here reaches both engines, so they cannot drift apart.
@@ -18,7 +24,7 @@ export function buildKnowledgeRequest(
   const { chatbot, settings } = turn;
   return {
     question: turn.text,
-    history: turn.history,
+    history: (turn.history ?? []).slice(-MAX_HISTORY_MESSAGES),
     prompts,
     ...knowledge,
     persona: personaRequest(turn),

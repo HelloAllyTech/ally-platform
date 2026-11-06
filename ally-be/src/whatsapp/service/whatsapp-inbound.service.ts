@@ -40,6 +40,7 @@ import { ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
 import { ConnectorService } from 'src/chatbot/service/connector.service';
 import { withFirstMessageParts } from 'src/chatbot/engine/first-reply';
+import { MAX_HISTORY_MESSAGES } from 'src/chatbot/engine/knowledge-request';
 
 /**
  * Opt-out / opt-in words, recognised in code regardless of what templates exist.
@@ -521,7 +522,7 @@ export class WhatsAppInboundService {
     const rows = await this.messageRepository.find({
       where: { conversationId },
       order: { createdAt: 'DESC' },
-      take: 6,
+      take: MAX_HISTORY_MESSAGES,
       select: ['direction', 'body', 'createdAt'],
     });
     return rows

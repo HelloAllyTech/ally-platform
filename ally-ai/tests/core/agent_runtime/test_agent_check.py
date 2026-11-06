@@ -306,8 +306,9 @@ class TestDeclineThatIgnoresWhatWasFound:
             searched=True,
         )
         assert rejection == "use_found"
-        # If the rewrite fails too, nothing of this text is sent.
-        assert result["answer"] == ""
+        # A nudge: the passages may be about something else, so a decline the
+        # rewrite still chooses goes out in its own words.
+        assert result["answer"].startswith("Yeh general jankari hai")
 
     def test_a_decline_about_something_else_keeps_its_words(self):
         result, rejection = review(
@@ -411,20 +412,49 @@ class TestTalkAboutSources:
     def test_a_product_feature_named_documents_is_not(self):
         assert not mentions_sources("Upload documents to Ally Assist to share notes.")
 
-    def test_is_sent_back_but_kept_if_the_rewrite_still_does_it(self):
+    @pytest.mark.parametrize(
+        "written,sent",
+        [
+            (
+                "I don't have information on refunds in my reference material.",
+                "I don't have information on refunds.",
+            ),
+            (
+                "I don't have a description of Ally in my reference materials. Ask "
+                "your admin.",
+                "I don't have a description of Ally. Ask your admin.",
+            ),
+            (
+                "I don't have that in my references, sorry.",
+                "I don't have that, sorry.",
+            ),
+            (
+                "Mujhe meri reference materials mein iski jaankari nahi hai.",
+                "Mujhe iski jaankari nahi hai.",
+            ),
+        ],
+    )
+    def test_the_common_phrase_is_cut_without_a_rewrite(self, written, sent):
+        result, rejection = review(
+            "decline", written, passages=[], question="refund policy?"
+        )
+        assert rejection is None
+        assert result["answer"] == sent
+
+    def test_other_source_talk_is_sent_back_and_kept_if_the_rewrite_does_it(self):
         result, rejection = review(
             "decline",
-            "I don't have that in my reference material.",
+            "The documents don't cover that.",
             passages=[],
             question="refund policy?",
         )
         assert rejection == "mentions_sources"
         # Wording, not safety: the final pass keeps the text.
-        assert result["answer"] == "I don't have that in my reference material."
+        assert result["answer"] == "The documents don't cover that."
 
     def test_a_cited_answer_keeps_its_citations(self):
         result, rejection = review(
-            "answer", "Per the documents I have, sign-in uses a code.", citations=[1]
+            "answer", "The documents say sign-in uses a code.", citations=[1]
         )
         assert rejection == "mentions_sources"
         assert result["intent"] == "answer"
@@ -504,7 +534,8 @@ class TestCrisisWordingOncePerConversation:
             passages=[],
             history=self.INTRO,
         )
-        assert rejection == "repeats_crisis"
+        # Trimmed directly: no rewrite for a wording fix.
+        assert rejection is None
         assert result["answer"] == "You're welcome!"
 
     def test_not_a_crisis_service_is_said_once(self):
@@ -587,7 +618,7 @@ class TestTopicsOfferedOnce:
             history=self.HI,
             organisation=self.BOT,
         )
-        assert rejection == "repeats_topics"
+        assert rejection is None  # trimmed directly
         assert result["answer"] == "Great!"
 
     def test_a_list_and_nothing_else_is_kept_rather_than_declined(self):
@@ -599,9 +630,8 @@ class TestTopicsOfferedOnce:
             history=self.HI,
             organisation=self.BOT,
         )
-        # Sent back once; a rewrite that still lists them is better than the
-        # bot's decline wording in reply to "ok".
-        assert rejection == "repeats_topics"
+        # Better than the bot's decline wording in reply to "ok".
+        assert rejection is None
         assert result["intent"] == "answer"
         assert result["answer"].startswith("I can help with Skills Lab")
 

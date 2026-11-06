@@ -74,7 +74,12 @@ def format_passages(passages: List[Dict[str, Any]]) -> str:
     return "\n\n".join(blocks)
 
 
-def format_history(history: Optional[List[Dict[str, str]]]) -> str:
+def format_history(
+    history: Optional[List[Dict[str, str]]],
+    *,
+    max_turns: int = MAX_HISTORY_TURNS,
+    max_chars: int = MAX_HISTORY_CHARS,
+) -> str:
     """
     Render recent turns as plain labelled lines.
 
@@ -85,7 +90,7 @@ def format_history(history: Optional[List[Dict[str, str]]]) -> str:
     if not history:
         return "(no previous messages)"
 
-    recent = history[-MAX_HISTORY_TURNS:]
+    recent = history[-max_turns:]
     lines: List[str] = []
     for turn in recent:
         role = (turn.get("role") or "").strip().lower()
@@ -96,10 +101,10 @@ def format_history(history: Optional[List[Dict[str, str]]]) -> str:
         lines.append(f"{speaker}: {content}")
 
     rendered = "\n".join(lines)
-    if len(rendered) > MAX_HISTORY_CHARS:
+    if len(rendered) > max_chars:
         # Keep the TAIL when trimming — the newest turn is the one the question refers
         # to.
-        rendered = "…\n" + rendered[-MAX_HISTORY_CHARS:]
+        rendered = "…\n" + rendered[-max_chars:]
     return rendered or "(no previous messages)"
 
 

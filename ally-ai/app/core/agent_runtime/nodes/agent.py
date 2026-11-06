@@ -4,6 +4,7 @@ up-front search before it, so whether to search, and for what, is its decision."
 
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, Literal
 
 from app.core.agent_runtime import conversation
@@ -27,10 +28,29 @@ def _summary(_: AgentState, update: Dict[str, Any]) -> str:
 MUST_SEARCH_AFTER = ("uncited", "search_first")
 
 
-def tool_budget(state: AgentState) -> int:
-    return max(
-        0, settings.AGENT_RUNTIME.MAX_TOOL_CALLS - len(state.get("tool_calls") or [])
+def recent(history: Any) -> Any:
+    """The last MAX_HISTORY_MESSAGES of the conversation; None when empty."""
+    keep = settings.AGENT_RUNTIME.MAX_HISTORY_MESSAGES
+    return list(history or [])[-keep:] if history and keep else None
+
+
+def over_time(state: AgentState) -> bool:
+    """Whether the run has used its time budget (RUN_BUDGET_SECONDS)."""
+    started = state.get("started_at")
+    return bool(
+        started and time.time() - started > settings.AGENT_RUNTIME.RUN_BUDGET_SECONDS
     )
+
+
+def tool_budget(state: AgentState) -> int:
+    """Searches left: none past the cap, past the time budget, or once a search
+    added nothing new (another phrasing of the same miss only costs time)."""
+    calls = state.get("tool_calls") or []
+    if calls and not calls[-1].get("added") and not calls[-1].get("refused"):
+        return 0
+    if over_time(state):
+        return 0
+    return max(0, settings.AGENT_RUNTIME.MAX_TOOL_CALLS - len(calls))
 
 
 def make_agent_node(service: KnowledgeAgentService) -> Node:
@@ -47,6 +67,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 "tool_passages": 0,
                 "revisions": 0,
                 "translation_degraded": False,
+                "started_at": time.time(),
             }
         budget = tool_budget(state)
         # Past the cap the schema itself offers only `reply`.
@@ -64,7 +85,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             tools=tools,
             tool_budget=budget,
             bot=bot,
-            history=state.get("history") or None,
+            history=recent(state.get("history")),
             searches=state.get("tool_calls") or [],
             feedback=state.get("feedback_text"),
             must_search=must_search,
@@ -84,7 +105,10 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
 
 
 def route_after_agent(state: AgentState) -> Literal["tools", "agent_check"]:
+    # Only the cap here: a step that was offered a search runs it, even if the time
+    # budget ran out while the model was deciding.
     action = (state.get("agent_step") or {}).get("action", REPLY_ACTION)
-    if action != REPLY_ACTION and tool_budget(state) > 0:
+    calls = len(state.get("tool_calls") or [])
+    if action != REPLY_ACTION and calls < settings.AGENT_RUNTIME.MAX_TOOL_CALLS:
         return "tools"
     return "agent_check"

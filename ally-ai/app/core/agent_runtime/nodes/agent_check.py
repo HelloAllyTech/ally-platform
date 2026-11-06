@@ -15,6 +15,7 @@ from app.core.agent_runtime.check import (
     organisation_of,
     rejection_feedback,
 )
+from app.core.agent_runtime.nodes.agent import over_time, recent
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
@@ -56,11 +57,17 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             question=state["question"],
             searched=bool(state.get("tool_calls")),
             organisation=organisation_of(state["bot"]),
-            history=state.get("history") or (),
+            history=recent(state.get("history")) or (),
         )
         revisions = state.get("revisions") or 0
-        if rejection and revisions < MAX_REVISIONS:
+        # Past the time budget the reply is final: a rewrite would run past
+        # ally-be's timeout and v1 would answer instead.
+        if rejection and revisions < MAX_REVISIONS and not over_time(state):
             return {
+                # What would go out if this draft were final (wording fixed, details
+                # trimmed). Kept so a rewrite that is refused outright falls back to
+                # it rather than to the bot's fixed decline wording.
+                "fallback_result": json_safe(result) if result["answer"] else None,
                 "feedback": rejection,
                 "feedback_text": rejection_feedback(
                     rejection,
@@ -69,6 +76,9 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
                 ),
                 "revisions": revisions + 1,
             }
+        fallback = state.get("fallback_result")
+        if fallback and not result["answer"]:
+            result = fallback
         return {"result": json_safe(result), "feedback": None, "feedback_text": None}
 
     return agent_check

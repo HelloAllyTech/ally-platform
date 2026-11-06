@@ -360,6 +360,18 @@ describe('ChatbotEngineService in Agent mode', () => {
       });
     });
 
+    it('sends only the last 10 messages of a long conversation', async () => {
+      const history = Array.from({ length: 14 }, (_, i) => ({
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        content: `message ${i}`,
+      }));
+      await engine.respond(turn({ text: 'and then?', history }));
+      const sent = aiService.runAgent.mock.calls[0][0].history;
+      expect(sent).toHaveLength(10);
+      expect(sent[0].content).toBe('message 4');
+      expect(sent[9].content).toBe('message 13');
+    });
+
     it('sends none of it for a v2 bot with the flag off', async () => {
       await engine.respond(
         turn({

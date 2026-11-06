@@ -288,6 +288,23 @@ def mentions_sources(text: str) -> bool:
     return bool(_MENTIONS_SOURCES.search(text or ""))
 
 
+# The common case, cut in place: "…on refunds in my reference material." → "…on
+# refunds." The model copies it from bots' decline wording; a rewrite for it cost a
+# whole model call.
+_SOURCE_PHRASE = re.compile(
+    r"\s*,?\s*\b(?:in|from|within)\s+(?:my|the|our)\s+"
+    r"(?:reference\s+materials?|references|documents|docs|knowledge\s*base|sources)\b"
+    r"|\s*\b(?:meri|mere|hamari|hamare)\s+(?:reference\s+materials?|documents)\s+"
+    r"(?:mein|me)\b",
+    re.IGNORECASE,
+)
+
+
+def without_source_phrases(text: str) -> str:
+    text = _SOURCE_PHRASE.sub("", text or "")
+    return re.sub(r"\s+([.,;!?।])", r"\1", text)
+
+
 def detail_kinds(text: str) -> List[str]:
     """The kinds of checkable detail in `text`, e.g. ``["a link", "a number"]``."""
     return [kind for kind, pattern in _DETAIL_KINDS if pattern.search(text or "")]
@@ -327,21 +344,14 @@ REJECTIONS: Dict[str, str] = {
         "It said it doesn't have this without searching. Search first: the answer "
         "may be in the library."
     ),
-    "repeats_crisis": (
-        "It repeated crisis wording. Say you're not a crisis service only the first "
-        "time you introduce yourself, and keep small talk to the point."
-    ),
-    "repeats_topics": (
-        "It listed your topics again. They were offered earlier in the conversation: "
-        "keep small talk to one or two sentences."
-    ),
     "mentions_sources": (
         "It talked about its reference material, documents or passages. Say the same "
         "as someone who simply knows, or doesn't: no talk of sources."
     ),
     "use_found": (
-        "A search found passages about this, so don't say you don't have it: answer "
-        "from those passages and cite them."
+        "A search found passages. If they answer what was asked, answer from them "
+        "and cite them. If they are about something else, say plainly what you don't "
+        "have and what you can help with."
     ),
 }
 
@@ -397,6 +407,9 @@ def check_reply(
     )
     unsupported = False
     rejection: Optional[str] = None
+    # A refusal that keeps the model's text if the rewrite doesn't fix it (wording,
+    # a nudge, or details removed sentence by sentence), rather than clearing it.
+    keeps_text = False
     # The model chose to decline, so its text is a decline written for the person.
     # A decline forced here replaces whatever the model wrote, which may be the
     # very claim being refused; ally-be then sends the bot's decline wording.
@@ -471,12 +484,13 @@ def check_reply(
             # It searched, found passages about the organisation, and still said
             # it doesn't have it.
             logger.info("Agent declined although a search found passages")
-            rejection = "use_found"
+            # A nudge: the passages may be about something else, so a decline the
+            # rewrite still chooses is kept in its own words.
+            rejection, keeps_text = "use_found", True
 
     # Fixes that keep the rest of the reply: sent back once, and if the rewrite
     # still needs them, applied to the text (sentences removed) rather than
     # refusing the reply.
-    keeps_text = False
     if intent != AgentIntent.DECLINE or model_declined:
         unsourced = unsupported_details(answer_text, passages)
         if unsourced and rejection in (None, "unsourced_detail"):
@@ -486,9 +500,9 @@ def check_reply(
             rejection, keeps_text = "unsourced_detail", True
             answer_text = without_details(answer_text, unsourced)
         if repeated_crisis_wording(answer_text, turn_type, history):
-            if rejection is None:
-                rejection, keeps_text = "repeats_crisis", True
-            # Wording only: if trimming would leave nothing, the reply stays as is.
+            # Trimmed here, not sent back: a rewrite costs a model call for what a
+            # deterministic trim does. If trimming would leave nothing, the reply
+            # stays as is.
             answer_text = (
                 without_repeated_crisis_wording(answer_text, turn_type, history)
                 or answer_text
@@ -502,14 +516,14 @@ def check_reply(
                 if organisation.topics_named_in(sentence) >= 3
             ]
             if listed:
-                if rejection is None:
-                    rejection, keeps_text = "repeats_topics", True
+                # Trimmed here, not sent back (as above).
                 answer_text = (
                     without_sentences(
                         answer_text, lambda sentence: sentence not in listed
                     )
                     or answer_text
                 )
+        answer_text = without_source_phrases(answer_text) or answer_text
         if rejection is None and mentions_sources(answer_text):
             # Wording, not safety: kept as written if the rewrite still does it.
             rejection, keeps_text = "mentions_sources", True

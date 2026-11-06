@@ -217,17 +217,21 @@ class TestToolLoop:
         assert "nothing relevant or new" in llm.calls[1]["prompt"]
 
     async def test_loop_stops_at_the_cap(self, agent_run, chunk_service):
-        assert settings.AGENT_RUNTIME.MAX_TOOL_CALLS == 4
-        chunk_service.search.return_value = []
+        assert settings.AGENT_RUNTIME.MAX_TOOL_CALLS == 2
+        chunk_service.search.side_effect = [
+            [passage(CHUNK_A, 0.7)],
+            [passage(CHUNK_B, 0.7)],
+        ]
         llm = FakeLLM(
-            *[search(f"try {i}") for i in range(4)],
-            reply("decline", "I don't have that information."),
+            search("try 1"),
+            search("try 2"),
+            reply(citations=[1, 2]),
         )
         state = await agent_run("q", llm)
 
-        assert len(state["tool_calls"]) == 4
-        assert len(llm.calls) == 5
-        # The fifth call can only reply: no tool is in its schema.
+        assert len(state["tool_calls"]) == 2
+        assert len(llm.calls) == 3
+        # The third call can only reply: no tool is in its schema.
         last = llm.calls[-1]["schema"]
         assert set(last.model_fields) == {
             "action",
@@ -238,7 +242,50 @@ class TestToolLoop:
             "language",
         }
         assert "searches left: 0" in llm.calls[-1]["prompt"]
+        assert state["result"]["intent"] == "answer"
+
+    async def test_no_search_after_one_that_added_nothing(
+        self, agent_run, chunk_service
+    ):
+        """The Preview loop: four rephrasings of the same miss, about 25 seconds."""
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        llm = FakeLLM(
+            search("What is Ally?"),
+            search("What is Ally and what does it do?"),  # finds the same passage
+            reply(citations=[1]),
+        )
+        state = await agent_run("ally kya hai?", llm)
+        assert len(state["tool_calls"]) == 2
+        assert state["tool_calls"][1]["added"] == []
+        assert "searches left: 0" in llm.calls[2]["prompt"]
+        assert "search_knowledge" not in llm.calls[2]["schema"].model_fields
+
+    async def test_past_the_time_budget_it_replies_and_is_not_rewritten(
+        self, agent_run, chunk_service, monkeypatch
+    ):
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "RUN_BUDGET_SECONDS", 0.000001)
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        llm = FakeLLM(
+            search("q"),
+            reply("answer", "An uncited claim."),  # would be sent back in time
+        )
+        state = await agent_run("q", llm)
+        assert len(llm.calls) == 2
+        assert "search_knowledge" not in llm.calls[1]["schema"].model_fields
+        # Final: declined with no text rather than a rewrite past ally-be's timeout.
         assert state["result"]["intent"] == "decline"
+        assert nodes(state)[-2:] == ["check", "finalize"]
+
+    async def test_reads_only_the_last_ten_messages(self, agent_run, chunk_service):
+        history = [
+            {"role": "user" if i % 2 == 0 else "assistant", "content": f"message {i}"}
+            for i in range(14)
+        ]
+        llm = FakeLLM(chat())
+        await agent_run("hi", llm, history=history)
+        prompt = llm.calls[0]["prompt"]
+        assert "message 3" not in prompt
+        assert "message 4" in prompt and "message 13" in prompt
 
     async def test_a_lower_cap_is_honoured(self, agent_run, chunk_service, monkeypatch):
         monkeypatch.setattr(settings.AGENT_RUNTIME, "MAX_TOOL_CALLS", 1)
@@ -298,6 +345,21 @@ class TestRevision:
         result = (await agent_run("access?", llm))["result"]
         assert result["intent"] == "answer"
         assert [c["chunk_id"] for c in result["citations"]] == [CHUNK_A]
+
+    async def test_a_refused_rewrite_falls_back_to_the_first_draft(
+        self, agent_run, chunk_service
+    ):
+        """Preview: "what is ally?" with only the Progress document attached."""
+        chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+        llm = FakeLLM(
+            search("What is Ally?"),
+            reply("decline", "The documents don't describe what Ally is."),
+            reply("answer", "Ally is a not-for-profit platform."),  # uncited
+        )
+        state = await agent_run("what is ally?", llm)
+        result = state["result"]
+        assert result["intent"] == "decline"
+        assert result["answer"] == "The documents don't describe what Ally is."
 
     async def test_a_second_refusal_is_final_and_sends_no_text(
         self, agent_run, chunk_service

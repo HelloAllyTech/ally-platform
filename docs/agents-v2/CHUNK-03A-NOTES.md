@@ -370,3 +370,30 @@ Each is sent back once first. These trims are wording, not safety: if trimming w
 | 2 | **0** | **0** | 100% of 12 | −24% |
 
 No reply in either run has markdown, an unsourced phone number, link or email, or "sakta/ti". In the hi → ok → thanks → bye conversation, every turn after the first is one or two sentences with no crisis line or topic list. Single-turn "ok" and "thanks" are a conversation's first message, so they may introduce the topics. `out-refund` is now a decline (filed as unanswered); it still says "reference material", which is in Ally FAQ's own decline text.
+
+## 12. Timeouts, history and speed (2026-11-06)
+
+**Preview finding.** "ally kya hai?" and "what's your refund policy?" took 26–33 s; ally-be's 25-second timeout fell back to v1 ("Answered by v1 (v2 failed: timeout)", "Would alert the team"). "what is ally?" was answered from the Progress document.
+
+**Cause.** Ally FAQ in `ally_local` now has **one** document attached (Progress, Badges and Streaks); the other six were removed from `chatbot_documents` (not by this work, and not restored). Every search found that one passage, so the agent rephrased and searched four times (each adding nothing), wrote a reply, and was sent back for a rewrite: six model calls. The eval passes its own seven document ids, so it didn't see this.
+
+**Fixes** (`app/core/config.py`, `nodes/agent.py`, `nodes/agent_check.py`, `check.py`):
+- `AGENT_RUNTIME__MAX_TOOL_CALLS` 4 → **2**, and **no further search once a search added nothing new** (the next step's schema has no tool).
+- **`AGENT_RUNTIME__RUN_BUDGET_SECONDS` = 15**: past it the agent can't search and its reply is final (no rewrite), so it answers inside ally-be's 25 s rather than falling back to v1. Routing still runs a search the step was already offered.
+- **A refused rewrite falls back to the first draft** as it would have gone out (wording fixed, details trimmed), not to the bot's fixed decline wording.
+- "Use what you found" is a nudge: answer from the passages if they answer the question, otherwise say what you don't have; a decline the rewrite keeps goes out in its own words.
+- **Fewer rewrites:** repeated crisis wording and topic lists in later small talk are trimmed directly; "in my reference material(s)" / "in my references" / "meri reference materials mein" are cut in place. A rewrite is asked for only when source talk remains after the cut.
+- Reasoning effort `minimal` was tried for the agent step (6–8 s per reply) and **rejected**: it answered "ally kya hai?" and "what is ally?" from the Progress passage. `low` stays.
+
+**History: the last 10 messages.**
+- ally-be: `MAX_HISTORY_MESSAGES = 10` in `chatbot/engine/knowledge-request.ts`, applied in `buildKnowledgeRequest` (Preview sent its whole thread before) and as the WhatsApp query size (`recentHistory`, was 6). This changes v1 too: v1 on WhatsApp now gets up to 10 messages instead of 6, and Preview at most 10.
+- ally-ai: the agent reads at most `AGENT_RUNTIME__MAX_HISTORY_MESSAGES` (10) messages and 3,000 characters. `format_history` gained optional limits; the parity path keeps 6 messages and 1,500 characters.
+- Long chats weren't failing from history size: ally-ai already capped every prompt at 6 messages. They failed from the search loop above.
+- Not changed: the checkpointer keeps every run of a thread (chunk 1 open item, retention).
+
+**Results.**
+- Replay of the Preview conversation against the one-document bot: 8–15 s per reply warm (21 s for the first request after a rebuild), all inside the timeout; no canned decline; no "reference material".
+- Full eval (seven documents): **0 hard fails**, 1 check fail (`out-mausam`: a polite weather decline labelled as small talk), every turn under 12 s (median 5.7 s, 90th percentile 9.5 s), in-scope documents the same as v1 100% of 12, p50 −18% vs parity.
+- Tests: `test_no_search_after_one_that_added_nothing`, `test_past_the_time_budget_it_replies_and_is_not_rewritten`, `test_reads_only_the_last_ten_messages`, `test_a_refused_rewrite_falls_back_to_the_first_draft`, `test_loop_stops_at_the_cap` (2), `TestTalkAboutSources::test_the_common_phrase_is_cut_without_a_rewrite`; ally-be `sends only the last 10 messages of a long conversation`.
+
+**To do on your side:** re-attach the six "Ally FAQ –" documents to Ally FAQ (Knowledge tab) if they were removed by accident; with only the Progress document, "What is Ally?" can only be answered from Progress, or declined.

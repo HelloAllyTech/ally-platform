@@ -140,8 +140,16 @@ class AgentRuntimeSettings(BaseModel):
     # without blocking the next step on the write; "exit" writes once per run.
     DURABILITY: Literal["sync", "async", "exit"] = Field("async")
     # Conversational agent (`features.agent`): tool calls allowed per run. Past this
-    # the agent must reply with what it has, or decline.
-    MAX_TOOL_CALLS: int = Field(4, ge=0, le=8)
+    # the agent must reply with what it has, or decline. Two: a second search with
+    # different words helps; more only repeated the same miss and ran past ally-be's
+    # 25-second timeout.
+    MAX_TOOL_CALLS: int = Field(2, ge=0, le=8)
+    # Seconds into a run after which the agent stops searching and its reply is
+    # final (no rewrite), so it answers inside ally-be's 25-second timeout rather
+    # than falling back to v1.
+    RUN_BUDGET_SECONDS: float = Field(15.0, gt=0, le=60)
+    # Conversation messages the agent reads, most recent last.
+    MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
     # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and
     # o-series; ignored for others). Unset = the provider default ("medium"). The
     # latency lever if the agent step is too slow; see CHUNK-03A-NOTES.md.

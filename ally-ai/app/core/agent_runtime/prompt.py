@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence
 
+from app.core.config import settings
 from app.core.knowledge_agent.prompt import (
     format_history,
     format_passages,
@@ -18,6 +19,9 @@ from app.core.knowledge_agent.prompt import (
 from app.prompts.resolver import load_and_format
 
 AGENT_PROMPT_PATH = "agent/system"
+#: Characters of conversation the agent reads (the parity path keeps 1,500 over six
+#: messages); ten messages of a WhatsApp chat fit.
+AGENT_HISTORY_CHARS = 3000
 
 NO_TOPICS = (
     "(no topics listed: say you answer questions from the organisation's reference "
@@ -108,7 +112,11 @@ def build_agent_prompt(
         prompts=prompts,
         message=message.strip(),
         passages=format_passages(passages),
-        history=format_history(history),
+        history=format_history(
+            history,
+            max_turns=settings.AGENT_RUNTIME.MAX_HISTORY_MESSAGES,
+            max_chars=AGENT_HISTORY_CHARS,
+        ),
         feedback=format_feedback(feedback),
         answer_scope=format_answer_scope(answer_mode),
         searches=format_searches(searches),

@@ -65,6 +65,10 @@ class AgentState(TypedDict, total=False):
     feedback: Optional[str]
     feedback_text: Optional[str]  # what the rewrite is told (check.py)
     revisions: int
+    started_at: Optional[float]  # wall clock at the run's first agent step
+    # The first draft as it would have gone out, when it was sent back for something
+    # that still let it go out (agent_check.py).
+    fallback_result: Optional[Dict[str, Any]]
 
     # --- output: the `/knowledge-agent/answer` response, field for field
     result: Optional[Dict[str, Any]]
@@ -96,6 +100,8 @@ RUN_SCOPED_KEYS = (
     "feedback",
     "feedback_text",
     "revisions",
+    "started_at",
+    "fallback_result",
     "result",
 )
 
