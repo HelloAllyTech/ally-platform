@@ -1,0 +1,7 @@
+# Paths that docs-path-lint should not check in ally-be docs. One per line; `#` starts a comment.
+# See scripts/docs-path-lint.mjs for the full rules.
+
+# Files of the React Native ally-mobile app, which was deleted in the 2026-11 Flutter rename.
+# DATA_SCHEMA.md and docs/courses-certification-plan.md name them as historical provenance.
+ally-mobile/scripts/i18n-parity.mjs
+ally-mobile/src/services/coursesApi.ts

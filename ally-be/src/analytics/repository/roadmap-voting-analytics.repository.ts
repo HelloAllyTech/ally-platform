@@ -71,6 +71,31 @@ export class RoadmapVotingAnalyticsRepository {
   }
 
   /**
+   * Of each admin's standing votes, how many sit on an opportunity THEY created
+   * (`createdBy` is the author). Soft-deleted opportunities are kept in on purpose:
+   * the vote still stands in `getVotesCast`, so it must stay in both sides of the
+   * "share on colleagues' ideas" ratio.
+   */
+  async getOwnVotesCast(): Promise<RoadmapVotesCastRow[]> {
+    const rows = await this.dataSource.query(
+      `
+      SELECT a."userId"        AS "userId",
+             a."periodKey"     AS "periodKey",
+             SUM(a.votes)::int AS "votes"
+      FROM roadmap_allocations a
+      INNER JOIN roadmap_opportunities o ON o.id = a."opportunityId"
+      WHERE o."createdBy" = a."userId"
+      GROUP BY a."userId", a."periodKey"
+      `,
+    );
+    return rows.map((r: Record<string, unknown>) => ({
+      userId: Number(r.userId),
+      periodKey: r.periodKey as string,
+      votes: Number(r.votes) || 0,
+    }));
+  }
+
+  /**
    * Bucketed on `grantKey` rather than `grantedAt`: the key IS the period the grant
    * was issued for ('YYYY-MM' monthly, 'YYYY-MM-DD' daily, both UTC — the same clock
    * as `periodKey`), whereas `grantedAt` is when the row was written, which for the
