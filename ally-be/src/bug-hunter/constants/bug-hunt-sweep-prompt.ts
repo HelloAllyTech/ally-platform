@@ -177,6 +177,15 @@ export interface SweepMemoryEntry {
  * comment there): `repoCommands(repo)` now throws before this function's
  * body is ever reached for that repo, so the carve-out could never fire.
  */
+function jsonEscape(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\"/g, '\\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
 export function buildSweepPrompt(ctx: SweepPromptContext): string {
   const {
     repo,
@@ -446,7 +455,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
     `First, tell the notebook which of the entries you read tonight actually changed what you did, and which turned out to be wrong — the ids are in the entries above and in the search results. Send this even when both lists are empty; an empty report is how an entry that never helps gets retired:`,
     `  curl -sS -X POST "${memoryFeedbackUrl}" -H "Content-Type: application/json" ${auth} -d '{"runId":"${runId}","applied":["<entry id>"],"contradicted":[]}'`,
     `Then write down what tonight taught you that the next sweep of "${repo}" should know — at most three entries, each under 600 characters, each written for a stranger who did not see tonight: name the repo, the file or command, and the symptom. Good entries: a test that is flaky and why; a lint rule that is suppressed on purpose; a pattern that looked like a bug and was not, and what settled it; where a class of bug tends to hide here; how a hard fix was eventually made to work. Do not write down tonight's findings themselves (they are already filed) or anything you only suspect. If a notebook entry you read in Phase 0 was wrong, write the correction.`,
-    `  curl -sS -X POST "${memoryWriteUrl}" -H "Content-Type: application/json" ${auth} -d '{"body":"<the lesson>","repos":["${repo}"],"tags":["<one or two labels>"],"runId":"${runId}"}'`,
+    `  curl -sS -X POST "${memoryWriteUrl}" -H "Content-Type: application/json" ${auth} -d '{"body":"${jsonEscape('<the lesson>')}","repos":["${repo}"],"tags":["<one or two labels>"],"runId":"${runId}"}'`,
     `Leave "repos" out for a lesson that applies to every Ally repo. Nothing learned tonight is a valid outcome — write nothing rather than something vague.`,
     ``,
     `## Phase 5 — Close`,

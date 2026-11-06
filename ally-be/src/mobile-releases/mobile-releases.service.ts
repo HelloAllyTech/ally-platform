@@ -320,7 +320,7 @@ export class MobileReleasesService {
     try {
       const { data } = await axios.get(
         `${GITHUB_API}/repos/${repo}/actions/workflows/${file}/runs`,
-        { headers, params: { per_page: 15 }, timeout: 15_000 },
+        { headers, params: { per_page: 15 }, timeout: 60_000 },
       );
       return (data?.workflow_runs ?? []).map((run: any) =>
         this.toRunDto(file, run),
@@ -520,7 +520,7 @@ export class MobileReleasesService {
             path: this.folder.replace(/\/$/, ''),
             per_page: 100,
           },
-          timeout: 15_000,
+          timeout: 60_000,
         },
       );
       const subjects: string[] = [];
@@ -553,7 +553,7 @@ export class MobileReleasesService {
     try {
       const { data } = await axios.get(
         `${GITHUB_API}/repos/${repo}/compare/${base}...${head}`,
-        { headers, timeout: 15_000 },
+        { headers, timeout: 60_000 },
       );
       const commits = data?.commits ?? [];
       return commits
@@ -597,7 +597,7 @@ export class MobileReleasesService {
           { repo: this.repo, path: `${this.folder}pubspec.yaml` },
           { repo: this.legacyRepo, path: 'android/app/build.gradle' },
         ]
-      : [{ repo: this.repo, path: 'android/app/build.gradle' }];
+      : [{ repo: this.repo, path: `${this.folder}pubspec.yaml` }];
     for (const source of sources) {
       try {
         const { data } = await axios.get(
@@ -605,7 +605,7 @@ export class MobileReleasesService {
           {
             headers,
             params: { path: source.path, sha: 'master', per_page: 10 },
-            timeout: 15_000,
+            timeout: 60_000,
           },
         );
         for (const commit of (data ?? []) as any[]) {
@@ -715,7 +715,7 @@ export class MobileReleasesService {
       await axios.post(
         `${GITHUB_API}/repos/${this.repo}/actions/workflows/${RELEASE_WORKFLOW_FILE}/dispatches`,
         { ref: 'master', inputs: { force: 'true' } },
-        { headers, timeout: 15_000 },
+        { headers, timeout: 60_000 },
       );
       return { dispatched: true };
     } catch (error) {
@@ -770,7 +770,7 @@ export class MobileReleasesService {
             whats_new: whatsNew ?? '',
           },
         },
-        { headers, timeout: 15_000 },
+        { headers, timeout: 60_000 },
       );
       return { dispatched: true };
     } catch (error) {
@@ -824,7 +824,7 @@ export class MobileReleasesService {
           // optional input.
           inputs: { whats_new: whatsNew ?? '' },
         },
-        { headers, timeout: 15_000 },
+        { headers, timeout: 60_000 },
       );
       return { dispatched: true };
     } catch (error) {
@@ -1173,7 +1173,7 @@ export class MobileReleasesService {
             'fields[appStoreVersions]': 'versionString,appVersionState',
             limit: 1,
           },
-          timeout: 15_000,
+          timeout: 60_000,
         },
       );
       return data?.data?.[0]?.attributes?.appVersionState ?? null;
@@ -1373,7 +1373,7 @@ export class MobileReleasesService {
               'submittedDate,state,appStoreVersionForReview',
             'fields[appStoreVersions]': 'versionString',
           },
-          timeout: 15_000,
+          timeout: 60_000,
         },
       );
       const included = data?.included ?? [];
@@ -1421,7 +1421,7 @@ export class MobileReleasesService {
           limit: TESTFLIGHT_HISTORY_BUILD_LIMIT,
           include: 'preReleaseVersion',
         },
-        timeout: 15_000,
+        timeout: 60_000,
       });
       const included = data?.included ?? [];
       return (data?.data ?? [])
@@ -1446,7 +1446,7 @@ export class MobileReleasesService {
       const { data } = await axios.get(`${APPSTORE_CONNECT_API}/apps`, {
         headers,
         params: { 'filter[bundleId]': APPSTORE_BUNDLE_ID },
-        timeout: 15_000,
+        timeout: 60_000,
       });
       const appId = data?.data?.[0]?.id;
       if (!appId) {
@@ -1477,7 +1477,7 @@ export class MobileReleasesService {
           limit: 1,
           include: 'preReleaseVersion',
         },
-        timeout: 15_000,
+        timeout: 60_000,
       });
       const build = data?.data?.[0];
       if (!build?.id) {
@@ -1506,7 +1506,7 @@ export class MobileReleasesService {
         {
           headers,
           params: { 'filter[build]': buildId },
-          timeout: 15_000,
+          timeout: 60_000,
         },
       );
       const submission = data?.data?.[0];
@@ -1547,7 +1547,7 @@ export class MobileReleasesService {
             'filter[name]': externalGroupName,
             limit: 1,
           },
-          timeout: 15_000,
+          timeout: 60_000,
         },
       );
       const groupId = groupsData?.data?.[0]?.id;
@@ -1563,7 +1563,7 @@ export class MobileReleasesService {
       // GET /v1/betaGroups/{id}/builds resource form — cheaper, and all that's needed here.
       const { data: buildsData } = await axios.get(
         `${APPSTORE_CONNECT_API}/betaGroups/${groupId}/relationships/builds`,
-        { headers, params: { limit: 200 }, timeout: 15_000 },
+        { headers, params: { limit: 200 }, timeout: 60_000 },
       );
       const buildIds: string[] = (buildsData?.data ?? []).map((b: any) =>
         String(b?.id ?? ''),
@@ -1585,7 +1585,7 @@ export class MobileReleasesService {
     try {
       const { data } = await axios.get(
         `${GITHUB_API}/repos/${this.repo}/contents/${folder}${path}`,
-        { headers, params: { ref: 'master' }, timeout: 15_000 },
+        { headers, params: { ref: 'master' }, timeout: 60_000 },
       );
       const content = data?.content;
       if (!content) {
