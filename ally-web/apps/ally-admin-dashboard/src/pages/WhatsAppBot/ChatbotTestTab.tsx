@@ -5,11 +5,10 @@ import { useGetChatbotsQuery, useTestChatbotMutation } from "@api";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { AgentTraceStep, Chatbot, ChatbotDraft, TestChatbotResponse } from "@types";
+import { AgentTraceStep, Chatbot, TestChatbotResponse } from "@types";
 
+import { takePreviewDraft } from "./previewDraft";
 import { Card, copyToClipboard, errorMessage, fill } from "./shared";
-
-import type { PersonaDraft } from "./PersonaTab";
 
 const t = en.whatsappBot.bots.test;
 /** Messages of the thread sent with each test, most recent last (ally-be keeps the same 10). */
@@ -20,26 +19,14 @@ type Turn =
   | { role: "user"; content: string }
   | { role: "assistant"; content: string; result?: TestChatbotResponse; error?: boolean };
 
-/** Unsaved persona changes handed over by the Persona tab's "Try these changes", read once. */
-const takeDraft = (botId: string): ChatbotDraft | undefined => {
-  try {
-    const raw = sessionStorage.getItem(`chatbot-draft:${botId}`);
-    if (!raw) return undefined;
-    sessionStorage.removeItem(`chatbot-draft:${botId}`);
-    const draft = JSON.parse(raw) as PersonaDraft;
-    return { persona: draft.persona, answerMode: draft.answerMode, model: draft.model };
-  } catch {
-    return undefined;
-  }
-};
-
 /**
  * A chat with the bot that sends nothing and stores nothing. It runs the same decision path as a
  * real WhatsApp message — keyword replies, then the answer with the bot's persona, documents and
  * model, with the crisis check beside it — and shows how each reply was decided.
  */
 export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
-  const [draft] = useState(() => takeDraft(bot.id));
+  // Unsaved changes handed over by "Preview these changes" on the Persona or Agent tab.
+  const [draft] = useState(() => takePreviewDraft(bot.id));
   const [turns, setTurns] = useState<Turn[]>([]);
   const [message, setMessage] = useState("");
   const [checkAccess, setCheckAccess] = useState(false);

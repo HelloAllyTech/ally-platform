@@ -7,26 +7,16 @@ import { useUpdateChatbotMutation } from "@api";
 import { Button, EntityField } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { Chatbot, ChatbotAnswerMode, ChatbotModelChoice, ChatbotPersona } from "@types";
+import { Chatbot, ChatbotPersona } from "@types";
 
+import { handOverToPreview, PreviewDraft } from "./previewDraft";
 import { Card, errorMessage, fill } from "./shared";
 
 const t = en.whatsappBot.bots.persona;
 const MAX_PROMPT = 4000;
 
-/**
- * What "Preview these changes" hands to Preview. Answer mode and model are edited on the Agent tab,
- * which hands over the same shape; here they are carried through as saved.
- */
-export interface PersonaDraft {
-  name: string;
-  description: string;
-  persona: ChatbotPersona;
-  answerMode: ChatbotAnswerMode;
-  model: ChatbotModelChoice | null;
-}
-
-const draftOf = (bot: Chatbot): PersonaDraft => ({
+/** The bot as this tab edits it. Answer mode and model are edited on the Agent tab. */
+const draftOf = (bot: Chatbot): PreviewDraft => ({
   name: bot.name,
   description: bot.description ?? "",
   persona: { ...bot.persona },
@@ -44,7 +34,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
   canEdit,
   onTest,
 }) => {
-  const [draft, setDraft] = useState<PersonaDraft>(() => draftOf(bot));
+  const [draft, setDraft] = useState<PreviewDraft>(() => draftOf(bot));
   useEffect(() => {
     setDraft(draftOf(bot));
   }, [bot]);
@@ -69,12 +59,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
   };
 
   const tryIt = () => {
-    // The test tab picks the draft up from session storage, so unsaved changes can be tried there.
-    try {
-      sessionStorage.setItem(`chatbot-draft:${bot.id}`, JSON.stringify(draft));
-    } catch {
-      // Storage refused: the test runs against the saved bot instead.
-    }
+    handOverToPreview(bot.id, draft);
     onTest();
   };
 

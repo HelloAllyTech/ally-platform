@@ -10,9 +10,8 @@ import { en } from "@constants";
 import { Chatbot, ChatbotAnswerMode, ChatbotModelChoice } from "@types";
 
 import { ChatbotEngineCard } from "./ChatbotEngineCard";
+import { handOverToPreview } from "./previewDraft";
 import { Card, errorMessage } from "./shared";
-
-import type { PersonaDraft } from "./PersonaTab";
 
 const t = en.whatsappBot.bots.agent;
 /** The runtime that answers chatbot questions; only its models are offered. */
@@ -62,18 +61,12 @@ export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => 
   };
 
   const tryIt = () => {
-    // Preview picks the draft up from session storage, so unsaved changes can be tried there.
-    const handover: PersonaDraft = {
+    handOverToPreview(bot.id, {
       name: bot.name,
       description: bot.description ?? "",
       persona: { ...bot.persona },
       ...draft,
-    };
-    try {
-      sessionStorage.setItem(`chatbot-draft:${bot.id}`, JSON.stringify(handover));
-    } catch {
-      // Storage refused: the test runs against the saved bot instead.
-    }
+    });
     onTest();
   };
 
