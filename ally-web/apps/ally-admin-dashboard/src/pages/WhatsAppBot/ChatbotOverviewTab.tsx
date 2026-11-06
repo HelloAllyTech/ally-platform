@@ -7,7 +7,13 @@ import { useArchiveChatbotMutation, useSetChatbotStatusMutation } from "@api";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en, ROUTES } from "@constants";
-import { Chatbot, ChatbotAccessMode, ChatbotKnowledgeSource, ChatbotStatus } from "@types";
+import {
+  Chatbot,
+  ChatbotAccessMode,
+  ChatbotKnowledgeSource,
+  ChatbotStatus,
+  WaBusinessNumberStatus,
+} from "@types";
 
 import { Card, errorMessage, fill, missingPersonaFields, StatCard } from "./shared";
 
@@ -26,6 +32,10 @@ interface Step {
   /** Why it isn't done yet, when that isn't obvious from the label. */
   hint?: string;
 }
+
+/** A channel that is set up and answering: not still waiting for Meta, and not in trouble. */
+const isWorking = (connector: Chatbot["connectors"][number]) =>
+  connector.summary?.status === WaBusinessNumberStatus.CONNECTED;
 
 /**
  * What a bot still needs, as a short checklist read from the bot itself — so it is right on every
@@ -74,10 +84,30 @@ export const ChatbotOverviewTab: React.FC<{
       done: Boolean(bot.lastTestedAt) || bot.stats.messages > 0,
       tab: "test",
     },
-    { label: t.stepConnector, done: bot.connectors.length > 0, tab: "connectors" },
-    { label: t.stepLive, done: bot.status === ChatbotStatus.LIVE, tab: "overview" },
+    {
+      label: t.stepConnector,
+      // Only a channel that works counts: one still waiting for Meta or needing attention can't
+      // reach anyone yet.
+      done: bot.connectors.some(isWorking),
+      tab: "connectors",
+      hint:
+        bot.connectors.length > 0 && !bot.connectors.some(isWorking)
+          ? t.connectorNotWorking
+          : undefined,
+    },
   ];
+  // Everything before publishing: Publish waits for all of it.
+  const missingBeforePublish = steps.filter(step => !step.done).map(step => step.label);
+  const canPublish = missingBeforePublish.length === 0;
+  const isLive = bot.status === ChatbotStatus.LIVE;
+  steps.push({ label: t.stepLive, done: isLive, tab: "overview" });
   const ready = steps.every(step => step.done);
+  const missingList = missingBeforePublish.join(", ");
+  const title = ready
+    ? t.checklistDone
+    : isLive
+      ? fill(t.checklistLiveNotReady, { steps: missingList })
+      : t.checklistTitle;
 
   const changeStatus = async (status: ChatbotStatus) => {
     try {
@@ -109,7 +139,7 @@ export const ChatbotOverviewTab: React.FC<{
   return (
     <div className="flex flex-col gap-6">
       <Card
-        title={ready ? t.checklistDone : t.checklistTitle}
+        title={title}
         subtitle={statusHint}
         action={
           canEdit && (
@@ -118,7 +148,7 @@ export const ChatbotOverviewTab: React.FC<{
                 <Button
                   variant={ButtonVariant.PRIMARY}
                   onClick={() => void changeStatus(ChatbotStatus.LIVE)}
-                  disabled={isChanging}
+                  disabled={isChanging || !canPublish}
                 >
                   {bot.status === ChatbotStatus.PAUSED ? t.resume : t.goLive}
                 </Button>
@@ -136,6 +166,11 @@ export const ChatbotOverviewTab: React.FC<{
           )
         }
       >
+        {canEdit && !isLive && !canPublish && (
+          <p className="text-sm text-typography-600" data-testid="publish-needs">
+            {fill(t.publishNeeds, { steps: missingList })}
+          </p>
+        )}
         {!ready && (
           <ol className="flex flex-col divide-y divide-border-light">
             {steps.map((step, index) => (

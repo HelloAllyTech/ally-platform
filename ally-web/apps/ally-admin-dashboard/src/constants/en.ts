@@ -1550,11 +1550,15 @@ export const en = {
       overview: {
         checklistTitle: "Get this chatbot ready to publish",
         checklistDone: "Published. People can message it now.",
+        checklistLiveNotReady: "Published, but still needs: {steps}",
+        publishNeeds: "Before you can publish: {steps}",
+        unsavedLeave: "You have unsaved changes. Leave without saving?",
         stepPersona: "Write its instructions",
         stepKnowledge: "Add knowledge",
         stepAccess: "Choose who can use it",
         stepTest: "Try it in Preview",
         stepConnector: "Add a channel",
+        connectorNotWorking: "Finish connecting your channel",
         stepLive: "Publish",
         view: "View",
         knowledgePreparing: "Your documents are still being prepared",
@@ -1619,8 +1623,7 @@ export const en = {
         saved: "Saved.",
         saveFailed: "Could not save these settings.",
         tryIt: "Preview these changes",
-        agentOff:
-          "The agent is switched off in Defaults, so this chatbot answers with the backup engine.",
+        agentOff: "Answers are in safe mode: “Answer with the agent” is switched off in Defaults.",
       },
       knowledge: {
         title: "Knowledge",
@@ -1634,6 +1637,10 @@ export const en = {
         private: "Private to this chatbot",
         indexing: "Indexing…",
         failed: "Failed",
+        failedHint: "Failed documents aren't used for answers. Remove it and upload it again.",
+        archivedHint:
+          "Archived documents aren't used for answers. Restore it in the knowledge library, or remove it.",
+        loadFailed: "Could not load this chatbot's documents.",
         removePrivateConfirm:
           "Delete “{title}”? It belongs to this chatbot only, so removing it deletes it.",
         privateRemoved: "Document deleted.",
@@ -1657,11 +1664,12 @@ export const en = {
         pickerAdd: "Add {count}",
         pickerEmpty: "Nothing else in the library matches.",
         pickerAllAdded: "Every document in the library is already on this chatbot.",
+        pickerLibraryEmpty: "The library is empty. Upload a document to this chatbot instead.",
         pickerFailed: "Could not load the knowledge library.",
         shared: "Shared",
         archived: "Archived",
         organisationSource:
-          "This chatbot answers each person from their own organisation's documents plus the shared ones (the platform number's original behaviour).",
+          "This chatbot answers each person from their own organisation's documents plus the shared ones.",
         useSelected: "Switch to picked documents",
       },
       people: {
@@ -1671,9 +1679,11 @@ export const en = {
         addMember: "Add",
         memberIdLabel: "User ID",
         memberIdPlaceholder: "e.g. 42",
+        memberIdHelp:
+          "The number on the person's Ally account. If you don't know it, ask an Ally admin to look it up.",
         roleViewer: "Viewer — sees it and tests it",
         roleEditor: "Editor — also changes it",
-        roleOwner: "Owner — also manages team and numbers",
+        roleOwner: "Owner — also manages team and channels",
         removeMember: "Remove",
         teamSaved: "Team updated.",
         teamFailed: "Could not update the team.",
@@ -1697,6 +1707,8 @@ export const en = {
         addFailed: "Could not add to the list.",
         removed: "Removed from the list.",
         modeSaved: "Saved.",
+        teamLoadFailed: "Could not load the team.",
+        listLoadFailed: "Could not load the list.",
       },
       connectors: {
         title: "Channels",
@@ -1717,6 +1729,7 @@ export const en = {
         none: "— No chatbot —",
         newWhatsApp: "Connect a WhatsApp number",
         newWhatsAppIntro: "Connect it here, then add it to a chatbot.",
+        ownerOnlyHint: "Ask the chatbot's owner to connect a number.",
       },
       defaults: {
         intro:
@@ -1732,7 +1745,7 @@ export const en = {
           "Turn off to stop every chatbot replying at once, for example during an incident. Messages are still recorded.",
         agentRuntimeLabel: "Answer with the agent",
         agentRuntimeHelp:
-          "Turn off only in an emergency: every chatbot then answers with the backup engine.",
+          "Turn off only in an emergency: every chatbot then answers in safe mode, with simpler answers.",
         crisisCheckLabel: "Extra AI crisis check",
         crisisCheckHelp:
           "Keyword replies catch messages that say it outright. This also catches ones that don't, like “I can't keep doing this”. Chatbots can't turn it off.",
@@ -1782,7 +1795,7 @@ export const en = {
         replyLengthHelp: "1,600 is safe for WhatsApp.",
         sourcesLabel: "Sources listed under an answer",
         agentNote:
-          "Each chatbot's instructions and model are set on that chatbot's Instructions tab.",
+          "Each chatbot's instructions are on its Instructions tab, and its model is under Settings › Agent.",
         on: "On",
         off: "Off",
         unsaved: "You have unsaved changes",
@@ -1809,9 +1822,9 @@ export const en = {
         agentEmptyHint: "Connect a WhatsApp number so people can message this chatbot.",
         noAgentsTitle: "Create a chatbot first",
         noAgentsHint:
-          "A channel is how people reach a chatbot. Create your first chatbot, then connect its WhatsApp number from the chatbot's Channels tab.",
+          "A channel is how people reach a chatbot. Create your first chatbot, then connect its WhatsApp number from the chatbot's Settings › Channels.",
         allEmpty: "No channels connected",
-        allEmptyHint: "Connect a WhatsApp number here, or from a chatbot's Channels tab.",
+        allEmptyHint: "Connect a WhatsApp number here, or from a chatbot's Settings › Channels.",
       },
       test: {
         title: "Preview",
@@ -1821,8 +1834,9 @@ export const en = {
         send: "Send",
         newThread: "New thread",
         answeredByAgent: "Answered by the agent",
-        answeredByBackup: "Answered by the backup engine",
-        fellBack: "Answered by the backup engine (the agent failed: {reason})",
+        answeredByBackup: "Answered in safe mode",
+        fellBack: "Answered in safe mode (the agent failed: {reason})",
+        fellBackPlain: "There was a problem, so a simpler answer was sent.",
         runId: "Run",
         copy: "Copy",
         steps: "Steps ({count})",
@@ -1834,8 +1848,7 @@ export const en = {
           question: "Question",
           unclear: "Unclear",
         } satisfies Record<AgentTurnType, string>,
-        agentOff:
-          "The agent is switched off in Defaults, so every test answers with the backup engine.",
+        agentOff: "Preview is in safe mode: “Answer with the agent” is switched off in Defaults.",
         handledBy: "Handled by",
         model: "Model",
         sources: "Sources",
@@ -1921,7 +1934,7 @@ export const en = {
       advancedHint: "Rarely needed. Ask Ally before changing these.",
       enabledLabel: "Answer messages",
       enabledHelp:
-        "Turn off to stop this chatbot replying. Pausing it from Overview does the same.",
+        "Turn off to stop this chatbot replying. Unpublishing it from Overview does the same.",
       helplineLabel: "Helpline numbers",
       helplineHelp: "Shown in the crisis reply wherever it says {helpline_numbers}.",
       disclaimerLabel: "First-message notice",
@@ -2092,7 +2105,12 @@ export const en = {
       created: "Reply added",
       updated: "Reply updated",
       archived: "Reply removed",
+      remove: "Remove",
+      removeConfirmTitle: "Remove “{name}”?",
+      removeConfirmBody:
+        "The chatbot will stop using this reply. Messages that matched it will be answered from its knowledge instead.",
       saveFailed: "Could not save the reply",
+      loadFailed: "Could not load the replies",
       validationName: "A name is required",
       validationPatterns: "Add at least one trigger",
       validationReply: "A reply is required",
@@ -2245,13 +2263,20 @@ export const en = {
       block: "Block",
       unblock: "Unblock",
       blocked: "Blocked",
+      unblocked: "Unblocked",
+      blockFailed: "Could not block the number",
+      unblockFailed: "Could not unblock the number",
       blockedBadge: "Blocked",
       blockConfirmTitle: "Block this number?",
       blockConfirmDescription:
         "Messages from this number will be dropped without a reply. They are not told they have been blocked.",
       empty: "No conversations yet",
       emptySubtitle:
-        "Once the chatbot is enabled and someone messages the number, threads appear here.",
+        "Once the chatbot is published and someone messages it, conversations appear here.",
+      emptyNoChannel: "Add a channel so people can message this chatbot.",
+      emptyNotLive: "Publish the chatbot so it starts answering messages.",
+      addChannel: "Add a channel",
+      publish: "Publish",
       emptyFiltered: "No conversations match those filters",
       emptyFilteredSubtitle: "Try a wider date range or clear the filters.",
       loadError: "Could not load conversations.",
@@ -2291,7 +2316,7 @@ export const en = {
       close: "Close",
     },
     unanswered: {
-      heading: "Unanswered Questions",
+      heading: "Knowledge gaps",
       subtitle:
         "Questions its knowledge could not answer. Each one is a gap worth filling — or a question worth declining on purpose.",
       columnQuestion: "Question",
@@ -2300,19 +2325,19 @@ export const en = {
       columnAsked: "Asked",
       reason: {
         no_hits: "Nothing found",
-        below_threshold: "Below the threshold",
+        below_threshold: "Match too weak",
         model_declined: "Passages were not enough",
         error: "Something failed",
       },
       reasonHelp:
-        '"Below the threshold" in bulk means the answer threshold is too high. "Passages were not enough" in bulk means retrieval is finding the wrong passages.',
+        '"Match too weak" for many questions can mean the chatbot is set to be too strict. "Passages were not enough" for many questions usually means its documents don\'t cover them well.',
       status: {
         open: "Open",
-        triaged: "Triaged",
+        triaged: "Seen",
         answered: "Answered",
         dismissed: "Dismissed",
       },
-      markTriaged: "Mark triaged",
+      markTriaged: "Mark as seen",
       markAnswered: "Mark answered",
       dismiss: "Dismiss",
       updated: "Updated",
@@ -2333,7 +2358,7 @@ export const en = {
       answerTitlePlaceholder: "What this material covers",
       answerTextLabel: "Answer text",
       answerTextPlaceholder:
-        "Write the guidance itself, not a reply to this one worker — it will be retrieved for other questions too.",
+        "Write the guidance itself, not a reply to this one worker — it will be used for other questions too.",
       answerTitleRequired: "Give the document a title",
       answerTextRequired: "Write the answer before saving",
       answerSaved: "Document created — it will be searchable once indexing finishes",
@@ -2341,14 +2366,14 @@ export const en = {
       answerSave: "Create document",
     },
     usage: {
-      heading: "Usage",
+      heading: "Analytics",
       subtitle: "How the chatbot is being used, and whether it is answering.",
       rangeLabel: "Period",
       range30: "30 days",
       range90: "90 days",
       range7: "7 days",
       declineRateHelp:
-        'Share of questions that reached the corpus and got no answer. Greetings and keyword replies are excluded, so a quiet week of "hi" does not read as a corpus failure.',
+        "Share of questions it couldn't answer from its knowledge. Greetings and keyword replies aren't counted, so a quiet week of \"hi\" doesn't look like a problem.",
       latencyHelp: "How long a worker waits for a reply.",
       inboundHelp: "Messages received, including greetings and commands.",
       contactsHelp: "Distinct phone numbers that messaged in this period.",
@@ -2367,14 +2392,14 @@ export const en = {
         "Every reply the chatbot sent, by what handled it. A rising orange band is its knowledge falling behind the questions being asked.",
       languagesHeading: "By language",
       languagesHelp:
-        "A decline rate much higher for one language than for English means retrieval is failing for it before an answer is written — check that translate-before-searching is on.",
+        "A decline rate much higher for one language than for English means the chatbot struggles to find answers in that language. Check that “Translate questions to English before searching” is on in Defaults.",
       languageColumn: "Language",
       languageTotal: "Questions",
       languageDeclineRate: "Decline rate",
       insufficientSample: "too few",
       coverageHeading: "Knowledge coverage",
       coverageHelp:
-        "Documents never cited are either badly chunked, badly titled for retrieval, or about something nobody asks.",
+        "Documents never cited may be hard to find (check their titles and layout) or about something nobody asks.",
       coverageDocument: "Document",
       coverageCitations: "Citations",
       neverCited: "never cited",

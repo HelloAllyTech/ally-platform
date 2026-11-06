@@ -22,11 +22,19 @@ import {
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { Chatbot, ChatbotAccessMode, ChatbotAudienceKind, ChatbotMemberRole } from "@types";
+import {
+  Chatbot,
+  ChatbotAccessMode,
+  ChatbotAudienceKind,
+  ChatbotMember,
+  ChatbotMemberRole,
+} from "@types";
 
-import { Card, errorMessage, fill } from "./shared";
+import { Card, errorMessage, fill, LoadError } from "./shared";
 
 const t = en.whatsappBot.bots.people;
+/** One empty list for every render while loading, so effects keyed on the list don't loop. */
+const NO_MEMBERS: ChatbotMember[] = [];
 
 const KIND_LABEL: Record<ChatbotAudienceKind, string> = {
   [ChatbotAudienceKind.USER]: t.kindUser,
@@ -55,7 +63,7 @@ export const PeopleTab: React.FC<{ bot: Chatbot; canEdit: boolean; canManage: bo
 
 const WhoCanChat: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot, canEdit }) => {
   const [updateBot] = useUpdateChatbotMutation();
-  const { data: entries = [], isLoading } = useGetChatbotAudienceQuery(bot.id);
+  const { data: entries = [], isLoading, isError, refetch } = useGetChatbotAudienceQuery(bot.id);
   const [add, { isLoading: isAdding }] = useAddChatbotAudienceMutation();
   const [remove] = useRemoveChatbotAudienceMutation();
   const [kind, setKind] = useState<ChatbotAudienceKind>(ChatbotAudienceKind.PHONE);
@@ -109,6 +117,8 @@ const WhoCanChat: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot, canEdit
         <div className="flex flex-col gap-4">
           {isLoading ? (
             <SkeletonText paragraph lineCount={3} />
+          ) : isError ? (
+            <LoadError title={t.listLoadFailed} onRetry={() => void refetch()} />
           ) : entries.length === 0 ? (
             <p className="text-sm text-warning-700">{t.listEmpty}</p>
           ) : (
@@ -216,7 +226,12 @@ const WhoCanChat: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot, canEdit
 };
 
 const Team: React.FC<{ bot: Chatbot; canManage: boolean }> = ({ bot, canManage }) => {
-  const { data: members = [], isLoading } = useGetChatbotMembersQuery(bot.id);
+  const {
+    data: members = NO_MEMBERS,
+    isLoading,
+    isError,
+    refetch,
+  } = useGetChatbotMembersQuery(bot.id);
   const [save, { isLoading: isSaving }] = useSetChatbotMembersMutation();
   const [draft, setDraft] = useState(members);
   useEffect(() => {
@@ -240,6 +255,8 @@ const Team: React.FC<{ bot: Chatbot; canManage: boolean }> = ({ bot, canManage }
     <Card title={t.teamTitle} subtitle={t.teamIntro}>
       {isLoading ? (
         <SkeletonText paragraph lineCount={3} />
+      ) : isError ? (
+        <LoadError title={t.teamLoadFailed} onRetry={() => void refetch()} />
       ) : draft.length === 0 ? (
         <p className="text-sm text-typography-600">{t.teamEmpty}</p>
       ) : (
@@ -285,11 +302,13 @@ const Team: React.FC<{ bot: Chatbot; canManage: boolean }> = ({ bot, canManage }
           ))}
         </ul>
       )}
-      {canManage && (
+      {/* Adding sends the whole team, so it waits until the team is known. */}
+      {canManage && !isLoading && !isError && (
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_16rem_auto] gap-2 items-end">
           <TextInput
             id="member-id"
             labelText={t.memberIdLabel}
+            helperText={t.memberIdHelp}
             placeholder={t.memberIdPlaceholder}
             value={newId}
             onChange={e => setNewId(e.target.value.replace(/\D/g, ""))}

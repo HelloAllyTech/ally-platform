@@ -157,7 +157,11 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         method: HttpMethod.POST,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.WHATSAPP_BOT_STATS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
+        TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     // ── Phone → organisation mappings ───────────────────────────────────────
@@ -230,7 +234,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         method: HttpMethod.PATCH,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
+      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.CHATBOT_DETAIL],
     }),
 
     /**
@@ -253,7 +257,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         method: HttpMethod.PUT,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
+      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.CHATBOT_DETAIL],
     }),
 
     /** Replace a pasted document's body. A no-op server-side when the text is unchanged. */
@@ -271,6 +275,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
         TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
         TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
       ],
     }),
 
@@ -285,6 +290,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
         TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
         TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
       ],
     }),
 
@@ -298,7 +304,11 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         params: org(row(arg).tenantId),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.WHATSAPP_BOT_STATS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
+        TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     unarchiveKbDocument: builder.mutation<KbDocument, RowArg>({
@@ -307,7 +317,11 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         params: org(row(arg).tenantId),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.WHATSAPP_BOT_STATS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
+        TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     /** A document's chunks — literally what the bot can see. */
@@ -499,7 +513,12 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         method: HttpMethod.POST,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_NUMBERS, TAG_TYPES.CONNECTORS, TAG_TYPES.CHATBOTS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+        TAG_TYPES.CONNECTORS,
+        TAG_TYPES.CHATBOTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     /** A mutation for the same reason as the provider check: it calls Meta only when pressed. */
@@ -511,7 +530,12 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.WHATSAPP_BOT.NUMBER_CHECK(id),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_NUMBERS, TAG_TYPES.CONNECTORS, TAG_TYPES.CHATBOTS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+        TAG_TYPES.CONNECTORS,
+        TAG_TYPES.CHATBOTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     subscribeWaNumber: builder.mutation<WaBusinessNumber, { id: string }>({
@@ -519,7 +543,12 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.WHATSAPP_BOT.NUMBER_SUBSCRIBE(id),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_NUMBERS, TAG_TYPES.CONNECTORS, TAG_TYPES.CHATBOTS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+        TAG_TYPES.CONNECTORS,
+        TAG_TYPES.CHATBOTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     disconnectWaNumber: builder.mutation<void, { id: string }>({
@@ -527,7 +556,12 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.WHATSAPP_BOT.NUMBER_BY_ID(id),
         method: HttpMethod.DELETE,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_NUMBERS, TAG_TYPES.CONNECTORS, TAG_TYPES.CHATBOTS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+        TAG_TYPES.CONNECTORS,
+        TAG_TYPES.CHATBOTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     // ---- Preview console ----
@@ -701,7 +735,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         params: bot(chatbotId),
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_UNANSWERED],
+      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_UNANSWERED, TAG_TYPES.CHATBOT_DETAIL],
     }),
 
     /**
@@ -720,7 +754,11 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         params: bot(chatbotId),
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_UNANSWERED, TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_UNANSWERED,
+        TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     // ---- Usage dashboard ----

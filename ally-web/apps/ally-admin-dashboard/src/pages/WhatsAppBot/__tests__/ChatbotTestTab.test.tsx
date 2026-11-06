@@ -6,9 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Chatbot, TestChatbotResponse } from "@types";
 
 /**
- * Preview says which engine answered each test, shows the new engine's run id and steps, and keeps
- * the engine's thread until "New thread". In Agent mode each step reads as its summary (tool calls
- * marked as such), and each reply says what the agent understood the message to be.
+ * Preview tells platform admins which engine answered each test and shows the run id and steps;
+ * everyone else sees none of that, only a plain note when an answer fell back. It keeps the
+ * engine's thread until "New thread". In Agent mode each step reads as its summary (tool calls
+ * marked as such), and each reply says what the agent understood the message to be. Edits handed
+ * over from Instructions or Agent are sent with each test and left stored for those tabs.
  */
 
 let canCreate = false;
@@ -96,7 +98,8 @@ describe("ChatbotTestTab — engine and run", () => {
     nextResult = result();
   });
 
-  it("shows the engine, the run id and the steps with their time", async () => {
+  it("shows platform admins the engine, the run id and the steps with their time", async () => {
+    canCreate = true;
     render(<ChatbotTestTab bot={BOT} />);
     await ask("What does Ally do?");
 
@@ -107,11 +110,12 @@ describe("ChatbotTestTab — engine and run", () => {
     expect(screen.getByText("write · 2100 ms")).toBeInTheDocument();
   });
 
-  it("shows a v1 answer with no run, and a fallback with its reason", async () => {
+  it("shows platform admins a v1 answer with no run, and a fallback with its reason", async () => {
+    canCreate = true;
     nextResult = result({ runtime: "v1", runId: null, trace: null, reply: "From v1." });
     render(<ChatbotTestTab bot={BOT} />);
     await ask("q1");
-    expect(screen.getByTestId("engine-badge")).toHaveTextContent("Answered by the backup engine");
+    expect(screen.getByTestId("engine-badge")).toHaveTextContent("Answered in safe mode");
     expect(screen.queryByText(/^Steps/)).not.toBeInTheDocument();
 
     nextResult = result({
@@ -122,7 +126,7 @@ describe("ChatbotTestTab — engine and run", () => {
     });
     await ask("q2");
     expect(screen.getAllByTestId("engine-badge")[1]).toHaveTextContent(
-      "Answered by the backup engine (the agent failed: upstream_404)",
+      "Answered in safe mode (the agent failed: upstream_404)",
     );
   });
 
@@ -138,9 +142,44 @@ describe("ChatbotTestTab — engine and run", () => {
     await ask("q");
     expect(
       screen.getByText(
-        "The agent is switched off in Defaults, so every test answers with the backup engine.",
+        "Preview is in safe mode: “Answer with the agent” is switched off in Defaults.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("shows everyone else no engine or run, and a plain note when an answer fell back", async () => {
+    render(<ChatbotTestTab bot={BOT} />);
+    await ask("q1");
+    expect(screen.queryByTestId("engine-badge")).not.toBeInTheDocument();
+    expect(screen.queryByText(nextResult.runId!)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Steps/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("fallback-note")).not.toBeInTheDocument();
+
+    nextResult = result({ runtime: "v2_fallback", fallbackReason: "upstream_404", reply: "Fell." });
+    await ask("q2");
+    expect(screen.getByTestId("fallback-note")).toHaveTextContent(
+      "There was a problem, so a simpler answer was sent.",
+    );
+    expect(screen.queryByText(/upstream_404/)).not.toBeInTheDocument();
+  });
+
+  it("sends the edits handed over to it and leaves them stored", async () => {
+    const stored = {
+      name: "Ally FAQ",
+      description: "",
+      persona: { displayName: "Ava" },
+      answerMode: "documents_only",
+      model: null,
+    };
+    sessionStorage.setItem("chatbot-draft:bot-1", JSON.stringify(stored));
+    render(<ChatbotTestTab bot={BOT} />);
+    expect(screen.getByText("Previewing your unsaved instructions.")).toBeInTheDocument();
+    await ask("q");
+    expect(testSpy.mock.calls[0][0]).toMatchObject({
+      draft: { persona: { displayName: "Ava" }, answerMode: "documents_only", model: null },
+    });
+    expect(JSON.parse(sessionStorage.getItem("chatbot-draft:bot-1")!)).toEqual(stored);
+    sessionStorage.clear();
   });
 
   it("keeps the thread across a conversation and drops it on New thread", async () => {
@@ -204,7 +243,8 @@ describe("ChatbotTestTab — Agent mode", () => {
     });
   });
 
-  it("shows tool steps with their summary and time", async () => {
+  it("shows platform admins tool steps with their summary and time", async () => {
+    canCreate = true;
     render(<ChatbotTestTab bot={BOT} />);
     await ask("and after that, how do I sign in?");
     expect(

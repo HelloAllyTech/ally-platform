@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 
 import { toast } from "sonner";
 
@@ -14,23 +14,29 @@ import { useGetChatbotsQuery, useGetLlmModelsQuery, useUpdateChatbotMutation } f
 import { Button, EntityField } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { Chatbot, ChatbotAnswerMode, ChatbotModelChoice } from "@types";
+import { Chatbot, ChatbotAnswerMode } from "@types";
 
-import { handOverToPreview } from "./previewDraft";
+import {
+  handOverToPreview,
+  PreviewDraft,
+  readStoredDraft,
+  savedDraftOf,
+  settlePreviewDraft,
+  useTabDraft,
+} from "./previewDraft";
 import { Card, errorMessage } from "./shared";
+import { useReportUnsaved } from "./unsavedChanges";
 
 const t = en.whatsappBot.bots.agent;
 /** The runtime that answers chatbot questions; only its models are offered. */
 const ANSWER_RUNTIME = "ally-ai";
 
-interface AnswersDraft {
-  answerMode: ChatbotAnswerMode;
-  model: ChatbotModelChoice | null;
-}
+type AnswersDraft = Pick<PreviewDraft, "answerMode" | "model">;
 
-const draftOf = (bot: Chatbot): AnswersDraft => ({
-  answerMode: bot.answerMode,
-  model: bot.model,
+/** The part of the bot this tab edits. */
+const answersPart = (draft: PreviewDraft): AnswersDraft => ({
+  answerMode: draft.answerMode,
+  model: draft.model,
 });
 
 /**
@@ -46,14 +52,10 @@ export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => 
 }) => {
   // Platform admins only: the same signal the chatbot pages use for every platform-wide control.
   const { data: list } = useGetChatbotsQuery();
-  const [draft, setDraft] = useState<AnswersDraft>(() => draftOf(bot));
-  useEffect(() => {
-    setDraft(draftOf(bot));
-  }, [bot]);
+  const { draft, setDraft, dirty } = useTabDraft(bot, answersPart);
+  useReportUnsaved("agent", dirty);
   const [save, { isLoading: isSaving }] = useUpdateChatbotMutation();
   const { data: models = [] } = useGetLlmModelsQuery(ANSWER_RUNTIME);
-
-  const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(draftOf(bot)), [draft, bot]);
   const selectedModel = models.find(
     m => m.provider === draft.model?.provider && m.model === draft.model?.model,
   );
@@ -61,6 +63,7 @@ export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => 
   const handleSave = async () => {
     try {
       await save({ id: bot.id, answerMode: draft.answerMode, model: draft.model }).unwrap();
+      settlePreviewDraft(bot, draft);
       toast.success(t.saved);
     } catch (err) {
       toast.error(errorMessage(err, t.saveFailed));
@@ -68,12 +71,7 @@ export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => 
   };
 
   const tryIt = () => {
-    handOverToPreview(bot.id, {
-      name: bot.name,
-      description: bot.description ?? "",
-      persona: { ...bot.persona },
-      ...draft,
-    });
+    handOverToPreview(bot, { ...(readStoredDraft(bot.id) ?? savedDraftOf(bot)), ...draft });
     onTest();
   };
 

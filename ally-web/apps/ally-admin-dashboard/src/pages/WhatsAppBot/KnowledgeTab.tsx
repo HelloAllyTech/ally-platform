@@ -80,7 +80,7 @@ export const KnowledgeTab: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot
   }
 
   if (isLoading) return <SkeletonText paragraph lineCount={6} />;
-  if (isError) return <LoadError title={t.saveFailed} onRetry={() => void refetch()} />;
+  if (isError) return <LoadError title={t.loadFailed} onRetry={() => void refetch()} />;
 
   // The library documents on this bot. Its private ones stay attached whatever is sent.
   const sharedIds = docs.filter(d => !d.private).map(d => d.id);
@@ -111,10 +111,10 @@ export const KnowledgeTab: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot
       action={
         canEdit && (
           <div className="flex flex-wrap gap-2">
-            <Button variant={ButtonVariant.SECONDARY} onClick={() => setUploading(true)}>
+            <Button variant={ButtonVariant.PRIMARY} onClick={() => setUploading(true)}>
               {t.upload}
             </Button>
-            <Button variant={ButtonVariant.PRIMARY} onClick={() => setPicking(true)}>
+            <Button variant={ButtonVariant.SECONDARY} onClick={() => setPicking(true)}>
               {t.add}
             </Button>
           </div>
@@ -124,8 +124,8 @@ export const KnowledgeTab: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot
       {docs.length === 0 ? (
         <EmptyState
           title={t.empty}
-          actionLabel={t.add}
-          onAction={() => setPicking(true)}
+          actionLabel={t.upload}
+          onAction={() => setUploading(true)}
           hideActionButton={!canEdit}
         />
       ) : (
@@ -135,6 +135,12 @@ export const KnowledgeTab: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot
               <div className="flex-1 min-w-0 flex flex-col">
                 <span className="text-sm text-typography-900 truncate">{doc.title}</span>
                 <span className="text-xs text-typography-500">{timeAgo(doc.updatedAt)}</span>
+                {/* The row carries no reason, so say what it means and what to do about it. */}
+                {doc.status === KbDocumentStatus.FAILED ? (
+                  <span className="text-xs text-destructive-600">{t.failedHint}</span>
+                ) : (
+                  doc.archived && <span className="text-xs text-warning-700">{t.archivedHint}</span>
+                )}
               </div>
               {isIndexing(doc) && <StatusPill tone="neutral">{t.indexing}</StatusPill>}
               {doc.status === KbDocumentStatus.FAILED && (
@@ -193,6 +199,8 @@ const LibraryPicker: React.FC<{
     () => (data?.documents ?? []).filter(doc => !alreadyPicked.includes(doc.id)),
     [data, alreadyPicked],
   );
+  // Nothing in the library at all, as against everything in it already being on this bot.
+  const libraryEmpty = !search && (data?.documents ?? []).length === 0;
   const toggle = (id: string) =>
     setChosen(current => {
       const next = new Set(current);
@@ -226,7 +234,9 @@ const LibraryPicker: React.FC<{
       ) : isFetching && !data ? (
         <SkeletonText paragraph lineCount={4} />
       ) : available.length === 0 ? (
-        <p className="text-sm text-typography-600">{search ? t.pickerEmpty : t.pickerAllAdded}</p>
+        <p className="text-sm text-typography-600">
+          {search ? t.pickerEmpty : libraryEmpty ? t.pickerLibraryEmpty : t.pickerAllAdded}
+        </p>
       ) : (
         <div className="flex flex-col gap-1">
           {available.map(doc => (

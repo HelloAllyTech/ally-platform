@@ -31,7 +31,7 @@ import {
 } from "@components";
 import { AppTooltip } from "@components/app-tooltip";
 import { en, TooltipLocation } from "@constants";
-import { WaConversationSummary, WaHandledBy } from "@types";
+import { Chatbot, ChatbotStatus, WaConversationSummary, WaHandledBy } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
 import { useChatbotId } from "./chatbotContext";
@@ -69,7 +69,12 @@ const endOfDayIso = (isoDate: string): string => {
  * screen gets screenshotted. A full number requires an explicit per-contact reveal, which the server
  * logs.
  */
-export const ConversationsTab: React.FC = () => {
+export const ConversationsTab: React.FC<{
+  /** The chatbot whose log this is, so an empty log can say what's missing. */
+  bot?: Pick<Chatbot, "status" | "connectors">;
+  /** Go to where the missing step is done: its channels, or Overview to publish. */
+  onGo?: (destination: "connectors" | "overview") => void;
+}> = ({ bot, onGo }) => {
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const [declinedOnly, setDeclinedOnly] = useState(false);
@@ -166,15 +171,22 @@ export const ConversationsTab: React.FC = () => {
 
   const handleBlockConfirmed = useCallback(async () => {
     if (!blockTarget) return;
+    const unblocking = Boolean(blockTarget.blockedAt);
     try {
-      if (blockTarget.blockedAt) {
+      if (unblocking) {
         await unblockContact({ id: blockTarget.contactId, chatbotId }).unwrap();
       } else {
         await blockContact({ id: blockTarget.contactId, chatbotId }).unwrap();
       }
-      toast.success(en.whatsappBot.conversations.blocked);
+      toast.success(
+        unblocking ? en.whatsappBot.conversations.unblocked : en.whatsappBot.conversations.blocked,
+      );
     } catch {
-      toast.error(en.whatsappBot.conversations.revealFailed);
+      toast.error(
+        unblocking
+          ? en.whatsappBot.conversations.unblockFailed
+          : en.whatsappBot.conversations.blockFailed,
+      );
     } finally {
       setBlockTarget(null);
     }
@@ -251,6 +263,24 @@ export const ConversationsTab: React.FC = () => {
 
   const isFiltered =
     search.trim().length > 0 || declinedOnly || Boolean(from || to || language || handledBy);
+
+  // An empty log on a chatbot that can't receive messages yet points at the step that's missing.
+  const nextStep: { subtitle: string; label: string; go: () => void } | null =
+    !bot || !onGo
+      ? null
+      : bot.connectors.length === 0
+        ? {
+            subtitle: en.whatsappBot.conversations.emptyNoChannel,
+            label: en.whatsappBot.conversations.addChannel,
+            go: () => onGo("connectors"),
+          }
+        : bot.status !== ChatbotStatus.LIVE
+          ? {
+              subtitle: en.whatsappBot.conversations.emptyNotLive,
+              label: en.whatsappBot.conversations.publish,
+              go: () => onGo("overview"),
+            }
+          : null;
 
   return (
     <div className="pt-4">
@@ -389,9 +419,11 @@ export const ConversationsTab: React.FC = () => {
           subtitle={
             isFiltered
               ? en.whatsappBot.conversations.emptyFilteredSubtitle
-              : en.whatsappBot.conversations.emptySubtitle
+              : (nextStep?.subtitle ?? en.whatsappBot.conversations.emptySubtitle)
           }
-          hideActionButton
+          actionLabel={nextStep?.label}
+          onAction={nextStep?.go}
+          hideActionButton={isFiltered || !nextStep}
         />
       )}
 

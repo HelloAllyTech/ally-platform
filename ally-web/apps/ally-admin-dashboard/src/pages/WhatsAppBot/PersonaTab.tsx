@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 
 import { toast } from "sonner";
 
@@ -9,49 +9,61 @@ import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { Chatbot, ChatbotPersona } from "@types";
 
-import { handOverToPreview, PreviewDraft } from "./previewDraft";
+import {
+  handOverToPreview,
+  PreviewDraft,
+  readStoredDraft,
+  savedDraftOf,
+  settlePreviewDraft,
+  useTabDraft,
+} from "./previewDraft";
 import { Card, errorMessage, fill, missingPersonaFields } from "./shared";
+import { useReportUnsaved } from "./unsavedChanges";
 
 const t = en.whatsappBot.bots.persona;
 const MAX_PROMPT = 4000;
 
-/** The bot as this tab edits it. Answer mode and model are edited on the Agent tab. */
-const draftOf = (bot: Chatbot): PreviewDraft => ({
-  name: bot.name,
-  description: bot.description ?? "",
-  persona: { ...bot.persona },
-  answerMode: bot.answerMode,
-  model: bot.model,
+type PersonaDraft = Pick<PreviewDraft, "name" | "description" | "persona">;
+
+/** The part of the bot this tab edits. Answer mode and model are edited on the Agent tab. */
+const personaPart = (draft: PreviewDraft): PersonaDraft => ({
+  name: draft.name,
+  description: draft.description,
+  persona: draft.persona,
 });
 
 /**
  * Who the bot is and what it says: name, instructions, tone and greeting. How it answers (answer
  * mode, model) is on the Agent tab. Unsaved changes can be tried in Preview before saving
- * (they travel as a draft).
+ * (they travel as a draft, and are still here on coming back).
  */
 export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => void }> = ({
   bot,
   canEdit,
   onTest,
 }) => {
-  const [draft, setDraft] = useState<PreviewDraft>(() => draftOf(bot));
-  useEffect(() => {
-    setDraft(draftOf(bot));
-  }, [bot]);
+  const { draft, setDraft, dirty } = useTabDraft(bot, personaPart);
+  useReportUnsaved("persona", dirty);
   const [save, { isLoading: isSaving }] = useUpdateChatbotMutation();
 
-  const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(draftOf(bot)), [draft, bot]);
   const setPersona = (patch: Partial<ChatbotPersona>) =>
     setDraft(current => ({ ...current, persona: { ...current.persona, ...patch } }));
 
   const handleSave = async () => {
+    const saved: PersonaDraft = {
+      name: draft.name.trim(),
+      description: draft.description.trim(),
+      persona: draft.persona,
+    };
     try {
       await save({
         id: bot.id,
-        name: draft.name.trim(),
-        description: draft.description.trim() || null,
-        persona: draft.persona,
+        name: saved.name,
+        description: saved.description || null,
+        persona: saved.persona,
       }).unwrap();
+      setDraft(saved);
+      settlePreviewDraft(bot, saved);
       toast.success(t.saved);
     } catch (err) {
       toast.error(errorMessage(err, t.saveFailed));
@@ -59,7 +71,7 @@ export const PersonaTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () =
   };
 
   const tryIt = () => {
-    handOverToPreview(bot.id, draft);
+    handOverToPreview(bot, { ...(readStoredDraft(bot.id) ?? savedDraftOf(bot)), ...draft });
     onTest();
   };
 

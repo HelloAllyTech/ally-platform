@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
@@ -17,9 +17,11 @@ import { ConversationsTab } from "./ConversationsTab";
 import { KnowledgeTab } from "./KnowledgeTab";
 import { PeopleTab } from "./PeopleTab";
 import { PersonaTab } from "./PersonaTab";
+import { clearPreviewDraft } from "./previewDraft";
 import { LoadError } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
 import { UnansweredTab } from "./UnansweredTab";
+import { UnsavedChangesContext } from "./unsavedChanges";
 import { UsageTab } from "./UsageTab";
 import { ChatbotStatusPill } from "./WhatsAppBot";
 
@@ -64,7 +66,7 @@ export const canDo = (bot: Pick<Chatbot, "myRole">, role: ChatbotMemberRole) =>
  * channels, general settings) as sections of Settings so the tab row stays short. Everything inside reads
  * the bot from ChatbotContext, and every action is offered only to the roles the backend accepts
  * it from — a viewer sees the bot and can test it, an editor changes it, an owner also manages its
- * team and numbers.
+ * team and channels. Leaving a tab with unsaved edits asks first.
  */
 export const ChatbotPage: React.FC = () => {
   const { botId = "" } = useParams();
@@ -91,12 +93,44 @@ export const ChatbotPage: React.FC = () => {
   const activeSection: ChatbotSettingsSectionId = isSection(requestedSection)
     ? requestedSection
     : "agent";
-  const goToTab = useCallback(
+  // Tabs with unsaved edits report them here, so leaving one (or the page) asks first.
+  const unsaved = useRef(new Set<string>());
+  const [hasUnsaved, setHasUnsaved] = useState(false);
+  const reportUnsaved = useCallback((source: string, dirty: boolean) => {
+    if (dirty) unsaved.current.add(source);
+    else unsaved.current.delete(source);
+    setHasUnsaved(unsaved.current.size > 0);
+  }, []);
+  useEffect(() => {
+    if (!hasUnsaved) return undefined;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Older browsers show the prompt only when returnValue is set.
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsaved]);
+
+  /** Open a tab or section. Edits handed to Preview travel with it, so that move doesn't ask. */
+  const openTab = useCallback(
     (id: string) => {
       if (isSection(id)) setSearchParams({ tab: "settings", section: id });
       else setSearchParams(id === "overview" ? {} : { tab: id });
     },
     [setSearchParams],
+  );
+  const goToTab = useCallback(
+    (id: string) => {
+      const current = activeTab === "settings" ? activeSection : activeTab;
+      if (id !== current && unsaved.current.size > 0) {
+        if (!window.confirm(t.overview.unsavedLeave)) return;
+        // Leaving without saving throws the edits away, including any handed to Preview.
+        clearPreviewDraft(botId);
+      }
+      openTab(id);
+    },
+    [activeTab, activeSection, openTab, botId],
   );
   const sectionItems = useMemo(
     () => SECTION_ORDER.map(id => ({ id, label: t.settingsSections[id] })),
@@ -114,7 +148,7 @@ export const ChatbotPage: React.FC = () => {
   const renderSection = () => {
     switch (activeSection) {
       case "replies":
-        return <TemplatesTab />;
+        return <TemplatesTab canEdit={canEdit} />;
       case "people":
         return <PeopleTab bot={bot} canEdit={canEdit} canManage={canManage} />;
       case "connectors":
@@ -123,14 +157,14 @@ export const ChatbotPage: React.FC = () => {
         return <ChatbotSettingsTab chatbotId={bot.id} chatbotName={bot.name} canEdit={canEdit} />;
       case "agent":
       default:
-        return <AgentTab bot={bot} canEdit={canEdit} onTest={() => goToTab("test")} />;
+        return <AgentTab bot={bot} canEdit={canEdit} onTest={() => openTab("test")} />;
     }
   };
 
   const renderTab = () => {
     switch (activeTab) {
       case "persona":
-        return <PersonaTab bot={bot} canEdit={canEdit} onTest={() => goToTab("test")} />;
+        return <PersonaTab bot={bot} canEdit={canEdit} onTest={() => openTab("test")} />;
       case "knowledge":
         return <KnowledgeTab bot={bot} canEdit={canEdit} />;
       case "settings":
@@ -148,7 +182,7 @@ export const ChatbotPage: React.FC = () => {
       case "test":
         return <ChatbotTestTab bot={bot} />;
       case "conversations":
-        return <ConversationsTab />;
+        return <ConversationsTab bot={bot} onGo={goToTab} />;
       case "unanswered":
         return <UnansweredTab />;
       case "usage":
@@ -166,6 +200,11 @@ export const ChatbotPage: React.FC = () => {
       <div className="flex flex-col gap-2 pb-6">
         <Link
           to={ROUTES.WHATSAPP_BOT}
+          onClick={event => {
+            if (unsaved.current.size === 0) return;
+            if (window.confirm(t.overview.unsavedLeave)) clearPreviewDraft(botId);
+            else event.preventDefault();
+          }}
           className="text-sm text-typography-600 hover:underline w-fit"
         >
           ← {t.back}
@@ -181,7 +220,9 @@ export const ChatbotPage: React.FC = () => {
       <div className="pt-6">
         {/* Keyed by bot so moving between bots starts every tab fresh. */}
         <ChatbotContext.Provider value={bot.id} key={bot.id}>
-          {renderTab()}
+          <UnsavedChangesContext.Provider value={reportUnsaved}>
+            {renderTab()}
+          </UnsavedChangesContext.Provider>
         </ChatbotContext.Provider>
       </div>
     </div>

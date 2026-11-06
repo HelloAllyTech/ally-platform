@@ -91,7 +91,7 @@ describe("AgentTab — no Engine card", () => {
     renderTab();
     expect(
       screen.getByText(
-        "The agent is switched off in Defaults, so this chatbot answers with the backup engine.",
+        "Answers are in safe mode: “Answer with the agent” is switched off in Defaults.",
       ),
     ).toBeInTheDocument();
   });
