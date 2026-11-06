@@ -10,6 +10,7 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_serializer
 
+from app.core.agent_runtime.schemas import TurnType
 from app.schemas.knowledge_agent import (
     KnowledgeAnswerRequest,
     KnowledgeAnswerResponse,
@@ -95,15 +96,13 @@ class AgentRunResponse(KnowledgeAnswerResponse):
     run_id: str
     trace: List[TraceStep] = Field(default_factory=list)
     runtime: Literal["v2"] = "v2"
-    turn_type: Optional[Literal["smalltalk", "about_bot", "question", "unclear"]] = (
-        Field(
-            None,
-            description=(
-                "What the conversational agent understood the message to be. None "
-                "when `features.agent` is off. A smalltalk or about_bot reply comes "
-                "back as intent `answer` with no citations."
-            ),
-        )
+    turn_type: Optional[TurnType] = Field(
+        None,
+        description=(
+            "What the conversational agent understood the message to be. None "
+            "when `features.agent` is off. A smalltalk or about_bot reply comes "
+            "back as intent `answer` with no citations."
+        ),
     )
 
     @model_serializer(mode="wrap")

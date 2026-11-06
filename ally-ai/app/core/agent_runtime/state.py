@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
+from app.core.agent_runtime.schemas import TurnType
+
 
 def add_trace(
     left: Optional[List[Dict[str, Any]]], right: Optional[List[Dict[str, Any]]]
@@ -57,7 +59,7 @@ class RunWorking(TypedDict, total=False):
     answer_meta: Optional[Dict[str, Any]]
 
     # --- working: conversational agent (`features.agent`)
-    turn_type: Optional[str]  # smalltalk | about_bot | question | unclear
+    turn_type: Optional[TurnType]
     # The gate verdict on the run's first search, as the parity path's gate would
     # have given it; None when it found something relevant or no search ran.
     search_gate: Optional[str]
