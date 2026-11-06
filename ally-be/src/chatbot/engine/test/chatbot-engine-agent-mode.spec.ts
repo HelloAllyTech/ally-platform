@@ -22,6 +22,7 @@ import {
   ChatbotEngineService,
   KNOWLEDGE_PROMPT_CODES,
 } from '../chatbot-engine.service';
+import { AgentRuntimeRunner } from '../agent-runtime-runner.service';
 import type { ChatTurn } from '../chatbot-engine.types';
 
 const row = (over: Partial<WaKeywordTemplate>): WaKeywordTemplate =>
@@ -205,11 +206,12 @@ describe('ChatbotEngineService in Agent mode', () => {
         { title: 'Ally FAQ – About Ally' },
         { title: 'Ally FAQ – Privacy and Data' },
       ]);
+    const documents = {
+      find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
+      manager: { query: titles },
+    } as never;
     engine = new ChatbotEngineService(
-      {
-        find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
-        manager: { query: titles },
-      } as never,
+      documents,
       new ChatbotReplyService({
         find: jest.fn().mockResolvedValue(TEMPLATES),
       } as never),
@@ -217,6 +219,7 @@ describe('ChatbotEngineService in Agent mode', () => {
       { canChat: jest.fn().mockResolvedValue(true) } as never,
       aiService as never,
       promptShared as never,
+      new AgentRuntimeRunner(documents, aiService as never),
     );
   });
 

@@ -14,6 +14,7 @@ import {
 } from '../../enum/chatbot.enum';
 import { agentRunIdFor } from '../agent-runtime';
 import { ChatbotEngineService } from '../chatbot-engine.service';
+import { AgentRuntimeRunner } from '../agent-runtime-runner.service';
 import type { ChatTurn } from '../chatbot-engine.types';
 
 const bot = (over: Partial<Chatbot> = {}): Chatbot =>
@@ -136,15 +137,17 @@ describe('ChatbotEngineService', () => {
         },
       ]),
     };
+    const documents = {
+      find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
+    } as never;
     engine = new ChatbotEngineService(
-      {
-        find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
-      } as never,
+      documents,
       { match: jest.fn().mockResolvedValue(null) } as never,
       { renderPlaceholders: (text: string) => text } as never,
       { canChat: jest.fn().mockResolvedValue(true) } as never,
       aiService as never,
       promptShared as never,
+      new AgentRuntimeRunner(documents, aiService as never),
     );
   });
 

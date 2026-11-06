@@ -9,6 +9,7 @@ import { WaKeywordTemplate } from '../whatsapp/entity/wa-keyword-template.entity
 import { ConnectorRegistry } from './connector/connector-registry';
 import { ChatbotController } from './controller/chatbot.controller';
 import { ConnectorController } from './controller/connector.controller';
+import { AgentRuntimeRunner } from './engine/agent-runtime-runner.service';
 import { ChatbotEngineService } from './engine/chatbot-engine.service';
 import { AgentShadowRun } from './entity/agent-shadow-run.entity';
 import { ChatbotAudience } from './entity/chatbot-audience.entity';
@@ -61,6 +62,7 @@ import { ConnectorService } from './service/connector.service';
     ChatbotSettingsService,
     ChatbotReplyService,
     ChatbotEngineService,
+    AgentRuntimeRunner,
     ConnectorService,
     ChatbotService,
     ChatbotShadowService,

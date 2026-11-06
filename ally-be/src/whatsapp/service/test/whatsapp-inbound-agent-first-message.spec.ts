@@ -18,6 +18,7 @@ import {
   AGENT_FALLBACK_EVENT,
   AGENT_SHADOW_RUN_EVENT,
 } from 'src/chatbot/engine/agent-runtime';
+import { AgentRuntimeRunner } from 'src/chatbot/engine/agent-runtime-runner.service';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { ChatbotAudience } from 'src/chatbot/entity/chatbot-audience.entity';
@@ -271,6 +272,7 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
           useValue: { identify: async (c: WaContact) => c },
         },
         ChatbotEngineService,
+        AgentRuntimeRunner,
         ChatbotAudienceService,
         { provide: ConnectorService, useValue: { chatbotFor: jest.fn() } },
         {

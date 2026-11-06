@@ -11,6 +11,9 @@ import type { ChatTurn } from './chatbot-engine.types';
  */
 export const MAX_HISTORY_MESSAGES = 10;
 
+/** A document id no document has: the "search nothing" filter. */
+export const NO_DOCUMENTS = '00000000-0000-0000-0000-000000000000';
+
 /**
  * The longest decline wording `/agent/run` accepts (ally-ai `AgentRunRequest.decline_text`, a 422
  * past it). The agent takes only its tone and where-to-go-next, so a longer wording — valid for v1,
