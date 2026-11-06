@@ -1,11 +1,12 @@
-import { AIMessage, createAgent, HumanMessage, ToolMessage, toolStrategy } from "langchain";
+import { AIMessage, BaseMessage, createAgent, HumanMessage, ToolMessage, toolStrategy } from "langchain";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { GoogleAuth } from "google-auth-library";
 import { createAppAuth } from "@octokit/auth-app";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { ChatOpenAI } from "@langchain/openai";
 import z from "zod"
-import { AGENT_SYSTEM_PROMPT } from "../constants/analytics-agent.constants";
+import { AGENT_LIMITS, AGENT_SYSTEM_PROMPT } from "../constants/analytics-agent.constants";
+import { AnalyticalAgentTraceHandler, buildAgentTrace, DbtHeadCommit, parseToolResult } from "./analytical-agent-trace";
 
 
 const LLM = new ChatOpenAI({
@@ -146,22 +147,100 @@ const AVAILABLE_TABLES = {
 };
 
 
-export async function invokeAnalyticalAgent(query : string , userId? : string , chatId? : string){
+const RECURSION_LIMIT = 60
+
+export type AnalyticalAgentHistoryTurn = {
+    question : string
+    sql? : string
+    answer? : string
+}
+
+// The server holds no conversation: the client replays prior answered turns so follow-ups
+// ("and by language?") have context. They go in as ONE labelled human message rather than as
+// assistant messages: replayed assistant turns are plain text, and the model copies that format
+// and answers in plain text instead of calling the structured-output tool - which leaves
+// `structuredResponse` empty. History is context only; every query still runs through the tools.
+function buildInputMessages(query : string , history : AnalyticalAgentHistoryTurn[] = []){
+    const turns = history.slice(-AGENT_LIMITS.MAX_HISTORY_TURNS)
+    if (turns.length === 0) return [new HumanMessage(query)]
+
+    const transcript = turns
+        .map((turn , i)=> [
+            `Previous question ${i + 1}: ${turn.question}`,
+            turn.sql ? `SQL that ran:\n${turn.sql}` : undefined,
+            turn.answer ? `Answer given: ${turn.answer}` : undefined,
+        ].filter(Boolean).join("\n"))
+        .join("\n\n")
+
+    return [new HumanMessage(
+        "Earlier in this conversation (context only - use it to resolve references like \"that\" or \"the same period\"; " +
+        "re-run queries rather than reusing numbers from it):\n\n" +
+        `${transcript}\n\n---\n\nCurrent question: ${query}`
+    )]
+}
+
+// When the model writes the structured answer out as text (sometimes inside a code fence)
+// instead of calling the tool, recover the fields; otherwise treat the whole text as the answer.
+function parseStructuredText(text : string){
+    const unfenced = text.replace(/^```(?:json)?\s*/i , "").replace(/\s*```$/ , "").trim()
+    try {
+        const parsed = outputSchema.safeParse(JSON.parse(unfenced))
+        if (parsed.success) return { response : parsed.data.response , followUps : parsed.data.followUps ?? [] }
+    } catch {
+        // not JSON - plain prose answer
+    }
+    return { response : text , followUps : [] as string[] }
+}
+
+// Plain text of the last assistant message, for when the model answered without the structured tool.
+function lastAiText(messages : BaseMessage[]) : string | undefined {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i]
+        if (message.type !== "ai") continue
+        const content = message.content as unknown
+        const text = typeof content === "string"
+            ? content
+            : Array.isArray(content)
+                ? content.map((block)=> (typeof block === "string" ? block : (block as { text? : string })?.text ?? "")).join("")
+                : ""
+        if (text.trim()) return text.trim()
+    }
+    return undefined
+}
+
+export async function invokeAnalyticalAgent(query : string , history : AnalyticalAgentHistoryTurn[] = [] , userId? : string , chatId? : string){
     console.log("entered the new function")
+    const startedAtMs = Date.now()
     const tools = await client.listTools()
 
+    const systemPrompt = AGENT_SYSTEM_PROMPT.replace("{{AVAILABLE_TABLES}}",Object.keys(AVAILABLE_TABLES).join("\n"))
     const agent = createAgent({
         model : LLM,
-        systemPrompt : AGENT_SYSTEM_PROMPT.replace("{{AVAILABLE_TABLES}}",Object.keys(AVAILABLE_TABLES).join("\n")),
+        systemPrompt,
         responseFormat : toolStrategy(outputSchema),
         tools
     })
 
+    const inputMessages = buildInputMessages(query , history)
+    const traceHandler = new AnalyticalAgentTraceHandler()
     const answer = await agent.invoke({
-        messages : [new HumanMessage(query)],
+        messages : inputMessages,
     } , {
-        recursionLimit : 60
+        recursionLimit : RECURSION_LIMIT,
+        callbacks : [traceHandler],
     })
+
+    // The model should finish through the structured-output tool. If it replied in plain text
+    // instead, use that text rather than returning no response at all.
+    const structured = answer.structuredResponse ?? (()=>{
+        const text = lastAiText(answer.messages.slice(inputMessages.length))
+        if (text === undefined) return undefined
+        console.warn("analytical agent finished without a structured response; falling back to its last message")
+        return parseStructuredText(text)
+    })()
+    if (!structured) {
+        throw new Error("The analytical agent finished without producing an answer")
+    }
 
     const toolMessages = new Map(
         answer.messages
@@ -192,33 +271,66 @@ export async function invokeAnalyticalAgent(query : string , userId? : string , 
             data : el.data,
         }))
 
-    console.log({
+    // Extra telemetry for this question. Built after the run, so it can never change the answer.
+    const dbtFileReads = toolCalls.some((el)=> el.name === "get_file_contents")
+    const headCommit = dbtFileReads ? await resolveDbtHeadCommit(tools, toolCalls) : null
+    const trace = buildAgentTrace({
+        question : query,
+        startedAtMs,
+        durationMs : Date.now() - startedAtMs,
+        structured,
+        handler : traceHandler,
+        newMessages : answer.messages.slice(inputMessages.length),
+        headCommit,
+        config : {
+            model : String(LLM.model),
+            systemPrompt,
+            modelSettings : {
+                temperature : LLM.temperature ?? null,
+                useResponsesApi : true,
+                supportsStrictToolCalling : false,
+                recursionLimit : RECURSION_LIMIT,
+            },
+            allowedTables : Object.keys(AVAILABLE_TABLES),
+        },
+    })
+
+     console.log({
         toolCalls : toolCalls.map((el)=>({
             name : el.name,
             args : el.args,
         })),
-        response : answer.structuredResponse
+        response : structured,
+        ...trace
     })
 
     return {
         toolCalls,
         queries,
-        response : answer.structuredResponse,
+        response : structured,
+        ...trace,
     }
 
 }
 
-// MCP tools reply with text or content blocks; most carry JSON, so hand back parsed data when it is.
-function parseToolResult(content : unknown){
-    const text = typeof content === "string"
-        ? content
-        : Array.isArray(content)
-            ? content.map((block)=> (typeof block === "string" ? block : (block as { text? : string })?.text ?? "")).join("")
-            : undefined
-    if (text === undefined) return content
+// The commit the default branch of the dbt repo points at, used to say which version of the
+// docs the agent read. Best effort: null if the lookup fails or the tool isn't exposed.
+async function resolveDbtHeadCommit(
+    tools : Awaited<ReturnType<typeof client.listTools>>,
+    toolCalls : { name : string, args : unknown }[],
+) : Promise<DbtHeadCommit> {
     try {
-        return JSON.parse(text)
-    } catch {
-        return text
+        const listCommits = tools.find((tool)=> tool.name === "list_commits")
+        const read = toolCalls.find((call)=> call.name === "get_file_contents")
+        const args = (read?.args ?? {}) as { owner? : string, repo? : string }
+        if (!listCommits || !args.owner || !args.repo) return null
+
+        const result = parseToolResult(await listCommits.invoke({ owner : args.owner, repo : args.repo, perPage : 1 }))
+        const first = Array.isArray(result) ? result[0] : undefined
+        const sha = (first as { sha? : unknown } | undefined)?.sha
+        return typeof sha === "string" ? { sha, resolvedAt : new Date().toISOString() } : null
+    } catch (err) {
+        console.warn("could not resolve the dbt repo head commit", err instanceof Error ? err.message : err)
+        return null
     }
 }

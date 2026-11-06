@@ -70,6 +70,7 @@ export class AnalyticsAgentController {
 
     const { response, queries } = await invokeAnalyticalAgent(
       body.question,
+      body.history ?? [],
       String(req.user?.id),
     );
     return {
