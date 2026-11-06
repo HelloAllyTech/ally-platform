@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from app.core.agent_runtime.schemas import REPLY_ACTION, AgentIntent
 from app.core.knowledge_agent.agent import AnswerResult, build_result, resolve_citations
@@ -383,6 +383,42 @@ def says_it_has_nothing(text: str) -> bool:
     return bool(_NO_INFORMATION.search(first))
 
 
+@dataclass(frozen=True)
+class CheckContext:
+    """What the check knows about the run besides the draft itself."""
+
+    passages: List[Dict[str, Any]]
+    turn_type: str
+    general: bool
+    #: The gate verdict on the run's first search (None when it found something
+    #: relevant or no search ran).
+    search_gate: Optional[str]
+    question: str
+    #: Whether a search ran this run at all.
+    searched: bool
+    organisation: Organisation
+    history: Sequence[Dict[str, str]]
+
+
+@dataclass
+class Verdict:
+    """The check's decision on one draft, as it is worked out phase by phase."""
+
+    intent: AgentIntent
+    answer: str
+    citations: List[Dict[str, Any]]
+    #: The model chose to decline, so its text is a decline written for the person.
+    #: A decline forced by the check replaces whatever the model wrote, which may be
+    #: the very claim being refused; ally-be then sends the bot's decline wording.
+    model_declined: bool
+    rejection: Optional[Rejection] = None
+    #: A refusal that keeps the model's text if the rewrite doesn't fix it (wording,
+    #: a nudge, or details removed sentence by sentence), rather than clearing it.
+    keeps_text: bool = False
+    #: General knowledge on a bot allowed it: answered without a citation.
+    unsupported: bool = False
+
+
 def check_reply(
     step: Dict[str, Any],
     meta: Dict[str, Any],
@@ -398,185 +434,261 @@ def check_reply(
     organisation: Organisation = Organisation(),
     history: Sequence[Dict[str, str]] = (),
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
-    """The run's result, and the rejection reason when the
-    check refused the draft; None when it went through as the model meant it.
+    """The run's result, and the rejection reason when the check refused the draft;
+    None when it went through as the model meant it.
 
-    `search_gate` is the gate verdict on the run's first search (None when it
-    found something relevant or no search ran). `searched` is whether a search ran
-    this run at all.
+    Four phases, in order: read the draft (`_read_draft`), decide whether it is
+    grounded (`_ground`), fix its wording (`WORDING_FIXES`), and build the result.
 
     The organisation is never general knowledge. A message naming it, or an answer
     to a question that names it, needs a citation whatever the answer mode; a bot
     allowed general knowledge may answer uncited only about something else, and
     only after a search this run found nothing relevant.
     """
-    action = step.get("action") or REPLY_ACTION
-    intent = AgentIntent(step.get("intent") or AgentIntent.DECLINE)
-    answer_text = plain_text(step.get("answer") or "")
-    citations = resolve_citations(list(step.get("citations") or []), passages)
-    unsupported = False
-    rejection: Optional[Rejection] = None
-    # A refusal that keeps the model's text if the rewrite doesn't fix it (wording,
-    # a nudge, or details removed sentence by sentence), rather than clearing it.
-    keeps_text = False
-    # The model chose to decline, so its text is a decline written for the person.
-    # A decline forced here replaces whatever the model wrote, which may be the
-    # very claim being refused; ally-be then sends the bot's decline wording.
-    if (
-        action == REPLY_ACTION
-        and intent == AgentIntent.ANSWER
-        and says_it_has_nothing(answer_text)
-    ):
-        logger.info("Answer opens by saying it has nothing; treating it as a decline")
-        intent = AgentIntent.DECLINE
-    model_declined = action == REPLY_ACTION and intent == AgentIntent.DECLINE
-    about_organisation = organisation.named_in(question) or (
-        turn_type == "question" and organisation.named_in(answer_text)
+    ctx = CheckContext(
+        passages=passages,
+        turn_type=turn_type,
+        general=general,
+        search_gate=search_gate,
+        question=question,
+        searched=searched,
+        organisation=organisation,
+        history=history,
+    )
+    verdict = _read_draft(step, ctx)
+    _ground(verdict, step, ctx)
+    # Fixes that keep the rest of the reply: sent back once, and if the rewrite
+    # still needs them, applied to the text (sentences removed) rather than
+    # refusing the reply.
+    if verdict.intent != AgentIntent.DECLINE or verdict.model_declined:
+        for _, fix in WORDING_FIXES:
+            fix(verdict, ctx)
+    return _build_result(verdict, step, meta, ctx, language, retrieval), (
+        verdict.rejection
     )
 
-    if action != REPLY_ACTION:
+
+# ------------------------------------------------------------------ 1. read the draft
+
+
+def _read_draft(step: Dict[str, Any], ctx: CheckContext) -> Verdict:
+    """The draft as plain text with its citations resolved. An answer that opens by
+    saying it has nothing is the decline it is."""
+    replied = (step.get("action") or REPLY_ACTION) == REPLY_ACTION
+    intent = AgentIntent(step.get("intent") or AgentIntent.DECLINE)
+    answer = plain_text(step.get("answer") or "")
+    if replied and intent == AgentIntent.ANSWER and says_it_has_nothing(answer):
+        logger.info("Answer opens by saying it has nothing; treating it as a decline")
+        intent = AgentIntent.DECLINE
+    return Verdict(
+        intent=intent,
+        answer=answer,
+        citations=resolve_citations(list(step.get("citations") or []), ctx.passages),
+        model_declined=replied and intent == AgentIntent.DECLINE,
+    )
+
+
+# ------------------------------------------------------------------ 2. grounding
+
+
+def _ground(verdict: Verdict, step: Dict[str, Any], ctx: CheckContext) -> None:
+    """Relabel the draft for what it really is, then require a source for anything
+    it states about the organisation."""
+    about_organisation = ctx.organisation.named_in(ctx.question) or (
+        ctx.turn_type == "question" and ctx.organisation.named_in(verdict.answer)
+    )
+    _relabel(verdict, step, ctx, about_organisation)
+    _require_sources(verdict, ctx, about_organisation)
+
+
+def _relabel(
+    verdict: Verdict,
+    step: Dict[str, Any],
+    ctx: CheckContext,
+    about_organisation: bool,
+) -> None:
+    factual = looks_factual(without_contact_details(verdict.answer))
+    if (step.get("action") or REPLY_ACTION) != REPLY_ACTION:
         # The tool budget ran out and the model still asked for a tool: it has
         # nothing it is willing to answer with.
         logger.info("Agent asked for a tool past its budget; declining")
-        intent = AgentIntent.DECLINE
-        rejection = Rejection.EMPTY
-    elif not answer_text:
-        intent = AgentIntent.DECLINE
-        rejection = Rejection.EMPTY
+        verdict.intent, verdict.rejection = AgentIntent.DECLINE, Rejection.EMPTY
+    elif not verdict.answer:
+        verdict.intent, verdict.rejection = AgentIntent.DECLINE, Rejection.EMPTY
     elif (
-        intent == AgentIntent.ANSWER
+        verdict.intent == AgentIntent.ANSWER
         and not step.get("citations")
-        and turn_type in ("smalltalk", "about_bot")
-        and not passages
-        and not looks_factual(without_contact_details(answer_text))
+        and ctx.turn_type in ("smalltalk", "about_bot")
+        and not ctx.passages
+        and not factual
         and not about_organisation
     ):
         # A reply to a greeting or to "what can you do?", labelled `answer` with
         # nothing searched or cited, is small talk: the same text sent as
         # `smalltalk` would pass, so refusing it only swaps in the fixed wording.
-        intent = AgentIntent.SMALLTALK
-    elif intent == AgentIntent.SMALLTALK and (
-        looks_factual(without_contact_details(answer_text)) or passages
-    ):
+        verdict.intent = AgentIntent.SMALLTALK
+    elif verdict.intent == AgentIntent.SMALLTALK and (factual or ctx.passages):
         # Small talk does not need a source, but this one either states something
         # checkable (a time, a price) or was written after a search found passages:
         # ground it like an answer. Phone numbers, links and emails are checked
-        # for every reply below.
+        # for every reply (WORDING_FIXES).
         logger.info("Small talk looks factual; treating it as an answer")
-        intent = AgentIntent.ANSWER
-        rejection = Rejection.UNSOURCED_DETAIL
-    elif intent == AgentIntent.SMALLTALK and about_organisation:
+        verdict.intent = AgentIntent.ANSWER
+        verdict.rejection = Rejection.UNSOURCED_DETAIL
+    elif verdict.intent == AgentIntent.SMALLTALK and about_organisation:
         # "What is Ally?" answered as small talk is an answer about the
         # organisation: it needs a source like any other.
-        intent = AgentIntent.ANSWER
-        rejection = Rejection.UNCITED
+        verdict.intent, verdict.rejection = AgentIntent.ANSWER, Rejection.UNCITED
 
-    if intent == AgentIntent.ANSWER and not citations:
-        if general and searched and not passages and not about_organisation:
+
+def _require_sources(
+    verdict: Verdict, ctx: CheckContext, about_organisation: bool
+) -> None:
+    if verdict.intent == AgentIntent.ANSWER and not verdict.citations:
+        if ctx.general and ctx.searched and not ctx.passages and not about_organisation:
             # General knowledge, on a bot allowed it: about something other than
             # the organisation, and only once a search found nothing. Flagged as
             # ungrounded, as today.
-            unsupported = True
-            rejection = None
+            verdict.unsupported, verdict.rejection = True, None
         else:
             logger.info("Agent answer with no valid citations; declining")
-            intent = AgentIntent.DECLINE
-            rejection = rejection or Rejection.UNCITED
-    elif intent != AgentIntent.DECLINE:
-        rejection = None
-    elif model_declined and rejection is None:
-        if organisation.named_in(question) and not searched:
+            verdict.intent = AgentIntent.DECLINE
+            verdict.rejection = verdict.rejection or Rejection.UNCITED
+    elif verdict.intent != AgentIntent.DECLINE:
+        verdict.rejection = None
+    elif verdict.model_declined and verdict.rejection is None:
+        names_it = ctx.organisation.named_in(ctx.question)
+        if names_it and not ctx.searched:
             # "Does Ally store audio?" → "I don't have that": it never looked.
             logger.info("Agent declined about the organisation without searching")
-            rejection = Rejection.SEARCH_FIRST
-        elif passages and organisation.named_in(question):
+            verdict.rejection = Rejection.SEARCH_FIRST
+        elif ctx.passages and names_it:
             # It searched, found passages about the organisation, and still said
             # it doesn't have it.
             logger.info("Agent declined although a search found passages")
             # A nudge: the passages may be about something else, so a decline the
             # rewrite still chooses is kept in its own words.
-            rejection, keeps_text = Rejection.USE_FOUND, True
+            verdict.rejection, verdict.keeps_text = Rejection.USE_FOUND, True
 
-    # Fixes that keep the rest of the reply: sent back once, and if the rewrite
-    # still needs them, applied to the text (sentences removed) rather than
-    # refusing the reply.
-    if intent != AgentIntent.DECLINE or model_declined:
-        unsourced = unsupported_details(answer_text, passages)
-        if unsourced and rejection in (None, Rejection.UNSOURCED_DETAIL):
-            # Any reply type: a phone number, link or email must be in a passage
-            # offered this run, word for word.
-            logger.info("Reply carries %d unsourced contact detail(s)", len(unsourced))
-            rejection, keeps_text = Rejection.UNSOURCED_DETAIL, True
-            answer_text = without_details(answer_text, unsourced)
-        if repeated_crisis_wording(answer_text, turn_type, history):
-            # Trimmed here, not sent back: a rewrite costs a model call for what a
-            # deterministic trim does. If trimming would leave nothing, the reply
-            # stays as is.
-            answer_text = (
-                without_repeated_crisis_wording(answer_text, turn_type, history)
-                or answer_text
-            )
-        earlier = any(turn.get("role") == "assistant" for turn in history)
-        if earlier and turn_type == "smalltalk":
-            # The topics were offered once; later small talk doesn't list them again.
-            listed = [
-                sentence
-                for sentence in _SENTENCE_END.split(answer_text)
-                if organisation.topics_named_in(sentence) >= 3
-            ]
-            if listed:
-                # Trimmed here, not sent back (as above).
-                answer_text = (
-                    without_sentences(
-                        answer_text, lambda sentence: sentence not in listed
-                    )
-                    or answer_text
-                )
-        answer_text = without_source_phrases(answer_text) or answer_text
-        if rejection is None and mentions_sources(answer_text):
-            # Wording, not safety: kept as written if the rewrite still does it.
-            rejection, keeps_text = Rejection.MENTIONS_SOURCES, True
-        if keeps_text and not answer_text:
-            # Nothing left once the unsourced details were removed.
-            intent, keeps_text = AgentIntent.DECLINE, False
 
-    if intent == AgentIntent.DECLINE:
+# ------------------------------------------------------------------ 3. wording fixes
+
+
+def _drop_unsourced_details(verdict: Verdict, ctx: CheckContext) -> None:
+    """Any reply type: a phone number, link or email must be in a passage offered
+    this run, word for word. Sent back, and the sentences carrying one removed."""
+    unsourced = unsupported_details(verdict.answer, ctx.passages)
+    if unsourced and verdict.rejection in (None, Rejection.UNSOURCED_DETAIL):
+        logger.info("Reply carries %d unsourced contact detail(s)", len(unsourced))
+        verdict.rejection, verdict.keeps_text = Rejection.UNSOURCED_DETAIL, True
+        verdict.answer = without_details(verdict.answer, unsourced)
+
+
+def _trim_repeated_crisis_wording(verdict: Verdict, ctx: CheckContext) -> None:
+    """Trimmed, not sent back: a rewrite costs a model call for what a deterministic
+    trim does. If trimming would leave nothing, the reply stays as is."""
+    if repeated_crisis_wording(verdict.answer, ctx.turn_type, ctx.history):
+        verdict.answer = (
+            without_repeated_crisis_wording(verdict.answer, ctx.turn_type, ctx.history)
+            or verdict.answer
+        )
+
+
+def _trim_repeated_topic_list(verdict: Verdict, ctx: CheckContext) -> None:
+    """The topics were offered once; later small talk doesn't list them again.
+    Trimmed, not sent back (as above)."""
+    earlier = any(turn.get("role") == "assistant" for turn in ctx.history)
+    if not (earlier and ctx.turn_type == "smalltalk"):
+        return
+    listed = [
+        sentence
+        for sentence in _SENTENCE_END.split(verdict.answer)
+        if ctx.organisation.topics_named_in(sentence) >= 3
+    ]
+    if listed:
+        verdict.answer = (
+            without_sentences(verdict.answer, lambda sentence: sentence not in listed)
+            or verdict.answer
+        )
+
+
+def _cut_source_phrases(verdict: Verdict, ctx: CheckContext) -> None:
+    verdict.answer = without_source_phrases(verdict.answer) or verdict.answer
+
+
+def _flag_source_talk(verdict: Verdict, ctx: CheckContext) -> None:
+    """Wording, not safety: kept as written if the rewrite still does it."""
+    if verdict.rejection is None and mentions_sources(verdict.answer):
+        verdict.rejection, verdict.keeps_text = Rejection.MENTIONS_SOURCES, True
+
+
+def _decline_if_nothing_left(verdict: Verdict, ctx: CheckContext) -> None:
+    """Nothing left once the unsourced details were removed."""
+    if verdict.keeps_text and not verdict.answer:
+        verdict.intent, verdict.keeps_text = AgentIntent.DECLINE, False
+
+
+#: Applied in this order to every reply that isn't a decline the check forced.
+WORDING_FIXES: Tuple[Tuple[str, Callable[[Verdict, CheckContext], None]], ...] = (
+    ("unsourced details", _drop_unsourced_details),
+    ("repeated crisis wording", _trim_repeated_crisis_wording),
+    ("repeated topic list", _trim_repeated_topic_list),
+    ("source phrases", _cut_source_phrases),
+    ("talk about sources", _flag_source_talk),
+    ("nothing left", _decline_if_nothing_left),
+)
+
+
+# ------------------------------------------------------------------ 4. the result
+
+#: The agent's intents as the `/knowledge-agent/answer` response has them: small talk
+#: is an uncited answer.
+_RESPONSE_INTENT = {
+    AgentIntent.ANSWER: AnswerIntent.ANSWER,
+    AgentIntent.SMALLTALK: AnswerIntent.ANSWER,
+    AgentIntent.CLARIFY: AnswerIntent.CLARIFY,
+    AgentIntent.DECLINE: AnswerIntent.DECLINE,
+}
+
+
+def _build_result(
+    verdict: Verdict,
+    step: Dict[str, Any],
+    meta: Dict[str, Any],
+    ctx: CheckContext,
+    language: str,
+    retrieval: Dict[str, Any],
+) -> AnswerResult:
+    answer, citations = verdict.answer, verdict.citations
+    if verdict.intent == AgentIntent.DECLINE:
         citations = []
-        if not model_declined or (rejection and not keeps_text):
-            answer_text = ""
+        if not verdict.model_declined or (verdict.rejection and not verdict.keeps_text):
+            answer = ""
         # The parity path's reason when searching found nothing at all, so the
         # unanswered queue reads the same as in v1.
         decline_reason = (
-            DeclineReason(search_gate)
-            if search_gate and not passages
+            DeclineReason(ctx.search_gate)
+            if ctx.search_gate and not ctx.passages
             else DeclineReason.MODEL_DECLINED
         )
     else:
         decline_reason = DeclineReason.NONE
-        if intent in (AgentIntent.SMALLTALK, AgentIntent.CLARIFY):
+        if verdict.intent in (AgentIntent.SMALLTALK, AgentIntent.CLARIFY):
             citations = []
 
-    response_intent = {
-        AgentIntent.ANSWER: AnswerIntent.ANSWER,
-        AgentIntent.SMALLTALK: AnswerIntent.ANSWER,
-        AgentIntent.CLARIFY: AnswerIntent.CLARIFY,
-        AgentIntent.DECLINE: AnswerIntent.DECLINE,
-    }[intent]
-    retrieval = {
-        **retrieval,
-        "passages_used": len(passages),
-        "unsupported": unsupported,
-    }
-
     result = build_result(
-        intent=response_intent,
-        answer=answer_text,
+        intent=_RESPONSE_INTENT[verdict.intent],
+        answer=answer,
         language=(step.get("language") or language or "en").strip(),
         confidence=0.0,
         citations=citations,
         decline_reason=decline_reason,
-        retrieval=retrieval,
+        retrieval={
+            **retrieval,
+            "passages_used": len(ctx.passages),
+            "unsupported": verdict.unsupported,
+        },
         meta=meta,
     )
-    result["turn_type"] = turn_type
-    return result, rejection
+    result["turn_type"] = ctx.turn_type
+    return result
