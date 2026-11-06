@@ -6,6 +6,7 @@ scripted step.
 """
 
 import json
+import re
 from unittest.mock import patch
 
 import pytest
@@ -26,6 +27,18 @@ from tests.core.knowledge_agent.test_agent import CHUNK_A, CHUNK_B, passage
 pytestmark = pytest.mark.asyncio
 
 CHUNK_C = "33333333-3333-3333-3333-333333333333"
+
+
+#: Stands in for the agent's prompt from the Skills Store: every variable the code
+#: fills, and none of the seed's wording, which is meant to change in Manage Prompts.
+TEST_TEMPLATE = (
+    "RULES. Scope: {answer_scope} Up to {max_chars} characters.\n"
+    "Covers:\n{knowledge_topics}\nWhen you can't help: {decline_text}\n"
+    "History:\n{history}\nMessage: {message}\nPassages:\n{passages}\n"
+    "Searched:\n{searches}\nTools (searches left: {tool_budget})\n{tools}\n"
+    "{feedback}"
+)
+TEST_PROMPTS = {"ally_ai_agent_system": {"prompt": TEST_TEMPLATE}}
 
 
 @pytest.fixture
@@ -112,6 +125,7 @@ class TestSmalltalk:
         await agent_run(
             "who are you?",
             llm,
+            prompts=TEST_PROMPTS,
             persona={"display_name": "Ally Helper", "tone": "warm"},
             knowledge_topics=["Ally FAQ – About Ally", "Ally FAQ – Privacy and Data"],
             decline_text="A colleague or supervisor is the better route.",
@@ -120,10 +134,20 @@ class TestSmalltalk:
         assert prompt.startswith("# Who you are\nYou are Ally Helper.")
         assert "- Ally FAQ – Privacy and Data" in prompt
         assert "A colleague or supervisor is the better route." in prompt
-        assert "You are not a crisis service" in prompt
-        assert "Don't repeat yourself" in prompt
+        # The rules: the bot's prompt text, with its variables filled in.
+        assert "RULES. Scope: " in prompt and "Up to 1400 characters." in prompt
         assert "search_knowledge" in prompt
         assert "Your previous draft" not in prompt
+
+    async def test_the_seed_prompt_renders_every_variable(
+        self, agent_run, chunk_service
+    ):
+        """app/prompts/agent/system.txt, which seeds new environments."""
+        llm = FakeLLM(chat())
+        await agent_run("hi", llm)
+        prompt = llm.calls[0]["prompt"]
+        assert prompt.strip()
+        assert not re.search(r"\{[a-z_]+\}", prompt)
 
 
 class TestToolLoop:
@@ -187,7 +211,7 @@ class TestToolLoop:
             search("try 2"),
             reply(citations=[1, 2]),
         )
-        state = await agent_run("q", llm)
+        state = await agent_run("q", llm, prompts=TEST_PROMPTS)
 
         assert len(state["tool_calls"]) == 2
         assert len(llm.calls) == 3
@@ -214,7 +238,7 @@ class TestToolLoop:
             search("What is Ally and what does it do?"),  # finds the same passage
             reply(citations=[1]),
         )
-        state = await agent_run("ally kya hai?", llm)
+        state = await agent_run("ally kya hai?", llm, prompts=TEST_PROMPTS)
         assert len(state["tool_calls"]) == 2
         assert state["tool_calls"][1]["added"] == []
         assert "searches left: 0" in llm.calls[2]["prompt"]
