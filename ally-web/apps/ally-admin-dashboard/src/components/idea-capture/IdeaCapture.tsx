@@ -214,7 +214,9 @@ export const IdeaCaptureLauncher: React.FC = () => {
         ? "Paused"
         : status === "denied"
           ? "Microphone is blocked"
-          : status === "unsupported"
+          : status === "unavailable"
+            ? "Can't reach the microphone"
+            : status === "unsupported"
             ? "Voice isn't available in this browser"
             : text.trim()
               ? "Mic is off"
@@ -226,7 +228,9 @@ export const IdeaCaptureLauncher: React.FC = () => {
         ? "Take your time. Resume when the next thought arrives."
         : status === "denied"
           ? "Allow the microphone from your browser's address bar, or just type your idea below."
-          : status === "unsupported"
+          : status === "unavailable"
+            ? "No microphone was found, or speech recognition couldn't connect. Tap the mic to retry, or type below."
+            : status === "unsupported"
             ? "Type your idea below — it saves exactly the same."
             : "Tap the mic to talk again, or keep typing.";
 
