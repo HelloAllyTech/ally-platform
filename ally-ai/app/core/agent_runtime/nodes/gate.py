@@ -7,6 +7,7 @@ from typing import Any, Dict, Literal
 from app.core.agent_runtime.state import AgentState
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.knowledge_agent.schemas import is_general
 
 
 def _summary(_: AgentState, update: Dict[str, Any]) -> str:
@@ -20,7 +21,7 @@ def make_gate_node(service: KnowledgeAgentService) -> Node:
         reason = service.gate(
             state["hits"],
             decline_similarity=state["limits"]["decline_similarity"],
-            general=state["bot"].get("answer_mode") == "documents_and_general",
+            general=is_general(state["bot"].get("answer_mode")),
             translation_degraded=state["translation_degraded"],
         )
         return {"gate_reason": reason.value if reason is not None else None}

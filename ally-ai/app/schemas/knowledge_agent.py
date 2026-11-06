@@ -5,12 +5,12 @@ the request. ally-be owns the rows, the phone numbers and the settings; this ser
 owns the retrieval and the wording.
 """
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.core.knowledge_agent.schemas import AnswerIntent, DeclineReason
+from app.core.knowledge_agent.schemas import AnswerIntent, AnswerMode, DeclineReason
 from app.schemas.knowledge_chunk import AudienceSelector
 
 
@@ -106,7 +106,7 @@ class KnowledgeAnswerRequest(BaseModel):
     persona: Optional[PersonaSelector] = Field(
         None, description="The answering chatbot's persona; absent = no persona block"
     )
-    answer_mode: Literal["documents_only", "documents_and_general"] = Field(
+    answer_mode: AnswerMode = Field(
         "documents_only",
         description=(
             "documents_only declines what the documents do not cover; "

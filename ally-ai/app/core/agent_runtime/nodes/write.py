@@ -7,6 +7,7 @@ from typing import Any, Dict
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.knowledge_agent.schemas import is_general
 
 
 def _summary(_: AgentState, update: Dict[str, Any]) -> str:
@@ -24,7 +25,7 @@ def make_write_node(service: KnowledgeAgentService) -> Node:
             history=state.get("history") or None,
             prompts=bot.get("prompts"),
             persona=bot.get("persona"),
-            general=bot.get("answer_mode") == "documents_and_general",
+            general=is_general(bot.get("answer_mode")),
             max_answer_chars=bot["max_answer_chars"],
         )
         return {

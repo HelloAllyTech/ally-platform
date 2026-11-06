@@ -19,6 +19,7 @@ from app.core.agent_runtime.check import (
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.knowledge_agent.schemas import is_general
 
 
 def _summary(_: AgentState, update: Dict[str, Any]) -> str:
@@ -48,7 +49,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             turn_type=state["turn_type"],
             language=state["language"],
             retrieval=dict(retrieval),
-            general=state["bot"].get("answer_mode") == "documents_and_general",
+            general=is_general(state["bot"].get("answer_mode")),
             search_gate=state.get("search_gate"),
             question=state["question"],
             searched=bool(state.get("tool_calls")),

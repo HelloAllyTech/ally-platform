@@ -42,6 +42,7 @@ from app.core.knowledge_agent.schemas import (
     DeclineReason,
     KnowledgeAnswer,
     TranslatedQuery,
+    is_general,
 )
 from app.core.knowledge_base.corpus import KbCorpus
 from app.core.knowledge_base.knowledge_chunk_service import (
@@ -800,7 +801,7 @@ class KnowledgeAgentService:
             translation_degraded=translation_degraded,
         )
 
-        general = answer_mode == "documents_and_general"
+        general = is_general(answer_mode)
         reason = self.gate(
             hits,
             decline_similarity=limits["decline_similarity"],

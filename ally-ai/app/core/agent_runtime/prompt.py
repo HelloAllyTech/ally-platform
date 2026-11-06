@@ -16,6 +16,7 @@ from app.core.knowledge_agent.prompt import (
     format_passages,
     format_persona,
 )
+from app.core.knowledge_agent.schemas import is_general
 from app.prompts.resolver import load_and_format
 
 AGENT_PROMPT_PATH = "agent/system"
@@ -49,7 +50,7 @@ DOCUMENTS_SCOPE = (
 
 
 def format_answer_scope(answer_mode: Optional[str]) -> str:
-    return GENERAL_SCOPE if answer_mode == "documents_and_general" else DOCUMENTS_SCOPE
+    return GENERAL_SCOPE if is_general(answer_mode) else DOCUMENTS_SCOPE
 
 
 def format_feedback(feedback: Optional[str]) -> str:

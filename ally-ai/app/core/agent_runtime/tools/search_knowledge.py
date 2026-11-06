@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.core.agent_runtime.state import json_safe
 from app.core.agent_runtime.tools.base import Tool, ToolContext, ToolResult
-from app.core.knowledge_agent.schemas import DeclineReason
+from app.core.knowledge_agent.schemas import DeclineReason, is_general
 from app.schemas.knowledge_chunk import AudienceSelector
 
 NAME = "search_knowledge"
@@ -56,7 +56,7 @@ async def search_knowledge(args: SearchKnowledgeInput, ctx: ToolContext) -> Tool
     reason = service.gate(
         hits,
         decline_similarity=ctx.limits["decline_similarity"],
-        general=ctx.bot.get("answer_mode") == "documents_and_general",
+        general=is_general(ctx.bot.get("answer_mode")),
         translation_degraded=False,
     )
     if reason is None:
