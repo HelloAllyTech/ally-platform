@@ -61,6 +61,7 @@ os.environ.update(
         # agent graph tests count searches and steps against them.
         "AGENT_RUNTIME__MAX_TOOL_CALLS": "2",
         "AGENT_RUNTIME__RUN_BUDGET_SECONDS": "15",
+        "AGENT_RUNTIME__RUN_TIMEOUT_SECONDS": "20",
         "AGENT_RUNTIME__MAX_HISTORY_MESSAGES": "10",
     }
 )

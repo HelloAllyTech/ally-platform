@@ -148,6 +148,12 @@ class AgentRuntimeSettings(BaseModel):
     # final (no rewrite), so it answers inside ally-be's 25-second timeout rather
     # than falling back to v1.
     RUN_BUDGET_SECONDS: float = Field(15.0, gt=0, le=60)
+    # Hard cap on one run, model calls included: past it the run is cancelled and
+    # /agent/run answers 504 (the stream sends `error: timeout`). Below ally-be's
+    # waits (22 s streaming, 25 s otherwise) so ally-ai always ends first: ally-be
+    # gets a clean timeout to fall back on, and no run keeps spending tokens after
+    # ally-be has moved on.
+    RUN_TIMEOUT_SECONDS: float = Field(20.0, gt=0, le=60)
     # Conversation messages the agent reads, most recent last.
     MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
     # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and
