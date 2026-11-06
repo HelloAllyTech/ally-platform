@@ -72,7 +72,7 @@ export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => 
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
-      {list?.canCreate && <ChatbotEngineCard chatbotId={bot.id} />}
+      {list?.canCreate && <ChatbotEngineCard bot={bot} />}
 
       <Card title={t.answersTitle} subtitle={t.answersIntro}>
         <EntityField label={t.answerModeLabel}>

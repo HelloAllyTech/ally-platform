@@ -9,12 +9,12 @@ import {
   RadioButtonGroup,
   Tooltip,
 } from "@ally-ui-mono/ui-shared";
-import { useGetChatbotQuery, useUpdateChatbotMutation } from "@api";
+import { useUpdateChatbotMutation } from "@api";
 import { TooltipIcon } from "@assets";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { ChatbotRuntime } from "@types";
+import { Chatbot, ChatbotRuntime } from "@types";
 
 import { Card, errorMessage } from "./shared";
 
@@ -32,20 +32,16 @@ const OPTIONS: { value: ChatbotRuntime; label: string; help: string }[] = [
  * alone, and the API refuses anyone else. Saved on its own, apart from the settings below, because
  * it changes who answers real people.
  */
-export const ChatbotEngineCard: React.FC<{ chatbotId: string }> = ({ chatbotId }) => {
-  const { data: bot } = useGetChatbotQuery(chatbotId);
+export const ChatbotEngineCard: React.FC<{ bot: Chatbot }> = ({ bot }) => {
   const [update, { isLoading: isSaving }] = useUpdateChatbotMutation();
-  const [runtime, setRuntime] = useState<ChatbotRuntime>("v1");
-  const [agent, setAgent] = useState(false);
+  const [runtime, setRuntime] = useState<ChatbotRuntime>(bot.runtime ?? "v1");
+  const [agent, setAgent] = useState(Boolean(bot.features?.agent));
 
+  // The saved bot changed (this card's own save, or a refetch): show what is saved now.
   useEffect(() => {
-    if (bot) {
-      setRuntime(bot.runtime ?? "v1");
-      setAgent(Boolean(bot.features?.agent));
-    }
+    setRuntime(bot.runtime ?? "v1");
+    setAgent(Boolean(bot.features?.agent));
   }, [bot]);
-
-  if (!bot) return null;
 
   const savedAgent = Boolean(bot.features?.agent);
   const changed = runtime !== bot.runtime || agent !== savedAgent;
@@ -53,7 +49,7 @@ export const ChatbotEngineCard: React.FC<{ chatbotId: string }> = ({ chatbotId }
   const save = async () => {
     try {
       await update({
-        id: chatbotId,
+        id: bot.id,
         ...(runtime !== bot.runtime ? { runtime } : {}),
         ...(agent !== savedAgent ? { features: { agent } } : {}),
       }).unwrap();
