@@ -16,6 +16,10 @@ import { ChatbotDocument } from './entity/chatbot-document.entity';
 import { ChatbotMember } from './entity/chatbot-member.entity';
 import { Chatbot } from './entity/chatbot.entity';
 import { Connector } from './entity/connector.entity';
+import { ChatbotContactIdentity } from './entity/chatbot-contact-identity.entity';
+import { ChatbotContact } from './entity/chatbot-contact.entity';
+import { ChatbotConversation } from './entity/chatbot-conversation.entity';
+import { ChatbotMessage } from './entity/chatbot-message.entity';
 import { AgentRuntimeAlertThrottle } from './service/agent-runtime-alert-throttle.service';
 import { ChatbotAccessService } from './service/chatbot-access.service';
 import { ChatbotAudienceService } from './service/chatbot-audience.service';
@@ -24,6 +28,7 @@ import { ChatbotSettingsService } from './service/chatbot-settings.service';
 import { ChatbotService } from './service/chatbot.service';
 import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
 import { ConnectorService } from './service/connector.service';
+import { ConversationService } from './service/conversation.service';
 
 /**
  * Chatbots: configurable bots reached through connectors.
@@ -44,6 +49,10 @@ import { ConnectorService } from './service/connector.service';
       ChatbotAudience,
       ChatbotDocument,
       Connector,
+      ChatbotContact,
+      ChatbotContactIdentity,
+      ChatbotConversation,
+      ChatbotMessage,
       WaKeywordTemplate,
       GlobalSettings,
     ]),
@@ -65,6 +74,7 @@ import { ConnectorService } from './service/connector.service';
     ConnectorService,
     ChatbotService,
     AgentRuntimeAlertThrottle,
+    ConversationService,
   ],
   exports: [
     ConnectorRegistry,
@@ -74,6 +84,7 @@ import { ConnectorService } from './service/connector.service';
     ChatbotReplyService,
     ChatbotEngineService,
     AgentRuntimeAlertThrottle,
+    ConversationService,
   ],
 })
 export class ChatbotModule {}
