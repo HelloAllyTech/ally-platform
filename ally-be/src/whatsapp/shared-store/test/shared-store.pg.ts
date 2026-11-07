@@ -1,13 +1,5 @@
 import { DataSource, QueryRunner } from 'typeorm';
-import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
-import { ChatbotContactIdentity } from 'src/chatbot/entity/chatbot-contact-identity.entity';
-import { ChatbotContact } from 'src/chatbot/entity/chatbot-contact.entity';
-import { ChatbotConversation } from 'src/chatbot/entity/chatbot-conversation.entity';
-import { ChatbotMessage } from 'src/chatbot/entity/chatbot-message.entity';
-import { WaContact } from '../../entity/wa-contact.entity';
-import { WaConversation } from '../../entity/wa-conversation.entity';
-import { WaMessage } from '../../entity/wa-message.entity';
-import { WaUnansweredQuestion } from '../../entity/wa-unanswered-question.entity';
+import { SHARED_STORE_ENTITIES } from '../wa-shared-store.data-source';
 
 /**
  * Specs that need real Postgres: the shared store's upserts, unique indexes and jsonb merges are
@@ -36,17 +28,7 @@ export async function openTestDataSource(): Promise<DataSource> {
   const dataSource = new DataSource({
     type: 'postgres',
     url: URL,
-    entities: [
-      Chatbot,
-      ChatbotContact,
-      ChatbotContactIdentity,
-      ChatbotConversation,
-      ChatbotMessage,
-      WaContact,
-      WaConversation,
-      WaMessage,
-      WaUnansweredQuestion,
-    ],
+    entities: SHARED_STORE_ENTITIES,
     synchronize: false,
     logging: false,
   });
