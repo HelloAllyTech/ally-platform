@@ -34,12 +34,15 @@ async def agent_step(
     searches: Sequence[Dict[str, Any]] = (),
     feedback: Optional[str] = None,
     must_search: bool = False,
+    timeout: Optional[float] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """One agent call. Returns ``(step, meta)``: the step as a plain dict.
 
     `tools` are those still callable; empty means the model can only reply.
     `feedback` is why check refused the previous draft, when it did.
     `must_search` leaves `reply` out of the schema, so this step can only search.
+    `timeout` is what is left of the run's hard cap, so a slow model call ends
+    with the run rather than after it.
     """
     prompts = bot.get("prompts")
     # The bot's model override is merged into this prompt's entry by ally-be, as it
@@ -74,5 +77,6 @@ async def agent_step(
         model=model,
         temperature=temperature if temperature is not None else 0.0,
         reasoning_effort=settings.AGENT_RUNTIME.AGENT_REASONING_EFFORT,
+        timeout=timeout,
     )
     return parsed.model_dump(mode="json"), dict(meta or {})

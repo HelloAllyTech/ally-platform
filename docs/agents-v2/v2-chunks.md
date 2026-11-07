@@ -1,96 +1,137 @@
-# Agents v2 — build chunks
+# Agents v2 — build chunks (revised 6 Nov 2026: modular building blocks)
 
-Read `CONTEXT.md` first. Product spec: `agents-v2-spec.md`. Engineering detail: `three-stage-plan.md`. What exists today: `stage1-build.md`. All are in this folder.
+Read `CONTEXT.md` and `BUILDING-BLOCKS.md` first. Product spec: `agents-v2-spec.md`; where it puts the scheduler, flows or the self-learning loop in v2, **this file wins: those three moved to v3.** Engineering detail: `three-stage-plan.md`. What exists today: `stage1-build.md`.
 
 ## How to use this file
 
-- Each chunk is sized for **one Claude Code loop**: a single branch, roughly 1–3 days of work, one PR.
-- Each chunk **ships dark**. It sits behind the per-bot `runtime: v2` setting or a feature flag, so Stage 1 bots never change until you switch them over.
-- Each chunk ends with **"You test"**: the exact checks you run before moving on. Don't start chunk N+1 until chunk N passes.
-- Give Claude Code one chunk brief at a time (`chunk-01.md`, then `chunk-02.md`, and so on). Ask for the next brief once a chunk passes.
-- Repos: **ally-ai** (Python, LangGraph), **ally-be** (TypeScript, migrations, WhatsApp, engine), **ally-web** (admin dashboard, RTK Query).
+- Each chunk is sized for **one Claude Code loop**: one branch, roughly 2–4 days, one PR.
+- Each chunk **ships dark**, behind the per-bot runtime, Agent mode or a feature flag.
+- Each chunk ends with **"You test"** checks. Don't start the next chunk until they pass.
+- Give Claude Code one chunk brief at a time. Ask for the next brief once a chunk passes.
+- Repos: **ally-ai** (Python, LangGraph), **ally-be** (TypeScript, migrations, WhatsApp, engine), **ally-web** (admin dashboard).
 
 ## Rules that hold for every chunk
 
 1. Don't change v1 behaviour. Every new path is opt-in per bot.
-2. Graph decides, ally-be executes. ally-ai never writes to the database or sends messages. It calls the ally-be tool gateway.
-3. Every send and every tool call has an idempotency key. A retry must never message a person twice.
-4. Safety only tightens. The crisis check, consent and STOP behave exactly as in Stage 1, or stricter.
-5. Each chunk adds its own tests, and leaves CI and flake8/lint green.
-6. Each chunk ends with a short `CHUNK-NN-NOTES.md` in the PR: what changed, how to test, and anything left open.
+2. Graph decides, ally-be executes. ally-ai never writes to the database or sends messages; it calls the ally-be gateway.
+3. Every send and every write has an idempotency key. A retry must never message a person twice or create a record twice.
+4. Safety only tightens. Crisis, consent, STOP and the grounding checks stay as they are, or stricter.
+5. **Build blocks, not industries.** Every feature is a generic block, field type, setting or template (`BUILDING-BLOCKS.md`). No code that only makes sense for one kind of business.
+6. Each chunk adds tests, leaves CI and lint green, and ends with `CHUNK-NN-NOTES.md`.
+7. Each chunk that changes what the agent says or does adds conversation eval cases and runs them: 0 hard fails (an uncited fact, medical advice, an out-of-scope answer, unsourced contact details, markdown in a reply, a write that broke a constraint).
+
+## Progress
+
+| Chunk | Status |
+|---|---|
+| 1 LangGraph runtime with parity | ✅ merged |
+| 2 Runtime switch, shadow, fallback | ✅ merged |
+| 3a Conversational agent | ✅ merged |
+| 3r Review and refactor | ✅ merged |
+| Manual test (Sunrise Mind demo bot) | ✅ done |
+| 3d v2 only, and a chatbot's own documents | ✅ merged: every bot answers with v2 and the agent while `agentRuntimeAllowed` is on; v1 is only the hidden fallback ([CHUNK-03D-NOTES.md](./CHUNK-03D-NOTES.md), PR #217) |
+| 3c Streaming and typing | ▶ in progress (`chunk-03c.md`) |
+| 3b onwards | Not started |
+
+**Learned so far:**
+- The agent decides every step itself; tools are modules; grounding is enforced in code (`agent_check`).
+- Contact details must come from a source; persona text isn't one.
+- The organisation name must be explicit (ORG.md, chunk 4).
+- Production needs `AGENT_RUNTIME__AGENT_REASONING_EFFORT=low`.
+
+## Phases at a glance
+
+| Phase | Chunks | Delivers |
+|---|---|---|
+| A. Engine | 1, 2, 3a, 3r, 3d, 3c, 3b | ✅ the agent, then streaming and the tool gateway |
+| B. Building blocks | 4, 5, 6, 7, 8, 9 | Pages, Collections, generated tools, People and relations, **Memory**, media in and voice |
+| C. Conversations | 10, 11, 12, 13 | Rich messages out, team inbox, shared store, website widget |
+| D. Trust, history and the owner | 14, 15, 16, 17 | Abilities and approvals, Never check, **history and "Why?"**, **owner on WhatsApp** |
+| E. Templates | 18, 19, 20 | Template format and install, builder and sharing, onboarding |
+| F. Ready for customers | 21 | Privacy, evals in CI, cost cap, Home, rollout |
 
 ---
 
-## Phase A — New engine (epic 1)
+## Phase A — Engine
 
 | # | Chunk | Repos | What you can test at the end |
 |---|---|---|---|
-| 1 | **LangGraph runtime with parity.** The current knowledge pipeline rebuilt as a LangGraph graph behind `POST /agent/run`, with a Postgres checkpointer and a parity script | ally-ai | `curl /agent/run` answers like `/knowledge-agent/answer`; the parity script shows matching decisions and citations on 20+ cases |
-| 2 | **Runtime switch in ally-be.** Per-bot `runtime: v1 \| v2` plus feature flags; the engine's answer step calls `/agent/run` for v2 bots; Preview shows the runtime and run id; the run id is stored on the outbound message | ally-be, ally-web | Flip one bot to v2 in the dashboard, chat on WhatsApp, and get the same answers; flip back with no residue |
-| 3a | **Conversational agent.** The `write` step becomes an `agent` node that talks like an assistant: it uses the conversation history to understand follow-ups, answers greetings, thanks and "who are you / what can you do" in the bot's own voice, and calls tools in a loop (capped at 4 in the plan; 2 as built, `AGENT_RUNTIME__MAX_TOOL_CALLS`, see CHUNK-03A-NOTES §12). A tool registry in ally-ai, each tool one small module; first tool `search_knowledge` (RAG as a tool, so it can search again with a better query). The decline gate stops being a dead end for small talk, but **any factual claim still needs a citation**, so out-of-scope questions still decline. v2 bots can turn off the rigid greeting/help quick replies; safety, consent and STOP keywords stay in ally-be | ally-ai, ally-be, ally-web | "Hi", "thanks", "who are you?" and "what can you do?" get natural replies in the bot's voice; "and how do I sign in after that?" is understood from the earlier turn; out-of-scope facts still decline; the conversation eval passes |
-| 3b | **Tool gateway.** ally-be internal routes `GET /internal/agent/context` and `POST /internal/agent/tools/:name` with a per-run token, idempotency, a `tool_runs` table and a per-bot tool allow-list. First gateway tool: `get_bot_profile` (name, what it covers, document titles), so later tools (facts, memory, schedules) just add files | ally-be, ally-ai | Every tool call shows up in `tool_runs`; a replayed call returns the stored result; a tool not on the allow-list is refused |
-| 3c | **Streaming and typing.** ally-ai `POST /api/v1/agent/run/stream` (SSE): `step` events per node, `token` events for the answer text, one `final` event identical to `/agent/run`'s response. ally-be relays the stream to channels that can show it (a `streaming` capability on the connector registry); Preview streams now, the website widget reuses it in chunk 21. **Nothing reaches a person before the crisis check clears** (tokens are held until it does), and `final` always wins (a late decline or crisis replaces the streamed text). WhatsApp can't stream, so it gets a typing indicator as soon as a message arrives instead. Also a hard timeout on the whole run (`asyncio.timeout` around the graph, mapped to 504), so a slow step can't run on after ally-be has given up (REVIEW-1-3A #62) | ally-ai, ally-be, ally-web | Preview shows "Searching… Writing…" and the answer appearing word by word; the final text and citations match `/agent/run`; a crisis question never shows streamed text; on WhatsApp the typing indicator appears within a second |
+| 1 | ✅ **LangGraph runtime with parity** | ally-ai | `/agent/run` answers like v1 |
+| 2 | ✅ **Runtime switch** (v1, Shadow, v2), fallback, kill switch, run id on messages | ally-be, ally-web | Flip a bot to v2 and back |
+| 3a | ✅ **Conversational agent:** the agent node, tool registry, `search_knowledge` as a tool, history, persona, grounding checks | all three | Natural small talk; cited answers; out-of-scope declines |
+| 3r | ✅ **Review and refactor** of 1–3a | all three | Same behaviour, cleaner code |
+| 3d | ✅ **v2 only, and a chatbot's own documents:** every bot answers with v2 and the agent while `agentRuntimeAllowed` is on (v1 is the hidden fallback); upload documents private to one chatbot | ally-be, ally-web | No Engine card; an uploaded document is private to its bot |
+| 3c | **Streaming and typing:** live status and steps, checked reply text revealed progressively, a hard run timeout, a WhatsApp typing indicator | all three | Preview shows the agent working; crisis text never streams |
+| 3b | **Tool gateway:** internal routes with a per-run token, idempotency, `tool_runs`, a per-bot tool allow-list | ally-be, ally-ai | Every tool call is logged; a replay returns the stored result; a disallowed tool is refused |
 
-## Phase B — Memory you can read (epics 2 and 3)
-
-| # | Chunk | Repos | What you can test at the end |
-|---|---|---|---|
-| 4 | **Layered context files.** `context_files` and versions tables; the `load_context` node merges platform > org > agent > role; About and Agent pages in the dashboard with edit, version history and restore | all three | Edit the Agent page and the next reply follows it; restoring an old version brings the old behaviour back |
-| 5 | **Facts.** `data_tables` and `data_rows`, a `look_up_facts` tool, and a Facts screen with a table editor and CSV import | all three | Add a price list; "how much is a haircut?" answers from the row and the reply cites it |
-| 6 | **Contact profiles and notebook.** A channel-agnostic `agent_contacts` identity (linked to `wa_contacts`, ready for the web widget later); `contact_memory`; `remember` and `recall` tools; USER.md view; profile panel in Conversations with sources, edit and forget; the agent notebook | all three | Tell the bot your name and preference; it remembers next time; Forget removes it, and the next run shows it's gone |
-| 7 | **Configurable fields and file types.** Per-bot field schema; file storage; `save_file` and `read_file`; reading invoices and business cards into fields; the Direction setting | all three | Send a business-card photo and the fields fill in, each with a source; a field marked "never store" is never saved |
-| 8 | **Documents the business sends.** Attach a file to a profile and send it from the dashboard or by forwarding on WhatsApp; delivery tracking; a template outside the 24-hour window | all three | Send a sample invoice to a test contact; it arrives and the status turns delivered |
-
-## Phase C — History and "Why?" (epic 4)
+## Phase B — Building blocks
 
 | # | Chunk | Repos | What you can test at the end |
 |---|---|---|---|
-| 9 | **History search and summaries.** Search across conversations, a summary per conversation, and unanswered chats grouped into topics | all three | Search "insurance" and find the right threads; the topics list groups similar unanswered questions |
-| 10 | **"Why?" card.** Run trace from the checkpointer, turned into a plain-language card on every reply (sources used, facts, memory, rules, abilities) | ally-ai, ally-web | Click Why? on any v2 reply; the card matches what actually happened in the run |
+| 4 | **Pages and the context workspace.** Versioned Markdown pages in a virtual file tree: `/org` (with the explicit organisation name), `/agent`, `/roles/*` always loaded within a size budget; `/knowledge/*` and `/updates/*` (with expiry) read on demand. Tools: `list`, `read` (whole sections), `grep`; `search_knowledge` stays. Page editor with history and restore; an Updates screen. **Page visibility by role**, enforced in retrieval and `read` | all three | Edit AGENT.md and the next reply follows it; restore brings back the old version; an expired update is ignored; a managers-only page is never read for an employee |
+| 5 | **Collections core.** User-defined collections: field types, constraints (`unique`, `capacity` with a waitlist, `limit_per_person`, status transitions), **recurrence** (every Tuesday until a date), views (table, board, calendar), CSV import and export, per-collection and per-field permissions including `never_store`, `masked` and retention. Rules tables | ally-be, ally-web | Build "Slots" and "Appointments" from scratch in the dashboard; a taken slot is refused; the 21st person in a class of 20 is waitlisted; a weekly booking creates one record per week |
+| 6 | **Generated collection tools.** `find_*` (filters, ranges, sort, count and sum), `create_*`, `update_*` and `check_rules`, generated from each collection's schema and exposed through the gateway. Constraint errors come back as plain reasons; results are citable, so grounding covers them | ally-ai, ally-be | "2BHK in Baner under 85 lakh" filters listings; "book Thursday 11:15" creates a record; "slot taken" is explained with alternatives; eligibility comes from `check_rules` |
+| 7 | **People and relations.** A channel-agnostic contact identity (WhatsApp now, web later); configurable profile fields; **relations** (parent ↔ students, employee ↔ manager, lead ↔ assigned agent, contact ↔ records); team members with roles; groups and segments; profile panel in Conversations | all three | A parent sees each child's records; a lead shows its assigned agent; profile fields are editable by staff |
+| 8 | **Memory: profiles and the agent's notebook.** Hermes-style memory you can read. **USER.md per contact** (preferences, context, open items, each with a source and date), written by `remember`, read by `recall`; the **agent's notebook** for business-level notes (`note`); memory settings per bot (what to remember, never store, how long to keep); view, edit and **Forget** in the dashboard; memory loaded into every run within a budget; memory writes visible in the run's steps | all three | Tell the bot "I prefer evenings" and next week it offers evening slots; the profile shows that fact with its source; Forget removes it and the next run doesn't know it; a "never store" item is refused |
+| 9 | **Media in and voice.** Files on a person or record; read photos and documents into fields (cards, invoices, IDs) with masking; **voice notes transcribed** with language detection before the agent runs; **optional voice replies** in the user's language; sensitive images dropped after extraction | all three | A business-card photo fills fields with sources; a Marathi voice note is answered (in voice too, if on); an Aadhaar photo keeps only the last 4 digits |
 
-## Phase D — Abilities and trust (epics 7 and 9)
-
-| # | Chunk | Repos | What you can test at the end |
-|---|---|---|---|
-| 11 | **Abilities with Do it, Ask me first and Never.** Ability registry for the eight built-in abilities; per-bot setting; LangGraph `interrupt` for Ask me first; approvals inbox on the web | all three | Set "hand over" to Ask me first; the run pauses, you approve on the web, and it resumes in the same conversation |
-| 12 | **Owner on WhatsApp: approvals, handover and notify team.** Register an owner number; approve or deny with WhatsApp buttons; handover promises with tracked reply times | ally-be, ally-ai | Approve a pending action from your phone; a handover shows a promised time and an alert fires when it's missed |
-| 13 | **Never check and learning mode.** Pre-send check against the Never list; learning mode sends unsure answers to the owner as drafts | ally-ai, ally-be | A reply that breaks a Never rule is blocked and logged; in learning mode, an unsure answer reaches you as a draft first |
-
-## Phase E — Scheduler and flows (epic 8)
+## Phase C — Conversations
 
 | # | Chunk | Repos | What you can test at the end |
 |---|---|---|---|
-| 14 | **Scheduler core.** `scheduled_jobs` and a worker with keys; quiet hours; opt-out checked at send time; the 24-hour rule with template choice; a `schedule` tool for follow-ups and reminders; smart wake-ups | ally-be, ally-ai | "Remind me tomorrow at 10" arrives once at 10 (after quiet hours); STOP before then cancels it; restarting the worker doesn't double-send |
-| 15 | **Schedules screen, owner scheduling, announcements and templates.** Calendar and list view; the owner creates schedules in plain words with a preview and Confirm; announcements to opted-in people; template submission to Meta | all three | From your phone, "remind everyone who asked about X on Friday" shows a preview with the count, then sends on Friday |
-| 16 | **Flows engine.** Flow definitions and runs; triggers from profile dates, conversation events, tags and files; steps, caps, priority and exits; five ready-made flows | ally-be, ally-ai | Switch on Collect reviews; a completed visit triggers the rating request; a 5 gets the link and a 2 goes to Needs you |
-| 17 | **Flow builder, plain-words flows and flow pages.** Step-list builder; describe a flow on WhatsApp and get a preview; dry run; a results page per flow | all three | Build a reminder flow in plain words; the dry run lists who would get what this week; the flow page shows live numbers |
+| 10 | **Messages out: documents, media and interactive.** Replies can carry reply buttons, list menus, images with captions, documents and location pins, falling back to text where a channel can't show them; send a document attached to a person or record, with delivery tracking; templates outside the 24-hour window | all three | "Morning or Evening batch" arrives as buttons; three listings arrive as photos; an invoice PDF is delivered and tracked |
+| 11 | **Team inbox and handover.** Staff see live conversations, **take over, reply from the dashboard, and hand back** to the bot; assignment (round robin or rules); each agent sees their own; handover with a promised reply time and an alert when it's missed; a conversation summary for whoever takes over | all three | Hand over, reply from the dashboard, hand back, and the bot continues with context; a missed promise alerts |
+| 12 | **Shared conversation store.** Channel-agnostic conversations and messages, WhatsApp data backfilled, writes going to both during the switch | ally-be | WhatsApp history unchanged; new messages land in the shared tables |
+| 13 | **Website chat widget.** Embed script, `web` connector with streaming, branding, page rules, Continue on WhatsApp with **memory and history carried over** | all three | Chat on a test page, continue on WhatsApp, and the agent remembers the earlier chat |
 
-## Phase F — Onboarding (epics 5 and 6)
-
-| # | Chunk | Repos | What you can test at the end |
-|---|---|---|---|
-| 18 | **Sandbox number with join codes.** An Ally-owned number; a join code routes a phone to a draft bot | ally-be | Text the join code from any phone and chat with your draft bot before connecting a number |
-| 19 | **Onboarding and self-drafting.** Website, documents or a description in; drafted pages, facts, abilities and a starter flow out; review, try and go live in under 10 minutes | all three | A new user goes from nothing to a live test chat in under 10 minutes, timed |
-
-## Phase G — Website widget (epic 13)
+## Phase D — Trust, history and the owner
 
 | # | Chunk | Repos | What you can test at the end |
 |---|---|---|---|
-| 20 | **Shared conversation store.** Channel-agnostic conversations and messages tables, with WhatsApp data backfilled and writes going to both during the switch | ally-be | Existing WhatsApp history shows unchanged; new messages land in the shared tables |
-| 21 | **Website chat widget.** Embed script, `web` connector, branding, page rules, Continue on WhatsApp with memory carried over | all three | Paste the snippet on a test page and chat; continue on WhatsApp and the agent knows the earlier chat |
+| 14 | **Abilities and approvals.** Every built-in and generated ability gets Do it / Ask me first / Never with an **approver** (owner, the assigned person, or a related person such as the manager); a LangGraph `interrupt` pauses the run; approvals inbox on the web and **approve/deny buttons on WhatsApp**; the run resumes in the same conversation | all three | "Cancel within 24 hours" pauses; the approver taps Approve on WhatsApp; the bot confirms to the patient |
+| 15 | **Never check and learning mode.** Every reply is checked against the bot's Never list before sending; learning mode sends unsure replies to the owner as drafts first | ally-ai, ally-be | A reply breaking a Never rule is blocked and logged; in learning mode the owner approves drafts |
+| 16 | **History: search, summaries, topics and "Why?".** Every conversation searchable, with a summary; the agent can `search_history` ("what did we discuss last month?"); unanswered and handed-over questions grouped into topics; a plain-language "Why?" card on every reply (pages, records, memory, rules and abilities used) | all three | Search "refund" across chats; the bot recalls an earlier conversation when asked; Why? matches the run |
+| 17 | **Owner on WhatsApp (manager mode).** The owner's number is recognised: **teach** ("we're closed Monday" becomes a proposed Update or page edit to confirm), **ask** ("how many bookings today?", "what did people ask about this week?" from collections and history), **pause and resume** the bot, and approvals in the same chat | ally-be, ally-ai | Text "closed Monday", confirm, and customers are told; ask "bookings today?" and get the count; "pause" stops replies until "resume" |
 
-## Phase H — Learning, owner mode and home (epics 10, 11 and 12)
+## Phase E — Templates
 
 | # | Chunk | Repos | What you can test at the end |
 |---|---|---|---|
-| 22 | **Self-learning loop.** Nightly reflection; lessons inbox; impact preview; apply and undo; owner locks | all three | After a day of test chats, lessons appear the next morning; apply one and the behaviour changes; undo reverts it |
-| 23 | **Owner manager mode and daily digest.** Teach, ask, pause and resume from WhatsApp; daily digest | ally-be, ally-ai | Text "we're closed Monday" and the About page updates (after you confirm); the digest arrives each evening |
-| 24 | **Home, insights and cost cap.** Needs-you list, five weekly numbers, what it learned; per-bot monthly cost cap | ally-web, ally-be | Home matches the data; hitting the cap switches to the fallback behaviour and alerts you |
-| 25 | **Hardening and rollout.** Eval set in CI, load test, alerts, a migration tool to move v1 bots to v2, and docs | all three | Eval and load reports pass the quality bars; one real bot runs on v2 for a week with no regressions |
+| 18 | **Template format, install and export.** `template.yaml` with pages, collection schemas and sample rows, people fields and relations, memory settings, ability settings, rules, setup questions and eval cases. Install into a bot; export any bot as a template (without records, people or memories); versioning; the safety layer can't be removed | all three | Export the clinic bot, install it as a new bot with a different name and hours, and its evals pass |
+| 19 | **Template builder, sharing and the official set.** Build or edit a template in the dashboard or as files; share within the organisation or by private link; import. Ship ten official templates (mental health FAQ, clinic, travel, shop, SaaS support, coaching, real estate, gym, public-services helpdesk, HR), each with passing evals | all three | Someone outside the team imports a shared template link and has a working bot |
+| 20 | **Onboarding and sandbox.** Pick a template or "start blank"; paste a website or upload documents to draft pages and sample rows; answer the setup questions; try it on the sandbox number with a join code; connect WhatsApp, all in under 10 minutes | all three | A new user goes from nothing to a live test chat in under 10 minutes, timed |
 
-## Order and parallel work
+## Phase F — Ready for customers
 
-- **Do these strictly in order:** 1 → 2 → 3a → 3b → 3c. Everything else needs the gateway. Every node and tool writes a `trace` step, so 3c (streaming) can show them live.
-- **After 3, they can run in parallel:** 4–5 (context), 6–8 (profiles), 9–10 (history), 18 (sandbox), 20 (shared store).
-- **Next:** 11–13 (abilities), then 14–17 (scheduler and flows), then 19 (onboarding needs pages, facts, abilities and flows), then 21, 22, 23, 24 and 25.
-- With one person driving Claude Code, plan on about one chunk every 2–4 days including your testing, so roughly 15–17 weeks. That matches the spec's estimate.
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| 21 | **Privacy, quality and rollout.** Consent and opt-in records; data export and delete on request (India's DPDP Act), covering memory, history, records and files; retention jobs; per-template evals in CI; load test; per-bot cost cap; Home (needs-you list, weekly numbers, top topics); a migration tool to move v1 bots to v2 | all three | Export and delete a contact's data end to end; CI blocks a template whose evals fail; Home matches the data |
+
+## Moved to v3
+
+Only three areas move, plus what v3 already had:
+
+- **Scheduler and outbound:** reminders, follow-ups, routines, the owner's daily digest, broadcasts and announcements, Meta template submission for campaigns.
+- **Flows and workflows:** record-status triggers, collect reviews, product updates, reorder, win-back, the flow builder.
+- **Self-learning loop:** nightly reflection and the lessons inbox. (Learning mode, where the owner approves drafts, stays in v2.)
+- **Already v3:** connectors (calendars, payments, stores, CRMs, ticketing, HRMS), MCP and any API as a tool, the public template gallery and skills store, forms and WhatsApp Flows, Slack and Teams.
+
+Without a scheduler, v2 bots never message people first. They answer, act, remember and hand over when someone writes in; approval results and handover replies are the only follow-ups, using templates outside the 24-hour window.
+
+## Release gates
+
+| Gate | After | What must be true |
+|---|---|---|
+| **G1: first real bot on v2** | 3b | Ops: checkpoint DB, retention, reasoning effort, agent prompt published. Ally FAQ in Shadow for a week (≥ 95% match on intent and decline, no crisis differences), then v2 with Agent mode |
+| **G2: blocks and memory live** | 9 | A pilot clinic runs bookings on Collections (built from blocks, not code) and the bot remembers returning patients; Forget and masking work end to end; no PHI in logs |
+| **G3: team-ready** | 13 | A pilot business with staff uses the team inbox and rich messages; the widget is on one website |
+| **G4: trusted, visible, owner-run** | 17 | Approvals, the Never check, history and Why? in use; the owner runs the bot from WhatsApp; learning mode for each new bot's first week |
+| **G5: anyone can build** | 20 | Ten official templates pass their evals; a non-Ally user builds and shares their own template; onboarding under 10 minutes |
+| **G6: v2 complete** | 21 | Privacy controls, CI evals, cost cap, v1 bots migrated |
+
+## Order and timing
+
+- **In order:** 3c → 3b → 4 → 5 → 6 → 7 → 8. Collections, generated tools, People and Memory are the foundation of everything after.
+- **Then in parallel where people allow:** 9 (media), 10–11 (messages, inbox), 14–15 (trust).
+- **Then:** 12 → 13, 16 → 17, then 18 → 19 → 20, then 21.
+- **Estimate:** 20 chunks remain at about 3 days each, including your testing: roughly **13–15 weeks** with one person driving Claude Code. Similar to the original plan, with scheduling, flows and the learning loop swapped for Collections, templates, the team inbox and rich messages.

@@ -3,17 +3,18 @@
 Dark until AGENT_RUNTIME__ENABLED: every route here answers 404 while it is off, so
 shipping this changes nothing in production, and 503 if it is on but its checkpoint
 database could not be opened at startup. Every run adds a run id, a per-step trace
-and a stored checkpoint to what /knowledge-agent/answer returns.
+and a stored checkpoint to what /knowledge-agent/answer returns. /run and
+/run/stream share one runner (agent_runtime/runner.py).
 """
 
-from uuid import uuid4
-
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from langgraph.graph.state import CompiledStateGraph
 
 from app.api.v1.endpoints.knowledge_agent import knowledge_errors
 from app.core.agent_runtime.checkpointer import checkpointer_available
-from app.core.agent_runtime.graph import get_agent_graph, run_agent
+from app.core.agent_runtime.graph import get_agent_graph
+from app.core.agent_runtime.runner import execute, stream
 from app.core.config import settings
 from app.core.dependencies import get_knowledge_agent_service
 from app.core.knowledge_agent.agent import KnowledgeAgentService
@@ -58,28 +59,37 @@ async def run(
 
     Same outcomes and status codes as /knowledge-agent/answer — `answer`, `decline`
     and `clarify` are all 200, and a failure maps to the same 502/503/500 — so a
-    caller can switch between the two without new error handling.
+    caller can switch between the two without new error handling. A run past
+    AGENT_RUNTIME__RUN_TIMEOUT_SECONDS is cancelled and answers 504.
     """
-    run_id = payload.run_id or str(uuid4())
+    timed_out = False
     with knowledge_errors("Unexpected error in an agent run"):
-        state = await run_agent(
-            graph,
-            run_id=run_id,
-            conversation_id=payload.conversation_id,
-            chatbot_id=payload.chatbot_id,
-            question=payload.question,
-            history=[turn.model_dump() for turn in payload.history],
-            bot=payload.to_bot(),
+        try:
+            return await execute(graph, payload)
+        except TimeoutError:
+            # Outside knowledge_errors, which would make it a 500.
+            timed_out = True
+    if timed_out:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="The agent run timed out",
         )
-        result = state["result"]
-        retrieval = {
-            **result["retrieval"],
-            "hit_chunk_ids": [
-                str(hit.get("chunk_id")) for hit in state.get("hits") or []
-            ],
-        }
-        return AgentRunResponse(
-            **{**result, "retrieval": retrieval},
-            run_id=run_id,
-            trace=state.get("trace") or [],
-        )
+
+
+@router.post("/run/stream", tags=["agent_runtime"])
+async def run_stream(
+    payload: AgentRunRequest,
+    graph: CompiledStateGraph = Depends(get_graph),
+):
+    """
+    The same run as /run, as Server-Sent Events: `run_started`, then `status` and
+    `step` as they happen, the checked reply as `token` events, and `final` —
+    exactly /run's response — or `error {code}` (timeout, upstream, internal).
+    A comment line every 10 s keeps the connection alive; disconnecting cancels
+    the run.
+    """
+    return StreamingResponse(
+        stream(graph, payload),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

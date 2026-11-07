@@ -120,6 +120,13 @@ export interface WhatsAppBotSettings {
    * rollback is this switch, not a deploy. Platform-wide only: a bot's settings cannot turn it on.
    */
   agentRuntimeAllowed: boolean;
+
+  /**
+   * Show WhatsApp's typing dots while the bot works on a reply. Meta's call for them also marks the
+   * message read (blue ticks), so it is a product choice per bot. On unless set to `false`; only a
+   * platform admin can change it.
+   */
+  showTyping?: boolean;
 }
 
 export const WHATSAPP_SETTINGS_NAME = 'whatsapp_bot';

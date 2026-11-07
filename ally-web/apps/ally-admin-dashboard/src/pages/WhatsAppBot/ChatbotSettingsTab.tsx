@@ -56,7 +56,9 @@ export const ChatbotSettingsTab: React.FC<{
   chatbotId: string;
   chatbotName: string;
   canEdit: boolean;
-}> = ({ chatbotId, chatbotName, canEdit }) => {
+  /** Platform admins also see "Show typing", which turns on read receipts too. */
+  isPlatformAdmin?: boolean;
+}> = ({ chatbotId, chatbotName, canEdit, isPlatformAdmin = false }) => {
   const { data, isLoading, isError, refetch } = useGetChatbotSettingsQuery(chatbotId);
   const [save, { isLoading: isSaving }] = useUpdateChatbotSettingsMutation();
   const [draft, setDraft] = useState<WaOrgSettings>({});
@@ -139,6 +141,22 @@ export const ChatbotSettingsTab: React.FC<{
           />
           <span className="text-xs text-typography-500">{t.enabledHelp}</span>
         </div>
+        {isPlatformAdmin && (
+          <div className="flex flex-col gap-1">
+            <CarbonToggle
+              id="wa-org-show-typing"
+              labelText={t.showTypingLabel}
+              size="sm"
+              toggled={draft.showTyping !== false}
+              disabled={!canEdit}
+              // On is the default, so it is stored only when switched off.
+              onToggle={(checked: boolean) =>
+                checked ? unset("showTyping") : set({ showTyping: false })
+              }
+            />
+            <span className="text-xs text-typography-500">{t.showTypingHelp}</span>
+          </div>
+        )}
         {text("helplineNumbers", d.helplineLabel, t.helplineHelp)}
       </Card>
 

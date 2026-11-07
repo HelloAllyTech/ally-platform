@@ -195,6 +195,18 @@ export class ChatbotSettingsService {
   }
 }
 
+/**
+ * Whether a settings write changes a key only a platform admin may set ("Show typing", which also
+ * turns on read receipts). Leaving it as stored, or leaving it out when it was never set, is not a
+ * change, so a bot editor's save round-trips it.
+ */
+export function changesAdminOnlySetting(
+  stored: ChatbotSettingsOverride | null | undefined,
+  next: ChatbotSettingsOverride | null | undefined,
+): boolean {
+  return (stored?.showTyping ?? null) !== (next?.showTyping ?? null);
+}
+
 /** Drop empty strings and unset values, so "cleared in the form" means "follow the default". */
 export function cleanOverride(
   override: ChatbotSettingsOverride,

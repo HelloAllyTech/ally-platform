@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { SkeletonText, Tabs } from "@ally-ui-mono/ui-shared";
-import { useGetChatbotQuery } from "@api";
+import { useGetChatbotQuery, useGetChatbotsQuery } from "@api";
 import { en, ROUTES } from "@constants";
 import { Chatbot, ChatbotMemberRole } from "@types";
 
@@ -72,6 +72,9 @@ export const ChatbotPage: React.FC = () => {
   const { botId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: bot, isLoading, isError, refetch } = useGetChatbotQuery(botId, { skip: !botId });
+  // Only platform admins may change "Show typing" (it turns on read receipts too).
+  const { data: list } = useGetChatbotsQuery();
+  const isPlatformAdmin = Boolean(list?.canCreate);
 
   const tabItems = useMemo(() => {
     const open = bot?.stats.openUnanswered ?? 0;
@@ -154,7 +157,14 @@ export const ChatbotPage: React.FC = () => {
       case "connectors":
         return <BotConnectorsTab bot={bot} canManage={canManage} />;
       case "general":
-        return <ChatbotSettingsTab chatbotId={bot.id} chatbotName={bot.name} canEdit={canEdit} />;
+        return (
+          <ChatbotSettingsTab
+            chatbotId={bot.id}
+            chatbotName={bot.name}
+            canEdit={canEdit}
+            isPlatformAdmin={isPlatformAdmin}
+          />
+        );
       case "agent":
       default:
         return <AgentTab bot={bot} canEdit={canEdit} onTest={() => openTab("test")} />;

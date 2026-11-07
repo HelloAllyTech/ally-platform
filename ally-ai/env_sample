@@ -69,6 +69,9 @@ AGENT_RUNTIME__ENABLED=false
 # after which it stops searching and its reply is final.
 # AGENT_RUNTIME__MAX_TOOL_CALLS=2
 # AGENT_RUNTIME__RUN_BUDGET_SECONDS=15
+# Hard cap on one run, model calls included (504 / stream error past it). Keep it
+# below ally-be's waits: 22 s for Preview's stream, 25 s for /agent/run.
+# AGENT_RUNTIME__RUN_TIMEOUT_SECONDS=20
 # Conversation messages the agent reads.
 # AGENT_RUNTIME__MAX_HISTORY_MESSAGES=10
 # Reasoning effort for the agent step on gpt-5/o-series models (minimal, low, medium,

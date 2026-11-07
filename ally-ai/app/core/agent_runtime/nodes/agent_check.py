@@ -35,7 +35,7 @@ def _summary(_: AgentState, update: Dict[str, Any]) -> str:
 
 
 def make_agent_check_node(service: KnowledgeAgentService) -> Node:
-    @traced("check", _summary)
+    @traced("check", _summary, lambda _: "checking")
     async def agent_check(state: AgentState) -> Dict[str, Any]:
         retrieval = state.get("retrieval") or service.retrieval_meta(
             state["limits"],

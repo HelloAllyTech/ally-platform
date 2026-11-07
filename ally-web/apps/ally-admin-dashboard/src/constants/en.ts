@@ -1866,6 +1866,31 @@ export const en = {
         wouldFile: "Would be logged as a knowledge gap",
         failed: "The test failed.",
         thinking: "Thinking…",
+        // What the agent is doing while a reply is made, one line per step.
+        activity: {
+          thinking: "Reading your question",
+          thinkingAgain: "Working out the answer",
+          searching: "Searching the knowledge base",
+          searchingFor: "Searching the knowledge base for “{detail}”",
+          found: "Found {detail}",
+          foundIn: "Found {detail} in {documents}",
+          foundNothing: "Found nothing new",
+          checking: "Checking the answer against the sources",
+          rewriting: "Rewriting the answer",
+          rewritingBecause: "Rewriting: {reason}",
+          // Why the check sent a draft back (ally-ai's rejection codes).
+          rewriteReasons: {
+            uncited: "the draft wasn't backed by a source",
+            unsourced_detail: "it gave a contact detail no source has",
+            empty: "the draft was empty",
+            search_first: "it answered before searching",
+            mentions_sources: "it talked about its sources",
+            use_found: "it didn't use what it found",
+          },
+          writing: "Writing the reply",
+          worked: "Worked for {seconds} s · {count} steps",
+        },
+        replaced: "Updated with the final reply",
         empty: "Start a conversation to see how it answers.",
         checkAccess: "Apply “who can use it” to me",
         draftBanner: "Previewing your unsaved instructions.",
@@ -1915,6 +1940,9 @@ export const en = {
       enabledLabel: "Answer messages",
       enabledHelp:
         "Turn off to stop this chatbot replying. Unpublishing it from Overview does the same.",
+      showTypingLabel: "Show typing on WhatsApp",
+      showTypingHelp:
+        "Shows the typing dots while the chatbot works on a reply. WhatsApp also marks the person's message as read (blue ticks). Only Ally admins can change this.",
       helplineHelp: "Shown in the crisis reply wherever it says {helpline_numbers}.",
       crisisClassifierHelp:
         "Can only be turned on here. Ally keeps it on for everyone who needs it.",

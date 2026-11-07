@@ -32,7 +32,9 @@ import type {
   AgentRunRef,
   ChatbotDecision,
   ChatTurn,
+  LiveReply,
 } from './chatbot-engine.types';
+import { holdTextUntilCleared } from './live-reply';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 
@@ -111,7 +113,11 @@ export class ChatbotEngineService {
     private readonly agentRuntime: AgentRuntimeRunner,
   ) {}
 
-  async respond(turn: ChatTurn): Promise<ChatbotDecision> {
+  /**
+   * Decide the reply to one message. `live` (a channel that streams) receives the run's status,
+   * steps and text while it happens; the decision returned is the same either way.
+   */
+  async respond(turn: ChatTurn, live?: LiveReply): Promise<ChatbotDecision> {
     const { chatbot, settings, sender } = turn;
     const allowed = await this.audienceService.canChat(chatbot, sender);
     // v2 (the conversational agent) unless the platform's emergency switch is off.
@@ -175,7 +181,7 @@ export class ChatbotEngineService {
     }
 
     // ── 3. Answer ────────────────────────────────────────────────────────
-    return this.answer(turn, useAgent);
+    return this.answer(turn, useAgent, live);
   }
 
   /**
@@ -218,6 +224,7 @@ export class ChatbotEngineService {
   private async answer(
     turn: ChatTurn,
     useAgent: boolean,
+    live?: LiveReply,
   ): Promise<ChatbotDecision> {
     const { settings } = turn;
     const { prompts, ran } = await this.loadPromptOverrides(turn, useAgent);
@@ -227,13 +234,21 @@ export class ChatbotEngineService {
     // Concurrent, not sequential: the classifier adds no latency this way, and `allSettled`
     // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
     // runs once and exactly as before, whichever engine answers.
+    const crisisCheck = settings.crisisClassifierEnabled
+      ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
+      : Promise.resolve(null);
+    // A streamed reply's text waits for the crisis check too: none of it is shown before the
+    // check clears the message, and none at all if it doesn't.
     const [answerResult, crisisResult] = await Promise.allSettled([
       useAgent
-        ? this.agentRuntime.answer(turn, request, knowledge)
+        ? this.agentRuntime.answer(
+            turn,
+            request,
+            knowledge,
+            live && holdTextUntilCleared(live, crisisCheck),
+          )
         : this.answerWithV1(request),
-      settings.crisisClassifierEnabled
-        ? this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts })
-        : Promise.resolve(null),
+      crisisCheck,
     ]);
     const agent = runBehind(answerResult);
 

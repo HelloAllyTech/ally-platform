@@ -30,6 +30,7 @@ An answer that changed because a fallback kicked in must be explainable after th
 from __future__ import annotations
 
 import re
+import time
 from typing import Any, Dict, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
@@ -467,6 +468,7 @@ async def _generate_anthropic(
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
     reasoning_effort: Optional[str] = None,  # OpenAI reasoning models only
+    timeout: Optional[float] = None,
 ) -> TSchema:
     """
     Structured output from Claude, enforced by the API rather than requested in prose.
@@ -519,6 +521,8 @@ async def _generate_anthropic(
         kwargs["temperature"] = temperature
     if system:
         kwargs["system"] = system
+    if timeout:
+        kwargs["timeout"] = timeout
 
     response = await client.messages.create(**kwargs)
 
@@ -577,6 +581,7 @@ async def _generate_gemini(
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
     reasoning_effort: Optional[str] = None,  # OpenAI reasoning models only
+    timeout: Optional[float] = None,
 ) -> TSchema:
     """
     Structured output from Gemini via `response_schema`, as the analytics agent does.
@@ -601,6 +606,8 @@ async def _generate_gemini(
         config_kwargs["max_output_tokens"] = max_tokens
     if system:
         config_kwargs["system_instruction"] = system
+    if timeout:
+        config_kwargs["http_options"] = types.HttpOptions(timeout=int(timeout * 1000))
 
     response = await client.aio.models.generate_content(
         model=model,
@@ -660,6 +667,7 @@ async def _generate_openai(
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
+    timeout: Optional[float] = None,
 ) -> TSchema:
     """
     Structured output from OpenAI via a json_schema response format.
@@ -707,6 +715,8 @@ async def _generate_openai(
     # Only the reasoning family takes it; anything else would reject the field.
     if reasoning_effort and reasoning:
         kwargs["reasoning_effort"] = reasoning_effort
+    if timeout:
+        kwargs["timeout"] = timeout
 
     response = await client.chat.completions.create(**kwargs)
 
@@ -791,6 +801,7 @@ async def generate_structured(
     max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
     never_fallback: bool = False,
     reasoning_effort: Optional[str] = None,
+    timeout: Optional[float] = None,
 ) -> Tuple[TSchema, Dict[str, Any]]:
     """
     Generate a validated instance of `schema` from whichever provider is selected.
@@ -824,6 +835,10 @@ async def generate_structured(
         reasoning_effort: OpenAI reasoning models (gpt-5, o-series) only:
             `minimal` / `low` / `medium` / `high`. Ignored for every other
             model and provider. None sends nothing (the provider default).
+        timeout: Seconds this call may take, across the provider fallback too: the
+            retry gets only what the first attempt left (at least one second). For
+            a caller with a hard deadline, such as an agent run. None leaves the
+            SDK's own timeout, as before.
         never_fallback: Refuse to run anywhere but the selected provider —
             neither substituting for a missing key nor retrying elsewhere after
             a failure; the call fails instead. For a call whose whole point is
@@ -855,7 +870,10 @@ async def generate_structured(
         "fell_back_from": fell_back_from,
     }
 
+    deadline = time.monotonic() + timeout if timeout else None
+
     async def attempt(prov: str, mdl: str) -> TSchema:
+        left = max(deadline - time.monotonic(), 1.0) if deadline else None
         return await _GENERATORS[prov](
             schema=schema,
             prompt=prompt,
@@ -866,6 +884,7 @@ async def generate_structured(
             task=task,
             scenario_session_id=scenario_session_id,
             reasoning_effort=reasoning_effort,
+            timeout=left,
         )
 
     try:

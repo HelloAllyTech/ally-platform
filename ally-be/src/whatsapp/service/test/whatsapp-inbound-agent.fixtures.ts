@@ -109,6 +109,7 @@ export async function buildInboundHarness({
   contactMessageCount = () => 4,
   settings: settingsOverride = {},
   documents = { find: async () => [{ documentId: 'doc-1' }] },
+  replies = {},
 }: {
   chatbot: () => Chatbot;
   /** What `/agent/run` answers. */
@@ -117,6 +118,8 @@ export async function buildInboundHarness({
   settings?: Partial<WhatsAppBotSettings>;
   /** The ChatbotDocument repository. */
   documents?: Record<string, unknown>;
+  /** ChatbotReplyService methods to replace (no keyword matches by default). */
+  replies?: Record<string, jest.Mock>;
 }): Promise<InboundHarness> {
   const savedMessages: Record<string, unknown>[] = [];
   const provider = {
@@ -239,6 +242,7 @@ export async function buildInboundHarness({
         useValue: {
           match: jest.fn().mockResolvedValue(null),
           findByKind: jest.fn().mockResolvedValue([]),
+          ...replies,
         },
       },
       {

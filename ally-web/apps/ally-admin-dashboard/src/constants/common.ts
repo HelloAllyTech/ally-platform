@@ -791,6 +791,7 @@ export const ApiEndpoints = {
     AUDIENCE: (id: string) => `/v1/chatbots/${id}/audience`,
     AUDIENCE_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/audience/${entryId}`,
     TEST: (id: string) => `/v1/chatbots/${id}/test`,
+    TEST_STREAM: (id: string) => `/v1/chatbots/${id}/test/stream`,
     CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
   },
   WHATSAPP_BOT: {

@@ -49,6 +49,7 @@ The report goes to eval_report.md unless --out names a file. CHUNK-03A-EVAL.md i
 
 import argparse
 import asyncio
+import json
 import os
 import re
 import statistics
@@ -76,6 +77,7 @@ from app.core.agent_runtime.check import (  # noqa: E402
 
 V1_PATH = "/api/v1/knowledge-agent/answer"
 V2_PATH = "/api/v1/agent/run"
+STREAM_PATH = "/api/v1/agent/run/stream"
 TIMEOUT_SECONDS = 90.0
 AGENT_ONLY_FIELDS = ("knowledge_topics", "decline_text")
 LATENCY_BUDGET = 0.25
@@ -158,6 +160,70 @@ def call(
     if response.status_code != 200:
         return None, ms, f"HTTP {response.status_code}: {response.text[:200]}"
     return response.json(), ms, None
+
+
+def read_events(lines) -> List[Tuple[str, Dict[str, Any]]]:
+    """(event, data) pairs from SSE lines; comment lines (pings) are skipped."""
+    events: List[Tuple[str, Dict[str, Any]]] = []
+    name = None
+    for line in lines:
+        if line.startswith("event: "):
+            name = line[len("event: ") :]
+        elif line.startswith("data: ") and name:
+            events.append((name, json.loads(line[len("data: ") :])))
+            name = None
+    return events
+
+
+def stream_problems(events: List[Tuple[str, Dict[str, Any]]]) -> List[str]:
+    """What the stream did wrong, beyond the reply itself: event order, reply text
+    before the check passed it, or tokens that don't spell the final answer."""
+    names = [name for name, _ in events]
+    problems = []
+    if not names or names[0] != "run_started":
+        problems.append("stream: run_started not first")
+    if names[-1:] != ["final"]:
+        problems.append("stream: final not last")
+    checks_at = [
+        i for i, (n, d) in enumerate(events) if n == "step" and d["node"] == "check"
+    ]
+    tokens_at = [i for i, n in enumerate(names) if n == "token"]
+    if tokens_at and (not checks_at or tokens_at[0] < checks_at[-1]):
+        problems.append("stream: reply text before the check")
+    if names[-1:] == ["final"]:
+        text = "".join(d["text"] for n, d in events if n == "token")
+        if text != (events[-1][1].get("answer") or ""):
+            problems.append("stream: tokens differ from the final answer")
+    return problems
+
+
+def call_stream(
+    client: httpx.Client, payload: Dict[str, Any]
+) -> Tuple[Optional[Dict[str, Any]], float, Optional[str], Optional[float], List[str]]:
+    """POST to the stream endpoint. Returns ``(final, ms, error, first_event_ms,
+    stream_problems)``; `final` is None on error, as `call`'s result is."""
+    started = time.monotonic()
+    first: Optional[float] = None
+    lines: List[str] = []
+    try:
+        with client.stream("POST", STREAM_PATH, json=payload) as response:
+            if response.status_code != 200:
+                response.read()
+                ms = (time.monotonic() - started) * 1000
+                return None, ms, f"HTTP {response.status_code}", None, []
+            for line in response.iter_lines():
+                if first is None and line.startswith("event: "):
+                    first = (time.monotonic() - started) * 1000
+                lines.append(line)
+    except httpx.HTTPError as e:
+        return None, (time.monotonic() - started) * 1000, type(e).__name__, first, []
+    ms = (time.monotonic() - started) * 1000
+    events = read_events(lines)
+    if events and events[-1][0] == "error":
+        return None, ms, f"stream error: {events[-1][1].get('code')}", first, []
+    if not events or events[-1][0] != "final":
+        return None, ms, "stream ended without final", first, []
+    return events[-1][1], ms, None, first, stream_problems(events)
 
 
 def p50(values: List[float]) -> float:
@@ -343,9 +409,11 @@ def run(
     workers: int = 1,
     title: str = "Conversation eval",
     cases_file: str = "",
+    stream: bool = False,
 ) -> int:
     rows: List[Dict[str, Any]] = []
     agent_ms: List[float] = []
+    first_event_ms: List[float] = []
     v1_ms: List[float] = []
     overlaps: List[bool] = []
     v1_defaults = {k: v for k, v in defaults.items() if k not in AGENT_ONLY_FIELDS}
@@ -364,7 +432,13 @@ def run(
                 "history": list(history),
                 "conversation_id": conversation_id,
             }
-            result, ms, error = call(client, V2_PATH, payload)
+            extra: List[str] = []
+            if stream:
+                result, ms, error, first, extra = call_stream(client, payload)
+                if first is not None:
+                    first_event_ms.append(first)
+            else:
+                result, ms, error = call(client, V2_PATH, payload)
             row: Dict[str, Any] = {
                 "case": case["id"],
                 "turn": index,
@@ -383,6 +457,8 @@ def run(
             status, problems = checks(
                 kind, result, later=index > 1, topics=bot.get("knowledge_topics")
             )
+            if extra:
+                status, problems = "fail", problems + extra
             verdict = None
             if judge_model:
                 try:
@@ -453,6 +529,7 @@ def run(
             f"{len(defaults.get('document_ids') or [])} documents. Cases: "
             f"`{cases_file}`"
         ),
+        first_event_ms=first_event_ms if stream else None,
         topic_prefix=shared_prefix(defaults.get("knowledge_topics") or []),
     )
 
@@ -479,6 +556,7 @@ def write_report(
     title: str,
     about: str,
     topic_prefix: str,
+    first_event_ms: Optional[List[float]] = None,
 ) -> int:
     hard_rows = [r for r in rows if r.get("hard")]
     failed = [r for r in rows if r.get("status") in ("fail", "error")]
@@ -513,10 +591,15 @@ def write_report(
         f"| p50 in scope: agent / v1 | {a50:.0f} ms / {p50_v1:.0f} ms "
         f"(**{delta:+.0%}**, budget +{LATENCY_BUDGET:.0%}) |",
     ]
+    if first_event_ms is not None:
+        summary.append(
+            f"| Streamed: p50 time to the first event | {p50(first_event_ms):.0f} ms |"
+        )
     lines = [
         f"# {title}",
         "",
-        f"Run {date.today().isoformat()} against `/api/v1/agent/run`, "
+        f"Run {date.today().isoformat()} against "
+        f"`{STREAM_PATH if first_event_ms is not None else V2_PATH}`, "
         f"{about}. Script: "
         "`ally-ai/scripts/agent_conversation_eval.py`.",
         "",
@@ -629,6 +712,12 @@ def main() -> int:
     )
     parser.add_argument("--judge-model", default="gpt-5-mini")
     parser.add_argument("--no-judge", action="store_true")
+    parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="ask through /agent/run/stream: the same checks on its `final`, plus "
+        "the stream's own (event order, no reply text before the check)",
+    )
     parser.add_argument("--only", help="Run only cases whose id starts with this")
     parser.add_argument(
         "--workers", type=int, default=6, help="Cases run side by side (default 6)"
@@ -667,6 +756,7 @@ def main() -> int:
             workers=max(1, args.workers),
             title=args.title,
             cases_file=str(args.cases),
+            stream=args.stream,
         )
 
 

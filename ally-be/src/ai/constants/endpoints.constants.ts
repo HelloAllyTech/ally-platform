@@ -67,6 +67,8 @@ export const ENDPOINTS = {
   KNOWLEDGE_AGENT_CRISIS_CHECK: 'api/v1/knowledge-agent/crisis-check',
   /** Agents v2: the LangGraph runtime. 404 while ally-ai's AGENT_RUNTIME__ENABLED is off. */
   AGENT_RUN: 'api/v1/agent/run',
+  /** The same run as Server-Sent Events (Preview): status and steps live, then `final`. */
+  AGENT_RUN_STREAM: 'api/v1/agent/run/stream',
 
   // ── Text helpline copilot (docs/text-helpline.md §9.1) ────────────────────
   // Both always answer 200 and report `failed` rather than erroring, so a caller
