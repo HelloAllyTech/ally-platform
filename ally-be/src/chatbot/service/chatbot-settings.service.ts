@@ -116,6 +116,9 @@ export class ChatbotSettingsService {
       // Platform-wide only. The per-bot settings body is not checked key by key, so a bot's jsonb
       // could otherwise switch the new engine on for itself past the kill switch.
       agentRuntimeAllowed: global.agentRuntimeAllowed,
+      // The shared store's switches are platform-wide for the same reason.
+      sharedStoreWrites: global.sharedStoreWrites,
+      readHistoryFrom: global.readHistoryFrom,
       rateLimit: {
         perMinute: tighter(global.rateLimit.perMinute, rateLimit?.perMinute),
         perHour: tighter(global.rateLimit.perHour, rateLimit?.perHour),

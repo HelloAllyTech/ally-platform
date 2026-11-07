@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, Repository } from 'typeorm';
 import { CreateKbDocumentDto } from 'src/knowledge-base/dto/knowledge-base.dto';
@@ -24,6 +24,8 @@ import {
   WaAnalyticsRepository,
 } from '../repository/wa-analytics.repository';
 import { ChatbotAccessService } from 'src/chatbot/service/chatbot-access.service';
+import { ConversationService } from 'src/chatbot/service/conversation.service';
+import { ConversationChannel } from 'src/chatbot/enum/conversation.enum';
 import { resolveSort } from 'src/common/util/sort.util';
 import { ERASED, ERASED_PHONE_PREFIX } from './whatsapp-retention.service';
 
@@ -55,6 +57,8 @@ export class WhatsAppConversationService {
     private readonly analyticsRepository: WaAnalyticsRepository,
     private readonly knowledgeBaseService: KnowledgeBaseService,
     private readonly access: ChatbotAccessService,
+    /** The shared conversation store (chunk 12), erased with `wa_*`. */
+    @Optional() private readonly conversations?: ConversationService,
   ) {}
 
   /**
@@ -409,6 +413,14 @@ export class WhatsAppConversationService {
         identifiedAt: null,
         identitySource: null,
       },
+    );
+
+    // The shared store's copy too (chunk 12). Not caught: an erasure must be complete, so a
+    // failure here fails the request, and repeating it is safe — every step above is idempotent.
+    await this.conversations?.eraseConversations(
+      conversations.map((c) => c.id),
+      ConversationChannel.WHATSAPP,
+      { text: ERASED, erasedPrefix: ERASED_PHONE_PREFIX },
     );
 
     this.logger.warn(

@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -17,6 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { WaTemplateKind, WaTemplateMatchType } from '../enum/whatsapp.enum';
+import type { HistorySource } from '../type/whatsapp-settings.type';
 
 export class CreateWaTemplateDto {
   @ApiProperty({ enum: WaTemplateKind })
@@ -276,6 +278,23 @@ export class UpdateWaSettingsDto {
   @IsOptional()
   @IsBoolean()
   agentRuntimeAllowed?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Also write WhatsApp messages to the shared conversation store (chunk 12).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  sharedStoreWrites?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['wa', 'shared'],
+    description:
+      'Where WhatsApp reads history from. `shared` needs sharedStoreWrites on.',
+  })
+  @IsOptional()
+  @IsIn(['wa', 'shared'])
+  readHistoryFrom?: HistorySource;
 }
 
 export class PreviewAskDto {

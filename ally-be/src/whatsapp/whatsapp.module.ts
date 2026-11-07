@@ -40,6 +40,7 @@ import { WhatsAppRetentionService } from './service/whatsapp-retention.service';
 import { WhatsAppSchedulerRegistrationService } from './service/whatsapp-scheduler-registration.service';
 import { WHATSAPP_PROVIDER } from './type/whatsapp-provider.interface';
 import { WhatsAppConnectorType } from './service/whatsapp-connector-type.service';
+import { WaSharedStoreWriter } from './shared-store/wa-shared-store.writer';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { Chatbot } from '../chatbot/entity/chatbot.entity';
 import { Connector } from '../chatbot/entity/connector.entity';
@@ -100,6 +101,7 @@ import { Connector } from '../chatbot/entity/connector.entity';
     WhatsAppConnectorType,
     WhatsAppInboundProducer,
     WhatsAppInboundService,
+    WaSharedStoreWriter,
     WhatsAppAdminService,
     WaAnalyticsRepository,
     WhatsAppConversationService,

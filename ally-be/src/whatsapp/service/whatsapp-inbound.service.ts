@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IsNull, Repository } from 'typeorm';
@@ -46,6 +46,7 @@ import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service'
 import { ConnectorService } from 'src/chatbot/service/connector.service';
 import { withFirstMessageParts } from 'src/chatbot/engine/first-reply';
 import { MAX_HISTORY_MESSAGES } from 'src/chatbot/engine/knowledge-request';
+import { WaSharedStoreWriter } from '../shared-store/wa-shared-store.writer';
 
 /**
  * Opt-out / opt-in words, recognised in code regardless of what templates exist.
@@ -149,6 +150,11 @@ export class WhatsAppInboundService {
     @InjectRepository(Chatbot)
     private readonly chatbotRepository: Repository<Chatbot>,
     private readonly eventEmitter: EventEmitter2,
+    /**
+     * The shared conversation store's dual-write (chunk 12). Optional so a module built without it
+     * — every spec that predates it — behaves exactly as before.
+     */
+    @Optional() private readonly sharedStore?: WaSharedStoreWriter,
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
@@ -218,6 +224,9 @@ export class WhatsAppInboundService {
           status: WaMessageStatus.PROCESSING,
         },
       );
+      // Copied to the shared store in the background. Awaited only when history is read from
+      // there, and then for a capped time (see recentHistory).
+      const sharedCopy = this.sharedStore?.mirrorInbound(settings, inboundId);
 
       if (contact.blockedAt) {
         // Silently. Telling an abuser precisely when they were blocked mostly teaches them to
@@ -298,7 +307,11 @@ export class WhatsAppInboundService {
         settings,
         text: inbound.text,
         language: contact.locale,
-        history: await this.recentHistory(conversation.id),
+        history: await this.recentHistory(
+          conversation.id,
+          settings,
+          sharedCopy,
+        ),
         isFirstMessage: contact.messageCount === 1,
         sender: {
           externalId: contact.phoneE164,
@@ -378,6 +391,7 @@ export class WhatsAppInboundService {
         { id: inboundId },
         { status: WaMessageStatus.FAILED, errorMessage: message },
       );
+      void this.sharedStore?.sync([inboundId], inboundId);
     }
   }
 
@@ -600,7 +614,15 @@ export class WhatsAppInboundService {
 
   private async recentHistory(
     conversationId: string,
+    settings?: WhatsAppBotSettings,
+    sharedCopy?: Promise<boolean>,
   ): Promise<{ role: string; content: string }[]> {
+    // `readHistoryFrom: shared` (chunk 12): the same history from the shared store, once this
+    // message's copy has landed; otherwise, or on any failure, from wa_messages as always.
+    if (settings && sharedCopy && this.sharedStore?.readsShared(settings)) {
+      const shared = await this.sharedStore.history(conversationId, sharedCopy);
+      if (shared) return shared;
+    }
     const rows = await this.messageRepository.find({
       where: { conversationId },
       order: { createdAt: 'DESC' },
@@ -865,6 +887,9 @@ export class WhatsAppInboundService {
         },
       );
     }
+
+    // After the send, in the background: both rows' final state to the shared store.
+    void this.sharedStore?.sync([inReplyToId, outbound.id], inReplyToId);
   }
 
   private async discard(messageId: string, reason: string): Promise<void> {
@@ -873,6 +898,7 @@ export class WhatsAppInboundService {
       { id: messageId },
       { status: WaMessageStatus.DISCARDED, errorMessage: reason },
     );
+    void this.sharedStore?.sync([messageId], messageId);
   }
 
   private async recordUnanswered(

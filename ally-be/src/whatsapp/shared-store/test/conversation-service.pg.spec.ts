@@ -11,6 +11,7 @@ import { WaMessageDirection, WaMessageStatus } from '../../enum/whatsapp.enum';
 import { WhatsAppInboundService } from '../../service/whatsapp-inbound.service';
 import { sharedMessageOf } from '../wa-shared-store.mapper';
 import {
+  closeTestDataSource,
   describePg,
   openTestDataSource,
   resetTables,
@@ -35,7 +36,7 @@ describePg('ConversationService (Postgres)', () => {
       dataSource.getRepository(ChatbotMessage),
     );
   });
-  afterAll(async () => dataSource?.destroy());
+  afterAll(async () => closeTestDataSource(dataSource));
   beforeEach(async () => {
     await resetTables(dataSource);
     botA = await seedChatbot(dataSource, 'A');

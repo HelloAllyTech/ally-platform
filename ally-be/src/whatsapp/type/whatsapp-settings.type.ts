@@ -127,7 +127,24 @@ export interface WhatsAppBotSettings {
    * platform admin can change it.
    */
   showTyping?: boolean;
+
+  /**
+   * Agents v2, chunk 12: also write every WhatsApp message to the shared conversation store
+   * (`chatbot_*`). `wa_*` stays the source of truth; a failed shared write is logged and counted,
+   * never felt by the person waiting for a reply. Platform-wide only.
+   */
+  sharedStoreWrites: boolean;
+
+  /**
+   * Where WhatsApp reads a thread's history for the engine: `wa` (`wa_messages`, as always) or
+   * `shared` (`chatbot_messages`). `shared` takes effect only while `sharedStoreWrites` is on, so it
+   * never reads a store nobody is writing to. Platform-wide only.
+   */
+  readHistoryFrom: HistorySource;
 }
+
+/** Which store WhatsApp reads a thread's history from. */
+export type HistorySource = 'wa' | 'shared';
 
 export const WHATSAPP_SETTINGS_NAME = 'whatsapp_bot';
 
@@ -181,4 +198,6 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
   crisisClassifierEnabled: true,
   helplineNumbers: '',
   agentRuntimeAllowed: false,
+  sharedStoreWrites: false,
+  readHistoryFrom: 'wa',
 };

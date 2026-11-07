@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { ChatbotContactIdentity } from 'src/chatbot/entity/chatbot-contact-identity.entity';
 import { ChatbotContact } from 'src/chatbot/entity/chatbot-contact.entity';
@@ -21,6 +21,9 @@ import { WaUnansweredQuestion } from '../../entity/wa-unanswered-question.entity
 const URL = process.env.CHATBOT_STORE_TEST_DB;
 
 export const describePg = URL ? describe : describe.skip;
+
+const SUITE_LOCK = 1_201_212;
+const locks = new Map<DataSource, QueryRunner>();
 
 export async function openTestDataSource(): Promise<DataSource> {
   const name = new globalThis.URL(URL!).pathname.replace(/^\//, '');
@@ -47,7 +50,26 @@ export async function openTestDataSource(): Promise<DataSource> {
     synchronize: false,
     logging: false,
   });
-  return dataSource.initialize();
+  await dataSource.initialize();
+  // One suite at a time: they share the database and truncate it, and jest runs suites in
+  // parallel workers. The lock is held by its own connection until closeTestDataSource.
+  const lock = dataSource.createQueryRunner();
+  await lock.connect();
+  await lock.query(`SELECT pg_advisory_lock($1)`, [SUITE_LOCK]);
+  locks.set(dataSource, lock);
+  return dataSource;
+}
+
+export async function closeTestDataSource(
+  dataSource: DataSource | undefined,
+): Promise<void> {
+  if (!dataSource) return;
+  const lock = locks.get(dataSource);
+  if (lock) {
+    await lock.query(`SELECT pg_advisory_unlock($1)`, [SUITE_LOCK]);
+    await lock.release();
+  }
+  await dataSource.destroy();
 }
 
 export async function resetTables(dataSource: DataSource): Promise<void> {
