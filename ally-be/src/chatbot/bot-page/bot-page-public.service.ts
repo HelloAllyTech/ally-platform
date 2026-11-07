@@ -158,6 +158,7 @@ export const WEB_CHANNEL: ChatChannel = {
   type: 'web',
   capabilities: {
     streaming: true,
+    showsSources: true,
     maxReplyChars: BOT_PAGE_BOUNDS.maxReplyChars,
   },
 };
@@ -645,7 +646,9 @@ export class BotPagePublicService {
     available: AvailableBotPage,
     ready: ReadyVisitor,
   ): Promise<PublicSession> {
-    let intakeDone = !intakeRequired(available.settings.prechat);
+    // Asked once per person when there are any questions, optional ones included; only the
+    // required ones block a message (`admit`).
+    let intakeDone = available.settings.prechat.length === 0;
     if (!intakeDone) {
       const contact = await this.contactOf(available, ready, false);
       intakeDone = Boolean(contact && (await this.latestIntake(contact.id)));

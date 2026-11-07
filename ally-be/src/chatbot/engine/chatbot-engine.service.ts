@@ -391,7 +391,11 @@ export class ChatbotEngineService {
       intent: answer.intent,
       answer: answer.answer,
       declineText: settings.declineText,
-      citations: answer.citations,
+      // A channel that lists sources itself gets the answer without the text footer; the
+      // decision still carries every citation.
+      citations: turn.channel.capabilities?.showsSources
+        ? []
+        : answer.citations,
       maxAnswerChars: settings.maxAnswerChars,
       maxReplyChars,
       maxCitations: settings.maxCitations,

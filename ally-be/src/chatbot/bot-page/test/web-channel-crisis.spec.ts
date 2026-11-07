@@ -116,4 +116,19 @@ describe('crisis on the web channel', () => {
     await engine.respond(turn('what are your fees?'), live);
     expect(visible.filter((e) => e.event === 'token')).toHaveLength(2);
   });
+
+  it('the reply text has no "Sources:" footer: the page lists the citations itself', async () => {
+    const { engine, turn } = setup();
+    const onWeb = await engine.respond(turn('what are your fees?'));
+    expect(onWeb.body).not.toContain('Sources:');
+    expect(onWeb.citations?.length).toBeGreaterThan(0);
+    const onWhatsApp = await engine.respond({
+      ...turn('what are your fees?'),
+      channel: {
+        type: 'whatsapp',
+        capabilities: { maxReplyChars: 4096, streaming: false },
+      },
+    });
+    expect(onWhatsApp.body).toContain('Sources:');
+  });
 });

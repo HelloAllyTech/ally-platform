@@ -36,6 +36,11 @@ export interface ChannelCapabilities {
    * and, later, the website widget. WhatsApp can't edit a sent message, so it never streams.
    */
   streaming?: boolean;
+  /**
+   * The channel shows a reply's sources itself, from `citations` (the bot page, chunk 12b), so the
+   * reply text leaves out the plain-text "Sources:" footer WhatsApp needs. Off everywhere else.
+   */
+  showsSources?: boolean;
 }
 
 export interface ChatChannel {
