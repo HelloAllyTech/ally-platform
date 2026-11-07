@@ -1170,6 +1170,91 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_agent_system',
   },
   {
+    id: 'onboarding-builder-step',
+    task: LlmTask.ONBOARDING_BUILDER_STEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Someone setting up an assistant at /chatbots/new sends a message or taps a quick reply',
+    detail:
+      'One call per owner message that needs a reply written (quick replies with a fixed answer, such as Skip for now, need none): the setup guide replies and proposes changes to the draft. It sees summaries of the pages read (titles and headings), what we learned, the answers so far and the draft — never whole pages. ally-be checks every proposed change (paths, schema, safety lock) before writing. 45-second step cap.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_system',
+  },
+  {
+    id: 'onboarding-extract-facts',
+    task: LlmTask.ONBOARDING_EXTRACT_FACTS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'A website is read during onboarding: once per batch of 8 pages',
+    detail:
+      'Reads up to 8 crawled pages (text capped per page) and returns the details for What we learned, each citing the page it came from by number; a detail citing no page in the batch is dropped and counted. At most 50 pages per site, so about 7 calls per onboarding — the largest share of its cost.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_extract',
+  },
+  {
+    id: 'onboarding-classify',
+    task: LlmTask.ONBOARDING_CLASSIFY,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner confirms What we learned during onboarding',
+    detail:
+      'One call per onboarding: chooses the industry from a fixed list of 13. ally-be maps the industry to its safety pack in code (PACK_FOR_INDUSTRY); the model never chooses the pack.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_classify',
+  },
+  {
+    id: 'onboarding-gaps',
+    task: LlmTask.ONBOARDING_GAPS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Right after the industry is chosen during onboarding',
+    detail:
+      "One call per onboarding: checks what we learned against the industry's fixed checklist (in ally-ai code) and adds at most 2 gaps of the site's own. At most 3 gaps are asked, then the three fixed questions.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_gaps',
+  },
+  {
+    id: 'onboarding-designs',
+    task: LlmTask.ONBOARDING_DESIGNS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner answers the last onboarding question',
+    detail:
+      "One call per onboarding: names 2–3 designs from those that work today (guide, enquiries, support) and writes a sample exchange. What each will and won't do is fixed in code; booking and orders are always a coming-soon card.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_designs',
+  },
+  {
+    id: 'onboarding-draft',
+    task: LlmTask.ONBOARDING_DRAFT,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner chooses a design during onboarding',
+    detail:
+      "One call per build: writes the assistant's introduction, instructions, tone, topics, suggested questions, pre-chat questions (enquiries only) and decline wording from what we learned and the owner's answers. Any sentence stating a number we were never given is dropped in code.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_draft',
+  },
+  {
     id: 'corpus-embedding',
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,

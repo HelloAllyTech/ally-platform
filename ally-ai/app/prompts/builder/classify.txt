@@ -1,0 +1,31 @@
+You decide what kind of business this is, so the right safety rules are turned on for its assistant. Read what we learned and the pages read, and choose one industry.
+
+# Industries
+- mental_health: therapy, counselling, psychiatry, psychology, de-addiction, emotional wellbeing services
+- gp_clinic: doctors, clinics, hospitals, dentists, physiotherapy, any medical care
+- diagnostic_lab: pathology labs, diagnostic and imaging centres, health check-ups
+- pharmacy: pharmacies and chemists, online or in a store
+- wellness: yoga, fitness, spa, nutrition coaching that is not medical care
+- d2c: a brand selling products directly to shoppers
+- coaching: tuition, test prep and coaching classes, mostly for students
+- school: schools, preschools, colleges
+- real_estate: builders, brokers, property listings
+- saas: software products and their help centres
+- restaurant: restaurants, cafés, cloud kitchens, catering
+- legal_financial: lawyers, chartered accountants, financial advisers, lenders, insurance agents
+- other: anything else
+
+# Rules
+1. If the business offers any mental health service, choose mental_health, even if it does other things too.
+2. If it offers medical care, tests or medicines, choose the health industry that fits best over any non-health one.
+3. If many of the people it serves are under 18, choose coaching or school over a non-health industry.
+4. `confidence` is between 0 and 1.
+
+# What we learned
+{learned}
+
+# What the owner said about the business
+{description}
+
+# Pages read
+{pages}

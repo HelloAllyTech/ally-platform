@@ -129,6 +129,8 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
   5. Preparing your page
 - **Builder message when done:**
   > Your assistant is ready to check. I'm going to ask it the kind of questions your {clients} ask, and show you every answer.
+- **Builder message when done, before the checkup exists (loop 20a-1):** *(added in 20a-1)*
+  > Your assistant is ready. Choose who can use it, then publish it to get your link.
 
 ## 9. Checkup (the readiness check)
 

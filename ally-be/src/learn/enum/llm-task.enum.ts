@@ -200,6 +200,16 @@ export enum LlmTask {
   // per loop iteration on the bot's answer model. Chatbot spend, not a learner practising, so
   // absent from TASK_AREA like the helpline's.
   WHATSAPP_AGENT_STEP = 'whatsapp_agent_step',
+  // Onboarding builder (chunk 20a), made by ally-ai's /builder/*: one label per
+  // sub-task, so the cost of setting up an assistant shows step by step.
+  // Extraction runs once per batch of crawled pages and dominates. Customer
+  // setup spend, not a learner practising, so absent from TASK_AREA.
+  ONBOARDING_BUILDER_STEP = 'onboarding_builder_step',
+  ONBOARDING_EXTRACT_FACTS = 'onboarding_extract_facts',
+  ONBOARDING_CLASSIFY = 'onboarding_classify',
+  ONBOARDING_GAPS = 'onboarding_gaps',
+  ONBOARDING_DESIGNS = 'onboarding_designs',
+  ONBOARDING_DRAFT = 'onboarding_draft',
   // Feedback → skill mapping (src/foundational-skills): one call per completed
   // session whose debrief names areas of growth, filing each under one
   // foundational helping skill (or none) for the Helping skills "named

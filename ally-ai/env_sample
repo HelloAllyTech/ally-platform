@@ -79,3 +79,9 @@ AGENT_RUNTIME__ENABLED=false
 # latency numbers were measured with it, and unset the agent is about 25% slower
 # than parity mode (CHUNK-03A-NOTES.md).
 # AGENT_RUNTIME__AGENT_REASONING_EFFORT=low
+
+# Onboarding builder (chunk 20a): /builder/* answer 404 until this is true.
+# BUILDER__ENABLED=false
+# BUILDER__STEP_TIMEOUT_SECONDS=45
+# BUILDER__EXTRACT_TIMEOUT_SECONDS=40
+# BUILDER__REASONING_EFFORT=low

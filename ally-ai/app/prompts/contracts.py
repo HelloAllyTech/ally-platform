@@ -559,6 +559,136 @@ class UserIdentifyUserInputs(PromptInputs):
     conversations: str
 
 
+class BuilderSystemInputs(PromptInputs):
+    """`builder/system.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_system",
+        name="Onboarding Builder: Conversation",
+        description=(
+            "The setup guide new customers talk to when they create an assistant "
+            "(chunk 20a). One call per owner message: it replies, offers quick "
+            "replies and proposes changes to the draft, which ally-be checks and "
+            "applies. It never chooses the safety pack."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    answers: str
+    draft: str
+    history: str
+    learned: str
+    message: str
+    pages: str
+    pending: str
+    safety_pack: str
+    step: str
+    step_guide: str
+
+
+class BuilderExtractInputs(PromptInputs):
+    """`builder/extract.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_extract",
+        name="Onboarding Builder: Extract Facts",
+        description=(
+            "Reads a batch of crawled website pages and returns the details the "
+            "assistant needs, each tied to the page it came from. Details without a "
+            "valid page are dropped in code."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    known: str
+    pages: str
+
+
+class BuilderClassifyInputs(PromptInputs):
+    """`builder/classify.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_classify",
+        name="Onboarding Builder: Classify Industry",
+        description=(
+            "Chooses the business's industry from a fixed list. ally-be maps the "
+            "industry to its safety pack in code; the model never picks the pack."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    description: str
+    learned: str
+    pages: str
+
+
+class BuilderGapsInputs(PromptInputs):
+    """`builder/gaps.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_gaps",
+        name="Onboarding Builder: Find Gaps",
+        description=(
+            "Checks what we learned against the industry's fixed checklist and the "
+            "site's own content, and lists what the owner should be asked."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    answers: str
+    checklist: str
+    learned: str
+    pages: str
+
+
+class BuilderDesignsInputs(PromptInputs):
+    """`builder/designs.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_designs",
+        name="Onboarding Builder: Propose Designs",
+        description=(
+            "Proposes 2–3 designs that work today (guide, enquiries, support) with a "
+            "title and sample exchange. What each will and won't do is fixed in code; "
+            "booking and orders are always a coming-soon card."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    audience: str
+    learned: str
+    offered: str
+
+
+class BuilderDraftInputs(PromptInputs):
+    """`builder/draft.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_draft",
+        name="Onboarding Builder: Draft the Assistant",
+        description=(
+            "Writes the assistant's introduction, instructions, tone, topics, "
+            "suggested questions, pre-chat questions and decline wording from what "
+            "we learned and the owner's answers."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    answers: str
+    decline_hint: str
+    design: str
+    learned: str
+    prechat_rule: str
+    safety_pack: str
+    tone_hint: str
+
+
 def _collect_contracts() -> dict[str, type[PromptInputs]]:
     """Every PromptInputs subclass that declares a prompt, keyed by its code."""
     found: dict[str, type[PromptInputs]] = {}

@@ -162,6 +162,25 @@ class AgentRuntimeSettings(BaseModel):
     AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = None
 
 
+class BuilderSettings(BaseModel):
+    """Onboarding builder (chunk 20a): the setup guide behind `/builder/*`.
+
+    Dark until ENABLED: the routes answer 404 while it is off. It keeps no state of
+    its own (ally-be holds the draft), so unlike the agent runtime it needs no
+    checkpointer.
+    """
+
+    ENABLED: bool = Field(False)
+    # Hard cap on one builder step, sub-tasks included. Below ally-be's 60-second
+    # relay deadline, so ally-be always gets a clean `error: timeout`.
+    STEP_TIMEOUT_SECONDS: float = Field(45.0, gt=0, le=120)
+    # One fact-extraction call for a batch of pages, during the crawl.
+    EXTRACT_TIMEOUT_SECONDS: float = Field(40.0, gt=0, le=120)
+    # Reasoning effort for the conversation step and fact extraction on an OpenAI
+    # reasoning model; the other sub-tasks use the provider default.
+    REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = "low"
+
+
 class HelplineSettings(BaseModel):
     """Text-helpline copilot (risk classifier + suggestion/nudge turn).
 
@@ -453,6 +472,7 @@ class AppSettings(BaseSettings):
         default_factory=KnowledgeAgentSettings
     )
     AGENT_RUNTIME: AgentRuntimeSettings = Field(default_factory=AgentRuntimeSettings)
+    BUILDER: BuilderSettings = Field(default_factory=BuilderSettings)
     HELPLINE: HelplineSettings = Field(default_factory=HelplineSettings)
     DRIFT_JUDGE: DriftJudgeSettings = Field(default_factory=DriftJudgeSettings)
     LANGUAGE_JUDGE: LanguageJudgeSettings = Field(default_factory=LanguageJudgeSettings)

@@ -1,0 +1,31 @@
+{
+  "name": "Sunrise Mind Clinic",
+  "assistantName": "Sunrise assistant",
+  "introduction": "Hi, I'm the Sunrise Mind Clinic assistant. I can help with our services, fees and how to start.",
+  "instructions": "You answer questions about Sunrise Mind Clinic for its clients.",
+  "tone": "warm",
+  "languages": ["en", "hi"],
+  "topics": ["Therapy sessions", "Fees"],
+  "knowledgeDocumentIds": ["11111111-1111-4111-8111-111111111111"],
+  "ownerNotes": "Your cancellation policy: 24 hours' notice.",
+  "suggestedQuestions": ["How much is a session?"],
+  "prechat": [
+    { "id": "q1", "label": "Your name", "type": "text", "required": true },
+    { "id": "q2", "label": "How did you hear about us?", "type": "choice", "required": false, "options": ["Friend", "Online"] }
+  ],
+  "declineText": "I don't know that one. Please call us on 98200 12345.",
+  "safetyPackId": "mental_health",
+  "extraNever": [],
+  "branding": {
+    "logoUrl": null,
+    "accentColour": "#264D8E",
+    "title": "Sunrise Mind Clinic",
+    "subtitle": "",
+    "assistantName": "Sunrise assistant",
+    "avatarUrl": null,
+    "disclaimer": "This is an automated assistant. It is not a crisis service or medical advice: in an emergency, contact your local emergency number.",
+    "footerLink": null
+  },
+  "access": { "mode": "invite", "emails": [], "organisationIds": [] },
+  "design": "guide"
+}
