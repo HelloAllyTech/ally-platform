@@ -542,6 +542,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
           ...(params?.search ? { search: params.search } : {}),
           ...(params?.sortBy ? { sortBy: params.sortBy } : {}),
           ...(params?.sortDir ? { sortDir: params.sortDir } : {}),
+          ...(params?.channel ? { channel: params.channel } : {}),
           ...bot(params?.chatbotId),
         },
       }),
@@ -623,6 +624,15 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         params: bot(botRow(arg).chatbotId),
       }),
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
+    }),
+
+    /** Chunk 12b: erase a bot page visitor (the shared store contact id from the thread). */
+    eraseWebContact: builder.mutation<{ id: string; erased: boolean }, string>({
+      query: id => ({
+        url: ApiEndpoints.WHATSAPP_BOT.WEB_CONTACT_ERASE(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS, TAG_TYPES.WHATSAPP_BOT_UNANSWERED],
     }),
 
     // ---- Unanswered queue ----
@@ -812,6 +822,7 @@ export const {
   useGetWaCitationQuery,
   useRevealWaContactPhoneMutation,
   useBlockWaContactMutation,
+  useEraseWebContactMutation,
   useUnblockWaContactMutation,
   useGetWaUnansweredQuery,
   useUpdateWaUnansweredMutation,

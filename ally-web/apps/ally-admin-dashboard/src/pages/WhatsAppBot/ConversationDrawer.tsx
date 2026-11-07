@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import { DoubleArrowRight } from "@icons";
+import { toast } from "sonner";
 
 import { InlineNotification, SkeletonText, Tag } from "@ally-ui-mono/ui-shared";
-import { useGetWaCitationQuery, useGetWaConversationQuery } from "@api";
+import { useEraseWebContactMutation, useGetWaCitationQuery, useGetWaConversationQuery } from "@api";
 import { TooltipHint } from "@components/app-tooltip";
 import { en, TooltipLocation } from "@constants";
-import { WaConversationMessage, WaHandledBy, WaPreviewCitation } from "@types";
+import { BotPageIntake, WaConversationMessage, WaHandledBy, WaPreviewCitation } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
 import { useChatbotId } from "./chatbotContext";
@@ -81,6 +82,7 @@ export const ConversationDrawer: React.FC<ConversationDrawerProps> = ({
             <span id="wa-thread-title" className="text-base font-tertiary font-[500]">
               {en.whatsappBot.conversations.threadHeading}
               {data?.contact ? ` · ••••${data.contact.phoneLast4}` : ""}
+              {data?.visitor ? ` · ${data.visitor.label}` : ""}
             </span>
           </button>
         </div>
@@ -108,6 +110,16 @@ export const ConversationDrawer: React.FC<ConversationDrawerProps> = ({
               )}
             </div>
           )}
+
+          {data?.channel && (
+            <div className="pb-4">
+              <Tag type={data.channel === "web" ? "teal" : "green"} size="sm">
+                {en.whatsappBot.conversations.channel[data.channel]}
+              </Tag>
+            </div>
+          )}
+          {data?.conversation.intake && <IntakeAnswers intake={data.conversation.intake} />}
+          {data?.visitor && <EraseVisitor contactId={data.visitor.id} onErased={onClose} />}
 
           {isLoading && <SkeletonText paragraph lineCount={8} />}
 
@@ -310,6 +322,67 @@ const CitationPopup: React.FC<{
           {en.whatsappBot.conversations.close}
         </button>
       </div>
+    </div>
+  );
+};
+
+/**
+ * A bot page conversation's pre-chat answers (chunk 12b), at the top: they are what the visitor told
+ * the bot before asking anything, and a consent shows the exact wording agreed to and when.
+ */
+const IntakeAnswers: React.FC<{ intake: BotPageIntake }> = ({ intake }) => (
+  <section
+    aria-label={en.whatsappBot.conversations.intakeTitle}
+    className="mb-4 rounded-md border border-border-light p-4 text-sm"
+  >
+    <h3 className="mb-2 font-secondary text-typography-900">
+      {en.whatsappBot.conversations.intakeTitle}
+    </h3>
+    <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1">
+      {intake.answers
+        .filter(answer => answer.type !== "consent")
+        .map(answer => (
+          <React.Fragment key={answer.id}>
+            <dt className="text-typography-500">{answer.label}</dt>
+            <dd className="text-typography-900 break-words">{answer.value}</dd>
+          </React.Fragment>
+        ))}
+    </dl>
+    {intake.consents.map(consent => (
+      <p key={consent.id} className="mt-2 text-typography-600">
+        {en.whatsappBot.conversations.consentGiven
+          .replace("{text}", consent.text)
+          .replace("{date}", formatDate(consent.acceptedAt))}
+      </p>
+    ))}
+  </section>
+);
+
+/** Right-to-erasure for a bot page visitor: messages, answers and email, after a confirmation. */
+const EraseVisitor: React.FC<{ contactId: string; onErased: () => void }> = ({
+  contactId,
+  onErased,
+}) => {
+  const [erase, { isLoading }] = useEraseWebContactMutation();
+  return (
+    <div className="pb-4">
+      <button
+        type="button"
+        disabled={isLoading}
+        className="text-sm text-error-700 underline disabled:opacity-50"
+        onClick={() => {
+          if (!window.confirm(en.whatsappBot.conversations.eraseVisitorConfirm)) return;
+          erase(contactId)
+            .unwrap()
+            .then(() => {
+              toast.success(en.whatsappBot.conversations.visitorErased);
+              onErased();
+            })
+            .catch(() => toast.error(en.whatsappBot.conversations.eraseFailed));
+        }}
+      >
+        {en.whatsappBot.conversations.eraseVisitor}
+      </button>
     </div>
   );
 };

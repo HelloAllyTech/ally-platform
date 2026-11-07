@@ -136,7 +136,14 @@ export const UnansweredTab: React.FC = () => {
         render: row => (
           <div className="flex flex-col gap-1">
             <span className="text-typography-900">{row.questionText}</span>
-            {row.language && <span className="text-xs text-typography-500">{row.language}</span>}
+            <span className="flex items-center gap-2">
+              {row.channel && (
+                <Tag type={row.channel === "web" ? "teal" : "green"} size="sm">
+                  {en.whatsappBot.conversations.channel[row.channel]}
+                </Tag>
+              )}
+              {row.language && <span className="text-xs text-typography-500">{row.language}</span>}
+            </span>
           </div>
         ),
       },

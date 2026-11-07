@@ -1,9 +1,15 @@
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 
 import { initials } from "../theme";
 
 import type { BotPageCopy } from "../copy";
 import type { BotPageBranding, PublicCitation } from "../types";
+
+/**
+ * Whether a screen's heading takes focus when it appears. Off in the dashboard's live preview, so
+ * the preview never pulls focus away from the form the owner is typing in.
+ */
+export const FocusHeadings = createContext(true);
 
 /** A screen's heading, focused when the screen appears so screen readers announce it. */
 export function ScreenHeading({
@@ -16,7 +22,10 @@ export function ScreenHeading({
   id?: string;
 }) {
   const ref = useRef<HTMLHeadingElement>(null);
-  useEffect(() => ref.current?.focus(), []);
+  const focus = useContext(FocusHeadings);
+  useEffect(() => {
+    if (focus) ref.current?.focus();
+  }, [focus]);
   return (
     <h1
       ref={ref}

@@ -1,3 +1,5 @@
+import type { BotPageIntake } from "./botPage";
+
 /**
  * Which knowledge corpus a request is about.
  *
@@ -519,7 +521,15 @@ export interface WaConversationSummary {
   /** Null for a number that is not on any Ally profile — which is why the thread was refused. */
   tenantId: string | null;
   tenantName: string | null;
+  /**
+   * Only while the dashboard reads the shared store (chunk 12b): the channel, and for a bot page
+   * thread the visitor's masked email ("Visitor" when they gave none). Absent, it is WhatsApp.
+   */
+  channel?: WaConversationChannel;
+  visitor?: string | null;
 }
+
+export type WaConversationChannel = "whatsapp" | "web";
 
 export interface GetWaConversationsResponse {
   conversations: WaConversationSummary[];
@@ -548,7 +558,11 @@ export interface WaConversationMessage {
 }
 
 export interface WaConversationDetail {
-  conversation: WaConversationSummary;
+  /** Chunk 12b, shared store only. */
+  channel?: WaConversationChannel;
+  /** A bot page visitor, in place of `contact`. `id` is the shared store contact, for erasure. */
+  visitor?: { id: string; label: string };
+  conversation: WaConversationSummary & { intake?: BotPageIntake | null };
   contact: {
     id: string;
     phoneLast4: string;
@@ -579,6 +593,8 @@ export interface GetWaConversationsParams {
   sortDir?: "asc" | "desc";
   /** Narrow to one organisation; absent = every organisation. */
   chatbotId?: string;
+  /** Chunk 12b: one channel, while the dashboard reads the shared store. */
+  channel?: WaConversationChannel;
 }
 
 // ── Unanswered queue ─────────────────────────────────────────────────────────
@@ -612,6 +628,8 @@ export interface WaUnansweredQuestion {
   resolutionNote: string | null;
   linkedDocumentId: string | null;
   createdAt: string;
+  /** Chunk 12b, shared store only: where the question was asked. */
+  channel?: WaConversationChannel;
 }
 
 export interface GetWaUnansweredResponse {

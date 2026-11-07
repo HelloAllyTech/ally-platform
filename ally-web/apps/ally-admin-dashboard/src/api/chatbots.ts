@@ -1,5 +1,8 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  BotPageAccessEntry,
+  BotPageAccessKind,
+  BotPageView,
   Chatbot,
   ChatbotAudienceEntry,
   ChatbotAudienceKind,
@@ -19,6 +22,7 @@ import {
   TestChatbotRequest,
   TestChatbotResponse,
   UpdateChatbotDocumentRequest,
+  UpdateBotPageRequest,
   UpdateChatbotRequest,
 } from "@types";
 
@@ -186,6 +190,73 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, { id }) => botTags(id),
     }),
 
+    // ── bot page (chunk 12b) ─────────────────────────────────────────────
+
+    getBotPage: builder.query<BotPageView, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.PAGE(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }],
+    }),
+
+    updateBotPage: builder.mutation<BotPageView, UpdateBotPageRequest>({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.PAGE(id),
+        method: HttpMethod.PUT,
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }],
+    }),
+
+    checkBotPageSlug: builder.query<
+      { slug: string; available: boolean; reason?: string },
+      { id: string; slug: string }
+    >({
+      query: ({ id, slug }) => ({
+        url: ApiEndpoints.CHATBOTS.PAGE_SLUG_AVAILABLE(id),
+        method: HttpMethod.GET,
+        params: { slug },
+      }),
+    }),
+
+    createBotPageLogoUrl: builder.mutation<
+      { presignedUrl: string; imageUrl: string },
+      { id: string; fileName: string; fileSize: number; contentType: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.PAGE_LOGO_URL(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    getBotPageAccess: builder.query<{ entries: BotPageAccessEntry[] }, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.PAGE_ACCESS(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page-access` }],
+    }),
+
+    addBotPageAccess: builder.mutation<
+      { added: number; skipped: number },
+      { id: string; entries: { kind: BotPageAccessKind; value: string; label?: string }[] }
+    >({
+      query: ({ id, entries }) => ({
+        url: ApiEndpoints.CHATBOTS.PAGE_ACCESS(id),
+        method: HttpMethod.POST,
+        body: { entries },
+      }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page-access` },
+      ],
+    }),
+
+    removeBotPageAccess: builder.mutation<void, { id: string; entryId: string }>({
+      query: ({ id, entryId }) => ({
+        url: ApiEndpoints.CHATBOTS.PAGE_ACCESS_ENTRY(id, entryId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page-access` },
+      ],
+    }),
+
     getChatbotAudience: builder.query<ChatbotAudienceEntry[], string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.AUDIENCE(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
@@ -263,4 +334,11 @@ export const {
   useRemoveChatbotAudienceMutation,
   useTestChatbotMutation,
   useBindConnectorMutation,
+  useGetBotPageQuery,
+  useUpdateBotPageMutation,
+  useLazyCheckBotPageSlugQuery,
+  useCreateBotPageLogoUrlMutation,
+  useGetBotPageAccessQuery,
+  useAddBotPageAccessMutation,
+  useRemoveBotPageAccessMutation,
 } = chatbotsApi;

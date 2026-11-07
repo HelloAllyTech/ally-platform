@@ -31,7 +31,13 @@ import {
 } from "@components";
 import { AppTooltip } from "@components/app-tooltip";
 import { en, TooltipLocation } from "@constants";
-import { Chatbot, ChatbotStatus, WaConversationSummary, WaHandledBy } from "@types";
+import {
+  Chatbot,
+  ChatbotStatus,
+  WaConversationChannel,
+  WaConversationSummary,
+  WaHandledBy,
+} from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
 import { useChatbotId } from "./chatbotContext";
@@ -82,6 +88,7 @@ export const ConversationsTab: React.FC<{
   const [to, setTo] = useState("");
   const [language, setLanguage] = useState("");
   const [handledBy, setHandledBy] = useState<WaHandledBy | "">("");
+  const [channel, setChannel] = useState<WaConversationChannel | "">("");
   // Newest first. Sorting is server-side because the list is server-paged — reordering the 25 rows
   // on screen would present itself as sorting all 342 and quietly be wrong.
   const [sort, setSort] = useState<EntityTableSort>({ key: "lastMessageAt", direction: "desc" });
@@ -122,6 +129,7 @@ export const ConversationsTab: React.FC<{
     to: to ? endOfDayIso(to) : undefined,
     language: language || undefined,
     handledBy: handledBy || undefined,
+    channel: channel || undefined,
     sortBy: sort.key,
     sortDir: sort.direction,
   });
@@ -151,6 +159,10 @@ export const ConversationsTab: React.FC<{
     ],
     [],
   );
+
+  // The shared store labels every row with its channel; reading wa_* there is only WhatsApp, so
+  // the filter would have nothing to choose between.
+  const showsChannels = Boolean(channel) || Boolean(data?.conversations.some(row => row.channel));
 
   const conversations = data?.conversations ?? [];
   const total = data?.count ?? 0;
@@ -201,7 +213,18 @@ export const ConversationsTab: React.FC<{
           <span className="flex items-center gap-2">
             {/* The dots are decoration; a screen reader would otherwise read "bullet bullet
                 bullet bullet 4821". The label says what the number actually is. */}
-            {revealed[row.contactId] ? (
+            {row.channel && (
+              // Only while the dashboard reads the shared store (chunk 12b): every row says where it
+              // came from, so a bot page chat is never mistaken for a WhatsApp number.
+              <Tag type={row.channel === "web" ? "teal" : "green"} size="sm">
+                {en.whatsappBot.conversations.channel[row.channel]}
+              </Tag>
+            )}
+            {row.channel === "web" ? (
+              <span className="text-sm text-typography-800">
+                {row.visitor ?? en.whatsappBot.conversations.visitor}
+              </span>
+            ) : revealed[row.contactId] ? (
               <span className="font-mono text-sm tabular-nums">{revealed[row.contactId]}</span>
             ) : (
               <span
@@ -224,7 +247,9 @@ export const ConversationsTab: React.FC<{
         key: "organisation",
         label: en.whatsappBot.conversations.organisation,
         render: row =>
-          row.tenantName ? (
+          row.channel === "web" ? (
+            <span className="text-typography-600">—</span>
+          ) : row.tenantName ? (
             <span className="text-sm text-typography-700">{row.tenantName}</span>
           ) : (
             // Not a dash. An unrecognised number is WHY that thread was refused rather than
@@ -262,7 +287,9 @@ export const ConversationsTab: React.FC<{
   );
 
   const isFiltered =
-    search.trim().length > 0 || declinedOnly || Boolean(from || to || language || handledBy);
+    search.trim().length > 0 ||
+    declinedOnly ||
+    Boolean(from || to || language || handledBy || channel);
 
   // An empty log on a chatbot that can't receive messages yet points at the step that's missing.
   const nextStep: { subtitle: string; label: string; go: () => void } | null =
@@ -362,12 +389,24 @@ export const ConversationsTab: React.FC<{
           }}
         />
 
+        {showsChannels && (
+          // Built only here: the copy is read when the filter shows, not on every render.
+          <ChannelFilter
+            value={channel}
+            onChange={next => {
+              setChannel(next);
+              setOffset(0);
+            }}
+          />
+        )}
+
         {isFiltered && (
           <button
             className="pb-2 text-sm text-primary-500 underline"
             onClick={() => {
               setSearch("");
               setDeclinedOnly(false);
+              setChannel("");
               setFrom("");
               setTo("");
               setLanguage("");
@@ -462,7 +501,7 @@ export const ConversationsTab: React.FC<{
                 ),
                 // Hidden once revealed in this session, so the action does not invite a second
                 // logged call for a number already on screen.
-                hidden: row => Boolean(revealed[row.contactId]),
+                hidden: row => row.channel === "web" || Boolean(revealed[row.contactId]),
                 onClick: row => void handleReveal(row),
               },
               {
@@ -473,7 +512,7 @@ export const ConversationsTab: React.FC<{
                     <Unpublish size={18} />
                   </AppTooltip>
                 ),
-                hidden: row => Boolean(row.blockedAt),
+                hidden: row => row.channel === "web" || Boolean(row.blockedAt),
                 onClick: row => setBlockTarget(row),
               },
               {
@@ -512,5 +551,32 @@ export const ConversationsTab: React.FC<{
         secondaryButton={{ label: en.common.cancel, onClick: () => setBlockTarget(null) }}
       />
     </div>
+  );
+};
+
+/** The channel filter, shown only while the dashboard reads the shared store (chunk 12b). */
+const ChannelFilter: React.FC<{
+  value: WaConversationChannel | "";
+  onChange: (value: WaConversationChannel | "") => void;
+}> = ({ value, onChange }) => {
+  const items: FilterItem[] = [
+    { id: "", label: en.whatsappBot.conversations.anyChannel },
+    { id: "whatsapp", label: en.whatsappBot.conversations.channel.whatsapp },
+    { id: "web", label: en.whatsappBot.conversations.channel.web },
+  ];
+  return (
+    <CarbonDropdown
+      id="wa-channel"
+      size="sm"
+      className="w-[180px]"
+      titleText={en.whatsappBot.conversations.channelFilter}
+      label={en.whatsappBot.conversations.anyChannel}
+      items={items}
+      selectedItem={items.find(item => item.id === value) ?? items[0]}
+      itemToString={(item: FilterItem | null) => item?.label ?? ""}
+      onChange={({ selectedItem }: { selectedItem: FilterItem | null }) => {
+        if (selectedItem) onChange(selectedItem.id as WaConversationChannel | "");
+      }}
+    />
   );
 };

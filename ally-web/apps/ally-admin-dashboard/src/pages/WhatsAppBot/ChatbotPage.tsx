@@ -8,6 +8,7 @@ import { en, ROUTES } from "@constants";
 import { Chatbot, ChatbotMemberRole } from "@types";
 
 import { AgentTab } from "./AgentTab";
+import { BotPageTab } from "./BotPageTab";
 import { ChatbotContext } from "./chatbotContext";
 import { ChatbotOverviewTab } from "./ChatbotOverviewTab";
 import { ChatbotSettingsTab } from "./ChatbotSettingsTab";
@@ -46,6 +47,7 @@ const SECTION_ORDER: ChatbotSettingsSectionId[] = [
   "replies",
   "people",
   "connectors",
+  "botPage",
   "general",
 ];
 
@@ -156,6 +158,8 @@ export const ChatbotPage: React.FC = () => {
         return <PeopleTab bot={bot} canEdit={canEdit} canManage={canManage} />;
       case "connectors":
         return <BotConnectorsTab bot={bot} canManage={canManage} />;
+      case "botPage":
+        return <BotPageTab bot={bot} canEdit={canEdit} />;
       case "general":
         return (
           <ChatbotSettingsTab
@@ -191,6 +195,7 @@ export const ChatbotPage: React.FC = () => {
         );
       case "test":
         return <ChatbotTestTab bot={bot} />;
+
       case "conversations":
         return <ConversationsTab bot={bot} onGo={goToTab} />;
       case "unanswered":
