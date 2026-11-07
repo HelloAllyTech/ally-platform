@@ -27,6 +27,7 @@ What makes it different: **everything the agent knows, does and learns is visibl
 | `CONTEXT.md` | This file | Background, decisions, glossary |
 | `agents-v2-spec.md` | Product and experience spec for v2 | **The source of truth for scope and user experience.** What the owner sees and how it behaves |
 | `BUILDING-BLOCKS.md` | The six blocks every bot is made of, generated tools, and the template format | **The architecture every chunk from 4 on must fit.** If a feature doesn't fit a block, raise it; don't build industry-specific code |
+| `SLICE-1.md` | The first end-to-end slice: website → agent-built, tested bot → shareable link; the onboarding experience and the four chunks | What's being built right now, and the experience bar for onboarding |
 | `v2-chunks.md` | v2 split into chunks, with rules for every chunk, release gates and what moved to v3 | Build order, and what "done" means per chunk |
 | `chunk-NN.md` | The brief for the current chunk | **The current task.** Do only this |
 | `three-stage-plan.md` | Earlier research and three-stage engineering plan | Engineering detail: graph nodes, state, `/agent/run` contract, gateway, data model, rollout, risks |

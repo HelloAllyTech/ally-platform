@@ -96,7 +96,7 @@ Rules:
 **Verification after the last commit:**
 
 - Full suites and lint in all three apps: ally-ai `pytest` + `flake8`; ally-be `test`, `lint`, `typecheck`, `build`; ally-web `test` (admin), `lint` and the CI typecheck.
-- **Parity:** `scripts/agent_parity.py` with the master baseline → 0 must-match failures. <!-- docs-path-lint: ignore -->
+- **Parity:** `scripts/agent_parity.py` with the master baseline → 0 must-match failures.
 - **Conversation eval** → 0 hard fails, run **twice**, with the judge mean within 0.3 of the last 3a run.
 - p50 latency not worse than the last 3a run by more than 10%.
 - Update the NOTES files where code locations changed, and add a short "Refactor summary" to `REVIEW-1-3A.md`: what was done, what was deferred, and the before/after line counts for the biggest files.
