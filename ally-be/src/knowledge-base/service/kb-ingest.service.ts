@@ -132,6 +132,41 @@ export class KbIngestService {
     return extracted;
   }
 
+  /**
+   * A document's text with its page spans, read without writing anything (onboarding, chunk 20a,
+   * reads an upload for "What we learned"). Re-extracts the file, because page spans are never
+   * stored; for a file that's gone, falls back to the stored text with no pages.
+   */
+  async readForOnboarding(documentId: string): Promise<{
+    title: string;
+    fileName: string | null;
+    ownerChatbotId: string | null;
+    extracted: ExtractedDocument;
+  } | null> {
+    const document = await this.documentRepository.findOne({
+      where: { id: documentId },
+    });
+    if (!document || document.archivedAt) return null;
+    let extracted: ExtractedDocument;
+    try {
+      extracted = await extractDocument({
+        sourceType: document.sourceType,
+        buffer: await this.loadSourceBuffer(document),
+        text: document.rawText || undefined,
+        sourceUrl: document.sourceUrl ?? undefined,
+      });
+    } catch {
+      if (!document.rawText) throw new Error('The document could not be read');
+      extracted = { text: document.rawText, pages: [], sections: [] };
+    }
+    return {
+      title: document.title,
+      fileName: document.fileName ?? null,
+      ownerChatbotId: document.ownerChatbotId ?? null,
+      extracted,
+    };
+  }
+
   private async loadSourceBuffer(
     document: KbDocument,
   ): Promise<Buffer | undefined> {

@@ -210,10 +210,14 @@ def draft_patches(
             replace("/assistantName", name),
             replace("/branding/assistantName", name),
         ]
-    introduction = tasks.keep_grounded(out.introduction, source)[:600]
+    introduction = catalogue.honest_about_booking(
+        tasks.keep_grounded(out.introduction, source)
+    )[:600]
     if introduction:
         patches.append(replace("/introduction", introduction))
-    instructions = tasks.keep_grounded(out.instructions, source)[:4000]
+    instructions = catalogue.honest_about_booking(
+        tasks.keep_grounded(out.instructions, source)
+    )[:4000]
     if instructions:
         patches.append(replace("/instructions", instructions))
     if out.tone != Tone.UNCHANGED:

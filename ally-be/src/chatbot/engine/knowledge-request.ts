@@ -92,6 +92,8 @@ function personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
         turn.chatbot.safetyPack,
         turn.chatbot.rules?.never ?? [],
       ) ?? undefined,
+    // The id too: for a health pack, ally-ai's check refuses diagnosis and dosing in code.
+    safety_pack: turn.chatbot.safetyPack || undefined,
   };
   return Object.values(out).some(Boolean) ? out : undefined;
 }

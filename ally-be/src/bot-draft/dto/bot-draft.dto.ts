@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  IsBoolean,
   ArrayMinSize,
   IsArray,
   IsEmail,
@@ -137,6 +138,23 @@ export class CreateBotDraftDto {
   @IsString()
   @MaxLength(4000)
   description?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Start from uploaded documents instead (they are added with POST :id/documents)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  upload?: boolean;
+}
+
+export class AddBotDraftDocumentDto {
+  @ApiProperty({
+    description:
+      "A document on the draft's chatbot, uploaded through /v1/chatbots/:id/documents",
+  })
+  @IsUUID()
+  documentId!: string;
 }
 
 export class PatchOpDto {

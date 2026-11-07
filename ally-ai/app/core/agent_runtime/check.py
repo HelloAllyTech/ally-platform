@@ -308,6 +308,7 @@ class Rejection(StrEnum):
 
     Stored in the run's state as its plain value, which the state requires."""
 
+    CLINICAL_ADVICE = "clinical_advice"
     UNCITED = "uncited"
     UNSOURCED_DETAIL = "unsourced_detail"
     EMPTY = "empty"
@@ -338,6 +339,12 @@ def rejection_feedback(
 #: Why a draft was refused, as told to the agent when it rewrites it. Plain
 #: guidance, never the refused text.
 REJECTIONS: Dict[Rejection, str] = {
+    Rejection.CLINICAL_ADVICE: (
+        "It diagnosed, interpreted a result, or advised on a medicine or its dose. "
+        "This assistant never does, whatever its instructions say. Say plainly that "
+        "you can't advise on that, and point the person to the team, or to "
+        "emergency care if it sounds urgent."
+    ),
     Rejection.UNCITED: (
         "It stated something about the organisation without citing a passage. "
         "Cite the passages that support it; if none do and searches are left, "
@@ -364,6 +371,88 @@ REJECTIONS: Dict[Rejection, str] = {
         "have and what you can help with."
     ),
 }
+
+
+# ------------------------------------------------------------- safety packs (20a)
+
+#: Packs whose rules the check enforces in code as well as in the prompt.
+HEALTH_PACKS = frozenset({"mental_health", "medical", "pharmacy"})
+
+_CONDITIONS = (
+    r"(?:an?\s+)?(?:depression|anxiety|panic(?: disorder| attacks?)?|bipolar|ocd|"
+    r"ptsd|adhd|schizophrenia|psychosis|an? eating disorder|insomnia|diabetes|"
+    r"hypertension|high blood pressure|an? infection|a heart attack|a stroke|"
+    r"a disorder|"
+    r"a condition|burnout|a personality disorder)"
+)
+_MEDICINES = (
+    r"(?:medication|medicines?|tablets?|pills?|capsules?|doses?|dosage|"
+    r"antidepressants?|painkillers?|insulin|[a-z]+(?:pine|pam|zole|pril|olol|statin|"
+    r"xetine|traline|lam|done|profen|mol|cillin))"
+)
+#: Diagnosis, reading a result, dosing, or changing a medicine: never from a pack bot.
+_CLINICAL = [
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        rf"\b(?:you|they)\s+(?:may\s+|might\s+|probably\s+|likely\s+|could\s+)?"
+        rf"(?:have|has|are suffering from|suffer from|are experiencing)\s+"
+        rf"{_CONDITIONS}",
+        rf"\b(?:it|this|that|these|you)\s+(?:sounds?|looks?|seems?)\s+like\s+"
+        rf"(?:you have\s+)?{_CONDITIONS}",
+        r"\byou(?:'re| are)\s+(?:probably\s+|likely\s+)?(?:depressed|bipolar|"
+        r"diabetic|hypertensive|anxious disorder)\b",
+        r"\b(?:hba1c|cholesterol|blood sugar|sugar level|tsh|ha?emoglobin|creatinine|"
+        r"blood pressure reading|report)\b(?:[^.?!]|\.\d){0,40}"
+        r"\b(?:is|are|looks?|seems?)\s+"
+        r"(?:a bit\s+|slightly\s+|very\s+)?(?:high|low|normal|fine|bad|good|"
+        r"elevated|concerning|nothing to worry)",
+        r"\b(?:take|taking|have|give|use)\s+(?:up to\s+|no more than\s+)?"
+        r"(?:\d+(?:\.\d+)?|one|two|three|four|half|a)\s*(?:mg|mcg|ml|units?|"
+        r"tablets?|pills?|capsules?|doses?|teaspoons?|drops?)\b",
+        r"\b(?:\d+|one|two|three|four)\s+(?:tablets?|pills?|capsules?|doses?)\s+"
+        r"(?:a|per|every|each|twice|thrice|once|daily|at)\b",
+        r"\b\d+(?:\.\d+)?\s?(?:mg|mcg)\b",
+        rf"\b(?:stop|start|increase|decrease|reduce|double|skip|halve|switch)\s+"
+        rf"(?:taking\s+)?(?:your\s+|the\s+)?{_MEDICINES}\b",
+        r"\b(?:you can|you could|you should|it'?s (?:safe|fine|ok(?:ay)?) to)\s+"
+        r"(?:safely\s+)?(?:take|mix|combine|double|stop|skip)\b"
+        r"(?!\s+(?:your|a|the|some)\s+(?:time|break|look|seat|moment|rest|call)\b)"
+        r"(?!\s+it\s+easy\b)",
+    )
+]
+#: A match in a sentence like "don't stop your medication without your doctor" is
+#: the safe advice, not the unsafe one.
+_DEFERS = re.compile(
+    r"n't\b|\b(?:not|never|without|before|ask|asking|check|talk|speak|consult|"
+    r"cannot|unable)\b",
+    re.IGNORECASE,
+)
+
+
+def clinical_advice(text: str) -> bool:
+    """Whether `text` diagnoses, reads a result, doses, or changes a medicine."""
+    for pattern in _CLINICAL:
+        for match in pattern.finditer(text or ""):
+            before = text[max(0, match.start() - 30) : match.start()]
+            if not _DEFERS.search(before) and not _DEFERS.search(match.group(0)):
+                return True
+    return False
+
+
+def _enforce_safety_pack(verdict: Verdict, ctx: CheckContext) -> None:
+    """A health pack's Never rules, in code: whatever the instructions or the model
+    say, a reply never diagnoses or doses. Sent back once; if the rewrite still
+    does it, those sentences are removed, and with nothing left it declines."""
+    if ctx.safety_pack not in HEALTH_PACKS or not clinical_advice(verdict.answer):
+        return
+    logger.info("Reply gave clinical advice on a health-pack bot; refused")
+    verdict.rejection, verdict.keeps_text = Rejection.CLINICAL_ADVICE, False
+    verdict.answer = without_sentences(
+        verdict.answer, lambda sentence: not clinical_advice(sentence)
+    )
+    if not verdict.answer.strip():
+        verdict.intent, verdict.citations = AgentIntent.DECLINE, []
+        verdict.model_declined = False
 
 
 # A reply that opens by saying it doesn't have the information is a decline, even
@@ -397,6 +486,8 @@ class CheckContext:
     searched: bool
     organisation: Organisation
     history: Sequence[Dict[str, str]]
+    #: The bot's safety pack id (chunk 20a), None without one.
+    safety_pack: Optional[str] = None
 
 
 @dataclass
@@ -432,6 +523,7 @@ def check_reply(
     searched: bool = False,
     organisation: Organisation = Organisation(),
     history: Sequence[Dict[str, str]] = (),
+    safety_pack: Optional[str] = None,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -453,9 +545,13 @@ def check_reply(
         searched=searched,
         organisation=organisation,
         history=history,
+        safety_pack=safety_pack,
     )
     verdict = _read_draft(step, ctx)
     _ground(verdict, step, ctx)
+    # Safety before wording, and on every reply, declines included: the pack's rules
+    # outrank everything the instructions or the model say.
+    _enforce_safety_pack(verdict, ctx)
     # Fixes that keep the rest of the reply: sent back once, and if the rewrite
     # still needs them, applied to the text (sentences removed) rather than
     # refusing the reply.

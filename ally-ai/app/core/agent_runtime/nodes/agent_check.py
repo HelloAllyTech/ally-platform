@@ -58,6 +58,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             searched=searched,
             organisation=organisation_of(state["bot"]),
             history=recent(state.get("history")) or (),
+            safety_pack=(state["bot"].get("persona") or {}).get("safety_pack"),
         )
         revisions = state.get("revisions") or 0
         # Past the time budget the reply is final: a rewrite would run past

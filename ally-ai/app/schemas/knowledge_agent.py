@@ -45,6 +45,14 @@ class PersonaSelector(BaseModel):
             "instructions can't remove them."
         ),
     )
+    safety_pack: Optional[str] = Field(
+        None,
+        max_length=32,
+        description=(
+            "The pack's id (mental_health, medical, pharmacy, ...). For a health "
+            "pack the check refuses diagnosis and dosing in code, not only by prompt."
+        ),
+    )
 
 
 class KnowledgeAnswerRequest(BaseModel):

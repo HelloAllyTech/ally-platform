@@ -62,6 +62,11 @@ FIXED_LABELS = {
 }
 
 
+#: Output cap for a sub-task. A reasoning model's hidden reasoning counts against it,
+#: so 2,048 (the dispatcher's default) cut the draft and the conversation step short.
+STEP_MAX_TOKENS = 6000
+
+
 async def call(
     path: str,
     schema: Type[T],
@@ -70,6 +75,7 @@ async def call(
     prompts: Optional[Dict[str, Any]],
     timeout: Optional[float],
     reasoning: bool = False,
+    max_tokens: Optional[int] = STEP_MAX_TOKENS,
     **variables: Any,
 ) -> T:
     """Render `builder/<path>` and run it. A missing template is an error, never an
@@ -91,6 +97,7 @@ async def call(
         temperature=temperature if temperature is not None else 0.0,
         reasoning_effort=settings.BUILDER.REASONING_EFFORT if reasoning else None,
         timeout=timeout,
+        max_tokens=max_tokens,
     )
     return parsed
 
@@ -102,6 +109,7 @@ def answer_labels(gaps: Optional[Sequence[Gap]]) -> Dict[str, str]:
 # --- extract -----------------------------------------------------------------
 
 _FACT_MAX_CHARS = 500
+SECTIONS = {section.value for section in LearnedSection}
 
 
 async def extract(request: ExtractRequest) -> ExtractResponse:
@@ -114,6 +122,9 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
         prompts=request.prompts,
         timeout=settings.BUILDER.EXTRACT_TIMEOUT_SECONDS,
         reasoning=True,
+        # Uncapped: the facts grow with the pages read, and a cap that cuts them off
+        # fails the whole batch (finish_reason=length) rather than shortening it.
+        max_tokens=None,
         known=format_list(request.known, "(nothing yet)"),
         pages=format_page_texts(request.pages),
     )
@@ -127,6 +138,9 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
         if not 1 <= fact.page <= len(request.pages):
             dropped += 1
             continue
+        if fact.section not in SECTIONS:
+            # Filed under a section we don't show ("press"): left out, not failed.
+            continue
         key = _key(text)
         if key in known:
             continue
@@ -134,7 +148,7 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
         page = request.pages[fact.page - 1]
         facts.append(
             ExtractedFact(
-                section=fact.section,
+                section=LearnedSection(fact.section),
                 text=text[:_FACT_MAX_CHARS],
                 source_url=page.url,
                 source_title=page.title,

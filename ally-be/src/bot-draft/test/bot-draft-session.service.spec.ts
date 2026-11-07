@@ -13,6 +13,7 @@ import { SAFETY_PACKS } from '../safety-pack/safety-packs';
 import {
   BotDraftSessionService,
   SessionEvent,
+  documentParts,
 } from '../service/bot-draft-session.service';
 import { memoryDrafts } from './memory-drafts';
 
@@ -59,15 +60,17 @@ function harness(overrides = {}, response?: BuilderStepResponse) {
     extractOnboardingFacts: jest.fn(),
     getPromptOverrides: jest.fn(async () => ({})),
   };
+  const documents = { readForOnboarding: jest.fn() };
   const session = new BotDraftSessionService(
     store.service,
     store.events as never,
     ai as never,
+    documents as never,
   );
   const emitted: SessionEvent[] = [];
   const turn = (input: { text?: string; chip?: string }) =>
     session.turn(store.row(), input, (e) => emitted.push(e));
-  return { store, ai, session, emitted, turn };
+  return { store, ai, session, emitted, turn, documents };
 }
 
 describe('BotDraftSessionService.turn', () => {
@@ -299,5 +302,115 @@ describe('BotDraftSessionService as the crawl’s learner', () => {
       text,
       chips,
     });
+  });
+});
+
+describe('reading an uploaded document', () => {
+  const pdf = {
+    title: 'Sunrise Mind',
+    fileName: 'Sunrise Mind.pdf',
+    ownerChatbotId: 'bot-1',
+    extracted: {
+      text: 'Page one text.Fees are 2,000.',
+      pages: [
+        { number: 1, start: 0, end: 14 },
+        { number: 2, start: 14, end: 30 },
+      ],
+      sections: [],
+    },
+  };
+
+  it('splits a PDF into its own pages, named for the reader', () => {
+    expect(documentParts('doc-1', pdf)).toEqual([
+      {
+        url: 'document:doc-1#page=1',
+        title: 'Sunrise Mind.pdf, page 1',
+        status: 'read',
+        text: 'Page one text.',
+      },
+      {
+        url: 'document:doc-1#page=2',
+        title: 'Sunrise Mind.pdf, page 2',
+        status: 'read',
+        text: 'Fees are 2,000.',
+      },
+    ]);
+  });
+
+  it('splits a document without pages into parts at paragraph breaks', () => {
+    const text = `${'a'.repeat(5000)}\n\n${'b'.repeat(5000)}`;
+    const parts = documentParts('doc-2', {
+      title: 'Policies',
+      fileName: null,
+      extracted: { text, pages: [] },
+    });
+    expect(parts.map((p) => [p.url, p.title, p.text.length])).toEqual([
+      ['document:doc-2#part=1', 'Policies', 5000],
+      ['document:doc-2#part=2', 'Policies', 5000],
+    ]);
+  });
+
+  it('sources each detail to the document and page, and drops one that cites no page', async () => {
+    const h = harness({ learned: { facts: [], dropped: 0 } });
+    h.documents.readForOnboarding.mockResolvedValue(pdf);
+    h.ai.extractOnboardingFacts.mockResolvedValue({
+      facts: [
+        {
+          section: 'services',
+          text: 'Sessions cost ₹2,000.',
+          source_url: 'document:doc-1#page=2',
+          source_title: 'Sunrise Mind.pdf, page 2',
+        },
+        {
+          section: 'about',
+          text: 'Founded in 1990.',
+          source_url: 'https://sunrise.example/',
+          source_title: '',
+        },
+      ],
+      dropped: 0,
+      findings: ['Found your services and prices'],
+    });
+    await h.session.learnFromDocument('draft-1', 'doc-1');
+    const row = h.store.row();
+    expect(row.learned.facts).toEqual([
+      expect.objectContaining({
+        sourceUrl: 'document:doc-1#page=2',
+        sourceTitle: 'Sunrise Mind.pdf, page 2',
+      }),
+    ]);
+    expect(row.learned.dropped).toBe(1);
+    expect(row.transcript.slice(-1)[0]).toMatchObject({
+      text: ONBOARDING_COPY.readingDone.replace('{n}', '2'),
+    });
+    expect(h.store.dataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining('knowledgeDocumentIds'),
+      ['draft-1', 'doc-1'],
+    );
+  });
+
+  it('says something went wrong if reading fails, never a silent dead end', async () => {
+    const h = harness();
+    h.documents.readForOnboarding.mockResolvedValue(pdf);
+    h.ai.extractOnboardingFacts.mockRejectedValue(new Error('upstream'));
+    await expect(
+      h.session.learnFromDocument('draft-1', 'doc-1'),
+    ).rejects.toThrow('upstream');
+    expect(h.store.row().transcript.slice(-1)[0]).toMatchObject({
+      role: 'builder',
+      text: ONBOARDING_COPY.problems.generic,
+    });
+  });
+
+  it('refuses a document from another assistant', async () => {
+    const h = harness();
+    h.documents.readForOnboarding.mockResolvedValue({
+      ...pdf,
+      ownerChatbotId: 'someone-else',
+    });
+    await expect(
+      h.session.learnFromDocument('draft-1', 'doc-1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(h.ai.extractOnboardingFacts).not.toHaveBeenCalled();
   });
 });

@@ -358,3 +358,43 @@ class TestNeverWrites:
         )
         res = await run(request("share", message="point people to our phone"), fake)
         assert "/declineText" not in paths(res)
+
+
+class TestHonestAboutBooking:
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            (
+                "I am an assistant at Sunrise Mind Clinic. I can help with booking, "
+                "services, fees and hours.",
+                "I am an assistant at Sunrise Mind Clinic. "
+                "I can help with how to book, services, fees and hours.",
+            ),
+            (
+                "Hi, I'm the Sunrise assistant. I can book a session for you.",
+                "Hi, I'm the Sunrise assistant.",
+            ),
+            (
+                "You cover booking, services and fees.\n"
+                "You point people to the website for bookings.",
+                "You cover how to book, services and fees.\nYou point people to the "
+                "website for bookings.",
+            ),
+        ],
+    )
+    def test_it_never_claims_to_book(self, text, expected):
+        assert catalogue.honest_about_booking(text) == expected
+
+    @pytest.mark.asyncio
+    async def test_the_drafted_introduction_is_made_honest(self):
+        draft = {
+            **DRAFT,
+            "introduction": (
+                "I'm the Sunrise assistant. I can help with booking and fees."
+            ),
+        }
+        fake = FakeLLM(DraftOut=[draft])
+        res = await run(request("design", designs=CARDS, chip="design:guide"), fake)
+        assert paths(res)["/introduction"] == (
+            "I'm the Sunrise assistant. I can help with how to book and fees."
+        )

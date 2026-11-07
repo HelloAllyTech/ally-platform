@@ -62,6 +62,37 @@ class TestExtract:
         assert "[Page 2] Team — https://a.example/team" in fake.calls[0]["prompt"]
 
 
+class TestLenient:
+    @pytest.mark.asyncio
+    async def test_an_unknown_section_drops_one_fact_not_the_batch(self):
+        fake = FakeLLM(
+            ExtractOut=[
+                {
+                    "facts": [
+                        {"section": "press", "text": "In the news.", "page": 1},
+                        {"section": "hours", "text": "Open 9 to 5.", "page": 1},
+                    ]
+                }
+            ]
+        )
+        with patch(f"{TASKS}.generate_structured", fake):
+            res = await tasks.extract(ExtractRequest(pages=PAGES))
+        assert [f.text for f in res.facts] == ["Open 9 to 5."]
+        assert res.dropped == 0
+
+    def test_unknown_labels_fall_back_instead_of_failing(self):
+        from app.core.builder.schemas import ClassifyOut, DesignsOut, DraftOut
+
+        assert ClassifyOut.model_validate({"industry": "ngo"}).industry.value == "other"
+        assert (
+            DesignsOut.model_validate({"designs": [{"id": "booking"}]})
+            .designs[0]
+            .id.value
+            == "guide"
+        )
+        assert DraftOut.model_validate({"tone": "chirpy"}).tone.value == "warm"
+
+
 class TestCopy:
     @pytest.mark.parametrize(
         "text",

@@ -10,7 +10,8 @@ You write a business's assistant from what we learned about the business and wha
 7. `suggested_questions`: exactly 4 questions a customer would ask, each under 80 characters, each answerable from what we learned.
 8. `prechat`: {prechat_rule}
 9. `decline_text`: what the assistant says when it doesn't know, in one sentence, pointing to {decline_hint}. At most 300 characters.
-10. Plain words, sentence case, no exclamation marks, never "AI" or "bot". Indian English spelling.
+10. Booking, orders and payments aren't available yet. Never say the assistant can book, take an order or take a payment, or that it "helps with booking"; it can explain how to book, from what we learned.
+11. Plain words, sentence case, no exclamation marks, never "AI" or "bot". Indian English spelling.
 
 # The design the owner chose
 {design}

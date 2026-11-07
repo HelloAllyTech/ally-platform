@@ -399,5 +399,34 @@ def overpromises(text: str) -> bool:
     return bool(_OVERPROMISE.search(text or ""))
 
 
+#: The assistant itself booking, ordering or taking payment ("I can book a session for
+#: you"): a sentence like this is dropped from what the builder drafts.
+_DOES_BOOKING = re.compile(
+    r"\b(?:i|you|it|we|the assistant)\s+(?:can|will|could)\s+(?:also\s+)?"
+    r"(?:book|schedule|reserve|take|place|process|accept)\s+(?:an?\s+|the\s+|your\s+)?"
+    r"(?:appointments?|sessions?|consultations?|slots?|tables?|orders?|payments?|"
+    r"bookings?)\b|\b(?:book|schedule|reserve)\s+(?:it|one|a \w+)\s+for you\b",
+    re.IGNORECASE,
+)
+#: "Booking" as something it helps with, in a list: it explains how to book instead.
+_BOOKING_TOPIC = re.compile(r"\bbookings?\b(?!\s+(?:is|are)\s+not)", re.IGNORECASE)
+
+
+def honest_about_booking(text: str) -> str:
+    """`text` without the assistant claiming to book, order or take payment: a
+    sentence saying it does is dropped, and "booking" as a topic it covers becomes
+    "how to book"."""
+    sentences = re.split(r"(?<=[.!?])\s+|\n", text or "")
+    kept: List[str] = []
+    for sentence in sentences:
+        if not sentence.strip() or _DOES_BOOKING.search(sentence):
+            continue
+        if re.search(r"\b(?:help|helps|cover|covers|answer|answers)\b", sentence, re.I):
+            sentence = _BOOKING_TOPIC.sub("how to book", sentence)
+        kept.append(sentence)
+    joiner = "\n" if "\n" in (text or "") else " "
+    return joiner.join(kept).strip()
+
+
 #: The "coming soon" card, always last and never choosable.
 COMING_SOON_ID = "coming_soon"

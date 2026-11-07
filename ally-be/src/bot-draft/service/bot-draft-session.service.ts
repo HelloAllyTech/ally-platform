@@ -11,6 +11,7 @@ import type {
   BuilderStepResponse,
 } from '../../ai/dto/builder.dto';
 import { AiService } from '../../ai/service/ai.service';
+import { KbIngestService } from '../../knowledge-base/service/kb-ingest.service';
 import { LoggerService } from '../../logger/logger.service';
 import { ONBOARDING_COPY, fill } from '../copy/onboarding-copy';
 import type { CrawlLearner, LearnablePage } from '../crawl/site-crawl.service';
@@ -90,6 +91,7 @@ export class BotDraftSessionService implements CrawlLearner {
     private readonly drafts: BotDraftService,
     private readonly events: BotDraftEventsService,
     private readonly ai: AiService,
+    private readonly documents: KbIngestService,
   ) {}
 
   // ── the conversation ──────────────────────────────────────────────────
@@ -378,19 +380,49 @@ export class BotDraftSessionService implements CrawlLearner {
     );
   }
 
+  /**
+   * "Upload documents instead": an uploaded document is read like a site, a page at a time (a
+   * PDF's own pages; other formats in parts), and each detail is sourced to the document and page.
+   * Same rule as the crawl: a detail that cites no part we sent is dropped.
+   */
+  async learnFromDocument(draftId: string, documentId: string): Promise<void> {
+    const draft = await this.fresh(draftId);
+    const read = await this.documents.readForOnboarding(documentId);
+    if (!read || !draft.chatbotId || read.ownerChatbotId !== draft.chatbotId) {
+      throw new ConflictException('That document is not part of this setup.');
+    }
+    await this.drafts.addKnowledgeDocument(draftId, documentId);
+    const parts = documentParts(documentId, read);
+    try {
+      for (let i = 0; i < parts.length; i += DOCUMENT_BATCH) {
+        await this.learnFrom(draftId, parts.slice(i, i + DOCUMENT_BATCH));
+      }
+    } catch (error) {
+      // Never a silent dead end: the owner hears it went wrong, and their progress is kept.
+      await this.crawlFinished(draftId, { read: 0, problem: 'generic' });
+      throw error;
+    }
+    await this.crawlFinished(draftId, { read: parts.length });
+  }
+
   /** "Describe it instead": the description is read for facts, sourced to the owner. */
   async learnFromDescription(
     draftId: string,
     description: string,
   ): Promise<void> {
-    await this.learnFrom(draftId, [
-      {
-        url: OWNER_SOURCE,
-        title: 'From you',
-        status: 'read',
-        text: description.slice(0, 4000),
-      },
-    ]);
+    try {
+      await this.learnFrom(draftId, [
+        {
+          url: OWNER_SOURCE,
+          title: 'From you',
+          status: 'read',
+          text: description.slice(0, 4000),
+        },
+      ]);
+    } catch (error) {
+      await this.crawlFinished(draftId, { read: 0, problem: 'generic' });
+      throw error;
+    }
     await this.withRetry(draftId, async (draft) => {
       const saved = await this.drafts.appendTranscript(draft, [
         {
@@ -463,6 +495,66 @@ export class BotDraftSessionService implements CrawlLearner {
       return {};
     }
   }
+}
+
+/** Parts of one document sent to fact extraction together, as with crawled pages. */
+const DOCUMENT_BATCH = 8;
+/** Most parts read from one document (a long PDF's first 50 pages). */
+const DOCUMENT_PARTS = 50;
+const PART_CHARS = 8_000;
+
+/**
+ * A document as "pages" for extraction. A PDF's own pages, each sourced as
+ * `document:<id>#page=<n>` and titled "<name>, page <n>"; any other format in parts of about
+ * 8,000 characters, titled with its name.
+ */
+export function documentParts(
+  documentId: string,
+  read: {
+    title: string;
+    fileName: string | null;
+    extracted: {
+      text: string;
+      pages: { number: number; start: number; end: number }[];
+    };
+  },
+): LearnablePage[] {
+  const name = (read.fileName || read.title || 'Your document').slice(0, 200);
+  const { text, pages } = read.extracted;
+  const parts: LearnablePage[] = [];
+  if (pages.length) {
+    for (const page of pages) {
+      const body = text.slice(page.start, page.end).trim();
+      if (!body) continue;
+      parts.push({
+        url: `document:${documentId}#page=${page.number}`,
+        title: `${name}, page ${page.number}`,
+        status: 'read',
+        text: body.slice(0, 12_000),
+      });
+    }
+  } else {
+    let start = 0;
+    let n = 1;
+    while (start < text.length) {
+      let end = Math.min(text.length, start + PART_CHARS);
+      const paragraph = text.lastIndexOf('\n\n', end);
+      if (end < text.length && paragraph > start + PART_CHARS / 2)
+        end = paragraph;
+      const body = text.slice(start, end).trim();
+      if (body) {
+        parts.push({
+          url: `document:${documentId}#part=${n}`,
+          title: name,
+          status: 'read',
+          text: body,
+        });
+        n += 1;
+      }
+      start = end;
+    }
+  }
+  return parts.slice(0, DOCUMENT_PARTS);
 }
 
 /** The conversation state kept in `answers`, with defaults for a new draft. */

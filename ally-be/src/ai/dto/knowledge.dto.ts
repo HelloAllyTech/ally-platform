@@ -236,6 +236,8 @@ export interface KnowledgePersonaRequest {
   tone?: string;
   /** The safety pack's rules block (chunk 20a); ally-ai renders it after the instructions. */
   safety_rules?: string;
+  /** The pack's id; ally-ai enforces a health pack's Never rules in its check too. */
+  safety_pack?: string;
 }
 
 export interface KnowledgeCitation {

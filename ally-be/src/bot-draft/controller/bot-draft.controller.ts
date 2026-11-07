@@ -27,6 +27,7 @@ import { ONBOARDING_COPY } from '../copy/onboarding-copy';
 import { displayDomain, startUrlFrom } from '../crawl/url-scope';
 import { SiteCrawlService } from '../crawl/site-crawl.service';
 import {
+  AddBotDraftDocumentDto,
   BotDraftMessageDto,
   CreateBotDraftDto,
   PatchBotDraftDto,
@@ -73,9 +74,9 @@ export class BotDraftController {
   async create(@Body() dto: CreateBotDraftDto) {
     const website = dto.website?.trim();
     const description = dto.description?.trim();
-    if (!website && !description) {
+    if (!website && !description && !dto.upload) {
       throw new BadRequestException(
-        'Paste your website, or describe your business.',
+        'Paste your website, upload documents, or describe your business.',
       );
     }
     let start: string | null = null;
@@ -95,11 +96,13 @@ export class BotDraftController {
     });
     const withOwner = await this.drafts.appendTranscript(draft, [
       { role: 'builder', text: ONBOARDING_COPY.opening },
-      { role: 'owner', text: start ?? description! },
+      ...(start || description
+        ? [{ role: 'owner' as const, text: start ?? description! }]
+        : []),
     ]);
     if (start) {
       await this.crawl.start(withOwner);
-    } else {
+    } else if (description) {
       // In the background: the canvas fills as the details arrive.
       void this.session
         .learnFromDescription(draft.id, description!)
@@ -110,6 +113,28 @@ export class BotDraftController {
         );
     }
     return draftView((await this.drafts.findById(draft.id)) ?? withOwner);
+  }
+
+  @Post(':id/documents')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Read an uploaded document into "What we learned"',
+    description:
+      "For a document already uploaded to the draft's chatbot (POST /v1/chatbots/:id/documents/upload-url, then /documents/private). Read in the background, a page at a time; each detail is sourced to the document and page. Progress on /events.",
+  })
+  async addDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AddBotDraftDocumentDto,
+  ) {
+    const draft = await this.drafts.get(id);
+    void this.session
+      .learnFromDocument(draft.id, dto.documentId)
+      .catch((error) =>
+        this.logger.warn(
+          `Reading document ${dto.documentId} for draft ${id} failed: ${error instanceof Error ? error.message : 'unknown'}`,
+        ),
+      );
+    return draftView(draft);
   }
 
   @Get('current')
