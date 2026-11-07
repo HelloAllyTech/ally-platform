@@ -18,7 +18,10 @@ import {
 import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { LoggerService } from '../../logger/logger.service';
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
-import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
+import {
+  dashboardReadsShared,
+  type WhatsAppBotSettings,
+} from '../../whatsapp/type/whatsapp-settings.type';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import { ChatbotMember } from '../entity/chatbot-member.entity';
 import { ChatbotAudience } from '../entity/chatbot-audience.entity';
@@ -279,8 +282,15 @@ export class ChatbotService {
     return new Map(rows.map((r) => [r.chatbotId, Number(r.count)]));
   }
 
-  /** Last-30-day activity per bot, from the conversations stamped with it. */
+  /**
+   * Last-30-day activity per bot, from the conversations stamped with it. From `wa_*`, or, while
+   * the dashboard reads the shared store (chunk 12b), from `chatbot_*`: every channel, the bot page
+   * included. The two have the same shape, so one query serves both.
+   */
   private async stats(ids: string[]): Promise<Map<string, ChatbotStats>> {
+    const shared = dashboardReadsShared(await this.settingsService.get());
+    const messages = shared ? 'chatbot_messages' : 'wa_messages';
+    const conversations = shared ? 'chatbot_conversations' : 'wa_conversations';
     const rows = await this.chatbotRepository.manager.query<
       {
         chatbot_id: string;
@@ -297,8 +307,8 @@ export class ChatbotService {
               COUNT(*) FILTER (WHERE m.direction = 'outbound' AND m.handled_by = $3) AS answered,
               COUNT(*) FILTER (WHERE m.direction = 'outbound' AND m.handled_by = $4) AS declined,
               MAX(m."createdAt") AS last_at
-         FROM wa_messages m
-         JOIN wa_conversations c ON c.id = m.conversation_id
+         FROM ${messages} m
+         JOIN ${conversations} c ON c.id = m.conversation_id
         WHERE c.chatbot_id = ANY($1::uuid[])
           AND m."createdAt" >= now() - ($2 || ' days')::interval
         GROUP BY c.chatbot_id`,
@@ -309,7 +319,7 @@ export class ChatbotService {
     >(
       `SELECT c.chatbot_id, COUNT(*) AS open
          FROM wa_unanswered_questions q
-         JOIN wa_conversations c ON c.id = q.conversation_id
+         JOIN ${conversations} c ON c.id = q.conversation_id
         WHERE c.chatbot_id = ANY($1::uuid[]) AND q.status = 'open'
         GROUP BY c.chatbot_id`,
       [ids],

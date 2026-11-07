@@ -162,6 +162,19 @@ export interface WhatsAppBotSettings {
 /** Which store WhatsApp reads a thread's history from. */
 export type HistorySource = 'wa' | 'shared';
 
+/** Whether the dashboard reads the shared store: asked for, and only while it is being written. */
+export function dashboardReadsShared(
+  settings: Pick<
+    WhatsAppBotSettings,
+    'sharedStoreWrites' | 'dashboardReadsFrom'
+  >,
+): boolean {
+  return (
+    settings.sharedStoreWrites === true &&
+    settings.dashboardReadsFrom === 'shared'
+  );
+}
+
 export const WHATSAPP_SETTINGS_NAME = 'whatsapp_bot';
 
 /**

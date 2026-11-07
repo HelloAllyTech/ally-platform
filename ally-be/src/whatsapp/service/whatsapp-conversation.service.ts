@@ -26,7 +26,15 @@ import {
 import { ChatbotAccessService } from 'src/chatbot/service/chatbot-access.service';
 import { ConversationService } from 'src/chatbot/service/conversation.service';
 import { ConversationChannel } from 'src/chatbot/enum/conversation.enum';
+import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { resolveSort } from 'src/common/util/sort.util';
+import { dashboardReadsShared } from '../type/whatsapp-settings.type';
+import {
+  DashboardChannel,
+  notWebQuestionSql,
+  SharedConversationReader,
+  sharedConversationInBotSql,
+} from './shared-conversation.reader';
 import { ERASED, ERASED_PHONE_PREFIX } from './whatsapp-retention.service';
 
 /**
@@ -59,7 +67,33 @@ export class WhatsAppConversationService {
     private readonly access: ChatbotAccessService,
     /** The shared conversation store (chunk 12), erased with `wa_*`. */
     @Optional() private readonly conversations?: ConversationService,
+    /** Decides `dashboardReadsFrom` (chunk 12b). Without it, the dashboard reads `wa_*` as always. */
+    @Optional() private readonly settings?: ChatbotSettingsService,
   ) {}
+
+  /**
+   * Whether the dashboard reads the shared store now (chunk 12b): `dashboardReadsFrom` is `shared`
+   * and the shared store is being written. Otherwise everything reads `wa_*` exactly as before, and
+   * the bot page's threads are not listed.
+   */
+  private async readsShared(): Promise<SharedConversationReader | null> {
+    if (!this.settings) return null;
+    return dashboardReadsShared(await this.settings.get())
+      ? new SharedConversationReader(this.conversationRepository.manager)
+      : null;
+  }
+
+  /** Refuse a bot the caller is not on, answering like a missing thread. */
+  private async assertBotInScope(
+    chatbotId: string,
+    what: string,
+  ): Promise<void> {
+    const botIds = await this.access.accessibleChatbotIds();
+    if (botIds === null) return;
+    if (!botIds.includes(chatbotId)) {
+      throw new NotFoundException(`${what} was not found`);
+    }
+  }
 
   /**
    * Refuse a contact the caller has no bot in common with — answering exactly like a missing one,
@@ -102,7 +136,17 @@ export class WhatsAppConversationService {
       select: ['id', 'contactId'],
     });
     if (!conversation) {
-      throw new NotFoundException(`Question ${questionId} was not found`);
+      // A bot page's question (chunk 12b): its thread is in the shared store only.
+      const thread = await new SharedConversationReader(
+        this.conversationRepository.manager,
+      )
+        .thread(conversationId)
+        .catch(() => null);
+      if (!thread) {
+        throw new NotFoundException(`Question ${questionId} was not found`);
+      }
+      await this.assertBotInScope(thread.chatbotId, `Question ${questionId}`);
+      return;
     }
     await this.assertContactInScope(
       conversation.contactId,
@@ -124,7 +168,14 @@ export class WhatsAppConversationService {
     sortBy?: string;
     sortDir?: string;
     chatbotId?: string;
+    /** Chunk 12b: `whatsapp` or `web` (the bot page). */
+    channel?: DashboardChannel;
   }) {
+    const shared = await this.readsShared();
+    if (shared) return shared.listConversations(options);
+    // `wa_*` holds WhatsApp threads only.
+    if (options.channel === 'web') return { conversations: [], count: 0 };
+
     const limit = options.limit ?? 25;
     const offset = options.offset ?? 0;
     const sort = resolveSort(
@@ -221,6 +272,8 @@ export class WhatsAppConversationService {
    * disappear from the dropdown while its threads were still listed.
    */
   async listLanguages(chatbotId?: string): Promise<string[]> {
+    const shared = await this.readsShared();
+    if (shared) return shared.listLanguages(chatbotId);
     const rows = await this.conversationRepository
       .createQueryBuilder('c')
       .select('DISTINCT c.last_language', 'language')
@@ -236,6 +289,17 @@ export class WhatsAppConversationService {
 
   /** One thread with every message, citations resolved to real passage text. */
   async getConversation(id: string) {
+    const shared = await this.readsShared();
+    if (shared) {
+      const thread = await shared.thread(id);
+      if (thread.channel !== ConversationChannel.WHATSAPP) {
+        await this.assertBotInScope(thread.chatbotId, `Conversation ${id}`);
+        return {
+          channel: thread.channel,
+          ...(await shared.getWebConversation(id)),
+        };
+      }
+    }
     const conversation = await this.conversationRepository.findOne({
       where: { id },
     });
@@ -272,6 +336,22 @@ export class WhatsAppConversationService {
           select: ['id', 'name'],
         })
       : null;
+
+    if (shared) {
+      return {
+        channel: ConversationChannel.WHATSAPP,
+        conversation,
+        contact: contact
+          ? {
+              ...contact,
+              organisation: tenant
+                ? { id: tenant.id, name: tenant.name }
+                : null,
+            }
+          : contact,
+        messages: await shared.messages(id),
+      };
+    }
 
     const messages = await this.messageRepository.find({
       where: { conversationId: id },
@@ -429,6 +509,37 @@ export class WhatsAppConversationService {
     return { id: contactId, erased: true };
   }
 
+  /**
+   * Erase a bot page visitor (chunk 12b): their messages, pre-chat answers, identities, and the
+   * questions they left unanswered. The shared store is the only copy, so this is the whole erasure.
+   */
+  async eraseWebContact(contactId: string) {
+    const threads: { id: string; chatbot_id: string }[] =
+      await this.conversationRepository.manager.query(
+        `SELECT id, chatbot_id FROM chatbot_conversations
+          WHERE contact_id = $1 AND channel <> $2`,
+        [contactId, ConversationChannel.WHATSAPP],
+      );
+    if (!threads.length || !this.conversations) {
+      throw new NotFoundException(`Contact ${contactId} was not found`);
+    }
+    for (const chatbotId of new Set(threads.map((t) => t.chatbot_id))) {
+      await this.assertBotInScope(chatbotId, `Contact ${contactId}`);
+    }
+    await this.conversations.eraseContact(contactId, {
+      text: ERASED,
+      erasedPrefix: ERASED_PHONE_PREFIX,
+    });
+    await this.unansweredRepository.update(
+      { conversationId: In(threads.map((t) => t.id)) },
+      { questionText: ERASED },
+    );
+    this.logger.warn(
+      `Bot page contact ${contactId} erased by user ${ExecutionManager.getUserId() ?? 'unknown'}`,
+    );
+    return { id: contactId, erased: true };
+  }
+
   // ── unanswered queue ──────────────────────────────────────────────────
 
   async listUnanswered(options: {
@@ -449,10 +560,17 @@ export class WhatsAppConversationService {
       options.sortDir,
     );
 
+    const shared = await this.readsShared();
     const query = this.unansweredRepository
       .createQueryBuilder('q')
       .where(
-        options.chatbotId ? conversationInBotSql('q.conversation_id') : '1=1',
+        options.chatbotId
+          ? (shared ? sharedConversationInBotSql : conversationInBotSql)(
+              'q.conversation_id',
+            )
+          : shared
+            ? '1=1'
+            : notWebQuestionSql('q.conversation_id'),
         { scopeBot: options.chatbotId },
       )
       .orderBy(sort.column, sort.direction)
@@ -476,7 +594,17 @@ export class WhatsAppConversationService {
     }
 
     const [questions, count] = await query.getManyAndCount();
-    return { questions, count };
+    if (!shared) return { questions, count };
+    const channels = await shared.channelsOf(
+      questions.map((q) => q.conversationId),
+    );
+    return {
+      questions: questions.map((q) => ({
+        ...q,
+        channel: channels.get(q.conversationId) ?? ConversationChannel.WHATSAPP,
+      })),
+      count,
+    };
   }
 
   async updateUnanswered(
@@ -535,11 +663,18 @@ export class WhatsAppConversationService {
     // answered next time. Targeted at the asker's organisation when known — the platform bot
     // answers per organisation, and an organisation-restricted admin may only add documents
     // targeted at their own.
-    const conversation = await this.conversationRepository.findOne({
-      where: { id: row.conversationId },
-      select: ['id', 'contactId', 'chatbotId'],
-    });
-    const contact = conversation
+    const conversation =
+      (await this.conversationRepository.findOne({
+        where: { id: row.conversationId },
+        select: ['id', 'contactId', 'chatbotId'],
+      })) ??
+      // A bot page's question: its bot comes from the shared thread, and it has no WhatsApp
+      // contact, so the document is not targeted at an organisation.
+      (await new SharedConversationReader(this.conversationRepository.manager)
+        .thread(row.conversationId)
+        .then((t) => ({ id: t.id, contactId: '', chatbotId: t.chatbotId }))
+        .catch(() => null));
+    const contact = conversation?.contactId
       ? await this.contactRepository.findOne({
           where: { id: conversation.contactId },
           select: ['id', 'tenantId'],
