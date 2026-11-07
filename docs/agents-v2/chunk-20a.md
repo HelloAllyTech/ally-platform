@@ -127,7 +127,7 @@ This is the first thing every new customer sees. It should feel like the best on
   - each with realistic content, **deliberate gaps** (2–3 per site) and a logo and theme colour
   - fictional names, `.example` domains, and the same disclaimer line as the Sunrise Mind PDF
 - A local static server for them.
-- `scripts/onboarding_eval.py` (or the repo's equivalent) drives each fixture end to end through the session API with scripted answers (chips), and records:
+- `scripts/onboarding_eval.py` <!-- docs-path-lint: planned --> (or the repo's equivalent) drives each fixture end to end through the session API with scripted answers (chips), and records:
   - time to publish
   - learned facts with valid sources (the share that had to be dropped is reported)
   - the industry and pack picked (must match the expected value)
