@@ -51,6 +51,26 @@ rules:
     why: >
       ally-mobile/AGENTS.md and ally-mobile/CLAUDE.md must stay byte-identical.
 
+  - id: ally-archiver-agent-entrypoints-in-sync
+    watch:
+      - "ally-archiver/AGENTS.md"
+      - "ally-archiver/CLAUDE.md"
+    requires: mirror
+    why: >
+      ally-archiver/AGENTS.md and ally-archiver/CLAUDE.md must stay byte-identical.
+
+  # ── ally-archiver ───────────────────────────────────────────────────────
+  - id: ally-archiver-wiki
+    watch:
+      - "ally-archiver/cmd/**"
+      - "ally-archiver/internal/**/*.go"
+    requires: helloallytech.github.io/wiki/repos/ally-archiver.md
+    why: >
+      repos/ally-archiver.md documents the commands, packages, object states and safety
+      defaults; a change to how objects move or what the UI does must reach it, and a change to
+      the plan itself belongs in platform/storage-archive.md. A test-only change can use
+      the `Docs-Skip:` trailer.
+
   # ── ally-be ─────────────────────────────────────────────────────────────
   - id: ally-be-data-schema
     watch:

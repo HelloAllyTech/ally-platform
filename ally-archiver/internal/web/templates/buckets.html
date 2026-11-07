@@ -1,0 +1,46 @@
+{{define "content"}}
+<h1>Buckets</h1>
+<p class="lead">A bucket starts disabled. <b>Enabled</b> lets the weekly run consider it. <b>Armed</b> lets a run copy and delete; until then, only dry runs. Run a dry run first and check the egress cost before you arm a bucket.</p>
+{{if not .BoxReady}}<div class="note">The Storage Box isn't configured, so only dry runs are possible.</div>{{end}}
+{{template "bucket-table" .}}
+{{end}}
+
+{{define "bucket-table"}}
+<div id="buckets">
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{if .FlashErr}}<div class="flash err">{{.FlashErr}}</div>{{end}}
+<div class="scroll">
+<table>
+  <thead><tr><th>Bucket</th><th>State</th><th class="num">Objects on S3</th><th class="num">Eligible now</th><th class="num">Backfill egress</th><th>Actions</th></tr></thead>
+  <tbody>
+  {{range .Buckets}}
+  <tr>
+    <td class="key">{{.Name}}{{if .BlockedReason}}<div class="muted">{{.BlockedReason}}</div>{{end}}</td>
+    <td>{{template "state" .}}</td>
+    <td class="num">{{if .Scanned}}{{.S3Objects}} · {{bytes .S3Bytes}}{{else}}<span class="muted">not scanned</span>{{end}}</td>
+    <td class="num">{{if .Scanned}}{{.Eligible}} · {{bytes .EligibleBytes}}{{end}}</td>
+    <td class="num">{{if .Scanned}}≈ {{usd .EgressUSD}}{{end}}</td>
+    <td>
+      <button hx-post="/buckets/{{.Name}}/dry-run" hx-target="#buckets" hx-swap="outerHTML" {{if $.Busy}}disabled{{end}}>Dry run</button>
+      {{if .Enabled}}
+        {{if .Armed}}
+          <button class="primary" hx-post="/buckets/{{.Name}}/run" hx-target="#buckets" hx-swap="outerHTML" hx-confirm="Start a live run of {{.Name}} now? It copies aged objects and deletes ones copied in earlier runs." {{if or $.Busy (not $.BoxReady)}}disabled{{end}}>Run now</button>
+          <button hx-post="/buckets/{{.Name}}/disarm" hx-target="#buckets" hx-swap="outerHTML">Disarm</button>
+        {{else}}
+          <button class="danger" hx-post="/buckets/{{.Name}}/arm" hx-target="#buckets" hx-swap="outerHTML" hx-confirm="Arm {{.Name}}? Runs will copy its aged objects to the Storage Box and delete them from S3 one run later.">Arm</button>
+        {{end}}
+        <button hx-post="/buckets/{{.Name}}/disable" hx-target="#buckets" hx-swap="outerHTML">Disable</button>
+      {{else}}
+        <button hx-post="/buckets/{{.Name}}/enable" hx-target="#buckets" hx-swap="outerHTML">Enable</button>
+      {{end}}
+      {{if .BlockedReason}}<button hx-post="/buckets/{{.Name}}/unblock" hx-target="#buckets" hx-swap="outerHTML" hx-confirm="Allow deletes on {{.Name}} again? Check the failed objects on the Archive page first.">Allow deletes</button>{{end}}
+    </td>
+  </tr>
+  {{else}}
+  <tr><td colspan="6" class="muted">No buckets configured. Add them to the buckets file and restart.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+</div>
+{{end}}

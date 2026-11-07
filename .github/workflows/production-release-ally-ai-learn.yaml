@@ -351,40 +351,9 @@ jobs:
           echo "- \`${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`${ECR_REGISTRY}/${ECR_REPO}:latest\`" >> $GITHUB_STEP_SUMMARY
 
-  run-db-migration:
-    name: Run DB Migration
-    runs-on: ubuntu-22.04
-    permissions:
-      id-token: write
-      pull-requests: write
-      contents: read
-    needs:
-      - prepare-env
-      - build-push-image
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: master
-
-      - name: Notify migration skipped
-        if: ${{ env.ENABLE_DB_MIGRATION != 'true' }}
-        run: echo "DB migration not enabled, skipping." >> $GITHUB_STEP_SUMMARY
-
-      - name: Run migration
-        if: ${{ env.ENABLE_DB_MIGRATION == 'true' }}
-        id: run_db_migration
-        uses: ./.github/actions/ally-ai-learn/run-migration
-        with:
-          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
-          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
-          task-definition: "${{ needs.prepare-env.outputs.TASK_DEFINITION }}-dbmigrate"
-          container-name: "${{ needs.prepare-env.outputs.CONTAINER_NAME }}-dbmigrate"
-          ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
-          image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
-          subnets: ${{ env.SUBNETS }}
-          security-groups: ${{ env.SECURITY_GROUPS }}
-
+  # The old run-db-migration ECS task is gone: since the 2026-11-07 cutover to
+  # metal01, deploys run via Ansible (ally_learn.yml). If learn migrations are
+  # ever enabled, add a migration command to that playbook like core/ai have.
   require-skills-store:
     # Deploy order guard: this release reads every prompt from ally-be's Skills
     # Store and ships minimal default prompt files. Deployed before the ally-be
@@ -411,24 +380,15 @@ jobs:
           echo "ally-be Skills Store present (HTTP $status)."
 
   deploy-to-ecs-service:
-    name: Deploy to ECS Service
+    # Kept the job id so branch-protection checks and the create-release needs
+    # stay valid; it now deploys to metal01 via Ansible.
+    name: Deploy to metal01
     runs-on: ubuntu-22.04
-    # Must stay above deploy-ecs's wait-for-minutes (25) so the ECS waiter is
-    # what times out, not the runner. At 20 this job cancelled itself while the
-    # rollout was still being watched: v1.29.0 reached COMPLETED (12/12) at
-    # 11:00:02Z and the job was cancelled at 11:05:20Z, reporting `cancelled`
-    # for a deploy that had already succeeded. Four of the five releases before
-    # it reported the same thing.
     timeout-minutes: 35
-    permissions:
-      id-token: write
-      pull-requests: write
-      contents: read
     needs:
       - validate-and-tag
       - prepare-env
       - build-push-image
-      - run-db-migration
       - require-skills-store
 
     steps:
@@ -436,18 +396,30 @@ jobs:
         with:
           ref: master
 
-      - name: Deploy to production
-        id: deploy_backend
-        uses: ./.github/actions/ally-ai-learn/deploy-ecs
+      - name: Deploy ally-ai-learn via Ansible
+        uses: ./.github/actions/deploy-metal01
         with:
-          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
-          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
-          task-definition: ${{ needs.prepare-env.outputs.TASK_DEFINITION }}
-          container-name: ${{ needs.prepare-env.outputs.CONTAINER_NAME }}
-          ecs-service: ${{ needs.prepare-env.outputs.ECS_SERVICE }}
-          ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
-          image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
-          release-tag: ${{ needs.validate-and-tag.outputs.VERSION }}
+          playbook: ally_learn.yml
+          extra-args: >-
+            -e inline_ecr_image=${{ needs.build-push-image.outputs.APP_IMAGE }}
+          ssh-key: ${{ secrets.METAL01_ANSIBLE_SSH_KEY }}
+          infra-deploy-key: ${{ secrets.INFRA_DEPLOY_KEY }}
+          vault-password: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+
+      - name: Verify health
+        run: |
+          sleep 15
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -m 10 https://learn-prod.helloally.dev/api/health || true)
+            if [ "$code" = "200" ]; then
+              echo "✅ learn-prod healthy" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            fi
+            echo "health returned $code; retrying ($i/30)..."
+            sleep 10
+          done
+          echo "::error::learn-prod did not return healthy after deploy"
+          exit 1
 
   create-release:
     name: Create Release Draft
@@ -519,8 +491,7 @@ jobs:
             - **Service**: learn-core
             - **Environment**: Production
             - **Branch**: master
-            - **ECS Cluster**: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
-            - **ECS Service**: ${{ needs.prepare-env.outputs.ECS_SERVICE }}
+            - **Deploy**: metal01 via Ansible `ally_learn.yml`
             - **Docker Image**: ${{ needs.build-push-image.outputs.APP_IMAGE }}
 
             ${{ steps.changelog.outputs.CHANGELOG }}
