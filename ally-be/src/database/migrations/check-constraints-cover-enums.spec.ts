@@ -9,6 +9,11 @@ import {
 } from '../../debrief/enum/debrief-run.enum';
 import { join } from 'path';
 import {
+  ConversationChannel,
+  ConversationMessageRole,
+  ConversationStatus,
+} from '../../chatbot/enum/conversation.enum';
+import {
   BuilderEventType,
   BuilderExemplarOutcome,
   BuilderLessonCategory,
@@ -390,6 +395,15 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_guide_appointments_purpose', Object.values(GuideAppointmentPurpose)],
     ['CHK_guide_crisis_responses_scope', Object.values(GuideCrisisScope)],
     ['CHK_track_enrollments_entry_source', Object.values(TrackEntrySource)],
+    // The shared conversation store (Agents v2, chunk 12).
+    [
+      'CHK_chatbot_contact_identities_channel',
+      Object.values(ConversationChannel),
+    ],
+    ['CHK_chatbot_conversations_channel', Object.values(ConversationChannel)],
+    ['CHK_chatbot_conversations_status', Object.values(ConversationStatus)],
+    ['CHK_chatbot_messages_channel', Object.values(ConversationChannel)],
+    ['CHK_chatbot_messages_role', Object.values(ConversationMessageRole)],
   ])('%s accepts every enum value', (constraint, values) => {
     const allowed = allowedValues(constraint as string);
     const missing = (values as string[]).filter((v) => !allowed.includes(v));
