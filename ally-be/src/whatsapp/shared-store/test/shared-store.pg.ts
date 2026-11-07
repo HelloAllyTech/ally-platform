@@ -17,7 +17,11 @@ export const describePg = URL ? describe : describe.skip;
 const SUITE_LOCK = 1_201_212;
 const locks = new Map<DataSource, QueryRunner>();
 
-export async function openTestDataSource(): Promise<DataSource> {
+export async function openTestDataSource(
+  extraEntities: NonNullable<
+    ConstructorParameters<typeof DataSource>[0]['entities']
+  > = [],
+): Promise<DataSource> {
   const name = new globalThis.URL(URL!).pathname.replace(/^\//, '');
   if (!/(_test|_fresh)$/.test(name)) {
     throw new Error(
@@ -28,7 +32,7 @@ export async function openTestDataSource(): Promise<DataSource> {
   const dataSource = new DataSource({
     type: 'postgres',
     url: URL,
-    entities: SHARED_STORE_ENTITIES,
+    entities: [...SHARED_STORE_ENTITIES, ...(extraEntities as never[])],
     synchronize: false,
     logging: false,
   });

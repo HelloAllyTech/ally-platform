@@ -966,6 +966,12 @@ stores share a key rather than matching on content); `Conversation.chat_id` ↔ 
   behind `OTP_LIMITS` (`otp_guesses:`, `otp_guesses_day:`, `otp_code_requests:`; see
   `src/auth/constants/otp-limits.constants.ts`). Deleting a learner's `otp_guesses_day:` key lifts
   the daily wrong-code limit early.
+  The bot page (Agents v2 chunk 12b, `src/chatbot/bot-page/`) keeps its own keys, with addresses and
+  IPs only ever as HMACs: a code's HMAC (`bp:otp:code:<bot>:<address hash>`, 10 minutes), its
+  wrong tries (`bp:otp:tries:`) and codes sent (`bp:otp:sent:`, 15 minutes); hourly windows per
+  visitor and per IP (`bp:rl:`); and each bot's daily message count and its once-a-day alert latch
+  (`bp:cap:<bot>:<UTC day>`, `bp:cap-alert:`). Visitors themselves are signed cookies, not Redis
+  rows.
 - **AWS SQS** (`src/message-broker/`): async pipeline between `ally-be` and `ally-ai`.
   Notably carries transcription + summarization results
   (`QUEUE__TRANSCRIBE_AND_SUMMARIZE_RESULTS_BUCKET`).

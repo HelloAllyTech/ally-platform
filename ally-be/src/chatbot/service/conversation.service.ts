@@ -9,6 +9,7 @@ import { MAX_HISTORY_MESSAGES } from '../engine/knowledge-request';
 import {
   ConversationChannel,
   ConversationMessageRole,
+  ConversationStatus,
 } from '../enum/conversation.enum';
 
 /** The scope a contact belongs to: one bot. */
@@ -184,6 +185,8 @@ export class ConversationService {
       .where('c.contactId = :contactId', { contactId })
       .andWhere('c.chatbotId = :chatbotId', { chatbotId })
       .andWhere('c.channel = :channel', { channel })
+      // Only the bot page closes a thread ("New chat"); WhatsApp threads are always open.
+      .andWhere('c.status = :open', { open: ConversationStatus.OPEN })
       .andWhere('c.lastMessageAt >= :cutoff', { cutoff })
       .orderBy('c.lastMessageAt', 'DESC')
       .getOne();
@@ -206,6 +209,147 @@ export class ConversationService {
         lastMessageAt: now,
       }),
     );
+  }
+
+  /**
+   * The thread a contact would continue right now, without touching it: open, on this channel, and
+   * within the idle window. What the bot page shows when a visitor reloads.
+   */
+  async currentConversation(
+    chatbotId: string,
+    contactId: string,
+    channel: ConversationChannel,
+    idleWindowMinutes: number,
+    now = new Date(),
+  ): Promise<ChatbotConversation | null> {
+    const cutoff = new Date(now.getTime() - idleWindowMinutes * 60_000);
+    return this.conversationRepository
+      .createQueryBuilder('c')
+      .where('c.contactId = :contactId', { contactId })
+      .andWhere('c.chatbotId = :chatbotId', { chatbotId })
+      .andWhere('c.channel = :channel', { channel })
+      .andWhere('c.status = :open', { open: ConversationStatus.OPEN })
+      .andWhere('c.lastMessageAt >= :cutoff', { cutoff })
+      .orderBy('c.lastMessageAt', 'DESC')
+      .getOne();
+  }
+
+  /** Close a thread, so the contact's next message starts a new one (the bot page's "New chat"). */
+  async closeConversation(id: string): Promise<void> {
+    await this.conversationRepository.update(
+      { id },
+      { status: ConversationStatus.CLOSED },
+    );
+  }
+
+  /** The newest messages of a thread, oldest first, for a visitor resuming it. */
+  async recentMessages(
+    conversationId: string,
+    limit: number,
+  ): Promise<ChatbotMessage[]> {
+    const rows = await this.messageRepository.find({
+      where: { conversationId },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+    return rows.reverse();
+  }
+
+  /**
+   * The contact behind a verified identity (an email), reached from a device identity (a bot page
+   * visitor id). A person who verifies the same email on a second device continues as the same
+   * contact; a device that verifies a different email moves to that email's contact.
+   *
+   * Race-safe through the identity's unique index: the email identity is inserted only if absent,
+   * and the device identity is upserted onto whichever contact holds the email.
+   */
+  async resolveVerifiedContact(
+    scope: ContactScope,
+    verified: { channel: ConversationChannel; externalId: string },
+    device: { channel: ConversationChannel; externalId: string },
+    now = new Date(),
+  ): Promise<ChatbotContact> {
+    let contact = await this.contactFor(
+      this.dataSource.manager,
+      scope,
+      verified.channel,
+      verified.externalId,
+    );
+    if (!contact) {
+      // First time this email is seen: it joins the device's contact (or a new one).
+      const base = await this.resolveContact(
+        scope,
+        device.channel,
+        device.externalId,
+      );
+      await this.dataSource.query(
+        `INSERT INTO chatbot_contact_identities
+                (contact_id, chatbot_id, channel, external_id, verified, verified_at)
+         VALUES ($1, $2, $3, $4, true, $5)
+         ON CONFLICT (channel, external_id, chatbot_id) DO NOTHING`,
+        [base.id, scope.chatbotId, verified.channel, verified.externalId, now],
+      );
+      contact = await this.contactFor(
+        this.dataSource.manager,
+        scope,
+        verified.channel,
+        verified.externalId,
+      );
+      if (!contact) throw new Error('Verified identity was not stored');
+    }
+    await this.dataSource.query(
+      `UPDATE chatbot_contact_identities
+          SET verified = true, verified_at = $4, "updatedAt" = now()
+        WHERE channel = $1 AND external_id = $2 AND chatbot_id = $3`,
+      [verified.channel, verified.externalId, scope.chatbotId, now],
+    );
+    await this.dataSource.query(
+      `INSERT INTO chatbot_contact_identities
+              (contact_id, chatbot_id, channel, external_id, verified, verified_at)
+       VALUES ($1, $2, $3, $4, true, $5)
+       ON CONFLICT (channel, external_id, chatbot_id)
+       DO UPDATE SET contact_id = EXCLUDED.contact_id, verified = true,
+                     verified_at = EXCLUDED.verified_at, "updatedAt" = now()`,
+      [contact.id, scope.chatbotId, device.channel, device.externalId, now],
+    );
+    return contact;
+  }
+
+  /** The contact an identity belongs to, without creating one. */
+  contactByIdentity(
+    scope: ContactScope,
+    channel: ConversationChannel,
+    externalId: string,
+  ): Promise<ChatbotContact | null> {
+    return this.contactFor(this.dataSource.manager, scope, channel, externalId);
+  }
+
+  /** The newest value of one metadata key across a contact's threads on a channel. */
+  async latestMetadata(
+    contactId: string,
+    channel: ConversationChannel,
+    key: string,
+  ): Promise<unknown> {
+    const rows: { value: unknown }[] = await this.dataSource.query(
+      `SELECT metadata -> $3 AS value
+         FROM chatbot_conversations
+        WHERE contact_id = $1 AND channel = $2 AND metadata ? $3
+        ORDER BY last_message_at DESC
+        LIMIT 1`,
+      [contactId, channel, key],
+    );
+    return rows[0]?.value ?? null;
+  }
+
+  /** A contact's identity on one channel, such as the email a bot page visitor verified. */
+  async identityOf(
+    contactId: string,
+    channel: ConversationChannel,
+  ): Promise<ChatbotContactIdentity | null> {
+    return this.dataSource.manager.findOne(ChatbotContactIdentity, {
+      where: { contactId, channel },
+      order: { updatedAt: 'DESC' },
+    });
   }
 
   /**
@@ -307,6 +451,7 @@ export class ConversationService {
       { conversationId: In(conversationIds) },
       { text: placeholders.text, citations: null },
     );
+    await this.dropIntake(conversationIds);
     const contactIds = (
       await this.conversationRepository.find({
         where: { id: In(conversationIds) },
@@ -314,6 +459,36 @@ export class ConversationService {
       })
     ).map((row) => row.contactId);
     await this.eraseIdentities([...new Set(contactIds)], channel, placeholders);
+  }
+
+  /**
+   * Erase everything about one contact: the text of every thread, their pre-chat answers, their
+   * display name, and every identity on every channel. For channels this store owns (the bot page),
+   * where there is no `wa_contacts` row to erase from.
+   */
+  async eraseContact(
+    contactId: string,
+    placeholders: { text: string; erasedPrefix: string },
+  ): Promise<{ conversationIds: string[] }> {
+    const conversationIds = (
+      await this.conversationRepository.find({
+        where: { contactId },
+        select: ['id'],
+      })
+    ).map((row) => row.id);
+    if (conversationIds.length) {
+      await this.messageRepository.update(
+        { conversationId: In(conversationIds) },
+        { text: placeholders.text, citations: null, retrievalMeta: null },
+      );
+      await this.dropIntake(conversationIds);
+    }
+    await this.dataSource.query(
+      `UPDATE chatbot_contacts SET display_name = NULL, "updatedAt" = now() WHERE id = $1`,
+      [contactId],
+    );
+    await this.eraseIdentities([contactId], null, placeholders);
+    return { conversationIds };
   }
 
   /**
@@ -342,6 +517,14 @@ export class ConversationService {
       if (batch.length < BLANK_BATCH_SIZE) break;
     }
 
+    // Pre-chat answers are as personal as the messages: they go with the thread's last message.
+    await this.dataSource.query(
+      `UPDATE chatbot_conversations
+          SET metadata = metadata - 'intake', "updatedAt" = now()
+        WHERE last_message_at < $1 AND metadata ? 'intake'`,
+      [cutoff],
+    );
+
     const stale: { contact_id: string }[] = await this.dataSource.query(
       `SELECT c.contact_id
          FROM chatbot_conversations c
@@ -349,6 +532,13 @@ export class ConversationService {
        HAVING MAX(c.last_message_at) < $1`,
       [cutoff],
     );
+    if (stale.length) {
+      await this.dataSource.query(
+        `UPDATE chatbot_contacts SET display_name = NULL, "updatedAt" = now()
+          WHERE id = ANY($1::uuid[]) AND display_name IS NOT NULL`,
+        [stale.map((row) => row.contact_id)],
+      );
+    }
     const identities = await this.eraseIdentities(
       stale.map((row) => row.contact_id),
       null,
@@ -378,6 +568,15 @@ export class ConversationService {
   }
 
   // ──────────────────────────────────────────────────────────────── plumbing
+
+  private async dropIntake(conversationIds: string[]): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE chatbot_conversations
+          SET metadata = metadata - 'intake', "updatedAt" = now()
+        WHERE id = ANY($1::uuid[]) AND metadata ? 'intake'`,
+      [conversationIds],
+    );
+  }
 
   private async contactFor(
     manager: EntityManager,

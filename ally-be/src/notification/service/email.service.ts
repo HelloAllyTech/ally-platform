@@ -86,6 +86,46 @@ ${magicLink ? `Or click the link below to login instantly:\n${magicLink}\n` : ''
     });
   }
 
+  /**
+   * A bot page's one-time code (Agents v2, chunk 12b), in the page's name and colour. The visitor
+   * asked for it on the bot's own link, so the email speaks for that page, with "Powered by Ally".
+   * In development the code is echoed to Slack, as the sign-in code is, so it can be read locally.
+   */
+  async sendBotPageCode(params: {
+    to: string;
+    code: string;
+    pageTitle: string;
+    logoUrl?: string | null;
+    accentColour?: string;
+    minutes: number;
+  }): Promise<boolean> {
+    if (this.config.isDevelopment) {
+      this.eventEmitter.emit('exception', {
+        statusCode: 200,
+        timestamp: new Date().toISOString(),
+        path: '/api/v1/public/bots/otp',
+        message: `Bot page code for ${params.to} - ${params.code}`,
+        type: 'BOT PAGE OTP',
+        channel: 'C0AS8EM1SUT',
+      });
+    }
+    return this.sesService.sendEmail({
+      from: this.config.email.sourceEmail,
+      to: params.to,
+      subject: `Your code for ${params.pageTitle}`,
+      body: brandedOtpHtml({
+        brand: params.pageTitle,
+        logoUrl: params.logoUrl ?? undefined,
+        color: params.accentColour,
+        otp: params.code,
+        minutes: params.minutes,
+      }),
+      isHtml: true,
+      purpose: 'bot page code',
+      maskRecipientsInLog: true,
+    });
+  }
+
   async sendSummaryNotification(params: {
     to: string;
     chatId: number;

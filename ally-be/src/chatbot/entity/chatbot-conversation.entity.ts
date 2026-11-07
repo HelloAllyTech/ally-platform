@@ -38,7 +38,7 @@ export class ChatbotConversation extends BaseWithoutTenantEntity {
   @Column({ type: 'uuid', name: 'connector_id', nullable: true })
   connectorId?: string | null;
 
-  /** Always `open` for now: nothing closes a thread yet (see CHUNK-12-NOTES, open items). */
+  /** `closed` only when a bot page visitor starts a new chat (12b); WhatsApp threads stay open. */
   @Column({ type: 'varchar', length: 16, default: ConversationStatus.OPEN })
   status!: ConversationStatus;
 

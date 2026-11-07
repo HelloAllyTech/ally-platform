@@ -7,8 +7,9 @@ export enum ConversationChannel {
 }
 
 /**
- * A thread's state. Nothing closes a thread yet: the idle window is computed from
- * `last_message_at` when the next message arrives, as on WhatsApp today.
+ * A thread's state. The idle window is computed from `last_message_at` when the next message
+ * arrives, as on WhatsApp. The bot page's "New chat" closes a thread (chunk 12b); a closed thread is
+ * never reused.
  */
 export enum ConversationStatus {
   OPEN = 'open',
