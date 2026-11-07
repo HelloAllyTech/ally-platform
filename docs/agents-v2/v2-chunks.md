@@ -31,9 +31,11 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 | Manual test (Sunrise Mind demo bot) | ✅ done |
 | 3d Every bot on v2 while the platform switch is on | ✅ (see its notes) |
 | 3c Streaming and typing | ✅ merged (#232) |
-| **Slice 1 (website → shareable bot)** | ▶ in progress: 12 → 12b → 20a → 15a (see `SLICE-1.md`), all on one branch |
-| 12 Shared conversation store | ✅ built on the slice-1 branch (see its notes) |
-| 12b Bot page | ▶ in progress (see its notes) |
+| **Slice 1 (website → shareable bot)** | One branch, `feat/agents-v2-chunk-12-shared-store` (see `SLICE-1.md`) |
+| 12 Shared store and contact identity | ✅ built on the slice 1 branch |
+| 12b Bot page | ✅ built on the slice 1 branch (see its notes) |
+| 20a Agent-first onboarding | ▶ in progress: 20a-1 (start → publish), then 20a-2 (checkup, try it, change by chat) |
+| 15a Crisis classifier v2 | next in slice 1 |
 | **Quality: Q1 Checkups, Q2 Live scorecard** | Right after slice 1 |
 | 3b Tool gateway | After Q1–Q2 |
 | Everything else | Not started |
