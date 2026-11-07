@@ -75,6 +75,20 @@ export class Chatbot extends BaseWithoutTenantEntity {
   @Column({ type: 'timestamp', name: 'last_tested_at', nullable: true })
   lastTestedAt?: Date | null;
 
+  /**
+   * The safety pack it was built with (chunk 20a onboarding), or null. The engine adds the pack's
+   * rules to every run, and a settings change that weakens it is refused.
+   */
+  @Column({ name: 'safety_pack', type: 'varchar', length: 32, nullable: true })
+  safetyPack?: string | null;
+
+  @Column({ name: 'safety_pack_version', type: 'int', nullable: true })
+  safetyPackVersion?: number | null;
+
+  /** The owner's own rules, on top of the pack: lines the assistant must never cross. */
+  @Column({ type: 'jsonb', default: () => `'{"never":[]}'` })
+  rules!: { never: string[] };
+
   @Column({ type: 'timestamp', name: 'archived_at', nullable: true })
   archivedAt?: Date | null;
 }

@@ -68,10 +68,14 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
   > You work in healthcare, so I've turned on **Medical safety**. Your assistant won't diagnose, interpret results or advise on doses. It points urgent symptoms to emergency care and everything clinical to your team.
 - **Builder message, minors:**
   > Some of the people you help are under 18, so I've turned on **Care for young people**. Your assistant will speak to parents and guardians about personal details and keep its tone age-appropriate.
+- **Builder message, legal and financial:** *(added in 20a-1)*
+  > You give legal or financial advice, so I've turned on **Legal and financial care**. Your assistant will explain your services and process, but won't judge anyone's own case or tell them what to do with their money. It points those questions to your team.
 - **Builder message, standard:**
   > Your assistant will only state facts it can find in your information, and will say so plainly when it doesn't know.
 - **Safety card title:** {Pack name} is on
 - **Safety card body:** These rules are always on for {industry}. You can add your own, but these can't be turned off.
+- **Pack names** *(standard and legal added in 20a-1)*: Mental health safety · Medical safety (also for labs and pharmacies) · Care for young people · Legal and financial care · Facts only
+- **{industry} in the card body** *(added in 20a-1)*: mental health practices · healthcare providers · services for young people · legal and financial services · every assistant
 - **Link:** See what this covers
 - **Expanded list headings:** Always · Never · If someone may be at risk
 
@@ -218,3 +222,11 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 **Care for young people**
 - **Always:** Speaks to parents or guardians about personal details. Keeps an age-appropriate tone.
 - **Never:** Collects personal details from under-18s without a guardian.
+
+**Legal and financial care** *(added in 20a-1)*
+- **Always:** Explains your services, fees and process from your information. Points questions about someone's own case to your team.
+- **Never:** Judges anyone's own legal case or tells them what to do with their money.
+
+**Facts only** *(added in 20a-1)*
+- **Always:** States only facts it can find in your information. Says plainly when it doesn't know, and where to go instead.
+- **Never:** Invents prices, offers, availability or contact details.
