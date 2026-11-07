@@ -31,9 +31,11 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 | Manual test (Sunrise Mind demo bot) | ✅ done |
 | 3d Every bot on v2 while the platform switch is on | ✅ (see its notes) |
 | 3c Streaming and typing | ✅ merged (#232) |
-| **Slice 1 (website → shareable bot)** | ▶ in progress: 12 → 12b → 20a → 15a (see `SLICE-1.md`) |
-| 12 Shared conversation store | ✅ built on its branch (see its notes); review, PR and merge next |
-| 3b Tool gateway | First chunk after slice 1 |
+| **Slice 1 (website → shareable bot)** | ▶ in progress: 12 → 12b → 20a → 15a (see `SLICE-1.md`), all on one branch |
+| 12 Shared conversation store | ✅ built on the slice-1 branch (see its notes) |
+| 12b Bot page | ▶ in progress (see its notes) |
+| **Quality: Q1 Checkups, Q2 Live scorecard** | Right after slice 1 |
+| 3b Tool gateway | After Q1–Q2 |
 | Everything else | Not started |
 
 **Learned so far:**
@@ -52,6 +54,7 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 | B. Building blocks | 4, 5, 6, 7, 8, 9 | Pages, Collections, generated tools, People and relations, **Memory**, media in and voice |
 | C. Conversations | 10, 11, 12, 13 | Rich messages out, team inbox, shared store, website widget |
 | D. Trust, history and the owner | 14, 15, 16, 17 | Abilities and approvals, Never check, **history and "Why?"**, **owner on WhatsApp** |
+| Quality | Q1, Q2 | Checkups and the live scorecard |
 | E. Templates | 18, 19, 20 | Template format and install, builder and sharing, onboarding |
 | F. Ready for customers | 21 | Privacy, evals in CI, cost cap, Home, rollout |
 
@@ -67,6 +70,17 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 | 3r | ✅ **Review and refactor** of 1–3a | all three | Same behaviour, cleaner code |
 | 3c | **Streaming and typing:** live status and steps, checked reply text revealed progressively, a hard run timeout, a WhatsApp typing indicator | all three | Preview shows the agent working; crisis text never streams |
 | 3b | **Tool gateway:** internal routes with a per-run token, idempotency, `tool_runs`, a per-bot tool allow-list | ally-be, ally-ai | Every tool call is logged; a replay returns the stored result; a disallowed tool is refused |
+
+## Quality — Checkups and the live scorecard (right after slice 1)
+
+In the product these are called **Checkups** (the test questions a bot must pass) and the **Scorecard** (how it's doing with real people). Internally they reuse the eval machinery.
+
+| # | Chunk | Repos | What you can test at the end |
+|---|---|---|---|
+| Q1 | **Checkups.** Test questions per bot, each with what a good answer must do: *answer and cite* (optionally which document, and key facts that must appear), *decline politely*, *ask a clarifying question*, *hand over*, *crisis reply only*, and *must not say* (phrases or claims). **Generated automatically:** from the bot's documents and pages (like 20a's readiness check), from its safety pack (crisis and medical probes), and from real conversations (a declined or thumbs-down question becomes a suggested checkup). Owners **add, edit, delete, pause and group** them, and can promote any real conversation turn to a checkup in one click. **Runs:** on demand, automatically after any change to the bot (persona, documents, pages, settings), and nightly. Results per checkup: pass or fail, the reply, its sources, why it failed (automatic checks first, then an AI grader for meaning). History per run, with "this got worse after Tuesday's change" flags and a link to the change. Cost cap per bot per day | all three | Open a bot → Checkups: about 20 generated; add one by hand; edit what a good answer must include; change the persona and see the checkups re-run and flag a regression; a declined real question appears as a suggested checkup |
+| Q2 | **Live scorecard.** How the bot is doing with real people, updated as conversations happen (from the shared store, chunk 12): conversations and people today and this week; **answered with sources**, **declined** and **clarified** as shares; top unanswered topics; crisis replies; handovers (later); median response time; **thumbs up or down** on bot-page replies, with an optional comment; checkup pass rate over time; per channel (WhatsApp, bot page). Each number opens the conversations behind it. Alerts when the answered share or the checkup pass rate drops below a threshold the owner sets | all three | Chat on the bot page and watch today's numbers move within a minute; give a thumbs down and see it in the scorecard and as a suggested checkup; click "declined" and land on those conversations |
+
+Templates (chunk 18) ship with their checkups, and the evals in CI (chunk 21) run every template's checkups.
 
 ## Phase B — Building blocks
 
@@ -140,6 +154,7 @@ Without a scheduler, v2 bots never message people first. They answer, act, remem
 ## Order and timing
 
 - **Slice 1 first (about 2–3 weeks):** 3c merge → 12 → 12b → 20a → 15a. Result: website in, agent-built and tested bot, branded shareable link, safe for health use cases.
+- **Then quality:** Q1 Checkups → Q2 Live scorecard (about 1 week). Every owner can see and prove how well their bot works.
 - **Then in order:** 3b → 4 → 5 → 6 → 7 → 8. Pages, Collections, generated tools, People and Memory; booking and orders stop being "coming soon" after 6.
 - **Then in parallel where people allow:** 9 (media), 10–11 (messages, inbox), 14–15 (trust).
 - **Then:** 13 (now a small embed of the bot page), 16 → 17, then 18 → 19 → 20, then 21.

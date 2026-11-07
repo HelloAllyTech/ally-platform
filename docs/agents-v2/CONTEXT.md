@@ -79,6 +79,8 @@ What makes it different: **everything the agent knows, does and learns is visibl
 | Needs you | The owner's to-do list: approvals, handovers, failed sends, flow problems |
 | Sandbox number | An Ally-owned WhatsApp number; join codes let anyone try a draft bot |
 | Parity | v2 answers the way v1 does on the same questions before anything new is switched on |
+| Checkup | A test question a bot must pass, with what a good answer must do (cite, decline, clarify, crisis only, must not say). Generated from documents, safety packs and real conversations; owners can edit them. The product name for evals |
+| Scorecard | A bot's live performance with real people: answered with sources, declined, unanswered topics, thumbs up or down, response time, checkup pass rate |
 
 ## Always
 
