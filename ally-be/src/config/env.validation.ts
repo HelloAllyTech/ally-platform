@@ -121,6 +121,10 @@ export const validationSchema = Joi.object({
   TURNSTILE_SITE_KEY: Joi.string().optional().allow(''),
   TURNSTILE_SECRET_KEY: Joi.string().optional().allow(''),
   BOT_PAGE_VISITOR_SECRET: Joi.string().optional().allow(''),
+  // Agent-first onboarding (chunk 20a). Allow-list for the local fixture sites (ignored outside
+  // local and development), and the per-owner daily crawl cap.
+  BOT_DRAFT_CRAWL_ALLOW_HOSTS: Joi.string().optional().allow(''),
+  BOT_DRAFT_CRAWLS_PER_DAY: Joi.number().integer().min(1).optional(),
 
   SCENARIO_PATH_ITEM_MIN_DURATION_FOR_COMPLETION: Joi.string().optional(),
 

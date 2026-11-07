@@ -973,6 +973,10 @@ stores share a key rather than matching on content); `Conversation.chat_id` ↔ 
   visitor and per IP (`bp:rl:`); and each bot's daily message count and its once-a-day alert latch
   (`bp:cap:<bot>:<UTC day>`, `bp:cap-alert:`). Visitors themselves are signed cookies, not Redis
   rows.
+  Agent-first onboarding (chunk 20a, `src/bot-draft/`): a per-draft crawl lock (`bd:crawl:<draft>`),
+  each owner's daily crawl count (`bd:crawl-cap:<user>:<UTC day>`), and live canvas events on the
+  pub/sub channel `<prefix>:bd:events:<draft>`. The crawl's own progress is saved in
+  `bot_drafts.crawl`, not Redis, so a restart resumes it.
 - **AWS SQS** (`src/message-broker/`): async pipeline between `ally-be` and `ally-ai`.
   Notably carries transcription + summarization results
   (`QUEUE__TRANSCRIBE_AND_SUMMARIZE_RESULTS_BUCKET`).

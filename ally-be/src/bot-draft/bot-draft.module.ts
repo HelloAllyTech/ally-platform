@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { Chatbot } from '../chatbot/entity/chatbot.entity';
+import { ChatbotDocument } from '../chatbot/entity/chatbot-document.entity';
 import { ChatbotMember } from '../chatbot/entity/chatbot-member.entity';
+import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
+import { SiteCrawlService } from './crawl/site-crawl.service';
 import { BotDraftEntity } from './entity/bot-draft.entity';
 import { BotDraftEventsService } from './service/bot-draft-events.service';
 import { BotDraftService } from './service/bot-draft.service';
@@ -14,10 +17,16 @@ import { BotDraftService } from './service/bot-draft.service';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BotDraftEntity, Chatbot, ChatbotMember]),
+    TypeOrmModule.forFeature([
+      BotDraftEntity,
+      Chatbot,
+      ChatbotMember,
+      ChatbotDocument,
+    ]),
     ChatbotModule,
+    KnowledgeBaseModule,
   ],
-  providers: [BotDraftService, BotDraftEventsService],
-  exports: [BotDraftService],
+  providers: [BotDraftService, BotDraftEventsService, SiteCrawlService],
+  exports: [BotDraftService, SiteCrawlService],
 })
 export class BotDraftModule {}

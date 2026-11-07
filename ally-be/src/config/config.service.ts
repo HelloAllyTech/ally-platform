@@ -1060,6 +1060,29 @@ export class AppConfigService {
    * `BOT_PAGE_BASE_URL` once the page has its own domain. The public API answers browsers from
    * `origin` only. Turnstile runs on public pages only while its secret is set.
    */
+  /**
+   * Agent-first onboarding (chunk 20a). `crawlAllowHosts` lets the crawl read hosts that resolve to
+   * private addresses (the local fixture server) and is honoured in local and development only;
+   * production always gets an empty list.
+   */
+  get botDraft() {
+    const hosts = (
+      this.configService.get<string>('BOT_DRAFT_CRAWL_ALLOW_HOSTS', '') || ''
+    )
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean);
+    const devOrTest =
+      this.isLocal || this.isDevelopment || this.nodeEnv === 'test';
+    return {
+      crawlAllowHosts: devOrTest ? hosts : [],
+      crawlsPerDay:
+        Number(
+          this.configService.get<string>('BOT_DRAFT_CRAWLS_PER_DAY', '5'),
+        ) || 5,
+    };
+  }
+
   get botPage() {
     const baseUrl = (
       this.configService.get<string>('BOT_PAGE_BASE_URL') || this.adminBaseUrl

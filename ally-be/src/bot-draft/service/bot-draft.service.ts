@@ -481,6 +481,74 @@ export class BotDraftService {
     return this.save({ ...draft, transcript }, draft.version, []);
   }
 
+  /**
+   * Save the crawl's progress. A targeted update that doesn't bump the version: the crawl runs in
+   * the background while the owner may be editing, and its progress must never make their edit
+   * stale (or be lost to it).
+   */
+  async saveCrawl(
+    draftId: string,
+    crawl: BotDraftEntity['crawl'],
+  ): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE bot_drafts SET crawl = $2::jsonb, "updatedAt" = now() WHERE id = $1`,
+      [draftId, JSON.stringify(crawl)],
+    );
+  }
+
+  /** Record a document the crawl or an upload added (server-maintained; patches can't touch it). */
+  async addKnowledgeDocument(
+    draftId: string,
+    documentId: string,
+  ): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE bot_drafts
+          SET draft_config = jsonb_set(draft_config, '{knowledgeDocumentIds}',
+                COALESCE(draft_config->'knowledgeDocumentIds', '[]'::jsonb) || to_jsonb($2::text)),
+              "updatedAt" = now()
+        WHERE id = $1 AND NOT (COALESCE(draft_config->'knowledgeDocumentIds', '[]'::jsonb) ? $2)`,
+      [draftId, documentId],
+    );
+  }
+
+  /**
+   * Put the site's logo and colour on the draft's page branding, unless the owner already set them.
+   * Targeted, like `saveCrawl`, so it can't collide with an edit.
+   */
+  async applyBrand(
+    draftId: string,
+    brand: { logoUrl: string | null; accentColour: string | null },
+  ): Promise<void> {
+    const draft = await this.drafts.findOne({ where: { id: draftId } });
+    if (!draft) return;
+    const branding = { ...draft.draftConfig.branding };
+    if (brand.logoUrl && !branding.logoUrl) branding.logoUrl = brand.logoUrl;
+    if (brand.accentColour && branding.accentColour === DEFAULT_ACCENT_COLOUR) {
+      branding.accentColour = brand.accentColour;
+    }
+    await this.dataSource.query(
+      `UPDATE bot_drafts SET draft_config = jsonb_set(draft_config, '{branding}', $2::jsonb), "updatedAt" = now() WHERE id = $1`,
+      [draftId, JSON.stringify(branding)],
+    );
+  }
+
+  /** Drafts whose crawl was left running (an instance restarted mid-crawl), for the sweep. */
+  findStalledCrawls(olderThanSeconds: number): Promise<BotDraftEntity[]> {
+    return this.drafts
+      .createQueryBuilder('d')
+      .where(`d.status = :active`, { active: BotDraftStatus.ACTIVE })
+      .andWhere(`d.crawl->>'status' = 'running'`)
+      .andWhere(`d."updatedAt" < now() - (:seconds || ' seconds')::interval`, {
+        seconds: String(olderThanSeconds),
+      })
+      .take(20)
+      .getMany();
+  }
+
+  async findById(draftId: string): Promise<BotDraftEntity | null> {
+    return this.drafts.findOne({ where: { id: draftId } });
+  }
+
   /** Persist a draft that changed in ways other than a patch (crawl, answers, design). */
   update(
     draft: BotDraftEntity,

@@ -1,8 +1,8 @@
 import { createHash } from 'crypto';
-import { lookup as dnsLookup } from 'dns';
-import { BlockList, isIP } from 'net';
+import { isIP } from 'net';
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosResponseHeaders, RawAxiosResponseHeaders } from 'axios';
+import { guardedLookup, isBlockedAddress } from 'src/common/net/guarded-fetch';
 import { LoggerService } from 'src/logger/logger.service';
 import { RedisService } from 'src/redis/service/redis.service';
 import { ArticleContent, TrackItemType } from '../type/track.type';
@@ -13,64 +13,8 @@ const PROBE_MAX_REDIRECTS = 5;
 const CACHE_TTL_SECONDS = 6 * 60 * 60;
 const CACHE_KEY_PREFIX = 'track:resource-embed:v1';
 
-/**
- * Loopback, private, link-local (cloud metadata), CGNAT and unspecified
- * ranges. The probe fetches trainer-supplied URLs from inside our network,
- * so without this a resource pointed at an internal address would turn the
- * endpoint into a (blind) internal port scanner.
- */
-const BLOCKED_ADDRESSES = new BlockList();
-[
-  ['0.0.0.0', 8],
-  ['10.0.0.0', 8],
-  ['100.64.0.0', 10],
-  ['127.0.0.0', 8],
-  ['169.254.0.0', 16],
-  ['172.16.0.0', 12],
-  ['192.168.0.0', 16],
-].forEach(([net, prefix]) =>
-  BLOCKED_ADDRESSES.addSubnet(net as string, prefix as number, 'ipv4'),
-);
-BLOCKED_ADDRESSES.addAddress('::', 'ipv6');
-BLOCKED_ADDRESSES.addAddress('::1', 'ipv6');
-BLOCKED_ADDRESSES.addSubnet('fc00::', 7, 'ipv6');
-BLOCKED_ADDRESSES.addSubnet('fe80::', 10, 'ipv6');
-
-export function isBlockedAddress(address: string): boolean {
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
-  if (mapped) return BLOCKED_ADDRESSES.check(mapped[1], 'ipv4');
-  const family = isIP(address);
-  if (family === 4) return BLOCKED_ADDRESSES.check(address, 'ipv4');
-  if (family === 6) return BLOCKED_ADDRESSES.check(address, 'ipv6');
-  return true;
-}
-
-/**
- * Resolves through the system resolver but refuses any blocked address. Used
- * as the request's own `lookup`, so the address checked is the address
- * connected to — no gap for a DNS answer to change in between.
- */
-function guardedLookup(
-  hostname: string,
-  options: object,
-  callback: (
-    err: NodeJS.ErrnoException | null,
-    address: string,
-    family: number,
-  ) => void,
-) {
-  dnsLookup(hostname, { ...options, all: false }, (err, address, family) => {
-    if (err) return callback(err, '', 0);
-    if (isBlockedAddress(address)) {
-      return callback(
-        new Error(`Refusing to probe internal address for ${hostname}`),
-        '',
-        0,
-      );
-    }
-    callback(null, address, family);
-  });
-}
+// The address guard lives in common/net (shared with the onboarding crawl, chunk 20a).
+export { isBlockedAddress };
 
 type Headers = RawAxiosResponseHeaders | AxiosResponseHeaders;
 
