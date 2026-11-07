@@ -30,8 +30,9 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 | 3r Review and refactor | ✅ merged |
 | Manual test (Sunrise Mind demo bot) | ✅ done |
 | 3d Every bot on v2 while the platform switch is on | ✅ (see its notes) |
-| 3c Streaming and typing | ✅ built on its branch; review, PR and merge next |
-| **Slice 1 (website → shareable bot)** | ▶ next: 12 → 12b → 20a → 15a (see `SLICE-1.md`) |
+| 3c Streaming and typing | ✅ merged (#232) |
+| **Slice 1 (website → shareable bot)** | ▶ in progress: 12 → 12b → 20a → 15a (see `SLICE-1.md`) |
+| 12 Shared conversation store | ✅ built on its branch (see its notes); review, PR and merge next |
 | 3b Tool gateway | First chunk after slice 1 |
 | Everything else | Not started |
 
