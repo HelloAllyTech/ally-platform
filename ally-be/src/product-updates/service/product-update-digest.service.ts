@@ -303,8 +303,8 @@ ${footer}
    * which reads the same service.
    *
    * Voters lead, highest first, as recognition (Stacks: *Social Presence and
-   * Recognition in Crowdsourced Work*). Admins who have not voted are left off,
-   * so nobody is ranked at the bottom of a table.
+   * Recognition in Crowdsourced Work*). Admins who have not voted are listed
+   * after, to encourage participation.
    *
    * First section of the email, but a rider on one that is going out anyway: it never makes a digest send
    * on its own, and a failure here drops the section rather than the email.
@@ -323,6 +323,10 @@ ${footer}
           (a, b) =>
             b.votes - a.votes || name(a.userId).localeCompare(name(b.userId)),
         );
+      const notYet = month.users
+        .filter((u) => u.votes === 0)
+        .map((u) => name(u.userId))
+        .sort((a, b) => a.localeCompare(b));
 
       const monthName = dayjs(now).tz(BUSINESS_TIMEZONE).format('MMMM');
       const th = (label: string, align: 'left' | 'right') =>
@@ -341,9 +345,13 @@ ${footer}
       const table = rows
         ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}"><tr>${th('Name', 'left')}${th('Votes cast', 'right')}${th('Voters voted others share', 'right')}</tr>${rows}</table>`
         : `<p style="margin:0;color:${MUTED}">No votes cast yet this month.</p>`;
+      const notYetHtml =
+        notYet.length > 0
+          ? `<p style="margin:12px 0 0;font-size:14px;color:${MUTED}">Not yet voted: ${escapeHtml(notYet.join(', '))}</p>`
+          : '';
 
       return `${heading(`Roadmap votes in ${monthName} so far:`)}
-${table}`;
+${table}${notYetHtml}`;
     } catch (error) {
       this.logger.error(
         `[PRODUCT-UPDATES] Roadmap votes section skipped: ${
