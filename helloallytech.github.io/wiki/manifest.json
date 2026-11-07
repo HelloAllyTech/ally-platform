@@ -342,25 +342,6 @@
       "skip_reason": ""
     },
     {
-      "path": "platform/storage-archive 2.md",
-      "title": "Storage Archive — Moving Aged S3 Objects to a Hetzner Storage Box",
-      "summary": "The plan and recorded decisions for cutting the AWS storage bill — a weekly job in the ally-archiver app copies every private S3 object older than 30 days to a VPN-only Hetzner Storage Box, verifies it, then deletes it from S3.",
-      "tags": [
-        "platform",
-        "storage",
-        "s3",
-        "hetzner",
-        "archive",
-        "cost",
-        "infra",
-        "decision"
-      ],
-      "last_reconciled": "2026-10-28",
-      "words": 1012,
-      "url": "https://tech.helloally.ai/#/wiki/platform/storage-archive 2.md",
-      "skip_reason": ""
-    },
-    {
       "path": "platform/storage-archive.md",
       "title": "Storage Archive — Moving Aged S3 Objects to a Hetzner Storage Box",
       "summary": "The plan and recorded decisions for cutting the AWS storage bill — a weekly job in the ally-archiver app copies every private S3 object older than 30 days to a VPN-only Hetzner Storage Box, verifies it, then deletes it from S3.",
@@ -565,25 +546,6 @@
       "last_reconciled": "2026-09-03",
       "words": 3916,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
-      "skip_reason": ""
-    },
-    {
-      "path": "repos/ally-archiver 2.md",
-      "title": "ally-archiver — S3 to Storage Box Archiver",
-      "summary": "A small Go + htmx internal app that weekly copies private S3 objects older than 30 days to a Hetzner Storage Box, verifies them by SHA-256, deletes them from S3 one run later, and restores on demand.",
-      "tags": [
-        "repo",
-        "ally-archiver",
-        "go",
-        "htmx",
-        "storage",
-        "s3",
-        "hetzner",
-        "ops"
-      ],
-      "last_reconciled": "2026-10-28",
-      "words": 472,
-      "url": "https://tech.helloally.ai/#/wiki/repos/ally-archiver 2.md",
       "skip_reason": ""
     },
     {
