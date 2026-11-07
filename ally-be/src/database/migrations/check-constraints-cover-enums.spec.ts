@@ -14,6 +14,11 @@ import {
   ConversationStatus,
 } from '../../chatbot/enum/conversation.enum';
 import {
+  BotPageAccess,
+  BotPageAccessKind,
+  BotPageStatus,
+} from '../../chatbot/enum/bot-page.enum';
+import {
   BuilderEventType,
   BuilderExemplarOutcome,
   BuilderLessonCategory,
@@ -404,6 +409,10 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_chatbot_conversations_status', Object.values(ConversationStatus)],
     ['CHK_chatbot_messages_channel', Object.values(ConversationChannel)],
     ['CHK_chatbot_messages_role', Object.values(ConversationMessageRole)],
+    // The bot page (Agents v2, chunk 12b).
+    ['CHK_chatbot_pages_status', Object.values(BotPageStatus)],
+    ['CHK_chatbot_pages_access', Object.values(BotPageAccess)],
+    ['CHK_chatbot_page_access_kind', Object.values(BotPageAccessKind)],
   ])('%s accepts every enum value', (constraint, values) => {
     const allowed = allowedValues(constraint as string);
     const missing = (values as string[]).filter((v) => !allowed.includes(v));

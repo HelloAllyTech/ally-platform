@@ -22,6 +22,7 @@ import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decor
 import { CallerScopedRoute } from '../../auth/decorators/caller-scoped-route.decorator';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
+import { changesPlatformAdminOnlySetting } from '../../chatbot/service/chatbot-settings.service';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import {
@@ -250,10 +251,17 @@ export class WhatsAppAdminController {
       'Merged over what is stored, so a partial save cannot blank a field. Retrieval thresholds ' +
       'take effect on the next message — no deploy.',
   })
-  updateSettings(@Body() dto: UpdateWaSettingsDto) {
-    return this.adminService.updateSettings(
-      dto as unknown as Record<string, unknown>,
-    );
+  async updateSettings(@Body() dto: UpdateWaSettingsDto) {
+    const patch = dto as unknown as Record<string, unknown>;
+    if (
+      changesPlatformAdminOnlySetting(
+        await this.adminService.getSettings(),
+        patch,
+      )
+    ) {
+      await this.access.assertPlatformAdmin();
+    }
+    return this.adminService.updateSettings(patch);
   }
 
   @Get('settings/provider-health')

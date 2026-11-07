@@ -141,6 +141,22 @@ export interface WhatsAppBotSettings {
    * never reads a store nobody is writing to. Platform-wide only.
    */
   readHistoryFrom: HistorySource;
+
+  /**
+   * Agents v2, chunk 12b: whether a bot page may be opened by anyone with its link. Off, pages can
+   * be organisation-only or invite-only, and a page already set to public stops answering. It stays
+   * off until the crisis classifier is reviewed end to end (chunk 15a, gate G1b). Platform-wide
+   * only, and only a platform admin can change it.
+   */
+  botPagePublicAllowed: boolean;
+
+  /**
+   * Where the dashboard's Conversations, Unanswered and bot stats read from: `wa` (`wa_*`, as
+   * always) or `shared` (`chatbot_*`, every channel, with the bot page's chats). `shared` takes
+   * effect only while `sharedStoreWrites` is on, so the dashboard never reads a store nobody is
+   * writing to. Platform-wide only, and only a platform admin can change it.
+   */
+  dashboardReadsFrom: HistorySource;
 }
 
 /** Which store WhatsApp reads a thread's history from. */
@@ -200,4 +216,6 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
   agentRuntimeAllowed: false,
   sharedStoreWrites: false,
   readHistoryFrom: 'wa',
+  botPagePublicAllowed: false,
+  dashboardReadsFrom: 'wa',
 };

@@ -58,6 +58,7 @@ import { ScenarioCoverImageLibraryModule } from './scenario-cover-image-library/
 import { ComfortAudioModule } from './comfort-audio/comfort-audio.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
+import { BotPageModule } from './chatbot/bot-page/bot-page.module';
 import { ScenarioReportModule } from './scenario-report/scenario-report.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { AppVersionModule } from './app-version/app-version.module';
@@ -145,6 +146,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     ComfortAudioModule,
     KnowledgeBaseModule,
     WhatsAppModule,
+    BotPageModule,
     ScenarioReportModule,
     SchedulerModule,
     AppVersionModule,

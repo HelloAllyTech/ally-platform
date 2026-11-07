@@ -1055,6 +1055,40 @@ export class AppConfigService {
   }
 
   /**
+   * The bot page (Agents v2, chunk 12b). Its link is `<baseUrl>/b/<slug>`. The page is a second
+   * entry of the admin dashboard, so the base URL defaults to `ADMIN_APP_BASE_URL`; set
+   * `BOT_PAGE_BASE_URL` once the page has its own domain. The public API answers browsers from
+   * `origin` only. Turnstile runs on public pages only while its secret is set.
+   */
+  get botPage() {
+    const baseUrl = (
+      this.configService.get<string>('BOT_PAGE_BASE_URL') || this.adminBaseUrl
+    ).replace(/\/+$/, '');
+    let origin = baseUrl;
+    try {
+      origin = new URL(baseUrl).origin;
+    } catch {
+      // Joi checked it is a URI; keep the raw value if URL still disagrees.
+    }
+    return {
+      baseUrl,
+      origin,
+      turnstileSiteKey: this.configService.get<string>(
+        'TURNSTILE_SITE_KEY',
+        '',
+      ),
+      turnstileSecretKey: this.configService.get<string>(
+        'TURNSTILE_SECRET_KEY',
+        '',
+      ),
+      visitorSecret: this.configService.get<string>(
+        'BOT_PAGE_VISITOR_SECRET',
+        '',
+      ),
+    };
+  }
+
+  /**
    * Stacks — the team's curated product-guidance library, reached over HTTP
    * (ally-be is not an MCP client). Optional: unset simply means the
    * interview runs without product guidance.

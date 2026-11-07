@@ -119,6 +119,8 @@ export class ChatbotSettingsService {
       // The shared store's switches are platform-wide for the same reason.
       sharedStoreWrites: global.sharedStoreWrites,
       readHistoryFrom: global.readHistoryFrom,
+      botPagePublicAllowed: global.botPagePublicAllowed,
+      dashboardReadsFrom: global.dashboardReadsFrom,
       rateLimit: {
         perMinute: tighter(global.rateLimit.perMinute, rateLimit?.perMinute),
         perHour: tighter(global.rateLimit.perHour, rateLimit?.perHour),
@@ -208,6 +210,25 @@ export function changesAdminOnlySetting(
   next: ChatbotSettingsOverride | null | undefined,
 ): boolean {
   return (stored?.showTyping ?? null) !== (next?.showTyping ?? null);
+}
+
+/**
+ * The platform settings only a platform admin may change (chunk 12b): opening bot pages to anyone,
+ * and moving the dashboard onto the shared store. `PUT /v1/whatsapp/settings` is otherwise open to
+ * anyone with the WhatsApp bot edit permission. A key left out, or sent unchanged, is not a change.
+ */
+export const PLATFORM_ADMIN_ONLY_SETTINGS = [
+  'botPagePublicAllowed',
+  'dashboardReadsFrom',
+] as const;
+
+export function changesPlatformAdminOnlySetting(
+  stored: WhatsAppBotSettings,
+  patch: Partial<Record<string, unknown>>,
+): boolean {
+  return PLATFORM_ADMIN_ONLY_SETTINGS.some(
+    (key) => patch[key] !== undefined && patch[key] !== stored[key],
+  );
 }
 
 /** Drop empty strings and unset values, so "cleared in the form" means "follow the default". */

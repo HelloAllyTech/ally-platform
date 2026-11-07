@@ -295,6 +295,23 @@ export class UpdateWaSettingsDto {
   @IsOptional()
   @IsIn(['wa', 'shared'])
   readHistoryFrom?: HistorySource;
+
+  @ApiPropertyOptional({
+    description:
+      'Let bot pages be opened by anyone with the link (chunk 12b). Platform admins only; off until chunk 15a.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  botPagePublicAllowed?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['wa', 'shared'],
+    description:
+      'Where the dashboard reads conversations from. `shared` needs sharedStoreWrites on. Platform admins only.',
+  })
+  @IsOptional()
+  @IsIn(['wa', 'shared'])
+  dashboardReadsFrom?: HistorySource;
 }
 
 export class PreviewAskDto {
