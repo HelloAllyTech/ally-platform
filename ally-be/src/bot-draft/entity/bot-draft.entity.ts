@@ -39,7 +39,13 @@ export class BotDraftEntity extends BaseWithoutTenantEntity {
   step!: BotDraftStep;
 
   @Column({ type: 'jsonb', default: () => "'{}'" })
-  source!: { website?: string; uploads?: string[]; description?: string };
+  source!: {
+    website?: string;
+    uploads?: string[];
+    description?: string;
+    /** The "Owner notes" document publish wrote, so publishing again updates it. */
+    ownerNotesDocumentId?: string | null;
+  };
 
   @Column({
     type: 'jsonb',

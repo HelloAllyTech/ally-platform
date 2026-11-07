@@ -36,6 +36,15 @@ class PersonaSelector(BaseModel):
         ),
     )
     tone: Optional[str] = Field(None, max_length=120)
+    safety_rules: Optional[str] = Field(
+        None,
+        max_length=3000,
+        description=(
+            "The bot's safety pack and its owner's own Never rules (chunk 20a), "
+            "rendered as a fixed block after the instructions, so editing the "
+            "instructions can't remove them."
+        ),
+    )
 
 
 class KnowledgeAnswerRequest(BaseModel):

@@ -69,6 +69,9 @@ export const ENDPOINTS = {
   AGENT_RUN: 'api/v1/agent/run',
   /** The same run as Server-Sent Events (Preview): status and steps live, then `final`. */
   AGENT_RUN_STREAM: 'api/v1/agent/run/stream',
+  /** Onboarding builder (chunk 20a). 404 while ally-ai's BUILDER__ENABLED is off. */
+  BUILDER_STEP_STREAM: 'api/v1/builder/step/stream',
+  BUILDER_EXTRACT: 'api/v1/builder/extract',
 
   // ── Text helpline copilot (docs/text-helpline.md §9.1) ────────────────────
   // Both always answer 200 and report `failed` rather than erroring, so a caller

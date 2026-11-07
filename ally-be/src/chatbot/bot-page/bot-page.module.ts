@@ -50,7 +50,8 @@ import { TurnstileService } from './turnstile.service';
     TurnstileService,
     BotPagePublicService,
   ],
-  exports: [BotPageService],
+  // The access service too: onboarding's publish (chunk 20a) writes the page's list through it.
+  exports: [BotPageService, BotPageAccessService],
 })
 export class BotPageModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

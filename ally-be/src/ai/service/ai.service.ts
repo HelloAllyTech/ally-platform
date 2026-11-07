@@ -25,7 +25,17 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
 import { ENDPOINTS } from '../constants/endpoints.constants';
-import { KNOWLEDGE_ANSWER_LIMITS } from '../constants/knowledge-answer.constants';
+import type {
+  BuilderExtractRequest,
+  BuilderExtractResponse,
+  BuilderStepRequest,
+  BuilderStepResponse,
+  BuilderStreamEvent,
+} from '../dto/builder.dto';
+import {
+  BUILDER_LIMITS,
+  KNOWLEDGE_ANSWER_LIMITS,
+} from '../constants/knowledge-answer.constants';
 import { SseParser } from '../util/sse-parser';
 import {
   HelplineRiskRequest,
@@ -744,9 +754,63 @@ export class AiService {
     onEvent: (event: AgentStreamEvent) => void,
     signal?: AbortSignal,
   ): Promise<AgentRunResponse> {
-    const deadline = AbortSignal.timeout(KNOWLEDGE_ANSWER_LIMITS.streamMs);
+    return this.streamSse<AgentRunResponse, AgentStreamEvent>(
+      ENDPOINTS.AGENT_RUN_STREAM,
+      request,
+      { deadlineMs: KNOWLEDGE_ANSWER_LIMITS.streamMs, what: 'agent run' },
+      onEvent,
+      signal,
+    );
+  }
+
+  /**
+   * One onboarding builder step (chunk 20a), streamed: `status` and `token` events, then the
+   * proposal. ally-ai caps a step at 45s (`BUILDER__STEP_TIMEOUT_SECONDS`), so its own
+   * `error: timeout` arrives before this deadline does.
+   */
+  async runBuilderStepStreaming(
+    request: BuilderStepRequest,
+    onEvent: (event: BuilderStreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<BuilderStepResponse> {
+    return this.streamSse<BuilderStepResponse, BuilderStreamEvent>(
+      ENDPOINTS.BUILDER_STEP_STREAM,
+      request,
+      { deadlineMs: BUILDER_LIMITS.stepMs, what: 'builder step' },
+      onEvent,
+      signal,
+    );
+  }
+
+  /**
+   * Facts for "What we learned" from a batch of crawled pages. redactBody=true: the payload is
+   * a business's site text, which can carry staff names, phones and emails.
+   */
+  async extractOnboardingFacts(
+    request: BuilderExtractRequest,
+  ): Promise<BuilderExtractResponse> {
+    return this.makeRequest<BuilderExtractResponse, BuilderExtractRequest>(
+      ENDPOINTS.BUILDER_EXTRACT,
+      request,
+      true,
+      'post',
+      undefined,
+      false,
+      BUILDER_LIMITS.extractMs,
+      true,
+    );
+  }
+
+  /** An ally-ai SSE endpoint: live events to `onEvent`, resolving with `final`. */
+  private async streamSse<R, E>(
+    endpoint: string,
+    request: unknown,
+    { deadlineMs, what }: { deadlineMs: number; what: string },
+    onEvent: (event: E) => void,
+    signal?: AbortSignal,
+  ): Promise<R> {
+    const deadline = AbortSignal.timeout(deadlineMs);
     const startedAt = Date.now();
-    const endpoint = ENDPOINTS.AGENT_RUN_STREAM;
     try {
       const response = await axios({
         method: 'post',
@@ -768,27 +832,27 @@ export class AiService {
             this.logger.info(
               `AI stream DONE | endpoint=${endpoint} | elapsedMs=${Date.now() - startedAt}`,
             );
-            return data as AgentRunResponse;
+            return data as R;
           }
           if (message.event === 'error') {
             const code = String(data?.code ?? 'internal');
             throw code === 'timeout'
               ? new AiUpstreamError(
-                  'The agent run timed out',
+                  `The ${what} timed out`,
                   ErrorCode.AI_SERVICE_TIMEOUT,
                   504,
                 )
               : new AiUpstreamError(
-                  `The agent run failed (${code})`,
+                  `The ${what} failed (${code})`,
                   ErrorCode.AI_SERVICE_UNAVAILABLE,
                   502,
                 );
           }
-          onEvent({ event: message.event, data } as AgentStreamEvent);
+          onEvent({ event: message.event, data } as E);
         }
       }
       throw new AiUpstreamError(
-        'The agent stream ended without a final event',
+        `The ${what.split(' ')[0]} stream ended without a final event`,
         ErrorCode.AI_SERVICE_UNAVAILABLE,
         502,
       );
@@ -796,7 +860,7 @@ export class AiService {
       const failure =
         deadline.aborted && !(error instanceof AiUpstreamError)
           ? new AiUpstreamError(
-              'The agent stream timed out',
+              `The ${what.split(' ')[0]} stream timed out`,
               ErrorCode.AI_SERVICE_TIMEOUT,
             )
           : classifyAiFailure(error);

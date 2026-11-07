@@ -29,6 +29,7 @@ function harness() {
       return builder;
     },
     where: () => builder,
+    setParameter: () => builder,
     execute: async () => ({ affected: stale ? 0 : 1 }),
   };
   const events = { publish: jest.fn() };

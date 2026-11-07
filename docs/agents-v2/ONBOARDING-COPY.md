@@ -48,6 +48,8 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
   - Found {n} questions people often ask
   - Found your address and contact details
   - Found your logo and brand colour
+- **Builder message after a description instead of a website:** *(added in 20a-1)*
+  > Here's what I took from your description. Take a quick look: if anything's wrong, tell me or edit it directly.
 - **Builder message when done:**
   > I've read {n} pages. Here's what I learned, and each detail links to the page it came from. Take a quick look: if anything's wrong, tell me or edit it directly.
 

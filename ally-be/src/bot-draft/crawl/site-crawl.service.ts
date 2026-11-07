@@ -51,8 +51,16 @@ export const CRAWL_LIMITS = {
 };
 
 /** Hands each batch of pages to the builder to learn from (BotDraftLearningService). */
+/** A page read, with its text for fact extraction. The text is never saved with the crawl. */
+export type LearnablePage = CrawlPage & { text: string };
+
 export interface CrawlLearner {
-  learnFrom(draftId: string, pages: CrawlPage[]): Promise<void>;
+  learnFrom(draftId: string, pages: LearnablePage[]): Promise<void>;
+  /** The crawl ended (read, partly read or failed): the builder says so in the chat. */
+  crawlFinished?(
+    draftId: string,
+    outcome: { read: number; domain?: string; problem?: CrawlProblem },
+  ): Promise<void>;
 }
 export const CRAWL_LEARNER = 'BOT_DRAFT_CRAWL_LEARNER';
 
@@ -200,7 +208,7 @@ export class SiteCrawlService implements OnModuleInit {
       }
     }
 
-    let pending: CrawlPage[] = [];
+    let pending: LearnablePage[] = [];
     const learning: Promise<void>[] = [];
     const flushLearning = () => {
       if (!pending.length || !this.learner) return;
@@ -257,9 +265,10 @@ export class SiteCrawlService implements OnModuleInit {
         .finally(() => {
           reading -= 1;
         });
-      crawl.pages.push(page);
-      if (page.status === 'read') {
-        pending.push(page);
+      const { text, ...stored } = page as CrawlPage & { text?: string };
+      crawl.pages.push(stored);
+      if (stored.status === 'read') {
+        pending.push({ ...stored, text: text ?? '' });
         await this.events.publish(draft.id, {
           type: 'page',
           n: readCount(),
@@ -408,8 +417,9 @@ export class SiteCrawlService implements OnModuleInit {
       status: 'read',
       documentId: document.id,
       headings: parsed.headings.slice(0, 20),
-      snippet: parsed.text.slice(0, 2400),
-    };
+      snippet: parsed.text.slice(0, 600),
+      text: parsed.text.slice(0, 12_000),
+    } as CrawlPage;
   }
 
   private async robots(
@@ -531,6 +541,14 @@ export class SiteCrawlService implements OnModuleInit {
       status,
       problem: problem ?? null,
     });
+    await this.moveOn(draftId, { read, domain: crawl.domain, problem });
+  }
+
+  /** Leave "reading" for "what we learned", and let the builder say how it went. */
+  private async moveOn(
+    draftId: string,
+    outcome: { read: number; domain?: string; problem?: CrawlProblem },
+  ): Promise<void> {
     const draft = await this.drafts.findById(draftId);
     if (draft && draft.step === BotDraftStep.READING) {
       await this.drafts.setStep(
@@ -539,6 +557,13 @@ export class SiteCrawlService implements OnModuleInit {
         BotDraftActor.SYSTEM,
       );
     }
+    await this.learner
+      ?.crawlFinished?.(draftId, outcome)
+      .catch((error) =>
+        this.logger.warn(
+          `Could not post the crawl's outcome for draft ${draftId}: ${error instanceof Error ? error.message : 'unknown'}`,
+        ),
+      );
   }
 
   private async fail(
@@ -566,6 +591,7 @@ export class SiteCrawlService implements OnModuleInit {
       status: 'failed',
       problem,
     });
+    await this.moveOn(draft.id, { read: 0, domain: crawl.domain, problem });
     return crawl;
   }
 }

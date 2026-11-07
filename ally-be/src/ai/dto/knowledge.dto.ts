@@ -234,6 +234,8 @@ export interface KnowledgePersonaRequest {
   display_name?: string;
   system_prompt?: string;
   tone?: string;
+  /** The safety pack's rules block (chunk 20a); ally-ai renders it after the instructions. */
+  safety_rules?: string;
 }
 
 export interface KnowledgeCitation {

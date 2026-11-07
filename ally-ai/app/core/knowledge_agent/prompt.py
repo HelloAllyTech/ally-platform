@@ -132,7 +132,8 @@ def format_persona(persona: Optional[Dict[str, Any]]) -> str:
     instructions = (persona.get("system_prompt") or "").strip()[
         :MAX_PERSONA_PROMPT_CHARS
     ]
-    if not (name or tone or instructions):
+    rules = (persona.get("safety_rules") or "").strip()
+    if not (name or tone or instructions or rules):
         return ""
 
     lines = ["# Who you are"]
@@ -150,6 +151,10 @@ def format_persona(persona: Optional[Dict[str, Any]]) -> str:
         # The admin's text cannot close the fence early.
         lines.append(instructions.replace(_FENCE, "''"))
         lines.append(_FENCE)
+    if rules:
+        # Built by ally-be from the bot's safety pack, never from an editor's text; it
+        # comes after the instructions so nothing in them can talk it away.
+        lines.append(rules)
     return "\n".join(lines) + "\n\n"
 
 

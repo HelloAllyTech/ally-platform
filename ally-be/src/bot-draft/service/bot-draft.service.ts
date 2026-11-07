@@ -511,25 +511,60 @@ export class BotDraftService {
     );
   }
 
+  /** Put a library document on the draft's chatbot (`chatbot_documents`), once. */
+  async attachDocument(
+    draft: Pick<BotDraftEntity, 'chatbotId' | 'ownerUserId'>,
+    documentId: string,
+  ): Promise<void> {
+    if (!draft.chatbotId) return;
+    await this.dataSource.query(
+      `INSERT INTO chatbot_documents (chatbot_id, document_id, created_by)
+       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [draft.chatbotId, documentId, draft.ownerUserId],
+    );
+  }
+
   /**
    * Put the site's logo and colour on the draft's page branding, unless the owner already set them.
-   * Targeted, like `saveCrawl`, so it can't collide with an edit.
+   * A versioned write (it touches what the owner can edit), retried on a stale version.
    */
   async applyBrand(
     draftId: string,
     brand: { logoUrl: string | null; accentColour: string | null },
   ): Promise<void> {
-    const draft = await this.drafts.findOne({ where: { id: draftId } });
-    if (!draft) return;
-    const branding = { ...draft.draftConfig.branding };
-    if (brand.logoUrl && !branding.logoUrl) branding.logoUrl = brand.logoUrl;
-    if (brand.accentColour && branding.accentColour === DEFAULT_ACCENT_COLOUR) {
-      branding.accentColour = brand.accentColour;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const draft = await this.drafts.findOne({ where: { id: draftId } });
+      if (!draft) return;
+      const branding = { ...draft.draftConfig.branding };
+      if (brand.logoUrl && !branding.logoUrl) branding.logoUrl = brand.logoUrl;
+      if (
+        brand.accentColour &&
+        branding.accentColour === DEFAULT_ACCENT_COLOUR
+      ) {
+        branding.accentColour = brand.accentColour;
+      }
+      if (
+        branding.logoUrl === draft.draftConfig.branding.logoUrl &&
+        branding.accentColour === draft.draftConfig.branding.accentColour
+      ) {
+        return;
+      }
+      try {
+        const saved = await this.save(
+          { ...draft, draftConfig: { ...draft.draftConfig, branding } },
+          draft.version,
+          [],
+        );
+        await this.events.publish(draftId, {
+          type: 'draft',
+          draft: saved.draftConfig,
+          version: saved.version,
+        });
+        return;
+      } catch (error) {
+        if (!(error instanceof ConflictException)) throw error;
+      }
     }
-    await this.dataSource.query(
-      `UPDATE bot_drafts SET draft_config = jsonb_set(draft_config, '{branding}', $2::jsonb), "updatedAt" = now() WHERE id = $1`,
-      [draftId, JSON.stringify(branding)],
-    );
   }
 
   /** Drafts whose crawl was left running (an instance restarted mid-crawl), for the sweep. */
@@ -547,6 +582,11 @@ export class BotDraftService {
 
   async findById(draftId: string): Promise<BotDraftEntity | null> {
     return this.drafts.findOne({ where: { id: draftId } });
+  }
+
+  /** The draft that built a chatbot, if one did. */
+  findByChatbot(chatbotId: string): Promise<BotDraftEntity | null> {
+    return this.drafts.findOne({ where: { chatbotId } });
   }
 
   /** Persist a draft that changed in ways other than a patch (crawl, answers, design). */
@@ -580,20 +620,29 @@ export class BotDraftService {
         status: next.status,
         step: next.step,
         source: next.source,
-        crawl: next.crawl,
+        // Never `crawl`: only the crawl writes it (`saveCrawl`), so a draft read before the
+        // crawl's latest page can't roll its progress back.
         learned: next.learned,
         industry: next.industry ?? null,
         safetyPack: next.safetyPack ?? null,
         safetyPackVersion: next.safetyPackVersion ?? null,
         answers: next.answers,
         design: next.design,
-        draftConfig: next.draftConfig,
+        // The documents list is kept from the row: the crawl and uploads add to it without a
+        // version bump (`addKnowledgeDocument`), and a draft read earlier must not drop them.
+        draftConfig: () =>
+          `jsonb_set(CAST(:draftConfig AS jsonb), '{knowledgeDocumentIds}', COALESCE(draft_config->'knowledgeDocumentIds', CAST(:documentIds AS jsonb)))`,
         chatbotId: next.chatbotId ?? null,
         transcript: next.transcript,
         events: next.events,
         version: next.version,
       } as never)
       .where('id = :id AND version = :basedOn', { id: draft.id, basedOn })
+      .setParameter('draftConfig', JSON.stringify(next.draftConfig))
+      .setParameter(
+        'documentIds',
+        JSON.stringify(next.draftConfig.knowledgeDocumentIds ?? []),
+      )
       .execute();
     if (!result.affected) {
       throw new ConflictException({

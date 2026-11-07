@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GlobalSettingsRepository } from '../../settings/repository/global-settings.repository';
@@ -14,6 +14,11 @@ import type {
   ChatbotSettingsOverride,
   ChatbotSettingsView,
 } from '../type/chatbot.type';
+import { packFor } from '../../bot-draft/safety-pack/safety-packs';
+import {
+  SafetyLockedError,
+  assertSettingsKeepPack,
+} from '../../bot-draft/safety-pack/safety-lock';
 
 /**
  * The defaults every chatbot inherits (the `whatsapp_bot` settings row) and each bot's changes on
@@ -50,15 +55,20 @@ export class ChatbotSettingsService {
    * top. `null` (no bot) is the defaults unchanged.
    */
   async getForChatbot(
-    chatbot: Pick<Chatbot, 'settings'> | null,
+    chatbot:
+      | (Pick<Chatbot, 'settings'> & Partial<Pick<Chatbot, 'safetyPack'>>)
+      | null,
   ): Promise<WhatsAppBotSettings> {
     const defaults = await this.get();
-    return chatbot ? this.applyOverride(defaults, chatbot.settings) : defaults;
+    return chatbot
+      ? this.applyOverride(defaults, chatbot.settings, chatbot.safetyPack)
+      : defaults;
   }
 
   /** Defaults, this bot's changes, and the result — what the settings screen shows. */
   async getChatbotView(
-    chatbot: Pick<Chatbot, 'id' | 'settings'>,
+    chatbot: Pick<Chatbot, 'id' | 'settings'> &
+      Partial<Pick<Chatbot, 'safetyPack'>>,
   ): Promise<ChatbotSettingsView> {
     const defaults = await this.get();
     const overrides = chatbot.settings ?? {};
@@ -66,7 +76,7 @@ export class ChatbotSettingsService {
       chatbotId: chatbot.id,
       defaults,
       overrides,
-      effective: this.applyOverride(defaults, overrides),
+      effective: this.applyOverride(defaults, overrides, chatbot.safetyPack),
     };
   }
 
@@ -75,9 +85,23 @@ export class ChatbotSettingsService {
    * leaving a field out; empty text is dropped for the same reason.
    */
   async updateChatbotSettings(
-    chatbot: Pick<Chatbot, 'id'>,
+    chatbot: Pick<Chatbot, 'id'> & Partial<Pick<Chatbot, 'safetyPack'>>,
     overrides: ChatbotSettingsOverride,
   ): Promise<ChatbotSettingsView> {
+    // A safety pack's settings can't be turned off (chunk 20a): refused, not silently floored, so
+    // the editor knows why the switch didn't move.
+    try {
+      assertSettingsKeepPack(chatbot.safetyPack, overrides);
+    } catch (error) {
+      if (error instanceof SafetyLockedError) {
+        throw new BadRequestException({
+          errorCode: error.code,
+          message: error.message,
+          details: { reason: error.reason },
+        });
+      }
+      throw error;
+    }
     const userId = Number(ExecutionManager.getUserId() ?? 0);
     const settings = cleanOverride(overrides);
     await this.chatbotRepository.update(
@@ -85,7 +109,11 @@ export class ChatbotSettingsService {
       { settings, updatedBy: userId },
     );
     this.logger.info(`Chatbot ${chatbot.id} settings updated`);
-    return this.getChatbotView({ id: chatbot.id, settings });
+    return this.getChatbotView({
+      id: chatbot.id,
+      settings,
+      safetyPack: chatbot.safetyPack,
+    });
   }
 
   /**
@@ -95,11 +123,19 @@ export class ChatbotSettingsService {
    * crisis classifier or consent, or lower its rate limits, but never weaken what the platform
    * set — a bot's settings screen must not be a way round the crisis safety net. `enabled` is the
    * same rule: a bot can be switched off, not on, against the platform switch.
+   *
+   * A bot with a safety pack (chunk 20a) also gets the pack's floor: a health pack keeps the crisis
+   * classifier on even where the platform default has it off.
    */
   applyOverride(
     global: WhatsAppBotSettings,
     override: ChatbotSettingsOverride | undefined,
+    safetyPack?: string | null,
   ): WhatsAppBotSettings {
+    const floor = packFor(safetyPack)?.requiredSettings;
+    if (floor?.crisisClassifierEnabled && !global.crisisClassifierEnabled) {
+      global = { ...global, crisisClassifierEnabled: true };
+    }
     if (!override || !Object.keys(override).length) return global;
     const { rateLimit, retrieval, ...plain } = override;
     const tighter = (base: number, value: number | undefined) =>
