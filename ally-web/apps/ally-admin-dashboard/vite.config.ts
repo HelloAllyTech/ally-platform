@@ -1,5 +1,5 @@
 /// <reference types='vitest' />
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { nxCopyAssetsPlugin } from "@nx/vite/plugins/nx-copy-assets.plugin";
@@ -9,6 +9,23 @@ import path from "path";
 import { testResourceLimits } from "../../vitest.resource-limits";
 // Get absolute paths
 const projectRoot = __dirname;
+
+/**
+ * `/b/<slug>` is the bot page (b.html). The dev server and `vite preview` would otherwise answer it
+ * with the dashboard's index.html. Deployed, CloudFront and Caddy do the same rewrite (see
+ * CHUNK-12B-NOTES).
+ */
+function botPageRoutes(): Plugin {
+  const rewrite = (req: { url?: string }, _res: unknown, next: () => void) => {
+    if (req.url && /^\/b\/[^/?#]+\/?(\?.*)?$/.test(req.url)) req.url = "/b.html";
+    next();
+  };
+  return {
+    name: "bot-page-routes",
+    configureServer: server => void server.middlewares.use(rewrite),
+    configurePreviewServer: server => void server.middlewares.use(rewrite),
+  };
+}
 
 export default defineConfig(() => ({
   root: __dirname,
@@ -34,7 +51,7 @@ export default defineConfig(() => ({
     port: 4300,
     host: "localhost",
   },
-  plugins: [react(), nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"]), svgr()],
+  plugins: [react(), nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"]), svgr(), botPageRoutes()],
   // Carbon v11 ships SCSS that triggers many Dart-Sass deprecation warnings.
   // quietDeps silences node_modules noise; silenceDeprecations keeps the
   // remaining (expected) Carbon warnings from failing the build.
@@ -59,6 +76,12 @@ export default defineConfig(() => ({
       transformMixedEsModules: true,
     },
     rollupOptions: {
+      // Two pages: the dashboard, and the public bot page (/b/<slug>, chunk 12b), which shares no
+      // code with the dashboard's entry so a visitor downloads only the page.
+      input: {
+        main: path.resolve(projectRoot, "index.html"),
+        botPage: path.resolve(projectRoot, "b.html"),
+      },
       output: {
         // Add content hashes to filenames for cache busting
         entryFileNames: "assets/[name]-[hash].js",

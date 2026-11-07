@@ -9,7 +9,7 @@ import {
   TestChatbotResponse,
 } from "@types";
 
-import { parseCopilotSse } from "./useRoadmapCopilotStream";
+import { readSse } from "./chatStream/sse";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -114,30 +114,27 @@ export const useChatbotTestStream = () => {
         throw new ChatbotTestStreamUnavailable(response.status);
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
       let started = false;
+      let final: TestChatbotResponse | undefined;
       try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const parsed = parseCopilotSse(buffer);
-          buffer = parsed.rest;
-          for (const event of parsed.events as unknown as StreamEvent[]) {
-            started = true;
-            if (event.type === "final") return event.data;
-            if (event.type === "error") throw new Error(event.data.code);
-            if (event.type === "status") handlers.onStatus(event.data);
-            else if (event.type === "step") handlers.onStep(event.data);
-            else if (event.type === "token") handlers.onToken(event.data.text);
+        ({ started } = await readSse(response.body, raw => {
+          started = true;
+          const event = raw as StreamEvent;
+          if (event.type === "final") {
+            final = event.data;
+            return true;
           }
-        }
+          if (event.type === "error") throw new Error(event.data.code);
+          if (event.type === "status") handlers.onStatus(event.data);
+          else if (event.type === "step") handlers.onStep(event.data);
+          else if (event.type === "token") handlers.onToken(event.data.text);
+          return false;
+        }));
       } catch (error) {
         if (!started && !controller.signal.aborted) throw new ChatbotTestStreamUnavailable();
         throw error;
       }
+      if (final) return final;
       if (!started) throw new ChatbotTestStreamUnavailable();
       throw new Error("The test ended without a reply");
     },
