@@ -105,6 +105,10 @@ export class AppConfigService {
    * - `digestTo` is who gets the daily email (comma-separated). Empty means no
    *   email, even when enabled.
    * - `digestHour` is the business-timezone (IST) hour it goes out.
+   * - `digestAllowed` is true only on the production database (`*_prd`). Env
+   *   files get copied between environments, and a staging copy that kept
+   *   `PRODUCT_UPDATES_DIGEST_TO` sent a second, differently-formatted digest
+   *   to the same people on 2026-11-05.
    */
   get productUpdates() {
     const start = new Date(
@@ -131,6 +135,7 @@ export class AppConfigService {
         .map((address) => address.trim())
         .filter(Boolean),
       digestHour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 18,
+      digestAllowed: (this.database.database ?? '').endsWith('_prd'),
     };
   }
 
@@ -201,6 +206,14 @@ export class AppConfigService {
    * actually released. Flip ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED=true only
    * after confirming that in Play Console; the task no-ops (not errors)
    * while this is unset.
+   *
+   * Since the Flutter rename, the task this gates
+   * (autoBumpAndroidMinimumVersionIfLive) matches the production track
+   * against the live Play *internal* track's release (via
+   * fetchAndroidInternalRelease()) instead of a committed versionCode —
+   * Flutter computes its real versionCode per-build in CI, never commits
+   * it. Sanity-check that parsing against Play Console after a real
+   * automated build before flipping this on.
    *
    * SECOND, SEPARATE PRECONDITION, confirmed live: this task authenticates
    * as the same ANDROID_SERVICE_ACCOUNT_JSON identity the release pipeline's
@@ -560,6 +573,13 @@ export class AppConfigService {
         'WHATSAPP_GRAPH_API_VERSION',
         'v25.0',
       ),
+      /**
+       * 64 hex chars (AES-256-GCM). Encrypts organisations' own access tokens and app secrets in
+       * wa_business_numbers. Without it a number cannot be connected — never stored in plaintext.
+       */
+      credentialsEncryptionKey: this.configService.get<string>(
+        'WHATSAPP_CREDENTIALS_ENCRYPTION_KEY',
+      ),
     };
   }
   get s3() {
@@ -793,10 +813,16 @@ export class AppConfigService {
         'OPENAI_TRANSCRIPTION_MODEL',
         'whisper-1',
       ),
-      imageModel: this.configService.get<string>(
-        'OPENAI_IMAGE_MODEL',
-        'gpt-image-1',
-      ),
+      imageModel: (() => {
+        const model = this.configService.get<string>(
+          'OPENAI_IMAGE_MODEL',
+          'gpt-image-1.5',
+        );
+        // OpenAI retired these on the Images API ('model does not exist'), so
+        // a stale env value must not bring image generation down with it.
+        const retired = ['gpt-image-1', 'dall-e-2', 'dall-e-3'];
+        return retired.includes(model) ? 'gpt-image-1.5' : model;
+      })(),
     };
   }
 
@@ -892,6 +918,18 @@ export class AppConfigService {
     };
   }
 
+  /**
+   * Breadth multiplier on roadmap votes. On by default; set ROADMAP_MULTIPLIER_ENABLED=false to
+   * switch it off, which makes a vote always worth 1.0 and hides the UI. `weightedVotes` is
+   * written either way, so the switch can be flipped without losing history.
+   */
+  get roadmapMultiplierEnabled(): boolean {
+    return (
+      this.configService.get<string>('ROADMAP_MULTIPLIER_ENABLED', 'true') !==
+      'false'
+    );
+  }
+
   get builder() {
     return {
       // Model per role in the tiered loop. Defaults live in ONE place
@@ -965,6 +1003,35 @@ export class AppConfigService {
         .map((id) => id.trim())
         .filter(Boolean),
     };
+  }
+
+  /**
+   * The Debrief agent's switch (DEBRIEF_AGENT_MODE). `shadow` (the default)
+   * debriefs every ended session beside today's debrief without any learner
+   * seeing it, and live for tenants switched on in the Console; `off` stops
+   * new runs everywhere — an emergency stop, not a rollback.
+   */
+  get debriefAgentMode(): 'off' | 'shadow' {
+    return this.configService.get<string>('DEBRIEF_AGENT_MODE') === 'off'
+      ? 'off'
+      : 'shadow';
+  }
+
+  /**
+   * User ids allowed to put a new version of a PINNED prompt live — the judge
+   * rubrics, measuring instruments and guards in `PINNED_PROMPTS`.
+   *
+   * Deny by default: unset means nobody, not every prompt editor. A pinned
+   * prompt is an instrument other numbers are read from (the debrief quality
+   * bar, the judges' series), so changing one is a named person's decision,
+   * never something any editor — or an automated agent with no person behind
+   * it — can confirm.
+   */
+  get skillsStorePinnedEditorIds(): number[] {
+    return (this.configService.get<string>('SKILLS_STORE_PINNED_EDITORS') ?? '')
+      .split(',')
+      .map((id) => Number(id.trim()))
+      .filter((id) => Number.isInteger(id) && id > 0);
   }
 
   /**

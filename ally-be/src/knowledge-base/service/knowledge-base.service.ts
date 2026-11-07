@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -9,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { isUUID } from 'class-validator';
 import { In, Repository } from 'typeorm';
 import { Tenant } from 'src/tenant/entity/tenant.entity';
+import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
 import { AiService } from 'src/ai/service/ai.service';
 import {
   KnowledgeAudienceRequest,
@@ -142,7 +144,41 @@ export class KnowledgeBaseService {
     // otherwise share nothing (and this codebase has a live circular-import DI trap).
     @InjectRepository(Tenant)
     private readonly tenantRepository: Repository<Tenant>,
+    private readonly tenantScope: TenantScopeService,
   ) {}
+
+  /**
+   * The organisations an org-restricted admin may manage documents for; `null` for everyone
+   * else. Keyed on `restricted`, not on the tenant list, so a background caller with no user (the
+   * WhatsApp "create from unanswered" path runs inside an admin request, but ingest does not) is
+   * never narrowed to whatever tenant the execution context happens to carry.
+   */
+  private async managedTenantIds(): Promise<string[] | null> {
+    const scope = await this.tenantScope.resolveScope();
+    return scope.restricted ? (scope.tenantIds ?? []) : null;
+  }
+
+  /**
+   * An org-restricted admin may only target their own organisations: never the global corpus,
+   * never nobody, never an organisation outside their allowlist.
+   */
+  private async assertAudienceManageable(
+    isGlobal: boolean,
+    tenantIds: string[],
+  ): Promise<void> {
+    const managed = await this.managedTenantIds();
+    if (managed === null) return;
+    if (isGlobal || !tenantIds.length) {
+      throw new ForbiddenException(
+        'Documents you add must be targeted at your organisation.',
+      );
+    }
+    if (tenantIds.some((id) => !managed.includes(id))) {
+      throw new ForbiddenException(
+        'You can only target documents at your own organisations.',
+      );
+    }
+  }
 
   private getBucket(): string {
     const bucket = this.configService.s3.assetsBucket;
@@ -312,6 +348,7 @@ export class KnowledgeBaseService {
 
     const isGlobal = dto.isGlobal ?? false;
     const tenantIds = isGlobal ? [] : (dto.tenantIds ?? []);
+    await this.assertAudienceManageable(isGlobal, tenantIds);
     await this.assertTenantsExist(tenantIds);
 
     return this.insertAndQueue(
@@ -337,6 +374,8 @@ export class KnowledgeBaseService {
       isGlobal: boolean;
       tenantIds: string[];
       ownerTenantId: string | null;
+      /** The chatbot the document belongs to (chunk 3d); absent for every other document. */
+      ownerChatbotId?: string;
     },
   ): Promise<KbDocumentResponseDto> {
     const { isGlobal, tenantIds } = audience;
@@ -357,6 +396,7 @@ export class KnowledgeBaseService {
       tags: dto.tags ?? [],
       isGlobal,
       ownerTenantId: audience.ownerTenantId,
+      ownerChatbotId: audience.ownerChatbotId ?? null,
       // Pasted text is stored up front so the row is self-sufficient; the extractor still runs over
       // it to derive sections, and every other source type fills this in during ingest.
       rawText:
@@ -449,7 +489,9 @@ export class KnowledgeBaseService {
   }
 
   async list(dto: GetKbDocumentsQueryDto) {
+    const managed = await this.managedTenantIds();
     const { documents, count } = await this.documentRepository.list({
+      ...(managed === null ? {} : { ownedByTenantIds: managed }),
       corpus: dto.corpus,
       limit: dto.limit,
       offset: dto.offset,
@@ -458,6 +500,7 @@ export class KnowledgeBaseService {
       sourceType: dto.sourceType,
       tags: dto.tags,
       tenantId: dto.tenantId,
+      excludeGlobal: dto.excludeGlobal,
       includeArchived: dto.includeArchived,
       sortBy: dto.sortBy,
       sortDir: dto.sortDir,
@@ -477,8 +520,16 @@ export class KnowledgeBaseService {
     };
   }
 
+  /**
+   * One document WITH its text, so the edit panel can show what the passages were cut from and
+   * an admin can correct pasted text rather than retyping it. The list omits it.
+   */
   async get(id: string): Promise<KbDocumentResponseDto> {
-    return this.respond(await this.findOrFail(id));
+    const document = await this.findOrFail(id);
+    return {
+      ...(await this.respond(document)),
+      rawText: document.rawText ?? '',
+    };
   }
 
   /**
@@ -509,6 +560,7 @@ export class KnowledgeBaseService {
     const userId = this.currentUserId();
 
     const tenantIds = dto.isGlobal ? [] : (dto.tenantIds ?? []);
+    await this.assertAudienceManageable(dto.isGlobal, tenantIds);
     await this.assertTenantsExist(tenantIds);
 
     const { added, removed } =
@@ -539,10 +591,27 @@ export class KnowledgeBaseService {
     return this.toResponse(updated, tenantIds);
   }
 
+  /**
+   * Load a document the caller may act on. For an org-restricted admin, a document that is
+   * global or reaches any organisation outside their allowlist answers exactly like a missing
+   * one — every per-document route goes through here, so none can touch another customer's.
+   */
   private async findOrFail(id: string): Promise<KbDocument> {
     const document = await this.documentRepository.findOne({ where: { id } });
     if (!document) {
       throw new NotFoundException(`Document ${id} was not found`);
+    }
+    const managed = await this.managedTenantIds();
+    if (managed !== null) {
+      const audience = document.isGlobal
+        ? []
+        : await this.documentTenantRepository.tenantIdsForDocument(id);
+      if (
+        !audience.length ||
+        audience.some((tenantId) => !managed.includes(tenantId))
+      ) {
+        throw new NotFoundException(`Document ${id} was not found`);
+      }
     }
     return document;
   }
@@ -654,7 +723,13 @@ export class KnowledgeBaseService {
   async archive(id: string): Promise<KbDocumentResponseDto> {
     const document = await this.findOrFail(id);
     if (document.archivedAt) return this.respond(document);
+    await this.archiveFound(document);
+    return this.get(id);
+  }
 
+  /** Archive a document the caller has already found and checked. */
+  private async archiveFound(document: KbDocument): Promise<void> {
+    const { id } = document;
     try {
       await this.aiService.deleteKnowledgeChunksByDocument(id, document.corpus);
     } catch (error) {
@@ -675,7 +750,6 @@ export class KnowledgeBaseService {
         updatedBy: this.currentUserId(),
       },
     );
-    return this.get(id);
   }
 
   /** Unarchive and re-index, since archiving deleted the vectors. */
@@ -1107,6 +1181,122 @@ export class KnowledgeBaseService {
             ownerTenantId: owner.tenantId,
           },
     );
+  }
+
+  // ─────────────────────────────────────────────── a chatbot's own documents (chunk 3d)
+  //
+  // Uploaded on a chatbot's Knowledge tab, in the WhatsApp corpus, and seen and managed there
+  // only. The caller (ChatbotService) checks that the user may edit that chatbot; these methods
+  // only keep a document tied to its chatbot.
+
+  private chatbotFolder(chatbotId: string): string {
+    return `${KB_DOCUMENT_S3_PREFIX}/chatbots/${chatbotId}`;
+  }
+
+  /** Presigned upload into this chatbot's folder. */
+  async createChatbotUploadUrl(chatbotId: string, dto: CreateKbUploadUrlDto) {
+    return this.createUploadUrl(dto, this.chatbotFolder(chatbotId));
+  }
+
+  /**
+   * Create a document that belongs to one chatbot and queue its ingest. Its audience is nobody
+   * by targeting (not global, no organisations): it is reached only through the chatbot's own
+   * `document_ids`, which is how a chatbot that answers from selected documents searches.
+   */
+  async createForChatbot(
+    chatbotId: string,
+    dto: CreateKbOwnedDocumentDto,
+  ): Promise<KbDocumentResponseDto> {
+    const userId = this.currentUserId();
+    this.validateSource(dto);
+    if (
+      dto.sourceType !== KbDocumentSourceType.PASTE &&
+      dto.sourceType !== KbDocumentSourceType.URL
+    ) {
+      this.assertIssuedFileUrl(
+        dto.fileUrl ?? '',
+        this.chatbotFolder(chatbotId),
+      );
+    }
+    return this.insertAndQueue(
+      userId,
+      dto,
+      { corpus: KbCorpus.WHATSAPP_QA, characterTopics: [] },
+      {
+        isGlobal: false,
+        tenantIds: [],
+        ownerTenantId: null,
+        ownerChatbotId: chatbotId,
+      },
+    );
+  }
+
+  /**
+   * Remove one of this chatbot's own documents: an archive, as everywhere in this module. A
+   * shared document, or another chatbot's, is the same 404 as a missing id.
+   */
+  async archiveForChatbot(chatbotId: string, id: string): Promise<void> {
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document || document.ownerChatbotId !== chatbotId) {
+      throw new NotFoundException(`Document ${id} was not found`);
+    }
+    // Not `archive(id)`: its organisation check would refuse an organisation's editor, and a
+    // chatbot's own document is targeted at no organisation. The chatbot check is the gate here.
+    if (!document.archivedAt) await this.archiveFound(document);
+  }
+
+  /**
+   * One document with its text, for a chatbot's Knowledge tab. The caller (ChatbotService) has
+   * checked the document is on that chatbot, so the library's organisation check doesn't apply.
+   */
+  async getForChatbot(id: string): Promise<KbDocumentResponseDto> {
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document) throw new NotFoundException(`Document ${id} was not found`);
+    return {
+      ...(await this.respond(document)),
+      rawText: document.rawText ?? '',
+    };
+  }
+
+  /**
+   * Rename one of this chatbot's own documents, or replace its text. New text is stored as the
+   * document's text and it is trained again (re-chunked and re-indexed); unchanged text does
+   * nothing. A PDF edited this way keeps no page numbers for its citations.
+   */
+  async updateForChatbot(
+    chatbotId: string,
+    id: string,
+    dto: { title?: string; text?: string },
+  ): Promise<KbDocumentResponseDto> {
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document || document.ownerChatbotId !== chatbotId) {
+      throw new NotFoundException(`Document ${id} was not found`);
+    }
+    if (document.archivedAt) {
+      throw new BadRequestException('This document has been removed.');
+    }
+    const userId = this.currentUserId();
+    const patch: Partial<KbDocument> = { updatedBy: userId };
+    if (dto.title !== undefined) patch.title = dto.title.trim();
+    let retrain = false;
+    if (dto.text !== undefined) {
+      const text = dto.text.trim();
+      const hash = KbIngestService.hash(text);
+      if (hash !== document.contentHash) {
+        Object.assign(patch, {
+          rawText: text,
+          contentHash: hash,
+          status: KbDocumentStatus.PENDING,
+          statusMessage: null,
+        });
+        retrain = true;
+      }
+    }
+    await this.documentRepository.update({ id }, patch);
+    if (retrain) {
+      await this.ingestProducer.enqueue({ documentId: id, action: 'reindex' });
+    }
+    return this.getForChatbot(id);
   }
 
   private assertIssuedFileUrl(fileUrl: string, folder: string): void {

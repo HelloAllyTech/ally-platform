@@ -26,11 +26,41 @@ export type XpLevelReachedBucket = "day" | "week" | "month" | "quarter" | "year"
 /**
  * Mirrors ally-be's `MAX_LEVEL` (src/progress/progress.constants.ts) — every
  * level from 1 through this is always present in a bucket's `levelCounts`,
- * whether or not anyone crossed it that period. The two constants are not
- * wired together (separate repos); keep them in sync by hand if the ladder
- * ever grows.
+ * whether or not anyone crossed it that period. Level 0 is the starting state
+ * every account has, so it is never charted. The two constants are not wired
+ * together (separate repos); keep them in sync by hand if the ladder ever
+ * grows.
  */
-export const XP_LEVEL_REACHED_MAX_LEVEL = 10;
+export const XP_LEVEL_REACHED_MAX_LEVEL = 50;
+
+/** Levels plotted at once: fifty grouped series in one chart is unreadable. */
+export const XP_LEVEL_RANGE_SIZE = 10;
+
+export interface XpLevelRange {
+  key: string;
+  label: string;
+  /** First and last level plotted, inclusive. */
+  from: number;
+  to: number;
+}
+
+/** The picker's choices — L1-L10, L11-L20, … through the top of the ladder. */
+export const xpLevelRanges = (maxLevel = XP_LEVEL_REACHED_MAX_LEVEL): XpLevelRange[] =>
+  Array.from({ length: Math.ceil(maxLevel / XP_LEVEL_RANGE_SIZE) }, (_, i) => {
+    const from = i * XP_LEVEL_RANGE_SIZE + 1;
+    const to = Math.min(maxLevel, from + XP_LEVEL_RANGE_SIZE - 1);
+    return { key: `${from}-${to}`, label: `L${from}–L${to}`, from, to };
+  });
+
+/** Every point restricted to the levels in `range`, buckets untouched. */
+export const pointsInLevelRange = (
+  points: XpLevelReachedPoint[],
+  range: XpLevelRange,
+): XpLevelReachedPoint[] =>
+  points.map(p => ({
+    ...p,
+    levelCounts: p.levelCounts.filter(lc => lc.level >= range.from && lc.level <= range.to),
+  }));
 
 /** One level's crossing count within one bucket. */
 export interface XpLevelReachedLevelCount {
@@ -89,9 +119,9 @@ export interface XpLevelReachedDatum {
  * Grouped-bar series, one datum per (level, bucket) — NESTED, never stacked
  * (a learner who crosses several levels in one bucket counts once in each,
  * so summing them into one bar would double-count people). Every level
- * present in `levelCounts` gets a datum even at 0: L8-L10 reading zero
- * everywhere is expected on a platform whose ladder is known to be
- * mis-scaled today (most learners sit at L1-L2 — see the backend DTO doc),
+ * present in `levelCounts` gets a datum even at 0: the upper levels reading
+ * zero everywhere is expected on a platform whose ladder is known to be
+ * mis-scaled today (most learners sit at L0-L1 — see the backend DTO doc),
  * not missing data, so nothing here filters a level out for being quiet.
  */
 export const buildXpLevelReachedSeries = (points: XpLevelReachedPoint[]): XpLevelReachedDatum[] =>
@@ -116,24 +146,31 @@ export const buildXpLevelReachedTable = (
 };
 
 /**
- * True only when NOTHING crossed any level anywhere on the axis. Judging
- * "empty" per level would misreport an ordinary window as broken: an
- * all-zero L8-L10 tail beside a busy L1 is the expected shape of today's
- * population, not a gap.
+ * True only when NOTHING crossed any plotted level anywhere on the axis.
+ * Judging "empty" per level would misreport an ordinary window as broken: an
+ * all-zero upper tail beside a busy L1 is the expected shape of today's
+ * population, not a gap. `scopeLabel` names the level range being shown, so
+ * an empty range reads as "nothing in L11–L20", not "no one has levelled up".
  */
-export const xpLevelReachedEmptyText = (points: XpLevelReachedPoint[]): string | undefined => {
+export const xpLevelReachedEmptyText = (
+  points: XpLevelReachedPoint[],
+  scopeLabel?: string,
+): string | undefined => {
   const total = points.reduce(
     (sum, p) => sum + p.levelCounts.reduce((s, lc) => s + lc.users, 0),
     0,
   );
-  return total === 0 ? "No learner has reached a new XP level in this window yet." : undefined;
+  if (total !== 0) return undefined;
+  return scopeLabel
+    ? `No learner has reached a level in ${scopeLabel} in this window yet.`
+    : "No learner has reached a new XP level in this window yet.";
 };
 
 /**
  * The one-sentence finding: total crossings in the latest COMPLETE bucket,
- * and L1's share of them — named explicitly because L1/L2 dominate the
+ * and L1's share of them — named explicitly because L1 dominates the
  * ladder today, so a reader should not have to discover that fact from a
- * chart that is mostly one tall bar and nine short ones.
+ * chart that is mostly one tall bar and a row of short ones.
  */
 export const xpLevelReachedTakeaway = (
   points: XpLevelReachedPoint[],

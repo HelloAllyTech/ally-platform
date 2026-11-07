@@ -93,6 +93,30 @@ export class BugHuntContextLookupRepository extends Repository<BugHuntContextLoo
   }
 
   /**
+   * Whether `probe` came back ok on any run that worked on this finding —
+   * its current run, or any run that reported an event against it (the fix
+   * session and the Verifier are separate runs).
+   */
+  async probeSucceededForFinding(
+    findingId: string,
+    runId: string | null,
+    probe: string,
+  ): Promise<boolean> {
+    const rows = await this.manager.query<unknown[]>(
+      `SELECT 1 FROM bug_hunt_context_lookups l
+        WHERE l.kind = 'probe'
+          AND l.metadata->>'probe' = $2
+          AND l.metadata->>'ok' = 'true'
+          AND (l.run_id = $3::uuid
+               OR l.run_id IN (SELECT e."runId" FROM bug_hunt_events e
+                                WHERE e.finding_id = $1 AND e."runId" IS NOT NULL))
+        LIMIT 1`,
+      [findingId, probe, runId],
+    );
+    return rows.length > 0;
+  }
+
+  /**
    * Per kind, over lookups in the window: how often the agent asked, how often
    * it got anything back, how long it waited, how much it was handed — and,
    * where the lookup ranked its results, how relevant they were and how much

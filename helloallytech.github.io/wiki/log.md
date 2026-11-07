@@ -8,6 +8,21 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-06] update | `repos/ally-mobile.md`: rewritten for the Flutter app.
+- The page described the retired React Native app (deleted in the 2026-11 rename). Rewrote Tech Stack, Architecture & Feature Areas, Integration Points, Local Setup, Testing and Key Documentation from the Flutter code in `ally-mobile/lib/` and `pubspec.yaml`; `last_reconciled` set to today. Also repointed the `ally-mobile` entry in `platform/agent-guide.md` and the index line.
+
+## [2026-11-03] update | `contributing/guide.md`: Branch Lifetime enforcement.
+- Added the "Enforcement" paragraph: `.github/workflows/stale-branches.yml` runs weekly, deletes branches with no PR and no commit for 7 days, and closes PRs idle for 14 days (then deletes their branch). It is report-only until the `STALE_BRANCH_ENFORCE` repository variable is `true`.
+
+## [2026-11-03] update | `contributing/guide.md`: Branch Lifetime rule.
+- Added a "Branch Lifetime" section: branches are short-lived (PR early, merge within 2 working days, nothing older than 7, delete on merge, one branch per change, root checkout stays on `master`, bots follow the same rules). Linked from `platform/agent-guide.md`, and the root `AGENTS.md` branch-naming block now points at the canonical rule instead of the old ticket-id convention.
+
+## [2026-10-29] update | `repos/ally-ai.md`: the debrief Safety reader.
+- Added `/debrief/safety-reader`, the debrief agent's mandatory safety step, and its recall gate script. `last_reconciled` is unchanged, since the rest of the page was not re-verified.
+
+## [2026-10-29] update | `repos/ally-ai.md`: the debrief-quality judge.
+- Added `/debrief-quality` to the HTTP surface and `debrief_quality/` to the judge modules: it scores a whole learner debrief on the debrief rubric's eight dimensions (0–10 each) and lists hard fails, and is the independent judge the debrief quality bar is read from. The judge-modules line now says it is the one ordinal exception, with the weighted overall still computed by ally-be. Also documented: the missed-risk-cue rule (derived in code from the judge's list of risk cues) and the perturbation script that gates a judge change. `last_reconciled` is unchanged, since the rest of the page was not re-verified.
+
 ## [2026-10-28] create | `platform/storage-archive.md`, `repos/ally-archiver.md`: the storage archive plan and its app.
 - New `platform/storage-archive.md` records the plan to cut the AWS storage bill by moving every private S3 object older than 30 days to a Hetzner Storage Box each week, and the decisions behind it: PHI included without app-layer encryption (an accepted compliance risk), archive-only read-back, public media left on S3, a one-time backfill. It is the plan's home because an earlier version was lost in a chat session.
 - New `repos/ally-archiver.md` documents the Go + htmx app that runs the move. `repos/infra.md` and `platform/architecture.md` gained one line each pointing at it; their `last_reconciled` is unchanged.
@@ -404,3 +419,24 @@ This is an append-only log of modifications, updates, and indexing runs performe
 - Model routing became engine-aware: the configured per-tier defaults are all one vendor's model ids and several tiers could reach one regardless of engine, worst on a small build, whose cheaper planning tier read the configured default directly and ignored the admin's settings. A default belonging to another engine is skipped rather than translated — there is no honest mapping between two vendors' tiers.
 - Spend is now computed from token counts for engines that report tokens but not cost. An estimate from a rate card, and labelled as one; a run that cannot be priced cannot be capped.
 - Also recorded under *Reading the UI honestly*: a run's failure reads as the last entry in its own feed rather than as two banners restating it above and below the transcript.
+
+## [2026-10-28] update | Builder gets a decision feed: everything it is waiting on a person for, as one keyboard-driven queue.
+- `platform/builder-agent.md` gains **The decision feed**. The bound on how much Builder can do turned out to be the person, not the runner: every session stops where only a human can choose, and each of those lived where it was raised — a question in one session's chat, a merge button in Slack, a stopped build on mission control — so clearing them meant a page visit and a context rebuild per session.
+- The feed (`/builder/decisions`) derives every pending decision across sessions into one card shape — what is blocked, the question, why Builder is asking, context, options with the recommendation first, a free-text answer — grouped as *what to build*, *how to build it* and *how to get unstuck*. Digits pick, Enter sends the recommendation, `S` skips to the back of the queue; no confirmation step, and the header keeps the sitting's pace.
+- Two load-bearing properties recorded on the page: **nothing is stored** (a decision is derived from the state that records it and answered through the same service call the session page uses, so the feed can never disagree with the session), and **an interview answer runs as a background turn** under the session's existing turn lock, with the follow-up question returning to the feed as a new card.
+
+## [2026-10-29] update | The decision feed asks for a second press on hard-to-undo answers, and no longer reads a failed load as an empty queue.
+- `platform/builder-agent.md`, **The decision feed**: the "no confirmation step" rule now has one stated exception. An option the server flags `confirm` (a merge, removing a budget ceiling, stopping a build) is picked first and sent on a second press, so a stray Enter on a merge card cannot merge; every other answer stays one press. Added the rule that a failed read shows a retry, never "Nothing needs you". A typed budget ceiling with no digits, or a zero, is now refused instead of removing the ceiling.
+
+## [2026-10-29] update | Builder's decision feed becomes the Builder tab: Now, Rules, History — and works on a phone.
+- `platform/builder-agent.md`: **The decision feed** is rewritten as **The Builder tab: Now, Rules, History**. `/builder` is now the person's desk (mission control's list moved to `/builder/sessions`; `/builder/decisions` redirects).
+- Now: a waiting-on-you summary replaces the per-hour score; In progress grouped by what each session waits on, with Up next, Start (server-side first turn), a Limit and Put back; reversible answers undo for 8 s, one-way answers arm with their consequence and a 600 ms second press; live updates never reorder what is on screen.
+- New: Ask (read-only, grounded) and Tell (to the interview now, or queued for the next run), Rules (drafted by Builder, previewed against History, scoped, optionally deciding budget / stuck-PR / failed-build decisions), History (append-only, frozen at answer time), and a phone layout whose overlays the back gesture closes.
+- `repos/ally-be.md`: the `/builder` gateway now also broadcasts payload-free `decisionsChanged` / `sessionsChanged` for the Builder tab, with the 10 s poll as fallback.
+
+## [2026-10-29] update | The Debrief agent and its Improver, in shadow.
+- `repos/ally-be.md`: new `debrief/` module — recipe runner, budget and fallback ladder, shadow everywhere and live per organisation, `debrief_runs`, the Improver's daily analysis, screens on test sets and approval into releases.
+- `repos/ally-ai.md`: the remaining `/debrief/*` steps and `/debrief/improver/analyse`; the debrief-quality judge takes the trainee history the writer saw.
+
+## [2026-10-29] update | Debriefs: every risk cue covered, learner flags, review queue, live on session end.
+- `repos/ally-be.md`: the Debrief agent's learner feedback (`debrief_run_feedback`), the Review tab, risk-cue coverage, and live runs starting on session end.

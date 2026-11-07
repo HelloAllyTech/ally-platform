@@ -13,9 +13,20 @@ export const ApiEndpoints = {
     PROFILE_IMAGE_URL: "/v1/users/profile-image-url",
     PROFILE_IMAGE: "/v1/users/profile-image",
     LOGO_URL: "/v1/users/tenant",
+    /** Signed-out branding for the login page, by org code (`?org=<code>`). */
+    PUBLIC_TENANT_BRANDING: (code: string) =>
+      `/v1/public/tenants/${encodeURIComponent(code)}/branding`,
   },
   AUTHORIZATION: {
     GET_PERMISSIONS: "/v1/authorization/permissions",
+  },
+  /** Own-organization branding editor; the same routes the admin console uses. */
+  TENANTS: {
+    BRANDING: (id: string) => `/v1/tenants/${encodeURIComponent(id)}/branding`,
+    BRANDING_FAVICON_URL: (id: string) =>
+      `/v1/tenants/${encodeURIComponent(id)}/branding/favicon-url`,
+    LOGO_URL: "/v1/tenants/logo-url",
+    LOGO: "/v1/tenants/logo",
   },
   ANALYTICS: {
     GET_DASHBOARD: "/v1/analytics/dashboard",
@@ -30,6 +41,9 @@ export const ApiEndpoints = {
       `/v1/learn/admin/tracks/items/${trackItemId}/branching-reset`,
     REOPEN_ROLEPLAY_ASSESSMENT: (trackItemId: string) =>
       `/v1/learn/admin/tracks/items/${trackItemId}/assessment-reopen`,
+    LEARNER_ENROLLMENTS: (userId: number) => `/v1/learn/admin/learners/${userId}/enrollments`,
+    REMOVE_LEARNER_ENROLLMENT: (userId: number, trackEnrollmentId: string) =>
+      `/v1/learn/admin/learners/${userId}/enrollments/${trackEnrollmentId}`,
   },
   AUDIO_CALL: {
     GET_WAITING_CLIENTS: "/v1/users/waiting-list",
@@ -216,6 +230,24 @@ export const ApiEndpoints = {
     // One boolean about the caller's own org; readable by any authenticated user.
     GET_PROGRESS_ENABLED: "/v1/progress/me/enabled",
   },
+  DEBRIEFS: {
+    // The Debrief agent's debrief for one of the caller's own sessions.
+    GET_LEARNER_DEBRIEF: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}`,
+    HELPFUL: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/helpful`,
+    FLAGS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/flags`,
+    FLAG: (sessionId: string, flagId: string) =>
+      `/v1/debriefs/sessions/${sessionId}/flags/${flagId}`,
+    // A supervisor's read-only view on Roleplay Logs (cards, flags, thread).
+    SUPERVISOR: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/supervisor`,
+    // The learner read the debrief to the end (XP, once).
+    READ: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/read`,
+    OPENED: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/opened`,
+    // Read-aloud: a short-lived link to one card's audio.
+    AUDIO: (sessionId: string, section: string) =>
+      `/v1/debriefs/sessions/${sessionId}/audio/${encodeURIComponent(section)}`,
+    // Ask Ally: replies about the Debrief agent's debrief, streamed.
+    REPLY_STREAM: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/reply/stream`,
+  },
   PRACTICE_STREAK: {
     GET_PRACTICE_STREAK: "/v1/community/practice-streak",
     // Streak state without the heatmap cells — for callers that mount often
@@ -346,6 +378,8 @@ export const ApiEndpoints = {
       `/v1/scenario-characters/interview/sessions/${sessionId}`,
     INTERVIEW_SESSION_STREAM: (sessionId: string) =>
       `/v1/scenario-characters/interview/sessions/${sessionId}/messages/stream`,
+    INTERVIEW_SESSION_ABANDON: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}/abandon`,
   },
   PRODUCT_UPDATES: {
     // Public (ungated) feature-level product updates for the /blog/changelog page.

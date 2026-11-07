@@ -1353,6 +1353,17 @@ class Settings(BaseSettings):
     # exchanges are sent to the main LLM, bounding input tokens / latency as the
     # conversation grows. The system prompt (persona/scenario/RAG) is unaffected.
     # This setting is the GLOBAL kill-switch.
+    AGENT_MIN_INTERRUPTION_WORDS: int = Field(
+        default=2,
+        description=(
+            "How many words the learner must say before their speech interrupts "
+            "the client mid-reply. Below this, the speech neither cuts the reply "
+            "nor becomes a turn of its own, so a backchannel ('okay', 'hmm') "
+            "doesn't make the client start a fresh reply that skips ahead or "
+            "goes back to an old topic (prod session 688069dc). 0 restores "
+            "livekit's default: any speech interrupts."
+        ),
+    )
     HISTORY_TRIM_ENABLED: bool = Field(
         default=True,
         description=(
@@ -1822,6 +1833,14 @@ class Settings(BaseSettings):
             "pipeline, so it competes with API serving for memory. Disabled "
             "by default to shed baseline memory pressure; set to True to "
             "re-enable POST /api/v1/v2v-tester/start."
+        ),
+    )
+    V2V_TESTER_SPEECH_PROVIDER: str = Field(
+        default="google",
+        description=(
+            "The tester's own speech: 'google' (chirp_2 STT + Chirp TTS) or "
+            "'sarvam' (saarika STT + bulbul TTS, any language Sarvam covers, "
+            "English included)."
         ),
     )
     V2V_TESTER_MAX_CONCURRENT: int = Field(

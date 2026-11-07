@@ -154,6 +154,21 @@ export const StepperList = [
   { id: SIMULATION_CREATOR_STEP_IDS.report, title: "Report" },
 ];
 
+/**
+ * Placeholder a main-agent prompt declares to run on Memories instead of
+ * Knowledge Sources + retrieval (the Stage Director prompt). The editor swaps
+ * Knowledge Sources for the Memories editor whenever the selected prompt body
+ * uses it — driven by the body, never by a hard-coded prompt code.
+ */
+export const MEMORIES_PLACEHOLDER = "memories";
+
+/**
+ * Backstory + every memory's title and text, in characters, above which the
+ * Memories editor warns that the character is getting long. 3x the largest
+ * scenario at design time (7.1k). A warning, never a block.
+ */
+export const MEMORIES_SIZE_WARNING_CHARS = 21000;
+
 export const FORM_FIELD_TYPES = {
   TEXT: "text",
   NUMBER: "number",
@@ -177,6 +192,7 @@ export const FORM_FIELD_TYPES = {
     TITLE_PANEL: "title_panel",
     COMFORT_AUDIO_TRACK: "comfort_audio_track",
     VIDEO_ACTOR_PICKER: "video_actor_picker",
+    MEMORIES_EDITOR: "memories_editor",
   },
   TOGGLE_BUTTON: "toggle_button",
   TAG_AND_DROPDOWN: "tag_and_dropdown",
@@ -229,6 +245,7 @@ export const FORM_FIELD_IDS = {
   CURRENT_STATE: "currentState",
   REMINDERS_ENABLED: "remindersEnabled",
   KNOWLEDGE_SOURCE: "knowledgeSources",
+  MEMORIES: "memories",
   STATE_NAMES: "stateNames",
   FILLER_ENABLED: "fillerEnabled",
   LANGUAGE_GLOSSARY_ENABLED: "languageGlossaryEnabled",
@@ -526,8 +543,13 @@ export const COMFORT_AUDIO_VOLUME_MIN = 0;
 export const COMFORT_AUDIO_VOLUME_MAX = 1;
 export const COMFORT_AUDIO_VOLUME_STEP = 0.1;
 
-export const ROLE_INSTRUCTION_PROMPT_CODE = "openai_simulation_role_instruction_default";
 export const DEFAULT_MAIN_AGENT_PROMPT_CODE = "ally_ai_learn_system_main_agent_prompt";
+// What a brand-new simulation starts on. Distinct from the default above, which
+// is what a simulation with no saved selection runs on at runtime: existing
+// unset simulations must keep showing (and saving) that, or opening one would
+// quietly move it to a different skill.
+export const NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE =
+  "ally_ai_learn_system_main_agent_prompt_working_memory_split";
 
 export const DEFAULT_ROLE_INSTRUCTION = `You are an AI roleplay assistant for counselor training. In this simulation, you must act ONLY as the client in a therapy session. Stay fully in character, provide realistic dialogue, and do not switch roles unless explicitly instructed.
 
@@ -686,11 +708,10 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         type: FORM_FIELD_TYPES.CUSTOM_FIELDS,
         tooltipLocation: TooltipLocation.CUSTOM_FIELDS,
         fullWidth: true,
-        // Custom fields exist solely to render `{custom_fields_text}` in the
-        // prompt — no other consumer reads them. Hide the editor when the
-        // selected variant doesn't reference that placeholder.
-        promptVariable: "custom_fields_text",
-        hideWhenUnused: true,
+        // Always shown, whatever the selected prompt. Besides
+        // `{custom_fields_text}`, ai-learn reads custom fields directly: event
+        // branch instructions substitute them by name, and the session report
+        // scores against them as part of the character description.
       },
       {
         id: "knowledgeSources",
@@ -707,6 +728,25 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         // or not the body names the placeholder. Prompt #3 omits the
         // placeholder for precisely that reason. Gating on it hid a field that
         // was still fully wired.
+        //
+        // The one exception: a prompt that uses `{memories}` (the Stage
+        // Director prompt) doesn't retrieve at all, so Memories below replaces
+        // this editor there. The stored knowledgeSources are left untouched —
+        // switching back to #3 shows them exactly as they were.
+        hideWhenPromptUses: MEMORIES_PLACEHOLDER,
+      },
+      {
+        // The Stage Director prompt's replacement for Knowledge Sources. A
+        // separate field (metadata.memories), so switching prompts never
+        // edits the other prompt's copy. Shown only when the selected prompt
+        // body uses `{memories}`.
+        id: "memories",
+        label: "Memories",
+        type: FORM_FIELD_TYPES.CUSTOM.MEMORIES_EDITOR,
+        fullWidth: true,
+        isMandatory: false,
+        promptVariable: MEMORIES_PLACEHOLDER,
+        showOnlyWhenUsed: true,
       },
       {
         id: "coverImageUrl",
@@ -766,16 +806,11 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         label: "Pick Competency",
         type: FORM_FIELD_TYPES.COMPETENCY,
         options: [],
-        // Competency stays mandatory and always visible. It's not just
-        // a prompt placeholder — it's a first-class scenario attribute
-        // (identifies the counselor skill being trained, used by
-        // analytics / organization / filtering). The `promptVariable`
-        // declaration below is intentionally kept so studio authors
-        // see `{competency}` in the chip list when editing a variant,
-        // but there's no `hideWhenUnused` because the field is
-        // structural metadata, not a prompt-only feeder field.
+        // Competency stays mandatory and always visible. It's a scenario
+        // attribute (the counselor skill being trained, used by analytics,
+        // organization and filtering), not a prompt variable, so it carries
+        // no `promptVariable` and no skill version can hide it.
         isMandatory: true,
-        promptVariable: "competency",
       },
       // The unified Behaviour Instructions table is always rendered.
       // Its rows drive the score-keeper via the SHOULD_DO/SHOULD_NOT_DO
@@ -811,7 +846,8 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         tooltipLocation: TooltipLocation.OPENING_DIALOGUE_TEMPLATES,
         fullWidth: true,
         isMandatory: false,
-        promptVariable: "opening_statements",
+        // What the client says first, played by the runtime itself. Not a
+        // prompt variable, so no skill version can hide it.
         enhanceType: ENHANCE_TYPE.OPENING_STATEMENTS,
       },
       // Plain-text reminders shown to the learner during the live session —

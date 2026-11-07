@@ -455,6 +455,30 @@ describe('buildSweepPrompt', () => {
       },
     ];
 
+    it('lists bugs already open, and tells the agent one root cause is one finding', () => {
+      // Two findings filed in one round for one LangGraph state-update error —
+      // "scheduled" and "immediately active" time events — reached Needs you
+      // as a pair because the sweep never saw what was open and named a
+      // different symbol for each symptom.
+      const p = build({
+        openBugs: [
+          {
+            title: 'Scheduled time events fail on an ambiguous state update',
+            file: 'app/graph/time_events.py',
+            symbol: 'schedule_time_events',
+          },
+        ],
+      });
+      expect(p).toMatch(/Already open — do NOT file a second one/);
+      expect(p).toContain(
+        'Scheduled time events fail on an ambiguous state update',
+      );
+      expect(p).toContain('app/graph/time_events.py · schedule_time_events');
+      expect(p).toMatch(/exactly that bug's file and symbol/);
+      expect(p).toMatch(/One root cause is one finding/);
+      expect(build({ openBugs: [] })).not.toMatch(/Already open/);
+    });
+
     it('says nothing at all when there is nothing settled', () => {
       // A heading with an empty list under it is prompt weight for no
       // information, and this text competes with the protocol it precedes.
@@ -533,40 +557,21 @@ describe('buildSweepPrompt', () => {
       expect(mergeable()).not.toContain('gh pr merge --admin');
     });
 
-    it('tells a protected repo it cannot merge, separately from the mobile rule', () => {
+    it('tells a protected repo it cannot merge', () => {
       // Same fix as in the fix-session prompt: the sweep spent its Fix phase
       // opening PRs and then failing at a merge its token could never perform.
       const p = build({ repo: 'ally-be' });
       expect(p).toMatch(/Do not attempt to merge anything here/i);
       expect(p).toMatch(/push access only/i);
       expect(p).not.toMatch(/you may merge at most/i);
-      // The mobile reasoning must not leak onto a backend repo.
-      expect(p).not.toMatch(/frozen contract/i);
     });
   });
 
-  describe('ally-mobile: fixable, but never merged', () => {
-    const mobile = (
-      over: Partial<Parameters<typeof buildSweepPrompt>[0]> = {},
-    ) => build({ repo: 'ally-mobile', ...over });
-
-    it('still runs the finders and the fix phase, unlike a genuinely unfixable repo', () => {
-      expect(mobile()).toMatch(/TEST\/LINT/);
-      expect(mobile()).toMatch(/Apply the MINIMAL fix/);
-      expect(mobile()).toContain('pipeline/approved-findings');
-    });
-
-    it('forbids merging, however trivial the fix', () => {
-      const p = mobile();
-      expect(p).toMatch(/Never merge here/i);
-      expect(p).not.toContain('gh pr merge --admin');
-      expect(p).not.toMatch(/you may merge at most/i);
-      expect(p).not.toMatch(/genuinely trivial/i);
-    });
-
-    it('still closes the run', () => {
-      expect(mobile()).toContain('/close');
-    });
+  it('sweeps ally-mobile like any other canBotMerge: false repo (re-onboarded 2026-11-06)', () => {
+    const p = build({ repo: 'ally-mobile' });
+    expect(p).toMatch(/flutter test/);
+    expect(p).toMatch(/flutter analyze/);
+    expect(p).toMatch(/Do not attempt to merge anything here/i);
   });
 
   describe('the progress stages it advertises', () => {
@@ -581,7 +586,7 @@ describe('buildSweepPrompt', () => {
     ][] = [
       ['ally-be, AI', 'ally-be', BugHunterMode.AI],
       ['ally-be, MANUAL', 'ally-be', BugHunterMode.MANUAL],
-      ['ally-mobile (never merges)', 'ally-mobile', BugHunterMode.AI],
+      ['ally-ai-learn (self-merges)', 'ally-ai-learn', BugHunterMode.AI],
       ['ally-ai', 'ally-ai', BugHunterMode.AI],
       ['ally-web (unfixable)', 'ally-web', BugHunterMode.AI],
     ];

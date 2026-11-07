@@ -1,3 +1,5 @@
+import { FaviconUploadContentType } from '../../constants/tenant-branding.constants';
+import { resolveBranding } from '../../util/tenant-branding.util';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { featureToggleGuardProviders } from 'src/auth/guards/test/feature-toggle-guard.fixtures';
@@ -52,6 +54,9 @@ describe('TenantController', () => {
     enabledDashboardIds: [],
     hideRankInCommunity: false,
     engagementReminderEnabled: false,
+    brandingEnabled: false,
+    brandedSignInUrl: null,
+    branding: resolveBranding({ name: 'Test Tenant' }, undefined),
     enableAudioUpload: true,
     enableMicrophoneMode: true,
     enableDictationMode: true,
@@ -63,6 +68,9 @@ describe('TenantController', () => {
     enabledDashboardIds: [],
     hideRankInCommunity: false,
     engagementReminderEnabled: false,
+    brandingEnabled: false,
+    brandedSignInUrl: null,
+    branding: resolveBranding({ name: 'Test Tenant' }, undefined),
     enableAudioUpload: true,
     enableMicrophoneMode: true,
     enableDictationMode: true,
@@ -74,6 +82,9 @@ describe('TenantController', () => {
     enabledDashboardIds: [],
     hideRankInCommunity: false,
     engagementReminderEnabled: false,
+    brandingEnabled: false,
+    brandedSignInUrl: null,
+    branding: resolveBranding({ name: 'Test Tenant' }, undefined),
     enableAudioUpload: true,
     enableMicrophoneMode: true,
   };
@@ -98,6 +109,8 @@ describe('TenantController', () => {
       updateTenant: jest.fn(),
       findTenantIdsUsingLogo: jest.fn(),
       deleteOrganizationLogo: jest.fn(),
+      updateBranding: jest.fn(),
+      getPresignedUrlForBrandingFavicon: jest.fn(),
     };
 
     // The real resolver: an unrestricted platform admin unless a test makes
@@ -428,6 +441,81 @@ describe('TenantController', () => {
 
       const result = await controller.updateTenant('invalid', dto);
       expect(result).toBeNull();
+    });
+  });
+  describe('organization branding routes', () => {
+    const brandingDto = { displayName: 'Acme Helpline' };
+    const faviconDto = {
+      fileName: 'fav.png',
+      fileSize: 1000,
+      contentType: FaviconUploadContentType.PNG,
+    };
+
+    it('updates branding for an org in scope', async () => {
+      const response = {
+        branding: resolveBranding({ name: 'Acme Helpline' }, { enabled: true }),
+        warnings: [],
+      };
+      tenantService.updateBranding.mockResolvedValue(response);
+
+      await expect(
+        controller.updateBranding('id1', brandingDto),
+      ).resolves.toEqual(response);
+      expect(tenantService.updateBranding).toHaveBeenCalledWith(
+        'id1',
+        brandingDto,
+      );
+    });
+
+    it('presigns a favicon upload for an org in scope', async () => {
+      tenantService.getPresignedUrlForBrandingFavicon.mockResolvedValue({
+        presignedUrl: 'https://p',
+        faviconUrl: 'https://f',
+      });
+
+      await expect(
+        controller.getPresignedUrlForBrandingFavicon('id1', faviconDto),
+      ).resolves.toEqual({
+        presignedUrl: 'https://p',
+        faviconUrl: 'https://f',
+      });
+      expect(
+        tenantService.getPresignedUrlForBrandingFavicon,
+      ).toHaveBeenCalledWith('id1', faviconDto);
+    });
+
+    describe('as a platform admin restricted to one organization', () => {
+      beforeEach(() => {
+        mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+      });
+
+      it('brands an allowlisted organization', async () => {
+        tenantService.updateBranding.mockResolvedValue({
+          branding: resolveBranding({ name: 'A' }, { enabled: true }),
+          warnings: [],
+        });
+        await controller.updateBranding(ALLOWED_TENANT_ID, brandingDto);
+        expect(tenantService.updateBranding).toHaveBeenCalledWith(
+          ALLOWED_TENANT_ID,
+          brandingDto,
+        );
+      });
+
+      it('refuses to brand, or presign for, an organization off their allowlist', async () => {
+        await expect(
+          controller.updateBranding('other-tenant', brandingDto),
+        ).rejects.toThrow(ForbiddenException);
+        await expect(
+          controller.getPresignedUrlForBrandingFavicon(
+            'other-tenant',
+            faviconDto,
+          ),
+        ).rejects.toThrow(ForbiddenException);
+        expect(tenantService.updateBranding).not.toHaveBeenCalled();
+        expect(
+          tenantService.getPresignedUrlForBrandingFavicon,
+        ).not.toHaveBeenCalled();
+      });
     });
   });
 });

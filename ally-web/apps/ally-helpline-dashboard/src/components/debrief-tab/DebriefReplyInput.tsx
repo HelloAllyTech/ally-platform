@@ -10,13 +10,19 @@ const MAX_MESSAGE_LENGTH = 2000;
 interface DebriefReplyInputProps {
   onSend: (text: string) => void;
   disabled?: boolean;
+  /** Overrides today's placeholder, e.g. Ask Ally's under the reflective question. */
+  placeholder?: string;
 }
 
 /**
  * Reply composer for the debrief thread. Same mechanics as the old Ask AI
  * composer, but framed as replying to Ally rather than querying a tool.
  */
-export const DebriefReplyInput: FC<DebriefReplyInputProps> = ({ onSend, disabled }) => {
+export const DebriefReplyInput: FC<DebriefReplyInputProps> = ({
+  onSend,
+  disabled,
+  placeholder,
+}) => {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const wasDisabledRef = useRef(disabled);
@@ -79,7 +85,7 @@ export const DebriefReplyInput: FC<DebriefReplyInputProps> = ({ onSend, disabled
           // on a phone. Below md the vertical padding moves outside the box
           // (my-2 py-0): phones force 16px text, the placeholder wraps, and
           // inside padding the next line's tops showed under the first.
-          placeholder={t("postSim.debrief.replyPlaceholder")}
+          placeholder={placeholder ?? t("postSim.debrief.replyPlaceholder")}
           disabled={disabled}
           maxLength={MAX_MESSAGE_LENGTH}
           rows={1}

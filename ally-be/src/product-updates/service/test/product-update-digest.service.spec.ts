@@ -1,3 +1,4 @@
+import { RoadmapVotingAnalyticsService } from 'src/analytics/service/roadmap-voting-analytics.service';
 import { SESService } from 'src/aws/service/ses.service';
 import { AppConfigService } from 'src/config/config.service';
 import { RedisService } from 'src/redis/service/redis.service';
@@ -48,10 +49,15 @@ describe('ProductUpdateDigestService', () => {
     set: jest.Mock;
   };
   let config: {
-    productUpdates: { digestTo: string[]; digestHour: number };
+    productUpdates: {
+      digestTo: string[];
+      digestHour: number;
+      digestAllowed: boolean;
+    };
     email: { sourceEmail: string };
     adminBaseUrl: string;
   };
+  let roadmapVoting: { getRoadmapVoting: jest.Mock };
   let service: ProductUpdateDigestService;
 
   beforeEach(() => {
@@ -68,7 +74,11 @@ describe('ProductUpdateDigestService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     };
     config = {
-      productUpdates: { digestTo: ['team@example.com'], digestHour: 18 },
+      productUpdates: {
+        digestTo: ['team@example.com'],
+        digestHour: 18,
+        digestAllowed: true,
+      },
       email: { sourceEmail: 'no-reply@example.com' },
       adminBaseUrl: 'https://admin.example.com/',
     };
@@ -86,6 +96,35 @@ describe('ProductUpdateDigestService', () => {
         .fn()
         .mockResolvedValue(new Map([['u2', ['ally-web:admin']]])),
     };
+    // Sept 2026 so far: Bea 12, Asha 3, Cy and Dev with access but no votes.
+    roadmapVoting = {
+      getRoadmapVoting: jest.fn().mockResolvedValue({
+        months: [
+          {
+            month: '2026-09-01',
+            partial: true,
+            votes: 15,
+            voters: 2,
+            eligible: 4,
+            granted: 800,
+            users: [
+              { userId: 1, votes: 3, votesOnOthers: 3, granted: 200 },
+              { userId: 2, votes: 12, votesOnOthers: 9, granted: 200 },
+              { userId: 3, votes: 0, votesOnOthers: 0, granted: 200 },
+              { userId: 4, votes: 0, votesOnOthers: 0, granted: 200 },
+            ],
+          },
+        ],
+        users: [
+          { userId: 2, name: 'Bea' },
+          { userId: 1, name: 'Asha' },
+          { userId: 4, name: 'Dev' },
+          { userId: 3, name: 'Cy' },
+        ],
+        accessRecordedFrom: '2026-09-01',
+        computedAt: IN_DIGEST_HOUR.toISOString(),
+      }),
+    };
     service = new ProductUpdateDigestService(
       updateRepository as unknown as ProductUpdateRepository,
       sourceRepository as unknown as ProductUpdateSourceRepository,
@@ -93,7 +132,16 @@ describe('ProductUpdateDigestService', () => {
       sesService as unknown as SESService,
       config as unknown as AppConfigService,
       redis as unknown as RedisService,
+      roadmapVoting as unknown as RoadmapVotingAnalyticsService,
     );
+  });
+
+  it('never sends from a database that is not production, and never takes the lock', async () => {
+    config.productUpdates.digestAllowed = false;
+
+    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('not-production');
+    expect(redis.acquireLock).not.toHaveBeenCalled();
+    expect(sesService.sendEmail).not.toHaveBeenCalled();
   });
 
   it('does nothing without recipients, or outside its business hour', async () => {
@@ -161,6 +209,46 @@ describe('ProductUpdateDigestService', () => {
     expect(redis.releaseLock).toHaveBeenCalledWith(
       'product-updates:digest:2026-09-30',
     );
+  });
+
+  it("adds this month's roadmap votes by name: voters highest first", async () => {
+    updateRepository.find
+      .mockResolvedValueOnce([update({})])
+      .mockResolvedValueOnce([]);
+
+    await service.sendIfDue(IN_DIGEST_HOUR);
+
+    const body: string = sesService.sendEmail.mock.calls[0][0].body;
+    expect(body).toContain('Roadmap votes in September so far:');
+    expect(body).toContain('Voters voted others share');
+    expect(body).toContain('75%'); // Bea: 9 of 12 on colleagues' ideas
+    expect(body).toContain('100%'); // Asha: 3 of 3
+    expect(body).not.toContain('admins have voted');
+    expect(body.indexOf('Bea')).toBeLessThan(body.indexOf('Asha'));
+    expect(body).not.toContain('Not voted yet');
+    expect(body.indexOf('Roadmap votes in September')).toBeLessThan(
+      body.indexOf('Live for customers'),
+    );
+    expect(body).not.toContain('analytics?tab=highlights');
+  });
+
+  it('still sends the digest when the roadmap votes cannot be read', async () => {
+    updateRepository.find
+      .mockResolvedValueOnce([update({})])
+      .mockResolvedValueOnce([]);
+    roadmapVoting.getRoadmapVoting.mockRejectedValue(new Error('db down'));
+
+    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('sent');
+    expect(sesService.sendEmail.mock.calls[0][0].body).not.toContain(
+      'Roadmap votes',
+    );
+  });
+
+  it('never sends a digest for the roadmap votes alone', async () => {
+    updateRepository.find.mockResolvedValue([]);
+
+    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('nothing-to-report');
+    expect(roadmapVoting.getRoadmapVoting).not.toHaveBeenCalled();
   });
 
   it('escapes what it writes into the email', () => {

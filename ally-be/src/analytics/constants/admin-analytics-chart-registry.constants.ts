@@ -2328,6 +2328,36 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       componentFile: f('Analytics/tabs/AllyGuideTab.tsx'),
       note: 'Learners, turns, model cost and cost per learner for each course with Ally conversations in the window; courses under 5 learners fold into one unnamed row. /v1/analytics/ally-guide/courses',
     },
+    {
+      id: 'AAQ-252',
+      tab: 'Highlights',
+      subTab: 'Goals',
+      title: 'Course units consumed',
+      kind: 'chart',
+      chartType: 'custom SVG',
+      componentFile: f('Analytics/CourseUnitsCard.tsx'),
+      note: 'Three panels on one period axis: course units (XP / 100), unique learners earning XP, average units per learner. /v1/analytics/course-units units, learners, avgUnitsPerLearner',
+    },
+    {
+      id: 'AAQ-253',
+      tab: 'Highlights',
+      subTab: 'Goals',
+      title: 'Learners who have reached a level (cumulative)',
+      kind: 'chart',
+      chartType: 'ComboChart',
+      componentFile: f('Analytics/LevelReachCumulativeCard.tsx'),
+      note: 'Level dropdown (L1-L5), monthly only: running total of unique learners who first reached the level (line) and the net addition over the previous month (bars). Running sum of /v1/analytics/xp-level-reached levelCounts at range=all, bucket=month',
+    },
+    {
+      id: 'AAQ-254',
+      tab: 'Highlights',
+      subTab: 'Goals',
+      title: 'Roadmap votes cast, by admin',
+      kind: 'chart',
+      chartType: 'StackedBarChart',
+      componentFile: f('Analytics/RoadmapVotingCard.tsx'),
+      note: 'Votes each admin with product-roadmap access cast per month (stacked, top 8 + Other admins), with participation (voted / could vote) per month and a who-voted grid that keeps non-voters visible. All-time. /v1/analytics/roadmap-voting',
+    },
   ];
 
 /** Total number of registered charts — handy for the guard test and the UI. */

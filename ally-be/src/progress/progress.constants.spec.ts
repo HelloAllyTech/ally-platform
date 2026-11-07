@@ -17,8 +17,16 @@ import {
 
 describe('progress constants', () => {
   describe('LEVEL_THRESHOLDS', () => {
-    it('has one threshold per level', () => {
-      expect(LEVEL_THRESHOLDS).toHaveLength(MAX_LEVEL);
+    it('has one threshold per level, from level 0 through the top', () => {
+      expect(MAX_LEVEL).toBe(50);
+      expect(LEVEL_THRESHOLDS).toHaveLength(MAX_LEVEL + 1);
+    });
+
+    it('starts everyone at 0 XP and puts level 1 at 100 XP', () => {
+      expect(LEVEL_THRESHOLDS[0]).toBe(0);
+      expect(LEVEL_THRESHOLDS.slice(0, 10)).toEqual([
+        0, 100, 260, 516, 926, 1581, 2630, 4308, 6992, 11287,
+      ]);
     });
 
     it('increases strictly, with each level costing more than the last', () => {
@@ -32,37 +40,51 @@ describe('progress constants', () => {
       }
     });
 
+    it('grows each step past level 9 by about 10%', () => {
+      for (let i = 10; i <= MAX_LEVEL; i += 1) {
+        const thisDelta = LEVEL_THRESHOLDS[i] - LEVEL_THRESHOLDS[i - 1];
+        const prevDelta = LEVEL_THRESHOLDS[i - 1] - LEVEL_THRESHOLDS[i - 2];
+        expect(thisDelta / prevDelta).toBeCloseTo(1.1, 2);
+      }
+    });
+
     it('does not top out before 5,000 lifetime practice minutes', () => {
       // A learner with 5,000 practice minutes earns at least 5,000 practice XP, and
       // should still have ladder left to climb.
       expect(LEVEL_THRESHOLDS[MAX_LEVEL - 1]).toBeGreaterThan(5000);
     });
+
+    it('keeps the top of the ladder inside the integer totalXp column', () => {
+      expect(LEVEL_THRESHOLDS[MAX_LEVEL]).toBeLessThan(2_147_483_647);
+    });
   });
 
   describe('resolveLevel', () => {
-    it('starts a learner with no XP at level 1', () => {
+    it('starts a learner with no XP at level 0', () => {
       const standing = resolveLevel(0);
-      expect(standing.level).toBe(1);
+      expect(standing.level).toBe(0);
       expect(standing.xpIntoLevel).toBe(0);
       expect(standing.xpToNextLevel).toBe(100);
       expect(standing.isMaxLevel).toBe(false);
     });
 
     it('treats a negative or non-finite total as zero rather than a negative level', () => {
-      expect(resolveLevel(-500).level).toBe(1);
-      expect(resolveLevel(Number.NaN).level).toBe(1);
+      expect(resolveLevel(-500).level).toBe(0);
+      expect(resolveLevel(Number.NaN).level).toBe(0);
     });
 
     it('levels up exactly at the threshold, not one XP later', () => {
-      expect(resolveLevel(99).level).toBe(1);
-      expect(resolveLevel(100).level).toBe(2);
-      expect(resolveLevel(259).level).toBe(2);
-      expect(resolveLevel(260).level).toBe(3);
+      expect(resolveLevel(99).level).toBe(0);
+      expect(resolveLevel(100).level).toBe(1);
+      expect(resolveLevel(259).level).toBe(1);
+      expect(resolveLevel(260).level).toBe(2);
+      expect(resolveLevel(515).level).toBe(2);
+      expect(resolveLevel(516).level).toBe(3);
     });
 
     it('reports position inside the current level', () => {
       const standing = resolveLevel(180);
-      expect(standing.level).toBe(2);
+      expect(standing.level).toBe(1);
       expect(standing.levelFloorXp).toBe(100);
       expect(standing.nextLevelXp).toBe(260);
       expect(standing.xpIntoLevel).toBe(80);
@@ -70,8 +92,15 @@ describe('progress constants', () => {
       expect(standing.progress).toBeCloseTo(0.5);
     });
 
+    it('is not max level one rung below the top', () => {
+      const standing = resolveLevel(LEVEL_THRESHOLDS[MAX_LEVEL] - 1);
+      expect(standing.level).toBe(MAX_LEVEL - 1);
+      expect(standing.isMaxLevel).toBe(false);
+      expect(standing.nextLevelXp).toBe(LEVEL_THRESHOLDS[MAX_LEVEL]);
+    });
+
     it('caps at max level with a full bar and no next threshold', () => {
-      const standing = resolveLevel(LEVEL_THRESHOLDS[MAX_LEVEL - 1] + 50_000);
+      const standing = resolveLevel(LEVEL_THRESHOLDS[MAX_LEVEL] + 50_000);
       expect(standing.level).toBe(MAX_LEVEL);
       expect(standing.isMaxLevel).toBe(true);
       expect(standing.nextLevelXp).toBeNull();

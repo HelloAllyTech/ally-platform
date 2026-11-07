@@ -26,6 +26,20 @@ export const ROADMAP_VOTE_GRANT_DAILY = 5;
 export const ROADMAP_VOTE_GRANT_EXPIRY_DAYS = 30;
 
 /**
+ * Breadth multiplier — a vote is worth 1.0 to 1.0 + MAX_BONUS of a vote, by how many DIFFERENT
+ * colleagues the voter has backed inside a rolling window. Own opportunities earn nothing.
+ *
+ *   multiplier = 1 + MAX_BONUS * min(1, qualifying / target)
+ *   target     = min(TARGET_AUTHORS, distinct other authors with a votable opportunity), at least 1
+ *
+ * TARGET_AUTHORS is a cap, not a fixed goal: with few colleagues filing, a flat 8 would be
+ * unreachable. All three are product-tunable; nothing else reads them.
+ */
+export const ROADMAP_MULTIPLIER_MAX_BONUS = 0.3;
+export const ROADMAP_MULTIPLIER_TARGET_AUTHORS = 8;
+export const ROADMAP_MULTIPLIER_WINDOW_DAYS = 14;
+
+/**
  * The `productGoal` every bug report is filed under. `productGoal` is a required text
  * FK-by-name into `roadmap_product_goals` (see the entity) and no bug-report form has a
  * goal/category picker (product decision — see CreateBugReportDto), so something has to be
@@ -494,4 +508,5 @@ export const ROADMAP_OWNER_EMAILS: readonly string[] = [
   'ajey@helloally.ai',
   'shubham.bhoite+admin@helloally.ai',
   'gopikrishnan.sasikumar@helloally.ai',
+  'shehbaz.sayed+admin@helloally.ai',
 ] as const;

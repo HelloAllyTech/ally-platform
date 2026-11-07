@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { IsNull } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { BuilderSession } from '../entity/builder-session.entity';
@@ -7,6 +7,7 @@ import { BuilderNotificationKind } from '../enum/builder.enum';
 import { SlackService } from 'src/notification/service/slack.service';
 import { AppConfigService } from 'src/config/config.service';
 import { BUILDER_ANNOUNCED_KINDS } from '../constants/builder.constants';
+import { BuilderLiveService } from './builder-live.service';
 
 /**
  * What happened while the admin was elsewhere.
@@ -30,6 +31,7 @@ export class BuilderNotificationService {
     private readonly repository: BuilderNotificationRepository,
     private readonly slack: SlackService,
     private readonly configService: AppConfigService,
+    @Optional() private readonly liveService?: BuilderLiveService,
   ) {}
 
   private async notify(
@@ -55,6 +57,8 @@ export class BuilderNotificationService {
       );
     }
 
+    // Every notification is a session moving: the Builder tab refetches.
+    this.liveService?.changed('sessionsChanged', 'decisionsChanged');
     await this.announce(session, kind, message);
   }
 
@@ -149,7 +153,7 @@ export class BuilderNotificationService {
       prUrl: string;
       title?: string | null;
     },
-  ): Promise<void> {
+  ): Promise<{ channel: string; ts: string } | null> {
     const what = pullRequest.title?.trim()
       ? `${pullRequest.repo}#${pullRequest.prNumber} — ${pullRequest.title.trim()}`
       : `${pullRequest.repo}#${pullRequest.prNumber}`;
@@ -206,7 +210,42 @@ export class BuilderNotificationService {
       this.logger.warn(
         `Could not offer a merge button for ${pullRequest.repo}#${pullRequest.prNumber}: ${result.error}`,
       );
+      return null;
     }
+    return result.ts && result.channel
+      ? { channel: result.channel, ts: result.ts }
+      : null;
+  }
+
+  /**
+   * Retire a merge prompt once the pull request has merged, wherever the
+   * click came from: the button goes, and the message says what happened.
+   * Best-effort — a stale button is untidy, not unsafe, because the handler
+   * refuses a merged pull request anyway.
+   */
+  async mergePromptAnswered(pullRequest: {
+    repo: string;
+    prNumber: number;
+    prUrl: string;
+    slackChannel?: string | null;
+    slackMessageTs?: string | null;
+  }): Promise<void> {
+    if (!pullRequest.slackChannel || !pullRequest.slackMessageTs) return;
+    const text = `Answered in Ally: merged ${pullRequest.repo}#${pullRequest.prNumber}.`;
+    await this.slack.updateMessage({
+      channel: pullRequest.slackChannel,
+      ts: pullRequest.slackMessageTs,
+      text,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `~Merge ${pullRequest.repo}#${pullRequest.prNumber}?~\n${text} <${pullRequest.prUrl}|Open on GitHub>`,
+          },
+        },
+      ],
+    });
   }
 
   /**

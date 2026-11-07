@@ -1,0 +1,211 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+import 'package:ally_mobile_flutter/features/simulations/data/learner_debrief_repository.dart';
+import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/feedback/learner_debrief_controller.dart';
+
+import '../data/learner_debrief_repository_test.dart' show readyDebriefJson;
+
+class MockLearnerDebriefRepository extends Mock implements LearnerDebriefRepository {}
+
+LearnerDebriefView _view(String state) => LearnerDebriefView.fromJson({'state': state});
+
+void main() {
+  late MockLearnerDebriefRepository repo;
+
+  setUpAll(() => registerFallbackValue(DebriefFlagReason.didntSay));
+  setUp(() => repo = MockLearnerDebriefRepository());
+
+  LearnerDebriefController make() => LearnerDebriefController(repository: repo, sessionId: 's-1');
+
+  test('not_available keeps today\'s debrief (view is null)', () async {
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async => _view('not_available'));
+    final c = make();
+    await c.load();
+    expect(c.view, isNull);
+    c.dispose();
+  });
+
+  test('a failed first request keeps today\'s debrief', () async {
+    when(() => repo.getDebrief('s-1')).thenThrow(Exception('500'));
+    final c = make();
+    await c.load();
+    expect(c.view, isNull);
+    c.dispose();
+  });
+
+  test('a blank session id never asks', () async {
+    final c = LearnerDebriefController(repository: repo, sessionId: '');
+    await c.load();
+    verifyNever(() => repo.getDebrief(any()));
+    c.dispose();
+  });
+
+  // testWidgets for its fake clock: `pump(duration)` advances the poll timer.
+  testWidgets('polls every 3 s while working, and a failed poll keeps the last answer', (tester) async {
+    final answers = <Object>[
+      _view('working'),
+      Exception('blip'),
+      _view('working'),
+      LearnerDebriefView.fromJson(readyDebriefJson()),
+    ];
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async {
+      final next = answers[calls++];
+      if (next is Exception) throw next;
+      return next as LearnerDebriefView;
+    });
+    final c = make();
+    await c.load();
+    expect(c.view?.state, LearnerDebriefState.working);
+    expect(calls, 1);
+
+    await tester.pump(const Duration(seconds: 2));
+    expect(calls, 1);
+    await tester.pump(const Duration(seconds: 1));
+    expect(calls, 2);
+    // The blip didn't swap back to today's debrief, and polling continues.
+    expect(c.view?.state, LearnerDebriefState.working);
+
+    await tester.pump(const Duration(seconds: 3));
+    expect(calls, 3);
+    await tester.pump(const Duration(seconds: 3));
+    expect(calls, 4);
+    expect(c.view?.state, LearnerDebriefState.ready);
+
+    // Ready: no more polling.
+    await tester.pump(const Duration(seconds: 30));
+    expect(calls, 4);
+    c.dispose();
+  });
+
+  testWidgets('after 4 minutes of working, polls every 30 s', (tester) async {
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async {
+      calls++;
+      return _view('working');
+    });
+    final c = make();
+    await c.load();
+
+    // 4 minutes at 3 s: the first answer plus 80 polls.
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(seconds: 3));
+    }
+    expect(calls, 81);
+    // Slow now: nothing for 29 s, then one.
+    await tester.pump(const Duration(seconds: 29));
+    expect(calls, 81);
+    await tester.pump(const Duration(seconds: 1));
+    expect(calls, 82);
+    await tester.pump(const Duration(seconds: 30));
+    expect(calls, 83);
+    // Dispose inside the test: the next poll is still pending.
+    c.dispose();
+  });
+
+  testWidgets('polls every 30 s while on its way; not at all once too short', (tester) async {
+    final answers = [_view('on_its_way'), _view('on_its_way'), _view('too_short')];
+    var calls = 0;
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async => answers[calls++]);
+    final c = make();
+    addTearDown(c.dispose);
+    await c.load();
+
+    await tester.pump(const Duration(seconds: 29));
+    expect(calls, 1);
+    await tester.pump(const Duration(seconds: 1));
+    expect(calls, 2);
+    await tester.pump(const Duration(seconds: 30));
+    expect(calls, 3);
+    expect(c.view?.state, LearnerDebriefState.tooShort);
+    await tester.pump(const Duration(minutes: 5));
+    expect(calls, 3);
+  });
+
+  test('markRead is sent once, and a failure is silent', () async {
+    when(() => repo.markRead('s-1')).thenThrow(Exception('500'));
+    final c = make();
+    await c.markRead();
+    await c.markRead();
+    verify(() => repo.markRead('s-1')).called(1);
+    c.dispose();
+  });
+
+  test('markOpened is sent once, and a failure is silent', () async {
+    when(() => repo.markOpened('s-1')).thenThrow(Exception('404'));
+    final c = make();
+    await c.markOpened();
+    await c.markOpened();
+    verify(() => repo.markOpened('s-1')).called(1);
+    c.dispose();
+  });
+
+  test('supervisor: reads the supervisor view only, and never marks read or opened', () async {
+    when(() => repo.getSupervisorDebrief('s-1')).thenAnswer(
+      (_) async => LearnerDebriefView.fromSupervisorJson({'state': 'ready', 'cards': readyDebriefJson()['cards']}),
+    );
+    final c = LearnerDebriefController(repository: repo, sessionId: 's-1', supervisor: true);
+    await c.load();
+    expect(c.view?.supervisor, isNotNull);
+    await c.markRead();
+    await c.markOpened();
+    verifyNever(() => repo.getDebrief(any()));
+    verifyNever(() => repo.markRead(any()));
+    verifyNever(() => repo.markOpened(any()));
+    c.dispose();
+  });
+
+  test('helpful shows the pressed state once the server accepts', () async {
+    when(() => repo.getDebrief('s-1')).thenAnswer((_) async => LearnerDebriefView.fromJson(readyDebriefJson()));
+    when(() => repo.setHelpful('s-1', helpful: true)).thenAnswer((_) async {});
+    final c = make();
+    await c.load();
+    await c.setHelpful(true);
+    expect(c.view!.helpful, isTrue);
+    verify(() => repo.setHelpful('s-1', helpful: true)).called(1);
+    c.dispose();
+  });
+
+  test('flagging shows the sent flag; undo takes it back; a failed flag throws', () async {
+    // A tiny server: the re-read after each change reflects stored flags.
+    final stored = <Map<String, dynamic>>[];
+    when(() => repo.getDebrief('s-1')).thenAnswer(
+      (_) async => LearnerDebriefView.fromJson({
+        ...readyDebriefJson(),
+        'feedback': {'helpful': null, 'flags': List.of(stored)},
+      }),
+    );
+    final until = DateTime.now().add(const Duration(minutes: 10));
+    when(
+      () => repo.flagCard('s-1', section: 'what_worked[0]', reason: DebriefFlagReason.didntSay, note: null),
+    ).thenAnswer((_) async {
+      stored.add({'id': 'f1', 'section': 'what_worked[0]', 'status': 'open', 'canUndoUntil': until.toIso8601String()});
+      return (id: 'f1', undoUntil: until);
+    });
+    when(() => repo.undoFlag('s-1', 'f1')).thenAnswer((_) async => stored.clear());
+    final c = make();
+    await c.load();
+
+    await c.flagCard(section: 'what_worked[0]', reason: DebriefFlagReason.didntSay);
+    expect(c.view!.flags.single.id, 'f1');
+    await pumpEventQueue();
+    expect(c.view!.flags.single.canUndoAt(DateTime.now()), isTrue);
+
+    await c.undoFlag('f1');
+    expect(c.view!.flags, isEmpty);
+    await pumpEventQueue();
+    expect(c.view!.flags, isEmpty);
+
+    when(
+      () => repo.flagCard('s-1', section: 'practise_next', reason: DebriefFlagReason.somethingElse, note: null),
+    ).thenThrow(Conflict409());
+    await expectLater(
+      c.flagCard(section: 'practise_next', reason: DebriefFlagReason.somethingElse),
+      throwsA(isA<Conflict409>()),
+    );
+    c.dispose();
+  });
+}
+
+class Conflict409 implements Exception {}

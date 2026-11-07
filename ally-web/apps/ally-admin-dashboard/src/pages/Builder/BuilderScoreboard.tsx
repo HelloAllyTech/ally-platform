@@ -19,6 +19,7 @@ import { useGetBuilderScoreboardQuery } from "@api";
 import { en, ROUTES } from "@constants";
 
 import { BUILDER_OUTCOME_TAG_TYPE } from "./builderMotion";
+import { PartnerScoreboard } from "./room/PartnerScoreboard";
 import {
   buildsStartedSeries,
   formatHours,
@@ -149,6 +150,8 @@ export const BuilderScoreboard: React.FC = () => {
           />
         </div>
       </header>
+
+      <PartnerScoreboard windowDays={windowDays} />
 
       {isError ? (
         <div className="flex flex-col items-start gap-2">

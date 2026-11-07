@@ -101,7 +101,6 @@ export const MobileReleases: FC = () => {
     ? getTestflightStatusDisplay(testflightStatus)
     : null;
 
-  const releaseInProgress = isReleaseInProgress(runs);
   // While this hasn't finished loading (or failed to), appStoreReviewHistory defaults to []
   // — indistinguishable from "genuinely never submitted" — so matchingSubmission must not be
   // trusted as a real answer yet; treat it as unknown rather than "not submitted".
@@ -129,18 +128,16 @@ export const MobileReleases: FC = () => {
     testflightHistory.find(entry => entry.buildId === testflightStatus?.buildId)?.uploadedDate ??
     null;
 
-  const lastAndroidBuildRun = findLastSuccessfulRun(runs, "Android Build");
   const lastAndroidPromoteRun = findLastRun(runs, "Promote Android");
-  // Validation signal for the promotion dialog: warn, don't block, since re-promoting the same
-  // build (e.g. to raise the rollout percentage) is a legitimate, common thing to do.
+  const lastAndroidBuildRun = findLastSuccessfulRun(runs, "Android Build");
+  // A promotion only counts as "already done" for the current build if it happened after that
+  // build's own upload — otherwise it's a promotion of some earlier version.
   const isAndroidAlreadyPromoted =
     isRunAfter(lastAndroidPromoteRun, lastAndroidBuildRun) &&
     lastAndroidPromoteRun?.conclusion === "success";
   const androidLastReleaseDate = lastAndroidBuildRun?.updatedAt ?? null;
-  const iosLastReleaseDate =
-    testflightHistory[0]?.uploadedDate ??
-    findLastSuccessfulRun(runs, "iOS Build")?.updatedAt ??
-    null;
+  const iosLastReleaseDate = testflightHistory[0]?.uploadedDate ?? null;
+  const releaseInProgress = isReleaseInProgress(runs);
 
   const [tabIndex, setTabIndex] = useState(0);
 
@@ -150,16 +147,13 @@ export const MobileReleases: FC = () => {
   const handleTrigger = async () => {
     try {
       await triggerRelease().unwrap();
-      toast.success("Release triggered — new run should appear in Release History shortly.");
+      toast.success("Release dispatched — new run should appear in Release History shortly.");
       setIsConfirmingTrigger(false);
     } catch (error) {
-      // Leave the dialog open on failure so the operator sees why (e.g. the
-      // GitHub Actions token isn't write-scoped) and can retry, rather than
-      // losing that context to a closed popup — same as RaiseBudgetDialog and
-      // StartBuildDialog elsewhere in Builder.
+      // Leave the dialog open on failure so the operator can see the error message and retry.
       const message =
         (error as { data?: { message?: string } })?.data?.message ??
-        "Failed to trigger the release. Please try again.";
+        "Failed to dispatch the release. Please try again.";
       toast.error(message);
     }
   };
@@ -424,7 +418,7 @@ export const MobileReleases: FC = () => {
           <NextCheckPanel
             isVersionsLoading={isVersionsLoading}
             isVersionsError={isVersionsError}
-            nextEligibleCheckAt={versions?.nextEligibleCheckAt}
+            nextEligibleCheckAt={versions?.nextEligibleCheckAt ?? null}
             isReleaseInProgress={releaseInProgress}
           />
         </div>
@@ -488,7 +482,7 @@ export const MobileReleases: FC = () => {
             {(isTriggering || isPromotingAndroid || isSubmittingAppStoreReview) && (
               <InlineLoading
                 description={
-                  isTriggering ? "Triggering…" : isPromotingAndroid ? "Promoting…" : "Submitting…"
+                  isTriggering ? "Dispatching…" : isPromotingAndroid ? "Promoting…" : "Submitting…"
                 }
               />
             )}
@@ -497,7 +491,7 @@ export const MobileReleases: FC = () => {
             <p className="text-xs tracking-wide text-typography-600 mb-1.5">Release actions</p>
             <div className="flex flex-wrap gap-2">
               <Tooltip
-                label="Skips the 2-day cadence and immediately builds and uploads both platforms to their internal tracks (Play Store internal track, TestFlight). Tests still gate the build."
+                label="Immediately dispatches the scheduled release pipeline — skips the 48h cadence wait, but tests still have to be green and there still have to be new commits to ship."
                 className="max-sm:w-full"
               >
                 <Button
@@ -641,9 +635,9 @@ export const MobileReleases: FC = () => {
           isOpen={isConfirmingTrigger}
           onClose={() => setIsConfirmingTrigger(false)}
           title="Trigger mobile release now?"
-          description="This immediately kicks off real production builds for **both Android and iOS** — uploading to the Play Store internal track and TestFlight. This is a real production action and can't be undone once it starts."
+          description="This immediately dispatches the scheduled release pipeline instead of waiting for its next automatic check. It still only ships something if there are new commits since the last release and tests are green."
           primaryButton={{
-            label: isTriggering ? "Triggering…" : "Trigger release",
+            label: isTriggering ? "Dispatching…" : "Trigger release",
             onClick: () => void handleTrigger(),
             disabled: isTriggering,
           }}
@@ -654,9 +648,9 @@ export const MobileReleases: FC = () => {
           }}
         >
           {releaseInProgress && (
-            <p className="w-full mt-2 text-sm text-warning-text">
-              A release is already running — this will queue behind it rather than run concurrently,
-              but confirm that's what you want before proceeding.
+            <p className="text-sm text-warning-text mt-2">
+              A release appears to be running right now — triggering another one may overlap with
+              it. Check Release History before proceeding.
             </p>
           )}
         </ActionConfirmationPopup>

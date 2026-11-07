@@ -26,11 +26,13 @@ import {
 } from "@types";
 
 import { RoadmapFilterBar, hasActiveFilters } from "./RoadmapFilterBar";
+import { useScoreUnit } from "./useScoreUnit";
 import { useSetVotes } from "./useSetVotes";
 import { RoadmapAdvancedFilterValues } from "./utils/filters";
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
 import { pageRange } from "./utils/paging";
 import { personName } from "./utils/people";
+import { formatPoints } from "./utils/points";
 import {
   isConsumerSourced,
   SOURCE_BADGE_STYLE,
@@ -136,6 +138,7 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
   onOffsetChange,
   layoutToggle,
 }) => {
+  const { unit } = useScoreUnit();
   const allocate = useSetVotes({ kind: "list", args: listArgs });
   const rows = data?.items ?? [];
   // Unfiltered max, so the bars keep a stable scale when a filter is applied.
@@ -235,7 +238,7 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
                     read as the same thing again. The sort key stays `priority`: it is the API's
                     field name, not a label. */}
                 <SortHeader field="priority" className="w-32">
-                  Total votes
+                  {unit === "points" ? "Points" : "Total votes"}
                 </SortHeader>
                 <TableHeader className="w-24">Your votes</TableHeader>
                 {/* A floor on phones only: the table scrolls sideways there, and without one the six
@@ -272,7 +275,7 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
                     {opportunity.code}
                   </TableCell>
                   <TableCell>
-                    <span className="tabular-nums">{opportunity.priorityScore}</span>
+                    <span className="tabular-nums">{formatPoints(opportunity.priorityScore)}</span>
                   </TableCell>
 
                   {/* stopPropagation, or every click inside the vote button also opens the

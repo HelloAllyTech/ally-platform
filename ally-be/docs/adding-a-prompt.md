@@ -243,6 +243,8 @@ Rules the store enforces on every new version, whichever way it arrives:
   - **A check:** have the change reviewed.
 
   The list is `src/prompt/constants/pinned-prompts.constants.ts`.
+
+  Confirming is not enough on its own: only the user ids named in `SKILLS_STORE_PINNED_EDITORS` (comma-separated, ally-be env) can put a pinned prompt live (`403 SKILLS_STORE_PINNED_LOCKED`). Unset means nobody — deny by default — and a caller with no signed-in person, such as an automated agent, is always refused. The one exception is `prompts apply-local`, which copies versions that already went live in the store they were exported from.
 - **Builder's interviewer and platform rules** go live only through Builder's replay eval, never by publishing (see [prompts-folder.md](./prompts-folder.md)).
 
 **Never** edit the default `.txt` to change what runs: production never reads it while the store answers. CI fails a PR that changes a default without changing its contract (`scripts/prompts/check-prompts.mjs`); label the PR `prompt-default-refresh` when you deliberately refresh the open-source base.

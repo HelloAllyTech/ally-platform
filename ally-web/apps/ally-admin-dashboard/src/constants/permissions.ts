@@ -101,6 +101,7 @@ export const SIDEBAR_ITEMS = {
   TRANSLATIONS: "translations",
   TOOLTIPS: "tooltips",
   ANALYTICS: "analytics",
+  DEBRIEFS: "debriefs",
   AGENT_TEST_CASES: "agent-test-cases",
   PRODUCT_ROADMAP: "product-roadmap",
   COMPETENCIES: "competencies",

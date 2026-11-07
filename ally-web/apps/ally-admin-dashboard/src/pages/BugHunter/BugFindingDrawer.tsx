@@ -293,7 +293,10 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   const [skipLocating, setSkipLocating] = useState(false);
   const [overrideBudget, setOverrideBudget] = useState(false);
   const budgetSpent = Boolean(finding?.budget?.exhausted);
-  const chainBlocked = Boolean(finding?.chain && !finding.chain.mergeable);
+  // A plan whose open step passed the Verifier: the merge is the STEP's PR,
+  // and the server checks that step's own chain, not the parent's.
+  const mergeStep = finding?.attention?.kind === "merge" ? finding.attention : null;
+  const chainBlocked = !mergeStep && Boolean(finding?.chain && !finding.chain.mergeable);
   // A human report nobody has located yet: "Put me on it" locates first
   // (the server sends the Verifier, not a fix session) unless forced.
   const needsLocating =
@@ -451,7 +454,10 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
 
   const handleMerge = async () => {
     try {
-      await merge({ id, ...(forceMerge ? { force: true } : {}) }).unwrap();
+      await merge({
+        id: mergeStep?.stepId ?? id,
+        ...(forceMerge ? { force: true } : {}),
+      }).unwrap();
       setConfirmAction(null);
     } catch (error) {
       // GitHub's own refusal is the useful one — "At least 1 approving review
@@ -767,16 +773,17 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
               {/* The merge Bug Hunter cannot do itself on a protected repo.
                   The backend re-checks the PR's own CI and refuses a red one,
                   so this is a shortcut past a trip to GitHub, not past a gate. */}
-              {canTriage && finding.status === BugFindingStatus.PR_OPENED && finding.prUrl && (
-                <Button
-                  size="sm"
-                  kind="primary"
-                  disabled={isMerging || isDraftingDescription}
-                  onClick={() => setConfirmAction("merge")}
-                >
-                  {en.bugHunter.drawerMerge}
-                </Button>
-              )}
+              {canTriage &&
+                ((finding.status === BugFindingStatus.PR_OPENED && finding.prUrl) || mergeStep) && (
+                  <Button
+                    size="sm"
+                    kind="primary"
+                    disabled={isMerging || isDraftingDescription}
+                    onClick={() => setConfirmAction("merge")}
+                  >
+                    {en.bugHunter.drawerMerge}
+                  </Button>
+                )}
 
               {canTriage && finding.releasable && (
                 <Button
@@ -869,6 +876,19 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                 <p className="text-xs text-typography-600 mt-0.5 mb-3">
                   {en.bugHunter.planSubtitle}
                 </p>
+                {finding?.attention && (
+                  <p
+                    className="text-xs text-orange-700 border border-orange-200 bg-orange-50 rounded px-2 py-1.5 mb-3"
+                    data-testid="plan-attention"
+                  >
+                    {(finding.attention.kind === "merge"
+                      ? en.bugHunter.planAttentionMergeHint
+                      : en.bugHunter.planAttentionReviewHint
+                    )
+                      .replace("{n}", String(finding.attention.stepIndex + 1))
+                      .replace("{repo}", finding.attention.repo ?? "")}
+                  </p>
+                )}
                 <ol className="flex flex-col gap-2">
                   {steps.map(step => (
                     <li key={step.id} className="flex items-start gap-2">
@@ -881,6 +901,17 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                             {step.repo}
                           </span>
                           <BugFindingStatusBadge status={step.status} />
+                          {step.fixVerdict && (
+                            <span
+                              className={`text-xs ${
+                                step.fixVerdict === "pass" ? "text-green-700" : "text-amber-700"
+                              }`}
+                            >
+                              {step.fixVerdict === "pass"
+                                ? en.bugHunter.planStepVerified
+                                : en.bugHunter.planStepRefused}
+                            </span>
+                          )}
                           {IN_FLIGHT_STATUSES.includes(step.status) && (
                             <BrailleSpinner className="text-amber-600" />
                           )}

@@ -228,6 +228,17 @@ export class BuilderPullRequest extends BaseWithoutTenantEntity {
   @Column({ type: 'timestamp', nullable: true })
   mergePromptedAt?: Date | null;
 
+  /**
+   * Where the merge prompt was posted, so the message can be edited to say it
+   * was answered — from Ally, or from Slack — instead of leaving a live button
+   * on work that has already merged.
+   */
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  slackChannel?: string | null;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  slackMessageTs?: string | null;
+
   @Column({ type: 'boolean', default: false })
   merged!: boolean;
 

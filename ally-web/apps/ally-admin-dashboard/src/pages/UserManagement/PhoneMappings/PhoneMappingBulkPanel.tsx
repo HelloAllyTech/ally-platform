@@ -17,6 +17,8 @@ import { parsePhoneMappingRows } from "./parsePhoneMappingRows";
 interface PhoneMappingBulkPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Opened from one organisation's WhatsApp page: every row goes to it, with no picker. */
+  fixedTenantId?: string;
 }
 
 interface TenantOption {
@@ -45,9 +47,10 @@ const NEEDS_ATTENTION: WaPhoneMappingOutcome[] = ["conflict", "invalid", "duplic
 export const PhoneMappingBulkPanel: React.FC<PhoneMappingBulkPanelProps> = ({
   isOpen,
   onClose,
+  fixedTenantId,
 }) => {
   const [text, setText] = useState("");
-  const [defaultTenantId, setDefaultTenantId] = useState("");
+  const [defaultTenantId, setDefaultTenantId] = useState(fixedTenantId ?? "");
   const [overwriteConflicts, setOverwriteConflicts] = useState(false);
   const [result, setResult] = useState<BulkWaPhoneMappingsResponse | null>(null);
   const [failed, setFailed] = useState(false);
@@ -222,22 +225,24 @@ export const PhoneMappingBulkPanel: React.FC<PhoneMappingBulkPanelProps> = ({
             </div>
           </EntityField>
 
-          <EntityField label={en.whatsappBot.phoneMappings.bulkDefaultOrganisationLabel}>
-            <CarbonDropdown
-              id="wa-bulk-tenant"
-              titleText=""
-              hideLabel
-              label={en.whatsappBot.phoneMappings.organisationLabel}
-              items={tenantOptions}
-              itemToString={(item: TenantOption | null) => item?.label ?? ""}
-              selectedItem={tenantOptions.find(option => option.id === defaultTenantId) ?? null}
-              invalid={needsDefaultOrganisation}
-              invalidText={en.whatsappBot.phoneMappings.validationOrganisation}
-              onChange={({ selectedItem }: { selectedItem?: TenantOption | null }) =>
-                setDefaultTenantId(selectedItem?.id ?? "")
-              }
-            />
-          </EntityField>
+          {!fixedTenantId && (
+            <EntityField label={en.whatsappBot.phoneMappings.bulkDefaultOrganisationLabel}>
+              <CarbonDropdown
+                id="wa-bulk-tenant"
+                titleText=""
+                hideLabel
+                label={en.whatsappBot.phoneMappings.organisationLabel}
+                items={tenantOptions}
+                itemToString={(item: TenantOption | null) => item?.label ?? ""}
+                selectedItem={tenantOptions.find(option => option.id === defaultTenantId) ?? null}
+                invalid={needsDefaultOrganisation}
+                invalidText={en.whatsappBot.phoneMappings.validationOrganisation}
+                onChange={({ selectedItem }: { selectedItem?: TenantOption | null }) =>
+                  setDefaultTenantId(selectedItem?.id ?? "")
+                }
+              />
+            </EntityField>
+          )}
 
           <EntityField label="">
             <CarbonToggle

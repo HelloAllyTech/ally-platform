@@ -20,6 +20,7 @@ describe('BugHunterProbeService', () => {
   let answers: unknown[][];
   let logs: { getLogEvents: jest.Mock };
   let service: BugHunterProbeService;
+  let imageProvider: { getModel: jest.Mock; generateImage: jest.Mock };
 
   beforeEach(() => {
     answers = [];
@@ -34,9 +35,19 @@ describe('BugHunterProbeService', () => {
       isTransactionActive: true,
     };
     logs = { getLogEvents: jest.fn().mockResolvedValue({ events: [] }) };
+    imageProvider = {
+      getModel: jest.fn().mockReturnValue('gpt-image-1.5'),
+      generateImage: jest.fn().mockResolvedValue(Buffer.from('png')),
+    };
     service = new BugHunterProbeService(
       { createQueryRunner: () => runner } as never,
       logs as never,
+      {
+        getProvider: jest.fn(() => ({
+          provider: imageProvider,
+          providerType: 'openai',
+        })),
+      } as never,
     );
   });
 
@@ -174,5 +185,53 @@ describe('BugHunterProbeService', () => {
     await expect(
       service.run('recent-errors', { service: 'ally-web' }),
     ).rejects.toThrow(/service must be one of/);
+  });
+
+  describe('image-generation', () => {
+    it('makes one real call the way the product does, at low quality, and reports ok without the image', async () => {
+      const answer = await service.run('image-generation', {});
+      expect(imageProvider.generateImage).toHaveBeenCalledWith(
+        expect.any(String),
+        '1536x1024',
+        { model: 'gpt-image-1.5', quality: 'low' },
+      );
+      expect(answer).toEqual(
+        expect.objectContaining({ ok: true, model: 'gpt-image-1.5', bytes: 3 }),
+      );
+    });
+
+    it("tries a candidate model and returns the provider's own refusal", async () => {
+      imageProvider.generateImage.mockRejectedValue(
+        Object.assign(new Error("400 The model 'dall-e-3' does not exist."), {
+          status: 400,
+          code: 'model_not_found',
+        }),
+      );
+      const answer = await service.run('image-generation', {
+        model: 'dall-e-3',
+        prompt: 'a cover',
+      });
+      expect(imageProvider.generateImage).toHaveBeenCalledWith(
+        'a cover',
+        '1536x1024',
+        { model: 'dall-e-3', quality: 'low' },
+      );
+      expect(answer).toEqual(
+        expect.objectContaining({
+          ok: false,
+          model: 'dall-e-3',
+          status: 400,
+          code: 'model_not_found',
+          message: "400 The model 'dall-e-3' does not exist.",
+        }),
+      );
+    });
+
+    it('stops after its hourly cap of real calls', async () => {
+      for (let i = 0; i < 20; i++) await service.run('image-generation', {});
+      await expect(service.run('image-generation', {})).rejects.toThrow(
+        /its cap/,
+      );
+    });
   });
 });

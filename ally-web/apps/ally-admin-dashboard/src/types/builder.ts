@@ -1178,3 +1178,319 @@ export interface UpdateBuilderEvalFixtureRequest {
   active?: boolean;
   checklist?: BuilderEvalChecklistItem[];
 }
+
+/* ── Decision feed ──────────────────────────────────────────────────────── */
+
+/**
+ * One thing Builder is waiting on a person for, in any session. Mirrors ally-be's
+ * `BuilderDecision` (`src/builder/type/builder-decision.type.ts`): derived server-side from
+ * session, transcript and pull-request state, never stored, and answered through the same
+ * action the session page would take.
+ */
+export type BuilderDecisionKind =
+  | "question"
+  | "brief"
+  | "start_build"
+  | "design_review"
+  | "budget"
+  | "pr_needs_human"
+  | "pr_merge"
+  | "build_failed";
+
+/** What is really being asked: what to build, how to build it, or how to get unstuck. */
+export type BuilderDecisionCategory = "what" | "how" | "issue";
+
+export interface BuilderDecisionOption {
+  id: string;
+  label: string;
+  description?: string;
+  /** At most one per decision; Enter answers with it. */
+  recommended?: boolean;
+  /** Hard to take back: the card asks for a second press before it sends. */
+  confirm?: boolean;
+  /** Can't be undone (replaces `confirm`): armed on the first press, sent on a deliberate second. */
+  oneWay?: boolean;
+  /** What choosing it does, in one line: shown while armed. */
+  consequence?: string;
+}
+
+export interface BuilderDecision {
+  id: string;
+  kind: BuilderDecisionKind;
+  category: BuilderDecisionCategory;
+  sessionId: string;
+  sessionTitle: string;
+  sessionStatus: BuilderSessionStatus;
+  createdByName: string | null;
+  repos: string[];
+  prompt: string;
+  /** For a gated question: the model's rationale, then `Based on:` and `Yours to decide because:` lines. */
+  rationale: string | null;
+  questionType: string | null;
+  context: string[];
+  /** One line: what cannot move until this is decided. */
+  blocked: string;
+  selection: "single" | "multi";
+  options: BuilderDecisionOption[];
+  allowCustom: boolean;
+  allowNone: boolean;
+  minSelections: number | null;
+  customPlaceholder: string | null;
+  waitingSince: string;
+  pullRequestUrl: string | null;
+}
+
+export interface BuilderDecisionFeed {
+  decisions: BuilderDecision[];
+  count: number;
+}
+
+export interface AnswerBuilderDecisionRequest {
+  id: string;
+  selectedOptionIds?: string[];
+  customValues?: string[];
+  none?: boolean;
+  message?: string;
+  /** Which layout answered, from breakpoint and pointer: recorded in History. */
+  client?: BuilderClient;
+  /** From the card taking focus to the answer. */
+  msToDecide?: number;
+}
+
+export type BuilderDecisionOutcome =
+  | "turn_started"
+  | "build_started"
+  | "design_started"
+  | "design_approved"
+  | "budget_raised"
+  | "merged"
+  | "resumed"
+  | "archived"
+  | "cancelled";
+
+export interface AnswerBuilderDecisionResponse {
+  ok: true;
+  /** `pending`: held for the undo window, reaching the session at `undoableUntil`. */
+  outcome: BuilderDecisionOutcome | "pending";
+  undoableUntil?: string;
+  historyId?: string | null;
+}
+
+/* ── The Builder tab (Now · Rules · History) ─────────────────────────── */
+
+export type BuilderClient = "phone" | "tablet" | "desktop";
+
+/** What a session in progress is waiting on: the Now page's groups, in order. */
+export type BuilderWaitingOn = "you" | "stuck" | "builder" | "review";
+
+export interface BuilderNowPullRequest {
+  id: string;
+  repo: string;
+  prNumber: number;
+  prUrl: string;
+  ciStatus: string | null;
+  merged: boolean;
+  state: string | null;
+}
+
+export interface BuilderNowSession {
+  id: string;
+  title: string;
+  code: string | null;
+  opportunityId: string | null;
+  status: BuilderSessionStatus;
+  currentStage: string | null;
+  waitingOn: BuilderWaitingOn;
+  nowLine: string;
+  waitingSince: string | null;
+  stuckSince: string | null;
+  pendingCount: number;
+  pendingKinds: BuilderDecisionKind[];
+  putBackEligible: boolean;
+  runSequence: number | null;
+  pullRequests: BuilderNowPullRequest[];
+  createdByName: string | null;
+  startedAt: string;
+  updatedAt: string;
+}
+
+export interface BuilderNow {
+  sessions: BuilderNowSession[];
+  decisions: BuilderDecision[];
+  inProgress: number;
+  limit: number;
+}
+
+export interface BuilderUpNextItem {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  queueRank: number | null;
+  voterCount: number;
+  effort: string | null;
+  productGoal: string | null;
+  goalsHelped: number;
+  goalsAssessed: number;
+  successMetric: string | null;
+  assessment: string | null;
+}
+
+export interface BuilderUpNext {
+  items: BuilderUpNextItem[];
+  inProgress: number;
+  limit: number;
+}
+
+export type BuilderHistoryEntryType = "decision" | "ask" | "tell" | "start" | "putback";
+export type BuilderHistorySurface = "now" | "session" | "slack" | "rule";
+
+export interface BuilderHistoryItem {
+  id: string;
+  entryType: BuilderHistoryEntryType;
+  decisionId: string | null;
+  kind: string | null;
+  sessionId: string | null;
+  sessionTitle: string | null;
+  prompt: string;
+  chosenLabel: string | null;
+  answerText: string | null;
+  recommendedOptionId: string | null;
+  matchedRecommendation: boolean | null;
+  oneWay: boolean;
+  ruleId: string | null;
+  surface: BuilderHistorySurface;
+  client: BuilderClient | null;
+  actorUserId: number | null;
+  actorName: string | null;
+  decidedAt: string;
+  waitSeconds: number | null;
+  undoneAt: string | null;
+  appliedAt: string | null;
+  applyError: string | null;
+  tellStatus: "queued" | "applied" | "cancelled" | null;
+}
+
+export interface BuilderHistoryPage {
+  entries: BuilderHistoryItem[];
+  nextBefore: string | null;
+}
+
+export interface BuilderHistoryQuery {
+  q?: string;
+  sessionId?: string;
+  entryType?: BuilderHistoryEntryType;
+  who?: "you" | "team" | "rule";
+  ruleId?: string;
+  before?: string;
+  limit?: number;
+}
+
+/** A thread item on the Session panel: an ask (with Builder's answer) or a tell. */
+export interface BuilderThreadEntry {
+  id: string;
+  entryType: "ask" | "tell";
+  prompt: string;
+  answerText: string | null;
+  chosenLabel: string | null;
+  decidedAt: string;
+  tellStatus: "queued" | "applied" | "cancelled" | null;
+  appliedRunId: string | null;
+}
+
+export interface BuilderAskAnswer {
+  historyId: string | null;
+  answer: string;
+  basedOn: string[];
+  suggestedInstruction: string | null;
+}
+
+export type BuilderTellRoute = "interview" | "queued" | "applied_now";
+
+export interface BuilderTellResult {
+  historyId: string | null;
+  route: BuilderTellRoute;
+  message: string;
+}
+
+export type BuilderRuleEffect = "guide" | "decide";
+
+export interface BuilderRuleMatch {
+  kind: string;
+  questionType?: string | null;
+  optionId: string;
+}
+
+export interface BuilderRule {
+  id: string;
+  statement: string;
+  scope: string;
+  area: string;
+  effect: BuilderRuleEffect;
+  match: BuilderRuleMatch | null;
+  active: boolean;
+  supersedesId: string | null;
+  appliedCount: number;
+  lastAppliedAt: string | null;
+  createdAt: string;
+}
+
+export interface BuilderRuleDraft {
+  statement: string;
+  area: string;
+  scope: string;
+  decideAllowed: boolean;
+  match: BuilderRuleMatch | null;
+  source: { historyId: string; prompt: string; chosen: string | null } | null;
+}
+
+export interface BuilderRulePreview {
+  considered: number;
+  matches: {
+    historyId: string;
+    sessionTitle: string | null;
+    prompt: string;
+    chosen: string | null;
+    decidedAt: string;
+    agrees: boolean;
+  }[];
+  conflicts: { id: string; statement: string; area: string }[];
+}
+
+export interface CreateBuilderRuleRequest {
+  statement: string;
+  scope: string;
+  effect?: BuilderRuleEffect;
+  match?: BuilderRuleMatch | null;
+  sourceHistoryId?: string;
+  supersedes?: string[];
+}
+
+export interface BuilderRuleProposal {
+  key: string;
+  kind: string;
+  questionType: string | null;
+  optionId: string;
+  optionLabel: string;
+  streak: number;
+  prompt: string;
+}
+
+export interface BuilderPartnerScoreboard {
+  windowDays: number;
+  decisions: number;
+  waitingOnYou: {
+    totalMinutes: number;
+    medianMinutes: number | null;
+    byKind: { kind: string; minutes: number; count: number }[];
+    oneWayMinutes: number;
+    reversibleMinutes: number;
+  };
+  askedTwice: { count: number; ofDecisions: number };
+  agreement: { kind: string; questionType: string | null; agreed: number; total: number }[];
+  caution: { hastyOneWay: number; oneWay: number; undone: number; answered: number };
+  pace: { decisions: number; sittingMinutes: number; perHour: number | null };
+  byClient: { client: string; decisions: number; undone: number }[];
+  decidedByRules: number;
+  outcome: { started: number; released: number };
+}

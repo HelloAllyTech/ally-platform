@@ -331,6 +331,35 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['course copilot', 'author course', 'generate course'],
   },
   {
+    id: 'debrief-agent',
+    name: 'Debrief agent and its Improver (admin Debriefs)',
+    whatItIs:
+      'Writes the debrief a learner reads after a roleplay by following a recipe of steps ' +
+      '(Safety reader, Analyst, Progress reader, Guidance lookup, Writer, rule checks, Evaluator, ' +
+      'Reviser) under a budget and deadline, with a fallback ladder; runs in shadow beside ' +
+      "today's debrief and live for organisations switched on. The Improver reads aggregate " +
+      'signals daily, proposes prompt and setting changes, tries them on test sets built from ' +
+      'real sessions, and a person approves each new release. Runs on the agent harness ' +
+      '(agentKey debrief).',
+    reuseWhen:
+      'A request is about post-roleplay feedback or debriefs: what learners read after a session, ' +
+      'its quality, safety (risk cues, learner distress), cost, language, or making it better over ' +
+      'time. Extend a recipe or a step rather than adding a separate feedback generator.',
+    extendVia:
+      'A new step: a stateless ally-ai endpoint under /debrief plus a DebriefStep in the release ' +
+      'bundle. A new kind of session: a new recipe, not a new agent.',
+    modules: ['ally-be:src/debrief', 'ally-ai:app/core/debrief'],
+    adminRoute: '/debriefs',
+    keywords: [
+      'debrief',
+      'feedback after roleplay',
+      'post-session feedback',
+      'improver',
+      'risk cue',
+      'important moment',
+    ],
+  },
+  {
     id: 'ally-guide',
     name: 'Ally guide (guided course experience) and the agent harness',
     whatItIs:
@@ -543,14 +572,24 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   },
   {
     id: 'whatsapp',
-    name: 'WhatsApp bot',
+    name: 'AI chatbots (WhatsApp and other channels)',
     whatItIs:
-      'The WhatsApp Q&A bot over a knowledge-base corpus, with number and identity gating.',
+      'Configurable AI chatbots — instructions, model, picked knowledge-base documents, quick replies, ' +
+      'who can chat and a dashboard team — reached through connectors (a WhatsApp number today), ' +
+      'with a channel-agnostic engine and a Preview console.',
     reuseWhen:
-      'A request wants to reach users on WhatsApp or answer questions there.',
-    modules: ['ally-be:src/whatsapp'],
-    adminRoute: '/whatsapp-bot',
-    keywords: ['whatsapp', 'chat bot', 'messaging'],
+      'A request wants a bot that answers questions from documents, or to reach users on WhatsApp ' +
+      'or another messaging channel.',
+    modules: ['ally-be:src/chatbot', 'ally-be:src/whatsapp'],
+    adminRoute: '/chatbots',
+    keywords: [
+      'whatsapp',
+      'chatbot',
+      'chat bot',
+      'faq bot',
+      'messaging',
+      'connector',
+    ],
   },
   {
     id: 'file-storage',

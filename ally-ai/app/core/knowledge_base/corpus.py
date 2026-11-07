@@ -33,12 +33,17 @@ class KbCorpus(str, Enum):
     # one organisation's own. The one corpus here that is NOT Ally-global
     # throughout — see migration 008 for what that changes.
     ALLY_GUIDE_LIBRARY = "ally_guide_library"
+    # The Debrief agent's guidance: practice guidelines, the debrief style guide,
+    # level guides and organisations' protocols. Platform-wide or targeted at named
+    # organisations; clinical passages are served only once signed off (ally-be).
+    DEBRIEF_KNOWLEDGE = "debrief_knowledge"
 
 
 CORPUS_COLLECTIONS: dict[KbCorpus, str] = {
     KbCorpus.WHATSAPP_QA: VectorDBCollectionNames.KNOWLEDGE_CHUNKS,
     KbCorpus.CHARACTER_LIBRARY: VectorDBCollectionNames.CHARACTER_CHUNKS,
     KbCorpus.ALLY_GUIDE_LIBRARY: VectorDBCollectionNames.GUIDE_LIBRARY_CHUNKS,
+    KbCorpus.DEBRIEF_KNOWLEDGE: VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS,
 }
 
 

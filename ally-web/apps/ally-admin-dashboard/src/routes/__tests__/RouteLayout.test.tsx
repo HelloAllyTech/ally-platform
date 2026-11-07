@@ -68,6 +68,7 @@ vi.mock("@pages", () => ({
   TranslationManagement: () => <div>TranslationManagementPage</div>,
   TooltipManagement: () => <div>TooltipManagementPage</div>,
   AgentTestCases: () => <div>AgentTestCasesPage</div>,
+  DebriefConsole: () => <div>DebriefConsolePage</div>,
   Competencies: () => <div>CompetenciesPage</div>,
   RoleplaySessionLogs: () => <div>RoleplaySessionLogsPage</div>,
   RoleplaySessionLogDetail: () => <div>RoleplaySessionLogDetailPage</div>,
@@ -75,6 +76,7 @@ vi.mock("@pages", () => ({
   Logs: () => <div>LogsPage</div>,
   MobileReleases: () => <div>MobileReleasesPage</div>,
   WhatsAppBot: () => <div>WhatsAppBotPage</div>,
+  ChatbotPage: () => <div>ChatbotPage</div>,
   Terms: () => <div>TermsPage</div>,
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,
@@ -84,8 +86,10 @@ vi.mock("@pages", () => ({
   EvaluateRecordDetail: () => <div>EvaluateRecordDetailPage</div>,
   BugHunter: () => <div>BugHunterPage</div>,
   Builder: () => <div>BuilderPage</div>,
+  BuilderRoom: () => <div>BuilderRoomPage</div>,
   BuilderSession: () => <div>BuilderSessionPage</div>,
   BuilderSettings: () => <div>BuilderSettingsPage</div>,
+  BuilderDecisions: () => <div>BuilderDecisionsPage</div>,
   BuilderPipeline: () => <div>BuilderPipelinePage</div>,
   BuilderScoreboard: () => <div>BuilderScoreboardPage</div>,
   BuilderKnowledge: () => <div>BuilderKnowledgePage</div>,
@@ -118,10 +122,17 @@ describe("RouteLayout", () => {
     expect(screen.getByText("RolePlaysPage")).toBeInTheDocument();
   });
 
-  it("renders Builder route", () => {
+  it("renders the Builder tab (Now · Rules · History) at /builder", () => {
     window.history.pushState({}, "", ROUTES.BUILDER);
     render(<RouteLayout />);
+    expect(screen.getByText("BuilderRoomPage")).toBeInTheDocument();
+  });
+
+  it("renders mission control's full session list at /builder/sessions, not the session route", () => {
+    window.history.pushState({}, "", ROUTES.BUILDER_ALL_SESSIONS);
+    render(<RouteLayout />);
     expect(screen.getByText("BuilderPage")).toBeInTheDocument();
+    expect(screen.queryByText("BuilderSessionPage")).not.toBeInTheDocument();
   });
 
   // The session route is a separate assertion from the list route because the
@@ -137,6 +148,14 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.BUILDER_SETTINGS);
     render(<RouteLayout />);
     expect(screen.getByText("BuilderSettingsPage")).toBeInTheDocument();
+  });
+
+  // Slack messages still link /builder/decisions; it lands on the Builder tab.
+  it("sends the old decisions route to the Builder tab, not the session route", () => {
+    window.history.pushState({}, "", ROUTES.BUILDER_DECISIONS);
+    render(<RouteLayout />);
+    expect(screen.getByText("BuilderRoomPage")).toBeInTheDocument();
+    expect(screen.queryByText("BuilderSessionPage")).not.toBeInTheDocument();
   });
 
   it("renders Builder pipeline route", () => {

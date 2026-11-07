@@ -22,6 +22,7 @@ REPOS_TO_ARCHIVE=(
   "HelloAllyTech/ally-ai"
   "HelloAllyTech/ally-ai-learn"
   "HelloAllyTech/ally-mobile"
+  "HelloAllyTech/ally-mobile-flutter"
 )
 
 echo "=== Step 1: Running sync check across all 7 repositories ==="

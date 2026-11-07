@@ -17,6 +17,13 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   ),
 }));
 
+// Mock the org-branding provider: it reads the Redux store and RTK Query,
+// neither of which this file sets up. Its own behaviour is covered in
+// src/branding/__tests__.
+vi.mock("../branding", () => ({
+  BrandingProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 // Mock Sonner Toaster
 vi.mock("sonner", () => ({
   Toaster: ({ position, closeButton, toastOptions }: any) => (

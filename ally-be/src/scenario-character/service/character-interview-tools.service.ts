@@ -412,6 +412,11 @@ export class CharacterInterviewToolsService {
             'profession',
             'currentLocation',
             'characterProfileText',
+            // Required since models reliably satisfy schema `required` but
+            // routinely skipped these as optional, saving characters whose
+            // Language style and Dialect samples sections arrived empty.
+            'languageCharacteristics',
+            'linguisticStyleSamples',
           ],
         },
       },
@@ -538,7 +543,12 @@ export class CharacterInterviewToolsService {
     }
 
     return (key: string): string => {
-      const raw = String(key ?? '').trim();
+      // Models sometimes quote the key itself ({ "'14'": … }); the create
+      // endpoint's numeric-key constraint then 400s at the trainer's save.
+      const raw = String(key ?? '')
+        .trim()
+        .replace(/^['"'""`]+|['"'""`]+$/g, '')
+        .trim();
       if (!raw) return raw;
       if (/^\d+$/.test(raw)) return raw;
       const exact = byCode.get(raw.toLowerCase());
@@ -847,6 +857,42 @@ export class CharacterInterviewToolsService {
     }
     if (linguisticStyleSamples.some((sample) => sample.length > 300)) {
       errors.push('each linguistic style sample must be ≤300 chars');
+    }
+    // Presence, not per-language completeness: shape leniency above files
+    // whatever the model sent, but a draft with NO style or NO samples saves a
+    // character whose speech sections are empty and the actor plays generic.
+    // ok=false makes the agent fill them and retry rather than skip silently.
+    if (Object.keys(languageCharacteristics).length === 0) {
+      errors.push(
+        'languageCharacteristics is required — describe how the character ' +
+          'speaks each of their languages (dialect, register, code-mixing, ' +
+          'pace, verbal tics), keyed by the numeric languageId from get_voices',
+      );
+    }
+    if (linguisticStyleSamples.length === 0) {
+      errors.push(
+        'linguisticStyleSamples is required — write 6-12 sample utterances ' +
+          'per language, keyed by the numeric languageId, each in that ' +
+          "language's own script",
+      );
+    }
+
+    // The character create/update endpoint accepts only numeric languageId
+    // keys, so a key the resolver could not place (a misspelt locale, an
+    // invented name) must bounce back to the agent now — passing it through
+    // 400s at the trainer when the reviewed character is finally saved.
+    for (const [field, map] of [
+      ['languageCharacteristics', languageCharacteristics],
+      ['linguisticStyleSamples', samplesByLanguage],
+    ] as const) {
+      for (const key of Object.keys(map)) {
+        if (!/^\d+$/.test(key)) {
+          errors.push(
+            `${field}["${key}"] is not a language — key every entry by the ` +
+              'numeric languageId from get_voices',
+          );
+        }
+      }
     }
 
     const knowledgeSources = (

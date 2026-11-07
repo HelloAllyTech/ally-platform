@@ -1,13 +1,19 @@
 /**
- * The automated mobile release pipeline (a scheduled job that bumps the app
- * version and triggers the existing App Store / Play Store production build
- * workflows every ~2 days) and the GitHub Actions workflows it drives.
+ * The GitHub Actions workflows this run-history mechanism tracks. RN's own build workflows
+ * and ally-mobile-rn-archive/ itself were deleted outright in the 2026-11 Flutter rename — the
+ * rollback purpose that folder was kept for never got used. The automated scheduled-bump
+ * pipeline ("Scheduled Check") was retired the same rename for lack of a Flutter equivalent,
+ * then rebuilt (same workflow name, Flutter-targeted) once that equivalent existed — see
+ * scheduled-mobile-release.yml's own header comment. "iOS Build"/"Android Build" now track
+ * build-ios-production-flutter.yml / build-android-production-flutter.yml, which that
+ * scheduler dispatches and which also remain directly dispatchable by hand.
  *
  * "Promote Android" is the manually-triggered production-promotion workflow
- * (see triggerAndroidPromotion below) rather than the scheduled pipeline
- * itself. iOS TestFlight-external promotion used to have a matching manual
- * workflow/entry here too; removed once submission became fully automatic
- * and this org's actual testers turned out to all be Internal, not External.
+ * (see triggerAndroidPromotion below) — pure Play Developer API orchestration with no
+ * dependency on either app's source, so it kept working unchanged through the RN deletion.
+ * iOS TestFlight-external promotion used to have a matching manual workflow/entry here too;
+ * removed once submission became fully automatic and this org's actual testers turned out
+ * to all be Internal, not External.
  */
 export type MobileReleaseWorkflowName =
   | "Scheduled Check"
@@ -45,7 +51,14 @@ export interface MobileReleaseRun {
 }
 
 export interface MobileReleaseAndroidVersion {
-  versionCode: number;
+  /**
+   * From the live Play internal-track release name — Flutter computes the
+   * real versionCode per-build in CI, not from a committed file the way
+   * RN's android/app/build.gradle used to provide one. Null if the internal
+   * track has no release yet, or the backend's Android Publisher isn't
+   * configured.
+   */
+  versionCode: number | null;
   versionName: string;
 }
 

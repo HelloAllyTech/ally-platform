@@ -1,11 +1,8 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Repository } from 'typeorm';
-import { AiService } from 'src/ai/service/ai.service';
-import { KnowledgeAnswerResponse } from 'src/ai/dto/knowledge.dto';
+import { IsNull, Repository } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
-import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { NotificationErrorType } from 'src/notification/type/notification.error.type';
 import { WaContact } from '../entity/wa-contact.entity';
 import { WaConversation } from '../entity/wa-conversation.entity';
@@ -25,11 +22,29 @@ import {
   WhatsAppProvider,
 } from '../type/whatsapp-provider.interface';
 import { WhatsAppBotSettings } from '../type/whatsapp-settings.type';
+import {
+  ResolvedWaNumber,
+  WhatsAppBusinessNumberService,
+} from './whatsapp-business-number.service';
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
 import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
-import { WhatsAppSettingsService } from './whatsapp-settings.service';
-import { WhatsAppTemplateService } from './whatsapp-template.service';
-import { composeReply } from '../util/reply-composer';
+import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
+import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
+import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
+import { isFallback } from 'src/chatbot/engine/agent-runtime';
+import {
+  AGENT_FALLBACK_EVENT,
+  type AgentFallbackEvent,
+} from 'src/chatbot/type/agent-runtime.event';
+import type {
+  AgentRunRef,
+  ChatbotDecision,
+} from 'src/chatbot/engine/chatbot-engine.types';
+import { ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
+import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
+import { ConnectorService } from 'src/chatbot/service/connector.service';
+import { withFirstMessageParts } from 'src/chatbot/engine/first-reply';
+import { MAX_HISTORY_MESSAGES } from 'src/chatbot/engine/knowledge-request';
 
 /**
  * Opt-out / opt-in words, recognised in code regardless of what templates exist.
@@ -39,24 +54,6 @@ import { composeReply } from '../util/reply-composer';
  */
 const OPT_OUT_WORDS = new Set(['stop', 'unsubscribe', 'cancel', 'quit']);
 const OPT_IN_WORDS = new Set(['start', 'subscribe', 'resume']);
-
-/**
- * The ally-ai prompt codes this feature owns.
- *
- * Derived from the file paths in ally-ai (`knowledge/whatsapp_answer` →
- * `ally_ai_knowledge_whatsapp_answer`), which is the convention its resolver uses.
- */
-/** Store version and content hash of each knowledge prompt sent to ally-ai, by code. */
-type PromptsRan = {
-  prompt_versions: Record<string, number | null>;
-  prompt_hashes: Record<string, string>;
-};
-
-export const KNOWLEDGE_PROMPT_CODES = [
-  'ally_ai_knowledge_whatsapp_answer',
-  'ally_ai_knowledge_translate_query',
-  'ally_ai_knowledge_crisis_classify',
-];
 
 /**
  * Send-retry budget for `reply()`.
@@ -100,27 +97,25 @@ function isRetryableSendFailure(error: unknown): boolean {
 }
 
 /**
- * Processes one inbound WhatsApp message end to end.
+ * Processes one inbound WhatsApp message end to end — the WhatsApp connector's half. Which reply
+ * to give is the chatbot engine's decision (ChatbotEngineService); everything that is about
+ * WhatsApp itself happens here, around it.
  *
  * The ORDER of the steps below is the design. Each one exists because of a specific way the pipeline
  * would otherwise misbehave, and moving any of them breaks that guarantee:
  *
- *   1. dedupe        — first, always. SQS is at-least-once AND Meta retries independently.
- *   2. kill switch   — before anything costs money.
+ *   0. bot           — the chatbot the number's connector is bound to; none, no reply.
+ *   1. dedupe        — first write, always. SQS is at-least-once AND Meta retries independently.
+ *   2. kill switch   — before anything costs money: the platform switch, and the bot being live.
  *   3. contact       — resolves consent and block state.
  *   4. rate limit    — after dedupe, so a redelivery never consumes budget.
  *   5. consent gate  — before the LLM, so a first-time worker sees the disclaimer.
- *   6. templates     — before retrieval, so a crisis reply never depends on a model call.
- *   7. identity      — AFTER the safety and compliance steps, never before them. The corpus is
- *                      targeted per organisation, so an unrecognised number cannot be answered at
- *                      all; but STOP must still work for it and a crisis keyword must still reach
- *                      the crisis reply, so this gate sits below both — and it runs the LLM crisis
- *                      classifier itself before refusing, so the second safety layer is not lost
- *                      for exactly the people we cannot identify.
- *   8. retrieval     — the expensive part, reached only when nothing above handled it, run
- *                      concurrently with the LLM crisis classifier (step 6 is keywords; this is the
- *                      second layer, and it wins over any answer that comes back beside it).
- *   9. send          — persisted as `queued` BEFORE the send, so a crash is visible.
+ *   6. identity      — who is asking, for the bot's "who can chat" list and per-organisation
+ *                      knowledge.
+ *   7. decide        — the engine: keyword replies first (so a crisis reply never depends on a
+ *                      model call), then the access gate (with the crisis classifier BEFORE any
+ *                      refusal), then the answer, concurrent with the crisis classifier.
+ *   8. send          — persisted as `queued` BEFORE the send, so a crash is visible.
  *
  * THE ONE INVARIANT: this service throws only BEFORE it has sent anything. After a send it records
  * the failure and returns normally. Throwing after a send guarantees an SQS redelivery that answers
@@ -143,17 +138,24 @@ export class WhatsAppInboundService {
     private readonly unansweredRepository: Repository<WaUnansweredQuestion>,
     @Inject(WHATSAPP_PROVIDER)
     private readonly provider: WhatsAppProvider,
-    private readonly settingsService: WhatsAppSettingsService,
-    private readonly templateService: WhatsAppTemplateService,
+    private readonly settingsService: ChatbotSettingsService,
+    private readonly templateService: ChatbotReplyService,
     private readonly rateLimitService: WhatsAppRateLimitService,
     private readonly identityService: WhatsAppIdentityService,
-    private readonly aiService: AiService,
-    private readonly promptSharedService: PromptSharedService,
+    private readonly numberService: WhatsAppBusinessNumberService,
+    private readonly connectorService: ConnectorService,
+    private readonly engine: ChatbotEngineService,
+    @InjectRepository(Chatbot)
+    private readonly chatbotRepository: Repository<Chatbot>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
-    const settings = await this.settingsService.get();
+    // ── 0. Bot ─────────────────────────────────────────────────────────────
+    const resolved = await this.resolveBot(inbound);
+    if (!resolved) return;
+    const { number, chatbot } = resolved;
+    const settings = await this.settingsService.getForChatbot(chatbot);
 
     // ── 1. Dedupe ──────────────────────────────────────────────────────────
     // First statement, unconditionally. ON CONFLICT DO NOTHING against the unique index on
@@ -194,10 +196,19 @@ export class WhatsAppInboundService {
         await this.discard(inboundId, 'the bot is disabled');
         return;
       }
+      if (chatbot.status !== ChatbotStatus.LIVE) {
+        await this.discard(inboundId, `the chatbot is ${chatbot.status}`);
+        return;
+      }
 
       // ── 3. Contact ───────────────────────────────────────────────────────
-      const contact = await this.resolveContact(inbound);
-      const conversation = await this.resolveConversation(contact, settings);
+      const contact = await this.resolveContact(inbound, number.id);
+      const conversation = await this.resolveConversation(
+        contact,
+        settings,
+        chatbot.id,
+        number.connectorId,
+      );
       await this.messageRepository.update(
         { id: inboundId },
         {
@@ -229,29 +240,15 @@ export class WhatsAppInboundService {
       }
 
       // ── 4. Rate limit ────────────────────────────────────────────────────
-      const limit = await this.rateLimitService.check(
-        contact.phoneE164,
+      const rateLimited = await this.handleRateLimit(
+        number,
+        contact,
+        conversation,
+        inboundId,
         settings,
+        startedAt,
       );
-      if (!limit.allowed) {
-        const notify = await this.rateLimitService.shouldNotify(
-          contact.phoneE164,
-          limit.window ?? 'minute',
-        );
-        if (notify) {
-          await this.reply(
-            contact,
-            conversation,
-            inboundId,
-            settings.rateLimitText,
-            WaHandledBy.RATE_LIMITED,
-            startedAt,
-          );
-        } else {
-          await this.discard(inboundId, 'rate limited (already notified)');
-        }
-        return;
-      }
+      if (rateLimited) return;
 
       // ── 5. Consent / opt-out ─────────────────────────────────────────────
       const consentHandled = await this.handleConsent(
@@ -261,89 +258,107 @@ export class WhatsAppInboundService {
         inbound.text,
         settings,
         startedAt,
+        chatbot.id,
       );
       if (consentHandled) return;
 
-      // ── 6. Templates ─────────────────────────────────────────────────────
-      const match = await this.templateService.match(
-        inbound.text,
-        contact.locale,
-      );
-      if (match && match.bypassRag) {
-        const isCrisis = match.template.kind === WaTemplateKind.CRISIS;
-        const body = this.settingsService.renderPlaceholders(
-          isCrisis
-            ? match.template.responseText || settings.crisisEscalationText
-            : match.template.responseText,
-          settings,
-        );
-
-        await this.reply(
-          contact,
-          conversation,
-          inboundId,
-          body,
-          isCrisis ? WaHandledBy.CRISIS : WaHandledBy.TEMPLATE,
-          startedAt,
-          { templateId: match.template.id },
-        );
-
-        if (isCrisis) {
-          // Routed to the existing Slack exception path so a human learns about it in near real
-          // time. A crisis reply that only lands in a database table nobody is watching is a log
-          // entry, not an escalation.
-          this.eventEmitter.emit('exception', {
-            statusCode: 200,
-            timestamp: new Date().toISOString(),
-            path: 'whatsapp/crisis',
-            message:
-              `A crisis keyword matched on the WhatsApp bot (contact ends ` +
-              `${contact.phoneLast4}). The fixed safety reply was sent.`,
-            type: 'WhatsApp Crisis Keyword',
-          } as NotificationErrorType);
-        }
-        return;
-      }
-
-      // Every path from here replies, and both of them wait on a model call first (the answer, or
-      // the crisis classifier ahead of a refusal) — several seconds with nothing on the worker's
-      // screen. Placed HERE and no earlier because Meta's guidance is to show typing only when a
-      // reply is coming: the silent exits above (opted out, blocked, rate-limited) must not leave a
-      // bubble that never resolves. Not awaited; the provider swallows its own failures, and the
-      // catch here covers any implementation that does not — an unhandled rejection would take the
-      // worker process down with it.
+      // Every path from here replies — a keyword reply at once, the others after a model call.
+      // Placed HERE and no earlier because Meta's guidance is to show typing only when a reply is
+      // coming: the silent exits above (opted out, blocked, rate-limited) must not leave a bubble
+      // that never resolves. Not awaited; the catch covers any implementation that rejects.
       void this.provider
-        .showTypingIndicator?.(inbound.providerMessageId)
+        .showTypingIndicator?.(inbound.providerMessageId, number.creds)
         ?.catch(() => undefined);
 
-      // ── 7. Identity ──────────────────────────────────────────────────────
-      // Which organisation is asking. Documents are targeted at one, some or all of them, so
-      // there is no corpus to answer from until this is known. Re-resolved on every message, so
-      // a number added to someone's Ally profile after they first wrote starts working on their
-      // next question rather than needing a support ticket.
-      const identified = await this.identityService.identify(contact);
+      // ── 6. Identity ──────────────────────────────────────────────────────
+      // Who is asking, for the bot's "who can chat" list and per-organisation knowledge.
+      // Re-resolved on every message, so a number mapped after someone first wrote starts working
+      // on their next question.
+      // A lookup failure counts as "not recognised" rather than failing the message: the keyword
+      // replies the engine runs next — crisis above all — must never depend on knowing who asked.
+      const identified = await this.identityService
+        .identify(contact, null)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `Identity lookup failed for contact ending ${contact.phoneLast4}; treated as ` +
+              `unrecognised: ${error instanceof Error ? error.message : 'unknown error'}`,
+          );
+          return { ...contact, userId: null, tenantId: null } as WaContact;
+        });
 
-      if (!identified.tenantId) {
-        await this.refuseUnidentified(
-          identified,
-          conversation,
-          inboundId,
-          inbound.text,
-          settings,
-          startedAt,
+      // ── 7. The bot decides ───────────────────────────────────────────────
+      const decision = await this.engine.respond({
+        chatbot,
+        settings,
+        text: inbound.text,
+        language: contact.locale,
+        history: await this.recentHistory(conversation.id),
+        isFirstMessage: contact.messageCount === 1,
+        sender: {
+          externalId: contact.phoneE164,
+          label: `contact ending ${contact.phoneLast4}`,
+          phone: contact.phoneE164,
+          userId: identified.userId ?? null,
+          tenantId: identified.tenantId ?? null,
+        },
+        channel: { type: 'whatsapp', capabilities: { maxReplyChars: 4096 } },
+        // The Agents v2 run's thread and the message its run id is derived from.
+        conversationId: conversation.id,
+        providerMessageId: inbound.providerMessageId,
+      });
+
+      // ── 8. Send and record ───────────────────────────────────────────────
+      // A person's first hello also gets the first-message notice after the welcome message.
+      const body =
+        contact.messageCount === 1
+          ? withFirstMessageParts({
+              body: decision.body,
+              handledBy: decision.handledBy,
+              bodyIsWelcome: decision.isWelcome,
+              notice: this.settingsService.renderPlaceholders(
+                settings.disclaimerText ?? '',
+                settings,
+              ),
+            })
+          : decision.body;
+      if (decision.language) {
+        await this.contactRepository.update(
+          { id: contact.id },
+          { locale: decision.language },
         );
-        return;
+        await this.conversationRepository.update(
+          { id: conversation.id },
+          { lastLanguage: decision.language },
+        );
       }
-
-      // ── 8. Retrieval + answer ────────────────────────────────────────────
-      await this.answerFromCorpus(
+      await this.reply(
         identified,
         conversation,
         inboundId,
-        inbound.text,
-        settings,
+        body,
+        decision.handledBy,
         startedAt,
+        {
+          templateId: decision.templateId,
+          citations: decision.citations,
+          retrievalMeta: decision.retrievalMeta,
+          language: decision.language ?? undefined,
+          agent: decision.agent,
+        },
       );
+      if (decision.unanswered) {
+        await this.recordUnanswered(
+          inboundId,
+          conversation.id,
+          inbound.text,
+          decision.language ?? contact.locale,
+          decision.unanswered.reason,
+          decision.unanswered.topSimilarity,
+          decision.unanswered.hitCount,
+        );
+      }
+      if (decision.alert) this.eventEmitter.emit('exception', decision.alert);
+      this.announceAgentOutcome(chatbot, decision);
     } catch (error) {
       // Reached only when nothing has been sent — every send path above returns. Recorded on the
       // message and swallowed: rethrowing would redeliver and risk a second reply.
@@ -355,6 +370,82 @@ export class WhatsAppInboundService {
         { status: WaMessageStatus.FAILED, errorMessage: message },
       );
     }
+  }
+
+  /**
+   * The number the worker wrote to and the bot that answers it, or null when the message is
+   * dropped unrecorded.
+   *
+   * The number decides whose bot this is: the settings, the organisation whose documents answer,
+   * and the credentials the reply goes out with. A number disconnected while its message sat in the
+   * queue is dropped — there are no credentials left to reply with.
+   *
+   * The bot is the one the number's connector is bound to, or for the env-configured platform
+   * number the platform chatbot. A number bound to no bot is not answered — and not recorded,
+   * since there is no bot whose conversations it would belong to.
+   */
+  private async resolveBot(
+    inbound: InboundWhatsAppMessage,
+  ): Promise<{ number: ResolvedWaNumber; chatbot: Chatbot } | null> {
+    const number = await this.numberService.resolveForInbound(
+      inbound.phoneNumberId,
+    );
+    if (!number) {
+      this.logger.warn(
+        `Dropping message ${inbound.providerMessageId}: phone number id ` +
+          `${inbound.phoneNumberId} is not connected`,
+      );
+      return null;
+    }
+    const chatbot = number.connectorId
+      ? await this.connectorService.chatbotFor(number.connectorId)
+      : await this.platformChatbot();
+    if (!chatbot) {
+      this.logger.warn(
+        `Dropping message ${inbound.providerMessageId}: the number is not bound to a chatbot`,
+      );
+      return null;
+    }
+    return { number, chatbot };
+  }
+
+  /**
+   * Over the limit: told once per window, then discarded in silence. Returns true when the message
+   * was rate-limited.
+   *
+   * Keyed per (number, sender): a worker's budget on one organisation's bot is not spent by their
+   * questions to another's. The platform number keeps its original keys.
+   */
+  private async handleRateLimit(
+    number: ResolvedWaNumber,
+    contact: WaContact,
+    conversation: WaConversation,
+    inboundId: string,
+    settings: WhatsAppBotSettings,
+    startedAt: number,
+  ): Promise<boolean> {
+    const rateKey = number.id
+      ? `${number.id}:${contact.phoneE164}`
+      : contact.phoneE164;
+    const limit = await this.rateLimitService.check(rateKey, settings);
+    if (limit.allowed) return false;
+    const notify = await this.rateLimitService.shouldNotify(
+      rateKey,
+      limit.window ?? 'minute',
+    );
+    if (notify) {
+      await this.reply(
+        contact,
+        conversation,
+        inboundId,
+        settings.rateLimitText,
+        WaHandledBy.RATE_LIMITED,
+        startedAt,
+      );
+    } else {
+      await this.discard(inboundId, 'rate limited (already notified)');
+    }
+    return true;
   }
 
   // ─────────────────────────────────────────────────────────────── consent
@@ -375,8 +466,9 @@ export class WhatsAppInboundService {
     text: string,
     settings: WhatsAppBotSettings,
     startedAt: number,
+    chatbotId: string,
   ): Promise<boolean> {
-    const normalised = WhatsAppTemplateService.normalise(text);
+    const normalised = ChatbotReplyService.normalise(text);
 
     if (OPT_OUT_WORDS.has(normalised)) {
       await this.contactRepository.update(
@@ -387,7 +479,7 @@ export class WhatsAppInboundService {
         },
       );
       const template = (
-        await this.templateService.findByKind(WaTemplateKind.CONSENT)
+        await this.templateService.findByKind(WaTemplateKind.CONSENT, chatbotId)
       ).find((t) => t.patterns.some((p) => OPT_OUT_WORDS.has(p.toLowerCase())));
       await this.reply(
         contact,
@@ -437,389 +529,33 @@ export class WhatsAppInboundService {
     return false;
   }
 
-  // ────────────────────────────────────────────────────────────── retrieval
-
-  // ────────────────────────────────────────────────────────────── identity
-
   /**
-   * Tell a contact we cannot recognise their number — but check for a crisis first.
-   *
-   * THE CRISIS CHECK COMES BEFORE THE REFUSAL, and that ordering is the point of this method
-   * existing at all. Someone in danger is not less in danger for being unrecognised, and the
-   * keyword rules that already ran are only the first layer of the safety net; the classifier is
-   * the second. Skipping it here would remove that layer for precisely the people we know least
-   * about, which is the wrong population to economise on.
-   *
-   * Nothing is written to the unanswered queue. That queue is a record of what the CORPUS failed
-   * to cover, and filling it with questions nobody attempted would make the one signal an admin
-   * uses to judge coverage useless. The refusal is countable on its own through
-   * `WaHandledBy.UNIDENTIFIED`.
+   * After the reply has been sent and recorded, tell the Agents v2 listener. The fallback alert is
+   * throttled per bot and reason by its listener (AgentRuntimeAlertThrottle), so it is announced
+   * here rather than emitted as an alert.
    */
-  private async refuseUnidentified(
-    contact: WaContact,
-    conversation: WaConversation,
-    inboundId: string,
-    question: string,
-    settings: WhatsAppBotSettings,
-    startedAt: number,
-  ): Promise<void> {
-    if (settings.crisisClassifierEnabled) {
-      try {
-        const { prompts, ran } = await this.loadPromptOverrides();
-        const crisis = await this.aiService.checkWhatsAppCrisis({
-          message: question,
-          prompts,
-        });
-
-        if (crisis?.is_crisis) {
-          await this.reply(
-            contact,
-            conversation,
-            inboundId,
-            this.settingsService.renderPlaceholders(
-              settings.crisisEscalationText,
-              settings,
-            ),
-            WaHandledBy.CRISIS,
-            startedAt,
-            { retrievalMeta: { ...ran } },
-          );
-
-          this.eventEmitter.emit('exception', {
-            statusCode: 200,
-            timestamp: new Date().toISOString(),
-            path: 'whatsapp/crisis',
-            message:
-              `The crisis classifier fired on the WhatsApp bot for an UNRECOGNISED number ` +
-              `(contact ends ${contact.phoneLast4}, confidence ` +
-              `${crisis.confidence.toFixed(2)}, signal "${crisis.signal}"). The fixed safety ` +
-              `reply was sent. This number is not linked to any Ally account, so there is no ` +
-              `worker record to follow up through — the number itself is the only handle.`,
-            type: 'WhatsApp Crisis Classifier',
-          } as NotificationErrorType);
-          return;
-        }
-      } catch (error) {
-        // Swallowed on purpose: the refusal below still has to go out. A classifier that is
-        // down must not turn "we cannot recognise you" into no reply at all.
-        this.logger.warn(
-          `Crisis classifier did not run for an unrecognised number (contact ends ` +
-            `${contact.phoneLast4}): ${
-              error instanceof Error ? error.message : 'unknown error'
-            }`,
-        );
-      }
+  private announceAgentOutcome(
+    chatbot: Pick<Chatbot, 'id' | 'name'>,
+    decision: Pick<ChatbotDecision, 'agent'>,
+  ): void {
+    if (isFallback(decision.agent)) {
+      this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
+        chatbot: { id: chatbot.id, name: chatbot.name },
+        reason: decision.agent.fallbackReason,
+      } satisfies AgentFallbackEvent);
     }
-
-    await this.reply(
-      contact,
-      conversation,
-      inboundId,
-      this.settingsService.renderPlaceholders(
-        settings.unrecognisedNumberText,
-        settings,
-      ),
-      WaHandledBy.UNIDENTIFIED,
-      startedAt,
-    );
   }
 
-  private async answerFromCorpus(
-    contact: WaContact,
-    conversation: WaConversation,
-    inboundId: string,
-    question: string,
-    settings: WhatsAppBotSettings,
-    startedAt: number,
-  ): Promise<void> {
-    const history = await this.recentHistory(conversation.id);
-    const { prompts, ran } = await this.loadPromptOverrides();
-
-    // The answer and the crisis classifier run CONCURRENTLY, not in sequence.
-    //
-    // Sequentially, the safety net would add a second LLM round trip to the latency of every
-    // ordinary reference question — which is nearly all of them — and the pair still has to finish
-    // inside one SQS visibility window. Run together it costs a small-model call and no waiting.
-    //
-    // `allSettled`, not `all`: a rejected classifier must not take down an answer that arrived fine.
-    // The classifier's own failure path already returns `failed` rather than throwing, so a rejection
-    // here means something below it broke — and the keyword rules, which ran before this, are what
-    // still hold.
-    const [answerResult, crisisResult] = await Promise.allSettled([
-      this.aiService.answerKnowledgeQuestion({
-        question,
-        history,
-        prompts,
-        // The gate above guarantees this is set. Sent explicitly rather than left to a default
-        // because ally-ai has none — a request without an audience is refused there, which is
-        // what keeps "we forgot to scope the corpus" from ever being a silent condition.
-        audience: {
-          tenant_id: contact.tenantId,
-          include_global: true,
-        },
-        top_k: settings.retrieval.topK,
-        min_similarity: settings.retrieval.minSimilarity,
-        decline_similarity: settings.retrieval.declineSimilarity,
-        max_passages: settings.retrieval.maxPassages,
-        max_context_tokens: settings.retrieval.maxContextTokens,
-        similarity_band: settings.retrieval.similarityBand,
-        max_answer_chars: settings.maxAnswerChars,
-        translate_query: settings.retrieval.translateQuery,
-      }),
-      settings.crisisClassifierEnabled
-        ? this.aiService.checkWhatsAppCrisis({ message: question, prompts })
-        : Promise.resolve(null),
-    ]);
-
-    // Crisis wins over the answer, unconditionally and before anything is sent. Not gated on the
-    // model's confidence: the prompt tells it to choose crisis when uncertain, so re-gating on
-    // confidence here would quietly undo that instruction. The cost of a false positive is one
-    // worker rephrasing one question; the cost of a false negative is answering a reference
-    // question at someone in danger.
-    const crisis =
-      crisisResult.status === 'fulfilled' ? crisisResult.value : null;
-    if (crisis?.is_crisis) {
-      await this.reply(
-        contact,
-        conversation,
-        inboundId,
-        this.settingsService.renderPlaceholders(
-          settings.crisisEscalationText,
-          settings,
-        ),
-        WaHandledBy.CRISIS,
-        startedAt,
-        { retrievalMeta: { ...ran } },
-      );
-
-      this.eventEmitter.emit('exception', {
-        statusCode: 200,
-        timestamp: new Date().toISOString(),
-        path: 'whatsapp/crisis',
-        message:
-          `The crisis classifier fired on the WhatsApp bot (contact ends ` +
-          `${contact.phoneLast4}, confidence ${crisis.confidence.toFixed(2)}, signal ` +
-          `"${crisis.signal}"). The fixed safety reply was sent and the corpus answer was ` +
-          `discarded. No keyword matched, so this one would have been answered as an ` +
-          `ordinary question.`,
-        type: 'WhatsApp Crisis Classifier',
-      } as NotificationErrorType);
-      return;
-    }
-
-    // The classifier did not run: either it reported `failed`, or the call itself rejected (which
-    // `allSettled` above turns into a rejected result rather than letting it take down the answer).
-    // BOTH are the degraded state, and the rejected case was previously not checked at all.
-    const classifierRequested = settings.crisisClassifierEnabled;
-    const classifierDegraded =
-      classifierRequested &&
-      (crisisResult.status === 'rejected' || Boolean(crisis?.failed));
-
-    if (classifierDegraded) {
-      const reason =
-        crisisResult.status === 'rejected'
-          ? crisisResult.reason instanceof Error
-            ? crisisResult.reason.message
-            : 'unknown error'
-          : 'ally-ai reported failed=true on the crisis check';
-
-      // Named explicitly, because a silently degraded safety net is worse than a loud one: from the
-      // dashboard, "the classifier never fires" and "the classifier is down" look identical.
-      this.logger.warn(
-        `Crisis classifier did not run for this message; keyword rules only (${reason})`,
-      );
-
-      // ...and ALERTED, which the log line alone never achieved. Slack was notified when crisis
-      // FIRED but never when detection was degraded, so an expired API key or a renamed ally-ai
-      // route would quietly halve the safety net and look, from every dashboard we have, exactly
-      // like a quiet week: the classifier's firing rate is low by design, so "zero crises today" is
-      // an ordinary reading. That made the failure mode with the highest human cost the one we were
-      // least equipped to notice.
-      //
-      // statusCode 500 rather than the crisis paths' 200: this IS a fault, and `handleException`
-      // suppresses only 401s, so it reaches Slack either way.
-      this.eventEmitter.emit('exception', {
-        statusCode: 500,
-        timestamp: new Date().toISOString(),
-        path: 'whatsapp/crisis-classifier-degraded',
-        message:
-          `The WhatsApp crisis classifier did not run for a message (contact ends ` +
-          `${contact.phoneLast4}). Reason: ${reason}. The keyword rules ran and are ` +
-          `holding the safety net alone — check ally-ai's crisis-check route and its ` +
-          `model provider key. Expect NO crisis alerts while this persists, which is ` +
-          `indistinguishable from a quiet day.`,
-        type: 'WhatsApp Crisis Classifier Degraded',
-      } as NotificationErrorType);
-    }
-
-    let answer: KnowledgeAnswerResponse;
-    if (answerResult.status === 'fulfilled') {
-      answer = answerResult.value;
-    } else {
-      const error = answerResult.reason;
-      // A model or index outage is NOT "the corpus does not cover this". It gets the fallback
-      // wording and an ERROR-reason queue row, so a bad afternoon for ally-ai does not silently fill
-      // the unanswered queue with questions the corpus answers perfectly well.
-      const reason = error instanceof Error ? error.message : 'unknown error';
-      this.logger.error(`Knowledge agent call failed: ${reason}`);
-      await this.reply(
-        contact,
-        conversation,
-        inboundId,
-        settings.fallbackText,
-        WaHandledBy.ERROR,
-        startedAt,
-      );
-      await this.recordUnanswered(
-        inboundId,
-        conversation.id,
-        question,
-        contact.locale,
-        WaUnansweredReason.ERROR,
-        null,
-        0,
-      );
-      return;
-    }
-
-    if (answer.language) {
-      await this.contactRepository.update(
-        { id: contact.id },
-        { locale: answer.language },
-      );
-      await this.conversationRepository.update(
-        { id: conversation.id },
-        { lastLanguage: answer.language },
-      );
-    }
-
-    const composed = composeReply({
-      intent: answer.intent,
-      answer: answer.answer,
-      declineText: settings.declineText,
-      citations: answer.citations,
-      maxAnswerChars: settings.maxAnswerChars,
-      maxReplyChars: settings.maxReplyChars,
-      maxCitations: settings.maxCitations,
+  /**
+   * The bot that answers the env-configured platform number, which has no connector: the
+   * `platformChatbotId` in the default settings.
+   */
+  private async platformChatbot(): Promise<Chatbot | null> {
+    const { platformChatbotId } = await this.settingsService.get();
+    if (!platformChatbotId) return null;
+    return this.chatbotRepository.findOne({
+      where: { id: platformChatbotId, archivedAt: IsNull() },
     });
-
-    const handledBy =
-      answer.intent === 'answer'
-        ? WaHandledBy.RAG
-        : answer.intent === 'clarify'
-          ? WaHandledBy.CLARIFIED
-          : WaHandledBy.DECLINED;
-
-    await this.reply(
-      contact,
-      conversation,
-      inboundId,
-      composed,
-      handledBy,
-      startedAt,
-      {
-        citations: answer.citations as unknown as Record<string, any>[],
-        retrievalMeta: {
-          ...answer.retrieval,
-          // The provider and model that ACTUALLY ran, which is not necessarily the configured one:
-          // dispatch falls back when a key is missing. Without these, "why did this answer change?"
-          // is unanswerable, because prompt_version does not move when an admin swaps models.
-          provider: answer.provider,
-          model: answer.model,
-          prompt_version: answer.prompt_version,
-          ...ran,
-        },
-        language: answer.language,
-      },
-    );
-
-    // A CLARIFY is deliberately NOT filed. A question too vague to retrieve against is not evidence
-    // of a corpus gap, and letting those in buries the real gaps.
-    if (answer.intent === 'decline') {
-      await this.recordUnanswered(
-        inboundId,
-        conversation.id,
-        question,
-        answer.language,
-        this.mapDeclineReason(answer.decline_reason),
-        answer.retrieval?.top_similarity ?? null,
-        answer.retrieval?.hit_count ?? 0,
-      );
-    }
-  }
-
-  private mapDeclineReason(reason: string): WaUnansweredReason {
-    switch (reason) {
-      case 'no_hits':
-        return WaUnansweredReason.NO_HITS;
-      case 'below_threshold':
-        return WaUnansweredReason.BELOW_THRESHOLD;
-      case 'model_declined':
-        return WaUnansweredReason.MODEL_DECLINED;
-      default:
-        return WaUnansweredReason.ERROR;
-    }
-  }
-
-  /**
-   * Prompt overrides for the two knowledge prompts, carrying the admin-selected model.
-   *
-   * Scoped by prompt-code prefix so this sends only the knowledge prompts, not every ally-ai prompt
-   * in the database — the payload rides on every single question.
-   *
-   * The live text and its model settings are both sent: the Skills Store is the source of truth.
-   * Rows with empty text are dropped below so ally-ai falls back to its own file default for the
-   * wording while still honouring the selected model.
-   *
-   * Also returns which store version of each prompt was sent, recorded on the reply so "which
-   * prompt answered this?" has an answer after the text is republished. ally-ai runs the text it
-   * is sent and its file default otherwise, so a code missing from `ran` ran that default.
-   */
-  private async loadPromptOverrides(): Promise<{
-    prompts: Record<string, unknown>;
-    ran: PromptsRan;
-  }> {
-    const ran: PromptsRan = { prompt_versions: {}, prompt_hashes: {} };
-    try {
-      const rows = await this.promptSharedService.getPromptsByOptions({
-        promptCode: KNOWLEDGE_PROMPT_CODES,
-      });
-
-      const prompts = (rows ?? []).reduce<Record<string, unknown>>(
-        (acc, row) => {
-          const entry: Record<string, unknown> = {};
-          const content = row.prompt?.trim();
-          if (content) {
-            entry.prompt = content;
-            ran.prompt_versions[row.promptCode] = row.version ?? null;
-            if (row.contentHash)
-              ran.prompt_hashes[row.promptCode] = row.contentHash;
-          }
-          if (row.provider) entry.provider = row.provider;
-          if (row.model) entry.model = row.model;
-          if (typeof row.temperature === 'number') {
-            entry.temperature = row.temperature;
-          }
-          if (row.availableVariables) {
-            entry.availableVariables = row.availableVariables;
-          }
-          // An entry with nothing in it would override nothing but still ship a key; skip it.
-          if (Object.keys(entry).length) acc[row.promptCode] = entry;
-          return acc;
-        },
-        {},
-      );
-      return { prompts, ran };
-    } catch (error) {
-      // Falls back to ally-ai's own file defaults, which are sane. Not worth failing a worker's
-      // question over.
-      this.logger.warn(
-        `Could not load prompt overrides; ally-ai defaults will be used: ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`,
-      );
-      return { prompts: {}, ran };
-    }
   }
 
   private async recentHistory(
@@ -828,7 +564,7 @@ export class WhatsAppInboundService {
     const rows = await this.messageRepository.find({
       where: { conversationId },
       order: { createdAt: 'DESC' },
-      take: 6,
+      take: MAX_HISTORY_MESSAGES,
       select: ['direction', 'body', 'createdAt'],
     });
     return rows
@@ -845,10 +581,14 @@ export class WhatsAppInboundService {
 
   private async resolveContact(
     inbound: InboundWhatsAppMessage,
+    businessNumberId: string | null,
   ): Promise<WaContact> {
     const now = new Date();
     const existing = await this.contactRepository.findOne({
-      where: { phoneE164: inbound.from },
+      where: {
+        phoneE164: inbound.from,
+        businessNumberId: businessNumberId ?? IsNull(),
+      },
     });
     if (existing) {
       await this.contactRepository.update(
@@ -861,6 +601,7 @@ export class WhatsAppInboundService {
     return this.contactRepository.save(
       this.contactRepository.create({
         phoneE164: inbound.from,
+        businessNumberId,
         phoneLast4: inbound.from.slice(-4),
         consentStatus: WaConsentStatus.PENDING,
         firstSeenAt: now,
@@ -880,6 +621,8 @@ export class WhatsAppInboundService {
   private async resolveConversation(
     contact: WaContact,
     settings: WhatsAppBotSettings,
+    chatbotId: string,
+    connectorId: string | null,
   ): Promise<WaConversation> {
     const now = new Date();
     const cutoff = new Date(
@@ -890,6 +633,9 @@ export class WhatsAppInboundService {
       .createQueryBuilder('c')
       .where('c.contactId = :contactId', { contactId: contact.id })
       .andWhere('c.lastMessageAt >= :cutoff', { cutoff })
+      // A thread belongs to the bot that started it: when a number moves to another bot, the
+      // next message starts a fresh thread instead of handing the new bot the old one's history.
+      .andWhere('c.chatbotId = :chatbotId', { chatbotId })
       .orderBy('c.lastMessageAt', 'DESC')
       .getOne();
 
@@ -904,6 +650,8 @@ export class WhatsAppInboundService {
     return this.conversationRepository.save(
       this.conversationRepository.create({
         contactId: contact.id,
+        chatbotId,
+        connectorId,
         startedAt: now,
         lastMessageAt: now,
         messageCount: 1,
@@ -930,6 +678,8 @@ export class WhatsAppInboundService {
       citations?: Record<string, any>[];
       retrievalMeta?: Record<string, any>;
       language?: string;
+      /** The Agents v2 run behind this reply; v1 replies leave the run columns unset. */
+      agent?: AgentRunRef;
     } = {},
   ): Promise<void> {
     const outbound = await this.messageRepository.save(
@@ -946,17 +696,22 @@ export class WhatsAppInboundService {
         latencyMs: Date.now() - startedAt,
         status: WaMessageStatus.QUEUED,
         inReplyToId,
+        ...(extra.agent
+          ? {
+              agentRunId: extra.agent.runId,
+              agentRuntime: extra.agent.runtime,
+            }
+          : {}),
       }),
     );
 
     let sent = false;
     let lastReason = 'unknown error';
 
-    // RETRY the send, then ALERT if it still fails. Neither existed before: a provider send failure
-    // marked the row FAILED and returned, so the worker who asked a question — possibly a CRISIS
-    // question, since the crisis paths reply through this same method — simply never heard back, and
-    // nobody was told. The crisis branches emit an `exception` event when a crisis FIRES; the reply
-    // that carries the safety number to the worker had no such coverage.
+    // RETRY the send, then ALERT if it still fails. Otherwise a worker who asked a question —
+    // possibly a CRISIS question, since the crisis paths reply through this same method — would
+    // simply never hear back, and nobody would be told. The crisis branches alert when a crisis
+    // FIRES; this covers the reply that carries the safety number to the worker.
     //
     // Budget: SEND_MAX_ATTEMPTS × the provider's own 15s timeout + the pauses between them, which is
     // sized to stay inside the inbound consumer's 60s SQS visibility window alongside the retrieval
@@ -964,9 +719,18 @@ export class WhatsAppInboundService {
     for (let attempt = 1; attempt <= SEND_MAX_ATTEMPTS; attempt++) {
       const attemptStartedAt = Date.now();
       try {
+        const creds = await this.numberService.credentialsFor(
+          contact.businessNumberId,
+        );
+        if (!creds) {
+          throw new Error(
+            "This organisation's WhatsApp number has been disconnected",
+          );
+        }
         const { providerMessageId } = await this.provider.sendText(
           contact.phoneE164,
           body,
+          creds,
         );
         await this.messageRepository.update(
           { id: outbound.id },
@@ -1052,10 +816,6 @@ export class WhatsAppInboundService {
 
     // Record consent on the first successful exchange, not before: a disclaimer that failed to send
     // has not been shown, and marking it granted would mean the worker never sees it.
-    //
-    // NOTE this predates the retry above and is unchanged in spirit, but it was already only
-    // loosely honouring its own comment — it runs whether or not the send succeeded. Gated on `sent`
-    // now, which is what the comment says.
     if (sent && contact.consentStatus === WaConsentStatus.PENDING) {
       await this.contactRepository.update(
         { id: contact.id },

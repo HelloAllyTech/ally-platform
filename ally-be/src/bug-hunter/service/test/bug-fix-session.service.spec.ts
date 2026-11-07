@@ -282,9 +282,11 @@ describe('BugFixSessionService', () => {
 
       await service.continueAfterAnswer('finding-1');
 
+      // The answer resolves the question that spent the escalation cap, so
+      // that cap alone must not refuse the session; every other cap still does.
       expect(budgetService.assertCanStartSession).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'finding-1' }),
-        { force: false, userId: null },
+        { force: false, userId: null, ignore: ['escalations'] },
       );
       expect(github.dispatchWorkflow).toHaveBeenCalled();
       expect(bugHunterService.appendEvent).toHaveBeenCalledWith(
@@ -360,6 +362,81 @@ describe('BugFixSessionService', () => {
 
       expect(await service.continueAfterAnswer('finding-1')).toBeNull();
       expect(github.dispatchWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('restarts when the GitHub run has ended, even though the hunt-run row still reads RUNNING', async () => {
+      bugFindingService.getOne.mockResolvedValue(
+        findingRow({
+          status: BugFindingStatus.NEEDS_INPUT,
+          runId: 'run-asked',
+          sessionRunId: '777',
+        }),
+      );
+      github.getRun.mockResolvedValue({ status: 'completed' });
+      bugHunterService.getRun.mockResolvedValue({
+        id: 'run-asked',
+        status: BugHuntRunStatus.RUNNING,
+        createdAt: new Date(Date.now() - 5 * 60_000),
+      });
+
+      await service.continueAfterAnswer('finding-1');
+
+      expect(github.getRun).toHaveBeenCalledWith('ally-be', '777');
+      expect(github.dispatchWorkflow).toHaveBeenCalled();
+    });
+
+    it('leaves the answer to a GitHub run that is still in progress', async () => {
+      bugFindingService.getOne.mockResolvedValue(
+        findingRow({
+          status: BugFindingStatus.NEEDS_INPUT,
+          sessionRunId: '777',
+        }),
+      );
+      github.getRun.mockResolvedValue({ status: 'in_progress' });
+
+      expect(await service.continueAfterAnswer('finding-1')).toBeNull();
+      expect(github.dispatchWorkflow).not.toHaveBeenCalled();
+    });
+
+    it("hands a halted plan's answer to the step that asked, and runs that step, not the parent", async () => {
+      const answeredAt = new Date();
+      const parent = findingRow({
+        status: BugFindingStatus.NEEDS_INPUT,
+        escalationAnswer: 'Use the tenant default.',
+        escalationAnsweredBy: 42,
+        escalationAnsweredAt: answeredAt,
+      });
+      const stuck = findingRow({
+        id: 'step-1',
+        parentFindingId: 'finding-1',
+        repo: 'ally-web',
+        status: BugFindingStatus.NEEDS_INPUT,
+      } as Partial<BugFinding>);
+      findingRepository.listChildren.mockImplementation((id: string) =>
+        Promise.resolve(id === 'finding-1' ? [stuck] : []),
+      );
+      bugFindingService.getOne.mockImplementation((id: string) =>
+        Promise.resolve(id === 'step-1' ? stuck : parent),
+      );
+
+      await service.continueAfterAnswer('finding-1');
+
+      expect(findingRepository.update).toHaveBeenCalledWith('step-1', {
+        escalationAnswer: 'Use the tenant default.',
+        escalationAnsweredBy: 42,
+        escalationAnsweredAt: answeredAt,
+      });
+      expect(github.dispatchWorkflow).toHaveBeenCalledTimes(1);
+      expect(github.dispatchWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repo: 'ally-web',
+          inputs: expect.objectContaining({ finding_id: 'step-1' }),
+        }),
+      );
+      expect(findingRepository.update).toHaveBeenCalledWith(
+        { id: 'finding-1', status: BugFindingStatus.NEEDS_INPUT },
+        { status: BugFindingStatus.COORDINATING },
+      );
     });
 
     it('does nothing for a bug that is not waiting on input', async () => {
@@ -456,17 +533,17 @@ describe('BugFixSessionService', () => {
       expect(github.dispatchWorkflow).not.toHaveBeenCalled();
     });
 
-    it('dispatches to ally-mobile when the classifier recognizes a native-app bug', async () => {
+    it('dispatches to ally-ai-learn when the classifier recognizes a voice-agent bug', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow({ repo: null }));
       repoClassifier.classifyRepo.mockResolvedValue({
-        repo: 'ally-mobile',
-        rationale: 'Native terms screen.',
+        repo: 'ally-ai-learn',
+        rationale: 'Voice session agent.',
       });
 
       await service.start('finding-1', 42);
 
       expect(github.dispatchWorkflow).toHaveBeenCalledWith(
-        expect.objectContaining({ repo: 'ally-mobile' }),
+        expect.objectContaining({ repo: 'ally-ai-learn' }),
       );
     });
 
@@ -492,7 +569,7 @@ describe('BugFixSessionService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('accepts an admin-supplied ally-mobile repo and dispatches it', async () => {
+    it('dispatches to ally-mobile (re-onboarded 2026-11-06 with its Flutter commands)', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow({ repo: null }));
 
       await service.start('finding-1', 42, 'ally-mobile');
@@ -704,6 +781,45 @@ describe('BugFixSessionService', () => {
       await service.reconcile();
 
       expect(findingRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('restarts an answered bug the answer itself could not restart', async () => {
+      const waiting = findingRow({
+        status: BugFindingStatus.NEEDS_INPUT,
+        escalationAnswer: 'Yes, hide it for learners.',
+        escalationAnsweredAt: new Date(Date.now() - 60_000),
+        dispatchedAt: new Date(Date.now() - 40 * 60_000),
+        sessionRunId: '777',
+      });
+      findingRepository.find.mockImplementation(({ where }: any) =>
+        where.status === BugFindingStatus.NEEDS_INPUT ? [waiting] : [],
+      );
+      bugFindingService.getOne.mockResolvedValue(waiting);
+      github.getRun.mockResolvedValue({ status: 'completed' });
+
+      await service.reconcile();
+
+      expect(github.dispatchWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inputs: expect.objectContaining({ finding_id: 'finding-1' }),
+        }),
+      );
+    });
+
+    it('does not reuse an answer the last session already had to restart a new question', async () => {
+      const askedAgain = findingRow({
+        status: BugFindingStatus.NEEDS_INPUT,
+        escalationAnswer: 'Yes, hide it for learners.',
+        escalationAnsweredAt: new Date(Date.now() - 60 * 60_000),
+        dispatchedAt: new Date(Date.now() - 30 * 60_000),
+      });
+      findingRepository.find.mockImplementation(({ where }: any) =>
+        where.status === BugFindingStatus.NEEDS_INPUT ? [askedAgain] : [],
+      );
+
+      await service.reconcile();
+
+      expect(github.dispatchWorkflow).not.toHaveBeenCalled();
     });
 
     it('attaches the run URL to a queued session once GitHub registers it', async () => {
@@ -1948,15 +2064,15 @@ describe('BugFixSessionService — coordinated multi-repo fixes', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('accepts a plan whose step lands in ally-mobile', async () => {
+    it('accepts a plan whose step lands in ally-web', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow());
       await service.recordPlan('finding-1', [
         { repo: 'ally-be', summary: 'add the field' },
-        { repo: 'ally-mobile', summary: 'render the field' },
+        { repo: 'ally-web', summary: 'render the field' },
       ]);
       expect(findingRepository.create).toHaveBeenNthCalledWith(
         2,
-        expect.objectContaining({ repo: 'ally-mobile', stepIndex: 1 }),
+        expect.objectContaining({ repo: 'ally-web', stepIndex: 1 }),
       );
     });
   });
@@ -2054,6 +2170,56 @@ describe('BugFixSessionService — coordinated multi-repo fixes', () => {
 
       expect(github.dispatchWorkflow).toHaveBeenCalledWith(
         expect.objectContaining({ repo: 'ally-web' }),
+      );
+    });
+
+    it('starts a first step whose own start never happened, instead of waiting on it forever', async () => {
+      // recordPlan dispatches step 0 at once and leaves it NEW; a dispatch
+      // that failed left the plan at "Fixing across repos" with nothing running.
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.NEW }),
+        step(1, { status: BugFindingStatus.BLOCKED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(github.dispatchWorkflow).toHaveBeenCalledTimes(1);
+      expect(github.dispatchWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repo: 'ally-be',
+          inputs: expect.objectContaining({ finding_id: 'step-0' }),
+        }),
+      );
+    });
+
+    it('counts a released step as merged, so the next one starts and the plan can finish', async () => {
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.RELEASED }),
+        step(1, { status: BugFindingStatus.MERGED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(findingRepository.update).toHaveBeenCalledWith('finding-1', {
+        status: BugFindingStatus.MERGED,
+      });
+    });
+
+    it('halts the plan on a step a human rejected', async () => {
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.REJECTED }),
+        step(1, { status: BugFindingStatus.BLOCKED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(github.dispatchWorkflow).not.toHaveBeenCalled();
+      expect(findingRepository.update).toHaveBeenCalledWith(
+        'finding-1',
+        expect.objectContaining({ status: BugFindingStatus.FAILED }),
       );
     });
 

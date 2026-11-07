@@ -128,6 +128,8 @@ export enum ErrorCode {
   SKILLS_STORE_TRANSLATIONS_PENDING = 'SKILLS_STORE_TRANSLATIONS_PENDING',
   /** 409. A judge rubric: confirm the judge's pinned label was bumped before publishing. */
   SKILLS_STORE_PROMPT_PINNED = 'SKILLS_STORE_PROMPT_PINNED',
+  /** 403. A pinned prompt: only the people named in SKILLS_STORE_PINNED_EDITORS can put it live. */
+  SKILLS_STORE_PINNED_LOCKED = 'SKILLS_STORE_PINNED_LOCKED',
   /** 409. That version was live before; publishing it again needs an explicit rollback. */
   SKILLS_STORE_NOT_A_CANDIDATE = 'SKILLS_STORE_NOT_A_CANDIDATE',
   /** 400. Text and model settings change through a new version, not a metadata update. */

@@ -57,6 +57,12 @@ async def _groundedness():
     )
 
 
+async def _debrief_quality():
+    from app.core.debrief_quality.judge import judge_debrief
+
+    return await judge_debrief(TRANSCRIPT, "You listened well.", "en")
+
+
 async def _recall():
     from app.core.recall_quality.judge import judge_recall
 
@@ -92,6 +98,7 @@ JUDGES = {
     "drift_labels": _drift_labels,
     "language": _language,
     "feedback_groundedness": _groundedness,
+    "debrief_quality": _debrief_quality,
     "recall_quality": _recall,
     "rag_quality": _rag,
     "filler": _filler,

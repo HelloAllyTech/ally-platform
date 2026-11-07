@@ -15,6 +15,8 @@ import { GoalsXpAnalyticsRepository } from './repository/goals-xp-analytics.repo
 // Highlights → Goals: additional charts beside the XP-vs-goal chart above.
 import { ActiveUsersXpAnalyticsService } from './service/active-users-xp-analytics.service';
 import { ActiveUsersXpAnalyticsRepository } from './repository/active-users-xp-analytics.repository';
+import { CourseUnitsAnalyticsService } from './service/course-units-analytics.service';
+import { CourseUnitsAnalyticsRepository } from './repository/course-units-analytics.repository';
 import { XpLevelReachedAnalyticsService } from './service/xp-level-reached-analytics.service';
 import { XpLevelReachedAnalyticsRepository } from './repository/xp-level-reached-analytics.repository';
 import { BugHunterVolumeAnalyticsService } from './service/bug-hunter-volume-analytics.service';
@@ -30,6 +32,9 @@ import { RoadmapDeliveryAnalyticsService } from './service/roadmap-delivery-anal
 import { ShipVolumeAnalyticsService } from './service/ship-volume-analytics.service';
 import { ChangelogModule } from 'src/changelog/changelog.module';
 import { RoadmapDeliveryAnalyticsRepository } from './repository/roadmap-delivery-analytics.repository';
+// Highlights → Priority "Roadmap votes cast": the same untenanted roadmap tables.
+import { RoadmapVotingAnalyticsService } from './service/roadmap-voting-analytics.service';
+import { RoadmapVotingAnalyticsRepository } from './repository/roadmap-voting-analytics.repository';
 // Testing-tab endpoints: candidates for the leadership Highlights tab, kept on a
 // separate admin tab until they have proved they change a decision.
 import { ActivationAnalyticsService } from './service/activation-analytics.service';
@@ -156,6 +161,12 @@ import { WeakMetricsAnalyticsRepository } from './repository/weak-metrics-analyt
 // a learner is graded by is actually true of their session.
 import { FeedbackGroundednessJudgeService } from './service/feedback-groundedness-judge.service';
 import { FeedbackGroundednessRepository } from './repository/feedback-groundedness.repository';
+// Debrief-quality judge: scores the whole debrief on the rubric — the score the
+// debrief quality bar is read from.
+import { DebriefQualityJudgeService } from './service/debrief-quality-judge.service';
+import { DebriefQualityRepository } from './repository/debrief-quality.repository';
+import { DebriefCalibrationService } from './service/debrief-calibration.service';
+import { DebriefCalibrationController } from './controller/debrief-calibration.controller';
 import { RagQualityJudgeService } from './service/rag-quality-judge.service';
 import { RagQualityAnalyticsService } from './service/rag-quality-analytics.service';
 import { RagQualityAnalyticsRepository } from './repository/rag-quality-analytics.repository';
@@ -195,13 +206,20 @@ import { TenantModule } from 'src/tenant/tenant.module';
     // tenant population (RSI loop, judge-side wiring).
     LanguageModule,
   ],
-  controllers: [AnalyticsController, TenantAnalyticsController],
+  controllers: [
+    AnalyticsController,
+    TenantAnalyticsController,
+    DebriefCalibrationController,
+  ],
   providers: [
     AnalyticsService,
     WeakMetricsAnalyticsService,
     WeakMetricsAnalyticsRepository,
     FeedbackGroundednessJudgeService,
     FeedbackGroundednessRepository,
+    DebriefQualityJudgeService,
+    DebriefQualityRepository,
+    DebriefCalibrationService,
     RagQualityJudgeService,
     RagQualityRepository,
     RagQualityAnalyticsService,
@@ -220,6 +238,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     GoalsXpAnalyticsRepository,
     ActiveUsersXpAnalyticsService,
     ActiveUsersXpAnalyticsRepository,
+    CourseUnitsAnalyticsService,
+    CourseUnitsAnalyticsRepository,
     XpLevelReachedAnalyticsService,
     XpLevelReachedAnalyticsRepository,
     BugHunterVolumeAnalyticsService,
@@ -230,6 +250,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     RoleplayVolumeAnalyticsRepository,
     RoadmapDeliveryAnalyticsService,
     RoadmapDeliveryAnalyticsRepository,
+    RoadmapVotingAnalyticsService,
+    RoadmapVotingAnalyticsRepository,
     // No repository: this one reads GitHub's statistics API, not our database.
     ShipVolumeAnalyticsService,
     ActivationAnalyticsService,

@@ -127,6 +127,12 @@ export enum FeatureToggleKey {
   // Bug Hunter: the autonomous find-and-fix agent (formerly SUPER_DUPER_ADMIN-only)
   BUG_HUNTER = 'bug_hunter',
 
+  // The clinical advisor's sign-off on clinical debrief guidance (plan §8.5):
+  // a document marked clinical is served to the Debrief agent only once
+  // someone holding this has signed off its current text. Off for everyone
+  // until named here, one person at a time.
+  DEBRIEF_CLINICAL_SIGN_OFF = 'debrief_clinical_sign_off',
+
   // Builder: the PRD-interview + coding agent that opens PRs
   BUILDER = 'builder',
 
@@ -424,8 +430,10 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Manage the WhatsApp Q&A bot: templates, conversations, unanswered queue and analytics.',
     legacyGrants: SDA_ONLY,
-    // One bot for the platform; most contacts belong to no organization.
-    platformOnly: true,
+    // The platform number and global settings span every organization, but each organization
+    // can connect its own number. An org-restricted admin reaches only the @OrgScopedRoute
+    // routes (their organization's number and settings); everything else stays platform-wide.
+    orgScopedRoutesOnly: true,
   },
   {
     key: FeatureToggleKey.KNOWLEDGE_BASE,
@@ -433,8 +441,10 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'View, edit, upload and archive documents in the WhatsApp bot’s knowledge base.',
     legacyGrants: SDA_ONLY,
-    // Feeds the one platform-wide WhatsApp bot.
-    platformOnly: true,
+    // An org-restricted admin manages only documents targeted solely at their organisations
+    // (the per-document routes, marked @OrgScopedRoute). Search, stats and the global corpus stay
+    // platform-wide.
+    orgScopedRoutesOnly: true,
   },
   {
     key: FeatureToggleKey.PRODUCT_ROADMAP_MANAGE,
@@ -468,6 +478,19 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
       'Restrict a platform admin to a specific set of tenants (or clear the restriction).',
     legacyGrants: SDA_ONLY,
     // Could lift their own organization restriction.
+    platformOnly: true,
+  },
+  {
+    key: FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+    label: 'Debriefs — Clinical sign-off',
+    description:
+      'Sign off clinical guidance in Debriefs → Knowledge, which the Debrief agent then uses for every organisation. For the clinical advisor.',
+    legacyGrants: {
+      superAdmin: false,
+      superDuperAdmin: false,
+      multiTenantAdmin: false,
+    },
+    // Signed-off guidance reaches every organisation's debriefs.
     platformOnly: true,
   },
   {
@@ -610,6 +633,7 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Default the admin sidebar to collapsed and expand it on hover.',
     legacyGrants: SUPER_ADMIN_TIER,
+    defaultEnabled: true,
   },
 ];
 

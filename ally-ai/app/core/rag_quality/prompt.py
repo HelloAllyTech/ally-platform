@@ -52,6 +52,15 @@ CORPUS_PURPOSE = {
         "to answer or ground what the learner asked; a passage on the same "
         "topic that does not bear on the question is tangential."
     ),
+    "debrief_knowledge": (
+        "The DEBRIEF KNOWLEDGE corpus. Its reader is the Debrief agent writing "
+        "a trainee counsellor's feedback after a practice roleplay; the query "
+        "describes one pivotal moment in that session. It holds practice "
+        "guidelines, the debrief style guide, level guides for lay and "
+        "professional helpers, and organisations' own protocols. A passage is "
+        "relevant when it says what good practice is at THAT kind of moment; "
+        "general material on the same topic is tangential."
+    ),
 }
 
 DEFAULT_JUDGE_RUBRIC = """\

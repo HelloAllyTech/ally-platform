@@ -143,12 +143,14 @@ import { TrackDropoffAnalyticsService } from '../service/track-dropoff-analytics
 import { UsageLevelAnalyticsService } from '../service/usage-level-analytics.service';
 import { RoleplayVolumeAnalyticsService } from '../service/roleplay-volume-analytics.service';
 import { RoadmapDeliveryAnalyticsService } from '../service/roadmap-delivery-analytics.service';
+import { RoadmapVotingAnalyticsService } from '../service/roadmap-voting-analytics.service';
 import { ShipVolumeAnalyticsService } from '../service/ship-volume-analytics.service';
 import {
   HighlightsAnalyticsService,
   withholdPlatformWideHighlights,
 } from '../service/highlights-analytics.service';
 import { ActiveUsersXpAnalyticsService } from '../service/active-users-xp-analytics.service';
+import { CourseUnitsAnalyticsService } from '../service/course-units-analytics.service';
 import { XpLevelReachedAnalyticsService } from '../service/xp-level-reached-analytics.service';
 import { BugHunterVolumeAnalyticsService } from '../service/bug-hunter-volume-analytics.service';
 import { XpByTenantAnalyticsService } from '../service/xp-by-tenant-analytics.service';
@@ -164,6 +166,7 @@ import {
 } from '../dto/weak-metrics.dto';
 import { WeakMetricsAnalyticsService } from '../service/weak-metrics-analytics.service';
 import { FeedbackGroundednessJudgeService } from '../service/feedback-groundedness-judge.service';
+import { DebriefQualityJudgeService } from '../service/debrief-quality-judge.service';
 import { RagQualityAnalyticsService } from '../service/rag-quality-analytics.service';
 import { FillerAnalyticsService } from '../service/filler-analytics.service';
 import { FillerJudgeService } from '../service/filler-judge.service';
@@ -199,6 +202,9 @@ import {
   StartDriftBackfillDto,
   StartGroundednessBackfillDto,
   GroundednessBackfillJobDto,
+  DebriefQualityBackfillJobDto,
+  DebriefQualityQueryDto,
+  DebriefQualityResponseDto,
   StartFillerBackfillDto,
   StartLanguageBackfillDto,
   StartLatencyQueryDto,
@@ -243,6 +249,10 @@ import {
   ActiveUsersXpResponseDto,
 } from '../dto/active-users-xp-analytics.dto';
 import {
+  CourseUnitsQueryDto,
+  CourseUnitsResponseDto,
+} from '../dto/course-units-analytics.dto';
+import {
   XpLevelReachedQueryDto,
   XpLevelReachedResponseDto,
 } from '../dto/xp-level-reached-analytics.dto';
@@ -259,6 +269,7 @@ import {
   RoleplayVolumeResponseDto,
 } from '../dto/roleplay-volume-analytics.dto';
 import { RoadmapDeliveryResponseDto } from '../dto/roadmap-delivery-analytics.dto';
+import { RoadmapVotingResponseDto } from '../dto/roadmap-voting-analytics.dto';
 import {
   ShipVolumeQueryDto,
   ShipVolumeResponseDto,
@@ -420,11 +431,13 @@ export class AnalyticsController {
     private readonly xpGrowthAnalyticsService: XpGrowthAnalyticsService,
     private readonly goalsXpAnalyticsService: GoalsXpAnalyticsService,
     private readonly activeUsersXpAnalyticsService: ActiveUsersXpAnalyticsService,
+    private readonly courseUnitsAnalyticsService: CourseUnitsAnalyticsService,
     private readonly xpLevelReachedAnalyticsService: XpLevelReachedAnalyticsService,
     private readonly bugHunterVolumeAnalyticsService: BugHunterVolumeAnalyticsService,
     private readonly xpByTenantAnalyticsService: XpByTenantAnalyticsService,
     private readonly roleplayVolumeAnalyticsService: RoleplayVolumeAnalyticsService,
     private readonly roadmapDeliveryAnalyticsService: RoadmapDeliveryAnalyticsService,
+    private readonly roadmapVotingAnalyticsService: RoadmapVotingAnalyticsService,
     private readonly shipVolumeAnalyticsService: ShipVolumeAnalyticsService,
     private readonly platformAnalyticsService: PlatformAnalyticsService,
     private readonly scribeAnalyticsService: ScribeAnalyticsService,
@@ -435,6 +448,7 @@ export class AnalyticsController {
     private readonly glossaryEffectAnalyticsService: GlossaryEffectAnalyticsService,
     private readonly weakMetricsAnalyticsService: WeakMetricsAnalyticsService,
     private readonly feedbackGroundednessJudgeService: FeedbackGroundednessJudgeService,
+    private readonly debriefQualityJudgeService: DebriefQualityJudgeService,
     private readonly ragQualityAnalyticsService: RagQualityAnalyticsService,
     private readonly activationAnalyticsService: ActivationAnalyticsService,
     private readonly completionRateAnalyticsService: CompletionRateAnalyticsService,
@@ -681,6 +695,29 @@ export class AnalyticsController {
     @Query() query: ActiveUsersXpQueryDto,
   ): Promise<ActiveUsersXpResponseDto> {
     return this.activeUsersXpAnalyticsService.getActiveUsers(query);
+  }
+
+  @Get('course-units')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Course units consumed per period, with learners (super-admin)',
+    description:
+      'A course unit is a fixed amount of XP (see `CourseUnitsResponseDto.' +
+      'unitXp`). Per bucket: units consumed (XP / unit size), the distinct ' +
+      'learners who earned XP, and the average units per learner. Derived ' +
+      'from the `xp_events` ledger. Test organisations are excluded, ' +
+      'platform-wide only. Honours the standard `range`/`bucket`/`from`/`to` ' +
+      'window params.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Course-units series retrieved successfully',
+    type: CourseUnitsResponseDto,
+  })
+  async getCourseUnits(
+    @Query() query: CourseUnitsQueryDto,
+  ): Promise<CourseUnitsResponseDto> {
+    return this.courseUnitsAnalyticsService.getCourseUnits(query);
   }
 
   @Get('xp-level-reached')
@@ -1233,6 +1270,33 @@ export class AnalyticsController {
   })
   async getRoadmapDelivery(): Promise<RoadmapDeliveryResponseDto> {
     return this.roadmapDeliveryAnalyticsService.getRoadmapDelivery();
+  }
+
+  @Get('roadmap-voting')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Roadmap votes cast per month, by admin (super-admin)',
+    description:
+      'How many votes each admin with product-roadmap access cast on the ' +
+      'internal roadmap, per calendar month — an adoption measure: is more of ' +
+      'the team shaping the roadmap. A month counts the votes cast in it that ' +
+      'still stand (`roadmap_allocations` by `periodKey`; a vote taken back is ' +
+      'gone). Every month lists every admin who could vote in it, with 0 for ' +
+      'non-voters, so `voters` / `eligible` is participation. Who could vote ' +
+      'is read from the grant ledger (`roadmap_vote_grants`, monthly + daily, ' +
+      'never refunds), plus every current permission holder in the current ' +
+      'month; months before the ledger existed have `eligible: null` rather ' +
+      "than a guess from today's admin list. The current month is kept and " +
+      'flagged `partial`. ALL-TIME and MONTH-GRAINED; no `tenantId` — the ' +
+      "roadmap is Ally's own backlog.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Roadmap voting retrieved successfully',
+    type: RoadmapVotingResponseDto,
+  })
+  async getRoadmapVoting(): Promise<RoadmapVotingResponseDto> {
+    return this.roadmapVotingAnalyticsService.getRoadmapVoting();
   }
 
   @Get('ship-volume')
@@ -2296,6 +2360,71 @@ export class AnalyticsController {
     @Param('jobId') jobId: string,
   ): Promise<GroundednessBackfillJobDto> {
     const job = await this.feedbackGroundednessJudgeService.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException(`Backfill job ${jobId} not found`);
+    }
+    return job;
+  }
+
+  @Get('debrief-quality')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Debrief quality, as the independent judge scored it (super-admin)',
+    description:
+      'The baseline readout for the debrief quality bar: the overall out of 10 ' +
+      '(eight rubric dimensions, weighted, capped at 4 by any hard fail), the ' +
+      'share passing (8 or more, no hard fail) and the hard-fail rate, overall ' +
+      'and cut by language, learner level, session length and debrief source. ' +
+      'Groups under 20 scored debriefs report counts only. Scores are only ' +
+      'comparable within one (judgeModel, judgePromptVersion) pair; ' +
+      '`judgeVersions` lists every pair present.',
+  })
+  @ApiResponse({ status: 200, type: DebriefQualityResponseDto })
+  async getDebriefQuality(
+    @Query() query: DebriefQualityQueryDto,
+  ): Promise<DebriefQualityResponseDto> {
+    return this.debriefQualityJudgeService.getSummary(query);
+  }
+
+  @Post('debrief-quality/backfill')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Score stored debriefs with the debrief-quality judge (super-admin)',
+    description:
+      'The scheduled drain already scores debriefs on its own; this is for a ' +
+      'manual run, e.g. after a provider outage (it ignores the attempt cap). ' +
+      'One Gemini call per debrief over its full transcript. Pass ' +
+      'judgePromptVersion to make the run resumable.',
+  })
+  @ApiResponse({ status: 202, type: DebriefQualityBackfillJobDto })
+  async startDebriefQualityBackfill(
+    @Body() body: StartGroundednessBackfillDto,
+  ): Promise<DebriefQualityBackfillJobDto> {
+    const unjudgedForVersion = body.judgePromptVersion
+      ? {
+          judgeModel: body.judgeModel ?? 'gemini-2.5-pro',
+          judgePromptVersion: body.judgePromptVersion,
+        }
+      : null;
+    return this.debriefQualityJudgeService.startBackfill(
+      body.sinceDays ?? 90,
+      unjudgedForVersion,
+      body.concurrency,
+    );
+  }
+
+  @Get('debrief-quality/backfill/:jobId')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Debrief-quality backfill job status (super-admin)',
+  })
+  @ApiResponse({ status: 200, type: DebriefQualityBackfillJobDto })
+  async debriefQualityBackfillStatus(
+    @Param('jobId') jobId: string,
+  ): Promise<DebriefQualityBackfillJobDto> {
+    const job = await this.debriefQualityJudgeService.getJob(jobId);
     if (!job) {
       throw new NotFoundException(`Backfill job ${jobId} not found`);
     }

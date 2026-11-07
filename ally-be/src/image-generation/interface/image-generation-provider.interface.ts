@@ -15,6 +15,12 @@ export const INTERACTIVE_IMAGE_QUALITY: ImageQuality = 'medium';
 
 export interface ImageGenerationOptions {
   quality?: ImageQuality;
+  /**
+   * Call this model instead of the configured one. Only Bug Hunter's
+   * image-generation probe sets it, to test a candidate model against the
+   * live API before a fix proposes it — see BugHunterProbeService.
+   */
+  model?: string;
 }
 
 export enum ImageGenerationProviderType {

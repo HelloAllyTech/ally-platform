@@ -2,8 +2,11 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     agent_memory,
+    agent_runtime,
     analytics_agent,
     conversation,
+    debrief,
+    debrief_quality,
     drift,
     feedback_groundedness,
     filler_quality,
@@ -48,12 +51,19 @@ api_router.include_router(
     prefix="/knowledge-agent",
     tags=["knowledge_agent"],
 )
+api_router.include_router(agent_runtime.router, prefix="/agent", tags=["agent_runtime"])
 api_router.include_router(helpline.router, prefix="/helpline", tags=["helpline"])
 api_router.include_router(drift.router, prefix="/drift", tags=["drift"])
 api_router.include_router(
     feedback_groundedness.router,
     prefix="/feedback-groundedness",
     tags=["feedback-groundedness"],
+)
+api_router.include_router(debrief.router, prefix="/debrief", tags=["debrief"])
+api_router.include_router(
+    debrief_quality.router,
+    prefix="/debrief-quality",
+    tags=["debrief-quality"],
 )
 api_router.include_router(
     analytics_agent.router, prefix="/analytics-agent", tags=["analytics_agent"]

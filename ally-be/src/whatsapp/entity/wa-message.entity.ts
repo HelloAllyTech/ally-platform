@@ -1,5 +1,6 @@
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { AgentRuntimeUsed } from 'src/chatbot/enum/chatbot.enum';
 import {
   WaHandledBy,
   WaMessageDirection,
@@ -97,4 +98,20 @@ export class WaMessage extends BaseWithoutTenantEntity {
   /** For an outbound message, the inbound message it answers. */
   @Column({ type: 'uuid', name: 'in_reply_to_id', nullable: true })
   inReplyToId?: string | null;
+
+  /**
+   * The Agents v2 run behind this reply: the checkpointer's run id in ally-ai, so a reply can be
+   * traced back to its run ("Why?"). Null for v1 replies.
+   */
+  @Column({ type: 'uuid', name: 'agent_run_id', nullable: true })
+  agentRunId?: string | null;
+
+  /** `v2`, or `v2_fallback` when the run failed and v1 answered. Null for v1 replies. */
+  @Column({
+    type: 'varchar',
+    length: 16,
+    name: 'agent_runtime',
+    nullable: true,
+  })
+  agentRuntime?: AgentRuntimeUsed | null;
 }

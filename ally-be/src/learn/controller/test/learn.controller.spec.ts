@@ -1,3 +1,4 @@
+import { StageDirectorMemoriesService } from '../../service/stage-director-memories.service';
 import { ElevenLabsVoiceSyncService } from '../../service/elevenlabs-voice-sync.service';
 import { TtsCatalogService } from '../../service/tts-catalog.service';
 import { VideoActorCatalogService } from '../../service/video-actor-catalog.service';
@@ -270,6 +271,10 @@ describe('LearnController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [LearnController],
       providers: [
+        {
+          provide: StageDirectorMemoriesService,
+          useValue: { mapMemories: jest.fn(), bulkSwitch: jest.fn() },
+        },
         {
           provide: ScenarioService,
           useValue: mockScenarioService,

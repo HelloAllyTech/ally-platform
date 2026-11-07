@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 
 import { productRoadmapAPI, useSetRoadmapAllocationMutation } from "@api";
+import { TAG_TYPES } from "@constants";
 import { store } from "@store";
 import { RoadmapBoardQuery, RoadmapOpportunitiesQuery, RoadmapOpportunity } from "@types";
 
@@ -85,13 +86,53 @@ export const useSetVotes = (target: AllocationTarget) => {
     [target],
   );
 
+  /**
+   * Once you've backed a colleague, every OTHER row by the same author stops being "new to you".
+   * The vote path deliberately doesn't refetch the list, so the "New colleague" markers on those
+   * sibling rows would otherwise stay lit until the next load. Only ever clears the flag — taking
+   * a vote back can't tell us whether another standing vote still covers that author, so it
+   * leaves the markers alone and lets the next refetch settle it.
+   */
+  const clearNewColleagueMarkers = useCallback(
+    (authorId: number | undefined) => {
+      if (authorId === undefined || target.kind === "detail") return;
+      const clear = (row: RoadmapOpportunity) => {
+        if (row.creator?.id === authorId) row.breadthNew = false;
+      };
+      if (target.kind === "list") {
+        store.dispatch(
+          productRoadmapAPI.util.updateQueryData("getRoadmapOpportunities", target.args, draft => {
+            draft.items.forEach(clear);
+          }),
+        );
+        return;
+      }
+      store.dispatch(
+        productRoadmapAPI.util.updateQueryData("getRoadmapBoard", target.args, draft => {
+          draft.lanes.forEach(lane => lane.items.forEach(clear));
+        }),
+      );
+    },
+    [target],
+  );
+
   return useCallback(
     async (opportunityId: string, next: number, previous: number) => {
       const delta = next - previous;
+      // The multiplier a vote added now will most likely be worth, read from the cache so the
+      // optimistic score is close; the server's number overwrites it on reconcile. Removals are
+      // taken off 1:1 — close enough for the instant it is on screen.
+      const cachedBreadth = productRoadmapAPI.endpoints.getRoadmapBreadth.select()(
+        store.getState(),
+      ).data;
+      const weight = delta > 0 && cachedBreadth?.enabled ? cachedBreadth.multiplier : 1;
 
       const patches = [
         patchOpportunity(opportunityId, row => {
-          row.priorityScore += delta;
+          row.priorityScore = Math.max(
+            0,
+            Math.round((row.priorityScore + delta * weight) * 10) / 10,
+          );
           row.myVotes = next;
         }),
         store.dispatch(
@@ -104,10 +145,17 @@ export const useSetVotes = (target: AllocationTarget) => {
       try {
         const result = await setAllocation({ opportunityId, votes: next }).unwrap();
 
+        let authorId: number | undefined;
         patchOpportunity(opportunityId, row => {
           row.priorityScore = result.priorityScore;
           row.myVotes = result.votes;
+          authorId = row.creator?.id;
+          if (result.votes > 0) row.breadthNew = false;
         });
+        if (result.votes > 0 && delta > 0) clearNewColleagueMarkers(authorId);
+        // Qualifying count, target hint and "next drop" all moved: refetch the breadth readout
+        // once per settled interaction (the vote button already debounces).
+        store.dispatch(productRoadmapAPI.util.invalidateTags([TAG_TYPES.PRODUCT_ROADMAP_BREADTH]));
         store.dispatch(
           productRoadmapAPI.util.updateQueryData("getRoadmapVoteBudget", undefined, draft =>
             Object.assign(draft, result.budget),
@@ -123,6 +171,6 @@ export const useSetVotes = (target: AllocationTarget) => {
         toast.error(message);
       }
     },
-    [patchOpportunity, setAllocation],
+    [patchOpportunity, clearNewColleagueMarkers, setAllocation],
   );
 };

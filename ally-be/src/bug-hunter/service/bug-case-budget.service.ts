@@ -114,10 +114,14 @@ export class BugCaseBudgetService {
    */
   async assertCanStartSession(
     finding: BugFinding,
-    options: { force?: boolean; userId: number | null },
+    options: {
+      force?: boolean;
+      userId: number | null;
+      ignore?: readonly BugCaseBudgetKind[];
+    },
   ): Promise<void> {
     const budget = this.read(finding);
-    const refusal = explainSessionRefusal(budget);
+    const refusal = explainSessionRefusal(budget, options.ignore);
     if (!refusal) return;
     if (!options.force || options.userId == null) {
       throw new ForbiddenException(refusal);

@@ -241,6 +241,9 @@ export default {
           800: "rgb(var(--color-primary-800) / <alpha-value>)",
           900: "rgb(var(--color-primary-900) / <alpha-value>)",
         },
+        // Label colour on a primary-500 surface. White on Ally Blue; an org
+        // with a light brand colour gets ink here from the backend.
+        "primary-foreground": "rgb(var(--color-primary-foreground) / <alpha-value>)",
         // Secondary/Accent Colors
         secondary: {
           DEFAULT: "rgb(var(--color-secondary-DEFAULT) / <alpha-value>)",

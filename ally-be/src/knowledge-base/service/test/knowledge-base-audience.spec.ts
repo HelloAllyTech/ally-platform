@@ -15,6 +15,7 @@ import { KbDocumentChunkRepository } from '../../repository/kb-document-chunk.re
 import { KbDocumentTenantRepository } from '../../repository/kb-document-tenant.repository';
 import { KbDocumentRepository } from '../../repository/kb-document.repository';
 import { KbRetrievalRepository } from '../../repository/kb-retrieval.repository';
+import { TenantScopeService } from '../../../authorization/service/tenant-scope.service';
 import { KnowledgeBaseService } from '../knowledge-base.service';
 
 jest.mock('src/common/execution/execution-manager', () => ({
@@ -38,6 +39,7 @@ const TENANT_B = '22222222-2222-2222-2222-222222222222';
  * no-op save that sweeps every chunk of a 300-page book costs minutes for nothing.
  */
 describe('KnowledgeBaseService audience', () => {
+  let tenantScope: { resolveScope: jest.Mock };
   let service: KnowledgeBaseService;
   let documentRepository: { findOne: jest.Mock; update: jest.Mock };
   let documentTenantRepository: {
@@ -81,6 +83,11 @@ describe('KnowledgeBaseService audience', () => {
         .mockResolvedValue({ document_id: DOC_ID, updated: 12 }),
     };
     tenantRepository = { count: jest.fn().mockResolvedValue(1) };
+    tenantScope = {
+      resolveScope: jest
+        .fn()
+        .mockResolvedValue({ tenantIds: null, restricted: false }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -99,6 +106,7 @@ describe('KnowledgeBaseService audience', () => {
         // be answered, it does not retrieve.
         { provide: KbRetrievalRepository, useValue: { record: jest.fn() } },
         { provide: getRepositoryToken(Tenant), useValue: tenantRepository },
+        { provide: TenantScopeService, useValue: tenantScope },
       ],
     }).compile();
 
@@ -222,5 +230,44 @@ describe('KnowledgeBaseService audience', () => {
 
     expect(result.isGlobal).toBe(true);
     expect(result.tenantIds).toEqual([]);
+  });
+
+  describe('for an org-restricted admin', () => {
+    beforeEach(() => {
+      tenantScope.resolveScope.mockResolvedValue({
+        tenantIds: [TENANT_A],
+        restricted: true,
+      });
+    });
+
+    it('cannot make a document global', async () => {
+      documentTenantRepository.tenantIdsForDocument.mockResolvedValue([
+        TENANT_A,
+      ]);
+      await expect(
+        service.setAudience(DOC_ID, { isGlobal: true, tenantIds: [] }),
+      ).rejects.toThrow('targeted at your organisation');
+    });
+
+    it('cannot target another organisation', async () => {
+      documentTenantRepository.tenantIdsForDocument.mockResolvedValue([
+        TENANT_A,
+      ]);
+      await expect(
+        service.setAudience(DOC_ID, {
+          isGlobal: false,
+          tenantIds: [TENANT_A, TENANT_B],
+        }),
+      ).rejects.toThrow('your own organisations');
+    });
+
+    it('cannot see a document shared with an organisation outside their allowlist', async () => {
+      // Editing it would change another customer's corpus.
+      documentTenantRepository.tenantIdsForDocument.mockResolvedValue([
+        TENANT_A,
+        TENANT_B,
+      ]);
+      await expect(service.get(DOC_ID)).rejects.toThrow('was not found');
+    });
   });
 });

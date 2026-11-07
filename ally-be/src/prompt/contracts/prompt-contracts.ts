@@ -356,6 +356,62 @@ export const BUILDER_LESSON_CURATOR_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/builder/rule_draft_system.txt */
+export const BUILDER_RULE_DRAFT_SYSTEM = definePrompt(
+  'builder_rule_draft_system',
+  {},
+  {
+    name: 'Builder — Rule Draft',
+    description:
+      'Turns one answer the admin gave Builder into a general rule (one sentence) and the area it belongs to, for the admin to edit before saving. Answers in JSON.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/rule_match_system.txt */
+export const BUILDER_RULE_MATCH_SYSTEM = definePrompt(
+  'builder_rule_match_system',
+  {},
+  {
+    name: 'Builder — Rule Preview',
+    description:
+      'Checks a proposed rule against the admin\'s earlier decisions: which it would have answered, and whether it agrees with what was chosen. Powers the rule editor\'s "would have applied to" preview. Answers in JSON.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/session_ask_system.txt */
+export const BUILDER_SESSION_ASK_SYSTEM = definePrompt(
+  'builder_session_ask_system',
+  {},
+  {
+    name: 'Builder — Ask a Session',
+    description:
+      "Answers an admin's read-only question about one Builder session from its PRD, transcript, runs, pull requests, decisions and rules. Never changes the session; may suggest an instruction for the admin to send. Answers in JSON.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/work_ask_system.txt */
+export const BUILDER_WORK_ASK_SYSTEM = definePrompt(
+  'builder_work_ask_system',
+  {},
+  {
+    name: 'Builder — Ask About All Work',
+    description:
+      "Answers an admin's read-only question across every Builder session in progress, the decisions waiting, the admin's rules, recent history and Up next. Answers in JSON.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
 /** src/prompts/builder/outcome_system.txt */
 export const BUILDER_OUTCOME_SYSTEM = definePrompt(
   'builder_outcome_system',
@@ -1042,6 +1098,29 @@ export const TRACK_MEMORY_FACTS = definePrompt(
   { output: 'json' },
 );
 
+/** src/prompts/stage_director/memory_mapping.txt */
+export const STAGE_DIRECTOR_MEMORY_MAPPING = definePrompt(
+  'stage_director_memory_mapping',
+  {
+    title: 'optional',
+    roleInstructions: 'optional',
+    backstory: 'optional',
+    states: 'required',
+    memories: 'required',
+  },
+  {
+    name: 'Stage Director: map memories to stages',
+    description:
+      'Runs once when a simulation is switched to Main Agent Prompt — Stage ' +
+      'Director: decides, for each of its memories (its Knowledge Sources), ' +
+      'from which stage the client is ready to talk about it. The author can ' +
+      'change every assignment afterwards in the editor.',
+    category: 'Simulation Studio',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
 /** src/prompts/track_memory/fold.txt */
 export const TRACK_MEMORY_FOLD = definePrompt('track_memory_fold', {
   sessionMemories: 'required',
@@ -1182,6 +1261,122 @@ export const FEEDBACK_GROUNDEDNESS_RUBRIC = definePrompt(
     name: 'Feedback Groundedness Judge Rubric',
     description:
       "Static rubric for the feedback-groundedness judge: is each claim in a learner's feedback supported by the transcript? The judge composes the transcript and the claims around this text.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief_quality/rubric.txt */
+export const DEBRIEF_QUALITY_RUBRIC = definePrompt(
+  'debrief_quality_rubric',
+  {},
+  {
+    name: 'Debrief Quality Judge Rubric',
+    description:
+      "Static rubric for the debrief-quality judge: scores a learner's whole debrief on eight dimensions and lists hard fails. The judge composes the transcript and the debrief around this text.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/safety_reader_system.txt */
+export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
+  'debrief_safety_reader_system',
+  {},
+  {
+    name: 'Debrief Safety Reader',
+    description:
+      "The debrief agent's mandatory safety step: finds the client's risk cues (and how the learner responded) and the learner's own distress. The step composes the transcript around this text. Pinned: change it only after the safety recall gate passes.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/analyst_system.txt */
+export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
+  'debrief_analyst_system',
+  {},
+  {
+    name: 'Debrief Analyst',
+    description:
+      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults). The step composes the transcript, scenario and expected behaviours around this text. Release-only: a new version reaches learners through an approved release.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/progress_reader_system.txt */
+export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
+  'debrief_progress_reader_system',
+  {},
+  {
+    name: 'Debrief Progress Reader',
+    description:
+      "The debrief agent's Progress reader: compares the latest evidence map with the learner's past Work-on-this points and says only what the evidence supports. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/writer_system.txt */
+export const DEBRIEF_WRITER_SYSTEM = definePrompt(
+  'debrief_writer_system',
+  {},
+  {
+    name: 'Debrief Writer',
+    description:
+      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/reviser_system.txt */
+export const DEBRIEF_REVISER_SYSTEM = definePrompt(
+  'debrief_reviser_system',
+  {},
+  {
+    name: 'Debrief Reviser',
+    description:
+      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged, adding any uncovered risk cue to the important moment's `others`. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/reply_system.txt */
+export const DEBRIEF_REPLY_SYSTEM = definePrompt(
+  'debrief_reply_system',
+  {},
+  {
+    name: 'Ask Ally (debrief reply)',
+    description:
+      "The Debrief agent in conversation mode: answers the learner's replies under the reflective question from the published debrief and the transcript. Streamed, one short answer per message, checked by code afterwards (no score, no diagnosis, quotes must match). Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/reflection_check_system.txt */
+export const DEBRIEF_REFLECTION_CHECK_SYSTEM = definePrompt(
+  'debrief_reflection_check_system',
+  { question: 'required' },
+  {
+    name: 'Debrief reflection check (XP)',
+    description:
+      "Says only whether a learner's message is an on-topic answer to the debrief's reflective question, for DEBRIEF_REFLECTION XP (v9 FR-65). Never grades quality or sincerity.",
+    category: 'evaluation',
+    output: 'json',
+  },
+);
+
+/** src/prompts/debrief/improver_system.txt */
+export const DEBRIEF_IMPROVER_SYSTEM = definePrompt(
+  'debrief_improver_system',
+  {},
+  {
+    name: 'Debrief Improver',
+    description:
+      "The Improver's instructions: reads aggregate signals from debrief runs, writes the weekly report and proposes ideas. Its own skill; changes go through a person.",
     category: 'evaluation',
     output: 'structured',
   },

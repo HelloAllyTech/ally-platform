@@ -3,18 +3,22 @@ import { FC, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 
-import { useGetChatHistoryQuery } from "@api";
+import { useGetChatHistoryQuery, useGetSupervisorDebriefQuery } from "@api";
 import { Refresh } from "@assets";
 import { useSendMessage } from "@hooks";
 import { initSession } from "@reducer";
 import { RootState } from "@store";
 import { ChatMessagePayload, SimulationSummary as SimulationSummaryType } from "@types";
 
+// The endpoint map alone: the `@constants` barrel loads icons at import time.
+import { DebriefCards } from "./DebriefCards";
 import { DebriefFeedback } from "./DebriefFeedback";
 import { DebriefReplyInput } from "./DebriefReplyInput";
 import { getDebriefViewState } from "./debriefViewState";
 import { ReplyBubble } from "./ReplyBubble";
 import { SupervisorNote } from "./SupervisorNote";
+import { useLearnerDebrief } from "./useLearnerDebrief";
+import { ApiEndpoints } from "../../constants/api";
 
 const NoteSkeleton = () => (
   <div className="flex w-full gap-3">
@@ -82,8 +86,17 @@ export const DebriefTab: FC<DebriefTabProps> = ({
   const threadEndRef = useRef<HTMLDivElement>(null);
 
   const sessionExists = useSelector((state: RootState) => state.chatHistory.sessions[sessionId]);
+  // The Debrief agent's debrief replaces everything below once the learner's
+  // organisation is switched on. `null` — not switched on, request failed,
+  // or still loading — keeps today's debrief exactly as it was.
+  const learnerDebrief = useLearnerDebrief(sessionId);
+  // Roleplay Logs (read-only): a supervisor reads the learner's new debrief,
+  // their flags and their Ask Ally thread (v9 FR-26). Anything else — not
+  // switched on, an older session, a refusal — keeps today's note.
+  const { data: supervisorView } = useGetSupervisorDebriefQuery(sessionId, { skip: !readOnly });
+  const askAlly = learnerDebrief?.state === "ready" && !readOnly;
   const { messages, streamingMessage, isStreaming, error, sendMessage, retryLastMessage } =
-    useSendMessage(sessionId);
+    useSendMessage(sessionId, askAlly ? ApiEndpoints.DEBRIEFS.REPLY_STREAM(sessionId) : undefined);
   const { data: history, isLoading: isHistoryLoading } = useGetChatHistoryQuery(
     { sessionId },
     // No thread on screen, so no reason to fetch one — this also keeps an admin
@@ -111,6 +124,109 @@ export const DebriefTab: FC<DebriefTabProps> = ({
       threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, streamingMessage, readOnly]);
+
+  // Ask Ally: the same thread, answered by the Debrief agent, under the
+  // reflective question. Never on a read-only (Logs) view.
+  const thread = (
+    <>
+      {messages.map((message, index) => (
+        <ReplyBubble
+          key={`${message.role}-${index}`}
+          role={message.role}
+          content={message.content}
+          citations={message.citations}
+          onOpenMoment={onOpenMoment}
+          counsellorName={counsellorName}
+          agentName={agentName}
+        />
+      ))}
+      {streamingMessage && (
+        <ReplyBubble
+          role={streamingMessage.role}
+          content={streamingMessage.content}
+          citations={streamingMessage.citations}
+          onOpenMoment={onOpenMoment}
+          counsellorName={counsellorName}
+          agentName={agentName}
+        />
+      )}
+      {error && (
+        <div className="flex w-full justify-start">
+          <button
+            onClick={retryLastMessage}
+            className="flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2.5 font-primary text-sm text-red-600 transition-colors hover:bg-red-100"
+          >
+            <Refresh className="h-4 w-4" />
+            {t("common.somethingWentWrong")} {t("common.retry")}
+          </button>
+        </div>
+      )}
+      <div ref={threadEndRef} />
+    </>
+  );
+
+  if (readOnly && supervisorView?.state === "ready" && supervisorView.cards) {
+    const supervisorThread = supervisorView.thread ?? [];
+    return (
+      <DebriefCards
+        view={{
+          state: "ready",
+          cards: supervisorView.cards,
+          language: supervisorView.language,
+          corrections: supervisorView.corrections,
+        }}
+        sessionId={sessionId}
+        supervisor={supervisorView}
+        replyThread={
+          <div data-testid="supervisor-thread" className="flex flex-col gap-3">
+            <p className="font-primary text-sm font-semibold text-typography-900">
+              {t("postSim.debriefCards.supervisor.thread")}
+            </p>
+            {supervisorThread.length === 0 ? (
+              <p className="font-primary text-sm text-typography-700">
+                {t("postSim.debriefCards.supervisor.noThread")}
+              </p>
+            ) : (
+              supervisorThread.map((m, index) => (
+                <ReplyBubble
+                  key={`${m.role}-${index}`}
+                  role={m.role === "learner" ? "user" : "assistant"}
+                  content={m.content}
+                  counsellorName={counsellorName}
+                  agentName={agentName}
+                />
+              ))
+            )}
+          </div>
+        }
+      />
+    );
+  }
+
+  if (learnerDebrief) {
+    return (
+      <DebriefCards
+        view={learnerDebrief}
+        sessionId={sessionId}
+        replyThread={
+          askAlly ? (
+            <div data-testid="ask-ally" className="flex flex-col gap-3">
+              {thread}
+              <DebriefReplyInput
+                onSend={sendMessage}
+                disabled={isStreaming}
+                placeholder={t("postSim.debriefCards.reply.placeholder")}
+              />
+              {/* v9 Q47: supervisors read this thread, and the learner is told. */}
+              <p className="font-primary text-xs text-typography-700">
+                {t("postSim.debriefCards.supervisor.canRead")}
+              </p>
+            </div>
+          ) : undefined
+        }
+      />
+    );
+  }
 
   const summary = summaryData?.details?.summary;
   const note = summary?.feedback?.supervisorNote;
@@ -194,39 +310,7 @@ export const DebriefTab: FC<DebriefTabProps> = ({
                 </p>
               )}
 
-              {messages.map((message, index) => (
-                <ReplyBubble
-                  key={`${message.role}-${index}`}
-                  role={message.role}
-                  content={message.content}
-                  citations={message.citations}
-                  onOpenMoment={onOpenMoment}
-                  counsellorName={counsellorName}
-                  agentName={agentName}
-                />
-              ))}
-              {streamingMessage && (
-                <ReplyBubble
-                  role={streamingMessage.role}
-                  content={streamingMessage.content}
-                  citations={streamingMessage.citations}
-                  onOpenMoment={onOpenMoment}
-                  counsellorName={counsellorName}
-                  agentName={agentName}
-                />
-              )}
-              {error && (
-                <div className="flex w-full justify-start">
-                  <button
-                    onClick={retryLastMessage}
-                    className="flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2.5 font-primary text-sm text-red-600 transition-colors hover:bg-red-100"
-                  >
-                    <Refresh className="h-4 w-4" />
-                    {t("common.somethingWentWrong")} {t("common.retry")}
-                  </button>
-                </div>
-              )}
-              <div ref={threadEndRef} />
+              {thread}
               {/* Replying only makes sense once there is a note to reply to. The
                 composer sits at the end of the thread and sticks to the bottom of
                 the viewport while the card is on screen, so a long thread never

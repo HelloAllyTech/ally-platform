@@ -17,6 +17,7 @@ import { TooltipHint } from "@components/app-tooltip";
 import { en, TooltipLocation } from "@constants";
 import { WaAnalyticsBucket, WaHandledBy } from "@types";
 
+import { useChatbotId } from "./chatbotContext";
 import {
   ChartCard,
   KpiTile,
@@ -95,11 +96,13 @@ export const UsageDashboard: React.FC = () => {
 
   // Recomputed only when the range changes, so every tile asks for the same window and a re-render
   // does not shift the boundary under them by a few milliseconds.
+  const chatbotId = useChatbotId();
   const window = useMemo(
     () => ({
       from: new Date(Date.now() - range.days * 24 * 60 * 60 * 1000).toISOString(),
+      chatbotId,
     }),
-    [range.days],
+    [range.days, chatbotId],
   );
   const windowLabel = en.whatsappBot.usage[range.labelKey].toLowerCase();
 

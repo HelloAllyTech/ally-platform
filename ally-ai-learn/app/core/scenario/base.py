@@ -236,6 +236,18 @@ class PromptData(BaseModel):
             "forms (app/core/agent/glossary_swap.py)."
         ),
     )
+    memories: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description=(
+            "The client's memories for Stage Director prompts (those using "
+            "{memories}). Same shape as knowledge_sources. Every unlocked one is "
+            "in the prompt on every turn, with no retrieval; one with "
+            "unlocksFromStateId shows only its title until the session reaches "
+            "that state (app/core/stage_director/memories.py). Kept separately "
+            "from knowledge_sources so switching a scenario between prompts "
+            "loses neither."
+        ),
+    )
     knowledge_sources: Optional[List[Dict[str, Any]]] = Field(
         default=None,
         description=(
@@ -355,6 +367,14 @@ class PromptData(BaseModel):
             "unchanged. Gated by settings.BACKCHANNEL_GLOBALLY_ENABLED (a "
             "global kill-switch): both must be on for back-channels to play. "
             "See app/core/livekit/backchannel.py."
+        ),
+    )
+    interim_reply_setting: Optional[bool] = Field(
+        default=None,
+        description=(
+            "interimReplyEnabled exactly as the author set it: None when never "
+            "set. Stage Director prompts read it so their interim is on by "
+            "default (app/core/livekit/interim_reply.py)."
         ),
     )
     interim_reply_enabled: bool = Field(
@@ -925,6 +945,7 @@ class Scenario(BaseModel):
                 "glossary_swaps": prompt_data_dict.get("glossarySwaps")
                 or prompt_data_dict.get("glossary_swaps"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
+                "memories": prompt_data_dict.get("memories"),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
                 # Comfort audio: ABSENT and EXPLICITLY FALSE are now different
                 # things. Silence between turns reads to users as
@@ -975,6 +996,13 @@ class Scenario(BaseModel):
                 ),
                 "interim_reply_enabled": bool(
                     prompt_data_dict.get("interimReplyEnabled") or False
+                ),
+                # Absent and explicitly off differ for Stage Director prompts,
+                # whose interim is on unless an author switched it off.
+                "interim_reply_setting": (
+                    prompt_data_dict.get("interimReplyEnabled")
+                    if isinstance(prompt_data_dict.get("interimReplyEnabled"), bool)
+                    else None
                 ),
                 "history_trim_enabled": bool(
                     prompt_data_dict.get("historyTrimEnabled") or False

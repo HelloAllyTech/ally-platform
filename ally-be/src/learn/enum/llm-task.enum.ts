@@ -25,6 +25,13 @@ export enum LlmTask {
   // AGENT_TURN but off the reply path, so it has to be separable from turn cost
   // for the feature's spend to be arguable against its benefit.
   CLIENT_WORKING_MEMORY = 'client_working_memory',
+  // Stage Director in ally-ai-learn: the same detached call per learner turn
+  // for scenarios on Main Agent Prompt — Stage Director, writing one paragraph
+  // of the client's thoughts.
+  STAGE_DIRECTOR = 'stage_director',
+  // Once per simulation, when it is switched to the Stage Director prompt:
+  // assigns each memory to the stage the client is ready to share it from.
+  STAGE_DIRECTOR_MEMORY_MAPPING = 'stage_director_memory_mapping',
   // Back-channel phrases in ally-ai-learn: one call per session, at session
   // start, generating the listener affirmations ("mm-hmm") the character plays
   // while the learner holds the floor. Its own label rather than AGENT_TURN
@@ -116,6 +123,25 @@ export enum LlmTask {
   // the transcript? Emitted by ally-ai before this member existed; the
   // processor stores the raw string, so those rows already carry this value.
   FEEDBACK_GROUNDEDNESS_JUDGE = 'feedback_groundedness_judge',
+  // Debrief-quality judge in ally-ai: scores the whole debrief on the rubric's
+  // eight dimensions. The independent judge the debrief quality bar is read
+  // from; a sibling of the groundedness judge, not a replacement for it.
+  DEBRIEF_QUALITY_JUDGE = 'debrief_quality_judge',
+  // Debrief agent steps in ally-ai, one label per step.
+  DEBRIEF_SAFETY_READER = 'debrief_safety_reader',
+  DEBRIEF_ANALYST = 'debrief_analyst',
+  DEBRIEF_PROGRESS_READER = 'debrief_progress_reader',
+  DEBRIEF_WRITER = 'debrief_writer',
+  DEBRIEF_EVALUATOR = 'debrief_evaluator',
+  DEBRIEF_REVISER = 'debrief_reviser',
+  // Ask Ally: the Debrief agent answering the learner's replies, streamed.
+  DEBRIEF_REPLY = 'debrief_reply',
+  // Read-aloud of a debrief card (Sarvam TTS), cached per card text.
+  DEBRIEF_READ_ALOUD = 'debrief_read_aloud',
+  // Whether an answer to the reflective question is on topic, for XP.
+  DEBRIEF_REFLECTION_CHECK = 'debrief_reflection_check',
+  // The debrief Improver's daily analysis; learning budget, never production.
+  DEBRIEF_IMPROVER = 'debrief_improver',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
   // character and fitted the turn. Its own label rather than folded into
   // LANGUAGE_JUDGE because it runs on a different cadence over a different
@@ -170,6 +196,10 @@ export enum LlmTask {
   HELPLINE_RISK_CLASSIFY = 'helpline_risk_classify',
   HELPLINE_COPILOT_TURN = 'helpline_copilot_turn',
   HELPLINE_QA_JUDGE = 'helpline_qa_judge',
+  // Chatbots in Agent mode (Agents v2), made by ally-ai's /agent/run: one call
+  // per loop iteration on the bot's answer model. Chatbot spend, not a learner practising, so
+  // absent from TASK_AREA like the helpline's.
+  WHATSAPP_AGENT_STEP = 'whatsapp_agent_step',
   // Feedback → skill mapping (src/foundational-skills): one call per completed
   // session whose debrief names areas of growth, filing each under one
   // foundational helping skill (or none) for the Helping skills "named
@@ -234,6 +264,13 @@ export enum LlmTask {
   // The learning loop: is an admin's reply in a Builder interview a
   // correction, and of what kind.
   BUILDER_CORRECTION_CLASSIFY = 'builder_correction_classify',
+  // The Builder tab: a read-only question to one session, or to all work.
+  BUILDER_SESSION_ASK = 'builder_session_ask',
+  BUILDER_WORK_ASK = 'builder_work_ask',
+  // The Builder tab's rules: drafting one from an answer, and previewing what
+  // it would have matched.
+  BUILDER_RULE_DRAFT = 'builder_rule_draft',
+  BUILDER_RULE_MATCH = 'builder_rule_match',
   // The roadmap's opportunity copilot: one pass of the guided interview's tool
   // loop (research, then a structured turn). Tagged with metadata.iteration so
   // a turn's passes can be summed.

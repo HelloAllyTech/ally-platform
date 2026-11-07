@@ -104,6 +104,53 @@ describe('EmailService', () => {
       expect(result).toBe(true);
     });
 
+    it('sends an HTML email in the org name with its logo and colour, signed Powered by Ally', async () => {
+      mockSESService.sendEmail.mockResolvedValue(true);
+
+      await service.sendEmailOTP({
+        to: 'test@example.com',
+        otp: '123456',
+        orgName: 'Acme <Helpline>',
+        orgLogoUrl: 'https://assets.example/logo.png',
+        orgColor: '#8E2626',
+      });
+
+      expect(mockSESService.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'test@example.com',
+          subject: 'Your Acme <Helpline> sign-in code',
+          isHtml: true,
+          purpose: 'login OTP',
+        }),
+      );
+      const body: string = mockSESService.sendEmail.mock.calls[0][0].body;
+      expect(body).toContain('<img src="https://assets.example/logo.png"');
+      expect(body).toContain('background:#8E2626');
+      expect(body).toContain('border:2px solid #8E2626');
+      expect(body).toContain('Your Acme &lt;Helpline&gt; sign-in code is:');
+      expect(body).toContain('>123456<');
+      expect(body).toContain('valid for the next 5 minutes');
+      expect(body).toContain('Powered by Ally');
+      // The org's own strings never reach the markup unescaped.
+      expect(body).not.toContain('<Helpline>');
+    });
+
+    it('falls back to Ally Blue, no logo, when the branded org has neither set', async () => {
+      mockSESService.sendEmail.mockResolvedValue(true);
+
+      await service.sendEmailOTP({
+        to: 'test@example.com',
+        otp: '123456',
+        orgName: 'Acme',
+        orgColor: 'not-a-colour',
+      });
+
+      const body: string = mockSESService.sendEmail.mock.calls[0][0].body;
+      expect(body).not.toContain('<img');
+      expect(body).toContain('background:#264D8E');
+      expect(body).not.toContain('not-a-colour');
+    });
+
     it('should emit event in development mode', async () => {
       mockConfig.isDevelopment = true;
       const params = { to: 'test@example.com', otp: '123456' };

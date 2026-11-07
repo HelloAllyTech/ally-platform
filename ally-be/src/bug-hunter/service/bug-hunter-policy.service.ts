@@ -21,6 +21,8 @@ import {
   BUG_HUNT_TRIVIAL_LINT_FIX_MAX_FILES,
 } from '../constants/bug-hunter.constants';
 import { BugFindingRepository } from '../repository/bug-finding.repository';
+import { BugHuntContextLookupRepository } from '../repository/bug-hunt-telemetry.repository';
+import { IMAGE_SERVICE_SYMPTOM } from '../constants/bug-hunter-probes.constants';
 import { BugFindingService } from './bug-finding.service';
 import { BugHunterService } from './bug-hunter.service';
 import { buildCaseChain, chainRefusal } from '../type/bug-case-chain.type';
@@ -113,6 +115,7 @@ export class BugHunterPolicyService {
     private readonly bugHunterService: BugHunterService,
     private readonly findingRepository: BugFindingRepository,
     private readonly github: GithubActionsService,
+    private readonly lookupRepository: BugHuntContextLookupRepository,
   ) {}
 
   /**
@@ -268,6 +271,23 @@ export class BugHunterPolicyService {
     // change and still land on its own.
     await this.assertSelfMergeable(finding, prUrl);
 
+    // The case chain, the data-repair rule and live evidence hold for EVERY
+    // self-merge, a fix somebody asked for included. They used to sit below
+    // the fix-session return, so every reported bug — all fix sessions —
+    // merged with no chain check at all: #124 and #134 (2026-10-28/29)
+    // landed with links missing that the chain exists to demand.
+    this.assertChainComplete(finding, prUrl);
+    // A data repair is run by a person after they merge it, so it never
+    // lands on its own, even with a complete chain (see bug-hunter-repair.ts).
+    if (isDataFault(faultLocationOf(finding.metadata))) {
+      throw new ForbiddenException(
+        'This is a data repair: a person reviews it, merges it and runs it. It never merges on its own — leave the PR open and PATCH to pr_opened.',
+      );
+    }
+    await this.assertExternalServiceSeenWorking(finding);
+
+    // Only a sweep's own finds, which nobody asked for, carry the nightly
+    // cap and the small-diff ceiling.
     const run = await this.runOf(finding);
     if (run?.trigger === BugHuntTrigger.FIX_SESSION) return;
 
@@ -287,12 +307,34 @@ export class BugHunterPolicyService {
     }
 
     await this.assertTrivialDiff(finding, prUrl);
-    this.assertChainComplete(finding, prUrl);
-    // A data repair is run by a person after they merge it, so it never
-    // lands on its own, even with a complete chain (see bug-hunter-repair.ts).
-    if (isDataFault(faultLocationOf(finding.metadata))) {
+  }
+
+  /**
+   * A bug whose symptom is the image service's answer merges itself only
+   * once that service has been seen to work: an `image-generation` probe
+   * that came back ok on a run that worked on this finding, which is how a
+   * fix's own model, size or prompt is tried against the real API. Code
+   * reading cannot say what a provider accepts today — two "verified" fixes
+   * for a retired model proved it.
+   */
+  private async assertExternalServiceSeenWorking(
+    finding: BugFinding,
+  ): Promise<void> {
+    if (
+      !IMAGE_SERVICE_SYMPTOM.test(`${finding.title}\n${finding.description}`)
+    ) {
+      return;
+    }
+    const seen = await this.lookupRepository.probeSucceededForFinding(
+      finding.id,
+      finding.runId ?? null,
+      'image-generation',
+    );
+    if (!seen) {
       throw new ForbiddenException(
-        'This is a data repair: a person reviews it, merges it and runs it. It never merges on its own — leave the PR open and PATCH to pr_opened.',
+        'This bug is about what the image service returns, and nobody has seen the service work with this fix: no ' +
+          '"image-generation" probe came back ok on a run for it. Call the probe with the model, size and prompt the fix ' +
+          'sends, and record what it returned. Until then the PR stays open for a person: PATCH to pr_opened.',
       );
     }
   }

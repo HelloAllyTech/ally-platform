@@ -13,8 +13,7 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
-import { Tooltip } from "@ally-ui-mono/ui-shared";
-import { CustomImage, FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared";
+import { FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared";
 import { useGetLogoUrlQuery, useGetUnreadReviewCountQuery } from "@api";
 import { DockToRight, LogoutIllustration, RedirectIcon, ReportProblemNavIcon } from "@assets";
 import {
@@ -41,6 +40,7 @@ import {
   useAnalytics,
   useCanUseTextHelpline,
   useCanViewAnalytics,
+  useCanEditOrgBranding,
   useCanViewCharacterLibrary,
   usePracticeStreakSummary,
   useProgressSummary,
@@ -48,6 +48,7 @@ import {
 } from "@hooks";
 
 import { NavSideBarProps, TabProps } from "./types";
+import { useBranding } from "../../branding";
 import { ButtonVariant } from "../button";
 import LanguageSelector from "../language-selector/LanguageSelector";
 import NotificationBadge from "../notification-badge/NotificationBadge";
@@ -231,7 +232,14 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
   const { canView: canViewCharacterLibrary } = useCanViewCharacterLibrary();
   const { canView: canViewAnalytics } = useCanViewAnalytics();
   const { canView: canUseTextHelpline } = useCanUseTextHelpline();
+  const { canEdit: canEditOrgBranding } = useCanEditOrgBranding();
   const permittedTabs = navBarOptions.filter(tab => {
+    // Branding needs edit:tenant-branding AND the org's branding switch on —
+    // see useCanEditOrgBranding.
+    if (tab.id === TabId.ORG_BRANDING) {
+      return canEditOrgBranding;
+    }
+
     // Text helpline needs a helpline permission AND the tenant's
     // TEXT_HELPLINE_ENABLED toggle — see useCanUseTextHelpline.
     if (tab.id === TabId.HELPLINE) {
@@ -281,6 +289,14 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
 
   const navigate = useNavigate();
   const { data: tenantData } = useGetLogoUrlQuery();
+  // A logo that failed to load counts as no logo, so a dead link leaves a
+  // blank, not a broken-image icon.
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+  const logoUrl = tenantData?.logoUrl?.trim() ?? "";
+  const hasLogo = !!logoUrl && logoUrl !== failedLogoUrl;
+  // Org branding: the "Powered by Ally" line, only while the org's switch is
+  // on. Colours come through the tokens, so nothing else here changes.
+  const { enabled: isBranded } = useBranding();
 
   const [isPinned, setIsPinned] = useState(readPinned);
   const [isPeeking, setIsPeeking] = useState(false);
@@ -604,33 +620,35 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
             isOpen ? "translate-x-0" : "-translate-x-full invisible md:visible"
           } md:translate-x-0 max-md:overflow-y-auto max-md:overscroll-contain`}
         >
-          {/* Logo container */}
+          {/* Header: the org's own logo, when it has one. An org without a logo
+              shows nothing — no initial, no name — and the row shrinks to just
+              the pin and the phone drawer's close button. */}
           <div
-            className="relative flex items-center justify-between h-[72px]"
+            className={`relative flex items-center ${
+              hasLogo ? "justify-between h-[72px]" : "justify-end h-12"
+            }`}
             data-testid="nav-sidebar-header"
           >
-            {/* Logo */}
-
-            {/* No `overflow-hidden` here: the org-name Tooltip renders its bubble
-              inline (Carbon Tooltip is not portaled), so an overflow-hidden
-              ancestor would clip it off-screen. The logo image is still clipped
-              to the rounded box by the inner wrapper's own overflow-hidden. */}
-            <div className="relative w-14 h-14 border-[0.5px] ml-2 rounded-md box-border flex items-center justify-center">
-              <Tooltip label={tenantData?.name ?? ""} align="right">
-                <div className="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center">
-                  <CustomImage
-                    src={tenantData?.logoUrl}
-                    alt="org-logo"
-                    className="object-cover w-full h-full rounded-md"
-                    fallbackClassName="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center bg-neutral-100"
-                    fallbackText={tenantData?.name?.slice(0, 1)?.toUpperCase() ?? "NA"}
-                  />
-                </div>
-              </Tooltip>
-            </div>
+            {/* Fixed height, free width: the logo keeps its own aspect ratio, so a
+              wide wordmark and a square mark both fill the height. The width cap
+              is what fits the rail — collapsed it is the rail's 72px of room,
+              expanded it leaves space for the pin beside it. */}
+            {hasLogo && (
+              <div className="flex items-center min-w-0 ml-2">
+                <img
+                  src={logoUrl}
+                  alt="org-logo"
+                  data-testid="nav-sidebar-logo"
+                  onError={() => setFailedLogoUrl(logoUrl)}
+                  className={`h-16 w-auto object-contain ${
+                    isExpanded ? "max-w-[10rem]" : "max-w-16"
+                  }`}
+                />
+              </div>
+            )}
 
             {/* The pin. Expanded — hover-opened or pinned — it sits beside the
-              logo. Collapsed it lies invisibly over the logo: a mouse never
+              logo. Collapsed it lies invisibly over the header: a mouse never
               meets it there (hovering opens the rail first), but a tap pins the
               rail open on a touch screen, which has no hover to open it with.
               One element across both states, so keyboard focus on it survives
@@ -642,7 +660,7 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
               className={
                 isExpanded
                   ? "hidden md:block p-3 transition-all duration-200 hover:bg-gray-50 hover:rounded-md"
-                  : "hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 w-14 h-14 items-center justify-center rounded-md opacity-0 focus-visible:opacity-100"
+                  : "hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 w-16 h-full items-center justify-center rounded-md opacity-0 focus-visible:opacity-100"
               }
               title={toggleTitle}
             >
@@ -686,6 +704,15 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
               profileUrl={user?.profileImageUrl}
               name={user?.name}
             />
+
+            {isBranded && (
+              <span
+                className={`text-xs text-typography-500 ${isExpanded ? "" : "sr-only"}`}
+                data-testid="nav-sidebar-powered-by"
+              >
+                {t("common.poweredByAlly")}
+              </span>
+            )}
           </div>
         </div>
       </div>

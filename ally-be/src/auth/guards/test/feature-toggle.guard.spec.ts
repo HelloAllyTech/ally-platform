@@ -21,6 +21,7 @@ describe('FeatureToggleGuard', () => {
   };
   let tenantScopeService: { assertTenantInScope: jest.Mock };
   let tenantFeatureService: { isEnabledForTenant: jest.Mock };
+  let permissionsService: { getUserPermissions: jest.Mock };
 
   const contextFor = (
     user: any,
@@ -52,13 +53,51 @@ describe('FeatureToggleGuard', () => {
     tenantFeatureService = {
       isEnabledForTenant: jest.fn().mockResolvedValue(false),
     };
+    permissionsService = {
+      getUserPermissions: jest.fn().mockResolvedValue([]),
+    };
 
     guard = new FeatureToggleGuard(
       reflector as unknown as Reflector,
       featureToggleService as any,
       tenantFeatureService as any,
       tenantScopeService as any,
+      permissionsService as any,
     );
+  });
+
+  describe('own-org permission (orgAdminPermission)', () => {
+    beforeEach(() => {
+      reflector.getAllAndOverride.mockReturnValue({
+        featureKey: 'users',
+        orgAdminPermission: 'edit:tenant-branding',
+      });
+    });
+
+    it('grants a tenant role that holds the named permission, with no toggle row', async () => {
+      permissionsService.getUserPermissions.mockResolvedValue([
+        'edit:tenant-branding',
+      ]);
+      await expect(guard.canActivate(contextFor(tenantAdmin))).resolves.toBe(
+        true,
+      );
+      expect(permissionsService.getUserPermissions).toHaveBeenCalledWith(2);
+    });
+
+    it('still refuses a caller without the permission or a toggle', async () => {
+      permissionsService.getUserPermissions.mockResolvedValue(['view:tenant']);
+      await expect(guard.canActivate(contextFor(tenantAdmin))).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('never consults permissions when the route names none', async () => {
+      reflector.getAllAndOverride.mockReturnValue({ featureKey: 'users' });
+      await expect(guard.canActivate(contextFor(tenantAdmin))).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(permissionsService.getUserPermissions).not.toHaveBeenCalled();
+    });
   });
 
   it('passes through when the route carries no @RequireFeatureToggle', async () => {

@@ -59,6 +59,13 @@ def is_interim_reply_enabled(scenario) -> bool:
     prompt_data = getattr(scenario, "prompt_data", None)
     if prompt_data is None:
         return False
+    # Stage Director prompts take their interim from here, as Main Agent Prompt
+    # #3 took one from its updater on every session, so it is on unless the
+    # author switched it off.
+    from app.core.graph.prompt import prompt_declares_stage_director
+
+    if prompt_declares_stage_director(prompt_data):
+        return getattr(prompt_data, "interim_reply_setting", None) is not False
     return bool(getattr(prompt_data, "interim_reply_enabled", False))
 
 

@@ -6,7 +6,7 @@ import { WaContact } from '../entity/wa-contact.entity';
 import { WaConversation } from '../entity/wa-conversation.entity';
 import { WaMessage } from '../entity/wa-message.entity';
 import { WaUnansweredQuestion } from '../entity/wa-unanswered-question.entity';
-import { WhatsAppSettingsService } from './whatsapp-settings.service';
+import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 
 /** Rows blanked per pass. Bounds one run's transaction size on a large backlog. */
 const BATCH_SIZE = 500;
@@ -40,7 +40,7 @@ export class WhatsAppRetentionService {
     private readonly conversationRepository: Repository<WaConversation>,
     @InjectRepository(WaUnansweredQuestion)
     private readonly unansweredRepository: Repository<WaUnansweredQuestion>,
-    private readonly settingsService: WhatsAppSettingsService,
+    private readonly settingsService: ChatbotSettingsService,
   ) {}
 
   /** Entry point for the daily scheduled task. */

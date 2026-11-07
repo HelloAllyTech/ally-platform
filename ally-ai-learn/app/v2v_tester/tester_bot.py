@@ -114,7 +114,41 @@ def should_take_over_stt(
     return is_avatar_participant(new_identity) and not current_is_avatar
 
 
+# Sarvam tester stack (V2V_TESTER_SPEECH_PROVIDER=sarvam): a speaker distinct
+# from the counselor catalog's common picks, so the two sides stay
+# distinguishable in a recording.
+_SARVAM_TESTER_SPEAKER = "priya"
+_SARVAM_TESTER_TTS_MODEL = "bulbul:v3"
+_SARVAM_TESTER_STT_MODEL = "saarika:v2.5"
+
+
+def _uses_sarvam() -> bool:
+    return (settings.V2V_TESTER_SPEECH_PROVIDER or "").lower() == "sarvam"
+
+
 async def _make_tts(language: str, http_session: aiohttp.ClientSession):
+    """The tester's TTS: Google by default, Sarvam when configured.
+
+    The Sarvam plugin is given the session's aiohttp session explicitly: the
+    tester is a plain participant, outside a job context, where the plugin
+    cannot fetch the shared one.
+    """
+    if _uses_sarvam():
+        from livekit.plugins import sarvam
+
+        from app.core.constants import convert_language_code_for_sarvam
+
+        return sarvam.TTS(
+            target_language_code=convert_language_code_for_sarvam(language),
+            model=_SARVAM_TESTER_TTS_MODEL,
+            speaker=_SARVAM_TESTER_SPEAKER,
+            api_key=settings.SARVAM_API_KEY,
+            http_session=http_session,
+        )
+    return await _make_google_tts(language, http_session)
+
+
+async def _make_google_tts(language: str, http_session: aiohttp.ClientSession):
     """Google TTS for the tester, any language."""
     from google.cloud import texttospeech
     from livekit.plugins import google
@@ -135,7 +169,17 @@ async def _make_tts(language: str, http_session: aiohttp.ClientSession):
 
 
 def _make_stt(language: str, http_session: aiohttp.ClientSession):
-    """Google streaming STT (chirp_2) for the tester, any language."""
+    """The tester's streaming STT: Google chirp_2 by default, Sarvam when set."""
+    if _uses_sarvam():
+        from app.stt.factory import create_stt_client
+
+        return create_stt_client(
+            stt_config={
+                "provider": "sarvam",
+                "config": {"model": _SARVAM_TESTER_STT_MODEL},
+            },
+            language_code=language,
+        ).stt_instance
     from livekit.plugins import google
 
     return google.STT(
@@ -829,7 +873,15 @@ class V2VTesterBot:
         if not self._audio_source or not text:
             return True
         try:
-            stream = tts.synthesize(text)
+            # Sarvam's REST synthesize() fails to decode in the pinned plugin;
+            # its WebSocket stream() is what the live agent uses.
+            if "sarvam" in type(tts).__module__:
+                stream = tts.stream()
+                stream.push_text(text)
+                stream.flush()
+                stream.end_input()
+            else:
+                stream = tts.synthesize(text)
             async for ev in stream:
                 frame = getattr(ev, "frame", None)
                 if frame is not None:

@@ -54,7 +54,7 @@ vi.mock("@api", () => ({
   useReopenRoleplayAssessmentMutation: () => [mockReopenAssessment, { isLoading: false }],
 }));
 
-vi.mock("@constants", () => ({ Permissions: { EDIT_USER: "edit:user" } }));
+vi.mock("@constants", () => ({ Permissions: { EDIT_LEARNER_PROGRESS: "edit:learner-progress" } }));
 vi.mock("@utils", () => ({
   hasPermissions: (perms: string[], p: string) => perms.includes(p),
 }));
@@ -101,7 +101,7 @@ const renderDrawer = () =>
 describe("ScenarioAttemptsDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPermissions.mockReturnValue(["edit:user"]);
+    mockPermissions.mockReturnValue(["edit:learner-progress"]);
   });
 
   it("lists paused and in-progress scenarios grouped under the course", () => {
@@ -227,14 +227,14 @@ describe("LearnerUsageTable scenario attempts action", () => {
   });
 
   it("opens the drawer for the learner when the user can edit users", () => {
-    mockPermissions.mockReturnValue(["edit:user"]);
+    mockPermissions.mockReturnValue(["edit:learner-progress"]);
     render(<LearnerUsageTable range="30d" />);
 
     fireEvent.click(screen.getByTestId("scenario-attempts-action-7"));
     expect(mockAttemptsQuery).toHaveBeenCalledWith(7, { skip: false });
   });
 
-  it("hides the action without edit:user", () => {
+  it("hides the action without edit:learner-progress", () => {
     mockPermissions.mockReturnValue([]);
     render(<LearnerUsageTable range="30d" />);
 

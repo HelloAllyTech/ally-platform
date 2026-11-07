@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional
 from app.prompts.resolver import load_and_format
 
 ANSWER_PROMPT_PATH = "knowledge/whatsapp_answer"
+# Bots allowed to answer beyond their documents (`documents_and_general`).
+GENERAL_ANSWER_PROMPT_PATH = "knowledge/answer_general"
 TRANSLATE_PROMPT_PATH = "knowledge/translate_query"
 CRISIS_PROMPT_PATH = "knowledge/crisis_classify"
 
@@ -72,7 +74,12 @@ def format_passages(passages: List[Dict[str, Any]]) -> str:
     return "\n\n".join(blocks)
 
 
-def format_history(history: Optional[List[Dict[str, str]]]) -> str:
+def format_history(
+    history: Optional[List[Dict[str, str]]],
+    *,
+    max_turns: int = MAX_HISTORY_TURNS,
+    max_chars: int = MAX_HISTORY_CHARS,
+) -> str:
     """
     Render recent turns as plain labelled lines.
 
@@ -83,7 +90,7 @@ def format_history(history: Optional[List[Dict[str, str]]]) -> str:
     if not history:
         return "(no previous messages)"
 
-    recent = history[-MAX_HISTORY_TURNS:]
+    recent = history[-max_turns:]
     lines: List[str] = []
     for turn in recent:
         role = (turn.get("role") or "").strip().lower()
@@ -94,11 +101,56 @@ def format_history(history: Optional[List[Dict[str, str]]]) -> str:
         lines.append(f"{speaker}: {content}")
 
     rendered = "\n".join(lines)
-    if len(rendered) > MAX_HISTORY_CHARS:
+    if len(rendered) > max_chars:
         # Keep the TAIL when trimming — the newest turn is the one the question refers
         # to.
-        rendered = "…\n" + rendered[-MAX_HISTORY_CHARS:]
+        rendered = "…\n" + rendered[-max_chars:]
     return rendered or "(no previous messages)"
+
+
+MAX_PERSONA_PROMPT_CHARS = 4000
+_FENCE = '"""'
+
+
+def format_persona(persona: Optional[Dict[str, Any]]) -> str:
+    """
+    Render a chatbot's persona as a block that goes AHEAD of the answer template.
+
+    Prepended in code rather than passed as a template variable, so it works with
+    whatever answer text is live in the Skills Store — no publish has to wait for a
+    deploy. The admin's instructions are fenced and explicitly ranked below the
+    template's rules: a system prompt can change voice and focus, never the grounding,
+    citation, format, language or safety rules that follow it.
+
+    Empty (no persona) renders as nothing, so a bot without one runs the template
+    exactly as before.
+    """
+    if not persona:
+        return ""
+    name = (persona.get("display_name") or "").strip()
+    tone = (persona.get("tone") or "").strip()
+    instructions = (persona.get("system_prompt") or "").strip()[
+        :MAX_PERSONA_PROMPT_CHARS
+    ]
+    if not (name or tone or instructions):
+        return ""
+
+    lines = ["# Who you are"]
+    if name:
+        lines.append(f"You are {name}.")
+    if tone:
+        lines.append(f"Your tone: {tone}.")
+    if instructions:
+        lines.append(
+            "Instructions from the team that runs you. They shape your voice and "
+            "focus; where they conflict with the rules after them (sources, citations, "
+            "format, language, safety), those rules win."
+        )
+        lines.append(_FENCE)
+        # The admin's text cannot close the fence early.
+        lines.append(instructions.replace(_FENCE, "''"))
+        lines.append(_FENCE)
+    return "\n".join(lines) + "\n\n"
 
 
 def build_answer_prompt(
@@ -108,16 +160,25 @@ def build_answer_prompt(
     history: Optional[List[Dict[str, str]]] = None,
     max_chars: int = 1400,
     prompts: Optional[Dict[str, Any]] = None,
+    persona: Optional[Dict[str, Any]] = None,
+    general: bool = False,
 ) -> str:
-    """Assemble the answer prompt, honouring any ally-be override of the template."""
-    return load_and_format(
-        ANSWER_PROMPT_PATH,
+    """
+    Assemble the answer prompt, honouring any ally-be override of the template.
+
+    `general` picks the template for bots allowed to answer beyond their documents.
+    """
+    body = load_and_format(
+        GENERAL_ANSWER_PROMPT_PATH if general else ANSWER_PROMPT_PATH,
         prompts=prompts,
         question=question.strip(),
         passages=format_passages(passages),
         history=format_history(history),
         max_chars=max_chars,
     )
+    if not body:
+        return body
+    return format_persona(persona) + body
 
 
 def build_translate_prompt(

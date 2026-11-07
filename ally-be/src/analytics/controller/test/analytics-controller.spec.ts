@@ -6,11 +6,13 @@ import { UsageLevelAnalyticsService } from '../../service/usage-level-analytics.
 import { XpGrowthAnalyticsService } from '../../service/xp-growth-analytics.service';
 import { GoalsXpAnalyticsService } from '../../service/goals-xp-analytics.service';
 import { ActiveUsersXpAnalyticsService } from '../../service/active-users-xp-analytics.service';
+import { CourseUnitsAnalyticsService } from '../../service/course-units-analytics.service';
 import { XpLevelReachedAnalyticsService } from '../../service/xp-level-reached-analytics.service';
 import { BugHunterVolumeAnalyticsService } from '../../service/bug-hunter-volume-analytics.service';
 import { XpByTenantAnalyticsService } from '../../service/xp-by-tenant-analytics.service';
 import { RoleplayVolumeAnalyticsService } from '../../service/roleplay-volume-analytics.service';
 import { RoadmapDeliveryAnalyticsService } from '../../service/roadmap-delivery-analytics.service';
+import { RoadmapVotingAnalyticsService } from '../../service/roadmap-voting-analytics.service';
 import { ShipVolumeAnalyticsService } from '../../service/ship-volume-analytics.service';
 import { HighlightsAnalyticsService } from '../../service/highlights-analytics.service';
 import { PlatformAnalyticsService } from '../../service/platform-analytics.service';
@@ -22,6 +24,7 @@ import { LanguageAnalyticsService } from '../../service/language-analytics.servi
 import { GlossaryEffectAnalyticsService } from '../../service/glossary-effect-analytics.service';
 import { WeakMetricsAnalyticsService } from '../../service/weak-metrics-analytics.service';
 import { FeedbackGroundednessJudgeService } from '../../service/feedback-groundedness-judge.service';
+import { DebriefQualityJudgeService } from '../../service/debrief-quality-judge.service';
 import { RagQualityAnalyticsService } from '../../service/rag-quality-analytics.service';
 import { ActivationAnalyticsService } from '../../service/activation-analytics.service';
 import { CompletionRateAnalyticsService } from '../../service/completion-rate-analytics.service';
@@ -154,6 +157,10 @@ describe('AnalyticsController', () => {
           useValue: { getActiveUsers: jest.fn() },
         },
         {
+          provide: CourseUnitsAnalyticsService,
+          useValue: { getCourseUnits: jest.fn() },
+        },
+        {
           provide: XpLevelReachedAnalyticsService,
           useValue: { getLevelsReached: jest.fn() },
         },
@@ -172,6 +179,10 @@ describe('AnalyticsController', () => {
         {
           provide: RoadmapDeliveryAnalyticsService,
           useValue: { getRoadmapDelivery: jest.fn() },
+        },
+        {
+          provide: RoadmapVotingAnalyticsService,
+          useValue: { getRoadmapVoting: jest.fn() },
         },
         {
           provide: ShipVolumeAnalyticsService,
@@ -212,6 +223,14 @@ describe('AnalyticsController', () => {
         {
           provide: FeedbackGroundednessJudgeService,
           useValue: { startBackfill: jest.fn(), getJob: jest.fn() },
+        },
+        {
+          provide: DebriefQualityJudgeService,
+          useValue: {
+            startBackfill: jest.fn(),
+            getJob: jest.fn(),
+            getSummary: jest.fn(),
+          },
         },
         {
           provide: RagQualityAnalyticsService,
@@ -983,6 +1002,33 @@ describe('AnalyticsController', () => {
         queryParams,
         mockUser.id,
       );
+    });
+  });
+
+  describe('getXpLevelReached', () => {
+    let xpLevelReachedAnalyticsService: jest.Mocked<XpLevelReachedAnalyticsService>;
+
+    beforeEach(() => {
+      xpLevelReachedAnalyticsService = controller[
+        'xpLevelReachedAnalyticsService'
+      ] as jest.Mocked<XpLevelReachedAnalyticsService>;
+    });
+
+    it('should include maxLevel in the response', async () => {
+      const mockResponse = {
+        window: { start: '2026-01-01', end: '2026-01-31', bucket: 'day' },
+        points: [],
+        scoping: { tenantId: null, unscopedSections: [] },
+        maxLevel: 50,
+        computedAt: new Date().toISOString(),
+      } as any;
+      xpLevelReachedAnalyticsService.getLevelsReached.mockResolvedValue(
+        mockResponse,
+      );
+
+      const result = await controller.getXpLevelReached({});
+      expect(result).toHaveProperty('maxLevel');
+      expect(result.maxLevel).toBe(50);
     });
   });
 });

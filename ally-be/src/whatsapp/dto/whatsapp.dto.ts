@@ -268,6 +268,14 @@ export class UpdateWaSettingsDto {
   @IsOptional()
   @IsBoolean()
   crisisClassifierEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Allow bots to use the Agents v2 engine. Off, every bot answers with v1.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  agentRuntimeAllowed?: boolean;
 }
 
 export class PreviewAskDto {

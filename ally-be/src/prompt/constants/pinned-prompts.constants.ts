@@ -31,6 +31,7 @@ export const PINNED_PROMPTS: ReadonlyMap<string, PinnedPromptReason> = new Map([
   ['language_quality_judge_rubric', 'judge_rubric'],
   ['recall_quality_rubric', 'judge_rubric'],
   ['feedback_groundedness_rubric', 'judge_rubric'],
+  ['debrief_quality_rubric', 'judge_rubric'],
   ['rag_quality_rubric', 'judge_rubric'],
   ['ally_ai_learn_evaluation_actor_goal_system', 'measuring_instrument'],
   ['builder_eval_admin_system', 'measuring_instrument'],
@@ -38,6 +39,9 @@ export const PINNED_PROMPTS: ReadonlyMap<string, PinnedPromptReason> = new Map([
   ['builder_prd_review_system', 'guard'],
   ['builder_prd_recheck_system', 'guard'],
   ['builder_discovery_plan_system', 'guard'],
+  // Decides whether a learner sees "an important moment"; its recall is gated
+  // at 100% on the seeded safety set (ally-ai scripts/debrief_safety_recall.py).
+  ['debrief_safety_reader_system', 'guard'],
 ]);
 
 /** What the editor must have done before confirming, by reason. */

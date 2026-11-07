@@ -107,6 +107,28 @@ describe('SimulationCreditsService', () => {
       expect(mockUserService.isValidUser).not.toHaveBeenCalled();
     });
 
+    it('should use tokenUserId when system access is granted but no userId is provided in query', async () => {
+      const tokenUserId = 1;
+      mockPermissionValidator.validatePermissions.mockResolvedValue(true); // Has SYSTEM_ACCESS
+      mockUserService.isValidUser.mockResolvedValue(true);
+      mockSimulationCreditsRepository.findByUserId.mockResolvedValue(
+        mockCredits,
+      );
+
+      const result = await service.getSimulationCredits(tokenUserId, undefined);
+
+      expect(result).toEqual({
+        creditLimit: 100,
+        consumedCredits: 25,
+        secondsAllowedPerCredit: 60,
+      });
+      // It should call findByUserId with tokenUserId, not undefined
+      expect(mockSimulationCreditsRepository.findByUserId).toHaveBeenCalledWith(
+        tokenUserId,
+      );
+      expect(mockUserService.isValidUser).toHaveBeenCalledWith(tokenUserId);
+    });
+
     it('should throw BadRequestException when targetUserId is undefined', async () => {
       const tokenUserId = 0;
       mockPermissionValidator.validatePermissions.mockResolvedValue(false);

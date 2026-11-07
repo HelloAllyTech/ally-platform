@@ -1107,7 +1107,15 @@ export class UserService {
       throw new NotFoundException(`Tenant with ID ${user.tenantId} not found`);
     }
 
-    return { name: tenant.name, logoUrl: tenant.logoUrl };
+    // `name`/`logoUrl` stay as they are: released mobile builds read them.
+    // `branding` is the resolved org identity for the web clients.
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      logoUrl: tenant.logoUrl,
+      branding: tenant.branding,
+      brandedSignInUrl: tenant.brandedSignInUrl ?? null,
+    };
   }
   async getPresignedUrlForProfileImage(
     profileImageUploadRequestDto: ProfileImageUploadRequestDto,

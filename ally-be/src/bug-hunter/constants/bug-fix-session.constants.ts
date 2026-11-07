@@ -41,9 +41,11 @@ export const BUG_HUNT_SWEEP_JOB_TIMEOUT_MINUTES = 120;
 
 /**
  * Repos a fix session may be dispatched for — i.e. those carrying
- * `bug-fix-session.yml`. `ally-mobile` is fixable (opens a PR) but never
- * auto-merges and never appears in `RELEASE_TARGETS` below — see
- * `buildFixSessionPrompt`'s merge-policy doc.
+ * `bug-fix-session.yml`.
+ *
+ * 'ally-mobile' was re-onboarded 2026-11-06 with its own Flutter commands
+ * (`BUG_HUNT_REPOS`' own comment in `bug-hunt-repos.constants.ts`) after the
+ * deliberate post-rename review this comment used to say was pending.
  */
 export const BUG_FIX_SESSION_REPOS = [
   'ally-be',

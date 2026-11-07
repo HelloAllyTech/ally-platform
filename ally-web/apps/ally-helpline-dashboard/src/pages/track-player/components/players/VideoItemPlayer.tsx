@@ -28,6 +28,8 @@ interface VideoItemPlayerProps {
    * classic doesn't pass it.
    */
   onPosition?: (seconds: number) => void;
+  /** The course's reading language — interjection True/False labels follow it. */
+  languageCode?: string | null;
 }
 
 /** Minimal shape of the YouTube IFrame API we touch. */
@@ -115,6 +117,7 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
   alreadyCompleted,
   onCompleted,
   onPosition,
+  languageCode,
 }) => {
   const { t } = useTranslation();
   const onPositionRef = useRef(onPosition);
@@ -301,6 +304,7 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
                 key={activeInterjection.id}
                 itemId={itemId}
                 interjection={activeInterjection}
+                languageCode={languageCode}
                 onContinue={handleInterjectionContinue}
               />
             )}

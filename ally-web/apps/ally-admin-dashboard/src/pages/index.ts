@@ -36,6 +36,7 @@ export * from "./BugHunter";
 export * from "./Builder";
 export * from "./CourseCopilot";
 export * from "./AgentTestCases/AgentTestCases";
+export * from "./Debriefs/DebriefConsole";
 export * from "./Competencies/Competencies";
 export * from "./RoleplaySessionLogs/RoleplaySessionLogs";
 export * from "./RoleplaySessionLogs/RoleplaySessionLogDetail";

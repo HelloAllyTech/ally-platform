@@ -71,6 +71,11 @@ export const validationSchema = Joi.object({
     .length(64)
     .pattern(/^[a-f0-9]+$/i)
     .optional(),
+  // Organisations' own WhatsApp access tokens and app secrets (wa_business_numbers).
+  WHATSAPP_CREDENTIALS_ENCRYPTION_KEY: Joi.string()
+    .length(64)
+    .pattern(/^[a-f0-9]+$/i)
+    .optional(),
 
   // HIPPA
   ENABLE_AUDIT_LOGS_TO_CLOUDWATCH: Joi.boolean().default(false),

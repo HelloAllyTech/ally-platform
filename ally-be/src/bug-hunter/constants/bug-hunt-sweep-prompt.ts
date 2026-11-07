@@ -53,6 +53,13 @@ export interface KnownNonBug {
   note?: string | null;
 }
 
+/** One bug still open in this repo — see `openBugs`. */
+export interface OpenBug {
+  title: string;
+  file?: string | null;
+  symbol?: string | null;
+}
+
 export interface SweepPromptContext {
   repo: string;
   runId: string;
@@ -76,6 +83,18 @@ export interface SweepPromptContext {
    * teach it to stop reporting real bugs.
    */
   knownNonBugs?: KnownNonBug[];
+  /**
+   * Bugs still open in this repo, newest first.
+   *
+   * The server's dedupe matches file + symbol, so the same root cause filed
+   * under a different symbol — "scheduled time events fail" one night,
+   * "immediately active time events fail" the next, or both in one round —
+   * opened a second row every time. The sweep could not avoid that: it was
+   * never shown what was already open. Seeing the list lets it skip a bug
+   * that is already tracked, or file under that bug's exact file and symbol
+   * so dedupe touches the existing row.
+   */
+  openBugs?: OpenBug[];
   /**
    * Which CLI will run this prompt: "claude-code" (default) or "gemini".
    *
@@ -149,10 +168,14 @@ export interface SweepMemoryEntry {
  * `BUG_HUNT_MAX_AUTO_MERGES_PER_RUN` genuinely trivial fixes and leaves
  * everything else as a PR for review. A fix session, by contrast, merges any
  * green fix — because there an admin asked for that bug by name. Guarded paths
- * never merge on either path, and neither does `ally-mobile`: this pipeline
- * only runs Jest, which cannot verify the native/on-device behaviour that
- * actually ships, so every ally-mobile fix — trivial or not — stays a PR for
- * a human to merge.
+ * never merge on either path.
+ *
+ * `ally-mobile` used to carry its own unconditional "never merge" carve-out
+ * here too (this pipeline only ran Jest, which cannot verify the native/
+ * on-device behaviour that actually ships) — removed as dead code once
+ * `ally-mobile` had no entry in `BUG_HUNT_REPOS` at all (see its own
+ * comment there): `repoCommands(repo)` now throws before this function's
+ * body is ever reached for that repo, so the carve-out could never fire.
  */
 export function buildSweepPrompt(ctx: SweepPromptContext): string {
   const {
@@ -162,6 +185,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
     mode,
     deep,
     knownNonBugs = [],
+    openBugs = [],
     engine = 'claude-code',
     memories = [],
     senses = [...BUG_HUNTER_MODEL_SENSES],
@@ -211,16 +235,9 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
   // comprehensive table is only useful if it keeps finding bugs regardless of
   // who is allowed to fix them.
   const gated = mode === BugHunterMode.MANUAL;
-  // ally-mobile writes code and opens PRs like any other fixable repo, but
-  // never merges — see the class doc's merge-policy note. The three protected
-  // repos cannot merge either, for an entirely different reason: the bot has
-  // push access and `master` wants a review, so `gh pr merge --admin` fails.
-  // Both end in the same instruction, and the prompt says which applies so
-  // the agent does not read a permissions wall as a policy it could argue
-  // with.
-  const neverMerges = repo === 'ally-mobile' || !commands.canBotMerge;
-  const mergeBlockedByPermissions =
-    repo !== 'ally-mobile' && !commands.canBotMerge;
+  // The protected repos cannot merge: the bot has push access and `master`
+  // wants a review, so `gh pr merge --admin` fails.
+  const mergeBlockedByPermissions = !commands.canBotMerge;
 
   const finderTexts: [BugHunterSense, string][] = [
     [
@@ -305,6 +322,24 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
         ]
       : []),
     ``,
+    ...(openBugs.length
+      ? [
+          ``,
+          `### Already open — do NOT file a second one`,
+          `These bugs in "${repo}" are already tracked and not yet fixed, newest first. If something you find tonight has the same root cause as one of them — even when the symptom, the event, the endpoint or your wording differs — it is that bug, not a new one: leave it out, or, when you have new evidence, report it with exactly that bug's file and symbol so it is recorded against the same row.`,
+          DATA_BEGIN('open bugs'),
+          ...openBugs.map((entry) => {
+            const where = [entry.file, entry.symbol]
+              .filter(Boolean)
+              .join(' · ');
+            return (
+              `  - ${clip(entry.title)}` + (where ? ` (${clip(where)})` : '')
+            );
+          }),
+          DATA_END,
+        ]
+      : []),
+    ``,
     ...(memories.length
       ? [
           ``,
@@ -326,6 +361,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
     `  - touchesGuardedPath=true for migrations, auth/permission gating, payments, or any other security-sensitive service. Be generous with this flag; it costs a review, and getting it wrong costs a production incident.`,
     `  - source is one of: test_failure, lint_error, code_review, production_log, reported_bug. Browser errors from finder 4 file as production_log — there is no separate source for them.`,
     ``,
+    `One root cause is one finding. Two symptoms of the same defect — two event types, two endpoints, two log lines failing on the same state update or the same missing value — go in ONE finding whose description names both, with the file and symbol of the shared cause. A fix for one that would also fix the other means they are the same bug.`,
     `Then persist them all in ONE call, dropping any duplicates you produced within this round:`,
     `  curl -sS -X POST "${findingsUrl}" -H "Content-Type: application/json" ${auth} -d '{"repo":"${repo}","findings":[...]}'`,
     `The response's "items" array comes back in the same order you sent, each with an "id" — use those ids in every later call about a finding. You do NOT need to dedupe against previous runs: the server matches each finding against still-open rows and touches the existing one instead of inserting, so a bug rediscovered tonight keeps its history.`,
@@ -395,9 +431,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
           `### Merging — the sweep is deliberately stricter than an on-demand fix`,
           mergeBlockedByPermissions
             ? `Do not attempt to merge anything here, and do not treat that as a failure. "${repo}"'s master requires an approving review and your token has push access only, so "gh pr merge --admin" has no admin rights to bypass it with and will simply fail. Every fix you open stays a green PR; Bug Hunter shows each one to an admin as one click to merge. Leaving a green PR IS the finished outcome on this repo — do not run "gh pr merge" at all.`
-            : neverMerges
-              ? `Never merge here, however trivial the fix looks. This repo's pipeline only runs Jest, which cannot verify the native/on-device behaviour that actually ships, and a released mobile build is a frozen contract real users stay on for a long time. Every fix you open in ally-mobile stays a PR for a human to merge — do not run "gh pr merge" at all.`
-              : `Do not merge anything, however trivial it looks. Since 7 October every fix PR is read by a separate Verifier run on a different model (OPP-0779); Bug Hunter merges it if the verdict is a pass and this repo allows a self-merge, or hands it to a person with the verdict. Leave every PR open, PATCH each to {"status":"pr_opened"} with its prUrl, and report pr_opened. Do not run "gh pr merge" in any form.`,
+            : `Do not merge anything, however trivial it looks. Since 7 October every fix PR is read by a separate Verifier run on a different model (OPP-0779); Bug Hunter merges it if the verdict is a pass and this repo allows a self-merge, or hands it to a person with the verdict. Leave every PR open, PATCH each to {"status":"pr_opened"} with its prUrl, and report pr_opened. Do not run "gh pr merge" in any form.`,
           '',
           '',
           '',

@@ -6,6 +6,17 @@ import {
 } from '../../entity/prompt-version.entity';
 import { PromptTranslation } from '../../entity/prompt-translation.entity';
 import { hashPromptBody } from '../../util/prompt-contract.util';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
+
+/** Run as a signed-in person, as a request from the admin console does. */
+const asUser = <T>(userId: number, fn: () => Promise<T>): Promise<T> =>
+  ExecutionManager.runWithContext(() => {
+    ExecutionManager.setAuthContext(String(userId), 'tenant');
+    return fn();
+  });
+
+/** The person named in SKILLS_STORE_PINNED_EDITORS in these tests. */
+const EDITOR = 7;
 
 /**
  * A fake TypeORM manager over an in-memory prompt, its versions and its
@@ -17,6 +28,7 @@ function buildStore(initial: {
   versions?: Array<Partial<PromptVersion>>;
   translations?: Array<Partial<PromptTranslation>>;
   languages?: number[];
+  pinnedEditors?: number[];
 }) {
   const state = {
     prompt: {
@@ -106,10 +118,14 @@ function buildStore(initial: {
       .mockResolvedValue((initial.languages ?? []).map((id) => ({ id }))),
   };
   const promptShared = { invalidate: jest.fn() };
+  const config = {
+    skillsStorePinnedEditorIds: initial.pinnedEditors ?? [EDITOR],
+  };
   const service = new PromptVersioningService(
     dataSource,
     translation as any,
     promptShared as any,
+    config as any,
   );
   return { service, state, manager, translation, promptShared };
 }
@@ -350,7 +366,89 @@ describe('PromptVersioningService.promote', () => {
         errorCode: 'SKILLS_STORE_PROMPT_PINNED',
       }),
     });
-    await service.promote('p1', 2, 1, { confirmPinnedChange: true });
+    await asUser(EDITOR, () =>
+      service.promote('p1', 2, 1, { confirmPinnedChange: true }),
+    );
+    expect(state.prompt.currentVersion).toBe(2);
+  });
+
+  it('refuses a confirmed pinned change from someone not named as an editor', async () => {
+    const { service, state } = buildStore({
+      prompt: { promptCode: 'debrief_quality_rubric', currentVersion: 1 },
+      versions: candidate(),
+    });
+
+    await expect(
+      asUser(99, () =>
+        service.promote('p1', 2, 1, { confirmPinnedChange: true }),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        statusCode: 403,
+        errorCode: 'SKILLS_STORE_PINNED_LOCKED',
+      }),
+    });
+    expect(state.prompt.currentVersion).toBe(1);
+  });
+
+  it('refuses a confirmed pinned change with no person behind it', async () => {
+    // An automated agent or a script has no signed-in user: confirming is
+    // not enough, so it can never put a pinned prompt live.
+    const { service, state } = buildStore({
+      prompt: { promptCode: 'debrief_quality_rubric', currentVersion: 1 },
+      versions: candidate(),
+    });
+
+    await expect(
+      service.promote('p1', 2, 1, { confirmPinnedChange: true }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_PINNED_LOCKED',
+      }),
+    });
+    expect(state.prompt.currentVersion).toBe(1);
+  });
+
+  it('refuses everyone when no editors are named', async () => {
+    const { service } = buildStore({
+      prompt: { promptCode: 'debrief_quality_rubric', currentVersion: 1 },
+      versions: candidate(),
+      pinnedEditors: [],
+    });
+
+    await expect(
+      asUser(EDITOR, () =>
+        service.promote('p1', 2, 1, { confirmPinnedChange: true }),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_PINNED_LOCKED',
+      }),
+    });
+  });
+
+  it('lets the local-store import copy a pinned version that went live elsewhere', async () => {
+    const { service, state } = buildStore({
+      prompt: { promptCode: 'debrief_quality_rubric', currentVersion: 1 },
+      versions: candidate(),
+      pinnedEditors: [],
+    });
+
+    await service.promote('p1', 2, 1, {
+      confirmPinnedChange: true,
+      trustedImport: true,
+    });
+    expect(state.prompt.currentVersion).toBe(2);
+  });
+
+  it('leaves prompts that are not pinned to every editor', async () => {
+    const { service, state } = buildStore({
+      prompt: { currentVersion: 1 },
+      versions: candidate(),
+      pinnedEditors: [],
+    });
+
+    await asUser(99, () => service.promote('p1', 2, 1));
     expect(state.prompt.currentVersion).toBe(2);
   });
 
@@ -430,10 +528,12 @@ describe('PromptVersioningService.createAndPromote', () => {
     });
     expect(state.versions).toHaveLength(1);
 
-    const result = await service.createAndPromote(
-      'p1',
-      input({ baseVersion: 1, source: PromptVersionSource.REVERT }),
-      { confirmPinnedChange: true },
+    const result = await asUser(EDITOR, () =>
+      service.createAndPromote(
+        'p1',
+        input({ baseVersion: 1, source: PromptVersionSource.REVERT }),
+        { confirmPinnedChange: true },
+      ),
     );
     expect(result.version).toBe(2);
     expect(state.prompt.currentVersion).toBe(2);

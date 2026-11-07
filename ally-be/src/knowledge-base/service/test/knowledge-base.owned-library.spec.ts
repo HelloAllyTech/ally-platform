@@ -103,7 +103,7 @@ describe('KnowledgeBaseService — the Ally guide library', () => {
       },
     };
     // Positional order matches the constructor: document, chunk, documentTenant, ingest,
-    // ai, s3, config, retrieval, tenant.
+    // ai, s3, config, retrieval, tenant, tenantScope.
     service = new KnowledgeBaseService(
       documentRepository as any,
       {} as any,
@@ -114,6 +114,9 @@ describe('KnowledgeBaseService — the Ally guide library', () => {
       { s3: { assetsBucket: BUCKET } } as any,
       retrievalRepository as any,
       tenantRepository as any,
+      {
+        resolveScope: async () => ({ tenantIds: null, restricted: false }),
+      } as any,
     );
   });
 

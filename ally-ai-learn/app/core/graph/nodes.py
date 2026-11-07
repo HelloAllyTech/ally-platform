@@ -40,6 +40,7 @@ from app.core.graph.prompt import (
 from app.core.graph.prompt import (
     generate_system_message,
     prompt_declares_client_working_memory,
+    prompt_declares_stage_director,
 )
 from app.core.graph.state import (
     BehaviorInstructionFeedbackData,
@@ -1541,6 +1542,36 @@ async def generate_response(
                 getattr(_rc, "unlocks", None),
             )
             _locked_memory_topics = locked_memory_topics(_locked)
+        # Stage Director prompts: every unlocked memory, every turn, and the
+        # director's latest paragraph (docs/stage-director-and-memories.md).
+        _sd_thoughts: Optional[str] = None
+        _sd_memories: Optional[str] = None
+        _sd_sink: Optional[dict] = None
+        if prompt_declares_stage_director(scenario.prompt_data):
+            from app.core.stage_director.director import NO_THOUGHT_YET
+            from app.core.stage_director.memories import (
+                partition_for_turn,
+                render_memory_block,
+            )
+
+            _sd_configurable = (config or {}).get("configurable", {})
+            _sd_unlocked, _sd_locked = partition_for_turn(
+                scenario.prompt_data,
+                _resolve_state_for_retrieval(
+                    getattr(scenario.prompt_data, "states", None), turn_score
+                ),
+                getattr(
+                    _sd_configurable.get("retrieved_context_store"), "unlocks", None
+                ),
+            )
+            _sd_memories = render_memory_block(_sd_unlocked, _sd_locked)
+            _sd_store = _sd_configurable.get("stage_director_store")
+            if _sd_store is not None:
+                _sd_store.begin_turn()
+                _sd_thoughts = _sd_store.thought_for_prompt()
+                _sd_sink = _sd_store.prompt_kwargs
+            else:
+                _sd_thoughts = NO_THOUGHT_YET
         system_message, retrieved_context_message = generate_system_message(
             prompt_data=scenario.prompt_data,
             next_instruction=next_instruction,
@@ -1555,6 +1586,9 @@ async def generate_response(
             client_working_memory=_cwm_memory,
             locked_memory_topics=_locked_memory_topics,
             text_chat_guidance=text_chat_guidance,
+            thoughts=_sd_thoughts,
+            memories=_sd_memories,
+            prompt_kwargs_sink=_sd_sink,
         )
 
         room_name = ""
@@ -2154,6 +2188,11 @@ async def retrieve_knowledge(
         return {"retrieved_context": None}
 
     knowledge_sources = getattr(scenario.prompt_data, "knowledge_sources", None)
+    # Stage Director prompts show every unlocked memory on every turn instead,
+    # so their knowledge never goes through the picker. Glossary sections still
+    # do.
+    if prompt_declares_stage_director(scenario.prompt_data):
+        knowledge_sources = None
     # Tier 1 language-glossary sections (LANGUAGE_GLOSSARY_DESIGN.md §5.2):
     # pre-prefixed titles + retrievalHint, shipped by ally-be for non-English
     # sessions with published retrieved-mode sections. They join the same
@@ -2613,6 +2652,10 @@ async def update_working_memory(
     reason recorded on SimulationState.
     """
     configurable = (config or {}).get("configurable", {})
+    _sd_scenario = configurable.get("scenario")
+    _sd_prompt_data = getattr(_sd_scenario, "prompt_data", None)
+    if _sd_prompt_data is not None and prompt_declares_stage_director(_sd_prompt_data):
+        return _schedule_stage_director(state, configurable, _sd_prompt_data)
     store = configurable.get("client_working_memory_store")
     if store is None:
         return {}
@@ -2726,6 +2769,66 @@ async def update_working_memory(
             "working_memory",
             recent_lines=_recent_character_lines(state.messages),
         ),
+    )
+    return {}
+
+
+def _latest_behaviours(state: SimulationState, prompt_data: Any) -> List[str]:
+    """This turn's detected behaviours as "helpful: …" / "unhelpful: …" labels."""
+    from app.core.working_memory.monologue import _behaviour_labels
+
+    out: List[str] = []
+    for item in getattr(state, "behavior_feedback_data", None) or []:
+        bid = getattr(item, "behavior_instruction_id", None)
+        if not bid:
+            continue
+        labels = _behaviour_labels(prompt_data, [str(bid)])
+        label = labels[0]["label"] if labels else str(bid)
+        score = getattr(item, "score", 0) or 0
+        out.append(f"{'helpful' if score >= 0 else 'unhelpful'}: {label}")
+    return out
+
+
+def _schedule_stage_director(
+    state: SimulationState, configurable: dict, prompt_data: Any
+) -> dict:
+    """Fire the Stage Director for this turn. Detached; never waits."""
+    store = configurable.get("stage_director_store")
+    llm_client = configurable.get("llm_client")
+    if store is None or llm_client is None:
+        return {}
+    _clock = configurable.get("session_clock")
+    if _clock is not None and getattr(_clock, "is_paused", False):
+        return {}
+    if store.turn_index < 0:
+        return {}
+
+    from app.core.graph.prompt import _resolve_simulation_state_by_score
+    from app.core.stage_director.director import schedule_thought
+
+    _sk = configurable.get("score_keeper")
+    score = _sk.get_total_score() if _sk is not None else None
+    authored = _resolve_simulation_state_by_score(
+        getattr(prompt_data, "states", None), score
+    )
+    current_state = (
+        str(authored.get("name") or "").strip() if authored else ""
+    ) or None
+    _rs_store = configurable.get("rolling_summary_store")
+    window = max(2, settings.CLIENT_WORKING_MEMORY_WINDOW_TURNS)
+    schedule_thought(
+        store,
+        prompt_data=prompt_data,
+        messages=list(state.messages)[-window:],
+        llm_client=llm_client,
+        timeout=settings.CLIENT_WORKING_MEMORY_TIMEOUT,
+        current_state=current_state,
+        rolling_summary=getattr(_rs_store, "summary", None),
+        learner_behaviours=_latest_behaviours(state, prompt_data),
+        behaviour_ids=list(getattr(state, "advancing_behaviour_ids", None) or []),
+        score=score,
+        room=configurable.get("room"),
+        record_store=configurable.get("client_working_memory_store"),
     )
     return {}
 

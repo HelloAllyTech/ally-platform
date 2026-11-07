@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Ally",
+    "poweredByAlly": "एली द्वारा संचालित",
     "or": "या",
     "loading": "लोड हो रहा है…",
     "loadMore": "और लोड करें",
@@ -97,7 +98,8 @@
       "allyAdmin": "Ally एडमिन",
       "characterLibrary": "चरित्र पुस्तकालय",
       "progress": "प्रगति",
-      "helpline": "हेल्पलाइन"
+      "helpline": "हेल्पलाइन",
+      "branding": "ब्रांडिंग"
     },
     "logout": {
       "title": {
@@ -197,6 +199,8 @@
       "badges": "बॅजेस",
       "streak": "स्ट्रीक",
       "streakHint": "अब तक की मौजूदा अभ्यास स्ट्रीक",
+      "xp": "XP",
+      "xpHint": "इस अवधि में अर्जित XP। रैंक XP के आधार पर तय होती है।",
       "streakValue_one": "{{count}} दिन की स्ट्रीक",
       "streakValue_other": "{{count}} दिन की स्ट्रीक",
       "badgeValue_one": "{{count}} बैज",
@@ -645,7 +649,7 @@
       "tooltips": {
         "status": "शिक्षार्थी के अंतिम सक्रियता के आधार पर: 14 दिनों के भीतर सक्रिय, 15-30 दिनों में जोखिम में, 30 दिनों से अधिक निष्क्रिय, यदि उन्होंने कभी कुछ नहीं किया है तो कभी शुरू नहीं किया। सभी समय, ऊपर दिए गए अवधि से प्रभावित नहीं।",
         "lastActive": "उनकी अंतिम भूमिका निभाने और उनके अंतिम पाठ्यक्रम गतिविधि का बाद का समय - इसलिए केवल क्विज़ करने वाला एक शिक्षार्थी अभी भी सक्रिय माना जाता है। सभी समय।",
-        "level": "1–10 स्तर की सीढ़ी पर स्थिति, जो अभ्यास के मिनटों, पूर्ण सत्रों और पाठ्यक्रम आइटमों से अर्जित की गई है। सभी समय। यह वही स्तर है जो शिक्षार्थी ऐप में देखता है।",
+        "level": "0–50 स्तर की सीढ़ी पर स्थिति, जो अभ्यास के मिनटों, पूर्ण सत्रों और पाठ्यक्रम आइटमों से अर्जित की गई है। सभी समय। यह वही स्तर है जो शिक्षार्थी ऐप में देखता है।",
         "totalXp": "जीवनकाल XP: प्रति अभ्यास मिनट 1, पूर्ण सत्र के लिए 10, पाठ्यक्रम आइटम के लिए 25, व्यक्तिगत सर्वश्रेष्ठ के लिए 50, एक दैनिक सीमा के साथ ताकि कोई एकल गतिविधि खेती न की जा सके। सभी समय।",
         "roleplaySessions": "चुने गए अवधि में शुरू किए गए भूमिका निभाने वाले खेलों की तुलना में पूर्ण किए गए भूमिका निभाने वाले खेल।",
         "totalPracticeMinutes": "चुने गए अवधि में पूर्ण किए गए भूमिका निभाने में बिताए गए मिनट।",
@@ -682,6 +686,31 @@
       "assessmentReopen": "Give another attempt",
       "assessmentConfirm": "Give {{name}} another attempt at {{scenario}}? Their earlier attempt and its report are kept.",
       "assessmentReopenSuccess": "Assessment reopened"
+    },
+    "learnerCourses": {
+      "action": "Courses",
+      "actionTooltip": "Shows the courses this learner is enrolled in, so you can remove them from one.",
+      "title": "Courses: {{name}}",
+      "empty": "This learner isn't enrolled in any courses.",
+      "errorTitle": "Couldn't load courses",
+      "errorSubtitle": "There was a problem fetching the data.",
+      "progress": "{{completed}} of {{total}} items done",
+      "completedOn": "Completed {{when}}",
+      "enrolledOn": "Enrolled {{when}}",
+      "denial": {
+        "NOT_IN_GROUP": "Not open to their group",
+        "NOT_IN_ORGANIZATION": "No longer assigned to your organisation",
+        "NOT_AVAILABLE": "Archived",
+        "other": "Not open to them"
+      },
+      "enrolmentOnlyHint": "They see this course only because they're enrolled in it.",
+      "remove": "Remove from course",
+      "confirmHidden": "Remove {{name}} from {{course}}? It will disappear from their course list and their progress in it will be cleared.",
+      "confirmOpen": "Remove {{name}} from {{course}}? Their progress will be cleared. The course is still open to them, so they can start it again from the beginning.",
+      "confirmButton": "Remove",
+      "cancel": "Cancel",
+      "removeSuccess": "Removed from course",
+      "removeError": "Couldn't remove them from the course. Please try again."
     },
     "courseUsage": {
       "title": "कोर्स का उपयोग",
@@ -809,11 +838,41 @@
           "4": "हाँ",
           "5": "बिल्कुल",
           "tags": {
-            "1": ["खराब", "सहायक नहीं", "बहुत बुरा", "निराशाजनक", "अनुपयोगी"],
-            "2": ["औसत से कम", "कमज़ोर", "असंतोषजनक", "अपर्याप्त", "सुधार की ज़रूरत"],
-            "3": ["तटस्थ", "ठीक है", "औसत", "मध्यम", "स्वीकार्य"],
-            "4": ["अच्छा", "सहायक", "संतोषजनक", "प्रभावी", "उपयोगी"],
-            "5": ["उत्कृष्ट", "अद्भुत", "बहुत उपयोगी", "शानदार", "अत्यंत प्रभावी"]
+            "1": [
+              "खराब",
+              "सहायक नहीं",
+              "बहुत बुरा",
+              "निराशाजनक",
+              "अनुपयोगी"
+            ],
+            "2": [
+              "औसत से कम",
+              "कमज़ोर",
+              "असंतोषजनक",
+              "अपर्याप्त",
+              "सुधार की ज़रूरत"
+            ],
+            "3": [
+              "तटस्थ",
+              "ठीक है",
+              "औसत",
+              "मध्यम",
+              "स्वीकार्य"
+            ],
+            "4": [
+              "अच्छा",
+              "सहायक",
+              "संतोषजनक",
+              "प्रभावी",
+              "उपयोगी"
+            ],
+            "5": [
+              "उत्कृष्ट",
+              "अद्भुत",
+              "बहुत उपयोगी",
+              "शानदार",
+              "अत्यंत प्रभावी"
+            ]
           }
         }
       }
@@ -865,6 +924,116 @@
         "thankYou": "आपकी प्रतिक्रिया के लिए धन्यवाद!",
         "commentPlaceholder": "आपको क्या अच्छा लगा या क्या पसंद नहीं आया? (वैकल्पिक)",
         "saveFailed": "क्षमा करें, हम आपकी प्रतिक्रिया सहेज नहीं सके।"
+      }
+    },
+    "debriefCards": {
+      "header": "आपकी डीब्रीफ़",
+      "aiLabel": "Ally (AI) द्वारा लिखा गया",
+      "importantMoment": {
+        "title": "एक अहम पल",
+        "support": "ऐसे पल मुश्किल होते हैं। अगर इस सेशन से कुछ उभरा है, तो आप बात कर सकते हैं:",
+        "others": "ऐसे और पल"
+      },
+      "distress": {
+        "title": "डीब्रीफ़ से पहले",
+        "body": "इस सेशन में कुछ ऐसा था जो आपको निजी तौर पर छू गया। ये ठीक है, और ये किसी भी फीडबैक से ज़्यादा अहम है। पहले अपने लिए थोड़ा समय लें।",
+        "supportLead": "अगर आप अभी किसी से बात करना चाहें:",
+        "whenReady": "जब आप तैयार हों, तब अपनी डीब्रीफ़"
+      },
+      "practise": {
+        "next": "अगला अभ्यास करें",
+        "this": "यह अभ्यास करें",
+        "label": "इसको रोलप्ले \"{{title}}\" में अभ्यास करें"
+      },
+      "reply": {
+        "placeholder": "यहाँ जवाब लिखें, या इस सेशन के बारे में Ally से कुछ भी पूछें…"
+      },
+      "listen": {
+        "all": "सभी सुनें",
+        "card": "सुनें",
+        "cardLabel": "\"{{card}}\" सुनें",
+        "pause": "रोकें",
+        "resume": "जारी रखें",
+        "stop": "बंद करें",
+        "speed": "स्पीड",
+        "loading": "ऑडियो तैयार हो रहा है…",
+        "error": "ऑडियो नहीं चल पाया। आप नीचे इसे पढ़ सकते हैं।"
+      },
+      "supervisor": {
+        "flagged": "लर्नर ने इसे फ्लैग किया: {{reason}}",
+        "note": "उनका नोट: {{note}}",
+        "waiting": "Ally टीम की समीक्षा का इंतजार है",
+        "kept": "समीक्षा के बाद रखा गया: {{note}}",
+        "corrected": "समीक्षा के बाद ठीक किया गया: {{note}}",
+        "removed": "समीक्षा के बाद हटाया गया",
+        "helpfulYes": "लर्नर को यह डीब्रीफ़ मददगार लगी।",
+        "helpfulNo": "लर्नर को यह डीब्रीफ़ मददगार नहीं लगी।",
+        "helpfulNone": "लर्नर ने नहीं बताया कि यह डीब्रीफ़ मददगार थी या नहीं।",
+        "thread": "लर्नर की Ally के साथ बातचीत",
+        "noThread": "लर्नर ने Ally को जवाब नहीं दिया।",
+        "canRead": "आपके सुपरवाइज़र यह बातचीत पढ़ सकते हैं।"
+      },
+      "ready": {
+        "tabTitle": "डीब्रीफ़ तैयार · Ally",
+        "announce": "आपकी डीब्रीफ़ तैयार है।"
+      },
+      "whatWorked": "क्या अच्छा रहा",
+      "workOnThis": "इस पर काम करें",
+      "trySaying": "ऐसा कहकर देखें:",
+      "practiseNext": "अगली बार इसे प्रैक्टिस करें",
+      "skillWords": {
+        "title": "इस सेशन में आपकी स्किल्स",
+        "strength": "आज की एक ताकत",
+        "keep_practising": "प्रैक्टिस जारी रखें",
+        "didnt_come_up": "आज यह नहीं आया"
+      },
+      "progressNote": "आपकी प्रगति",
+      "reflectiveQuestion": "सोचने के लिए एक सवाल",
+      "working": {
+        "title": "Ally आपकी डीब्रीफ़ लिख रहा है",
+        "defaultStep": "आपका सेशन पढ़ा जा रहा है…",
+        "steps": {
+          "reading": "आपका सेशन पढ़ रहे हैं…",
+          "past_sessions": "आपके पिछले सेशनों को देख रहे हैं…",
+          "guidance": "गाइडेंस देख रहे हैं…",
+          "guidanceTopic": "{{topic}} पर गाइडेंस देख रहे हैं…",
+          "writing": "आपकी डीब्रीफ़ लिख रहे हैं…",
+          "reviewing": "अपना ड्राफ्ट देख रहे हैं…",
+          "care": "एक अहम पल के साथ थोड़ा और ध्यान रख रहे हैं…",
+          "revising": "थोड़ा और साफ़ कर रहे हैं (राउंड {{round}})…"
+        }
+      },
+      "onItsWay": "आपकी डीब्रीफ़ को थोड़ा और ध्यान चाहिए। Ally टीम का कोई सदस्य इसे पूरा करेगा, आमतौर पर एक दिन के अंदर।",
+      "tooShort": "यह सेशन डीब्रीफ़ के लिए बहुत छोटा था। अगली बार थोड़ी लंबी बातचीत करें, Ally आपको डीब्रीफ़ लिखेगा।",
+      "flag": {
+        "open": "यह सही नहीं है",
+        "openLabel": "यह सही नहीं है: {{card}}",
+        "question": "क्या सही नहीं है?",
+        "reasons": {
+          "didnt_say": "मैंने यह नहीं कहा",
+          "described_wrongly": "यह पल गलत तरीके से बताया गया है",
+          "advice_doesnt_fit": "यह सलाह सही नहीं लगती",
+          "something_else": "कुछ और"
+        },
+        "noteLabel": "कुछ और जोड़ना है? (वैकल्पिक)",
+        "send": "भेजें",
+        "sending": "भेजा जा रहा है…",
+        "cancel": "रद्द करें",
+        "sent": "धन्यवाद। Ally टीम का कोई सदस्य इसे देखेगा।",
+        "undo": "वापस लें",
+        "waiting": "Ally टीम को भेज दिया गया है",
+        "failed": "यह नहीं भेजा गया। फिर से कोशिश करें।"
+      },
+      "corrections": {
+        "kept": "समीक्षा की गई: Ally टीम ने यह पॉइंट रखा है। {{note}}",
+        "corrected": "{{date}} को Ally टीम की समीक्षा के बाद अपडेट किया गया: {{note}}",
+        "removed": "Ally टीम की समीक्षा के बाद एक पॉइंट हटा दिया गया।"
+      },
+      "helpful": {
+        "question": "क्या यह मददगार था?",
+        "yes": "हाँ",
+        "no": "नहीं",
+        "thanks": "हमें बताने के लिए धन्यवाद।"
       }
     }
   },
@@ -2017,6 +2186,26 @@
         "notHere_other": "{{count}} त्रुटि में चिह्नित किया गया"
       }
     },
+    "bucketSort": {
+      "whereDoesItGo": "यह कहाँ जाएगा?",
+      "progress": "{{total}} में से {{placed}} छाँटे गए",
+      "dragHint": "कार्ड को किसी बकेट पर खींचें, या बकेट पर टैप करें।",
+      "bucketAria": "\"{{item}}\" को {{bucket}} में डालें",
+      "correct": "सही!",
+      "notQuite": "बिल्कुल सही नहीं",
+      "belongsIn": "यह {{bucket}} में आता है।",
+      "youChose": "आपने {{bucket}} चुना।",
+      "next": "अगला आइटम",
+      "seeResults": "परिणाम देखें",
+      "resultsHeading": "सब छँट गया",
+      "firstTry": "पहली कोशिश में {{pct}}% सही",
+      "best": "अब तक का सर्वश्रेष्ठ: {{pct}}%",
+      "reviewHeading": "एक और नज़र डालने लायक",
+      "allRight": "हर आइटम पहली बार में सही बकेट में गया।",
+      "practiceAgain": "फिर से छाँटें",
+      "continue": "जारी रखें",
+      "yourItem": "छाँटने के लिए आइटम"
+    },
     "branching": {
       "sceneHeading": "Scene",
       "choicesLabel": "Your choices",
@@ -2176,26 +2365,6 @@
       "deleteModeratorBody": "यह पोस्ट और इसके सभी उत्तरों को सभी के लिए हटा देता है। इसे पूर्ववत नहीं किया जा सकता।",
       "deleteWithRepliesBody": "आपका पोस्ट “[लेखक द्वारा हटाया गया]” से बदल दिया जाएगा ताकि उत्तरों का संदर्भ बना रहे। इसे पूर्ववत नहीं किया जा सकता।",
       "deleteBody": "आपका पोस्ट हटा दिया जाएगा। इसे पूर्ववत नहीं किया जा सकता।"
-    },
-    "bucketSort": {
-      "whereDoesItGo": "यह कहाँ जाएगा?",
-      "progress": "{{total}} में से {{placed}} छाँटे गए",
-      "dragHint": "कार्ड को किसी बकेट पर खींचें, या बकेट पर टैप करें।",
-      "bucketAria": "\"{{item}}\" को {{bucket}} में डालें",
-      "correct": "सही!",
-      "notQuite": "बिल्कुल सही नहीं",
-      "belongsIn": "यह {{bucket}} में आता है।",
-      "youChose": "आपने {{bucket}} चुना।",
-      "next": "अगला आइटम",
-      "seeResults": "परिणाम देखें",
-      "resultsHeading": "सब छँट गया",
-      "firstTry": "पहली कोशिश में {{pct}}% सही",
-      "best": "अब तक का सर्वश्रेष्ठ: {{pct}}%",
-      "reviewHeading": "एक और नज़र डालने लायक",
-      "allRight": "हर आइटम पहली बार में सही बकेट में गया।",
-      "practiceAgain": "फिर से छाँटें",
-      "continue": "जारी रखें",
-      "yourItem": "छाँटने के लिए आइटम"
     }
   },
   "errorBoundary": {
@@ -3547,5 +3716,54 @@
       "failed": "यह सेव नहीं हुआ। फिर कोशिश करें।",
       "fromOthers": "आपसे पहले पूरा करने वालों की ओर से"
     }
+  },
+  "orgBranding": {
+    "title": "संगठन ब्रांडिंग",
+    "intro": "ऐप आपके संगठन में सभी के लिए कैसा दिखता है: लोगो, नाम, रंग, ब्राउज़र आइकन और एक स्वागत लाइन। एली एक छोटा \"एली द्वारा संचालित\" लाइन रखता है।",
+    "signInLink": "आपके संगठन का साइन-इन लिंक",
+    "signInLinkHint": "इस लिंक को अपने लोगों के साथ साझा करें। यह जो साइन-इन पृष्ठ खुलता है, वह पहले से ही आपका लोगो, नाम, रंग और स्वागत संदेश दिखाता है।",
+    "copyLink": "लिंक कॉपी करें",
+    "linkCopied": "लिंक कॉपी किया गया",
+    "copyFailed": "कॉपी नहीं कर सका। लिंक का चयन करें और इसे हाथ से कॉपी करें।",
+    "logo": "लोगो",
+    "logoHint": "PNG या JPG, अधिकतम 2 MB। साइडबार और साइन-इन पृष्ठ पर दिखाया गया।",
+    "changeLogo": "लोगो बदलें",
+    "uploadLogo": "लोगो अपलोड करें",
+    "noLogo": "अभी तक कोई लोगो नहीं",
+    "logoWrongType": "लोगो PNG या JPG फ़ाइल होना चाहिए",
+    "logoTooLarge": "लोगो 2 MB या उससे छोटा होना चाहिए",
+    "displayName": "प्रदर्शित नाम",
+    "displayNameHint": "आपके संगठन के पंजीकृत नाम के स्थान पर दिखाया गया। पंजीकृत नाम का उपयोग करने के लिए खाली छोड़ दें।",
+    "primaryColor": "ब्रांड रंग",
+    "primaryColorHint": "एक रंग, जो मुख्य बटन, लिंक और चयनित आइटम के लिए उपयोग किया जाता है। बाकी का पैलेट इससे आता है।",
+    "invalidHex": "एक हेक्स रंग दर्ज करें जैसे #264D8E",
+    "contrastFail": "{{ratio}}:1 पृष्ठ पृष्ठभूमि के खिलाफ। पढ़ने के लिए बहुत कम; कम से कम 3:1 की आवश्यकता है। एक गहरा या अधिक संतृप्त रंग चुनें।",
+    "contrastWeak": "{{ratio}}:1 पृष्ठ पृष्ठभूमि के खिलाफ। बटन और लिंक के लिए ठीक, पाठ के रूप में पढ़ने में कठिन। एक गहरा रंग सुरक्षित है।",
+    "contrastPass": "{{ratio}}:1 पृष्ठ पृष्ठभूमि के खिलाफ। अच्छा पढ़ता है।",
+    "favicon": "ब्राउज़र आइकन",
+    "faviconHint": "PNG, ICO, WebP या JPG, अधिकतम 512 KB, वर्गाकार। इसे प्रदर्शन नाम के बगल में ब्राउज़र टैब में दिखाया जाएगा। एली के लिए खाली छोड़ दें।",
+    "uploadFavicon": "अपलोड आइकन",
+    "changeFavicon": "आइकन बदलें",
+    "removeFavicon": "हटाएँ",
+    "allyFavicon": "सहयोगी आइकन",
+    "faviconWrongType": "आइकन PNG, ICO, WebP या JPG फ़ाइल होना चाहिए",
+    "faviconTooLarge": "आइकन 512 KB या उससे छोटा होना चाहिए।",
+    "uploadFailed": "अपलोड विफल हो गया। फिर से प्रयास करें।",
+    "welcomeLine": "स्वागत पंक्ति",
+    "welcomeLineHint": "साइन-इन पृष्ठ पर लोगो के नीचे एक पंक्ति।",
+    "welcomeLinePlaceholder": "उदाहरण के लिए: एक्मे हेल्पलाइन प्रशिक्षण स्थान में आपका स्वागत है",
+    "preview": "पूर्वावलोकन",
+    "previewHint": "अनुमानित। ऐप एक बार सहेजे गए मानों को लागू करता है।",
+    "previewNavHome": "घर",
+    "previewNavRoleplays": "भूमिका निभाना",
+    "previewNavProgress": "प्रगति",
+    "previewButton": "भूमिका निभाना शुरू करें",
+    "previewLink": "सभी भूमिका निभाने वाले देखें",
+    "resetToDefaults": "अल्ली डिफ़ॉल्ट्स पर रीसेट करें",
+    "resetConfirm": "रीसेट की पुष्टि करें",
+    "resetHint": "डिस्प्ले नाम, रंग, ब्राउज़र आइकन और स्वागत लाइन को साफ़ करता है। लोगो बना रहता है।",
+    "saved": "ब्रांडिंग सहेजी गई",
+    "failedToSave": "ब्रांडिंग सहेजने में असमर्थ",
+    "saving": "सहेजना..."
   }
 }

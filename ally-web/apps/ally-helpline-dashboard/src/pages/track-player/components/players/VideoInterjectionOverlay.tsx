@@ -25,6 +25,8 @@ interface VideoInterjectionOverlayProps {
   interjection: VideoInterjection;
   /** Resume playback and mark this interjection answered — called from the "Continue" button. */
   onContinue: () => void;
+  /** The course's reading language — the True/False answer labels follow it. */
+  languageCode?: string | null;
 }
 
 /**
@@ -40,6 +42,7 @@ export const VideoInterjectionOverlay: FC<VideoInterjectionOverlayProps> = ({
   itemId,
   interjection,
   onContinue,
+  languageCode,
 }) => {
   const { t } = useTranslation();
   const { question } = interjection;
@@ -71,7 +74,13 @@ export const VideoInterjectionOverlay: FC<VideoInterjectionOverlayProps> = ({
       case "mcq_multi":
         return <McqQuestion question={question} state={answerState} onChange={setAnswerState} />;
       case "true_false":
-        return <TrueFalseQuestion state={answerState} onChange={setAnswerState} />;
+        return (
+          <TrueFalseQuestion
+            state={answerState}
+            languageCode={languageCode}
+            onChange={setAnswerState}
+          />
+        );
       case "ordering":
         return (
           <OrderingQuestion question={question} state={answerState} onChange={setAnswerState} />

@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Ally",
+    "poweredByAlly": "Powered by Ally",
     "or": "OR",
     "loading": "Loading…",
     "loadMore": "Load More",
@@ -97,7 +98,8 @@
       "allyAdmin": "Ally Admin",
       "characterLibrary": "Character Library",
       "progress": "Progress",
-      "helpline": "Helpline"
+      "helpline": "Helpline",
+      "branding": "Branding"
     },
     "logout": {
       "title": {
@@ -197,6 +199,8 @@
       "badges": "Badges",
       "streak": "Streak",
       "streakHint": "Current practice streak, all time",
+      "xp": "XP",
+      "xpHint": "XP earned in this period. Rank is ordered by XP.",
       "streakValue_one": "{{count}}d streak",
       "streakValue_other": "{{count}}d streak",
       "badgeValue_one": "{{count}} badge",
@@ -645,7 +649,7 @@
       "tooltips": {
         "status": "Based on when the learner was last active anywhere: Active within 14 days, At risk 15–30 days, Dormant over 30 days, Never started if they have never done anything. All-time, not affected by the period above.",
         "lastActive": "The later of their last roleplay and their last course activity — so a learner doing only quizzes still counts as active. All-time.",
-        "level": "Position on the 1–10 level ladder, earned from practice minutes, completed sessions and course items. All-time. This is the same level the learner sees in the app.",
+        "level": "Position on the 0–50 level ladder, earned from practice minutes, completed sessions and course items. All-time. This is the same level the learner sees in the app.",
         "totalXp": "Lifetime XP: 1 per practice minute, 10 per completed session, 25 per course item, 50 for a personal best, with a daily cap so no single activity can be farmed. All-time.",
         "roleplaySessions": "Roleplays completed of roleplays started, in the selected period.",
         "totalPracticeMinutes": "Minutes spent in completed roleplays, in the selected period.",
@@ -682,6 +686,31 @@
       "assessmentReopen": "Give another attempt",
       "assessmentConfirm": "Give {{name}} another attempt at {{scenario}}? Their earlier attempt and its report are kept.",
       "assessmentReopenSuccess": "Assessment reopened"
+    },
+    "learnerCourses": {
+      "action": "Courses",
+      "actionTooltip": "Shows the courses this learner is enrolled in, so you can remove them from one.",
+      "title": "Courses: {{name}}",
+      "empty": "This learner isn't enrolled in any courses.",
+      "errorTitle": "Couldn't load courses",
+      "errorSubtitle": "There was a problem fetching the data.",
+      "progress": "{{completed}} of {{total}} items done",
+      "completedOn": "Completed {{when}}",
+      "enrolledOn": "Enrolled {{when}}",
+      "denial": {
+        "NOT_IN_GROUP": "Not open to their group",
+        "NOT_IN_ORGANIZATION": "No longer assigned to your organisation",
+        "NOT_AVAILABLE": "Archived",
+        "other": "Not open to them"
+      },
+      "enrolmentOnlyHint": "They see this course only because they're enrolled in it.",
+      "remove": "Remove from course",
+      "confirmHidden": "Remove {{name}} from {{course}}? It will disappear from their course list and their progress in it will be cleared.",
+      "confirmOpen": "Remove {{name}} from {{course}}? Their progress will be cleared. The course is still open to them, so they can start it again from the beginning.",
+      "confirmButton": "Remove",
+      "cancel": "Cancel",
+      "removeSuccess": "Removed from course",
+      "removeError": "Couldn't remove them from the course. Please try again."
     },
     "courseUsage": {
       "title": "Course usage",
@@ -809,11 +838,41 @@
           "4": "Yes",
           "5": "5 — Absolutely",
           "tags": {
-            "1": ["Poor", "Not helpful", "Very bad", "Disappointing", "Unhelpful"],
-            "2": ["Below average", "Lacking", "Unsatisfying", "Weak", "Needs improvement"],
-            "3": ["Neutral", "Okay", "Average", "Moderate", "Acceptable"],
-            "4": ["Good", "Helpful", "Satisfying", "Effective", "Worthwhile"],
-            "5": ["Excellent", "Amazing", "Highly useful", "Outstanding", "Very effective"]
+            "1": [
+              "Poor",
+              "Not helpful",
+              "Very bad",
+              "Disappointing",
+              "Unhelpful"
+            ],
+            "2": [
+              "Below average",
+              "Lacking",
+              "Unsatisfying",
+              "Weak",
+              "Needs improvement"
+            ],
+            "3": [
+              "Neutral",
+              "Okay",
+              "Average",
+              "Moderate",
+              "Acceptable"
+            ],
+            "4": [
+              "Good",
+              "Helpful",
+              "Satisfying",
+              "Effective",
+              "Worthwhile"
+            ],
+            "5": [
+              "Excellent",
+              "Amazing",
+              "Highly useful",
+              "Outstanding",
+              "Very effective"
+            ]
           }
         }
       }
@@ -865,6 +924,116 @@
         "thankYou": "Thank you for your feedback!",
         "commentPlaceholder": "What did you like or dislike? (Optional)",
         "saveFailed": "Sorry, we couldn't save your feedback."
+      }
+    },
+    "debriefCards": {
+      "header": "Your debrief",
+      "aiLabel": "Written by Ally (AI)",
+      "importantMoment": {
+        "title": "An important moment",
+        "support": "Moments like this are hard. If this session brought something up for you, you can talk to:",
+        "others": "Other moments like this"
+      },
+      "distress": {
+        "title": "Before your debrief",
+        "body": "Something in this session seemed to touch you personally. That's okay, and it matters more than any feedback. Take a moment for yourself first.",
+        "supportLead": "If you'd like to talk to someone now:",
+        "whenReady": "Your debrief, when you're ready"
+      },
+      "practise": {
+        "next": "Practise this next",
+        "this": "Practise this",
+        "label": "Practise this in the roleplay \"{{title}}\""
+      },
+      "reply": {
+        "placeholder": "Answer here, or ask Ally anything about this session…"
+      },
+      "listen": {
+        "all": "Listen all",
+        "card": "Listen",
+        "cardLabel": "Listen to \"{{card}}\"",
+        "pause": "Pause",
+        "resume": "Resume",
+        "stop": "Stop",
+        "speed": "Speed",
+        "loading": "Getting the audio ready…",
+        "error": "Couldn't play the audio. You can still read it below."
+      },
+      "supervisor": {
+        "flagged": "The learner flagged this: {{reason}}",
+        "note": "Their note: {{note}}",
+        "waiting": "Waiting for the Ally team's review",
+        "kept": "Kept after review: {{note}}",
+        "corrected": "Corrected after review: {{note}}",
+        "removed": "Removed after review",
+        "helpfulYes": "The learner found this debrief helpful.",
+        "helpfulNo": "The learner found this debrief not helpful.",
+        "helpfulNone": "The learner didn't say whether this debrief helped.",
+        "thread": "The learner's conversation with Ally",
+        "noThread": "The learner didn't reply to Ally.",
+        "canRead": "Your supervisor can read this conversation."
+      },
+      "ready": {
+        "tabTitle": "Debrief ready · Ally",
+        "announce": "Your debrief is ready."
+      },
+      "whatWorked": "What worked",
+      "workOnThis": "Work on this",
+      "trySaying": "Try saying:",
+      "practiseNext": "Practise this next",
+      "skillWords": {
+        "title": "Your skills in this session",
+        "strength": "A strength today",
+        "keep_practising": "Keep practising",
+        "didnt_come_up": "Didn't come up today"
+      },
+      "progressNote": "Your progress",
+      "reflectiveQuestion": "One question to think about",
+      "working": {
+        "title": "Ally is writing your debrief",
+        "defaultStep": "Reading your session…",
+        "steps": {
+          "reading": "Reading your session…",
+          "past_sessions": "Looking at your past sessions…",
+          "guidance": "Looking up guidance…",
+          "guidanceTopic": "Looking up guidance on {{topic}}…",
+          "writing": "Writing your debrief…",
+          "reviewing": "Reviewing my draft…",
+          "care": "Taking extra care with an important moment…",
+          "revising": "Making it clearer (round {{round}})…"
+        }
+      },
+      "onItsWay": "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day.",
+      "tooShort": "This session was too short for a debrief. Try a longer conversation next time and Ally will write you one.",
+      "flag": {
+        "open": "This isn't right",
+        "openLabel": "This isn't right: {{card}}",
+        "question": "What's not right?",
+        "reasons": {
+          "didnt_say": "I didn't say this",
+          "described_wrongly": "This moment is described wrongly",
+          "advice_doesnt_fit": "This advice doesn't fit",
+          "something_else": "Something else"
+        },
+        "noteLabel": "Anything else to add? (optional)",
+        "send": "Send",
+        "sending": "Sending…",
+        "cancel": "Cancel",
+        "sent": "Thanks. Someone from the Ally team will look at this.",
+        "undo": "Undo",
+        "waiting": "Sent to the Ally team",
+        "failed": "That didn't send. Try again."
+      },
+      "corrections": {
+        "kept": "Reviewed: the Ally team kept this point. {{note}}",
+        "corrected": "Updated on {{date}} after a review by the Ally team: {{note}}",
+        "removed": "A point was removed after a review by the Ally team."
+      },
+      "helpful": {
+        "question": "Was this helpful?",
+        "yes": "Yes",
+        "no": "No",
+        "thanks": "Thanks for telling us."
       }
     }
   },
@@ -3547,5 +3716,54 @@
       "failed": "That didn't save. Try again.",
       "fromOthers": "From people who finished before you"
     }
+  },
+  "orgBranding": {
+    "title": "Organization branding",
+    "intro": "How the app looks for everyone in your organization: logo, name, colour, browser icon and a welcome line. Ally keeps a small \"Powered by Ally\" line.",
+    "signInLink": "Your organization's sign-in link",
+    "signInLinkHint": "Share this link with your people. The sign-in page it opens already shows your logo, name, colour and welcome line.",
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied",
+    "copyFailed": "Could not copy. Select the link and copy it by hand.",
+    "logo": "Logo",
+    "logoHint": "PNG or JPG, 2 MB max. Shown in the sidebar and on the sign-in page.",
+    "changeLogo": "Change logo",
+    "uploadLogo": "Upload logo",
+    "noLogo": "No logo yet",
+    "logoWrongType": "The logo must be a PNG or JPG file",
+    "logoTooLarge": "The logo must be 2 MB or smaller",
+    "displayName": "Display name",
+    "displayNameHint": "Shown in place of your organization's registered name. Leave blank to use the registered name.",
+    "primaryColor": "Brand colour",
+    "primaryColorHint": "One colour, used for the main button, links and selected items. The rest of the palette comes from it.",
+    "invalidHex": "Enter a hex colour like #264D8E",
+    "contrastFail": "{{ratio}}:1 against the page background. Too low to read; needs at least 3:1. Pick a darker or more saturated shade.",
+    "contrastWeak": "{{ratio}}:1 against the page background. Fine for buttons and links, hard to read as text. A darker shade is safer.",
+    "contrastPass": "{{ratio}}:1 against the page background. Reads well.",
+    "favicon": "Browser icon",
+    "faviconHint": "PNG, ICO, WebP or JPG, 512 KB max, square. Shown in the browser tab next to the display name. Leave empty for Ally's.",
+    "uploadFavicon": "Upload icon",
+    "changeFavicon": "Change icon",
+    "removeFavicon": "Remove",
+    "allyFavicon": "Ally icon",
+    "faviconWrongType": "The icon must be a PNG, ICO, WebP or JPG file",
+    "faviconTooLarge": "The icon must be 512 KB or smaller",
+    "uploadFailed": "Upload failed. Try again.",
+    "welcomeLine": "Welcome line",
+    "welcomeLineHint": "One line under the logo on the sign-in page.",
+    "welcomeLinePlaceholder": "e.g. Welcome to the Acme Helpline training space",
+    "preview": "Preview",
+    "previewHint": "Approximate. The app applies the values once saved.",
+    "previewNavHome": "Home",
+    "previewNavRoleplays": "Roleplays",
+    "previewNavProgress": "Progress",
+    "previewButton": "Start a roleplay",
+    "previewLink": "View all roleplays",
+    "resetToDefaults": "Reset to Ally defaults",
+    "resetConfirm": "Confirm reset",
+    "resetHint": "Clears the display name, colour, browser icon and welcome line. The logo stays.",
+    "saved": "Branding saved",
+    "failedToSave": "Could not save branding",
+    "saving": "Saving..."
   }
 }

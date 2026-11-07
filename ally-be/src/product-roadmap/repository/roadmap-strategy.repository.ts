@@ -191,7 +191,7 @@ export class RoadmapRankWeightsRepository extends Repository<RoadmapRankWeights>
               COALESCE(MAX(s.voters), 0) AS "maxVoters",
               (SELECT COUNT(*) FROM roadmap_strategy_goals) AS "totalGoals"
          FROM (SELECT a."opportunityId",
-                      SUM(a.votes)                  AS score,
+                      SUM(a."weightedVotes")          AS score,
                       COUNT(DISTINCT a."userId")    AS voters
                  FROM roadmap_allocations a
                  JOIN roadmap_opportunities o ON o.id = a."opportunityId"

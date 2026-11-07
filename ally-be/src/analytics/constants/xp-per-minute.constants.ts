@@ -35,6 +35,8 @@ export const XP_SOURCE_GROUP_BY_RULE: Readonly<Record<string, XpSourceGroup>> =
     [XP_RULE.DAILY_DEPTH_MILESTONE]: 'roleplay',
     [XP_RULE.TRACK_ITEM_COMPLETED]: 'tracks',
     [XP_RULE.DEBRIEF_THREAD]: 'community',
+    [XP_RULE.DEBRIEF_READ]: 'community',
+    [XP_RULE.DEBRIEF_REFLECTION]: 'community',
     [XP_RULE.PEER_COMMENT]: 'community',
     [XP_RULE.WEEKLY_CONSISTENCY]: 'consistency',
   };

@@ -3,11 +3,11 @@ defaults:
   run:
     working-directory: ally-mobile
 #
-# Runs daily, but only *acts* roughly every 2 days: bumps the Android + iOS version, commits
-# and tags the bump on master, then dispatches the existing production build workflows
-# (build-android-production.yml, build-ios-production.yml) unchanged. Release destination is
-# unchanged too — still TestFlight (iOS) and the Play Store internal track (Android), same as
-# today's manual process.
+# Runs daily, but only *acts* roughly every 2 days: bumps the Flutter app's marketing version,
+# commits and tags the bump on master, then dispatches the existing production build workflows
+# (build-android-production-flutter.yml, build-ios-production-flutter.yml) unchanged. Release
+# destination is unchanged too — the Play Store internal track (status completed, not a draft)
+# and TestFlight, same as the manual process those workflows already support.
 #
 # A daily check with an internal 48h-elapsed gate is used instead of a `*/2 * *` day-of-month
 # cron, which drifts at month boundaries and doesn't actually mean "every 2 days".
@@ -17,6 +17,12 @@ defaults:
 # App Store + Play Store review cycle (plus Slack noise) for no visible change. The cadence gate
 # additionally requires at least one conventional-commit `feat`/`fix` subject in range; anything
 # else-only skips, same as "no new commits" does today.
+#
+# confirm_store_identity on both build workflows is satisfied programmatically below
+# (com.helloally.app) — that input exists to stop a human from fat-fingering a dispatch during
+# the RN/Flutter cutover window; now that RN is gone and Flutter is the only app, there is no
+# ambiguity left for it to guard against, so the scheduler supplying the fixed string is correct,
+# not a bypass of anything meaningful.
 
 on:
   schedule:
@@ -88,9 +94,9 @@ jobs:
           # two types users actually feel keeps the check simple and matches what the release
           # notes step already highlights as the interesting part of a release.
           #
-          # `-- .`: this runs in ally-mobile/ of the monorepo (since the 2026-10-23 cutover), and
-          # only the app's own commits count. Without it a backend `feat:` releases the app.
-          # --no-merges: the cutover's import merges and PR merges are not work of their own.
+          # `-- .`: this runs in ally-mobile/ of the monorepo, and only the app's own commits
+          # count. Without it a backend `feat:` releases the app.
+          # --no-merges: PR merges are not work of their own.
           has_meaningful_commit() {
             git log --no-merges "$1" --pretty='%s' -- . | grep -v '^Merge pull request' | grep -qiE '^(feat|fix)(\(|:)'
           }
@@ -133,11 +139,21 @@ jobs:
           set -e
           # The app's tests run only on master pushes that touch ally-mobile/, so master's
           # head (often another service's commit) has no run at all. What ships is the app as
-          # of its newest commit, and that commit's run is the one that has to be green.
+          # of its newest commit, and a run on that exact app tree is the one that has to be green.
+          # Matched by tree rather than sha: a push that merges master forward lands the run on
+          # the merge commit, while `git log -- .` names the app commit beneath it.
           APP_HEAD=$(git log -1 --format=%H -- .)
-          CONCLUSION=$(gh run list --repo "${{ github.repository }}" --workflow test-ally-mobile.yml --branch master --limit 20 --json headSha,conclusion \
-            --jq "[.[] | select(.headSha == \"$APP_HEAD\")] | .[0].conclusion // \"\"")
-          echo "Tests conclusion for $APP_HEAD: '$CONCLUSION'"
+          APP_TREE=$(git rev-parse "$APP_HEAD:./")
+          CONCLUSION=""
+          for row in $(gh run list --repo "${{ github.repository }}" --workflow test-ally-mobile.yml --branch master --limit 20 --json headSha,conclusion \
+            --jq '.[] | "\(.headSha):\(.conclusion)"'); do
+            sha=${row%%:*}
+            if [ "$(git rev-parse "$sha:./" 2>/dev/null)" = "$APP_TREE" ]; then
+              CONCLUSION=${row#*:}
+              break
+            fi
+          done
+          echo "Tests conclusion for $APP_HEAD (tree $APP_TREE): '$CONCLUSION'"
           if [ "$CONCLUSION" != "success" ]; then
             echo "proceed=false" >> "$GITHUB_OUTPUT"
           else
@@ -157,28 +173,24 @@ jobs:
         if: steps.gate_enabled.outputs.proceed == 'true' && steps.gate_cadence.outputs.proceed == 'true' && steps.gate_tests.outputs.proceed == 'true'
         run: |
           set -e
-          CURRENT_VERSION=$(grep 'versionName' android/app/build.gradle | head -1 | sed -E 's/.*versionName "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
-          CURRENT_CODE=$(grep 'versionCode' android/app/build.gradle | head -1 | awk '{print $2}')
+          CURRENT_VERSION=$(grep '^version:' pubspec.yaml | sed -E 's/version: *([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
           MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
           PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
           NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
-          NEXT_CODE=$((CURRENT_CODE + 1))
-          echo "Bumping $CURRENT_VERSION ($CURRENT_CODE) -> $NEXT_VERSION ($NEXT_CODE)"
+          echo "Bumping $CURRENT_VERSION -> $NEXT_VERSION"
           echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
-          echo "next_code=$NEXT_CODE" >> "$GITHUB_OUTPUT"
 
-      - name: Bump version files
+      - name: Bump version file
         if: steps.version.outputs.next_version != ''
         run: |
           set -e
           NEXT_VERSION="${{ steps.version.outputs.next_version }}"
-          NEXT_CODE="${{ steps.version.outputs.next_code }}"
-          sed -i -E "s/versionCode [0-9]+/versionCode ${NEXT_CODE}/" android/app/build.gradle
-          sed -i -E "s/versionName \"[0-9]+\.[0-9]+\.[0-9]+\"/versionName \"${NEXT_VERSION}\"/" android/app/build.gradle
-          sed -i -E "s/MARKETING_VERSION = [0-9]+\.[0-9]+\.[0-9]+;/MARKETING_VERSION = ${NEXT_VERSION};/g" ios/ally.xcodeproj/project.pbxproj
-          grep -n 'versionCode\|versionName' android/app/build.gradle
-          grep -n 'MARKETING_VERSION' ios/ally.xcodeproj/project.pbxproj
+          # Keeps whatever build-number suffix (+N) is already there — it's a placeholder RN's
+          # workflows never read anyway (see pubspec.yaml's own comment): the real build-time
+          # identifiers are computed fresh by each build workflow, not read from here.
+          sed -i -E "s/^version: [0-9]+\.[0-9]+\.[0-9]+/version: ${NEXT_VERSION}/" pubspec.yaml
+          grep -n '^version:' pubspec.yaml
 
       - name: Generate release notes
         id: notes
@@ -191,10 +203,9 @@ jobs:
           else
             LOG=$(git log --no-merges "$LAST_TAG"..HEAD --pretty='%s' -- . | grep -v '^Merge pull request' || true)
           fi
-          # `cut -c1-480` truncates each *line* to 480 chars, not the combined output — with
-          # several commit lines the total can still blow past Play Store's 500-char whatsnew
-          # limit (hit this for real: 800 chars from ~15 short commit lines). `head -c` operates
-          # on the whole byte stream regardless of newlines, so it actually caps the total.
+          # `head -c` caps the total byte stream regardless of newlines — Play Store rejects
+          # release notes over 500 characters per language, and several short commit-subject
+          # lines can add up past that even though each individually looks short.
           NOTES=$(printf '%s\n' "$LOG" | sed 's/^/- /' | head -c 480)
           {
             echo "notes<<NOTES_EOF"
@@ -208,7 +219,7 @@ jobs:
           set -e
           git config user.name "ally-release-bot"
           git config user.email "release-bot@helloally.ai"
-          git add android/app/build.gradle ios/ally.xcodeproj/project.pbxproj
+          git add pubspec.yaml
           git commit -m "chore(release): bump version to ${{ steps.version.outputs.next_version }} [automated]"
           git push origin HEAD:master
           git tag "auto-release/${{ steps.version.outputs.next_version }}"
@@ -217,20 +228,22 @@ jobs:
       - name: Trigger Android production build
         if: steps.version.outputs.next_version != ''
         # RELEASE_NOTES goes through env:, never ${{ }} straight into the run: script — commit
-        # subjects routinely contain double quotes (e.g. one of this repo's own commit messages,
-        # `Add optional "What's New in This Version" text...`), which breaks the shell's quoting
-        # when interpolated raw and fails with "unexpected EOF while looking for matching `'".
-        # Same safe pattern build-android-production.yml's own $RELEASE_NOTES step already uses.
+        # subjects can contain double quotes, which breaks the shell's quoting when interpolated
+        # raw. Same safe pattern build-android-production-flutter.yml's own release_notes
+        # handling already uses.
         env:
           RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
         run: |
-          gh workflow run build-android-production.yml --repo "${{ github.repository }}" --ref master \
+          gh workflow run build-android-production-flutter.yml --repo "${{ github.repository }}" --ref master \
+            -f confirm_store_identity="com.helloally.app" \
+            -f internal_track_status="completed" \
             -f release_notes="$RELEASE_NOTES"
 
       - name: Trigger iOS production build
         if: steps.version.outputs.next_version != ''
         run: |
-          gh workflow run build-ios-production.yml --repo "${{ github.repository }}" --ref master
+          gh workflow run build-ios-production-flutter.yml --repo "${{ github.repository }}" --ref master \
+            -f confirm_store_identity="com.helloally.app"
 
       - name: Notify Slack - release triggered
         if: steps.version.outputs.next_version != ''
@@ -246,7 +259,7 @@ jobs:
                 "fields": [
                   {
                     "title": "New version",
-                    "value": "${{ steps.version.outputs.next_version }} (Android versionCode ${{ steps.version.outputs.next_code }})"
+                    "value": "${{ steps.version.outputs.next_version }}"
                   },
                   {
                     "title": "Actions",

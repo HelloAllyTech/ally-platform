@@ -58,6 +58,9 @@ describe('KnowledgeBaseService.search', () => {
       retrievalRepository as any,
       // tenantRepository, for the existence check on a write path this spec never takes.
       {} as any,
+      {
+        resolveScope: async () => ({ tenantIds: null, restricted: false }),
+      } as any,
     );
   };
 
@@ -330,6 +333,9 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
       retrievalRepository as any,
       // tenantRepository, for the existence check on a write path this spec never takes.
       {} as any,
+      {
+        resolveScope: async () => ({ tenantIds: null, restricted: false }),
+      } as any,
     );
   };
 

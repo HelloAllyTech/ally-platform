@@ -50,6 +50,12 @@ async def _groundedness(**kw):
     return await judge_feedback(TRANSCRIPT, CLAIMS, "en", **kw)
 
 
+async def _debrief_quality(**kw):
+    from app.core.debrief_quality.judge import judge_debrief
+
+    return await judge_debrief(TRANSCRIPT, "You listened well.", "en", **kw)
+
+
 async def _recall(**kw):
     from app.core.recall_quality.judge import judge_recall
 
@@ -75,6 +81,7 @@ JUDGES = {
     "drift_labels": _drift_labels,
     "language": _language,
     "feedback_groundedness": _groundedness,
+    "debrief_quality": _debrief_quality,
     "recall_quality": _recall,
     "filler": _filler,
 }
@@ -155,6 +162,11 @@ ENDPOINTS = {
         "app.api.v1.endpoints.feedback_groundedness.judge_feedback",
         {"transcript": TRANSCRIPT, "claims": CLAIMS},
         ([], "gemini-2.5-pro"),
+    ),
+    "/api/v1/debrief-quality/judge": (
+        "app.api.v1.endpoints.debrief_quality.judge_debrief",
+        {"transcript": TRANSCRIPT, "debrief": "You listened well."},
+        (None, "gemini-2.5-pro"),
     ),
     "/api/v1/recall-quality/judge": (
         "app.api.v1.endpoints.recall_quality.judge_recall",

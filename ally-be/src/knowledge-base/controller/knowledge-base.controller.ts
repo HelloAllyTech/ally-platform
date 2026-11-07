@@ -18,6 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decorator';
+import { OrgScopedRoute } from '../../auth/decorators/org-scoped-route.decorator';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import {
@@ -54,6 +55,7 @@ export class KnowledgeBaseController {
   constructor(private readonly knowledgeBaseService: KnowledgeBaseService) {}
 
   @Post('documents/upload-url')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.UPLOAD_KNOWLEDGE_BASE],
   })
@@ -75,6 +77,7 @@ export class KnowledgeBaseController {
   }
 
   @Post('documents')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.EDIT_KNOWLEDGE_BASE],
   })
@@ -90,6 +93,7 @@ export class KnowledgeBaseController {
   }
 
   @Get('documents')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.VIEW_KNOWLEDGE_BASE],
   })
@@ -148,6 +152,7 @@ export class KnowledgeBaseController {
   }
 
   @Get('documents/:id')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.VIEW_KNOWLEDGE_BASE],
   })
@@ -158,6 +163,7 @@ export class KnowledgeBaseController {
   }
 
   @Get('documents/:id/chunks')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.VIEW_KNOWLEDGE_BASE],
   })
@@ -177,6 +183,7 @@ export class KnowledgeBaseController {
   }
 
   @Patch('documents/:id')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.EDIT_KNOWLEDGE_BASE],
   })
@@ -193,6 +200,7 @@ export class KnowledgeBaseController {
   }
 
   @Put('documents/:id/tenants')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.EDIT_KNOWLEDGE_BASE],
   })
@@ -224,6 +232,7 @@ export class KnowledgeBaseController {
   }
 
   @Put('documents/:id/content')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.EDIT_KNOWLEDGE_BASE],
   })
@@ -243,6 +252,7 @@ export class KnowledgeBaseController {
   }
 
   @Post('documents/:id/reindex')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.EDIT_KNOWLEDGE_BASE],
   })
@@ -258,6 +268,7 @@ export class KnowledgeBaseController {
   }
 
   @Post('documents/:id/archive')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.EDIT_KNOWLEDGE_BASE_ARCHIVE],
   })
@@ -275,6 +286,7 @@ export class KnowledgeBaseController {
   }
 
   @Post('documents/:id/unarchive')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.EDIT_KNOWLEDGE_BASE_ARCHIVE],
   })
@@ -289,6 +301,7 @@ export class KnowledgeBaseController {
   }
 
   @Delete('documents/:id')
+  @OrgScopedRoute()
   @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
     permissions: [PERMISSIONS.EDIT_KNOWLEDGE_BASE_ARCHIVE],
   })

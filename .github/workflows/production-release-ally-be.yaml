@@ -314,45 +314,12 @@ jobs:
           echo "- \`$ECR_REPO/$ECR_IMAGE:$MAJOR\`" >> $GITHUB_STEP_SUMMARY
           echo "- \`$ECR_REPO/$ECR_IMAGE:latest\`" >> $GITHUB_STEP_SUMMARY
 
-  run-db-migration:
-    name: Run DB Migration
-    runs-on: ubuntu-22.04
-    permissions:
-      id-token: write
-      pull-requests: write
-      contents: read
-    needs:
-      - validate-and-tag
-      - prepare-env
-      - test
-      - build
-    env:
-      PROJECT_PREFIX: ${{ needs.prepare-env.outputs.PROJECT_PREFIX }}
-      AWS_ROLE: ${{ needs.prepare-env.outputs.AWS_ROLE }}
-      AWS_REGION: ${{ needs.prepare-env.outputs.AWS_REGION }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: master
-          
-      - name: Run DB migration
-        id: run_db_migration
-        uses: ./.github/actions/ally-be/run-migration
-        with:
-          aws-region: ${{ vars[env.AWS_REGION] }}
-          aws-role: ${{ secrets[env.AWS_ROLE] }}
-          task-definition: "${{ needs.prepare-env.outputs.TASK_DEFINITION }}-dbmigrate"
-          container-name: "${{ needs.prepare-env.outputs.CONTAINER_NAME }}-dbmigrate"
-          ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
-          image: ${{ secrets.PRD_ECR_REPOSITORY }}/${{ needs.prepare-env.outputs.ECR_IMAGE }}:${{ needs.validate-and-tag.outputs.VERSION }}
-          subnets: ${{ secrets.PRD_SUBNETS }}
-          security-groups: ${{ secrets.PRD_SECURITY_GROUPS }}
-
+  # The old run-db-migration ECS task is gone: since the 2026-11-07 cutover to
+  # metal01, migrations run inside the deploy playbook (ally_core.yml enables
+  # the ally_docker_service role's migration step: `npm run migration:run`).
   deploy:
-    # No checkout in this job, so the workflow's service-folder default
-    # does not exist on the runner; run from the workspace root instead.
+    name: Deploy to metal01
+    # No service-folder checkout in this job; run from the workspace root.
     defaults:
       run:
         working-directory: .
@@ -360,37 +327,38 @@ jobs:
       - validate-and-tag
       - build
       - prepare-env
-      - run-db-migration
     runs-on: ubuntu-22.04
-    env:
-      AWS_ROLE: ${{ needs.prepare-env.outputs.AWS_ROLE }}
-      AWS_REGION: ${{ needs.prepare-env.outputs.AWS_REGION }}
-      ECR_IMAGE: ${{ needs.prepare-env.outputs.ECR_IMAGE }}
-      ECS_SERVICE: ${{ needs.prepare-env.outputs.ECS_SERVICE }}
-      ECS_CLUSTER: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
-      TASK_DEFINITION: ${{ needs.prepare-env.outputs.TASK_DEFINITION }}
-      ECR_REPOSITORY: ${{ needs.prepare-env.outputs.ECR_REPOSITORY }}
 
     steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Checkout (for the deploy-metal01 action)
+        uses: actions/checkout@v4
         with:
-          role-to-assume: ${{ secrets[env.AWS_ROLE] }}
-          aws-region: ${{ vars[env.AWS_REGION] }}
+          ref: master
 
-      - name: Update ECS Task Definition
-        run: |
-          TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "${TASK_DEFINITION}")
-          echo "$TASK_DEFINITION" | jq --arg IMAGE "${{ secrets.PRD_ECR_REPOSITORY }}/${{ needs.prepare-env.outputs.ECR_IMAGE }}:${{ needs.validate-and-tag.outputs.VERSION }}" \
-            '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > taskDefinition.json
-            
-      - name: Deploy to Amazon ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      - name: Deploy ally-be via Ansible
+        uses: ./.github/actions/deploy-metal01
         with:
-          task-definition: taskDefinition.json
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+          playbook: ally_core.yml
+          extra-args: >-
+            -e inline_ecr_image=${{ secrets.PRD_ECR_REPOSITORY }}/${{ needs.prepare-env.outputs.ECR_IMAGE }}:${{ needs.validate-and-tag.outputs.VERSION }}
+          ssh-key: ${{ secrets.METAL01_ANSIBLE_SSH_KEY }}
+          infra-deploy-key: ${{ secrets.INFRA_DEPLOY_KEY }}
+          vault-password: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+
+      - name: Verify health
+        run: |
+          sleep 15
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -m 10 https://api.helloally.ai/api/health || true)
+            if [ "$code" = "200" ]; then
+              echo "✅ api.helloally.ai healthy" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            fi
+            echo "health returned $code; retrying ($i/20)..."
+            sleep 10
+          done
+          echo "::error::api.helloally.ai did not return healthy after deploy"
+          exit 1
 
   create-release:
     name: Create Release Draft
@@ -460,10 +428,8 @@ jobs:
             
             ### Deployment Information
             - **Service**: ally-core (Backend)
-            - **Environment**: Production
+            - **Environment**: Production (metal01, via Ansible `ally_core.yml`)
             - **Branch**: master
-            - **ECS Cluster**: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
-            - **ECS Service**: ${{ needs.prepare-env.outputs.ECS_SERVICE }}
             - **Docker Image**: ${{ secrets.PRD_ECR_REPOSITORY }}/${{ needs.prepare-env.outputs.ECR_IMAGE }}:${{ needs.validate-and-tag.outputs.VERSION }}
             
             ${{ steps.changelog.outputs.CHANGELOG }}

@@ -64,6 +64,7 @@ export const SCENARIO_METADATA_FIELDS: (keyof UpdateScenarioDto)[] = [
   'currentState',
   'remindersEnabled',
   'knowledgeSources',
+  'memories',
   'stateNames',
   'selectedMainPromptCode',
   'selectedEvaluatorPromptCode',
@@ -280,6 +281,17 @@ export const mapCreateScenarioRequestToEntity = (
         // dispatch path strips empties too — see createRoomMetadata.
         ...(knowledgeSource.unlocksFromStateId
           ? { unlocksFromStateId: knowledgeSource.unlocksFromStateId }
+          : {}),
+      })),
+      memories: scenario.memories?.map((memory) => ({
+        id: memory.id,
+        title: memory.title,
+        content: memory.content,
+        ...(memory.unlocksFromStateId
+          ? { unlocksFromStateId: memory.unlocksFromStateId }
+          : {}),
+        ...(Array.isArray(memory.unlocksInStateIds)
+          ? { unlocksInStateIds: memory.unlocksInStateIds }
           : {}),
       })),
       stateNames: scenario.stateNames,

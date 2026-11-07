@@ -24,17 +24,39 @@ describe('BuilderSlackService', () => {
     const pullRequestRepository = {
       findOne: jest.fn().mockResolvedValue(prRow()),
     };
+    const historyService = { record: jest.fn().mockResolvedValue(null) };
     const service = new BuilderSlackService(
       { builder: { slackApprovers: approvers } } as never,
       pullRequestService as never,
       pullRequestRepository as never,
+      historyService as never,
     );
-    return { service, pullRequestService, pullRequestRepository };
+    return {
+      service,
+      pullRequestService,
+      pullRequestRepository,
+      historyService,
+    };
   };
 
   const click = (userId: string | undefined, value = 'pr-1') => ({
     user: userId ? { id: userId } : undefined,
     actions: [{ action_id: 'builder_merge', value }],
+  });
+
+  it('writes the merge to History as a Slack answer', async () => {
+    const { service, historyService } = build();
+
+    await service.handleInteraction(click('U-APPROVER'));
+
+    expect(historyService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'pr_merge',
+        surface: 'slack',
+        actorUserId: null,
+        oneWay: true,
+      }),
+    );
   });
 
   it('merges for someone on the approver list', async () => {

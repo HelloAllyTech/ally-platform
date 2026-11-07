@@ -10,7 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.core.knowledge_agent.schemas import AnswerIntent, DeclineReason
+from app.core.knowledge_agent.schemas import AnswerIntent, AnswerMode, DeclineReason
 from app.schemas.knowledge_chunk import AudienceSelector
 
 
@@ -21,6 +21,21 @@ class AgentTurn(BaseModel):
         ..., description="'user' for the worker, anything else = assistant"
     )
     content: str = ""
+
+
+class PersonaSelector(BaseModel):
+    """How the answering chatbot presents itself. Every field is optional."""
+
+    display_name: Optional[str] = Field(None, max_length=80)
+    system_prompt: Optional[str] = Field(
+        None,
+        max_length=4000,
+        description=(
+            "The bot team's instructions. Rendered ahead of the answer template and "
+            "ranked below its grounding, format and safety rules."
+        ),
+    )
+    tone: Optional[str] = Field(None, max_length=120)
 
 
 class KnowledgeAnswerRequest(BaseModel):
@@ -87,6 +102,19 @@ class KnowledgeAnswerRequest(BaseModel):
     document_ids: Optional[List[UUID]] = Field(
         None,
         description="Restrict retrieval to these documents; None searches everything",
+    )
+    persona: Optional[PersonaSelector] = Field(
+        None, description="The answering chatbot's persona; absent = no persona block"
+    )
+    answer_mode: AnswerMode = Field(
+        "documents_only",
+        description=(
+            "documents_only declines what the documents do not cover; "
+            "documents_and_general may answer from general knowledge, saying so"
+        ),
+    )
+    channel: Optional[str] = Field(
+        None, max_length=32, description="Where the question came in (whatsapp, test…)"
     )
     audience: AudienceSelector = Field(
         ...,

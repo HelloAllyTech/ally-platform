@@ -1,4 +1,12 @@
 import { readdirSync, readFileSync } from 'fs';
+import {
+  DebriefFeedbackKind,
+  DebriefFeedbackStatus,
+  DebriefFlagReason,
+  DebriefRunArm,
+  DebriefRunMode,
+  DebriefRunStatus,
+} from '../../debrief/enum/debrief-run.enum';
 import { join } from 'path';
 import {
   BuilderEventType,
@@ -328,6 +336,12 @@ describe('CHECK constraints cover their enums', () => {
     // Agent harness + Ally guide (plans/ally-guide/plan.md §8).
     ['CHK_agent_releases_status', Object.values(AgentReleaseStatus)],
     ['CHK_agent_releases_author_kind', Object.values(AgentReleaseAuthorKind)],
+    ['CHK_debrief_runs_mode', Object.values(DebriefRunMode)],
+    ['CHK_debrief_runs_status', Object.values(DebriefRunStatus)],
+    ['CHK_debrief_runs_arm', Object.values(DebriefRunArm)],
+    ['CHK_debrief_run_feedback_kind', Object.values(DebriefFeedbackKind)],
+    ['CHK_debrief_run_feedback_reason', Object.values(DebriefFlagReason)],
+    ['CHK_debrief_run_feedback_status', Object.values(DebriefFeedbackStatus)],
     ['CHK_agent_release_audit_action', Object.values(AgentReleaseAuditAction)],
     [
       'CHK_agent_release_audit_actor_kind',

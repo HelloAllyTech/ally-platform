@@ -78,6 +78,7 @@ describe('RagQualityRepository', () => {
         'whatsapp_qa',
         'character_library',
         'ally_guide_library',
+        'debrief_knowledge',
       ]);
     });
 
@@ -95,7 +96,12 @@ describe('RagQualityRepository', () => {
       expect(sql).toContain('judge_prompt_version');
       // $1 is the judgeable-corpus list; the pinned pair follows it.
       expect(params).toEqual([
-        ['whatsapp_qa', 'character_library', 'ally_guide_library'],
+        [
+          'whatsapp_qa',
+          'character_library',
+          'ally_guide_library',
+          'debrief_knowledge',
+        ],
         'gemini-2.5-pro',
         'v1',
       ]);
@@ -106,7 +112,12 @@ describe('RagQualityRepository', () => {
       const [sql, params] = query.mock.calls[0];
       expect(sql).toContain('r.consumer = $2');
       expect(params).toEqual([
-        ['whatsapp_qa', 'character_library', 'ally_guide_library'],
+        [
+          'whatsapp_qa',
+          'character_library',
+          'ally_guide_library',
+          'debrief_knowledge',
+        ],
         'interview_agent',
       ]);
     });

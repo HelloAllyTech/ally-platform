@@ -69,6 +69,23 @@ import { BuilderReadinessService } from './service/builder-readiness.service';
 import { BuilderProductMapService } from './service/builder-product-map.service';
 import { BuilderPlatformContextService } from './service/builder-platform-context.service';
 import { BuilderNotificationService } from './service/builder-notification.service';
+import { BuilderDecisionService } from './service/builder-decision.service';
+import {
+  BuilderHistoryRepository,
+  BuilderHistoryService,
+} from './service/builder-history.service';
+import { BuilderHistoryEntry } from './entity/builder-history.entity';
+import { BuilderRoomController } from './controller/builder-room.controller';
+import { BuilderNowService } from './service/builder-now.service';
+import { BuilderLiveService } from './service/builder-live.service';
+import { BuilderRulesService } from './service/builder-rules.service';
+import {
+  BuilderRuleContextService,
+  BuilderRuleRepository,
+} from './service/builder-rule-context.service';
+import { BuilderAskService } from './service/builder-ask.service';
+import { BuilderPartnerMetricsService } from './service/builder-partner-metrics.service';
+import { BuilderRule } from './entity/builder-rule.entity';
 import { BuilderSchedulerRegistrationService } from './service/builder-scheduler-registration.service';
 import { BuilderSessionRepository } from './repository/builder-session.repository';
 import { BuilderMessageRepository } from './repository/builder-message.repository';
@@ -132,6 +149,8 @@ import {
       BuilderEvalSuite,
       BuilderEvalRun,
       BuilderCorrection,
+      BuilderHistoryEntry,
+      BuilderRule,
     ]),
     PromptModule,
     LlmUsageModule,
@@ -166,6 +185,7 @@ import {
     BuilderPipelineController,
     BuilderEvalController,
     BuilderCorrectionsController,
+    BuilderRoomController,
   ],
   providers: [
     BuilderSlackService,
@@ -200,6 +220,16 @@ import {
     BuilderProductMapService,
     BuilderPlatformContextService,
     BuilderNotificationService,
+    BuilderDecisionService,
+    BuilderHistoryService,
+    BuilderNowService,
+    BuilderLiveService,
+    BuilderRulesService,
+    BuilderRuleRepository,
+    BuilderRuleContextService,
+    BuilderAskService,
+    BuilderPartnerMetricsService,
+    BuilderHistoryRepository,
     BuilderSchedulerRegistrationService,
     BuilderSessionRepository,
     BuilderMessageRepository,
@@ -218,6 +248,12 @@ import {
   ],
   exports: [
     BuilderSessionService,
+    // The Builder tab's Up next, Start and Put back live with the roadmap
+    // (which owns opportunities); they read these to gate, seed and record.
+    BuilderNowService,
+    BuilderDecisionService,
+    BuilderHistoryService,
+    BuilderLiveService,
     BuilderKnowledgeService,
     // The read-only research belt, reused by the roadmap's opportunity copilot so it reads the
     // same repos, the same Stacks library and the same production evidence through the same

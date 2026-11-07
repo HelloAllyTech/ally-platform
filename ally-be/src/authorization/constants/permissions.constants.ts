@@ -6,6 +6,14 @@ const PERMISSIONS = {
   EDIT_USER_STATUS: 'edit:user:status',
   VIEW_USER_ROLES: 'view:user:roles',
   VIEW_USER_TENANT: 'view:user:tenant',
+  /**
+   * Fix up a learner's course progress from the consumer web app's Org Metrics
+   * learner table: remove them from a course, reopen scenario-quiz or
+   * assessment attempts. Held by the tenant ADMIN group and platform admins.
+   * Deliberately NOT EDIT_USER, which also opens user and role editing. Every
+   * route behind it acts only on learners in the caller's own organisation.
+   */
+  EDIT_LEARNER_PROGRESS: 'edit:learner-progress',
 
   // === CHAT MANAGEMENT ===
   VIEW_CHAT: 'view:chat',
@@ -91,6 +99,13 @@ const PERMISSIONS = {
   VIEW_TENANT: 'view:tenant',
   EDIT_TENANT: 'edit:tenant',
   VIEW_TENANTS: 'view:tenants',
+  /**
+   * Edit the caller's OWN organization's branding (logo, display name,
+   * colour, favicon, welcome line) from the consumer web app. Held by the
+   * tenant ADMIN group; never widens past the caller's tenant, and the
+   * org-level on/off switch stays with EDIT_TENANT (platform admins).
+   */
+  EDIT_TENANT_BRANDING: 'edit:tenant-branding',
 
   // === REFERENCE DOCUMENTS ===
   VIEW_REFERENCE_DOCUMENT: 'view:reference-document',
@@ -295,6 +310,10 @@ const PERMISSIONS = {
   // Narrower than VIEW_MOBILE_RELEASES: dispatches a real production release
   // pipeline run (scheduled-mobile-release.yml with force: true), so it is
   // gated separately even though both are SUPER_DUPER_ADMIN-only today.
+  // Briefly unused between the RN retirement and the Flutter rebuild of this
+  // workflow — a migration had already seeded it into group_permissions
+  // (never recomputed from this file — see ally-be/CLAUDE.md's roles gotcha),
+  // which is why reviving it needed no new migration.
   TRIGGER_MOBILE_RELEASES: 'trigger:mobile-releases',
   // Narrower still: promotes an already-shipped build further into
   // production (Play Store staged rollout increase, or TestFlight external
@@ -438,6 +457,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   // Full administrative access
   PERMISSIONS.SYSTEM_ACCESS,
   PERMISSIONS.EDIT_USER,
+  PERMISSIONS.EDIT_LEARNER_PROGRESS,
   PERMISSIONS.EDIT_USER_ROLE,
   PERMISSIONS.VIEW_USERS,
   PERMISSIONS.EDIT_USER_STATUS,
@@ -699,6 +719,16 @@ const ADMIN_PERMISSIONS = [
   // granted by 1975750000000 and revoked by
   // 1976600000000-RevokeTenantAdminHelplineWorkspaceGrants.
   PERMISSIONS.EDIT_HELPLINE_TEAM,
+
+  // Own-org branding editor in the consumer web app (Branding tab). Usable
+  // only once a platform admin has switched branding on for the org — the
+  // switch itself is EDIT_TENANT. Granted by
+  // 1980850000000-AddOrgAdminBrandingPermission.
+  PERMISSIONS.EDIT_TENANT_BRANDING,
+
+  // Remove a learner from a course / reopen their attempts, from the Org
+  // Metrics learner table. Granted by 1980880000000-GrantLearnerProgressPermission.
+  PERMISSIONS.EDIT_LEARNER_PROGRESS,
 
   // start:microphone-chat / start:cloud-telephony-chat are intentionally NOT
   // granted here — initiating a recording (scribe/dictation/telephony) is a

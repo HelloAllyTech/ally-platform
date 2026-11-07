@@ -20,6 +20,15 @@ export class EmailService {
     otp: string;
     magicLinkToken?: string;
     appType?: AppType;
+    /**
+     * The org's branded display name, only when its branding switch is on.
+     * The email then speaks in the org's name and carries a "Powered by
+     * Ally" line, so a learner whose org brands the app recognises it.
+     */
+    orgName?: string;
+    /** With orgName: the org's logo (if any) and brand colour, for the HTML email. */
+    orgLogoUrl?: string;
+    orgColor?: string;
   }): Promise<boolean> {
     if (this.config.isDevelopment) {
       // TODO: Remove this once email otp is verified in dev
@@ -43,8 +52,23 @@ export class EmailService {
       ? `${baseUrl}/auth/verify?token=${params.magicLinkToken}`
       : undefined;
 
-    const subject = 'Your Ally Verification Code';
-    const body = `Your Ally Verification Code is:
+    const brand = params.orgName?.trim();
+    const subject = brand
+      ? `Your ${brand} sign-in code`
+      : 'Your Ally Verification Code';
+
+    // A branded org gets an HTML email with its logo and colour at the top;
+    // the plain Ally email stays the plain text it has always been.
+    const body = brand
+      ? brandedOtpHtml({
+          brand,
+          logoUrl: params.orgLogoUrl,
+          color: params.orgColor,
+          otp: params.otp,
+          magicLink,
+          minutes,
+        })
+      : `Your Ally Verification Code is:
 ${params.otp}
 ${magicLink ? `Or click the link below to login instantly:\n${magicLink}\n` : ''}
 ⏱️ This security code is valid for the next ${minutes} minutes.
@@ -57,7 +81,7 @@ ${magicLink ? `Or click the link below to login instantly:\n${magicLink}\n` : ''
       to: params.to,
       subject,
       body,
-      isHtml: false,
+      isHtml: Boolean(brand),
       purpose: 'login OTP',
     });
   }
@@ -130,4 +154,61 @@ The Ally Team`;
       purpose: 'AI Lab evaluator invite',
     });
   }
+}
+
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
+const ALLY_BLUE = '#264D8E';
+
+/**
+ * The branded sign-in email. Table layout and inline styles only, since
+ * mail clients ignore most else; the org's colour is a strip across the top
+ * and the border of the code box, so the message is recognisably the org's
+ * without the colour carrying any text. Every org-supplied string is
+ * escaped; the colour is used only if it is a plain #RRGGBB.
+ */
+export function brandedOtpHtml(input: {
+  brand: string;
+  logoUrl?: string;
+  color?: string;
+  otp: string;
+  magicLink?: string;
+  minutes: number;
+}): string {
+  const color = HEX_COLOUR.test(input.color ?? '') ? input.color! : ALLY_BLUE;
+  const brand = escapeHtml(input.brand);
+  const logo =
+    input.logoUrl && /^https:\/\//.test(input.logoUrl)
+      ? `<img src="${escapeHtml(input.logoUrl)}" alt="${brand}" height="48" style="display:block;height:48px;max-width:220px;object-fit:contain;margin:0 auto 12px;" />`
+      : '';
+  const magic = input.magicLink
+    ? `<p style="margin:0 0 20px;font-size:15px;line-height:22px;color:#29261F;">Or sign in instantly: <a href="${escapeHtml(input.magicLink)}" style="color:${color};">${escapeHtml(input.magicLink)}</a></p>`
+    : '';
+  return `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#F5F4EE;font-family:Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F5F4EE;padding:32px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;background:#FFFFFF;border-radius:8px;overflow:hidden;">
+<tr><td style="height:6px;background:${color};font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td style="padding:28px 32px 8px;text-align:center;">
+${logo}<div style="font-size:18px;font-weight:bold;color:#29261F;">${brand}</div>
+</td></tr>
+<tr><td style="padding:16px 32px 0;">
+<p style="margin:0 0 12px;font-size:15px;line-height:22px;color:#29261F;">Your ${brand} sign-in code is:</p>
+<div style="margin:0 0 20px;padding:14px;border:2px solid ${color};border-radius:6px;text-align:center;font-size:28px;letter-spacing:6px;font-weight:bold;color:#29261F;">${escapeHtml(input.otp)}</div>
+${magic}<p style="margin:0 0 6px;font-size:13px;line-height:20px;color:#5F5B52;">This code is valid for the next ${input.minutes} minutes.</p>
+<p style="margin:0 0 6px;font-size:13px;line-height:20px;color:#5F5B52;">Do not share this code with anyone.</p>
+<p style="margin:0 0 24px;font-size:13px;line-height:20px;color:#5F5B52;">If you did not request this code, you can safely ignore this email.</p>
+</td></tr>
+<tr><td style="padding:14px 32px;border-top:1px solid #E8E6DF;text-align:center;font-size:12px;color:#8A8578;">Powered by Ally</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
 }

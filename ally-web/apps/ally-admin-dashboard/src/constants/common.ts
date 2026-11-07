@@ -171,6 +171,7 @@ export const ApiEndpoints = {
     FILLER_TAGS: "/v1/learn/filler-tags",
     GET_AUTOFILL_MODELS: "/v1/learn/models",
     ENHANCE_FIELD: "/v1/learn/scenarios/enhance-field",
+    MAP_SCENARIO_MEMORIES: "/v1/learn/scenarios/memories/map",
     GENERATE_AGENT_BUILDER_FIELD: "/v1/learn/agent-builder/generate-field",
     COMPETENCIES: "/v1/learn/competencies",
     COMPETENCY_BY_ID: (id: string) => `/v1/learn/competencies/${id}`,
@@ -186,6 +187,8 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
+    // Raise a live quiz's attempt limit; the structure PUT is locked once learners enrol.
+    QUIZ_SETTINGS: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/quiz/settings`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
@@ -244,6 +247,8 @@ export const ApiEndpoints = {
       `/v1/scenario-characters/interview/sessions/${sessionId}`,
     INTERVIEW_SESSION_STREAM: (sessionId: string) =>
       `/v1/scenario-characters/interview/sessions/${sessionId}/messages/stream`,
+    INTERVIEW_SESSION_ABANDON: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}/abandon`,
   },
 
   USER_MANAGEMENT: {
@@ -251,6 +256,8 @@ export const ApiEndpoints = {
     TENANT: "/v1/tenant",
     TENANTS: "/v1/tenants",
     TENANTS_BY_ID: (id: string) => `/v1/tenants/${id}`,
+    TENANT_BRANDING: (id: string) => `/v1/tenants/${id}/branding`,
+    TENANT_BRANDING_FAVICON_URL: (id: string) => `/v1/tenants/${id}/branding/favicon-url`,
     ADD_USER: "/v1/users",
     BULK_ADD_USERS: "/v1/users/bulk",
     SIMULATION_CREDITS: "/v1/simulation-credits",
@@ -365,6 +372,8 @@ export const ApiEndpoints = {
     BOARD_LANE: "/v1/product-roadmap/board/lane",
     ALLOCATIONS: "/v1/product-roadmap/allocations",
     VOTE_BUDGET: "/v1/product-roadmap/me/vote-budget",
+    MY_BREADTH: "/v1/product-roadmap/me/breadth",
+    BREADTH_EVERYONE: "/v1/product-roadmap/breadth",
     FACETS: "/v1/product-roadmap/facets",
     PRODUCT_GOALS: "/v1/product-roadmap/product-goals",
     PRODUCT_GOAL_BY_ID: (id: string) => `/v1/product-roadmap/product-goals/${id}`,
@@ -385,6 +394,8 @@ export const ApiEndpoints = {
     OWNER_BY_ID: (id: string) => `/v1/product-roadmap/opportunity-owners/${id}`,
     OWNERS_ORDER: "/v1/product-roadmap/opportunity-owners/order",
     OWNERS_USAGE: "/v1/product-roadmap/opportunity-owners/usage",
+    IDEA_DRAFTS: "/v1/product-roadmap/idea-drafts",
+    IDEA_DRAFT_BY_ID: (id: string) => `/v1/product-roadmap/idea-drafts/${id}`,
     INTERVIEW_NOTES: "/v1/product-roadmap/interview-notes",
     INTERVIEW_NOTE_BY_ID: (id: string) => `/v1/product-roadmap/interview-notes/${id}`,
     VIEWS: "/v1/product-roadmap/views",
@@ -436,6 +447,36 @@ export const ApiEndpoints = {
     QUESTION_SET_BY_ID: (id: string) => `/v1/lab/question-sets/${id}`,
     QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
     QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
+  },
+  DEBRIEF_CONSOLE: {
+    OVERVIEW: "/v1/debriefs/console/overview",
+    RUNS: "/v1/debriefs/console/runs",
+    RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
+    RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
+    IMPROVER: "/v1/debriefs/console/improver",
+    IMPROVER_ANALYSE: "/v1/debriefs/console/improver/analyse",
+    IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
+      `/v1/debriefs/console/improver/ideas/${id}/${action}`,
+    RELEASES: "/v1/debriefs/console/releases",
+    MODELS: "/v1/debriefs/console/models",
+    ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
+    TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",
+    TENANTS: "/v1/debriefs/console/tenants",
+    TENANT_LIVE: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/live`,
+    TENANT_REGION: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/region`,
+    REVIEW: "/v1/debriefs/console/review",
+    RUN_ACTION: (id: string, action: "publish" | "todays-debrief" | "reviewed") =>
+      `/v1/debriefs/console/runs/${id}/${action}`,
+    RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
+    ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
+    KNOWLEDGE: "/v1/debriefs/console/knowledge",
+    KNOWLEDGE_CLINICAL: (id: string) => `/v1/debriefs/console/knowledge/${id}/clinical`,
+    KNOWLEDGE_SIGN_OFF: (id: string) => `/v1/debriefs/console/knowledge/${id}/sign-off`,
+  },
+  DEBRIEF_CALIBRATION: {
+    SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
+    AGREEMENT: "/v1/analytics/debrief-quality/calibration/agreement",
+    ITEM: (sessionId: string) => `/v1/analytics/debrief-quality/calibration/${sessionId}`,
   },
   SKILL_EXPERIMENTS: {
     LIST: "/v1/skill-experiments",
@@ -666,6 +707,27 @@ export const ApiEndpoints = {
     SESSION_PR_FEEDBACK: (id: string) => `/v1/builder/sessions/${id}/pr-feedback`,
     SETTINGS: "/v1/builder/settings",
     NOTIFICATIONS: "/v1/builder/notifications",
+    // The decision feed: every pending decision across sessions, and the one answer endpoint
+    // that routes each back to the action the session page would have taken.
+    DECISIONS: "/v1/builder/decisions",
+    DECISION_ANSWER: (id: string) => `/v1/builder/decisions/${encodeURIComponent(id)}/answer`,
+    // The Builder tab (Now · Rules · History). DELETE on DECISION_ANSWER is Undo.
+    NOW: "/v1/builder/now",
+    UP_NEXT: "/v1/builder/up-next",
+    UP_NEXT_START: (opportunityId: string) => `/v1/builder/up-next/${opportunityId}/start`,
+    SESSION_PUT_BACK: (id: string) => `/v1/builder/sessions/${id}/put-back`,
+    SESSION_ASK: (id: string) => `/v1/builder/sessions/${id}/ask`,
+    SESSION_TELL: (id: string) => `/v1/builder/sessions/${id}/tell`,
+    SESSION_THREAD: (id: string) => `/v1/builder/sessions/${id}/thread`,
+    ASK_ALL: "/v1/builder/ask",
+    HISTORY: "/v1/builder/history",
+    RULES: "/v1/builder/rules",
+    RULE_BY_ID: (id: string) => `/v1/builder/rules/${id}`,
+    RULE_DRAFT: "/v1/builder/rules/draft",
+    RULE_PREVIEW: "/v1/builder/rules/preview",
+    RULE_PROPOSALS: "/v1/builder/rules/proposals",
+    RULE_PROPOSAL: (key: string) => `/v1/builder/rules/proposals/${encodeURIComponent(key)}`,
+    PARTNER_SCOREBOARD: "/v1/builder/partner-scoreboard",
     NOTIFICATION_READ: (id: string) => `/v1/builder/notifications/${id}/read`,
     NOTIFICATIONS_READ_ALL: "/v1/builder/notifications/read-all",
     // Scoreboard + knowledge (lessons/exemplars) — the visibility surfaces.
@@ -714,6 +776,23 @@ export const ApiEndpoints = {
     TRACK_ALLY_NOTES_DRAFT: (trackId: string) =>
       `/v1/course-copilot/tracks/${trackId}/ally-notes-draft`,
   },
+  CHATBOTS: {
+    LIST: "/v1/chatbots",
+    BY_ID: (id: string) => `/v1/chatbots/${id}`,
+    STATUS: (id: string) => `/v1/chatbots/${id}/status`,
+    ARCHIVE: (id: string) => `/v1/chatbots/${id}/archive`,
+    SETTINGS: (id: string) => `/v1/chatbots/${id}/settings`,
+    DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents`,
+    DOCUMENT_UPLOAD_URL: (id: string) => `/v1/chatbots/${id}/documents/upload-url`,
+    PRIVATE_DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents/private`,
+    DOCUMENT_BY_ID: (id: string, documentId: string) =>
+      `/v1/chatbots/${id}/documents/${documentId}`,
+    MEMBERS: (id: string) => `/v1/chatbots/${id}/members`,
+    AUDIENCE: (id: string) => `/v1/chatbots/${id}/audience`,
+    AUDIENCE_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/audience/${entryId}`,
+    TEST: (id: string) => `/v1/chatbots/${id}/test`,
+    CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
+  },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
     DOCUMENTS: "/v1/knowledge-base/documents",
@@ -739,12 +818,14 @@ export const ApiEndpoints = {
     TEMPLATE_ARCHIVE: (id: string) => `/v1/whatsapp/templates/${id}/archive`,
     TEMPLATES_REORDER: "/v1/whatsapp/templates/reorder",
     TEMPLATES_TEST: "/v1/whatsapp/templates/test",
+    TEMPLATE_CUSTOMISE: (id: string) => `/v1/whatsapp/templates/${id}/customise`,
     SETTINGS: "/v1/whatsapp/settings",
-    PROVIDER_HEALTH: "/v1/whatsapp/settings/provider-health",
-    PROVIDER_CHECK: "/v1/whatsapp/settings/provider-check",
-    PROVIDER_REGISTER: "/v1/whatsapp/settings/provider-register",
-    PROVIDER_SUBSCRIBE: "/v1/whatsapp/settings/provider-subscribe",
-    PREVIEW_ASK: "/v1/whatsapp/preview/ask",
+    // Organisations' own numbers
+    NUMBERS: "/v1/whatsapp/numbers",
+    NUMBERS_MANUAL: "/v1/whatsapp/numbers/manual",
+    NUMBER_CHECK: (id: string) => `/v1/whatsapp/numbers/${id}/check`,
+    NUMBER_SUBSCRIBE: (id: string) => `/v1/whatsapp/numbers/${id}/subscribe`,
+    NUMBER_BY_ID: (id: string) => `/v1/whatsapp/numbers/${id}`,
     // Conversations, unanswered queue and usage dashboard
     CONVERSATIONS: "/v1/whatsapp/conversations",
     CONVERSATION_BY_ID: (id: string) => `/v1/whatsapp/conversations/${id}`,
@@ -904,6 +985,7 @@ export const ROUTES = {
   MANAGE_LLM_CONFIGS: "/manage-llm-configs",
   MANAGE_LLM_MODEL_CATALOG: "/manage-llm-model-catalog",
   AI_TASKS: "/ai-tasks",
+  DEBRIEFS: "/debriefs",
   MANAGE_SCENARIO_LANGUAGES: "/manage-scenario-languages",
   MANAGE_LANGUAGE_GLOSSARY: (id: string | number) => `/manage-scenario-languages/${id}/glossary`,
   MANAGE_PROMPTS: "/manage-prompts",
@@ -930,7 +1012,10 @@ export const ROUTES = {
   SETTINGS: "/settings",
   LOGS: "/logs",
   MOBILE_RELEASES: "/mobile-releases",
-  WHATSAPP_BOT: "/whatsapp-bot",
+  WHATSAPP_BOT: "/chatbots",
+  /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
+  WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
+  CHATBOT_DETAIL: "/chatbots/:botId",
   TERMS: "/terms",
   PRIVACY: "/privacy",
   // Fully public, no-login gallery of the centralised design-system components.
@@ -943,6 +1028,10 @@ export const ROUTES = {
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
+  BUILDER_DECISIONS: "/builder/decisions",
+  // Mission control's full session list (search, archive, start by hand), moved off /builder
+  // when the Builder tab became Now · Rules · History.
+  BUILDER_ALL_SESSIONS: "/builder/sessions",
   BUILDER_SCOREBOARD: "/builder/scoreboard",
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
@@ -1075,6 +1164,10 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_UNANSWERED: "whatsAppBotUnanswered",
   WHATSAPP_BOT_ANALYTICS: "whatsAppBotAnalytics",
   WHATSAPP_BOT_PHONE_MAPPINGS: "whatsAppBotPhoneMappings",
+  WHATSAPP_BOT_NUMBERS: "whatsAppBotNumbers",
+  CHATBOTS: "chatbots",
+  CHATBOT_DETAIL: "chatbotDetail",
+  CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so
   // a restriction edit refreshes the content tab without refetching the roster.
@@ -1103,6 +1196,7 @@ export const TAG_TYPES = {
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
   PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
+  PRODUCT_ROADMAP_BREADTH: "productRoadmapBreadth",
   PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",
   PRODUCT_ROADMAP_GOALS: "productRoadmapGoals",
   PRODUCT_ROADMAP_STRATEGY_GOALS: "productRoadmapStrategyGoals",
@@ -1113,6 +1207,7 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_COMMENTS: "productRoadmapComments",
   PRODUCT_ROADMAP_VOTERS: "productRoadmapVoters",
   PRODUCT_ROADMAP_INTERVIEWS: "productRoadmapInterviews",
+  PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
   // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.
@@ -1143,10 +1238,16 @@ export const TAG_TYPES = {
   BUILDER_PRD_VERSIONS: "builderPrdVersions",
   BUILDER_SETTINGS: "builderSettings",
   BUILDER_NOTIFICATIONS: "builderNotifications",
+  BUILDER_DECISIONS: "builderDecisions",
   BUILDER_LESSONS: "builderLessons",
   BUILDER_EXEMPLARS: "builderExemplars",
   BUILDER_EVAL_FIXTURES: "builderEvalFixtures",
   BUILDER_EVAL_SUITES: "builderEvalSuites",
+  BUILDER_NOW: "builderNow",
+  BUILDER_UP_NEXT: "builderUpNext",
+  BUILDER_HISTORY: "builderHistory",
+  BUILDER_RULES: "builderRules",
+  BUILDER_THREAD: "builderThread",
   // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
   COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
   COURSE_COPILOT_SESSION: "courseCopilotSession",
@@ -1190,6 +1291,8 @@ export const TAG_TYPES = {
   // Skill experiments (auto-improve on Skills Store). Also registered in
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
+  DEBRIEF_CALIBRATION: "debriefCalibration",
+  DEBRIEF_CONSOLE: "debriefConsole",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",

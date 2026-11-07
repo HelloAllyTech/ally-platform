@@ -52,6 +52,7 @@ import {
   BuilderTurnReceipt,
 } from '../type/builder-sse.type';
 import { BuilderSettingsService } from './builder-settings.service';
+import { BuilderRuleContextService } from './builder-rule-context.service';
 import { freeTextOf } from './builder-readiness.service';
 import { isAcknowledgement } from '../util/builder-readiness-checks.util';
 import {
@@ -389,6 +390,9 @@ export class BuilderInterviewOrchestratorService {
      */
     @Optional()
     private readonly settingsService?: BuilderSettingsService,
+    /** The admin's rules. Optional, like the two above, so fixtures without it still run. */
+    @Optional()
+    private readonly ruleContext?: BuilderRuleContextService,
   ) {}
 
   /**
@@ -744,6 +748,7 @@ export class BuilderInterviewOrchestratorService {
       handoffContext,
       validatedTurns,
       protocol,
+      sessionId,
     );
     const messages: any[] = [
       ...(await this.replayHistory(session, history)),
@@ -2130,6 +2135,7 @@ export class BuilderInterviewOrchestratorService {
     handoffContext: string | null = null,
     validatedTurns = false,
     protocol = false,
+    sessionId: string | null = null,
   ): Promise<AgentSystemBlock[]> {
     const [instructions, context, platformRules, platformMap] =
       await Promise.all([
@@ -2177,6 +2183,13 @@ export class BuilderInterviewOrchestratorService {
     if (handoffContext) {
       blocks.push({ text: this.renderHandoff(handoffContext), cache: true });
     }
+    // The admin's rules: per session (some are scoped to it) and they change
+    // when the admin saves one, so after the shared prefix and uncached.
+    const rules =
+      sessionId && this.ruleContext
+        ? await this.ruleContext.renderRulesBlock(sessionId)
+        : '';
+    if (rules) blocks.push({ text: rules, cache: false });
     return blocks;
   }
 

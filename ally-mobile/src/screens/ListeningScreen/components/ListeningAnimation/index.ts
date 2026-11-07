@@ -1,1 +1,0 @@
-export {ListeningAnimation} from './ListeningAnimation';

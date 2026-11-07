@@ -158,4 +158,20 @@ describe('validateKnowledgeSourceUnlocks', () => {
       ),
     ).toHaveLength(1);
   });
+
+  it('checks every state a memory is picked for', () => {
+    const known = states.map((st: any) => st.id);
+    expect(
+      validateKnowledgeSourceUnlocks(
+        [{ title: 'Father', unlocksInStateIds: known }],
+        states,
+      ),
+    ).toEqual([]);
+    expect(
+      validateKnowledgeSourceUnlocks(
+        [{ title: 'Father', unlocksInStateIds: [known[0], 'gone'] }],
+        states,
+      ),
+    ).toHaveLength(1);
+  });
 });

@@ -1144,3 +1144,43 @@ describe("createSimulation utils", () => {
     });
   });
 });
+
+describe("Stage Director memories hydration", () => {
+  it("loads memories from a version snapshot as their own field, next to knowledge sources", () => {
+    const form = formatVersionConfigToForm({
+      knowledgeSources: [{ id: "k-1", title: "KS", content: "c", unlocksFromStateId: "s-1" }],
+      memories: [{ id: "m-1", title: "My father", content: "x", unlocksFromStateId: "s-2" }],
+    });
+    expect(form.memories).toEqual([
+      { id: "m-1", title: "My father", content: "x", unlocksInStateIds: ["s-2"] },
+    ]);
+    expect(form.knowledgeSources).toEqual([
+      { id: "k-1", title: "KS", content: "c", unlocksFromStateId: "s-1" },
+    ]);
+  });
+
+  it("reads an older single memory lock as that state and every later one", () => {
+    const form = formatVersionConfigToForm({
+      states: [
+        { id: "s-3", name: "Trusting", scoreLower: 100 },
+        { id: "s-1", name: "Guarded", scoreLower: 0 },
+        { id: "s-2", name: "Open", scoreLower: 50 },
+      ],
+      memories: [
+        { id: "m-1", title: "My father", content: "x", unlocksFromStateId: "s-2" },
+        { id: "m-2", title: "My job", content: "y", unlocksInStateIds: ["s-1", "s-3"] },
+      ],
+    });
+    expect(form.memories?.map((m: any) => m.unlocksInStateIds)).toEqual([
+      ["s-2", "s-3"],
+      ["s-1", "s-3"],
+    ]);
+  });
+
+  it("leaves memories undefined when the scenario never had them (first switch maps them)", () => {
+    const form = formatSimulationResponseData({
+      metadata: {},
+    } as unknown as GetSimulationByIdResponse);
+    expect(form.memories).toBeUndefined();
+  });
+});

@@ -3,6 +3,8 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { BuilderPullRequestService } from './builder-pull-request.service';
 import { BuilderPullRequestRepository } from '../repository/builder-build.repository';
+import { BuilderHistoryService } from './builder-history.service';
+import { buildDecisionId } from '../type/builder-decision.type';
 
 /**
  * Acting on a button pressed in Slack.
@@ -34,6 +36,7 @@ export class BuilderSlackService {
     private readonly configService: AppConfigService,
     private readonly pullRequestService: BuilderPullRequestService,
     private readonly pullRequestRepository: BuilderPullRequestRepository,
+    private readonly historyService: BuilderHistoryService,
   ) {}
 
   private isApprover(slackUserId: string | null | undefined): boolean {
@@ -115,6 +118,25 @@ export class BuilderSlackService {
       this.logger.info(
         `[BUILDER] ${row.repo}#${row.prNumber} merged from Slack by ${slackUserId}.`,
       );
+      // No Ally user to attribute it to (a Slack id is not one), so the actor
+      // is empty and the surface says where it came from.
+      await this.historyService.record({
+        entryType: 'decision',
+        decisionId: buildDecisionId('pr_merge', row.sessionId, row.id),
+        kind: 'pr_merge',
+        category: 'issue',
+        sessionId: row.sessionId,
+        pullRequestId: row.id,
+        prompt: `Merge ${row.repo} #${row.prNumber}?`,
+        chosenOptionIds: ['merge'],
+        chosenLabel: 'Merge',
+        oneWay: true,
+        surface: 'slack',
+        actorUserId: null,
+        raisedAt: row.mergePromptedAt ?? null,
+        decidedAt: new Date(),
+        appliedAt: new Date(),
+      });
       return {
         text: `Merged ${row.repo}#${row.prNumber}. Its production release starts on the next reconcile, and I'll say here if it doesn't reach production.`,
       };

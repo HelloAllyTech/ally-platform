@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { RoadmapVotingAnalyticsRepository } from 'src/analytics/repository/roadmap-voting-analytics.repository';
+import { RoadmapVotingAnalyticsService } from 'src/analytics/service/roadmap-voting-analytics.service';
 import { AwsModule } from 'src/aws/aws.module';
 import { ChangelogModule } from 'src/changelog/changelog.module';
 import { GithubModule } from 'src/github/github.module';
@@ -50,6 +52,11 @@ import { ProductUpdatesService } from './service/product-updates.service';
     ProductUpdatePipelineService,
     ProductUpdatesService,
     ProductUpdatesSchedulerRegistrationService,
+    // The digest's "Roadmap votes" section. Provided here rather than by
+    // importing AnalyticsModule: both only need the DataSource, and the
+    // analytics module is far too large to pull in for one query.
+    RoadmapVotingAnalyticsService,
+    RoadmapVotingAnalyticsRepository,
   ],
 })
 export class ProductUpdatesModule {}

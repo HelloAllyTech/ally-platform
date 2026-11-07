@@ -65,6 +65,10 @@ describe('save_character_draft — per-language shapes', () => {
     profession: 'Schoolteacher',
     currentLocation: 'Pune',
     characterProfileText: 'A 34-year-old schoolteacher in Pune.',
+    // Style and samples are mandatory now (characters were being saved with
+    // both sections empty); each shape test overrides the map it exercises.
+    languageCharacteristics: { '1': 'Measured, formal English.' },
+    linguisticStyleSamples: { '1': ['I am managing, thank you.'] },
   };
 
   const run = async (input: Record<string, any>) => {
@@ -192,12 +196,45 @@ describe('save_character_draft — per-language shapes', () => {
     );
   });
 
-  it('leaves an unrecognisable key alone rather than guessing', async () => {
-    const { draft } = await run({
+  it('rejects a key that resolves to no language rather than passing it through', async () => {
+    // Pass-through used to seem harmless, but the character create endpoint
+    // accepts only numeric languageId keys — the bad key 400ed at the trainer.
+    const { outcome } = await run({
       languageCharacteristics: { klingon: 'nope' },
     });
-    expect(Object.keys(draft.languageCharacteristics ?? {})).toEqual([
-      'klingon',
-    ]);
+    expect(outcome.modelResult.ok).toBe(false);
+    expect(JSON.stringify(outcome.modelResult.errors)).toMatch(
+      /languageCharacteristics\[\\"klingon\\"\] is not a language/,
+    );
+  });
+
+  it('strips the quotes a model wraps around a key, as seen in production', async () => {
+    // The exact prod payload shape: { "'14'": … } → 400 "not a valid
+    // language id" when the reviewed character was saved.
+    const { outcome, draft } = await run({
+      languageCharacteristics: { "'1'": 'Measured, formal English.' },
+      linguisticStyleSamples: { '"2"': ['मैं ठीक हूँ।'] },
+    });
+    expect(outcome.modelResult.ok).toBe(true);
+    expect(draft.languageCharacteristics).toEqual({
+      '1': 'Measured, formal English.',
+    });
+    expect(draft.linguisticStyleSamples).toEqual({ '2': ['मैं ठीक हूँ।'] });
+  });
+
+  it('rejects a draft with no language style, so the agent fills it and retries', async () => {
+    const { outcome } = await run({ languageCharacteristics: undefined });
+    expect(outcome.modelResult.ok).toBe(false);
+    expect(JSON.stringify(outcome.modelResult.errors)).toMatch(
+      /languageCharacteristics is required/,
+    );
+  });
+
+  it('rejects a draft with no dialect samples, so the agent fills them and retries', async () => {
+    const { outcome } = await run({ linguisticStyleSamples: {} });
+    expect(outcome.modelResult.ok).toBe(false);
+    expect(JSON.stringify(outcome.modelResult.errors)).toMatch(
+      /linguisticStyleSamples is required/,
+    );
   });
 });

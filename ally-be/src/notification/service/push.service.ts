@@ -10,6 +10,8 @@ export interface PushPayload {
   body: string;
   type: string;
   screen?: string;
+  /** Extra string fields the app routes on, e.g. the session to open. */
+  data?: Record<string, string>;
 }
 
 const DEAD_TOKEN_ERROR_CODES = new Set([
@@ -53,6 +55,9 @@ export class PushService {
     };
     if (payload.screen) {
       data.screen = payload.screen;
+    }
+    for (const [key, value] of Object.entries(payload.data ?? {})) {
+      if (!(key in data)) data[key] = value;
     }
 
     try {

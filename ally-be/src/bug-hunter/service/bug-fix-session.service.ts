@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
@@ -98,6 +98,21 @@ import {
 /** A plan step that changes nothing: "no code changes required", "nothing to change", "verify only". */
 const NO_CHANGE_STEP =
   /\b(no (code )?(changes?|fix(es)?) (are |is )?(required|needed|necessary)|nothing to (change|fix)|verify only|only verify)\b/i;
+
+/** A plan step past its PR merge — released or on its way counts as done. */
+const PLAN_STEP_DONE_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.MERGED,
+  BugFindingStatus.RELEASING,
+  BugFindingStatus.RELEASED,
+];
+
+/** A plan step that has not started yet and may be dispatched when its turn comes. */
+const PLAN_STEP_STARTABLE_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.BLOCKED,
+  BugFindingStatus.NEW,
+  BugFindingStatus.APPROVED,
+  BugFindingStatus.PENDING_APPROVAL,
+];
 
 @Injectable()
 export class BugFixSessionService {
@@ -324,6 +339,11 @@ export class BugFixSessionService {
     await this.budgetService.assertCanStartSession(finding, {
       force: false,
       userId: null,
+      // The escalation cap stops Bug Hunter asking again, and asking once is
+      // usually what reached it. Answering resolves that question, so it must
+      // not also block the session the answer was given to start — that left
+      // every answered bug at Needs input. The other caps still apply.
+      ignore: actor === 'answer' ? ['escalations'] : [],
     });
     await this.dispatchFix(finding, repo, actor);
     return this.bugFindingService.getOne(finding.id);
@@ -340,17 +360,27 @@ export class BugFixSessionService {
   async continueAfterAnswer(findingId: string): Promise<BugFinding | null> {
     const finding = await this.bugFindingService.getOne(findingId);
     if (finding.status !== BugFindingStatus.NEEDS_INPUT) return null;
-    if (finding.runId) {
-      const run = await this.bugHunterService
-        .getRun(finding.runId)
-        .catch(() => null);
-      const stillPolling =
-        run?.status === BugHuntRunStatus.RUNNING &&
-        Date.now() - run.createdAt.getTime() < BUG_FIX_SESSION_RUN_TIMEOUT_MS;
-      if (stillPolling) return null;
-    }
+    // A coordinated plan halts with its parent at NEEDS_INPUT, so that is the
+    // row the admin answers — but the question was the step's, and only the
+    // step's session can use the answer. Starting a session on the parent
+    // would fix the whole bug in one repo, outside its own plan.
+    const step = await this.forwardAnswerToStuckStep(finding);
+    if (step) return this.continueAfterAnswer(step.id);
+    if (await this.sessionMayStillBePolling(finding)) return null;
     try {
-      return await this.startByAgent(finding.id, 'answer');
+      const started = await this.startByAgent(finding.id, 'answer');
+      if (finding.parentFindingId) {
+        // The plan halted on this step; with the step running again it is
+        // coordinating, and `advancePlans` takes it from here.
+        await this.findingRepository.update(
+          {
+            id: finding.parentFindingId,
+            status: BugFindingStatus.NEEDS_INPUT,
+          },
+          { status: BugFindingStatus.COORDINATING },
+        );
+      }
+      return started;
     } catch (error) {
       this.logger.warn(
         `[BUG_HUNTER] Answer recorded on finding ${findingId} but no session could start: ${
@@ -358,6 +388,84 @@ export class BugFixSessionService {
         }`,
       );
       return null;
+    }
+  }
+
+  /**
+   * Whether the session that asked may still be polling for the answer. The
+   * GitHub run is the truth when we know it: the hunt-run row is closed by
+   * the agent itself, and an agent killed mid-wait leaves it RUNNING for the
+   * full run timeout, which used to swallow every answer given in that time.
+   */
+  private async sessionMayStillBePolling(
+    finding: BugFinding,
+  ): Promise<boolean> {
+    if (finding.sessionRunId && finding.repo) {
+      const run = await this.github
+        .getRun(finding.repo, finding.sessionRunId)
+        .catch(() => null);
+      if (run) return run.status !== 'completed';
+    }
+    if (!finding.runId) return false;
+    const run = await this.bugHunterService
+      .getRun(finding.runId)
+      .catch(() => null);
+    return (
+      run?.status === BugHuntRunStatus.RUNNING &&
+      Date.now() - run.createdAt.getTime() < BUG_FIX_SESSION_RUN_TIMEOUT_MS
+    );
+  }
+
+  /** Copies a halted plan's answer onto the step that asked. Null when the finding is not a halted plan. */
+  private async forwardAnswerToStuckStep(
+    parent: BugFinding,
+  ): Promise<BugFinding | null> {
+    if (parent.escalationAnswer == null) return null;
+    const steps = await this.findingRepository.listChildren(parent.id);
+    const stuck = steps.find(
+      (step) => step.status === BugFindingStatus.NEEDS_INPUT,
+    );
+    if (!stuck) return null;
+    await this.findingRepository.update(stuck.id, {
+      escalationAnswer: parent.escalationAnswer,
+      escalationAnsweredBy: parent.escalationAnsweredBy ?? null,
+      escalationAnsweredAt: parent.escalationAnsweredAt ?? new Date(),
+    });
+    return stuck;
+  }
+
+  /**
+   * The safety net for `continueAfterAnswer`, which runs once, at the moment
+   * of answering. When the asking session still looked alive then, that call
+   * left it to the session — and a session that ended without reading the
+   * answer left the bug at NEEDS_INPUT for good, answered and going nowhere.
+   *
+   * An answer older than the bug's last dispatch was already in that
+   * session's dossier; if the bug is back at NEEDS_INPUT, it asked something
+   * new, so the old answer must not start another session.
+   */
+  private async reconcileAnsweredQuestions(): Promise<void> {
+    const answered = await this.findingRepository.find({
+      where: {
+        status: BugFindingStatus.NEEDS_INPUT,
+        escalationAnswer: Not(IsNull()),
+      },
+    });
+    for (const finding of answered) {
+      if (
+        finding.dispatchedAt &&
+        finding.escalationAnsweredAt &&
+        finding.escalationAnsweredAt <= finding.dispatchedAt
+      ) {
+        continue;
+      }
+      await this.continueAfterAnswer(finding.id).catch((error) =>
+        this.logger.warn(
+          `[BUG_HUNTER] Could not continue answered finding ${finding.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
     }
   }
 
@@ -1009,6 +1117,7 @@ export class BugFixSessionService {
     if (!this.github.isConfigured) return;
     await this.reconcileQueuedSessions();
     await this.reconcileFixingSessions();
+    await this.reconcileAnsweredQuestions();
     await this.reconcilePrOpenedFindings();
     await this.reconcileReleases();
     await this.reconcileOutOfBandReleases();
@@ -1067,6 +1176,8 @@ export class BugFixSessionService {
             step.status === BugFindingStatus.FAILED ||
             step.status === BugFindingStatus.NEEDS_INPUT ||
             step.status === BugFindingStatus.DISMISSED ||
+            // A human declined the step's fix; the plan cannot build on it.
+            step.status === BugFindingStatus.REJECTED ||
             // An admin cancelling one step must stop the whole plan here —
             // without this, the next tick would read the cancelled step as
             // neither stuck nor in-flight and dispatch the step after it,
@@ -1078,7 +1189,11 @@ export class BugFixSessionService {
           continue;
         }
 
-        if (steps.every((step) => step.status === BugFindingStatus.MERGED)) {
+        // A step that has since gone out in a release is still merged —
+        // reading only MERGED left a plan whose step shipped waiting forever.
+        if (
+          steps.every((step) => PLAN_STEP_DONE_STATUSES.includes(step.status))
+        ) {
           const mergedAt = new Date();
           await this.findingRepository.update(parent.id, {
             status: BugFindingStatus.MERGED,
@@ -1109,8 +1224,13 @@ export class BugFixSessionService {
         );
         if (inFlight) continue;
 
-        const next = steps.find(
-          (step) => step.status === BugFindingStatus.BLOCKED,
+        // The first not-yet-started step, in plan order. BLOCKED is the normal
+        // case; NEW / APPROVED / PENDING_APPROVAL is a step whose start never
+        // happened (recordPlan's dispatch failed, or a sweep re-touched it).
+        // Waiting only on BLOCKED left those plans at "Fixing across repos"
+        // with nothing running and nothing to say why.
+        const next = steps.find((step) =>
+          PLAN_STEP_STARTABLE_STATUSES.includes(step.status),
         );
         if (next?.repo) await this.dispatchFix(next, next.repo, null);
       } catch (error) {

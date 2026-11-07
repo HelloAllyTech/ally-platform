@@ -5,13 +5,12 @@ import { useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { Tabs } from "@ally-ui-mono/ui-shared";
+import { InlineLoading, Tabs } from "@ally-ui-mono/ui-shared";
 import {
   useCreateSimulationMutation,
   useDeleteCoverImageMutation,
   useGetAvailableLanguageVoicesQuery,
   useGetMappedScenarioEventsQuery,
-  useGetPromptsQuery,
   useLazyGetAdminSimulationByIdQuery,
   useUpdateSimulationByIdMutation,
   useUpdateScenarioVersionMutation,
@@ -47,7 +46,8 @@ import {
   SESSION_TIMER_CONFIG,
   FORM_FIELD_IDS,
   isValidStateInstructionId,
-  ROLE_INSTRUCTION_PROMPT_CODE,
+  DEFAULT_ROLE_INSTRUCTION,
+  NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE,
   BEHAVIOUR_STATES,
   SIMULATION_CATEGORY,
   TooltipLocation,
@@ -61,6 +61,7 @@ import {
   triggerWarning,
   behaviourInstruction,
   knowledgeSource,
+  ScenarioMemory,
   TranslationProgressPayload,
   ScenarioVersionStatus,
   formatVersionLabel,
@@ -77,6 +78,8 @@ import {
   isNonEmptyArray,
   validateTimeRange,
 } from "@utils";
+
+import { useIsMappingMemories } from "../../components/memories/memoriesMappingStatus";
 
 const stepIds: any = SIMULATION_CREATOR_STEP_IDS;
 
@@ -353,12 +356,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     active: true,
     voicesNeeded: true,
   }) as { data: Array<{ language_id: number; value: string; label: string }> };
-  const { data: roleInstructionPrompts = [] } = useGetPromptsQuery({
-    searchName: ROLE_INSTRUCTION_PROMPT_CODE,
-    limit: 20,
-    offset: 0,
-    includeBlocks: false,
-  });
 
   // Advanced (mapped) event count, sourced from the same RTK Query cache the
   // Advanced Settings tab's event table uses (shared SIMULATION_EVENTS tag), so
@@ -377,9 +374,26 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // field groups come from the `@constants` barrel, which several test files
   // mock wholesale (see CLAUDE.md). useForm only reads `defaultValues` on the
   // first render, and the field groups are static, so the memo is just hygiene.
-  const toggleDefaultValues = useMemo(
-    () => buildToggleDefaultValues(SIMULATION_CREATOR_FIELD_GROUPS),
-    [],
+  // A new simulation (no `id` in the route) also starts on
+  // NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE. Seeded here, not in the picker: the
+  // picker's own fallback is for loaded simulations with no saved selection,
+  // which must keep showing the runtime default they actually run on.
+  //
+  // It starts with the default role instruction too. The Role instruction
+  // input applies its own default only once mounted, and it sits in an
+  // accordion that starts closed, so an author who never opened it saved a
+  // blank role and the client ran with an empty "## Role" section.
+  const formDefaultValues = useMemo(
+    () => ({
+      ...buildToggleDefaultValues(SIMULATION_CREATOR_FIELD_GROUPS),
+      ...(id
+        ? {}
+        : {
+            selectedMainPromptCode: NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE,
+            prompt: DEFAULT_ROLE_INSTRUCTION,
+          }),
+    }),
+    [id],
   );
 
   // `FieldValues` is pinned explicitly: without it, `defaultValues` narrows the
@@ -389,15 +403,12 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   const formMethods = useForm<FieldValues>({
     mode: "onChange",
     reValidateMode: "onChange",
-    defaultValues: toggleDefaultValues,
+    defaultValues: formDefaultValues,
   });
-
-  const managedRoleInstruction = useMemo(
-    () =>
-      roleInstructionPrompts.find(prompt => prompt.promptCode === ROLE_INSTRUCTION_PROMPT_CODE)
-        ?.prompt ?? "",
-    [roleInstructionPrompts],
-  );
+  // True while the first-switch (or "Re-map") memory mapping runs, ~20-35s.
+  // Saving, previewing or publishing in that window would store or run the
+  // simulation without the memories the author is waiting for.
+  const isMappingMemories = useIsMappingMemories(formMethods.control as unknown as object);
 
   const uploadsInProgress = useSelector(selectUploadsInProgress);
   const isReportGenerationInProgress = uploadsInProgress.some(
@@ -428,18 +439,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
       formMethods.reset(formatSimulationResponseData(adminSimulationByIdData));
     }
   }, [adminSimulationByIdData, formMethods, activeVersionId]);
-
-  useEffect(() => {
-    if (simulationId) return;
-    if (!isNonEmptyString(managedRoleInstruction)) return;
-    if (isNonEmptyString(formMethods.getValues("prompt"))) return;
-
-    formMethods.setValue("prompt", managedRoleInstruction, {
-      shouldDirty: false,
-      shouldTouch: false,
-      shouldValidate: false,
-    });
-  }, [simulationId, managedRoleInstruction, formMethods]);
 
   const {
     formState: { dirtyFields },
@@ -766,6 +765,22 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
             unlocksFromStateId: item.unlocksFromStateId || null,
           }))
         : [],
+      // The Stage Director prompt's memories — a separate copy from
+      // knowledgeSources. Sent only once the form has them (never on a
+      // scenario that hasn't been on that prompt), so the stored value is
+      // never blanked by a save from another prompt.
+      ...(Array.isArray(restForm.memories)
+        ? {
+            memories: (restForm.memories as ScenarioMemory[]).map(item => ({
+              id: item.id,
+              title: item.title ?? "",
+              content: item.content ?? "",
+              unlocksInStateIds: item.unlocksInStateIds ?? [],
+              // The older single lock is replaced by the list above.
+              unlocksFromStateId: null,
+            })),
+          }
+        : {}),
       // Which post-session tabs this roleplay shows. Always send both keys —
       // a partial object leans on the backend resolver's "absent means on"
       // default for whichever key is missing, which is right for a legacy
@@ -788,6 +803,9 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     // top-level booleans.
     delete (simulationData as any).feedbackTabDebrief;
     delete (simulationData as any).feedbackTabTranscript;
+    // extractValidData turns an absent `memories` into null; never send that —
+    // ally-be would read it as "clear the Stage Director prompt's memories".
+    if (!Array.isArray(restForm.memories)) delete (simulationData as any).memories;
 
     if (Array.isArray((simulationData as any).stateNames)) {
       const filtered = ((simulationData as any).stateNames as any[]).filter(sn =>
@@ -838,6 +856,21 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           ? { ...ks, unlocksFromStateId: null }
           : ks,
       );
+    }
+    // Same for memories (the Stage Director prompt's copy).
+    if (Array.isArray((simulationData as any).memories)) {
+      (simulationData as any).memories = ((simulationData as any).memories as any[]).map(memory => {
+        if (!Array.isArray(memory.unlocksInStateIds)) {
+          return memory;
+        }
+        const filteredUnlocks = memory.unlocksInStateIds.filter(
+          (id: string) => !removedStateIds.includes(id),
+        );
+        return {
+          ...memory,
+          unlocksInStateIds: filteredUnlocks.length > 0 ? filteredUnlocks : null,
+        };
+      });
     }
 
     // The partner-org tag only means something for Partner Sim entries; when
@@ -976,6 +1009,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     if (isAutosavingRef.current) return; // an autosave is already running
     if (isCreatingSimulation) return; // a create/publish is in flight
     if (isReportGenerationInProgress) return; // don't fight report generation
+    if (isMappingMemories) return; // memories land when mapping ends; save them with the rest
     if (Object.keys(dirtyFields).length === 0) return; // nothing to save
 
     isAutosavingRef.current = true;
@@ -1003,14 +1037,14 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // CreateTrack.tsx's guard.
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!viewMode && Object.keys(dirtyFields).length > 0) {
+      if (!viewMode && (Object.keys(dirtyFields).length > 0 || isMappingMemories)) {
         event.preventDefault();
         event.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [viewMode, dirtyFields]);
+  }, [viewMode, dirtyFields, isMappingMemories]);
 
   // Note: a brand-new roleplay is NOT persisted on mount. Nothing is saved until
   // the user actually edits a field — at which point the interval autosave above
@@ -1058,6 +1092,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   };
 
   const handlePublish = () => {
+    if (isMappingMemories) return;
     if (emptyOptionalFields.length > 0) {
       pendingActionRef.current = doPublish;
       setShowOptionalFieldsWarning(true);
@@ -1092,6 +1127,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // Header Save. On a live roleplay it confirms first: it saves as a draft,
   // which takes the roleplay offline for learners.
   const handleSaveClick = () => {
+    if (isMappingMemories) return;
     if (isEditingLiveRoleplay) {
       setPendingOfflineSave("save");
       return;
@@ -1313,6 +1349,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   };
 
   const handlePreview = () => {
+    if (isMappingMemories) return;
     if (!viewMode && emptyOptionalFields.length > 0) {
       pendingActionRef.current = doPreview;
       setShowOptionalFieldsWarning(true);
@@ -1398,7 +1435,12 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
               <button
                 type="button"
                 onClick={() => setIsVersionPanelOpen(o => !o)}
-                title={en.simulation.versions.switchVersion}
+                disabled={isMappingMemories}
+                title={
+                  isMappingMemories
+                    ? en.memories.pausedWhileMapping
+                    : en.simulation.versions.switchVersion
+                }
                 className={`flex items-center gap-1.5 h-[40px] px-3 rounded text-typography-900 transition-colors ${
                   isVersionPanelOpen ? "bg-secondary-50" : "hover:bg-secondary-50"
                 }`}
@@ -1472,6 +1514,8 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
             <Button
               variant={ButtonVariant.TEXT}
               onClick={handleSaveClick}
+              disabled={isMappingMemories}
+              title={isMappingMemories ? en.memories.pausedWhileMapping : undefined}
               className="px-4 h-[40px] text-typography-900"
             >
               {en.simulation.save}
@@ -1480,8 +1524,9 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           <Button
             variant={ButtonVariant.TEXT}
             onClick={handlePreview}
-            disabled={!areAllMandatoryFieldsFilled}
-            className={`px-4 h-[40px] ${areAllMandatoryFieldsFilled ? "text-primary-500" : "text-typography-600 cursor-not-allowed"}`}
+            disabled={!areAllMandatoryFieldsFilled || isMappingMemories}
+            title={isMappingMemories ? en.memories.pausedWhileMapping : undefined}
+            className={`px-4 h-[40px] ${areAllMandatoryFieldsFilled && !isMappingMemories ? "text-primary-500" : "text-typography-600 cursor-not-allowed"}`}
           >
             {en.simulation.preview}
           </Button>
@@ -1514,8 +1559,12 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
                 variant={ButtonVariant.PRIMARY}
                 onClick={handlePublish}
                 disabled={
-                  !areAllMandatoryFieldsFilled || isCreatingSimulation || isPublishingVersion
+                  !areAllMandatoryFieldsFilled ||
+                  isCreatingSimulation ||
+                  isPublishingVersion ||
+                  isMappingMemories
                 }
+                title={isMappingMemories ? en.memories.pausedWhileMapping : undefined}
                 className="transition-colors h-[40px] pr-[20px]"
               >
                 {isCreatingSimulation || isPublishingVersion
@@ -1526,6 +1575,20 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           )}
         </div>
       </div>
+
+      {/* Memory mapping in progress. Page-level, not only next to the prompt
+          picker, so it is seen from any tab, and it says how long and what is
+          paused, so nobody starts the simulation half-mapped. */}
+      {isMappingMemories && (
+        <div
+          role="status"
+          data-testid="memories-mapping-banner"
+          className="mt-4 flex items-start gap-2 rounded-md border border-primary-200 bg-primary-50 px-3 md:px-4 py-3 text-sm text-typography-900 shrink-0 font-primary"
+        >
+          <InlineLoading className="!w-auto shrink-0" status="active" />
+          <span>{en.memories.mappingBanner}</span>
+        </div>
+      )}
 
       {/* Latency warning — shown before the tab strip when this simulation has
           more advanced (mapped) events than the recommended threshold, since a

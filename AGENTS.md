@@ -15,7 +15,7 @@ Every app directory has its own `AGENTS.md` / `CLAUDE.md` router — read it bef
 | `ally-ai/` | FastAPI / Python 3.12 / Poetry / Weaviate / LangChain / OpenAI | `app/main.py` | `ally-ai/AGENTS.md`, `app/core/config.py` |
 | `ally-ai-learn/` | FastAPI + LiveKit Agents / Python 3.12 / Poetry / LangGraph / multi-provider TTS/STT/LLM | `app/main.py` (API), `app/worker.py` (agent) | `ally-ai-learn/AGENTS.md`, `app/core/graph/graph_builder.py`, `docs/architecture.md` |
 | `ally-web/` | Nx 22 / React 18 / TypeScript / Vite dashboards / Next.js 14 landing | admin (8081), helpline (8080), landing (3000) under `apps/` | `ally-web/AGENTS.md`, `apps/ally-helpline-dashboard/src/main.tsx` |
-| `ally-mobile/` | React Native 0.79 / TypeScript 5 / React 19 / Redux Toolkit + RTK Query | `index.js` → `src/App.tsx` | `ally-mobile/AGENTS.md`, `src/navigation/RootNavigator.tsx` |
+| `ally-mobile/` | Flutter / Dart / Riverpod | `lib/main.dart` | `ally-mobile/AGENTS.md`, `lib/core/config/app_config.dart` |
 | `helloallytech.github.io/` | The Developer Wiki's source (`wiki/`); `publish-wiki.yml` mirrors it to GitHub Pages | — | `helloallytech.github.io/CLAUDE.md` |
 
 **infra** is a standalone private repo (`HelloAllyTech/infra`), kept outside `ally-platform` to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d here. Ansible 13 + Terraform + Docker Compose: playbooks such as `infra/ansible/baremetal.yml`, dev scripts at its root (`infra/bootstrap.sh`, `infra/dev_env.sh`, `infra/colima.sh`). Vault needs `$HOME/ansible_vault_pass`. Incus containers on Hetzner baremetal, Consul, Caddy, Wireguard.
@@ -24,10 +24,9 @@ Every app directory has its own `AGENTS.md` / `CLAUDE.md` router — read it bef
 
 ### Branch Naming
 ```
-feature/<ticket-id>-short-description
-fix/<ticket-id>-short-description
-chore/<ticket-id>-short-description
+<type>/<short-description>      e.g. feat/add-user-profile, fix/login-error
 ```
+Branches are **short-lived** (merged within 2 working days, never older than 7; delete on merge) and the root checkout stays on `master`; do feature work in a `git worktree`. Canonical rules: [Contributing Guide](helloallytech.github.io/wiki/contributing/guide.md#branch-naming) and [Branch Lifetime](helloallytech.github.io/wiki/contributing/guide.md#branch-lifetime).
 
 ### Commit Messages
 Follow conventional commits style. Check each repo's CONTRIBUTING.md for specifics.

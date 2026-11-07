@@ -93,9 +93,13 @@ export function withBudgetDefaults(
   };
 }
 
-/** The first kind whose cap is met or passed, or null while everything is under. */
-export function exceededKind(budget: BugCaseBudget): BugCaseBudgetKind | null {
+/** The first kind whose cap is met or passed, or null while everything is under. `ignore` leaves kinds out of the check. */
+export function exceededKind(
+  budget: BugCaseBudget,
+  ignore: readonly BugCaseBudgetKind[] = [],
+): BugCaseBudgetKind | null {
   for (const kind of BUG_CASE_BUDGET_KINDS) {
+    if (ignore.includes(kind)) continue;
     if (budget.caps[kind] > 0 && budget.used[kind] >= budget.caps[kind])
       return kind;
   }
@@ -138,8 +142,11 @@ export function overrideBudget(
 }
 
 /** Why a session cannot start, in the words shown to the admin, or null when it can. */
-export function explainSessionRefusal(budget: BugCaseBudget): string | null {
-  const kind = exceededKind(budget);
+export function explainSessionRefusal(
+  budget: BugCaseBudget,
+  ignore: readonly BugCaseBudgetKind[] = [],
+): string | null {
+  const kind = exceededKind(budget, ignore);
   if (!kind) return null;
   const words: Record<BugCaseBudgetKind, string> = {
     sessions: `I have already run ${budget.used.sessions} fix session${budget.used.sessions === 1 ? '' : 's'} on this bug, which is the budget.`,

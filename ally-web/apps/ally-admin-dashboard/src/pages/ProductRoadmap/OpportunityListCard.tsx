@@ -2,9 +2,12 @@ import React from "react";
 
 import { RoadmapVoteBudget, RoadmapOpportunity } from "@types";
 
+import { NewColleagueTag } from "./NewToYouChip";
 import { RankScore } from "./RankBreakdown";
+import { useScoreUnit } from "./useScoreUnit";
 import { monthLabel } from "./utils/monthBoard";
 import { personName } from "./utils/people";
+import { formatPoints } from "./utils/points";
 import { priorityBorderColour } from "./utils/priorityColour";
 import {
   isConsumerSourced,
@@ -78,6 +81,7 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
   onSetVotes,
   onOpen,
 }) => {
+  const { unit, enabled } = useScoreUnit();
   const isQueueCard = isQueue;
   // Null outside the queue stages, so a queue card that has just been released mid-render simply
   // shows no number rather than a stale one.
@@ -220,12 +224,13 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
               {SOURCE_LABEL[opportunity.source]}
             </span>
           )}
+          {!!budget && canVote && enabled && opportunity.breadthNew && <NewColleagueTag />}
           {/* Total votes, for the cards that have no rank to sit under — outside the queue
               there is no rank column, so this stays where it always was. Same reasoning as the
               queue placement: a number, not just the edge colour. */}
           {!isQueueCard && (
             <span className="text-typography-secondary tabular-nums">
-              · {opportunity.priorityScore} votes
+              · {formatPoints(opportunity.priorityScore)} {unit}
               {/* Outside the queue there is no rank badge for a score to sit under, so the vote
                   total stays the headline and the composite is not shown at all. A rank score
                   with nothing to be a rank IN would invite comparison across two different

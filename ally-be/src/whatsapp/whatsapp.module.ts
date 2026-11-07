@@ -6,8 +6,6 @@ import { AppConfigService } from '../config/config.service';
 import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { RedisModule } from '../redis/redis.module';
-import { GlobalSettings } from '../settings/entity/global-settings.entity';
-import { GlobalSettingsRepository } from '../settings/repository/global-settings.repository';
 import { Tenant } from '../tenant/entity/tenant.entity';
 import { User } from '../user/entity/user.entity';
 import {
@@ -15,9 +13,11 @@ import {
   WhatsAppInboundDlqConsumer,
 } from './consumer/whatsapp-inbound.consumer';
 import { WhatsAppAdminController } from './controller/whatsapp-admin.controller';
+import { WhatsAppBusinessNumberController } from './controller/whatsapp-business-number.controller';
 import { WhatsAppConversationController } from './controller/whatsapp-conversation.controller';
 import { WhatsAppPhoneMappingController } from './controller/whatsapp-phone-mapping.controller';
 import { WhatsAppWebhookController } from './controller/whatsapp-webhook.controller';
+import { WaBusinessNumber } from './entity/wa-business-number.entity';
 import { WaContact } from './entity/wa-contact.entity';
 import { WaConversation } from './entity/wa-conversation.entity';
 import { WaKeywordTemplate } from './entity/wa-keyword-template.entity';
@@ -29,6 +29,8 @@ import { KbDocument } from '../knowledge-base/entity/kb-document.entity';
 import { MetaWhatsAppProvider } from './provider/meta-whatsapp.provider';
 import { WaAnalyticsRepository } from './repository/wa-analytics.repository';
 import { WhatsAppAdminService } from './service/whatsapp-admin.service';
+import { WhatsAppBusinessNumberService } from './service/whatsapp-business-number.service';
+import { WhatsAppCredentialCipherService } from './service/whatsapp-credential-cipher.service';
 import { WhatsAppConversationService } from './service/whatsapp-conversation.service';
 import { WhatsAppIdentityService } from './service/whatsapp-identity.service';
 import { WhatsAppPhoneMappingService } from './service/whatsapp-phone-mapping.service';
@@ -36,21 +38,22 @@ import { WhatsAppInboundService } from './service/whatsapp-inbound.service';
 import { WhatsAppRateLimitService } from './service/whatsapp-rate-limit.service';
 import { WhatsAppRetentionService } from './service/whatsapp-retention.service';
 import { WhatsAppSchedulerRegistrationService } from './service/whatsapp-scheduler-registration.service';
-import { WhatsAppSettingsService } from './service/whatsapp-settings.service';
-import { WhatsAppTemplateService } from './service/whatsapp-template.service';
 import { WHATSAPP_PROVIDER } from './type/whatsapp-provider.interface';
+import { WhatsAppConnectorType } from './service/whatsapp-connector-type.service';
+import { ChatbotModule } from '../chatbot/chatbot.module';
+import { Chatbot } from '../chatbot/entity/chatbot.entity';
+import { Connector } from '../chatbot/entity/connector.entity';
 
 /**
- * The WhatsApp Q&A bot.
+ * WhatsApp: the first connector type for chatbots.
+ *
+ * Receives messages on Meta's webhook, works out which bot a number serves (ChatbotModule's
+ * ConnectorService), handles what is WhatsApp-only — dedupe, consent/STOP, media, rate limits,
+ * sending — and hands the message itself to ChatbotEngineService for the decision.
  *
  * The provider is bound behind the `WHATSAPP_PROVIDER` token rather than injected directly, so
  * swapping Meta for a BSP is one factory change and nothing downstream — the consumer, templates,
  * consent and retrieval are all provider-agnostic.
- *
- * `GlobalSettingsRepository` is registered locally because SettingsModule does not export it. A
- * TypeORM repository is a stateless wrapper over the shared DataSource, so a second instance over
- * the same entity is safe; the alternative was widening SettingsModule's public surface for one
- * consumer.
  */
 @Module({
   imports: [
@@ -61,7 +64,9 @@ import { WHATSAPP_PROVIDER } from './type/whatsapp-provider.interface';
       WaKeywordTemplate,
       WaUnansweredQuestion,
       WaPhoneMapping,
-      GlobalSettings,
+      WaBusinessNumber,
+      Chatbot,
+      Connector,
       // Counted (never written) by the settings screen's readiness check: an empty WhatsApp corpus
       // means every question is declined. The entity, not KnowledgeBaseModule's internals.
       KbDocument,
@@ -77,20 +82,22 @@ import { WHATSAPP_PROVIDER } from './type/whatsapp-provider.interface';
     RedisModule,
     PromptModule,
     KnowledgeBaseModule,
+    ChatbotModule,
   ],
   controllers: [
     WhatsAppWebhookController,
     WhatsAppAdminController,
     WhatsAppConversationController,
     WhatsAppPhoneMappingController,
+    WhatsAppBusinessNumberController,
   ],
   providers: [
-    GlobalSettingsRepository,
-    WhatsAppSettingsService,
-    WhatsAppTemplateService,
     WhatsAppRateLimitService,
     WhatsAppIdentityService,
     WhatsAppPhoneMappingService,
+    WhatsAppCredentialCipherService,
+    WhatsAppBusinessNumberService,
+    WhatsAppConnectorType,
     WhatsAppInboundProducer,
     WhatsAppInboundService,
     WhatsAppAdminService,
@@ -114,6 +121,5 @@ import { WHATSAPP_PROVIDER } from './type/whatsapp-provider.interface';
       inject: [AppConfigService, MetaWhatsAppProvider],
     },
   ],
-  exports: [WhatsAppSettingsService],
 })
 export class WhatsAppModule {}

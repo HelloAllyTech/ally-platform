@@ -149,28 +149,29 @@ describe('UxSignalsService', () => {
     );
   });
 
-  it('fails the scan, rather than recording a clean run, when every detector failed', async () => {
+  it('returns a failed outcome without throwing when every detector failed', async () => {
     // A total PostHog outage must not look like a quiet night: zero signals here
     // means the scan could not look at anything, not that nothing was wrong.
+    const failedDetectors = [
+      UxSignalDetector.API_ERROR_SPIKE,
+      UxSignalDetector.ERROR_LOOP,
+      UxSignalDetector.RAGE_CLICK_CLUSTER,
+      UxSignalDetector.DEAD_CLICK_CLUSTER,
+      UxSignalDetector.ROUTE_ABANDONMENT,
+      UxSignalDetector.ZERO_RESULT_SEARCH,
+      UxSignalDetector.FUNNEL_DROPOFF,
+    ];
     detect.mockResolvedValue({
       signals: [],
-      failedDetectors: [
-        UxSignalDetector.API_ERROR_SPIKE,
-        UxSignalDetector.ERROR_LOOP,
-        UxSignalDetector.RAGE_CLICK_CLUSTER,
-        UxSignalDetector.DEAD_CLICK_CLUSTER,
-        UxSignalDetector.ROUTE_ABANDONMENT,
-        UxSignalDetector.ZERO_RESULT_SEARCH,
-        UxSignalDetector.FUNNEL_DROPOFF,
-      ],
+      failedDetectors,
       totalDetectors: 7,
     });
 
-    await expect(
-      service.runScan(UxSignalScanTrigger.SCHEDULED),
-    ).rejects.toThrow(ServiceUnavailableException);
+    const outcome = await service.runScan(UxSignalScanTrigger.SCHEDULED);
 
     expect(triage).not.toHaveBeenCalled();
+    expect(outcome.signalsDetected).toBe(0);
+    expect(outcome.failedDetectors).toEqual(failedDetectors);
     expect(updateScan).toHaveBeenCalledWith(
       'scan-1',
       expect.objectContaining({
@@ -183,10 +184,10 @@ describe('UxSignalsService', () => {
   it('fails the scan, with the reason on the row, when triage is unparseable', async () => {
     triage.mockResolvedValue(null);
 
-    await expect(
-      service.runScan(UxSignalScanTrigger.MANUAL, 1),
-    ).rejects.toThrow(ServiceUnavailableException);
+    const outcome = await service.runScan(UxSignalScanTrigger.MANUAL, 1);
 
+    expect(outcome.signalsDetected).toBe(0);
+    expect(outcome.findingsCreated).toBe(0);
     expect(write).not.toHaveBeenCalled();
     expect(updateScan).toHaveBeenCalledWith(
       'scan-1',

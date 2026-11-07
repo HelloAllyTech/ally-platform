@@ -1,0 +1,19 @@
+// Identity of the `dev` flavor: this repo's pre-cutover test app. A
+// separate bundle id from the store app (com.helloally.app) so installing a
+// test build never replaces the real Ally on a tester's phone. See
+// docs/RELEASE.md.
+APP_FLAVOR = dev
+PRODUCT_BUNDLE_IDENTIFIER = com.helloally.allyMobileFlutter
+APP_DISPLAY_NAME = Ally Flutter
+
+// Google Sign-In (Info.plist GIDClientID + reversed-client-id URL scheme).
+// RN hardcodes these in ios/ally/Info.plist rather than reading
+// GoogleService-Info.plist; the same values are used here. The client is
+// registered for com.helloally.app, so sign-in under this test bundle id is
+// not guaranteed (see docs/RELEASE.md).
+GOOGLE_IOS_CLIENT_ID = 168892399692-hmu1u4mghka0eu17s97tmnnbdu7bo5t0.apps.googleusercontent.com
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.168892399692-hmu1u4mghka0eu17s97tmnnbdu7bo5t0
+GOOGLE_REVERSED_CLIENT_ID_2 = com.googleusercontent.apps.168892399692-i5g20jnljvcddis0s5o7kp9linmvt376
+
+// Same Apple team as the store app (RN's DEVELOPMENT_TEAM).
+DEVELOPMENT_TEAM = W3ZL4N9N9J

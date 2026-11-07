@@ -18,7 +18,7 @@ describe('TrackCoverImageService', () => {
   let service: TrackCoverImageService;
 
   const mockProvider = {
-    getModel: jest.fn().mockReturnValue('gpt-image-1'),
+    getModel: jest.fn().mockReturnValue('gpt-image-1.5'),
     assertConfigured: jest.fn(),
     generateImage: jest.fn(),
   };
@@ -94,7 +94,7 @@ describe('TrackCoverImageService', () => {
       expect.objectContaining({
         task: LlmTask.GENERATE_COURSE_COVER_IMAGE,
         unit: 'images',
-        model: 'gpt-image-1',
+        model: 'gpt-image-1.5',
       }),
     );
   });
@@ -128,9 +128,10 @@ describe('TrackCoverImageService', () => {
     );
   });
 
-  it('maps a provider refusal to 400 and uploads nothing', async () => {
+  it('maps a content refusal to 400 and uploads nothing', async () => {
     mockProvider.generateImage.mockRejectedValue({
       status: 400,
+      code: 'moderation_blocked',
       message: 'safety system',
     });
 
@@ -140,6 +141,18 @@ describe('TrackCoverImageService', () => {
     expect(error.message).not.toMatch(/safety system/);
     expect(mockS3.uploadStream).not.toHaveBeenCalled();
     expect(mockUsage.record).not.toHaveBeenCalled();
+  });
+
+  it('does not blame the prompt for a 400 that is not a content refusal', async () => {
+    mockProvider.generateImage.mockRejectedValue({
+      status: 400,
+      code: 'invalid_value',
+      message: "The model 'dall-e-3' does not exist.",
+    });
+
+    const error = await service.generate(dto).catch((e) => e);
+    expect(error).toBeInstanceOf(BadGatewayException);
+    expect(error.message).not.toMatch(/rewording/);
   });
 
   it('maps a rate limit or outage to 502', async () => {

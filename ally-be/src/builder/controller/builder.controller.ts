@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -45,6 +46,7 @@ import { BuilderEpicService } from '../service/builder-epic.service';
 import { BuilderResearchService } from '../service/builder-research.service';
 import { BuilderCatalogService } from '../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../service/builder-evidence-log.service';
+import { BuilderDecisionService } from '../service/builder-decision.service';
 import { BuilderPrdVersionRepository } from '../repository/builder-prd.repository';
 import { BuilderBuildRunRepository } from '../repository/builder-build.repository';
 import {
@@ -60,6 +62,7 @@ import {
   ListBuilderLessonsQueryDto,
   UpdateBuilderLessonDto,
   BuilderResearchDto,
+  AnswerBuilderDecisionDto,
 } from '../dto/builder.dto';
 import {
   BUILDER_EVENT_PAGE_SIZE,
@@ -69,6 +72,8 @@ import {
   BUILDER_PR_AUTOMATION_TIMEBOX_MS,
 } from '../constants/builder.constants';
 import { BUILDER_REPOS } from '../constants/builder-repos.constants';
+import { buildDecisionId } from '../type/builder-decision.type';
+import { BuilderSessionStatus } from '../enum/builder.enum';
 
 /**
  * Builder — the admin-facing half (JWT). The machine-facing pipeline that
@@ -105,6 +110,7 @@ export class BuilderController {
     private readonly redisService: RedisService,
     private readonly catalogService: BuilderCatalogService,
     private readonly evidenceLog: BuilderEvidenceLogService,
+    private readonly decisionService: BuilderDecisionService,
   ) {}
 
   @Post('sessions')
@@ -187,7 +193,12 @@ export class BuilderController {
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.sessionService.cancelSession(sessionId, user.id);
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('budget', sessionId)],
+      { selectedOptionIds: ['stop'] },
+      user.id,
+      () => this.sessionService.cancelSession(sessionId, user.id),
+    );
   }
 
   @Post('sessions/:sessionId/pull-requests/:pullRequestId/resume-automation')
@@ -205,10 +216,16 @@ export class BuilderController {
     @Param('pullRequestId', ParseUUIDPipe) pullRequestId: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.pullRequestService.resumeAutomation(
-      sessionId,
-      pullRequestId,
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('pr_needs_human', sessionId, pullRequestId)],
+      { selectedOptionIds: ['resume'] },
       user.id,
+      () =>
+        this.pullRequestService.resumeAutomation(
+          sessionId,
+          pullRequestId,
+          user.id,
+        ),
     );
   }
 
@@ -229,10 +246,19 @@ export class BuilderController {
     @Param('pullRequestId', ParseUUIDPipe) pullRequestId: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.pullRequestService.mergePullRequest(
-      sessionId,
-      pullRequestId,
+    return this.decisionService.withSessionAnswer(
+      [
+        buildDecisionId('pr_merge', sessionId, pullRequestId),
+        buildDecisionId('pr_needs_human', sessionId, pullRequestId),
+      ],
+      { selectedOptionIds: ['merge'] },
       user.id,
+      () =>
+        this.pullRequestService.mergePullRequest(
+          sessionId,
+          pullRequestId,
+          user.id,
+        ),
     );
   }
 
@@ -247,7 +273,12 @@ export class BuilderController {
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.sessionService.archiveSession(sessionId, user.id);
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('build_failed', sessionId)],
+      { selectedOptionIds: ['archive'] },
+      user.id,
+      () => this.sessionService.archiveSession(sessionId, user.id),
+    );
   }
 
   @Post('sessions/:sessionId/unarchive')
@@ -402,7 +433,13 @@ export class BuilderController {
     @CurrentUser() user: TokenUser,
   ) {
     const session = await this.sessionService.getSession(sessionId);
-    return this.buildService.startBuild(session, user.id, dto);
+    const failed = session.status === BuilderSessionStatus.FAILED;
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId(failed ? 'build_failed' : 'start_build', sessionId)],
+      { selectedOptionIds: [failed ? 'retry' : 'start'] },
+      user.id,
+      () => this.buildService.startBuild(session, user.id, dto),
+    );
   }
 
   /**
@@ -437,7 +474,12 @@ export class BuilderController {
     @CurrentUser() user: TokenUser,
   ) {
     const session = await this.sessionService.getSession(sessionId);
-    return this.buildService.approveDesign(session, user.id);
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('design_review', sessionId)],
+      { selectedOptionIds: ['approve'] },
+      user.id,
+      () => this.buildService.approveDesign(session, user.id),
+    );
   }
 
   /**
@@ -458,7 +500,12 @@ export class BuilderController {
     @CurrentUser() user: TokenUser,
   ) {
     const session = await this.sessionService.getSession(sessionId);
-    return this.buildService.raiseBudget(session, user.id, dto.budgetUsd);
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('budget', sessionId)],
+      { customText: `Raise the ceiling to $${dto.budgetUsd}` },
+      user.id,
+      () => this.buildService.raiseBudget(session, user.id, dto.budgetUsd),
+    );
   }
 
   /**
@@ -721,6 +768,9 @@ export class BuilderController {
         ...(dto.maxConcurrentBuilds !== undefined
           ? { maxConcurrentBuilds: dto.maxConcurrentBuilds }
           : {}),
+        ...(dto.inProgressLimit !== undefined
+          ? { inProgressLimit: dto.inProgressLimit }
+          : {}),
         ...(dto.defaultBudgetUsd !== undefined
           ? { defaultBudgetUsd: String(dto.defaultBudgetUsd) }
           : {}),
@@ -812,6 +862,64 @@ export class BuilderController {
     return { ok: true };
   }
 
+  /**
+   * The decision feed: everything Builder is waiting on a person for, across
+   * every session, as answerable cards. See builder-decision.type.ts.
+   */
+  @Get('decisions')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.VIEW_BUILDER],
+  })
+  @ApiOperation({
+    summary: 'Every pending decision across Builder sessions, oldest first',
+  })
+  async listDecisions() {
+    const decisions = await this.decisionService.listPending();
+    return { decisions, count: decisions.length };
+  }
+
+  /**
+   * EDIT_BUILDER, like every action this routes to: an answer can start a
+   * build, approve a design, raise spend or merge a pull request.
+   */
+  @Post('decisions/:decisionId/answer')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.EDIT_BUILDER],
+  })
+  @ApiOperation({
+    summary:
+      'Answer one decision — routed to the same action the session page would take',
+  })
+  answerDecision(
+    @Param('decisionId') decisionId: string,
+    @Body() dto: AnswerBuilderDecisionDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.decisionService.answer(decisionId, dto, user.id, {
+      surface: 'now',
+      client: dto.client ?? null,
+      msToDecide: dto.msToDecide ?? null,
+    });
+  }
+
+  /**
+   * Take back a reversible answer inside its undo window. One-way answers
+   * (a merge) are never held, so there is nothing to take back.
+   */
+  @Delete('decisions/:decisionId/answer')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.EDIT_BUILDER],
+  })
+  @ApiOperation({
+    summary: 'Undo an answer inside its undo window',
+  })
+  undoDecision(
+    @Param('decisionId') decisionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.decisionService.undo(decisionId, user.id);
+  }
+
   @Post('sessions/:sessionId/messages/stream')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
@@ -863,6 +971,27 @@ export class BuilderController {
       });
       res.end();
       return;
+    }
+
+    // An answer to a pending question or brief, typed on the session page,
+    // goes to History like one answered from Now. Snapshotted before the turn
+    // runs: once it starts, the question is no longer pending.
+    if (dto.questionId || dto.briefResponse?.briefId) {
+      await this.decisionService.withSessionAnswer(
+        [
+          dto.questionId
+            ? buildDecisionId('question', sessionId, dto.questionId)
+            : buildDecisionId('brief', sessionId, dto.briefResponse!.briefId),
+        ],
+        {
+          selectedOptionIds: dto.answer?.selectedOptionIds ?? [],
+          customText:
+            dto.answer?.customValues?.join('\n') || dto.message || null,
+          none: dto.answer?.none,
+        },
+        user.id,
+        async () => undefined,
+      );
     }
 
     // Keep-alive: a turn that spends 40s researching the codebase emits

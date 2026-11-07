@@ -39,7 +39,7 @@ import {
 import { TerminationEventsDto } from './termination-events.dto';
 import { BehaviorInstructionDto } from './behavior-instruction.dto';
 import { MAX_BEHAVIOR_INSTRUCTIONS_COUNT } from '../constants/scenario-behavior-instuctions.constants';
-import { KnowledgeSourceDto } from './knowledge-source.dto';
+import { KnowledgeSourceDto, MemoryDto } from './knowledge-source.dto';
 import { SimulationStateDto } from './simulation-state.dto';
 import { StateNamesDto } from './state-names.dto';
 import { sanitizeDescriptionHtml } from 'src/common/util/sanitize-html.util';
@@ -822,6 +822,22 @@ export class CreateScenarioDto {
   @ValidateNested({ each: true })
   @Type(() => KnowledgeSourceDto)
   knowledgeSources?: KnowledgeSourceDto[];
+
+  @ApiProperty({
+    description:
+      "The client's memories for Main Agent Prompt — Stage Director, kept " +
+      'separately from knowledgeSources so switching prompts loses neither. ' +
+      'Same shape plus unlocksInStateIds; a memory shows only its title ' +
+      'until the session reaches one of its states.',
+    type: [MemoryDto],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_KNOWLEDGE_SOURCES_COUNT)
+  @ValidateNested({ each: true })
+  @Type(() => MemoryDto)
+  memories?: MemoryDto[];
 
   @ApiProperty({
     description: 'State names map',

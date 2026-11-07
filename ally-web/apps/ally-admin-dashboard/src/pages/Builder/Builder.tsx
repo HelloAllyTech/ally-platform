@@ -10,6 +10,7 @@ import {
   useArchiveBuilderSessionMutation,
   useCreateBuilderSessionMutation,
   useGetArchivedBuilderSessionsQuery,
+  useGetBuilderDecisionsQuery,
   useGetBuilderSessionsQuery,
   useUnarchiveBuilderSessionMutation,
 } from "@api";
@@ -200,6 +201,14 @@ export const Builder: React.FC = () => {
     { skip: !showArchived },
   );
   const [createSession, { isLoading: isCreating }] = useCreateBuilderSessionMutation();
+  // The decision feed's count rides the same poll cadence as the list: a
+  // decision that arrived while this page was open should show here too.
+  const { data: decisionFeed } = useGetBuilderDecisionsQuery(undefined, {
+    pollingInterval: 15000,
+    skipPollingIfUnfocused: true,
+    skip: showArchived,
+  });
+  const pendingDecisions = decisionFeed?.count ?? 0;
   const [archiveSession] = useArchiveBuilderSessionMutation();
   const [unarchiveSession] = useUnarchiveBuilderSessionMutation();
 
@@ -324,6 +333,14 @@ export const Builder: React.FC = () => {
             <p className="mt-1 text-sm text-typography-600">{strings.heroSubtitle}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-1">
+            <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER_DECISIONS)}>
+              {strings.decisions.link}
+              {pendingDecisions > 0 && (
+                <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white">
+                  {pendingDecisions}
+                </span>
+              )}
+            </Button>
             <Button
               kind="ghost"
               size="sm"
@@ -496,6 +513,17 @@ export const Builder: React.FC = () => {
         )
       ) : visibleSessions.length ? (
         <>
+          {/* The feed is where decisions get made fast; this is the nudge towards it. */}
+          {pendingDecisions > 0 && !showArchived && (
+            <div className="mb-6 flex flex-wrap items-center gap-3 rounded border border-primary-200 bg-primary-50 px-4 py-3">
+              <p className="flex-1 text-sm text-typography-900">
+                {strings.decisions.banner(pendingDecisions)}
+              </p>
+              <Button kind="primary" size="sm" onClick={() => navigate(ROUTES.BUILDER_DECISIONS)}>
+                {strings.decisions.bannerCta}
+              </Button>
+            </div>
+          )}
           {renderGroup(strings.needsYouHeading, needsYou, 0)}
           {renderGroup(strings.activeHeading, active, needsYou.length)}
           {renderGroup(strings.recentHeading, recent, needsYou.length + active.length)}

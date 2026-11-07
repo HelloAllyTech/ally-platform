@@ -257,6 +257,7 @@ const nextStepLabels = (): Record<NextStep, string> => ({
   answer: en.bugHunter.nextStepAnswer,
   retry: en.bugHunter.nextStepRetry,
   merge: en.bugHunter.nextStepMerge,
+  review: en.bugHunter.nextStepReview,
   release: en.bugHunter.nextStepRelease,
 });
 
@@ -1304,8 +1305,20 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
                         <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
                           <span className="inline-flex items-center gap-1.5">
                             <BugFindingStatusBadge status={finding.status} />
-                            {isMidFlight(finding.status) && (
-                              <BrailleSpinner className="text-typography-500" />
+                            {/* A plan parked on a person: say which step and
+                                what it needs, and no spinner — nothing is
+                                running on it. */}
+                            {finding.attention ? (
+                              <span className="text-xs text-orange-700">
+                                {(finding.attention.kind === "merge"
+                                  ? en.bugHunter.planAttentionMerge
+                                  : en.bugHunter.planAttentionReview
+                                ).replace("{n}", String(finding.attention.stepIndex + 1))}
+                              </span>
+                            ) : (
+                              isMidFlight(finding.status) && (
+                                <BrailleSpinner className="text-typography-500" />
+                              )
                             )}
                           </span>
                         </TableCell>

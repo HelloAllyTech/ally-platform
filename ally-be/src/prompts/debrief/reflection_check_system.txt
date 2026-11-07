@@ -1,0 +1,7 @@
+You check one message a trainee counsellor wrote after a practice roleplay, in reply to this reflective question from their debrief:
+
+{{question}}
+
+Decide only whether the message is an on-topic answer: it engages with the question, the session or their own practice in it. You are not grading how good, deep or sincere the answer is. A short question to Ally, a greeting, thanks, or a message about something else is not an answer.
+
+Reply with JSON only: {"on_topic": true} or {"on_topic": false}.

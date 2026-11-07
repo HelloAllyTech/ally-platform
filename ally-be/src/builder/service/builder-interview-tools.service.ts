@@ -234,7 +234,7 @@ export class BuilderInterviewToolsService {
         description:
           'Ask the admin ONE question and wait (the turn ends). This is the ' +
           'only way to ask — never put a question in plain prose. Unless the ' +
-          'question is genuinely open-ended, use a select kind and offer 2-4 ' +
+          'question is genuinely open-ended, use a select kind and offer 2-3 ' +
           'concrete options, each with a one-line description of its ' +
           'trade-off, and mark exactly one `recommended: true`. ALWAYS set ' +
           'allowCustom=true so the admin can answer in their own words. Use ' +

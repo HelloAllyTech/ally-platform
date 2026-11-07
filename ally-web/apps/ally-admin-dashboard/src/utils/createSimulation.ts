@@ -6,7 +6,15 @@ import {
   SIMULATION_CREATOR_FIELD_GROUPS,
   TEMPERATURE_DEFAULT,
 } from "@constants";
-import { CreatorFieldGroups, GetSimulationByIdResponse, knowledgeSource } from "@types";
+import {
+  CreatorFieldGroups,
+  GetSimulationByIdResponse,
+  knowledgeSource,
+  ScenarioMemory,
+} from "@types";
+
+import { ladderOrder } from "../components/knowledge-source/memoryLocks";
+import { normaliseMemories } from "../components/memories/memoryUtils";
 
 export const getCreateSimulationSubSectionById = (id: string) => {
   return SIMULATION_CREATOR_FIELD_GROUPS.find(section => section.id === id);
@@ -280,5 +288,17 @@ export const formatSimulationResponseData = (data: GetSimulationByIdResponse) =>
       content: source.content,
       unlocksFromStateId: source.unlocksFromStateId ?? null,
     })),
+    // Stage Director prompt's memories. Left undefined when never set, which
+    // is what tells the editor to map them on the first switch to that prompt.
+    // An older single lock is read as that state and every later one.
+    memories: Array.isArray(data?.metadata?.memories)
+      ? normaliseMemories(
+          data.metadata.memories as ScenarioMemory[],
+          ladderOrder(
+            ((data?.metadata as any)?.states ?? []).filter((state: any) => !!state?.id),
+          ).map((state: any) => String(state.id)),
+          { dropUnknown: false },
+        )
+      : undefined,
   };
 };

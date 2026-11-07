@@ -14,7 +14,11 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { MAIN_AGENT_PROMPT_VARIABLE_CATALOG } from "../PromptVariableCatalog";
+import {
+  LEGACY_VARIABLE_NAMES,
+  MAIN_AGENT_PROMPT_VARIABLE_CATALOG,
+  VARIABLES_USED_OUTSIDE_THE_PROMPT,
+} from "../PromptVariableCatalog";
 
 /**
  * Authoritative list of kwargs passed to `load_and_format` by
@@ -24,6 +28,7 @@ const PROMPT_BUILDER_KWARGS: ReadonlySet<string> = new Set([
   "age",
   "allowed_fillers",
   "behavior_instructions_json",
+  "character_backstory",
   "character_profile_text",
   "competency",
   "current_location",
@@ -38,7 +43,6 @@ const PROMPT_BUILDER_KWARGS: ReadonlySet<string> = new Set([
   "language_label",
   "multilingual_instructions_block",
   "name",
-  "opening_statements",
   "previous_memory",
   "previous_memory_block",
   "profession",
@@ -65,6 +69,18 @@ const PROMPT_BUILDER_BLOCK_KWARGS: ReadonlySet<string> = new Set([
   "profession_block",
 ]);
 
+/**
+ * Kwargs the builder still supplies for live prompt text that references
+ * them, but which are deliberately not offered to authors: Prompt #1's
+ * live text still renders both.
+ */
+const UNADVERTISED_KWARGS: ReadonlySet<string> = new Set([
+  "behavior_instructions_json",
+  // Old name of character_backstory; see LEGACY_VARIABLE_NAMES.
+  "character_profile_text",
+  "competency",
+]);
+
 describe("MAIN_AGENT_PROMPT_VARIABLE_CATALOG", () => {
   it("every catalog entry maps to a real kwarg in _build_behavior_prompt", () => {
     const missingFromBuilder: string[] = [];
@@ -88,6 +104,7 @@ describe("MAIN_AGENT_PROMPT_VARIABLE_CATALOG", () => {
       // intentionally live in the "Used Blocks" panel instead of the
       // variables picker. Exempt them from the bijection check.
       if (PROMPT_BUILDER_BLOCK_KWARGS.has(kwarg)) continue;
+      if (UNADVERTISED_KWARGS.has(kwarg)) continue;
       if (!catalogNames.has(kwarg)) {
         missingFromCatalog.push(kwarg);
       }
@@ -138,5 +155,23 @@ describe("MAIN_AGENT_PROMPT_VARIABLE_CATALOG", () => {
       }
     }
     expect(unknownGroups).toEqual([]);
+  });
+
+  it("every legacy name points at a variable the catalog offers", () => {
+    const catalogNames = new Set(MAIN_AGENT_PROMPT_VARIABLE_CATALOG.map(e => e.name));
+    for (const [oldName, newName] of Object.entries(LEGACY_VARIABLE_NAMES)) {
+      expect(catalogNames.has(oldName), `${oldName} is still offered`).toBe(false);
+      expect(catalogNames.has(newName), `${newName} is not offered`).toBe(true);
+      expect(PROMPT_BUILDER_KWARGS.has(oldName), `${oldName} no longer renders`).toBe(true);
+    }
+  });
+
+  it("every 'used outside the prompt' note names a variable the builder supplies", () => {
+    for (const name of Object.keys(VARIABLES_USED_OUTSIDE_THE_PROMPT)) {
+      expect(
+        PROMPT_BUILDER_KWARGS.has(name) || name === "language_glossary",
+        `${name} has a note but is not a prompt variable`,
+      ).toBe(true);
+    }
   });
 });

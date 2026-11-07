@@ -69,6 +69,8 @@ export type AiTaskProvider =
   | 'google'
   /** Legacy: unfunded since 2026-10, kept so an old row still reads. */
   | 'deepgram'
+  /** Sarvam AI speech (Indic TTS/STT). */
+  | 'sarvam'
   | 'multiple'
   | 'resolved';
 
@@ -225,6 +227,20 @@ const AI_LEARN_TASKS: AiTaskEntry[] = [
     trigger: 'The context window fills mid-session',
     detail:
       'Episodic-memory compaction during the session, plus one final fold at session end.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'resolved',
+    defaultModel: "the scenario's main LLM",
+    configuredBy: 'Inherits the agent_turn client',
+  },
+  {
+    id: 'stage-director',
+    task: LlmTask.STAGE_DIRECTOR,
+    runtime: LlmRuntime.AI_LEARN,
+    trigger: 'Every learner turn, off the reply path',
+    detail:
+      'Scenarios on Main Agent Prompt — Stage Director only: one paragraph of the ' +
+      "client's thoughts, passed to the next reply as written. Replaces " +
+      'client-working-memory for those scenarios; it plans no fillers or interims.',
     kind: AiTaskKind.COMPLETION,
     provider: 'resolved',
     defaultModel: "the scenario's main LLM",
@@ -867,6 +883,153 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'FEEDBACK_GROUNDEDNESS_JUDGE__MODEL',
   },
   {
+    id: 'debrief-quality-judge',
+    task: LlmTask.DEBRIEF_QUALITY_JUDGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Scheduled: debrief quality is judged',
+    detail:
+      'How good is the whole debrief? Scores eight rubric dimensions and lists hard fails; ' +
+      'the overall out of 10 is computed in ally-be. Pinned, so scores stay comparable.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy: 'DEBRIEF_QUALITY_JUDGE__MODEL',
+  },
+  {
+    id: 'debrief-safety-reader',
+    task: LlmTask.DEBRIEF_SAFETY_READER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every debrief run, whatever the recipe',
+    detail:
+      "Finds the client's risk cues and how the learner responded, and the learner's own " +
+      'distress. Mandatory: a recipe cannot drop it. Recall is gated at 100% on the seeded ' +
+      'safety set before any change to its prompt or model.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'DEBRIEF__SAFETY_READER_MODEL',
+  },
+  {
+    id: 'debrief-analyst',
+    task: LlmTask.DEBRIEF_ANALYST,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every debrief run with an Analyst step',
+    detail:
+      "Builds the evidence map the Writer writes from: each behaviour's opportunity, observation and exact quote, the pivotal moments and the AI client's faults.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy: 'debrief release bundle (recipes.*.steps[analyst].model)',
+  },
+  {
+    id: 'debrief-progress-reader',
+    task: LlmTask.DEBRIEF_PROGRESS_READER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Standard runs for a learner with past debriefs',
+    detail:
+      "Compares the session's evidence with the learner's past Work-on-this points; says only what the evidence supports.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (recipes.standard.steps[progress_reader].model)',
+  },
+  {
+    id: 'debrief-writer',
+    task: LlmTask.DEBRIEF_WRITER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every debrief run',
+    detail:
+      "Writes the learner's debrief cards in the session's language. Never sees the rubric; differs from the Evaluator's and the judge's model.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy: 'debrief release bundle (recipes.*.steps[writer].model)',
+  },
+  {
+    id: 'debrief-evaluator',
+    task: LlmTask.DEBRIEF_EVALUATOR,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every draft, up to three per run',
+    detail:
+      "Scores a draft on the pinned rubric with fix notes per section; the loop's guide, never the KPI (the independent judge is).",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'debrief release bundle (recipes.*.steps[evaluator].model)',
+  },
+  {
+    id: 'debrief-reviser',
+    task: LlmTask.DEBRIEF_REVISER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A draft below the bar or failing a check, with budget and time left',
+    detail: 'Edits only the flagged sections of the best draft.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy:
+      'debrief release bundle (recipes.standard.steps[reviser].model)',
+  },
+  {
+    id: 'debrief-reply',
+    task: LlmTask.DEBRIEF_REPLY,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner replies under the reflective question of a published Debrief-agent debrief',
+    detail:
+      'Ask Ally: answers from the published debrief and the transcript, streamed, one short reply ' +
+      'per message (≤ $0.05). A first-person risk statement gets the fixed support reply instead, ' +
+      'and the Safety reader reads each message alongside. Replaces coaching-chat for switched-on organisations.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (reply.model); default DEBRIEF_REPLY_DEFAULT',
+    promptOverride: 'debrief_reply_system',
+  },
+  {
+    id: 'debrief-read-aloud',
+    task: LlmTask.DEBRIEF_READ_ALOUD,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'A learner taps Listen on a card of a Debrief-agent debrief',
+    detail:
+      'Speech of one card, generated on the first tap and cached in the private audio bucket ' +
+      'by its exact text and voice, so a second play makes no TTS call (≤ $0.05 a debrief).',
+    kind: AiTaskKind.SPEECH,
+    provider: 'sarvam',
+    defaultModel: 'bulbul:v3',
+    configuredBy: 'DEBRIEF_READ_ALOUD_VOICE in debrief-audio.service.ts',
+  },
+  {
+    id: 'debrief-reflection-check',
+    task: LlmTask.DEBRIEF_REFLECTION_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner message in Ask Ally that is 15+ words and not copied from the debrief',
+    detail:
+      'Says only whether the message is an on-topic answer to the reflective question, for ' +
+      'DEBRIEF_REFLECTION XP (v9 FR-65). Never grades quality or sincerity. Off the reply path.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'DEBRIEF_REFLECTION_CHECK_MODEL in debrief-release.constants.ts',
+    promptOverride: 'debrief_reflection_check_system',
+  },
+  {
+    id: 'debrief-improver',
+    task: LlmTask.DEBRIEF_IMPROVER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Daily, and on demand from the Debrief Console',
+    detail:
+      'The Improver: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.improver)',
+  },
+  {
     id: 'rag-quality-judge',
     task: LlmTask.RAG_QUALITY_JUDGE,
     runtime: LlmRuntime.ALLY_AI,
@@ -944,18 +1107,23 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'whatsapp-answer',
     task: null,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'A worker sends the WhatsApp bot a question',
+    trigger:
+      'Someone asks a chatbot a question (WhatsApp, or the test console)',
     detail:
-      'Answers only from retrieved corpus passages, or declines. Ran on Claude because ' +
+      'Answers from the bot’s documents, or declines — or, for a bot in "documents + general ' +
+      'knowledge" mode, answers generally and says so. A bot may pick its own model from the ' +
+      'catalog (ally-ai runtime); it applies to this call only, never to the crisis check. Ran on Claude because ' +
       'refusing to answer from outside the passages is an instruction-following problem, ' +
       'until that credential expired and took the bot silent — OpenAI is the one provider ' +
       'whose key is required in that service. Falls back to OpenAI whatever is selected, ' +
-      'and says so in the metadata.',
+      'and says so in the metadata. With the Agents v2 emergency switch on ' +
+      '(agentRuntimeAllowed), every bot makes the same calls through /agent/run, and this ' +
+      'path is v2’s fallback.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
     configuredBy:
-      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER',
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per bot: chatbots.model',
     promptOverride: 'ally_ai_knowledge_whatsapp_answer',
   },
   {
@@ -981,6 +1149,25 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     provider: 'openai',
     defaultModel: 'gpt-4o-mini',
     configuredBy: 'KNOWLEDGE_AGENT__TRANSLATE_MODEL',
+  },
+  {
+    id: 'whatsapp-agent-step',
+    task: LlmTask.WHATSAPP_AGENT_STEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Someone messages a chatbot that is in Agent mode (Agents v2)',
+    detail:
+      'One call per step: the agent reads the conversation and either searches the bot’s ' +
+      'documents (writing its own query) or replies. Small talk takes one call, a question ' +
+      'usually two; at most 2 searches (none after one that found nothing new) and one rewrite ' +
+      'of a reply the check refused, within a 15-second run budget. Replaces ' +
+      'the translate and answer calls for these bots, so the bot’s own model (chatbots.model) ' +
+      'applies here, never to the crisis check.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per bot: chatbots.model',
+    promptOverride: 'ally_ai_agent_system',
   },
   {
     id: 'corpus-embedding',
@@ -1232,6 +1419,22 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     promptOverride: 'glossary_lexeme_pairing',
   },
   {
+    id: 'stage-director-memory-mapping',
+    task: LlmTask.STAGE_DIRECTOR_MEMORY_MAPPING,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'An author switches a simulation to the Stage Director prompt',
+    detail:
+      'Once per simulation (and once per simulation in the bulk switch): assigns ' +
+      'each memory to the stage the client is ready to share it from. Falls back ' +
+      'to every memory available from the start if it fails.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'stage_director_memory_mapping',
+  },
+  {
     id: 'track-memory-fold',
     task: LlmTask.TRACK_MEMORY_FOLD,
     runtime: LlmRuntime.ALLY_BE,
@@ -1314,13 +1517,12 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     trigger: 'An author generates a simulation cover image',
     detail:
-      'Runs as a background job the editor polls (generate-jobs): at the default ' +
-      'quality gpt-image-1 took 79–95 s in prod, past the 60 s load-balancer idle ' +
-      'timeout. Sent at quality medium (~25 s). Gemini renders from an aspect ' +
-      'ratio rather than pixel dimensions and has no quality setting.',
+      'Runs as a background job the editor polls (generate-jobs): image generation ' +
+      'can outlast the 60 s load-balancer idle timeout. Sent at quality medium (~25 s). ' +
+      'Gemini renders from an aspect ratio rather than pixel dimensions and has no quality setting.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'gpt-image-1',
+    defaultModel: 'gpt-image-1.5',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },
@@ -1339,7 +1541,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'the roleplay cover library.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'gpt-image-1',
+    defaultModel: 'gpt-image-1.5',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },
@@ -1613,6 +1815,21 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUG_HUNTER_CLASSIFY_REPO_MODEL (compiled in)',
+  },
+  {
+    id: 'bug-hunter-image-probe',
+    task: LlmTask.BUG_HUNTER,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A Bug Hunter run calls the image-generation probe on a bug about the image service',
+    detail:
+      'One real image call made the way the product makes it, to see what the provider accepts today (a retired model, a refused size, a blocked prompt); the image is discarded. Quality low; capped at 20 calls an hour across every run.',
+    kind: AiTaskKind.IMAGE,
+    provider: 'openai',
+    defaultModel: 'gpt-image-1.5',
+    configuredBy:
+      "OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL (or the probe's model parameter)",
+    configPath: 'openai.imageModel',
   },
   {
     id: 'bug-hunter-miss-classifier',
@@ -1949,6 +2166,70 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     defaultModel: 'gemini-3.1-pro-preview',
     configuredBy:
       'BUILDER_REVIEW_MODEL, falling back to BUILDER_REVIEW_FALLBACK_MODEL (Actions variables on the monorepo, read by .github/workflows/builder-review-opencode.yml)',
+  },
+  {
+    id: 'builder-session-ask',
+    task: LlmTask.BUILDER_SESSION_ASK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'An admin asks one Builder session a question from the Builder tab',
+    detail:
+      'Read-only: one call per question, grounded in the PRD, transcript tail, runs, pull ' +
+      "requests, the session's History and the admin's rules. Takes no turn lock and writes " +
+      'no transcript; the answer is stored in History.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_session_ask_system',
+  },
+  {
+    id: 'builder-work-ask',
+    task: LlmTask.BUILDER_WORK_ASK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'An admin asks about all of Builder’s work at once (⌘K → Ask about all work)',
+    detail:
+      'Read-only: one call per question over the sessions in progress, pending decisions, ' +
+      'rules, recent History and Up next.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_work_ask_system',
+  },
+  {
+    id: 'builder-rule-draft',
+    task: LlmTask.BUILDER_RULE_DRAFT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'An admin makes a rule from one of their answers',
+    detail:
+      'One short call: generalises the answer into a one-sentence rule and an area, which ' +
+      'the admin edits before saving. Nothing is saved by the model.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'builder_rule_draft_system',
+  },
+  {
+    id: 'builder-rule-match',
+    task: LlmTask.BUILDER_RULE_MATCH,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      '...and the rule editor previews what the rule would have applied to',
+    detail:
+      'One call per preview over up to 60 History decisions from the last 90 days; cached in ' +
+      'Redis per statement and scope for 10 minutes, so typing does not re-bill it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'builder_rule_match_system',
   },
   {
     id: 'builder-lesson-curation',
@@ -2342,7 +2623,7 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
       'row, so the session budget counts each at COURSE_COPILOT_IMAGE_COST_USD.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'gpt-image-1',
+    defaultModel: 'gpt-image-1.5',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },

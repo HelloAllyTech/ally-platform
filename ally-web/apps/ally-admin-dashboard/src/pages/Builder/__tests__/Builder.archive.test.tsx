@@ -101,6 +101,7 @@ vi.mock("@api", () => ({
     getArchivedSpy(...args);
     return { data: archivedPage, isLoading: false, isFetching: false, isError: false };
   },
+  useGetBuilderDecisionsQuery: () => ({ data: { decisions: [], count: 0 } }),
   useCreateBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],
   useArchiveBuilderSessionMutation: () => [
     (id: string) => {

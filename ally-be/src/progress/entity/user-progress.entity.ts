@@ -26,10 +26,10 @@ export class UserProgress extends BaseEntity {
   totalXp!: number;
 
   /** Derived from totalXp via resolveLevel, stored so the nav read needs no computation. */
-  @Column({ type: 'integer', default: 1 })
+  @Column({ type: 'integer', default: 0 })
   level!: number;
 
-  /** Null until the learner first leaves level 1. Drives the level-up celebration. */
+  /** Null until the learner first leaves level 0. Drives the level-up celebration. */
   @Column({ type: 'timestamp', nullable: true })
   lastLevelUpAt?: Date | null;
 

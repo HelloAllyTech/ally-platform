@@ -20,6 +20,8 @@ import { BuilderPrdService } from '../service/builder-prd.service';
 import { BuilderSessionService } from '../service/builder-session.service';
 import { BuilderCatalogService } from '../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../service/builder-evidence-log.service';
+import { BuilderAskService } from '../service/builder-ask.service';
+import { BuilderRuleContextService } from '../service/builder-rule-context.service';
 import { renderPrd } from '../constants/builder-build-prompt';
 import { renderPlatformRules } from '../constants/builder-platform-rules';
 import {
@@ -84,6 +86,8 @@ export class BuilderPipelineController {
     private readonly sessionService: BuilderSessionService,
     private readonly catalogService: BuilderCatalogService,
     private readonly evidenceLog: BuilderEvidenceLogService,
+    private readonly askService: BuilderAskService,
+    private readonly ruleContext: BuilderRuleContextService,
   ) {}
 
   /**
@@ -293,12 +297,20 @@ export class BuilderPipelineController {
       'The spec an issue build works from: rules, CI checks, PRD, approved design',
   })
   async getSpec(@Param('runId', ParseUUIDPipe) runId: string): Promise<string> {
-    const { doc, repos } = await this.loadRunContext(runId);
-    const platformRules = await this.knowledgeService.platformRules();
+    const { doc, repos, run } = await this.loadRunContext(runId);
+    const [platformRules, adminRules, told] = await Promise.all([
+      this.knowledgeService.platformRules(),
+      // The admin's rules and their queued instructions: what a person
+      // decided binds the run as much as the PRD does.
+      this.ruleContext.renderRulesBlock(run.sessionId),
+      this.askService.tellsForRun(run.sessionId, run.id),
+    ]);
     return [
       renderPlatformRules(platformRules),
       renderRepoChecks(repos),
       renderPrd(doc.draft),
+      adminRules,
+      told,
     ]
       .filter(Boolean)
       .join('\n\n---\n\n');
@@ -319,7 +331,15 @@ export class BuilderPipelineController {
   async getFixRequest(
     @Param('pullRequestId', ParseUUIDPipe) pullRequestId: string,
   ): Promise<string> {
-    return this.pullRequestService.fixRequestPrompt(pullRequestId);
+    const prompt =
+      await this.pullRequestService.fixRequestPrompt(pullRequestId);
+    // A fix round is the next run a queued instruction can reach once the
+    // pull requests are open.
+    const sessionId = await this.askService.sessionOfPullRequest(pullRequestId);
+    const told = sessionId
+      ? await this.askService.tellsForRun(sessionId, null)
+      : '';
+    return told ? `${prompt}\n\n---\n\n${told}` : prompt;
   }
 
   @Get('runs/:runId/design-review-prompt')

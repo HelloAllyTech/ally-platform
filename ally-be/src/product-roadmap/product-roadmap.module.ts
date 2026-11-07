@@ -11,6 +11,9 @@ import { BugHuntEvent } from 'src/bug-hunter/entity/bug-hunt-event.entity';
 import { RoadmapAllocation } from './entity/roadmap-allocation.entity';
 import { RoadmapVoteGrant } from './entity/roadmap-vote-grant.entity';
 import { RoadmapInterviewNote } from './entity/roadmap-interview-note.entity';
+import { RoadmapIdeaDraft } from './entity/roadmap-idea-draft.entity';
+import { RoadmapIdeaDraftController } from './controller/roadmap-idea-draft.controller';
+import { RoadmapIdeaDraftService } from './service/roadmap-idea-draft.service';
 import { RoadmapOpportunity } from './entity/roadmap-opportunity.entity';
 import { RoadmapOpportunityComment } from './entity/roadmap-opportunity-comment.entity';
 import { RoadmapOpportunityOwner } from './entity/roadmap-opportunity-owner.entity';
@@ -49,6 +52,7 @@ import { RoadmapCopilotToolsService } from './service/roadmap-copilot-tools.serv
 import { RoadmapCopilotService } from './service/roadmap-copilot.service';
 import { GlobalSettings } from 'src/settings/entity/global-settings.entity';
 import { RoadmapAllocationService } from './service/roadmap-allocation.service';
+import { RoadmapMultiplierService } from './service/roadmap-multiplier.service';
 import { RoadmapCommentService } from './service/roadmap-comment.service';
 import { RoadmapInterviewNoteService } from './service/roadmap-content.service';
 import { RoadmapNotificationService } from './service/roadmap-notification.service';
@@ -57,6 +61,8 @@ import { RoadmapOpportunityService } from './service/roadmap-opportunity.service
 import { RoadmapSavedViewService } from './service/roadmap-saved-view.service';
 import { RoadmapSplitMergeService } from './service/roadmap-split-merge.service';
 import { RoadmapBuilderService } from './service/roadmap-builder.service';
+import { RoadmapUpNextService } from './service/roadmap-up-next.service';
+import { RoadmapUpNextController } from './controller/roadmap-up-next.controller';
 import { BuilderModule } from 'src/builder/builder.module';
 import { RoadmapBoardService } from './service/roadmap-board.service';
 import { RoadmapTaxonomyService } from './service/roadmap-taxonomy.service';
@@ -114,6 +120,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
       RoadmapVoteGrant,
       RoadmapOpportunityComment,
       RoadmapInterviewNote,
+      RoadmapIdeaDraft,
       RoadmapSavedView,
       RoadmapUserTabOrder,
       RoadmapUserMap,
@@ -159,6 +166,8 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapOpportunityController,
     RoadmapCollaborationController,
     RoadmapAdminController,
+    RoadmapUpNextController,
+    RoadmapIdeaDraftController,
   ],
   providers: [
     // repositories
@@ -184,8 +193,10 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapImportService,
     RoadmapOpportunityService,
     RoadmapAllocationService,
+    RoadmapMultiplierService,
     RoadmapSplitMergeService,
     RoadmapBuilderService,
+    RoadmapUpNextService,
     RoadmapBoardService,
     RoadmapCommentService,
     RoadmapSavedViewService,
@@ -193,6 +204,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapStrategyGoalService,
     RoadmapGoalImpactService,
     RoadmapInterviewNoteService,
+    RoadmapIdeaDraftService,
     RoadmapAiService,
     // The opportunity copilot: the guided interview's tool loop, its tools, and the Vision &
     // strategy page it always reads.

@@ -1,1 +1,0 @@
-export {SimulationCard} from './SimulationCard';

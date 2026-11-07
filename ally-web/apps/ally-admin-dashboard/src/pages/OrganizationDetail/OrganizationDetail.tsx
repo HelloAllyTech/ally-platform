@@ -29,6 +29,7 @@ import {
   CoursesTab,
   GroupsTab,
   BadgesTab,
+  BrandingSettings,
 } from "@components";
 import { en, ROUTES, FeatureToggleKey } from "@constants";
 import { useAllyGuideAccess } from "@hooks";
@@ -46,6 +47,7 @@ enum TAB_IDS {
   SCRIBE_SETTINGS = "scribeSettings",
   SIMULATION_SETTINGS = "simulationSettings",
   TEXT_HELPLINE = "textHelpline",
+  BRANDING = "branding",
   ALLY = "ally",
 }
 
@@ -59,6 +61,7 @@ const defaultTabs = [
   { id: TAB_IDS.SCRIBE_SETTINGS, label: en.userManagement.scribeSettings },
   { id: TAB_IDS.SIMULATION_SETTINGS, label: en.userManagement.simulationSettings },
   { id: TAB_IDS.TEXT_HELPLINE, label: en.userManagement.textHelpline },
+  { id: TAB_IDS.BRANDING, label: en.orgBranding.tabLabel },
   { id: TAB_IDS.ALLY, label: en.allyConsole.org.tabLabel },
 ];
 
@@ -278,6 +281,8 @@ export const OrganizationDetail: FC = () => {
         return <SimulationsSettings organizationId={id} onUpdateTenant={refetchTenant} />;
       case TAB_IDS.TEXT_HELPLINE:
         return <TextHelplineSettings tenantId={id} />;
+      case TAB_IDS.BRANDING:
+        return <BrandingSettings tenantId={id} onUpdateTenant={refetchTenant} />;
       case TAB_IDS.ALLY:
         return <AllyOrgTab tenantId={id} />;
       default:

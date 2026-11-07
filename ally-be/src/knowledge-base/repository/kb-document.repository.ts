@@ -27,6 +27,14 @@ export interface ListKbDocumentsOptions {
   tags?: string[];
   /** Only what this organisation can retrieve: its own targeted documents plus the global ones. */
   tenantId?: string;
+  /** With `tenantId`: only documents aimed at it, not the global ones. */
+  excludeGlobal?: boolean;
+  /**
+   * Only documents an org-restricted admin may manage: targeted at one or more of these
+   * organisations and at NO other, never global. Editing a document shared with an organisation
+   * outside their allowlist would change another customer's corpus.
+   */
+  ownedByTenantIds?: string[];
   /**
    * Only the documents this owner MANAGES (`owner_tenant_id`): an organisation's own, or with
    * `tenantId: null` the platform's. An object rather than a bare `string | null` so that
@@ -73,7 +81,9 @@ export class KbDocumentRepository extends Repository<KbDocument> {
       sourceType,
       tags,
       tenantId,
+      excludeGlobal = false,
       owner,
+      ownedByTenantIds,
       includeArchived = false,
     } = options;
     const sort = resolveSort(
@@ -86,6 +96,9 @@ export class KbDocumentRepository extends Repository<KbDocument> {
     const query = this.createQueryBuilder('doc');
 
     query.andWhere('doc.corpus = :corpus', { corpus });
+    // A chatbot's own documents (chunk 3d) are listed on that chatbot's Knowledge tab only, never
+    // in the library or another bot's picker.
+    query.andWhere('doc.ownerChatbotId IS NULL');
 
     if (!includeArchived) {
       query.andWhere('doc.archivedAt IS NULL');
@@ -107,13 +120,36 @@ export class KbDocumentRepository extends Repository<KbDocument> {
       // a document targeted at several organisations cannot appear twice in the page and skew
       // the count.
       query.andWhere(
-        `(doc."is_global" = true OR EXISTS (
+        `(${excludeGlobal ? 'false' : 'doc."is_global" = true'} OR EXISTS (
             SELECT 1 FROM kb_document_tenants dt
             WHERE dt.document_id = doc.id
               AND dt.tenant_id = :tenantId
               AND dt."deletedAt" IS NULL
           ))`,
         { tenantId },
+      );
+    }
+    if (ownedByTenantIds) {
+      query.andWhere(
+        `doc."is_global" = false
+          AND EXISTS (
+            SELECT 1 FROM kb_document_tenants dt
+            WHERE dt.document_id = doc.id
+              AND dt.tenant_id IN (:...ownedByTenantIds)
+              AND dt."deletedAt" IS NULL
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM kb_document_tenants dt
+            WHERE dt.document_id = doc.id
+              AND dt.tenant_id NOT IN (:...ownedByTenantIds)
+              AND dt."deletedAt" IS NULL
+          )`,
+        // An empty allowlist must match nothing, and `IN ()` is a syntax error.
+        {
+          ownedByTenantIds: ownedByTenantIds.length
+            ? ownedByTenantIds
+            : ['00000000-0000-0000-0000-000000000000'],
+        },
       );
     }
     if (owner) {
@@ -247,7 +283,12 @@ export class KbDocumentRepository extends Repository<KbDocument> {
       .select(['doc.id', 'doc.isGlobal'])
       .where('doc.corpus = :corpus', { corpus: options.corpus })
       .andWhere('doc.archivedAt IS NULL')
-      .andWhere('doc.status = :status', { status: KbDocumentStatus.INDEXED });
+      .andWhere('doc.status = :status', { status: KbDocumentStatus.INDEXED })
+      // Clinical content is served only as signed off: its current text, by the advisor.
+      .andWhere(
+        `(doc."needs_clinical_sign_off" = false
+          OR doc."clinical_signed_off_hash" = doc."content_hash")`,
+      );
 
     if (options.tenantId === null) {
       query.andWhere('doc.isGlobal = true');

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { SkeletonText, TextArea } from "@ally-ui-mono/ui-shared";
 import {
   useCreateRoadmapOpportunityMutation,
+  useDeleteRoadmapIdeaDraftMutation,
   useGetRoadmapReadinessCriteriaQuery,
   useRoadmapAiDuplicatesMutation,
 } from "@api";
@@ -31,6 +32,13 @@ interface OpportunityInterviewDrawerProps {
   onCreated: (id: string) => void;
   /** "Upvote this instead" — closes this and opens the existing opportunity's drawer. */
   onOpenExisting: (id: string) => void;
+  /**
+   * A saved raw idea to continue from. It becomes the admin's opening message, so the copilot
+   * starts by reacting to what they already said instead of asking them to start over.
+   */
+  seed?: string;
+  /** The draft the seed came from. Deleted once the opportunity is actually filed. */
+  draftId?: string;
 }
 
 /** A transcript row plus what the copilot looked up before writing it. Display-only. */
@@ -100,6 +108,8 @@ export const OpportunityInterviewDrawer: React.FC<OpportunityInterviewDrawerProp
   onClose,
   onCreated,
   onOpenExisting,
+  seed,
+  draftId,
 }) => {
   const [messages, setMessages] = useState<FeedMessage[]>([]);
   const [gates, setGates] = useState<RoadmapInterviewGate[]>([]);
@@ -114,6 +124,7 @@ export const OpportunityInterviewDrawer: React.FC<OpportunityInterviewDrawerProp
   const { data: checklist } = useGetRoadmapReadinessCriteriaQuery();
   const { runTurn, activity, isThinking } = useRoadmapCopilotStream();
   const [createOpportunity, { isLoading: isFiling }] = useCreateRoadmapOpportunityMutation();
+  const [deleteIdeaDraft] = useDeleteRoadmapIdeaDraftMutation();
   const [checkDuplicates, { isLoading: isCheckingDuplicates }] = useRoadmapAiDuplicatesMutation();
 
   const feedRef = useRef<HTMLDivElement>(null);
@@ -152,7 +163,7 @@ export const OpportunityInterviewDrawer: React.FC<OpportunityInterviewDrawerProp
   useEffect(() => {
     if (openedRef.current) return;
     openedRef.current = true;
-    void takeTurn([]);
+    void takeTurn(seed ? [{ role: "admin", content: seed }] : []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -207,6 +218,12 @@ export const OpportunityInterviewDrawer: React.FC<OpportunityInterviewDrawerProp
         // from what was decided here rather than asking it all again.
         interviewTranscript: toWire(messages),
       }).unwrap();
+      // The idea has graduated; its draft must not linger beside the opportunity it became.
+      // Best-effort — a failed cleanup must never undo or hide a successful filing.
+      if (draftId)
+        void deleteIdeaDraft(draftId)
+          .unwrap()
+          .catch(() => undefined);
       onCreated(created.id);
     } catch (error) {
       const message = (error as { data?: { message?: string | string[] } })?.data?.message;

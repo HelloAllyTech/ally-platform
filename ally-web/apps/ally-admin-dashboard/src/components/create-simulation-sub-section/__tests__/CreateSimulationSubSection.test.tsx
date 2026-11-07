@@ -1042,3 +1042,57 @@ describe("CreateSimulationSubSection — requiredFeature gate", () => {
     expect(screen.getByTestId("form-field-plainField")).toBeInTheDocument();
   });
 });
+
+// The Stage Director prompt swaps Knowledge Sources for Memories. The wrapper
+// enforces the same gate as FormField so no empty width-wrapper is left behind.
+describe("CreateSimulationSubSection — Knowledge Sources vs Memories", () => {
+  const ksField: FormFieldConfig = {
+    id: "knowledgeSources",
+    label: "Knowledge Sources",
+    type: "knowledge_source",
+    fullWidth: true,
+    hideWhenPromptUses: "memories",
+  };
+  const memoriesField: FormFieldConfig = {
+    id: "memories",
+    label: "Memories",
+    type: "memories_editor",
+    fullWidth: true,
+    promptVariable: "memories",
+    showOnlyWhenUsed: true,
+  };
+  const renderFor = (code: string | undefined) =>
+    render(
+      <TestWrapper defaultValues={{ selectedMainPromptCode: code }}>
+        {(formMethods: any) => (
+          <CreateSimulationSubSection items={[ksField, memoriesField]} formMethods={formMethods} />
+        )}
+      </TestWrapper>,
+    );
+
+  beforeEach(() => {
+    mainAgentPromptsMock.current = [
+      { promptCode: "prompt_3", availableVariables: [{ name: "state_x_guidelines" }] },
+      { promptCode: "stage_director", availableVariables: [{ name: "memories" }, "thoughts"] },
+    ];
+  });
+
+  it("renders Memories and not Knowledge Sources on a {memories} prompt", () => {
+    renderFor("stage_director");
+    expect(screen.getByTestId("form-field-memories")).toBeInTheDocument();
+    expect(screen.queryByTestId("form-field-knowledgeSources")).not.toBeInTheDocument();
+  });
+
+  it("renders Knowledge Sources and not Memories on other prompts", () => {
+    renderFor("prompt_3");
+    expect(screen.getByTestId("form-field-knowledgeSources")).toBeInTheDocument();
+    expect(screen.queryByTestId("form-field-memories")).not.toBeInTheDocument();
+  });
+
+  it("keeps Knowledge Sources and hides Memories before the prompt list loads", () => {
+    mainAgentPromptsMock.current = undefined;
+    renderFor("stage_director");
+    expect(screen.getByTestId("form-field-knowledgeSources")).toBeInTheDocument();
+    expect(screen.queryByTestId("form-field-memories")).not.toBeInTheDocument();
+  });
+});

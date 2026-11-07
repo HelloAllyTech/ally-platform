@@ -179,12 +179,20 @@ export class BugHunterPipelineController {
     @Query() query: Record<string, string | undefined>,
   ): Promise<Record<string, unknown>> {
     const { runId, ...params } = query;
+    // The lookup keeps the probe's verdict too (`ok`, where it gives one):
+    // the merge policy asks whether an image-service bug was ever seen to
+    // work against the live service, not merely whether the probe was called.
+    const recorded: Record<string, unknown> = { probe: name, params };
     return this.telemetryService.timed(
       runId,
       BugHuntLookupKind.PROBE,
-      () => this.probeService.run(name, params),
+      async () => {
+        const result = await this.probeService.run(name, params);
+        if (typeof result.ok === 'boolean') recorded.ok = result.ok;
+        return result;
+      },
       (result) => ({ itemCount: 1, chars: JSON.stringify(result).length }),
-      { probe: name, params },
+      recorded,
     );
   }
 
@@ -742,6 +750,11 @@ export class BugHunterPipelineController {
       }),
       { repo },
     );
+    // What is already open here, so a later night (or a second symptom
+    // tonight) of an existing bug is not filed again under a new symbol.
+    const openBugs = (await this.bugFindingService.listOpenForRepo(repo)).map(
+      (row) => ({ title: row.title, file: row.file, symbol: row.symbol }),
+    );
     // The always-on half of memory: the strongest notebook entries for this
     // repo, rendered up front. Recorded as a memory lookup like a search, so
     // the telemetry counts the context the agent was handed either way.
@@ -769,6 +782,7 @@ export class BugHunterPipelineController {
       senses: plan.senses,
       light: plan.light,
       knownNonBugs,
+      openBugs,
       engine,
       memories: memories.map((m) => ({
         id: m.id,

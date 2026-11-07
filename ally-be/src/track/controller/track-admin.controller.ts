@@ -7,6 +7,7 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  Patch,
   ParseEnumPipe,
   ParseIntPipe,
   ParseUUIDPipe,
@@ -34,6 +35,10 @@ import {
   TrackSummaryResponseDto,
 } from '../dto/create-track.dto';
 import { UpdateTrackDto } from '../dto/update-track.dto';
+import {
+  UpdateQuizSettingsDto,
+  UpdateQuizSettingsResponseDto,
+} from '../dto/update-quiz-settings.dto';
 import { UpsertTrackStructureDto } from '../dto/upsert-track-structure.dto';
 import {
   CreateTrackTenantDto,
@@ -62,6 +67,7 @@ import { TrackSortBy, TrackSortOrder } from '../type/track.type';
 import { BranchingResetDto } from '../dto/branching-reset.dto';
 import { TrackBranchingService } from '../service/track-branching.service';
 import { TrackProgressService } from '../service/track-progress.service';
+import { TrackEnrollmentService } from '../service/track-enrollment.service';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { TrackGuideNotesService } from '../service/track-guide-notes.service';
 import { UpdateTrackGuideNotesDto } from '../dto/track-guide-notes.dto';
@@ -81,6 +87,7 @@ export class TrackAdminController {
     private readonly trackBranchingService: TrackBranchingService,
     private readonly trackGuideNotesService: TrackGuideNotesService,
     private readonly trackProgressService: TrackProgressService,
+    private readonly trackEnrollmentService: TrackEnrollmentService,
   ) {}
 
   @ApiOperation({ summary: 'List tracks' })
@@ -226,6 +233,23 @@ export class TrackAdminController {
   ): Promise<SuccessResponse> {
     await this.trackService.assertCallerMayEdit(id);
     return this.trackService.upsertStructure(id, dto);
+  }
+
+  @ApiOperation({
+    summary: "Raise a live quiz's attempt limit",
+    description:
+      'Works on a published course with learners enrolled, where the ' +
+      'structure is locked. The limit can only go up (or to null for ' +
+      'unlimited); learners who used every attempt can retry at once.',
+  })
+  @ApiResponse({ status: 200, type: UpdateQuizSettingsResponseDto })
+  @AuthPermissions([PERMISSIONS.EDIT_ADMIN_TRACK])
+  @Patch('tracks/items/:trackItemId/quiz/settings')
+  async updateQuizSettings(
+    @Param('trackItemId', ParseUUIDPipe) trackItemId: string,
+    @Body() dto: UpdateQuizSettingsDto,
+  ): Promise<UpdateQuizSettingsResponseDto> {
+    return this.trackService.updateQuizSettings(trackItemId, dto);
   }
 
   /* ---------------------------------------------------------------- *
@@ -428,7 +452,7 @@ export class TrackAdminController {
       'started but not passed, with attempts used and when a paused round ' +
       'reopens. What the "reopen attempts" action acts on.',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
   @Get('learners/:userId/scenario-attempts')
   async listLearnerScenarioAttempts(
     @Param('userId', ParseIntPipe) userId: number,
@@ -443,7 +467,7 @@ export class TrackAdminController {
       'round to open by itself. This opens it immediately. Only learners in ' +
       "the caller's own organisation can be reset.",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
   @Post('tracks/items/:trackItemId/branching-reset')
   async resetBranchingAttempts(
     @Param('trackItemId', ParseUUIDPipe) trackItemId: string,
@@ -459,7 +483,7 @@ export class TrackAdminController {
       'it again; the earlier session and its report are kept. Only learners ' +
       "in the caller's own organisation can be reopened.",
   })
-  @AuthPermissions([PERMISSIONS.EDIT_USER])
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
   @Post('tracks/items/:trackItemId/assessment-reopen')
   async reopenRoleplayAssessment(
     @Param('trackItemId', ParseUUIDPipe) trackItemId: string,
@@ -473,6 +497,40 @@ export class TrackAdminController {
       trackItemId,
       dto.userId,
       tenantId,
+    );
+  }
+
+  @ApiOperation({
+    summary: "A learner's course enrolments",
+    description:
+      "The courses a learner in the caller's own organisation is enrolled in, " +
+      'with progress and, as `accessDenial`, what would keep each course from ' +
+      'them if they were not enrolled (null when it is still open to them). ' +
+      'What the "remove from course" action acts on.',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
+  @Get('learners/:userId/enrollments')
+  async listLearnerEnrollments(@Param('userId', ParseIntPipe) userId: number) {
+    return this.trackEnrollmentService.listLearnerEnrollmentsForAdmin(userId);
+  }
+
+  @ApiOperation({
+    summary: 'Remove a learner from a course',
+    description:
+      'Ends the enrolment and clears its progress. The course leaves the ' +
+      "learner's list unless it is still open to their group, in which case " +
+      'they can start it again from the beginning. Only learners in the ' +
+      "caller's own organisation can be removed.",
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_LEARNER_PROGRESS])
+  @Delete('learners/:userId/enrollments/:trackEnrollmentId')
+  async removeLearnerEnrollment(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('trackEnrollmentId', ParseUUIDPipe) trackEnrollmentId: string,
+  ) {
+    return this.trackEnrollmentService.removeLearnerEnrollmentForAdmin(
+      userId,
+      trackEnrollmentId,
     );
   }
 

@@ -2,7 +2,7 @@
 title: ally-be — Core Backend
 tags: [repo, backend, nestjs, api]
 summary: ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth, real-time voice sessions, the audio/transcription pipeline, AI-driven feedback, and analytics for the counselor-training platform.
-last_reconciled: 2026-08-06
+last_reconciled: 2026-10-29
 ---
 
 # ally-be — Core Backend
@@ -63,6 +63,7 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
 - `voice-preview/` — TTS voice preview across ElevenLabs, Deepgram, Sarvam, Google, and Hume.
 
 **Learning & sessions**
+- `debrief/` — the Debrief agent: writes the debrief a learner reads after a roleplay by following a recipe (Safety reader, Analyst, Progress reader, Guidance lookup over the Ally guide's library, Writer, rule checks, Evaluator, up to two revisions) under a per-run budget, a monthly pool and cap, and a deadline, stepping down a fallback ladder that ends with a person finishing it. Every ended session runs in **shadow** beside today's debrief (`DEBRIEF_AGENT_MODE`, `off` stops it); organisations switched on in the admin **Debriefs** console get it **live** instead. One row per run in `debrief_runs`; the independent judge scores every one. Its **Improver** reads aggregate signals daily, proposes prompt and setting changes, tries each against the current release on test sets built from real sessions (open / gate / sealed), and a person approves what goes live; releases, test sets, ideas and the per-organisation switch are the agent harness's tables under agentKey `debrief`, so rollback is one click. A switched-on organisation's debrief starts about 45 s after the session ends (the drain is the backstop). Learners can say whether it helped and flag a single card ("This isn't right", undoable for 10 minutes) — `debrief_run_feedback`, not today's `debrief_feedback`; the Console's Review tab holds live debriefs that need a person (publish as is, or show today's debrief instead) and flags (keep with a reason the learner reads, or remove). Every client risk cue must be covered: the most serious by the important moment, each other one in its `others`.
 - `learn/`, `scenario-path/` — scenario engine, learning pathways, session management. A session is a voice call or, for text-helpline training, a **text chat** (`scenario_sessions.interactionMode`). Text needs two switches, both off by default: the org preference `TEXT_CHAT_ROLEPLAY_ENABLED` (platform admin) and the scenario's `metadata.textChatEnabled` (author); a TEXT start with either off is refused with `FEATURE_NOT_ENABLED` rather than falling back to voice. The room, dispatch, scoring and debrief are the voice path's — the envelope just carries `interactionMode: "TEXT"`, and no egress recording is started.
 - `scenario-character/` — client-persona (NPC) definitions.
 - `scenario-report/`, `scenario-session-review/`, `scribe-session-review/` — reporting and threaded review/feedback.
@@ -114,7 +115,7 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
 - `/microphone-chat` — live audio chat with message streaming.
 - `/audio-ingest` — cloud-telephony integration.
 - `/scenario-report` — real-time scenario reporting.
-- `/builder` — live build transcript for a Builder session (rooms are `session:<id>`). An optimisation rather than a dependency: the admin polls the same events endpoint regardless, so a socket that never connects degrades the feed without breaking it.
+- `/builder` — live build transcript for a Builder session (rooms are `session:<id>`). An optimisation rather than a dependency: the admin polls the same events endpoint regardless, so a socket that never connects degrades the feed without breaking it. It also broadcasts two payload-free events to every connected admin — `decisionsChanged` and `sessionsChanged` (debounced, from `BuilderLiveService`) — on which the Builder tab refetches its Now snapshot; they reach only clients on the process that saw the change, so the tab keeps a 10 s poll as the fallback.
 - `/course-copilot` — build progress for a Course Copilot session (rooms are `course-copilot:<id>`). Same arrangement as `/builder`: a push reaches only clients on the process running the build, so the admin also polls `GET /v1/course-copilot/sessions/:id?afterSeq=` while jobs are live.
 
 **Auth model** — the REST API is versioned (`/api/v1/...`). Supported methods: JWT (access/refresh flow), email OTP (v2), Google OAuth, Magic Link, and `X-API-Key` for service-to-service calls. The WhatsApp webhook (`POST /api/v1/webhook/whatsapp`) carries no guard at all — an HMAC-SHA256 signature over the **raw** request body *is* its authentication, so `main.ts` captures the raw body in `express.json`'s `verify` hook rather than re-reading the stream (which is already drained by the time a handler runs). Multi-tenancy is enforced at the entity level, with fine-grained RBAC via groups and permission guards. See `DATA_SCHEMA.md` for the full store map (105 TypeORM tables plus Weaviate, Redis, SQS, S3, LiveKit).

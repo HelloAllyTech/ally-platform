@@ -9,6 +9,8 @@
 export enum KbCorpus {
   WHATSAPP_QA = "whatsapp_qa",
   CHARACTER_LIBRARY = "character_library",
+  /** The Debrief agent's guidance (Debriefs → Knowledge). */
+  DEBRIEF_KNOWLEDGE = "debrief_knowledge",
 }
 
 /**
@@ -89,6 +91,8 @@ export interface KbDocument {
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
+  /** The extracted text. Only on the single-document response (GET /documents/:id), never the list. */
+  rawText?: string;
 }
 
 export interface GetKbDocumentsParams {
@@ -108,6 +112,8 @@ export interface GetKbDocumentsParams {
   sourceType?: KbDocumentSourceType;
   /** Only what this organisation can retrieve: its own documents plus the global ones. */
   tenantId?: string;
+  /** With `tenantId`: only documents aimed at that organisation, not the shared ones. */
+  excludeGlobal?: boolean;
   includeArchived?: boolean;
 }
 
@@ -260,7 +266,22 @@ export interface WaTemplate {
    */
   mandatory: boolean;
   archivedAt: string | null;
+  /** The organisation a reply belongs to; null = a default every organisation gets. */
+  chatbotId?: string | null;
+  /** The default reply this organisation's version replaces. */
+  overridesTemplateId?: string | null;
+  /**
+   * Only when listed for one organisation: where the reply comes from. `default` = shared and
+   * untouched, `customised` = its own wording of a default, `off` = an optional default it switched
+   * off, `own` = a reply only it has.
+   */
+  state?: WaTemplateState;
+  /** For a customised or switched-off default: the shared wording it replaces. */
+  defaultResponseText?: string;
+  defaultPatterns?: string[];
 }
+
+export type WaTemplateState = "default" | "customised" | "off" | "own";
 
 export interface GetWaTemplatesResponse {
   templates: WaTemplate[];
@@ -339,26 +360,80 @@ export interface WaBotSettings {
   retentionDays: number;
   /** Run the LLM crisis classifier alongside retrieval. Keyword rules are unaffected by this. */
   crisisClassifierEnabled: boolean;
+  /** The platform kill switch for the new engine (Agents v2). Off: every chatbot answers with v1. */
+  agentRuntimeAllowed: boolean;
   helplineNumbers: string;
 }
 
-/** Booleans and counts only — the endpoint never returns a secret's value. */
-export interface WaProviderHealth {
-  enabled: boolean;
-  provider: string;
-  verifyTokenConfigured: boolean;
-  appSecretConfigured: boolean;
-  phoneNumberIdConfigured: boolean;
-  accessTokenConfigured: boolean;
-  inboundQueueConfigured: boolean;
-  // Optional: a backend one release behind this build does not send them, and "unknown" must not
-  // render as "missing".
-  businessAccountIdConfigured?: boolean;
-  inboundDlqConfigured?: boolean;
-  kbIngestQueueConfigured?: boolean;
-  helplineNumbersSet?: boolean;
-  mappedNumbers?: number;
-  indexedDocuments?: number;
+export enum WaBusinessNumberStatus {
+  /** Checked with Meta, but Meta has not called the webhook yet. */
+  AWAITING_WEBHOOK = "awaiting_webhook",
+  CONNECTED = "connected",
+  ERROR = "error",
+}
+
+/** An organisation's own WhatsApp number. Never carries the token or the app secret. */
+export interface WaBusinessNumber {
+  id: string;
+  connectorId: string | null;
+  /** The bot this number answers for, if it is bound to one. */
+  chatbotId: string | null;
+  chatbotName: string | null;
+  /** The organisation that connected it, for numbers from before chatbots. */
+  tenantId: string | null;
+  tenantName: string | null;
+  phoneNumberId: string;
+  wabaId: string;
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  source: "manual" | "embedded_signup";
+  status: WaBusinessNumberStatus;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  /** When the number last received a message — the proof the setup works end to end. */
+  lastInboundAt: string | null;
+  /** Paste into the Meta app. Manual numbers only. */
+  callbackUrl: string | null;
+  verifyToken: string | null;
+  hasAppSecret: boolean;
+  createdAt: string;
+}
+
+/**
+ * One chatbot's changes to the defaults. Absent = follow the default. Safety levers
+ * (`crisisClassifierEnabled`, `consentRequired`, `rateLimit`) can only be made stricter.
+ */
+export interface WaOrgSettings {
+  enabled?: boolean;
+  helplineNumbers?: string;
+  disclaimerText?: string;
+  crisisEscalationText?: string;
+  fallbackText?: string;
+  declineText?: string;
+  unsupportedMediaText?: string;
+  unrecognisedNumberText?: string;
+  rateLimitText?: string;
+  maxCitations?: number;
+  maxAnswerChars?: number;
+  conversationIdleMinutes?: number;
+  crisisClassifierEnabled?: boolean;
+  consentRequired?: boolean;
+  rateLimit?: { perMinute?: number; perHour?: number; perDay?: number };
+  retrieval?: {
+    minSimilarity?: number;
+    declineSimilarity?: number;
+    topK?: number;
+    maxPassages?: number;
+  };
+}
+
+export interface ConnectWaNumberRequest {
+  /** Bind to this bot straight away; none leaves the number free (platform admins). */
+  chatbotId?: string;
+  phoneNumberId: string;
+  wabaId: string;
+  accessToken: string;
+  appSecret: string;
 }
 
 /** Meta's live answer about the configured token and number. */
@@ -378,7 +453,7 @@ export interface WaConnectionCheck {
   subscriptionError?: string;
 }
 
-// ── Preview console ──────────────────────────────────────────────────────────
+// ── Citations and retrieval (on a conversation's replies) ────────────────────
 
 export interface WaPreviewCitation {
   passage_number: number;
@@ -403,33 +478,6 @@ export interface WaPreviewRetrieval {
   translated_query: string | null;
   /** True when the model answered but cited nothing. */
   unsupported: boolean;
-}
-
-export interface WaPreviewResponse {
-  intent: "answer" | "decline" | "clarify";
-  declineReason: string;
-  /** The exact message a worker would receive, including source lines and truncation. */
-  reply: string;
-  replyLength: number;
-  language: string;
-  citations: WaPreviewCitation[];
-  retrieval: WaPreviewRetrieval;
-  provider: string;
-  model: string;
-  promptVersion: string;
-  latencyMs: number;
-  /**
-   * Which corpus answered. Echoed back because "the bot found this fine" from an unscoped
-   * preview is otherwise indistinguishable from what one customer's worker would actually get.
-   */
-  audience: { tenantId: string | null; includesGlobal: boolean };
-}
-
-export interface WaPreviewRequest {
-  question: string;
-  retrieval?: Partial<WaRetrievalSettings>;
-  /** Answer as a worker from this organisation would be. Omitted searches the whole corpus. */
-  tenantId?: string;
 }
 
 // ── Conversation log ─────────────────────────────────────────────────────────
@@ -524,6 +572,8 @@ export interface GetWaConversationsParams {
   /** Whitelisted server-side; an unknown key falls back to the default order rather than erroring. */
   sortBy?: string;
   sortDir?: "asc" | "desc";
+  /** Narrow to one organisation; absent = every organisation. */
+  chatbotId?: string;
 }
 
 // ── Unanswered queue ─────────────────────────────────────────────────────────

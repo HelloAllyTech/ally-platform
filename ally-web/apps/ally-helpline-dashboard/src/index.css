@@ -89,6 +89,7 @@
     --color-primary-700: 24 48 89; /* #183059 (active) */
     --color-primary-800: 16 33 60; /* #10213C */
     --color-primary-900: 10 20 36; /* #0A1424 */
+    --color-primary-foreground: 255 255 255; /* labels on primary-500 */
 
     /*
      * The AI accent — warm clay, deliberately NOT the brand blue.

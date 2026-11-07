@@ -41,7 +41,7 @@ export const CHARACTER_INTERVIEW_MAX_TRUNCATION_RETRIES = 2;
  * partial result, so the fix is to send the identical request again rather
  * than to tell the model anything: two retries put a turn's odds past 95%.
  */
-export const CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES = 2;
+export const CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES = 4;
 
 /**
  * Per-tenant interview caps. These bound LLM spend now that the agent is
@@ -53,9 +53,19 @@ export const CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES = 2;
  * over-use. An interview is a ~20-25 turn conversation, so a handful in flight
  * at once across an org is already generous, and a hundred a month is far more
  * characters than an org realistically builds.
+ *
+ * "In progress" means ACTIVE *and touched within the idle window*. Before
+ * the window existed, every interview an admin walked away from (Leave,
+ * Start over, a second browser, a cleared tab) stayed ACTIVE forever, and an
+ * org that built ten characters in an afternoon was locked out of the
+ * interview that night with the generic "couldn't start" screen. An idle
+ * session costs nothing — the lock the cap exists to bound is LLM turns in
+ * flight — so one nobody has touched for an hour is not counted. It can still
+ * be resumed; it just no longer blocks anyone.
  */
 export const CHARACTER_INTERVIEW_MAX_ACTIVE_SESSIONS_PER_TENANT = 10;
 export const CHARACTER_INTERVIEW_MAX_SESSIONS_PER_TENANT_PER_MONTH = 100;
+export const CHARACTER_INTERVIEW_ACTIVE_SESSION_IDLE_MS = 60 * 60 * 1000;
 
 // Prompt registry code (src/prompts/character_interview/interviewer_system.txt).
 export const CHARACTER_INTERVIEW_PROMPTS = {

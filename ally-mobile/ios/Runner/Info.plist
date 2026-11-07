@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- Per flavor (ios/Flutter/{dev,prod}.xcconfig): "Ally" for prod, like RN. -->
+	<key>CFBundleDisplayName</key>
+	<string>$(APP_DISPLAY_NAME)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>ally_mobile_flutter</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Google Sign-In, as RN's Info.plist: GIDClientID plus the
+	     reversed-client-id URL schemes the sign-in redirect returns to.
+	     Values per flavor in ios/Flutter/{dev,prod}.xcconfig. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID_2)</string>
+			</array>
+		</dict>
+	</array>
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<!-- Universal links are routed by lib/core/deeplink (app_links), not by
+	     Flutter's built-in deep linking, which would push "/summary/1" into
+	     go_router where no such route exists. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<!-- Call summary export: Documents/CallSummary shows in the Files app (RN fileOperations.saveFile). -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
+	<!-- iOS's side of the same fix as the Android foreground-service
+	     declaration below: without the "audio" background mode, both Scribe
+	     recording and LiveKit roleplay voice would be suspended the moment
+	     the app backgrounds. LiveKit's own docs list this as required setup
+	     for background audio on iOS (see Flutter-Migration-Plan.pdf). -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<!-- RN's only background mode: lets FCM wake the app for the
+		     data-only engagement reminders (push_notification_service.dart). -->
+		<string>remote-notification</string>
+	</array>
+	<!-- Usage strings are RN's (ios/ally/Info.plist) word for word: the prod
+	     flavor is the same App Store listing. Camera: LiveKit/WebRTC link the
+	     camera APIs, so App Store Connect rejects an upload without it
+	     (ITMS-90683) even though the app never opens the camera. RN's empty
+	     NSLocationWhenInUseUsageDescription is not copied: nothing here links
+	     location APIs, and an empty purpose string is itself a review flag. -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app may access your camera for video communication features. Camera access is required for live video calls and screen sharing functionality.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>We need access to your microphone for audio streaming</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to allow you to select a profile image for your account.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<!-- As RN's Info.plist: the app does no encryption of its own (HTTPS via
+	     the platform stack only), which is exempt, so App Store Connect
+	     doesn't hold every upload at "Missing Compliance". -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<!-- Portrait only, as RN's Info.plist. The iPad list below stays open
+	     because iPad multitasking requires all four orientations; main.dart
+	     locks the app to portrait there too (SystemChrome). -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+</dict>
+</plist>

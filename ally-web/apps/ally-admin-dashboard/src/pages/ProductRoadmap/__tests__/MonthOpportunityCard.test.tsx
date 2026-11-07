@@ -8,6 +8,9 @@ import {
   RoadmapOpportunityType,
 } from "@types";
 
+// The breadth flag is a server answer behind a cached query; these tests are about the row/panel, so pin it off ("votes").
+vi.mock("../useScoreUnit", () => ({ useScoreUnit: () => ({ enabled: false, unit: "votes" }) }));
+
 vi.mock("@dnd-kit/sortable", () => ({
   useSortable: () => ({
     attributes: {},

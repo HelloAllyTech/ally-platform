@@ -366,7 +366,7 @@ class TestSarvamProvider:
             speaker="anushka",
             api_key="test-api-key",
         )
-        assert result == mock_tts_instance
+        assert result._tts_instance == mock_tts_instance
 
     @pytest.mark.unit
     @patch("app.tts.sarvam.SarvamTTSClient.validate_voice")
@@ -395,7 +395,7 @@ class TestSarvamProvider:
             speaker="anushka",
             api_key="test-api-key",
         )
-        assert result == mock_tts_instance
+        assert result._tts_instance == mock_tts_instance
 
     @pytest.mark.unit
     @patch("app.tts.sarvam.SarvamTTSClient.validate_voice")
@@ -425,7 +425,7 @@ class TestSarvamProvider:
             speaker="anushka",
             api_key="test-api-key",
         )
-        assert result == mock_tts_instance
+        assert result._tts_instance == mock_tts_instance
 
     @pytest.mark.unit
     def test_create_sarvam_tts_missing_speaker(self):
@@ -853,7 +853,7 @@ class TestTTSNewStructureIntegration:
             speaker="anushka",
             api_key="test-key",
         )
-        assert result == mock_tts_instance
+        assert result._tts_instance == mock_tts_instance
 
 
 class TestGoogleProvider:

@@ -9,3 +9,4 @@ export { TextHelplineSettings } from "./TextHelplineSettings";
 export * from "./GroupsTab";
 export { CohortRestrictionCell } from "./CohortRestrictionCell";
 export { useCohortRestrictions } from "./useCohortRestrictions";
+export { BrandingSettings } from "./BrandingSettings";

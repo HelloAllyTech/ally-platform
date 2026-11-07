@@ -98,7 +98,8 @@ export interface KnowledgeChunkDeleteResponse {
 export type KnowledgeCorpus =
   | 'whatsapp_qa'
   | 'character_library'
-  | 'ally_guide_library';
+  | 'ally_guide_library'
+  | 'debrief_knowledge';
 
 export interface KnowledgeChunkSearchRequest {
   query: string;
@@ -158,6 +159,81 @@ export interface KnowledgeAnswerRequest {
   document_ids?: string[];
   /** REQUIRED by ally-ai. A request without it is refused with a 422 rather than defaulted. */
   audience: KnowledgeAudienceRequest;
+  /** The answering bot's persona. Absent: the prompt is exactly as before chatbots. */
+  persona?: KnowledgePersonaRequest;
+  /** `documents_only` (default) declines what the documents miss; the other may answer generally. */
+  answer_mode?: 'documents_only' | 'documents_and_general';
+  /** The channel the question came in on (`whatsapp`, `test`, …), for format adaptation. */
+  channel?: string;
+}
+
+/**
+ * ally-ai's `/agent/run` (Agents v2): every `/knowledge-agent/answer` field plus the run's
+ * identity. Built by `buildAgentRunRequest` from the same body v1 sends, so the two can't drift.
+ *
+ * Mirrors ally-ai `app/schemas/agent_runtime.py::AgentRunRequest`; the limits noted here are its
+ * validation (a 422 past them).
+ */
+export interface AgentRunRequest extends KnowledgeAnswerRequest {
+  /**
+   * The checkpointer's thread id: the conversation, or a `preview-…` thread.
+   * 1–200 characters.
+   */
+  conversation_id: string;
+  /** At most 200 characters. */
+  run_id: string;
+  /** At most 200 characters. */
+  chatbot_id?: string;
+  runtime_version: 'v2';
+  /**
+   * Titles of the bot's documents, so the agent can say what it covers. At most 50; ally-ai
+   * cuts each title to 200 characters.
+   */
+  knowledge_topics?: string[];
+  /**
+   * The bot's decline wording, whose tone (not words) the agent follows. At most 500
+   * characters (`MAX_DECLINE_TEXT_CHARS`).
+   */
+  decline_text?: string;
+}
+
+/** What the conversational agent understood a message to be. */
+export type AgentTurnType = 'smalltalk' | 'about_bot' | 'question' | 'unclear';
+
+/** One graph node that ran, in order. */
+export interface AgentTraceStep {
+  node: string;
+  ms: number;
+  summary: string;
+}
+
+/** `/agent/run`'s retrieval block: v1's plus a debug list (ally-ai `AgentRetrievalMeta`). */
+export interface AgentRetrievalMeta extends KnowledgeRetrievalMeta {
+  /** Debug only: every retrieved chunk id, best first, before selection. Never stored. */
+  hit_chunk_ids?: string[];
+}
+
+/**
+ * `/agent/run`'s answer: the `/knowledge-agent/answer` response plus the run (ally-ai
+ * `AgentRunResponse`).
+ */
+export interface AgentRunResponse extends KnowledgeAnswerResponse {
+  retrieval: AgentRetrievalMeta;
+  run_id: string;
+  runtime: 'v2';
+  trace: AgentTraceStep[];
+  /**
+   * Set by the conversational agent. A `smalltalk` / `about_bot`
+   * reply arrives as intent `answer` with no citations, so this is what tells it apart from a
+   * grounded answer.
+   */
+  turn_type?: AgentTurnType;
+}
+
+export interface KnowledgePersonaRequest {
+  display_name?: string;
+  system_prompt?: string;
+  tone?: string;
 }
 
 export interface KnowledgeCitation {

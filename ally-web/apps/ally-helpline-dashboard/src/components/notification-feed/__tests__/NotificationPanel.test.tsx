@@ -29,6 +29,21 @@ const notification = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("notificationTargetRoute", () => {
+  it("opens the session's debrief for the Debrief agent's notifications", () => {
+    for (const type of ["DEBRIEF_READY", "DEBRIEF_REVIEWED"]) {
+      expect(
+        notificationTargetRoute({
+          ...notification(),
+          type,
+          data: { screen: "SimulationFeedback", scenarioSessionId: "s-9" },
+        } as any),
+      ).toBe("/simulation-summary/s-9");
+    }
+    expect(
+      notificationTargetRoute({ ...notification(), type: "DEBRIEF_READY", data: {} } as any),
+    ).toBeNull();
+  });
+
   it("maps a course-discussion reply to the track item with the post highlighted", () => {
     expect(notificationTargetRoute(notification() as any)).toBe("/track/t1/item/i1?post=p9");
   });

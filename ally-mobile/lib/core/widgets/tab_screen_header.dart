@@ -1,0 +1,162 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../features/progress/presentation/progress_header_widget.dart';
+import '../navigation/drawer_menu_button.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
+import 'info_tooltip_icon.dart';
+
+/// Direct port of ally-mobile (React Native)'s `src/components/
+/// TabScreenHeader/TabScreenHeader.tsx` — the shared title+subtitle header
+/// used across most tab-root screens. Single row, space-between: title
+/// (with an optional nested, differently-weighted/italic subtitle) and an
+/// optional info tooltip on the left, the always-on level indicator plus
+/// caller-supplied trailing content (credits display, badges button, etc.)
+/// on the right.
+class TabScreenHeader extends StatelessWidget {
+  const TabScreenHeader({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.italicSubtitle = false,
+    this.leading,
+    this.trailing,
+    this.showBorder = true,
+    this.tooltip,
+    this.hideProgressWidget = false,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool italicSubtitle;
+
+  /// Matches the real header's hamburger-menu slot — reused here for any
+  /// leading affordance, e.g. CallLogScreen's back button when viewing
+  /// archived logs (`showBackButton` in the RN source).
+  final Widget? leading;
+  final Widget? trailing;
+  final bool showBorder;
+
+  /// RN's `isTooltipRequired`/`tooltipContent` — an info `(i)` icon right
+  /// after the title, e.g. LeaderboardScreen's badge-earning explanation.
+  final String? tooltip;
+
+  /// RN's `ProgressHeaderWidget` is rendered by this shared header on every
+  /// screen except the Progress screen itself — a widget that navigates to
+  /// the screen you're already on would be a dead control next to a hero
+  /// showing the same ring. ProgressScreen's own header call sets this true.
+  final bool hideProgressWidget;
+
+  @override
+  Widget build(BuildContext context) {
+    // A caller's own leading control (e.g. a back arrow) takes the slot;
+    // otherwise the first tab's header carries the drawer menu, as in RN.
+    // On a pushed screen with neither, it gets a back arrow, the way
+    // Flutter's own AppBar implies one; RN's pushed screens all have one.
+    final leading = this.leading ??
+        (DrawerMenuScope.showsMenu(context)
+            ? const DrawerMenuButton()
+            : (ModalRoute.of(context)?.impliesAppBarDismissal ?? false)
+                ? const _BackArrow()
+                : null);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      // Inside the tab shell's SafeArea the top inset is already consumed
+      // (0 here); pushed screens that reuse this header get it instead of
+      // drawing under the status bar.
+      margin: EdgeInsets.only(top: 16 + MediaQuery.paddingOf(context).top),
+      decoration: showBorder
+          ? const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
+            )
+          : null,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          ?leading,
+          if (leading != null) const SizedBox(width: 6),
+          Expanded(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text.rich(
+                    // RN nests the subtitle <Text> inside the title's, so it
+                    // inherits the 18pt headline size; as a sibling span it
+                    // fell back to the 14pt default.
+                    TextSpan(
+                      text: title,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.replayProBold,
+                        fontSize: 18,
+                        height: 24 / 18,
+                        letterSpacing: 0.18,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.highEmphasis,
+                      ),
+                      children: [
+                        if (subtitle != null)
+                          TextSpan(
+                            text: ' $subtitle',
+                            style: TextStyle(
+                              // RN's nested <Text> re-resolves the inherited 'ReplayPro-Headline'
+                              // with its own light weight, landing back on Headline, not the
+                              // title's Bold.
+                              fontFamily: italicSubtitle ? AppFonts.replayProBoldItalic : AppFonts.replayProHeadline,
+                              fontWeight: FontWeight.w300,
+                              fontStyle: italicSubtitle ? FontStyle.italic : FontStyle.normal,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (tooltip != null) ...[
+                  const SizedBox(width: 6),
+                  InfoTooltipIcon(message: tooltip!),
+                ],
+              ],
+            ),
+          ),
+          // Rendered here rather than passed in per screen so it's genuinely
+          // on every header, and so it doesn't compete with `trailing`,
+          // which the busiest screens already use for credits/badge counts.
+          ProgressHeaderWidget(isOnProgressScreen: hideProgressWidget),
+          if (trailing != null) const SizedBox(width: 12),
+          // Capped rather than `Flexible`: a Flexible here shares the free
+          // width with the title's Expanded, and spaceBetween then pushed
+          // the title right of the menu icon. The cap still keeps a wide
+          // control (Leaderboard's "7 Badges") from overflowing the row.
+          if (trailing != null)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.45),
+              child: trailing!,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// RN's `LeftArrowIcon` (41x41, black), as its pushed screens draw it.
+class _BackArrow extends StatelessWidget {
+  const _BackArrow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: MaterialLocalizations.of(context).backButtonTooltip,
+      child: GestureDetector(
+        key: const Key('tab-screen-header-back'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).maybePop(),
+        child: SvgPicture.asset(
+          'assets/icons/leftArrowIcon.svg',
+          colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
+        ),
+      ),
+    );
+  }
+}

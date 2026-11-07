@@ -893,6 +893,28 @@ export class BugFindingRefDto {
   findingId!: string | null;
 }
 
+/** What a person has to do on a multi-repo plan — see planAttention. */
+export class PlanAttentionDto {
+  @ApiProperty({
+    enum: ['merge', 'review'],
+    description:
+      "merge: the step's PR passed the Verifier in a repo Bug Hunter may not merge in. review: the Verifier refused it and a person reads it.",
+  })
+  kind!: 'merge' | 'review';
+
+  @ApiProperty({ description: 'The step (a finding of its own) to act on.' })
+  stepId!: string;
+
+  @ApiProperty({ description: '0-based position in the plan.' })
+  stepIndex!: number;
+
+  @ApiProperty({ type: String, nullable: true })
+  repo!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  prUrl!: string | null;
+}
+
 export class BugFindingDto {
   @ApiProperty()
   id!: string;
@@ -1091,6 +1113,14 @@ export class BugFindingDto {
   latestFixVerdict!: Record<string, any> | null;
 
   @ApiProperty({
+    type: PlanAttentionDto,
+    nullable: true,
+    description:
+      'On a coordinating multi-repo plan: the step waiting on a person, with what it needs. Null while Bug Hunter still has the plan, and on every single-repo bug.',
+  })
+  attention!: PlanAttentionDto | null;
+
+  @ApiProperty({
     enum: ['pending', 'confirmed', 'refuted', 'unsure'],
     nullable: true,
     description:
@@ -1249,6 +1279,14 @@ export class BugFixStepDto {
 
   @ApiProperty({ nullable: true })
   releaseRunUrl!: string | null;
+
+  @ApiProperty({
+    enum: ['pass', 'fail'],
+    nullable: true,
+    description:
+      "The Verifier's latest verdict on this step's current PR, or null until it has run.",
+  })
+  fixVerdict!: 'pass' | 'fail' | null;
 }
 
 export class BugFindingDetailDto extends BugFindingDto {

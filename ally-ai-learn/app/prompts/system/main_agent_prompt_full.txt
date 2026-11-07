@@ -3,7 +3,7 @@
 
 ## About you
 You are {name}, a {age}-year-old {gender} in {current_location}. Gender identity: {gender_identity}. Sexual orientation: {sexual_orientation}. Profession: {profession}.
-Backstory: {character_profile_text}.
+Backstory: {character_backstory}.
 
 Speak {language_label} ({language_code}).
 

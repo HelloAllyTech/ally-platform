@@ -6,6 +6,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { RoadmapVoteBudget, RoadmapOpportunity, RoadmapOpportunityType } from "@types";
 
+import { NewColleagueTag } from "./NewToYouChip";
+import { useScoreUnit } from "./useScoreUnit";
+import { formatPoints } from "./utils/points";
 import {
   isConsumerSourced,
   SOURCE_BADGE_STYLE,
@@ -49,6 +52,7 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
   onSetVotes,
   onOpen,
 }) => {
+  const { enabled } = useScoreUnit();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: opportunity.id,
     disabled: !canDrag,
@@ -102,6 +106,7 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
             {SOURCE_LABEL[opportunity.source]}
           </span>
         )}
+        {canVote && enabled && opportunity.breadthNew && <NewColleagueTag />}
       </div>
 
       {/* Priority bar, same unfiltered scale as the table's, so switching layout doesn't rescale
@@ -111,7 +116,7 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
           <div className="bg-primary-500 h-full" style={{ width: `${scorePercent}%` }} />
         </div>
         <span className="text-typography-secondary font-mono text-xs tabular-nums">
-          {opportunity.priorityScore}
+          {formatPoints(opportunity.priorityScore)}
         </span>
       </div>
 

@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { CharacterInterviewOrchestratorService } from '../character-interview-orchestrator.service';
 import { CharacterInterviewMessageRole } from '../../enum/character-interview.enum';
 
@@ -355,7 +356,7 @@ describe('CharacterInterviewOrchestratorService — truncated turns', () => {
     // Not reported as an empty turn — the two are indistinguishable from the
     // response alone but need different advice.
     expect(error?.data.message).toContain('could not read');
-    expect(streamMock).toHaveBeenCalledTimes(3);
+    expect(streamMock).toHaveBeenCalledTimes(5);
     expect(appendMessage.mock.calls[1][1].metadata.errored).toBe(true);
   });
 
@@ -401,5 +402,39 @@ describe('CharacterInterviewOrchestratorService — truncated turns', () => {
       'empty_turn',
     );
     expect(appendMessage.mock.calls[1][1].metadata.errored).toBe(true);
+  });
+});
+
+describe('CharacterInterviewOrchestratorService — abandoned sessions', () => {
+  it('refuses a turn on an ABANDONED session with a NotFoundException, so the client starts afresh', async () => {
+    const appendMessage = jest.fn();
+    const service = new CharacterInterviewOrchestratorService(
+      {
+        anthropic: { apiKey: 'test-key' },
+        characterInterview: { model: 'claude-test', provider: 'anthropic' },
+      } as any,
+      {
+        getPromptByCode: jest.fn().mockResolvedValue('SYSTEM'),
+        getPromptLlmConfig: jest.fn().mockResolvedValue({}),
+      } as any,
+      {
+        getSession: jest
+          .fn()
+          .mockResolvedValue({ id: 'sess-1', status: 'ABANDONED' }),
+      } as any,
+      { getToolDefinitions: jest.fn().mockReturnValue([]) } as any,
+      {
+        listBySession: jest.fn().mockResolvedValue([]),
+        appendMessage,
+      } as any,
+      { record: jest.fn() } as any,
+      { create: jest.fn() } as any,
+    );
+
+    const frames = service.streamTurn('sess-1', { message: 'Hi' } as any, 1);
+
+    await expect(frames.next()).rejects.toThrow(NotFoundException);
+    // Nothing is written to a transcript nobody will resume.
+    expect(appendMessage).not.toHaveBeenCalled();
   });
 });

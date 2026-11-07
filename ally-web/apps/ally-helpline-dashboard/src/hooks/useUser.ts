@@ -138,6 +138,9 @@ export const useUser = () => {
 
     // Clear persisted state
     localStorage.removeItem("persist:user");
+
+    // The next person on this browser may belong to another org.
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.ORG_BRANDING);
   };
 
   return {

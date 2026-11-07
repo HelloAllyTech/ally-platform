@@ -6,6 +6,7 @@ import {
   toBusinessDateString,
   toBusinessWeekKey,
 } from 'src/common/util/date.util';
+import { RetryOnFail } from 'src/common/decorator/retry.decorator';
 import { ProgressTenantResolver } from './progress-tenant.resolver';
 import { UserProgressRepository } from '../repository/user-progress.repository';
 import { SessionEngagementRepository } from '../repository/session-engagement.repository';
@@ -131,6 +132,7 @@ export class XpAwardService {
    * matters — XP v2 never reads the score. What it must still have is turns: the learner
    * either did the practice or they did not, and the sweeper does not change that.
    */
+  @RetryOnFail()
   async awardForSession(params: {
     userId: number;
     tenantId: string;
@@ -290,6 +292,44 @@ export class XpAwardService {
       xp: XP_AWARD.PER_DEBRIEF_THREAD,
       at: params.at ?? new Date(),
       label: 'debrief',
+    });
+  }
+
+  /** XP for reading a Debrief-agent debrief to the end, once per session. */
+  async awardForDebriefRead(params: {
+    userId: number;
+    tenantId: string;
+    scenarioSessionId: string;
+    at?: Date;
+  }): Promise<void> {
+    await this.awardOne({
+      userId: params.userId,
+      rawTenantId: params.tenantId,
+      rule: XP_RULE.DEBRIEF_READ,
+      sourceType: XP_SOURCE_TYPE.DEBRIEF,
+      sourceId: params.scenarioSessionId,
+      xp: XP_AWARD.PER_DEBRIEF_READ,
+      at: params.at ?? new Date(),
+      label: 'debrief-read',
+    });
+  }
+
+  /** XP for a genuine answer to the reflective question, once per session. */
+  async awardForDebriefReflection(params: {
+    userId: number;
+    tenantId: string;
+    scenarioSessionId: string;
+    at?: Date;
+  }): Promise<void> {
+    await this.awardOne({
+      userId: params.userId,
+      rawTenantId: params.tenantId,
+      rule: XP_RULE.DEBRIEF_REFLECTION,
+      sourceType: XP_SOURCE_TYPE.DEBRIEF,
+      sourceId: params.scenarioSessionId,
+      xp: XP_AWARD.PER_DEBRIEF_REFLECTION,
+      at: params.at ?? new Date(),
+      label: 'debrief-reflection',
     });
   }
 

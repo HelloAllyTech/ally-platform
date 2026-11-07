@@ -31,7 +31,7 @@ const configStub = {
     autofillModel: 'gpt-5-mini',
     translationModel: 'gpt-4o-mini',
     transcriptionModel: 'whisper-1',
-    imageModel: 'gpt-image-1',
+    imageModel: 'dall-e-3',
   },
   anthropic: {
     autofillModel: 'claude-sonnet-4-6',

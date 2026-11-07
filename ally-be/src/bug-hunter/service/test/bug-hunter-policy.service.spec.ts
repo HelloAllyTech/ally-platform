@@ -90,6 +90,7 @@ describe('BugHunterPolicyService', () => {
   let bugHunterService: { getRun: jest.Mock; getSettings: jest.Mock };
   let findingRepository: { count: jest.Mock };
   let github: { listPullRequestFiles: jest.Mock; getPullRequest: jest.Mock };
+  let lookupRepository: { probeSucceededForFinding: jest.Mock };
 
   beforeEach(() => {
     bugFindingService = {
@@ -101,6 +102,9 @@ describe('BugHunterPolicyService', () => {
       getSettings: jest.fn().mockResolvedValue({ mode: BugHunterMode.AI }),
     };
     findingRepository = { count: jest.fn().mockResolvedValue(0) };
+    lookupRepository = {
+      probeSucceededForFinding: jest.fn().mockResolvedValue(false),
+    };
     github = {
       listPullRequestFiles: jest.fn().mockResolvedValue({
         files: ['src/a.py', 'tests/test_a.py'],
@@ -115,6 +119,7 @@ describe('BugHunterPolicyService', () => {
       bugHunterService as never,
       findingRepository as never,
       github as never,
+      lookupRepository as never,
     );
   });
 
@@ -395,6 +400,58 @@ describe('BugHunterPolicyService', () => {
         42,
       );
       expect(findingRepository.count).not.toHaveBeenCalled();
+    });
+
+    it('holds a fix session to the case chain too — a reported bug is no exemption (#124, #134)', async () => {
+      // The chain check used to sit below the fix-session return, so every
+      // reported bug merged without it.
+      bugHunterService.getRun.mockResolvedValue(
+        run({ trigger: BugHuntTrigger.FIX_SESSION }),
+      );
+      const f = finding();
+      bugFindingService.getOne.mockResolvedValue(
+        finding({
+          metadata: { ...f.metadata, findingVerdicts: [] },
+        }),
+      );
+      await expect(merging()).rejects.toThrow(/chain is not complete/);
+    });
+
+    describe('a bug in what the image service returns', () => {
+      const imageBug = () =>
+        finding({
+          title: 'Cover image fails: OpenAI rejected the image request',
+          description:
+            "400 The model 'gpt-image-1' does not exist. Expected: the image to be generated.",
+        });
+      beforeEach(() => {
+        bugHunterService.getRun.mockResolvedValue(
+          run({ trigger: BugHuntTrigger.FIX_SESSION }),
+        );
+        bugFindingService.getOne.mockResolvedValue(imageBug());
+      });
+
+      it('does not merge itself until the live service has been seen to work with the fix', async () => {
+        await expect(merging()).rejects.toThrow(/image-generation" probe/);
+        expect(lookupRepository.probeSucceededForFinding).toHaveBeenCalledWith(
+          'f-1',
+          'run-1',
+          'image-generation',
+        );
+      });
+
+      it('merges once an image-generation probe came back ok on a run for it', async () => {
+        lookupRepository.probeSucceededForFinding.mockResolvedValue(true);
+        await expect(merging()).resolves.toBeUndefined();
+      });
+
+      it('leaves bugs that are not about the image service alone', async () => {
+        bugFindingService.getOne.mockResolvedValue(finding());
+        await expect(merging()).resolves.toBeUndefined();
+        expect(
+          lookupRepository.probeSucceededForFinding,
+        ).not.toHaveBeenCalled();
+      });
     });
 
     describe('the self-merge ceiling, on every trigger (OPP-0759)', () => {

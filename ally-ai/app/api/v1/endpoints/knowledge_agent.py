@@ -6,6 +6,9 @@ tune retrieval without spending generation tokens, and so a retrieval problem ca
 diagnosed without the prompt confounding it.
 """
 
+from contextlib import contextmanager
+from typing import Iterator
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.dependencies import get_knowledge_agent_service
@@ -25,6 +28,40 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+@contextmanager
+def knowledge_errors(unexpected: str) -> Iterator[None]:
+    """Map a knowledge pipeline failure to its status code.
+
+    Shared by `/knowledge-agent/answer` and `/agent/run`, so a caller can switch
+    between them without new error handling. `unexpected` is logged with the
+    traceback of anything unmapped, which then answers 500.
+    """
+    try:
+        yield
+    except EmbeddingFailedException:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to embed the question",
+        )
+    except VectorDBSearchFailedException:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The knowledge index is unavailable",
+        )
+    except LLMInvocationFailedException as e:
+        # Surfaced as 502 rather than swallowed into a decline: a model outage is NOT
+        # the same as "the corpus does not cover this", and reporting it as one would
+        # quietly fill the unanswered-question queue with questions the corpus answers
+        # fine.
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+    except Exception:
+        logger.exception(unexpected)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to answer the question",
+        )
 
 
 @router.post(
@@ -52,7 +89,7 @@ async def answer_knowledge_question(
     default, or a slow call will outlive the SQS visibility window and the question gets
     answered twice.
     """
-    try:
+    with knowledge_errors("Unexpected error answering a knowledge question"):
         result = await service.answer(
             payload.question,
             payload.audience.to_chunk_audience(),
@@ -66,34 +103,18 @@ async def answer_knowledge_question(
             similarity_band=payload.similarity_band,
             max_answer_chars=payload.max_answer_chars,
             translate_query=payload.translate_query,
+            # `is not None`, not truthiness: an EMPTY list is "this bot has no
+            # documents" and must search nothing. Collapsing it to None would mean
+            # "search everything" — answering a bot from documents it was never given.
             document_ids=(
-                [str(d) for d in payload.document_ids] if payload.document_ids else None
+                [str(d) for d in payload.document_ids]
+                if payload.document_ids is not None
+                else None
             ),
+            persona=payload.persona.model_dump() if payload.persona else None,
+            answer_mode=payload.answer_mode,
         )
         return KnowledgeAnswerResponse(**result)
-
-    except EmbeddingFailedException:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to embed the question",
-        )
-    except VectorDBSearchFailedException:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The knowledge index is unavailable",
-        )
-    except LLMInvocationFailedException as e:
-        # Surfaced as 502 rather than swallowed into a decline: a model outage is NOT
-        # the same as "the corpus does not cover this", and reporting it as one would
-        # quietly fill the unanswered-question queue with questions the corpus answers
-        # fine.
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
-    except Exception:
-        logger.exception("Unexpected error answering a knowledge question")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to answer the question",
-        )
 
 
 @router.post(

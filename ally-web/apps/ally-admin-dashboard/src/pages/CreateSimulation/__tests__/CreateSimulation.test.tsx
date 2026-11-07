@@ -14,6 +14,10 @@ import reportUploadReducer from "@reducer/reportUploadReducer";
 const mockEn = vi.hoisted(() => ({
   // The header's "Past runs" control opens the recorded preview monologues.
   previewMonologueRuns: { trigger: "Past runs" },
+  memories: {
+    mappingBanner: "Sorting memories — about 30 seconds",
+    pausedWhileMapping: "Paused while memories are sorted",
+  },
   simulation: {
     unsaved: "Unsaved",
     changes: "Changes",
@@ -106,7 +110,6 @@ vi.mock("@api", () => ({
   ],
   useDeleteCoverImageMutation: () => [mockDeleteCoverImage],
   useGetAvailableLanguageVoicesQuery: () => ({ data: [] }),
-  useGetPromptsQuery: () => ({ data: [] }),
   useGetMappedScenarioEventsQuery: () => ({
     data: { data: Array.from({ length: mockMappedEvents.count }, (_, i) => ({ id: String(i) })) },
   }),
@@ -130,8 +133,14 @@ vi.mock("@hooks", () => ({
   }),
 }));
 
+const mapping = vi.hoisted(() => ({ inFlight: false }));
+vi.mock("../../../components/memories/memoriesMappingStatus", () => ({
+  useIsMappingMemories: () => mapping.inFlight,
+}));
+
 // Mock components
 vi.mock("@ally-ui-mono/ui-shared", () => ({
+  InlineLoading: () => <span data-testid="inline-loading" />,
   Tabs: ({ items, activeId, onChange }: any) => (
     <div data-testid="tabs">
       {items.map((item: any) => (
@@ -219,7 +228,9 @@ vi.mock("@constants", () => ({
   // whatever is already stored. The real preset expansion is covered in
   // utils/__tests__/createSimulation.test.ts.
   resolveSttConfigFromPreset: (presetId: any, existing: any) => (presetId ? existing : null),
-  ROLE_INSTRUCTION_PROMPT_CODE: "openai_simulation_role_instruction",
+  DEFAULT_ROLE_INSTRUCTION: "You are the client.",
+  NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE:
+    "ally_ai_learn_system_main_agent_prompt_working_memory_split",
   SIMULATION_CATEGORY: { PARTNER_SIM: "PARTNER_SIM" },
   ROUTES: {
     SIMULATION_STUDIO: "/simulation-studio",
@@ -368,6 +379,29 @@ describe("CreateSimulation", () => {
       expect(screen.getByTestId("tabs")).toBeInTheDocument();
       expect(screen.getByText("Save Draft")).toBeInTheDocument();
       expect(screen.getByText("Publish")).toBeInTheDocument();
+    });
+
+    it("starts a new simulation on Main Agent Prompt #3", () => {
+      renderCreateSimulation();
+
+      expect((useForm as any).mock.calls[0][0].defaultValues.selectedMainPromptCode).toBe(
+        "ally_ai_learn_system_main_agent_prompt_working_memory_split",
+      );
+    });
+
+    it("starts a new simulation with the default role instruction", () => {
+      renderCreateSimulation();
+
+      expect((useForm as any).mock.calls[0][0].defaultValues.prompt).toBe("You are the client.");
+    });
+
+    it("leaves an existing simulation's prompt and role to what it loads with", () => {
+      mockParams.id = "existing-id";
+      renderCreateSimulation();
+
+      const { defaultValues } = (useForm as any).mock.calls[0][0];
+      expect(defaultValues).not.toHaveProperty("selectedMainPromptCode");
+      expect(defaultValues).not.toHaveProperty("prompt");
     });
 
     it("should not render the deprecated 'Voice' standalone field", () => {
@@ -603,6 +637,54 @@ describe("CreateSimulation", () => {
         mockFormMethods.formState = { dirtyFields: {} };
         vi.useRealTimers();
       }
+    });
+  });
+
+  // Mapping memories takes ~30s after a switch to the Stage Director prompt.
+  // Saving, previewing or publishing in that window would store or run the
+  // simulation without them, so the editor pauses all three and says why.
+  describe("While memories are being mapped", () => {
+    afterEach(() => {
+      mapping.inFlight = false;
+      mockFormMethods.formState = { dirtyFields: {} };
+      vi.useRealTimers();
+    });
+
+    it("shows the banner and pauses Save, Preview and Publish", () => {
+      mapping.inFlight = true;
+      mockParams.id = "existing-id";
+      renderCreateSimulation();
+
+      expect(screen.getByTestId("memories-mapping-banner")).toHaveTextContent(
+        "Sorting memories — about 30 seconds",
+      );
+      expect(screen.getByText("Save Draft").closest("button")).toBeDisabled();
+      expect(screen.getByText("Preview").closest("button")).toBeDisabled();
+      expect(screen.getByText("Publish").closest("button")).toBeDisabled();
+    });
+
+    it("does not autosave until mapping ends", async () => {
+      vi.useFakeTimers();
+      mapping.inFlight = true;
+      mockParams.id = "existing-id";
+      mockFormMethods.formState = { dirtyFields: { title: true } } as any;
+      mockUpdateSimulation.mockResolvedValue({ data: [{ id: "existing-id" }] });
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+      renderCreateSimulation();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+    });
+
+    it("shows no banner when nothing is being mapped", () => {
+      renderCreateSimulation();
+      expect(screen.queryByTestId("memories-mapping-banner")).not.toBeInTheDocument();
     });
   });
 
@@ -1217,6 +1299,73 @@ describe("CreateSimulation", () => {
           }),
         );
       });
+    });
+    it("sends memories as their own field and clears locks on unnamed states, leaving knowledge sources alone", async () => {
+      mockParams.id = "existing-id";
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        states: [
+          { id: "state-1", name: "Named State" },
+          { id: "state-2", name: "" },
+        ],
+        knowledgeSources: [
+          { id: "ks-1", title: "KS", content: "c", unlocksFromStateId: "state-1" },
+        ],
+        memories: [
+          { id: "m-1", title: "My father", content: "x", unlocksInStateIds: ["state-2"] },
+          { id: "m-2", title: "My job", content: "y", unlocksInStateIds: ["state-1"] },
+        ],
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+
+      await waitFor(() => {
+        expect(mockUpdateSimulation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            simulation: expect.objectContaining({
+              knowledgeSources: [
+                { id: "ks-1", title: "KS", content: "c", unlocksFromStateId: "state-1" },
+              ],
+              memories: [
+                {
+                  id: "m-1",
+                  title: "My father",
+                  content: "x",
+                  unlocksInStateIds: null,
+                  unlocksFromStateId: null,
+                },
+                {
+                  id: "m-2",
+                  title: "My job",
+                  content: "y",
+                  unlocksInStateIds: ["state-1"],
+                  unlocksFromStateId: null,
+                },
+              ],
+            }),
+          }),
+        );
+      });
+    });
+
+    it("does not send memories at all when the form never had them", async () => {
+      mockParams.id = "existing-id";
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Test",
+        description: "Test Description",
+        memories: undefined,
+        triggerWarningIds: [],
+      });
+
+      renderCreateSimulation();
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+
+      await waitFor(() => expect(mockUpdateSimulation).toHaveBeenCalled());
+      const payload = mockUpdateSimulation.mock.calls[0][0].simulation;
+      expect(payload).not.toHaveProperty("memories");
     });
   });
 });

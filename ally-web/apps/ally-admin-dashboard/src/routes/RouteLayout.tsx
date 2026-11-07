@@ -42,6 +42,7 @@ import {
   BuilderEval,
   BuilderKnowledge,
   BuilderPipeline,
+  BuilderRoom,
   BuilderScoreboard,
   BuilderSession,
   BuilderSettings,
@@ -50,6 +51,7 @@ import {
   CourseCopilotSessions,
   AgentTestCases,
   Competencies,
+  DebriefConsole,
   RoleplaySessionLogs,
   RoleplaySessionLogDetail,
   Terms,
@@ -58,6 +60,7 @@ import {
   EvaluateRecords,
   EvaluateRecordDetail,
   WhatsAppBot,
+  ChatbotPage,
 } from "@pages";
 
 import { DefaultRedirect } from "./DefaultRedirect";
@@ -485,8 +488,18 @@ export const RouteLayout: React.FC = () => {
             </PrivateLayout>
           }
         />
+        {/* The Builder tab: Now · Rules · History. Mission control's full list moved to
+            /builder/sessions, and /builder/decisions (linked from Slack) lands here. */}
         <Route
           path={ROUTES.BUILDER}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+              <BuilderRoom />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.BUILDER_ALL_SESSIONS}
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
               <Builder />
@@ -501,6 +514,7 @@ export const RouteLayout: React.FC = () => {
             </PrivateLayout>
           }
         />
+        <Route path={ROUTES.BUILDER_DECISIONS} element={<Navigate to={ROUTES.BUILDER} replace />} />
         <Route
           path={ROUTES.BUILDER_SETTINGS}
           element={
@@ -614,6 +628,26 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
               <WhatsAppBot />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.CHATBOT_DETAIL}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
+              <ChatbotPage />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.WHATSAPP_BOT_LEGACY}
+          element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}
+        />
+        <Route
+          path={ROUTES.DEBRIEFS}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
+              <DebriefConsole />
             </PrivateLayout>
           }
         />

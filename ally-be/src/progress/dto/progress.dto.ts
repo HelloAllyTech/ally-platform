@@ -10,7 +10,8 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class ProgressSummaryDto {
   @ApiProperty({
-    description: 'Current level, 1 through the ladder maximum.',
+    description:
+      'Current level, 0 (the starting state) through the ladder maximum.',
     example: 4,
   })
   level!: number;
@@ -97,7 +98,7 @@ export class ProgressResponseDto extends ProgressSummaryDto {
 
   @ApiProperty({
     description:
-      'When the learner last advanced a level, for a one-time celebration. Null if they have never left level 1.',
+      'When the learner last advanced a level, for a one-time celebration. Null if they have never left level 0.',
     nullable: true,
   })
   lastLevelUpAt!: Date | null;
