@@ -75,7 +75,7 @@ The one-screen flow needs from the hook what the two-pane layout didn't: the **c
 
 **Consequence for 20d:** the new tokens can't use the app's `theme` keys as-is (radius 0, weights capped at 600, every font IBM Plex Serif). They need their own names, scoped so the old dashboard is unaffected; see the plan.
 
-## 2. Plan (for approval; no 20d feature code until it's approved)
+## 2. Plan (approved 2026-11-08)
 
 ### A. Tokens and fonts
 
@@ -103,12 +103,12 @@ Every screen renders inside **StepFrame** and takes everything from `useOnboardi
 | 4 | Safety | `view.safety` (SafetyCard: Always / Never / If someone may be at risk) | Continue |
 | 5…n | One question per screen | `line`, `options`, `questionsLeft`, `chooseChip`, `say` (typed answer) | Option (auto-advance 380 ms) or OK |
 | n+1 | Choose a design | `view.designs`, `chooseDesign` (20a-2 swaps in purposes; the screen takes cards from the hook) | Choose this |
-| n+2 | **Make it yours** (new) | `view.draft` + `edit` (name, tone, opening line), the brand (logo, cover, colour) through the image and brand API, PhonePreview | Build my assistant |
-| n+3 | Building | `building`, BuildSteps | Continue (until 20a-2: "Run the checkup") |
+| n+2 | Building | `building`, BuildSteps (the builder drafts the assistant here, as in 20a-1) | Continue |
+| n+3 | **Make it yours** (new) | `view.draft` + `edit` (name, tone, opening line), the brand (logo, cover, colour) through the image and brand API, PhonePreview | Continue to Share (20a-2: "Run the checkup") |
 | n+4 | Who can use it? | `publicAllowed`, `publish` | Publish |
 | n+5 | Your assistant is live | `published` (link, QR, WhatsApp share, open page, "Want it on WhatsApp too?"; "Give it a landing page" hidden until 20e) | Copy link |
 
-- **Make it yours today vs the builder's order:** 20a-1 builds after the design is chosen. 20d moves "Make it yours" between design and building **without a server change**: choosing a design still drafts the assistant (as now), and the screen shows the drafted name, tone and opening line for editing before "Build my assistant" (which shows the building ticks over the already-built result, then Continue). Recorded as a decision; if you'd rather the build run after Make it yours, that's an ally-be step-order change (one line in the step machine and the flow).
+- **Order (decided at approval):** Choose a design → Building → Make it yours → Checkup (20a-2) → Share. The server's step machine is unchanged: choosing a design drafts the assistant (Building), and Make it yours edits that result through draft patches, so nothing builds twice. Make it yours is a client screen between the server's `building` and `share` steps; the hook remembers it was passed (so Back and Resume land right).
 - **Back** uses `back()` (server step back, answers kept); **Resume** opens the screen for the draft's step. **Keyboard:** Enter submits the screen (bound per screen), A–D pick options, ↑/↓ move, Esc closes "Tell me something else". **Phone:** full width; PhonePreview moves below the controls.
 
 ### D. "Tell me something else"
@@ -129,7 +129,7 @@ A collapsed line at the foot of every screen; it opens a one-line input. Sending
 - **SVG decision: rasterise.** A logo SVG is rendered to PNG at 1024 px and stored only as raster variants; we never serve SVG, so there's no script, handler, external reference or `foreignObject` to sanitise and no sanitiser to keep correct. Cost: a logo isn't vector-sharp past 1024 px, which no surface here needs.
 - **Re-encode** every image (which strips EXIF and GPS), auto-rotate from EXIF first; store variants 256, 768 and 1600 px WebP (never upscaled) plus the original re-encoded. **Needs `sharp`** (see Risks).
 - **Storage:** a new table `bot_images` (id, chatbot_id, tenant_id, kind, content_hash, width, height, variants, alt, original_name, status, created_by, detached_at). Objects at `bot-images/<tenantId>/<chatbotId>/<hash>-<size>.webp` (content-hashed names, `immutable` cache headers).
-- **Visibility:** drafts are read through short-lived signed URLs from a **private** bucket. On publish (and on each brand save of a published page), the variants the page uses are copied to the public assets bucket with long cache headers; unpublishing or removing deletes the public copies. So an image is public only while a published page uses it. **Needs a decision on the private bucket** (see Risks).
+- **Visibility:** all objects live in the existing private bucket under `bot-images/<tenantId>/<chatbotId>/`. The dashboard (drafts, Look and feel) reads them through short-lived signed URLs. Visitors read them through `GET v1/public/bot-images/:slug/:file`, which serves the bytes only while that page is published and the image is attached to it, with `Cache-Control: public, max-age=31536000, immutable` (names are content-hashed, so a change is a new URL). No copies to a public bucket.
 - **Limits:** 50 images per bot. **Removing** detaches at once (and deletes public copies); a daily sweep (`scheduledTaskRegistry`) deletes files 30 days after detaching, so Undo works within that window.
 - **Onboarding logo:** the crawl's detected logo is fetched through the same guarded, same-site fetcher and stored like an upload (no hotlinking); `branding.logoUrl` stops pointing at the site.
 - **Alt text:** stored per image; defaults from DESIGN.md §6; editable in Look and feel.
@@ -159,12 +159,12 @@ A collapsed line at the foot of every screen; it opens a one-line input. Sending
 8. Tests: Playwright screenshots, keyboard, reduced motion, axe.
 9. Notes: before and after screenshots, budgets measured, the text-only test updates listed, open items for 20a-2 and 20e.
 
-### J. Risks and open questions
+### J. Decisions at approval (2026-11-08)
 
-1. **New dependencies (need your OK):** `sharp` in ally-be (image checks, re-encode, variants, SVG rasterise; it ships native binaries, so the Docker images need its platform build); `@playwright/test` and `@axe-core/playwright` in ally-web (dev only, plus browsers in CI); the fonts: copy the woff2 files from their open-font-licence sources into the repo (no package), or add `@fontsource/instrument-serif`, `@fontsource/nunito` and `geist` as dependencies.
-2. **A private bucket for draft images:** reuse an existing private bucket under a `bot-images/` prefix, or add `BOT_IMAGES_S3_BUCKET` (an infra change)?
-3. **Make it yours before or after the build** (C above): show the drafted fields for editing after choosing a design (no server change), or move the build step after it.
-4. **Hindi on the bot page:** the restyle adds visitor strings (for example the status lines); the page has its own English and Hindi copy files. Who writes the Hindi?
-5. **The screenshots and the deck disagree** in places (for example the cover hint says "PNG, JPG or SVG"; the deck says "PNG, JPG or WebP"). DESIGN.md says the written spec wins, so I'll follow the deck and list each case.
-6. **Budget risk:** the shared React chunk is 47 KB of the 70 KB JS budget; the restyle has about 13 KB of headroom, enough without framer-motion.
-7. **Screenshot baselines** differ by OS font rendering; they'll be generated in the Playwright Docker image so CI and local runs match.
+1. **Dependencies:** `sharp` (pinned; must build in the ally-be Docker image); `@playwright/test` and `@axe-core/playwright` as dev dependencies. Fonts from `@fontsource` packages, importing only the weights used; plus **Noto Sans Devanagari**, loaded only for Hindi text (Geist has no Devanagari).
+2. **Draft images:** a `bot-images/<org>/<bot>/` prefix in the **existing private bucket**; no new bucket for now (**launch item**). Published images are served through an ally-be route that checks the page is published, with content-hashed names and long cache headers. Drafts use short-lived signed URLs.
+3. **Screen order:** Choose a design → Building → Make it yours → Checkup (20a-2; until then Continue goes to Share). Server unchanged. Step map, footer step names and buttons updated in the deck.
+4. **Hindi:** new bot page strings drafted by me, marked "needs review" in the strings file. Owner screens stay English.
+5. **Screenshots vs the deck:** the deck wins; each difference is listed in §3.
+
+Remaining risks: the bot page budget (the shared React chunk is 47 KB of the 70 KB JS budget); screenshot baselines differ by OS font rendering, so they're generated in the Playwright Docker image.

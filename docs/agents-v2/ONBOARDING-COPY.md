@@ -238,7 +238,8 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 - **Saved indicator:** Saved
 - **Back button:** Back
 - **Footer, left:** Step {n} of {total} · {step name}
-- **Step names:** Start · Reading your website · What we learned · Safety · A few questions · Choose a design · Make it yours · Building · Checkup · Share
+- **Step names:** Start · Reading your website · What we learned · Safety · A few questions · Choose a design · Building · Make it yours · Checkup · Share
+- **Order:** Choose a design → Building → Make it yours (edits the assistant just built) → Checkup → Share. Until the checkup exists, Make it yours goes straight to Share.
 - **Footer, right:** Your progress is saved. You can come back any time.
 - **Enter hint:** press Enter ↵
 - **Option hint (screen readers):** Press {keys} to choose
@@ -246,8 +247,7 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 - **Talk to the builder, placeholder:** Correct something, or tell me what I missed
 - **Reading, done button:** See what I learned
 - **Questions eyebrow:** {n} quick questions left · 1 quick question left
-- **Building, done button (before the checkup exists):** Continue
-- **Building, done button (with the checkup):** Run the checkup
+- **Building, done button:** Continue
 
 ### From 20a-1 *(added in 20a-1)*
 
@@ -298,7 +298,8 @@ Labels the 20a-1 screens use that the sections above don't name. Same voice.
 - **Image hint:** PNG, JPG or WebP, up to 5 MB. The cover shows at the top of your page.
 - **Tone options:** Warm · Balanced · Formal
 - **Preview status line:** Usually replies in seconds
-- **Primary button:** Build my assistant
+- **Primary button (before the checkup exists):** Continue
+- **Primary button (with the checkup):** Run the checkup
 
 ## 17. Checkup in plain words (20a-2)
 

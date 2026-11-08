@@ -26,7 +26,7 @@
 
 ### 2. Onboarding: one screen at a time (`/chatbots/new`)
 
-Replace the two-pane layout with **StepFrame** and one screen per step. The builder still leads: its message for each step is the screen's **AssistantLine**, and its quick replies are the screen's **Options**.
+Replace the two-pane layout with **StepFrame** and one screen per step. *(Order changed at plan approval, 2026-11-08: the build runs right after the design is chosen, and Make it yours edits the built assistant, so nothing builds twice. The server's step order is unchanged.)* The builder still leads: its message for each step is the screen's **AssistantLine**, and its quick replies are the screen's **Options**.
 
 | # | Screen | From 20a-1 | Primary action |
 |---|---|---|---|
@@ -36,8 +36,8 @@ Replace the two-pane layout with **StepFrame** and one screen per step. The buil
 | 4 | Safety | Pack card | Continue |
 | 5…n | One gap or setup question per screen | Gap questions, audience, languages, "don't know" | Option (auto-advance) or OK |
 | n+1 | Choose a design | Design cards | Choose this |
-| n+2 | Make it yours | "Your assistant" canvas section | Build my assistant |
-| n+3 | Building | Building steps | Run the checkup (20a-2) or, until 20a-2, Continue |
+| n+2 | Building | Building steps | Continue |
+| n+3 | Make it yours | "Your assistant" canvas section (edits the assistant just built) | Run the checkup (20a-2) or, until 20a-2, Continue (to Share) |
 | n+4 | Checkup | 20a-2 | (20a-2) |
 | n+5 | Who can use it? | Share section | Publish |
 | n+6 | Your assistant is live | Live state | Copy link, QR, WhatsApp, Open page; "Want it on WhatsApp too?"; "Give it a landing page" (hidden until 20e) |
