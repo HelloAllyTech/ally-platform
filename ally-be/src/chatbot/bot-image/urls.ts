@@ -1,4 +1,4 @@
-import type { BotImage } from './bot-image.entity';
+import type { BotImage } from '../entity/bot-image.entity';
 import { VARIANT_WIDTHS } from './image-check';
 
 /** The first 32 hex characters of the content hash name an image's files. */

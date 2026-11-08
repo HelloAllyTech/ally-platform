@@ -12,7 +12,11 @@ import {
 import { BotPageService } from '../../bot-page/bot-page.service';
 import { BotPageAccess, BotPageStatus } from '../../enum/bot-page.enum';
 import { ChatbotStatus } from '../../enum/chatbot.enum';
-import { BotImage, BotImageKind, BotImageStatus } from '../bot-image.entity';
+import {
+  BotImage,
+  BotImageKind,
+  BotImageStatus,
+} from '../../entity/bot-image.entity';
 import {
   BotImageService,
   IMAGE_ERRORS,

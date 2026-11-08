@@ -13,7 +13,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import { BotImageKind } from '../bot-image/bot-image.entity';
+import { BotImageKind } from '../entity/bot-image.entity';
 import {
   BRAND_THEMES,
   BrandTheme,

@@ -12,7 +12,7 @@ import { ExecutionManager } from '../../common/execution/execution-manager';
 import { AppConfigService } from '../../config/config.service';
 import { darkenForWhiteText } from '../../tenant/util/brand-colour.util';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
-import { BotImage, BotImageStatus } from '../bot-image/bot-image.entity';
+import { BotImage, BotImageStatus } from '../entity/bot-image.entity';
 import { PublicImage, publicImage } from '../bot-image/urls';
 import { UpdateBotPageBrandDto } from '../dto/bot-image.dto';
 import { BotPageLogoUrlDto, UpdateBotPageDto } from '../dto/bot-page.dto';

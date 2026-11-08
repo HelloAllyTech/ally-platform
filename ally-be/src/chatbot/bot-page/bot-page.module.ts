@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AwsModule } from '../../aws/aws.module';
 import { BotImagePublicController } from '../bot-image/bot-image-public.controller';
 import { BotImageController } from '../bot-image/bot-image.controller';
-import { BotImage } from '../bot-image/bot-image.entity';
+import { BotImage } from '../entity/bot-image.entity';
 import { BotImageService } from '../bot-image/bot-image.service';
 import { NotificationModule } from '../../notification/notification.module';
 import { WaUnansweredQuestion } from '../../whatsapp/entity/wa-unanswered-question.entity';

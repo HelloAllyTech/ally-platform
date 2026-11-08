@@ -25,7 +25,7 @@ import {
   BotImageKind,
   BotImageStatus,
   BotImageVariants,
-} from './bot-image.entity';
+} from '../entity/bot-image.entity';
 import {
   IMAGE_MAX_BYTES,
   ImageCheckError,
