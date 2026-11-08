@@ -308,6 +308,27 @@ GAP_CHECKLISTS: Dict[Industry, List[GapCheck]] = {
         _HOURS,
         _CONTACT,
     ],
+    Industry.NON_PROFIT: [
+        GapCheck(
+            "programmes",
+            "what your programmes are and who they're for",
+            "People want to know how you can help them.",
+            (LearnedSection.SERVICES, LearnedSection.ABOUT),
+        ),
+        GapCheck(
+            "donate",
+            "how people can donate",
+            "Supporters often ask how to give.",
+            (LearnedSection.POLICIES, LearnedSection.SERVICES, LearnedSection.FAQS),
+        ),
+        GapCheck(
+            "volunteer",
+            "how people can volunteer",
+            "Many people write in wanting to help.",
+            (LearnedSection.SERVICES, LearnedSection.FAQS),
+        ),
+        _CONTACT,
+    ],
     Industry.OTHER: [_FEES, _HOURS, _CONTACT],
 }
 
@@ -381,6 +402,7 @@ DESIGNS_FOR: Dict[Industry, List[DesignId]] = {
     Industry.D2C: [DesignId.SUPPORT, DesignId.GUIDE, DesignId.ENQUIRIES],
     Industry.SAAS: [DesignId.SUPPORT, DesignId.GUIDE, DesignId.ENQUIRIES],
     Industry.REAL_ESTATE: [DesignId.ENQUIRIES, DesignId.GUIDE],
+    Industry.NON_PROFIT: [DesignId.GUIDE, DesignId.ENQUIRIES, DesignId.SUPPORT],
 }
 DEFAULT_DESIGNS = [DesignId.GUIDE, DesignId.ENQUIRIES, DesignId.SUPPORT]
 

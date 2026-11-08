@@ -109,3 +109,17 @@ export function isJunk(url: string): boolean {
     /[?&](replytocom|share|print)=/i.test(parsed.search)
   );
 }
+
+const ARTICLE_PATH =
+  /\/(blog|blogs|news|newsroom|article|articles|stories|story|press|press-releases|media|insights|posts?|updates|events?|webinars?|podcasts?)(\/|$)/i;
+
+/**
+ * Blog posts, news and the like: read last, and only a few, because they say little about the
+ * business itself (Shehbaz, 2026-11-08: "read them last, and at most 10").
+ */
+export function isArticle(url: string): boolean {
+  return ARTICLE_PATH.test(new URL(url).pathname);
+}
+
+/** How many blog and news pages one crawl reads, at most. */
+export const MAX_ARTICLES = 10;

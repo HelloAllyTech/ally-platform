@@ -537,7 +537,11 @@ export class BotDraftService {
       const draft = await this.drafts.findOne({ where: { id: draftId } });
       if (!draft) return;
       const branding = { ...draft.draftConfig.branding };
-      if (brand.logoUrl && !branding.logoUrl) branding.logoUrl = brand.logoUrl;
+      // The page only takes an https logo (BotPageBrandingDto); an http one would make every
+      // later change to the draft fail validation.
+      if (brand.logoUrl?.startsWith('https://') && !branding.logoUrl) {
+        branding.logoUrl = brand.logoUrl;
+      }
       if (
         brand.accentColour &&
         branding.accentColour === DEFAULT_ACCENT_COLOUR

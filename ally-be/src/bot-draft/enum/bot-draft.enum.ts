@@ -47,7 +47,21 @@ export enum Industry {
   SAAS = 'saas',
   RESTAURANT = 'restaurant',
   LEGAL_FINANCIAL = 'legal_financial',
+  NON_PROFIT = 'non_profit',
   OTHER = 'other',
+}
+
+/**
+ * What a business deals with that calls for care, whatever kind of business it is. The pack comes
+ * from these and the industry together (the strongest wins): a mental health non-profit gets
+ * Mental health safety (Shehbaz, 2026-11-08).
+ */
+export enum CareTopic {
+  MENTAL_HEALTH = 'mental_health',
+  MEDICAL = 'medical',
+  MEDICINES = 'medicines',
+  YOUNG_PEOPLE = 'young_people',
+  LEGAL_FINANCIAL = 'legal_financial',
 }
 
 /** The designs that work today. Booking and orders are always offered as "coming soon". */

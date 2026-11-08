@@ -143,6 +143,21 @@ describe('BotDraftSessionService.turn', () => {
     });
   });
 
+  it('gives a mental health non-profit Mental health safety, from its cause', async () => {
+    const h = harness(
+      {},
+      reply({
+        industry: 'non_profit',
+        care_topics: ['mental_health'],
+        next_step: 'gaps',
+      }),
+    );
+    await h.turn({ chip: 'Looks right' });
+    const row = h.store.row();
+    expect(row.industry).toBe('non_profit');
+    expect(row.draftConfig.safetyPackId).toBe(SafetyPackId.MENTAL_HEALTH);
+  });
+
   it('never lets the builder weaken a pack that is on', async () => {
     const h = harness(
       {},
@@ -194,6 +209,22 @@ describe('BotDraftSessionService.turn', () => {
     expect(row.draftConfig.branding.title).toBe('Sunrise Clinic');
     expect(row.draftConfig.design).toBe('guide');
     expect(row.step).toBe(BotDraftStep.SHARE);
+  });
+
+  it('a stopped turn leaves the draft exactly as it was', async () => {
+    const h = harness();
+    const before = h.store.row();
+    const stop = new AbortController();
+    h.ai.runBuilderStepStreaming.mockImplementationOnce(async () => {
+      stop.abort();
+      throw new DOMException('The operation was aborted', 'AbortError');
+    });
+    await expect(
+      h.session.turn(before, { text: 'hello' }, () => undefined, stop.signal),
+    ).rejects.toThrow();
+    const after = h.store.row();
+    expect(after.transcript).toEqual(before.transcript);
+    expect(after.version).toBe(before.version);
   });
 
   it('refuses a finished setup', async () => {
@@ -455,5 +486,24 @@ describe('reading an uploaded document', () => {
       h.session.learnFromDocument('draft-1', 'doc-1'),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(h.ai.extractOnboardingFacts).not.toHaveBeenCalled();
+  });
+});
+
+describe('the site’s brand on the draft', () => {
+  it('takes an https logo and the colour, but never an http logo', async () => {
+    const store = memoryDrafts();
+    await store.service.applyBrand('draft-1', {
+      logoUrl: 'http://sunrise.example/logo.png',
+      accentColour: '#0F766E',
+    });
+    let branding = store.row().draftConfig.branding;
+    expect(branding.logoUrl).toBeNull();
+    expect(branding.accentColour).toBe('#0F766E');
+    await store.service.applyBrand('draft-1', {
+      logoUrl: 'https://sunrise.example/logo.png',
+      accentColour: null,
+    });
+    branding = store.row().draftConfig.branding;
+    expect(branding.logoUrl).toBe('https://sunrise.example/logo.png');
   });
 });

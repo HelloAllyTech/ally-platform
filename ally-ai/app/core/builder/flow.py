@@ -368,12 +368,19 @@ async def _learned(step: Step) -> BuilderStepResponse:
             )
         ack = out.message
     step.status("classifying")
-    industry = await tasks.classify(request, step.deadline.left())
+    industry, care_topics = await tasks.classify(request, step.deadline.left())
     step.status("finding_gaps")
     gaps = await tasks.find_gaps(request, industry, step.deadline.left())
     # ally-be turns the pack on (and says so, in the pack's own words) between this
     # step and the first question.
-    return _ask(step, gaps, dict(request.answers), ack=ack, industry=industry)
+    return _ask(
+        step,
+        gaps,
+        dict(request.answers),
+        ack=ack,
+        industry=industry,
+        care_topics=care_topics,
+    )
 
 
 def _ask(

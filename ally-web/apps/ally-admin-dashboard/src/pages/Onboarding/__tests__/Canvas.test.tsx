@@ -7,6 +7,7 @@ import { BuildingCard, DesignCards, LearnedCard, SafetyCard, ShareCard, reached 
 import { COPY } from "../copy";
 import type { BotDraftView } from "../types";
 import { withFinding } from "../findings";
+import { reached } from "../steps";
 
 vi.mock("@components", () => ({
   Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (

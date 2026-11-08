@@ -23,7 +23,7 @@ import {
   Industry,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
-import { PACK_FOR_INDUSTRY, packFor } from '../safety-pack/safety-packs';
+import { packFor, packForBusiness } from '../safety-pack/safety-packs';
 import type {
   CrawlProblem,
   LearnedFact,
@@ -120,9 +120,9 @@ export class BotDraftSessionService implements CrawlLearner {
       throw new BadRequestException('Write a message or choose a reply.');
     }
 
-    draft = await this.drafts.appendTranscript(draft, [
-      { role: 'owner', text: text || chipLabel(draft, chip) },
-    ]);
+    // The owner's message is saved with the reply, not before it: a turn that's stopped (or
+    // fails) leaves the draft exactly as it was.
+    const said = text || chipLabel(draft, chip);
     const request = await this.stepRequest(draft, text, chip);
     const tokens: string[] = [];
     const response = await this.ai.runBuilderStepStreaming(
@@ -135,7 +135,7 @@ export class BotDraftSessionService implements CrawlLearner {
       signal,
     );
     signal?.throwIfAborted();
-    return this.apply(draft.id, response, emit, tokens);
+    return this.apply(draft.id, said, response, emit, tokens);
   }
 
   /** The step request: the whole draft, as ally-ai keeps nothing between steps. */
@@ -190,6 +190,7 @@ export class BotDraftSessionService implements CrawlLearner {
    */
   private async apply(
     draftId: string,
+    said: string,
     response: BuilderStepResponse,
     emit: (event: SessionEvent) => void,
     tokens: string[],
@@ -210,7 +211,7 @@ export class BotDraftSessionService implements CrawlLearner {
     const notes: Omit<TranscriptEntry, 'id' | 'at'>[] = [];
     if (response.industry && draft.step === BotDraftStep.LEARNED) {
       const industry = response.industry as Industry;
-      const packId = PACK_FOR_INDUSTRY[industry] ?? SafetyPackId.STANDARD;
+      const packId = packForBusiness(industry, response.care_topics ?? []);
       draft = await this.drafts.setSafety(draft, industry, packId);
       const pack = packFor(draft.draftConfig.safetyPackId)!;
       notes.push({ role: 'builder', text: pack.builderMessage });
@@ -242,7 +243,11 @@ export class BotDraftSessionService implements CrawlLearner {
       text: response.message,
       ...(response.chips?.length ? { chips: response.chips } : {}),
     };
-    draft = await this.drafts.appendTranscript(draft, [...notes, message]);
+    draft = await this.drafts.appendTranscript(draft, [
+      { role: 'owner', text: said },
+      ...notes,
+      message,
+    ]);
     const added = draft.transcript.slice(-(notes.length + 1));
     for (const note of added.slice(0, -1)) {
       emit({ event: 'message', data: note });

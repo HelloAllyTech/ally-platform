@@ -2,6 +2,7 @@ import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
 import { AddressInfo } from 'net';
 import { BotDraftStep } from '../enum/bot-draft.enum';
 import { CRAWL_LIMITS, SiteCrawlService } from '../crawl/site-crawl.service';
+import { MAX_ARTICLES } from '../crawl/url-scope';
 import type { CrawlState } from '../type/bot-draft.type';
 
 jest.mock('src/common/execution/execution-manager', () => ({
@@ -293,6 +294,25 @@ describe('SiteCrawlService', () => {
     // The builder learns in batches as pages arrive.
     expect(h.learned.reduce((a, b) => a + b, 0)).toBe(50);
     expect(Math.max(...h.learned)).toBeLessThanOrEqual(CRAWL_LIMITS.learnBatch);
+  });
+
+  it('reads blog and news pages last, and at most 10 of them', async () => {
+    const posts = Array.from({ length: 15 }, (_, i) => `/blog/post-${i}`);
+    const core = ['/fees', '/team', '/contact'];
+    const routes: Routes = {
+      // The posts are linked first; the business's own pages still come first.
+      '/': { body: page('Home', LONG, [...posts, ...core]) },
+    };
+    for (const path of [...posts, ...core])
+      routes[path] = { body: page(path, LONG) };
+    const s = await serve(routes);
+    const crawl = await harness().crawl(s.url);
+    // The order pages were taken in (reading runs 4 at a time, so finishing order varies).
+    const taken = crawl.seen.map((url) => new URL(url).pathname);
+    expect(taken.slice(0, 4).sort()).toEqual(['/', ...core].sort());
+    expect(
+      read(crawl).filter((path) => path.startsWith('/blog/')),
+    ).toHaveLength(MAX_ARTICLES);
   });
 
   it('finds the brand: logo, theme colour and favicon', async () => {

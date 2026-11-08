@@ -9,7 +9,7 @@ never says what a design will do (that is fixed in the catalogue).
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
@@ -39,6 +39,7 @@ from app.exceptions.custom_exceptions import LLMInvocationFailedException
 from app.prompts.resolver import get_backend_llm_overrides, load_and_format
 from app.schemas.builder import (
     BuilderStepRequest,
+    CareTopic,
     DesignCard,
     DesignId,
     ExtractedFact,
@@ -181,7 +182,11 @@ def findings(facts: Sequence[ExtractedFact]) -> List[str]:
 # --- classify ----------------------------------------------------------------
 
 
-async def classify(request: BuilderStepRequest, timeout: float) -> Industry:
+async def classify(
+    request: BuilderStepRequest, timeout: float
+) -> Tuple[Industry, List[CareTopic]]:
+    """The kind of business, and the topics it deals with that call for care. Neither
+    is the pack: ally-be picks that from both, in code."""
     out = await call(
         "classify",
         ClassifyOut,
@@ -192,7 +197,9 @@ async def classify(request: BuilderStepRequest, timeout: float) -> Industry:
         description=request.description or "(none)",
         pages=format_pages(request.pages, snippets=False),
     )
-    return out.industry
+    known = {topic.value for topic in CareTopic}
+    topics = [CareTopic(t) for t in dict.fromkeys(out.care_topics) if t in known]
+    return out.industry, topics
 
 
 # --- gaps --------------------------------------------------------------------

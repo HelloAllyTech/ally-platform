@@ -59,6 +59,7 @@ export interface BuilderStepResponse {
   asking: string;
   answer: string;
   industry: string | null;
+  care_topics?: string[];
   gaps: BuilderGap[] | null;
   designs: BuilderDesignCard[] | null;
   dropped_patches: number;

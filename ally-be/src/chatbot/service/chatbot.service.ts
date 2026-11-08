@@ -90,6 +90,8 @@ export interface ChatbotSummary {
   memberCount: number;
   stats: ChatbotStats;
   lastTestedAt: Date | null;
+  /** The caller's own unfinished onboarding for this bot (chunk 20a): "Continue setup". */
+  setupDraftId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -216,6 +218,7 @@ export class ChatbotService {
       memberCounts,
       stats,
       defaults,
+      setups,
     ] = await Promise.all([
       this.access.rolesFor(ids),
       this.connectors.summariesForBots(ids),
@@ -225,6 +228,7 @@ export class ChatbotService {
       this.countBy(this.memberRepository, ids),
       this.stats(ids),
       this.settingsService.get(),
+      this.setupDrafts(ids),
     ]);
     return bots.map((bot) => ({
       id: bot.id,
@@ -245,9 +249,27 @@ export class ChatbotService {
       memberCount: memberCounts.get(bot.id) ?? 0,
       stats: stats.get(bot.id) ?? EMPTY_STATS,
       lastTestedAt: bot.lastTestedAt ?? null,
+      setupDraftId: setups.get(bot.id) ?? null,
       createdAt: bot.createdAt,
       updatedAt: bot.updatedAt,
     }));
+  }
+
+  /**
+   * The caller's own unfinished onboarding per bot. Read directly: onboarding's module imports this
+   * one, so the dependency can't run the other way. Only the person setting it up resumes it.
+   */
+  private async setupDrafts(ids: string[]): Promise<Map<string, string>> {
+    const userId = currentUserId();
+    if (!userId) return new Map();
+    const rows = await this.chatbotRepository.manager.query<
+      { chatbot_id: string; id: string }[]
+    >(
+      `SELECT chatbot_id, id FROM bot_drafts
+        WHERE chatbot_id = ANY($1::uuid[]) AND status = 'active' AND owner_user_id = $2`,
+      [ids, userId],
+    );
+    return new Map((rows ?? []).map((row) => [row.chatbot_id, row.id]));
   }
 
   /** Per bot, the documents it can answer from now: indexed and not archived. */

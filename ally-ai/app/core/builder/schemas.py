@@ -15,7 +15,13 @@ from typing import Any, List, Type
 from pydantic import BaseModel, BeforeValidator, Field
 from typing_extensions import Annotated
 
-from app.schemas.builder import DesignId, Industry, LearnedSection, PrechatFieldType
+from app.schemas.builder import (
+    CareTopic,
+    DesignId,
+    Industry,
+    LearnedSection,
+    PrechatFieldType,
+)
 
 
 def lenient(enum: Type[Enum], default: Any) -> Any:
@@ -73,6 +79,11 @@ class ExtractOut(BaseModel):
 
 class ClassifyOut(BaseModel):
     industry: lenient(Industry, Industry.OTHER) = Industry.OTHER
+    # Unknown topics are dropped, not failed: lenient per item, filtered in code.
+    care_topics: List[str] = Field(
+        default_factory=list,
+        json_schema_extra={"items": {"enum": [t.value for t in CareTopic]}},
+    )
     confidence: float = 0.0
 
 

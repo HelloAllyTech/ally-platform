@@ -1,4 +1,4 @@
-import { Industry, SafetyPackId } from '../enum/bot-draft.enum';
+import { CareTopic, Industry, SafetyPackId } from '../enum/bot-draft.enum';
 
 /**
  * A safety pack: rules that are always on for an industry (chunk 20a). Packs are versioned code,
@@ -242,8 +242,38 @@ export const PACK_FOR_INDUSTRY: Record<Industry, SafetyPackId> = {
   [Industry.REAL_ESTATE]: SafetyPackId.STANDARD,
   [Industry.SAAS]: SafetyPackId.STANDARD,
   [Industry.RESTAURANT]: SafetyPackId.STANDARD,
+  // A non-profit's pack comes from its cause (its care topics), not from being a non-profit.
+  [Industry.NON_PROFIT]: SafetyPackId.STANDARD,
   [Industry.OTHER]: SafetyPackId.STANDARD,
 };
+
+/** Care topic → pack. */
+export const PACK_FOR_TOPIC: Record<CareTopic, SafetyPackId> = {
+  [CareTopic.MENTAL_HEALTH]: SafetyPackId.MENTAL_HEALTH,
+  [CareTopic.MEDICAL]: SafetyPackId.MEDICAL,
+  [CareTopic.MEDICINES]: SafetyPackId.PHARMACY,
+  [CareTopic.YOUNG_PEOPLE]: SafetyPackId.MINORS,
+  [CareTopic.LEGAL_FINANCIAL]: SafetyPackId.LEGAL_FINANCIAL,
+};
+
+/**
+ * The pack for a business: the strongest of its industry's and its care topics'. Decided here, in
+ * code; the builder only says what kind of business it is and what it deals with.
+ */
+export function packForBusiness(
+  industry: Industry | string | null | undefined,
+  topics: (CareTopic | string)[] = [],
+): SafetyPackId {
+  const candidates = [
+    PACK_FOR_INDUSTRY[industry as Industry] ?? SafetyPackId.STANDARD,
+    ...topics
+      .map((topic) => PACK_FOR_TOPIC[topic as CareTopic])
+      .filter((id): id is SafetyPackId => Boolean(id)),
+  ];
+  return candidates.reduce((best, id) =>
+    SAFETY_PACKS[id].strength > SAFETY_PACKS[best].strength ? id : best,
+  );
+}
 
 export function packFor(
   id: SafetyPackId | string | null | undefined,

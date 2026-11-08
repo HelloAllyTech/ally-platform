@@ -177,7 +177,14 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
         <button
           key={bot.id}
           type="button"
-          onClick={() => navigate(ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id))}
+          onClick={() =>
+            // An unfinished setup opens where it left off (chunk 20a), not the bot's page.
+            navigate(
+              bot.status === ChatbotStatus.DRAFT && bot.setupDraftId
+                ? ROUTES.CHATBOT_NEW_SESSION(bot.setupDraftId)
+                : ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id),
+            )
+          }
           className="flex flex-col gap-3 text-left border border-border-light rounded-md p-5 hover:bg-neutral-50 min-w-0"
         >
           <div className="flex items-start justify-between gap-3">
@@ -214,6 +221,11 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
             <span>{fill(t.cardMessages, { count: bot.stats.messages })}</span>
             <span>{fill(t.cardPeople, { count: bot.stats.people })}</span>
             <span>{fill(t.cardDocs, { count: bot.documentCount })}</span>
+            {bot.status === ChatbotStatus.DRAFT && bot.setupDraftId && (
+              <span className="font-semibold text-primary-700 underline">
+                {ONBOARDING_COPY.continueSetup}
+              </span>
+            )}
             <span className="ml-auto text-typography-500">{t.role[bot.myRole]}</span>
           </div>
         </button>

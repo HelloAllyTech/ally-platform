@@ -28,7 +28,9 @@ import { CRAWLER_USER_AGENT, parseRobots, Robots } from './robots';
 import { parseSitemap } from './sitemap';
 import {
   displayDomain,
+  isArticle,
   isJunk,
+  MAX_ARTICLES,
   normaliseUrl,
   sameSite,
   startUrlFrom,
@@ -227,12 +229,18 @@ export class SiteCrawlService implements OnModuleInit {
 
     const readCount = () =>
       crawl.pages.filter((p) => p.status === 'read').length;
+    // The business's own pages first; blog and news pages only once those run out, and at most
+    // MAX_ARTICLES of them (counted from what was taken, so it holds across a resume).
     const take = (): string | undefined => {
-      while (crawl.queue.length) {
-        const url = crawl.queue.shift()!;
-        if (!crawl.seen.includes(url)) return url;
+      crawl.queue = crawl.queue.filter((url) => !crawl.seen.includes(url));
+      const core = crawl.queue.findIndex((url) => !isArticle(url));
+      if (core >= 0) return crawl.queue.splice(core, 1)[0];
+      const articles = crawl.seen.filter((url) => isArticle(url)).length;
+      if (articles >= MAX_ARTICLES) {
+        crawl.queue = [];
+        return undefined;
       }
-      return undefined;
+      return crawl.queue.shift();
     };
 
     let startFailed: GuardedFetchError | null = null;

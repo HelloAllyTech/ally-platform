@@ -413,3 +413,25 @@ async def test_the_decline_hint_is_the_detail_not_the_chip_text():
     prompt = fake.calls[0]["prompt"]
     assert "written out exactly as in What we learned" in prompt
     assert "pointing to Our phone number" not in prompt
+
+
+class TestNonProfit:
+    @pytest.mark.asyncio
+    async def test_a_mental_health_foundation_is_a_non_profit_with_its_cause(self):
+        fake = FakeLLM(
+            ClassifyOut=[
+                {
+                    "industry": "non_profit",
+                    "care_topics": ["mental_health", "astrology", "mental_health"],
+                }
+            ],
+            GapsOut=[{"missing": ["donate", "volunteer"]}],
+        )
+        res = await run(request("learned", chip=catalogue.LOOKS_RIGHT), fake)
+        assert res.industry.value == "non_profit"
+        # Unknown topics dropped, repeats folded; ally-be picks the pack from these.
+        assert [t.value for t in res.care_topics] == ["mental_health"]
+        assert [g.key for g in res.gaps] == ["donate", "volunteer"]
+        assert res.message.startswith(
+            "One thing I couldn't find: how people can donate."
+        )

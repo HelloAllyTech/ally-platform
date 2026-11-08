@@ -40,6 +40,8 @@ export interface BotDraftSession {
   canvasVersion: number;
   /** `shown` is how the owner's choice reads in the chat (a design's title), if not its text. */
   send: (input: { text?: string; chip?: string }, shown?: string) => Promise<void>;
+  /** Cancel the builder's reply: the draft stays exactly as it was before the message. */
+  stop: () => void;
   reload: () => Promise<void>;
   setView: (view: BotDraftView) => void;
 }
@@ -186,6 +188,8 @@ export const useBotDraftSession = (draftId: string): BotDraftSession => {
 
   useEffect(() => () => turnAbort.current?.abort(), []);
 
+  const stop = useCallback(() => turnAbort.current?.abort(), []);
+
   const send = useCallback(
     async (input: { text?: string; chip?: string }, label?: string) => {
       if (sending) return;
@@ -253,6 +257,7 @@ export const useBotDraftSession = (draftId: string): BotDraftSession => {
     error,
     canvasVersion,
     send,
+    stop,
     reload,
     setView,
   };

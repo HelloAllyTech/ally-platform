@@ -1,20 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { InlineNotification, SkeletonText } from "@ally-ui-mono/ui-shared";
-import {
-  useBackBotDraftMutation,
-  useGetBotPageQuery,
-  usePatchBotDraftMutation,
-  usePublishBotDraftMutation,
-} from "@api";
 import { Button } from "@components";
 import { ChatComposer, ChatMessage } from "@components/agent-chat";
 import { ButtonVariant } from "@components/types";
 import { ROUTES } from "@constants";
-import type { AgentChatMessage } from "@types";
 
 import {
   AssistantCard,
@@ -25,24 +18,12 @@ import {
   SafetyCard,
   Section,
   ShareCard,
-  reached,
 } from "./Canvas";
 import { COPY, fill } from "./copy";
-import { useBotDraftSession } from "./useBotDraftSession";
-
-import type { PatchOp, PublishResult } from "./types";
+import { reached } from "./steps";
+import { CanvasSection, useOnboardingSession } from "./useOnboardingSession";
 
 const LG_QUERY = "(min-width: 1024px)";
-
-/** The canvas section a step brings into view. */
-const STEP_SECTION: Partial<Record<string, string>> = {
-  learned: "learned",
-  gaps: "safety",
-  design: "designs",
-  building: "building",
-  share: "assistant",
-  published: "share",
-};
 
 /** Tailwind's `lg`: the canvas sits beside the chat above it, and is a tab below it. */
 const useIsLargeScreen = (): boolean => {
@@ -61,116 +42,58 @@ const useIsLargeScreen = (): boolean => {
   return matches;
 };
 
-const errorText = (error: unknown): string => {
-  const data = (error as { data?: { message?: unknown } })?.data;
-  return typeof data?.message === "string" ? data.message : COPY.problems.generic;
-};
-
 /**
- * Onboarding (chunk 20a): the builder chat on the left and the canvas on the right, where
- * everything the builder finds and makes appears, section by section, as its step starts. On a
- * phone the two are tabs, and the canvas tab shows a dot when it changed out of sight. The canvas
- * is mounted once (never hidden with CSS), so edits in it are never lost to a second copy.
+ * Onboarding's session screen (chunk 20a). Presentation only: every decision and action is
+ * `useOnboardingSession`, so the design pass can replace this file (and Canvas.tsx) and keep the
+ * hooks. The builder chat sits on the left and the canvas on the right; on a phone they're tabs.
  */
 export const OnboardingSession: React.FC = () => {
   const { draftId = "" } = useParams<{ draftId: string }>();
   const navigate = useNavigate();
   const isLarge = useIsLargeScreen();
-  const session = useBotDraftSession(draftId);
-  const { view, reading, working, streaming, sending, error, send, setView, canvasVersion } =
-    session;
+  const s = useOnboardingSession(draftId, message => toast.error(message));
   const [tab, setTab] = useState<"chat" | "canvas">("chat");
   const [seenCanvas, setSeenCanvas] = useState(0);
-  const [published, setPublished] = useState<PublishResult | null>(null);
-  const [patchDraft] = usePatchBotDraftMutation();
-  const [back, { isLoading: goingBack }] = useBackBotDraftMutation();
-  const [publish, { isLoading: publishing }] = usePublishBotDraftMutation();
-  const { data: page } = useGetBotPageQuery(view?.chatbotId ?? "", {
-    skip: !view?.chatbotId,
-  });
   const feedRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const shownSection = useRef<CanvasSection | null | undefined>(undefined);
 
   useEffect(() => {
-    if (tab === "canvas" || isLarge) setSeenCanvas(canvasVersion);
-  }, [tab, isLarge, canvasVersion]);
-
-  // A published draft opened again shows its live link.
-  useEffect(() => {
-    if (view?.status === "published" && page?.link && !published && view.chatbotId) {
-      setPublished({
-        chatbotId: view.chatbotId,
-        slug: page.slug,
-        link: page.link,
-        access: page.access as PublishResult["access"],
-      });
-    }
-  }, [view, page, published]);
+    if (tab === "canvas" || isLarge) setSeenCanvas(s.canvasVersion);
+  }, [tab, isLarge, s.canvasVersion]);
 
   useEffect(() => {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" });
-  }, [view?.transcript.length, streaming, working]);
+  }, [s.rows.length, s.streaming, s.working]);
 
-  // When a step starts, its section is the newest thing on the canvas: bring it into view and
-  // move focus there, so it isn't left below a long "What we learned".
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const shownStep = useRef<string | null>(null);
+  // When a step starts, bring its section into view (the canvas's own pane only) and move focus
+  // to its heading, so it isn't left below a long "What we learned".
   useEffect(() => {
-    if (!view) return undefined;
-    const section = STEP_SECTION[view.step];
-    if (shownStep.current === null) {
-      shownStep.current = view.step;
+    if (!s.view) return undefined;
+    if (shownSection.current === undefined) {
+      shownSection.current = s.focusSection;
       return undefined;
     }
-    if (shownStep.current === view.step || !section) return undefined;
-    shownStep.current = view.step;
+    if (!s.focusSection || shownSection.current === s.focusSection) return undefined;
+    shownSection.current = s.focusSection;
     const timer = setTimeout(() => {
       const target = canvasRef.current?.querySelector<HTMLElement>(
-        `[data-testid="canvas-${section}"]`,
+        `[data-testid="canvas-${s.focusSection}"]`,
       );
-      // Only the canvas's own pane scrolls: scrollIntoView would move the page layout too.
       const pane = canvasRef.current?.parentElement;
       if (target && pane) {
         const top =
           target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop;
         pane.scrollTo({ top: Math.max(0, top - 16), behavior: "smooth" });
       }
-      target?.querySelector<HTMLElement>("h3")?.setAttribute("tabindex", "-1");
-      target?.querySelector<HTMLElement>("h3")?.focus({ preventScroll: true });
+      const heading = target?.querySelector<HTMLElement>("h3");
+      heading?.setAttribute("tabindex", "-1");
+      heading?.focus({ preventScroll: true });
     }, 250);
     return () => clearTimeout(timer);
-  }, [view]);
+  }, [s.view, s.focusSection]);
 
-  const onPatch = useCallback(
-    async (target: "draft" | "learned", ops: PatchOp[]): Promise<boolean> => {
-      if (!view) return false;
-      try {
-        setView(await patchDraft({ id: view.id, target, ops, version: view.version }).unwrap());
-        return true;
-      } catch (err) {
-        toast.error(errorText(err));
-        void session.reload();
-        return false;
-      }
-    },
-    [patchDraft, session, setView, view],
-  );
-
-  const messages = useMemo<AgentChatMessage[]>(() => {
-    if (!view) return [];
-    const rows = view.transcript.filter(entry => entry.role !== "note");
-    const lastBuilder = [...rows].reverse().find(e => e.role === "builder")?.id;
-    return rows.map(entry => ({
-      id: entry.id,
-      role: entry.role === "owner" ? "user" : "assistant",
-      content: entry.text,
-      ...(entry.id === lastBuilder && entry.chips?.length && !sending
-        ? {
-            suggestedActions: entry.chips.map(chip => ({ label: chip, message: chip })),
-          }
-        : {}),
-    }));
-  }, [view, sending]);
-
+  const view = s.view;
   if (!view) {
     return (
       <div className="p-6">
@@ -179,125 +102,97 @@ export const OnboardingSession: React.FC = () => {
     );
   }
 
-  const step = view.step;
-  const notes = view.transcript.filter(entry => entry.role === "note");
-  const questionsLeft = step === "gaps" ? view.conversation.questionsLeft : null;
-  const canGoBack = reached(step, "safety") && step !== "published" && !sending;
-  const building = step === "building" || (sending && working === COPY.working.drafting);
-
   const chat = (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div ref={feedRef} className="flex-1 overflow-y-auto p-4" aria-live="polite">
         <div className="flex flex-col gap-3">
-          {messages.map(message => (
+          {s.rows.map(row => (
             <ChatMessage
-              key={message.id}
-              message={message}
+              key={row.id}
+              message={{
+                id: row.id,
+                role: row.from === "owner" ? "user" : "assistant",
+                content: row.text,
+                suggestedActions: row.chips.map(chip => ({ label: chip, message: chip })),
+              }}
               onAnswerQuestion={() => undefined}
-              onSendSuggestion={chip => void send({ chip })}
-              disabled={sending}
+              onSendSuggestion={s.chooseChip}
+              disabled={s.sending}
             />
           ))}
-          {notes.slice(-1).map(note => (
-            <p key={note.id} className="text-center text-xs text-typography-500">
-              {note.text}
-            </p>
-          ))}
-          {sending && (
+          {s.note && <p className="text-center text-xs text-typography-500">{s.note.text}</p>}
+          {s.sending && (
             <ChatMessage
               message={{
                 id: "streaming",
                 role: "assistant",
-                content: streaming,
+                content: s.streaming,
                 isStreaming: true,
-                toolNotes: working ? [working] : [],
+                toolNotes: s.working ? [s.working] : [],
               }}
               onAnswerQuestion={() => undefined}
               disabled
             />
           )}
-          {error && <InlineNotification kind="error" lowContrast hideCloseButton title={error} />}
+          {s.error && (
+            <InlineNotification kind="error" lowContrast hideCloseButton title={s.error} />
+          )}
         </div>
       </div>
-      {questionsLeft ? (
+      {s.questionsLeft ? (
         <p className="px-4 pb-1 text-xs text-typography-600">
-          {fill(COPY.gaps.left, { n: questionsLeft })}
+          {fill(COPY.gaps.left, { n: s.questionsLeft })}
         </p>
       ) : null}
       <ChatComposer
-        onSend={text => void send({ text })}
-        onStop={() => undefined}
-        isStreaming={sending}
+        onSend={s.say}
+        onStop={s.stop}
+        isStreaming={s.sending}
         disabled={view.status !== "active"}
       />
     </section>
   );
 
+  const render: Record<CanvasSection, () => React.ReactNode> = {
+    reading: () => <ReadingCard view={view} reading={s.reading} />,
+    learned: () => (
+      <LearnedCard view={view} busy={s.sending} onPatch={s.edit} onConfirm={s.confirmLearned} />
+    ),
+    safety: () => <SafetyCard view={view} />,
+    designs: () => (
+      <DesignCards
+        designs={view.designs ?? []}
+        chosen={view.draft.design}
+        canChoose={s.canChooseDesign}
+        onChoose={id => {
+          const card = view.designs?.find(d => d.id === id);
+          if (card) s.chooseDesign(card);
+        }}
+      />
+    ),
+    building: () => <BuildingCard done={reached(view.step, "share")} />,
+    assistant: () => <AssistantCard view={view} onPatch={s.edit} />,
+    share: () => (
+      <ShareCard
+        view={view}
+        publicAllowed={s.publicAllowed}
+        published={s.published}
+        publishing={s.publishing}
+        onPublish={(access, emails) => void s.publish(access, emails)}
+        onConnectWhatsApp={() =>
+          navigate(`${ROUTES.CHATBOT_DETAIL.replace(":botId", view.chatbotId!)}?tab=connectors`)
+        }
+      />
+    ),
+  };
+
   const canvas = (
     <div ref={canvasRef} className="flex flex-col gap-4 p-4">
-      {view.source.website && (
-        <Section id="reading">
-          <ReadingCard view={view} reading={reading} />
+      {s.sections.map(id => (
+        <Section key={id} id={id}>
+          {render[id]()}
         </Section>
-      )}
-      {reached(step, "learned") && (
-        <Section id="learned">
-          <LearnedCard
-            view={view}
-            busy={sending}
-            onPatch={onPatch}
-            onConfirm={() => void send({ chip: COPY.learned.confirm })}
-          />
-        </Section>
-      )}
-      {view.safety?.on && (
-        <Section id="safety">
-          <SafetyCard view={view} />
-        </Section>
-      )}
-      {view.designs && reached(step, "design") && (
-        <Section id="designs">
-          <DesignCards
-            designs={view.designs}
-            chosen={view.draft.design}
-            canChoose={step === "design" && !sending}
-            onChoose={id =>
-              void send({ chip: `design:${id}` }, view.designs?.find(card => card.id === id)?.title)
-            }
-          />
-        </Section>
-      )}
-      {(building || reached(step, "share")) && (
-        <Section id="building">
-          <BuildingCard done={reached(step, "share")} />
-        </Section>
-      )}
-      {reached(step, "share") && (
-        <Section id="assistant">
-          <AssistantCard view={view} onPatch={onPatch} />
-        </Section>
-      )}
-      {reached(step, "share") && (
-        <Section id="share">
-          <ShareCard
-            view={view}
-            publicAllowed={Boolean(page?.publicAllowed)}
-            published={published}
-            publishing={publishing}
-            onPublish={async (access, emails) => {
-              try {
-                setPublished(await publish({ id: view.id, access, emails }).unwrap());
-                void session.reload();
-              } catch (err) {
-                toast.error(errorText(err));
-              }
-            }}
-            onConnectWhatsApp={() =>
-              navigate(`${ROUTES.CHATBOT_DETAIL.replace(":botId", view.chatbotId!)}?tab=connectors`)
-            }
-          />
-        </Section>
-      )}
+      ))}
     </div>
   );
 
@@ -314,12 +209,8 @@ export const OnboardingSession: React.FC = () => {
           </Button>
           <h1 className="truncate text-base font-semibold text-typography-900">{COPY.header}</h1>
         </div>
-        {canGoBack && (
-          <Button
-            variant={ButtonVariant.SECONDARY}
-            disabled={goingBack}
-            onClick={async () => setView(await back(view.id).unwrap())}
-          >
+        {s.canGoBack && (
+          <Button variant={ButtonVariant.SECONDARY} onClick={() => void s.back()}>
             {COPY.back}
           </Button>
         )}
@@ -349,7 +240,7 @@ export const OnboardingSession: React.FC = () => {
                 }`}
               >
                 {COPY.tabs[id]}
-                {id === "canvas" && tab !== "canvas" && canvasVersion > seenCanvas && (
+                {id === "canvas" && tab !== "canvas" && s.canvasVersion > seenCanvas && (
                   <span
                     data-testid="canvas-badge"
                     className="absolute ml-1 inline-block h-2 w-2 rounded-full bg-primary-600"

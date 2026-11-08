@@ -1,9 +1,10 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { Industry, SafetyPackId } from '../enum/bot-draft.enum';
+import { CareTopic, Industry, SafetyPackId } from '../enum/bot-draft.enum';
 import {
   isHealthPack,
   PACK_FOR_INDUSTRY,
+  packForBusiness,
   packRulesBlock,
   SAFETY_PACKS,
 } from '../safety-pack/safety-packs';
@@ -67,5 +68,29 @@ describe('safety packs', () => {
     expect(block).toContain('Never diagnose');
     expect(block).toContain('- Never: discuss fees for other clinics');
     expect(packRulesBlock(null)).toBeNull();
+  });
+});
+
+describe('packForBusiness', () => {
+  it.each([
+    // A mental health non-profit gets Mental health safety from its cause.
+    [
+      Industry.NON_PROFIT,
+      [CareTopic.MENTAL_HEALTH],
+      SafetyPackId.MENTAL_HEALTH,
+    ],
+    [Industry.NON_PROFIT, [], SafetyPackId.STANDARD],
+    // The strongest wins, whichever side it comes from.
+    [Industry.SCHOOL, [CareTopic.MENTAL_HEALTH], SafetyPackId.MENTAL_HEALTH],
+    [
+      Industry.MENTAL_HEALTH,
+      [CareTopic.YOUNG_PEOPLE],
+      SafetyPackId.MENTAL_HEALTH,
+    ],
+    [Industry.D2C, [CareTopic.MEDICINES], SafetyPackId.PHARMACY],
+    [Industry.SAAS, ['astrology'], SafetyPackId.STANDARD],
+    ['made_up', [], SafetyPackId.STANDARD],
+  ])('%s with %j gets %s', (industry, topics, pack) => {
+    expect(packForBusiness(industry, topics as never)).toBe(pack);
   });
 });

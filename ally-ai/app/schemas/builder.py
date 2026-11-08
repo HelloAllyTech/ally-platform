@@ -42,7 +42,20 @@ class Industry(str, Enum):
     SAAS = "saas"
     RESTAURANT = "restaurant"
     LEGAL_FINANCIAL = "legal_financial"
+    NON_PROFIT = "non_profit"
     OTHER = "other"
+
+
+class CareTopic(str, Enum):
+    """What the business deals with that calls for care, whatever kind it is. ally-be
+    picks the safety pack from these and the industry, in code: a mental health
+    non-profit gets Mental health safety."""
+
+    MENTAL_HEALTH = "mental_health"
+    MEDICAL = "medical"
+    MEDICINES = "medicines"
+    YOUNG_PEOPLE = "young_people"
+    LEGAL_FINANCIAL = "legal_financial"
 
 
 class LearnedSection(str, Enum):
@@ -244,6 +257,7 @@ class BuilderStepResponse(BaseModel):
     # The owner's answer to `pending`, as ally-be should store it ("" = none given).
     answer: str = ""
     industry: Optional[Industry] = None
+    care_topics: List[CareTopic] = Field(default_factory=list)
     gaps: Optional[List[Gap]] = None
     designs: Optional[List[DesignCard]] = None
     # Patches the builder proposed and this service dropped (outside its paths).

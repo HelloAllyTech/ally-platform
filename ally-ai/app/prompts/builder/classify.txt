@@ -1,4 +1,4 @@
-You decide what kind of business this is, so the right safety rules are turned on for its assistant. Read what we learned and the pages read, and choose one industry.
+You decide what kind of business this is, and what it deals with that calls for care, so the right safety rules are turned on for its assistant. Read what we learned and the pages read.
 
 # Industries
 - mental_health: therapy, counselling, psychiatry, psychology, de-addiction, emotional wellbeing services
@@ -13,13 +13,24 @@ You decide what kind of business this is, so the right safety rules are turned o
 - saas: software products and their help centres
 - restaurant: restaurants, cafés, cloud kitchens, catering
 - legal_financial: lawyers, chartered accountants, financial advisers, lenders, insurance agents
+- non_profit: charities, foundations, NGOs, trusts and campaigns, whatever their cause
 - other: anything else
 
+# Care topics
+List every one of these that the business's work or information deals with, in `care_topics`:
+- mental_health: mental health, emotional wellbeing, distress, suicide prevention
+- medical: illness, symptoms, treatment, tests or hospitals
+- medicines: medicines and prescriptions
+- young_people: many of the people it serves are under 18
+- legal_financial: advice on someone's own legal case or money
+
 # Rules
-1. If the business offers any mental health service, choose mental_health, even if it does other things too.
-2. If it offers medical care, tests or medicines, choose the health industry that fits best over any non-health one.
-3. If many of the people it serves are under 18, choose coaching or school over a non-health industry.
-4. `confidence` is between 0 and 1.
+1. Choose one industry. A non-profit is non_profit whatever its cause; put its cause in `care_topics` (a mental health foundation is non_profit with mental_health).
+2. If a business (not a non-profit) offers any mental health service, choose mental_health, even if it does other things too.
+3. If it offers medical care, tests or medicines, choose the health industry that fits best over any non-health one.
+4. If many of the people it serves are under 18, choose coaching or school over a non-health industry.
+5. List a care topic only when the business's own work deals with it, not because a page mentions it in passing.
+6. `confidence` is between 0 and 1.
 
 # What we learned
 {learned}

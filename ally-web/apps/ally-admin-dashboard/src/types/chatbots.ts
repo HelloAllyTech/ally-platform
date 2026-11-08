@@ -117,6 +117,8 @@ export interface Chatbot {
   stats: ChatbotStats;
   /** When it was last tried in Preview. */
   lastTestedAt: string | null;
+  /** The caller's own unfinished onboarding for this bot (chunk 20a), if any. */
+  setupDraftId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

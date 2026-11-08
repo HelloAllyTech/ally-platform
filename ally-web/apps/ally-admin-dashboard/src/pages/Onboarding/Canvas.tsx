@@ -12,7 +12,6 @@ import { COPY, fill } from "./copy";
 import { Card, StatusPill } from "../WhatsAppBot/shared";
 
 import type {
-  BotDraftStep,
   BotDraftView,
   DesignCard,
   LearnedFact,
@@ -21,23 +20,6 @@ import type {
   PublishResult,
 } from "./types";
 import type { ReadingProgress } from "./useBotDraftSession";
-
-/** Steps in order, to say which sections a draft has reached. */
-const ORDER: BotDraftStep[] = [
-  "start",
-  "reading",
-  "learned",
-  "safety",
-  "gaps",
-  "design",
-  "building",
-  "checkup",
-  "try_it",
-  "share",
-  "published",
-];
-export const reached = (step: BotDraftStep, at: BotDraftStep) =>
-  ORDER.indexOf(step) >= ORDER.indexOf(at);
 
 /** A canvas section that fades in (and its heading takes focus) when its step starts. */
 const Section: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {

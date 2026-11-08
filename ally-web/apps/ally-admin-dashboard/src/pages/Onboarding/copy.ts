@@ -135,6 +135,7 @@ export const COPY = {
     leaving: "Your progress is saved. You can come back any time.",
   },
   newAssistant: "New assistant",
+  continueSetup: "Continue setup",
   advancedSetup: "Advanced setup",
 } as const;
 

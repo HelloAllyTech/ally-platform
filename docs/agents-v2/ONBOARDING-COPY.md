@@ -238,6 +238,7 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 Labels the screens need that the sections above don't name. Same voice.
 
 - **AI Chatbots button:** New assistant
+- **On a draft assistant whose setup isn't finished:** Continue setup
 - **The old form, for platform admins:** Advanced setup
 - **Builder header:** Set up your assistant
 - **Back button:** Back
