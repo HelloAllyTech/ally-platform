@@ -109,6 +109,15 @@ export async function guardedFetchText(
   url: string,
   options: GuardedFetchOptions,
 ): Promise<GuardedFetchResult> {
+  const result = await guardedFetchBuffer(url, options);
+  return { ...result, body: result.body.toString('utf8') };
+}
+
+/** `guardedFetchText`, keeping the bytes (an image, for example). */
+export async function guardedFetchBuffer(
+  url: string,
+  options: GuardedFetchOptions,
+): Promise<Omit<GuardedFetchResult, 'body'> & { body: Buffer }> {
   let current = url;
   const maxRedirects = options.maxRedirects ?? 5;
   for (let hop = 0; hop <= maxRedirects; hop++) {
@@ -169,7 +178,7 @@ export async function guardedFetchText(
     ) {
       throw new GuardedFetchError('not_html');
     }
-    const body = Buffer.from(response.data as ArrayBuffer).toString('utf8');
+    const body = Buffer.from(response.data as ArrayBuffer);
     return { url: current, status: response.status, contentType, body };
   }
   throw new GuardedFetchError('too_many_redirects');

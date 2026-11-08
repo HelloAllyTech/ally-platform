@@ -64,13 +64,25 @@ import { TurnstileService } from './turnstile.service';
 export interface PublicBotPage {
   slug: string;
   access: BotPageAccess;
-  branding: AvailableBotPage['settings']['branding'];
+  /** The words, plus `look` (chunk 20d): heading style, theme, the corrected accent and images. */
+  branding: AvailableBotPage['settings']['branding'] & {
+    look: PublicBrandLook;
+  };
   suggestedQuestions: string[];
   prechat: PrechatField[];
   maxMessageChars: number;
   language: AvailableBotPage['settings']['language'];
   /** Set when the page needs a Turnstile token to start a session. */
   turnstileSiteKey: string | null;
+}
+
+/** How the page looks to a visitor. Image URLs are on the public image route; no ids. */
+export interface PublicBrandLook {
+  headingStyle: AvailableBotPage['settings']['brand']['headingStyle'];
+  theme: AvailableBotPage['settings']['brand']['theme'];
+  accent: string;
+  logo: AvailableBotPage['brandImages']['logo'];
+  cover: AvailableBotPage['brandImages']['cover'];
 }
 
 export type SessionState = 'ready' | 'needs_email' | 'needs_code';
@@ -210,7 +222,16 @@ export class BotPagePublicService {
     return {
       slug: page.slug,
       access: page.access,
-      branding: settings.branding,
+      branding: {
+        ...settings.branding,
+        look: {
+          headingStyle: settings.brand.headingStyle,
+          theme: settings.brand.theme,
+          accent: settings.branding.accentColour,
+          logo: available.brandImages?.logo ?? null,
+          cover: available.brandImages?.cover ?? null,
+        },
+      },
       suggestedQuestions: settings.suggestedQuestions,
       prechat: settings.prechat,
       maxMessageChars: Math.min(

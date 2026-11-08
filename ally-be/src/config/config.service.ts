@@ -593,6 +593,11 @@ export class AppConfigService {
       // I/O). Unset → the trace service falls back to the private audio
       // bucket; never a public one.
       agentTraceBucket: this.configService.get<string>('AGENT_TRACE_S3_BUCKET'),
+      // Bot page images (chunk 20d): private. Unset → the private audio bucket, under a
+      // `bot-images/` prefix; a bucket of its own is a launch item.
+      botImagesBucket:
+        this.configService.get<string>('BOT_IMAGES_S3_BUCKET') ||
+        this.configService.get<string>('AUDIO_STORAGE_S3_BUCKET'),
     };
   }
 

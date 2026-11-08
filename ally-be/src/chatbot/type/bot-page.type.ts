@@ -39,8 +39,60 @@ export interface BotPageLimits {
 
 export type BotPageLanguage = 'en' | 'hi' | 'auto';
 
+export const HEADING_STYLES = ['classic', 'modern', 'friendly'] as const;
+export type HeadingStyle = (typeof HEADING_STYLES)[number];
+export const BRAND_THEMES = ['light', 'dark', 'auto'] as const;
+export type BrandTheme = (typeof BRAND_THEMES)[number];
+/** Landing gallery slots (chunk 20e uses them). */
+export const MAX_GALLERY_IMAGES = 6;
+
+/**
+ * The page's look (chunk 20d, DESIGN.md §7): images by `bot_images` id, the owner's colour and its
+ * contrast-corrected copy, heading style and theme. Beside `branding`, which keeps the words; the
+ * public view derives `branding.logoUrl` and `branding.accentColour` from this when it is set.
+ */
+export interface BotPageBrand {
+  logo: string | null;
+  /** The owner's colour, as chosen. Null: `branding.accentColour`. */
+  accent: string | null;
+  /** `accent` darkened until white text on it reads at 4.5:1. Stored, never sent by a client. */
+  accentContrast: string | null;
+  headingStyle: HeadingStyle;
+  theme: BrandTheme;
+  coverImage: string | null;
+  shareImage: string | null;
+  landingImages: { hero: string | null; gallery: string[] };
+  /** A team member's name → image id. */
+  peoplePhotos: Record<string, string>;
+}
+
+export const DEFAULT_BOT_PAGE_BRAND: BotPageBrand = {
+  logo: null,
+  accent: null,
+  accentContrast: null,
+  headingStyle: 'classic',
+  theme: 'light',
+  coverImage: null,
+  shareImage: null,
+  landingImages: { hero: null, gallery: [] },
+  peoplePhotos: {},
+};
+
+/** Every image id a brand uses. */
+export function brandImageIds(brand: BotPageBrand): string[] {
+  return [
+    brand.logo,
+    brand.coverImage,
+    brand.shareImage,
+    brand.landingImages.hero,
+    ...brand.landingImages.gallery,
+    ...Object.values(brand.peoplePhotos),
+  ].filter((id): id is string => Boolean(id));
+}
+
 export interface BotPageSettings {
   branding: BotPageBranding;
+  brand: BotPageBrand;
   suggestedQuestions: string[];
   prechat: PrechatField[];
   limits: BotPageLimits;
@@ -136,6 +188,11 @@ export function defaultBotPageSettings(bot: {
       disclaimer: bot.crisisSafetyOn ? CRISIS_DISCLAIMER : '',
       footerLink: null,
     },
+    brand: {
+      ...DEFAULT_BOT_PAGE_BRAND,
+      landingImages: { hero: null, gallery: [] },
+      peoplePhotos: {},
+    },
     suggestedQuestions: [],
     prechat: [],
     limits: { ...DEFAULT_BOT_PAGE_LIMITS },
@@ -149,6 +206,14 @@ export function mergeBotPageSettings(
 ): BotPageSettings {
   return {
     branding: { ...defaults.branding, ...(stored?.branding ?? {}) },
+    brand: {
+      ...defaults.brand,
+      ...(stored?.brand ?? {}),
+      landingImages: {
+        ...defaults.brand.landingImages,
+        ...(stored?.brand?.landingImages ?? {}),
+      },
+    },
     suggestedQuestions:
       stored?.suggestedQuestions ?? defaults.suggestedQuestions,
     prechat: stored?.prechat ?? defaults.prechat,

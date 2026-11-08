@@ -1,7 +1,10 @@
 import { Inject, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { BotImageService } from '../../chatbot/bot-image/bot-image.service';
+import { BotPageService } from '../../chatbot/bot-page/bot-page.service';
 import { ChatbotDocument } from '../../chatbot/entity/chatbot-document.entity';
+import { Chatbot } from '../../chatbot/entity/chatbot.entity';
 import {
   GuardedFetchError,
   guardedFetchText,
@@ -91,7 +94,50 @@ export class SiteCrawlService implements OnModuleInit {
     private readonly redis: RedisService,
     private readonly config: AppConfigService,
     @Optional() @Inject(CRAWL_LEARNER) private readonly learner?: CrawlLearner,
+    // Chunk 20d (the site's logo onto the page). Optional and last so earlier specs construct the
+    // service unchanged; Nest always provides them.
+    @Optional()
+    @InjectRepository(Chatbot)
+    private readonly chatbots?: Repository<Chatbot>,
+    @Optional() private readonly images?: BotImageService,
+    @Optional() private readonly pages?: BotPageService,
   ) {}
+
+  /**
+   * The site's logo and colour onto the bot's page (chunk 20d): the logo is downloaded through the
+   * same guarded fetcher and stored like an upload. Best effort: a logo that can't be used leaves
+   * initials, and nothing here stops the crawl.
+   */
+  private async storeBrand(
+    draft: BotDraftEntity,
+    brand: { logoUrl: string | null; accentColour: string | null },
+    allowHosts: string[] | undefined,
+  ): Promise<void> {
+    if (!this.chatbots || !this.images || !this.pages) return;
+    if (!draft.chatbotId || (!brand.logoUrl && !brand.accentColour)) return;
+    try {
+      const chatbot = await this.chatbots.findOne({
+        where: { id: draft.chatbotId },
+      });
+      if (!chatbot) return;
+      const logo = brand.logoUrl
+        ? await this.images.importFromUrl(chatbot.id, brand.logoUrl, {
+            allowHosts,
+            alt: `${chatbot.name} logo`,
+            tenantId: draft.tenantId ?? null,
+          })
+        : null;
+      if (!logo && !brand.accentColour) return;
+      await this.pages.saveBrand(chatbot, {
+        ...(logo ? { logo: logo.id } : {}),
+        ...(brand.accentColour ? { accent: brand.accentColour } : {}),
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Brand not stored for draft ${draft.id}: ${(error as Error).message}`,
+      );
+    }
+  }
 
   onModuleInit(): void {
     scheduledTaskRegistry.register('5min', 'bot-draft-crawl-resume', () =>
@@ -397,6 +443,7 @@ export class SiteCrawlService implements OnModuleInit {
         fetchOptions,
       );
       crawl.brand = detectBrand(parsed, fetched.url, css);
+      await this.storeBrand(draft, crawl.brand, fetchOptions.allowHosts);
       await this.drafts.applyBrand(draft.id, crawl.brand);
       await this.events.publish(draft.id, { type: 'brand', ...crawl.brand });
       if (crawl.brand.logoUrl || crawl.brand.accentColour) {

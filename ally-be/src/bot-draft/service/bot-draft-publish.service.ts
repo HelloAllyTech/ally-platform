@@ -144,6 +144,9 @@ export class BotDraftPublishService {
       settings: {
         branding: {
           ...config.branding,
+          // The logo is the page's stored image (`settings.brand.logo`, chunk 20d), never the
+          // site's own URL: the page must not hotlink it.
+          logoUrl: null,
           title: config.branding.title.trim() || config.name,
           assistantName:
             config.branding.assistantName.trim() || config.assistantName,

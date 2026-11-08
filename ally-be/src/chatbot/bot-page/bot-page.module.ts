@@ -2,6 +2,10 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AwsModule } from '../../aws/aws.module';
+import { BotImagePublicController } from '../bot-image/bot-image-public.controller';
+import { BotImageController } from '../bot-image/bot-image.controller';
+import { BotImage } from '../bot-image/bot-image.entity';
+import { BotImageService } from '../bot-image/bot-image.service';
 import { NotificationModule } from '../../notification/notification.module';
 import { WaUnansweredQuestion } from '../../whatsapp/entity/wa-unanswered-question.entity';
 import { ChatbotModule } from '../chatbot.module';
@@ -34,13 +38,19 @@ import { TurnstileService } from './turnstile.service';
       ChatbotPageAccess,
       Chatbot,
       WaUnansweredQuestion,
+      BotImage,
     ]),
     JwtModule.register({}),
     ChatbotModule,
     AwsModule,
     NotificationModule,
   ],
-  controllers: [BotPageAdminController, BotPagePublicController],
+  controllers: [
+    BotPageAdminController,
+    BotPagePublicController,
+    BotImageController,
+    BotImagePublicController,
+  ],
   providers: [
     BotPageService,
     BotPageAccessService,
@@ -49,9 +59,11 @@ import { TurnstileService } from './turnstile.service';
     BotPageOtpService,
     TurnstileService,
     BotPagePublicService,
+    BotImageService,
   ],
   // The access service too: onboarding's publish (chunk 20a) writes the page's list through it.
-  exports: [BotPageService, BotPageAccessService],
+  // The image service: onboarding stores the logo it found through it (chunk 20d).
+  exports: [BotPageService, BotPageAccessService, BotImageService],
 })
 export class BotPageModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
