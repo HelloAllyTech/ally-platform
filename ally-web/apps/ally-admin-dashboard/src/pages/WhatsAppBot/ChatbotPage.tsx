@@ -16,6 +16,7 @@ import { ChatbotTestTab } from "./ChatbotTestTab";
 import { BotConnectorsTab } from "./ConnectorsTab";
 import { ConversationsTab } from "./ConversationsTab";
 import { KnowledgeTab } from "./KnowledgeTab";
+import { LookAndFeelSection } from "./LookAndFeel";
 import { PeopleTab } from "./PeopleTab";
 import { PersonaTab } from "./PersonaTab";
 import { clearPreviewDraft } from "./previewDraft";
@@ -48,6 +49,7 @@ const SECTION_ORDER: ChatbotSettingsSectionId[] = [
   "people",
   "connectors",
   "botPage",
+  "lookAndFeel",
   "general",
 ];
 
@@ -160,6 +162,8 @@ export const ChatbotPage: React.FC = () => {
         return <BotConnectorsTab bot={bot} canManage={canManage} />;
       case "botPage":
         return <BotPageTab bot={bot} canEdit={canEdit} />;
+      case "lookAndFeel":
+        return <LookAndFeelSection bot={bot} canEdit={canEdit} />;
       case "general":
         return (
           <ChatbotSettingsTab

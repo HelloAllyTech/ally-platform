@@ -245,6 +245,10 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }],
     }),
 
+    getChatbotTeamNames: builder.query<{ names: string[] }, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.TEAM_NAMES(id), method: HttpMethod.GET }),
+    }),
+
     getBotImages: builder.query<BotImageView[], string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.IMAGES(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
@@ -401,6 +405,7 @@ export const {
   useCreateBotPageLogoUrlMutation,
   useUpdateBotPageBrandMutation,
   useGetBotImagesQuery,
+  useGetChatbotTeamNamesQuery,
   useUploadBotImageMutation,
   useUpdateBotImageMutation,
   useRemoveBotImageMutation,

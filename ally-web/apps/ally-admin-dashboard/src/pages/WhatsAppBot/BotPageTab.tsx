@@ -40,8 +40,11 @@ import { brandContrastVerdict, isHexColour, normaliseHex } from "@utils/brandCol
 import { Card, copyToClipboard, errorMessage, fill, LoadError } from "./shared";
 import { useReportUnsaved } from "./unsavedChanges";
 import { BotPagePreview } from "../../botPage/BotPagePreview";
+import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
 
 import type { PrechatFieldType, PublicBotPage } from "../../botPage/types";
+
+const LOOK_AND_FEEL = ONBOARDING_COPY.look.title;
 
 const t = en.whatsappBot.bots.botPage;
 
@@ -215,6 +218,13 @@ const BotPageEditor: React.FC<{ bot: Chatbot; view: BotPageView; canEdit: boolea
 
           {/* ── branding ─────────────────────────────────────────────── */}
           <Card title={t.brandingTitle}>
+            {/* The page's logo, images, colour and style now live in Look and feel (chunk 20d). */}
+            <a
+              href="?tab=settings&section=lookAndFeel"
+              className="self-start text-sm text-primary-600 underline underline-offset-2"
+            >
+              {LOOK_AND_FEEL} →
+            </a>
             <LogoField
               botId={bot.id}
               value={settings.branding.logoUrl}

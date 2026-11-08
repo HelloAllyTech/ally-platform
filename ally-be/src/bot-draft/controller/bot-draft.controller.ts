@@ -1,3 +1,4 @@
+import { teamNames } from '../service/team-names';
 import {
   BadRequestException,
   Body,
@@ -314,6 +315,17 @@ export class ChatbotChangesController {
     await this.access.assert(id, ChatbotMemberRole.VIEWER);
     const draft = await this.drafts.findByChatbot(id);
     return { changes: draft ? changes(draft.events) : [] };
+  }
+
+  @Get(':id/team-names')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
+    permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
+  })
+  async teamNames(@Param('id', ParseUUIDPipe) id: string) {
+    await this.access.assert(id, ChatbotMemberRole.VIEWER);
+    const draft = await this.drafts.findByChatbot(id);
+    // Look and feel's Team photos (chunk 20d): the people onboarding learned about.
+    return { names: draft ? teamNames(draft.learned.facts) : [] };
   }
 }
 

@@ -39,6 +39,10 @@ export interface BrandEditor {
   change: (patch: BrandChange) => void;
   upload: (slot: BrandSlot, file: File) => Promise<void>;
   remove: (slot: BrandSlot) => void;
+  /** A team member's photo (Look and feel's Team photos). */
+  uploadPerson: (name: string, file: File) => Promise<void>;
+  personUploading: string | null;
+  personError: { name: string; message: string } | null;
   undo: () => void;
   dismissChanged: () => void;
 }
@@ -70,6 +74,8 @@ export const useBrandEditor = (chatbotId: string | null, failed: string): BrandE
   const [changed, setChanged] = useState(false);
   const [pending, setPending] = useState(false);
   const [extra, setExtra] = useState<Record<string, BotImageView>>({});
+  const [personUploading, setPersonUploading] = useState<string | null>(null);
+  const [personError, setPersonError] = useState<{ name: string; message: string } | null>(null);
   const queued = useRef<BrandChange>({});
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const before = useRef<{ brand: BotPageBrand; removed: string | null } | null>(null);
@@ -131,6 +137,29 @@ export const useBrandEditor = (chatbotId: string | null, failed: string): BrandE
     [apply, chatbotId, failed, uploadImage],
   );
 
+  const uploadPerson = useCallback(
+    async (name: string, file: File) => {
+      if (!chatbotId || !brand) return;
+      setPersonUploading(name);
+      setPersonError(null);
+      try {
+        const image = await uploadImage({
+          id: chatbotId,
+          kind: "person",
+          file,
+          alt: name,
+        }).unwrap();
+        setExtra(x => ({ ...x, [image.id]: image }));
+        apply({ peoplePhotos: { ...brand.peoplePhotos, [name]: image.id } });
+      } catch (error) {
+        setPersonError({ name, message: message(error, failed) });
+      } finally {
+        setPersonUploading(null);
+      }
+    },
+    [apply, brand, chatbotId, failed, uploadImage],
+  );
+
   const remove = useCallback(
     (slot: BrandSlot) => {
       const id = brand?.[slot] ?? null;
@@ -167,6 +196,9 @@ export const useBrandEditor = (chatbotId: string | null, failed: string): BrandE
     change: patch => apply(patch),
     upload,
     remove,
+    uploadPerson,
+    personUploading,
+    personError,
     undo,
     dismissChanged: () => setChanged(false),
   };

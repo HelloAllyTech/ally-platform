@@ -1624,6 +1624,7 @@ export const en = {
         people: "Access",
         connectors: "Channels",
         botPage: "Bot page",
+        lookAndFeel: "Look and feel",
         general: "General",
       },
       createPanel: {
