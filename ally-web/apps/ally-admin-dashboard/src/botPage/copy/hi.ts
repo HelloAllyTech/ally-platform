@@ -9,6 +9,8 @@ export const hi: BotPageCopy = {
   cover: {
     privateNote: "यह चैट केवल आमंत्रित लोगों के लिए है।",
     organisationNote: "संगठन के सदस्यों के लिए। पहले आपको अपना कार्य ईमेल पुष्टि करना होगा।",
+    // needs review: drafted in chunk 20d, not yet checked by a Hindi speaker.
+    coverAlt: "{business} की कवर तस्वीर",
   },
   access: {
     emailTitle: "अपना ईमेल पुष्टि करें",
@@ -46,6 +48,10 @@ export const hi: BotPageCopy = {
     you: "आप",
     signedInAs: "{email} के रूप में साइन इन",
     tooLong: "{count} / {max} अक्षर",
+    // needs review: drafted in chunk 20d, not yet checked by a Hindi speaker.
+    headerIdle: "{name} की अपनी जानकारी से जवाब",
+    // needs review: drafted in chunk 20d, not yet checked by a Hindi speaker.
+    typing: "लिख रहे हैं…",
     status: {
       thinking: "सोच रहा है…",
       searching: "जानकारी खोज रहा है…",

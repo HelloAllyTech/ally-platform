@@ -7,6 +7,7 @@ export const en = {
   cover: {
     privateNote: "Only invited people can use this chat.",
     organisationNote: "For members of the organisation. You'll confirm your work email first.",
+    coverAlt: "{business} cover image",
   },
   access: {
     emailTitle: "Confirm your email",
@@ -43,6 +44,8 @@ export const en = {
     you: "You",
     signedInAs: "Signed in as {email}",
     tooLong: "{count} of {max} characters",
+    headerIdle: "Answers from {name}'s own information",
+    typing: "Typing…",
     status: {
       thinking: "Thinking…",
       searching: "Looking it up…",

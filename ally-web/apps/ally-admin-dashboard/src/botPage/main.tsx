@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { BotPageApp } from "./BotPageApp";
-import "./botPage.css";
+import "./page.css";
 
 /**
  * The public bot page (chunk 12b): a second entry of this app (`b.html`), served for `/b/<slug>`.

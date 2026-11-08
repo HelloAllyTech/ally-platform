@@ -15,12 +15,11 @@ export function ErrorState({
   onAction?(): void;
 }) {
   return (
-    <main className="flex min-h-full flex-col items-center justify-center px-6 text-center">
-      <ScreenHeading>{message}</ScreenHeading>
+    <main className="bp-screen bp-pad" style={{ justifyContent: "center", gap: 24 }}>
+      <span className="ally-orb" aria-hidden="true" style={{ width: 48, height: 48 }} />
+      <ScreenHeading className="bp-error-heading">{message}</ScreenHeading>
       {onAction && (
-        <PrimaryButton className="mt-6" onClick={onAction}>
-          {actionLabel ?? copy.errors.tryAgain}
-        </PrimaryButton>
+        <PrimaryButton onClick={onAction}>{actionLabel ?? copy.errors.tryAgain}</PrimaryButton>
       )}
     </main>
   );

@@ -4,7 +4,8 @@ import { FocusHeadings } from "./components/parts";
 import { pickCopy } from "./copy";
 import { Chat } from "./screens/Chat";
 import { Cover } from "./screens/Cover";
-import { themeVars } from "./theme";
+import "./page.css";
+import { surfaceProps } from "./theme";
 
 import type { PublicBotPage } from "./types";
 
@@ -30,8 +31,9 @@ export function BotPagePreview({
     <FocusHeadings.Provider value={false}>
       <div
         aria-hidden="true"
-        style={themeVars(page.branding.accentColour)}
-        className="pointer-events-none h-full overflow-hidden bg-stone-50 font-sans text-stone-900"
+        {...surfaceProps(page.branding)}
+        className="brand-surface bp-root"
+        style={{ ...surfaceProps(page.branding).style, pointerEvents: "none", overflow: "hidden" }}
       >
         {screen === "cover" ? (
           <Cover page={page} copy={copy} onStart={noop} />

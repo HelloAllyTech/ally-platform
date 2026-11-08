@@ -8,7 +8,7 @@ import { Chat, type ChatItem, type PendingReply } from "./screens/Chat";
 import { Cover } from "./screens/Cover";
 import { ErrorState } from "./screens/ErrorState";
 import { Prechat } from "./screens/Prechat";
-import { themeVars } from "./theme";
+import { surfaceProps } from "./theme";
 
 import type { PublicBotPage, PublicMessage, PublicSession } from "./types";
 
@@ -409,10 +409,7 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
   }
 
   return (
-    <div
-      style={themeVars(page.branding.accentColour)}
-      className="h-full bg-stone-50 text-stone-900"
-    >
+    <div {...surfaceProps(page.branding)} className="brand-surface bp-root">
       {screen}
     </div>
   );

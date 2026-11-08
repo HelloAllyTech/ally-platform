@@ -1,9 +1,27 @@
-import { ErrorText, Footer, PrimaryButton, ScreenHeading } from "../components/parts";
+import { ErrorText, Footer, LogoMark, PrimaryButton, ScreenHeading } from "../components/parts";
+import { fill } from "../copy";
 
 import type { BotPageCopy } from "../copy";
 import type { PublicBotPage } from "../types";
 
-/** The first screen: who this is, what it isn't, and Start. */
+const Arrow = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </svg>
+);
+
+/**
+ * The first screen (screenshot 02-bot-page-01): the cover image (or the orb in the brand colour),
+ * the logo tile, the heading in the page's style, what it isn't, and Start.
+ */
 export function Cover({
   page,
   copy,
@@ -21,6 +39,7 @@ export function Cover({
   turnstile?: React.ReactNode;
 }) {
   const { branding } = page;
+  const cover = branding.look?.cover;
   const note =
     page.access === "invite"
       ? copy.cover.privateNote
@@ -28,30 +47,57 @@ export function Cover({
         ? copy.cover.organisationNote
         : null;
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="h-2 bg-[var(--bp-accent)]" />
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-        {branding.logoUrl && (
+    <div className="bp-screen bp-pad">
+      <div className="bp-cover-image ally-rise">
+        {cover ? (
           <img
-            src={branding.logoUrl}
-            alt=""
-            className="mb-6 h-16 w-auto max-w-[200px] object-contain"
+            className="bp-cover-photo"
+            src={cover.src}
+            srcSet={cover.srcset || undefined}
+            sizes="(max-width: 640px) 100vw, 640px"
+            width={cover.width}
+            height={cover.height}
+            alt={cover.alt || fill(copy.cover.coverAlt, { business: branding.title })}
+          />
+        ) : (
+          <span
+            className="ally-orb ally-breathe"
+            aria-hidden="true"
+            style={{ width: 96, height: 96 }}
           />
         )}
-        <ScreenHeading className="text-2xl">{branding.title}</ScreenHeading>
-        {branding.subtitle && <p className="mt-2 max-w-sm text-stone-600">{branding.subtitle}</p>}
-        {note && <p className="mt-4 max-w-sm text-sm text-stone-500">{note}</p>}
+        <span className="bp-logo-tile">
+          <LogoMark branding={branding} />
+        </span>
+      </div>
+      <div className="bp-stack bp-cover-title bp-grow">
+        <ScreenHeading>{branding.title}</ScreenHeading>
+        {branding.subtitle && (
+          <p className="ally-body bp-muted" style={{ margin: 0 }}>
+            {branding.subtitle}
+          </p>
+        )}
+        {note && (
+          <p className="bp-small" style={{ margin: 0 }}>
+            {note}
+          </p>
+        )}
         {turnstile}
-        <PrimaryButton className="mt-8 w-full max-w-xs" onClick={onStart} disabled={busy}>
-          {busy ? copy.loading : copy.start}
-        </PrimaryButton>
+      </div>
+      <div className="bp-stack" style={{ paddingTop: 24 }}>
+        <div className="bp-cta">
+          <PrimaryButton onClick={onStart} disabled={busy}>
+            {busy ? copy.loading : copy.start}
+            {!busy && <Arrow />}
+          </PrimaryButton>
+        </div>
         <ErrorText>{error}</ErrorText>
         {branding.disclaimer && (
-          <p className="mt-8 max-w-sm text-xs leading-relaxed text-stone-500">
+          <p className="bp-small bp-center" style={{ margin: 0 }}>
             {branding.disclaimer}
           </p>
         )}
-      </main>
+      </div>
       <Footer branding={branding} copy={copy} />
     </div>
   );

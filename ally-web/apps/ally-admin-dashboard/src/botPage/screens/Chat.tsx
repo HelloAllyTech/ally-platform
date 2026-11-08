@@ -1,13 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import {
-  Avatar,
-  ErrorText,
-  PageHeader,
-  Sources,
-  TextButton,
-  TypingDots,
-} from "../components/parts";
+import { ErrorText, PageHeader, Sources, TypingDots } from "../components/parts";
 import { fill, type BotPageCopy } from "../copy";
 
 import type { PublicBotPage, PublicCitation, StatusCode } from "../types";
@@ -75,56 +68,62 @@ export function Chat({
     setDraft("");
   };
 
+  // The header says what the assistant is doing while it works, else where its answers come from.
+  const status = pending
+    ? pending.text
+      ? copy.chat.typing
+      : copy.chat.status[pending.status ?? "thinking"]
+    : (statusLine ?? fill(copy.chat.headerIdle, { name: branding.title }));
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <PageHeader branding={branding} subtitle={statusLine}>
-        <TextButton onClick={onNewChat} disabled={busy || (!messages.length && !pending)}>
+    <div className="bp-chat">
+      <PageHeader branding={branding} subtitle={status}>
+        <button
+          type="button"
+          className="bp-pill"
+          onClick={onNewChat}
+          disabled={busy || (!messages.length && !pending)}
+        >
           {copy.chat.newChat}
-        </TextButton>
+        </button>
       </PageHeader>
       {signedInAs && (
-        <p className="bg-stone-100 px-4 py-1 text-center text-xs text-stone-600">
-          {fill(copy.chat.signedInAs, { email: signedInAs })}
-        </p>
+        <p className="bp-signed-in">{fill(copy.chat.signedInAs, { email: signedInAs })}</p>
       )}
 
-      <main
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
-        aria-live="polite"
-        aria-relevant="additions"
-      >
-        <ol className="mx-auto flex max-w-2xl flex-col gap-3">
+      <main className="bp-thread" aria-live="polite" aria-relevant="additions">
+        <ol className="bp-messages">
+          {page.branding.subtitle && !messages.length && !pending && (
+            <li className="bp-msg ally-rise">
+              <p className="bp-bubble bp-bubble--assistant">{page.branding.subtitle}</p>
+            </li>
+          )}
           {messages.map(m =>
             m.role === "user" ? (
-              <li key={m.id} className="flex justify-end">
-                <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-[var(--bp-accent)] px-4 py-2 text-[var(--bp-on-accent)]">
-                  <span className="sr-only">{copy.chat.you}: </span>
+              <li key={m.id} className="bp-msg bp-msg--user ally-rise">
+                <p className="bp-bubble bp-bubble--user">
+                  <span className="ally-sr-only">{copy.chat.you}: </span>
                   {m.text}
                 </p>
               </li>
             ) : (
-              <li key={m.id} className="flex items-end gap-2">
-                <Avatar branding={branding} size={28} />
-                <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white px-4 py-2 shadow-sm">
-                  <span className="sr-only">{branding.assistantName}: </span>
-                  <p className="whitespace-pre-wrap text-stone-900">{m.text}</p>
-                  <Sources citations={m.citations} copy={copy} />
+              <li key={m.id} className="bp-msg ally-rise">
+                <div className="bp-bubble bp-bubble--assistant">
+                  <span className="ally-sr-only">{branding.assistantName}: </span>
+                  {m.text}
                 </div>
+                <Sources citations={m.citations} copy={copy} />
               </li>
             ),
           )}
           {pending && (
-            <li className="flex items-end gap-2">
-              <Avatar branding={branding} size={28} />
-              <div className="max-w-[85%] rounded-2xl rounded-bl-sm bg-white px-4 py-2 shadow-sm">
+            <li className="bp-msg">
+              <div className="bp-bubble bp-bubble--assistant">
                 {pending.text ? (
-                  <p className="whitespace-pre-wrap text-stone-900">
+                  <>
                     {pending.text}
-                    <span
-                      aria-hidden="true"
-                      className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-stone-400 align-middle motion-reduce:animate-none"
-                    />
-                  </p>
+                    <span aria-hidden="true" className="ally-caret" />
+                  </>
                 ) : (
                   <TypingDots label={copy.chat.status[pending.status ?? "thinking"]} />
                 )}
@@ -135,21 +134,21 @@ export function Chat({
         <div ref={endRef} />
       </main>
 
-      <p role="status" className="min-h-[1.25rem] px-4 text-center text-xs text-stone-500">
+      <p role="status" className="ally-sr-only">
         {pending && !pending.text && pending.status ? copy.chat.status[pending.status] : ""}
       </p>
 
       {!messages.length && !pending && page.suggestedQuestions.length > 0 && (
-        <div className="mx-auto w-full max-w-2xl px-4 pb-2">
-          <p className="mb-2 text-xs font-semibold text-stone-500">{copy.chat.suggested}</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="bp-suggested">
+          <p className="ally-sr-only">{copy.chat.suggested}</p>
+          <div className="ally-chips">
             {page.suggestedQuestions.map(q => (
               <button
                 key={q}
                 type="button"
+                className="ally-chip ally-press"
                 onClick={() => send(q)}
                 disabled={busy}
-                className="min-h-[44px] rounded-full border border-[var(--bp-accent)] px-4 text-left text-sm text-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bp-accent)]"
               >
                 {q}
               </button>
@@ -159,15 +158,15 @@ export function Chat({
       )}
 
       <form
-        className="mx-auto w-full max-w-2xl border-t border-stone-200 bg-white px-4 py-3"
+        className="bp-composer"
         onSubmit={e => {
           e.preventDefault();
           send(draft);
         }}
       >
         <ErrorText>{error}</ErrorText>
-        <div className="flex items-end gap-2">
-          <label htmlFor="bp-message" className="sr-only">
+        <div className="bp-composer__box">
+          <label htmlFor="bp-message" className="ally-sr-only">
             {copy.chat.inputLabel}
           </label>
           <textarea
@@ -184,20 +183,27 @@ export function Chat({
             placeholder={copy.chat.placeholder}
             aria-invalid={tooLong || undefined}
             aria-describedby="bp-count"
-            className="max-h-32 min-h-[44px] flex-1 resize-none rounded-lg border border-stone-300 px-3 py-2 text-base focus:border-[var(--bp-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--bp-accent)]"
           />
           <button
             type="submit"
+            className="bp-send ally-press"
+            aria-label={copy.chat.send}
             disabled={busy || !draft.trim() || tooLong}
-            className="min-h-[44px] rounded-lg bg-[var(--bp-accent)] px-4 font-semibold text-[var(--bp-on-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bp-accent)] focus-visible:ring-offset-2 disabled:opacity-50"
           >
-            {copy.chat.send}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              aria-hidden="true"
+            >
+              <path d="M12 19V5M6 11l6-6 6 6" />
+            </svg>
           </button>
         </div>
-        <p
-          id="bp-count"
-          className={`mt-1 text-right text-xs ${tooLong ? "text-red-700" : "text-stone-400"}`}
-        >
+        <p id="bp-count" className="bp-count" data-over={tooLong}>
           {draft.length > page.maxMessageChars * 0.8
             ? fill(copy.chat.tooLong, { count: draft.length, max: page.maxMessageChars })
             : ""}

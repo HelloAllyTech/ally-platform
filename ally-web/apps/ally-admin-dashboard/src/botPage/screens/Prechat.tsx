@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+// By path: the bot page imports only self-contained modules (see eslint.config.mjs).
+import { isTypingTarget, optionKey } from "../../components/v2/core/keys";
+import { AUTO_ADVANCE_MS } from "../../components/v2/core/Option";
 import {
   ErrorText,
   PageHeader,
@@ -11,10 +14,11 @@ import { fill, type BotPageCopy } from "../copy";
 
 import type { BotPageBranding, PrechatField } from "../types";
 
-const inputClass =
-  "mt-2 min-h-[44px] w-full rounded-lg border border-stone-300 px-3 text-base focus:border-[var(--bp-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--bp-accent)]";
-
-/** The pre-chat questions, one per screen, with progress. */
+/**
+ * The pre-chat questions, one per screen (screenshots 02-bot-page-02/03): each slides in, with a
+ * progress bar. A choice is a lettered option; picking one (click or its letter) moves on after
+ * 380 ms, except on the last question, which waits for "Start chatting".
+ */
 export function Prechat({
   branding,
   copy,
@@ -47,6 +51,31 @@ export function Prechat({
     setMissing(false);
     setAnswers(a => ({ ...a, [field.id]: next }));
   };
+
+  const advance = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(advance.current), []);
+  const choose = (option: string) => {
+    set(option);
+    if (last) return;
+    clearTimeout(advance.current);
+    advance.current = setTimeout(() => setIndex(i => i + 1), AUTO_ADVANCE_MS);
+  };
+  // Letter keys pick a choice while a choice question is on screen.
+  useEffect(() => {
+    if (field.type !== "choice") return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.key.length !== 1) return;
+      const target = event.target as HTMLElement | null;
+      if (isTypingTarget(target) && target?.getAttribute("type") !== "radio") return;
+      const option = (field.options ?? [])[event.key.toUpperCase().charCodeAt(0) - 65];
+      if (option) {
+        event.preventDefault();
+        choose(option);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
   const next = (event: React.FormEvent) => {
     event.preventDefault();
     if (field.required && !value.trim()) {
@@ -62,53 +91,67 @@ export function Prechat({
 
   const inputId = `bp-q-${field.id}`;
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="bp-screen">
       <PageHeader branding={branding} />
-      <div
-        className="h-1 bg-stone-200"
-        role="progressbar"
-        aria-valuemin={1}
-        aria-valuemax={fields.length}
-        aria-valuenow={index + 1}
-        aria-label={fill(copy.prechat.progress, { n: index + 1, total: fields.length })}
-      >
-        <div
-          className="h-1 bg-[var(--bp-accent)] transition-all"
-          style={{ width: `${((index + 1) / fields.length) * 100}%` }}
-        />
-      </div>
       <form
         key={field.id}
         onSubmit={next}
-        className="mx-auto flex w-full max-w-sm flex-1 flex-col px-6 py-8"
+        className="bp-pad bp-stack bp-grow ally-slide"
         noValidate
       >
-        <p className="text-sm text-stone-500">
-          {fill(copy.prechat.progress, { n: index + 1, total: fields.length })}
-        </p>
+        <div className="bp-progress-row">
+          <div
+            className="ally-progress"
+            role="progressbar"
+            aria-valuemin={1}
+            aria-valuemax={fields.length}
+            aria-valuenow={index + 1}
+            aria-label={fill(copy.prechat.progress, { n: index + 1, total: fields.length })}
+          >
+            <div
+              className="ally-progress__bar"
+              style={{ width: `${((index + 1) / fields.length) * 100}%` }}
+            />
+          </div>
+          <span className="bp-small">
+            {fill(copy.prechat.progress, { n: index + 1, total: fields.length })}
+          </span>
+        </div>
         {field.type === "choice" ? (
-          <fieldset className="mt-2" aria-labelledby={`${inputId}-label`}>
+          <fieldset
+            className="bp-stack"
+            style={{ border: 0, margin: 0, padding: 0 }}
+            aria-labelledby={`${inputId}-label`}
+          >
             <ScreenHeading id={`${inputId}-label`}>{field.label}</ScreenHeading>
-            {!field.required && <p className="text-sm text-stone-500">{copy.prechat.optional}</p>}
-            <div className="mt-4 space-y-2">
-              {(field.options ?? []).map(option => (
-                <label
-                  key={option}
-                  className={`flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border px-3 ${
-                    value === option
-                      ? "border-[var(--bp-accent)] ring-2 ring-[var(--bp-accent)]"
-                      : "border-stone-300"
-                  }`}
-                >
+            {!field.required && <p className="bp-small">{copy.prechat.optional}</p>}
+            <div className="bp-stack" style={{ gap: 10 }}>
+              {(field.options ?? []).map((option, i) => (
+                <label key={option} htmlFor={`${inputId}-${i}`} className="bp-choice ally-press">
                   <input
+                    id={`${inputId}-${i}`}
+                    aria-labelledby={`${inputId}-${i}-text`}
                     type="radio"
                     name={inputId}
                     value={option}
                     checked={value === option}
-                    onChange={() => set(option)}
-                    className="accent-[var(--bp-accent)]"
+                    onChange={() => choose(option)}
                   />
-                  <span>{option}</span>
+                  <span className="ally-kbd" aria-hidden="true">
+                    {optionKey(i)}
+                  </span>
+                  <span id={`${inputId}-${i}-text`} style={{ flex: 1 }}>
+                    {option}
+                  </span>
+                  {value === option && (
+                    <span
+                      className="ally-pop"
+                      aria-hidden="true"
+                      style={{ color: "var(--brand-accent)" }}
+                    >
+                      ✓
+                    </span>
+                  )}
                 </label>
               ))}
             </div>
@@ -117,22 +160,23 @@ export function Prechat({
           <>
             <ScreenHeading id={`${inputId}-label`}>{field.label}</ScreenHeading>
             {field.consentText && (
-              <p className="mt-3 whitespace-pre-line text-sm text-stone-700">{field.consentText}</p>
+              <p className="ally-body" style={{ margin: 0, whiteSpace: "pre-line" }}>
+                {field.consentText}
+              </p>
             )}
-            <label className="mt-4 flex min-h-[44px] cursor-pointer items-center gap-3">
+            <label className="bp-check">
               <input
                 type="checkbox"
                 checked={value === "true"}
                 onChange={e => set(e.target.checked ? "true" : "")}
-                className="h-5 w-5 accent-[var(--bp-accent)]"
               />
-              <span className="font-semibold">{copy.prechat.agree}</span>
+              <span style={{ fontWeight: 600 }}>{copy.prechat.agree}</span>
             </label>
           </>
         ) : (
           <>
             <ScreenHeading id={`${inputId}-label`}>{field.label}</ScreenHeading>
-            {!field.required && <p className="text-sm text-stone-500">{copy.prechat.optional}</p>}
+            {!field.required && <p className="bp-small">{copy.prechat.optional}</p>}
             <input
               id={inputId}
               type={
@@ -155,17 +199,17 @@ export function Prechat({
               maxLength={500}
               aria-labelledby={`${inputId}-label`}
               aria-invalid={missing || undefined}
-              className={inputClass}
+              className="ally-input"
             />
           </>
         )}
         {missing && (
-          <p className="mt-2 text-sm text-red-700" role="alert">
+          <p className="bp-error" role="alert">
             {copy.prechat.required}
           </p>
         )}
         <ErrorText>{error}</ErrorText>
-        <div className="mt-auto flex items-center justify-between gap-3 pt-8">
+        <div className="bp-actions">
           {index > 0 ? (
             <TextButton onClick={() => setIndex(index - 1)} disabled={busy}>
               {copy.prechat.back}

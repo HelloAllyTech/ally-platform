@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useRef } from "react";
 
+// By path: the bot page imports only self-contained modules (see eslint.config.mjs).
+import { Orb } from "../../components/v2/core/Orb";
 import { initials } from "../theme";
 
 import type { BotPageCopy } from "../copy";
@@ -27,41 +29,53 @@ export function ScreenHeading({
     if (focus) ref.current?.focus();
   }, [focus]);
   return (
-    <h1
-      ref={ref}
-      id={id}
-      tabIndex={-1}
-      className={`text-xl font-semibold text-stone-900 outline-none ${className}`}
-    >
+    <h1 ref={ref} id={id} tabIndex={-1} className={`ally-display bp-heading ${className}`}>
       {children}
     </h1>
   );
 }
 
-export function Avatar({ branding, size = 32 }: { branding: BotPageBranding; size?: number }) {
-  const style = { width: size, height: size };
-  if (branding.avatarUrl) {
+/** The page's logo, or (without one) the assistant's initials in the brand colour. */
+export function LogoMark({ branding }: { branding: BotPageBranding }) {
+  const logo = branding.look?.logo;
+  if (logo || branding.logoUrl) {
     return (
       <img
-        src={branding.avatarUrl}
+        src={logo?.src ?? branding.logoUrl ?? ""}
+        srcSet={logo?.srcset || undefined}
+        sizes="72px"
         alt=""
-        style={style}
-        className="shrink-0 rounded-full object-cover"
       />
     );
   }
   return (
-    <span
-      aria-hidden="true"
-      style={style}
-      className="flex shrink-0 items-center justify-center rounded-full bg-[var(--bp-accent)] text-xs font-semibold text-[var(--bp-on-accent)]"
-    >
+    <span className="bp-initials" aria-hidden="true">
       {initials(branding.assistantName)}
     </span>
   );
 }
 
-/** The bar at the top of every screen after the cover: logo (or avatar) and the page's title. */
+/** The chat's avatar: the owner's picture, else the orb in the brand colour. */
+export function Avatar({ branding, size = 40 }: { branding: BotPageBranding; size?: number }) {
+  if (branding.avatarUrl) {
+    return (
+      <img
+        src={branding.avatarUrl}
+        alt=""
+        width={size}
+        height={size}
+        className="bp-header__logo"
+        style={{ borderRadius: 999 }}
+      />
+    );
+  }
+  return <Orb size={size} />;
+}
+
+/**
+ * The bar at the top of every screen after the cover: the orb (or the owner's picture), the
+ * page's name and a status line.
+ */
 export function PageHeader({
   branding,
   subtitle,
@@ -72,15 +86,15 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-3">
-      {branding.logoUrl ? (
-        <img src={branding.logoUrl} alt="" className="h-8 w-auto max-w-[96px] object-contain" />
-      ) : (
-        <Avatar branding={branding} />
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold text-stone-900">{branding.title}</p>
-        {subtitle && <p className="truncate text-xs text-stone-500">{subtitle}</p>}
+    <header className="bp-header">
+      <Avatar branding={branding} />
+      <div className="bp-header__text">
+        <p className="bp-header__name">{branding.title}</p>
+        {subtitle && (
+          <p className="bp-header__status" aria-live="polite">
+            {subtitle}
+          </p>
+        )}
       </div>
       {children}
     </header>
@@ -89,37 +103,48 @@ export function PageHeader({
 
 export function TypingDots({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1" aria-label={label}>
-      {[0, 1, 2].map(i => (
-        <span
-          key={i}
-          className="h-1.5 w-1.5 animate-bounce rounded-full bg-stone-400 motion-reduce:animate-none"
-          style={{ animationDelay: `${i * 150}ms` }}
-        />
-      ))}
+    <span className="bp-dots" role="img" aria-label={label}>
+      <span />
+      <span />
+      <span />
     </span>
   );
 }
 
+const DocIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+  >
+    <path d="M14 3H6v18h12V7z" />
+    <path d="M14 3v4h4" />
+  </svg>
+);
+
+/** Where an answer came from, once, as chips under it. */
 export function Sources({ citations, copy }: { citations: PublicCitation[]; copy: BotPageCopy }) {
   if (!citations.length) return null;
   return (
-    <div className="mt-2 border-t border-stone-200 pt-2 text-xs text-stone-600">
-      <p className="font-semibold">{copy.chat.sources}</p>
-      <ul className="mt-1 space-y-0.5">
+    <div>
+      <p className="ally-sr-only">{copy.chat.sources}</p>
+      <ul className="bp-sources">
         {citations.map(c => (
           <li key={c.title}>
             {c.url ? (
-              <a
-                href={c.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2"
-              >
+              <a className="bp-source" href={c.url} target="_blank" rel="noopener noreferrer">
+                <DocIcon />
                 {c.title}
               </a>
             ) : (
-              c.title
+              <span className="bp-source">
+                <DocIcon />
+                {c.title}
+              </span>
             )}
           </li>
         ))}
@@ -134,27 +159,21 @@ export function PrimaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElemen
     <button
       type="button"
       {...rest}
-      className={`min-h-[44px] rounded-lg bg-[var(--bp-accent)] px-5 font-semibold text-[var(--bp-on-accent)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bp-accent)] focus-visible:ring-offset-2 disabled:opacity-50 ${className}`}
+      className={`ally-btn ally-btn--primary ally-press ${className}`}
     />
   );
 }
 
 export function TextButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const { className = "", ...rest } = props;
-  return (
-    <button
-      type="button"
-      {...rest}
-      className={`min-h-[44px] px-2 text-sm font-semibold text-stone-700 underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bp-accent)] disabled:opacity-50 ${className}`}
-    />
-  );
+  return <button type="button" {...rest} className={`ally-btn ally-btn--ghost ${className}`} />;
 }
 
 /** An error the visitor can read, announced as it appears. */
 export function ErrorText({ children }: { children?: string | null }) {
   if (!children) return null;
   return (
-    <p role="alert" className="mt-2 text-sm text-red-700">
+    <p role="alert" className="bp-error">
       {children}
     </p>
   );
@@ -162,14 +181,9 @@ export function ErrorText({ children }: { children?: string | null }) {
 
 export function Footer({ branding, copy }: { branding: BotPageBranding; copy: BotPageCopy }) {
   return (
-    <footer className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-3 text-xs text-stone-500">
+    <footer className="bp-footer">
       {branding.footerLink && (
-        <a
-          href={branding.footerLink.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline underline-offset-2"
-        >
+        <a href={branding.footerLink.url} target="_blank" rel="noopener noreferrer">
           {branding.footerLink.label}
         </a>
       )}
