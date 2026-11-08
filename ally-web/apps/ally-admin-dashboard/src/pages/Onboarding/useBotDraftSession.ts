@@ -6,6 +6,7 @@ import { fetchWithReauth } from "@hooks/chatStream/fetchWithReauth";
 import { readSse } from "@hooks/chatStream/sse";
 
 import { COPY } from "./copy";
+import { withFinding } from "./findings";
 
 import type { BotDraftView, TranscriptEntry } from "./types";
 
@@ -37,24 +38,11 @@ export interface BotDraftSession {
   error: string | null;
   /** Bumped whenever the canvas changed, for the phone tab's badge. */
   canvasVersion: number;
-  send: (input: { text?: string; chip?: string }) => Promise<void>;
+  /** `shown` is how the owner's choice reads in the chat (a design's title), if not its text. */
+  send: (input: { text?: string; chip?: string }, shown?: string) => Promise<void>;
   reload: () => Promise<void>;
   setView: (view: BotDraftView) => void;
 }
-
-/**
- * The findings with `line` added. Each batch of pages reports its own counts ("Found 3 team
- * members", then "Found 5 team members"), so a line that differs only in its number replaces the
- * earlier one rather than piling up beside it.
- */
-export const withFinding = (findings: string[], line: string): string[] => {
-  const shape = (text: string) => text.replace(/\d+/g, "#");
-  const index = findings.findIndex(existing => shape(existing) === shape(line));
-  if (index < 0) return [...findings, line];
-  const next = [...findings];
-  next[index] = line;
-  return next;
-};
 
 const emptyReading = (view?: BotDraftView | null): ReadingProgress => ({
   domain: view?.crawl.domain ?? null,
@@ -199,9 +187,9 @@ export const useBotDraftSession = (draftId: string): BotDraftSession => {
   useEffect(() => () => turnAbort.current?.abort(), []);
 
   const send = useCallback(
-    async (input: { text?: string; chip?: string }) => {
+    async (input: { text?: string; chip?: string }, label?: string) => {
       if (sending) return;
-      const shown = input.text ?? input.chip?.replace(/^design:/, "") ?? "";
+      const shown = label ?? input.text ?? input.chip ?? "";
       const pendingId = `pending-${Date.now()}`;
       appendEntry({ id: pendingId, role: "owner", text: shown, at: new Date().toISOString() });
       setSending(true);

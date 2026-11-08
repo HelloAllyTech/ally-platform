@@ -34,6 +34,16 @@ import type { PatchOp, PublishResult } from "./types";
 
 const LG_QUERY = "(min-width: 1024px)";
 
+/** The canvas section a step brings into view. */
+const STEP_SECTION: Partial<Record<string, string>> = {
+  learned: "learned",
+  gaps: "safety",
+  design: "designs",
+  building: "building",
+  share: "assistant",
+  published: "share",
+};
+
 /** Tailwind's `lg`: the canvas sits beside the chat above it, and is a tab below it. */
 const useIsLargeScreen = (): boolean => {
   const [matches, setMatches] = useState(() =>
@@ -99,6 +109,36 @@ export const OnboardingSession: React.FC = () => {
   useEffect(() => {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" });
   }, [view?.transcript.length, streaming, working]);
+
+  // When a step starts, its section is the newest thing on the canvas: bring it into view and
+  // move focus there, so it isn't left below a long "What we learned".
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const shownStep = useRef<string | null>(null);
+  useEffect(() => {
+    if (!view) return undefined;
+    const section = STEP_SECTION[view.step];
+    if (shownStep.current === null) {
+      shownStep.current = view.step;
+      return undefined;
+    }
+    if (shownStep.current === view.step || !section) return undefined;
+    shownStep.current = view.step;
+    const timer = setTimeout(() => {
+      const target = canvasRef.current?.querySelector<HTMLElement>(
+        `[data-testid="canvas-${section}"]`,
+      );
+      // Only the canvas's own pane scrolls: scrollIntoView would move the page layout too.
+      const pane = canvasRef.current?.parentElement;
+      if (target && pane) {
+        const top =
+          target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop;
+        pane.scrollTo({ top: Math.max(0, top - 16), behavior: "smooth" });
+      }
+      target?.querySelector<HTMLElement>("h3")?.setAttribute("tabindex", "-1");
+      target?.querySelector<HTMLElement>("h3")?.focus({ preventScroll: true });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [view]);
 
   const onPatch = useCallback(
     async (target: "draft" | "learned", ops: PatchOp[]): Promise<boolean> => {
@@ -194,7 +234,7 @@ export const OnboardingSession: React.FC = () => {
   );
 
   const canvas = (
-    <div className="flex flex-col gap-4 p-4">
+    <div ref={canvasRef} className="flex flex-col gap-4 p-4">
       {view.source.website && (
         <Section id="reading">
           <ReadingCard view={view} reading={reading} />
@@ -221,7 +261,9 @@ export const OnboardingSession: React.FC = () => {
             designs={view.designs}
             chosen={view.draft.design}
             canChoose={step === "design" && !sending}
-            onChoose={id => void send({ chip: `design:${id}` })}
+            onChoose={id =>
+              void send({ chip: `design:${id}` }, view.designs?.find(card => card.id === id)?.title)
+            }
           />
         </Section>
       )}

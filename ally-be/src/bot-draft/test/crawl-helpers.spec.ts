@@ -1,5 +1,5 @@
 import { readable, toHex, commonColour, detectBrand } from '../crawl/brand';
-import { mainContent, parsePage } from '../crawl/page-parser';
+import { decodeEntities, mainContent, parsePage } from '../crawl/page-parser';
 import { parseRobots } from '../crawl/robots';
 import { parseSitemap } from '../crawl/sitemap';
 import {
@@ -170,5 +170,16 @@ describe('sitemap', () => {
       ).sitemaps,
     ).toEqual(['https://s.example/s1.xml']);
     expect(parseSitemap('not xml <')).toEqual({ pages: [], sitemaps: [] });
+  });
+});
+
+describe('decodeEntities', () => {
+  it('decodes what a page title carries', () => {
+    expect(
+      decodeEntities(
+        'Research &amp; Survey &#8211; Live&nbsp;Love &#x2019;Laugh&rsquo;',
+      ),
+    ).toBe('Research & Survey – Live Love ’Laugh’');
+    expect(decodeEntities('&bogus; &#0;')).toBe('&bogus; &#0;');
   });
 });

@@ -247,6 +247,9 @@ Labels the screens need that the sections above don't name. Same voice.
 - **Upload button:** Choose files
 - **Edit buttons:** Save · Cancel
 - **Source of a detail the owner gave:** From you
+- **Chat note after an edit on the canvas:** Updated {what}, for example "Updated your hours"
+  - **{what} for a detail:** what we learned about you · your services and prices · your hours · your team · your address and contact details · your policies · your common questions · your brand
+  - **{what} for the assistant:** your assistant's name · its introduction · its instructions · its tone · its languages · its topics · its suggested questions · its questions before the chat · what it says when it doesn't know · your own rules · your page · who can use it · your notes · its design
 - **While the builder works:**
   - Reading your message
   - Working out your industry

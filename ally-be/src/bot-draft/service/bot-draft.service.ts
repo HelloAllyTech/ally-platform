@@ -314,7 +314,7 @@ export class BotDraftService {
       target: options.target,
       ops,
       inverse,
-      summary: options.summary ?? summarise(ops, options.target),
+      summary: options.summary ?? summarise(ops, options.target, draft.learned),
     };
     const saved = await this.save(patched, draft.version, [event]);
     await this.events.publish(draft.id, {
@@ -729,12 +729,52 @@ export class BotDraftService {
 
 const currentUserId = (): number => Number(ExecutionManager.getUserId() ?? 0);
 
-function summarise(ops: PatchOp[], target: 'draft' | 'learned'): string {
-  if (target === 'learned') {
-    return ops.length === 1
-      ? 'Updated what we learned'
-      : `Updated ${ops.length} details`;
-  }
-  const fields = [...new Set(ops.map((op) => op.path.split('/')[1]))];
-  return `Updated ${fields.join(', ')}`;
+/** What an owner's edit changed, as the chat says it (copy §15: "Updated your hours"). */
+const FIELD_LABELS: Record<string, string> = {
+  name: "your assistant's name",
+  assistantName: "your assistant's name",
+  introduction: 'its introduction',
+  instructions: 'its instructions',
+  tone: 'its tone',
+  languages: 'its languages',
+  topics: 'its topics',
+  suggestedQuestions: 'its suggested questions',
+  prechat: 'its questions before the chat',
+  declineText: "what it says when it doesn't know",
+  extraNever: 'your own rules',
+  branding: 'your page',
+  access: 'who can use it',
+  ownerNotes: 'your notes',
+  design: 'its design',
+};
+const SECTION_LABELS: Record<string, string> = {
+  about: 'what we learned about you',
+  services: 'your services and prices',
+  hours: 'your hours',
+  team: 'your team',
+  location: 'your address and contact details',
+  policies: 'your policies',
+  faqs: 'your common questions',
+  brand: 'your brand',
+};
+
+export function summarise(
+  ops: PatchOp[],
+  target: 'draft' | 'learned',
+  learned?: Learned,
+): string {
+  const labels =
+    target === 'learned'
+      ? ops.map((op) => {
+          const index = Number(op.path.split('/')[2]);
+          const fact = Number.isInteger(index)
+            ? learned?.facts[index]
+            : (op.value as LearnedFact | undefined);
+          return SECTION_LABELS[fact?.section ?? ''] ?? SECTION_LABELS.about;
+        })
+      : ops.map(
+          (op) => FIELD_LABELS[op.path.split('/')[1]] ?? 'your assistant',
+        );
+  const unique = [...new Set(labels)];
+  return `Updated ${unique.slice(0, 2).join(' and ')}`;
 }

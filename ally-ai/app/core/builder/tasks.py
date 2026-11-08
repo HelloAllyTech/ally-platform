@@ -352,10 +352,31 @@ def keep_grounded(text: str, source: str) -> str:
     return joiner.join(kept).strip()
 
 
+#: What each "don't know" quick reply means for the decline wording: the detail
+#: itself, from what we learned, never the chip's own words ("call Our phone number").
+DECLINE_HINTS: Dict[str, str] = {
+    "Our phone number": (
+        "the business's phone number, written out exactly as in What we learned; if "
+        "there is none, say to contact the team"
+    ),
+    "Our email": (
+        "the business's email address, written out exactly as in What we learned; if "
+        "there is none, say to contact the team"
+    ),
+    "Our front desk": "the front desk",
+    "": "the team's contact details from What we learned",
+}
+
+
 async def draft_assistant(
     request: BuilderStepRequest, design: DesignId, timeout: float
 ) -> DraftOut:
-    decline = request.answers.get("decline") or "the team's contact details"
+    decline = (
+        DECLINE_HINTS.get(
+            request.answers.get("decline") or "", request.answers.get("decline") or ""
+        )
+        or DECLINE_HINTS[""]
+    )
     audience = request.answers.get("audience") or ""
     tone_hint = (
         "plain and friendly, for the business's own team"

@@ -98,7 +98,7 @@ export function parsePage(html: string): ParsedPage {
     },
   } as sanitizeHtml.IOptions);
 
-  page.title = title.replace(/\s+/g, ' ').trim() || null;
+  page.title = decodeEntities(title).replace(/\s+/g, ' ').trim() || null;
   const extracted = htmlToExtractedDocument(mainContent(html));
   page.text = extracted.text;
   page.headings = extracted.sections
@@ -116,4 +116,39 @@ export function mainContent(html: string): string {
   if (main) return main[1];
   const body = /<body\b[^>]*>([\s\S]*)<\/body>/i.exec(html)?.[1] ?? html;
   return body.replace(/<(nav|header|footer|aside|form)\b[\s\S]*?<\/\1>/gi, ' ');
+}
+
+const NAMED: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  ndash: '–',
+  mdash: '—',
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+  hellip: '…',
+};
+
+/** "Research &amp; Survey" → "Research & Survey": the raw title text keeps its entities. */
+export function decodeEntities(text: string): string {
+  return text.replace(
+    /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,
+    (match, code: string) => {
+      if (code[0] === '#') {
+        const n =
+          code[1].toLowerCase() === 'x'
+            ? parseInt(code.slice(2), 16)
+            : parseInt(code.slice(1), 10);
+        return Number.isFinite(n) && n > 0 && n < 0x110000
+          ? String.fromCodePoint(n)
+          : match;
+      }
+      return NAMED[code.toLowerCase()] ?? match;
+    },
+  );
 }

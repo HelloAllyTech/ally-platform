@@ -398,3 +398,18 @@ class TestHonestAboutBooking:
         assert paths(res)["/introduction"] == (
             "I'm the Sunrise assistant. I can help with how to book and fees."
         )
+
+
+@pytest.mark.asyncio
+async def test_the_decline_hint_is_the_detail_not_the_chip_text():
+    fake = FakeLLM(DraftOut=[DRAFT])
+    body = request(
+        "design",
+        designs=CARDS,
+        chip="design:guide",
+        answers={"decline": "Our phone number"},
+    )
+    await run(body, fake)
+    prompt = fake.calls[0]["prompt"]
+    assert "written out exactly as in What we learned" in prompt
+    assert "pointing to Our phone number" not in prompt

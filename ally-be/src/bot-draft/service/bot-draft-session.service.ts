@@ -121,7 +121,7 @@ export class BotDraftSessionService implements CrawlLearner {
     }
 
     draft = await this.drafts.appendTranscript(draft, [
-      { role: 'owner', text: text || chip.replace(/^design:/, '') },
+      { role: 'owner', text: text || chipLabel(draft, chip) },
     ]);
     const request = await this.stepRequest(draft, text, chip);
     const tokens: string[] = [];
@@ -615,6 +615,13 @@ export function documentParts(
     }
   }
   return parts.slice(0, DOCUMENT_PARTS);
+}
+
+/** How a quick reply reads in the chat: a design by its card's title, not its id. */
+export function chipLabel(draft: BotDraftEntity, chip: string): string {
+  if (!chip.startsWith('design:')) return chip;
+  const id = chip.slice('design:'.length);
+  return designCards(draft)?.find((card) => card.id === id)?.title ?? id;
 }
 
 /** The conversation state kept in `answers`, with defaults for a new draft. */
