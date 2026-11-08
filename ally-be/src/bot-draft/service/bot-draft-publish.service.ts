@@ -136,7 +136,19 @@ export class BotDraftPublishService {
     const ownerNotesDocumentId = await this.ownerNotes(draft, config);
 
     const existing = await this.botPages.findForChatbot(chatbot.id);
-    const slug = existing?.slug ?? (await this.botPages.view(updated)).slug;
+    // Onboarding may have created the page early, off, to hold the logo it found (chunk 20d), while
+    // the draft was still named after the site's domain. Until the first publish its link isn't
+    // anyone's yet, so it is suggested again from the assistant's final name.
+    const unclaimed =
+      existing &&
+      existing.status === BotPageStatus.OFF &&
+      draft.status !== BotDraftStatus.PUBLISHED;
+    const slug =
+      existing && !unclaimed
+        ? existing.slug
+        : unclaimed
+          ? await this.botPages.suggestSlug(updated)
+          : (await this.botPages.view(updated)).slug;
     const view = await this.botPages.save(updated, {
       status: BotPageStatus.ON,
       slug,

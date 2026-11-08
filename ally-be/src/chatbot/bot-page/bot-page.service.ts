@@ -450,7 +450,7 @@ export class BotPageService {
   }
 
   /** The bot's name as a slug, with a number added until it is free. */
-  private async suggestSlug(chatbot: Chatbot): Promise<string> {
+  async suggestSlug(chatbot: Chatbot): Promise<string> {
     const base = slugFromName(chatbot.name);
     const candidate = RESERVED_SLUGS.has(base) ? `${base}-chat` : base;
     for (let n = 0; n < 20; n++) {

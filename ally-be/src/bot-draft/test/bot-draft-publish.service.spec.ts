@@ -190,6 +190,25 @@ describe('BotDraftPublishService', () => {
     ).toEqual(['sunrise-mind', 'sunrise-mind']);
   });
 
+  it('names the link from the assistant, not the early page that holds the site logo', async () => {
+    const h = harness();
+    // The crawl stored the site's logo on a page created early, off, while the draft was "Host".
+    h.fakes.botPages.findForChatbot.mockResolvedValueOnce({
+      id: 'page-1',
+      slug: 'host',
+      status: BotPageStatus.OFF,
+    } as never);
+    (h.fakes.botPages as Record<string, jest.Mock>).suggestSlug = jest.fn(
+      async () => 'sunrise-mind',
+    );
+    await h.publish({ access: 'invite', emails: ['asha@example.com'] });
+    const [, pageDto] = h.fakes.botPages.save.mock.calls[0] as unknown as [
+      unknown,
+      { slug: string },
+    ];
+    expect(pageDto.slug).toBe('sunrise-mind');
+  });
+
   it('refuses public while the platform has it off, before writing anything', async () => {
     const h = harness();
     await expect(h.publish({ access: 'public' })).rejects.toBeInstanceOf(
