@@ -7,7 +7,7 @@
 
 **Result: 13 of 13 pass.** Times to publish 54–80 s. Facts unsourced: 0. Deliberate gaps asked: 20 of 20. Preview answers with at least one source: 28 of 33.
 
-**Outside this bar, and not fixed here: 5 of 33 answers wrongly declined.** The assistant said it didn't have something its own pages say (the yoga styles, the beginners' series, the batch timings, a possession date, amenities). It isn't timing: asked again later with every page indexed, the yoga question still declined. The search found passages; the agent declined anyway, was nudged to use them (`USE_FOUND`) and asked a question back. That is answer quality in the 3a agent on short, list-like pages. The 20a-2 checkup measures exactly this; it should be looked at before G1b.
+**Outside this bar, and not fixed here: 5 of 33 answers wrongly declined.** The assistant said it didn't have something its own pages say (the yoga styles, the beginners' series, the batch timings, a possession date, amenities). It isn't timing: asked again later with every page indexed, the yoga question still declined. The search found passages; the agent declined anyway, was nudged to use them (`USE_FOUND`) and asked a question back. That is answer quality in the 3a agent on short, list-like pages. The 20a-2 checkup measures exactly this; it should be looked at before G1b. **Update:** the diagnosis below finds the cause is passage selection, not the agent: search retrieved the right page every time, but a heading-only chunk set the similarity bar and the answer was cut before the agent saw it. See [The 5 wrong declines: diagnosis](#the-5-wrong-declines-diagnosis).
 
 **How it was run:** the steps of `ally-ai/scripts/onboarding_eval.py`, driven from a logged-in dashboard tab (the same API calls, cases and checks), because a dashboard token isn't available to a script here. The report below is rendered by the script's own `report()`. To rerun: `python3 fixtures/onboarding-sites/serve.py`, then `ALLY_TOKEN=… poetry run python scripts/onboarding_eval.py` from `ally-ai`.
 
@@ -169,3 +169,83 @@ Sources:
 - Q: Which helplines are available 24/7? → 2 source(s). I don’t have information in our materials that says which helplines are available 24/7. Our site lists helpline numbers for referral, but the pages we have note
 - Q: How do I find a therapist near me? → 2 source(s). You can use our online therapist directory to find verified mental health professionals across India. Go to the “Find a Therapist” page, browse therapists by lo
 
+## The 5 wrong declines: diagnosis
+
+*Written 8 Nov 2026, from the eval runs' own LangGraph checkpoints (`ally_agent_runtime`, schema `agent_runtime`; every Preview question is its own `preview-<uuid>` thread), plus 15 fresh `/agent/run` calls with the same bot payloads. No code was changed to observe this.*
+
+**In one line:** the agent never saw the answer. `search_knowledge` retrieved the right page every time, but `KnowledgeAgentService._select_passages` (`ally-ai/app/core/knowledge_agent/agent.py`) keeps only hits within `similarity_band` (0.08, from the bot's `settings.retrieval.similarityBand`) of the best hit. On these sites the best hit was often a 2–4 token chunk holding only a heading ("Prana Yoga Studio", "Greenfield Meadows"), which matches any query that names the business. That set the bar, and the answer chunk fell below it. With only the heading or the home sentence in front of it, the agent's decline was honest, and the check's nudge (`USE_FOUND`) couldn't help: the passages really didn't say.
+
+**Why there are heading-only chunks.** `extractPastedText` in `ally-be/src/knowledge-base/extractor/index.ts` starts each section *after* its heading line (`start: offset + line.length`). So a page's first heading becomes its own "preface" chunk, and later headings are glued to the end of the section before ("Founder, 500-hour certified, teaching since 2012.\nVikram Shetty"). Sections are hard chunk boundaries (`chunker.ts`), so these never merge with their content.
+
+**Evidence that it is selection, not the model.** Across the 6 eval runs (5 from run 3, plus the yoga question asked again at 14:07) and 13 completed reruns, the agent answered every time the answer chunk was among its passages (6 of 6) and declined every time it wasn't (13 of 13). It never declined with the answer in front of it.
+
+### 1. wellness: "What yoga styles do you teach?"
+
+- **Answer is on:** `/` "Prana Yoga Studio teaches Hatha, Vinyasa and Yin yoga…" (also implied by `/classes`).
+- **Search** (`What yoga styles does Prana Yoga Studio teach?`): 6 hits. Best: "Prana Yoga Studio" (heading only, home page, 0.769). The answer sentence was hit #2 at 0.616, below the band floor of 0.689. `/classes` was hit #4 at 0.486.
+- **Passages the agent got:** P1 "Prana Yoga Studio". Nothing else.
+- **Draft:** decline. "I'm sorry — I don't have information in my files about which yoga styles Prana Yoga Studio teaches. I can help look up the class schedule…"
+- **Check:** `check.py` `_require_sources` → `Rejection.USE_FOUND` (the question names the organisation: "yoga" matches the display name). Sent back with `REJECTIONS[USE_FOUND]`.
+- **Rewrite / final:** decline again, kept in its own words (`keeps_text`): "I'm sorry—I don't have information about which yoga styles Prana Yoga Studio teaches in the materials I can access. For the most accurate list, please contact the studio at +91 80 0000 6060…" The 14:07 re-ask got the same single passage and ended as `clarify` ("Would you like me to look up the current class types…?"): that is the "asked a question back".
+- **What made it a decline:** the model, correctly following `agent/system` rule at line 12 ("If you searched and still have nothing to cite, be honest…"). Cause: selection band. It did not search again (line 10, "If a search misses, try once more", doesn't fire: the search returned a passage, so it doesn't look like a miss).
+- **Reruns now: 2 answer, 1 decline (plus 1 timeout).** Both answers got the home sentence as P2: once because the query happened to add "(Hatha, Vinyasa, Yin, etc.)", once via a second search.
+
+### 2. wellness: "When is the beginners' series?"
+
+- **Answer is on:** `/classes` "Beginners' series: four Sundays each month, 8 am."
+- **Search** (`When is the beginners' series at Prana Yoga Studio in Koramangala?`): best was the home sentence (0.713). `/classes` was hit #2 at 0.602, below the floor of 0.633.
+- **Passages:** P1 "Prana Yoga Studio teaches Hatha, Vinyasa and Yin yoga… for beginners and regular practitioners." That is why the decline mentions the three styles.
+- **Draft:** decline, with the studio's phone number.
+- **Check:** `_drop_unsourced_details` → `Rejection.UNSOURCED_DETAIL` ("It contained a number"). The phone came from the persona instructions and decline wording, not a passage. `USE_FOUND` did not apply: the question doesn't name the organisation.
+- **Rewrite / final:** decline again, citing P1. The phone sentence was cut. Final: "I'm sorry — I don't have the schedule for the beginners' series in the information I can access. I can tell you Prana Yoga Studio teaches Hatha, Vinyasa and Yin…"
+- **What made it a decline:** the model (rule at line 12). Cause: selection band.
+- **Reruns now: 1 answer, 2 decline (plus 1 timeout).** Every run that searched a second time with different words got `/classes`; the one that finished answered correctly ("four Sundays each month at 8:00 am").
+
+### 3. coaching: "What are the morning and evening batch timings?"
+
+- **Answer is on:** `/batches` "Morning batch: 7 to 10 am. Evening batch: 5 to 8 pm."
+- **Search** (`Bright Minds Academy morning and evening batch timings for classes (8-12) in Kothrud`): best was the home sentence (0.716). The batch chunk was hit #4 at 0.575, below the floor of 0.636. A heading-only "Bright Minds Academy" chunk was #3 (0.627).
+- **Passages:** P1 home sentence, P2 contact page (address, phone, office hours).
+- **Draft:** decline. "I'm sorry—I don't have the morning/evening batch timings in my records. Please call our centre at +91 20 0000 3344…"
+- **Check:** `_require_sources` → `USE_FOUND`. "Batch timings" counts as an organisation name here: `organisation_of` takes the part before " — " in each document title as a name, and the builder titles pages "Batch timings — Bright Minds Academy".
+- **Rewrite / final:** decline again (`keeps_text`): "I don't have the morning/evening batch timings in my information. Please call +91 20 0000 3344…"
+- **What made it a decline:** the model (line 12). Cause: selection band, and the query's extra words ("classes (8-12) in Kothrud") pulled the home sentence above the batch chunk.
+- **Reruns now: 3 answer, 0 decline.** The queries were shorter ("…batch timings at Bright Minds Academy in Kothrud?") and the batch chunk came first (0.64–0.66). This one is query luck.
+
+### 4. real-estate: "When is possession for Greenfield Meadows?"
+
+- **Answer is on:** `/` "…with possession from June 2027."
+- **Search** (`What is the possession date for Greenfield Meadows?`): best was "Greenfield Meadows" (heading only, `/project`, 0.631). The home sentence was hit #2 at 0.539, below the floor of 0.551.
+- **Passages:** P1 "Greenfield Meadows". Nothing else.
+- **Draft:** decline, with the sales phone.
+- **Check:** `_require_sources` → `USE_FOUND`.
+- **Rewrite / final:** decline again: "I'm sorry—I don't have the possession date for Greenfield Meadows in the information I can access. For the exact possession schedule, please contact Greenfield Meadows' sales office directly…"
+- **What made it a decline:** the model (line 12). Cause: selection band.
+- **Reruns now: 0 answer, 3 decline.** All three got only "Greenfield Meadows" (0.685).
+
+### 5. real-estate: "What amenities does the project have?"
+
+- **Answer is on:** `/project` "Clubhouse, pool, children's play area, and a 1 km walking track."
+- **Search** (`Greenfield Meadows amenities list for the project (2 BHK 3 BHK Whitefield)`): best was the home sentence (0.764), then "Greenfield Meadows" (heading only, 0.732). The amenities chunk was hit #4 at 0.555, far below the floor of 0.684.
+- **Passages:** P1 home sentence, P2 "Greenfield Meadows".
+- **Draft:** intent `answer`, citing P1 and P2, but opening "I don't have the project's amenities listed…", with the sales phone and the 2/3 BHK sizes (1,150 / 1,540 sq ft). The sizes came from the bot's persona instructions, which the builder wrote with facts in them.
+- **Check:** `_read_draft` → `says_it_has_nothing` relabels it a decline. Then `_drop_unsourced_details` → `UNSOURCED_DETAIL` (phone and sizes not in any passage).
+- **Rewrite / final:** decline, phone sentence cut: "I'm sorry — I don't have the project's amenities list in the information I can access. I can help here with other details…"
+- **What made it a decline:** the model (line 12), confirmed by `says_it_has_nothing`. Cause: selection band.
+- **Reruns now: 0 answer, 3 decline.** All three got only "Greenfield Meadows" (0.72–0.73).
+
+### Pattern
+
+All five pages are short. The chunker turns each page heading into a tiny chunk of its own, and the agent's queries name the business, so that chunk often scores highest. The selection band is relative to the best hit, so one heading-only chunk at the top pushes everything useful out. The agent then declines honestly, the check's rules work as designed, and `USE_FOUND` can't rescue a reply whose passages don't hold the answer. The agent rarely searches a second time, because its first search "found" something. When it did search again, it found the answer each time. This also affects v1, which uses the same `_select_passages`. Two smaller things made the replies worse: the builder puts facts and the phone number in the persona instructions, so drafts carry details the check then sends back (`UNSOURCED_DETAIL`); and 2 of 15 reruns hit the 20 s run cap and returned 504.
+
+### Suggested fix for 20a-2 (task 1, target 0 wrong declines on the fixtures)
+
+Suggestions only; nothing here is built.
+
+1. **Keep headings with their section.** In `extractPastedText`, start a section at its heading line, not after it, so "Greenfield Meadows" is part of the chunk that describes it. Or merge any chunk under ~10 tokens into the next one. Re-index the fixtures. This alone removes the top hit in 1, 4 and 5.
+2. **Don't let a tiny or weak top hit set the band.** In `_select_passages`, ignore chunks under a minimum token count when finding `best`, and always keep at least 4 passages above `decline_similarity`. With that rule, every answer chunk above would have been offered: they ranked 2nd to 4th among the hits, with scores of 0.54–0.62, far above 0.30. This is shared with v1, so check v1 parity.
+3. **Send a decline back to search again.** When the agent declines after one search and has searches left, have the check send it back with "search again with different words" (a new rejection, or `USE_FOUND` with that sentence added), whether or not the question names the organisation. Today `USE_FOUND` doesn't ask for a new search and only fires when `organisation.named_in(question)`. In the reruns, a second search found the answer every time.
+4. **Keep the business name out of queries for its own pages.** Rule line 10 of `agent/system` makes queries self-contained, so the agent adds "Prana Yoga Studio" to every query, and that is what matches the heading chunks. A prompt change goes through the Skills Store as a new version, not the `.txt` file.
+5. **Builder: no facts or phone numbers in the persona instructions.** They make the agent write details the check then strips (`UNSOURCED_DETAIL`), which costs a rewrite and turns answers into declines (question 5).
+6. **Make the checkup catch this.** For each fixture question, assert that the page holding the answer is among the passages offered (`state.passages`, or the response's `retrieval.hit_chunk_ids` against the selected set), not only that the reply has a source. Run each question 3 times: results vary by query wording.
+7. Minor: `organisation_of` reads "Batch timings", "Courses" and "Location" as organisation names, because builder pages are titled "Page — Business" and the code takes the left side. Harmless here, but `USE_FOUND` and the "about the organisation" rules then trigger on ordinary words.
