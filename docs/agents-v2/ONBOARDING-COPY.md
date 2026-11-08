@@ -233,9 +233,25 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 - **Always:** States only facts it can find in your information. Says plainly when it doesn't know, and where to go instead.
 - **Never:** Invents prices, offers, availability or contact details.
 
-## 15. Screen labels *(added in 20a-1)*
+## 15. One screen at a time (onboarding frame)
 
-Labels the screens need that the sections above don't name. Same voice.
+- **Saved indicator:** Saved
+- **Back button:** Back
+- **Footer, left:** Step {n} of {total} · {step name}
+- **Step names:** Start · Reading your website · What we learned · Safety · A few questions · Choose a design · Make it yours · Building · Checkup · Share
+- **Footer, right:** Your progress is saved. You can come back any time.
+- **Enter hint:** press Enter ↵
+- **Option hint (screen readers):** Press {keys} to choose
+- **Talk to the builder, collapsed:** Tell me something else
+- **Talk to the builder, placeholder:** Correct something, or tell me what I missed
+- **Reading, done button:** See what I learned
+- **Questions eyebrow:** {n} quick questions left · 1 quick question left
+- **Building, done button (before the checkup exists):** Continue
+- **Building, done button (with the checkup):** Run the checkup
+
+### From 20a-1 *(added in 20a-1)*
+
+Labels the 20a-1 screens use that the sections above don't name. Same voice.
 
 - **AI Chatbots button:** New assistant
 - **On a draft assistant whose setup isn't finished:** Continue setup
@@ -269,3 +285,73 @@ Labels the screens need that the sections above don't name. Same voice.
 - **Publishing:** Publishing…
 - **Coming soon card title:** Booking and payments
 
+## 16. Make it yours
+
+- **Title:** Make it yours
+- **Subtitle:** You can change all of this later.
+- **Labels:** Name · Logo and cover image · Colour · Tone · Opening line
+- **Colour hint:** first one is from your logo
+- **Logo notes:** From your website · {file name} · Initials will show instead
+- **Logo actions:** Upload · Remove
+- **Cover slot, empty:** Add a cover image
+- **Cover slot, filled:** {file name} · Change
+- **Image hint:** PNG, JPG or WebP, up to 5 MB. The cover shows at the top of your page.
+- **Tone options:** Warm · Balanced · Formal
+- **Preview status line:** Usually replies in seconds
+- **Primary button:** Build my assistant
+
+## 17. Checkup in plain words (20a-2)
+
+- **Page subtitle:** We asked your assistant {total} questions your {clients} ask, and checked every answer against your information. Last run {when}.
+- **Run again button:** Run again
+- **Summary title, all clear:** Ready for {clients}
+- **Summary title, with gaps:** Ready for {clients}, with {gaps} small gaps
+- **Summary body, with gaps:** It answered {passed} of {total} questions correctly and showed where each answer came from. The other {gaps} weren't wrong: your information doesn't cover them yet, so it pointed people to {fallback}. Answer them below and it will know.
+- **Trend caption:** Accuracy over the last {n} checkups
+- **Section titles:** What we checked · Needs your input · Every question we asked
+- **Explain toggle:** What do these mean? · Hide explanations
+- **Measures** (title · technical word · meaning · explanation):
+  - **Gets facts right** · Accuracy · When it answered, the answer matched your information. · We know the right answer to each question from your website and documents, so we compare. {gaps} questions had no answer in your information yet.
+  - **Shows where it found it** · Sources · Every answer linked to the page it came from. · An answer without a source could be made up. Your assistant only states what it can point to.
+  - **Says when it doesn't know** · Honesty · Instead of guessing, it pointed people to {fallback}. · Guessing is the most common way assistants go wrong. We ask questions your information can't answer on purpose.
+  - **Handles sensitive messages safely** · Safety · Declined medical questions and shared crisis contacts when needed. This one must always be perfect. · We send messages about medication, diagnosis and risk. Each must get the response your safety rules require, every time.
+- **Gap card label:** What it said
+- **Gap answer label:** Your answer
+- **Gap buttons:** Add answer · We don't offer this
+- **Gap counter:** {n} of {total} · All done
+- **Filters:** All {total} · Answered · Safety · Needs input
+
+## 18. Landing page (20e)
+
+- **Card after publishing, title:** Give it a landing page
+- **Card body:** A one-page site with your services, hours and team, and your assistant built in.
+- **Card button:** Create landing page
+- **Unavailable note (not public):** Landing pages are for assistants anyone can use. Change who can use it to "Anyone with the link" first.
+- **Ask box suggestions:** {suggested questions}
+- **Default section titles:** Services and fees · Our team · Inside {business} · Visit us · Common questions
+- **Call to action (health):** Not sure who to see? · Tell our assistant what you're looking for and the language you prefer. It will point you to the right person and how to book.
+- **Call to action (other):** Have a question? · Our assistant knows our services, prices and hours, and answers straight away.
+- **Button:** Ask a question
+- **Footer credit:** Assistant by Ally
+- **Edit mode:** Replace logo · Replace image · Add photo · + Add images · Show in search engines
+- **Publish button (first time):** Publish landing page
+
+## 19. Look and feel, and images
+
+- **Screen title:** Look and feel
+- **Section titles:** Logo · Images · Team photos · Style
+- **Logo hint:** Shown on your page, in the chat header and on your landing page
+- **Images hint:** Drop photos here, or click a slot. PNG, JPG or WebP, up to 5 MB each.
+- **Slot names:** Bot page cover · Landing main photo · Gallery {n} · Link preview image
+- **Slot, empty:** Add image
+- **Team photos hint:** The assistant can show a photo when it recommends someone.
+- **Heading styles:** Classic · Modern · Friendly
+- **Theme:** Light · Dark · Match the visitor's device
+- **Preview switch:** Bot page · Landing page
+- **Save notes:** Changes save as you go · Saved. Live on your page now.
+- **Upload errors:**
+  - Too large: That image is over 5 MB. Try a smaller one, or export it at a lower size.
+  - Wrong type: We can only use PNG, JPG or WebP images (and SVG for logos).
+  - Too many: This assistant has 50 images, the most it can hold. Remove one to add another.
+  - Failed: That upload didn't finish. Try again.
+- **Alt text label:** Describe this image for people who can't see it

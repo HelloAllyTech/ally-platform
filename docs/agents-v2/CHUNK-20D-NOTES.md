@@ -1,0 +1,170 @@
+# Chunk 20d notes: design pass, brand and images
+
+**Brief:** [chunk-20d.md](./chunk-20d.md). **Design:** [DESIGN.md](./DESIGN.md) and the screenshots in `design/`. **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §15–19. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20d]`. **Order in slice 1:** 12 → 12b → 20a-1 → **20d** → 20a-2 → 15a → 20e.
+
+## 1. Code map: what exists today (read before building)
+
+Paths are relative to `ally-web/apps/ally-admin-dashboard` (ADMIN) or `ally-be` (BE).
+
+### 20a-1's onboarding: what stays, what's replaced
+
+20a-1 put everything the screens *do* in hooks and the screens only draw (CHUNK-20A-NOTES.md §3). 20d replaces the drawing and keeps the rest.
+
+| File (ADMIN/src/pages/Onboarding/) | Kind | In 20d |
+|---|---|---|
+| `useOnboardingStart.ts` | Logic: start with a website, description or files; resume | **Keep.** |
+| `useOnboardingSession.ts` | Logic: `view`, `reading`, `rows`, `note`, `sending`, `working`, `streaming`, `error`, `questionsLeft`, `sections`, `focusSection`, `building`, `canGoBack`, `canChooseDesign`, `publicAllowed`, `published`, `publishing`, `canvasVersion`; actions `say`, `chooseChip`, `confirmLearned`, `chooseDesign`, `stop`, `back`, `edit`, `publish` | **Keep; extend** with what the one-screen flow needs (below). |
+| `useBotDraftSession.ts` | Logic: the draft, `/events` and `/messages/stream`, reconnects | **Keep.** |
+| `steps.ts`, `findings.ts`, `types.ts` | Pure helpers | **Keep.** |
+| `copy.ts` | Every string, held to the deck by `copy.test.ts` | **Keep; add** §15–19 strings. |
+| `OnboardingStart.tsx` | Presentation | **Replace** (screen 1). |
+| `OnboardingSession.tsx` | Presentation (two panes, phone tabs) | **Replace** with StepFrame and one screen per step. |
+| `Canvas.tsx` | Presentation (cards per section) | **Replace** with screens. Small view logic to move into the hook or a helper first: `parseEmails`, the QR data URL, the building-tick timer. |
+
+The one-screen flow needs from the hook what the two-pane layout didn't: the **current screen** (one of: start, reading, learned, safety, question n, design, make-it-yours, building, share, live), the **step number and total** for the footer, and the builder's **latest line for this screen** (its AssistantLine) with its **options**. These are derived from `view.step`, `conversation` and `rows`, so they're additions to `useOnboardingSession`, not new server calls.
+
+### 12b's bot page
+
+- **Entry:** ADMIN/b.html → `src/botPage/main.tsx`, built by Vite as a second input (`vite.config.ts:85-97`, `rollupOptions.input = {main, botPage}`). No `manualChunks`. The dev server and `vite preview` rewrite `/b/<slug>` to `b.html` (`vite.config.ts:17-29`); production rewrites are in CloudFront and Caddy, outside this repo.
+- **Kept small by an ESLint import fence** (`ally-web/apps/ally-admin-dashboard/eslint.config.mjs`, lines 13–60): `src/botPage/**` can't import `@api`, `@components`, `@constants`, `@hooks`, `@store`, `@utils`, `@ally-ui-mono/*`, `@carbon/*`, MUI, Redux or PostHog. It imports only `hooks/chatStream/sse.ts` and `utils/brandColour.ts`, by relative path.
+- **Components** (`src/botPage/`): `BotPageApp.tsx` (the visit's state machine: loading, error, cover, email, code, prechat, chat), `screens/Cover.tsx`, `screens/Access.tsx`, `screens/Prechat.tsx`, `screens/Chat.tsx`, `screens/ErrorState.tsx`, `components/parts.tsx` (heading, avatar, header, typing dots, sources, buttons, footer), `components/Turnstile.tsx`, `api.ts`, `theme.ts` (`--bp-accent`, `--bp-on-accent`), `types.ts`, `copy/{en,hi,index}.ts` (the page's own strings, with Hindi), `botPage.css`.
+- **The dashboard preview:** `BotPagePreview.tsx` renders the real Cover and Chat screens, `aria-hidden` and inert, inside `pages/WhatsAppBot/BotPageTab.tsx` (Settings → Bot page) in a 300 × 600 phone frame.
+- **Size today** (last build; gzipped): page JS 9.7 KB + a shared chunk of React and `sse.ts` 46.9 KB + CSS **22.4 KB** = about 79 KB. The CSS is large because `botPage.css` compiles the app's whole Tailwind (content glob `src/**`). No size check exists in CI.
+- **Fonts:** the live page uses the system stack; the dashboard preview adds `font-sans`, which this app maps to IBM Plex Serif, so preview and page don't match today.
+- **Cache:** the deploy workflow sets `immutable` on hashed assets and `no-cache` on `*.html`.
+
+### 12b's bot page settings record (where the brand object lives)
+
+- **Entity:** BE/src/chatbot/entity/chatbot-page.entity.ts, table `chatbot_pages`: `chatbot_id` (unique), `slug`, `status`, `access`, `settings` jsonb.
+- **Shape** (BE/src/chatbot/type/bot-page.type.ts): `settings = {branding, suggestedQuestions, prechat, limits, language}`; `branding = {logoUrl, accentColour, title, subtitle, assistantName, avatarUrl, disclaimer, footerLink}`.
+- **Merge:** `mergeBotPageSettings` is per field over defaults, branding merged key by key, so a new branding key gets its default on pages saved before it existed.
+- **Validation:** `BotPageBrandingDto` (BE/src/chatbot/dto/bot-page.dto.ts:42-86): https logo and avatar URLs, hex colour, length limits.
+- **To visitors:** `GET v1/public/bots/:slug` (`no-store`) returns the whole merged `branding` plus suggestions, pre-chat, `maxMessageChars`, language and the Turnstile key. The OTP email uses title, logo and colour.
+- **The `brand` object from DESIGN.md §7 goes here:** `settings.brand`, beside `branding` (see the plan for how the two relate).
+
+### Image upload and storage today
+
+- **12b's logo upload:** `POST v1/chatbots/:id/page/logo-url` (EDITOR) → `BotPageService.logoUploadUrl` → `S3Service.getPresignedUrlForImageUpload` (BE/src/aws/service/s3.service.ts:368-398).
+  - Bucket `ASSETS_S3_BUCKET` (public media, stored as full URLs). Key `bot-page-logos/<chatbotId>-<uuid>/<ms>-<name>`.
+  - PNG, JPEG or WebP by the **claimed** content type; 2 MB by the **claimed** size (not enforced by S3); presigned PUT, 10 minutes.
+  - Served as a plain public bucket URL (`https://<bucket>.s3.<region>.amazonaws.com/<key>`): no CloudFront, no cache headers, no signed GET.
+  - The browser PUTs straight to S3, so **ally-be never sees the bytes**: no magic-byte check, no re-encode, no EXIF strip.
+- **Knowledge library uploads** use the same bucket and presign helper (PDF, DOCX, EPUB; 50 MB).
+- **S3Service** has what a server-side pipeline needs: `uploadStream`, `getObjectBuffer`, `copyObject`, `deleteObject`, `getHeadObject`, `generatePresignedUrl` (get or put).
+- **Image libraries in ally-be:** none (no `sharp`, `jimp`, `image-size` or `file-type` in package.json). `file-type` 21 is present only as a transitive dependency.
+
+### Tests that assert on text or selectors
+
+| Test | Kind | What it pins |
+|---|---|---|
+| `pages/Onboarding/__tests__/copy.test.ts` | Text | Every `COPY` string appears in `ONBOARDING-COPY.md` |
+| `pages/Onboarding/__tests__/Canvas.test.tsx` | Text and behaviour | Card texts through `COPY`, roles (radio disabled), the patches and publish calls |
+| `pages/Onboarding/__tests__/useOnboardingSession.test.tsx` | Behaviour only | The hook's decisions; no markup |
+| `pages/WhatsAppBot/__tests__/BotPageTab.test.tsx` | Text, roles, test ids | `bot-page-preview` test id, labels, buttons, preview text, save payloads |
+| `botPage/__tests__/BotPageFlow.test.tsx` | Behaviour through roles and English/Hindi strings | The visit end to end (cover → code → pre-chat → chat), headings, labels, alerts, `lang` |
+
+- **No Playwright, no axe tooling, no bundle-size check** in ally-web. `axe-core` exists only transitively (from `eslint-plugin-jsx-a11y`).
+
+### Fonts and Tailwind
+
+- **tailwind.config.js** (one for the app): content `src/**` plus Nx dependency globs (ui-shared); **`theme` replaces** fontFamily (everything IBM Plex Serif, mono IBM Plex Mono), fontWeight (300/400/600 only) and borderRadius (0 except `sm` and `full`); `extend` adds the brand ramp and Carbon colours. No presets, no plugins.
+- **styles.css** self-hosts IBM Plex Serif and Mono via `@font-face`; sets `html, body` to IBM Plex Serif in `@layer base`; loaded twice (index.html link and `main.tsx` import).
+- **Google Fonts:** only Material Symbols, from index.html. b.html loads no fonts.
+- **No per-file `@config`** anywhere (one broke the dashboard in 12b).
+- **framer-motion** 12.38 is installed; `useReducedMotion` is used in Onboarding and Bug Hunter. The bot page uses `matchMedia` and `motion-reduce:` instead.
+
+**Consequence for 20d:** the new tokens can't use the app's `theme` keys as-is (radius 0, weights capped at 600, every font IBM Plex Serif). They need their own names, scoped so the old dashboard is unaffected; see the plan.
+
+## 2. Plan (for approval; no 20d feature code until it's approved)
+
+### A. Tokens and fonts
+
+- **Tokens:** `src/v2/tokens.css` defines DESIGN.md §2 as CSS variables under two scopes: `.ally-v2` (the Ally surfaces: onboarding, and later assistant home, Checkup, Look and feel) and `.brand-surface` (visitor surfaces), where the `--brand-*` values are set inline from the bot's brand. Nothing is set on `:root`, so the old dashboard never sees them.
+- **Tailwind:** `theme.extend` gains **new, prefixed keys only**: colours `ally-*`, fonts `font-display`/`font-ui`/`font-label`, radii `rounded-ally-{sm,md,lg,xl}`, shadows, and the motion keyframes. Existing keys (`sans`, radius 0, weights) are untouched, so every existing class renders as before. No per-file `@config` (it broke the dashboard in 12b).
+- **Fonts:** self-hosted woff2 in `src/assets/fonts/v2/`: Geist (variable 400–600), Geist Mono, Instrument Serif 400, Nunito 700. Latin, plus Devanagari where the font has it (Nunito: no; the Geist family: no; so Hindi falls back to Noto Sans Devanagari in the system stack, as today). `font-display: swap`; preload only Instrument Serif and Geist on `/chatbots/new` and the bot page. **Needs your OK:** where the files come from (see Risks).
+
+### B. Components (`src/components/v2/`)
+
+Split in two so the bot page stays inside its import fence and budget:
+- `v2/core/`: dependency-free (React only, CSS variables, CSS animations, no framer-motion, no aliases): **Orb, PrimaryButton, Option, Chip, Kbd, Toast, ImageSlot, AssistantLine, Question, ProgressBar**. Importable by relative path from `src/botPage/` and, later, the landing entry. A lint rule keeps `v2/core` free of aliases.
+- `v2/`: dashboard-only, may use framer-motion: **StepFrame, FindingLine, LearnedCard, SafetyCard, DesignCard, BuildStep, PhonePreview** (renders the real bot page screens), **Dropzone, ColourPicker, ToneSwitch, TellMeSomethingElse**; 20a-2 adds CheckRow, MeasureCard and GapCard in this folder.
+- Motion: `rise`, stagger, `slide`, `pop`, `breathe`, progress and press as CSS classes in `tokens.css` (shared), with framer-motion only where layout animation needs it on dashboard screens. One `prefers-reduced-motion: reduce` block turns every class into an instant opacity change and stops loops; the dashboard side also checks `useReducedMotion`.
+- A gallery route `/dev/v2-components` (dev builds only) shows every component in light and dark, for review and screenshots.
+
+### C. Onboarding, one screen at a time (`/chatbots/new`)
+
+Every screen renders inside **StepFrame** and takes everything from `useOnboardingSession` (start: `useOnboardingStart`). The hook gains `screen` (which screen to show), `stepNumber`/`stepTotal`/`stepName` for the footer, and `line` + `options` (the builder's latest message and quick replies for this screen), all derived from what it already has.
+
+| # | Screen | Hook fields and actions | Primary action |
+|---|---|---|---|
+| 1 | Start | `useOnboardingStart`: `startWithWebsite`, `startWithFiles`, `startWithDescription`, `resume` | Start with my website |
+| 2 | Reading your website | `reading` (domain, count, findings with running totals, done) | Auto-advance 1.2 s after done, or "See what I learned" |
+| 3 | What we learned | `view.learned`, `edit`, `confirmLearned`; LearnedCards grouped by section, each with SourceChip and inline Edit | Looks right |
+| 4 | Safety | `view.safety` (SafetyCard: Always / Never / If someone may be at risk) | Continue |
+| 5…n | One question per screen | `line`, `options`, `questionsLeft`, `chooseChip`, `say` (typed answer) | Option (auto-advance 380 ms) or OK |
+| n+1 | Choose a design | `view.designs`, `chooseDesign` (20a-2 swaps in purposes; the screen takes cards from the hook) | Choose this |
+| n+2 | **Make it yours** (new) | `view.draft` + `edit` (name, tone, opening line), the brand (logo, cover, colour) through the image and brand API, PhonePreview | Build my assistant |
+| n+3 | Building | `building`, BuildSteps | Continue (until 20a-2: "Run the checkup") |
+| n+4 | Who can use it? | `publicAllowed`, `publish` | Publish |
+| n+5 | Your assistant is live | `published` (link, QR, WhatsApp share, open page, "Want it on WhatsApp too?"; "Give it a landing page" hidden until 20e) | Copy link |
+
+- **Make it yours today vs the builder's order:** 20a-1 builds after the design is chosen. 20d moves "Make it yours" between design and building **without a server change**: choosing a design still drafts the assistant (as now), and the screen shows the drafted name, tone and opening line for editing before "Build my assistant" (which shows the building ticks over the already-built result, then Continue). Recorded as a decision; if you'd rather the build run after Make it yours, that's an ally-be step-order change (one line in the step machine and the flow).
+- **Back** uses `back()` (server step back, answers kept); **Resume** opens the screen for the draft's step. **Keyboard:** Enter submits the screen (bound per screen), A–D pick options, ↑/↓ move, Esc closes "Tell me something else". **Phone:** full width; PhonePreview moves below the controls.
+
+### D. "Tell me something else"
+
+A collapsed line at the foot of every screen; it opens a one-line input. Sending calls `say(text)` (the same builder turn as today: a typed gap answer becomes an Owner note, a correction becomes a patch). The reply replaces the screen's AssistantLine while streaming (`streaming`, `working`); if the turn changed the canvas (`canvasVersion` moved), the screen's content re-renders with `rise`. Esc closes it; Stop cancels the turn (20a-1's Stop). A test checks it on every screen type.
+
+### E. The bot page restyle and its budget
+
+- Same `BotPageApp` state machine, endpoints and copy; new presentation per screenshots `02-bot-page-*`: Cover (cover image or the orb in the brand colour, logo tile, heading style, Start, disclaimer), Access and Pre-chat one per screen with `slide`, a progress bar and "1 / 2", lettered options that auto-advance, then Chat (orb or logo header with a status line, outlined suggestion chips, the visitor's bubble in the brand colour, streamed text with a caret, source chips once, New chat, round send button). Crisis replies unchanged.
+- Theme (light, dark, auto) and heading style from the brand; `--brand-accent` contrast-corrected server-side (stored) and checked client-side.
+- **Budget** (gzipped, fonts excluded): JS ≤ 70 KB, CSS ≤ 25 KB; LCP < 2 s on Lighthouse mobile. Today: 56.6 KB JS, 22.4 KB CSS (the CSS is mostly unused dashboard utilities). Plan: the bot page stops compiling the app's Tailwind; its stylesheet becomes `tokens.css` + `v2/core` CSS + a small `botPage.css` (estimated 8–12 KB); no framer-motion on the page (CSS motion only). A new size script <!-- docs-path-lint: planned --> `ally-web/scripts/check-bot-page-size.mjs` reads the built assets and fails over budget; added to the CI test workflow after `build:admin`.
+- **Tests to update for markup** (behaviour unchanged): `BotPageFlow.test.tsx` keeps its roles and strings (the page copy doesn't change), so it should pass as is; `BotPageTab.test.tsx` keeps the `bot-page-preview` test id. Any test that has to change will be listed with the reason.
+
+### F. The image pipeline (ally-be + ally-web)
+
+- **Upload through ally-be**, not presigned direct to S3, because every image must be checked and re-encoded: `POST v1/chatbots/:id/images` (multipart, multer, which is already in `@nestjs/platform-express`), EDITOR; rate-limited per user (Redis, 30 a minute).
+- **Validation:** read the first bytes for the type (PNG, JPEG, WebP; SVG for `kind=logo` only); refuse anything else whatever its name; ≤ 5 MB; ≤ 6000 px on the longest side and a decompression-bomb pixel cap.
+- **SVG decision: rasterise.** A logo SVG is rendered to PNG at 1024 px and stored only as raster variants; we never serve SVG, so there's no script, handler, external reference or `foreignObject` to sanitise and no sanitiser to keep correct. Cost: a logo isn't vector-sharp past 1024 px, which no surface here needs.
+- **Re-encode** every image (which strips EXIF and GPS), auto-rotate from EXIF first; store variants 256, 768 and 1600 px WebP (never upscaled) plus the original re-encoded. **Needs `sharp`** (see Risks).
+- **Storage:** a new table `bot_images` (id, chatbot_id, tenant_id, kind, content_hash, width, height, variants, alt, original_name, status, created_by, detached_at). Objects at `bot-images/<tenantId>/<chatbotId>/<hash>-<size>.webp` (content-hashed names, `immutable` cache headers).
+- **Visibility:** drafts are read through short-lived signed URLs from a **private** bucket. On publish (and on each brand save of a published page), the variants the page uses are copied to the public assets bucket with long cache headers; unpublishing or removing deletes the public copies. So an image is public only while a published page uses it. **Needs a decision on the private bucket** (see Risks).
+- **Limits:** 50 images per bot. **Removing** detaches at once (and deletes public copies); a daily sweep (`scheduledTaskRegistry`) deletes files 30 days after detaching, so Undo works within that window.
+- **Onboarding logo:** the crawl's detected logo is fetched through the same guarded, same-site fetcher and stored like an upload (no hotlinking); `branding.logoUrl` stops pointing at the site.
+- **Alt text:** stored per image; defaults from DESIGN.md §6; editable in Look and feel.
+- **Errors:** copy §19.
+
+### G. The brand object and Look and feel
+
+- **`settings.brand`** on 12b's `chatbot_pages` record (DESIGN.md §7): `logo`, `accent`, `accentContrast` (stored), `headingStyle`, `theme`, `coverImage`, `shareImage`, `landingImages {hero, gallery[≤6]}` with alt text, `peoplePhotos`. Validated by a `BrandDto` (hex, enums, image ids that belong to this bot). `mergeBotPageSettings` gives defaults, so pages saved before 20d keep working.
+- **Relation to 12b's `branding`:** `branding` keeps title, subtitle, assistant name, disclaimer and footer link; its `logoUrl` and `accentColour` become **derived** from `brand` on save (the OTP email and older clients keep reading them). One store, no second record.
+- **Public view:** resolves image ids to public URLs and `srcset` variants; still `no-store`.
+- **Look and feel** (screenshot `06-look-and-feel`): a Settings section beside "Bot page" (and linked from it): Logo, Images (cover, link preview; landing slots hidden until 20e), Team photos (names from learned team facts), Style (heading style, colour, theme), and a live PhonePreview. **Saves as you go:** each change is a debounced (600 ms) brand PATCH through the same service as 12b's settings; a Toast "Changed. Undo" restores the previous brand; "Saved. Live on your page now." after a save on a published page.
+
+### H. Tests
+
+- **ally-web:** Playwright screenshots of every onboarding screen and bot page screen at 1440 and 390 px, light and dark, against fixed data (mocked API), checked in as baselines; a keyboard-only run from start to publish; a reduced-motion run asserting no animation classes are active; axe on every screen (0 serious or critical); the bot page size check; Look and feel (preview updates, Undo restores, save debounces); component tests for Option (keys, auto-advance), StepFrame (Back, Enter), ImageSlot (states and errors). **Needs Playwright and `@axe-core/playwright`** (see Risks).
+- **ally-be:** the upload cases from the brief (a `.exe` renamed `.png`, over 5 MB, too many pixels, an SVG with a script rasterised safely, EXIF and GPS gone, variants made, the 50 limit, a draft image not public, a removed image gone after the purge), the brand DTO and contrast correction, and 12b's settings tests unchanged.
+
+### I. Commit sequence (each `[20d]`)
+
+1. Docs: copy §15–19 merged, current chunk 20d, this code map and plan.
+2. Foundation: tokens, fonts, Tailwind extension, motion, `v2/core` and `v2` components, the gallery route.
+3. ally-be: `bot_images`, the upload pipeline, visibility on publish, the purge sweep, the brand object and DTO.
+4. Onboarding: StepFrame and every screen, the hook additions, Tell me something else, keyboard.
+5. Make it yours: logo, cover, colour, tone, opening line, PhonePreview.
+6. Bot page restyle, its own stylesheet, the size check in CI.
+7. Look and feel.
+8. Tests: Playwright screenshots, keyboard, reduced motion, axe.
+9. Notes: before and after screenshots, budgets measured, the text-only test updates listed, open items for 20a-2 and 20e.
+
+### J. Risks and open questions
+
+1. **New dependencies (need your OK):** `sharp` in ally-be (image checks, re-encode, variants, SVG rasterise; it ships native binaries, so the Docker images need its platform build); `@playwright/test` and `@axe-core/playwright` in ally-web (dev only, plus browsers in CI); the fonts: copy the woff2 files from their open-font-licence sources into the repo (no package), or add `@fontsource/instrument-serif`, `@fontsource/nunito` and `geist` as dependencies.
+2. **A private bucket for draft images:** reuse an existing private bucket under a `bot-images/` prefix, or add `BOT_IMAGES_S3_BUCKET` (an infra change)?
+3. **Make it yours before or after the build** (C above): show the drafted fields for editing after choosing a design (no server change), or move the build step after it.
+4. **Hindi on the bot page:** the restyle adds visitor strings (for example the status lines); the page has its own English and Hindi copy files. Who writes the Hindi?
+5. **The screenshots and the deck disagree** in places (for example the cover hint says "PNG, JPG or SVG"; the deck says "PNG, JPG or WebP"). DESIGN.md says the written spec wins, so I'll follow the deck and list each case.
+6. **Budget risk:** the shared React chunk is 47 KB of the 70 KB JS budget; the restyle has about 13 KB of headroom, enough without framer-motion.
+7. **Screenshot baselines** differ by OS font rendering; they'll be generated in the Playwright Docker image so CI and local runs match.
