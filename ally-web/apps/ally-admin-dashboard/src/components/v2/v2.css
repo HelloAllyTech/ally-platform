@@ -500,3 +500,16 @@ a.ally-source:hover {
     align-self: center;
   }
 }
+
+.ally-make__images {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.ally-make__logo {
+  width: 120px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

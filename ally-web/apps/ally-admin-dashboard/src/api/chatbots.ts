@@ -1,7 +1,10 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  BotImageKind,
+  BotImageView,
   BotPageAccessEntry,
   BotPageAccessKind,
+  BotPageBrand,
   BotPageView,
   Chatbot,
   ChatbotAudienceEntry,
@@ -228,6 +231,64 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       }),
     }),
 
+    // ── bot page look and images (chunk 20d) ─────────────────────────────
+
+    updateBotPageBrand: builder.mutation<
+      BotPageView,
+      { id: string } & Partial<Omit<BotPageBrand, "accentContrast">>
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.PAGE_BRAND(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }],
+    }),
+
+    getBotImages: builder.query<BotImageView[], string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.IMAGES(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
+    }),
+
+    uploadBotImage: builder.mutation<
+      BotImageView,
+      { id: string; kind: BotImageKind; file: File; alt?: string }
+    >({
+      query: ({ id, kind, file, alt }) => {
+        const body = new FormData();
+        body.append("file", file);
+        body.append("kind", kind);
+        if (alt) body.append("alt", alt);
+        return { url: ApiEndpoints.CHATBOTS.IMAGES(id), method: HttpMethod.POST, body };
+      },
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
+    }),
+
+    updateBotImage: builder.mutation<BotImageView, { id: string; imageId: string; alt: string }>({
+      query: ({ id, imageId, alt }) => ({
+        url: ApiEndpoints.CHATBOTS.IMAGE(id, imageId),
+        method: HttpMethod.PATCH,
+        body: { alt },
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
+    }),
+
+    removeBotImage: builder.mutation<void, { id: string; imageId: string }>({
+      query: ({ id, imageId }) => ({
+        url: ApiEndpoints.CHATBOTS.IMAGE(id, imageId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
+    }),
+
+    restoreBotImage: builder.mutation<BotImageView, { id: string; imageId: string }>({
+      query: ({ id, imageId }) => ({
+        url: ApiEndpoints.CHATBOTS.IMAGE_RESTORE(id, imageId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
+    }),
+
     getBotPageAccess: builder.query<{ entries: BotPageAccessEntry[] }, string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.PAGE_ACCESS(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page-access` }],
@@ -338,6 +399,12 @@ export const {
   useUpdateBotPageMutation,
   useLazyCheckBotPageSlugQuery,
   useCreateBotPageLogoUrlMutation,
+  useUpdateBotPageBrandMutation,
+  useGetBotImagesQuery,
+  useUploadBotImageMutation,
+  useUpdateBotImageMutation,
+  useRemoveBotImageMutation,
+  useRestoreBotImageMutation,
   useGetBotPageAccessQuery,
   useAddBotPageAccessMutation,
   useRemoveBotPageAccessMutation,

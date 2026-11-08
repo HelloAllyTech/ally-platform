@@ -16,6 +16,7 @@ export {
   SourceChip,
 } from "./Cards";
 export type { DesignCardLabels, LearnedCardLabels } from "./Cards";
+export { PhonePreview } from "./PhonePreview";
 export { StepFrame } from "./StepFrame";
 export type { StepFrameLabels } from "./StepFrame";
 export { TellMeSomethingElse } from "./TellMeSomethingElse";

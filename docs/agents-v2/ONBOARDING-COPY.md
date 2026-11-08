@@ -350,6 +350,8 @@ Labels the 20a-1 screens use that the sections above don't name. Same voice.
 - **Slot names:** Bot page cover · Landing main photo · Gallery {n} · Link preview image
 - **Slot, empty:** Add image
 - **Team photos hint:** The assistant can show a photo when it recommends someone.
+- **Team photo actions:** Add photo · Replace
+- **Toast after a change:** Changed · Undo
 - **Heading styles:** Classic · Modern · Friendly
 - **Theme:** Light · Dark · Match the visitor's device
 - **Preview switch:** Bot page · Landing page

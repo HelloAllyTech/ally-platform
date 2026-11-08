@@ -1,10 +1,143 @@
 import React, { useState } from "react";
 
-import { PrimaryButton, Question, Segmented, useEnterToSubmit } from "@components/v2";
+import {
+  ColourPicker,
+  ImageSlot,
+  PhonePreview,
+  PrimaryButton,
+  Question,
+  Segmented,
+  Toast,
+  useEnterToSubmit,
+} from "@components/v2";
 
+import { BrandPreview } from "./BrandPreview";
 import { COPY } from "./copy";
+import { colourSwatches } from "../../utils/colourPicks";
 
 import type { BotDraftView, PatchOp } from "./types";
+import type { BrandEditor } from "../../hooks/brand/useBrandEditor";
+
+/** The last part of a URL's path: "https://site/img/logo.png" → "logo.png". */
+const fileOf = (url: string | null | undefined) => {
+  try {
+    return url ? (new URL(url).pathname.split("/").pop() ?? "") : "";
+  } catch {
+    return "";
+  }
+};
+
+/**
+ * Logo, cover and colour on "Make it yours" (copy §16): the brand editor's state drawn as the
+ * screenshot's controls. Uploads and saves are the editor's.
+ */
+export const BrandControls: React.FC<{ view: BotDraftView; editor: BrandEditor }> = ({
+  view,
+  editor,
+}) => {
+  const brand = editor.brand;
+  if (!brand) return null;
+  const logo = editor.imageFor("logo");
+  const cover = editor.imageFor("coverImage");
+  const siteLogo = fileOf(view.crawl.brand?.logoUrl);
+  const logoNote = !logo
+    ? COPY.make.logoInitials
+    : siteLogo && logo.fileName === siteLogo
+      ? COPY.make.logoFromSite
+      : logo.fileName || COPY.make.logoFromSite;
+  const swatches = colourSwatches(view.crawl.brand?.accentColour ?? brand.accent);
+  return (
+    <>
+      <div className="ally-field">
+        <span className="ally-field__label">{COPY.make.images}</span>
+        <div className="ally-make__images">
+          <div className="ally-make__logo">
+            <ImageSlot
+              name={COPY.make.images}
+              labels={{
+                empty: COPY.make.upload,
+                replace: COPY.make.upload,
+                remove: COPY.make.remove,
+              }}
+              src={logo?.urls[256]}
+              alt={logo?.alt}
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              height={120}
+              disabled={editor.uploading.logo}
+              progress={editor.uploading.logo ? 60 : null}
+              error={editor.errors.logo}
+              onFile={file => void editor.upload("logo", file)}
+              onRemove={() => editor.remove("logo")}
+            />
+            <span className="ally-small">{logoNote}</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <ImageSlot
+              name={COPY.make.coverEmpty}
+              labels={{
+                empty: COPY.make.coverEmpty,
+                replace: COPY.make.change,
+                remove: COPY.make.remove,
+              }}
+              src={cover?.urls[768]}
+              alt={cover?.alt}
+              fileName={cover?.fileName}
+              height={120}
+              disabled={editor.uploading.coverImage}
+              progress={editor.uploading.coverImage ? 60 : null}
+              error={editor.errors.coverImage}
+              onFile={file => void editor.upload("coverImage", file)}
+              onRemove={() => editor.remove("coverImage")}
+            />
+          </div>
+        </div>
+        <span className="ally-field__hint">{COPY.make.imageHint}</span>
+      </div>
+      <div className="ally-field">
+        <span className="ally-field__label">
+          {COPY.make.colour} <span className="ally-field__hint">· {COPY.make.colourHint}</span>
+        </span>
+        <ColourPicker
+          label={COPY.make.colour}
+          value={brand.accent ?? swatches[0]}
+          swatches={swatches}
+          customLabel={COPY.make.colour}
+          onChange={hex => editor.change({ accent: hex.toUpperCase() })}
+        />
+      </div>
+      {editor.changed && (
+        <Toast
+          message={COPY.look.changed}
+          actionLabel={COPY.look.undo}
+          onAction={editor.undo}
+          onDone={editor.dismissChanged}
+        />
+      )}
+    </>
+  );
+};
+
+/** The phone on "Make it yours": the chat as visitors will open it, with the current settings. */
+export const MakePreview: React.FC<{
+  view: BotDraftView;
+  editor: BrandEditor;
+  name: string;
+  opening: string;
+}> = ({ view, editor, name, opening }) =>
+  editor.brand ? (
+    <PhonePreview label={COPY.make.title}>
+      <BrandPreview
+        name={name}
+        brand={editor.brand}
+        logoSrc={editor.imageFor("logo")?.urls[256] ?? null}
+        coverSrc={editor.imageFor("coverImage")?.urls[768] ?? null}
+        screen="chat"
+        introduction={opening}
+        suggestedQuestions={view.draft.suggestedQuestions.slice(0, 3)}
+        statusLine={COPY.make.previewStatus}
+      />
+    </PhonePreview>
+  ) : null;
 
 /** The deck's three tones (copy §16) and the draft's tone values they set. */
 export const TONES = [
@@ -25,10 +158,9 @@ export const MakeItYoursScreen: React.FC<{
   view: BotDraftView;
   onPatch: (target: "draft", ops: PatchOp[]) => Promise<boolean>;
   onContinue: () => void;
-  /** The logo, cover and colour controls and the phone preview (added by the brand work). */
-  brand?: React.ReactNode;
-  preview?: React.ReactNode;
-}> = ({ view, onPatch, onContinue, brand, preview }) => {
+  /** The page's look (logo, cover, colour) and the live phone preview. */
+  editor?: BrandEditor;
+}> = ({ view, onPatch, onContinue, editor }) => {
   const draft = view.draft;
   const [name, setName] = useState(draft.assistantName);
   const [opening, setOpening] = useState(draft.introduction);
@@ -55,7 +187,7 @@ export const MakeItYoursScreen: React.FC<{
             onBlur={() => save("/assistantName", name, draft.assistantName)}
           />
         </div>
-        {brand}
+        {editor && <BrandControls view={view} editor={editor} />}
         <div className="ally-field">
           <span className="ally-field__label" id="make-tone">
             {COPY.make.tone}
@@ -87,7 +219,11 @@ export const MakeItYoursScreen: React.FC<{
           {COPY.make.continue}
         </PrimaryButton>
       </div>
-      {preview && <div className="ally-make__preview">{preview}</div>}
+      {editor && (
+        <div className="ally-make__preview">
+          <MakePreview view={view} editor={editor} name={name} opening={opening} />
+        </div>
+      )}
     </div>
   );
 };

@@ -4,6 +4,28 @@ export type BotPageAccess = "public" | "organisation" | "invite";
 export type PrechatFieldType = "text" | "email" | "phone" | "choice" | "date" | "consent";
 export type BotPageLanguage = "en" | "hi" | "auto";
 
+/** An image on the public image route, with its sizes (chunk 20d). */
+export interface PublicImage {
+  src: string;
+  srcset: string;
+  width: number;
+  height: number;
+  alt: string;
+}
+
+export type HeadingStyle = "classic" | "modern" | "friendly";
+export type BrandTheme = "light" | "dark" | "auto";
+
+/** How the page looks (chunk 20d): ally-be sends it inside `branding` as `look`. */
+export interface BrandLook {
+  headingStyle: HeadingStyle;
+  theme: BrandTheme;
+  /** The owner's colour, corrected so white text on it reads at 4.5:1. */
+  accent: string;
+  logo: PublicImage | null;
+  cover: PublicImage | null;
+}
+
 export interface BotPageBranding {
   logoUrl: string | null;
   accentColour: string;
@@ -13,6 +35,8 @@ export interface BotPageBranding {
   avatarUrl: string | null;
   disclaimer: string;
   footerLink: { label: string; url: string } | null;
+  /** Absent from pages served before chunk 20d. */
+  look?: BrandLook;
 }
 
 export interface PrechatField {

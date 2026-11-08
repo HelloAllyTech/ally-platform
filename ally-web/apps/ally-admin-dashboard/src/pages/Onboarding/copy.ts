@@ -92,6 +92,32 @@ export const COPY = {
     continue: "Continue",
     checkup: "Run the checkup",
   },
+  /** Look and feel, and images (copy §19, chunk 20d). */
+  look: {
+    title: "Look and feel",
+    sections: { logo: "Logo", images: "Images", team: "Team photos", style: "Style" },
+    logoHint: "Shown on your page, in the chat header and on your landing page",
+    imagesHint: "Drop photos here, or click a slot. PNG, JPG or WebP, up to 5 MB each.",
+    slots: { cover: "Bot page cover", share: "Link preview image" },
+    slotEmpty: "Add image",
+    teamHint: "The assistant can show a photo when it recommends someone.",
+    teamActions: { add: "Add photo", replace: "Replace" },
+    headingStyles: { classic: "Classic", modern: "Modern", friendly: "Friendly" },
+    themeLabel: "Theme",
+    themes: { light: "Light", dark: "Dark", auto: "Match the visitor's device" },
+    previewSwitch: { bot: "Bot page", landing: "Landing page" },
+    savesAsYouGo: "Changes save as you go",
+    savedLive: "Saved. Live on your page now.",
+    changed: "Changed",
+    undo: "Undo",
+    altLabel: "Describe this image for people who can't see it",
+    errors: {
+      tooLarge: "That image is over 5 MB. Try a smaller one, or export it at a lower size.",
+      wrongType: "We can only use PNG, JPG or WebP images (and SVG for logos).",
+      tooMany: "This assistant has 50 images, the most it can hold. Remove one to add another.",
+      failed: "That upload didn't finish. Try again.",
+    },
+  },
   /** The one-screen-at-a-time frame (copy §15, chunk 20d). */
   frame: {
     saved: "Saved",

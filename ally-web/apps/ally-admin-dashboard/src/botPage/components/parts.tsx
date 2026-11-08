@@ -64,9 +64,11 @@ export function Avatar({ branding, size = 32 }: { branding: BotPageBranding; siz
 /** The bar at the top of every screen after the cover: logo (or avatar) and the page's title. */
 export function PageHeader({
   branding,
+  subtitle,
   children,
 }: {
   branding: BotPageBranding;
+  subtitle?: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -76,7 +78,10 @@ export function PageHeader({
       ) : (
         <Avatar branding={branding} />
       )}
-      <p className="min-w-0 flex-1 truncate font-semibold text-stone-900">{branding.title}</p>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-stone-900">{branding.title}</p>
+        {subtitle && <p className="truncate text-xs text-stone-500">{subtitle}</p>}
+      </div>
       {children}
     </header>
   );

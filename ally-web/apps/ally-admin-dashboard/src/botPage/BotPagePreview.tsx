@@ -16,10 +16,13 @@ export function BotPagePreview({
   page,
   screen,
   sampleReply,
+  statusLine,
 }: {
   page: PublicBotPage;
   screen: "cover" | "chat";
   sampleReply: string;
+  /** The header's status line, for example "Usually replies in seconds". */
+  statusLine?: string;
 }) {
   const copy = useMemo(() => pickCopy(page.language, "en"), [page.language]);
   const noop = () => undefined;
@@ -47,6 +50,7 @@ export function BotPagePreview({
             pending={null}
             onSend={noop}
             onNewChat={noop}
+            statusLine={statusLine}
           />
         )}
       </div>

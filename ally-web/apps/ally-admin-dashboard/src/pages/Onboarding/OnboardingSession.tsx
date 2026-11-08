@@ -20,6 +20,7 @@ import {
 } from "./Screens";
 import { reached } from "./steps";
 import { useOnboardingSession } from "./useOnboardingSession";
+import { useBrandEditor } from "../../hooks/brand/useBrandEditor";
 
 import type { OnboardingScreen } from "./flow";
 
@@ -43,6 +44,7 @@ export const OnboardingSession: React.FC = () => {
   const s = useOnboardingSession(draftId, message => toast.error(message));
   const view = s.view;
   const flow = s.flow;
+  const editor = useBrandEditor(view?.chatbotId ?? null, COPY.look.errors.failed);
 
   if (!view || !flow) {
     return (
@@ -111,7 +113,14 @@ export const OnboardingSession: React.FC = () => {
           <BuildingScreen done={reached(view.step, "share")} onContinue={() => s.pass("built")} />
         );
       case "make":
-        return <MakeItYoursScreen view={view} onPatch={s.edit} onContinue={() => s.pass("make")} />;
+        return (
+          <MakeItYoursScreen
+            view={view}
+            onPatch={s.edit}
+            onContinue={() => s.pass("make")}
+            editor={editor}
+          />
+        );
       case "share":
         return (
           <ShareScreen

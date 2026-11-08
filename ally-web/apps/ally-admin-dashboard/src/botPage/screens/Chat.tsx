@@ -36,6 +36,7 @@ export function Chat({
   error,
   signedInAs,
   returnedDraft,
+  statusLine,
 }: {
   page: PublicBotPage;
   copy: BotPageCopy;
@@ -48,6 +49,8 @@ export function Chat({
   signedInAs?: string | null;
   /** A message that was refused before it was answered, put back in the box to send again. */
   returnedDraft?: { text: string } | null;
+  /** Under the name in the header: what the assistant is doing, or how fast it replies. */
+  statusLine?: string;
 }) {
   const { branding } = page;
   const [draft, setDraft] = useState("");
@@ -74,7 +77,7 @@ export function Chat({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader branding={branding}>
+      <PageHeader branding={branding} subtitle={statusLine}>
         <TextButton onClick={onNewChat} disabled={busy || (!messages.length && !pending)}>
           {copy.chat.newChat}
         </TextButton>
