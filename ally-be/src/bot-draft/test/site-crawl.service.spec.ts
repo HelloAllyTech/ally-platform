@@ -296,6 +296,17 @@ describe('SiteCrawlService', () => {
     expect(Math.max(...h.learned)).toBeLessThanOrEqual(CRAWL_LIMITS.learnBatch);
   });
 
+  it('follows a short home page’s links instead of giving up', async () => {
+    const s = await serve({
+      '/': { body: page('Home', 'Welcome.', ['/classes', '/contact']) },
+      '/classes': { body: page('Classes', LONG) },
+      '/contact': { body: page('Contact', LONG) },
+    });
+    const crawl = await harness().crawl(s.url);
+    expect(read(crawl).sort()).toEqual(['/classes', '/contact']);
+    expect(crawl.status).toBe('done');
+  });
+
   it('reads blog and news pages last, and at most 10 of them', async () => {
     const posts = Array.from({ length: 15 }, (_, i) => `/blog/post-${i}`);
     const core = ['/fees', '/team', '/contact'];

@@ -435,3 +435,21 @@ class TestNonProfit:
         assert res.message.startswith(
             "One thing I couldn't find: how people can donate."
         )
+
+
+@pytest.mark.asyncio
+async def test_a_site_gap_that_repeats_a_checklist_gap_is_not_asked_twice():
+    fake = FakeLLM(
+        ClassifyOut=[{"industry": "mental_health"}],
+        GapsOut=[
+            {
+                "missing": ["fees"],
+                "extra": [
+                    {"item": "your fees for sessions", "why": "x"},
+                    {"item": "your workshop waitlist", "why": "Workshops fill up."},
+                ],
+            }
+        ],
+    )
+    res = await run(request("learned", chip=catalogue.LOOKS_RIGHT), fake)
+    assert [g.item for g in res.gaps] == ["your fees", "your workshop waitlist"]

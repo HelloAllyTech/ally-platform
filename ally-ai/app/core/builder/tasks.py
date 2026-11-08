@@ -235,10 +235,48 @@ async def find_gaps(
         why = " ".join(extra.why.split())
         if not item or catalogue.overpromises(item):
             continue
+        # "your fees for sessions" after "your fees" is the same question twice.
+        if any(_words(item) & _words(gap.item) for gap in gaps):
+            continue
         if why and not why.endswith("."):
             why += "."
         gaps.append(Gap(key=f"site_{n}", item=item[:200], why=why[:200]))
     return gaps[: catalogue.MAX_GAPS]
+
+
+_FILLER = {
+    "your",
+    "the",
+    "a",
+    "an",
+    "for",
+    "and",
+    "or",
+    "of",
+    "to",
+    "how",
+    "what",
+    "whether",
+    "which",
+    "when",
+    "people",
+    "can",
+    "you",
+    "are",
+    "is",
+    "it",
+    "they",
+    "in",
+    "on",
+    "with",
+    "do",
+    "does",
+}
+
+
+def _words(text: str) -> set:
+    """The words that say what a gap is about ("fees", "cancellation")."""
+    return {w.rstrip("s") for w in re.findall(r"[a-z]+", text.lower())} - _FILLER
 
 
 # --- designs -----------------------------------------------------------------

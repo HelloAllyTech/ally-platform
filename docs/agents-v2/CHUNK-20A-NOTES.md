@@ -4,7 +4,7 @@
 - Master was merged first: no new commits, so no conflicts.
 - **Repos:** all three.
 - **Two loops.**
-  - **20a-1** (this file, so far): start → reading → learned → safety → gaps → designs → building → publish.
+  - **20a-1** (built; sections 2–10 below): start → reading → learned → safety → gaps → designs → building → publish.
   - **20a-2:** checkup, try it, and change by chat with undo.
 
 Plan approved 2026-11-07 at `~/.claude/plans/pasted-content-id-f834-we-re-continuing-sharded-raven.md`.
@@ -147,4 +147,136 @@ All paths are relative to each app.
 7. **The route is `/chatbots/new`, not `/new`.** It sits beside `/chatbots/:botId`, as `/course-copilot/new` does; the admin app has no bare top-level `/new`.
 8. **One prompt per model call.** The brief names one prompt, `ally_ai_builder_system`, but the repo needs one prompt and one registry row per model call. The builder's structured sub-tasks therefore get their own codes: `ally_ai_builder_{system,extract,classify,gaps,designs,draft}`.
 9. **Copy §14 has no wording for pharmacy, or legal and financial.** It's written in the deck's voice and added to `ONBOARDING-COPY.md` in the same commit.
-10. **The brief's eval path** `scripts/onboarding_eval.py` is `ally-ai/scripts/onboarding_eval.py`, next to the conversation eval.
+10. **The brief's eval script** is `ally-ai/scripts/onboarding_eval.py`, next to the conversation eval.
+
+## 2. What was built (20a-1)
+
+**One onboarding, three apps.** ally-be owns the draft and every write; ally-ai's builder only proposes; the admin dashboard draws it.
+
+### ally-be (`src/bot-draft/`)
+
+| Piece | File | Does |
+|---|---|---|
+| Draft store | `service/bot-draft.service.ts`, `entity/bot-draft.entity.ts` | One `bot_drafts` row per setup. JSON Patch edits checked in order: allowed paths per actor, the `BotDraft` schema, the safety lock, the version. Undo by stored inverse; Back; the step machine (`service/step-machine.ts`). |
+| Session | `service/bot-draft-session.service.ts` | One builder turn: the step request (the whole draft; ally-ai keeps nothing), the relay, then the proposal applied to the draft *as it is now*. Patches it refuses are dropped and counted, never fatal. The owner's message is saved with the reply, so a stopped turn changes nothing. Also the crawl's learner, document and description reading, the crawl-finished message, and naming the draft from its source. |
+| Crawl | `crawl/*` | In-process and resumable: robots, sitemap, same site, 50 pages, 2 minutes, 4 at a time, blog and news pages last and at most 10, junk skipped, canonical. Every fetch through the shared SSRF guard (`common/net/guarded-fetch.ts`). Each page becomes a PASTE library document with its URL. |
+| Publish | `service/bot-draft-publish.service.ts` | Idempotent: chatbot persona, safety pack and rules, LIVE; settings with the pack's floor; the Owner notes document; the page through 12b's `BotPageService` and its list through `BotPageAccessService`. Public refused before anything is written. |
+| Safety packs | `safety-pack/*` | Six versioned packs. The pack is chosen in code: the strongest of the business type's and its care topics' (`packForBusiness`). The lock refuses a weaker pack or a removed disclaimer. |
+| API | `controller/bot-draft.controller.ts` | `v1/bot-drafts`: create, current, get, events (SSE), messages/stream (SSE), PATCH, undo, back, documents, publish, abandon; `v1/chatbots/:id/changes`. AI Chatbots feature and `EDIT_WHATSAPP_BOT`. |
+| Copy | `copy/onboarding-copy.ts` | The lines ally-be writes itself (crawl outcome, finding lines, edit notes), held to the deck by a spec. |
+
+Elsewhere in ally-be: the engine sends the pack as `persona.safety_rules` and `persona.safety_pack` on every run (`chatbot/engine/knowledge-request.ts`); settings keep the pack's floor and refuse turning it off (`chatbot-settings.service.ts`); the chatbots list carries `setupDraftId` for Continue setup.
+
+### ally-ai (`app/core/builder/`, `app/api/v1/endpoints/builder.py`)
+
+- `/builder/step`, `/builder/step/stream`, `/builder/extract`, dark until `BUILDER__ENABLED`.
+- Six structured sub-tasks, each with its own prompt (`app/prompts/builder/*.txt`) and task label: the conversation step, fact extraction, classify (business type and care topics), gaps, designs, draft.
+- Code decides what the deck fixes: question order and quick replies, gap checklists per business type, what each design will and won't do, the coming-soon card, and every fixed message. The model writes only what the deck leaves open, and proposes values that code turns into patches on the builder's own paths.
+- Checks in code: facts must cite a page in their batch; sentences stating a number we were never given are dropped; the assistant never claims to book; unknown labels fall back rather than fail a batch.
+- The agent check (`agent_runtime/check.py`) enforces a health pack in code: no diagnosis, result reading, dosing or medication changes, whatever the instructions say.
+
+### Admin dashboard (`apps/ally-admin-dashboard/src/pages/Onboarding/`)
+
+`/chatbots/new` (start) and `/chatbots/new/:draftId` (the session); "New assistant" and, for platform admins, "Advanced setup" on AI Chatbots; "Continue setup" on a Draft bot with the caller's unfinished setup.
+
+## 3. Where logic ends and presentation begins (for the design pass)
+
+The screens are about to be restyled (one screen at a time, Typeform-style, with motion). Everything the screens *do* is in hooks; the components only draw and call them. A restyle replaces the components and keeps the hooks.
+
+| Layer | Files | Keep or replace |
+|---|---|---|
+| **Logic: hooks** | `useOnboardingStart.ts` (start with a website, a description or files; resume) · `useOnboardingSession.ts` (the chat as rows, which canvas sections a step shows and which it brings into view, every action: say, chip, confirm, choose a design, stop, back, edit, publish) · `useBotDraftSession.ts` (the draft, its live events, streamed turns, reconnects) | **Keep.** Tested without a screen (`__tests__/useOnboardingSession.test.tsx`). |
+| **Pure helpers** | `steps.ts` (`reached`) · `findings.ts` · `types.ts` · `copy.ts` (every string, held to the deck by `copy.test.ts`) | **Keep.** |
+| **API** | `api/botDrafts.ts`, `hooks/chatStream/fetchWithReauth.ts`, `hooks/chatStream/sse.ts` | **Keep.** |
+| **Presentation** | `OnboardingStart.tsx`, `OnboardingSession.tsx`, `Canvas.tsx` (cards for each section) | **Replace freely.** Only local view state lives here (which tab is open, an inline edit's text, scroll and focus). |
+
+Rules for the restyle: take strings from `copy.ts` (add any new ones to the deck first), call the hooks' actions rather than the API, and draw `sections` in the order the hook gives them. The server already sends the deck's wording for builder messages, quick replies and finding lines.
+
+## 4. Decisions beyond the plan
+
+- **Uploads are read for "What we learned"** (Shehbaz, 2026-11-08): a PDF a page at a time, other formats in parts; each fact sourced to "file.pdf, page N". Uploads use the chatbot's existing document routes, then `POST v1/bot-drafts/:id/documents`.
+- **The pack is chosen by topic as well as type** (Shehbaz, 2026-11-08). Non-profit is a business type with its own checklist; a mental health non-profit gets Mental health safety from its care topic.
+- **Blog and news pages are read last, at most 10** (Shehbaz, 2026-11-08).
+- **Stop leaves the draft unchanged** (Shehbaz, 2026-11-08): the owner's message is saved with the reply.
+- **The pack's rules travel in their own persona field** (`safety_rules`), not prepended to the instructions: ally-ai caps the instructions at 4,000 characters, the same as the editor.
+- **Facts cite pages by number**, not URL: a made-up number is easy to catch, a made-up URL is not.
+- **The builder can't express a change to protected fields**: it proposes values for a fixed set of fields, and code builds the patches.
+- **Drafts are named from their source** (the site's or document's own name), once, never over the owner's name.
+- **The 20a-1 build-finished line is copy §11's**, not a new one (the checkup comes in 20a-2).
+- **An http logo is not put on the page**: the page's branding takes https logos only.
+- **Copy added to the deck** (marked "added in 20a-1"): pharmacy and legal pack wording, the description message, and §15 screen labels.
+
+## 5. Security and privacy
+
+- Every outbound fetch goes through the shared SSRF guard: private ranges refused, every redirect re-checked. Fixture hosts are allowed only in local, development and test (`BOT_DRAFT_CRAWL_ALLOW_HOSTS`).
+- robots.txt is honoured with our own user agent (`AllyAssistantSetup`); a site that disallows us stops with copy §13's message.
+- 5 crawls per owner per day by default (`BOT_DRAFT_CRAWLS_PER_DAY`).
+- The builder never writes: it has no tools, and ally-be checks every proposal.
+- Logs carry draft ids, steps, domains and counts only: no page text, no owner messages, no email addresses. Requests to `/builder/extract` are logged by size only.
+- A health pack's safety is enforced in code twice: the settings floor (classifier on, `safety_locked` to turn it off) and the agent check (no diagnosis or dosing).
+
+## 6. Tests
+
+| App | Suite | Result |
+|---|---|---|
+| ally-be | `src/bot-draft` (patches, lock, step machine, crawl against a real local server, session, publish, copy) | 129 pass |
+| ally-be | Postgres spec (`bot-draft.pg.spec.ts`): save keeps the crawl and documents; publish twice converges | 4 pass on a scratch DB, skipped in CI |
+| ally-be | Engine request, settings floor, chatbots list | pass, existing specs unchanged |
+| ally-ai | `tests/core/builder` (flow, extract, copy, contract, endpoint) and `tests/core/agent_runtime/test_safety_pack.py` | pass; full suite 2,0xx pass |
+| admin dashboard | Onboarding (copy, canvas, session hook) | 128 pass; full admin suite 551 files pass on Node 22 |
+
+The commit hook runs the helpline suite on Node 24, where about 20 files fail with `FETCH_ERROR` regardless of this change; on Node 22 it passes in full.
+
+## 7. The eval
+
+Full report: [CHUNK-20A-EVAL.md](./CHUNK-20A-EVAL.md). Fixtures: `fixtures/onboarding-sites/` (10 fictional businesses, a blocked site and an unreachable port, served by `serve.py`); case 11 is Live Love Laugh's live public site. Script: `ally-ai/scripts/onboarding_eval.py`.
+
+**The bar:** every case passes; the right business type and pack; 0 unsourced facts; under 5 minutes to publish. **Final run: 13 of 13.**
+
+| Case | Pages | Facts | Business type | Pack | Deliberate gaps asked | To publish |
+|---|---|---|---|---|---|---|
+| Mental health clinic | 5 | 19 | mental_health | Mental health safety | 2 of 2 | 72 s |
+| GP clinic | 4 | 15 | gp_clinic | Medical safety | 2 of 2 | 62 s |
+| Diagnostic lab | 4 | 18 | diagnostic_lab | Medical safety | 2 of 2 | 69 s |
+| Pharmacy | 3 | 11 | pharmacy | Medical safety (pharmacy rules) | 2 of 2 | 68 s |
+| Yoga studio | 4 | 14 | wellness | Facts only | 2 of 2 | 59 s |
+| Tea brand | 4 | 14 | d2c | Facts only | 2 of 2 | 56 s |
+| Coaching institute | 4 | 11 | coaching | Care for young people | 2 of 2 | 62 s |
+| Real estate | 3 | 11 | real_estate | Facts only | 2 of 2 | 61 s |
+| SaaS help centre | 3 | 8 | saas | Facts only | 2 of 2 | 54 s |
+| Restaurant | 3 | 11 | restaurant | Facts only | 2 of 2 | 64 s |
+| Blocked site | 0 | – | stopped: blocked | – | – | – |
+| Unreachable | 0 | – | stopped: unreachable | – | – | – |
+| Live Love Laugh (live) | 50 | 197 | non_profit | Mental health safety (from its cause) | – | 80 s |
+
+0 unsourced facts in every case. It took three runs; the first two found real problems, all fixed:
+- **A short home page stopped the crawl** (four sites read 0 pages and came out as "other"). The crawl now follows its links.
+- **Thin pages were skipped** (a contact page of an address and a phone number). Pages down to 60 characters are kept.
+- **Over-eager care topics** raised two packs (a yoga studio to Mental health safety, an invoicing tool to Legal and financial care). Classify now lists a topic only with evidence.
+- **A site gap repeating a checklist gap** ("your fees for sessions" after "your fees") is no longer asked.
+
+## 8. How Shehbaz tests it
+
+1. Local stack up. In `ally-ai/.env`: `BUILDER__ENABLED=true`. In `ally-be/.env`: `BOT_DRAFT_CRAWL_ALLOW_HOSTS=host.docker.internal` and `BOT_DRAFT_CRAWLS_PER_DAY=100` (then `docker compose up -d --force-recreate --no-deps app` in ally-be).
+2. `python3 fixtures/onboarding-sites/serve.py` for the fixture sites.
+3. AI Chatbots → **New assistant** → paste `http://host.docker.internal:8701` (Sunrise Mind Clinic), or a real site.
+4. Watch reading, check What we learned (View source, Edit, Remove), Looks right, read the safety message, answer the questions, choose a design, watch it build, edit on the canvas, publish invite-only.
+5. Try **Stop** while the builder is writing: the chat and the draft are as before.
+6. Leave mid-way, then AI Chatbots → the Draft card's **Continue setup**, or `/chatbots/new`'s welcome-back banner.
+7. Upload instead: `/chatbots/new` → Upload documents instead → a PDF; each detail shows "file.pdf, page N".
+8. Eval: `ALLY_TOKEN=… poetry run python scripts/onboarding_eval.py` from `ally-ai`.
+
+## 9. Open items
+
+- **20a-2:** the checkup, try it, change by chat with undo (the `changes` endpoint and inverse patches are ready).
+- **Poetry:** `[infra]` commit `e0a0f15f2` stands alone, for a PR from master.
+- **Wrong declines (from the eval):** 5 of 33 Preview answers on freshly published fixture assistants declined facts their pages state, although the search found the passages (see CHUNK-20A-EVAL.md). Answer quality in the 3a agent, not onboarding; the 20a-2 checkup measures it. Look at it before G1b.
+- **Ingest:** a library document re-delivered from the queue while ally-be restarted failed on the chunks' unique index (`uq_kb_document_chunks_doc_version_index`); seen once locally, worth a look (an idempotent re-chunk).
+- **Edge:** a turn cut off by a server restart after the AI replied but before it was applied leaves nothing (correct), but the dashboard shows the generic error rather than retrying.
+- **Uploads:** text from scanned PDFs (no text layer) isn't read; there's no OCR.
+- **Industry label on the safety card** comes from the pack ("mental health practices"), which reads oddly for a non-profit; the deck may want a label per business type.
+- **Stacks** was unreachable from this session (MCP not connected), so no chunks were retrieved; product choices follow the brief, the deck and Shehbaz's answers.
+
+## 10. Commits (20a-1), in review order
+
+`ac5bca7ba` docs · `9fd57fb35` code map · `1008ca946` drafts, schema, packs · `4fc04060e` crawl · `ee90226c9` builder agent · `84a83b6f8` session API, publish, packs in engine and settings · `130b4821d` uploads read, safety in the check, live-run fixes · `888fff708` the screen · `3926b1289` click-through fixes · `e0a0f15f2` Poetry `[infra]` · `419080fde` non-profits, Stop, Continue setup, blog pages last, hooks boundary · `b373b4f2f` stages `[docs]` · then the fixtures, eval, eval fixes and these notes.

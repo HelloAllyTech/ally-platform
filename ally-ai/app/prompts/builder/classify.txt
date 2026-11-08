@@ -22,14 +22,14 @@ List every one of these that the business's work or information deals with, in `
 - medical: illness, symptoms, treatment, tests or hospitals
 - medicines: medicines and prescriptions
 - young_people: many of the people it serves are under 18
-- legal_financial: advice on someone's own legal case or money
+- legal_financial: the business advises people on their own legal case or their own money (lawyers, accountants, financial advisers, lenders). Software, shops or services that merely handle money, invoices or tax filing are not this
 
 # Rules
 1. Choose one industry. A non-profit is non_profit whatever its cause; put its cause in `care_topics` (a mental health foundation is non_profit with mental_health).
 2. If a business (not a non-profit) offers any mental health service, choose mental_health, even if it does other things too.
 3. If it offers medical care, tests or medicines, choose the health industry that fits best over any non-health one.
 4. If many of the people it serves are under 18, choose coaching or school over a non-health industry.
-5. List a care topic only when the business's own work deals with it, not because a page mentions it in passing.
+5. List a care topic only when what we learned shows the business's own work deals with it (it offers that service, or its information is about that topic). Not because a page mentions it in passing, and not because the business is near it: yoga, fitness, spa and nutrition are not mental_health or medical unless they offer therapy, counselling or medical care, and invoicing or accounting software is not legal_financial. When unsure, list none.
 6. `confidence` is between 0 and 1.
 
 # What we learned

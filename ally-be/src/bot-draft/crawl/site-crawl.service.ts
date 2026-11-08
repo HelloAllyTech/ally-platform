@@ -44,7 +44,9 @@ export const CRAWL_LIMITS = {
   pageTimeoutMs: 10_000,
   pageMaxBytes: 2 * 1024 * 1024,
   cssMaxBytes: 512 * 1024,
-  minPageChars: 150,
+  // A page shorter than this is skipped. Low on purpose: a contact page is often only an
+  // address, a phone number and hours, and it's among the most useful pages there are.
+  minPageChars: 60,
   /** Pages read before their summaries are sent to the builder, so findings appear while reading. */
   learnBatch: 8,
   /** A crawl left "running" this long (an instance restarted) is picked up by the sweep. */
@@ -294,10 +296,13 @@ export class SiteCrawlService implements OnModuleInit {
       }
     };
 
-    // The start page alone first (unless resuming): it decides reachability and the brand.
+    // The start page alone first (unless resuming): it decides reachability and the brand. A
+    // short home page (a banner and links) is still followed: only a page we couldn't reach, or
+    // one that kept nothing and links nowhere, ends the crawl here.
     if (!crawl.pages.length) {
       await step();
-      if (startFailed || !crawl.pages.some((p) => p.status === 'read')) {
+      const kept = crawl.pages.some((p) => p.status === 'read');
+      if (startFailed || (!kept && !crawl.queue.length)) {
         return this.finish(
           draft.id,
           crawl,
@@ -323,7 +328,11 @@ export class SiteCrawlService implements OnModuleInit {
     return this.finish(
       draft.id,
       crawl,
-      Date.now() > deadline && crawl.queue.length ? 'partial' : 'done',
+      !read.length
+        ? 'failed'
+        : Date.now() > deadline && crawl.queue.length
+          ? 'partial'
+          : 'done',
       problem,
     );
   }
