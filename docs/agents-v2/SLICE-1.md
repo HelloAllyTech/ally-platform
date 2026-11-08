@@ -1,6 +1,6 @@
 # Slice 1 — From website to a shareable bot, agent-first
 
-> Read with `CONTEXT.md`, `BUILDING-BLOCKS.md` and `v2-chunks.md`. This slice is built as four chunks, one Claude Code loop each: **12 → 12b → 20a → 15a**. Each has its own brief (`chunk-12.md` first; the others are written once the previous one is merged, so they match what was actually built).
+> Read with `CONTEXT.md`, `BUILDING-BLOCKS.md` and `v2-chunks.md`. This slice is Stage 1 of the plan (`v2-chunks.md`, Stages): **12 → 12b → 20a-1 → 20d → 20a-2 → 15a → 20e**, one Claude Code loop each. Each has its own brief (`chunk-12.md` first; the others are written once the previous one is merged, so they match what was actually built).
 
 ## The goal
 
@@ -81,15 +81,18 @@ The safety packs live in code and pages, versioned, and are applied by industry.
 - **The readiness check** runs generated questions through `/agent/run` against the draft bot, with a per-session cost cap.
 - **The bot page (12b)** and **the shared conversation store (12)** carry the shared link.
 
-## The four chunks
+## The chunks
 
 | # | Chunk | Why it's in the slice | Done when |
 |---|---|---|---|
 | **12** | **Shared conversation store and contact identity.** Channel-agnostic `contacts`, `contact_identities`, `conversations` and `messages`; WhatsApp dual-writes; backfill; history read through one service | The bot page needs conversations that aren't WhatsApp messages | WhatsApp unchanged; the shared tables match the old ones; the engine can read history from the shared store behind a flag |
 | **12b** | **Bot page.** A branded, shareable link with streaming, access modes (public, organisation, invite with a one-time code), pre-chat questions, suggested questions, rate limits, a bot check and a daily cap | The link the owner shares | Chat from a phone browser by link; invite-only asks for a code; pre-chat answers are saved on the conversation |
 | **20a** | **Agent-first onboarding (quick-start).** The builder agent, the live canvas, website reading, safety packs, design proposals, the readiness check, publish and share, change-by-chat with undo | The 10x experience | Every fixture above: website to shared link in under 5 minutes; a readiness check with 0 unsourced answers; safety packs applied |
+| **20d** | **Design pass.** One screen at a time with motion, the owner's brand on everything their clients see, logo and image uploads, Look and feel | The first thing a customer sees must feel like the best product they've used | Every onboarding screen and the bot page in the new style; uploads validated and served; screenshots, keyboard and accessibility checks pass |
+| **20a-2** | **Checkup, try it, change by chat**, plus purposes and choosing pages (`chunk-20a2-additions.md`) | Owners see proof it works before they share | The checkup gates publishing; change by chat with Confirm and Undo; safety can't be weakened |
 | **15a** | **Crisis classifier v2.** Recent turns as context, benign look-alikes in the prompt, a crisis eval set with zero missed crises, and fewer false alarms | Required before any public health bot link (gate G1b) | Crisis eval: 0 misses, false alarms down; the Sunrise Mind and Ally FAQ tests still pass |
+| **20e** | **Landing page.** A one-page site built from what the assistant knows, with the assistant built in | Many small businesses have a weak website or none | Public by nature, so after 15a (gate G1b) |
 
-**Estimate:** about 2–3 weeks. 12 and 12b take about 3 days each; 20a is the biggest (about 5–7 days, maybe two loops: builder plus canvas, then the readiness check plus change-by-chat); 15a takes about 2 days.
+**Target:** late November 2026 (v2.0), gated by G1 and G1b. 20a was split into two loops (20a-1: start to publish; 20a-2: checkup, try it, change by chat), with the 20d design pass between them so 20a-2 is built in the new style.
 
-**After slice 1:** 3b (gateway) → 4 Pages → 5–6 Collections and tools (booking and orders stop being "coming soon") → 7–8 People and Memory → and so on, as in `v2-chunks.md`. Every later chunk makes this same website-to-link journey richer.
+**After slice 1:** Stage 2, the agent core (3b → 4 Workspace → 7 → 8 Memory → 16a → 8L), then the later stages in `v2-chunks.md`. Every later chunk makes this same website-to-link journey richer.

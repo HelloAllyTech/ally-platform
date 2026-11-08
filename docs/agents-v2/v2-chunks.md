@@ -34,11 +34,12 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 | **Slice 1 (website → shareable bot)** | One branch, `feat/agents-v2-chunk-12-shared-store` (see `SLICE-1.md`) |
 | 12 Shared store and contact identity | ✅ built on the slice 1 branch |
 | 12b Bot page | ✅ built on the slice 1 branch (see its notes) |
-| 20a Agent-first onboarding | ▶ in progress: 20a-1 (start → publish), then 20a-2 (checkup, try it, change by chat) |
-| 15a Crisis classifier v2 | next in slice 1 |
-| **Quality: Q1 Checkups, Q2 Live scorecard** | Right after slice 1 |
-| 3b Tool gateway | After Q1–Q2 |
-| Everything else | Not started |
+| 20a-1 Agent-first onboarding: start → publish | ✅ built on the slice 1 branch (see its notes) |
+| 20d Design pass: one screen at a time, brand and images | ▶ next |
+| 20a-2 Checkup, try it, change by chat (+ `chunk-20a2-additions.md`) | after 20d |
+| 15a Crisis classifier v2 | after 20a-2 |
+| 20e Landing page | after 15a |
+| Stages 2–8 | Not started (see Stages below) |
 
 **Learned so far:**
 - The agent decides every step itself; tools are modules; grounding is enforced in code (`agent_check`).
@@ -48,19 +49,30 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 - **Open: the crisis classifier** flags harmless follow-ups ("and what if I miss a day?") because it sees only the latest message. Deferred until the agent is tested end to end; must be fixed before any public bot page (gate G1b). Plan: give it recent turns, add benign look-alikes to the prompt, and require zero missed crises on a crisis eval set.
 - Cold start: the first question after a restart took 19.6 s. Add a warm-up at startup before G1.
 
-## Phases at a glance
+## Stages (8 Nov 2026)
 
-| Phase | Chunks | Delivers |
-|---|---|---|
-| A. Engine | 1, 2, 3a, 3r, 3c, 3b | ✅ the agent, then streaming and the tool gateway |
-| B. Building blocks | 4, 5, 6, 7, 8, 9 | Pages, Collections, generated tools, People and relations, **Memory**, media in and voice |
-| C. Conversations | 10, 11, 12, 13 | Rich messages out, team inbox, shared store, website widget |
-| D. Trust, history and the owner | 14, 15, 16, 17 | Abilities and approvals, Never check, **history and "Why?"**, **owner on WhatsApp** |
-| Quality | Q1, Q2 | Checkups and the live scorecard |
-| E. Templates | 18, 19, 20 | Template format and install, builder and sharing, onboarding |
-| F. Ready for customers | 21 | Privacy, evals in CI, cost cap, Home, rollout |
+The stages replace the earlier phases, "Moved to v3" and "Order and timing". The chunk descriptions in the Phase sections below still hold unless "Changes to chunks" says otherwise. The human-readable version is the Claude Doc "Agents v2: The Complete Plan".
 
----
+| Stage | Version | Chunks, in order | Result | Target | Gate |
+|---|---|---|---|---|---|
+| 1 First version live | v2.0 | 20a-1 finish → 20d → 20a-2 (+ `chunk-20a2-additions.md`) → 15a → 20e | Website → tested, branded assistant → shareable link and landing page | Late Nov 2026 | G1 + G1b |
+| 2 Agent core | v2.1 | 3b → 4 → 7 → 8 → 16a → 8L | Workspace (filesystem agent), profiles, managed memory, history search, owner-approved learning | Late Dec 2026 | G2a (new) |
+| 3 Quality | v2.2 | Q1 → Q2 | Checkups and the live scorecard | Mid Jan 2027 | — |
+| 4 Building blocks | v2.3 | 5 → 6 → 6F → 9 | Owner's own lists and tools, light follow-ups, media and voice | Early Feb 2027 | G2 |
+| 5 Templates | v2.4 | 18 → 19 → 20 | Save, share and install assistants (booking, reviews, leads…) | Late Feb 2027 | G5 |
+| 6 Conversations and team | v2.5 | 10 → 11 → 13 | Buttons and media, team inbox, website widget | Mid Mar 2027 | G3 |
+| 7 Trust and the owner | v2.6 | 14 → 15 → 16b → 17 | Approvals, Never check, Why?, owner on WhatsApp | Late Mar 2027 | G4 |
+| 8 Ready for customers | v2.7 | 21 | Privacy, CI evals, cost cap, rollout | Early Apr 2027 | G6 |
+
+### Changes to chunks
+
+- **4 Workspace (was "Pages and the context workspace")** moves to Stage 2, before memory. The tree gains `/skills/*`. Tools: `list`, `read`, `grep`, `search_knowledge`, and `write` only to `/contacts/<id>/USER.md`, the notebook and `/scratch`. Stage 1's learned facts and Owner notes migrate into `/knowledge` and `/org`.
+- **8 Memory** adds managed memory: USER.md with fixed sections (preferences, context, open items, relations), each line sourced and dated; new facts update their line; a nightly tidy (merge duplicates, close finished items, expire short-lived ones, newest wins on conflict); a per-run budget (summary + relevant lines); health packs store only non-clinical details by default.
+- **16 splits:** 16a History search and summaries (Stage 2); 16b "Why?" (Stage 7).
+- **8L Learns from conversations (new, Stage 2):** proposes answers, corrections to `/knowledge` and `/org`, and skills in `/skills`; the owner approves each; approved items also become checkups. Fully automatic learning stays in v3.
+- **6F Follow-ups, light (new, Stage 4, brought in from v3):** triggers on a list change or a time offset send an approved WhatsApp template, bot page message or email, with quiet hours, once per person and opt-out. Powers booking reminders and review collection. The visual flow builder stays in v3.
+- **Gate G2a (new):** a pilot bot remembers a returning person across two channels; Forget works end to end; no clinical details in memory or logs; learning proposals approved or rejected by a real owner.
+- **Gate G1** (ops: checkpoint DB, retention, reasoning effort, prompts published) now applies before Stage 1 goes live, not after 3b.
 
 ## Phase A — Engine
 
@@ -130,22 +142,18 @@ Templates (chunk 18) ship with their checkups, and the evals in CI (chunk 21) ru
 |---|---|---|---|
 | 21 | **Privacy, quality and rollout.** Consent and opt-in records; data export and delete on request (India's DPDP Act), covering memory, history, records and files; retention jobs; per-template evals in CI; load test; per-bot cost cap; Home (needs-you list, weekly numbers, top topics); a migration tool to move v1 bots to v2 | all three | Export and delete a contact's data end to end; CI blocks a template whose evals fail; Home matches the data |
 
-## Moved to v3
+## Still in v3
 
-Only three areas move, plus what v3 already had:
+Campaigns and routines (broadcasts, announcements, daily digest, campaign templates), the visual flow builder, fully automatic learning, connectors, MCP and any API as a tool, the public template gallery and skills store, forms and WhatsApp Flows, Slack and Teams, custom domains and multi-page sites.
 
-- **Scheduler and outbound:** reminders, follow-ups, routines, the owner's daily digest, broadcasts and announcements, Meta template submission for campaigns.
-- **Flows and workflows:** record-status triggers, collect reviews, product updates, reorder, win-back, the flow builder.
-- **Self-learning loop:** nightly reflection and the lessons inbox. (Learning mode, where the owner approves drafts, stays in v2.)
-- **Already v3:** connectors (calendars, payments, stores, CRMs, ticketing, HRMS), MCP and any API as a tool, the public template gallery and skills store, forms and WhatsApp Flows, Slack and Teams.
-
-Without a scheduler, v2 bots never message people first. They answer, act, remember and hand over when someone writes in; approval results and handover replies are the only follow-ups, using templates outside the 24-hour window.
+Light follow-ups (6F) and owner-approved learning (8L) moved into v2; fully automatic learning and the visual flow builder stay in v3.
 
 ## Release gates
 
 | Gate | After | What must be true |
 |---|---|---|
-| **G1: first real bot on v2** | 3b | Ops: checkpoint DB, retention, reasoning effort, agent prompt published. Ally FAQ in Shadow for a week (≥ 95% match on intent and decline, no crisis differences), then v2 with Agent mode |
+| **G1: first real bot on v2** | before Stage 1 goes live (was after 3b) | Ops: checkpoint DB, retention, reasoning effort, agent prompt published. Ally FAQ in Shadow for a week (≥ 95% match on intent and decline, no crisis differences), then v2 with Agent mode |
+| **G2a: the agent core** | 8L | A pilot bot remembers a returning person across two channels; Forget works end to end; no clinical details in memory or logs; learning proposals approved or rejected by a real owner |
 | **G2: blocks and memory live** | 9 | A pilot clinic runs bookings on Collections (built from blocks, not code) and the bot remembers returning patients; Forget and masking work end to end; no PHI in logs |
 | **G1b: bot pages live** | slice 1 (15a) | The crisis classifier reviewed end to end (deferred from 3c) before any **public** bot page goes live; rate limits and the daily cap on; one internal and one pilot bot shared by link |
 | **G3: team-ready** | 13 | A pilot business with staff uses the team inbox and rich messages; the widget is on one website |
@@ -155,9 +163,4 @@ Without a scheduler, v2 bots never message people first. They answer, act, remem
 
 ## Order and timing
 
-- **Slice 1 first (about 2–3 weeks):** 3c merge → 12 → 12b → 20a → 15a. Result: website in, agent-built and tested bot, branded shareable link, safe for health use cases.
-- **Then quality:** Q1 Checkups → Q2 Live scorecard (about 1 week). Every owner can see and prove how well their bot works.
-- **Then in order:** 3b → 4 → 5 → 6 → 7 → 8. Pages, Collections, generated tools, People and Memory; booking and orders stop being "coming soon" after 6.
-- **Then in parallel where people allow:** 9 (media), 10–11 (messages, inbox), 14–15 (trust).
-- **Then:** 13 (now a small embed of the bot page), 16 → 17, then 18 → 19 → 20, then 21.
-- **Estimate:** 20 chunks remain at about 3 days each, including your testing: roughly **13–15 weeks** with one person driving Claude Code. Similar to the original plan, with scheduling, flows and the learning loop swapped for Collections, templates, the team inbox and rich messages.
+The order is the Stages table above: Stage 1 (20a-1 → 20d → 20a-2 → 15a → 20e) to v2.0 in late November 2026, then Stages 2–8 to v2.7 in early April 2027.

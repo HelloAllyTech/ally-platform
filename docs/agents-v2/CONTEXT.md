@@ -18,7 +18,7 @@ What makes it different: **everything the agent knows, does and learns is visibl
 |---|---|---|
 | Stage 1 | **Live** | Chatbots, WhatsApp connector, channel-agnostic engine in ally-be, knowledge answers in ally-ai, admin page at `/chatbots`. See `stage1-build.md`. |
 | **v2 (Stage 2)** | **Building now** | The agent engine, plus **seven generic building blocks** (Pages, Collections, People, Memory and history, Abilities, Channels and messages, Rules) that any bot is assembled from, and **templates** made of those blocks that anyone can install, customise, export and share. Also: memory you can read (profiles, the agent's notebook), conversation history and "Why?", rich and interactive messages, voice notes in and voice replies, team inbox, website widget, approvals, Never check and learning mode, owner manager mode on WhatsApp, onboarding, privacy controls. See `BUILDING-BLOCKS.md`. |
-| v3 (Stage 3) | Later | **Scheduler and outbound** (reminders, follow-ups, digests, broadcasts), **flows and workflows**, **the self-learning loop**; connectors (calendars, payments, stores, CRMs, ticketing), MCP, any API as a tool, the public template gallery and skills store, forms and WhatsApp Flows, Slack and Teams. **Don't build any of this in v2.** |
+| v3 (Stage 3) | Later | **Campaigns and routines** (broadcasts, announcements, the daily digest, campaign templates), **the visual flow builder**, **fully automatic learning**; connectors (calendars, payments, stores, CRMs, ticketing), MCP, any API as a tool, the public template gallery and skills store, forms and WhatsApp Flows, Slack and Teams. **Don't build any of this in v2.** |
 
 ## Documents in this folder, and which one wins
 
@@ -28,7 +28,7 @@ What makes it different: **everything the agent knows, does and learns is visibl
 | `agents-v2-spec.md` | Product and experience spec for v2 | **The source of truth for scope and user experience.** What the owner sees and how it behaves |
 | `BUILDING-BLOCKS.md` | The six blocks every bot is made of, generated tools, and the template format | **The architecture every chunk from 4 on must fit.** If a feature doesn't fit a block, raise it; don't build industry-specific code |
 | `SLICE-1.md` | The first end-to-end slice: website → agent-built, tested bot → shareable link; the onboarding experience and the four chunks | What's being built right now, and the experience bar for onboarding |
-| `v2-chunks.md` | v2 split into chunks, with rules for every chunk, release gates and what moved to v3 | Build order, and what "done" means per chunk |
+| `v2-chunks.md` | v2 split into chunks and stages, with rules for every chunk, release gates and what stays in v3 | Build order, and what "done" means per chunk |
 | `chunk-NN.md` | The brief for the current chunk | **The current task.** Do only this |
 | `three-stage-plan.md` | Earlier research and three-stage engineering plan | Engineering detail: graph nodes, state, `/agent/run` contract, gateway, data model, rollout, risks |
 | `stage1-build.md` | How Stage 1 is built today | Real module names, tables, message flow, engine order |
@@ -40,6 +40,8 @@ What makes it different: **everything the agent knows, does and learns is visibl
 2. `agents-v2-spec.md` wins on scope and behaviour.
 3. `three-stage-plan.md` wins on engineering detail only where the spec is silent.
 4. The code wins over every document on facts about the existing system. Write down every mismatch in the notes file.
+
+**v2 was split into stages on 8 Nov 2026** (v2.0 to v2.7; see Stages in `v2-chunks.md`). Light follow-ups (6F) and owner-approved learning (8L) moved into v2; campaigns, the visual flow builder and fully automatic learning stay in v3.
 
 **v2 scope was revised on 6 Nov 2026:** only the scheduler, flows and the self-learning loop moved to v3; Collections, People relations, Memory as its own block, media and voice, rich messages, the team inbox and templates moved in. Where `agents-v2-spec.md` describes the moved features as v2, `v2-chunks.md` wins.
 
