@@ -60,4 +60,23 @@ export default [
       ],
     },
   },
+  {
+    // Agents v2 core components (chunk 20d) are shared with the bot page, so they follow its fence
+    // and import nothing but React and each other: no path aliases, no framer-motion.
+    files: ["src/components/v2/core/**/*.ts", "src/components/v2/core/**/*.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@*", "framer-motion", "!@fontsource/*"],
+              message:
+                "v2/core is shared with the public bot page: import only React and files in v2/core.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

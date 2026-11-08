@@ -1,0 +1,459 @@
+/* Dashboard-only v2 components (DESIGN.md §4), on the tokens in core/tokens.css. */
+@import "./core/styles.css";
+
+/* ── StepFrame ── */
+.ally-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  height: 100%;
+  overflow-y: auto;
+}
+.ally-frame__top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ally-bg);
+}
+.ally-frame__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+}
+.ally-frame__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--ally-muted);
+}
+.ally-frame__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 16px/1 var(--ally-font-ui);
+  color: var(--ally-ink);
+  text-decoration: none;
+}
+.ally-frame__tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--ally-ink);
+  color: var(--ally-surface);
+  font-size: 13px;
+}
+.ally-frame__crumb {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ally-frame__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--ally-muted);
+}
+.ally-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ally-saved::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ally-good);
+}
+.ally-frame__main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 48px 24px 32px;
+}
+.ally-frame__screen {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.ally-frame__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding: 16px 24px 20px;
+  font-size: 13px;
+  color: var(--ally-faint);
+}
+@media (max-width: 640px) {
+  .ally-frame__bar,
+  .ally-frame__main,
+  .ally-frame__foot {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .ally-frame__main {
+    padding-top: 28px;
+  }
+}
+
+/* ── Tell me something else ── */
+.ally-tell {
+  border-top: 1px dashed var(--ally-line-strong);
+  padding-top: 16px;
+}
+.ally-tell form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* ── FindingLine ── */
+.ally-findings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ally-finding {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  font-size: 15px;
+  color: var(--ally-ink-2);
+}
+.ally-finding__tick {
+  color: var(--ally-accent);
+  font-weight: 600;
+}
+
+/* ── LearnedCard / SourceChip ── */
+.ally-learned-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ally-learned {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  transition:
+    box-shadow 200ms var(--ally-ease),
+    transform 200ms var(--ally-ease);
+}
+.ally-learned:hover {
+  box-shadow: var(--ally-shadow-hover);
+}
+.ally-learned__text {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ally-ink);
+  margin: 0;
+}
+.ally-learned__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 13px;
+  color: var(--ally-muted);
+}
+.ally-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ally-surface-2);
+  border: 1px solid var(--ally-line);
+  font: 400 12px/1.3 var(--ally-font-label);
+  color: var(--ally-ink-2);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.ally-source:hover {
+  border-color: var(--ally-ink-2);
+}
+.ally-empty {
+  font-size: 14px;
+  color: var(--ally-faint);
+  margin: 0;
+}
+
+/* ── SafetyCard ── */
+.ally-safety {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border-radius: var(--ally-radius-lg);
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+}
+.ally-safety__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ally-safety__shield {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--ally-good-bg);
+  color: var(--ally-good);
+  flex: none;
+}
+.ally-safety__panels {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.ally-safety__panel {
+  padding: 14px 16px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+  border: 1px solid var(--ally-line);
+}
+.ally-safety__panel ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ally-ink-2);
+}
+.ally-safety__panel--never .ally-label {
+  color: var(--ally-danger);
+}
+
+/* ── DesignCard ── */
+.ally-designs {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.ally-design {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  border-radius: var(--ally-radius-lg);
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  transition:
+    box-shadow 200ms var(--ally-ease),
+    transform 200ms var(--ally-ease);
+}
+.ally-design:hover {
+  box-shadow: var(--ally-shadow-hover);
+  transform: translateY(-2px);
+}
+.ally-design[data-chosen="true"] {
+  border-color: var(--ally-accent);
+}
+.ally-design[data-soon="true"] {
+  opacity: 0.6;
+  border-style: dashed;
+}
+.ally-design[data-soon="true"]:hover {
+  box-shadow: none;
+  transform: none;
+}
+.ally-design__title {
+  font-family: var(--ally-font-display);
+  font-size: 28px;
+  line-height: 1.1;
+  margin: 0;
+}
+.ally-design ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--ally-ink-2);
+}
+.ally-design__will li::before {
+  content: "✓";
+  color: var(--ally-good);
+  margin-right: 8px;
+}
+.ally-design__wont li::before {
+  content: "✕";
+  color: var(--ally-danger);
+  margin-right: 8px;
+}
+.ally-design__sample {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ally-design__sample p {
+  margin: 0;
+}
+.ally-design__sample [data-from="visitor"] {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: var(--ally-ink);
+  color: var(--ally-surface);
+}
+.ally-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--ally-sunken);
+  font: 500 11px/1.4 var(--ally-font-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ally-muted);
+}
+
+/* ── BuildStep ── */
+.ally-build {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ally-build li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 16px;
+  color: var(--ally-muted);
+}
+.ally-build li[data-state="done"] {
+  color: var(--ally-ink);
+}
+.ally-build li[data-state="active"] {
+  color: var(--ally-ink-2);
+}
+
+/* ── Swatches and segmented control ── */
+.ally-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.ally-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 2px solid var(--ally-surface);
+  box-shadow: 0 0 0 1px var(--ally-line-strong);
+  cursor: pointer;
+  padding: 0;
+}
+.ally-swatch[aria-checked="true"] {
+  box-shadow: 0 0 0 2px var(--ally-ink);
+}
+.ally-swatch-custom {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--ally-line-strong);
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+}
+.ally-swatch-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.ally-segmented {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-sunken);
+}
+.ally-segmented button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font: 500 14px/1 var(--ally-font-ui);
+  color: var(--ally-muted);
+  cursor: pointer;
+}
+.ally-segmented button[aria-checked="true"] {
+  background: var(--ally-surface);
+  color: var(--ally-ink);
+  box-shadow: 0 1px 2px rgba(23, 23, 28, 0.08);
+}
+
+/* ── PhonePreview ── */
+.ally-phone {
+  width: 300px;
+  height: 580px;
+  border-radius: 40px;
+  padding: 9px;
+  background: #17171c;
+  box-shadow: var(--ally-shadow-phone);
+  flex: none;
+}
+.ally-phone__screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 31px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Field ── */
+.ally-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ally-field > label,
+.ally-field > .ally-field__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ally-ink-2);
+}
+.ally-field__hint {
+  font-size: 13px;
+  color: var(--ally-faint);
+}

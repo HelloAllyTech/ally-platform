@@ -82,6 +82,9 @@ const DesignSystem = lazy(() =>
   import("../pages/DesignSystem/DesignSystem").then(module => ({ default: module.DesignSystem })),
 );
 
+// Agents v2 component gallery (chunk 20d): development builds only, so it never ships.
+const DevV2Components = import.meta.env.DEV ? lazy(() => import("../pages/DevV2Components")) : null;
+
 export const RouteLayout: React.FC = () => {
   return (
     <BrowserRouter>
@@ -118,6 +121,17 @@ export const RouteLayout: React.FC = () => {
             </Suspense>
           }
         />
+
+        {DevV2Components && (
+          <Route
+            path="/dev/v2-components"
+            element={
+              <Suspense fallback={null}>
+                <DevV2Components />
+              </Suspense>
+            }
+          />
+        )}
 
         {/* Evaluator micro-app — its own email+password session (NOT admin
             auth); the pages gate themselves on the evaluator token. */}
