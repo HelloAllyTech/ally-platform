@@ -154,7 +154,12 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
                 source_title=page.title,
             )
         )
-    return ExtractResponse(facts=facts, dropped=dropped, findings=findings(facts))
+    return ExtractResponse(
+        facts=facts,
+        dropped=dropped,
+        findings=findings(facts),
+        business_name=" ".join(out.business_name.split())[:120],
+    )
 
 
 def _key(text: str) -> str:

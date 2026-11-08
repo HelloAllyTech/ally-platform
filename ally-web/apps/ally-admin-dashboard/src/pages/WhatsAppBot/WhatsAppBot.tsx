@@ -15,6 +15,7 @@ import { CorpusTab } from "./CorpusTab";
 import { CreateChatbotPanel } from "./CreateChatbotPanel";
 import { fill, LoadError, StatusPill } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
+import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
 
 const t = en.whatsappBot.bots;
 
@@ -36,6 +37,7 @@ export const WhatsAppBot: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, isLoading, isError, refetch } = useGetChatbotsQuery();
   const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
   const canCreate = Boolean(data?.canCreate);
 
   const tabItems = useMemo(
@@ -64,11 +66,17 @@ export const WhatsAppBot: React.FC = () => {
           <h1 className="text-2xl text-typography-900 font-secondary">{en.whatsappBot.title}</h1>
           <p className="text-sm text-typography-600">{en.whatsappBot.subtitle}</p>
         </div>
-        {canCreate && (
-          <Button variant={ButtonVariant.PRIMARY} onClick={() => setCreating(true)}>
-            {t.create}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* The old form stays for platform admins, as "Advanced setup" (chunk 20a). */}
+          {canCreate && (
+            <Button variant={ButtonVariant.SECONDARY} onClick={() => setCreating(true)}>
+              {ONBOARDING_COPY.advancedSetup}
+            </Button>
+          )}
+          <Button variant={ButtonVariant.PRIMARY} onClick={() => navigate(ROUTES.CHATBOT_NEW)}>
+            {ONBOARDING_COPY.newAssistant}
           </Button>
-        )}
+        </div>
       </div>
       {tabItems.length > 1 && (
         <Tabs items={tabItems} activeId={activeTab} onChange={goToTab} showCount={false} />

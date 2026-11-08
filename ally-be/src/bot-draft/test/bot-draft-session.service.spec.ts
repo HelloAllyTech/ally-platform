@@ -14,6 +14,7 @@ import {
   BotDraftSessionService,
   SessionEvent,
   documentParts,
+  findingLines,
 } from '../service/bot-draft-session.service';
 import { memoryDrafts } from './memory-drafts';
 
@@ -243,10 +244,52 @@ describe('BotDraftSessionService as the crawl’s learner', () => {
       }),
     ]);
     expect(row.learned.dropped).toBe(1 + 2 + 1);
+    // Running totals over everything learned, not the batch's own count.
     expect(h.store.events.publish).toHaveBeenCalledWith('draft-1', {
       type: 'finding',
       text: 'Found your opening hours',
     });
+    expect(
+      findingLines([
+        ...row.learned.facts,
+        { ...row.learned.facts[0], id: 't1', section: 'team' as never },
+        { ...row.learned.facts[0], id: 't2', section: 'team' as never },
+      ]),
+    ).toEqual(['Found your opening hours', 'Found 2 team members']);
+  });
+
+  it('names the draft from the site, once, and never over the owner’s name', async () => {
+    const h = harness({
+      learned: { facts: [], dropped: 0 },
+      source: { website: 'https://sunrise.example/', autoName: 'Sunrise Mind' },
+    });
+    h.ai.extractOnboardingFacts.mockResolvedValue({
+      facts: [],
+      dropped: 0,
+      findings: [],
+      business_name: 'Sunrise Mind Clinic',
+    });
+    const page = {
+      url: 'https://sunrise.example/',
+      title: 'Home',
+      status: 'read' as const,
+      text: 'x',
+    };
+    await h.session.learnFrom('draft-1', [page]);
+    let row = h.store.row();
+    expect(row.draftConfig.name).toBe('Sunrise Mind Clinic');
+    expect(row.draftConfig.branding.title).toBe('Sunrise Mind Clinic');
+    expect(row.source.autoName).toBeNull();
+
+    h.ai.extractOnboardingFacts.mockResolvedValue({
+      facts: [],
+      dropped: 0,
+      findings: [],
+      business_name: 'Something Else',
+    });
+    await h.session.learnFrom('draft-1', [page]);
+    row = h.store.row();
+    expect(row.draftConfig.name).toBe('Sunrise Mind Clinic');
   });
 
   it('marks a description’s details as the owner’s', async () => {

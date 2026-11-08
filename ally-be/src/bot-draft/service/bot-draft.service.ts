@@ -194,6 +194,7 @@ export class BotDraftService {
           status: BotDraftStatus.ACTIVE,
           step: input.website ? BotDraftStep.READING : BotDraftStep.LEARNED,
           source: {
+            autoName: draftConfig.name,
             ...(input.website ? { website: input.website } : {}),
             ...(input.description ? { description: input.description } : {}),
           },

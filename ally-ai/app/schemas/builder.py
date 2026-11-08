@@ -273,3 +273,6 @@ class ExtractResponse(BaseModel):
     dropped: int = 0
     # Live finding lines for the canvas ("Found your opening hours"), copy §3.
     findings: List[str] = Field(default_factory=list)
+    # The business's name as the pages write it ("" if they don't), for a draft the
+    # owner hasn't named yet.
+    business_name: str = ""

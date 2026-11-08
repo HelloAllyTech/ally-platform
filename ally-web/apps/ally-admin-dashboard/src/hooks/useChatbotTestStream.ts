@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS } from "@constants";
-import {
-  AgentTraceStep,
-  ChatbotTestStatus,
-  RefreshResponse,
-  TestChatbotRequest,
-  TestChatbotResponse,
-} from "@types";
+import { ApiEndpoints } from "@constants";
+import { AgentTraceStep, ChatbotTestStatus, TestChatbotRequest, TestChatbotResponse } from "@types";
 
+import { fetchWithReauth } from "./chatStream/fetchWithReauth";
 import { readSse } from "./chatStream/sse";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -39,41 +34,6 @@ type StreamEvent =
   | { type: "token"; data: { text: string } }
   | { type: "final"; data: TestChatbotResponse }
   | { type: "error"; data: { code: string } };
-
-/** Same bearer and one-shot 401 refresh-and-retry as the other admin SSE hooks. */
-const fetchWithReauth = async (
-  url: string,
-  body: unknown,
-  signal: AbortSignal,
-): Promise<Response> => {
-  const request = (token: string | null) =>
-    fetch(url, {
-      method: HttpMethod.POST,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(body),
-      signal,
-    });
-
-  const response = await request(localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN));
-  if (response.status !== 401) return response;
-  const refreshToken = localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN);
-  if (!refreshToken) return response;
-  const refreshed = await fetch(`${API_BASE_URL}/api${ApiEndpoints.AUTH.REFRESH}`, {
-    method: HttpMethod.POST,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
-    signal,
-  });
-  if (!refreshed.ok) return response;
-  const tokens = (await refreshed.json()) as RefreshResponse;
-  localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN, tokens.accessToken);
-  localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN, tokens.refreshToken);
-  return request(tokens.accessToken);
-};
 
 /**
  * One Preview message over SSE (POST /v1/chatbots/:id/test/stream). `run` resolves with the same

@@ -14,6 +14,7 @@ describe('onboarding copy', () => {
     ONBOARDING_COPY.describedDone,
     ONBOARDING_COPY.looksRight,
     ...Object.values(ONBOARDING_COPY.problems),
+    ...Object.values(ONBOARDING_COPY.findings),
   ])('is the deck’s: %s', (line) => {
     expect(DECK).toContain(line);
   });

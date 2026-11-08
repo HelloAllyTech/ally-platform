@@ -372,7 +372,12 @@ export class BotDraftSessionService implements CrawlLearner {
         );
       }
     });
-    for (const text of result.findings ?? []) {
+    if (result.business_name)
+      await this.nameFromSource(draftId, result.business_name);
+    // Running totals over everything learned so far, not this batch's own counts.
+    for (const text of findingLines(
+      (await this.fresh(draftId)).learned.facts,
+    )) {
       await this.events.publish(draftId, { type: 'finding', text });
     }
     this.logger.info(
@@ -438,6 +443,51 @@ export class BotDraftSessionService implements CrawlLearner {
     });
   }
 
+  /**
+   * The business's own name, from its site or documents, in place of the placeholder the draft
+   * started with ("Thelivelovelaughfoundation", "Your business"). Once only, and never over a
+   * name the owner chose.
+   */
+  private async nameFromSource(draftId: string, name: string): Promise<void> {
+    const clean = name.trim().slice(0, 120);
+    await this.withRetry(draftId, async (draft) => {
+      const auto = draft.source?.autoName;
+      const config = draft.draftConfig;
+      if (!clean || !auto || config.name !== auto) return;
+      const ops: PatchOp[] = [{ op: 'replace', path: '/name', value: clean }];
+      if (config.assistantName === auto.slice(0, 60)) {
+        ops.push({
+          op: 'replace',
+          path: '/assistantName',
+          value: clean.slice(0, 60),
+        });
+      }
+      if (config.branding.title === auto.slice(0, 80)) {
+        ops.push({
+          op: 'replace',
+          path: '/branding/title',
+          value: clean.slice(0, 80),
+        });
+      }
+      if (config.branding.assistantName === auto.slice(0, 60)) {
+        ops.push({
+          op: 'replace',
+          path: '/branding/assistantName',
+          value: clean.slice(0, 60),
+        });
+      }
+      const { draft: named } = await this.drafts.applyPatch(
+        draft,
+        ops,
+        BotDraftActor.SYSTEM,
+        { target: 'draft', summary: `Named ${clean}` },
+      );
+      await this.drafts.update(named, {
+        source: { ...named.source, autoName: null },
+      });
+    });
+  }
+
   /** The crawl ended: the builder says what it found, or what went wrong (copy §3, §13). */
   async crawlFinished(
     draftId: string,
@@ -495,6 +545,16 @@ export class BotDraftSessionService implements CrawlLearner {
       return {};
     }
   }
+}
+
+/** Copy §3's finding lines for the facts learned so far. */
+export function findingLines(facts: LearnedFact[]): string[] {
+  const counts = new Map<string, number>();
+  for (const fact of facts)
+    counts.set(fact.section, (counts.get(fact.section) ?? 0) + 1);
+  return Object.entries(ONBOARDING_COPY.findings)
+    .filter(([section]) => counts.get(section))
+    .map(([section, line]) => fill(line, { n: counts.get(section)! }));
 }
 
 /** Parts of one document sent to fact extraction together, as with crawled pages. */

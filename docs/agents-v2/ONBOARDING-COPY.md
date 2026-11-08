@@ -131,8 +131,6 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
   5. Preparing your page
 - **Builder message when done:**
   > Your assistant is ready to check. I'm going to ask it the kind of questions your {clients} ask, and show you every answer.
-- **Builder message when done, before the checkup exists (loop 20a-1):** *(added in 20a-1)*
-  > Your assistant is ready. Choose who can use it, then publish it to get your link.
 
 ## 9. Checkup (the readiness check)
 
@@ -234,3 +232,36 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 **Facts only** *(added in 20a-1)*
 - **Always:** States only facts it can find in your information. Says plainly when it doesn't know, and where to go instead.
 - **Never:** Invents prices, offers, availability or contact details.
+
+## 15. Screen labels *(added in 20a-1)*
+
+Labels the screens need that the sections above don't name. Same voice.
+
+- **AI Chatbots button:** New assistant
+- **The old form, for platform admins:** Advanced setup
+- **Builder header:** Set up your assistant
+- **Back button:** Back
+- **Phone tabs:** Chat · Your assistant
+- **Description box placeholder:** What does your business do, who do you help, and what do people usually ask?
+- **Description button:** Continue
+- **Upload button:** Choose files
+- **Edit buttons:** Save · Cancel
+- **Source of a detail the owner gave:** From you
+- **While the builder works:**
+  - Reading your message
+  - Working out your industry
+  - Checking what's missing
+  - Choosing designs
+  - Writing your assistant
+  - Writing the reply
+- **"Your assistant" card:**
+  - **Title:** Your assistant
+  - **Labels:** Name · Introduction · Topics · Suggested questions · Questions before the chat · When it doesn't know · Safety
+  - **Empty field:** Not set yet
+- **Invite field:**
+  - **Label:** Their emails
+  - **Placeholder:** asha@example.com, ravi@example.com
+  - **Help:** Separate emails with commas or new lines.
+- **Publishing:** Publishing…
+- **Coming soon card title:** Booking and payments
+

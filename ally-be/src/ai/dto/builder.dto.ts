@@ -84,4 +84,5 @@ export interface BuilderExtractResponse {
   }[];
   dropped: number;
   findings: string[];
+  business_name?: string;
 }

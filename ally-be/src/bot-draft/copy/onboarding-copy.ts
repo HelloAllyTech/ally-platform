@@ -14,6 +14,14 @@ export const ONBOARDING_COPY = {
   describedDone:
     "Here's what I took from your description. Take a quick look: if anything's wrong, tell me or edit it directly.",
   looksRight: 'Looks right',
+  /** Live finding lines, by learned section, as running totals (copy §3). */
+  findings: {
+    services: 'Found your services and prices',
+    hours: 'Found your opening hours',
+    team: 'Found {n} team members',
+    faqs: 'Found {n} questions people often ask',
+    location: 'Found your address and contact details',
+  } as Record<string, string>,
   problems: {
     unreachable:
       "We couldn't reach {domain}. Check the address, or upload documents instead.",

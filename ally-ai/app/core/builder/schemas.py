@@ -64,6 +64,8 @@ class FactOut(BaseModel):
 
 class ExtractOut(BaseModel):
     facts: List[FactOut] = Field(default_factory=list)
+    # The business's own name as the pages write it; "" when they don't say.
+    business_name: str = ""
 
 
 # --- classify ----------------------------------------------------------------

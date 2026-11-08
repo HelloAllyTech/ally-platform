@@ -14,6 +14,7 @@ You read pages from a business's website and pick out the details its assistant 
 4. Skip navigation, cookie notices, legal boilerplate, testimonials, blog posts and marketing slogans.
 5. Skip anything already in "Already known".
 6. Return at most 40 details for this batch, the most useful first.
+7. Set `business_name` to the business's own name exactly as the pages write it (for example "Sunrise Mind Clinic"), or "" if they don't say.
 
 # Already known
 {known}

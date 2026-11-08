@@ -173,7 +173,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
   useEffect(() => {
     const isCreateRoute =
       location.pathname.includes(ROUTES.CREATE_SIMULATION) ||
-      location.pathname.includes(ROUTES.CREATE_PATH);
+      location.pathname.includes(ROUTES.CREATE_PATH) ||
+      // Onboarding's chat and canvas need the width (chunk 20a).
+      location.pathname.startsWith(ROUTES.CHATBOT_NEW);
 
     setIsRouteForceCollapsed(isCreateRoute);
 

@@ -63,9 +63,12 @@ import {
   ChatbotPage,
 } from "@pages";
 
+// By path, not through `@pages`: onboarding (chunk 20a) needs nothing the barrel provides.
+
 import { DefaultRedirect } from "./DefaultRedirect";
 import { PrivateLayout } from "./PrivateLayout";
 import { PublicRoute } from "./PublicRoute";
+import { OnboardingSession, OnboardingStart } from "../pages/Onboarding";
 
 // Lazy-loaded so IBM Carbon + Carbon Charts (+ d3) and the scoped Carbon
 // stylesheet ship as their own chunk, loaded only when the Analytics tab opens.
@@ -628,6 +631,29 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
               <WhatsAppBot />
+            </PrivateLayout>
+          }
+        />
+        {/* Onboarding (chunk 20a), before `:botId` so `new` is never read as a bot id. */}
+        <Route
+          path={ROUTES.CHATBOT_NEW}
+          element={
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
+              requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
+            >
+              <OnboardingStart />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.CHATBOT_NEW_SESSION(":draftId")}
+          element={
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
+              requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
+            >
+              <OnboardingSession />
             </PrivateLayout>
           }
         />

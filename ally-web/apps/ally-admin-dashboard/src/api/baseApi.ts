@@ -122,6 +122,7 @@ export const baseAPI = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: [
     TAG_TYPES.USERS,
+    TAG_TYPES.BOT_DRAFT,
     TAG_TYPES.TENANTS,
     TAG_TYPES.SESSION_EVENTS,
     TAG_TYPES.SESSION_EVENT_TAGS,

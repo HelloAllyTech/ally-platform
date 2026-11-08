@@ -69,10 +69,9 @@ COMING_SOON_BODY = (
     "Booking and payments are on the way. For now, your assistant can collect "
     "details and pass them to you."
 )
-#: 20a-1 has no checkup yet, so building ends at Share (copy §8, added in 20a-1).
+#: 20a-1 has no checkup yet, so building ends at Share, with copy §11's message.
 BUILT_MESSAGE = (
-    "Your assistant is ready. Choose who can use it, then publish it to get your "
-    "link."
+    "Your assistant is ready. Choose who can use it, and I'll create your link."
 )
 
 #: The language chips as BCP-47 tags.

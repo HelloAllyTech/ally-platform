@@ -35,6 +35,7 @@ export * from "./MobileReleases/MobileReleases";
 export * from "./BugHunter";
 export * from "./Builder";
 export * from "./CourseCopilot";
+export * from "./Onboarding";
 export * from "./AgentTestCases/AgentTestCases";
 export * from "./Debriefs/DebriefConsole";
 export * from "./Competencies/Competencies";

@@ -45,6 +45,8 @@ export class BotDraftEntity extends BaseWithoutTenantEntity {
     description?: string;
     /** The "Owner notes" document publish wrote, so publishing again updates it. */
     ownerNotesDocumentId?: string | null;
+    /** The placeholder name the draft started with, until the site or the owner names it. */
+    autoName?: string | null;
   };
 
   @Column({

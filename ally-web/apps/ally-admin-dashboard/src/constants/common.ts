@@ -799,6 +799,18 @@ export const ApiEndpoints = {
     PAGE_ACCESS_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/page/access/${entryId}`,
     CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
   },
+  BOT_DRAFTS: {
+    LIST: "/v1/bot-drafts",
+    CURRENT: "/v1/bot-drafts/current",
+    BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
+    EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,
+    MESSAGES_STREAM: (id: string) => `/v1/bot-drafts/${id}/messages/stream`,
+    UNDO: (id: string) => `/v1/bot-drafts/${id}/undo`,
+    BACK: (id: string) => `/v1/bot-drafts/${id}/back`,
+    DOCUMENTS: (id: string) => `/v1/bot-drafts/${id}/documents`,
+    PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,
+    ABANDON: (id: string) => `/v1/bot-drafts/${id}/abandon`,
+  },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
     DOCUMENTS: "/v1/knowledge-base/documents",
@@ -1023,6 +1035,9 @@ export const ROUTES = {
   /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
   WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
   CHATBOT_DETAIL: "/chatbots/:botId",
+  /** Onboarding (chunk 20a). Static, so it outranks `:botId`. */
+  CHATBOT_NEW: "/chatbots/new",
+  CHATBOT_NEW_SESSION: (draftId: string) => `/chatbots/new/${draftId}`,
   TERMS: "/terms",
   PRIVACY: "/privacy",
   // Fully public, no-login gallery of the centralised design-system components.
@@ -1174,6 +1189,7 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_NUMBERS: "whatsAppBotNumbers",
   CHATBOTS: "chatbots",
   CHATBOT_DETAIL: "chatbotDetail",
+  BOT_DRAFT: "botDraft",
   CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so

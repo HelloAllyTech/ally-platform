@@ -37,6 +37,7 @@ export * from "./evaluatorPortal";
 export * from "./productRoadmap";
 export * from "./whatsappBot";
 export * from "./chatbots";
+export * from "./botDrafts";
 export * from "./characterInterview";
 export * from "./cohorts";
 export * from "./helplineAdmin";
