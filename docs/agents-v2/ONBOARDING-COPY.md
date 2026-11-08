@@ -248,6 +248,10 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 - **Reading, done button:** See what I learned
 - **Questions eyebrow:** {n} quick questions left · 1 quick question left
 - **Building, done button:** Continue
+- **Safety, button:** Continue
+- **Answer box** (a question with no quick replies)**:** placeholder "Type your answer" · button "OK"
+- **Talk to the builder, buttons:** Send · Stop
+- **Progress bar, for screen readers:** Your progress
 
 ### From 20a-1 *(added in 20a-1)*
 

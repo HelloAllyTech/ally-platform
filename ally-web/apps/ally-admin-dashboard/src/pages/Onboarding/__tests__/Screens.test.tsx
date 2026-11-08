@@ -3,63 +3,23 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { BuildingCard, DesignCards, LearnedCard, SafetyCard, ShareCard } from "../Canvas";
 import { COPY } from "../copy";
 import type { BotDraftView } from "../types";
 import { withFinding } from "../findings";
+import {
+  BuildingScreen,
+  DesignScreen,
+  LearnedScreen,
+  LiveScreen,
+  SafetyScreen,
+  ShareScreen,
+} from "../Screens";
 import { reached } from "../steps";
 
-vi.mock("@components", () => ({
-  Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button type="button" {...props}>
-      {children}
-    </button>
-  ),
-}));
-vi.mock("@components/types", () => ({
-  ButtonVariant: { PRIMARY: "primary", SECONDARY: "secondary", TEXT: "text" },
-}));
-vi.mock("@ally-ui-mono/ui-shared", () => ({
-  AutoExpandableTextarea: ({
-    id,
-    value,
-    onChange,
-    placeholder,
-  }: {
-    id: string;
-    value: string;
-    onChange: (v: string) => void;
-    placeholder?: string;
-  }) => (
-    <textarea
-      id={id}
-      value={value}
-      placeholder={placeholder}
-      onChange={e => onChange(e.target.value)}
-    />
-  ),
-}));
-vi.mock("../../WhatsAppBot/shared", () => ({
-  Card: ({
-    title,
-    subtitle,
-    action,
-    children,
-  }: {
-    title?: string;
-    subtitle?: string;
-    action?: React.ReactNode;
-    children: React.ReactNode;
-  }) => (
-    <section>
-      {title && <h3>{title}</h3>}
-      {subtitle && <p>{subtitle}</p>}
-      {action}
-      {children}
-    </section>
-  ),
-  StatusPill: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-}));
+/**
+ * The onboarding screens (chunk 20d). Ported from Canvas.test.tsx (chunk 20a-1) when the canvas
+ * cards became one screen each: every case asserts the same behaviour against the new screens.
+ */
 vi.mock("qrcode", () => ({ default: { toDataURL: async () => "data:image/png;base64,x" } }));
 
 const view = (over: Partial<BotDraftView> = {}): BotDraftView =>
@@ -136,7 +96,7 @@ const view = (over: Partial<BotDraftView> = {}): BotDraftView =>
 
 describe("What we learned", () => {
   it("lists details by section, sourced, with the deck's empty line for the rest", () => {
-    render(<LearnedCard view={view()} busy={false} onPatch={vi.fn()} onConfirm={vi.fn()} />);
+    render(<LearnedScreen view={view()} busy={false} onPatch={vi.fn()} onConfirm={vi.fn()} />);
     expect(screen.getByText("Open 9 to 5.")).toBeTruthy();
     expect(screen.getByText("Contact")).toBeTruthy();
     expect(screen.getByText(COPY.learned.fromYou)).toBeTruthy();
@@ -148,7 +108,7 @@ describe("What we learned", () => {
 
   it("turns an edit and a removal into patches", async () => {
     const onPatch = vi.fn().mockResolvedValue(true);
-    render(<LearnedCard view={view()} busy={false} onPatch={onPatch} onConfirm={vi.fn()} />);
+    render(<LearnedScreen view={view()} busy={false} onPatch={onPatch} onConfirm={vi.fn()} />);
     fireEvent.click(screen.getAllByText(COPY.learned.remove)[0]);
     expect(onPatch).toHaveBeenCalledWith("learned", [{ op: "remove", path: "/facts/0" }]);
   });
@@ -156,12 +116,12 @@ describe("What we learned", () => {
   it("offers Looks right only on its own step", () => {
     const onConfirm = vi.fn();
     const { rerender } = render(
-      <LearnedCard view={view()} busy={false} onPatch={vi.fn()} onConfirm={onConfirm} />,
+      <LearnedScreen view={view()} busy={false} onPatch={vi.fn()} onConfirm={onConfirm} />,
     );
     fireEvent.click(screen.getByText(COPY.learned.confirm));
     expect(onConfirm).toHaveBeenCalled();
     rerender(
-      <LearnedCard
+      <LearnedScreen
         view={view({ step: "gaps" })}
         busy={false}
         onPatch={vi.fn()}
@@ -174,7 +134,7 @@ describe("What we learned", () => {
 
 describe("Safety", () => {
   it("names the pack and opens what it covers", () => {
-    render(<SafetyCard view={view()} />);
+    render(<SafetyScreen view={view()} />);
     expect(screen.getByText("Mental health safety is on")).toBeTruthy();
     expect(screen.queryByText("Diagnoses.")).toBeNull();
     fireEvent.click(screen.getByText(COPY.safety.link));
@@ -207,7 +167,7 @@ describe("Designs", () => {
 
   it("chooses a real design; booking is only ever coming soon", () => {
     const onChoose = vi.fn();
-    render(<DesignCards designs={designs} chosen={null} canChoose onChoose={onChoose} />);
+    render(<DesignScreen designs={designs} chosen={null} canChoose onChoose={onChoose} />);
     expect(screen.getByText(COPY.designs.comingSoonBadge)).toBeTruthy();
     const buttons = screen.getAllByText(COPY.designs.choose);
     expect(buttons).toHaveLength(1);
@@ -218,7 +178,7 @@ describe("Designs", () => {
 
 describe("Building", () => {
   it("ticks every step once it's done", () => {
-    render(<BuildingCard done />);
+    render(<BuildingScreen done />);
     expect(screen.getAllByText("✓")).toHaveLength(COPY.building.steps.length);
   });
 });
@@ -227,13 +187,11 @@ describe("Share", () => {
   it("keeps public off with the deck's note while the platform has it off", () => {
     const onPublish = vi.fn();
     render(
-      <ShareCard
+      <ShareScreen
         view={view({ step: "share" })}
         publicAllowed={false}
-        published={null}
         publishing={false}
         onPublish={onPublish}
-        onConnectWhatsApp={vi.fn()}
       />,
     );
     expect(screen.getByText(COPY.share.publicDisabled)).toBeTruthy();
@@ -250,17 +208,14 @@ describe("Share", () => {
 
   it("shows the live link with its ways to share", () => {
     render(
-      <ShareCard
+      <LiveScreen
         view={view({ step: "published" })}
-        publicAllowed={false}
         published={{
           chatbotId: "b1",
           slug: "sunrise",
           link: "https://ally.example/b/sunrise",
           access: "invite",
         }}
-        publishing={false}
-        onPublish={vi.fn()}
         onConnectWhatsApp={vi.fn()}
       />,
     );

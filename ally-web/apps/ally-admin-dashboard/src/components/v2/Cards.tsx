@@ -80,9 +80,14 @@ export const LearnedCard: React.FC<{
         <p className="ally-learned__text">{text}</p>
       )}
       <div className="ally-learned__meta">
-        <SourceChip label={source.label} href={source.href} />
+        <SourceChip label={source.label} />
         {!editing && (
           <>
+            {source.href && (
+              <a className="ally-link" href={source.href} target="_blank" rel="noreferrer">
+                {labels.viewSource}
+              </a>
+            )}
             <button
               type="button"
               className="ally-link"
@@ -104,7 +109,11 @@ export const LearnedCard: React.FC<{
   );
 };
 
-/** The safety pack (DESIGN.md §4): shield, "{Pack} is on", the always-on sentence, three panels. */
+/**
+ * The safety pack (DESIGN.md §4): shield, "{Pack} is on", the always-on sentence, and three panels
+ * (Always / Never / If someone may be at risk). With `toggleLabel` the panels open from that link
+ * (copy §5's "See what this covers").
+ */
 export const SafetyCard: React.FC<{
   title: string;
   body: string;
@@ -112,7 +121,9 @@ export const SafetyCard: React.FC<{
   always: string[];
   never: string[];
   atRisk: string[];
-}> = ({ title, body, panels, always, never, atRisk }) => {
+  toggleLabel?: string;
+}> = ({ title, body, panels, always, never, atRisk, toggleLabel }) => {
+  const [open, setOpen] = useState(!toggleLabel);
   const panel = (label: string, items: string[], kind: string) =>
     items.length > 0 && (
       <section className={`ally-safety__panel ally-safety__panel--${kind}`}>
@@ -142,16 +153,33 @@ export const SafetyCard: React.FC<{
             <path d="M8.5 12l2.5 2.5 4.5-5" />
           </svg>
         </span>
-        <h2 className="ally-heading">{title}</h2>
+        <div>
+          <h2 className="ally-heading" style={{ fontSize: 22 }}>
+            {title}
+          </h2>
+          <p className="ally-small" style={{ margin: "2px 0 0" }}>
+            {body}
+          </p>
+        </div>
       </div>
-      <p className="ally-body" style={{ margin: 0 }}>
-        {body}
-      </p>
-      <div className="ally-safety__panels">
-        {panel(panels.always, always, "always")}
-        {panel(panels.never, never, "never")}
-        {panel(panels.atRisk, atRisk, "risk")}
-      </div>
+      {toggleLabel && (
+        <button
+          type="button"
+          className="ally-link"
+          style={{ alignSelf: "flex-start" }}
+          aria-expanded={open}
+          onClick={() => setOpen(o => !o)}
+        >
+          {toggleLabel}
+        </button>
+      )}
+      {open && (
+        <div className="ally-safety__panels ally-rise">
+          {panel(panels.always, always, "always")}
+          {panel(panels.never, never, "never")}
+          {panel(panels.atRisk, atRisk, "risk")}
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 
+import { Menu } from "@icons";
 import { useDispatch } from "react-redux";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -22,7 +23,6 @@ import {
   en,
   normalizeEmailForAllowlist,
 } from "@constants";
-import { Menu } from "@icons";
 import { setUser, setPermissions, setFeatures } from "@reducer";
 import { hasPermissions, hasFeature } from "@utils";
 
@@ -59,6 +59,11 @@ interface PrivateLayoutProps {
    * prop = no email gate (fully backward compatible).
    */
   allowedEmails?: string[];
+  /**
+   * No padding around the page: for full-screen flows that draw their own frame (Agents v2
+   * onboarding, chunk 20d).
+   */
+  fullBleed?: boolean;
 }
 
 export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
@@ -69,6 +74,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   alsoRequiredFeatures,
   requiredOrgToggle,
   allowedEmails,
+  fullBleed = false,
 }) => {
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
@@ -196,16 +202,16 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   /*
     "Denied" and "we could not find out" are not the same answer, and until now they rendered
     the identical screen.
-    
+
     Failing CLOSED is right and stays: while entitlements are unknown, nothing gates open. What
     was wrong is what the reader was TOLD. A platform admin holding 215 permissions saw "this
     page isn't turned on for your role yet" because the API was down for ninety seconds, and
     the copy sent them to ask an admin for access they already had. It cost this session twice
     — once on a slow direct navigation, once on a backend restart.
-    
+
     So: still no children until the answer is known, but a load says it is loading and a
     failure says it failed and offers a retry.
-    
+
     Only routes that actually GATE on something get the failure screen. A route requiring
     neither a permission nor a feature is reachable regardless, and a blip on an endpoint it
     never consults must not block it.
@@ -273,7 +279,9 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
           {/* The barrier sits inside the shell, not around it: a page that
               throws during render should cost the admin that page, not the
               sidebar, the nav and their way out of it. */}
-          <div className="relative min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
+          <div
+            className={`relative min-h-0 flex-1 overflow-y-auto ${fullBleed ? "" : "p-4 lg:p-6"}`}
+          >
             <ErrorBoundary resetKey={pathname}>
               {entitlementsLoading ? (
                 <div

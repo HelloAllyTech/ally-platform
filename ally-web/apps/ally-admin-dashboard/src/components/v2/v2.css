@@ -138,8 +138,16 @@
   color: var(--ally-ink-2);
 }
 .ally-finding__tick {
-  color: var(--ally-accent);
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--ally-accent);
+  color: var(--ally-on-accent);
+  font-size: 12px;
+  flex: none;
 }
 
 /* ── LearnedCard / SourceChip ── */
@@ -246,8 +254,14 @@ a.ally-source:hover {
   line-height: 1.5;
   color: var(--ally-ink-2);
 }
+.ally-safety__panel--always .ally-label {
+  color: var(--ally-good);
+}
 .ally-safety__panel--never .ally-label {
   color: var(--ally-danger);
+}
+.ally-safety__panel--risk .ally-label {
+  color: var(--ally-info);
 }
 
 /* ── DesignCard ── */
@@ -402,6 +416,7 @@ a.ally-source:hover {
 }
 .ally-segmented {
   display: inline-flex;
+  align-self: flex-start;
   padding: 4px;
   gap: 4px;
   border-radius: var(--ally-radius-sm);
@@ -456,4 +471,32 @@ a.ally-source:hover {
 .ally-field__hint {
   font-size: 13px;
   color: var(--ally-faint);
+}
+
+/* ── Make it yours: controls left, phone right; the phone moves below on narrow screens ── */
+.ally-make {
+  display: flex;
+  gap: 56px;
+  align-items: flex-start;
+}
+.ally-make__controls {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.ally-make__preview {
+  position: sticky;
+  top: 120px;
+}
+@media (max-width: 960px) {
+  .ally-make {
+    flex-direction: column;
+    gap: 32px;
+  }
+  .ally-make__preview {
+    position: static;
+    align-self: center;
+  }
 }

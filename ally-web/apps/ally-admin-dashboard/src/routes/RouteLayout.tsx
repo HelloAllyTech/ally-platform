@@ -655,6 +655,7 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
               requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
+              fullBleed
             >
               <OnboardingStart />
             </PrivateLayout>
@@ -666,6 +667,7 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredFeature={FeatureToggleKey.WHATSAPP_BOT}
               requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
+              fullBleed
             >
               <OnboardingSession />
             </PrivateLayout>

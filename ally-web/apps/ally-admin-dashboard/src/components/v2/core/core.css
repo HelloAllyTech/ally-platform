@@ -202,7 +202,8 @@
   border-color: var(--ally-ink-2);
 }
 .ally-option[aria-checked="true"],
-.ally-option[aria-pressed="true"] {
+.ally-option[aria-pressed="true"],
+.ally-option[data-checked="true"] {
   border-color: var(--ally-accent);
   background: var(--ally-accent-soft);
 }
