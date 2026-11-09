@@ -1,27 +1,42 @@
-# First Principles — plan
+# First Principles — plan (revision 2)
 
 > Status: **plan, not built.** Owner decisions recorded 2026-11-09 (see §1).
 > Replaces the third-party **Stacks** MCP everywhere it is used today.
 
+## What changed in revision 2
+
+| Gap in revision 1 | Fix |
+|---|---|
+| Nothing proved the feature makes PRDs better, and "applied" was whatever the agent chose to cite, so the effectiveness score rewarded citing, not helping | **§3 Success measures**: a retrieval benchmark, a distillation yield report, and Builder's existing *replay eval* run with principles on vs off. Citations are now **verified** before they count (§8.4) |
+| Staging text sat in Postgres, so nightly **database backups would keep the book text** | Staging text moves to **Redis with a 24h TTL**. Postgres holds only hashes and counts (§6.2) |
+| Text is deleted after distilling, so a better prompt can never re-process old books, and the plan didn't say so | **Re-distil by re-upload**, which merges into existing principles and keeps their codes and history (§6.6) |
+| The plan guided the agent, not the admin | Every principle carries a **probe question** the interviewer asks you. Conflicting principles become **trade-off decision cards** (reusing Builder's `DecisionCard`). The PRD panel shows **principle coverage per section** (§8) |
+| One blended vector, no re-ranking, no relevance floor, no cap on how much lands in context | **Two vectors** (statement and situations), an **optional re-rank** kept only if the benchmark says it helps, relevance bands instead of raw scores, and a **context budget** (§7, §8.2) |
+| The LLM graded its own output, nothing stopped platitudes, no per-book cap, book text could inject instructions | Separate **critic pass**, **platitude anchors**, **density cap**, **injection screening** (§6.4) |
+| Each section was distilled with no idea what the book is about | A **book thesis pass** runs first and is the cached prefix for every section call (§6.3) |
+| The proactive brief would go live untested | **Shadow mode** first; on by default only after the replay eval passes (§10, chunks 4–5) |
+
 ## 0. The idea in one paragraph
 
 An admin uploads PDF or EPUB books about product, UX, architecture and engineering practice.
-The browser parses each book into sections and sends that text to ally-be, which has an LLM
-**distil** it into short, punchy, self-contained **principles**: rules, heuristics,
-anti-patterns and trade-offs, written in our own words. The book and its text are
-**never kept**. Only the principles stay, plus rich metadata and a record of which book
-inspired each one. Over time this builds a library that the Builder PRD interview (and the
-copilots, and engineers' Claude Code sessions) search many times per session. Every search,
-every hit, every principle the interview actually applies, and whether that PRD shipped is
-recorded, so retrieval gets measurably better and the library can be pruned using data.
+The browser parses each book into sections. ally-be first works out what the book is about,
+then has an LLM **distil** each section into short, punchy, self-contained **principles**
+(rules, heuristics, anti-patterns and trade-offs) in our own words, each with the situations
+it applies to and a question that tests whether a PRD honours it. The book and its text are
+**never kept**: they live in memory for at most a day and are not written to the database.
+Over time this builds a library that the Builder PRD interview searches many times per
+session, turning principles into questions for the admin and checks on the draft. The
+copilots and engineers' Claude Code search it too. Every search, every hit, every principle
+actually used (verified, not just cited), and whether that PRD shipped is recorded, so
+retrieval gets measurably better and the library can be pruned using data.
 
 ## 1. Decisions already made
 
 | Question | Decision |
 |---|---|
 | Name | **First Principles** (admin tab: Builder → First Principles; each item is a *principle*) |
-| Review gate | **Auto-publish + spot-check.** Principles that pass the quality gate go live at once; borderline ones (low score or possible duplicate) wait in a short review queue |
-| Processing | **Background on the server.** The browser parses and uploads all sections, then can close. ally-be distils in the background and deletes each section's text as soon as it is distilled |
+| Review gate | **Auto-publish + spot-check.** Principles that pass the quality gate go live at once; borderline ones wait in a short review queue |
+| Processing | **Background on the server.** The browser parses and uploads all sections, then can close. ally-be distils in the background |
 | Replace Stacks in | **All four places:** Builder interview (+ research + PRD review), Roadmap Copilot, Course Copilot, engineers' Claude Code (our own MCP endpoint replaces `stacks-bridge.mjs`) |
 | Seeding | The owner has the books that seeded Stacks and will upload them once the upload screen (chunk 3) is live |
 | Ally house rules | **Books only.** No import of the deprecated `wiki/product/` pages. Hand-adding a principle stays available |
@@ -32,296 +47,446 @@ recorded, so retrieval gets measurably better and the library can be pruned usin
 
 | Existing piece | Where | How we use it |
 |---|---|---|
-| `StacksClientService` (JSON-RPC to Stacks) | `ally-be/src/llm-agent/service/stacks-client.service.ts` | **Deleted** at the end. Its soft-failure messaging ("a failed lookup says nothing about coverage") carries over |
-| Builder tools `stacks_search` / `stacks_get` | `builder-interview-tools.service.ts:421`, evidence log, turn receipt, `interviewer_system.txt`, `research_system.txt` | Replaced by `principles_search` / `principles_get` |
-| Roadmap + Course Copilot Stacks tools | `roadmap-copilot-tools.service.ts`, `course-copilot-tools.service.ts` | Pointed at the same service |
+| `StacksClientService` (JSON-RPC to Stacks) | `ally-be/src/llm-agent/service/stacks-client.service.ts` | **Deleted** at the end. Its soft-failure messaging ("a failed lookup says nothing about coverage") carries over. Note: per its own header, Builder has never reached Stacks in production, so the Builder swap has nothing to regress |
+| Builder tools `stacks_search` / `stacks_get` | `ally-be/src/builder/service/builder-interview-tools.service.ts`, evidence log, turn receipt, `interviewer_system.txt`, `research_system.txt` | Replaced by `principles_search` / `principles_get` |
+| Roadmap + Course Copilot Stacks tools | `ally-be/src/product-roadmap/service/roadmap-copilot-tools.service.ts`, `ally-be/src/course-copilot/service/course-copilot-tools.service.ts` | Pointed at the same service |
 | Knowledge Base pattern: Postgres is the system of record, the Weaviate index in ally-ai is derived from it, `embeddingStatus` / `textHash` / reconciliation sweep | `ally-be/src/knowledge-base/`, `ally-be/src/product-roadmap/service/roadmap-vector.service.ts`, `ally-ai/app/core/knowledge_base/` | Same pattern for principles. **No pgvector** (the codebase deliberately avoids it) |
-| Retrieval logging (`kb_retrievals` + passage rows + judge) | `knowledge-base/entity/kb-retrieval*.ts` | Model for `fp_retrievals` / `fp_retrieval_hits`. Same "measurement, not mitigation" rule and fire-and-forget writes |
-| Lesson usage loop (`appliedLessonIds`, `sourceCount`, curator retires unused lessons) | `builder-knowledge.service.ts`, `builder-lesson-curator.service.ts` | Same loop for principles: applied IDs, corroboration count, curator |
+| Retrieval logging + LLM relevance judge (`kb_retrievals`, passages, passage judgments) | `ally-be/src/knowledge-base/entity/` | Model for `fp_retrievals` / `fp_retrieval_hits` / `fp_hit_judgments`. Same "measurement, not mitigation" rule and fire-and-forget writes |
+| **Builder replay eval** (recorded interviews + human-written checklists, run N times with overrides; `prompt_gate` suites decide whether a prompt change goes live) | `ally-be/src/builder/eval/`, `builder-eval-*.entity.ts` | **The success measure.** Run the same fixtures with principles off vs on (an override), and gate every First Principles prompt change through it |
+| **Decision cards** | `ally-be/src/builder/service/builder-decision.service.ts`, `ally-web/apps/ally-admin-dashboard/src/components/builder/DecisionCard.tsx` | Trade-off cards when two applicable principles pull in different directions |
+| PRD review | `ally-be/src/builder/service/builder-prd-review.service.ts`, `PrdReviewFindings.tsx` | Gains a principle check pass |
+| Lesson usage loop (`appliedLessonIds`, `sourceCount`, curator retires unused lessons) | `builder-knowledge.service.ts`, `builder-lesson-curator.service.ts` | Same loop for principles |
 | Builder outcomes (did the PRD ship / build pass) | `builder-outcome.service.ts` | Links "principle applied" to "PRD shipped" |
-| Skills Store prompts (`.txt` default + typed contract) | `ally-be/docs/adding-a-prompt.md` | New prompts: distiller, consolidator, query planner, PRD principle check |
-| Skills Store personal keys | `ally-be/src/prompt/service/skills-store-key.service.ts` | **Pattern only** (hashing, issuing, revoking) for a new read-only principles key; the keys themselves are not reused |
+| Skills Store prompts (`.txt` default + typed contract) | `ally-be/docs/adding-a-prompt.md` | New prompts: thesis, distiller, critic, consolidator, query planner, re-ranker, citation verifier, PRD principle check |
+| Skills Store personal keys | `ally-be/src/prompt/service/skills-store-key.service.ts` | **Pattern only** (hashing, issuing, revoking) for the new read-only principles key |
+| Redis | ally-be (already used for caching, pub/sub, rate limits) | Short-lived staging of section text, with a TTL |
 | `@nestjs/schedule` | ally-be | Background distillation worker (no new SQS queue, so no infra-repo change) |
-| Server-side PDF/EPUB extractors | `knowledge-base/extractor/` | **Not used.** You asked for parsing in the browser, so the file never leaves the admin's machine. The section heuristics are worth porting to the browser parser |
+| Server-side PDF/EPUB extractors | `ally-be/src/knowledge-base/extractor/` | **Not used** (parsing happens in the browser so the file never leaves the admin's machine). Their section heuristics are worth porting |
 
-Gap found: ally-ai's Weaviate client has `near_vector_search` but **no hybrid (BM25 + vector)
-search**. Principles are short and keyword-heavy ("empty state", "idempotency key"), so pure
-vector search will miss exact terms. We add `hybrid_search`.
+Gaps found in ally-ai: the Weaviate client has `near_vector_search` but **no hybrid (BM25 +
+vector) search** and no named vectors. Weaviate 1.28 (the local image) supports both;
+**chunk 1 confirms the production server version** before relying on named vectors.
 
-## 3. Architecture
+## 3. Success measures (new): how we know it works
+
+Three measurements, built before the features they judge. Every threshold below is a first
+guess to be revised once real numbers exist.
+
+| Measure | What it answers | How | Bar to clear |
+|---|---|---|---|
+| **Retrieval benchmark** | Does a situation-style query find the right principles? | A golden set of ~60 situation queries, each with its labelled relevant principles. Built from thumbs on the admin preview search (chunk 3) plus judged production hits (chunk 6). Metrics: precision@8, recall@20, nDCG@8 | Precision@8 ≥ 0.6 before the proactive brief is on by default. Every retrieval change (alpha, vectors, re-rank, boosts) must not lower nDCG |
+| **Distillation yield report** | Is a book producing sharp principles or noise? | Per source: candidates → kept / merged / reviewed / rejected (with reasons: verbatim, platitude, injection, critic), review rate, plus a 20-principle random sample the admin rates 1–5 | Review rate ≤ 20%; mean sample rating ≥ 3.5; platitude rate falling across prompt versions |
+| **PRD outcome (replay eval)** | Do PRDs actually get better? | Builder's replay eval: the same fixtures with First Principles off vs on, scored against their human-written checklists, plus the PRD review's finding count | The proactive brief and probes only go on by default if checklist pass rate improves and no fixture regresses. Every First Principles prompt change goes through a `prompt_gate` suite |
+
+Traffic from `admin_preview` and eval runs is tagged and **excluded** from usage stats and
+effectiveness, so tuning and testing don't skew the numbers.
+
+## 4. Architecture
 
 ```
  Admin browser (ally-admin-dashboard)
    PDF (pdfjs) / EPUB (jszip + DOMParser)
    → clean → split into sections → SHA-256 of file
-        │  POST /first-principles/sources            (metadata + hash only)
+        │  POST /first-principles/sources             (metadata + hash, no text)
         │  POST /first-principles/sources/:id/sections (batched section text)
         ▼
  ally-be  ── first-principles module ─────────────────────────────────────────
-   fp_ingest_sections (staging: text lives here only until distilled, max 24h)
+   Redis  fp:section:{id}  (section text, TTL 24h, deleted once distilled)
+   Postgres fp_ingest_sections (status, hash, counts; never text)
         │  worker (cron, claims rows with FOR UPDATE SKIP LOCKED, concurrency N)
         ▼
-   DISTIL (LLM, Skills Store prompt) → candidate principles
-        → quality gate (scores, length, verbatim-overlap check)
-        → dedupe vs library (embedding similarity via ally-ai)
-        → publish | merge as corroboration | review queue
-   section text DELETED
-        │  when every section is done: CONSOLIDATE pass per source
+   THESIS (once per book: TOC + intro + conclusion → thesis + vocabulary)
+   DISTIL each section, with the thesis as a cached prefix → candidates
+     → deterministic gate (length, vocab, verbatim, injection)
+     → platitude check + CRITIC pass (separate prompt)
+     → dedupe vs library: merge as corroboration | review | publish
+   CONSOLIDATE per book: cluster, sharpen, keep best ≤ cap, detect tensions
         ▼
    fp_principles (system of record) ──upsert──► ally-ai Weaviate `FirstPrinciple`
-                                                 (derived index, hybrid search)
-   Retrieval API ◄── Builder interview / research / PRD review
-                 ◄── Roadmap Copilot, Course Copilot
-                 ◄── /mcp endpoint ◄── engineers' Claude Code
-   every call → fp_retrievals + fp_retrieval_hits; citations → fp_usage_events
+                                                 (vectors: statement, situations; hybrid)
+   Retrieval: queries → hybrid (both vectors) → RRF → [re-rank] → bands → bounded prior
+        ◄── Builder interview / research / PRD review / brief
+        ◄── Roadmap Copilot, Course Copilot
+        ◄── /mcp endpoint ◄── engineers' Claude Code
+   logs: fp_retrievals, fp_retrieval_hits; citations → verifier → fp_usage_events
 ```
 
-## 4. Data model (ally-be Postgres, platform-global, `BaseWithoutTenantEntity`)
+## 5. Data model (ally-be Postgres, platform-global, `BaseWithoutTenantEntity`)
 
-All tables are prefixed `fp_`. No document file and no source text is stored outside the
-short-lived staging table.
+All tables are prefixed `fp_`. **No document file and no source text is stored in
+Postgres**, so none of it can reach a database backup.
 
 ### `fp_sources`: one row per uploaded book
 `id`, `title`, `author`, `year` (pre-filled from PDF metadata or EPUB OPF; editable),
-`kind` (`pdf` | `epub`), `fileHash` (SHA-256, unique among non-archived rows, so the same
-book is never distilled twice), `pageCount`, `sectionCount`, `sectionsDistilled`,
-`sectionsFailed`, `status` (`uploading` | `queued` | `distilling` | `consolidating` |
-`complete` | `failed` | `archived`), `principlesCreated`, `principlesMerged`,
-`principlesQueuedForReview`, `distillModel`, `promptVersion`, `inputTokens`,
-`outputTokens`, `costUsd`, `uploadedBy`, timestamps.
+`kind` (`pdf` | `epub`), `fileHash` (SHA-256), `titleKey` (normalised title + author, to
+catch the same book uploaded as both PDF and EPUB), `thesis` (≤ 150 words, our own summary
+of the book's core argument, used as context and shown in the UI), `pageCount`,
+`sectionCount`, `sectionsDistilled`, `sectionsFailed`, `status` (`uploading` | `queued` |
+`distilling` | `consolidating` | `complete` | `failed` | `archived`), `yield` jsonb (the §3
+yield report), `distillModel`, `promptVersions` jsonb, `inputTokens`, `outputTokens`,
+`cachedInputTokens`, `costUsd`, `costCapUsd`, `generation` (1 for the first distil, +1 per
+re-distil), `uploadedBy`, timestamps.
 
-### `fp_ingest_sections`: staging, temporary
+### `fp_ingest_sections`: progress tracking (no text)
 `id`, `sourceId`, `ordinal`, `sectionPath` (e.g. "Part II › Ch 7 › Empty states"),
-`pageFrom`, `pageTo`, `text` (**nulled the moment it is distilled**), `textHash`,
-`tokenCount`, `status` (`pending` | `claimed` | `done` | `failed` | `skipped`),
-`attempts`, `claimedAt`, `error`, `candidatesFound`. A sweeper nulls any `text` older
-than 24h whatever its status. Once text is nulled, only the hash and counts remain.
+`pageFrom`, `pageTo`, `textHash`, `tokenCount`, `status` (`pending` | `claimed` | `done` |
+`failed` | `skipped` | `expired`), `attempts`, `claimedAt`, `error`, `candidatesFound`,
+`candidatesKept`. The text itself is in Redis (§6.2).
 
 ### `fp_principles`: the library
 | Field | Purpose |
 |---|---|
-| `code` | Stable human handle, `FP-0142`. What the PRD cites, short and readable |
+| `code` | Stable human handle, `FP-0142`. What the PRD cites. Never reused |
 | `statement` | The principle itself, imperative, ≤ 160 chars ("Design the empty state before the full state") |
 | `rationale` | Why it holds, ≤ 300 chars |
-| `appliesWhen` `text[]` | 1–4 trigger situations ("designing a list view that can have zero items"). **The most important field for retrieval**, because interview queries describe situations |
-| `antiPattern` | What breaking it looks like (helps the PRD review spot violations) |
+| `appliesWhen` `text[]` | 1–4 trigger situations ("designing a list view that can have zero items"). Embedded as their own vector, because interview queries describe situations |
+| `probe` | **New.** One question an interviewer can ask to test whether a PRD honours it ("What does a brand-new user see before they have any items?"). This is how a principle reaches the admin |
+| `antiPattern` | What breaking it looks like (used by the PRD principle check) |
 | `kind` | `rule` · `heuristic` · `anti_pattern` · `trade_off` · `checklist_item` |
 | `strength` | `must` · `should` · `consider` |
-| `domain` | Controlled list: `product_strategy`, `discovery`, `ux_ui`, `interaction`, `content_copy`, `data_viz`, `accessibility`, `architecture`, `backend`, `data`, `ai_llm`, `security_privacy`, `reliability`, `performance`, `testing`, `delivery`, `metrics_analytics`, `growth` |
+| `domain` | Controlled list: `product_strategy`, `discovery`, `ux_ui`, `interaction`, `content_copy`, `data_viz`, `accessibility`, `architecture`, `backend`, `data`, `ai_llm`, `security_privacy`, `reliability`, `performance`, `testing`, `delivery`, `metrics_analytics`, `growth`, `instructional_design` |
 | `topics` `text[]` | Free-form, normalised (lower-kebab, merged against a synonym table) |
 | `keywords` `text[]` | Exact terms for BM25 |
 | `prdSections` `text[]` | Where it bites: `problem`, `users`, `goals_metrics`, `scope`, `ux_states`, `requirements`, `architecture`, `data_model`, `api`, `rollout`, `risks`, `testing` |
 | `lifecycleStage` | `discovery` · `definition` · `design` · `build` · `launch` · `iterate` |
-| `quality` jsonb | LLM self-scores 1–5: specificity, actionability, generality, plus the gate's verdict |
-| `status` | `active` · `review` · `archived` · `superseded` (`supersededById`) |
-| `origin` | `distilled` · `manual` (Ally house rules added by hand, no source) |
+| `quality` jsonb | The **critic's** scores 1–5 (specificity, actionability, standalone clarity), platitude similarity, and the gate's verdict and reasons |
+| `status` | `active` · `review` · `archived` · `superseded` (`supersededById`: old codes **redirect** to the successor, so citations in past PRDs still resolve) |
+| `origin` | `distilled` · `manual` |
 | `sourceCount` | How many distinct books independently produced it (corroboration) |
-| `embeddingStatus`, `embeddingAttempts`, `embeddedAt`, `textHash` | Same as Knowledge Base and roadmap |
-| usage counters (denormalised, recomputed nightly) | `timesRetrieved`, `timesSurfaced`, `timesRead`, `timesApplied`, `timesHelpful`, `timesUnhelpful`, `timesInShippedPrd`, `lastRetrievedAt`, `lastAppliedAt`, `effectiveness` (see §7) |
+| `embeddingStatus`, `embeddingAttempts`, `embeddedAt`, `textHash` | Same as Knowledge Base and roadmap. An edit changes `textHash`, which re-embeds |
+| usage counters (denormalised, recomputed nightly, eval + preview traffic excluded) | `timesRetrieved`, `timesSurfaced`, `timesRead`, `timesProbed`, `timesAppliedVerified`, `timesHelpful`, `timesUnhelpful`, `timesInShippedPrd`, `lastRetrievedAt`, `lastAppliedAt`, `effectiveness` (§8.4) |
 | `version`, `createdBy`, `editedBy` | Edits are versioned in `fp_principle_versions` |
 
 ### `fp_principle_sources`: many-to-many, the "inspired by" record
-`principleId`, `sourceId`, `sectionPath`, `pageFrom`, `pageTo`, `confidence`,
+`principleId`, `sourceId`, `generation`, `sectionPath`, `pageFrom`, `pageTo`, `confidence`,
 `extractedAt`. Records the location (book, chapter, pages) and never the text.
+
+### `fp_principle_relations` (new): how principles relate
+`fromId`, `toId`, `type` (`tension` · `refines` · `prerequisite` · `related`), `note`
+(one line: what the trade-off is), `origin` (`consolidation` · `curator` · `admin`),
+`confidence`. Tensions drive the trade-off decision cards (§8.3).
 
 ### `fp_retrievals`: one row per search call
 `id`, `consumer` (`builder_interview` · `builder_research` · `builder_prd_review` ·
-`builder_auto_brief` · `roadmap_copilot` · `course_copilot` · `mcp_dev` · `admin_preview`),
-`sessionId`, `turnIndex`, `query`, `queryOrigin` (`agent_tool` · `auto_planner` ·
-`prd_review` · `human`), `filters` jsonb, `alpha`, `limit`, `resultCount`, `topScore`,
-`latencyMs`, `failed`, `createdAt`. Stored verbatim, same reasoning as `kb_retrievals`:
-reading the zero-hit queries is how you find gaps.
+`builder_brief` · `roadmap_copilot` · `course_copilot` · `mcp_dev` · `admin_preview` ·
+`eval`), `sessionId`, `turnIndex`, `query`, `queryOrigin` (`agent_tool` · `planner` ·
+`section_focus` · `prd_review` · `human`), `filters` jsonb, `pipeline` jsonb (alpha,
+vectors, rerank on/off: so the benchmark can compare configurations), `limit`,
+`resultCount`, `topBand`, `latencyMs`, `failed`, `shadow` (logged but not shown to the
+model), `createdAt`. Queries are stored verbatim: reading the zero-hit ones is how you find
+gaps.
 
 ### `fp_retrieval_hits`: one row per returned principle
-`retrievalId`, `principleId`, `rank`, `hybridScore`, `vectorScore`, `bm25Score`,
-`boostedScore`, `surfaced` (did it make the cut shown to the model?).
+`retrievalId`, `principleId`, `rank`, `bm25Score`, `statementVectorScore`,
+`situationVectorScore`, `rrfScore`, `rerankScore`, `band` (`high` · `medium` · `low`),
+`boostedScore`, `surfaced`, `explorationSlot`.
+
+### `fp_hit_judgments`: sampled relevance labels (benchmark + floor calibration)
+`hitId`, `relevant` (`yes` · `partial` · `no`), `judge` (`llm` · `admin`), `judgeModel`,
+`reason`, `createdAt`. Same shape and purpose as `kb_retrieval_passage_judgments`.
 
 ### `fp_usage_events`: what happened after retrieval
-`principleId`, `sessionId`, `consumer`, `type` (`read` · `applied` · `dismissed` ·
-`helpful` · `unhelpful` · `shipped`), `retrievalId?`, `prdVersionId?`, `actorId?`,
-`note?`, `createdAt`.
+`principleId`, `sessionId`, `consumer`, `type` (`read` · `probed` · `cited` ·
+`applied_verified` · `cite_rejected` · `dismissed` · `helpful` · `unhelpful` · `shipped`),
+`retrievalId?`, `prdVersionId?`, `actorId?`, `note?`, `createdAt`.
 
-## 5. Ingestion
+### `fp_reader_keys`: engineers' read-only MCP keys
+`id`, `ownerId`, `label`, `keyHash`, `lastUsedAt`, `revokedAt`, `createdAt` (§9).
 
-### 5.1 Browser (ally-admin-dashboard → Builder → First Principles → Library)
+## 6. Ingestion
+
+### 6.1 Browser (ally-admin-dashboard → Builder → First Principles → Library)
 1. Admin drops a `.pdf` / `.epub` (multi-file supported, processed one at a time).
-2. Hash the file (WebCrypto SHA-256). `POST /sources` with the hash. If it is already
-   distilled, say "Already in the library, distilled 3 Oct, 142 principles" and stop.
+2. Hash the file (WebCrypto SHA-256). `POST /sources` with the hash, title and author.
+   - Same hash already distilled → "Already in the library (distilled 3 Oct, 64 principles).
+     Re-distil with the current prompts?" (§6.6)
+   - Same `titleKey`, different hash (e.g. the EPUB of a book already uploaded as PDF) →
+     warn before going ahead.
 3. Parse:
    - **PDF** with `pdfjs-dist`. Sections come from `getOutline()` (bookmarks mapped to
-     pages). Fallback: font-size heading detection. Last resort: 8-page windows.
-     Remove running headers and footers (lines repeated across pages) and page numbers.
-     No text layer means a scanned PDF: refuse with a clear message (no OCR in v1).
+     pages). Fallback: font-size heading detection. Last resort: 8-page windows. Remove
+     running headers and footers (lines repeated across pages) and page numbers. No text
+     layer means a scanned PDF: refuse with a clear message (no OCR in v1).
    - **EPUB** with `jszip` + `DOMParser`: OPF spine for order, `nav.xhtml` / NCX for the
      section tree, strip markup to paragraphs.
    - Skip front and back matter by title (copyright, contents, index, bibliography,
      acknowledgements, about the author).
    - Pack into sections of roughly 2.5–4k tokens on paragraph boundaries, each carrying its
-     `sectionPath` and page range.
-4. Show a preview: title/author (editable), section list with skip toggles, estimated cost.
-   Admin confirms.
-5. `POST /sources/:id/sections` in batches (≤ 1 MB each). Then the tab can close.
-6. The library page polls source status and shows a progress bar per book.
+     `sectionPath` and page range. Mark the intro and conclusion chapters for the thesis pass.
+4. Preview: title/author (editable), section tree with skip toggles, **cost estimate and a
+   cost cap** (default 1.5× the estimate). Admin confirms.
+5. `POST /sources/:id/sections` in batches (≤ 1 MB each). The tab can then close.
+6. The library page polls source status: a progress bar per book, then its yield report.
 
 New ally-web dependencies: `pdfjs-dist`, `jszip` (new, not upgrades).
 
-### 5.2 Background worker (ally-be)
+### 6.2 Staging without retention
+- Section text goes to **Redis** under `fp:section:{id}` with a **24h TTL**, and is deleted
+  the moment that section is distilled. Postgres only ever sees `textHash`, counts and status.
+- If a key expires before it is distilled (worker down for a day), the section becomes
+  `expired` and the UI asks for the file to be dropped again. The hash check means only the
+  missing sections are re-sent.
+- Chunk 2 checks Redis persistence settings. A snapshot taken during the window can hold
+  text until the next snapshot overwrites it, which is acceptable and short-lived. Postgres
+  backups, which are kept for much longer, never see it.
+
+### 6.3 Background worker (ally-be)
 - A `@nestjs/schedule` interval claims `pending` sections with `FOR UPDATE SKIP LOCKED`
   (safe across replicas), with a global concurrency cap (start at 3) and a 3-attempt retry
   with backoff. Postgres is the queue, so no new SQS queue and no infra-repo change.
-- **Distil** (Skills Store prompt `first_principles_distiller`, JSON output contract):
-  input is the section text, `sectionPath`, book title, and the controlled vocabularies.
-  Output is 0–N candidates with every field in §4. Prompt rules: own words only; no quotes;
-  no examples tied to the book's anecdotes; one idea per principle; skip filler and
-  storytelling; "0 principles" is a valid answer for a narrative section.
-- **Quality gate** (deterministic, in code):
-  - length limits; required fields; vocab values valid
-  - **verbatim check**: reject any candidate sharing an 8-word run with its section
-    (guarantees we keep meaning, not text)
-  - self-scores: any score < 3 → `review`
-- **Dedupe**, by embedding and searching the existing library:
-  - similarity ≥ 0.92 → **merge**: no new row, add an `fp_principle_sources` link,
-    `sourceCount++`. If the new wording scores higher, keep it as a proposed rewrite in review
-  - 0.85–0.92 → `review` flagged "possible duplicate of FP-xxxx"
-  - < 0.85 → `active`, then embed and index
-  - Thresholds are first guesses. The admin review decisions are logged so they can be tuned
-- Null the section `text`. Update source counters.
-- **Consolidate** (once per source, after its last section): cluster the source's new
-  principles by similarity. An LLM (`first_principles_consolidator`) merges each cluster into
-  the sharpest single statement, with the rest marked `superseded`. Then source → `complete`.
+- **Thesis pass, once per book** (`first_principles_thesis`): the section tree plus the
+  intro and conclusion produce a ≤ 150-word thesis, the book's key terms, and which chapters
+  look like narrative or filler. Without this, each section is distilled blind and generic
+  principles repeat across chapters.
+- **Distil each section** (`first_principles_distiller`, JSON output contract). Prefix:
+  rules + controlled vocabularies + book thesis, the same for every section of a book, so
+  **Anthropic prompt caching** makes calls after the first much cheaper. Then the section
+  text and `sectionPath`. Output: **0–4** candidates with every §5 field, including `probe`.
+  Rules: own words only; no quotes; no examples taken from the book's anecdotes; one idea
+  per principle; prefer the specific and surprising over the obvious; "0 principles" is a
+  valid answer.
+- Stop the book if `costUsd` reaches `costCapUsd`; the admin can raise the cap and resume.
 
-### 5.3 Review queue (the spot-check)
-Builder → First Principles → Review. Cards show statement, rationale, scores, the reason it
-was held, the possible duplicate side by side, and the source chapter. Actions: approve, edit
-+ approve, merge into FP-xxxx, reject. Bulk approve. Expect roughly 10–20% of candidates here.
+### 6.4 Quality gate
+In order, cheapest first:
+1. **Deterministic**: length limits, required fields, valid vocabulary values.
+2. **Verbatim check**: reject any candidate sharing an 8-word run with its section. This
+   guarantees we keep meaning, not text.
+3. **Injection screen**: reject candidates that address an AI or carry instructions or
+   payloads ("ignore previous", "system prompt", URLs, code, tool names). Books are
+   untrusted input, and these principles end up in Builder's and engineers' agents. The
+   distiller prompt also treats section text strictly as data.
+4. **Platitude check**: embedding similarity against a maintained list of platitude anchors
+   ("know your users", "keep it simple", "communicate with stakeholders"). Similarity ≥ 0.85
+   → reject. The list grows from review rejections.
+5. **Critic pass** (`first_principles_critic`, a separate prompt, batched per section): scores
+   specificity, actionability and standalone clarity. LLMs grade their own output generously,
+   so the distiller no longer self-scores. Any score < 3 → `review`.
+6. **Dedupe** against the library (same embedding call):
+   - similarity ≥ 0.92 → **merge**: no new row, add an `fp_principle_sources` link,
+     `sourceCount++`. If the new wording scores higher, it becomes a proposed rewrite in review
+   - 0.85–0.92 → `review`, flagged "possible duplicate of FP-xxxx"
+   - < 0.85 → `active`, then embed both vectors and index
+   - The admin's review decisions are logged so these thresholds can be tuned from data
 
-## 6. Retrieval
+Section text is deleted from Redis after step 6. Every rejection is counted by reason in the
+source's yield report.
 
-### 6.1 ally-ai
-- New Weaviate collection `FirstPrinciple`. Properties: `principle_id`, `code`, `statement`,
-  `applies_when`, `keywords`, `topics`, `domain`, `prd_sections`, `kind`, `strength`,
-  `status`. The vector is computed from the text
-  `statement + applies_when + keywords` (OpenAI `text-embedding-3-small`, existing client).
-- Add `hybrid_search` to `vector_db/weaviate.py` (BM25 + vector, `alpha` parameter,
-  filters) and endpoints for bulk upsert, delete, list IDs, and search, mirroring the
+### 6.5 Consolidation (once per book, after its last section)
+`first_principles_consolidator` over the book's new principles:
+- Cluster by similarity and merge each cluster into its sharpest statement; the rest become
+  `superseded` (their codes redirect).
+- **Density cap**: keep the best principles up to roughly 1 per 2 sections, minimum 15,
+  maximum 80, ranked by critic score and distinctiveness. The rest are archived with reason
+  `over_cap`, so they stay recoverable. "The absolute core best practices", not everything
+  the book says.
+- **Tension detection**: compare kept principles against their nearest library neighbours
+  and record `tension` / `refines` relations with a one-line note.
+- Source → `complete`; the yield report is finalised.
+
+### 6.6 Re-distilling and archiving
+- The text is gone after distillation, so **the only way to apply a better prompt to an old
+  book is to drop the file again.** That is accepted, and the UI says so plainly.
+- Re-distil runs the same pipeline as `generation + 1`, but dedupe treats that source's
+  existing principles as merge targets: matching principles keep their **code and usage
+  history** and take the better wording; new ones are added; principles the new generation
+  no longer produces are flagged in review rather than deleted.
+- Archiving a source archives principles whose **only** source it is, and decrements
+  `sourceCount` on the rest.
+
+### 6.7 Review queue (the spot-check)
+Builder → First Principles → Review. Cards show the statement, rationale, probe, critic
+scores, why it was held, the possible duplicate side by side, and the source chapter.
+Actions: approve, edit + approve, merge into FP-xxxx, reject (optionally "reject as
+platitude", which adds it to the anchors). Bulk approve. Target ≤ 20% of candidates here.
+
+## 7. Retrieval
+
+### 7.1 ally-ai
+- New Weaviate collection `FirstPrinciple` with **two named vectors**:
+  - `statement`: `statement + rationale`
+  - `situations`: `appliesWhen + probe`, which matches how interview queries are phrased
+
+  Properties: `principle_id`, `code`, `statement`, `applies_when`, `probe`, `keywords`,
+  `topics`, `domain`, `prd_sections`, `kind`, `strength`, `status`. Embeddings use OpenAI
+  `text-embedding-3-small` (the existing client).
+- Add `hybrid_search` to `vector_db/weaviate.py` (BM25 over statement, keywords and
+  applies_when, plus both named vectors; `alpha`; filters). Add endpoints for bulk upsert,
+  delete, list IDs, search and embed-only (for dedupe and platitude checks), mirroring the
   roadmap and knowledge-chunk endpoints. Migration in `app/migrations/`.
+- If production Weaviate predates named vectors, fall back to one vector over
+  `statement + appliesWhen + probe`. The benchmark will show what that costs.
 
-### 6.2 ally-be `FirstPrinciplesRetrievalService.search()`
-- Input: `queries[]` (fan-out in one call), `filters` (domain, prdSections, kind, strength),
-  `limit` (default 8, max 20), `consumer`, `sessionId`, `excludeIds` (already in context).
-- Run the queries in parallel, merge with **reciprocal rank fusion**, apply a small
-  **bounded** prior: `boosted = rrf × (0.9 + 0.1·effectiveness + 0.05·min(sourceCount-1, 2))`.
-  The prior can reorder near-ties but never pull an off-topic principle above a relevant
-  one. Raw and boosted scores are both logged, so the boost can be audited or turned off.
-- Exploration: one of every 8 surfaced slots goes to a relevant principle with fewer than
-  5 surfacings, so new principles get a chance (no rich-get-richer lock-in).
-- Log `fp_retrievals` + `fp_retrieval_hits` fire-and-forget.
-- Soft failure: same message discipline as the Stacks client ("retrieval failed, which says
-  nothing about what the library holds, so continue").
+### 7.2 ally-be `FirstPrinciplesRetrievalService.search()`
+1. Input: `queries[]` (fan-out in one call), `filters` (domain, prdSections, kind, strength),
+   `limit` (default 8, max 20), `consumer`, `sessionId`, `excludeCodes` (already in context),
+   `shadow`.
+2. Run the queries in parallel (hybrid over both vectors), merge with **reciprocal rank
+   fusion**, take the top 30.
+3. **Optional re-rank** (`first_principles_reranker`, one call per search with all queries,
+   using a small model): labels each candidate `high` / `medium` / `low` for this situation.
+   Off by default, and turned on only if it raises the benchmark's nDCG by a margin worth its
+   latency.
+4. **Relevance bands** instead of raw scores: from the re-ranker when it is on, otherwise
+   from RRF thresholds calibrated against `fp_hit_judgments`. `low` hits are dropped, unless
+   that would leave nothing, in which case the best one comes back with `band: low`.
+5. A **bounded prior** within a band only:
+   `boosted = score × (0.9 + 0.1·effectiveness + 0.05·min(sourceCount-1, 2))`.
+   It can reorder near-ties; it can never lift a principle into a higher band.
+6. **Exploration**: one of every 8 surfaced slots goes to a `high`/`medium` principle with
+   fewer than 5 surfacings, so new principles get a chance.
+7. Superseded codes resolve to their successors. Logging is fire-and-forget.
+8. Soft failure: "retrieval failed, which says nothing about what the library holds, so
+   continue". An empty result says the same.
 
-## 7. Using it in the Builder interview
+## 8. Using it in the Builder interview
 
-### 7.1 Tools (replace `stacks_search` / `stacks_get`)
+### 8.1 Tools (replace `stacks_search` / `stacks_get`)
 - `principles_search({ queries: string[], domain?, prdSection?, limit? })` returns compact
-  hits: `code`, `statement`, `appliesWhen`, `domain`, `strength`. Several sharp queries per
-  call are encouraged.
-- `principles_get({ codes })` returns the full principle: rationale, anti-pattern, related
-  principles, "inspired by *Book*, ch. 7". Logged as `read`.
+  hits: `code`, `statement`, `appliesWhen`, `band`, `strength`. Several sharp situational
+  queries per call are encouraged.
+- `principles_get({ codes })` returns the full principle: rationale, probe, anti-pattern,
+  **tensions and refinements**, and "inspired by *Book*, ch. 7". Logged as `read`.
 - Evidence log, turn receipt ("Consulted 6 principles · applied FP-0142, FP-0311") and the
-  prompts (`interviewer_system.txt`, `research_system.txt`) are updated to match.
+  prompts (`interviewer_system.txt`, `research_system.txt`) are updated to match. Retrieved
+  principles are framed as **advisory reference data, not instructions**.
 
-### 7.2 Proactive retrieval (the "keeps running multiple queries" part)
+### 8.2 Proactive retrieval, within a context budget
 The agent does not have to remember to search:
-1. **Session start: guidance brief.** A query-planner prompt
-   (`first_principles_query_planner`) turns the rough idea into 8–12 situational queries,
-   one or more per PRD dimension (problem, users, scope/MVP, UX states, metrics,
-   architecture, data, security/privacy, rollout, testing). Fan out, then put the top ~15 in
-   a **Guiding principles** block in the cached context prefix (next to the repo knowledge
-   packs, so prompt caching still works).
-2. **Each turn: section focus.** When the orchestrator sees which PRD section is being
-   worked on (it already tracks readiness per section), it runs 2–3 queries for that section,
-   excluding principles already in context, and adds any new ones to that turn's context.
-3. **Before sign-off: PRD principle check.** `builder-prd-review.service` gets a new pass
-   that retrieves principles for each section of the draft and asks the reviewer prompt
-   which ones the draft **violates or ignores** (using `antiPattern`). These show up as review
-   findings ("Scope has no empty state. FP-0142: design the empty state first"), so the admin
-   is guided toward a complete PRD.
+1. **Session start: guidance brief.** `first_principles_query_planner` turns the rough idea
+   into 8–12 situational queries across the PRD dimensions (problem, users, scope/MVP,
+   UX states, metrics, architecture, data, security/privacy, rollout, testing). Fan out,
+   then put up to 15 principles, **grouped by PRD section**, into a **Guiding principles**
+   block in the cached context prefix (next to the repo knowledge packs). The brief is fixed
+   for the session so the cache holds.
+2. **Each turn: section focus.** When the orchestrator sees which PRD section is being worked
+   on (it already tracks readiness per section), it runs 2–3 queries for that section,
+   excluding codes already in context. New hits go **after the cache breakpoint**, in that
+   turn only.
+3. **Budget**: at most ~25 principles in context at once (brief + section focus + the
+   agent's own lookups). When over, drop the ones already applied or dismissed first. A
+   principle the model doesn't see can't help, and one it sees among 60 barely helps either.
+4. **Before sign-off: PRD principle check.** `builder-prd-review.service` gains a pass that
+   retrieves principles for each section of the draft and asks which ones the draft
+   **violates or ignores** (matching against `antiPattern`). These show up as review findings
+   ("Scope has no empty state. FP-0142: design the empty state first") with an **Apply**
+   action that asks the agent to revise that section.
 
-### 7.3 Tracking what was actually used
-- **Applied:** the PRD cites principles inline as `[FP-0142]`. On every PRD version save we
-  parse citations and record an `applied` event for each code that is new to this session.
-  The citation in the document is the source of truth, because it is checkable.
-- **Dismissed:** surfaced in context but never read or cited by session end.
-- **Helpful / unhelpful:** thumbs on each principle chip in the turn receipt and PRD panel.
-- **Shipped:** when `builder-outcome` records a merged build for the session, every principle
-  applied in it gets a `shipped` event.
-- **Effectiveness** (nightly job, Bayesian-smoothed so a principle seen twice can't score 1.0):
-  `applyRate = (applied + 1) / (surfaced + 5)`,
+### 8.3 Guiding the admin, not just the agent
+- **Probes become questions.** The interviewer is told to turn the highest-band unaddressed
+  principles for the current section into its next question, using the principle's `probe`
+  and citing it ("FP-0142 suggests deciding the empty state first: what does a brand-new
+  user see?"). Logged as `probed`. This is what makes the interview feel principled rather
+  than generic.
+- **Trade-offs become decisions.** When two principles in context have a `tension` relation
+  and both apply, the orchestrator raises a **decision card** (existing
+  `builder-decision.service` / `DecisionCard.tsx`): the two principles, the one-line
+  trade-off, and the options. The admin's choice is recorded in the PRD with both codes.
+- **Coverage view.** The PRD panel shows, per section, the principles applied, probed but
+  open, and violated (from the PRD check), so the admin can see at a glance where the draft
+  is thin.
+- **Chips** on turn receipts and the PRD panel: code, statement on hover, thumbs up/down.
+
+### 8.4 Tracking what was actually used, honestly
+- **Cited**: the PRD cites principles inline as `[FP-0142]`. Each PRD version save parses
+  citations.
+- **Citation integrity**:
+  - A cited code that was never surfaced in this session, or doesn't exist, is
+    `cite_rejected`. It is stripped from the PRD and flagged in the turn receipt, which
+    catches invented codes.
+  - The remaining citations go to `first_principles_citation_verifier` (a small model, on
+    all of them while volume is low, sampled later). It checks that the cited sentence
+    genuinely applies the principle. Only a pass becomes `applied_verified`.
+  - Without this the agent learns that citing is rewarded, and the effectiveness score
+    measures citing instead of helping.
+- **Dismissed**: surfaced in context but never probed, read or cited by session end.
+- **Helpful / unhelpful**: thumbs on chips.
+- **Shipped**: when `builder-outcome` records a merged build for the session, every
+  `applied_verified` principle in it gets a `shipped` event.
+- **Effectiveness** (nightly, Bayesian-smoothed so a principle seen twice can't score 1.0;
+  eval and preview traffic excluded):
+  `applyRate = (appliedVerified + probed·0.5 + 1) / (surfaced + 5)`,
   `feedback = (helpful + 1) / (helpful + unhelpful + 2)`,
   `effectiveness = 0.6·applyRate_norm + 0.25·feedback + 0.15·shippedRate_norm`.
+  "Shipped" is heavily confounded, so it gets the smallest weight. It only feeds the bounded
+  in-band prior and the Insights tab, never a filter.
+- **Curator** (nightly, like the lesson curator): proposes archiving principles that have
+  been surfaced at least 30 times with 0 verified applications, proposes merges for
+  principles that keep surfacing together, and proposes new `tension` relations. All of
+  these go to the review queue. Nothing is archived automatically.
 
-## 8. Other consumers
+## 9. Other consumers
 
 - **Roadmap Copilot**: swap its `stacks_*` tools for the same two tools (`consumer =
   roadmap_copilot`).
-- **Course Copilot**: same swap. Note: it currently asks for *instructional-design*
-  guidance; that only works once instructional-design books are uploaded. Add a domain
-  `instructional_design` and have its tool filter to it by default.
+- **Course Copilot**: same swap, filtered to `instructional_design` by default. It only
+  returns useful results once instructional-design books are uploaded, and it says so
+  rather than claiming the library is empty of guidance.
 - **Engineers' Claude Code**:
-  - ally-be exposes `POST /first-principles/mcp`: JSON-RPC `tools/list` + `tools/call`
-    for `search_principles`, `get_principles`, `list_domains`, plus a `planning_context`
-    prompt, matching the four Stacks surfaces so habits carry over.
-  - Auth: a **separate read-only personal key** (`fp_reader_keys`: hashed, owner, label,
-    `lastUsedAt`, `revokedAt`) that can only call the search tools, sent as
-    `Authorization: Bearer`. Engineers create one from Builder → First Principles → Access;
-    the issue/revoke flow copies the Skills Store key service's pattern.
+  - ally-be exposes `POST /first-principles/mcp`: JSON-RPC `tools/list` + `tools/call` for
+    `search_principles`, `get_principles`, `list_domains`, plus a `planning_context` prompt,
+    matching the four Stacks surfaces so habits carry over.
+  - Auth: a **separate read-only personal key** (`fp_reader_keys`) that can only call these
+    tools, sent as `Authorization: Bearer`. Engineers create one from Builder → First
+    Principles → Access; the issue/revoke flow copies the Skills Store key service's
+    pattern. Per-key rate limit (Redis) and `lastUsedAt` tracking.
   - Each repo's `.mcp.json` points at it (HTTP transport, key from env). Then delete
     `stacks-bridge.mjs` and the `.claude/skills/stacks` skill (replaced by a
     `first-principles` skill). Update every `CLAUDE.md` / `AGENTS.md` and rewrite
     `wiki/contributing/planning-with-stacks.md` as `planning-with-first-principles.md`.
-  - Retrievals log with `consumer = mcp_dev`, so dev usage shows in the same analytics.
+  - Retrievals log with `consumer = mcp_dev`. Engineers' sessions give no applied signal, so
+    they count toward retrieval stats only.
 
-## 9. Admin UI (Builder → First Principles)
+## 10. Admin UI (Builder → First Principles)
 
 | Tab | Contents |
 |---|---|
-| **Library** | Upload zone; sources table with progress, counts and cost; principle browser with search box (runs the real retrieval as `admin_preview`, showing scores), filters by domain / kind / strength / source / status, and edit / archive / add manual principle |
-| **Review** | The spot-check queue (§5.3) |
-| **Access** | Engineers create and revoke their read-only keys for the MCP endpoint (§8) |
-| **Insights** | Library size by domain; top applied; **never surfaced** (dead weight or bad keywords); **surfaced often, never applied** (noisy, rewrite or archive); **zero/low-score queries** (what to upload next); per-source yield vs usefulness ("this book gave 140 principles, 3 ever applied"); usage by consumer over time |
+| **Library** | Upload zone; sources table with progress, cost, thesis and yield report; principle browser with filters by domain / kind / strength / source / status; edit, archive, add a principle by hand; relations shown on each principle |
+| **Search preview** | Runs the real retrieval as `admin_preview`, showing bands and per-signal scores, with a pipeline switch (re-rank on/off, alpha). **Thumbs on results feed the retrieval benchmark** |
+| **Review** | The spot-check queue (§6.7), including curator proposals |
+| **Access** | Engineers create and revoke their read-only MCP keys (§9) |
+| **Insights** | Benchmark scores over time; library size by domain; top applied; never surfaced; surfaced often, never applied; **gap list**: zero-hit and low-band queries clustered into topics ("6 sessions asked about offline sync and found nothing: consider a book on it"); per-source yield vs usefulness; usage by consumer |
 
-Turn receipts and the PRD panel get principle chips (code + statement on hover + thumbs).
+Feature toggle: add `BUILDER_FIRST_PRINCIPLES` (separate from `BUILDER`) so it can be rolled
+out and switched off on its own. Builder settings get two switches: `principlesBrief`
+(off / shadow / on) and `principlesProbes` (off / on).
 
-Feature toggle: reuse `BUILDER`, or add `BUILDER_FIRST_PRINCIPLES` if you want to roll it out
-separately.
-
-## 10. Build order (chunks; each one ships and is tested on its own)
+## 11. Build order (chunks; each one ships and is tested on its own)
 
 | # | Chunk | Done when |
 |---|---|---|
-| 1 | **Data model + ally-ai index**: migrations for `fp_*`; `FirstPrinciple` collection; `hybrid_search`; upsert/search endpoints; manual-add principle API | A manually added principle is searchable via hybrid search, tests green in both repos |
-| 2 | **Server ingestion**: sources/sections API, staging table, worker, distiller prompt, quality gate, verbatim check, dedupe, consolidation, 24h sweeper | Posting the sections of a real book produces principles; staging text is null afterwards |
-| 3 | **Browser parser + Library/Review UI**: pdf/epub parsing, preview, batched upload, progress, principle browser, review queue | Admin uploads a PDF and an EPUB end to end |
-| 4 | **Builder swap**: retrieval service + logging, `principles_*` tools, prompts, receipts, citation parsing → `applied` events | An interview cites `[FP-…]` and the events are recorded; Stacks is no longer called by Builder |
-| 5 | **Proactive retrieval**: query planner brief, per-section queries, PRD principle check in review | A rough idea produces a guiding-principles block and review findings |
-| 6 | **Feedback + Insights**: thumbs, shipped linkage, nightly effectiveness, bounded boost, exploration, Insights tab | Insights tab shows real numbers |
+| 1 | **Library core**: `fp_*` migrations; ally-ai `FirstPrinciple` collection with named vectors (or the fallback), `hybrid_search`, upsert/search/embed endpoints; `FirstPrinciplesRetrievalService` with RRF, bands, logging; add a principle by hand via the API | Hand-added principles come back from hybrid search with bands and are logged; prod Weaviate version confirmed; tests and lint green in ally-be and ally-ai |
+| 2 | **Server ingestion**: sources/sections API, Redis staging, worker, thesis → distil → gate (verbatim, injection, platitude, critic) → dedupe → consolidation (cap, tensions), cost cap, re-distil merge, yield report | Posting a real book's sections produces a capped set of principles with a yield report; no section text in Postgres; Redis keys gone afterwards |
+| 3 | **Browser upload + Library / Search preview / Review UI**; thumbs in Search preview | The owner uploads the seed books end to end; a first ~60-query **retrieval benchmark** exists from preview thumbs |
+| 4 | **Builder swap**: `principles_*` tools, prompts, receipts, citation parsing, integrity check + verifier; proactive brief in **shadow** mode (logged, not shown) | An interview cites `[FP-…]`, invented codes are stripped, verified applications are recorded; Stacks is no longer called by Builder |
+| 5 | **Guiding the admin**: brief + section focus within the budget, probes as questions, tension decision cards, PRD principle check with Apply, coverage view; **replay eval off vs on** | The replay eval shows an improvement with no fixture regressing, after which `principlesBrief` and `principlesProbes` go on by default |
+| 6 | **Feedback loop + Insights**: thumbs, shipped linkage, LLM hit judge, nightly effectiveness, in-band prior, exploration, re-rank A/B on the benchmark, curator, Insights tab with gap list | Insights shows real numbers; the re-rank decision is made from the benchmark |
 | 7 | **Copilots + MCP + Stacks removal**: Roadmap/Course Copilot swap, read-only keys + Access tab, `/mcp` endpoint, `.mcp.json` in every repo, delete `StacksClientService` + bridge + skill + `STACKS_*` config, docs/wiki rewrite | `grep -ri stacks` finds only history notes |
 
-Chunks 1–4 make it usable; 5–6 make it good; 7 finishes the cutover. Stacks stays wired
-for engineers until chunk 7, so nobody loses guidance while the library fills up.
+Chunks 1–4 make it usable; 5–6 make it good and prove it; 7 finishes the cutover. Stacks
+stays wired for engineers until chunk 7, so nobody loses guidance while the library fills up.
+Every new prompt from chunk 2 on goes through the Skills Store, and from chunk 5 on through
+a `prompt_gate` eval suite.
 
-## 11. Risks and how the plan handles them
+## 12. Risks and how the plan handles them
 
 | Risk | Mitigation |
 |---|---|
-| Copyright: keeping the book's text | Browser parses locally; text lives only in staging until distilled (24h hard cap); the 8-word verbatim check rejects copied phrasing; we store location metadata, never passages |
-| Bland, generic principles ("Know your users") | Distiller prompt demands specificity + `appliesWhen`; specificity score < 3 goes to review; Insights flags "surfaced, never applied" |
-| Library bloat from overlapping books | Similarity merge → corroboration instead of duplicates; consolidation pass per book |
-| Feedback loop locks in early favourites | Bounded boost (max ±10%), exploration slot, raw scores logged |
-| Agent claims "the library has nothing on X" | Same tool-message discipline Stacks used; zero-hit queries logged for the Insights gap list |
-| Long book, worker crash midway | Per-section rows with retry/attempts; the source shows "38/42 sections, 1 failed, retry" |
-| Cost | Estimate shown before confirm; tokens + cost recorded per source; concurrency cap |
+| Copyright: keeping the book's text | Parsing happens in the browser; text sits only in Redis with a 24h TTL, never in Postgres or backups; the 8-word verbatim check; only location metadata is stored, never passages |
+| Bland, generic principles | Thesis pass for context, critic pass, platitude anchors, density cap, and the yield report's sample rating; Insights flags "surfaced, never applied" |
+| Prompt injection via an uploaded book | Distiller treats text as data; injection screen in the gate; principles framed as advisory data to every agent; read-only MCP keys |
+| The agent games citations | Only surfaced codes count; invented codes are stripped; the verifier must pass before anything counts as applied |
+| Too much in context dilutes the interview | ~25-principle budget, a fixed cached brief, per-turn additions after the cache breakpoint |
+| Library bloat from overlapping books | Merge as corroboration, consolidation per book, density cap, curator merge proposals |
+| A better prompt can't reach old books | Re-distil by re-upload, merging while keeping codes and history (§6.6) |
+| Feedback loop locks in early favourites | In-band prior only (max ±10%), exploration slot, raw scores logged |
+| Agent claims "the library has nothing on X" | Same tool-message discipline Stacks used; zero-hit queries feed the gap list |
+| It doesn't actually improve PRDs | The replay eval gates the proactive features; if it shows no gain they stay off and we learn why before building more |
+| Long book, worker crash, Redis expiry | Per-section status with retries; expired sections re-sent by re-dropping the file (hash-matched) |
+| Cost | Estimate and cap before confirm; prompt caching on the per-book prefix; tokens and cost per source; concurrency cap |
 
-## 12. Open questions
+## 13. Open questions
 
-None. All four earlier questions were answered on 2026-11-09 and are recorded in §1.
+None blocking. All four earlier questions were answered on 2026-11-09 and are recorded in §1.
+Thresholds marked as first guesses (§3, §6.4, §6.5, §7.2, §8.4) are meant to be revised
+from real data, not decided up front.
