@@ -64,12 +64,12 @@ describe('KnowledgeBaseService.search', () => {
     build(['d1', 'd2'], [[passage()]]);
 
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
     } as any);
 
     expect(documentRepository.retrievableIds).toHaveBeenCalledWith({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       tags: undefined,
     });
     expect(
@@ -113,7 +113,7 @@ describe('KnowledgeBaseService.search', () => {
     build([], []);
 
     const result = await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
     } as any);
 
@@ -124,7 +124,7 @@ describe('KnowledgeBaseService.search', () => {
   it("applies each corpus's own similarity floor, and lets a caller override it", async () => {
     build(['d1'], [[]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
     } as any);
     // 0.35 for every corpus. Precision is the agent's job (it reads the passage and can
@@ -141,7 +141,7 @@ describe('KnowledgeBaseService.search', () => {
 
     build(['d1'], [[]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
       minSimilarity: 0.2,
     } as any);
@@ -153,7 +153,7 @@ describe('KnowledgeBaseService.search', () => {
   it('over-fetches so shaping cannot silently shrink the result below the limit', async () => {
     build(['d1'], [[]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
       limit: 8,
     } as any);
@@ -163,7 +163,7 @@ describe('KnowledgeBaseService.search', () => {
   it('caps the over-fetch so a large limit cannot become an unbounded query', async () => {
     build(['d1'], [[]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
       limit: 50,
     } as any);
@@ -173,12 +173,12 @@ describe('KnowledgeBaseService.search', () => {
   it('passes tags through as a document-level narrowing', async () => {
     build(['d1'], [[]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
       tags: ['dementia'],
     } as any);
     expect(documentRepository.retrievableIds).toHaveBeenCalledWith({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       tags: ['dementia'],
     });
   });
@@ -231,7 +231,7 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
     // which is the entire reason this table exists.
     build(['d1'], [[]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
       minSimilarity: 0.31,
     } as any);
@@ -274,7 +274,7 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
     build(['d1'], [overlapping]);
 
     const result = await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
       limit: 8,
     } as any);
@@ -295,7 +295,7 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
     // null that there were no documents to search. Collapsing them hides which happened.
     build(['d1', 'd2'], [[passage({ chunk_id: 'a' })]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
     } as any);
     expect(aiService.searchKnowledgeChunks).toHaveBeenCalledTimes(1);
@@ -309,7 +309,7 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
 
     build([], []);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
     } as any);
     expect(recorded()[0].secondPassHits).toBeNull();
@@ -320,7 +320,7 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
     // nothing is how a corpus gap gets found. A skipped row would hide exactly those.
     build(['d1'], [[]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'nothing covers this',
     } as any);
     expect(retrievalRepository.record).toHaveBeenCalledTimes(1);
@@ -333,7 +333,7 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
     // the floor gets calibrated against.
     build(['d1'], [[]]);
     await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
     } as any);
     expect(recorded()[0].consumer).toBe('admin_preview');
@@ -341,14 +341,11 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
 
   it('carries the session and consumer through when given them', async () => {
     build(['d1'], [[]]);
-    await service.search(
-      { corpus: KbCorpus.DEBRIEF_KNOWLEDGE, query: 'q' } as any,
-      {
-        consumer: 'debrief' as any,
-        sessionId: 'session-1',
-        userId: 42,
-      },
-    );
+    await service.search({ corpus: KbCorpus.WHATSAPP_QA, query: 'q' } as any, {
+      consumer: 'debrief' as any,
+      sessionId: 'session-1',
+      userId: 42,
+    });
     expect(recorded()[0]).toMatchObject({
       consumer: 'debrief',
       sessionId: 'session-1',
@@ -363,7 +360,7 @@ describe('KnowledgeBaseService.search — retrieval log', () => {
     retrievalRepository.record.mockRejectedValue(new Error('table is locked'));
 
     const result = await service.search({
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       query: 'q',
     } as any);
 

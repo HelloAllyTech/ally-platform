@@ -369,8 +369,19 @@ class TestRetiredCollectionEndpoint(_ResolvedKeyAPITest):
         assert response.json() == {"deleted": deleted}
         mock_drop.assert_called_once_with("CharacterChunk")
 
+    @pytest.mark.parametrize("name", ["GuideLibraryChunk", "DebriefKnowledgeChunk"])
+    def test_drops_the_corpora_retired_in_phase_6(self, client: TestClient, name):
+        with patch(self.DROP) as mock_drop:
+            mock_drop.return_value = True
+            response = client.delete(
+                self.URL, params={"collection": name, "confirm": name}
+            )
+
+        assert response.status_code == 200
+        mock_drop.assert_called_once_with(name)
+
     @pytest.mark.parametrize(
-        "name", ["KnowledgeChunk", "GuideLibraryChunk", "CtxFirstPrinciples_v1"]
+        "name", ["KnowledgeChunk", "AgentMemory", "CtxFirstPrinciples_v1"]
     )
     def test_refuses_any_collection_that_is_not_retired(self, client, name):
         with patch(self.DROP) as mock_drop:

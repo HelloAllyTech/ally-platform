@@ -6,13 +6,12 @@
  * WhatsApp Q&A bot was the first, which is why these endpoints live in this file — the data
  * layer is shared, the screens are not.
  *
- * The character corpus (`character_library`) was retired into the Context Library's Character
- * Insights collection; the API now rejects that value.
+ * The character corpus, the Ally guide's library and Debrief's guidance were retired into the
+ * Context Library (Character Insights, Ally Guide Library, Debrief Guidance); the API now rejects
+ * those values.
  */
 export enum KbCorpus {
   WHATSAPP_QA = "whatsapp_qa",
-  /** The Debrief agent's guidance (Debriefs → Knowledge). */
-  DEBRIEF_KNOWLEDGE = "debrief_knowledge",
 }
 
 /** Types for the WhatsApp Q&A bot admin tab. Mirrors ally-be's DTOs. */

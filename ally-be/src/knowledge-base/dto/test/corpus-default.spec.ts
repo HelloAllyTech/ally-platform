@@ -65,10 +65,21 @@ describe('corpus defaults on the HTTP edge', () => {
       KbSearchDto,
     ] as const) {
       const { dto } = await check(cls, {
-        corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+        corpus: KbCorpus.WHATSAPP_QA,
         query: 'q',
       });
-      expect(dto.corpus).toBe(KbCorpus.DEBRIEF_KNOWLEDGE);
+      expect(dto.corpus).toBe(KbCorpus.WHATSAPP_QA);
+    }
+  });
+
+  it('rejects a corpus retired into the Context Library', async () => {
+    for (const corpus of [
+      'character_library',
+      'ally_guide_library',
+      'debrief_knowledge',
+    ]) {
+      const { errors } = await check(GetKbDocumentsQueryDto, { corpus });
+      expect(errors.map((e) => e.property)).toContain('corpus');
     }
   });
 
@@ -93,7 +104,7 @@ describe('corpus defaults on the HTTP edge', () => {
 describe('includeArchived on a query string', () => {
   const parse = async (value: unknown) => {
     const dto = plainToInstance(GetKbDocumentsQueryDto, {
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
       includeArchived: value,
     });
     const errors = await validate(dto as object);
@@ -128,7 +139,7 @@ describe('includeArchived on a query string', () => {
 
   it('leaves it undefined when absent, so the repository default applies', async () => {
     const dto = plainToInstance(GetKbDocumentsQueryDto, {
-      corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+      corpus: KbCorpus.WHATSAPP_QA,
     });
     expect(dto.includeArchived).toBeUndefined();
     expect(await validate(dto as object)).toHaveLength(0);

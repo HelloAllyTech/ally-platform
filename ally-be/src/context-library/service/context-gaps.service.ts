@@ -146,6 +146,44 @@ export class ContextGapsService {
     return found.length;
   }
 
+  /**
+   * Name what a set of searches had in common, without storing anything: the same clustering and
+   * labelling as the nightly loop, for a one-off report (the smoke check after a corpus moves in).
+   * Every cluster counts, however small, so each search lands in a topic; only the largest
+   * `maxTopics` are named, and the rest are counted as unlabelled. What comes back is labels and
+   * counts — never a query's text.
+   */
+  async topicsFor(
+    texts: string[],
+    sensitive: boolean,
+    maxTopics = MAX_TOPICS_PER_RUN,
+  ): Promise<{
+    topics: Array<{ label: string; queries: number }>;
+    unlabelled: number;
+  }> {
+    const group: GapQuery[] = texts
+      .map((t) => t.trim().slice(0, 300))
+      .filter(Boolean)
+      .map((text) => ({ text, sensitive, tenantId: null, at: new Date() }));
+    if (!group.length) return { topics: [], unlabelled: 0 };
+    const vectors = await this.embed(group);
+    if (vectors.length !== group.length) {
+      return { topics: [], unlabelled: group.length };
+    }
+    const clusters = greedyClusters(vectors, CL_GAP_CLUSTER_SIMILARITY).sort(
+      (a, b) => b.length - a.length,
+    );
+    const topics: Array<{ label: string; queries: number }> = [];
+    let unlabelled = 0;
+    for (const [i, cluster] of clusters.entries()) {
+      const label =
+        i < maxTopics ? await this.label(cluster.map((j) => group[j])) : null;
+      if (label) topics.push({ label, queries: cluster.length });
+      else unlabelled += cluster.length;
+    }
+    return { topics, unlabelled };
+  }
+
   private async embed(group: GapQuery[]): Promise<number[][]> {
     const out: number[][] = [];
     try {

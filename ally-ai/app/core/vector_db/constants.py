@@ -24,6 +24,11 @@ class VectorDBCollectionNames:
     # (RETIRED_CORPUS_COLLECTIONS in app/core/knowledge_base/corpus.py). Nothing reads
     # or writes it.
     CHARACTER_CHUNKS = "CharacterChunk"
+    # RETIRED: the Ally guide's library and Debrief's guidance moved to ally-be's
+    # Context Library (Ally Guide Library, Debrief Guidance), their passages copied
+    # word for word. Kept only because the immutable migrations 008 and 009 create
+    # them, and so ally-be's confirmed retirement can name them
+    # (RETIRED_CORPUS_COLLECTIONS). Nothing reads or writes either.
     GUIDE_LIBRARY_CHUNKS = "GuideLibraryChunk"
     DEBRIEF_KNOWLEDGE_CHUNKS = "DebriefKnowledgeChunk"
 
@@ -245,9 +250,8 @@ class AgentMemoryProperties:
 class KnowledgeChunkProperties:
     """
     Properties for a passage-level retrieval collection — the WhatsApp Q&A bot's
-    KnowledgeChunk, the Ally guide's library, GuideLibraryChunk, and Debrief guidance,
-    DebriefKnowledgeChunk. (The retired character corpus's CharacterChunk was created
-    from the same list.)
+    KnowledgeChunk. (The retired corpora's CharacterChunk, GuideLibraryChunk and
+    DebriefKnowledgeChunk were created from the same list.)
 
     Distinct from ReferenceDocument, which is left untouched: that collection stores one
     object per document with a SINGLE embedding of the whole body, which is why it can
@@ -311,12 +315,11 @@ class KnowledgeChunkProperties:
     of a filtered traversal is accepted here, and is the reason it is not also used for
     corpora.
 
-    THE ALLY GUIDE LIBRARY is the reason the audience pair matters most. It holds
+    The Ally guide's library was the reason the audience pair mattered most: it held
     platform documents (`is_global = true`) beside one organisation's own protocols
-    and guides (`tenant_ids = [that organisation]`), and every search for a
-    learner names who is asking: their organisation plus the
-    global documents, or the global documents alone for an anonymous visitor. It is
-    never searched unrestricted on a learner's behalf.
+    (`tenant_ids = [that organisation]`). It moved to ally-be's Context Library, whose
+    `Ctx<Collection>_v{N}` indexes carry the same pair and pre-filter on it the same
+    way.
 
     Audience is also the ONE piece of chunk metadata deliberately MUTABLE in place.
     Chunk text is immutable for a given (document_id, chunk_version, chunk_index) so a

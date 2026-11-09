@@ -308,11 +308,17 @@ describe('chunkDocument', () => {
 describe('per-corpus chunk profiles', () => {
   /**
    * Sizing differs because what reads the passage differs: a 1600-character WhatsApp reply
-   * grounds on one clinical idea, while the Ally guide's protocols need a whole procedure held
-   * together. The splitting hierarchy is deliberately NOT parameterised — a passage that
-   * respects headings and sentences is right for both.
+   * grounds on one clinical idea, while a protocol needs a whole procedure held together (the
+   * size the Ally guide's library used before it moved to the Context Library, which segments
+   * with this same chunker). The splitting hierarchy is deliberately NOT parameterised — a
+   * passage that respects headings and sentences is right for both.
    */
-  const larger = KB_CHUNK_PROFILES[KbCorpus.ALLY_GUIDE_LIBRARY];
+  const larger = {
+    targetTokens: 600,
+    minTokens: 480,
+    maxTokens: 780,
+    overlapTokens: 90,
+  };
   const whatsapp = KB_CHUNK_PROFILES[KbCorpus.WHATSAPP_QA];
 
   it('defaults to the WhatsApp profile when no profile is given', () => {

@@ -95,10 +95,7 @@ export interface KnowledgeChunkDeleteResponse {
  * transport layer and must not depend on a domain module. The values are
  * `KbCorpus`'s, which is assignable to this, so the compiler still couples them.
  */
-export type KnowledgeCorpus =
-  | 'whatsapp_qa'
-  | 'ally_guide_library'
-  | 'debrief_knowledge';
+export type KnowledgeCorpus = 'whatsapp_qa';
 
 export interface KnowledgeChunkSearchRequest {
   query: string;

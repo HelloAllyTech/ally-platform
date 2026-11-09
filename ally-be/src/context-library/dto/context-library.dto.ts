@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -215,6 +216,21 @@ export class ContextChunkListQueryDto {
   @MaxLength(200)
   q?: string;
 
+  @ApiPropertyOptional({
+    description:
+      '`global` for entries every learner may read, or an organisation id for the entries that ' +
+      'reach that organisation (on the organisation routes, `mine` for its own).',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(
+    /^(global|mine|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+    {
+      message: 'audience must be "global", "mine" or an organisation id',
+    },
+  )
+  audience?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
@@ -312,7 +328,8 @@ export class ContextLoopSettingsDto {
 export class ContextRetireCorpusDto {
   @ApiProperty({
     description:
-      'Exactly "retire character_library". Anything else deletes nothing.',
+      'Exactly "retire <corpus>" — "retire character_library", "retire ally_guide_library" or ' +
+      '"retire debrief_knowledge", matching the route. Anything else deletes nothing.',
     example: 'retire character_library',
   })
   @IsString()

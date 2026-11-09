@@ -74,11 +74,7 @@ describe('RagQualityRepository', () => {
       await repository.selectRetrievals({ sinceDays: 30 });
       const [sql, params] = query.mock.calls[0];
       expect(sql).toContain('r.corpus = ANY(');
-      expect(params).toContainEqual([
-        'whatsapp_qa',
-        'ally_guide_library',
-        'debrief_knowledge',
-      ]);
+      expect(params).toContainEqual(['whatsapp_qa']);
     });
 
     it('scopes "already judged" to one model and rubric version', async () => {
@@ -94,21 +90,14 @@ describe('RagQualityRepository', () => {
       expect(sql).toContain('kb_retrieval_judgments');
       expect(sql).toContain('judge_prompt_version');
       // $1 is the judgeable-corpus list; the pinned pair follows it.
-      expect(params).toEqual([
-        ['whatsapp_qa', 'ally_guide_library', 'debrief_knowledge'],
-        'gemini-2.5-pro',
-        'v1',
-      ]);
+      expect(params).toEqual([['whatsapp_qa'], 'gemini-2.5-pro', 'v1']);
     });
 
     it('can narrow to one consumer, so a batch can be sampled across both', async () => {
       await repository.selectRetrievals({ consumer: 'whatsapp_bot' });
       const [sql, params] = query.mock.calls[0];
       expect(sql).toContain('r.consumer = $2');
-      expect(params).toEqual([
-        ['whatsapp_qa', 'ally_guide_library', 'debrief_knowledge'],
-        'whatsapp_bot',
-      ]);
+      expect(params).toEqual([['whatsapp_qa'], 'whatsapp_bot']);
     });
   });
 

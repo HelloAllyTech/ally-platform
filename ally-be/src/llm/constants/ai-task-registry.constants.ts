@@ -1177,11 +1177,12 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,
     trigger:
-      'Anything is embedded for semantic search — including every document added to ' +
-      "Ally's library and every library search Ally makes for a learner",
+      'Anything is embedded for semantic search — including every Context Library entry and ' +
+      'every library search Ally makes for a learner',
     detail:
-      'All three knowledge corpora (WhatsApp Q&A, the character library and the Ally ' +
-      "guide's library, one Weaviate collection each) plus roadmap opportunities — " +
+      'The WhatsApp Q&A corpus (the one knowledge corpus left; the character library, the Ally ' +
+      "guide's library and Debrief guidance moved into the Context Library, whose indexes embed " +
+      'with the same model) plus roadmap opportunities — ' +
       'embedded once per chunk at ingest and once per query at search. Every corpus embeds with THIS model, ' +
       'because a query vector from another model lands in a different space and makes every ' +
       'similarity number meaningless rather than merely worse. 1536 dimensions; Weaviate ' +
@@ -2987,7 +2988,9 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
       'insights each). The prompt is the collection’s own extractor — ' +
       '`context_library_extract_first_principles_system` for First Principles, ' +
       '`context_library_extract_character_insights_system` for Character Insights (including ' +
-      'the one-off distillation of the retired character corpus) — and each prompt’s own model ' +
+      'the one-off distillation of the retired character corpus), ' +
+      '`context_library_extract_ally_guide_library_system` for the Ally Guide Library and ' +
+      '`context_library_extract_debrief_guidance_system` for Debrief Guidance — and each prompt’s own model ' +
       'is read first. The overview and vocabularies are an identical prefix across a document, ' +
       'so prompt caching applies.',
     kind: AiTaskKind.COMPLETION,
@@ -3050,10 +3053,11 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.FAST,
     trigger:
-      'An admin writes or bulk-uploads an entry, or an agent writes a lesson',
+      'An admin writes or bulk-uploads an entry, an agent writes a lesson, or a platform admin enriches the Ally guide and Debrief passages imported from the Knowledge Base',
     detail:
       'Adds situations, example searches, keywords and missing facets without touching the ' +
-      'entry text. One call per entry; bulk uploads run them in small parallel batches.',
+      'entry text (an imported passage also gets a one-line statement in place of its citation). ' +
+      'One call per entry; bulk uploads and the import enrichment run them in small parallel batches.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-4o-mini',

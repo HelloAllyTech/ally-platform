@@ -151,13 +151,11 @@ export class CreateKbDocumentDto {
 }
 
 /**
- * A document added to an owned corpus (KB_OWNED_CORPORA) by its owner — the platform or one
- * organisation.
+ * A document added by its owner — today, a chatbot on its Knowledge tab (chunk 3d).
  *
- * Deliberately WITHOUT `corpus`, `isGlobal` and `tenantIds`. The route
- * decides the corpus and the owner, and the audience follows the owner; a body that could
- * name them would let one organisation's admin publish to the platform, or target another
- * organisation, by editing a request.
+ * Deliberately WITHOUT `corpus`, `isGlobal` and `tenantIds`. The route decides the corpus and
+ * the owner, and the audience follows the owner; a body that could name them would let an
+ * editor publish more widely, or target another organisation, by editing a request.
  */
 export class CreateKbOwnedDocumentDto extends PickType(CreateKbDocumentDto, [
   'title',
@@ -335,16 +333,6 @@ export class GetKbDocumentsQueryDto {
   sortDir?: string;
 }
 
-/**
- * One owner's documents. Fewer filters than the corpus console's list: an owner's library is
- * small, and the organisation filter is the route itself. Archived (removed) documents are
- * never listed — removing one is how an owner says they are done with it.
- */
-export class GetKbOwnedDocumentsQueryDto extends PickType(
-  GetKbDocumentsQueryDto,
-  ['limit', 'offset', 'search', 'status', 'sortBy', 'sortDir'] as const,
-) {}
-
 export class KbDocumentResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty({ enum: KbCorpus }) corpus!: KbCorpus;
@@ -380,9 +368,8 @@ export class KbDocumentResponseDto {
   @ApiProperty({
     nullable: true,
     description:
-      'The organisation that owns it, on a corpus whose documents have owners (the Ally ' +
-      "guide's library). Null for the platform's own documents and for every document of " +
-      'the other corpora.',
+      "The organisation that owned it, on the Ally guide's library (moved to the Context " +
+      'Library in phase 6). Null for every WhatsApp Q&A document.',
   })
   ownerTenantId!: string | null;
   @ApiProperty() isArchived!: boolean;

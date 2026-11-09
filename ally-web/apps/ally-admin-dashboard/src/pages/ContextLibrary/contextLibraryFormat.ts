@@ -28,6 +28,30 @@ export const ORIGINS: ContextChunkOrigin[] = [
 export const originLabel = (origin: string): string =>
   en.contextLibrary.origins[origin] ?? humanise(origin);
 
+/**
+ * The audience badge's word. Global reaches every learner; an organisation admin sees their own
+ * organisation as "Your organisation"; a platform admin sees the organisation's name, or a count
+ * when an entry is targeted at several. An entry targeted at no one says so.
+ */
+export const audienceLabel = (
+  chunk: { isGlobal: boolean; tenantIds?: string[] | null; ownerTenantId?: string | null },
+  ownTenantId?: string,
+  orgNames: Record<string, string> = {},
+): { label: string; kind: "global" | "organisation" | "nobody" } => {
+  const strings = en.contextLibrary.audience;
+  if (chunk.isGlobal) return { label: strings.global, kind: "global" };
+  const tenants = chunk.tenantIds ?? [];
+  const owner = chunk.ownerTenantId ?? (tenants.length === 1 ? tenants[0] : null);
+  if (ownTenantId && (owner === ownTenantId || tenants.includes(ownTenantId))) {
+    return { label: strings.yours, kind: "organisation" };
+  }
+  if (!tenants.length) return { label: strings.nobody, kind: "nobody" };
+  if (tenants.length === 1) {
+    return { label: orgNames[tenants[0]] ?? strings.oneOrganisation, kind: "organisation" };
+  }
+  return { label: strings.organisations(tenants.length), kind: "organisation" };
+};
+
 /** The shorter word on the origin filter chips. */
 export const originFilterLabel = (origin: string): string =>
   en.contextLibrary.originFilters[origin] ?? humanise(origin);

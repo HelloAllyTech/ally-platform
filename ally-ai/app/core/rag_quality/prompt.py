@@ -21,8 +21,9 @@ class JudgedPassage(TypedDict, total=False):
 # What each corpus is FOR. Without this the judge cannot label relevance
 # honestly: the same passage answers one reader's question and is tangential to
 # another's, and would be scored differently depending on which corpus asked.
-# (The character corpus moved to ally-be's Context Library, which judges its
-# own collections; its rows are no longer sent here.)
+# (The character corpus, the Ally guide's library and Debrief's guidance moved to
+# ally-be's Context Library, which judges its own collections and sends each
+# collection's purpose with the request; their rows are no longer sent here.)
 CORPUS_PURPOSE = {
     "whatsapp_qa": (
         "The WHATSAPP Q&A corpus. Its reader is a bot answering a mental "
@@ -30,25 +31,6 @@ CORPUS_PURPOSE = {
         "guidance and reference material — guidelines, intervention manuals, "
         "protocols. A passage is relevant when it helps ANSWER the question "
         "that was asked."
-    ),
-    "ally_guide_library": (
-        "The ALLY GUIDE LIBRARY corpus. Its reader is Ally, a guide walking a "
-        "learner through a course on mental-health helping skills; the query is "
-        "Ally's own search, usually prompted by something the learner asked. It "
-        "holds material on becoming and being a helper — helping skills, "
-        "self-care, supervision, the work itself — plus an organisation's own "
-        "protocols and handbooks. A passage is relevant when Ally could use it "
-        "to answer or ground what the learner asked; a passage on the same "
-        "topic that does not bear on the question is tangential."
-    ),
-    "debrief_knowledge": (
-        "The DEBRIEF KNOWLEDGE corpus. Its reader is the Debrief agent writing "
-        "a trainee counsellor's feedback after a practice roleplay; the query "
-        "describes one pivotal moment in that session. It holds practice "
-        "guidelines, the debrief style guide, level guides for lay and "
-        "professional helpers, and organisations' own protocols. A passage is "
-        "relevant when it says what good practice is at THAT kind of moment; "
-        "general material on the same topic is tangential."
     ),
 }
 

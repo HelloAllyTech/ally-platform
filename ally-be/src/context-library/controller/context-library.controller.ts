@@ -46,6 +46,7 @@ import {
   ContextUploadDto,
 } from '../dto/context-library.dto';
 import { ClChunkSource } from '../entity/cl-chunk-links.entity';
+import { ClChunk } from '../entity/cl-chunk.entity';
 import { ClCollection } from '../entity/cl-collection.entity';
 import { ClSource } from '../entity/cl-source.entity';
 import { ClChunkStatus, ClUseCase } from '../enum/context-library.enum';
@@ -56,19 +57,53 @@ import { ClActor, ContextChunkService } from '../service/context-chunk.service';
 import { ContextRetrievalService } from '../service/context-retrieval.service';
 import { ContextUploadService } from '../service/context-upload.service';
 import { ContextGapsService } from '../service/context-gaps.service';
-import { ContextKbImportService } from '../service/context-kb-import.service';
+import { ContextKbCopyService } from '../service/context-kb-copy.service';
+import {
+  ALLY_GUIDE_CORPUS_MIGRATION,
+  ContextKbImportService,
+  DEBRIEF_CORPUS_MIGRATION,
+  KbCorpusMigration,
+} from '../service/context-kb-import.service';
 import { ContextLoopActionsService } from '../service/context-loop-actions.service';
 import { ContextLoopsService } from '../service/context-loops.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_CONTEXT_LIBRARY] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_CONTEXT_LIBRARY] };
 
-/** Platform admins act for the platform; organisation-scoped access arrives with phase 6. */
+/**
+ * Everyone on these routes acts for the platform. The Context Library toggle is platform-only, so
+ * an admin restricted to some organisations never reaches them; organisation admins use the
+ * organisation routes (`ContextLibraryOrgController`), where the route names the organisation.
+ */
 function actorFor(user: TokenUser): ClActor {
   return { userId: user?.id ?? null, tenantId: null };
 }
 
-function toAuthoredInput(dto: ContextAuthoredChunkDto) {
+/** One chunk with the documents it was distilled from (title, version, year and location). */
+export async function chunkDetail(
+  chunk: ClChunk,
+  chunkSources: Repository<ClChunkSource>,
+  sources: Repository<ClSource>,
+) {
+  const links = await chunkSources.find({ where: { chunkId: chunk.id } });
+  const found = links.length
+    ? await sources.find({
+        where: { id: In(links.map((l) => l.sourceId)) },
+        select: ['id', 'title', 'docVersion', 'year'],
+      })
+    : [];
+  return {
+    ...chunk,
+    sources: links.map((l) => ({
+      ...found.find((s) => s.id === l.sourceId),
+      sectionPath: l.sectionPath,
+      pageFrom: l.pageFrom,
+      pageTo: l.pageTo,
+    })),
+  };
+}
+
+export function toAuthoredInput(dto: ContextAuthoredChunkDto) {
   return {
     statement: dto.statement,
     body: dto.body ?? null,
@@ -103,6 +138,7 @@ export class ContextLibraryController {
     private readonly loopActions: ContextLoopActionsService,
     private readonly gaps: ContextGapsService,
     private readonly kbImport: ContextKbImportService,
+    private readonly kbCopy: ContextKbCopyService,
   ) {}
 
   // ── Collections ────────────────────────────────────────────────────────────
@@ -248,32 +284,29 @@ export class ContextLibraryController {
 
   @Get('chunks')
   @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, VIEW)
+  @ApiOperation({
+    summary: 'Entries, newest first',
+    description:
+      '`audience` narrows to `global` entries, or to those reaching one organisation (its id).',
+  })
   listChunks(@Query() dto: ContextChunkListQueryDto) {
-    return this.chunkService.list(dto);
+    const { audience, ...rest } = dto;
+    // `mine` is an organisation admin's word; the platform has no organisation of its own.
+    return this.chunkService.list({
+      ...rest,
+      ...(audience === 'global'
+        ? { globalOnly: true }
+        : audience && audience !== 'mine'
+          ? { audienceTenantId: audience }
+          : {}),
+    });
   }
 
   @Get('chunks/:code')
   @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, VIEW)
   async getChunk(@Param('code') code: string) {
     const chunk = await this.chunkService.findByCode(code);
-    const links = await this.chunkSources.find({
-      where: { chunkId: chunk.id },
-    });
-    const sources = links.length
-      ? await this.sources.find({
-          where: { id: In(links.map((l) => l.sourceId)) },
-          select: ['id', 'title', 'docVersion', 'year'],
-        })
-      : [];
-    return {
-      ...chunk,
-      sources: links.map((l) => ({
-        ...sources.find((s) => s.id === l.sourceId),
-        sectionPath: l.sectionPath,
-        pageFrom: l.pageFrom,
-        pageTo: l.pageTo,
-      })),
-    };
+    return chunkDetail(chunk, this.chunkSources, this.sources);
   }
 
   @Post('collections/:id/chunks')
@@ -543,4 +576,120 @@ export class ContextLibraryController {
   ) {
     return this.kbImport.retire(dto.confirm, actorFor(user));
   }
+
+  // The Ally guide's library and Debrief's guidance were copied word for word by migration
+  // 1981000800000, so their routes have no import: a status, enrichment of the copies, the smoke
+  // check, and retirement of the old corpus.
+
+  @Get('migrations/ally-guide-library')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary:
+      "How far the Ally guide's library was copied into the Ally Guide Library",
+  })
+  allyGuideCorpusStatus() {
+    return this.kbImport.status(ALLY_GUIDE_CORPUS_MIGRATION);
+  }
+
+  @Post('migrations/ally-guide-library/enrich')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation(enrichDoc('Ally Guide Library'))
+  enrichAllyGuideCopies(@CurrentUser() user: TokenUser) {
+    return this.kbCopy.startEnrichment(
+      ALLY_GUIDE_CORPUS_MIGRATION,
+      actorFor(user),
+    );
+  }
+
+  @Get('migrations/ally-guide-library/smoke-check')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation(smokeDoc('ally_guide', 'Ally Guide Library'))
+  allyGuideSmokeCheck(@CurrentUser() user: TokenUser) {
+    return this.kbCopy.smokeCheck(ALLY_GUIDE_CORPUS_MIGRATION, actorFor(user));
+  }
+
+  @Post('migrations/ally-guide-library/retire')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation(retireDoc(ALLY_GUIDE_CORPUS_MIGRATION))
+  retireAllyGuideCorpus(
+    @CurrentUser() user: TokenUser,
+    @Body() dto: ContextRetireCorpusDto,
+  ) {
+    return this.kbImport.retire(
+      dto.confirm,
+      actorFor(user),
+      ALLY_GUIDE_CORPUS_MIGRATION,
+    );
+  }
+
+  @Get('migrations/debrief-knowledge')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary: "How far Debrief's guidance was copied into Debrief Guidance",
+  })
+  debriefCorpusStatus() {
+    return this.kbImport.status(DEBRIEF_CORPUS_MIGRATION);
+  }
+
+  @Post('migrations/debrief-knowledge/enrich')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation(enrichDoc('Debrief Guidance'))
+  enrichDebriefCopies(@CurrentUser() user: TokenUser) {
+    return this.kbCopy.startEnrichment(
+      DEBRIEF_CORPUS_MIGRATION,
+      actorFor(user),
+    );
+  }
+
+  @Get('migrations/debrief-knowledge/smoke-check')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation(smokeDoc('debrief', 'Debrief Guidance'))
+  debriefSmokeCheck(@CurrentUser() user: TokenUser) {
+    return this.kbCopy.smokeCheck(DEBRIEF_CORPUS_MIGRATION, actorFor(user));
+  }
+
+  @Post('migrations/debrief-knowledge/retire')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation(retireDoc(DEBRIEF_CORPUS_MIGRATION))
+  retireDebriefCorpus(
+    @CurrentUser() user: TokenUser,
+    @Body() dto: ContextRetireCorpusDto,
+  ) {
+    return this.kbImport.retire(
+      dto.confirm,
+      actorFor(user),
+      DEBRIEF_CORPUS_MIGRATION,
+    );
+  }
+}
+
+function enrichDoc(collection: string) {
+  return {
+    summary: `Enrich the passages imported into ${collection}, in the background`,
+    description:
+      'Platform admins only. Adds situations, example searches, keywords and missing facets, and ' +
+      'a one-line statement in place of the citation heading; the passage text is never touched. ' +
+      'Returns how many were pending; re-run to retry any that failed.',
+  };
+}
+
+function smokeDoc(useCase: string, collection: string) {
+  return {
+    summary: `Replay the last 30 days of ${useCase} searches against ${collection}`,
+    description:
+      'Platform admins only, read-only. Each logged search (old corpus and new collection) is ' +
+      "replayed as its asker's organisation; the report counts those with a good-or-better " +
+      'result and groups the rest into missing topics. Counts and topic labels only: the ' +
+      "searches are learners' own words and are never returned.",
+  };
+}
+
+function retireDoc(migration: KbCorpusMigration) {
+  return {
+    summary: `Delete the retired ${migration.corpus} corpus`,
+    description:
+      'Platform admins only, and only once every passage has its copy. Drops its Weaviate ' +
+      'collection and deletes its documents, passages, stored files and retrieval logs. ' +
+      `Requires { "confirm": "${migration.confirmation}" }.`,
+  };
 }

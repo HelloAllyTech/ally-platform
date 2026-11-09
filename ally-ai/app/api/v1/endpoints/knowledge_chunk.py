@@ -2,9 +2,10 @@
 
 Corpus-agnostic. Every route takes a `corpus` query parameter that resolves to that
 corpus's own Weaviate collection (see app/core/knowledge_base/corpus.py), so the same
-plumbing serves the WhatsApp Q&A bot, the Ally guide and Debrief without any of them
-being able to read another's passages. One route takes no corpus: dropping the
-collection of a corpus retired into ally-be's Context Library.
+plumbing could serve several consumers without any of them being able to read
+another's passages; since the Ally guide's library and Debrief's guidance moved into
+ally-be's Context Library, the WhatsApp Q&A bot is the one left. One route takes no
+corpus: dropping the collection of a corpus retired into the Context Library.
 
 This module is the plumbing: ally-be pushes chunks here after extracting and chunking a
 document, deletes a document's chunks when it re-chunks or archives, and reconciles ids
@@ -238,8 +239,9 @@ async def delete_retired_collection(
     Drop the whole collection of a corpus retired into ally-be's Context Library.
 
     Called once, by ally-be's confirmed platform-admin retirement, after the corpus's
-    documents have been distilled there. Only names in RETIRED_CORPUS_COLLECTIONS are
-    accepted (400 otherwise), so no live corpus can be dropped through here, and
+    documents have been distilled or copied there. Only names in
+    RETIRED_CORPUS_COLLECTIONS are accepted (400 otherwise), so no live corpus can be
+    dropped through here, and
     `confirm` must repeat the name. A missing collection answers `deleted: false`.
     """
     if collection not in RETIRED_CORPUS_COLLECTIONS:

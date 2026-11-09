@@ -6,6 +6,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { ContextLibraryMcpController } from './controller/context-library-mcp.controller';
+import { ContextLibraryOrgController } from './controller/context-library-org.controller';
 import { ContextLibraryController } from './controller/context-library.controller';
 import {
   ClBulkUpload,
@@ -47,6 +48,7 @@ import { ContextStagingService } from './service/context-staging.service';
 import { ContextUploadService } from './service/context-upload.service';
 import { ContextWorkerService } from './service/context-worker.service';
 import { ContextGapsService } from './service/context-gaps.service';
+import { ContextKbCopyService } from './service/context-kb-copy.service';
 import { ContextKbImportService } from './service/context-kb-import.service';
 import { ContextJudgeService } from './service/context-judge.service';
 import { ContextLearningService } from './service/context-learning.service';
@@ -90,7 +92,12 @@ import { ContextTuningService } from './service/context-tuning.service';
     PromptModule,
     RedisModule,
   ],
-  controllers: [ContextLibraryController, ContextLibraryMcpController],
+  controllers: [
+    ContextLibraryController,
+    ContextLibraryMcpController,
+    // One organisation's view, for its admins (phase 6).
+    ContextLibraryOrgController,
+  ],
   providers: [
     ContextAccessService,
     ContextBriefService,
@@ -105,8 +112,10 @@ import { ContextTuningService } from './service/context-tuning.service';
     ContextStagingService,
     ContextUploadService,
     ContextWorkerService,
-    // One-off imports of retired Knowledge Base corpora (phase 4).
+    // One-off imports of retired Knowledge Base corpora (phase 4), and what follows the
+    // word-for-word copies of the Ally guide's library and Debrief's guidance (phase 6).
     ContextKbImportService,
+    ContextKbCopyService,
     // The learning loops (phase 3).
     ContextGapsService,
     ContextJudgeService,

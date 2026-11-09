@@ -35,6 +35,8 @@ export interface CuratorRow extends CuratorStats {
   id: string;
   code: string;
   statement: string;
+  /** The organisation that owns it; null for the platform's own. */
+  ownerTenantId?: string | null;
 }
 
 /**
@@ -191,7 +193,7 @@ export class ContextLearningService {
 
   async curatorStats(collectionId: string): Promise<CuratorRow[]> {
     const rows: any[] = await this.dataSource.query(
-      `SELECT c.id, c.code, c.statement, c.origin, c.confidence, c.pinned,
+      `SELECT c.id, c.code, c.statement, c.origin, c.confidence, c.pinned, c.owner_tenant_id,
               COALESCE(u.surfaced, 0) AS surfaced, COALESCE(u.applied, 0) AS applied,
               COALESCE(u.cited, 0) AS cited,
               COALESCE(j.judged, 0) AS judged, COALESCE(j.off_topic, 0) AS off_topic,
@@ -223,6 +225,7 @@ export class ContextLearningService {
       origin: r.origin,
       confidence: r.confidence,
       pinned: Boolean(r.pinned),
+      ownerTenantId: r.owner_tenant_id ?? null,
       surfaced: Number(r.surfaced),
       applied: Number(r.applied),
       cited: Number(r.cited),
@@ -289,16 +292,20 @@ export class ContextLearningService {
   }
 
   /** Written entries that never help, for their owners. The loops never change them. */
-  async neverUsefulEntries(collectionId: string) {
+  /** With `ownerTenantId`, only that organisation's own entries (its admins' "For owners"). */
+  async neverUsefulEntries(collectionId: string, ownerTenantId?: string) {
     const stats = await this.curatorStats(collectionId);
-    return stats.filter(neverUseful).map((s) => ({
-      code: s.code,
-      statement: s.statement,
-      origin: s.origin,
-      surfaced: s.surfaced,
-      judged: s.judged,
-      judgedOffTopic: s.judgedOffTopic,
-    }));
+    return stats
+      .filter((s) => !ownerTenantId || s.ownerTenantId === ownerTenantId)
+      .filter(neverUseful)
+      .map((s) => ({
+        code: s.code,
+        statement: s.statement,
+        origin: s.origin,
+        surfaced: s.surfaced,
+        judged: s.judged,
+        judgedOffTopic: s.judgedOffTopic,
+      }));
   }
 
   /**

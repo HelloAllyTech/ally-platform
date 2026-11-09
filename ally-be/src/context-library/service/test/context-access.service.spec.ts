@@ -77,6 +77,10 @@ describe('ContextAccessService', () => {
     expect(
       service.assertAudience(ClUseCase.BUILDER_INTERVIEW, undefined),
     ).toBeNull();
+    // A platform use case may still be narrowed: the Library search as an organisation sees it.
+    expect(
+      service.assertAudience(ClUseCase.ADMIN_PREVIEW, { tenantId: 'org-1' }),
+    ).toEqual({ tenantId: 'org-1' });
   });
 
   it('never lets Settings grant a locked collection', async () => {

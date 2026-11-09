@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`, `repos/ally-web.md`: the Ally guide's library and Debrief's guidance moved into the Context Library; organisation admins get a scoped Library.
+
+They are now the Ally Guide Library and Debrief Guidance collections, their passages copied word for word with citations, audiences and owners; the guide and Debrief search them as the learner's organisation. Clinical sign-off is dropped (`clinical` is information only). An organisation's admins open the Context Library scoped to their organisation and manage their own entries there, which replaces the guide library panel and the Debrief knowledge tab. ally-ai lists `GuideLibraryChunk` and `DebriefKnowledgeChunk` as retired; each is dropped only by ally-be's confirmed retire action after a smoke check, never by a migration.
+
 ## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`: Builder's lessons and Bug Hunter's notes moved into the Context Library.
 
 They are now the Builder Lessons and Bug Hunter Notes collections, written by agents as candidates and curated by one hourly agent curator, with usage-based retirement. The agent-memory module, Builder's lesson table and both old curators are gone; ally-ai's `/agent-memories` endpoints are deleted and its migration `010` drops the `AgentMemory` collection.

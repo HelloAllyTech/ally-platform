@@ -193,8 +193,25 @@ export class ContextLoopsService implements OnModuleInit {
    * entries that never help. Sensitive query text never appears: gaps carry only the model's
    * label and non-sensitive examples.
    */
-  async insights(collectionId: string, days = 30) {
+  /**
+   * Is it helping, what's missing, what changed, and never-useful written entries.
+   *
+   * With `scope` (an organisation's admin, §10.2) everything narrows to that organisation: usage
+   * and judgements of its own entries only, the gaps its own learners' searches left, its own
+   * never-useful entries — and no loop changes or settings, which span every organisation.
+   */
+  async insights(
+    collectionId: string,
+    days = 30,
+    scope?: { tenantId: string },
+  ) {
     const window = String(Math.min(Math.max(days, 1), CL_LOOP_WINDOW_DAYS));
+    // The organisation is the last parameter, so each query keeps its own numbering.
+    const owned = (n: number, column = 'chunk_id') =>
+      scope
+        ? ` AND ${column} IN (SELECT id FROM cl_chunks WHERE owner_tenant_id = $${n})`
+        : '';
+    const own = scope ? [scope.tenantId] : [];
     const [usage, judged, weekly, holdout] = await Promise.all([
       this.dataSource.query(
         `SELECT use_case,
@@ -204,34 +221,34 @@ export class ContextLoopsService implements OnModuleInit {
                 count(*) FILTER (WHERE type IN ('applied_verified', 'agent_applied', 'shipped')) AS applied,
                 count(*) FILTER (WHERE type = 'cite_rejected') AS rejected
          FROM cl_usage_events
-         WHERE collection_id = $1 AND "createdAt" > now() - ($2 || ' days')::interval
+         WHERE collection_id = $1 AND "createdAt" > now() - ($2 || ' days')::interval${owned(3)}
          GROUP BY use_case ORDER BY surfaced DESC`,
-        [collectionId, window],
+        [collectionId, window, ...own],
       ),
       this.dataSource.query(
         `SELECT count(*) AS n, count(*) FILTER (WHERE grade >= 2) AS useful,
                 count(DISTINCT retrieval_id) AS searches
          FROM cl_judgments
          WHERE collection_id = $1 AND final_rank IS NOT NULL
-           AND "createdAt" > now() - ($2 || ' days')::interval`,
-        [collectionId, window],
+           AND "createdAt" > now() - ($2 || ' days')::interval${owned(3)}`,
+        [collectionId, window, ...own],
       ),
       this.dataSource.query(
         `SELECT date_trunc('week', "createdAt") AS week,
                 count(*) AS n, count(*) FILTER (WHERE grade >= 2) AS useful
          FROM cl_judgments
          WHERE collection_id = $1 AND final_rank IS NOT NULL
-           AND "createdAt" > now() - interval '84 days'
+           AND "createdAt" > now() - interval '84 days'${owned(2)}
          GROUP BY 1 ORDER BY 1`,
-        [collectionId],
+        [collectionId, ...own],
       ),
       this.dataSource.query(
         `SELECT j.retrieval_id, json_agg(json_build_object('id', j.chunk_id, 'grade', j.grade, 'rank', j.final_rank)) AS rows
          FROM cl_judgments j
          WHERE j.collection_id = $1 AND j.split = 'holdout'
-           AND j."createdAt" > now() - ($2 || ' days')::interval
+           AND j."createdAt" > now() - ($2 || ' days')::interval${owned(3, 'j.chunk_id')}
          GROUP BY j.retrieval_id`,
-        [collectionId, window],
+        [collectionId, window, ...own],
       ),
     ]);
     const [j] = judged as Array<{
@@ -254,10 +271,12 @@ export class ContextLoopsService implements OnModuleInit {
       return ndcgAt(shown, grades, 8);
     });
     const [gaps, changes, neverUseful, settings] = await Promise.all([
-      this.gaps.list(collectionId),
-      this.actions.list(collectionId, 30),
-      this.learning.neverUsefulEntries(collectionId),
-      this.settings(collectionId),
+      scope
+        ? this.gaps.list(collectionId, scope.tenantId)
+        : this.gaps.list(collectionId),
+      scope ? Promise.resolve([]) : this.actions.list(collectionId, 30),
+      this.learning.neverUsefulEntries(collectionId, scope?.tenantId),
+      scope ? Promise.resolve(null) : this.settings(collectionId),
     ]);
     const n = Number(j?.n ?? 0);
     return {

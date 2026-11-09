@@ -79,6 +79,18 @@ rules:
       which never call a model. Now that they resolve through LlmCompletionService and
       the agent factory, the scan sees their ids and the glob is redundant noise.
 
+  - id: context-library-collections
+    watch:
+      - "src/context-library/profiles/*.profile.ts"
+      - "src/context-library/constants/context-use-cases.constants.ts"
+    requires: DATA_SCHEMA.md
+    why: >
+      A Context Library collection is a profile plus the migration that adds its row and
+      grants, and DATA_SCHEMA.md §3.22 is where every collection, its code, its readers and
+      where its chunks came from are listed. A new or changed collection (or a use case that
+      reads a different one) that skips it leaves "where does X live?" answering with a
+      collection that no longer matches the code.
+
   - id: agent-entrypoints-in-sync
     watch:
       - "AGENTS.md"

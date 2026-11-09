@@ -7640,76 +7640,28 @@ export const en = {
         working: "Rejecting…",
       },
     },
+    // Ally's library is the Context Library's Ally Guide Library, managed there
+    // (docs/context-library/PLAN.md §10.2: "Ally guide admin → Ally Guide Library").
     library: {
-      platformIntro:
-        "The platform library: documents every learner and visitor can have Ally draw on, such as guidance on supporting someone in distress. Removing one stops Ally using it at once; its rows stay so citations already given still resolve.",
-      orgIntro:
-        "This organisation's own documents for Ally, such as protocols and handbooks. Only this organisation's learners' Ally reads them. Removing one stops Ally using it at once.",
-      add: "Add a document…",
-      emptyTitle: "No documents yet",
-      emptyMessage: "Add a document and Ally will draw on it once it has been indexed.",
-      columns: {
-        title: "Title",
-        source: "Source",
-        status: "Status",
-        chunks: "Indexed",
-        added: "Added",
+      link: {
+        title: "Ally Guide Library",
+        description:
+          "What Ally can look up for learners: Ally's own entries for everyone, and each organisation's own protocols for its learners.",
+        count: (n: number) =>
+          n === 0 ? "No entries yet" : `${n} ${n === 1 ? "entry" : "entries"}`,
+        manage: "Manage in Context Library",
+        manageLabel: "Manage the Ally Guide Library in the Context Library",
       },
-      sources: {
-        paste: "Pasted text",
-        pdf: "PDF",
-        docx: "Word",
-        epub: "EPUB",
-        url: "Web page",
-      } as Record<string, string>,
-      statuses: {
-        pending: "Waiting to be read",
-        extracting: "Reading the file",
-        chunking: "Splitting into passages",
-        indexing: "Indexing",
-        indexed: "Ready",
-        failed: "Failed",
-      } as Record<string, string>,
-      statusHelp:
-        "A document is only used by Ally once it is Ready. This list refreshes by itself while any document is still being read.",
-      failedWhy: (message: string) => message,
-      chunks: (indexed: number, total: number) => `${indexed} of ${total} passages`,
-      archive: "Remove",
-      archiveLabel: (title: string) => `Remove ${title}`,
-      archiveDialog: {
-        title: (title: string) => `Remove ${title}?`,
-        body: "Ally stops using this document at once. Its rows stay so citations already given still resolve. You cannot add it back; add it again as a new document.",
-        cancel: "Keep it",
-        confirm: "Remove document",
-        working: "Removing…",
-        success: "Removed.",
-        failed: "Could not remove the document.",
-      },
-      loadFailed: "the library",
-      needsOrg: "Choose an organisation to see its library.",
-      addDialog: {
-        title: "Add a document",
-        titleLabel: "Title",
-        titlePlaceholder: "For example: Our safeguarding protocol",
-        sourceLabel: "Source",
-        sourceOptions: { paste: "Paste text", pdf: "PDF", docx: "Word", epub: "EPUB" },
-        textLabel: "Text",
-        textPlaceholder: "Paste the document here",
-        textHelp: (max: number) => `Up to ${max} characters.`,
-        fileLabel: "File",
-        fileHelp: "PDF, Word or EPUB, up to 25 MB.",
-        fileChosen: (name: string) => `Chosen: ${name}`,
-        languageLabel: "Language (optional)",
-        languageHelp: "A language tag such as en or hi. Detected when left empty.",
-        invalidFileType: "That is not the right kind of file for this source.",
-        fileTooLarge: "That file is too large.",
-        cancel: "Cancel",
-        confirm: "Add document",
-        working: "Adding…",
-        uploading: "Uploading the file…",
-        success: "Added. Ally can use it once it shows Ready.",
-        failed: "Could not add the document.",
-        uploadFailed: "The file did not upload. Nothing was added.",
+      orgLink: {
+        title: "This organisation's entries",
+        description:
+          "Protocols and policies only this organisation's learners' Ally reads, beside Ally's own entries.",
+        count: (n: number) =>
+          n === 0
+            ? "None yet. Add your organisation's protocols so your learners' guide can use them"
+            : `${n} ${n === 1 ? "entry" : "entries"}`,
+        manage: "Manage in Context Library",
+        manageLabel: "Manage this organisation's entries in the Context Library",
       },
     },
     evals: {
@@ -8098,6 +8050,7 @@ export const en = {
       draftFailed: "Could not draft the notes.",
       draftKeeps: "Your edits are kept: the draft only replaces the text after you confirm.",
       draftReplace: "Replace what is there with the draft?",
+      keepWhatIsThere: "Keep it",
       tensionHeading: "Pacing, by item",
       tensionHelp:
         "How much tension an item carries decides how gently Ally paces around it. Ally assumes a level from the item's type, raised by trigger warnings. Set one only where you know better.",
@@ -8123,9 +8076,9 @@ export const en = {
       configHeading: "Ally settings for this organisation",
       configDescription:
         "The numbers Ally runs on for this organisation's learners, where the platform allows an organisation to choose. Anything left alone uses the live release.",
-      libraryHeading: "Documents for Ally",
+      libraryHeading: "Entries for Ally",
       libraryDescription:
-        "Protocols, handbooks and policies Ally can draw on for this organisation's learners.",
+        "Protocols and policies Ally can draw on for this organisation's learners, kept in the Context Library's Ally Guide Library.",
     },
     delegation: {
       heading: "How much runs on its own",
@@ -9780,34 +9733,15 @@ export const en = {
       calibration: "Calibration",
       knowledge: "Knowledge",
     },
-    knowledge: {
-      title: "Guidance the Debrief agent can use",
-      help: "Practice guidelines, the debrief style guide, level guides and organisations' protocols. The agent looks up to two passages for each important moment. A document marked clinical is used only once the clinical advisor has signed off its current text; editing it afterwards needs a new sign-off. An empty knowledge base never stops a debrief.",
-      add: "Add a document",
-      empty: "No guidance yet. Debriefs are written without it until you add some.",
-      columns: {
-        title: "Document",
-        audience: "Who it's for",
-        status: "Indexing",
-        clinical: "Clinical sign-off",
-        actions: "",
-      },
-      everyone: "Every organisation",
-      organisations: (n: number) => (n === 1 ? "1 organisation" : `${n} organisations`),
-      nobody: "No one yet",
-      archived: "Archived",
-      notClinical: "Not clinical",
-      awaiting: "Waiting for sign-off — not used",
-      signedOff: (by: string | null, when: string) => `Signed off${by ? ` by ${by}` : ""}, ${when}`,
-      edit: "Edit",
-      markClinical: "Mark clinical",
-      markNotClinical: "Not clinical",
-      signOff: "Sign off",
-      signOffConfirm:
-        "Sign off this document's current text as sound clinical guidance? The Debrief agent will start using it.",
-      saved: "Saved",
-      signedOffToast: "Signed off. The Debrief agent now uses it.",
-      failed: "That didn't save. Try again.",
+    // The guidance moved into the Context Library's Debrief Guidance (PLAN.md §9.7).
+    guidance: {
+      title: "Debrief Guidance",
+      description:
+        "Practice guidelines, the debrief style guide, level guides and organisations' protocols the Debrief agent reads beside each important moment. An empty collection never stops a debrief.",
+      count: (n: number) =>
+        n === 0 ? "No guidelines yet" : `${n} ${n === 1 ? "guideline" : "guidelines"}`,
+      manage: "Manage in Context Library",
+      manageLabel: "Manage Debrief Guidance in the Context Library",
     },
     status: {
       queued: "Queued",
@@ -10274,6 +10208,29 @@ export const en = {
     views: { library: "Library", insights: "Insights", settings: "Settings" },
     viewsLabel: "Context Library views",
     switcher: { label: "Collection", all: "All collections" },
+    // §10.2: an organisation's admins see the collections that take organisation entries.
+    org: {
+      subtitle: "Your organisation's entries, and Ally's own for every learner.",
+      pickerLabel: "Organisation",
+      none: "You aren't an admin of any organisation yet, so there is nothing to show here.",
+      emptyOwn: "Add your organisation's protocols so your learners' guide can use them",
+      globalReadOnly:
+        "Ally's own entry, read by every learner's guide. You can read it, not change it.",
+    },
+    // §10.4/§10.6: who an entry reaches. Badges always pair an icon with a word.
+    audience: {
+      label: "Audience",
+      all: "All",
+      global: "Global",
+      mine: "My organisation",
+      yours: "Your organisation",
+      oneOrganisation: "One organisation",
+      organisations: (count: number) => `${count} organisations`,
+      nobody: "No one yet",
+      pick: "Choose an organisation",
+      filterHelp:
+        "Global entries reach every learner. An organisation's reach only its own learners.",
+    },
     /** For "All": no single collection noun applies. */
     allNoun: "item",
     allNounPlural: "items",
@@ -10677,6 +10634,9 @@ export const en = {
         noneJudgedTitle: "Nothing judged yet",
         noneJudged: (percent: number) =>
           `Each night the judge grades a sample of searches (${percent}% of them). The numbers appear here after the first night with searches.`,
+        // An organisation's admin: their own entries only, and no Settings to point at.
+        noneJudgedOwn:
+          "Each night the judge grades a sample of searches. Numbers for your organisation's entries appear here once a graded search has shown one.",
         judgePaused:
           "The judge is paused for this collection, so nothing is being graded. Switch it on in Settings.",
         weeklyLabel: "Share judged useful, week by week",

@@ -5,8 +5,10 @@ import {
 } from '@nestjs/common';
 import { ClCollectionId } from '../../enum/context-library.enum';
 import {
+  ALLY_GUIDE_CORPUS_MIGRATION,
   CHARACTER_CORPUS_MIGRATION,
   ContextKbImportService,
+  DEBRIEF_CORPUS_MIGRATION,
   KbStoredChunk,
   rebuildFromChunks,
   stripByline,
@@ -346,6 +348,91 @@ describe('ContextKbImportService', () => {
       ).rejects.toThrow(/Nothing was deleted/);
       expect(s3.deleteObject).not.toHaveBeenCalled();
       expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a corpus copied word for word (phase 6)', () => {
+    const copied = (
+      id: string,
+      passages: number,
+      copiedCount: number,
+      over: Record<string, unknown> = {},
+    ) => ({
+      id,
+      archived: false,
+      served: true,
+      passages: String(passages),
+      copied: String(copiedCount),
+      ...over,
+    });
+
+    it('is complete only when every passage of every served document has its copy', async () => {
+      const partial = build({
+        docs: [
+          copied('a', 3, 3),
+          copied('b', 2, 1),
+          copied('c', 4, 0, { served: false }),
+          copied('d', 1, 0, { archived: true }),
+        ],
+      });
+      expect(
+        await partial.service.status(ALLY_GUIDE_CORPUS_MIGRATION),
+      ).toMatchObject({
+        corpus: 'ally_guide_library',
+        documents: 4,
+        importable: 2,
+        complete: 1,
+        inProgress: 1,
+        notServed: 1,
+        archived: 1,
+        passages: 5,
+        passagesCopied: 4,
+        importComplete: false,
+      });
+
+      const done = build({ docs: [copied('a', 3, 3)] });
+      expect(
+        (await done.service.status(DEBRIEF_CORPUS_MIGRATION)).importComplete,
+      ).toBe(true);
+    });
+
+    it('has nothing to queue', async () => {
+      const { service, uploads } = build({ docs: [copied('a', 3, 0)] });
+      await expect(
+        service.import(actor, ALLY_GUIDE_CORPUS_MIGRATION),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(uploads.queuePrepared).not.toHaveBeenCalled();
+    });
+
+    it('retires only with its own phrase, dropping its own collection', async () => {
+      const { service, ai } = build({ docs: [copied('doc-1', 2, 2)] });
+      await expect(
+        service.retire(
+          'retire character_library',
+          actor,
+          ALLY_GUIDE_CORPUS_MIGRATION,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await service.retire(
+        'retire ally_guide_library',
+        actor,
+        ALLY_GUIDE_CORPUS_MIGRATION,
+      );
+      expect(ai.dropRetiredKnowledgeCollection).toHaveBeenCalledWith(
+        'GuideLibraryChunk',
+      );
+    });
+
+    it('refuses to retire Debrief guidance until every passage is copied', async () => {
+      const { service, ai } = build({ docs: [copied('doc-1', 2, 1)] });
+      await expect(
+        service.retire(
+          'retire debrief_knowledge',
+          actor,
+          DEBRIEF_CORPUS_MIGRATION,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(ai.dropRetiredKnowledgeCollection).not.toHaveBeenCalled();
     });
   });
 });

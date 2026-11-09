@@ -19,6 +19,7 @@ import {
   ClCollectionId,
   ClSourceKind,
   ClSourceStatus,
+  ClUseCase,
 } from '../enum/context-library.enum';
 import { segmentDocument } from '../util/segment.util';
 import { ClActor } from './context-chunk.service';
@@ -39,6 +40,15 @@ export interface KbCorpusMigration {
   retiredIndex: string;
   /** What the admin must type to retire it. */
   confirmation: string;
+  /**
+   * How it moved. `distil`: its stored passages are distilled by the worker, as an uploaded
+   * document would be (phase 4, the character corpus). `copy`: each stored passage was copied
+   * word for word, as an `imported` chunk keyed by `sync_key`, by a migration (phase 6, the
+   * Ally guide's library and Debrief's guidance) — so there is nothing to queue.
+   */
+  mode: 'distil' | 'copy';
+  /** The use case that searched the old corpus, whose searches the smoke check replays. */
+  useCase?: ClUseCase;
 }
 
 export const CHARACTER_CORPUS_MIGRATION: KbCorpusMigration = {
@@ -46,7 +56,31 @@ export const CHARACTER_CORPUS_MIGRATION: KbCorpusMigration = {
   collectionId: ClCollectionId.CHARACTER_INSIGHTS,
   retiredIndex: 'CharacterChunk',
   confirmation: 'retire character_library',
+  mode: 'distil',
 };
+
+/** The Ally guide's library, copied by `1981000800000` into the Ally Guide Library. */
+export const ALLY_GUIDE_CORPUS_MIGRATION: KbCorpusMigration = {
+  corpus: 'ally_guide_library',
+  collectionId: ClCollectionId.ALLY_GUIDE_LIBRARY,
+  retiredIndex: 'GuideLibraryChunk',
+  confirmation: 'retire ally_guide_library',
+  mode: 'copy',
+  useCase: ClUseCase.ALLY_GUIDE,
+};
+
+/** Debrief's guidance, copied by `1981000800000` into Debrief Guidance. */
+export const DEBRIEF_CORPUS_MIGRATION: KbCorpusMigration = {
+  corpus: 'debrief_knowledge',
+  collectionId: ClCollectionId.DEBRIEF_GUIDANCE,
+  retiredIndex: 'DebriefKnowledgeChunk',
+  confirmation: 'retire debrief_knowledge',
+  mode: 'copy',
+  useCase: ClUseCase.DEBRIEF,
+};
+
+/** `sync_key` prefix of a passage copied word for word (see `1981000800000`). */
+export const PASSAGE_SYNC_PREFIX = 'kb_document_chunks:';
 
 /** One stored passage of an old document, as the import reads it. */
 export interface KbStoredChunk {
@@ -76,6 +110,16 @@ export interface KbImportStatus {
   withFailedParts: number;
   /** True once every importable document is complete — the only state retirement accepts. */
   importComplete: boolean;
+  /** Copied corpora only: passages of importable documents, and how many have their copy. */
+  passages?: number;
+  passagesCopied?: number;
+  /**
+   * Copied corpora only: documents that were never served (not indexed: still ingesting, or
+   * failed) and so were not copied. Retiring the corpus deletes them with the rest.
+   */
+  notServed?: number;
+  /** Copied corpora only: imported chunks still waiting for enrichment. */
+  enrichmentPending?: number;
 }
 
 export interface KbImportResult extends KbImportStatus {
@@ -186,8 +230,8 @@ export class ContextKbImportService {
     private readonly tenantScope: TenantScopeService,
   ) {}
 
-  /** Both jobs act on platform-wide content: an organisation-restricted admin is refused. */
-  private async assertPlatformAdmin(actor: ClActor): Promise<void> {
+  /** Every job acts on platform-wide content: an organisation-restricted admin is refused. */
+  async assertPlatformAdmin(actor: ClActor): Promise<void> {
     if (actor.tenantId) {
       throw new ForbiddenException('Only a platform admin can do this.');
     }
@@ -234,6 +278,7 @@ export class ContextKbImportService {
   async status(
     migration: KbCorpusMigration = CHARACTER_CORPUS_MIGRATION,
   ): Promise<KbImportStatus> {
+    if (migration.mode === 'copy') return this.copyStatus(migration);
     const documents = await this.oldDocuments(migration);
     const importable = documents.filter((d) => d.importable);
     const hashes = importable.map((d) =>
@@ -286,11 +331,82 @@ export class ContextKbImportService {
     };
   }
 
+  /**
+   * How far a word-for-word copy got. A document counts as importable exactly when the copy
+   * migration covers it — not archived, indexed (what retrieval served), with passages — and as
+   * complete once every one of its passages has a chunk with its `sync_key`.
+   */
+  private async copyStatus(
+    migration: KbCorpusMigration,
+  ): Promise<KbImportStatus> {
+    const rows: Array<{
+      id: string;
+      archived: boolean;
+      served: boolean;
+      passages: string;
+      copied: string;
+    }> = await this.dataSource.query(
+      `SELECT d.id, (d.archived_at IS NOT NULL) AS archived,
+              (d.status = 'indexed') AS served,
+              (SELECT COUNT(*) FROM kb_document_chunks c
+                WHERE c.document_id = d.id AND c.chunk_version = d.chunk_version
+                  AND char_length(trim(COALESCE(c.text, ''))) > 0) AS passages,
+              (SELECT COUNT(*) FROM kb_document_chunks c
+                WHERE c.document_id = d.id AND c.chunk_version = d.chunk_version
+                  AND EXISTS (SELECT 1 FROM cl_chunks k WHERE k.sync_key = $2 || c.id)) AS copied
+         FROM kb_documents d
+        WHERE d.corpus = $1`,
+      [migration.corpus, PASSAGE_SYNC_PREFIX],
+    );
+    const [pending]: Array<{ n: string }> = await this.dataSource.query(
+      `SELECT COUNT(*) AS n FROM cl_chunks
+        WHERE collection_id = $1 AND origin = 'imported'
+          AND quality->>'enrichment' = 'pending'`,
+      [migration.collectionId],
+    );
+    const live = rows.filter((r) => !r.archived);
+    const importable = live.filter((r) => r.served && Number(r.passages) > 0);
+    let notStarted = 0;
+    let inProgress = 0;
+    let complete = 0;
+    for (const doc of importable) {
+      const copied = Number(doc.copied);
+      if (!copied) notStarted++;
+      else if (copied < Number(doc.passages)) inProgress++;
+      else complete++;
+    }
+    return {
+      corpus: migration.corpus,
+      collectionId: migration.collectionId,
+      documents: rows.length,
+      importable: importable.length,
+      archived: rows.length - live.length,
+      withoutPassages: live.filter((r) => !Number(r.passages)).length,
+      notStarted,
+      inProgress,
+      complete,
+      withFailedParts: 0,
+      importComplete: complete === importable.length,
+      passages: importable.reduce((n, r) => n + Number(r.passages), 0),
+      passagesCopied: importable.reduce(
+        (n, r) => n + Math.min(Number(r.copied), Number(r.passages)),
+        0,
+      ),
+      notServed: live.filter((r) => !r.served && Number(r.passages) > 0).length,
+      enrichmentPending: Number(pending?.n ?? 0),
+    };
+  }
+
   async import(
     actor: ClActor,
     migration: KbCorpusMigration = CHARACTER_CORPUS_MIGRATION,
   ): Promise<KbImportResult> {
     await this.assertPlatformAdmin(actor);
+    if (migration.mode === 'copy') {
+      throw new BadRequestException(
+        `${migration.corpus} was copied word for word by a migration; there is nothing to queue.`,
+      );
+    }
     const documents = (await this.oldDocuments(migration)).filter(
       (d) => d.importable,
     );

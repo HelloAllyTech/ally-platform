@@ -56,6 +56,25 @@ export interface ContextCollection {
   activeIndexVersion?: number | null;
   /** Chunk counts by status, e.g. `{ active: 120, archived: 4 }`. Missing statuses are zero. */
   counts: Partial<Record<ContextChunkStatus, number>>;
+  /**
+   * Organisation routes only: how many active entries are the organisation's own. Zero is the
+   * empty organisation library, which says what to add rather than looking like an empty page.
+   */
+  ownActive?: number;
+}
+
+/**
+ * Who an entry reaches, as the Library filters it: `global` (every learner), `mine` (an
+ * organisation admin's own organisation) or one organisation's id (platform admins).
+ */
+export type ContextAudienceFilter = "global" | "mine" | string;
+
+/**
+ * An organisation admin's requests go to the organisation routes, which the route itself scopes
+ * with `?tenantId=`. Absent for platform admins.
+ */
+export interface ContextOrgScope {
+  tenantId?: string;
 }
 
 export interface ContextCitation {
@@ -118,8 +137,9 @@ export interface ContextChunkPage {
   total: number;
 }
 
-export interface ContextChunkListQuery {
+export interface ContextChunkListQuery extends ContextOrgScope {
   collectionId?: string;
+  audience?: ContextAudienceFilter;
   status?: ContextChunkStatus;
   origin?: ContextChunkOrigin;
   confidence?: ContextChunkConfidence;
@@ -288,7 +308,7 @@ export interface ContextSearchResponse {
   noConfidentMatch: boolean;
 }
 
-export interface ContextSearchRequest {
+export interface ContextSearchRequest extends ContextOrgScope {
   query: string;
   collectionId?: string;
   explain?: boolean;
@@ -419,7 +439,8 @@ export interface ContextInsights {
   missing: ContextGapTopic[];
   changes: ContextLoopChange[];
   forOwners: ContextNeverUseful[];
-  settings: ContextLoopSettings;
+  /** Null on the organisation routes: loop settings span every organisation. */
+  settings: ContextLoopSettings | null;
 }
 
 export interface ContextChangesQuery {

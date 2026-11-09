@@ -13,6 +13,7 @@ import {
   ContextLoopChange,
   ContextLoopSettings,
   ContextLoopSettingsPatch,
+  ContextOrgScope,
   ContextQueueItem,
   ContextReaderKey,
   ContextReaderKeyCreated,
@@ -25,6 +26,17 @@ import {
 import { baseAPI } from "./baseApi";
 
 type SourceAction = "pause" | "cancel" | "front" | "retry";
+
+/**
+ * An organisation admin's requests go to the organisation routes (`/v1/context-library/org/…`),
+ * which the ROUTE scopes with `?tenantId=` — never a body field. Platform admins' requests are
+ * unchanged. Only what an organisation admin can do has an organisation route: collections,
+ * entries, bulk files, search and Insights.
+ */
+const PLATFORM_PREFIX = "/v1/context-library/";
+const routeFor = (url: string, tenantId?: string) =>
+  tenantId ? url.replace(PLATFORM_PREFIX, `${PLATFORM_PREFIX}org/`) : url;
+const orgParams = (tenantId?: string) => (tenantId ? { tenantId } : {});
 type ChunkAction = "archive" | "restore" | "pin" | "unpin";
 type LoopRunKind = "nightly" | "tuning";
 
@@ -39,16 +51,25 @@ type LoopRunKind = "nightly" | "tuning";
  */
 export const contextLibraryAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
-    getContextCollections: builder.query<ContextCollection[], void>({
-      query: () => ({ url: ApiEndpoints.CONTEXT_LIBRARY.COLLECTIONS, method: HttpMethod.GET }),
+    /** Every collection; on the organisation routes, only those it can write to. */
+    getContextCollections: builder.query<ContextCollection[], ContextOrgScope | void>({
+      query: scope => {
+        const tenantId = scope ? scope.tenantId : undefined;
+        return {
+          url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.COLLECTIONS, tenantId),
+          method: HttpMethod.GET,
+          params: orgParams(tenantId),
+        };
+      },
       providesTags: [TAG_TYPES.CONTEXT_LIBRARY_COLLECTIONS],
     }),
 
     /** The bulk-upload template, as CSV text. */
-    getContextTemplate: builder.query<string, string>({
-      query: collectionId => ({
-        url: ApiEndpoints.CONTEXT_LIBRARY.TEMPLATE(collectionId),
+    getContextTemplate: builder.query<string, { collectionId: string } & ContextOrgScope>({
+      query: ({ collectionId, tenantId }) => ({
+        url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.TEMPLATE(collectionId), tenantId),
         method: HttpMethod.GET,
+        params: orgParams(tenantId),
         responseHandler: "text",
       }),
     }),
@@ -92,7 +113,7 @@ export const contextLibraryAPI = baseAPI.injectEndpoints({
 
     getContextChunks: builder.query<ContextChunkPage, ContextChunkListQuery>({
       query: params => ({
-        url: ApiEndpoints.CONTEXT_LIBRARY.CHUNKS,
+        url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.CHUNKS, params.tenantId),
         method: HttpMethod.GET,
         params: Object.fromEntries(
           Object.entries(params).filter(([, value]) => value !== undefined && value !== ""),
@@ -101,12 +122,15 @@ export const contextLibraryAPI = baseAPI.injectEndpoints({
       providesTags: [TAG_TYPES.CONTEXT_LIBRARY_CHUNKS],
     }),
 
-    getContextChunk: builder.query<ContextChunkDetail, string>({
-      query: code => ({
-        url: ApiEndpoints.CONTEXT_LIBRARY.CHUNK_BY_CODE(code),
+    getContextChunk: builder.query<ContextChunkDetail, { code: string } & ContextOrgScope>({
+      query: ({ code, tenantId }) => ({
+        url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.CHUNK_BY_CODE(code), tenantId),
         method: HttpMethod.GET,
+        params: orgParams(tenantId),
       }),
-      providesTags: (result, error, code) => [{ type: TAG_TYPES.CONTEXT_LIBRARY_CHUNKS, id: code }],
+      providesTags: (result, error, { code }) => [
+        { type: TAG_TYPES.CONTEXT_LIBRARY_CHUNKS, id: code },
+      ],
     }),
 
     /**
@@ -114,35 +138,49 @@ export const contextLibraryAPI = baseAPI.injectEndpoints({
      * a query: cached per (query, collection, explain) and refetched when entries change.
      */
     searchContextLibrary: builder.query<ContextSearchResponse, ContextSearchRequest>({
-      query: body => ({ url: ApiEndpoints.CONTEXT_LIBRARY.SEARCH, method: HttpMethod.POST, body }),
+      query: ({ tenantId, ...body }) => ({
+        url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.SEARCH, tenantId),
+        method: HttpMethod.POST,
+        params: orgParams(tenantId),
+        body,
+      }),
       providesTags: [TAG_TYPES.CONTEXT_LIBRARY_CHUNKS],
     }),
 
     createContextChunk: builder.mutation<
       ContextChunk,
-      { collectionId: string; entry: ContextEntryInput }
+      { collectionId: string; entry: ContextEntryInput } & ContextOrgScope
     >({
-      query: ({ collectionId, entry }) => ({
-        url: ApiEndpoints.CONTEXT_LIBRARY.COLLECTION_CHUNKS(collectionId),
+      query: ({ collectionId, entry, tenantId }) => ({
+        url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.COLLECTION_CHUNKS(collectionId), tenantId),
         method: HttpMethod.POST,
+        params: orgParams(tenantId),
         body: entry,
       }),
       invalidatesTags: [TAG_TYPES.CONTEXT_LIBRARY_CHUNKS, TAG_TYPES.CONTEXT_LIBRARY_COLLECTIONS],
     }),
 
-    updateContextChunk: builder.mutation<ContextChunk, { code: string; entry: ContextEntryInput }>({
-      query: ({ code, entry }) => ({
-        url: ApiEndpoints.CONTEXT_LIBRARY.CHUNK_BY_CODE(code),
+    updateContextChunk: builder.mutation<
+      ContextChunk,
+      { code: string; entry: ContextEntryInput } & ContextOrgScope
+    >({
+      query: ({ code, entry, tenantId }) => ({
+        url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.CHUNK_BY_CODE(code), tenantId),
         method: HttpMethod.PATCH,
+        params: orgParams(tenantId),
         body: entry,
       }),
       invalidatesTags: [TAG_TYPES.CONTEXT_LIBRARY_CHUNKS],
     }),
 
-    contextChunkAction: builder.mutation<ContextChunk, { code: string; action: ChunkAction }>({
-      query: ({ code, action }) => ({
-        url: ApiEndpoints.CONTEXT_LIBRARY.CHUNK_ACTION(code, action),
+    contextChunkAction: builder.mutation<
+      ContextChunk,
+      { code: string; action: ChunkAction } & ContextOrgScope
+    >({
+      query: ({ code, action, tenantId }) => ({
+        url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.CHUNK_ACTION(code, action), tenantId),
         method: HttpMethod.POST,
+        params: orgParams(tenantId),
       }),
       invalidatesTags: [
         TAG_TYPES.CONTEXT_LIBRARY_CHUNKS,
@@ -154,14 +192,19 @@ export const contextLibraryAPI = baseAPI.injectEndpoints({
     /** Dry run unless `apply` is true; the same file is sent again to apply it. */
     bulkContextChunks: builder.mutation<
       ContextBulkResult,
-      { file: File; collectionId: string; apply: boolean }
+      { file: File; collectionId: string; apply: boolean } & ContextOrgScope
     >({
-      query: ({ file, collectionId, apply }) => {
+      query: ({ file, collectionId, apply, tenantId }) => {
         const body = new FormData();
         body.append("file", file, file.name);
         body.append("collectionId", collectionId);
         if (apply) body.append("apply", "true");
-        return { url: ApiEndpoints.CONTEXT_LIBRARY.BULK, method: HttpMethod.POST, body };
+        return {
+          url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.BULK, tenantId),
+          method: HttpMethod.POST,
+          params: orgParams(tenantId),
+          body,
+        };
       },
       invalidatesTags: (result, error, { apply }) =>
         apply ? [TAG_TYPES.CONTEXT_LIBRARY_CHUNKS, TAG_TYPES.CONTEXT_LIBRARY_COLLECTIONS] : [],
@@ -184,11 +227,14 @@ export const contextLibraryAPI = baseAPI.injectEndpoints({
     /* ── Insights and the learning loops ─────────────────────────────── */
 
     /** Is it helping, what's missing, the newest changes, and never-useful written entries. */
-    getContextInsights: builder.query<ContextInsights, { collectionId: string; days?: number }>({
-      query: ({ collectionId, days = 30 }) => ({
-        url: ApiEndpoints.CONTEXT_LIBRARY.INSIGHTS(collectionId),
+    getContextInsights: builder.query<
+      ContextInsights,
+      { collectionId: string; days?: number } & ContextOrgScope
+    >({
+      query: ({ collectionId, days = 30, tenantId }) => ({
+        url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.INSIGHTS(collectionId), tenantId),
         method: HttpMethod.GET,
-        params: { days },
+        params: { days, ...orgParams(tenantId) },
       }),
       providesTags: (result, error, { collectionId }) => [
         { type: TAG_TYPES.CONTEXT_LIBRARY_INSIGHTS, id: collectionId },

@@ -24,9 +24,6 @@ const h = vi.hoisted(() => ({
   escalate: vi.fn(),
   models: vi.fn(),
   setModels: vi.fn(),
-  knowledge: vi.fn(),
-  setClinical: vi.fn(),
-  signOff: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }));
@@ -65,21 +62,18 @@ vi.mock("@api", async importOriginal => ({
   useEscalateDebriefMutation: () => [h.escalate, { isLoading: false }],
   useGetDebriefModelsQuery: () => h.models(),
   useSetDebriefModelsMutation: () => [h.setModels, { isLoading: false }],
-  useGetDebriefKnowledgeQuery: () => h.knowledge(),
-  useSetDebriefKnowledgeClinicalMutation: () => [h.setClinical, { isLoading: false }],
-  useSignOffDebriefKnowledgeMutation: () => [h.signOff, { isLoading: false }],
-  useGetKbDocumentQuery: () => ({ data: undefined }),
 }));
-vi.mock("@components/knowledge-corpus", () => ({
-  CorpusDocumentPanel: ({ corpus }: { corpus?: string }) => (
-    <div data-testid="corpus-panel">{corpus}</div>
+// The guidance is the Context Library's Debrief Guidance; the link has its own suite.
+vi.mock("@components/context-collection-link", () => ({
+  ContextCollectionLink: ({ collection }: { collection: string }) => (
+    <div data-testid="collection-link" data-collection={collection} />
   ),
 }));
 
 // eslint-disable-next-line import/first
 import { ImproverTab } from "../ImproverTab";
 // eslint-disable-next-line import/first
-import { KnowledgeTab } from "../KnowledgeTab";
+import { GuidanceTab } from "../GuidanceTab";
 // eslint-disable-next-line import/first
 import { OrganisationsTab } from "../OrganisationsTab";
 // eslint-disable-next-line import/first
@@ -613,56 +607,12 @@ describe("Debrief Console tabs", () => {
     await waitFor(() => expect(h.act).toHaveBeenCalledWith({ id: RUN_ROW.id, action: "reviewed" }));
   });
 
-  describe("Knowledge", () => {
-    const DOC = {
-      id: "d1",
-      title: "Asking about suicide",
-      status: "indexed",
-      isGlobal: true,
-      tenantCount: 0,
-      chunkCount: 4,
-      archived: false,
-      updatedAt: "2026-11-02T00:00:00Z",
-      needsClinicalSignOff: true,
-      clinical: "awaiting",
-      signedOffBy: null,
-      signedOffAt: null,
-    };
-
-    it("adds a document to the debrief corpus", () => {
-      h.knowledge.mockReturnValue(ok({ documents: [], canSignOff: false }));
-      render(<KnowledgeTab />);
-      fireEvent.click(screen.getByRole("button", { name: "Add a document" }));
-      expect(screen.getByTestId("corpus-panel")).toHaveTextContent("debrief_knowledge");
-    });
-
-    it("shows a clinical document as not used until signed off, and only the advisor can sign", async () => {
-      h.knowledge.mockReturnValue(ok({ documents: [DOC], canSignOff: false }));
-      const { unmount } = render(<KnowledgeTab />);
-      expect(screen.getByText("Waiting for sign-off — not used")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Sign off" })).not.toBeInTheDocument();
-      unmount();
-
-      h.signOff.mockReturnValue(resolves());
-      h.knowledge.mockReturnValue(ok({ documents: [DOC], canSignOff: true }));
-      render(<KnowledgeTab />);
-      fireEvent.click(screen.getAllByRole("button", { name: "Sign off" })[0]);
-      fireEvent.click(screen.getAllByRole("button", { name: "Sign off" }).at(-1)!);
-      await waitFor(() => expect(h.signOff).toHaveBeenCalledWith("d1"));
-    });
-
-    it("the Ally team marks a document clinical or not", async () => {
-      h.setClinical.mockReturnValue(resolves());
-      h.knowledge.mockReturnValue(
-        ok({
-          documents: [{ ...DOC, needsClinicalSignOff: false, clinical: "not_clinical" }],
-          canSignOff: false,
-        }),
-      );
-      render(<KnowledgeTab />);
-      fireEvent.click(screen.getByRole("button", { name: "Mark clinical" }));
-      await waitFor(() =>
-        expect(h.setClinical).toHaveBeenCalledWith({ id: "d1", needsSignOff: true }),
+  describe("Guidance", () => {
+    it("points at Debrief Guidance in the Context Library, where clinical is information only", () => {
+      render(<GuidanceTab />);
+      expect(screen.getByTestId("collection-link")).toHaveAttribute(
+        "data-collection",
+        "debrief_guidance",
       );
     });
   });

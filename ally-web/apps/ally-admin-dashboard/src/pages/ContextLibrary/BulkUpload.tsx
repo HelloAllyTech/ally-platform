@@ -8,6 +8,7 @@ import { en } from "@constants";
 import { ContextBulkResult, ContextCollection } from "@types";
 
 import { bulkSummary, errorReason, takesEntries } from "./contextLibraryFormat";
+import { useContextLibraryScope } from "./contextLibraryScope";
 import { Sheet } from "../Builder/room/Sheet";
 
 const isBulkFile = (name: string) => /\.(csv|json)$/i.test(name);
@@ -32,13 +33,14 @@ export const BulkUpload: React.FC<{
   const [problem, setProblem] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { tenantId } = useContextLibraryScope();
   const [fetchTemplate, templateState] = useLazyGetContextTemplateQuery();
   const [sendBulk, bulkState] = useBulkContextChunksMutation();
 
   const download = async () => {
     if (!collection) return;
     try {
-      const csv = await fetchTemplate(collection.id).unwrap();
+      const csv = await fetchTemplate({ collectionId: collection.id, tenantId }).unwrap();
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
       link.href = url;
@@ -63,7 +65,12 @@ export const BulkUpload: React.FC<{
     setProblem(null);
     try {
       setResult(
-        await sendBulk({ file: chosen, collectionId: collection.id, apply: false }).unwrap(),
+        await sendBulk({
+          file: chosen,
+          collectionId: collection.id,
+          apply: false,
+          tenantId,
+        }).unwrap(),
       );
     } catch (error) {
       setProblem(errorReason(error) || strings.failed);
@@ -73,7 +80,12 @@ export const BulkUpload: React.FC<{
   const apply = async () => {
     if (!collection || !file) return;
     try {
-      const applied = await sendBulk({ file, collectionId: collection.id, apply: true }).unwrap();
+      const applied = await sendBulk({
+        file,
+        collectionId: collection.id,
+        apply: true,
+        tenantId,
+      }).unwrap();
       toast.success(bulkSummary(applied, collection).toast);
       onClose();
     } catch (error) {

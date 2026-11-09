@@ -103,6 +103,20 @@ const mocks = vi.hoisted(() => ({
   createKey: vi.fn(),
   revokeKey: vi.fn(),
   restoreKey: vi.fn(),
+  access: { mode: "platform", canEdit: true, orgIds: null } as {
+    mode: "platform" | "organisation" | null;
+    canEdit: boolean;
+    orgIds: string[] | null;
+  },
+  tenants: [] as Array<{ id: string; name: string }>,
+  collectionsArg: vi.fn(),
+  chunksArg: vi.fn(),
+}));
+
+// Who is looking: the store is not mounted here, so the access hook is set per test.
+vi.mock("../contextLibraryScope", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useContextLibraryAccess: () => mocks.access,
 }));
 
 vi.mock("@api", () => {
@@ -119,12 +133,18 @@ vi.mock("@api", () => {
     { isLoading: false },
   ];
   return {
-    useGetContextCollectionsQuery: () => query(mocks.collections),
+    useGetContextCollectionsQuery: (arg: unknown) => {
+      mocks.collectionsArg(arg);
+      return query(mocks.collections);
+    },
     useGetPermissionsQuery: () => query(mocks.permissions),
-    useGetContextChunksQuery: () =>
-      query({ items: mocks.chunks, total: (mocks.chunks as unknown[]).length }),
+    useGetTenantsQuery: () => query({ data: mocks.tenants }),
+    useGetContextChunksQuery: (arg: unknown) => {
+      mocks.chunksArg(arg);
+      return query({ items: mocks.chunks, total: (mocks.chunks as unknown[]).length });
+    },
     useSearchContextLibraryQuery: (args: unknown) => query(mocks.search(args)),
-    useGetContextChunkQuery: (code: string) => {
+    useGetContextChunkQuery: ({ code }: { code: string }) => {
       // Stable per code, as RTK Query's cache is.
       const found = (mocks.chunks as ContextChunk[]).find(c => c.code === code);
       if (found && !mocks.details.has(found)) mocks.details.set(found, { ...found, sources: [] });
@@ -179,6 +199,8 @@ const renderAt = (search = "") =>
 
 describe("ContextLibrary page", () => {
   beforeEach(() => {
+    mocks.access = { mode: "platform", canEdit: true, orgIds: null };
+    mocks.tenants = [];
     mocks.collections = [firstPrinciples];
     mocks.permissions = ["edit:admin:context-library", "view:admin:context-library"];
     mocks.chunks = [
@@ -709,5 +731,143 @@ describe("Connect Claude Code", () => {
     });
     expect(mocks.restoreKey).toHaveBeenCalledWith("k-1");
     expect(screen.getByTestId("cl-key-row")).toHaveTextContent("Work laptop");
+  });
+});
+
+describe("ContextLibrary for an organisation's admin (§10.2)", () => {
+  const ORG = "11111111-1111-4111-8111-111111111111";
+  const OTHER = "22222222-2222-4222-8222-222222222222";
+  const allyGuide: ContextCollection = {
+    ...firstPrinciples,
+    id: "ally_guide_library",
+    name: "Ally Guide Library",
+    noun: "entry",
+    nounPlural: "entries",
+    codePrefix: "AG",
+    allowedOrigins: ["authored", "imported", "distilled"],
+    allowsOrgChunks: true,
+    takesDocuments: false,
+    facets: {},
+    counts: { active: 3 },
+    ownActive: 1,
+  };
+  const entry = (code: string, statement: string, over: Partial<ContextChunk> = {}) =>
+    chunk(code, statement, { collectionId: "ally_guide_library", facets: {}, ...over });
+
+  beforeEach(() => {
+    mocks.access = { mode: "organisation", canEdit: true, orgIds: [ORG] };
+    mocks.tenants = [
+      { id: ORG, name: "Acme Helpline" },
+      { id: OTHER, name: "Other Org" },
+    ];
+    mocks.permissions = [];
+    mocks.collections = [allyGuide];
+    mocks.chunks = [
+      entry("AG-0001", "Rest is part of the work.", { origin: "imported" }),
+      entry("AG-0002", "Our out-of-hours escalation.", {
+        origin: "authored",
+        isGlobal: false,
+        tenantIds: [ORG],
+        ownerTenantId: ORG,
+      }),
+    ];
+    mocks.collectionsArg.mockReset();
+    mocks.chunksArg.mockReset();
+  });
+
+  it("shows one organisation's view: no Settings, no Connect, no All, every request scoped", () => {
+    renderAt();
+    expect(screen.queryByRole("tab", { name: /Settings/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cl-connect-button")).not.toBeInTheDocument();
+    const switcher = screen.getByTestId("cl-collection-switcher");
+    expect(switcher).toHaveValue("ally_guide_library");
+    expect(within(switcher).queryByText("All collections")).not.toBeInTheDocument();
+    expect(mocks.collectionsArg).toHaveBeenCalledWith({ tenantId: ORG });
+    expect(mocks.chunksArg).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: ORG, collectionId: "ally_guide_library" }),
+    );
+  });
+
+  it("badges each entry with who it reaches, an icon and a word", () => {
+    renderAt();
+    const rows = screen.getAllByTestId("cl-chunk-row");
+    expect(within(rows[0]).getByTestId("cl-audience")).toHaveTextContent("Global");
+    expect(within(rows[1]).getByTestId("cl-audience")).toHaveTextContent("Your organisation");
+    expect(within(rows[0]).getByTestId("cl-audience").querySelector("svg")).not.toBeNull();
+  });
+
+  it("filters Global · My organisation", () => {
+    renderAt();
+    const filter = screen.getByTestId("cl-audience-filter");
+    fireEvent.click(within(filter).getByRole("button", { name: "My organisation" }));
+    expect(mocks.chunksArg).toHaveBeenLastCalledWith(
+      expect.objectContaining({ audience: "mine", tenantId: ORG }),
+    );
+  });
+
+  it("asks for the organisation's protocols when it has written none", () => {
+    mocks.collections = [{ ...allyGuide, ownActive: 0 }];
+    renderAt();
+    expect(screen.getByTestId("cl-org-empty")).toHaveTextContent(
+      "Add your organisation's protocols so your learners' guide can use them",
+    );
+  });
+
+  it("scopes Insights to its own entries: no loop changes, no gap dismissal", () => {
+    mocks.insights = {
+      collectionId: "ally_guide_library",
+      days: 30,
+      helping: {
+        precision: null,
+        judgedResults: 0,
+        judgedSearches: 0,
+        holdoutNdcg: null,
+        holdoutSearches: 0,
+        weekly: [],
+        byUseCase: [],
+      },
+      missing: [
+        {
+          id: "g1",
+          label: "Night-shift escalation",
+          kind: "organisation",
+          queryCount: 4,
+          exampleQueries: [],
+          action: "add_entries",
+        },
+      ],
+      changes: [],
+      forOwners: [],
+      settings: null,
+    };
+    renderAt("?view=insights&collection=ally_guide_library");
+    expect(screen.getByTestId("cl-helping-empty")).toHaveTextContent(
+      "Numbers for your organisation's entries appear here",
+    );
+    expect(screen.queryByTestId("cl-changes")).not.toBeInTheDocument();
+    expect(screen.getByTestId("cl-missing")).toHaveTextContent("Night-shift escalation");
+    expect(screen.queryByRole("button", { name: /Dismiss/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps Ally's global entries read-only in the sheet", () => {
+    renderAt("?collection=ally_guide_library&chunk=AG-0001");
+    expect(screen.getByTestId("cl-global-read-only")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+  });
+
+  it("opens Settings as the Library, never as Settings", () => {
+    renderAt("?view=settings");
+    expect(screen.getByRole("tab", { name: /Library/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("lets a platform admin narrow to one named organisation", () => {
+    mocks.access = { mode: "platform", canEdit: true, orgIds: null };
+    mocks.permissions = ["view:admin:context-library"];
+    renderAt("?collection=ally_guide_library");
+    fireEvent.change(screen.getByTestId("cl-audience-org"), { target: { value: OTHER } });
+    expect(mocks.chunksArg).toHaveBeenLastCalledWith(
+      expect.objectContaining({ audience: OTHER, tenantId: undefined }),
+    );
+    expect(mocks.collectionsArg).toHaveBeenCalledWith(undefined);
   });
 });

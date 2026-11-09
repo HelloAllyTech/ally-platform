@@ -237,3 +237,140 @@ describe('agent-written collections (phase 5)', () => {
     );
   });
 });
+
+describe('Ally Guide Library and Debrief Guidance (phase 6)', () => {
+  const {
+    ALLY_GUIDE_LIBRARY_PROFILE,
+  } = require('../ally-guide-library.profile');
+  const { DEBRIEF_GUIDANCE_PROFILE } = require('../debrief-guidance.profile');
+
+  it('registers both with their codes, nouns and origins', () => {
+    expect(requireProfile(ClCollectionId.ALLY_GUIDE_LIBRARY)).toBe(
+      ALLY_GUIDE_LIBRARY_PROFILE,
+    );
+    expect(ALLY_GUIDE_LIBRARY_PROFILE.codePrefix).toBe('AG');
+    expect(ALLY_GUIDE_LIBRARY_PROFILE.noun).toBe('entry');
+    expect(requireProfile(ClCollectionId.DEBRIEF_GUIDANCE)).toBe(
+      DEBRIEF_GUIDANCE_PROFILE,
+    );
+    expect(DEBRIEF_GUIDANCE_PROFILE.codePrefix).toBe('DG');
+    expect(DEBRIEF_GUIDANCE_PROFILE.noun).toBe('guideline');
+    for (const profile of [
+      ALLY_GUIDE_LIBRARY_PROFILE,
+      DEBRIEF_GUIDANCE_PROFILE,
+    ]) {
+      expect([...profile.allowedOrigins].sort()).toEqual([
+        'authored',
+        'distilled',
+        'imported',
+      ]);
+      expect(profile.extraction.promptCode).toMatch(
+        /^context_library_extract_/,
+      );
+      expect(profile.purpose.length).toBeGreaterThan(80);
+      // Information only: a flag the Library shows, never a gate.
+      expect(profile.attributes.clinical).toMatchObject({
+        type: 'bool',
+        shown: true,
+      });
+      expect(profile.attributes.clinical.required).toBeFalsy();
+    }
+  });
+
+  it('lets organisations write to the guide library only', () => {
+    expect(ALLY_GUIDE_LIBRARY_PROFILE.allowsOrgChunks).toBe(true);
+    expect(DEBRIEF_GUIDANCE_PROFILE.allowsOrgChunks).toBe(false);
+    expect(
+      Object.values(COLLECTION_PROFILES)
+        .filter((p) => p?.allowsOrgChunks)
+        .map((p) => p!.id),
+    ).toEqual([ClCollectionId.ALLY_GUIDE_LIBRARY]);
+  });
+
+  it('is never granted to engineers, and reaches the guide and Debrief only', () => {
+    for (const profile of [
+      ALLY_GUIDE_LIBRARY_PROFILE,
+      DEBRIEF_GUIDANCE_PROFILE,
+    ]) {
+      expect(profile.neverGrantTo).toContain(ClUseCase.MCP_DEV);
+    }
+    expect(CONTEXT_USE_CASES[ClUseCase.DEBRIEF].defaultCollections).toEqual([
+      ClCollectionId.DEBRIEF_GUIDANCE,
+    ]);
+    for (const useCase of [ClUseCase.ALLY_GUIDE, ClUseCase.DEBRIEF]) {
+      expect(CONTEXT_USE_CASES[useCase].querySensitive).toBe(true);
+    }
+  });
+
+  it('puts the passage and its citation on the card, word for word', () => {
+    const body =
+      'Call the duty supervisor first. Then write down what was said, in their words.';
+    const card = ALLY_GUIDE_LIBRARY_PROFILE.card(
+      {
+        code: 'AG-0012',
+        statement: 'Who to call when a learner is at risk',
+        body,
+        situations: [],
+        exampleQueries: [],
+        keywords: [],
+        topics: [],
+        facets: { kind: 'protocol' },
+        attributes: {},
+        citation: {
+          title: 'Escalation protocol',
+          sectionPath: 'Out of hours',
+          pageFrom: 4,
+          pageTo: 5,
+        },
+      },
+      'good',
+    );
+    expect(card).toContain('[AG-0012 · protocol · good]');
+    expect(card).toContain('From: Escalation protocol, Out of hours, pp. 4–5');
+    expect(card).toContain(body);
+
+    const guideline = DEBRIEF_GUIDANCE_PROFILE.card({
+      code: 'DG-0003',
+      statement: 'Ask about safety directly',
+      body: null,
+      situations: [],
+      exampleQueries: [],
+      keywords: [],
+      topics: [],
+      facets: { kind: 'practice_guideline' },
+      attributes: { clinical: true, detail: 'Ask plainly and calmly.' },
+      citation: { title: 'Risk guide', pageFrom: 2 },
+    });
+    expect(guideline).toContain('[DG-0003 · practice_guideline · clinical]');
+    expect(guideline).toContain('From: Risk guide, p. 2');
+    expect(guideline).toContain('Ask plainly and calmly.');
+  });
+
+  it('indexes the opening of a body, so an imported passage is found before it is enriched', () => {
+    const view = {
+      code: 'DG-0004',
+      statement: 'Risk guide — Asking about suicide',
+      body: 'Asking directly about suicide does not plant the idea.',
+      situations: [],
+      exampleQueries: [],
+      keywords: [],
+      topics: [],
+      facets: {},
+      attributes: {},
+    };
+    expect(DEBRIEF_GUIDANCE_PROFILE.situationsText(view)).toContain(
+      'does not plant the idea',
+    );
+    expect(DEBRIEF_GUIDANCE_PROFILE.statementText(view)).toContain(
+      'Asking directly',
+    );
+  });
+
+  it('keeps the Debrief levels in step with the learner levels a debrief is pitched at', () => {
+    expect([...DEBRIEF_GUIDANCE_PROFILE.facets.level.values]).toEqual([
+      'lay',
+      'early_professional',
+      'experienced_professional',
+    ]);
+  });
+});

@@ -153,7 +153,7 @@ export const ALLOWED_TABLES: Readonly<Record<string, string>> = Object.freeze({
   // Segment every one of them by `consumer` — the admin preview is an operator
   // probing thresholds, not traffic.
   analytics_agent_kb_retrievals:
-    'One row per corpus retrieval: the query as issued, the similarity floor used, per-pass hit counts and what was returned. SEGMENT BY `consumer` (whatsapp_bot, ally_guide, debrief vs admin_preview) before reading any trend — the preview is an operator probing thresholds.',
+    'One row per corpus retrieval: the query as issued, the similarity floor used, per-pass hit counts and what was returned. SEGMENT BY `consumer` (whatsapp_bot vs admin_preview; ally_guide and debrief rows predate their move to the Context Library) before reading any trend — the preview is an operator probing thresholds.',
   kb_retrieval_passages:
     'Every candidate passage a retrieval considered, INCLUDING the ones shaping discarded (`outcome`), with its `similarity` and which pass it came from. Join to kb_retrieval_passage_judgments on passage_id for the similarity/relevance distribution.',
   kb_retrieval_judgments:

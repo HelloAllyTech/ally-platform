@@ -4,9 +4,9 @@ import { Library } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useGetContextCollectionsQuery } from "@api";
-import { FeatureToggleKey, Permissions, ROUTES } from "@constants";
+import { ROUTES } from "@constants";
 import { useUser } from "@hooks";
-import { hasFeature, hasPermissions } from "@utils";
+import { deriveContextLibraryAccess } from "@pages/ContextLibrary/contextLibraryScope";
 
 /** What one product calls its collection, in its own words. */
 export interface ContextCollectionLinkCopy {
@@ -21,6 +21,12 @@ interface ContextCollectionLinkProps {
   /** The Context Library collection id, e.g. `builder_lessons`. */
   collection: string;
   copy: ContextCollectionLinkCopy;
+  /**
+   * One organisation the link is about (an organisation's Ally tab). A platform admin lands on the
+   * collection filtered to entries reaching it; that organisation's own admin lands on its own
+   * view, with its own entries counted.
+   */
+  tenantId?: string;
 }
 
 /**
@@ -30,30 +36,42 @@ interface ContextCollectionLinkProps {
  * one place to add, edit, pin or archive entries rather than two. The same shape as the Character
  * Library's `CharacterInsightsCard`.
  *
- * Shown only to people the Context Library itself admits (its feature toggle and view permission,
- * the pair the collections endpoint enforces): a link to a page that turns them away would be a
+ * Shown only to people the Context Library itself admits (§10.2: a platform admin, or — for one
+ * organisation — that organisation's admin): a link to a page that turns them away would be a
  * dead end. The count is a convenience from the collections list the Context Library already
  * loads, so while it is loading, or if it fails, the card is simply the link.
  */
 export const ContextCollectionLink: React.FC<ContextCollectionLinkProps> = ({
   collection: collectionId,
   copy,
+  tenantId,
 }) => {
-  const { permissions, features } = useUser();
-  const canOpen =
-    hasFeature(features, FeatureToggleKey.CONTEXT_LIBRARY) &&
-    hasPermissions(permissions, [Permissions.VIEW_CONTEXT_LIBRARY]);
+  const { permissions, features, user } = useUser();
+  const access = deriveContextLibraryAccess(
+    permissions,
+    features,
+    user?.restrictedTenantIds ?? null,
+  );
+  const asOrg = access.mode === "organisation" && Boolean(tenantId);
+  const canOpen = access.mode === "platform" || asOrg;
 
-  const { data: collections } = useGetContextCollectionsQuery(undefined, { skip: !canOpen });
+  const { data: collections } = useGetContextCollectionsQuery(asOrg ? { tenantId } : undefined, {
+    skip: !canOpen,
+  });
 
   if (!canOpen) return null;
 
   // Built here rather than at module load: tests mock `@constants` wholesale.
-  const href = `${ROUTES.CONTEXT_LIBRARY}?collection=${collectionId}`;
+  const params = new URLSearchParams({ collection: collectionId });
+  if (tenantId) params.set(asOrg ? "org" : "audience", tenantId);
+  const href = `${ROUTES.CONTEXT_LIBRARY}?${params.toString()}`;
 
-  // A status missing from `counts` is zero, so a listed collection always has a count.
+  // A status missing from `counts` is zero, so a listed collection always has a count. An
+  // organisation's admin counts their own entries.
   const collection = collections?.find(c => c.id === collectionId);
-  const count = collection ? copy.count(collection.counts?.active ?? 0) : null;
+  const count = collection
+    ? copy.count(asOrg ? (collection.ownActive ?? 0) : (collection.counts?.active ?? 0))
+    : null;
 
   return (
     <section

@@ -37,6 +37,7 @@ import {
 } from "@types";
 
 import { capitalise, errorReason, humanise } from "./contextLibraryFormat";
+import { useContextLibraryScope } from "./contextLibraryScope";
 import { InlineError, LoadingRows, OriginBadge, StatusWord } from "./ContextLibraryUi";
 import {
   CHANGES_PAGE,
@@ -134,9 +135,13 @@ const CollectionInsights: React.FC<InsightsViewProps & { collection: ContextColl
   onNewEntry,
   onOpenChunk,
 }) => {
+  // An organisation's admin sees Insights for their own entries and their own learners' gaps;
+  // the loops' changes and settings span every organisation, so they are not on that route.
+  const { tenantId } = useContextLibraryScope();
   const { data, isLoading, isError, error, refetch } = useGetContextInsightsQuery({
     collectionId: collection.id,
     days: 30,
+    tenantId,
   });
 
   if (isLoading) return <LoadingRows />;
@@ -160,16 +165,19 @@ const CollectionInsights: React.FC<InsightsViewProps & { collection: ContextColl
         gaps={data.missing ?? []}
         collection={collection}
         canEdit={canEdit}
+        canDismiss={canEdit && !tenantId}
         onUpload={onUpload}
         onNewEntry={onNewEntry}
       />
-      <ChangesSection
-        key={collection.id}
-        first={data.changes ?? []}
-        collection={collection}
-        canEdit={canEdit}
-        onOpenChunk={onOpenChunk}
-      />
+      {!tenantId && (
+        <ChangesSection
+          key={collection.id}
+          first={data.changes ?? []}
+          collection={collection}
+          canEdit={canEdit}
+          onOpenChunk={onOpenChunk}
+        />
+      )}
       <OwnersSection
         entries={data.forOwners ?? []}
         collection={collection}
@@ -186,9 +194,12 @@ const HelpingSection: React.FC<{ insights: ContextInsights; collection: ContextC
   collection,
 }) => {
   const strings = en.contextLibrary.insights.helping;
-  const { helping, settings } = insights;
+  const { helping } = insights;
+  const settings = insights.settings ?? undefined;
   const days = insights.days ?? 30;
-  const { data: useCases } = useGetContextUseCasesQuery();
+  // Use-case names come from Settings, which only the platform reads; ids are humanised instead.
+  const { tenantId } = useContextLibraryScope();
+  const { data: useCases } = useGetContextUseCasesQuery(undefined, { skip: Boolean(tenantId) });
   const labelOfUseCase = (id: string) =>
     useCases?.find(u => u.useCase === id)?.label ?? humanise(id);
   const nothingJudged = !helping.judgedResults;
@@ -204,9 +215,11 @@ const HelpingSection: React.FC<{ insights: ContextInsights; collection: ContextC
         >
           <p className="text-sm font-medium text-typography-900">{strings.noneJudgedTitle}</p>
           <p className="text-sm text-typography-600">
-            {judgeIdle(settings)
-              ? strings.judgePaused
-              : strings.noneJudged(sampleRatePercent(settings?.judgeSampleRate))}
+            {!settings
+              ? strings.noneJudgedOwn
+              : judgeIdle(settings)
+                ? strings.judgePaused
+                : strings.noneJudged(sampleRatePercent(settings.judgeSampleRate))}
           </p>
         </div>
       ) : (
@@ -305,9 +318,11 @@ const MissingSection: React.FC<{
   gaps: ContextGapTopic[];
   collection: ContextCollection;
   canEdit: boolean;
+  /** Dismissing a gap hides it for everyone, so it is the platform's call. */
+  canDismiss: boolean;
   onUpload: () => void;
   onNewEntry: () => void;
-}> = ({ gaps, collection, canEdit, onUpload, onNewEntry }) => {
+}> = ({ gaps, collection, canEdit, canDismiss, onUpload, onNewEntry }) => {
   const strings = en.contextLibrary.insights.missing;
   const [dismissGap] = useDismissContextGapMutation();
   // Hidden here ahead of the server; put back if it refuses.
@@ -378,14 +393,16 @@ const MissingSection: React.FC<{
                         {capitalise(strings.addEntries(collection.nounPlural))}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className={quietButton}
-                      aria-label={strings.dismissLabel(gap.label)}
-                      onClick={() => void dismiss(gap)}
-                    >
-                      <X size={14} aria-hidden /> {strings.dismiss}
-                    </button>
+                    {canDismiss && (
+                      <button
+                        type="button"
+                        className={quietButton}
+                        aria-label={strings.dismissLabel(gap.label)}
+                        onClick={() => void dismiss(gap)}
+                      >
+                        <X size={14} aria-hidden /> {strings.dismiss}
+                      </button>
+                    )}
                   </div>
                 )}
               </li>

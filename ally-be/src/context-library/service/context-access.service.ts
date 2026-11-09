@@ -129,6 +129,10 @@ export class ContextAccessService {
   /**
    * Organisation-scoped use cases must say who is asking. There is no safe default:
    * "everything" leaks other organisations' protocols, "global only" hides the asker's own.
+   *
+   * A platform use case has no audience filter — unless its caller names one, which can only
+   * narrow what comes back. That is how the Library's search box searches as an organisation's
+   * admin sees it: global entries plus that organisation's own, never another's.
    */
   assertAudience(
     useCase: ClUseCase,
@@ -143,7 +147,7 @@ export class ContextAccessService {
       }
       return audience;
     }
-    return null;
+    return audience && audience.tenantId !== undefined ? audience : null;
   }
 
   // ── Settings ──────────────────────────────────────────────────────────────

@@ -601,7 +601,17 @@ export class ContextChunkService {
     confidence?: ClChunkConfidence;
     sourceId?: string;
     q?: string;
+    /**
+     * An organisation admin's scope: that organisation's own entries plus the global ones.
+     * `null` is the platform's own entries only.
+     */
     ownerTenantId?: string | null;
+    /** Only entries every learner may read. */
+    globalOnly?: boolean;
+    /** Only entries that reach this organisation by name (its own, or targeted at it). */
+    audienceTenantId?: string;
+    /** Only this organisation's own entries. */
+    ownedBy?: string;
     offset?: number;
     limit?: number;
   }) {
@@ -622,6 +632,15 @@ export class ContextChunkService {
         qb.andWhere('(c.owner_tenant_id = :owner OR c.is_global = true)', {
           owner: params.ownerTenantId,
         });
+    }
+    if (params.globalOnly) qb.andWhere('c.is_global = true');
+    if (params.audienceTenantId) {
+      qb.andWhere('c.is_global = false AND :aud = ANY(c.tenant_ids)', {
+        aud: params.audienceTenantId,
+      });
+    }
+    if (params.ownedBy) {
+      qb.andWhere('c.owner_tenant_id = :ownedBy', { ownedBy: params.ownedBy });
     }
     if (params.sourceId) {
       qb.andWhere(

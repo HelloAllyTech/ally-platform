@@ -36,9 +36,8 @@ import {
  * audience argument, and this platform refuses to answer a WhatsApp contact whose
  * organisation it could not resolve rather than falling back to something plausible.
  *
- * The Ally guide's library adds OWNERSHIP beside audience — `ownerTenantId`, see there —
- * because its organisation documents are an organisation's own, managed by that
- * organisation, rather than central material shared out.
+ * The Ally guide's library added OWNERSHIP beside audience — `ownerTenantId`, see there —
+ * until it moved to the Context Library (phase 6), where organisation-owned entries live now.
  */
 @Entity('kb_documents')
 @Index('idx_kb_documents_corpus_owner', ['corpus', 'ownerTenantId'])
@@ -128,19 +127,15 @@ export class KbDocument extends BaseWithoutTenantEntity {
   isGlobal!: boolean;
 
   /**
-   * The organisation this document BELONGS to, for corpora whose documents have an owner
-   * (KB_OWNED_CORPORA — the Ally guide's library). Null means the platform's own.
+   * The organisation a document of the Ally guide's library BELONGED to (null: the platform's
+   * own). Ownership, not audience: who could MANAGE it, where `isGlobal` + `kb_document_tenants`
+   * say who could RETRIEVE it.
    *
-   * Ownership, not audience, and the two are kept apart on purpose. Audience is who may
-   * RETRIEVE a document (`isGlobal` + `kb_document_tenants`) and is what every search filters
-   * on; ownership is who may MANAGE it, and is what the organisation-scoped admin routes
-   * filter on — an organisation lists, adds and removes its own documents and can never reach
-   * another's or the platform's. For an owned corpus the audience is derived from this column
-   * at creation (null → global; an organisation → that organisation only) and cannot be
-   * retargeted afterwards, so the two never disagree.
-   *
-   * Always null on the other corpora, whose documents are curated centrally and targeted by
-   * hand. A uuid, like `kb_document_tenants.tenant_id`, so the two compare without a cast.
+   * Written by nothing since phase 6, when the library moved to the Context Library and its
+   * passages were copied there with this owner as `cl_chunks.owner_tenant_id`. Kept until a
+   * platform admin retires the old corpus, whose rows still carry it; always null on WhatsApp
+   * Q&A documents. A uuid, like `kb_document_tenants.tenant_id`, so the two compare without a
+   * cast.
    */
   @Column({ type: 'uuid', name: 'owner_tenant_id', nullable: true })
   ownerTenantId?: string | null;
@@ -154,28 +149,6 @@ export class KbDocument extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'uuid', name: 'owner_chatbot_id', nullable: true })
   ownerChatbotId?: string | null;
-
-  /**
-   * Clinical content (plan §8.5): served to the Debrief agent only once the
-   * clinical advisor has signed off this exact content. Set by the Ally team.
-   */
-  @Column({ type: 'boolean', name: 'needs_clinical_sign_off', default: false })
-  needsClinicalSignOff!: boolean;
-
-  @Column({ type: 'int', name: 'clinical_signed_off_by', nullable: true })
-  clinicalSignedOffBy?: number | null;
-
-  @Column({ type: 'timestamp', name: 'clinical_signed_off_at', nullable: true })
-  clinicalSignedOffAt?: Date | null;
-
-  /** The content hash that was signed off; an edit after it needs a new sign-off. */
-  @Column({
-    type: 'varchar',
-    length: 64,
-    name: 'clinical_signed_off_hash',
-    nullable: true,
-  })
-  clinicalSignedOffHash?: string | null;
 
   @Index('idx_kb_documents_status')
   @Column({

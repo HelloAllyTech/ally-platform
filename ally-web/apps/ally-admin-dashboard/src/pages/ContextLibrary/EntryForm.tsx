@@ -21,6 +21,7 @@ import {
   humanise,
   textHints,
 } from "./contextLibraryFormat";
+import { useContextLibraryScope } from "./contextLibraryScope";
 import { Chip } from "./ContextLibraryUi";
 
 /** ally-be CL_BODY_MAX_CHARS. */
@@ -55,6 +56,8 @@ const HelpTip: React.FC<{ label: string }> = ({ label }) => (
  */
 export const EntryForm: React.FC<EntryFormProps> = ({ collection, initial, onSaved, onCancel }) => {
   const strings = en.contextLibrary.entry;
+  // An organisation's admin writes through the organisation routes: the entry is theirs.
+  const { tenantId } = useContextLibraryScope();
   const [statement, setStatement] = useState(initial?.statement ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [facets, setFacets] = useState<FacetValues>(() =>
@@ -162,8 +165,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({ collection, initial, onSav
     try {
       const entry = buildEntry();
       const saved = initial
-        ? await update({ code: initial.code, entry }).unwrap()
-        : await create({ collectionId: collection.id, entry }).unwrap();
+        ? await update({ code: initial.code, entry, tenantId }).unwrap()
+        : await create({ collectionId: collection.id, entry, tenantId }).unwrap();
       toast.success(strings.saved(saved.code));
       onSaved(saved);
     } catch (error) {

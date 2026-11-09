@@ -1,5 +1,4 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { isUUID } from 'class-validator';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Observable, ReplaySubject, startWith } from 'rxjs';
@@ -25,11 +24,8 @@ import {
   isGenuineReflection,
   isSubstantiveDebriefReply,
 } from '../../learn/type/debrief-engagement-event.type';
-import {
-  KbCorpus,
-  KbRetrievalConsumer,
-} from '../../knowledge-base/enum/knowledge-base.enum';
-import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
+import { ContextRetrievalService } from '../../context-library/service/context-retrieval.service';
+import { guidancePassage, guidanceSearch } from '../util/debrief-guidance.util';
 import { LoggerService } from '../../logger/logger.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
@@ -127,7 +123,7 @@ export class DebriefReplyService {
     private readonly events: EventEmitter2,
     private readonly llm: LlmProviderFactory,
     private readonly usage: LlmUsageService,
-    @Optional() private readonly knowledge?: KnowledgeBaseService,
+    @Optional() private readonly guidance?: ContextRetrievalService,
   ) {}
 
   async stream(
@@ -424,9 +420,9 @@ export class DebriefReplyService {
 
   /** The prompt the GA release pins, else the store's current, else the default file. */
   /**
-   * v9 FR-43: what Ask Ally knows beyond this debrief — guidance from the
-   * debrief knowledge base (as the learner's organisation may read it,
-   * clinical documents only as signed off), the learner's own earlier
+   * v9 FR-43: what Ask Ally knows beyond this debrief — Debrief Guidance
+   * from the Context Library (as the learner's organisation may read it),
+   * the learner's own earlier
    * Work-on-this points, and their organisation's wording. Each part has a
    * short budget and is simply left out when it is slow or fails: the first
    * words must stay fast. The knowledge query is built from the debrief's
@@ -450,8 +446,6 @@ export class DebriefReplyService {
       }
     };
     const tenantId = run.tenantId ?? null;
-    // The knowledge base scopes by organisation id; a non-UUID tenant reads global documents.
-    const kbTenantId = tenantId && isUUID(tenantId) ? tenantId : null;
     const cards = (run.cards ?? {}) as DebriefCards;
     const query = [
       ...(cards.work_on_this ?? []).map((c) => c.skill),
@@ -462,28 +456,20 @@ export class DebriefReplyService {
       .slice(0, 6)
       .join('; ');
     const [guidance, history, org] = await Promise.all([
-      query && this.knowledge
+      query && this.guidance
         ? within(
             () =>
-              this.knowledge!.searchForAudience(
-                {
-                  corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
-                  query,
-                  limit: 3,
-                  minSimilarity: 0.35,
-                },
-                { tenantId: kbTenantId },
-                {
-                  consumer: KbRetrievalConsumer.DEBRIEF,
-                  sessionId,
-                  userId,
-                },
-              ).then((r) => r.passages),
-            [] as Array<{ document_title: string; text: string }>,
+              this.guidance!.search(
+                // A non-UUID tenant reads the global guidelines only.
+                guidanceSearch(query, tenantId, 3, sessionId),
+              ).then((r) =>
+                r.noConfidentMatch
+                  ? []
+                  : r.results.map(({ chunk }) => guidancePassage(chunk)),
+              ),
+            [] as Array<{ title: string; text: string }>,
           )
-        : Promise.resolve(
-            [] as Array<{ document_title: string; text: string }>,
-          ),
+        : Promise.resolve([] as Array<{ title: string; text: string }>),
       within(
         () => this.context.pastWorkOnThis(userId, tenantId, sessionId, 5),
         [],
@@ -496,7 +482,7 @@ export class DebriefReplyService {
     if (guidance.length) {
       out.push(
         'GUIDANCE (practice guidance your organisation uses; draw on it, never quote it as rules):',
-        ...guidance.map((g) => `- ${g.document_title}: ${g.text}`),
+        ...guidance.map((g) => `- ${g.title}: ${g.text}`),
       );
     }
     if (history.length) {

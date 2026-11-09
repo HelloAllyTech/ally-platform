@@ -35,7 +35,7 @@ export const ENDPOINTS = {
   ROADMAP_OPPORTUNITY_BULK_UPSERT: 'api/v1/roadmap-opportunities/bulk-upsert',
   ROADMAP_OPPORTUNITY_IDS: 'api/v1/roadmap-opportunities/ids',
 
-  // ── Knowledge corpora (WhatsApp Q&A, Ally guide library, Debrief guidance) ──
+  // ── Knowledge corpora (WhatsApp Q&A; the others moved to the Context Library) ──
   // Same ownership rule as the roadmap collection above: ally-ai owns the `KnowledgeChunk`
   // Weaviate collection, ally-be's Postgres (kb_documents + kb_document_chunks) stays the
   // system of record, and the vector store is a DERIVED index. The Weaviate object uuid IS

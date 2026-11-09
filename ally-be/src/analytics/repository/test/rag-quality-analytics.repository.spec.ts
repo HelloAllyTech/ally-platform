@@ -78,13 +78,13 @@ describe('RagQualityAnalyticsRepository', () => {
     await repository.sufficiency({
       ...filter,
       consumer: 'whatsapp_bot',
-      corpus: 'ally_guide_library',
+      corpus: 'reference_documents',
     });
     const [sql, params] = query.mock.calls[0];
     expect(sql).toContain('r.consumer = $3');
     expect(sql).toContain('r.corpus = $4');
     expect(params).toContain('whatsapp_bot');
-    expect(params).toContain('ally_guide_library');
+    expect(params).toContain('reference_documents');
   });
 
   it('counts what a higher floor would have thrown away', async () => {

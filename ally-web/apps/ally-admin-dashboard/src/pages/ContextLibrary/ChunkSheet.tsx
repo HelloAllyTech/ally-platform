@@ -7,7 +7,14 @@ import { en } from "@constants";
 import { ContextChunkDetail, ContextCollection, ContextChunkSourceLink } from "@types";
 
 import { errorReason, humanise, nounsFor } from "./contextLibraryFormat";
-import { ChunkStatusWords, InlineError, LoadingRows, OriginBadge } from "./ContextLibraryUi";
+import { useContextLibraryScope } from "./contextLibraryScope";
+import {
+  AudienceBadge,
+  ChunkStatusWords,
+  InlineError,
+  LoadingRows,
+  OriginBadge,
+} from "./ContextLibraryUi";
 import { EntryForm } from "./EntryForm";
 import { Sheet } from "../Builder/room/Sheet";
 
@@ -55,9 +62,15 @@ const sourceLine = (source: ContextChunkSourceLink): string => {
  * a written or imported entry's text is shown verbatim with its citation. Pin, archive and
  * their opposites happen at once with an undo, never behind a confirm.
  */
-export const ChunkSheet: React.FC<ChunkSheetProps> = ({ code, collections, canEdit, onClose }) => {
+export const ChunkSheet: React.FC<ChunkSheetProps> = ({
+  code,
+  collections,
+  canEdit: canEditLibrary,
+  onClose,
+}) => {
   const strings = en.contextLibrary.sheet;
-  const { data, isLoading, isError, error, refetch } = useGetContextChunkQuery(code);
+  const { tenantId, orgNames } = useContextLibraryScope();
+  const { data, isLoading, isError, error, refetch } = useGetContextChunkQuery({ code, tenantId });
   const [act] = useContextChunkActionMutation();
   const [editing, setEditing] = useState(false);
   // What the last action changed, shown before the server confirms it.
@@ -73,6 +86,9 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({ code, collections, canEd
   const collection = collections.find(c => c.id === data?.collectionId);
   const { noun } = nounsFor(collection);
   const chunk = data ? { ...data, ...optimistic } : undefined;
+  // An organisation's admin edits their own entries only; Ally's global ones are read-only.
+  const notOurs = Boolean(tenantId && data && data.ownerTenantId !== tenantId);
+  const canEdit = canEditLibrary && !notOurs;
 
   // The toast's Undo outlives this render; it calls whatever `run` is current.
   const runRef = useRef<(action: ChunkAction, undoable: boolean) => Promise<void>>();
@@ -86,7 +102,7 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({ code, collections, canEd
             : { pinned: action === "pin" };
       setOptimistic(previous => ({ ...previous, ...patch }));
       try {
-        await act({ code, action }).unwrap();
+        await act({ code, action, tenantId }).unwrap();
         const message = {
           archive: strings.toasts.archived,
           restore: strings.toasts.restored,
@@ -109,7 +125,7 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({ code, collections, canEd
         toast.error(strings.toasts.failed);
       }
     },
-    [act, code, strings.toasts],
+    [act, code, tenantId, strings.toasts],
   );
   runRef.current = run;
 
@@ -179,6 +195,7 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({ code, collections, canEd
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-xs text-typography-600">{chunk.code}</span>
             <OriginBadge origin={chunk.origin} />
+            <AudienceBadge chunk={chunk} ownTenantId={tenantId} orgNames={orgNames} />
             <ChunkStatusWords chunk={chunk} noun={noun} />
           </div>
           <p className="text-lg font-medium leading-snug text-typography-900">{chunk.statement}</p>
@@ -263,7 +280,12 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({ code, collections, canEd
             <p className="text-sm text-typography-600">{strings.historyPlaceholder}</p>
           </section>
 
-          {!canEdit && <p className="text-xs text-typography-600">{strings.readOnly}</p>}
+          {notOurs && canEditLibrary && (
+            <p className="text-xs text-typography-600" data-testid="cl-global-read-only">
+              {en.contextLibrary.org.globalReadOnly}
+            </p>
+          )}
+          {!canEditLibrary && <p className="text-xs text-typography-600">{strings.readOnly}</p>}
           {canEdit && synced && <p className="text-xs text-typography-600">{strings.syncedNote}</p>}
         </div>
       )}

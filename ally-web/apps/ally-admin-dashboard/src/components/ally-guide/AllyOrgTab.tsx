@@ -11,6 +11,7 @@ import {
   useSaveAllyGuideOrgCrisisResponseMutation,
   useSaveAllyGuideOrgProfileMutation,
 } from "@api";
+import { ContextCollectionLink } from "@components/context-collection-link";
 import { en } from "@constants";
 import { useAllyGuideAccess } from "@hooks";
 import { RootState } from "@store";
@@ -23,7 +24,6 @@ import { ConfigLayerEditor } from "./ConfigLayerEditor";
 import { ErrorPanel, LoadingBlock, ViewOnlyNote } from "./ConsoleStates";
 import { CrisisCopyEditor } from "./CrisisCopyEditor";
 import { InfoTip } from "./InfoTip";
-import { LibraryPanel } from "./LibraryPanel";
 import {
   draftFromProfile,
   isDraftDirty,
@@ -437,7 +437,11 @@ export const AllyOrgTab: React.FC<AllyOrgTabProps> = ({ tenantId }) => {
         heading={en.allyConsole.orgSections.libraryHeading}
         description={en.allyConsole.orgSections.libraryDescription}
       >
-        <LibraryPanel scope="organisation" tenantId={tenantId} canEdit={canEditOrg} />
+        <ContextCollectionLink
+          collection="ally_guide_library"
+          copy={en.allyConsole.library.orgLink}
+          tenantId={tenantId}
+        />
       </Section>
     </div>
   );

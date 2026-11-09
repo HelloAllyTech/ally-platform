@@ -564,9 +564,10 @@ export class AiService {
   }
 
   /**
-   * Drop the whole Weaviate collection of a retired corpus (today only the character corpus's
-   * `CharacterChunk`). Called once, by the confirmed platform-admin retirement after the corpus
-   * has been distilled into the Context Library. `deleted: false` means it was already gone.
+   * Drop the whole Weaviate collection of a retired corpus (the character corpus's
+   * `CharacterChunk`, the Ally guide's `GuideLibraryChunk`, Debrief's `DebriefKnowledgeChunk`).
+   * Called once, by the confirmed platform-admin retirement after the corpus
+   * has been distilled or copied into the Context Library. `deleted: false` means it was already gone.
    */
   async dropRetiredKnowledgeCollection(collection: string) {
     const params = new URLSearchParams({ collection, confirm: collection });

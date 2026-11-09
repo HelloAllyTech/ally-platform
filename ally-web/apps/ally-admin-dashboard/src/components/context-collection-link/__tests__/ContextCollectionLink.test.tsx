@@ -20,8 +20,13 @@ vi.mock("@hooks", () => ({ useUser: () => mockUser() }));
 vi.mock("@utils", async () => import("../../../utils/permissions"));
 
 vi.mock("@constants", () => ({
-  FeatureToggleKey: { CONTEXT_LIBRARY: "context_library" },
-  Permissions: { VIEW_CONTEXT_LIBRARY: "view:admin:context-library" },
+  FeatureToggleKey: { CONTEXT_LIBRARY: "context_library", ALLY_GUIDE_ORG: "ally_guide_org" },
+  Permissions: {
+    VIEW_CONTEXT_LIBRARY: "view:admin:context-library",
+    EDIT_CONTEXT_LIBRARY: "edit:admin:context-library",
+    VIEW_ALLY_GUIDE: "view:admin:ally-guide",
+    EDIT_ALLY_GUIDE: "edit:admin:ally-guide",
+  },
   ROUTES: { CONTEXT_LIBRARY: "/context-library" },
 }));
 
@@ -81,5 +86,52 @@ describe("ContextCollectionLink", () => {
     const { container } = renderLink();
     expect(container).toBeEmptyDOMElement();
     expect(querySpy).toHaveBeenCalledWith(undefined, { skip: true });
+  });
+
+  describe("for one organisation (an organisation's Ally tab)", () => {
+    const ORG = "11111111-1111-4111-8111-111111111111";
+    const renderOrgLink = () =>
+      render(
+        <MemoryRouter>
+          <ContextCollectionLink collection="ally_guide_library" copy={copy} tenantId={ORG} />
+        </MemoryRouter>,
+      );
+
+    it("sends a platform admin to the collection filtered to entries reaching that organisation", () => {
+      queryResult.mockReturnValue({ data: [{ id: "ally_guide_library", counts: { active: 40 } }] });
+      renderOrgLink();
+      expect(screen.getByRole("link", { name: copy.manageLabel })).toHaveAttribute(
+        "href",
+        `/context-library?collection=ally_guide_library&audience=${ORG}`,
+      );
+      expect(querySpy).toHaveBeenCalledWith(undefined, { skip: false });
+    });
+
+    it("sends that organisation's own admin to its own view, counting its own entries", () => {
+      mockUser.mockReturnValue({
+        features: ["ally_guide_org"],
+        permissions: ["view:admin:ally-guide"],
+        user: { restrictedTenantIds: [ORG] },
+      });
+      queryResult.mockReturnValue({
+        data: [{ id: "ally_guide_library", counts: { active: 40 }, ownActive: 0 }],
+      });
+      renderOrgLink();
+      expect(screen.getByRole("link", { name: copy.manageLabel })).toHaveAttribute(
+        "href",
+        `/context-library?collection=ally_guide_library&org=${ORG}`,
+      );
+      expect(querySpy).toHaveBeenCalledWith({ tenantId: ORG }, { skip: false });
+      expect(screen.getByTestId("context-collection-count")).toHaveTextContent("No lessons yet");
+    });
+
+    it("is absent for an organisation admin when no organisation is named", () => {
+      mockUser.mockReturnValue({
+        features: ["ally_guide_org"],
+        permissions: ["view:admin:ally-guide"],
+      });
+      const { container } = renderLink();
+      expect(container).toBeEmptyDOMElement();
+    });
   });
 });

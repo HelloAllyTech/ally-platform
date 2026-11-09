@@ -11,46 +11,19 @@
  * itself. A filter can be forgotten; a required argument cannot. Each corpus also gets its
  * OWN Weaviate collection rather than a discriminator on a shared one — a similarity
  * threshold only means something against one distribution, and chunk size differs per corpus
- * (400 tokens for a 1600-character WhatsApp reply, 600 for the Ally guide's procedures).
+ * (400 tokens for a 1600-character WhatsApp reply; the Ally guide's procedures, since moved to
+ * the Context Library, were cut at 600).
  *
- * The character corpus (`character_library`) was retired into the Context Library's Character
- * Insights collection (docs/context-library/PLAN.md, phase 4). Rows that still carry that value
- * are read and finally deleted only by `ContextKbImportService`, with literal SQL, until a
- * platform admin retires them.
+ * Three corpora were retired into the Context Library (docs/context-library/PLAN.md): the
+ * character corpus (`character_library`, phase 4, distilled into Character Insights), and the
+ * Ally guide's library (`ally_guide_library`) and Debrief's guidance (`debrief_knowledge`),
+ * phase 6, copied word for word into the Ally Guide Library and Debrief Guidance. Rows that
+ * still carry those values are read and finally deleted only by `ContextKbImportService`, with
+ * literal SQL, until a platform admin retires them. What remains is the WhatsApp Q&A corpus.
  */
 export enum KbCorpus {
   /** Grounds the WhatsApp Q&A bot's answers. */
   WHATSAPP_QA = 'whatsapp_qa',
-  /**
-   * Grounds the Ally guide (plans/ally-guide/plan.md §7.6) — material about becoming and
-   * being a helper. The first corpus that is not Ally-global throughout: a document is
-   * either the PLATFORM's, available to every learner, or one ORGANISATION's own
-   * protocols and handbooks, available only to that organisation's learners. So it is
-   * searched only through `KnowledgeBaseService.searchForAudience`, and its documents'
-   * audience follows their owner (`kb_documents.owner_tenant_id`) rather than being
-   * targeted by hand — see KB_OWNED_CORPORA.
-   */
-  ALLY_GUIDE_LIBRARY = 'ally_guide_library',
-  /**
-   * Grounds the Debrief agent's guidance lookup (v9 FR-16): practice guidelines, the
-   * debrief style guide, level guides and organisations' protocols. Curated centrally and
-   * targeted by hand (platform-wide or named organisations), like the WhatsApp corpus; a
-   * document marked clinical is served only once the clinical advisor has signed off its
-   * current content.
-   */
-  DEBRIEF_KNOWLEDGE = 'debrief_knowledge',
-}
-
-/**
- * Where a retrieved document sits relative to the person asking. Derived from
- * `kb_documents.is_global` at query time rather than stored, so it can never disagree with
- * the audience that let the passage through.
- */
-export enum KbDocumentScope {
-  /** Available to every organisation, and to anonymous visitors. */
-  GLOBAL = 'global',
-  /** Targeted at organisations — on an audience search, the asker's own. */
-  ORGANISATION = 'organisation',
 }
 
 /**
@@ -181,16 +154,9 @@ export enum KbRetrievalConsumer {
   REFERENCE_SEARCH = 'reference_search',
   /** Roadmap duplicate detection. Staff-authored product text, nothing sensitive. */
   ROADMAP_MATCHER = 'roadmap_matcher',
-  /**
-   * The Ally guide's library search, on a learner's behalf. Marked sensitive: Ally composes
-   * the query, but from what the learner just said, so it can carry their words.
-   */
-  ALLY_GUIDE = 'ally_guide',
-  /**
-   * The Debrief agent's guidance lookup, one search per pivotal moment. Marked sensitive:
-   * the query describes a moment in a learner's session.
-   */
-  DEBRIEF = 'debrief',
+  // The Ally guide's library search (`ally_guide`) and Debrief's guidance lookup (`debrief`)
+  // logged here until phase 6 moved both into the Context Library, which logs them as use cases
+  // of its own. Their rows stay in `kb_retrievals` until a platform admin retires each corpus.
 }
 
 /**
@@ -202,8 +168,7 @@ export enum KbRetrievalConsumer {
  * passages and declines on all of them looks healthy in every count except this one.
  *
  * Null for consumers that have no decline step of their own: the admin preview shows whatever
- * comes back, and the Ally guide and Debrief judge passages in their own reasoning rather than
- * at a threshold.
+ * comes back.
  */
 export enum KbRetrievalDisposition {
   /** Passages were used to ground an answer. */

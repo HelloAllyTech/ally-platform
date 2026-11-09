@@ -13,7 +13,7 @@ import { KnowledgeBaseService } from '../knowledge-base.service';
  */
 
 const dto = {
-  corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
+  corpus: KbCorpus.WHATSAPP_QA,
   title: 'Designing clients',
   sourceType: KbDocumentSourceType.PASTE,
   text: 'A stance written into backstory can never be earned.',
@@ -82,6 +82,6 @@ describe('KnowledgeBaseService.create — when enqueueing fails', () => {
     const result = await service.create(dto);
 
     expect(documentRepository.update).not.toHaveBeenCalled();
-    expect(result.corpus).toBe(KbCorpus.DEBRIEF_KNOWLEDGE);
+    expect(result.corpus).toBe(KbCorpus.WHATSAPP_QA);
   });
 });

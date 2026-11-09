@@ -137,7 +137,6 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.WHATSAPP_BOT, FeatureToggleKey.WHATSAPP_BOT],
     [sidebarItems.BUG_HUNTER, FeatureToggleKey.BUG_HUNTER],
     [sidebarItems.BUILDER, FeatureToggleKey.BUILDER],
-    [sidebarItems.CONTEXT_LIBRARY, FeatureToggleKey.CONTEXT_LIBRARY],
     [sidebarItems.ANALYTICS, FeatureToggleKey.ANALYTICS],
     [sidebarItems.DEBRIEFS, FeatureToggleKey.ANALYTICS],
     [sidebarItems.COMPETENCIES, FeatureToggleKey.COMPETENCIES],

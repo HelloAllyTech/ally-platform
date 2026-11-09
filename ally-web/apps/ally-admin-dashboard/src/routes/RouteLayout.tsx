@@ -491,7 +491,11 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.CONTEXT_LIBRARY}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.CONTEXT_LIBRARY}>
+            // Platform admins, or an organisation's admins (the Ally organisation-settings
+            // toggle), who see only their organisation's entries.
+            <PrivateLayout
+              requiredFeature={[FeatureToggleKey.CONTEXT_LIBRARY, FeatureToggleKey.ALLY_GUIDE_ORG]}
+            >
               <Suspense fallback={null}>
                 <ContextLibrary />
               </Suspense>

@@ -134,11 +134,11 @@ describe('RagQualityAnalyticsService', () => {
     const { service, repository } = build();
     await service.getRagQuality({
       consumer: 'whatsapp_bot',
-      corpus: 'ally_guide_library',
+      corpus: 'reference_documents',
     });
     const [filter] = repository.coverage.mock.calls[0];
     expect(filter.consumer).toBe('whatsapp_bot');
-    expect(filter.corpus).toBe('ally_guide_library');
+    expect(filter.corpus).toBe('reference_documents');
   });
 
   it('reports the gap text, which is the only thing that names a corpus hole', async () => {

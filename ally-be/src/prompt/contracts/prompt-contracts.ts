@@ -1512,6 +1512,34 @@ export const CONTEXT_LIBRARY_EXTRACT_CHARACTER_INSIGHTS_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/context_library/extract_ally_guide_library_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_ALLY_GUIDE_LIBRARY_SYSTEM = definePrompt(
+  'context_library_extract_ally_guide_library_system',
+  {},
+  {
+    name: 'Context Library — Extract Ally Guide Library entries',
+    description:
+      'Distils one part of a helping-skills document, or an organisation’s own procedure, into short, standalone entries for the Ally guide’s library: statement, what it says in practice, situations, example searches, kind, topics and an information-only clinical flag. Keeps a procedure whole; own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_debrief_guidance_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_DEBRIEF_GUIDANCE_SYSTEM = definePrompt(
+  'context_library_extract_debrief_guidance_system',
+  {},
+  {
+    name: 'Context Library — Extract Debrief Guidance',
+    description:
+      'Distils one part of a practice guideline, style guide, level guide or protocol into short guidelines the Debrief agent reads beside a pivotal moment: statement, what good practice looks like, the moments it applies to, kind, learner levels, skills and an information-only clinical flag. Own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
 /** src/prompts/context_library/critic_system.txt */
 export const CONTEXT_LIBRARY_CRITIC_SYSTEM = definePrompt(
   'context_library_critic_system',

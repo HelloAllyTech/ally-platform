@@ -4,14 +4,17 @@ import {
   AlertTriangle,
   Archive,
   Bot,
+  Building2,
   CircleDot,
   FileText,
+  Globe,
   Hourglass,
   Import,
   Merge,
   PenLine,
   Pin,
   RefreshCw,
+  UserX,
   type LucideIcon,
 } from "lucide-react";
 
@@ -19,7 +22,7 @@ import { SkeletonText } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 import { ContextChunk } from "@types";
 
-import { originLabel } from "./contextLibraryFormat";
+import { audienceLabel, originLabel } from "./contextLibraryFormat";
 
 /**
  * Small pieces the Context Library views share. Every status is an icon AND a word, never
@@ -60,6 +63,28 @@ export const StatusWord: React.FC<{
 export const OriginBadge: React.FC<{ origin: string }> = ({ origin }) => (
   <StatusWord icon={ORIGIN_ICON[origin] ?? CircleDot} label={originLabel(origin)} />
 );
+
+/**
+ * Who an entry reaches: Global, the viewer's own organisation, a named one, or several. An icon
+ * and a word, always (§10.6), so it never rests on colour or shape alone.
+ */
+export const AudienceBadge: React.FC<{
+  chunk: Pick<ContextChunk, "isGlobal" | "tenantIds" | "ownerTenantId">;
+  /** The organisation an organisation admin is looking at, if any. */
+  ownTenantId?: string;
+  orgNames?: Record<string, string>;
+}> = ({ chunk, ownTenantId, orgNames }) => {
+  const { label, kind } = audienceLabel(chunk, ownTenantId, orgNames);
+  const icon = kind === "global" ? Globe : kind === "nobody" ? UserX : Building2;
+  return (
+    <StatusWord
+      icon={icon}
+      label={label}
+      tone={kind === "nobody" ? "warning" : undefined}
+      testId="cl-audience"
+    />
+  );
+};
 
 /** Low confidence, pinned, archived, merged: the words a row carries beyond its origin. */
 export const ChunkStatusWords: React.FC<{

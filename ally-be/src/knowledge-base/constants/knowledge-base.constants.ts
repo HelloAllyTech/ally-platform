@@ -51,15 +51,9 @@ export const KB_CHUNK_OVERLAP_TOKENS = 60;
  * `whatsapp_qa` — 400 tokens, derived above from a 1600-character reply grounding on three to
  * five passages. One complete clinical idea: a definition plus its qualification.
  *
- * `ally_guide_library` — 600, because its material is two kinds of thing. The
- * helper-craft half reads like the WhatsApp corpus (one idea, its qualification), and Ally's
- * reply is a chat turn of about that size. The organisation half is protocols and handbooks,
- * whose unit of use is a PROCEDURE: who to call, in what order, what to write down. Those run
- * 300–700 tokens, and a 400-token cut lands inside one — retrieving steps 1–4 of a six-step
- * escalation protocol without 5 and 6 is worse than retrieving nothing, because it reads as
- * complete. Stacks, "Document chunking requires semantic and contextual consideration": chunks
- * should be semantically complete sections. Five 600-token passages is ~3000 tokens of tool
- * result per search, which Ally's context can carry. Overlap 90 holds the ~15%.
+ * (The Ally guide's library used 600 so a protocol's steps stayed together, and Debrief's
+ * guidance 400; both corpora moved into the Context Library in phase 6, keeping their passages
+ * as they were cut.)
  *
  * Sizing is fixed at INGEST, so changing a profile only affects documents chunked afterwards.
  * Re-chunking an existing one is the `chunkVersion` path — it writes new chunk rows and deletes
@@ -78,21 +72,6 @@ export const KB_CHUNK_PROFILES: Record<KbCorpus, KbChunkProfile> = {
     minTokens: KB_CHUNK_MIN_TOKENS,
     maxTokens: KB_CHUNK_MAX_TOKENS,
     overlapTokens: KB_CHUNK_OVERLAP_TOKENS,
-  },
-  [KbCorpus.ALLY_GUIDE_LIBRARY]: {
-    targetTokens: 600,
-    minTokens: 480,
-    maxTokens: 780,
-    overlapTokens: 90,
-  },
-  // Guidance is read next to one pivotal moment and the Writer sees two passages per
-  // moment, so the unit of use is one piece of advice with its qualification: the
-  // WhatsApp corpus's size, for the same reason.
-  [KbCorpus.DEBRIEF_KNOWLEDGE]: {
-    targetTokens: 400,
-    minTokens: 320,
-    maxTokens: 520,
-    overlapTokens: 60,
   },
 };
 
@@ -123,21 +102,15 @@ export const KB_URL_FETCH_TIMEOUT_MS = 20_000;
 export const KB_URL_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
- * Default cosine similarity floor per corpus. All are PERMISSIVE, for different reasons.
+ * Default cosine similarity floor per corpus. PERMISSIVE on purpose.
  *
  * The WhatsApp bot answers a question it was asked, and a weak passage there is recoverable:
  * the answering prompt sees it doesn't address the question and declines, which is a
  * first-class outcome on that path (`KnowledgeDeclineReason`). Recall beats precision, so 0.35.
  *
- * The Ally guide's library and Debrief guidance are 0.35 for the opposite reason, learned on
- * the retired character corpus, which took two wrong turns (0.5, then 0.45) before landing
- * here. A floor tuned to look safe mostly buys silence: single-shot cosine similarity is
- * brittle across paraphrase, and an on-topic query there missed a section titled almost
- * exactly what it asked. An agent that reads what comes back CAN decline — it is told to say
- * the library has nothing rather than stretch a weak passage — so a high floor does not make
- * grounding safer; it removes the agent's ability to judge. Precision belongs to the agent's
- * judgement, recall to this layer. Each consumer is logged under its own name (`ally_guide`,
- * `debrief`), so its curve can be read apart from the others'.
+ * The retired character corpus learned the same lesson from the other side, taking two wrong
+ * turns (0.5, then 0.45) before landing here: a floor tuned to look safe mostly buys silence,
+ * because single-shot cosine similarity is brittle across paraphrase.
  *
  * Still not a tuned value — `kb_retrievals` + `kb_retrieval_passages` exist to replace it with
  * a precision/recall curve over real traffic. `KbSearchDto.minSimilarity` overrides it per
@@ -146,27 +119,19 @@ export const KB_URL_MAX_BYTES = 10 * 1024 * 1024;
  */
 export const KB_MIN_SIMILARITY_DEFAULT: Record<KbCorpus, number> = {
   [KbCorpus.WHATSAPP_QA]: 0.35,
-  [KbCorpus.ALLY_GUIDE_LIBRARY]: 0.35,
-  [KbCorpus.DEBRIEF_KNOWLEDGE]: 0.35,
 };
 
 /**
- * Corpora whose documents BELONG to someone: the platform (`owner_tenant_id` null) or one
- * organisation. For these, three rules replace the hand-targeting the other corpora use:
- *
- *  - The audience FOLLOWS THE OWNER and is never set directly. A platform document is global;
- *    an organisation's reaches that organisation only. `setAudience` refuses these, because
- *    retargeting an organisation's own protocol at a second organisation is exactly the leak
- *    this corpus must not have, and no screen would show it happened.
- *  - They are written only through the owner-scoped methods (`createOwned`, `archiveOwned`),
- *    which is where the owner is checked. The generic console's create refuses them.
- *  - They are searched only for a stated audience. `search()` — whose omitted tenant means
- *    "every organisation" — answers for them only to the permission-gated admin preview, by
- *    name; everything else goes through `searchForAudience`.
+ * Corpora retired into the Context Library (docs/context-library/PLAN.md, phases 4 and 6). Their
+ * rows stay in `kb_documents` until a platform admin retires each one, and only that job may
+ * touch them: to every route here they are missing documents. Literal values, because they are
+ * no longer `KbCorpus` members.
  */
-export const KB_OWNED_CORPORA: ReadonlySet<KbCorpus> = new Set([
-  KbCorpus.ALLY_GUIDE_LIBRARY,
-]);
+export const RETIRED_KB_CORPORA: readonly string[] = [
+  'character_library',
+  'ally_guide_library',
+  'debrief_knowledge',
+];
 
 /**
  * Max passages one document may contribute to a single retrieval.

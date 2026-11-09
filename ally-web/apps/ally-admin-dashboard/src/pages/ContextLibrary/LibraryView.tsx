@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useGetContextChunksQuery, useSearchContextLibraryQuery } from "@api";
 import { en } from "@constants";
 import {
+  ContextAudienceFilter,
   ContextChunk,
   ContextChunkConfidence,
   ContextChunkListQuery,
@@ -28,7 +29,9 @@ import {
   originFilterLabel,
   sourceCountLine,
 } from "./contextLibraryFormat";
+import { useContextLibraryScope } from "./contextLibraryScope";
 import {
+  AudienceBadge,
   Chip,
   ChunkStatusWords,
   InlineError,
@@ -74,6 +77,8 @@ const BAND_ICON: Record<ContextSearchBand, typeof Check> = {
 interface LibraryViewProps {
   collection?: ContextCollection;
   collections: ContextCollection[];
+  /** `?audience=` on arrival, e.g. from an organisation's Ally tab: `global`, `mine` or an id. */
+  initialAudience?: ContextAudienceFilter;
   onOpenChunk: (code: string) => void;
 }
 
@@ -85,9 +90,15 @@ interface LibraryViewProps {
 export const LibraryView: React.FC<LibraryViewProps> = ({
   collection,
   collections,
+  initialAudience,
   onOpenChunk,
 }) => {
   const strings = en.contextLibrary.library;
+  const { tenantId, orgNames } = useContextLibraryScope();
+  // Global · My organisation for an organisation's admin; Global · one organisation for the
+  // platform, in collections that hold organisation entries at all.
+  const [audience, setAudience] = useState<ContextAudienceFilter | null>(initialAudience ?? null);
+  const showAudience = Boolean(tenantId) || Boolean(collection?.allowsOrgChunks);
   const { noun, nounPlural } = nounsFor(collection);
   const [query, setQuery] = useState("");
   const debounced = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
@@ -101,7 +112,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     setFilters(NO_FILTERS);
     setPages(1);
   }, [collection?.id]);
-  useEffect(() => setPages(1), [filters, debounced]);
+  useEffect(() => setPages(1), [filters, debounced, audience]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -136,6 +147,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     });
 
   const listArgs = (offset: number): ContextChunkListQuery => ({
+    tenantId,
+    audience: showAudience ? (audience ?? undefined) : undefined,
     collectionId: collection?.id,
     origin: filters.origin ?? undefined,
     confidence: filters.lowConfidence ? ("low" as ContextChunkConfidence) : undefined,
@@ -242,6 +255,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </button>
           )}
         </div>
+        {showAudience && (
+          <AudienceFilter
+            value={audience}
+            orgMode={Boolean(tenantId)}
+            orgNames={orgNames}
+            onChange={setAudience}
+          />
+        )}
         {facetSpecs.map(([key, spec]) => (
           <div key={key} className="flex flex-wrap items-center gap-1">
             <span className="mr-1 text-xs text-typography-600">{spec.label}</span>
@@ -278,6 +299,59 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           onShowMore={() => setPages(p => p + 1)}
           onOpen={onOpenChunk}
         />
+      )}
+    </div>
+  );
+};
+
+/**
+ * Who the entries reach: All · Global · My organisation for an organisation's admin, All · Global ·
+ * one named organisation for the platform.
+ */
+const AudienceFilter: React.FC<{
+  value: ContextAudienceFilter | null;
+  orgMode: boolean;
+  orgNames: Record<string, string>;
+  onChange: (value: ContextAudienceFilter | null) => void;
+}> = ({ value, orgMode, orgNames, onChange }) => {
+  const strings = en.contextLibrary.audience;
+  const named = value && value !== "global" && value !== "mine" ? value : "";
+  const orgOptions = Object.entries(orgNames).sort(([, a], [, b]) => a.localeCompare(b));
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1"
+      role="group"
+      aria-label={strings.label}
+      data-testid="cl-audience-filter"
+    >
+      <span className="mr-1 text-xs text-typography-600" title={strings.filterHelp}>
+        {strings.label}
+      </span>
+      <Chip pressed={!value} onClick={() => onChange(null)}>
+        {strings.all}
+      </Chip>
+      <Chip pressed={value === "global"} onClick={() => onChange("global")}>
+        {strings.global}
+      </Chip>
+      {orgMode ? (
+        <Chip pressed={value === "mine"} onClick={() => onChange("mine")}>
+          {strings.mine}
+        </Chip>
+      ) : (
+        <select
+          aria-label={strings.pick}
+          value={named}
+          onChange={event => onChange(event.target.value || null)}
+          className="h-7 rounded border border-border-light bg-white px-1 text-xs"
+          data-testid="cl-audience-org"
+        >
+          <option value="">{strings.pick}</option>
+          {orgOptions.map(([id, name]) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </select>
       )}
     </div>
   );
@@ -404,7 +478,9 @@ const SearchResults: React.FC<{
   onOpen: (code: string) => void;
 }> = ({ query, collection, collections, filters, explain, onOpen }) => {
   const strings = en.contextLibrary.library;
+  const { tenantId } = useContextLibraryScope();
   const { data, isLoading, isFetching, isError, error, refetch } = useSearchContextLibraryQuery({
+    tenantId,
     query,
     collectionId: collection?.id,
     explain: explain || undefined,
@@ -492,6 +568,7 @@ export const ChunkRow: React.FC<{
   onOpen: (code: string) => void;
 }> = ({ chunk, collections, band, diagnostics, showCollection, onOpen }) => {
   const strings = en.contextLibrary.library;
+  const { tenantId, orgNames } = useContextLibraryScope();
   const collection = collections.find(c => c.id === chunk.collectionId);
   const { noun } = nounsFor(collection);
   const meta = [facetLine(chunk.facets), sourceCountLine(chunk)].filter(Boolean).join(" · ");
@@ -527,6 +604,9 @@ export const ChunkRow: React.FC<{
             </span>
           )}
           <OriginBadge origin={chunk.origin} />
+          {(tenantId || collection?.allowsOrgChunks || !chunk.isGlobal) && (
+            <AudienceBadge chunk={chunk} ownTenantId={tenantId} orgNames={orgNames} />
+          )}
           <ChunkStatusWords chunk={chunk} noun={noun} />
         </div>
         {diagnostics && <Diagnostics diagnostics={diagnostics} />}

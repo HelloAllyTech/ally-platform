@@ -8,9 +8,9 @@ That resolution is the whole point. A leak BETWEEN corpora would rarely expose a
 data; it would do something subtler and harder to notice, which is answer a health
 worker's clinical question out of material written for another reader — a learner's
 course guide, or (before it was retired) the character interview's corpus. That reads as
-good clinical prose. (Leaks WITHIN a corpus are the other boundary: the
-Ally guide's library holds organisations' own protocols beside the global material, so
-its searches always carry an audience — see `ChunkAudience`.) The
+good clinical prose. (Leaks WITHIN a corpus are the other boundary: a document may be
+targeted at some organisations only, so every search carries an audience — see
+`ChunkAudience`.) The
 reasons for a collection per corpus rather than one collection plus a scope
 argument are recorded in
 migration 005 and in KnowledgeChunkProperties: a similarity threshold only means
@@ -29,20 +29,13 @@ class KbCorpus(str, Enum):
     kb_documents.corpus, so the two must not drift."""
 
     WHATSAPP_QA = "whatsapp_qa"
-    # The Ally guide's library: material on becoming and being a helper, global or
-    # one organisation's own. The one corpus here that is NOT Ally-global
-    # throughout — see migration 008 for what that changes.
-    ALLY_GUIDE_LIBRARY = "ally_guide_library"
-    # The Debrief agent's guidance: practice guidelines, the debrief style guide,
-    # level guides and organisations' protocols. Platform-wide or targeted at named
-    # organisations; clinical passages are served only once signed off (ally-be).
-    DEBRIEF_KNOWLEDGE = "debrief_knowledge"
+    # The character corpus, the Ally guide's library ("ally_guide_library") and
+    # Debrief's guidance ("debrief_knowledge") moved to ally-be's Context Library,
+    # which retrieves through its own Ctx<Collection>_v{N} indexes.
 
 
 CORPUS_COLLECTIONS: dict[KbCorpus, str] = {
     KbCorpus.WHATSAPP_QA: VectorDBCollectionNames.KNOWLEDGE_CHUNKS,
-    KbCorpus.ALLY_GUIDE_LIBRARY: VectorDBCollectionNames.GUIDE_LIBRARY_CHUNKS,
-    KbCorpus.DEBRIEF_KNOWLEDGE: VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS,
 }
 
 
@@ -52,7 +45,11 @@ CORPUS_COLLECTIONS: dict[KbCorpus, str] = {
 #: — never by a migration, because a migration runs on deploy, before anyone confirmed
 #: the import finished. The only names that route accepts.
 RETIRED_CORPUS_COLLECTIONS: frozenset[str] = frozenset(
-    {VectorDBCollectionNames.CHARACTER_CHUNKS}
+    {
+        VectorDBCollectionNames.CHARACTER_CHUNKS,
+        VectorDBCollectionNames.GUIDE_LIBRARY_CHUNKS,
+        VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS,
+    }
 )
 
 

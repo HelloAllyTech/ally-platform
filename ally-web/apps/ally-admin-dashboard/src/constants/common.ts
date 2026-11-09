@@ -470,9 +470,6 @@ export const ApiEndpoints = {
       `/v1/debriefs/console/runs/${id}/${action}`,
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
     ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
-    KNOWLEDGE: "/v1/debriefs/console/knowledge",
-    KNOWLEDGE_CLINICAL: (id: string) => `/v1/debriefs/console/knowledge/${id}/clinical`,
-    KNOWLEDGE_SIGN_OFF: (id: string) => `/v1/debriefs/console/knowledge/${id}/sign-off`,
   },
   DEBRIEF_CALIBRATION: {
     SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
@@ -954,13 +951,6 @@ export const ApiEndpoints = {
     // Advice moderation.
     ADVICE: "/v1/guide/admin/advice",
     ADVICE_MODERATE: (id: string) => `/v1/guide/admin/advice/${id}/moderate`,
-    // Library: the platform's, and one organisation's own.
-    LIBRARY_DOCUMENTS: "/v1/guide/admin/library/documents",
-    LIBRARY_UPLOAD_URL: "/v1/guide/admin/library/documents/upload-url",
-    LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/library/documents/${id}`,
-    ORG_LIBRARY_DOCUMENTS: "/v1/guide/admin/org-library/documents",
-    ORG_LIBRARY_UPLOAD_URL: "/v1/guide/admin/org-library/documents/upload-url",
-    ORG_LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/org-library/documents/${id}`,
     // Learning loop (plan §7.13, §10.5 "Evals").
     EVALUATOR_RUBRIC: "/v1/guide/admin/evaluator/rubric",
     EVALUATOR_SUMMARY: "/v1/guide/admin/evaluator/summary",
@@ -1294,7 +1284,6 @@ export const TAG_TYPES = {
   ALLY_GUIDE_BASELINE: "allyGuideBaseline",
   ALLY_GUIDE_CONFIG: "allyGuideConfig",
   ALLY_GUIDE_ADVICE: "allyGuideAdvice",
-  ALLY_GUIDE_LIBRARY: "allyGuideLibrary",
   ALLY_GUIDE_REVIEWS: "allyGuideReviews",
   ALLY_GUIDE_EVALS: "allyGuideEvals",
   ALLY_GUIDE_NOTES: "allyGuideNotes",
