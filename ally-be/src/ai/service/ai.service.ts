@@ -38,6 +38,11 @@ import {
 } from '../constants/knowledge-answer.constants';
 import { SseParser } from '../util/sse-parser';
 import {
+  CHECKUP_GRADE_TIMEOUT_MS,
+  type CheckupGradeRequest,
+  type CheckupGradeResponse,
+} from '../dto/checkup.dto';
+import {
   HelplineRiskRequest,
   HelplineRiskResponse,
   HelplineTurnRequest,
@@ -779,6 +784,23 @@ export class AiService {
       { deadlineMs: BUILDER_LIMITS.stepMs, what: 'builder step' },
       onEvent,
       signal,
+    );
+  }
+
+  /**
+   * Grade one checkup question (chunk 20a-2): the case and what the engine did go in, one verdict
+   * comes back. The same grader serves the Checkup, the eval suites and the scorecard.
+   *
+   * redactBody=true: the payload holds the question and the reply. No Slack alert: a failed grade
+   * is recorded on the result and the run carries on.
+   */
+  async gradeCheckup(
+    request: CheckupGradeRequest,
+  ): Promise<CheckupGradeResponse> {
+    return this.postKnowledge<CheckupGradeResponse, CheckupGradeRequest>(
+      ENDPOINTS.CHECKUP_GRADE,
+      request,
+      { timeoutMs: CHECKUP_GRADE_TIMEOUT_MS, alertOnFailure: false },
     );
   }
 

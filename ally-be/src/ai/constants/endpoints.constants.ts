@@ -72,6 +72,8 @@ export const ENDPOINTS = {
   /** Onboarding builder (chunk 20a). 404 while ally-ai's BUILDER__ENABLED is off. */
   BUILDER_STEP_STREAM: 'api/v1/builder/step/stream',
   BUILDER_EXTRACT: 'api/v1/builder/extract',
+  /** The checkup grader (chunk 20a-2): one verdict per question. */
+  CHECKUP_GRADE: 'api/v1/checkup/grade',
 
   // ── Text helpline copilot (docs/text-helpline.md §9.1) ────────────────────
   // Both always answer 200 and report `failed` rather than erroring, so a caller

@@ -1255,6 +1255,21 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_builder_draft',
   },
   {
+    id: 'checkup-judge',
+    task: LlmTask.CHECKUP_JUDGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      "An assistant's checkup runs (onboarding, Run again, after a change, or an eval suite)",
+    detail:
+      'One call per graded question that needs a reading for meaning: are the expected facts there, is anything it must not say there, did it make anything up. Automatic checks decide the rest; the judge can fail a question, never pass one.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_checkup_judge',
+  },
+  {
     id: 'corpus-embedding',
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,

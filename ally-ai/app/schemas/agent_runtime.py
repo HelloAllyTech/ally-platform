@@ -105,6 +105,17 @@ class AgentRetrievalMeta(RetrievalMeta):
             "Not part of the /knowledge-agent/answer contract."
         ),
     )
+    passage_document_ids: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Every document the agent was shown a passage from, across all of the "
+            "run's searches (the fields above cover the first search only). The "
+            "checkup uses it to tell a wrong decline from an honest one."
+        ),
+    )
+    searches: int = Field(
+        0, description="How many times the agent searched in this run."
+    )
 
 
 class TraceStep(BaseModel):

@@ -86,6 +86,9 @@ class LLMTask(str, Enum):
     ONBOARDING_GAPS = "onboarding_gaps"
     ONBOARDING_DESIGNS = "onboarding_designs"
     ONBOARDING_DRAFT = "onboarding_draft"
+    # The checkup (chunk 20a-2): one judge call per graded question that needs a
+    # reading for meaning (the automatic checks decide the rest).
+    CHECKUP_JUDGE = "checkup_judge"
     HELPLINE_RISK_CLASSIFY = "helpline_risk_classify"
     HELPLINE_COPILOT_TURN = "helpline_copilot_turn"
 

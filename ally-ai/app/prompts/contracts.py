@@ -559,6 +559,31 @@ class UserIdentifyUserInputs(PromptInputs):
     conversations: str
 
 
+class CheckupJudgeInputs(PromptInputs):
+    """`checkup/judge.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_checkup_judge",
+        name="Checkup: Judge a Reply",
+        description=(
+            "Checks one assistant reply for meaning in a checkup (chunk 20a-2): the "
+            "expected facts, what it must not say, and anything made up. Automatic "
+            "checks decide the rest; this judge can fail a case, never pass one."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    question: str
+    history: str
+    expected: str
+    facts: str
+    must_not: str
+    also_ok: str
+    sources: str
+    reply: str
+
+
 class BuilderSystemInputs(PromptInputs):
     """`builder/system.txt`."""
 

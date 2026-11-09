@@ -77,6 +77,8 @@ import { ConversationService } from './service/conversation.service';
     ConversationService,
   ],
   exports: [
+    // The Checkup (chunk 20a-2) asks questions through Preview's path.
+    ChatbotService,
     ConnectorRegistry,
     ConnectorService,
     ChatbotAccessService,

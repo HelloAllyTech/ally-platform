@@ -18,6 +18,13 @@ import { BotDraftPublishService } from './service/bot-draft-publish.service';
 import { BotDraftSessionService } from './service/bot-draft-session.service';
 import { SiteCrawlService } from './crawl/site-crawl.service';
 import { BotDraftEntity } from './entity/bot-draft.entity';
+import {
+  ChatbotCheckupCase,
+  ChatbotCheckupResult,
+  ChatbotCheckupRun,
+} from './entity/chatbot-checkup.entity';
+import { CheckupController } from './checkup/checkup.controller';
+import { CheckupService } from './checkup/checkup.service';
 import { BotDraftEventsService } from './service/bot-draft-events.service';
 import { BotDraftService } from './service/bot-draft.service';
 
@@ -33,6 +40,9 @@ import { BotDraftService } from './service/bot-draft.service';
       Chatbot,
       ChatbotMember,
       ChatbotDocument,
+      ChatbotCheckupCase,
+      ChatbotCheckupRun,
+      ChatbotCheckupResult,
     ]),
     ChatbotModule,
     BotPageModule,
@@ -43,6 +53,7 @@ import { BotDraftService } from './service/bot-draft.service';
     BotDraftController,
     ChatbotChangesController,
     AssistantHomeController,
+    CheckupController,
   ],
   providers: [
     BotDraftService,
@@ -51,6 +62,7 @@ import { BotDraftService } from './service/bot-draft.service';
     BotDraftSessionService,
     BotDraftPublishService,
     AssistantHomeService,
+    CheckupService,
     // The crawl hands each batch of pages to the builder's fact extraction.
     { provide: CRAWL_LEARNER, useExisting: BotDraftSessionService },
   ],

@@ -5,6 +5,7 @@ from app.api.v1.endpoints import (
     agent_runtime,
     analytics_agent,
     builder,
+    checkup,
     conversation,
     debrief,
     debrief_quality,
@@ -54,6 +55,7 @@ api_router.include_router(
 )
 api_router.include_router(agent_runtime.router, prefix="/agent", tags=["agent_runtime"])
 api_router.include_router(builder.router, prefix="/builder", tags=["builder"])
+api_router.include_router(checkup.router, prefix="/checkup", tags=["checkup"])
 api_router.include_router(helpline.router, prefix="/helpline", tags=["helpline"])
 api_router.include_router(drift.router, prefix="/drift", tags=["drift"])
 api_router.include_router(
