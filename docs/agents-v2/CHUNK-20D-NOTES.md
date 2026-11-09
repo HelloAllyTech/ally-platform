@@ -431,3 +431,106 @@ Section names (Overview · What it knows · Personality · Safety · Page · Con
 7. Page and Share.
 8. Conversations, Try it, the admin engine panel, the old form removed.
 9. Tests, screenshots and notes.
+
+## 5. What was built: the assistant home (2026-11-09)
+
+Commits, all `[20d]`: `c10855e54` docs · `f59149354` ally-be home API · `11537d910` the four fixes · `dc931b8b6` the home · then the browser tests and these notes.
+
+### ally-be (`src/bot-draft/home/`)
+
+- **`GET v1/chatbots/:id/home`**: every owner-editable field with a version, the safety view (pack plus own rules) and the learned facts.
+- **`PATCH v1/chatbots/:id/home` `{field, value, version}`**:
+  - The version is a 16-character hash of the value the edit started from (keys sorted).
+  - A stale save returns 409 `stale` with the current value and version.
+  - Saves of one bot run under a row lock on `chatbots`, so the check and the write can't interleave.
+  - Different fields never conflict.
+- **The field registry** (`home-fields.ts`) maps each field to every place it's stored:
+  - assistant name → persona and page branding;
+  - disclaimer → settings and page branding, and a pack's disclaimer can't be dropped;
+  - business name → bot name and page title;
+  - page on/off and page access → the page row (public is refused while the platform forbids it);
+  - the rest → one store each.
+  - A bot without a page gets one, off and invite-only, on its first page save.
+- **`PATCH v1/chatbots/:id/rules` `{op, id?, text?, version}`**: add, edit or remove an own rule. `pack-<n>` ids are refused as `safety_locked`. Limits: 20 own rules, 200 characters each, no duplicates.
+- **`POST v1/chatbots/:id/facts/:factId/correction` `{text, version}`**: as §4.1.1.
+  - It word-matches the fact to a sentence of its page document, replaces that sentence and re-indexes the document.
+  - With no match (under 60% of the fact's content words), it goes into the notes only, and the owner is told.
+  - It always adds the correction to the Owner notes, building on the notes document as the owner last edited it.
+  - The fact keeps `correction {text, originalText, appliedTo, documentId, notesDocumentId, pageHash, at}`. A second correction keeps the first original.
+- **The four fixes** (§4D): an edited fact becomes "From you" (and Undo restores its source); installers are skipped; logo order is header logo, then touch icon, then og:image only if its declared size is ≤ 2:1; design samples have one speaker per line and are grounded (ally-ai).
+
+### ally-web (`pages/AssistantHome/`)
+
+- **Routing:** `/chatbots/:botId` opens the home (edge to edge). `?view=classic` opens the old `ChatbotPage`, unchanged. Old `?tab=` and `?tab=settings&section=` links land on the section that holds them now (`sections.ts`); `?tab=test` opens Try it.
+- **Saving:** `useHomeField` shows a value at once and saves after 600 ms or on blur, with the version it started from.
+  - On a 409 it puts the other tab's value in the field and shows the server's words.
+  - Each save offers "Changed · Undo", which saves the previous value the same way.
+  - The header shows Saving… / Saved / Couldn't save.
+- **Sections, and where each old control went:**
+
+  | Section | Built in v2 | Still the classic component inside (to redraw) |
+  |---|---|---|
+  | Overview | live switch, link + QR, last 30 days, needs-you, Remove | "All numbers" (the usage charts, loaded only when opened) |
+  | What it knows | facts with Correct this / Show original, Your notes, document list | "Upload or remove documents" (collapsed); the unanswered list when there is one |
+  | Personality | name, introduction, tone, languages, suggested questions, when it doesn't know, Extra instructions (collapsed) | Quick replies (shown only once WhatsApp is connected) |
+  | Safety | pack card, own rules, disclaimer, at-risk reply | none |
+  | Page | on/off, business name, questions before the chat, limits, too-many-messages | Look and feel was already v2 |
+  | Checkup | empty state | none |
+  | Conversations | heading | the conversation list and drawer |
+  | Share | who can open the page (3 choices); WhatsApp messages (collapsed, once connected) | the page's access list, WhatsApp audience, numbers, team |
+
+- **Try it** (right panel; a bottom sheet on phones): the bot page's own `Chat` screen in the page's brand, through `/test/stream` with the plain endpoint as fallback.
+- **Engine** (header button, platform admins only): the classic AgentTab.
+- **The old "Advanced setup" form** (`CreateChatbotPanel`) is deleted. "New assistant" and the empty-state and connectors actions all go to onboarding.
+- **Copy:** `ONBOARDING-COPY.md` §20. Words the deck already had (safety card, tones, share options, Changed · Undo) come from onboarding's COPY. "This week" became "Last 30 days", because the bot's stats cover 30 days.
+
+### Decisions in code (not in §4.1)
+
+- **Commits:** the home landed as one ally-web commit, not five per-section ones. The shell imports every section, so a partial commit wouldn't build.
+- **The 30-day window:** stats are 30 days, so the tiles say so.
+- **Page on/off and access** became home fields, not the whole-page PUT, so no control sends a whole object.
+- **WhatsApp-only controls** (audience, WhatsApp messages, quick replies) appear once a number is connected; before that, Share shows deck §11's "Connect your WhatsApp number…" and the Connect button.
+- **The Owner notes document** is edited directly from What it knows and saved on blur, because each save retrains it.
+
+### Tests changed or removed
+
+- `WhatsAppBot.test.tsx`: removed its `vi.mock("../CreateChatbotPanel")`, because the file is deleted. No assertion changed; the "member sees no New chatbot" test still passes.
+- `RouteLayout.test.tsx`: added a mock of `AssistantHome` and one test: the home at `/chatbots/:id`, and the classic page at `?view=classic`.
+- `crawl-helpers.spec.ts` "uses a logo-shaped og:image…" and `site-crawl.service.spec.ts` "finds the brand": their fixtures now declare a square og:image, because an undeclared one is no longer trusted (approved fix 4).
+- `memory-drafts.ts` (test helper): `findOne` also matches by `chatbotId`.
+- Nothing else changed; no test was removed.
+
+### New tests
+
+- **ally-be `assistant-home.spec.ts` (57):** the field registry; two tabs on the same field (sequential and simultaneous); different fields don't conflict; refusals; a rule can be added but a pack rule can't be removed or edited; corrections (page, notes only, second correction, notes as last edited); the server's words against the deck.
+- **ally-be `assistant-home.pg.spec.ts` (2, Postgres):** two tabs saving at once, where one wins and the other gets the winner's value, and both stores hold it; adding a rule.
+- **ally-be fixes:** "From you" plus Undo; installers; logo order.
+- **ally-ai `test_flow.py`:** one speaker per sample line; ungrounded samples are replaced.
+- **ally-web:**
+  - `copy.test.ts` (every string is the deck's; none says "model");
+  - `sections.test.ts` (deep links);
+  - `fields.test.ts` (saves after a pause with its version; blur saves one field; 409 shows the other tab's words; viewer read-only; add rule with the list's version; no Edit on a pack rule);
+  - the classic-view route test.
+- **Playwright `assistantHome.e2e.ts`:** each section at 1440 and 390 px against baselines, with axe; Try it; a field changed in another tab; viewer read-only; Engine for platform admins only. The dev harness is `/dev/assistant-home/<id>` (dev builds only; it isn't in the production bundle), with every API call answered by `assistantHome.fixture.ts`.
+
+### Suites (2026-11-09)
+
+- ally-be: 1009 suites, 14,560 passed, 65 skipped (the Postgres specs without a test database). With `CHATBOT_STORE_TEST_DB`: the 6 bot-draft Postgres tests pass.
+- ally-ai: 2,019 passed, 38 skipped; flake8 clean.
+- ally-web admin: 560 files, 8,820 passed; typecheck clean; `build:admin` succeeds; eslint clean on everything this work touched. `IdeaCapture.tsx` and `types/bugHunter.ts` have prettier errors from before.
+
+### How to test
+
+1. Open an onboarded assistant from AI Chatbots. It opens on Overview.
+2. Change its name in Personality, then reload. The page's assistant name changed too (Page → the phone, or Try it).
+3. Open the same assistant in two tabs. Change Introduction in one, then in the other. The second shows "This changed while you were editing…" with the first tab's text.
+4. In Safety, add a rule, edit it and remove it. Pack rules have no Edit or Remove.
+5. In What it knows, use Correct this on a website fact. Show original shows the old line. Ask Try it the question: it answers with the correction.
+6. Open `?view=classic`: the old tabs.
+
+### Open
+
+- **To redraw in v2:** the conversation list and drawer, the documents upload panel, the unanswered list, the page access list, the WhatsApp audience, numbers and team, quick replies, and the usage charts.
+- **Unused create path:** the `useCreateChatbotMutation` and `POST v1/chatbots` stay for now (platform scripts may use the endpoint). Remove them with the classic view.
+- **Re-reading a corrected page:** `pageHash` is stored; the "choose which to keep" flag needs re-reading, which isn't built.
+- **The designs prompt's default text** changed (one speaker per line, no ungrounded details). The live Skills Store version needs a push with the `prompts` CLI (needs a Skills Store key). The code check applies either way.
