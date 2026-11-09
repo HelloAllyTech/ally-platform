@@ -66,6 +66,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             organisation=organisation_of(state["bot"]),
             history=recent(state.get("history")) or (),
             safety_pack=(state["bot"].get("persona") or {}).get("safety_pack"),
+            decline_text=state["bot"].get("decline_text"),
             can_search_again=len(state.get("tool_calls") or []) == 1
             and tool_budget(state) > 0
             and (state.get("revisions") or 0) < MAX_REVISIONS

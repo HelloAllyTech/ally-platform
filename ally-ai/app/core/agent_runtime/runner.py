@@ -62,6 +62,9 @@ def build_response(state: AgentState, run_id: str) -> AgentRunResponse:
                 if p.get("document_id")
             )
         ),
+        "passage_chunk_ids": [
+            str(p["chunk_id"]) for p in state.get("passages") or [] if p.get("chunk_id")
+        ],
         "searches": sum(
             1
             for call in state.get("tool_calls") or []

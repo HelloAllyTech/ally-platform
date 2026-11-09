@@ -77,7 +77,25 @@ class CheckupObserved(BaseModel):
     turn_type: str = ""
     citations: List[CheckupCitation] = Field(default_factory=list)
     passage_document_ids: List[str] = Field(default_factory=list)
+    passage_chunk_ids: List[str] = Field(
+        default_factory=list,
+        description="Every passage the run retrieved; the judge reads them all.",
+    )
     would_file_unanswered: bool = False
+    about: str = Field(
+        "",
+        description=(
+            "The assistant's configured introduction and instructions: what it may "
+            "say about itself and what it helps with."
+        ),
+    )
+    decline_text: str = Field(
+        "",
+        description=(
+            "The owner's wording for when it doesn't know; every decline carries its "
+            "contact, so the judge reads it as a source."
+        ),
+    )
     history: List[Dict[str, Any]] = Field(
         default_factory=list, description="Earlier turns of the case's thread, if any."
     )

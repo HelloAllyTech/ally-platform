@@ -9,7 +9,6 @@ from typing import Any, Dict, Literal, Tuple, Union
 
 from app.core.agent_runtime import conversation
 from app.core.agent_runtime.budget import MUST_SEARCH_AFTER, recent, tool_budget
-from app.core.agent_runtime.check import Rejection
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import allowed_tools
@@ -51,16 +50,13 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         tools = allowed_tools(bot) if budget > 0 else []
         # Sent back for not searching, and still nothing searched: this step can
         # only search. Asking alone was not enough in the eval.
+        # A step sent back to search again (SEARCH_AGAIN) is asked to, not forced:
+        # forcing the schema made a step that replied anyway fail validation, and
+        # the failed run fell back to v1 (chunk 20a-2).
         must_search = bool(
             tools
-            and (
-                (
-                    state.get("feedback") in MUST_SEARCH_AFTER
-                    and not state.get("tool_calls")
-                )
-                # Sent back to search again with other words (chunk 20a-2).
-                or state.get("feedback") == Rejection.SEARCH_AGAIN.value
-            )
+            and state.get("feedback") in MUST_SEARCH_AFTER
+            and not state.get("tool_calls")
         )
         step, meta = await conversation.agent_step(
             state["question"],

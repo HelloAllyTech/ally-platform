@@ -287,7 +287,7 @@ def test_source_texts_are_titled_and_capped():
         {"document_title": "Empty", "text": ""},
     ]
     texts = grader.source_texts(passages)
-    assert len(texts) == grader.MAX_SOURCE_PASSAGES
+    assert len(texts) == grader.MAX_SOURCE_PASSAGES + 2
     assert texts[0].startswith("[Fees] ")
     assert len(texts[0]) <= grader.MAX_SOURCE_CHARS + len("[Fees] ")
 
@@ -308,3 +308,11 @@ async def test_a_decline_that_reads_as_smalltalk_is_judged(judge):
         probe, seen(reply="Here is a poem…", cited=False, turn_type="smalltalk")
     )
     assert "expected_decline_got_answered" in bad.reasons
+
+
+def test_the_judge_reads_cited_passages_first_then_the_rest_retrieved():
+    observed = seen(passage_chunk_ids=["r1", "c-cited", "r2"])
+    observed.citations[0].chunk_id = "c-cited"
+    assert grader.source_chunk_ids(observed) == ["c-cited", "r1", "r2"]
+    many = seen(cited=False, passage_chunk_ids=[f"r{n}" for n in range(20)])
+    assert len(grader.source_chunk_ids(many)) == grader.MAX_SOURCE_PASSAGES

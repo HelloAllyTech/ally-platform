@@ -37,6 +37,9 @@ def test_grade_reads_each_cited_passage_once(client):
                 {"chunk_id": "c1", "document_id": "d1"},
                 {"chunk_id": "c2", "document_id": "d1"},
             ],
+            "passage_chunk_ids": ["c3", "c2"],
+            "decline_text": "Please call +91 20 0000 4400.",
+            "about": "You cover services, fees and booking.",
         },
     }
     graded = AsyncMock(
@@ -56,8 +59,10 @@ def test_grade_reads_each_cited_passage_once(client):
     assert [c.args[0] for c in service.chunk_service.get.call_args_list] == [
         "c1",
         "c2",
+        "c3",
     ]
     assert graded.call_args.kwargs["sources"] == [
-        "[Fees] First consultation: Rs. 1,800.",
-        "[Fees] First consultation: Rs. 1,800.",
+        *["[Fees] First consultation: Rs. 1,800."] * 3,
+        "[When it doesn't know] Please call +91 20 0000 4400.",
+        "[The assistant's own setup] You cover services, fees and booking.",
     ]

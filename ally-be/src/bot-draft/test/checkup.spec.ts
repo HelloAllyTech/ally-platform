@@ -159,15 +159,27 @@ describe('CheckupService.gradeRequest', () => {
             source_url: '',
           },
         ],
-        retrieval: { passage_document_ids: ['doc-1', 'doc-2'], searches: 2 },
+        retrieval: {
+          passage_document_ids: ['doc-1', 'doc-2'],
+          passage_chunk_ids: ['c-1', 'c-2'],
+          searches: 2,
+        },
         wouldFileUnanswered: null,
       } as never,
       [{ role: 'user', content: 'hi' }],
+      undefined,
+      {
+        declineText: 'Please call +91 20 0000 4400.',
+        about: 'You cover fees.',
+      },
     );
     expect(request.case.source.document_id).toBe('doc-1');
     expect(request.observed.reply).toBe('It costs Rs. 1,800.');
     expect(request.observed.passage_document_ids).toEqual(['doc-1', 'doc-2']);
     expect(request.observed.citations[0].chunk_id).toBe('c-1');
+    expect(request.observed.passage_chunk_ids).toEqual(['c-1', 'c-2']);
+    expect(request.observed.decline_text).toBe('Please call +91 20 0000 4400.');
+    expect(request.observed.about).toBe('You cover fees.');
     expect(request.observed.would_file_unanswered).toBe(false);
     expect(request.observed.history).toHaveLength(1);
     expect(request.judge).toBe(true);
@@ -184,7 +196,7 @@ describe('CheckupService.start', () => {
       update: jest.fn(),
     };
     const access = {
-      assert: jest.fn().mockResolvedValue({}),
+      assert: jest.fn().mockResolvedValue({ chatbot: {} }),
       assertPlatformAdmin: jest.fn(async () => {
         if (!admin) throw new Error('forbidden');
       }),

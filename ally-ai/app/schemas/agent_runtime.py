@@ -113,6 +113,14 @@ class AgentRetrievalMeta(RetrievalMeta):
             "checkup uses it to tell a wrong decline from an honest one."
         ),
     )
+    passage_chunk_ids: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Every passage the agent was shown, across all of the run's searches. "
+            "The checkup's judge reads them, so a detail a decline took from them "
+            "isn't taken for an invented one."
+        ),
+    )
     searches: int = Field(
         0, description="How many times the agent searched in this run."
     )

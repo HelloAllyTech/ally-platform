@@ -19,7 +19,7 @@ sites:
     cases:
       - { id: gp-fee, send: "How much is a general consultation?", expect: answer, facts: ["₹700"], page: /services }
       - { id: gp-vaccines, send: "Do you offer child vaccinations?", expect: answer, facts: ["yes, child vaccinations"], page: /services }
-      - { id: gp-hours, send: "When are you open on weekdays?", expect: answer, facts: ["Monday to Saturday, 8 am to 8 pm"], page: /visit }
+      - { id: gp-hours, send: "When are you open on weekdays?", expect: answer, facts: ["8 am to 8 pm on weekdays"], page: /visit }
   diagnostic-lab:
     cases:
       - { id: lab-hours, send: "What are your opening hours?", expect: answer, facts: ["every day, 7 am to 9 pm"], page: /contact }

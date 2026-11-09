@@ -4,7 +4,6 @@
 from unittest.mock import patch
 
 import pytest
-from pydantic import ValidationError
 
 from app.core.agent_runtime.check import REJECTIONS
 from tests.core.agent_runtime.steps import CONVERSATION, FakeLLM, reply, search
@@ -53,9 +52,10 @@ async def test_the_retry_must_search(agent_run, chunk_service):
     )
     state = await agent_run("Is there parking?", llm)
 
-    # The step after the refusal can only search: a reply doesn't fit its schema.
-    with pytest.raises(ValidationError):
-        llm.calls[2]["schema"].model_validate(reply("decline", "No."))
+    # The step after the refusal is asked to search again, not forced: a reply
+    # still fits its schema, so a step that replies can't fail the run.
+    llm.calls[2]["schema"].model_validate(reply("decline", "No."))
+    assert REJECTIONS["search_again"] in llm.calls[2]["prompt"]
     # Still nothing: the honest decline stands, in its own words, after one retry.
     assert state["result"]["intent"] == "decline"
     assert state["result"]["answer"] == "I don't have parking details, sorry."
@@ -72,6 +72,21 @@ async def test_no_retry_when_the_first_search_found_nothing(agent_run, chunk_ser
 
     assert len(llm.calls) == 2
     assert state["result"]["intent"] == "decline"
+
+
+async def test_a_retry_that_replies_instead_of_searching_ends_the_run(
+    agent_run, chunk_service
+):
+    chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+    llm = FakeLLM(
+        search("parking"),
+        reply("decline", "I don't have parking details."),
+        reply("decline", "I don't have parking details, sorry."),
+    )
+    state = await agent_run("Is there parking?", llm)
+
+    assert state["result"]["intent"] == "decline"
+    assert len(llm.calls) == 3
 
 
 async def test_no_retry_after_two_searches(agent_run, chunk_service):

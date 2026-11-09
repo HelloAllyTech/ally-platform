@@ -26,6 +26,15 @@ import { dataSourceOptions } from '../data-source';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
+/**
+ * The queue message for one document. `reindex`, never `ingest`: an `ingest` of an indexed
+ * document keeps its chunk version, so its old chunks would stay (found on the first local run).
+ */
+export const reindexMessage = (documentId: string) => ({
+  documentId,
+  action: 'reindex' as const,
+});
+
 /** Pasted documents of onboarded assistants (a safety pack is set only by onboarding). */
 export const NEEDS_REINGEST_SQL = `
   SELECT d.id
@@ -72,7 +81,7 @@ async function main(): Promise<void> {
       await sqs.send(
         new SendMessageCommand({
           QueueUrl: queueUrl,
-          MessageBody: JSON.stringify({ documentId: id, action: 'reindex' }),
+          MessageBody: JSON.stringify(reindexMessage(id)),
         }),
       );
       queued += 1;
@@ -83,9 +92,11 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(
-    `Re-ingest failed: ${error instanceof Error ? error.message : 'unknown error'}`,
-  );
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    console.error(
+      `Re-ingest failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+    );
+    process.exit(1);
+  });
+}

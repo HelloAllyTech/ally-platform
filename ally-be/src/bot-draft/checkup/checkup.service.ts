@@ -17,6 +17,7 @@ import {
   ChatbotMemberRole,
 } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
+import { ChatbotSettingsService } from '../../chatbot/service/chatbot-settings.service';
 import {
   ChatbotService,
   ChatbotTestResult,
@@ -71,6 +72,12 @@ export interface StartRun {
 
 type Group = { thread: string | null; cases: ChatbotCheckupCase[] };
 
+/** What the judge reads besides the passages: the owner's wording and setup. */
+interface GradeContext {
+  declineText?: string;
+  about?: string;
+}
+
 /**
  * The Checkup (chunk 20a-2): asks an assistant its checkup questions through its own engine (the
  * Preview path, so crisis handling, the safety pack and the answer check all apply), grades each
@@ -88,6 +95,7 @@ export class CheckupService {
     private readonly access: ChatbotAccessService,
     private readonly chatbots: ChatbotService,
     private readonly ai: AiService,
+    private readonly settings?: ChatbotSettingsService,
   ) {}
 
   private readonly logger = LoggerService.getInstance(CheckupService.name);
@@ -166,7 +174,10 @@ export class CheckupService {
     chatbotId: string,
     options: StartRun,
   ): Promise<ChatbotCheckupRun> {
-    await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
+    const { chatbot } = await this.access.assert(
+      chatbotId,
+      ChatbotMemberRole.EDITOR,
+    );
     const attempts = Math.min(
       Math.max(options.attempts ?? 1, 1),
       CHECKUP_LIMITS.maxAttempts,
@@ -218,15 +229,26 @@ export class CheckupService {
       }),
     );
     // Not awaited: the caller polls the run. The request's user context carries into the work.
-    void this.execute(run, asked, attempts).catch(async (error: unknown) => {
-      this.logger.error(
-        `Checkup run ${run.id} failed: ${error instanceof Error ? error.name : 'error'}`,
-      );
-      await this.runs.update(
-        { id: run.id },
-        { status: 'failed', finishedAt: new Date() },
-      );
-    });
+    // The assistant's "when it doesn't know" wording: every decline carries its
+    // contact, so the judge reads it as a source.
+    const declineText = this.settings
+      ? ((await this.settings.getForChatbot(chatbot)).declineText ?? '')
+      : '';
+    // What the assistant may say about itself: its introduction and instructions.
+    const about = [chatbot?.persona?.greeting, chatbot?.persona?.systemPrompt]
+      .filter(Boolean)
+      .join('\n');
+    void this.execute(run, asked, attempts, { declineText, about }).catch(
+      async (error: unknown) => {
+        this.logger.error(
+          `Checkup run ${run.id} failed: ${error instanceof Error ? error.name : 'error'}`,
+        );
+        await this.runs.update(
+          { id: run.id },
+          { status: 'failed', finishedAt: new Date() },
+        );
+      },
+    );
     return run;
   }
 
@@ -254,6 +276,7 @@ export class CheckupService {
     run: ChatbotCheckupRun,
     cases: ChatbotCheckupCase[],
     attempts: number,
+    context: GradeContext = {},
   ): Promise<void> {
     const prompts = await this.prompts();
     const work: { group: Group; attempt: number }[] = [];
@@ -265,7 +288,7 @@ export class CheckupService {
     const worker = async () => {
       while (next < work.length) {
         const { group, attempt } = work[next++];
-        await this.askGroup(run, group, attempt, prompts);
+        await this.askGroup(run, group, attempt, prompts, context);
       }
     };
     await Promise.all(
@@ -292,6 +315,7 @@ export class CheckupService {
     group: Group,
     attempt: number,
     prompts: Record<string, unknown> | undefined,
+    context: GradeContext = {},
   ): Promise<void> {
     const conversationId = `checkup-${run.id.slice(0, 8)}-${group.cases[0].id.slice(0, 8)}-${attempt}`;
     const history: { role: 'user' | 'assistant'; content: string }[] = [];
@@ -306,7 +330,7 @@ export class CheckupService {
           conversationId,
         });
         grade = await this.ai.gradeCheckup(
-          CheckupService.gradeRequest(item, tested, history, prompts),
+          CheckupService.gradeRequest(item, tested, history, prompts, context),
         );
       } catch (error) {
         this.logger.warn(
@@ -359,6 +383,7 @@ export class CheckupService {
     tested: ChatbotTestResult,
     history: { role: 'user' | 'assistant'; content: string }[],
     prompts?: Record<string, unknown>,
+    context: GradeContext = {},
   ): CheckupGradeRequest {
     const retrieval = (tested.retrieval ?? {}) as Record<string, unknown>;
     return {
@@ -387,7 +412,12 @@ export class CheckupService {
         passage_document_ids: Array.isArray(retrieval.passage_document_ids)
           ? (retrieval.passage_document_ids as unknown[]).map(String)
           : [],
+        passage_chunk_ids: Array.isArray(retrieval.passage_chunk_ids)
+          ? (retrieval.passage_chunk_ids as unknown[]).map(String)
+          : [],
         would_file_unanswered: Boolean(tested.wouldFileUnanswered),
+        decline_text: context.declineText ?? '',
+        about: context.about ?? '',
         history,
       },
       judge: true,

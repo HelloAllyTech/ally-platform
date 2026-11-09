@@ -520,6 +520,9 @@ class CheckContext:
     #: One search ran and another is allowed (chunk 20a-2): a decline is sent back
     #: to search again with different words before it is accepted.
     can_search_again: bool = False
+    #: The owner's wording for when it doesn't know (onboarding's "When it doesn't
+    #: know"). Its contact details count as sourced, and every decline carries them.
+    decline_text: str = ""
 
 
 @dataclass
@@ -557,6 +560,7 @@ def check_reply(
     history: Sequence[Dict[str, str]] = (),
     safety_pack: Optional[str] = None,
     can_search_again: bool = False,
+    decline_text: Optional[str] = None,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -580,6 +584,7 @@ def check_reply(
         history=history,
         safety_pack=safety_pack,
         can_search_again=can_search_again,
+        decline_text=(decline_text or "").strip(),
     )
     verdict = _read_draft(step, ctx)
     _ground(verdict, step, ctx)
@@ -592,6 +597,7 @@ def check_reply(
     if verdict.intent != AgentIntent.DECLINE or verdict.model_declined:
         for fix in WORDING_FIXES:
             fix(verdict, ctx)
+    _add_fallback_contact(verdict, ctx)
     result = _build_result(verdict, step, meta, ctx, language, retrieval)
     return result, verdict.rejection
 
@@ -712,12 +718,74 @@ def _require_sources(
 
 def _drop_unsourced_details(verdict: Verdict, ctx: CheckContext) -> None:
     """Any reply type: a phone number, link or email must be in a passage offered
-    this run, word for word. Sent back, and the sentences carrying one removed."""
-    unsourced = unsupported_details(verdict.answer, ctx.passages)
+    this run, or in the owner's own "when it doesn't know" wording, word for word.
+    Sent back, and the sentences carrying one removed."""
+    sources = [*ctx.passages, {"text": ctx.decline_text}]
+    unsourced = unsupported_details(verdict.answer, sources)
     if unsourced and verdict.rejection in (None, Rejection.UNSOURCED_DETAIL):
         logger.info("Reply carries %d unsourced contact detail(s)", len(unsourced))
         verdict.rejection, verdict.keeps_text = Rejection.UNSOURCED_DETAIL, True
         verdict.answer = without_details(verdict.answer, unsourced)
+
+
+_CLAUSE_END = re.compile(r"(?<=[.!?।])\s+|\s+[—–]\s+|;\s+")
+
+
+def fallback_contact(decline_text: str) -> str:
+    """The part of the owner's decline wording that carries its contact details
+    ("please call +91 20 0000 4400."), capitalised as a sentence of its own."""
+    clauses = [c.strip() for c in _CLAUSE_END.split(decline_text or "") if c.strip()]
+    with_contact = [c for c in clauses if contact_details(c)]
+    if not with_contact:
+        return ""
+    text = " ".join(with_contact)
+    text = text[0].upper() + text[1:]
+    return text if text[-1] in ".!?।" else f"{text}."
+
+
+def _add_fallback_contact(verdict: Verdict, ctx: CheckContext) -> None:
+    """A decline in the agent's own words always gives the owner's fallback contact
+    (chunk 20a-2): taken word for word from the bot's decline wording, never
+    searched for or made up. Added only when the reply carries none of it. A
+    decline with no text left gets the owner's wording from ally-be anyway."""
+    if verdict.intent != AgentIntent.DECLINE or not verdict.answer.strip():
+        return
+    if not verdict.model_declined:
+        return
+    contact = fallback_contact(ctx.decline_text)
+    if not contact:
+        return
+    wanted = {normalise_detail(d) for d in contact_details(contact)}
+    present = {normalise_detail(d) for d in contact_details(verdict.answer)}
+    if wanted & present:
+        return
+    verdict.answer = f"{verdict.answer.rstrip()} {contact}"
+
+
+# The assistant offering to book, reserve or schedule for the person, which it can't
+# do (chunk 20a-2; booking is "coming soon"). Telling them how to book stays.
+_OFFERS_BOOKING = re.compile(
+    r"\b(?:would you like|do you want|shall|should|want)\s+(?:me|us)\s+to\s+"
+    r"(?:help\s+(?:you\s+)?)?(?:\w+\s+and\s+)?(?:book|reserve|schedule|arrange)\b"
+    r"|\b(?:i|we)\s+(?:can|will|could)\s+(?:also\s+)?(?:help\s+(?:you\s+)?)?"
+    r"(?:find\s+and\s+)?(?:book|reserve|schedule)\b"
+    r"|\b(?:book|reserve|schedule)\s+(?:it|one|that|a\s+\w+)\s+for\s+you\b",
+    re.IGNORECASE,
+)
+
+
+def offers_booking(sentence: str) -> bool:
+    return bool(_OFFERS_BOOKING.search(sentence or ""))
+
+
+def _trim_booking_offers(verdict: Verdict, ctx: CheckContext) -> None:
+    """The assistant can't book, so it never offers to (chunk 20a-2). The sentence
+    is trimmed, not sent back; if nothing would be left, the reply stays."""
+    if offers_booking(verdict.answer):
+        verdict.answer = (
+            without_sentences(verdict.answer, lambda s: not offers_booking(s))
+            or verdict.answer
+        )
 
 
 def _trim_repeated_crisis_wording(verdict: Verdict, ctx: CheckContext) -> None:
@@ -769,6 +837,7 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _drop_unsourced_details,
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,
+    _trim_booking_offers,
     _cut_source_phrases,
     _flag_source_talk,
     _decline_if_nothing_left,

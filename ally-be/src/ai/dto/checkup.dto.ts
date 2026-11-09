@@ -50,7 +50,10 @@ export interface CheckupGradeRequest {
       source_url: string;
     }[];
     passage_document_ids: string[];
+    passage_chunk_ids: string[];
     would_file_unanswered: boolean;
+    decline_text: string;
+    about: string;
     history: { role: 'user' | 'assistant'; content: string }[];
   };
   judge: boolean;

@@ -6,6 +6,7 @@ from app.core.agent_runtime.check import (
     REJECTIONS,
     check_reply,
     detail_kinds,
+    fallback_contact,
     looks_factual,
     mentions_sources,
     organisation_of,
@@ -733,3 +734,99 @@ class TestSaysItHasNothing:
     )
     def test_answers(self, text):
         assert not says_it_has_nothing(text)
+
+
+class TestFallbackContact:
+    """Every decline gives the owner's fallback contact (onboarding's "When it
+    doesn't know"), word for word from the bot's decline wording (chunk 20a-2)."""
+
+    WORDING = "I don't have that information — please call +91 20 0000 4400."
+
+    def test_a_decline_without_it_gets_the_configured_contact(self):
+        result, _ = review(
+            "decline",
+            "I can't share a staff member's personal number.",
+            decline_text=self.WORDING,
+        )
+        assert result["intent"] == "decline"
+        assert result["answer"] == (
+            "I can't share a staff member's personal number. "
+            "Please call +91 20 0000 4400."
+        )
+
+    def test_a_decline_that_has_it_is_left_alone(self):
+        text = "I don't have that. Please call +91 20 0000 4400 to ask."
+        result, _ = review("decline", text, decline_text=self.WORDING)
+        assert result["answer"] == text
+
+    def test_an_invented_number_is_removed_and_the_configured_one_added(self):
+        result, _ = review(
+            "decline",
+            "I don't have her number. Try 98765 43210.",
+            decline_text=self.WORDING,
+            passages=[],
+        )
+        assert "98765" not in result["answer"]
+        assert result["answer"].endswith("Please call +91 20 0000 4400.")
+
+    def test_no_contact_in_the_wording_adds_nothing(self):
+        text = "I don't have that information."
+        result, _ = review("decline", text, decline_text="Please ask our front desk.")
+        assert result["answer"] == text
+
+    def test_answers_are_untouched(self):
+        result, _ = review(
+            "answer", "It costs Rs. 1,800.", citations=[1], decline_text=self.WORDING
+        )
+        assert "4400" not in result["answer"]
+
+    def test_the_contact_clause(self):
+        assert fallback_contact(self.WORDING) == "Please call +91 20 0000 4400."
+        assert fallback_contact("Please ask our front desk.") == ""
+
+
+class TestOutRefund:
+    """3a eval case `out-refund`: the reply declines in words but the model labelled
+    it an answer and cited where to go. The label follows what the reply does, so
+    ally-be files it as unanswered (chunk 20a-2)."""
+
+    def test_a_cited_answer_that_says_it_has_nothing_is_a_decline(self):
+        result, _ = review(
+            "answer",
+            "I don’t have any information about a refund policy. Please ask your "
+            "organisation, who manage access and billing.",
+            citations=[1],
+        )
+        assert result["intent"] == "decline"
+        assert result["citations"] == []
+        assert result["answer"].startswith("I don’t have any information")
+
+
+class TestBookingOffers:
+    """The assistant can't book, so offers to are trimmed (chunk 20a-2)."""
+
+    def test_an_offer_to_book_is_trimmed_and_how_to_book_stays(self):
+        result, _ = review(
+            "answer",
+            "Couples sessions are 75 minutes. You can book on WhatsApp. "
+            "Would you like me to book a slot for you?",
+            citations=[1],
+        )
+        assert result["answer"] == (
+            "Couples sessions are 75 minutes. You can book on WhatsApp."
+        )
+
+    def test_a_decline_keeps_its_contact_and_loses_the_offer(self):
+        result, _ = review(
+            "decline",
+            "I can't diagnose anyone. I can help you find and book a consultation.",
+            decline_text="Please call +91 20 0000 4400.",
+        )
+        assert result["answer"] == (
+            "I can't diagnose anyone. Please call +91 20 0000 4400."
+        )
+
+    def test_a_reply_that_is_only_an_offer_is_kept(self):
+        text = "Would you like me to book a slot for you?"
+        result, _ = review("decline", text)
+        assert result["answer"] == text

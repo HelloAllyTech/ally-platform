@@ -34,5 +34,6 @@ def test_passage_documents_cover_every_search_and_searches_are_counted():
     }
     retrieval = build_response(state, "run-1").retrieval
     assert retrieval.passage_document_ids == ["home", "classes"]
+    assert retrieval.passage_chunk_ids == ["c1", "c2", "c3"]
     assert retrieval.searches == 2
     assert retrieval.hit_chunk_ids == ["c1"]
