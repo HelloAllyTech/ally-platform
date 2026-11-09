@@ -23,7 +23,15 @@ poetry run bug-hunter cache clean         # prune kept artefacts by age (30 d) a
 poetry run bug-hunter runs clean          # sweep what a crashed run left behind
 make eval CASES=<id>                      # one golden case against the baseline agent (Docker)
 make eval-oracle CASES=<id>               # prove one case: oracle fails before, passes after the real fix
+make db-up                                # local Postgres for checkpoints (compose.yaml, port 5433)
+poetry run bug-hunter run --app ally-be --issue-text "…"   # one signal through graph v1 (issue mode)
+poetry run bug-hunter run --commit <sha>                   # sweep mode: review one commit's diff
+poetry run bug-hunter replay <run_id> [--resume]           # list checkpoints / continue a killed run
+make eval AGENT=graph CASES=<id>          # the real graph on one golden case (costs money)
 ```
+
+Keys: `bug-hunter/.env` locally (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `LANGSMITH_API_KEY`;
+loaded by the CLI, never printed), repository secrets in CI.
 
 Full eval runs (all cases: oracle check + baseline) go through the manual workflow
 `.github/workflows/bug-hunter-evals.yml` (Actions → "Bug Hunter v2 evals" → Run
@@ -53,6 +61,15 @@ called done. Unit tests never hit the network or a real model.
 | `src/bug_hunter/tools/runner.py` | `Runner`: run_tests/run_lint/run_typecheck from apps.yaml, parsed results |
 | `src/bug_hunter/tools/lc.py` | The above as LangChain `StructuredTool`s: `read_tools`, `write_tools`, `runner_tools` |
 | `sandbox/*.Dockerfile` | Test images per app, versions mirroring `.github/workflows/test-*.yml` |
+| `src/bug_hunter/graph/state.py` | `BugState` + sub-models (spec §4), `Budget` per node |
+| `src/bug_hunter/graph/build.py` | `build_graph(deps, checkpointer)`, `run_graph`; `deps.py` holds tools/models/context per run |
+| `src/bug_hunter/graph/nodes/` | intake, triage, investigate (tool loop), reproduce (tool loop + code verification), escalate, report |
+| `src/bug_hunter/graph/loop.py` | ReAct tool loop as a subgraph with finish tools; resumable mid-loop |
+| `src/bug_hunter/graph/routing.py` | Conditional edges, pure functions of the state |
+| `src/bug_hunter/graph/budget.py` | Token/cost accounting (prices in `models.yaml`) and the per-run caps |
+| `src/bug_hunter/graph/failure.py` | Setup vs genuine test failure, per framework |
+| `src/bug_hunter/graph/checkpointer.py` | `PostgresSaver` (schema `bughunter`), `InMemorySaver` only on request |
+| `src/bug_hunter/graph/prompts.py` + `prompts/*.vN.md` | Versioned prompts; active version in `models.yaml` |
 | `src/bug_hunter/runs.py` | `Run` lifecycle: worktree + containers always cleaned, artefacts always kept under `runs/artefacts/<run_id>/`; `clean_orphans`, `clean_artefacts`, `cache_report` |
 | `src/bug_hunter/context/app_context.py` | Per-app knowledge: `AGENTS.md` + the app's parts of the root `CLAUDE.md` |
 | `src/bug_hunter/context/repo_map.py` | tree-sitter symbol index + best-effort call graph (NestJS DI aware); `outline`, `find_symbol`, `callers`, `callees`, `tests_for`, `neighbourhood(diff)`; gzip cache per commit under `runs/cache/repo-map/` |

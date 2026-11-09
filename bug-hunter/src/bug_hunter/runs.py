@@ -39,6 +39,9 @@ RESUME_FILE = "resume.json"
 PAUSED = "paused"
 
 
+RUN_CONTAINER_PREFIX = "bughunter-run-"  # Sandbox.container_name = bughunter-<run_id>-…
+
+
 def new_run_id(prefix: str = "run") -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     return f"{prefix}-{stamp}-{uuid.uuid4().hex[:6]}"
@@ -232,7 +235,8 @@ def clean_orphans(
     git_runner: Callable[..., Any] | None = None,
 ) -> dict[str, list[str]]:
     """Remove what a crashed run left behind: live run dirs (artefacts are kept
-    first), stale git worktrees and ``bughunter-*`` containers."""
+    first), stale git worktrees and ``bughunter-run-*`` containers (never the
+    ``bughunter-pg`` checkpoint database)."""
     removed: dict[str, list[str]] = {"runs": [], "worktrees": [], "containers": []}
     skipped_live: list[str] = []
     git = Git(config.repo_root, git_runner) if git_runner else Git(config.repo_root)
@@ -276,7 +280,10 @@ def clean_orphans(
         pass
     try:
         listing = docker(
-            ["docker", "ps", "-aq", "--filter", "name=bughunter-"], timeout=60
+            # run containers only (bughunter-run-<id>-<app>-N): never the
+            # bughunter-pg checkpoint database or anything else with the prefix
+            ["docker", "ps", "-aq", "--filter", f"name={RUN_CONTAINER_PREFIX}"],
+            timeout=60,
         )
         ids = listing.stdout.split() if listing.ok else []
         if ids:

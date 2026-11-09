@@ -215,3 +215,22 @@ def test_clean_artefacts_by_age_then_size(repo_config, tmp_path: Path) -> None:
     ]  # old by age, mid as the oldest over the cap
     assert result["size_bytes"] == dir_size(artefacts / "new")
     assert (artefacts / "new").exists()
+
+
+def test_orphan_sweep_only_touches_run_containers(config, tmp_path) -> None:
+    """The checkpoint database container is `bughunter-pg`; the sweep must not list it
+    (found the hard way: a run start removed the database the run was about to use)."""
+    from bug_hunter.runs import RUN_CONTAINER_PREFIX, clean_orphans
+    from bug_hunter.tools.sandbox import DockerResult
+
+    seen: list[list[str]] = []
+
+    def docker(args, timeout=None):
+        seen.append(list(args))
+        return DockerResult(tuple(args), 0, "", "")
+
+    clean_orphans(config, runs_dir=tmp_path / "runs", docker=docker)
+    ps = [a for a in seen if a[:2] == ["docker", "ps"]]
+    assert ps and ps[0][-1] == f"name={RUN_CONTAINER_PREFIX}"
+    assert RUN_CONTAINER_PREFIX == "bughunter-run-"
+    assert not "bughunter-pg".startswith(RUN_CONTAINER_PREFIX)
