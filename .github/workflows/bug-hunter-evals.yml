@@ -68,6 +68,9 @@ env:
   LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
   LANGSMITH_TRACING: "true"
   LANGSMITH_PROJECT: ally-bug-hunter
+  # The key is an organisation-scoped service key; workspace-scoped calls (trace
+  # ingest) need the workspace id with it. An id, not a secret.
+  LANGSMITH_WORKSPACE_ID: 0c854988-4630-4eeb-84c4-ab532b3e578b
   # The graph agent checkpoints into the Postgres service below (the real code path).
   BUGHUNTER_EVAL_CHECKPOINT: postgres
   BUGHUNTER_CHECKPOINT_DB_URL: postgresql://bughunter:bughunter@localhost:5433/bughunter

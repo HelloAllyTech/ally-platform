@@ -30,8 +30,9 @@ poetry run bug-hunter replay <run_id> [--resume]           # list checkpoints / 
 make eval AGENT=graph CASES=<id>          # the real graph on one golden case (costs money)
 ```
 
-Keys: `bug-hunter/.env` locally (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `LANGSMITH_API_KEY`;
-loaded by the CLI, never printed), repository secrets in CI.
+Keys: `bug-hunter/.env` locally (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `LANGSMITH_API_KEY`,
+plus `LANGSMITH_WORKSPACE_ID` because the LangSmith key is organisation-scoped; loaded by
+the CLI, never printed), repository secrets in CI.
 
 Full eval runs (all cases: oracle check + baseline) go through the manual workflow
 `.github/workflows/bug-hunter-evals.yml` (Actions → "Bug Hunter v2 evals" → Run
