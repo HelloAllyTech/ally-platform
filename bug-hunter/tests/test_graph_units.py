@@ -130,11 +130,9 @@ def test_failure_classifier_special_cases(config: BugHunterConfig) -> None:
 
 def test_prompts_load_and_render_strictly(config: BugHunterConfig) -> None:
     prompt = load_prompt(config, "triage")
-    assert prompt.name == "triage.v1" and set(prompt.inputs) == {
-        "context",
-        "app",
-        "mode",
-    }
+    version = config.models.prompts["triage"]
+    assert prompt.name == f"triage.{version}"
+    assert set(prompt.inputs) == {"context", "app", "mode"}
     text = prompt.render(context="CTX", app="ally-be", mode="issue")
     assert "CTX" in text and "$context" not in text and "valued answer" in text
     with pytest.raises(PromptError):
@@ -143,6 +141,16 @@ def test_prompts_load_and_render_strictly(config: BugHunterConfig) -> None:
         prompt.render(context="CTX", app="ally-be", mode="issue", extra="x")
     for node in ("investigate", "reproduce"):
         assert load_prompt(config, node).text.count("Bad") >= 1
+    # every prompt version on disk still loads, with the same inputs as the active one
+    from bug_hunter.graph.prompts import PROMPTS_DIR
+
+    for path in sorted(PROMPTS_DIR.glob("*.v*.md")):
+        node, version = path.stem.split(".")
+        models = config.models.model_copy(
+            update={"prompts": {**config.models.prompts, node: version}}
+        )
+        cfg = config.model_copy(update={"models": models})
+        assert load_prompt(cfg, node).inputs == load_prompt(config, node).inputs
 
 
 def test_workspace_at_old_layout_writes_tests_at_the_root(
