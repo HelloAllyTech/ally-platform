@@ -73,6 +73,14 @@ const Analytics = lazy(() =>
   import("../pages/Analytics/Analytics").then(module => ({ default: module.Analytics })),
 );
 
+// Lazy-loaded (kept out of the eager @pages barrel): the Context Library is a large page that
+// only admins with its toggle ever open.
+const ContextLibrary = lazy(() =>
+  import("../pages/ContextLibrary/ContextLibrary").then(module => ({
+    default: module.ContextLibrary,
+  })),
+);
+
 // Public design-system gallery. Lazy-loaded (kept out of the eager @pages
 // barrel) so this browse-only showcase never weighs on the main admin bundle.
 const DesignSystem = lazy(() =>
@@ -477,6 +485,16 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.SETTINGS}>
               <Settings />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.CONTEXT_LIBRARY}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.CONTEXT_LIBRARY}>
+              <Suspense fallback={null}>
+                <ContextLibrary />
+              </Suspense>
             </PrivateLayout>
           }
         />

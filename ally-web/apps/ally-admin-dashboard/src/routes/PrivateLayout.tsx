@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 
+import { Menu } from "@icons";
 import { useDispatch } from "react-redux";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -22,7 +23,7 @@ import {
   en,
   normalizeEmailForAllowlist,
 } from "@constants";
-import { Menu } from "@icons";
+import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 import { setUser, setPermissions, setFeatures } from "@reducer";
 import { hasPermissions, hasFeature } from "@utils";
 
@@ -313,6 +314,9 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
           </div>
         </main>
         <ReportUploadProgressDialog />
+        {/* Context Library's upload dock: draws nothing until documents are added, then keeps
+            following them on every admin page. */}
+        <UploadDockHost />
       </div>
     </ScenarioReportsSocketProvider>
   );

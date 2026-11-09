@@ -673,6 +673,28 @@ export const ApiEndpoints = {
     DECISION_REPLAY: "/v1/bug-hunter/decisions/replay",
     DECISION_OWNERS: "/v1/bug-hunter/decisions/owners",
   },
+  // Context Library — ally-be src/context-library, docs/context-library/PLAN.md.
+  CONTEXT_LIBRARY: {
+    COLLECTIONS: "/v1/context-library/collections",
+    TEMPLATE: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/template.csv`,
+    // Multipart with upload progress, so sent by the upload client (XHR), not RTK Query.
+    UPLOADS: "/v1/context-library/uploads",
+    QUEUE: "/v1/context-library/queue",
+    SOURCES: "/v1/context-library/sources",
+    SOURCE_BY_ID: (id: string) => `/v1/context-library/sources/${id}`,
+    SOURCE_ACTION: (id: string, action: "pause" | "resume" | "cancel" | "front" | "retry") =>
+      `/v1/context-library/sources/${id}/${action}`,
+    CHUNKS: "/v1/context-library/chunks",
+    CHUNK_BY_CODE: (code: string) => `/v1/context-library/chunks/${encodeURIComponent(code)}`,
+    CHUNK_ACTION: (code: string, action: "archive" | "restore" | "pin" | "unpin") =>
+      `/v1/context-library/chunks/${encodeURIComponent(code)}/${action}`,
+    COLLECTION_CHUNKS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/chunks`,
+    BULK: "/v1/context-library/bulk",
+    SEARCH: "/v1/context-library/search",
+    USE_CASES: "/v1/context-library/settings/use-cases",
+  },
   BUILDER: {
     SESSIONS: "/v1/builder/sessions",
     SESSION_BY_ID: (id: string) => `/v1/builder/sessions/${id}`,
@@ -1045,6 +1067,9 @@ export const ROUTES = {
   COURSE_COPILOT_SESSION: (id: string) => `/course-copilot/${id}`,
   // The Ally Console (ally guide admin). `?tab=` picks the tab; `?thread=` opens the Turn Inspector.
   ALLY_CONSOLE: "/ally",
+  // `?view=` (library · insights · settings), `?collection=`, `?chunk=` and `?document=` open
+  // their sheets; `?sheet=new|bulk` the add flows.
+  CONTEXT_LIBRARY: "/context-library",
   // Evaluator micro-app (public routes; evaluator email+password auth)
   EVALUATE: "/evaluate",
   EVALUATE_RECORDS: "/evaluate/records",
@@ -1298,6 +1323,12 @@ export const TAG_TYPES = {
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",
+  // Context Library. Also registered in baseApi.ts's `tagTypes`.
+  CONTEXT_LIBRARY_COLLECTIONS: "contextLibraryCollections",
+  CONTEXT_LIBRARY_QUEUE: "contextLibraryQueue",
+  CONTEXT_LIBRARY_SOURCES: "contextLibrarySources",
+  CONTEXT_LIBRARY_CHUNKS: "contextLibraryChunks",
+  CONTEXT_LIBRARY_USE_CASES: "contextLibraryUseCases",
 };
 
 /**
