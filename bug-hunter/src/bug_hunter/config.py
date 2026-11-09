@@ -83,8 +83,12 @@ class AppConfig(_Strict):
     @field_validator("test_one")
     @classmethod
     def _test_one_placeholders(cls, value: str | None) -> str | None:
-        if value is not None and "{file}" not in value:
-            raise ValueError("must contain the {file} placeholder")
+        if (
+            value is not None
+            and "{file}" not in value
+            and "{project_file}" not in value
+        ):
+            raise ValueError("must contain the {file} (or {project_file}) placeholder")
         return value
 
 

@@ -63,6 +63,16 @@ def nx_project(file: str) -> str:
     )
 
 
+def nx_project_file(file: str) -> str:
+    """The path relative to the Nx project dir: vitest's cwd when Nx runs it."""
+    parts = PurePosixPath(file).parts
+    if len(parts) >= 3 and parts[0] in ("apps", "libs"):
+        return "/".join(parts[2:])
+    raise RunnerError(
+        f"{file}: cannot derive the Nx project (expected apps/<p>/… or libs/<p>/…)"
+    )
+
+
 def single_test_command(app: AppConfig, file: str, name: str | None) -> str:
     if not app.test_one:
         raise RunnerError(
@@ -76,6 +86,8 @@ def single_test_command(app: AppConfig, file: str, name: str | None) -> str:
     values = {"file": shlex.quote(file), "name": shlex.quote(name) if name else ""}
     if "{project}" in template:
         values["project"] = nx_project(file)
+    if "{project_file}" in template:
+        values["project_file"] = shlex.quote(nx_project_file(file))
     return template.format(**values)
 
 

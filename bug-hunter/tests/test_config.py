@@ -177,7 +177,9 @@ def test_test_one_needs_file_placeholder(config_copy: Path) -> None:
         config_copy / "apps.yaml",
         lambda d: d["apps"]["ally-ai"].__setitem__("test_one", "poetry run pytest"),
     )
-    with pytest.raises(ConfigError, match=r"\{file\} placeholder"):
+    with pytest.raises(
+        ConfigError, match=r"\{file\} \(or \{project_file\}\) placeholder"
+    ):
         load_config(config_dir=config_copy, env={})
 
 

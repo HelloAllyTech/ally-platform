@@ -1,0 +1,152 @@
+{
+ "ally-ai-1ff07399": {
+  "checked_at": "2026-11-09T08:02:29+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-6d1b48a8": {
+  "checked_at": "2026-11-09T08:02:29+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-6e81b510": {
+  "checked_at": "2026-11-09T08:02:02+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-7d30a176": {
+  "checked_at": "2026-11-09T08:02:03+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-b680c643": {
+  "checked_at": "2026-11-09T07:56:09+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-ai-e6286217": {
+  "checked_at": "2026-11-09T08:03:00+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-e9a0e1c3": {
+  "checked_at": "2026-11-09T07:56:17+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-ai-f06c8ed5": {
+  "checked_at": "2026-11-09T08:03:00+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-learn-1065743a": {
+  "checked_at": "2026-11-09T07:56:48+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-ai-learn-66d9a037": {
+  "checked_at": "2026-11-09T08:04:34+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-learn-7391ff7e": {
+  "checked_at": "2026-11-09T07:57:22+00:00",
+  "detail": "test_patch_applied=True fix_applied=True fails_before=False passes_after=True | ally-ai-learn test: passed in 16.8s | ally-ai-learn test: passed in 14.3s",
+  "proven": false
+ },
+ "ally-ai-learn-88592f67": {
+  "checked_at": "2026-11-09T08:04:33+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-learn-995242d7": {
+  "checked_at": "2026-11-09T07:58:21+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-ai-learn-a645303c": {
+  "checked_at": "2026-11-09T08:04:33+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-learn-b408b775": {
+  "checked_at": "2026-11-09T08:04:34+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-learn-b6c51894": {
+  "checked_at": "2026-11-09T08:04:33+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-ai-learn-c77f929e": {
+  "checked_at": "2026-11-09T08:04:34+00:00",
+  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
+  "proven": false
+ },
+ "ally-be-89d8e055": {
+  "checked_at": "2026-11-09T07:49:59+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-be-8c4f9caf": {
+  "checked_at": "2026-11-09T07:50:15+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-be-99584ee6": {
+  "checked_at": "2026-11-09T07:49:46+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-be-adf36739": {
+  "checked_at": "2026-11-09T07:50:07+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-be-b82759ae": {
+  "checked_at": "2026-11-09T07:49:38+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-be-d039e256": {
+  "checked_at": "2026-11-09T07:49:53+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-mobile-83bdf91e": {
+  "checked_at": "2026-11-09T08:01:35+00:00",
+  "detail": null,
+  "proven": true
+ },
+ "ally-web-3b3db9b5": {
+  "checked_at": "2026-11-09T07:54:17+00:00",
+  "detail": "test_patch_applied=True fix_applied=True fails_before=True passes_after=False | ally-web test: failed in 6.2s | ally-web test: failed in 2.7s | ally-web test: failed in 2.8s | ally-web test: failed in 2.5s",
+  "proven": false
+ },
+ "ally-web-9299e9aa": {
+  "checked_at": "2026-11-09T07:50:53+00:00",
+  "detail": "test_patch_applied=True fix_applied=True fails_before=False passes_after=True | ally-web test: passed in 6.3s | ally-web test: passed in 3.1s",
+  "proven": false
+ },
+ "ally-web-dd128ff8": {
+  "checked_at": "2026-11-09T07:53:29+00:00",
+  "detail": "test_patch_applied=True fix_applied=True fails_before=False passes_after=True | ally-web test: passed in 6.9s | ally-web test: passed in 4.0s",
+  "proven": false
+ },
+ "ally-web-e5ad37b3": {
+  "checked_at": "2026-11-09T07:53:12+00:00",
+  "detail": "test_patch_applied=True fix_applied=False fails_before=False passes_after=False | ally-web test: passed in 2.5s",
+  "proven": false
+ },
+ "ally-web-eebbfd01": {
+  "checked_at": "2026-11-09T07:54:00+00:00",
+  "detail": "test_patch_applied=True fix_applied=True fails_before=True passes_after=False | ally-web test: failed in 6.3s | ally-web test: failed in 3.4s",
+  "proven": false
+ },
+ "ally-web-f35e117d": {
+  "checked_at": "2026-11-09T07:53:47+00:00",
+  "detail": "test_patch_applied=True fix_applied=True fails_before=False passes_after=True | ally-web test: passed in 6.1s | ally-web test: passed in 3.1s | ally-web test: passed in 3.5s | ally-web test: passed in 2.8s",
+  "proven": false
+ }
+}

@@ -63,6 +63,9 @@ class HarnessOptions:
     dry_run: bool = False
     min_free_gb: float | None = None
     runs_dir: Path = RUNS_DIR  # tests pass a temp dir; never share the live one
+    # Old-era lockfiles each cost a dependency volume (ally-web ≈ 1.3 GB). Keep
+    # only the volumes for HEAD's lockfiles; drop the others after each case.
+    keep_nonhead_volumes: bool = False
     docker: DockerRunner = subprocess_docker
     sandbox_factory: Callable[..., Sandbox] | None = None  # tests inject a fake
 
@@ -181,6 +184,11 @@ def run_case(
                 app_root=app_root,
             )
             run.sandbox = sandbox
+            sandbox._case_lockfile_blob = case.lockfile_blob
+            created_volumes: list[str] = []
+            _track_installs(
+                sandbox, created_volumes, _head_lockfile(config, case, repo)
+            )
             runner = Runner(config, sandbox)
             diff = (
                 scrub_code(repo.git("show", "--format=", case.commit))
@@ -198,9 +206,13 @@ def run_case(
             )
 
             if options.oracle_check:
-                return _oracle_check(
+                row = _oracle_check(
                     config, case, run, runner, sandbox, guard, repo, result_row, started
                 )
+                run.write_artefact("result.json", json.dumps(row.to_dict(), indent=1))
+                if not options.keep_nonhead_volumes:
+                    _drop_created_volumes(sandbox, created_volumes, options.docker)
+                return row
 
             t0 = time.monotonic()
             agent_result = agent.run(case_input, run)
@@ -243,7 +255,14 @@ def run_case(
                     passed, secs, _ = _run_tests(runner, [path])
                     sandbox_seconds += secs
                     result_row.repro_valid = not passed  # must fail on the buggy code
-                if agent_result.patch and not agent_result.escalated:
+                if (
+                    agent_result.patch
+                    and not agent_result.escalated
+                    and not oracle_proven(case.id)
+                ):
+                    result_row.patch_applied = _apply_patch(run, agent_result.patch)
+                    result_row.error = "oracle unproven: fix not scored"
+                elif agent_result.patch and not agent_result.escalated:
                     result_row.patch_applied = _apply_patch(run, agent_result.patch)
                     if result_row.patch_applied:
                         _add_oracle_tests(run, repo, case, app_path)  # hidden until now
@@ -262,7 +281,39 @@ def run_case(
             result_row.error = f"{type(exc).__name__}: {exc}"[:500]
         result_row.sandbox_seconds = round(sandbox_seconds, 1)
         run.write_artefact("result.json", json.dumps(result_row.to_dict(), indent=1))
+        if not options.keep_nonhead_volumes:
+            _drop_created_volumes(sandbox, created_volumes, options.docker)
         return result_row
+
+
+def _head_lockfile(config, case: Case, repo: Repo) -> str | None:
+    app_path = config.app(case.app).path
+    return repo.blob(repo.ref, f"{app_path}/{config.app(case.app).lockfile}")
+
+
+def _track_installs(sandbox, created: list[str], head_blob: str | None) -> None:
+    """Record dependency volumes this case creates (install ran, lockfile is not
+    HEAD's), so only those are removed afterwards. Volumes that already existed,
+    and HEAD's, are never touched."""
+    original = sandbox.install
+
+    def install(force: bool = False):
+        result = original(force=force)
+        if result is not None:  # an install ran: the volumes are new
+            case_blob = getattr(sandbox, "_case_lockfile_blob", None)
+            if case_blob != head_blob:
+                created.extend(sandbox.volume_names())
+        return result
+
+    sandbox.install = install
+
+
+def _drop_created_volumes(sandbox, created: list[str], docker) -> None:
+    for name in dict.fromkeys(created):
+        try:
+            docker(["docker", "volume", "rm", "-f", name], timeout=120)
+        except Exception:  # noqa: BLE001 - best effort
+            pass
 
 
 def _add_oracle_tests(run: Run, repo: Repo, case: Case, app_path: str) -> bool:
@@ -275,13 +326,16 @@ def _add_oracle_tests(run: Run, repo: Repo, case: Case, app_path: str) -> bool:
 
 
 def _apply_patch(run: Run, patch: str, name: str = "agent.patch") -> bool:
-    patch_file = run.write_artefact("agent.patch", patch)
+    patch_file = run.write_artefact(name, patch)
     try:
         run.git._git(
             ["apply", "--whitespace=nowarn", str(patch_file)], cwd=run.worktree
         )
         return True
-    except GitError:
+    except GitError as exc:
+        errors = run.artefacts / "apply-errors.txt"
+        previous = errors.read_text(encoding="utf-8") if errors.exists() else ""
+        run.write_artefact("apply-errors.txt", f"{previous}{name}: {exc}\n")
         return False
 
 
@@ -320,7 +374,11 @@ def _oracle_check(
         "--",
         *[f"{config.app(case.app).path}/{s}" for s in case.src_files],
     )
-    applied = _apply_patch(run, src_patch) if src_patch.strip() else False
+    applied = (
+        _apply_patch(run, src_patch, name="fix-source.patch")
+        if src_patch.strip()
+        else False
+    )
     passed_after, secs, after = (
         _run_tests(runner, case.oracle_tests) if applied else (False, 0.0, [])
     )
@@ -344,6 +402,16 @@ def _oracle_check(
     run.write_artefact("oracle-after.md", "\n\n".join(r.excerpt for r in after))
     _record_oracle(case.id, proven, row.error)
     return row
+
+
+def oracle_proven(case_id: str) -> bool:
+    """True when ``--oracle-check`` proved the case (fails before, passes after).
+    Unproven cases still run, but a patch against them is not scored."""
+    if not ORACLE_STATUS.exists():
+        return True  # no proof run yet: do not silently drop fix scoring
+    status = json.loads(ORACLE_STATUS.read_text())
+    entry = status.get(case_id)
+    return True if entry is None else bool(entry.get("proven"))
 
 
 def _record_oracle(case_id: str, proven: bool, detail: str | None) -> None:
@@ -397,7 +465,10 @@ def run_evals(
         "stopped_reason": None,
         "free_gb_start": guard.free_gb(),
     }
-    if not options.oracle_check:
+    if options.oracle_check:
+        cases = [c for c in cases if c.kind == "bug"]  # clean cases have no oracle
+        meta["cases"] = len(cases)
+    else:
         skipped = [c.id for c in cases if options.mode not in c.modes]
         cases = [c for c in cases if options.mode in c.modes]
         meta["cases"] = len(cases)
