@@ -792,6 +792,15 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
     }),
 
+    /** One spoken clip from idea capture, as text. Saves nothing. Body: FormData with `audio`. */
+    transcribeRoadmapIdea: builder.mutation<{ text: string }, FormData>({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_TRANSCRIBE,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
     deleteRoadmapIdeaDraft: builder.mutation<void, string>({
       query: id => ({
         url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFT_BY_ID(id),
@@ -1028,6 +1037,7 @@ export const {
   useCreateRoadmapIdeaDraftMutation,
   useUpdateRoadmapIdeaDraftMutation,
   useDeleteRoadmapIdeaDraftMutation,
+  useTranscribeRoadmapIdeaMutation,
   useGetRoadmapInterviewNotesQuery,
   useCreateRoadmapInterviewNoteMutation,
   useUpdateRoadmapInterviewNoteMutation,

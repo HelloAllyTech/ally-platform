@@ -1905,6 +1905,16 @@
       "answerQuestionsToContinue": "ಮುಂದುವರಿಯಲು ಪ್ರಶ್ನೆಗಳಿಗೆ ಉತ್ತರಿಸಿ",
       "resourcesHeading": "ಸಂಪನ್ಮೂಲಗಳು",
       "openExternally": "ಬಾಹ್ಯವಾಗಿ ತೆರೆಯಿರಿ",
+      "takeaways": "ಮುಖ್ಯ ಅಂಶಗಳು",
+      "minRead": "{{count}} ನಿಮಿಷದ ಓದು",
+      "quickChecks_one": "{{count}} ತ್ವರಿತ ಪರಿಶೀಲನೆ",
+      "quickChecks_other": "{{count}} ತ್ವರಿತ ಪರಿಶೀಲನೆಗಳು",
+      "startReading": "ಓದಲು ಪ್ರಾರಂಭಿಸಿ",
+      "callout": {
+        "say": "ಹೀಗೆ ಹೇಳಿ ನೋಡಿ",
+        "info": "ತಿಳಿದಿರಲಿ",
+        "warn": "ಎಚ್ಚರಿಕೆ"
+      },
       "question": {
         "title": "ತ್ವರಿತ ಪರಿಶೀಲನೆ",
         "submit": "ಉತ್ತರವನ್ನು ಪರಿಶೀಲಿಸಿ",

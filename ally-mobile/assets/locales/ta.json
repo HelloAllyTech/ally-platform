@@ -1905,6 +1905,16 @@
       "answerQuestionsToContinue": "தொடர கேள்விகளுக்குப் பதிலளிக்கவும்",
       "resourcesHeading": "ஆதாரங்கள்",
       "openExternally": "வெளியே திற",
+      "takeaways": "முக்கியக் குறிப்புகள்",
+      "minRead": "{{count}} நிமிட வாசிப்பு",
+      "quickChecks_one": "{{count}} விரைவு சோதனை",
+      "quickChecks_other": "{{count}} விரைவு சோதனைகள்",
+      "startReading": "படிக்கத் தொடங்கவும்",
+      "callout": {
+        "say": "இப்படிச் சொல்லிப் பாருங்கள்",
+        "info": "தெரிந்துகொள்ளுங்கள்",
+        "warn": "கவனம்"
+      },
       "question": {
         "title": "விரைவு சோதனை",
         "submit": "பதிலைச் சரிபார்க்கவும்",

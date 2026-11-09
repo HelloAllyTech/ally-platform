@@ -396,6 +396,7 @@ export const ApiEndpoints = {
     OWNERS_USAGE: "/v1/product-roadmap/opportunity-owners/usage",
     IDEA_DRAFTS: "/v1/product-roadmap/idea-drafts",
     IDEA_DRAFT_BY_ID: (id: string) => `/v1/product-roadmap/idea-drafts/${id}`,
+    IDEA_TRANSCRIBE: "/v1/product-roadmap/idea-drafts/transcribe",
     INTERVIEW_NOTES: "/v1/product-roadmap/interview-notes",
     INTERVIEW_NOTE_BY_ID: (id: string) => `/v1/product-roadmap/interview-notes/${id}`,
     VIEWS: "/v1/product-roadmap/views",

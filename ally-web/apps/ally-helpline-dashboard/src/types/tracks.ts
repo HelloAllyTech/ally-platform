@@ -683,14 +683,33 @@ export interface ArticleResourceEmbeddabilityResponse {
   resources: { id: string; openExternally: boolean }[];
 }
 
+/** How an article is laid out for the learner. */
+export type ArticleExperience = "CLASSIC" | "MAGAZINE" | "CARDS";
+
+/** An article's cover photo. */
+export interface ArticleCover {
+  url: string;
+  alt?: string;
+}
+
 export interface StartArticleItemPayload extends StartTrackItemBase {
   type: TrackItemType.ARTICLE;
+  /**
+   * Highlight boxes arrive inside it as
+   * `<div data-ally-callout="say|info|warn">…</div>`; the player adds their
+   * icon and label.
+   */
   html: string;
   minReadSeconds: number;
   /** Empty for an article authored without questions. */
   questions?: ArticleQuestion[];
   answeredQuestionCount?: number;
   resources?: ArticleResource[];
+  /** Absent from older servers; anything unknown reads as "CLASSIC". */
+  experience?: ArticleExperience;
+  cover?: ArticleCover | null;
+  /** 0–5 short lines shown as "Key takeaways" at the end. */
+  takeaways?: string[];
 }
 
 /** Response to `POST .../article-questions/:questionId/answer`. */
@@ -748,6 +767,9 @@ export interface StartGameItemPayload extends StartTrackItemBase {
 
 export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
 
+/** How the scenario is staged: cards (CLASSIC) or full-screen photo and panel (STORY). */
+export type BranchingExperience = "CLASSIC" | "STORY";
+
 export interface BranchingChoice {
   id: string;
   text: string;
@@ -759,7 +781,7 @@ export interface BranchingNode {
   title?: string;
   text: string;
   image?: { url: string; alt?: string };
-  /** Absent or empty means this scene is an ending. */
+  /** Absent or empty means this scene is an ending; one choice is a single "continue" button. */
   choices?: BranchingChoice[];
   outcome?: BranchingOutcomeTone;
   score?: number;
@@ -777,6 +799,8 @@ export interface BranchingRecapRun {
 /** The whole story ships to the learner; the server scores the path walked. */
 export interface StartBranchingScenarioItemPayload extends StartTrackItemBase {
   type: TrackItemType.BRANCHING_SCENARIO;
+  /** Absent from older servers; anything but "STORY" plays classic. */
+  experience?: BranchingExperience;
   intro: string | null;
   startNodeId: string;
   nodes: BranchingNode[];

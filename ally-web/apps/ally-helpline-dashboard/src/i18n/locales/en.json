@@ -838,41 +838,11 @@
           "4": "Yes",
           "5": "5 — Absolutely",
           "tags": {
-            "1": [
-              "Poor",
-              "Not helpful",
-              "Very bad",
-              "Disappointing",
-              "Unhelpful"
-            ],
-            "2": [
-              "Below average",
-              "Lacking",
-              "Unsatisfying",
-              "Weak",
-              "Needs improvement"
-            ],
-            "3": [
-              "Neutral",
-              "Okay",
-              "Average",
-              "Moderate",
-              "Acceptable"
-            ],
-            "4": [
-              "Good",
-              "Helpful",
-              "Satisfying",
-              "Effective",
-              "Worthwhile"
-            ],
-            "5": [
-              "Excellent",
-              "Amazing",
-              "Highly useful",
-              "Outstanding",
-              "Very effective"
-            ]
+            "1": ["Poor", "Not helpful", "Very bad", "Disappointing", "Unhelpful"],
+            "2": ["Below average", "Lacking", "Unsatisfying", "Weak", "Needs improvement"],
+            "3": ["Neutral", "Okay", "Average", "Moderate", "Acceptable"],
+            "4": ["Good", "Helpful", "Satisfying", "Effective", "Worthwhile"],
+            "5": ["Excellent", "Amazing", "Highly useful", "Outstanding", "Very effective"]
           }
         }
       }
@@ -2051,6 +2021,18 @@
       "resourcesHeading": "Resources",
       "openInNewTab": "Open in new tab",
       "embedTimedOut": "This page couldn't load here — opened in a new tab instead.",
+      "callout": {
+        "say": "Try saying",
+        "info": "Good to know",
+        "warn": "Watch out"
+      },
+      "takeawaysHeading": "Key takeaways",
+      "inThisArticle": "In this article",
+      "minRead": "{{minutes}} min read",
+      "quickChecks_one": "{{count}} quick check",
+      "quickChecks_other": "{{count}} quick checks",
+      "startReading": "Start reading",
+      "cardProgress": "Card {{current}} of {{total}}",
       "question": {
         "title": "Quick check",
         "submit": "Check answer",

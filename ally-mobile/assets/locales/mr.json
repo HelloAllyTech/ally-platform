@@ -1905,6 +1905,16 @@
       "answerQuestionsToContinue": "पुढे जाण्यासाठी प्रश्नांची उत्तरे द्या",
       "resourcesHeading": "संसाधने",
       "openExternally": "बाहेरून उघडा",
+      "takeaways": "महत्त्वाचे मुद्दे",
+      "minRead": "{{count}} मिनिटांचे वाचन",
+      "quickChecks_one": "{{count}} त्वरित तपासणी",
+      "quickChecks_other": "{{count}} त्वरित तपासण्या",
+      "startReading": "वाचायला सुरुवात करा",
+      "callout": {
+        "say": "असे म्हणून पाहा",
+        "info": "हे जाणून घ्या",
+        "warn": "सावध राहा"
+      },
       "question": {
         "title": "त्वरित तपासणी",
         "submit": "उत्तर तपासा",
