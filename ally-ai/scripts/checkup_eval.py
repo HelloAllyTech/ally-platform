@@ -122,6 +122,13 @@ def onboard_pdf(api: Api, pdf: Path) -> str:
         turns += 1
     real = [d for d in view.get("designs") or [] if not d.get("coming_soon")]
     final, _ = api.say(draft["id"], {"chip": f"design:{real[0]['id']}"})
+    # The checkup gates publishing (chunk 20a-2).
+    started = api.post(f"/bot-drafts/{draft['id']}/checkup")
+    for _ in range(150):
+        run = api.get(f"/chatbots/{bot}/checkup/runs/{started['run']['id']}")
+        if run["run"]["status"] != "running":
+            break
+        time.sleep(2)
     published = api.post(
         f"/bot-drafts/{draft['id']}/publish",
         {"access": "invite", "emails": ["eval@example.com"]},

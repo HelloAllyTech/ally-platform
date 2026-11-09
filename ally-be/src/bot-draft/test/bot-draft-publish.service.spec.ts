@@ -92,10 +92,27 @@ function harness(over: { publicAllowed?: boolean } = {}) {
   );
   const publish = (dto: Record<string, unknown>) =>
     service.publish(store.row(), dto as never);
-  return { store, fakes, publish };
+  return { store, fakes, publish, service };
 }
 
 describe('BotDraftPublishService', () => {
+  it('stages the assistant for its checkup without going live or touching the page', async () => {
+    const h = harness();
+    await h.service.stage(h.store.row());
+    expect(h.fakes.chatbots.update).toHaveBeenCalledWith(
+      { id: 'bot-1' },
+      expect.objectContaining({
+        safetyPack: SafetyPackId.MENTAL_HEALTH,
+        rules: { never: ['Quote prices for group sessions'] },
+        status: ChatbotStatus.DRAFT,
+      }),
+    );
+    expect(h.fakes.settings.updateChatbotSettings).toHaveBeenCalled();
+    expect(h.fakes.knowledge.createForChatbot).toHaveBeenCalled();
+    expect(h.fakes.botPages.save).not.toHaveBeenCalled();
+    expect(h.fakes.pageAccess.add).not.toHaveBeenCalled();
+  });
+
   it('publishes the chatbot, its settings and its page through the 12b services', async () => {
     const h = harness();
     const result = await h.publish({

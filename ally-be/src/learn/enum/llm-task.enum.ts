@@ -213,6 +213,8 @@ export enum LlmTask {
   // The checkup (chunk 20a-2), made by ally-ai's /checkup/grade: one judge call per graded
   // question that needs a reading for meaning. Customer spend, absent from TASK_AREA.
   CHECKUP_JUDGE = 'checkup_judge',
+  // Writes an assistant's checkup questions from its learned details (chunk 20a-2).
+  CHECKUP_QUESTIONS = 'checkup_questions',
   // Feedback → skill mapping (src/foundational-skills): one call per completed
   // session whose debrief names areas of growth, filing each under one
   // foundational helping skill (or none) for the Helping skills "named

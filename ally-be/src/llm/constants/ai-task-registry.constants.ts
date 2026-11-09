@@ -1270,6 +1270,21 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_checkup_judge',
   },
   {
+    id: 'checkup-questions',
+    task: LlmTask.CHECKUP_QUESTIONS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      "An onboarding assistant's checkup is written (before its first run)",
+    detail:
+      "One call per checkup: phrases up to 12 test questions, each answered by one or two of the business's learned details. Code keeps the details as the question's expected facts and source, and drops a question naming a detail it wasn't given.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_checkup_questions',
+  },
+  {
     id: 'corpus-embedding',
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,

@@ -219,11 +219,52 @@ export class BotDraftPublishService {
     };
   }
 
-  /** The chatbot as the draft describes it, live, with its safety pack and the owner's rules. */
+  /**
+   * The draft's assistant on its chatbot, as publish writes it (persona, safety pack and rules,
+   * settings, Owner notes), without going live or touching the page: the checkup (chunk 20a-2)
+   * asks the assistant its questions before it's published. A DRAFT chatbot stays a draft.
+   */
+  async stage(draft: BotDraftEntity): Promise<void> {
+    if (!draft.chatbotId) return;
+    const { chatbot } = await this.access.assert(
+      draft.chatbotId,
+      ChatbotMemberRole.EDITOR,
+    );
+    const config = draft.draftConfig;
+    const pack = packFor(config.safetyPackId);
+    const updated = await this.updateChatbot(
+      chatbot,
+      config,
+      draft,
+      chatbot.status,
+    );
+    await this.settings.updateChatbotSettings(
+      { id: chatbot.id, safetyPack: updated.safetyPack },
+      {
+        ...(chatbot.settings ?? {}),
+        ...(config.declineText.trim()
+          ? { declineText: config.declineText.trim() }
+          : {}),
+        ...(pack?.requiredSettings.crisisClassifierEnabled
+          ? { crisisClassifierEnabled: true }
+          : {}),
+      },
+    );
+    const ownerNotesDocumentId = await this.ownerNotes(draft, config);
+    if (ownerNotesDocumentId !== (draft.source?.ownerNotesDocumentId ?? null)) {
+      const fresh = (await this.drafts.findById(draft.id)) ?? draft;
+      await this.drafts.update(fresh, {
+        source: { ...fresh.source, ownerNotesDocumentId },
+      });
+    }
+  }
+
+  /** The chatbot as the draft describes it, with its safety pack and the owner's rules. */
   private async updateChatbot(
     chatbot: Chatbot,
     config: BotDraft,
     draft: BotDraftEntity,
+    status: ChatbotStatus = ChatbotStatus.LIVE,
   ): Promise<Chatbot> {
     const pack = packFor(config.safetyPackId);
     const patch: Partial<Chatbot> = {
@@ -240,7 +281,7 @@ export class BotDraftPublishService {
       safetyPack: pack?.id ?? null,
       safetyPackVersion: pack?.version ?? draft.safetyPackVersion ?? null,
       rules: { never: config.extraNever },
-      status: ChatbotStatus.LIVE,
+      status,
       updatedBy: Number(ExecutionManager.getUserId() ?? 0) || null,
     } as Partial<Chatbot>;
     await this.chatbots.update({ id: chatbot.id }, patch as never);

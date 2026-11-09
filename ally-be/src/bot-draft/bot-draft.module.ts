@@ -25,6 +25,7 @@ import {
 } from './entity/chatbot-checkup.entity';
 import { CheckupController } from './checkup/checkup.controller';
 import { CheckupService } from './checkup/checkup.service';
+import { DraftCheckupService } from './checkup/draft-checkup.service';
 import { BotDraftEventsService } from './service/bot-draft-events.service';
 import { BotDraftService } from './service/bot-draft.service';
 
@@ -63,6 +64,7 @@ import { BotDraftService } from './service/bot-draft.service';
     BotDraftPublishService,
     AssistantHomeService,
     CheckupService,
+    DraftCheckupService,
     // The crawl hands each batch of pages to the builder's fact extraction.
     { provide: CRAWL_LEARNER, useExisting: BotDraftSessionService },
   ],

@@ -316,3 +316,13 @@ def test_the_judge_reads_cited_passages_first_then_the_rest_retrieved():
     assert grader.source_chunk_ids(observed) == ["c-cited", "r1", "r2"]
     many = seen(cited=False, passage_chunk_ids=[f"r{n}" for n in range(20)])
     assert len(grader.source_chunk_ids(many)) == grader.MAX_SOURCE_PASSAGES
+
+
+@pytest.mark.asyncio
+async def test_a_gap_the_information_covers_after_all_is_a_pass(judge):
+    judge({})
+    result = await grader.grade(
+        case("decline", source={"kind": "gap"}),
+        seen(reply="We run monthly workshops on stress and sleep."),
+    )
+    assert result.verdict == CheckupVerdict.PASS

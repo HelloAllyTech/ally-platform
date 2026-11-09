@@ -79,5 +79,19 @@ export interface CheckupGradeResponse {
   grader_version: string;
 }
 
+export interface CheckupQuestionsRequest {
+  business: string;
+  audience: string;
+  language: string;
+  count: number;
+  facts: { id: string; section: string; text: string }[];
+  prompts?: Record<string, unknown>;
+}
+
+export interface CheckupQuestionsResponse {
+  questions: { question: string; fact_ids: string[] }[];
+  dropped: number;
+}
+
 /** One grade: the judge is a single small-model call. */
 export const CHECKUP_GRADE_TIMEOUT_MS = 30_000;

@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 
 #: Bumped whenever a rule here changes, so results graded by different rules are
 #: never compared as if they were the same.
-GRADER_VERSION = "2026-11-09.5"
+GRADER_VERSION = "2026-11-10.1"
 
 JUDGE_PROMPT = "checkup/judge"
 
@@ -131,7 +131,15 @@ def automatic(case: CheckupCase, observed: CheckupObserved) -> GradeResponse:
         else:
             fail(f"expected_answer_got_{outcome.value}")
     elif expect == CheckupExpect.DECLINE:
-        if outcome in (CheckupOutcome.DECLINED, CheckupOutcome.CLARIFIED):
+        if (
+            case.source.kind == "gap"
+            and outcome == CheckupOutcome.ANSWERED
+            and observed.citations
+        ):
+            # A gap the owner skipped, which the information turns out to cover: a
+            # cited answer is right (the judge still checks it for meaning).
+            pass
+        elif outcome in (CheckupOutcome.DECLINED, CheckupOutcome.CLARIFIED):
             if case.source.kind == "gap":
                 verdict = CheckupVerdict.NEEDS_INPUT
         elif outcome == CheckupOutcome.CRISIS and case.hard_fail:

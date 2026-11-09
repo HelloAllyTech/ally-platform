@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, Repository } from 'typeorm';
 import type {
   CheckupGradeRequest,
   CheckupGradeResponse,
@@ -31,6 +31,7 @@ import {
   CheckupTrigger,
 } from '../entity/chatbot-checkup.entity';
 import { checkupTotals, StatInput } from './checkup-stats';
+import type { PlannedCase } from './checkup-generation';
 
 /** The plain-text sources list a channel without a sources view gets (reply-composer.ts). */
 export const withoutSourcesFooter = (reply: string): string =>
@@ -43,8 +44,8 @@ export const CHECKUP_LIMITS = {
   runsPerDay: 5,
   /** Questions asked per run. */
   questionsPerRun: 25,
-  /** Questions asked at once. */
-  concurrency: 4,
+  /** Questions asked at once (6 keeps onboarding's checkup to about a minute). */
+  concurrency: 6,
   /** An eval asks each question up to this many times, because wording varies run to run. */
   maxAttempts: 3,
 } as const;
@@ -68,6 +69,30 @@ export interface StartRun {
   suite?: string | null;
   attempts?: number;
   draftId?: string | null;
+}
+
+/** One graded question as the Checkup screens show it. */
+export interface CheckupResultView {
+  caseId: string;
+  question: string;
+  expect: ChatbotCheckupCase['expect'];
+  verdict: ChatbotCheckupResult['verdict'];
+  outcome: string;
+  reasons: string[];
+  hardFail: boolean;
+  /** A safety question from the pack: never removed, edited or paused. */
+  safety: boolean;
+  source: ChatbotCheckupCase['source'];
+  reply: string;
+}
+
+export interface CheckupRunView {
+  run: Pick<
+    ChatbotCheckupRun,
+    'id' | 'status' | 'total' | 'done' | 'startedAt' | 'finishedAt'
+  >;
+  totals: Record<string, unknown>;
+  results: CheckupResultView[];
 }
 
 type Group = { thread: string | null; cases: ChatbotCheckupCase[] };
@@ -170,6 +195,57 @@ export class CheckupService {
     );
   }
 
+  /**
+   * Replaces the generated questions the owner hasn't confirmed with `planned`; the owner's own,
+   * confirmed ones, suite questions and the platform's are never deleted. Platform questions are
+   * added once (a pack upgrade adds new ones, never removes).
+   */
+  async generate(chatbotId: string, planned: PlannedCase[]): Promise<void> {
+    await this.cases.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(ChatbotCheckupCase);
+      const existing = await repo.find({ where: { chatbotId } });
+      const generation = Math.max(0, ...existing.map((c) => c.generation)) + 1;
+      const stale = existing.filter(
+        (c) => c.origin === 'generated' && !c.confirmed,
+      );
+      if (stale.length) await repo.delete(stale.map((c) => c.id));
+      const kept = new Set(
+        existing
+          .filter((c) => c.origin !== 'generated' || c.confirmed)
+          .map((c) => c.externalId ?? c.question.toLowerCase()),
+      );
+      const rows = planned
+        .filter(
+          (p) =>
+            !kept.has(p.key) &&
+            !(p.origin === 'generated' && kept.has(p.question.toLowerCase())),
+        )
+        .map((p, index) =>
+          repo.create({
+            chatbotId,
+            question: p.question.slice(0, 500),
+            expect: p.expect,
+            facts: p.facts,
+            mustNot: p.mustNot,
+            alsoOk: p.alsoOk,
+            source: p.source,
+            origin: p.origin,
+            confirmed: false,
+            status: 'active',
+            hardFail: p.hardFail,
+            tier: p.tier,
+            position: index,
+            externalId: p.origin === 'platform' ? p.key : null,
+            packId: p.packId ?? null,
+            packVersion: p.packVersion ?? null,
+            generation,
+            createdBy: Number(ExecutionManager.getUserId() ?? 0) || null,
+          }),
+        );
+      if (rows.length) await repo.save(rows);
+    });
+  }
+
   async start(
     chatbotId: string,
     options: StartRun,
@@ -205,7 +281,8 @@ export class CheckupService {
       where: {
         chatbotId,
         status: 'active',
-        ...(options.suite ? { suite: options.suite } : {}),
+        // A run asks the assistant's own questions; an eval asks one suite's.
+        ...(options.suite ? { suite: options.suite } : { suite: IsNull() }),
       },
       order: { position: 'ASC', createdAt: 'ASC' },
     });
@@ -461,6 +538,127 @@ export class CheckupService {
       ];
     });
     return checkupTotals(inputs);
+  }
+
+  /**
+   * Asks `caseIds` again now and waits for the grades (the publish gate's safety recheck). Not
+   * counted against the owner's daily runs.
+   */
+  async askNow(
+    chatbotId: string,
+    caseIds: string[],
+    draftId: string | null,
+  ): Promise<CheckupResultView[]> {
+    const cases = await this.cases.find({
+      where: { chatbotId, id: In(caseIds) },
+    });
+    const run = await this.runs.save(
+      this.runs.create({
+        chatbotId,
+        draftId,
+        trigger: 'onboarding',
+        status: 'running',
+        total: cases.length,
+        done: 0,
+        startedBy: Number(ExecutionManager.getUserId() ?? 0) || null,
+      }),
+    );
+    await this.execute(run, cases, 1);
+    return (await this.viewOf(run.id)).results;
+  }
+
+  /** The latest finished-or-running run of the assistant's own questions, for a draft or any. */
+  async latestFor(
+    chatbotId: string,
+    draftId?: string,
+  ): Promise<CheckupRunView | null> {
+    const run = await this.runs.findOne({
+      where: {
+        chatbotId,
+        suite: IsNull(),
+        trigger: In(['onboarding', 'manual', 'after_change']),
+        ...(draftId ? { draftId } : {}),
+      },
+      order: { startedAt: 'DESC' },
+    });
+    return run ? this.viewOf(run.id) : null;
+  }
+
+  /** The Checkup section: the latest run, the trend of finished runs, and the wording it needs. */
+  async view(chatbotId: string, fallback: string, audience: string) {
+    await this.access.assert(chatbotId, ChatbotMemberRole.VIEWER);
+    const latest = await this.latestFor(chatbotId);
+    const done = await this.runs.find({
+      where: {
+        chatbotId,
+        suite: IsNull(),
+        status: 'done',
+        trigger: In(['onboarding', 'manual', 'after_change']),
+      },
+      order: { startedAt: 'DESC' },
+      take: 7,
+    });
+    const trend = done.reverse().map((run) => {
+      const accuracy = (
+        run.totals as { accuracy?: { passed: number; total: number } }
+      ).accuracy;
+      return {
+        at: (run.finishedAt ?? run.startedAt).toISOString(),
+        accuracy: accuracy?.total
+          ? Math.round((accuracy.passed / accuracy.total) * 100)
+          : 0,
+      };
+    });
+    return { latest, trend, fallback, audience };
+  }
+
+  private async viewOf(runId: string): Promise<CheckupRunView> {
+    const run = await this.runs.findOneOrFail({ where: { id: runId } });
+    const results = await this.results.find({
+      where: { runId },
+      order: { createdAt: 'ASC' },
+    });
+    const cases = await this.cases.find({
+      where: { id: In([...new Set(results.map((r) => r.caseId))]) },
+    });
+    const byId = new Map(cases.map((c) => [c.id, c]));
+    return {
+      run: {
+        id: run.id,
+        status: run.status,
+        total: run.total,
+        done: run.done,
+        startedAt: run.startedAt,
+        finishedAt: run.finishedAt ?? null,
+      },
+      totals:
+        run.status === 'done'
+          ? run.totals
+          : results.length
+            ? ((await this.totalsFor(run.id)) as unknown as Record<
+                string,
+                unknown
+              >)
+            : {},
+      results: results.flatMap((row) => {
+        const item = byId.get(row.caseId);
+        if (!item) return [];
+        return [
+          {
+            caseId: item.id,
+            question: item.question,
+            expect: item.expect,
+            verdict: row.verdict,
+            outcome: row.outcome,
+            reasons: row.reasons,
+            hardFail: row.hardFail,
+            safety: item.origin === 'platform' && Boolean(item.packId),
+            source: item.source,
+            reply: row.reply,
+          },
+        ];
+      }),
+    };
   }
 
   async getRun(chatbotId: string, runId: string) {

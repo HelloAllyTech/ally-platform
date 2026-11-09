@@ -34,6 +34,7 @@ import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decor
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { CHECKUP_LIMITS, CheckupService, SuiteCase } from './checkup.service';
+import { DraftCheckupService } from './draft-checkup.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -87,6 +88,10 @@ export class ImportSuiteDto {
   cases!: SuiteCaseDto[];
 }
 
+export class GapAnswerDto {
+  @ApiProperty() @IsString() @MaxLength(1000) text!: string;
+}
+
 export class StartRunDto {
   @ApiPropertyOptional({ enum: ['manual', 'eval'] })
   @IsOptional()
@@ -118,7 +123,44 @@ export class StartRunDto {
 @Controller('v1/chatbots')
 @CallerScopedRoute()
 export class CheckupController {
-  constructor(private readonly checkup: CheckupService) {}
+  constructor(
+    private readonly checkup: CheckupService,
+    private readonly drafts: DraftCheckupService,
+  ) {}
+
+  @Get(':id/checkup')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({
+    summary: 'The checkup: the latest run, the trend, and the wording it needs',
+  })
+  view(@Param('id', ParseUUIDPipe) id: string) {
+    return this.drafts.view(id);
+  }
+
+  @Post(':id/checkup/cases/:caseId/answer')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Answer a question it couldn’t: added to the Owner notes',
+  })
+  answer(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('caseId', ParseUUIDPipe) caseId: string,
+    @Body() dto: GapAnswerDto,
+  ) {
+    return this.drafts.answerGap(id, caseId, dto.text);
+  }
+
+  @Post(':id/checkup/cases/:caseId/not-offered')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: '"We don’t offer this": noted, and kept as a decline',
+  })
+  notOffered(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('caseId', ParseUUIDPipe) caseId: string,
+  ) {
+    return this.drafts.notOffered(id, caseId);
+  }
 
   @Post(':id/checkup/suites')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)

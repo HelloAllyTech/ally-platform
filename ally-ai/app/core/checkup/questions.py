@@ -75,5 +75,8 @@ async def write_questions(request: QuestionsRequest) -> QuestionsResponse:
         provider=provider,
         model=model,
         temperature=temperature if temperature is not None else 0.0,
+        # Uncapped: a reasoning model's hidden reasoning counts against the cap, and
+        # 2,048 ran out before the questions were written (as with the builder).
+        max_tokens=None,
     )
     return keep_grounded(request, out.questions)

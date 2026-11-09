@@ -41,6 +41,8 @@ import {
   CHECKUP_GRADE_TIMEOUT_MS,
   type CheckupGradeRequest,
   type CheckupGradeResponse,
+  type CheckupQuestionsRequest,
+  type CheckupQuestionsResponse,
 } from '../dto/checkup.dto';
 import {
   HelplineRiskRequest,
@@ -802,6 +804,22 @@ export class AiService {
       request,
       { timeoutMs: CHECKUP_GRADE_TIMEOUT_MS, alertOnFailure: false },
     );
+  }
+
+  /**
+   * Checkup questions from what we learned (chunk 20a-2): each keeps the ids of the facts that
+   * answer it. redactBody=true: the payload is the business's own details.
+   */
+  async writeCheckupQuestions(
+    request: CheckupQuestionsRequest,
+  ): Promise<CheckupQuestionsResponse> {
+    return this.postKnowledge<
+      CheckupQuestionsResponse,
+      CheckupQuestionsRequest
+    >(ENDPOINTS.CHECKUP_QUESTIONS, request, {
+      timeoutMs: CHECKUP_GRADE_TIMEOUT_MS * 2,
+      alertOnFailure: false,
+    });
   }
 
   /**

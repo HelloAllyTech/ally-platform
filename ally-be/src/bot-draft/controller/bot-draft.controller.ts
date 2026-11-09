@@ -41,6 +41,7 @@ import { BotDraftSessionService } from '../service/bot-draft-session.service';
 import { changes, draftView } from '../service/bot-draft-view';
 import { BotDraftEventsService } from '../service/bot-draft-events.service';
 import { BotDraftService } from '../service/bot-draft.service';
+import { DraftCheckupService } from '../checkup/draft-checkup.service';
 import { SseWriter } from './sse';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -63,6 +64,7 @@ export class BotDraftController {
     private readonly crawl: SiteCrawlService,
     private readonly publisher: BotDraftPublishService,
     private readonly events: BotDraftEventsService,
+    private readonly checkup: DraftCheckupService,
   ) {}
 
   @Post()
@@ -279,7 +281,24 @@ export class BotDraftController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: PublishBotDraftDto,
   ) {
-    return this.publisher.publish(await this.drafts.get(id), dto);
+    const draft = await this.drafts.get(id);
+    // The checkup gates the first publish (chunk 20a-2); changing who can use a published
+    // assistant doesn't run it again.
+    if (draft.status !== BotDraftStatus.PUBLISHED) {
+      await this.checkup.assertCanPublish(draft);
+    }
+    return this.publisher.publish(draft, dto);
+  }
+
+  @Post(':id/checkup')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Run the checkup on the assistant this setup built',
+    description:
+      'Writes its questions (keeping the owner’s and the platform’s) and starts a run; poll GET /v1/chatbots/:chatbotId/checkup/runs/:runId.',
+  })
+  runCheckup(@Param('id', ParseUUIDPipe) id: string) {
+    return this.checkup.runForDraft(id);
   }
 
   @Post(':id/abandon')

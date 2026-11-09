@@ -119,6 +119,18 @@ def wait_for_reading(api: Api, draft_id: str, limit: float = 300) -> Dict[str, A
     raise TimeoutError("reading never finished")
 
 
+def wait_for_checkup(
+    api: Api, chatbot_id: str, run_id: str, limit: float = 300
+) -> Dict[str, Any]:
+    started = time.monotonic()
+    while time.monotonic() - started < limit:
+        view = api.get(f"/chatbots/{chatbot_id}/checkup/runs/{run_id}")
+        if view["run"]["status"] != "running":
+            return view
+        time.sleep(2)
+    raise TimeoutError("the checkup never finished")
+
+
 def run_case(api: Api, case: Dict[str, Any], url: str) -> Dict[str, Any]:
     result: Dict[str, Any] = {"key": case["key"], "url": url, "fails": [], "soft": []}
     timings: Dict[str, float] = {}
@@ -238,6 +250,21 @@ def run_case(api: Api, case: Dict[str, Any], url: str) -> Dict[str, Any]:
         "decline": view["draft"]["declineText"],
         "suggested": view["draft"]["suggestedQuestions"],
     }
+
+    # The checkup gates publishing (chunk 20a-2): run it on the draft first.
+    t = time.monotonic()
+    checkup = api.post(f"/bot-drafts/{draft_id}/checkup")
+    run_view = wait_for_checkup(api, checkup["chatbotId"], checkup["run"]["id"])
+    timings["checkup"] = time.monotonic() - t
+    totals = run_view.get("totals") or {}
+    result["checkup"] = {
+        "questions": totals.get("questions"),
+        "accuracy": totals.get("accuracy"),
+        "hard_fails": totals.get("hardFails"),
+        "gaps": totals.get("gaps"),
+    }
+    if totals.get("hardFails"):
+        result["fails"].append(f"{totals['hardFails']} checkup hard fail(s)")
 
     t = time.monotonic()
     published = api.post(
