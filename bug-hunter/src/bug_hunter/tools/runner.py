@@ -81,6 +81,19 @@ def nx_project_file(file: str) -> str:
     )
 
 
+def test_name_filter(app: AppConfig, name: str) -> str:
+    """The name as the framework's filter wants it. Jest ``-t`` and Flutter ``--name``
+    take a regular expression, so a test called ``handles (not) this`` matched nothing
+    and the run counted as "no tests"; pytest ``-k`` is an expression where ``-``,
+    brackets and the words ``and``/``or``/``not`` are operators."""
+    if app.lang in ("typescript", "dart"):
+        return re.sub(r"([.^$*+?{}\[\]\\|()])", r"\\\1", name)  # metacharacters only
+    # pytest: keep the longest leading run of identifier characters; -k matches
+    # substrings, so a prefix still selects the test
+    match = re.match(r"[A-Za-z0-9_]+", name)
+    return match.group(0) if match else name
+
+
 def single_test_command(app: AppConfig, file: str, name: str | None) -> str:
     if not app.test_one:
         raise RunnerError(
@@ -91,7 +104,10 @@ def single_test_command(app: AppConfig, file: str, name: str | None) -> str:
         # drop the flag that carries {name}: "-t {name}", "--name {name}",
         # "--testNamePattern={name}"
         template = re.sub(r"\s+(?:\S+\s+\{name\}|\S*\{name\}\S*)", "", template)
-    values = {"file": shlex.quote(file), "name": shlex.quote(name) if name else ""}
+    values = {
+        "file": shlex.quote(file),
+        "name": shlex.quote(test_name_filter(app, name)) if name else "",
+    }
     if "{project}" in template:
         values["project"] = nx_project(file)
     if "{project_file}" in template:

@@ -228,3 +228,25 @@ def test_zero_tests_rule_applies_to_test_runs_only(config: BugHunterConfig) -> N
     # a linter printing "collected 0 items" is not a test run
     sb = FakeSandbox("ally-ai", stdout="collected 0 items\n")
     assert Runner(config, sb).run_lint().passed
+
+
+def test_test_names_are_escaped_for_the_frameworks_filter(
+    config: BugHunterConfig,
+) -> None:
+    from bug_hunter.tools.runner import test_name_filter
+
+    dart = config.app("ally-mobile")
+    cmd = single_test_command(
+        dart, "test/a_test.dart", "Try again on disconnect (not navigate away)"
+    )
+    assert r"\(not navigate away\)" in cmd  # a literal match, not a regex group
+    be = config.app("ally-be")
+    assert single_test_command(be, "src/a.spec.ts", "x [edge] case").endswith(
+        "-t 'x \\[edge\\] case' --forceExit"
+    )
+    assert test_name_filter(config.app("ally-ai"), "test_nested-path (variant)") == (
+        "test_nested"
+    )
+    # plain names are unchanged for every framework
+    assert test_name_filter(dart, "renders") == "renders"
+    assert test_name_filter(be, "finds a user") == "finds a user"
