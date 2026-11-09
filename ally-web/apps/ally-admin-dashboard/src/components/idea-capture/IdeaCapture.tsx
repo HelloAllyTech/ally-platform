@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Tooltip } from "@ally-ui-mono/ui-shared";
-import { useCreateRoadmapIdeaDraftMutation } from "@api";
+import { useCreateRoadmapIdeaDraftMutation, useTranscribeRoadmapIdeaMutation } from "@api";
 import { FeatureToggleKey, Permissions, ROUTES } from "@constants";
 import { useUser } from "@hooks";
 import { useSpeechCapture } from "@hooks/useSpeechCapture";
@@ -39,6 +39,10 @@ const formatClock = (seconds: number) =>
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 
+/** The file extension the backend's transcriber expects for a recorded clip. */
+const clipExtension = (type: string) =>
+  type.includes("mp4") ? "mp4" : type.includes("ogg") ? "ogg" : "webm";
+
 const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).length : 0);
 
 /**
@@ -50,9 +54,13 @@ const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).leng
  * Roadmap, where it is later continued through the normal copilot interview (which is what
  * creates the real, readiness-checked opportunity).
  *
- * THE MIC STARTS ITSELF. Opening is the user gesture, so recognition starts inside the click
+ * THE MIC STARTS ITSELF. Opening is the user gesture, so recording starts inside the click
  * handler — no second "start" tap between having the thought and saying it. Pause, Stop and the
  * keyboard remain: stopping the mic leaves the screen and the text exactly where they are.
+ *
+ * WORDS ARRIVE PHRASE BY PHRASE. Speech is recorded here and transcribed by the backend (see
+ * useSpeechCapture for why not the browser's own recognition), so each phrase lands a moment
+ * after the speaker pauses. Save waits for any phrase still being transcribed.
  *
  * Access mirrors filing an opportunity (the VOTE permission and the roadmap toggle), because the
  * draft endpoints do; anyone else never sees the button.
@@ -70,26 +78,58 @@ export const IdeaCaptureLauncher: React.FC = () => {
   const [mounted, setMounted] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
-  const [text, setText] = useState("");
-  const [usedVoice, setUsedVoice] = useState(false);
+  const [text, setTextState] = useState("");
+  /**
+   * The text as of right now, ahead of the next render. Save reads this after waiting for the
+   * last phrase: that phrase has been appended by then, but React may not have re-rendered.
+   */
+  const textRef = useRef("");
+  const setText = useCallback((next: string) => {
+    textRef.current = next;
+    setTextState(next);
+  }, []);
+  /** Whether any of the text was dictated. A ref: Save reads it right after the last phrase lands. */
+  const usedVoice = useRef(false);
   const [elapsed, setElapsed] = useState(0);
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [saved, setSaved] = useState(false);
+  /** Save was pressed and is waiting for the last spoken words to be transcribed. */
+  const [finishing, setFinishing] = useState(false);
   const closeTimer = useRef<number | null>(null);
 
   const [createDraft, { isLoading: isSaving }] = useCreateRoadmapIdeaDraftMutation();
+  const [transcribeClip] = useTranscribeRoadmapIdeaMutation();
 
-  const appendFinal = useCallback((phrase: string) => {
-    if (!phrase) return;
-    setUsedVoice(true);
-    setText(current => {
-      const joined =
-        current && !/\s$/.test(current) ? `${current} ${phrase}` : `${current}${phrase}`;
-      return joined.slice(0, IDEA_DRAFT_TEXT_MAX);
-    });
+  const transcribe = useCallback(
+    async (clip: Blob) => {
+      const body = new FormData();
+      body.append("audio", clip, `idea.${clipExtension(clip.type)}`);
+      return (await transcribeClip(body).unwrap()).text;
+    },
+    [transcribeClip],
+  );
+
+  const onTranscribeError = useCallback(() => {
+    toast.error("Couldn't catch part of that. Say it again, or type it.");
   }, []);
 
-  const speech = useSpeechCapture({ onFinal: appendFinal });
+  const appendFinal = useCallback(
+    (phrase: string) => {
+      if (!phrase) return;
+      usedVoice.current = true;
+      const current = textRef.current;
+      const joined =
+        current && !/\s$/.test(current) ? `${current} ${phrase}` : `${current}${phrase}`;
+      setText(joined.slice(0, IDEA_DRAFT_TEXT_MAX));
+    },
+    [setText],
+  );
+
+  const speech = useSpeechCapture({
+    onFinal: appendFinal,
+    transcribe,
+    onError: onTranscribeError,
+  });
   const isListening = speech.status === "listening";
 
   // Elapsed listening time — counts only while the mic is actually hearing.
@@ -108,7 +148,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
   useEffect(() => {
     const el = textareaRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [text, speech.interim]);
+  }, [text, speech.transcribing]);
 
   const open = () => {
     const rect = buttonRef.current?.getBoundingClientRect();
@@ -118,25 +158,27 @@ export const IdeaCaptureLauncher: React.FC = () => {
         : { x: window.innerWidth - 40, y: 24 },
     );
     setText(readUnsent());
-    setUsedVoice(false);
+    usedVoice.current = false;
     setElapsed(0);
     setSaved(false);
+    setFinishing(false);
     setConfirmingClose(false);
     setMounted(true);
-    // Inside the click: recognition needs the user gesture.
+    // Inside the click, so the mic opens as part of the user's gesture.
     speech.start();
     requestAnimationFrame(() => requestAnimationFrame(() => setRevealed(true)));
   };
 
   const finishClose = useCallback(() => {
-    speech.stop();
+    // Anything still being transcribed was either saved already or is being discarded.
+    speech.cancel();
     setRevealed(false);
     if (closeTimer.current) window.clearTimeout(closeTimer.current);
     closeTimer.current = window.setTimeout(() => setMounted(false), REVEAL_MS);
   }, [speech]);
 
   const requestClose = useCallback(() => {
-    if (saved || !text.trim()) {
+    if (saved || (!text.trim() && !speech.transcribing)) {
       if (!saved) writeUnsent("");
       finishClose();
       return;
@@ -153,11 +195,19 @@ export const IdeaCaptureLauncher: React.FC = () => {
   );
 
   const save = useCallback(async () => {
-    const rawText = text.trim();
-    if (!rawText || isSaving) return;
+    if (isSaving || finishing) return;
+    // The last phrase may still be on its way: stop the mic, then wait for it before reading.
     speech.stop();
+    setFinishing(true);
+    await speech.finish();
+    setFinishing(false);
+    const rawText = textRef.current.trim();
+    if (!rawText) {
+      toast.error("No words were caught. Try the mic again, or type your idea.");
+      return;
+    }
     try {
-      await createDraft({ rawText, captureMode: usedVoice ? "voice" : "typed" }).unwrap();
+      await createDraft({ rawText, captureMode: usedVoice.current ? "voice" : "typed" }).unwrap();
       writeUnsent("");
       setConfirmingClose(false);
       setSaved(true);
@@ -178,7 +228,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
           "Could not save that idea. Your words are still here — try again.",
       );
     }
-  }, [text, isSaving, speech, createDraft, usedVoice, finishClose, navigate]);
+  }, [isSaving, finishing, speech, createDraft, finishClose, navigate]);
 
   // Keyboard: Esc closes (safely), Cmd/Ctrl+Enter saves.
   useEffect(() => {
@@ -217,10 +267,10 @@ export const IdeaCaptureLauncher: React.FC = () => {
           : status === "unavailable"
             ? "Can't reach the microphone"
             : status === "unsupported"
-            ? "Voice isn't available in this browser"
-            : text.trim()
-              ? "Mic is off"
-              : "Ready when you are";
+              ? "Voice isn't available in this browser"
+              : text.trim()
+                ? "Mic is off"
+                : "Ready when you are";
   const subline =
     status === "listening"
       ? "Capturing the absolute first, raw version of your idea. No structure needed — just talk."
@@ -229,14 +279,16 @@ export const IdeaCaptureLauncher: React.FC = () => {
         : status === "denied"
           ? "Allow the microphone from your browser's address bar, or just type your idea below."
           : status === "unavailable"
-            ? "No microphone was found, or speech recognition couldn't connect. Tap the mic to retry, or type below."
+            ? "No microphone was found, or it couldn't be opened. Tap the mic to retry, or type below."
             : status === "unsupported"
-            ? "Type your idea below — it saves exactly the same."
-            : "Tap the mic to talk again, or keep typing.";
+              ? "Type your idea below — it saves exactly the same."
+              : "Tap the mic to talk again, or keep typing.";
 
   const canMic = status !== "unsupported" && status !== "denied";
   const orbScale = 1 + (isListening ? speech.level * 0.45 : 0);
   const hasText = text.trim().length > 0;
+  /** Words may be on their way even before any are on screen. */
+  const canSave = (hasText || isListening || speech.transcribing) && !isSaving && !finishing;
 
   const overlay = mounted
     ? createPortal(
@@ -364,9 +416,9 @@ export const IdeaCaptureLauncher: React.FC = () => {
                 aria-label="Your idea"
                 className="min-h-0 w-full flex-1 resize-none bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-white/30 md:text-xl"
               />
-              {speech.interim && (
-                <p className="mt-2 line-clamp-2 text-base italic text-white/45" aria-hidden="true">
-                  {speech.interim}…
+              {(speech.transcribing || finishing) && (
+                <p className="mt-2 text-base italic text-white/45" aria-live="polite">
+                  Writing down what you said…
                 </p>
               )}
               <span className="absolute bottom-2 right-4 text-[11px] tabular-nums text-white/25">
@@ -410,10 +462,10 @@ export const IdeaCaptureLauncher: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void save()}
-                  disabled={!hasText || isSaving}
+                  disabled={!canSave}
                   className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-full bg-white px-6 text-sm font-medium text-[#1a1250] shadow-lg shadow-black/30 transition hover:scale-[1.03] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
-                  {isSaving ? "Saving…" : "Save to drafts"}
+                  {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save to drafts"}
                   <kbd className="hidden rounded bg-black/10 px-1.5 py-0.5 text-[10px] font-normal md:inline">
                     ⌘↵
                   </kbd>
@@ -433,9 +485,10 @@ export const IdeaCaptureLauncher: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => void save()}
-                      className="h-11 cursor-pointer rounded-full bg-white text-sm font-medium text-[#1a1250]"
+                      disabled={isSaving || finishing}
+                      className="h-11 cursor-pointer rounded-full bg-white text-sm font-medium text-[#1a1250] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Save to drafts
+                      {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save to drafts"}
                     </button>
                     <button
                       type="button"

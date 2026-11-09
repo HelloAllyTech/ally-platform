@@ -1462,6 +1462,21 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'openai.transcriptionModel',
   },
   {
+    id: 'roadmap-idea-transcribe',
+    task: LlmTask.TRANSCRIPTION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'An admin speaks an idea into the mic-and-bulb idea capture',
+    detail:
+      'One call per spoken phrase: the browser cuts a clip at each pause (or ' +
+      'every 30 s of unbroken speech) and skips clips with no speech in them. ' +
+      'Auto-detects the language. Nothing is stored.',
+    kind: AiTaskKind.TRANSCRIPTION,
+    provider: 'openai',
+    defaultModel: 'whisper-1',
+    configuredBy: 'OPENAI_TRANSCRIPTION_MODEL',
+    configPath: 'openai.transcriptionModel',
+  },
+  {
     id: 'voice-note-extract',
     task: LlmTask.VOICE_NOTE_EXTRACT,
     runtime: LlmRuntime.ALLY_BE,
