@@ -124,7 +124,9 @@ def make_investigate_node(deps: GraphDeps):
             "started_at": state.started_at,
             "node": "investigate",
         }
-        out = run_loop(compiled, initial, config, deps.checkpointer)
+        out = run_loop(
+            compiled, initial, config, deps.checkpointer, max_turns=loop.max_turns
+        )
         budget = with_clock(out["budget_used"], state.started_at)
         result = out.get("result")
         if result and result["tool"] == "submit_finding":

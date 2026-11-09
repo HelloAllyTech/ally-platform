@@ -217,15 +217,24 @@ def initial_messages(system: str, user: str) -> list[BaseMessage]:
     return [SystemMessage(content=system), HumanMessage(content=user)]
 
 
+def recursion_limit_for(max_turns: int) -> int:
+    """Each tool turn is two graph steps (agent, tools) plus nudges; LangGraph's default
+    of 25 would kill any investigation past ~12 tool turns with GraphRecursionError."""
+    return 3 * max_turns + 10
+
+
 def run_loop(
     compiled,
     initial: LoopState,
     config: RunnableConfig | None,
     checkpointer: BaseCheckpointSaver | None = None,
+    max_turns: int | None = None,
 ) -> LoopState:
     """Invoke the loop; if a checkpoint for this namespace is mid-loop (the process was
     killed), continue it instead of starting over."""
-    if config is not None and checkpointer is not None:
+    limit = recursion_limit_for(max_turns or 30)
+    config = {**(config or {}), "recursion_limit": limit}
+    if checkpointer is not None and config.get("configurable"):
         try:
             snapshot = compiled.get_state(config)
         except Exception:  # noqa: BLE001 - no state for this namespace

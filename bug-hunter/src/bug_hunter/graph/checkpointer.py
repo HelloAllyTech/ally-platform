@@ -34,15 +34,8 @@ def _redacted(url: str) -> str:
 
 
 @contextmanager
-def open_checkpointer(
-    url: str | None = None, in_memory: bool = False
-) -> Iterator[BaseCheckpointSaver]:
-    """``with open_checkpointer() as saver:`` — Postgres (tables created on first use)
-    or ``InMemorySaver`` when ``in_memory`` is set."""
-    if in_memory:
-        yield InMemorySaver()
-        return
-    url = url or db_url()
+def _connect(url: str) -> Iterator[BaseCheckpointSaver]:
+    """Postgres saver with its tables created; only connection problems are wrapped."""
     try:
         from langgraph.checkpoint.postgres import PostgresSaver
         from psycopg import Connection
@@ -53,20 +46,40 @@ def open_checkpointer(
         with Connection.connect(url, autocommit=True) as admin:
             admin.execute(f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"')
         # autocommit, dict rows and no prepared statements are what PostgresSaver needs
-        with Connection.connect(
+        conn = Connection.connect(
             url,
             autocommit=True,
             prepare_threshold=0,
             row_factory=dict_row,
             options=f"-c search_path={SCHEMA}",
-        ) as conn:
-            saver = PostgresSaver(conn)
-            saver.setup()
-            yield saver
-    except CheckpointerError:
-        raise
+        )
     except Exception as exc:  # noqa: BLE001 - the type only; the URL holds a password
         raise CheckpointerError(
             f"could not open the checkpoint database at {_redacted(url)} "
             f"({type(exc).__name__}); start it with `make db-up` or set {ENV_DB_URL}"
         ) from exc
+    try:
+        saver = PostgresSaver(conn)
+        saver.setup()
+    except Exception as exc:  # noqa: BLE001
+        conn.close()
+        raise CheckpointerError(
+            f"could not set up the checkpoint tables ({type(exc).__name__})"
+        ) from exc
+    try:
+        yield saver  # whatever the caller raises in here propagates unchanged
+    finally:
+        conn.close()
+
+
+@contextmanager
+def open_checkpointer(
+    url: str | None = None, in_memory: bool = False
+) -> Iterator[BaseCheckpointSaver]:
+    """``with open_checkpointer() as saver:`` — Postgres (tables created on first use)
+    or ``InMemorySaver`` when ``in_memory`` is set."""
+    if in_memory:
+        yield InMemorySaver()
+        return
+    with _connect(url or db_url()) as saver:
+        yield saver

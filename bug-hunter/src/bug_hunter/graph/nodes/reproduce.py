@@ -164,7 +164,9 @@ def make_reproduce_node(deps: GraphDeps):
             "started_at": state.started_at,
             "node": "reproduce",
         }
-        out = run_loop(compiled, initial, config, deps.checkpointer)
+        out = run_loop(
+            compiled, initial, config, deps.checkpointer, max_turns=loop.max_turns
+        )
         budget = with_clock(out["budget_used"], state.started_at)
         result = out.get("result")
         if not result or result["tool"] != "submit_repro":

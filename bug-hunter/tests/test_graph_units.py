@@ -159,3 +159,23 @@ def test_workspace_at_old_layout_writes_tests_at_the_root(
     ws.write_test_file("src/x.spec.ts", "it('x', () => {});\n")
     assert (root / "src/x.spec.ts").exists()
     assert ws.policy.app_rel(root / "src/x.ts", "ally-be") == "src/x.ts"
+
+
+def test_checkpointer_does_not_relabel_the_callers_exceptions(monkeypatch) -> None:
+    """Only connection problems are CheckpointerError; a failure while the graph runs
+    inside the context must surface as itself (the first runs reported a
+    GraphRecursionError as 'could not open the checkpoint database')."""
+    from contextlib import contextmanager
+
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from bug_hunter.graph import checkpointer as module
+
+    @contextmanager
+    def fake_connect(url):
+        yield InMemorySaver()
+
+    monkeypatch.setattr(module, "_connect", fake_connect)
+    with pytest.raises(ZeroDivisionError):
+        with module.open_checkpointer(url="postgresql://u:p@h/db"):
+            1 / 0

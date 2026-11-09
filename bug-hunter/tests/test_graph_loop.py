@@ -191,3 +191,14 @@ def test_a_killed_loop_resumes_from_its_checkpoint(config, tmp_path) -> None:
     # the resumed call saw the two earlier tool turns, i.e. it did not restart
     assert sum(1 for m in model.calls[-1] if m.type == "tool") == 2
     assert out["turns"] == 2
+
+
+def test_long_loops_do_not_hit_the_recursion_limit(config, tmp_path) -> None:
+    """Twenty tool turns = forty-plus graph steps; LangGraph's default limit is 25."""
+    script = [
+        ai(tool_calls=[{"name": "echo", "args": {"value": str(i)}}]) for i in range(20)
+    ]
+    script.append(ai(tool_calls=[{"name": "finish", "args": {"text": "late"}}]))
+    loop = _loop(config, tmp_path, script, max_turns=30)
+    out = run_loop(loop.build(), _initial(), None, None, max_turns=loop.max_turns)
+    assert out["result"]["args"]["text"] == "late" and out["turns"] == 20
