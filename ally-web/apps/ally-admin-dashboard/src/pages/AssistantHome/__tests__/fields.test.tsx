@@ -137,6 +137,30 @@ describe("a field", () => {
     );
   });
 
+  it("keeps a just-added question on screen, and saves it once it has words", async () => {
+    save.mockImplementation(({ value }: { value: unknown }) =>
+      resolves({ field: "suggestedQuestions", value, version: "3".repeat(16) }),
+    );
+    render(<PersonalitySection {...props()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add a question" }));
+    await act(async () => {
+      vi.advanceTimersByTime(FIELD_SAVE_DEBOUNCE_MS * 2);
+    });
+    const added = screen.getByLabelText("Suggested questions 2") as HTMLInputElement;
+    expect(added.value).toBe("");
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.change(added, { target: { value: "Do you see children?" } });
+    await act(async () => {
+      vi.advanceTimersByTime(FIELD_SAVE_DEBOUNCE_MS);
+    });
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "suggestedQuestions",
+        value: ["What are your fees?", "Do you see children?"],
+      }),
+    );
+  });
+
   it("is read-only for a viewer", () => {
     render(<PersonalitySection {...props(false)} />);
     expect((screen.getByLabelText("Name") as HTMLInputElement).disabled).toBe(true);

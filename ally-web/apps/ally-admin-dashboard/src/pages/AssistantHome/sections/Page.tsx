@@ -5,7 +5,7 @@ import type { BotPageLimits, PrechatField } from "@types";
 
 import { LookAndFeelSection } from "../../WhatsAppBot/LookAndFeel";
 import { fill, HOME } from "../copy";
-import { Group, SectionHead, TextField } from "../fields";
+import { Group, SectionHead, TextField, useDraftList } from "../fields";
 import { HomeField, useHomeField } from "../useHomeField";
 
 import type { SectionProps } from "./props";
@@ -129,11 +129,18 @@ const Question: React.FC<{
   );
 };
 
+const isComplete = (q: PrechatField): boolean =>
+  q.label.trim() !== "" &&
+  (q.type !== "choice" || (q.options ?? []).some(o => o.trim())) &&
+  (q.type !== "consent" || Boolean(q.consentText?.trim()));
+
 const PrechatEditor: React.FC<{ field: HomeField<PrechatField[]>; disabled: boolean }> = ({
   field,
   disabled,
 }) => {
-  const questions = field.value;
+  // A question is saved once it's complete: its words, a choice's options, an agreement's text.
+  // Until then it stays on screen only.
+  const [questions, set] = useDraftList(field, isComplete);
   // A choice's options are saved without blank lines (the server refuses an empty option).
   const clean = (list: PrechatField[]) =>
     list.map(q =>
@@ -141,7 +148,6 @@ const PrechatEditor: React.FC<{ field: HomeField<PrechatField[]>; disabled: bool
         ? { ...q, options: (q.options ?? []).map(o => o.trim()).filter(Boolean) }
         : q,
     );
-  const set = (list: PrechatField[], now = false) => field.set(list, { now });
   return (
     <>
       {questions.length > 0 && (
@@ -178,7 +184,7 @@ const PrechatEditor: React.FC<{ field: HomeField<PrechatField[]>; disabled: bool
           <Button
             onClick={() =>
               // A new question waits for its wording before it's saved.
-              field.set([
+              set([
                 ...questions,
                 { id: newId(questions), label: "", type: "text", required: false },
               ])

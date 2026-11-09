@@ -1,4 +1,4 @@
-import React, { useId } from "react";
+import React, { useEffect, useId, useState } from "react";
 
 import { Button } from "@components/v2";
 
@@ -77,6 +77,30 @@ export const TextField: React.FC<{
   );
 };
 
+/**
+ * A list being edited, where some items aren't finished yet (a question with no words). They stay
+ * on screen but aren't saved until they're ready; only the ready ones are sent. A new list from the
+ * server (Undo, another tab) replaces what's shown unless it's just the ready part of it.
+ */
+export const useDraftList = <T,>(
+  field: HomeField<T[]>,
+  ready: (item: T) => boolean,
+): [T[], (next: T[], now?: boolean) => void] => {
+  const [items, setItems] = useState(field.value);
+  const saved = JSON.stringify(field.value);
+  useEffect(() => {
+    setItems(current =>
+      JSON.stringify(current.filter(ready)) === saved ? current : (JSON.parse(saved) as T[]),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved]);
+  const update = (next: T[], now = false) => {
+    setItems(next);
+    field.set(next.filter(ready), { now });
+  };
+  return [items, update];
+};
+
 /** A short list of lines (suggested questions): edit, remove, add, up to `max`. */
 export const LinesField: React.FC<{
   label: string;
@@ -89,8 +113,7 @@ export const LinesField: React.FC<{
   maxLength?: number;
 }> = ({ label, hint, addLabel, removeLabel, field, max, disabled, maxLength }) => {
   const id = useId();
-  const lines = field.value;
-  const update = (next: string[], now = false) => field.set(next, { now });
+  const [lines, update] = useDraftList(field, line => line.trim() !== "");
   return (
     <fieldset
       className="ally-field ally-home__lines"
@@ -110,6 +133,8 @@ export const LinesField: React.FC<{
             value={line}
             disabled={disabled}
             maxLength={maxLength}
+            // A line just added is ready for its words.
+            autoFocus={line === "" && index === lines.length - 1}
             onChange={event => update(lines.map((l, n) => (n === index ? event.target.value : l)))}
             onBlur={() => {
               // An emptied line goes when the owner moves on.

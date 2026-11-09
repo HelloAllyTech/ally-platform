@@ -73,3 +73,34 @@ test("only platform admins see the engine", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("button", { name: "Engine" })).toBeVisible();
 });
+
+test("a question just added stays until it has words, then saves", async ({ page }) => {
+  const { saves } = await mockAssistantHome(page);
+  await open(page, "personality");
+  await page.getByRole("button", { name: "Add a question" }).first().click();
+  const added = page.getByRole("textbox", { name: "Suggested questions 4", exact: true });
+  await expect(added).toBeFocused();
+  await page.waitForTimeout(1500);
+  await expect(added).toHaveValue("");
+  expect(saves).toEqual([]);
+  await added.fill("Do you see children?");
+  await added.blur();
+  await expect
+    .poll(() => saves.at(-1)?.value)
+    .toEqual([
+      "What are your fees?",
+      "Who speaks Marathi?",
+      "How do I book?",
+      "Do you see children?",
+    ]);
+  await expect(added).toHaveValue("Do you see children?");
+});
+
+test("a question before the chat stays until it has words", async ({ page }) => {
+  const { saves } = await mockAssistantHome(page);
+  await open(page, "page");
+  await page.getByRole("button", { name: "Add a question" }).click();
+  await page.waitForTimeout(1500);
+  await expect(page.getByRole("textbox", { name: "Question 3", exact: true })).toHaveValue("");
+  expect(saves.filter(s => s.field === "prechat")).toEqual([]);
+});
