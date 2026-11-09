@@ -175,6 +175,16 @@ class ArtefactLimits(_Strict):
     max_size_mb: int = Field(default=500, ge=1)
 
 
+class EvalLimits(_Strict):
+    min_free_gb: float = Field(default=5, ge=0)
+    since_months: int = Field(default=12, ge=1)
+    max_src_lines: int = Field(default=60, ge=1)
+    max_src_lines_thin_apps: int = Field(default=120, ge=1)
+    clean_window_days: int = Field(default=30, ge=1)
+    clean_min_src_lines: int = Field(default=5, ge=1)
+    clean_max_src_lines: int = Field(default=200, ge=1)
+
+
 class LimitsConfig(_Strict):
     run: RunLimits
     sweep: SweepLimits = Field(default_factory=SweepLimits)
@@ -183,6 +193,7 @@ class LimitsConfig(_Strict):
     nodes: dict[str, int] = Field(default_factory=dict)
     context: ContextLimits = Field(default_factory=ContextLimits)
     artefacts: ArtefactLimits = Field(default_factory=ArtefactLimits)
+    evals: EvalLimits = Field(default_factory=EvalLimits)
 
     @field_validator("nodes")
     @classmethod

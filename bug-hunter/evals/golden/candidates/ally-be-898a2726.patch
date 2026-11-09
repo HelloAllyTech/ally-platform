@@ -1,0 +1,31 @@
+diff --git a/ally-be/src/builder/util/builder-turn-claims.util.ts b/ally-be/src/builder/util/builder-turn-claims.util.ts
+index 826f7f6e0b..34ef01c3b9 100644
+--- a/ally-be/src/builder/util/builder-turn-claims.util.ts
++++ b/ally-be/src/builder/util/builder-turn-claims.util.ts
+@@ -34,7 +34,7 @@ export function claimsPrdEdit(text: string | null | undefined): boolean {
+ const CLAIMS_READY = new RegExp(
+   [
+     String.raw`build[- ]ready`,
+-    String.raw`ready (?:to|for) (?:be )?(?:build|built|building|the build|a build|technical design|the technical design|design|development|implementation)`,
++    String.raw`ready (?:to|for) (?:be )?(?:build|built|building|the build|a build|technical design|the technical design|design|development|implementation|the next (?:step|stage|phase))`,
+     String.raw`(?:PRD|plan|it|document|spec) is (?:now )?(?:\w+ and )?(?:ready|complete|final|finali[sz]ed)`,
+     String.raw`readiness is (?:now )?(?:at )?100`,
+     String.raw`build is (?:now )?ready`,
+diff --git a/ally-be/src/builder/util/test/builder-turn-receipt.util.spec.ts b/ally-be/src/builder/util/test/builder-turn-receipt.util.spec.ts
+index b8677aaf8e..9ec1fce885 100644
+--- a/ally-be/src/builder/util/test/builder-turn-receipt.util.spec.ts
++++ b/ally-be/src/builder/util/test/builder-turn-receipt.util.spec.ts
+@@ -289,6 +289,13 @@ describe('reply claims', () => {
+     ],
+     ["When you're happy with it, you can start the build.", true],
+     ['The PRD is final.', true],
++    // A rewrite after two send-backs in the live check: discloses the
++    // blocker, then claims ready anyway.
++    [
++      'Aside from this technical constraint, the specification is ready for the next step: drafting the technical design.',
++      true,
++    ],
++    ['Are you ready for the next step?', false],
+     [
+       "I'm also addressing the review findings to get this ready to build.",
+       false,

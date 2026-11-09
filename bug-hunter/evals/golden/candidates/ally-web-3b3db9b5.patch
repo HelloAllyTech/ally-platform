@@ -1,0 +1,184 @@
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/__tests__/GuidedCourse.finale.test.tsx b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/__tests__/GuidedCourse.finale.test.tsx
+index 5acfa429cb..62d0fa76ab 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/__tests__/GuidedCourse.finale.test.tsx
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/__tests__/GuidedCourse.finale.test.tsx
+@@ -217,6 +217,26 @@ describe("GuidedCourse: finale, advice, thumbs, memory provenance, scenes on rel
+       expect(JSON.stringify(track.mock.calls)).not.toContain("night shifts");
+     });
+ 
++    it("thumbs given earlier come back on reload, without a fresh thank-you", async () => {
++      const first = renderJourney();
++      await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
++      const row = (await screen.findAllByTestId("message-feedback")).at(-1) as HTMLElement;
++      fireEvent.click(within(row).getByRole("button", { name: "Helpful" }));
++      await waitFor(() => expect(server.ratings.size).toBe(1));
++      first.unmount();
++
++      renderJourney();
++      await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
++      const again = (await screen.findAllByTestId("message-feedback")).at(-1) as HTMLElement;
++      expect(within(again).getByRole("button", { name: "Helpful" })).toHaveAttribute(
++        "aria-pressed",
++        "true",
++      );
++      expect(within(again).queryByText("Thanks.")).not.toBeInTheDocument();
++      const bootstraps = requests(/\/bootstrap$/);
++      expect(bootstraps.length).toBeGreaterThanOrEqual(2);
++    });
++
+     it("no thumbs in a CARE moment", async () => {
+       renderJourney();
+       await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/contract/bootstrap.ts b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/contract/bootstrap.ts
+index 758a409002..0db03d4cc0 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/contract/bootstrap.ts
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/contract/bootstrap.ts
+@@ -64,6 +64,8 @@ export interface JourneyHistoryMessage {
+   turnId: string | null;
+   createdAt: string | null;
+   interrupted?: boolean;
++  /** The learner's own thumb on this message of Ally's, if they gave one. */
++  myRating?: 1 | -1;
+ }
+ 
+ export interface JourneyNextStep {
+@@ -220,6 +222,7 @@ export const fromBootstrapWire = (trackId: string, wire: GuideBootstrapWire): Jo
+       turnId: message.turnId ?? null,
+       createdAt: message.createdAt,
+       interrupted: message.interrupted ?? false,
++      ...(message.myRating === 1 || message.myRating === -1 ? { myRating: message.myRating } : {}),
+     })),
+     cards: (wire.cards ?? []).map(({ seq, card }) => ({ ...card, seq })),
+     prefs: { guidance: asGuidance(wire.prefs?.guidance) },
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/fixture/fixtureServer.ts b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/fixture/fixtureServer.ts
+index 86c7eb8acf..4109fe08b7 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/fixture/fixtureServer.ts
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/fixture/fixtureServer.ts
+@@ -430,7 +430,7 @@ export class GuideFixtureServer {
+               title: "Leave a line for the next learner",
+               body: "What would you tell someone just starting this course?",
+               maxChars: 200,
+-              // The fixture plays the server once advice lines are wired into the finale.
++              // As the server sends it (1ef63b4f6); "nomentor" shows the door hidden.
+               available: !lower.includes("nomentor"),
+             },
+           ],
+@@ -702,6 +702,15 @@ export class GuideFixtureServer {
+         text: (e.data as { text: string }).text,
+         turnId: (e.data as { turnId?: string | null }).turnId ?? null,
+         createdAt: e.at,
++        // The learner's own thumb, as the server returns it (`myRating`).
++        ...(e.type === "assistant.message" &&
++        this.ratings.get((e.data as { messageId: string }).messageId)
++          ? {
++              myRating: this.ratings.get((e.data as { messageId: string }).messageId)!.rating as
++                | 1
++                | -1,
++            }
++          : {}),
+       }));
+     const current = this.nextItem() ?? null;
+     return {
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/hooks/__tests__/seedRatings.test.ts b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/hooks/__tests__/seedRatings.test.ts
+new file mode 100644
+index 0000000000..affb9496f1
+--- /dev/null
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/hooks/__tests__/seedRatings.test.ts
+@@ -0,0 +1,18 @@
++import { describe, expect, it } from "vitest";
++
++import { seedRatings } from "../useGuideJourney";
++
++describe("seedRatings", () => {
++  it("keeps the learner's earlier thumbs from bootstrap, marked as given before", () => {
++    expect(
++      seedRatings([{ id: "m1", myRating: 1 }, { id: "m2" }, { id: "m3", myRating: -1 }]),
++    ).toEqual({
++      m1: { rating: 1, status: "saved", seeded: true },
++      m3: { rating: -1, status: "saved", seeded: true },
++    });
++  });
++
++  it("ignores anything that isn't a thumb", () => {
++    expect(seedRatings([{ id: "m1", myRating: 0 as unknown as 1 }])).toEqual({});
++  });
++});
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/hooks/useGuideJourney.ts b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/hooks/useGuideJourney.ts
+index 524d2eaab4..09f04525b5 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/hooks/useGuideJourney.ts
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/hooks/useGuideJourney.ts
+@@ -131,8 +131,23 @@ export interface MessageRating {
+   rating: 1 | -1;
+   comment?: string;
+   status: "sending" | "saved" | "error";
++  /** Given before this page loaded (bootstrap `myRating`): shown, not thanked again. */
++  seeded?: boolean;
+ }
+ 
++/** The learner's earlier thumbs, from bootstrap's `myRating`. */
++export const seedRatings = (
++  messages: ReadonlyArray<{ id: string; myRating?: 1 | -1 }>,
++): Record<string, MessageRating> =>
++  Object.fromEntries(
++    messages
++      .filter(message => message.myRating === 1 || message.myRating === -1)
++      .map(message => [
++        message.id,
++        { rating: message.myRating as 1 | -1, status: "saved" as const, seeded: true },
++      ]),
++  );
++
+ export type SignInSource = "card" | "allowance" | "paused" | "item" | "voice" | "header";
+ 
+ export interface UseGuideJourneyOptions {
+@@ -318,6 +333,8 @@ export const useGuideJourney = (
+           setEnrolled(outcome.bootstrap.access.enrolled);
+           // After signing in, what was typed meanwhile is still waiting to go.
+           dispatch({ type: "hydrate", bootstrap: outcome.bootstrap, keepQueued: wasClaiming });
++          // Thumbs given before this page loaded (`myRating`) show as given.
++          setRatings(seedRatings(outcome.bootstrap.messages));
+           if (outcome.claim) trackClaim(outcome.claim);
+           send({ type: "BOOT_OK" });
+           break;
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/stage/Messages.tsx b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/stage/Messages.tsx
+index 6dbd132658..21ed9f75f3 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/stage/Messages.tsx
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/stage/Messages.tsx
+@@ -62,6 +62,8 @@ export interface MessageFeedbackProps {
+   failed: boolean;
+   /** Always shown on Ally's latest message; on hover or focus for the rest. */
+   prominent: boolean;
++  /** Given on an earlier visit: shown as given, without a fresh "Thanks". */
++  seeded?: boolean;
+   onRate: (rating: 1 | -1, comment?: string) => void;
+ }
+ 
+@@ -94,6 +96,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
+   commented,
+   failed,
+   prominent,
++  seeded = false,
+   onRate,
+ }) => {
+   const { t } = useTranslation();
+@@ -130,7 +133,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
+         {thumb(1, t("guide.message.helpful"))}
+         {thumb(-1, t("guide.message.notHelpful"))}
+         {failed && <span className="g-caption ml-1">{t("guide.message.feedbackFailed")}</span>}
+-        {rating !== null && !failed && !askingWhy && (
++        {rating !== null && !failed && !askingWhy && !seeded && (
+           <span className="g-caption ml-1">{t("guide.message.feedbackThanks")}</span>
+         )}
+       </div>
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/stage/Stage.tsx b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/stage/Stage.tsx
+index 5df5a1c7d9..6ea443b95d 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/stage/Stage.tsx
++++ b/ally-web/apps/ally-helpline-dashboard/src/pages/guided-course/stage/Stage.tsx
+@@ -130,6 +130,7 @@ export const Stage: FC<StageProps> = ({
+       commented: Boolean(saved?.comment),
+       failed: saved?.status === "error",
+       prominent: entry.id === lastAllyId,
++      seeded: saved?.seeded ?? false,
+       onRate: (rating, comment) => void actions.rateMessage(entry.id, rating, comment),
+     };
+   };

@@ -22,14 +22,14 @@ test:
 # Lint and formatting
 .PHONY: lint
 lint:
-	@poetry run flake8 src tests
-	@poetry run isort --check-only src tests
-	@poetry run black --check src tests
+	@poetry run flake8 src tests evals
+	@poetry run isort --check-only src tests evals
+	@poetry run black --check src tests evals
 
 .PHONY: format
 format:
-	@poetry run isort src tests
-	@poetry run black src tests
+	@poetry run isort src tests evals
+	@poetry run black src tests evals
 
 # Real sandbox against every app (needs Docker; slow). BUGHUNTER_IT_APPS=ally-ai,ally-be to limit.
 .PHONY: test-docker
@@ -40,6 +40,17 @@ test-docker:
 .PHONY: test-slow
 test-slow:
 	@poetry run pytest tests/slow -m slow -v -s
+
+# Evals (chunk 04). CASES=ally-be or CASES=bug or CASES=<id>; AGENT=baseline or module:Class
+.PHONY: eval eval-mine eval-oracle
+eval:
+	@poetry run bug-hunter eval run $(if $(CASES),--cases $(CASES)) --agent $(or $(AGENT),baseline) --mode $(or $(MODE),issue)
+
+eval-mine:
+	@poetry run bug-hunter eval mine
+
+eval-oracle:
+	@poetry run bug-hunter eval run --oracle-check $(if $(CASES),--cases $(CASES))
 
 .PHONY: check
 check:

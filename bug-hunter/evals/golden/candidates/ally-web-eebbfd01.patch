@@ -1,0 +1,77 @@
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/analytics/PageviewTracker.tsx b/ally-web/apps/ally-helpline-dashboard/src/analytics/PageviewTracker.tsx
+index 9fe415a69d..5d7d92922b 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/analytics/PageviewTracker.tsx
++++ b/ally-web/apps/ally-helpline-dashboard/src/analytics/PageviewTracker.tsx
+@@ -1 +1,26 @@
+-export * from "@analytics/PageviewTracker";
++import { useEffect } from "react";
++import { useLocation } from "react-router-dom";
++
++import { useAnalytics } from "@hooks/useAnalytics";
++
++/**
++ * Fires a $pageview PostHog event on every React Router route transition.
++ * Renders nothing — mount as a direct child of <BrowserRouter> in RouteLayout.
++ *
++ * Kept in this app rather than re-exported from ui-shared: this app is on
++ * react-router-dom 6 (its own node_modules), while a ui-shared module resolves
++ * react-router-dom from the workspace root, which is 7. The shared tracker's
++ * useLocation() then reads v7's router context, never finds this app's v6
++ * <BrowserRouter>, and throws "useLocation() may be used only in the context of
++ * a <Router> component" — which took the whole app down in helpline-v1.50.3.
++ */
++export function PageviewTracker() {
++  const location = useLocation();
++  const { capturePageview } = useAnalytics();
++
++  useEffect(() => {
++    capturePageview(location.pathname + location.search);
++  }, [location.pathname, location.search, capturePageview]);
++
++  return null;
++}
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/analytics/__tests__/PageviewTracker.test.tsx b/ally-web/apps/ally-helpline-dashboard/src/analytics/__tests__/PageviewTracker.test.tsx
+new file mode 100644
+index 0000000000..ac9e19a0ff
+--- /dev/null
++++ b/ally-web/apps/ally-helpline-dashboard/src/analytics/__tests__/PageviewTracker.test.tsx
+@@ -0,0 +1,30 @@
++import { render } from "@testing-library/react";
++import { MemoryRouter } from "react-router-dom";
++import { describe, expect, it, vi } from "vitest";
++
++const capturePageview = vi.fn();
++vi.mock("@hooks/useAnalytics", () => ({
++  useAnalytics: () => ({ capturePageview }),
++}));
++
++import { PageviewTracker } from "../index";
++
++/**
++ * Not mocked on purpose. RouteLayout's test mocks the tracker away "to avoid
++ * context error", and that is how helpline-v1.50.3 shipped a tracker that
++ * crashed the whole app: the shared one read react-router-dom 7's context
++ * inside this app's react-router-dom 6 router. Rendering the real export
++ * inside this app's own router is the check that would have failed.
++ */
++describe("PageviewTracker (helpline)", () => {
++  it("renders inside the app's own router and records the page", () => {
++    expect(() =>
++      render(
++        <MemoryRouter initialEntries={["/home?tab=1"]}>
++          <PageviewTracker />
++        </MemoryRouter>,
++      ),
++    ).not.toThrow();
++    expect(capturePageview).toHaveBeenCalledWith("/home?tab=1");
++  });
++});
+diff --git a/ally-web/apps/ally-helpline-dashboard/src/analytics/index.ts b/ally-web/apps/ally-helpline-dashboard/src/analytics/index.ts
+index c7147717a0..a683b1f98c 100644
+--- a/ally-web/apps/ally-helpline-dashboard/src/analytics/index.ts
++++ b/ally-web/apps/ally-helpline-dashboard/src/analytics/index.ts
+@@ -1 +1,4 @@
+ export * from "@analytics/index";
++// Named, so it wins over the shared PageviewTracker the star export also brings
++// in. The app's own copy uses its own react-router-dom; see PageviewTracker.tsx.
++export { PageviewTracker } from "./PageviewTracker";

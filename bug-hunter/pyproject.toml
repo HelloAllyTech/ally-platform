@@ -5,7 +5,7 @@ description = "Bug Hunter v2: a LangGraph agent that finds and fixes bugs in the
 authors = ["Ally <engineering@helloally.ai>"]
 license = "Proprietary"
 readme = "README.md"
-packages = [{ include = "bug_hunter", from = "src" }]
+packages = [{ include = "bug_hunter", from = "src" }, { include = "evals" }]
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.14"

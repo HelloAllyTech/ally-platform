@@ -1,0 +1,30 @@
+diff --git a/ally-be/src/course-copilot/service/specialists/specialist-llm.service.ts b/ally-be/src/course-copilot/service/specialists/specialist-llm.service.ts
+index 393ee5fa5a..a3c74dceb2 100644
+--- a/ally-be/src/course-copilot/service/specialists/specialist-llm.service.ts
++++ b/ally-be/src/course-copilot/service/specialists/specialist-llm.service.ts
+@@ -132,7 +132,7 @@ export function buildSpecialistPrompt(
+     prompt +=
+       '\n\n---\nYour previous output was rejected for these reasons:\n' +
+       request.repairErrors.map((error) => `- ${error}`).join('\n') +
+-      '\nProduce the whole object again, fixed.';
++      '\nProduce the whole object again, fixed. As before, return ONLY a JSON object.';
+   }
+ 
+   return prompt;
+diff --git a/ally-be/src/course-copilot/service/specialists/test/specialist-llm.service.spec.ts b/ally-be/src/course-copilot/service/specialists/test/specialist-llm.service.spec.ts
+index f75e7926b3..47269e9a59 100644
+--- a/ally-be/src/course-copilot/service/specialists/test/specialist-llm.service.spec.ts
++++ b/ally-be/src/course-copilot/service/specialists/test/specialist-llm.service.spec.ts
+@@ -92,7 +92,11 @@ describe('SpecialistLlmService', () => {
+     expect(prompt).toContain('- Question 2 has no prompt.');
+     expect(prompt).toContain('- Question 4 needs an explanation.');
+     expect(
+-      prompt.trim().endsWith('Produce the whole object again, fixed.'),
++      prompt
++        .trim()
++        .endsWith(
++          'Produce the whole object again, fixed. As before, return ONLY a JSON object.',
++        ),
+     ).toBe(true);
+     expect(llm.complete.mock.calls[0][0].usageMetadata.repairPass).toBe(true);
+   });

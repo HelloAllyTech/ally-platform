@@ -92,6 +92,9 @@ class Sandbox:
     run_id: str
     docker: DockerRunner = subprocess_docker
     sandbox_dir: Path = SANDBOX_DIR
+    app_root: Path | None = (
+        None  # host dir that *is* the app; default worktree/<app path>
+    )
     _counter: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
@@ -99,6 +102,18 @@ class Sandbox:
         self.app_config = self.config.app(self.app)
         self.app_path = self.app_config.path
         self.limits = self.config.limits.sandbox
+        # Pre-monorepo commits keep the app at the worktree root (no ally-be/ prefix):
+        # the worktree is then mounted at /work/<app path> so commands see the same
+        # layout as today.
+        self.app_root = (
+            Path(self.app_root).resolve()
+            if self.app_root
+            else self.worktree / self.app_path
+        )
+
+    @property
+    def mounts_app_at_root(self) -> bool:
+        return self.app_root != self.worktree / self.app_path
 
     # --- image ----
 
@@ -139,7 +154,7 @@ class Sandbox:
     # --- dependency volumes ----
 
     def lockfile_hash(self) -> str:
-        lockfile = self.worktree / self.app_path / self.app_config.lockfile
+        lockfile = self.app_root / self.app_config.lockfile
         if not lockfile.is_file():
             raise SandboxError(f"{lockfile}: lockfile not found")
         return hashlib.sha256(lockfile.read_bytes()).hexdigest()[:12]
@@ -213,7 +228,11 @@ class Sandbox:
             "--network",
             "bridge" if network else "none",
             "-v",
-            f"{self.worktree}:{WORK_MOUNT}",
+            (
+                f"{self.app_root}:{WORK_MOUNT}/{self.app_path}"
+                if self.mounts_app_at_root
+                else f"{self.worktree}:{WORK_MOUNT}"
+            ),
             "-w",
             f"{WORK_MOUNT}/{self.app_path}",
         ]

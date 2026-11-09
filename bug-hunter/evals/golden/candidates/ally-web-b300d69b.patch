@@ -1,0 +1,73 @@
+diff --git a/ally-web/apps/ally-admin-dashboard/src/components/character-interview/VoiceQuestionOptions.tsx b/ally-web/apps/ally-admin-dashboard/src/components/character-interview/VoiceQuestionOptions.tsx
+index 00893d9e26..b55f7a6b87 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/components/character-interview/VoiceQuestionOptions.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/components/character-interview/VoiceQuestionOptions.tsx
+@@ -1,6 +1,6 @@
+ import { useMemo } from "react";
+ 
+-import { useGetScenarioVoicesQuery } from "@api";
++import { useGetAvailableLanguageVoicesQuery } from "@api";
+ import { VoiceOptionRow } from "@components/voice-option";
+ // Imported by module rather than through the `@hooks` barrel: the barrel pulls
+ // in hooks that reach `@store`, which reads `baseAPI.reducerPath` at module
+@@ -41,12 +41,26 @@ interface VoiceQuestionOptionsProps {
+  * do not.
+  */
+ export const useIsVoiceQuestion = (options: CharacterInterviewQuestionOption[]): boolean => {
+-  const { data: voices } = useGetScenarioVoicesQuery({});
++  const { data: languages } = useGetAvailableLanguageVoicesQuery({
++    active: true,
++    voicesNeeded: true,
++  });
+   return useMemo(() => {
+-    if (options.length === 0 || !voices?.length) return false;
+-    const voiceIds = new Set(voices.map(voice => voice.id).filter(Boolean));
++    if (options.length === 0 || !languages?.length) return false;
++    const voiceIds = new Set<string>();
++    // The response type is `ScenarioLanguage[]`, but with `voicesNeeded: true` it
++    // should contain a `voices` array on each language object, similar to
++    // `VoiceCatalogLanguage` used in `VoiceShortlistStrip`.
++    for (const lang of languages as any[]) {
++      for (const voice of lang.voices ?? []) {
++        if (voice.id) {
++          voiceIds.add(voice.id);
++        }
++      }
++    }
++    if (voiceIds.size === 0) return false;
+     return options.every(option => voiceIds.has(option.id));
+-  }, [options, voices]);
++  }, [options, languages]);
+ };
+ 
+ export const VoiceQuestionOptions = ({
+diff --git a/ally-web/apps/ally-admin-dashboard/src/components/character-interview/__tests__/QuestionCard.voice.test.tsx b/ally-web/apps/ally-admin-dashboard/src/components/character-interview/__tests__/QuestionCard.voice.test.tsx
+index e1ca232443..46bc21df33 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/components/character-interview/__tests__/QuestionCard.voice.test.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/components/character-interview/__tests__/QuestionCard.voice.test.tsx
+@@ -29,9 +29,22 @@ vi.mock("@store", () => ({
+   store: { dispatch: vi.fn(), getState: () => ({}), subscribe: vi.fn() },
+ }));
+ 
+-vi.mock("@api", () => ({
+-  useGetScenarioVoicesQuery: () => ({ data: VOICES }),
+-}));
++vi.mock("@api", async importOriginal => {
++  const actual = await importOriginal();
++  return {
++    ...actual,
++    useGetScenarioVoicesQuery: () => ({ data: [] }),
++    useGetAvailableLanguageVoicesQuery: () => ({
++      data: [
++        {
++          language_id: 1,
++          label: "English (India)",
++          voices: VOICES.map(v => ({ id: v.id })),
++        },
++      ],
++    }),
++  };
++});
+ 
+ vi.mock("@hooks/useVoicePreview", () => ({
+   useVoicePreview: () => ({

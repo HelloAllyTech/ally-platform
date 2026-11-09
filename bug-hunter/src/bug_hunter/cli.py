@@ -33,6 +33,8 @@ runs_app = typer.Typer(help="Runs: sweep what crashed runs left behind.")
 app.add_typer(runs_app, name="runs")
 cache_app = typer.Typer(help="Caches and kept artefacts: sizes and cleaning.")
 app.add_typer(cache_app, name="cache")
+eval_app = typer.Typer(help="Eval harness: mine, curate and run golden cases.")
+app.add_typer(eval_app, name="eval")
 
 
 def _load_or_exit(
@@ -337,6 +339,150 @@ def config_check(
         raise typer.Exit(code=1)
     typer.echo("")
     typer.echo("config ok")
+
+
+@eval_app.command("mine")
+def eval_mine(
+    apps: Annotated[
+        list[str] | None, typer.Argument(help="Apps to mine (default: all five).")
+    ] = None,
+    no_gh: Annotated[
+        bool, typer.Option("--no-gh", help="Do not call gh for PR titles.")
+    ] = False,
+) -> None:
+    """Mine real-bug and clean-diff candidates into evals/golden/candidates/."""
+    from bug_hunter.config import PACKAGE_ROOT
+    from evals.mine_cases import Repo, mine_all, write_candidates
+
+    config = _load_or_exit()
+    folder = PACKAGE_ROOT / "evals" / "golden" / "candidates"
+    repo = Repo(config.repo_root)
+    candidates = mine_all(
+        config, repo, apps, use_gh=not no_gh, pr_cache_path=folder / "pr-cache.json"
+    )
+    md = write_candidates(folder, repo, candidates)
+    bugs = sum(1 for c in candidates if c.kind == "bug")
+    typer.echo(f"{bugs} bug and {len(candidates) - bugs} clean candidates → {md}")
+
+
+@eval_app.command("accept")
+def eval_accept(
+    ids: Annotated[
+        list[str], typer.Argument(help="Candidate ids to add to cases.yaml.")
+    ],
+) -> None:
+    """Move reviewed candidates into evals/golden/cases.yaml."""
+    import json as _json
+
+    from bug_hunter.config import PACKAGE_ROOT
+    from evals.schema import Case, load_cases, save_cases
+
+    folder = PACKAGE_ROOT / "evals" / "golden"
+    candidates = {
+        c["id"]: c
+        for c in _json.loads((folder / "candidates" / "candidates.json").read_text())
+    }
+    cases = load_cases(folder / "cases.yaml")
+    known = {c.id for c in cases.cases}
+    added = []
+    for cid in ids:
+        if cid in known:
+            typer.echo(f"{cid}: already in cases.yaml")
+            continue
+        c = candidates.get(cid)
+        if c is None:
+            typer.echo(f"{cid}: not a candidate", err=True)
+            raise typer.Exit(code=1)
+        cases.cases.append(
+            Case(
+                id=c["id"],
+                kind=c["kind"],
+                app=c["app"],
+                parent=c["parent"],
+                commit=c["sha"],
+                expected=c["expected"],
+                layout=c.get("layout", "monorepo"),
+                risk=c["risk"],
+                description=c["description"],
+                src_files=c["src_files"],
+                oracle_tests=c["test_files"],
+                src_lines=c["src_lines"],
+                lockfile_blob=c["lockfile_blob"],
+            )
+        )
+        added.append(cid)
+    save_cases(folder / "cases.yaml", cases)
+    typer.echo(
+        f"added {len(added)}: {', '.join(added) or 'none'}; "
+        f"cases.yaml now {len(cases.cases)} cases {cases.by_app()}"
+    )
+
+
+@eval_app.command("run")
+def eval_run(
+    cases_filter: Annotated[
+        str | None,
+        typer.Option("--cases", help="app, kind (bug/clean) or id; comma-separated."),
+    ] = None,
+    agent: Annotated[
+        str, typer.Option(help="'baseline' or module:Class.")
+    ] = "baseline",
+    mode: Annotated[str, typer.Option(help="sweep or issue.")] = "issue",
+    oracle_check: Annotated[
+        bool,
+        typer.Option(
+            "--oracle-check", help="Prove cases: real fix makes the oracle pass."
+        ),
+    ] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Print the plan; run nothing.")
+    ] = False,
+    min_free_gb: Annotated[
+        float | None, typer.Option(help="Disk floor (default from limits.yaml).")
+    ] = None,
+) -> None:
+    """Run the golden cases against an agent, one at a time, and write a report."""
+    import json as _json
+
+    from bug_hunter.config import PACKAGE_ROOT
+    from evals.agents import load_agent
+    from evals.run_evals import HarnessOptions, run_evals
+    from evals.schema import load_cases
+
+    config = _load_or_exit()
+    case_file = load_cases(PACKAGE_ROOT / "evals" / "golden" / "cases.yaml")
+    selected = case_file.select(cases_filter)
+    if not selected:
+        typer.echo(
+            "no cases selected (is cases.yaml empty? "
+            "run `bug-hunter eval mine` and `eval accept`)",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    if mode not in ("sweep", "issue"):
+        typer.echo("mode must be sweep or issue", err=True)
+        raise typer.Exit(code=1)
+    options = HarnessOptions(
+        mode=mode, oracle_check=oracle_check, dry_run=dry_run, min_free_gb=min_free_gb
+    )
+    report, path = run_evals(config, selected, load_agent(agent), options)
+    if dry_run:
+        typer.echo(_json.dumps(report.meta["plan"], indent=1))
+        return
+    typer.echo(f"report: {path}")
+    summary = report.to_dict()["metrics"]["total"]
+    typer.echo(
+        _json.dumps(
+            {
+                "cases": summary["cases"],
+                "rates": summary["rates"],
+                "stopped": report.meta["stopped_reason"],
+            },
+            indent=1,
+        )
+    )
+    if report.meta["stopped_reason"]:
+        raise typer.Exit(code=2)
 
 
 if __name__ == "__main__":

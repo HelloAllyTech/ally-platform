@@ -1,0 +1,72 @@
+diff --git a/ally-be/src/guide/runtime/guide-orchestrator.runner.ts b/ally-be/src/guide/runtime/guide-orchestrator.runner.ts
+index 4228757992..d6262bd0dd 100644
+--- a/ally-be/src/guide/runtime/guide-orchestrator.runner.ts
++++ b/ally-be/src/guide/runtime/guide-orchestrator.runner.ts
+@@ -244,6 +244,10 @@ export async function runOrchestrator(
+         if (passText && !muted) texts.push(passText);
+       }
+ 
++      // A paused turn continues: the assistant content is already appended,
++      // so the next pass resends the conversation as it stands.
++      if (final.stopReason === 'pause_turn') continue;
++
+       const uses = content.filter(
+         (block): block is Extract<AgentContentBlock, { type: 'tool_use' }> =>
+           block.type === 'tool_use',
+diff --git a/ally-be/src/guide/runtime/test/guide-orchestrator.runner.spec.ts b/ally-be/src/guide/runtime/test/guide-orchestrator.runner.spec.ts
+index 0fc952a6c4..e8735e72c3 100644
+--- a/ally-be/src/guide/runtime/test/guide-orchestrator.runner.spec.ts
++++ b/ally-be/src/guide/runtime/test/guide-orchestrator.runner.spec.ts
+@@ -186,6 +186,24 @@ describe('runOrchestrator', () => {
+     expect(repeatsEarlierText('Yes.', earlier)).toBe(false);
+   });
+ 
++  it('continues a paused turn instead of ending it', async () => {
++    const { stream, requests } = streamOf([
++      [final([{ type: 'text', text: 'Looking.' }], 'pause_turn')],
++      [final([{ type: 'text', text: 'Found it.' }])],
++    ]);
++    const gate = new ReleaseGate(async () => undefined);
++    await gate.release();
++    const out = await runOrchestrator({
++      ...base(),
++      stream,
++      executeTool: jest.fn(),
++      gate,
++    });
++    expect(requests).toHaveLength(2);
++    expect(requests[1].messages.at(-1)).toMatchObject({ role: 'assistant' });
++    expect(out.text).toBe('Looking.\n\nFound it.');
++  });
++
+   it('closes with tool_choice none after the pass limit, keeping the tools', async () => {
+     const toolPass = () => [
+       final(
+diff --git a/ally-be/src/llm-agent/provider/anthropic-agent.provider.ts b/ally-be/src/llm-agent/provider/anthropic-agent.provider.ts
+index f188c61628..497652c6e5 100644
+--- a/ally-be/src/llm-agent/provider/anthropic-agent.provider.ts
++++ b/ally-be/src/llm-agent/provider/anthropic-agent.provider.ts
+@@ -36,6 +36,7 @@ const STOP_REASONS: Record<string, AgentStopReason> = {
+   max_tokens: 'max_tokens',
+   stop_sequence: 'end_turn',
+   refusal: 'refusal',
++  pause_turn: 'pause_turn',
+ };
+ 
+ /** `cache: true` is the API default TTL; a string names one explicitly. */
+diff --git a/ally-be/src/llm-agent/type/agent-llm.type.ts b/ally-be/src/llm-agent/type/agent-llm.type.ts
+index 1ac758e2e5..85062e0354 100644
+--- a/ally-be/src/llm-agent/type/agent-llm.type.ts
++++ b/ally-be/src/llm-agent/type/agent-llm.type.ts
+@@ -109,6 +109,11 @@ export type AgentStopReason =
+    * it before reading content. `stopDetails` says which category.
+    */
+   | 'refusal'
++  /**
++   * The server paused a long turn (e.g. tool search) and expects the caller
++   * to send the conversation back as is to continue it.
++   */
++  | 'pause_turn'
+   | 'other';
+ 
+ export interface AgentUsage {

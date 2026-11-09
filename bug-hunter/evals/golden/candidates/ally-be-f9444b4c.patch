@@ -1,0 +1,329 @@
+diff --git a/ally-be/src/config/config.service.ts b/ally-be/src/config/config.service.ts
+index dd38f6dc7..f96adb0b6 100644
+--- a/ally-be/src/config/config.service.ts
++++ b/ally-be/src/config/config.service.ts
+@@ -796,9 +796,12 @@ export class AppConfigService {
+       imageModel: (() => {
+         const model = this.configService.get<string>(
+           'OPENAI_IMAGE_MODEL',
+-          'dall-e-3',
++          'gpt-image-1.5',
+         );
+-        return model === 'gpt-image-1' ? 'dall-e-3' : model;
++        // OpenAI retired these on the Images API ('model does not exist'), so
++        // a stale env value must not bring image generation down with it.
++        const retired = ['gpt-image-1', 'dall-e-2', 'dall-e-3'];
++        return retired.includes(model) ? 'gpt-image-1.5' : model;
+       })(),
+     };
+   }
+diff --git a/ally-be/src/config/test/config.service.spec.ts b/ally-be/src/config/test/config.service.spec.ts
+index ce54d667d..095045f37 100644
+--- a/ally-be/src/config/test/config.service.spec.ts
++++ b/ally-be/src/config/test/config.service.spec.ts
+@@ -77,19 +77,22 @@ describe('AppConfigService', () => {
+   });
+ 
+   describe('openai', () => {
+-    it('returns dall-e-3 even when the env var is the deprecated gpt-image-1', () => {
+-      const service = make({ OPENAI_IMAGE_MODEL: 'gpt-image-1' });
+-      expect(service.openai.imageModel).toBe('dall-e-3');
+-    });
++    it.each(['gpt-image-1', 'dall-e-2', 'dall-e-3'])(
++      'replaces the retired image model %s from a stale env with gpt-image-1.5',
++      (model) => {
++        const service = make({ OPENAI_IMAGE_MODEL: model });
++        expect(service.openai.imageModel).toBe('gpt-image-1.5');
++      },
++    );
+ 
+     it('returns the default when the env var is not set', () => {
+       const service = make({});
+-      expect(service.openai.imageModel).toBe('dall-e-3');
++      expect(service.openai.imageModel).toBe('gpt-image-1.5');
+     });
+ 
+     it('returns a different model when the env var is set to it', () => {
+-      const service = make({ OPENAI_IMAGE_MODEL: 'dall-e-2' });
+-      expect(service.openai.imageModel).toBe('dall-e-2');
++      const service = make({ OPENAI_IMAGE_MODEL: 'gpt-image-1-mini' });
++      expect(service.openai.imageModel).toBe('gpt-image-1-mini');
+     });
+   });
+ });
+diff --git a/ally-be/src/image-generation/provider/openai-image.provider.ts b/ally-be/src/image-generation/provider/openai-image.provider.ts
+index 285adaceb..6ec172989 100644
+--- a/ally-be/src/image-generation/provider/openai-image.provider.ts
++++ b/ally-be/src/image-generation/provider/openai-image.provider.ts
+@@ -39,15 +39,18 @@ export class OpenAiImageProvider implements ImageGenerationProvider {
+     options?: ImageGenerationOptions,
+   ): Promise<Buffer> {
+     const model = this.getModel();
++    const isGptImage = model.startsWith('gpt-image');
+     const response = await this.getClient().images.generate({
+       model,
+       prompt,
+       n: 1,
+       size: size as OpenAI.Images.ImageGenerateParams['size'],
+       // low/medium/high are gpt-image tiers; dall-e models reject them.
+-      ...(options?.quality && model.startsWith('gpt-image')
+-        ? { quality: options.quality }
+-        : {}),
++      ...(options?.quality && isGptImage ? { quality: options.quality } : {}),
++      // Counselor-training covers legitimately name suicide, self-harm and
++      // abuse (a QPR course description was refused outright under the
++      // default 'auto' filter); 'low' still blocks disallowed imagery.
++      ...(isGptImage ? { moderation: 'low' as const } : {}),
+     });
+ 
+     const base64 = response.data?.[0]?.b64_json;
+diff --git a/ally-be/src/image-generation/provider/test/openai-image.provider.spec.ts b/ally-be/src/image-generation/provider/test/openai-image.provider.spec.ts
+index 02af224a9..da4d0f3ef 100644
+--- a/ally-be/src/image-generation/provider/test/openai-image.provider.spec.ts
++++ b/ally-be/src/image-generation/provider/test/openai-image.provider.spec.ts
+@@ -24,26 +24,37 @@ describe('OpenAiImageProvider', () => {
+   });
+ 
+   it('leaves quality to the model default when none is asked for', async () => {
+-    await providerFor('dall-e-3').generateImage('a bench', '1536x1024');
++    await providerFor('gpt-image-1.5').generateImage('a bench', '1536x1024');
+     expect(mockGenerate.mock.calls[0][0]).not.toHaveProperty('quality');
+   });
+ 
+-  it('never sends a gpt-image tier to a dall-e model, which would reject it', async () => {
++  it('never sends a gpt-image tier or moderation to a dall-e model, which would reject them', async () => {
+     await providerFor('dall-e-3').generateImage('a bench', '1792x1024', {
+       quality: 'medium',
+     });
+     expect(mockGenerate.mock.calls[0][0]).not.toHaveProperty('quality');
++    expect(mockGenerate.mock.calls[0][0]).not.toHaveProperty('moderation');
++  });
++
++  it('relaxes moderation for gpt-image models, so counselling topics are not refused', async () => {
++    await providerFor('gpt-image-1.5').generateImage('a bench', '1536x1024', {
++      quality: 'medium',
++    });
++    expect(mockGenerate.mock.calls[0][0]).toMatchObject({
++      quality: 'medium',
++      moderation: 'low',
++    });
+   });
+ 
+   it('returns the decoded image bytes', async () => {
+-    const image = await providerFor('dall-e-3').generateImage(
++    const image = await providerFor('gpt-image-1.5').generateImage(
+       'a bench',
+       '1536x1024',
+     );
+     expect(image.toString()).toBe('png');
+   });
+ 
+-  it('uses dall-e-3 as the default model for image generation', async () => {
++  it('uses gpt-image-1.5 as the default model for image generation', async () => {
+     const configService = new ConfigService();
+     jest
+       .spyOn(configService, 'get')
+@@ -60,10 +71,8 @@ describe('OpenAiImageProvider', () => {
+ 
+     await provider.generateImage('a bench', '1024x1024');
+ 
+-    // This test will fail before the fix, because the default model is 'gpt-image-1'.
+-    // After fixing the default value in AppConfigService to 'dall-e-3', this test will pass.
+     expect(mockGenerate).toHaveBeenCalledWith(
+-      expect.objectContaining({ model: 'dall-e-3' }),
++      expect.objectContaining({ model: 'gpt-image-1.5' }),
+     );
+   });
+ });
+diff --git a/ally-be/src/llm/constants/ai-task-registry.constants.ts b/ally-be/src/llm/constants/ai-task-registry.constants.ts
+index 032f66249..ca94308b2 100644
+--- a/ally-be/src/llm/constants/ai-task-registry.constants.ts
++++ b/ally-be/src/llm/constants/ai-task-registry.constants.ts
+@@ -1319,7 +1319,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
+       'Gemini renders from an aspect ratio rather than pixel dimensions and has no quality setting.',
+     kind: AiTaskKind.IMAGE,
+     provider: 'openai',
+-    defaultModel: 'dall-e-3',
++    defaultModel: 'gpt-image-1.5',
+     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
+     configPath: 'openai.imageModel',
+   },
+@@ -1338,7 +1338,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
+       'the roleplay cover library.',
+     kind: AiTaskKind.IMAGE,
+     provider: 'openai',
+-    defaultModel: 'dall-e-3',
++    defaultModel: 'gpt-image-1.5',
+     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
+     configPath: 'openai.imageModel',
+   },
+@@ -2341,7 +2341,7 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
+       'row, so the session budget counts each at COURSE_COPILOT_IMAGE_COST_USD.',
+     kind: AiTaskKind.IMAGE,
+     provider: 'openai',
+-    defaultModel: 'dall-e-3',
++    defaultModel: 'gpt-image-1.5',
+     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
+     configPath: 'openai.imageModel',
+   },
+diff --git a/ally-be/src/scenario-cover-image-library/service/cover-image-generation.service.ts b/ally-be/src/scenario-cover-image-library/service/cover-image-generation.service.ts
+index a7712a70f..67d3335b7 100644
+--- a/ally-be/src/scenario-cover-image-library/service/cover-image-generation.service.ts
++++ b/ally-be/src/scenario-cover-image-library/service/cover-image-generation.service.ts
+@@ -63,7 +63,12 @@ export class CoverImageGenerationService {
+     const status = err?.status;
+     const message = err?.message ?? 'Unknown error';
+ 
+-    if (status === 400 || err?.code === 'content_policy_violation') {
++    // Only a content refusal is the author's to fix; any other 400 (invalid
++    // size, retired model) is our configuration bug, reported as upstream.
++    if (
++      err?.code === 'moderation_blocked' ||
++      err?.code === 'content_policy_violation'
++    ) {
+       return new BadRequestException(
+         `${providerType} rejected the image request: ${message}`,
+       );
+diff --git a/ally-be/src/scenario-cover-image-library/service/test/cover-image-generation.service.spec.ts b/ally-be/src/scenario-cover-image-library/service/test/cover-image-generation.service.spec.ts
+index bb41ee5f3..dfca1de5f 100644
+--- a/ally-be/src/scenario-cover-image-library/service/test/cover-image-generation.service.spec.ts
++++ b/ally-be/src/scenario-cover-image-library/service/test/cover-image-generation.service.spec.ts
+@@ -161,9 +161,10 @@ describe('CoverImageGenerationService', () => {
+     expect(mockProvider.generateImage).not.toHaveBeenCalled();
+   });
+ 
+-  it('maps provider 400s to BadRequest and does not upload', async () => {
++  it('maps a content refusal to BadRequest and does not upload', async () => {
+     mockProvider.generateImage.mockRejectedValueOnce({
+       status: 400,
++      code: 'moderation_blocked',
+       message: 'content policy',
+     });
+ 
+@@ -173,6 +174,18 @@ describe('CoverImageGenerationService', () => {
+     expect(mockS3.uploadStream).not.toHaveBeenCalled();
+   });
+ 
++  it('reports a non-refusal 400 (retired model, bad size) as upstream, not the prompt', async () => {
++    mockProvider.generateImage.mockRejectedValueOnce({
++      status: 400,
++      code: 'invalid_value',
++      message: "The model 'gpt-image-1' does not exist.",
++    });
++
++    await expect(service.generateCoverImage(dto)).rejects.toThrow(
++      BadGatewayException,
++    );
++  });
++
+   it('maps provider quota/unknown failures to BadGateway', async () => {
+     mockProvider.generateImage.mockRejectedValueOnce({ status: 429 });
+     await expect(service.generateCoverImage(dto)).rejects.toThrow(
+diff --git a/ally-be/src/track/service/test/track-cover-image.service.spec.ts b/ally-be/src/track/service/test/track-cover-image.service.spec.ts
+index 101345bfc..fe11a7ab7 100644
+--- a/ally-be/src/track/service/test/track-cover-image.service.spec.ts
++++ b/ally-be/src/track/service/test/track-cover-image.service.spec.ts
+@@ -18,7 +18,7 @@ describe('TrackCoverImageService', () => {
+   let service: TrackCoverImageService;
+ 
+   const mockProvider = {
+-    getModel: jest.fn().mockReturnValue('dall-e-3'),
++    getModel: jest.fn().mockReturnValue('gpt-image-1.5'),
+     assertConfigured: jest.fn(),
+     generateImage: jest.fn(),
+   };
+@@ -94,7 +94,7 @@ describe('TrackCoverImageService', () => {
+       expect.objectContaining({
+         task: LlmTask.GENERATE_COURSE_COVER_IMAGE,
+         unit: 'images',
+-        model: 'dall-e-3',
++        model: 'gpt-image-1.5',
+       }),
+     );
+   });
+@@ -128,9 +128,10 @@ describe('TrackCoverImageService', () => {
+     );
+   });
+ 
+-  it('maps a provider refusal to 400 and uploads nothing', async () => {
++  it('maps a content refusal to 400 and uploads nothing', async () => {
+     mockProvider.generateImage.mockRejectedValue({
+       status: 400,
++      code: 'moderation_blocked',
+       message: 'safety system',
+     });
+ 
+@@ -142,6 +143,18 @@ describe('TrackCoverImageService', () => {
+     expect(mockUsage.record).not.toHaveBeenCalled();
+   });
+ 
++  it('does not blame the prompt for a 400 that is not a content refusal', async () => {
++    mockProvider.generateImage.mockRejectedValue({
++      status: 400,
++      code: 'invalid_value',
++      message: "The model 'dall-e-3' does not exist.",
++    });
++
++    const error = await service.generate(dto).catch((e) => e);
++    expect(error).toBeInstanceOf(BadGatewayException);
++    expect(error.message).not.toMatch(/rewording/);
++  });
++
+   it('maps a rate limit or outage to 502', async () => {
+     mockProvider.generateImage.mockRejectedValueOnce({ status: 429 });
+     await expect(service.generate(dto)).rejects.toBeInstanceOf(
+@@ -153,23 +166,4 @@ describe('TrackCoverImageService', () => {
+       BadGatewayException,
+     );
+   });
+-
+-  it("removes 'documentary-style' from the prompt before sending to the provider", async () => {
+-    mockProvider.generateImage.mockResolvedValue(Buffer.from('png-bytes'));
+-    const problematicPrompt =
+-      'A warm, realistic documentary-style photograph of a group of people learning.';
+-
+-    await service.generate({
+-      prompt: problematicPrompt,
+-      trackTitle: 'Test Course',
+-    });
+-
+-    const expectedPrompt =
+-      'A warm, realistic photograph of a group of people learning.';
+-    expect(mockProvider.generateImage).toHaveBeenCalledWith(
+-      expectedPrompt,
+-      '1536x1024',
+-      { quality: 'medium' },
+-    );
+-  });
+ });
+diff --git a/ally-be/src/track/service/track-cover-image.service.ts b/ally-be/src/track/service/track-cover-image.service.ts
+index 58b3ef607..9dba0fb74 100644
+--- a/ally-be/src/track/service/track-cover-image.service.ts
++++ b/ally-be/src/track/service/track-cover-image.service.ts
+@@ -71,10 +71,7 @@ export class TrackCoverImageService {
+     const startedAt = Date.now();
+     let image: Buffer;
+     try {
+-      // The default prompt from the frontend includes "documentary-style", which
+-      // can trip the provider's content filter.
+-      const prompt = dto.prompt.replace(/documentary-style /gi, '');
+-      image = await provider.generateImage(prompt, TRACK_COVER_IMAGE_SIZE, {
++      image = await provider.generateImage(dto.prompt, TRACK_COVER_IMAGE_SIZE, {
+         quality: INTERACTIVE_IMAGE_QUALITY,
+       });
+     } catch (error) {
+@@ -127,7 +124,13 @@ export class TrackCoverImageService {
+    */
+   private toHttpError(error: unknown): HttpException {
+     const err = error as { status?: number; code?: string };
+-    if (err?.status === 400 || err?.code === 'content_policy_violation') {
++    // Only a content refusal is the trainer's to fix by rewording. Every
++    // other 400 (invalid size, retired model) is our configuration bug —
++    // blaming the prompt for those sent two fixes down the wrong road.
++    if (
++      err?.code === 'moderation_blocked' ||
++      err?.code === 'content_policy_violation'
++    ) {
+       return new BadRequestException(
+         "The image service couldn't use this prompt. Try rewording it — for example, remove anything graphic or any real person's name.",
+       );

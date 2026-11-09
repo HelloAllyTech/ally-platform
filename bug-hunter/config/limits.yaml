@@ -31,3 +31,12 @@ context:
 artefacts:
   max_age_days: 30
   max_size_mb: 500
+# Eval harness (chunk 04).
+evals:
+  min_free_gb: 5              # stop the harness cleanly below this much free host disk
+  since_months: 12            # how far back to mine fix commits (full history for thin apps)
+  max_src_lines: 60           # real-bug candidates: source lines changed (tests excluded)
+  max_src_lines_thin_apps: 120   # ally-ai, ally-ai-learn, ally-mobile have few fixes
+  clean_window_days: 30       # a feat/chore is "clean" if no fix touched its lines within this
+  clean_min_src_lines: 5
+  clean_max_src_lines: 200

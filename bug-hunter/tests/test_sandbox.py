@@ -157,3 +157,17 @@ def test_missing_lockfile_is_an_error(config, tmp_path) -> None:
 
 def test_docker_available_with_fake() -> None:
     assert docker_available(FakeDocker()) is True
+
+
+def test_old_layout_mounts_the_worktree_as_the_app(config, tmp_path) -> None:
+    root = tmp_path / "old-layout"
+    root.mkdir()
+    (root / "package-lock.json").write_text("{}")
+    docker = FakeDocker(image_exists=True)
+    sb = Sandbox(config, root, "ally-be", "run-old", docker=docker, app_root=root)
+    assert sb.mounts_app_at_root
+    sb.exec("npm test")
+    run = docker.calls[-1]
+    assert f"{root.resolve()}:/work/ally-be" in run
+    assert run[run.index("-w") + 1] == "/work/ally-be"
+    assert any(v.endswith(":/work/ally-be/node_modules") for v in run)
