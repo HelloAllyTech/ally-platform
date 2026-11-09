@@ -244,6 +244,40 @@ Full runs: Actions → "Bug Hunter v2 evals" → `what=baseline`, `agent=graph`,
 (the workflow's "baseline" steps run whichever agent is chosen). Both modes run, each
 under the cost cap.
 
+## v1 vs v2 prompts on the 10-case subset
+
+| Mode | Version | Detection | False alarms | Verified repro | Cost |
+|---|---|---|---|---|---|
+| issue | v1 | 6/6 | 0/4 | 4/6¹ | $2.66 |
+| issue | v2 | 6/6 | 0/4 | 4/6 | $2.38 |
+| sweep | v1 | 4/6 | 1/4 | 2/6 | $3.28 |
+| sweep | v2 | 5/6 | 1/4 | 1/6 | $3.94 |
+
+¹ the v1 report printed 5/6 because the agent then exported its test file even when the
+test had passed inside the graph; fixed before v2.
+
+Per case (outcome, verified repro, cost): see the eval reports
+`evals/results/20261109-125735-graph-issue-caa0c93c`, `…-133908-graph-sweep-9310851d`
+(v1) and `…-graph-issue-4db14b98`, `…-graph-sweep-4db14b98` (v2, GitHub run 42628674101).
+v2 changes and what each targeted: triage.v2 treats a sweep diff as a suspect (the
+995242d7 "no symptom" rejection); investigate.v2 traces the new lines at runtime instead
+of trusting the description (the b680c643 sweep miss); reproduce.v2 copies the
+neighbouring test's setup and forbids submitting a passing test (9299e9aa, 819f6ccf
+issue-mode escalations); the right-reason judge accepts a failing assertion on the
+symptom (the b680c643 judge rejection). Effect: the two issue-mode repro failures were
+fixed; sweep detection +1; two sweep agents still submitted passing tests, so the
+"never submit a passing test" rule needs code enforcement (bounce back into the loop),
+not prose; clean cases in sweep now cost $0.2–0.35 each because they are investigated.
+
+## Spend ledger and rules
+
+`bug-hunter/runs/spend.json` (gitignored) records every local eval and `run`
+automatically and GitHub runs by hand (`bug-hunter spend add`); `spend show` prints the
+day; the harness and `run` refuse to start past $15/day unless `--override-spend-cap`.
+Today's total, including estimates for two cancelled GitHub runs without reports: see
+`spend show` (≈ $21 on 2026-11-09). Standing rules: show prompt proposals first; ask
+before every GitHub dispatch and every multi-case local run, with the expected cost.
+
 ## Open questions and notes for later chunks
 
 - Chunk 06 (fix): `after_reproduce` routes a reproduced bug to `report`; the

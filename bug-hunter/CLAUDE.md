@@ -28,7 +28,15 @@ poetry run bug-hunter run --app ally-be --issue-text "…"   # one signal throug
 poetry run bug-hunter run --commit <sha>                   # sweep mode: review one commit's diff
 poetry run bug-hunter replay <run_id> [--resume]           # list checkpoints / continue a killed run
 make eval AGENT=graph CASES=<id>          # the real graph on one golden case (costs money)
+poetry run bug-hunter spend show          # today's model spend (runs/spend.json) against the $15/day cap
+poetry run bug-hunter spend add 2.40 --source github --note "run 123 issue"   # record a GitHub run's cost
+poetry run bug-hunter spend check --expected 6   # exit 1 if a ~$6 run would pass today's cap
 ```
+
+Spend rules (user, 2026-11-09): show the proposal before changing any prompt; ask before every
+GitHub eval dispatch and every local run of more than one case, with the expected cost; the
+harness and `run` refuse to start once today's ledger passes $15 unless `--override-spend-cap`
+(explicit go-ahead only).
 
 Keys: `bug-hunter/.env` locally (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `LANGSMITH_API_KEY`,
 plus `LANGSMITH_WORKSPACE_ID` because the LangSmith key is organisation-scoped; loaded by

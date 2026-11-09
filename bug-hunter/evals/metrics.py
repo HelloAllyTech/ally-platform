@@ -161,6 +161,13 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {c['tokens']} | ${c['cost_usd']:.3f} | {c['seconds']:.0f} | {trace} "
             f"| {(c['error'] or '')[:60]} |"
         )
+    if meta.get("spend_today_usd") is not None:
+        lines += [
+            "",
+            "Today's model spend on this machine: "
+            f"${meta['spend_today_usd']:.2f} of the "
+            f"${meta['spend_daily_cap_usd']:.0f} daily cap (runs/spend.json)",
+        ]
     if meta.get("cost_cap_usd") is not None:
         lines += [
             "",

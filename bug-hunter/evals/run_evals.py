@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from bug_hunter import spend
 from bug_hunter.config import PACKAGE_ROOT, RUNS_DIR, BugHunterConfig
 from bug_hunter.graph.prompts import prompt_versions
 from bug_hunter.runs import Run
@@ -64,6 +65,8 @@ class HarnessOptions:
     dry_run: bool = False
     min_free_gb: float | None = None
     max_cost_usd: float | None = None  # hard cap for the whole eval run (limits.yaml)
+    spend_file: Path | None = None  # daily ledger; None (tests) disables it
+    override_spend_cap: bool | None = None  # None = read BUGHUNTER_SPEND_OVERRIDE
     runs_dir: Path = RUNS_DIR  # tests pass a temp dir; never share the live one
     # Old-era lockfiles each cost a dependency volume (ally-web ≈ 1.3 GB). Keep
     # only the volumes for HEAD's lockfiles; drop the others after each case.
@@ -528,6 +531,13 @@ def run_evals(
         else config.limits.evals.max_cost_usd
     )
     meta["cost_cap_usd"] = cost_cap
+    if options.spend_file is not None and agent.name != "baseline":
+        # the daily ledger: refuse past the cap unless overridden explicitly
+        meta["spend_today_before_usd"] = spend.check_cap(
+            expected_usd=0.0,
+            override=options.override_spend_cap,
+            path=options.spend_file,
+        )
     spent = 0.0
     try:
         for index, case in enumerate(cases):
@@ -543,6 +553,16 @@ def run_evals(
     except StopHarness as exc:
         meta["stopped_reason"] = str(exc)
     meta["cost_usd_total"] = round(spent, 4)
+    if options.spend_file is not None and spent > 0:
+        spend.record(
+            spent,
+            "local-eval",
+            f"{agent.name} {meta['mode']} {len(report.cases)} cases",
+            path=options.spend_file,
+        )
+    if options.spend_file is not None:
+        meta["spend_today_usd"] = spend.total_for(path=options.spend_file)
+        meta["spend_daily_cap_usd"] = spend.DAILY_CAP_USD
     meta["cases_done"] = len(report.cases)
     meta["cases_remaining"] = len(cases) - len(report.cases)
     meta["free_gb_end"] = guard.free_gb()

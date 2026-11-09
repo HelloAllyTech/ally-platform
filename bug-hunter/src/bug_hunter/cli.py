@@ -52,6 +52,58 @@ cache_app = typer.Typer(help="Caches and kept artefacts: sizes and cleaning.")
 app.add_typer(cache_app, name="cache")
 eval_app = typer.Typer(help="Eval harness: mine, curate and run golden cases.")
 app.add_typer(eval_app, name="eval")
+spend_app = typer.Typer(help="Daily model-spend ledger (runs/spend.json).")
+app.add_typer(spend_app, name="spend")
+
+
+@spend_app.command("show")
+def spend_show(
+    day: Annotated[
+        str | None, typer.Option(help="YYYY-MM-DD (default today, UTC).")
+    ] = None,
+) -> None:
+    """Today's entries and total against the daily cap."""
+    from bug_hunter import spend
+
+    typer.echo(spend.summary(day))
+
+
+@spend_app.command("add")
+def spend_add(
+    usd: Annotated[float, typer.Argument(help="Cost in USD.")],
+    source: Annotated[
+        str, typer.Option(help="github | estimate | local-run | other")
+    ] = "github",
+    note: Annotated[str, typer.Option(help="Run id / what it was.")] = "",
+) -> None:
+    """Record spend that did not happen on this machine (a GitHub run, an estimate)."""
+    from bug_hunter import spend
+
+    entry = spend.record(usd, source, note)
+    typer.echo(
+        f"recorded ${entry.usd:.2f} ({entry.source}) — "
+        f"{spend.summary().splitlines()[0]}"
+    )
+
+
+@spend_app.command("check")
+def spend_check(
+    expected: Annotated[
+        float, typer.Option(help="Expected cost of the run about to start.")
+    ] = 0.0,
+) -> None:
+    """Exit 1 if today's spend plus --expected would pass the daily cap."""
+    from bug_hunter import spend
+
+    try:
+        spent = spend.check_cap(expected_usd=expected)
+    except spend.SpendCapExceeded as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+    typer.echo(
+        f"ok: ${spent:.2f} spent today + ~${expected:.2f} stays under the "
+        f"${spend.DAILY_CAP_USD:.0f} cap"
+    )
 
 
 def _load_or_exit(
@@ -534,6 +586,13 @@ def eval_run(
         float | None,
         typer.Option(help="Stop cleanly once the cases cost this much (limits.yaml)."),
     ] = None,
+    override_spend_cap: Annotated[
+        bool,
+        typer.Option(
+            "--override-spend-cap",
+            help="Start even past the $15 daily ledger cap (user's explicit go-ahead).",
+        ),
+    ] = False,
 ) -> None:
     """Run the golden cases against an agent, one at a time, and write a report."""
     import json as _json
@@ -556,14 +615,22 @@ def eval_run(
     if mode not in ("sweep", "issue"):
         typer.echo("mode must be sweep or issue", err=True)
         raise typer.Exit(code=1)
+    from bug_hunter import spend
+
     options = HarnessOptions(
         mode=mode,
         oracle_check=oracle_check,
         dry_run=dry_run,
         min_free_gb=min_free_gb,
         max_cost_usd=max_cost_usd,
+        spend_file=spend.SPEND_FILE,
+        override_spend_cap=True if override_spend_cap else None,
     )
-    report, path = run_evals(config, selected, load_agent(agent), options)
+    try:
+        report, path = run_evals(config, selected, load_agent(agent), options)
+    except spend.SpendCapExceeded as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=3)
     if dry_run:
         typer.echo(_json.dumps(report.meta["plan"], indent=1))
         return
@@ -576,6 +643,7 @@ def eval_run(
                 "rates": summary["rates"],
                 "cost_usd": report.meta.get("cost_usd_total"),
                 "cost_cap_usd": report.meta.get("cost_cap_usd"),
+                "spend_today_usd": report.meta.get("spend_today_usd"),
                 "stopped": report.meta["stopped_reason"],
             },
             indent=1,
@@ -676,6 +744,13 @@ def run_cmd(
     if app_name not in config.apps.apps:
         typer.echo(f"unknown app {app_name!r}", err=True)
         raise typer.Exit(code=1)
+    from bug_hunter import spend
+
+    try:
+        spend.check_cap(expected_usd=config.limits.run.max_cost_usd)
+    except spend.SpendCapExceeded as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=3)
     try:
         with open_checkpointer(in_memory=no_checkpoint) as saver:
             with Run.start(config, app_name, checkout, run_id=run_id) as run:
@@ -692,6 +767,12 @@ def run_cmd(
                 graph = build_graph(deps, saver)
                 state = run_graph(graph, deps, signal)
                 state.trace_url = trace_url(run.run_id)
+                if state.budget_used.cost_usd:
+                    spend.record(
+                        state.budget_used.cost_usd,
+                        "local-run",
+                        f"{run.run_id} {app_name}",
+                    )
                 typer.echo(
                     _json.dumps(
                         {
