@@ -320,6 +320,36 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     ],
   },
   {
+    id: 'context-library',
+    name: 'Context Library',
+    whatItIs:
+      'The central library every agent retrieves context from: documents distilled into short ' +
+      'chunks (the files are never kept), entries admins write or bulk-upload, and lessons agents ' +
+      'write, in collections that each use case may only read when granted. One retrieval pipeline ' +
+      '(keyword + two vectors, fused, re-ranked) with usage-driven learning loops.',
+    reuseWhen:
+      'A feature needs an agent to look things up before it acts — guidance, protocols, examples, ' +
+      'lessons — or wants a new kind of reference material searchable by an agent.',
+    extendVia:
+      'A collection profile in src/context-library/profiles/ plus a migration for its row, and a ' +
+      'use case in context-use-cases.constants.ts; agents read it through ContextToolsService.',
+    modules: [
+      'ally-be:src/context-library',
+      'ally-ai:app/core/context_library',
+    ],
+    adminRoute: '/context-library',
+    keywords: [
+      'context library',
+      'first principles',
+      'principles',
+      'knowledge',
+      'rag',
+      'retrieval',
+      'search guidance',
+      'lessons',
+    ],
+  },
+  {
     id: 'course-copilot',
     name: 'Course Copilot',
     whatItIs:

@@ -4,6 +4,7 @@ import { AiModule } from 'src/ai/ai.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { RedisModule } from 'src/redis/redis.module';
+import { ContextLibraryMcpController } from './controller/context-library-mcp.controller';
 import { ContextLibraryController } from './controller/context-library.controller';
 import {
   ClBulkUpload,
@@ -14,6 +15,12 @@ import {
 import { ClChunk } from './entity/cl-chunk.entity';
 import { ClCollection } from './entity/cl-collection.entity';
 import {
+  ClReaderKey,
+  ClRetrieval,
+  ClRetrievalHit,
+  ClUsageEvent,
+} from './entity/cl-retrieval.entity';
+import {
   ClIngestSegment,
   ClSegmentRun,
 } from './entity/cl-ingest-segment.entity';
@@ -23,6 +30,11 @@ import {
   ClUseCaseAccessLog,
 } from './entity/cl-use-case-access.entity';
 import { ContextAccessService } from './service/context-access.service';
+import { ContextBriefService } from './service/context-brief.service';
+import { ContextCitationService } from './service/context-citation.service';
+import { ContextReaderKeyService } from './service/context-reader-key.service';
+import { ContextRetrievalService } from './service/context-retrieval.service';
+import { ContextToolsService } from './service/context-tools.service';
 import { ContextChunkService } from './service/context-chunk.service';
 import { ContextExtractionService } from './service/context-extraction.service';
 import { ContextIndexService } from './service/context-index.service';
@@ -52,16 +64,25 @@ import { ContextWorkerService } from './service/context-worker.service';
       ClChunkRelation,
       ClChunkVersion,
       ClBulkUpload,
+      ClRetrieval,
+      ClRetrievalHit,
+      ClUsageEvent,
+      ClReaderKey,
     ]),
     AiModule,
     LlmAgentModule,
     PromptModule,
     RedisModule,
   ],
-  controllers: [ContextLibraryController],
+  controllers: [ContextLibraryController, ContextLibraryMcpController],
   providers: [
     ContextAccessService,
+    ContextBriefService,
     ContextChunkService,
+    ContextCitationService,
+    ContextReaderKeyService,
+    ContextRetrievalService,
+    ContextToolsService,
     ContextExtractionService,
     ContextIndexService,
     ContextLlmService,
@@ -69,6 +90,14 @@ import { ContextWorkerService } from './service/context-worker.service';
     ContextUploadService,
     ContextWorkerService,
   ],
-  exports: [ContextAccessService, ContextChunkService, ContextIndexService],
+  exports: [
+    ContextAccessService,
+    ContextBriefService,
+    ContextChunkService,
+    ContextCitationService,
+    ContextIndexService,
+    ContextRetrievalService,
+    ContextToolsService,
+  ],
 })
 export class ContextLibraryModule {}

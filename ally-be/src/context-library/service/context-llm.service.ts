@@ -7,6 +7,9 @@ import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.servi
 import { LoggerService } from 'src/logger/logger.service';
 import {
   CONTEXT_LIBRARY_ADJUDICATE_SYSTEM,
+  CONTEXT_LIBRARY_CITATION_CHECK_SYSTEM,
+  CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM,
+  CONTEXT_LIBRARY_RERANK_SYSTEM,
   CONTEXT_LIBRARY_CONSOLIDATE_SYSTEM,
   CONTEXT_LIBRARY_CRITIC_SYSTEM,
   CONTEXT_LIBRARY_ENRICH_SYSTEM,
@@ -71,6 +74,7 @@ export class ContextLlmService {
     maxTokens: number;
     strong: boolean;
     sourceId?: string;
+    timeoutMs?: number;
   }): Promise<LlmJsonResult<T>> {
     const system = await this.system(args.promptCode);
     const result = await this.llm.complete({
@@ -81,7 +85,7 @@ export class ContextLlmService {
       prompt: args.user,
       maxTokens: args.maxTokens,
       jsonMode: true,
-      timeoutMs: args.strong ? 180_000 : 90_000,
+      timeoutMs: args.timeoutMs ?? (args.strong ? 180_000 : 90_000),
       ...(args.strong && this.strongModel ? { model: this.strongModel } : {}),
       usageMetadata: args.sourceId
         ? { contextSourceId: args.sourceId }
@@ -187,6 +191,42 @@ export class ContextLlmService {
       user,
       maxTokens: 800,
       strong: false,
+    });
+  }
+
+  /** Listwise grading for a search. Short timeout: the caller falls back without it. */
+  rerank<T>(user: string, timeoutMs: number) {
+    return this.completeJson<T>({
+      taskId: 'context-library-rerank',
+      task: LlmTask.CONTEXT_LIBRARY_RERANK,
+      promptCode: CONTEXT_LIBRARY_RERANK_SYSTEM.code,
+      user,
+      maxTokens: 1200,
+      strong: false,
+      timeoutMs,
+    });
+  }
+
+  citationCheck<T>(user: string) {
+    return this.completeJson<T>({
+      taskId: 'context-library-citation-check',
+      task: LlmTask.CONTEXT_LIBRARY_CITATION_CHECK,
+      promptCode: CONTEXT_LIBRARY_CITATION_CHECK_SYSTEM.code,
+      user,
+      maxTokens: 1200,
+      strong: false,
+    });
+  }
+
+  queryPlan<T>(user: string) {
+    return this.completeJson<T>({
+      taskId: 'context-library-query-plan',
+      task: LlmTask.CONTEXT_LIBRARY_QUERY_PLAN,
+      promptCode: CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM.code,
+      user,
+      maxTokens: 1000,
+      strong: false,
+      timeoutMs: 30_000,
     });
   }
 }

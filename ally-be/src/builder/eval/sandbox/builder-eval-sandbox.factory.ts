@@ -22,7 +22,7 @@ import { BuilderKnowledgeService } from '../../service/builder-knowledge.service
 import { BuilderInterviewToolsService } from '../../service/builder-interview-tools.service';
 import { BuilderInterviewOrchestratorService } from '../../service/builder-interview-orchestrator.service';
 import { BuilderGithubReadService } from '../../service/builder-github-read.service';
-import { BuilderStacksService } from '../../service/builder-stacks.service';
+import { ContextToolsService } from 'src/context-library/service/context-tools.service';
 import { BuilderEvidenceService } from '../../service/builder-evidence.service';
 import { BuilderCatalogService } from '../../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../../service/builder-evidence-log.service';
@@ -95,7 +95,7 @@ export class BuilderEvalSandboxFactory {
     private readonly repoMapRepository: BuilderRepoMapRepository,
     private readonly lessonRepository: BuilderLessonRepository,
     private readonly githubRead: BuilderGithubReadService,
-    private readonly stacks: BuilderStacksService,
+    private readonly principles: ContextToolsService,
     private readonly evidence: BuilderEvidenceService,
     private readonly catalog: BuilderCatalogService,
     private readonly platformContext: BuilderPlatformContextService,
@@ -264,7 +264,7 @@ export class BuilderEvalSandboxFactory {
     const tools = new BuilderInterviewToolsService(
       prdService,
       github,
-      this.stacks,
+      this.principles,
       this.evidence,
       this.catalog,
       evidenceLog,

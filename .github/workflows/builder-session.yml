@@ -96,11 +96,11 @@ jobs:
       # it looked like an answer and was not.
       GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       # BUILDER_GH_TOKEN and GH_TOKEN are exported by the first steps.
-      # Tier 1 of `.claude/stacks-bridge.mjs`. Without it the bridge falls
-      # through to `gh auth token`, and BUILDER_GH_TOKEN (the app's token) has no
-      # `read:org`, so the exchange 403s and every phase runs with no
-      # product guidance at all — which is what the first real build reported.
-      STACKS_API_KEY: ${{ secrets.STACKS_API_KEY }}
+      # The Context Library's MCP endpoint and a read-only key for it (create one under
+      # Context Library → Connect Claude Code). Without them every phase runs with no
+      # product guidance; run-engine.sh skips the server rather than failing.
+      ALLY_CONTEXT_LIBRARY_URL: ${{ vars.ALLY_CONTEXT_LIBRARY_URL }}
+      ALLY_CONTEXT_LIBRARY_KEY: ${{ secrets.ALLY_CONTEXT_LIBRARY_KEY }}
       BUILDER_SESSION_ID: ${{ inputs.session_id }}
       BUILDER_RUN_ID: ${{ inputs.run_id }}
       BUILDER_MODE: ${{ inputs.mode }}

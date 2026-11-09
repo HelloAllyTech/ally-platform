@@ -65,6 +65,7 @@ import { RoadmapBuilderService } from './service/roadmap-builder.service';
 import { RoadmapUpNextService } from './service/roadmap-up-next.service';
 import { RoadmapUpNextController } from './controller/roadmap-up-next.controller';
 import { BuilderModule } from 'src/builder/builder.module';
+import { ContextLibraryModule } from 'src/context-library/context-library.module';
 import { RoadmapBoardService } from './service/roadmap-board.service';
 import { RoadmapTaxonomyService } from './service/roadmap-taxonomy.service';
 import { RoadmapStrategyGoalService } from './service/roadmap-strategy-goal.service';
@@ -157,6 +158,8 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
      * imports ProductRoadmapModule.
      */
     BuilderModule,
+    // The opportunity copilot's principles_search/principles_get (replaced the Stacks client).
+    ContextLibraryModule,
     /**
      * S3Service — presigned PUTs for opportunity reference images, and the URL parsing that
      * checks a stored image really is one of our own uploads.

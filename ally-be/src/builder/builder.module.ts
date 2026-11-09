@@ -31,13 +31,14 @@ import { BuilderNotification } from './entity/builder-notification.entity';
 import { BuilderRepoCatalog } from './entity/builder-repo-catalog.entity';
 import { BuilderEvidence } from './entity/builder-evidence.entity';
 import { BuilderController } from './controller/builder.controller';
+import { BuilderPrinciplesController } from './controller/builder-principles.controller';
 import { BuilderPipelineController } from './controller/builder-pipeline.controller';
 import { BuilderGateway } from './gateway/builder.gateway';
 import { BuilderSessionService } from './service/builder-session.service';
 import { BuilderPrdService } from './service/builder-prd.service';
 import { BuilderKnowledgeService } from './service/builder-knowledge.service';
 import { BuilderGithubReadService } from './service/builder-github-read.service';
-import { BuilderStacksService } from './service/builder-stacks.service';
+import { ContextLibraryModule } from 'src/context-library/context-library.module';
 import { BuilderEvidenceService } from './service/builder-evidence.service';
 import { BuilderInterviewToolsService } from './service/builder-interview-tools.service';
 import { BuilderInterviewOrchestratorService } from './service/builder-interview-orchestrator.service';
@@ -54,6 +55,7 @@ import { BuilderResearchService } from './service/builder-research.service';
 import { BuilderCatalogService } from './service/builder-catalog.service';
 import { BuilderEvidenceLogService } from './service/builder-evidence-log.service';
 import { BuilderPrdReviewService } from './service/builder-prd-review.service';
+import { BuilderPrinciplesService } from './service/builder-principles.service';
 import { BuilderEvalFixture } from './entity/builder-eval-fixture.entity';
 import { BuilderEvalSuite } from './entity/builder-eval-suite.entity';
 import { BuilderEvalRun } from './entity/builder-eval-run.entity';
@@ -178,6 +180,9 @@ import {
     UxSignalsModule,
     // SlackService: the inbox is a pull surface, so a paused build needs a push.
     NotificationModule,
+    // The interview's principles (search, guiding brief, citation checks) and, later, its
+    // lessons — the Context Library replaced the Stacks client.
+    ContextLibraryModule,
   ],
   controllers: [
     BuilderSlackController,
@@ -186,15 +191,16 @@ import {
     BuilderEvalController,
     BuilderCorrectionsController,
     BuilderRoomController,
+    BuilderPrinciplesController,
   ],
   providers: [
+    BuilderPrinciplesService,
     BuilderSlackService,
     BuilderGateway,
     BuilderSessionService,
     BuilderPrdService,
     BuilderKnowledgeService,
     BuilderGithubReadService,
-    BuilderStacksService,
     BuilderEvidenceService,
     BuilderInterviewToolsService,
     BuilderInterviewOrchestratorService,
@@ -256,10 +262,9 @@ import {
     BuilderLiveService,
     BuilderKnowledgeService,
     // The read-only research belt, reused by the roadmap's opportunity copilot so it reads the
-    // same repos, the same Stacks library and the same production evidence through the same
+    // same repos, the same Context Library and the same production evidence through the same
     // fail-soft wrappers — rather than a second GitHub client and a second deadline policy.
     BuilderGithubReadService,
-    BuilderStacksService,
     BuilderEvidenceService,
     // One product map for both agents: the copilot renders it whole, the interview reads the
     // reusable-systems and docs sections. See BuilderProductMapService.

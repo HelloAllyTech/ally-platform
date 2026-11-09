@@ -380,6 +380,9 @@ export enum LlmTask {
   CONTEXT_LIBRARY_ADJUDICATE = 'context_library_adjudicate',
   CONTEXT_LIBRARY_CONSOLIDATE = 'context_library_consolidate',
   CONTEXT_LIBRARY_ENRICH = 'context_library_enrich',
+  CONTEXT_LIBRARY_RERANK = 'context_library_rerank',
+  CONTEXT_LIBRARY_CITATION_CHECK = 'context_library_citation_check',
+  CONTEXT_LIBRARY_QUERY_PLAN = 'context_library_query_plan',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

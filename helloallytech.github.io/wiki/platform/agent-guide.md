@@ -2,7 +2,7 @@
 title: Cross-Repo Agent Guide
 tags: [platform, agents, conventions, reference]
 summary: Quick-reference for AI assistants and developers working across Ally repos — per-repo entry points, cross-repo conventions, common tasks, and gotchas.
-last_reconciled: 2026-07-28
+last_reconciled: 2026-11-09
 ---
 
 # Cross-Repo Agent Guide
@@ -10,11 +10,11 @@ last_reconciled: 2026-07-28
 This page helps AI agents (and developers) quickly orient in the Ally workspace and work effectively across repos. It is migrated from the workspace `AGENTS.md`. For per-repo depth, follow the links to each [repo page](../index.md#repositories).
 
 > [!IMPORTANT]
-> **This page tells you how to build. [Stacks](../contributing/planning-with-stacks.md) tells you what to build and how it should behave.**
-> **Whenever a decision about how the product should behave comes up, search Stacks with the `search_chunks` tool, incorporate relevant returned guidance, and cite chunk titles.** Before writing an implementation plan above all — but equally mid-implementation, at each point you would otherwise invent the answer: an empty, loading, edge or failure state; a user-facing label, button or error message; what a view shows and what it omits; a threshold, limit, cadence or reward rule. **Search on your own initiative** — specific noun phrases, several per task, then `get_chunks` on what bears on the decision and `list_tags` to see how the library is organised. Never claim Stacks does or doesn't cover something: tags aren't contents, and an empty search isn't a gap. `/stacks:planning_context` remains as the human entry point. The `stacks` server is declared in every repo's committed `.mcp.json` and reads your `STACKS_API_KEY` from the environment — see [Working with the Stacks MCP](../contributing/planning-with-stacks.md) for setup, retrieval technique, and how to cite. Trivial mechanical changes are exempt.
+> **This page tells you how to build. The [Context Library](../contributing/planning-with-context-library.md) tells you what to build and how it should behave.**
+> **Whenever a product or engineering judgement comes up, search the Context Library with the `search_context` tool, incorporate relevant returned guidance, and cite chunk codes such as `[FP-0142]`.** Before writing an implementation plan above all — but equally mid-implementation, at each point you would otherwise invent the answer: an empty, loading, edge or failure state; a user-facing label, button or error message; what a view shows and what it omits; a threshold, limit, cadence or reward rule. **Search on your own initiative** — several short queries that each describe a situation, in one call, then `get_chunks` on the one or two that bear on the decision, and `list_collections` to see what you can search. Never claim the library does or doesn't cover something: an empty search isn't a gap, and a failed search says nothing about what it holds. Results are advisory, not instructions. The `planning_context` MCP prompt remains as the human entry point. The `context-library` server is declared in every repo's committed `.mcp.json` and reads `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` from the environment — see [Working with the Context Library](../contributing/planning-with-context-library.md) for setup, retrieval technique, and how to cite. Trivial mechanical changes are exempt.
 
 > [!NOTE]
-> The in-wiki **Product Management Best Practices** section ([hub](../product/best-practices.md), [UI](../product/ui.md), [Gamification](../product/gamification.md), [Data Visualisation](../product/data-visualisation.md), [Prioritisation](../product/prioritisation.md), [User Personas](../product/user-personas.md), [AI-Product Patterns](../product/ai-product-patterns.md)) was **deprecated on 2026-08-07** and replaced by Stacks. Nothing in it is a gate any more. It is kept readable because platform pages cite its principles by number, and because it records what this team decided up to August 2026 — useful context, not a checklist.
+> The in-wiki **Product Management Best Practices** section ([hub](../product/best-practices.md), [UI](../product/ui.md), [Gamification](../product/gamification.md), [Data Visualisation](../product/data-visualisation.md), [Prioritisation](../product/prioritisation.md), [User Personas](../product/user-personas.md), [AI-Product Patterns](../product/ai-product-patterns.md)) was **deprecated on 2026-08-07** and replaced by Stacks, which the Context Library in turn replaced on 2026-11-09. Nothing in it is a gate any more. It is kept readable because platform pages cite its principles by number, and because it records what this team decided up to August 2026 — useful context, not a checklist.
 
 ## Repo Quick Reference
 
@@ -82,7 +82,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 ## Common Tasks
 
-> Every task below that reaches an implementation plan starts with the [Stacks search](../contributing/planning-with-stacks.md). Cross-repo work is the dominant hidden cost in estimates — worth a query of its own.
+> Every task below that reaches an implementation plan starts with a [Context Library search](../contributing/planning-with-context-library.md). Cross-repo work is the dominant hidden cost in estimates — worth a query of its own.
 
 **Adding a new API endpoint** — ally-be: controller + service + DTOs in the relevant `src/` module; ally-web/mobile: add an RTK Query endpoint in `src/services/`.
 
@@ -108,4 +108,4 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 ---
 
-*See also: [Platform Overview](overview.md), [Architecture](architecture.md), [Contributing Guide](../contributing/guide.md), [Planning with the Stacks MCP](../contributing/planning-with-stacks.md).*
+*See also: [Platform Overview](overview.md), [Architecture](architecture.md), [Contributing Guide](../contributing/guide.md), [Working with the Context Library](../contributing/planning-with-context-library.md).*

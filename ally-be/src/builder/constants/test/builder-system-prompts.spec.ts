@@ -77,7 +77,7 @@ const cases: [PromptDefinition, string[]][] = [
       'github_repo_tree',
       'github_search_code',
       'github_read_file',
-      'stacks_search',
+      'principles_search',
       'update_prd',
       'assumptions',
     ],

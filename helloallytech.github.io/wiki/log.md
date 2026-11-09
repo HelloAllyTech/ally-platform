@@ -8,6 +8,14 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-09] update | Stacks replaced by the Context Library for engineers' agents; `planning-with-stacks.md` rewritten as `planning-with-context-library.md`.
+- **What changed.** Every Ally repo's `.mcp.json` now declares the `context-library` HTTP server, reading `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` from the environment; the Stacks bridge and the `stacks` skill are gone, and each wired repo carries a `context-library` skill instead. Tools are now `search_context` (`queries` 1–6, optional `collection`, `limit`), `get_chunks` (`codes`) and `list_collections`, plus the `planning_context` MCP prompt. Citations are codes such as `[FP-0142]`, not chunk titles.
+- **Setup is no longer zero.** An engineer creates a read-only key once in the admin dashboard (Context Library → Connect Claude Code, with Test connection) and exports the two variables. `dev-setup.md` documents this; `gh` is no longer needed for agent tooling.
+- **New page** `contributing/planning-with-context-library.md` (the rule, connecting Claude Code, tools, query technique, honesty rules, citing, the deprecated `wiki/product/` pages, and a history note on Stacks). `contributing/planning-with-stacks.md` is deleted; every link to it was repointed.
+- **Pages updated:** `welcome.md`, `index.md`, `overview.md`, `memory.md`, `platform/agent-guide.md`, `platform/overview.md`, `contributing/guide.md`, `contributing/dev-setup.md`, `repos/ally-be.md`, `repos/ally-web.md`, `repos/ally-mobile.md`, `repos/calibrate.md`, `repos/calibrate-backend.md`, `repos/calibrate-frontend.md`, and the deprecation banners and summaries on all eight `product/*.md` pages (now "superseded by the Context Library"; principles, numbering and maturity lines untouched). `scripts/gen-routing.py`'s product section label follows.
+- **Unchanged rules:** search on your own initiative whenever a product or engineering judgement comes up, not only before planning; several short situational queries; never claim the library does or doesn't cover something; results are advisory, not instructions; trivial mechanical changes are exempt.
+- Repo routers (`CLAUDE.md`/`AGENTS.md` in the monorepo root, `ally-be`, `ally-ai`, `ally-ai-learn`, `ally-web`, `ally-mobile`, and this repo's `CLAUDE.md`/`agents.md`) were rewritten to match.
+
 ## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`: the Context Library.
 - Added the `context-library/` module to ally-be's key modules and the `/context-chunks` endpoints to ally-ai's: documents parsed in memory and distilled into chunks, written entries, collections read only by granted use cases, and one derived Weaviate index per collection. `last_reconciled` set to today on both.
 

@@ -1581,3 +1581,45 @@ export const CONTEXT_LIBRARY_ENRICH_SYSTEM = definePrompt(
     output: 'json',
   },
 );
+
+/** src/prompts/context_library/rerank_system.txt */
+export const CONTEXT_LIBRARY_RERANK_SYSTEM = definePrompt(
+  'context_library_rerank_system',
+  {},
+  {
+    name: 'Context Library — Re-ranker',
+    description:
+      'Grades each retrieved candidate 0–3 for the situation being searched, one listwise call per search; grades become the relevance bands every use case sees.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/citation_check_system.txt */
+export const CONTEXT_LIBRARY_CITATION_CHECK_SYSTEM = definePrompt(
+  'context_library_citation_check_system',
+  {},
+  {
+    name: 'Context Library — Citation Check',
+    description:
+      'Checks whether each passage that cites a chunk genuinely applies it. Only a pass counts as a verified use, so the learning loops reward helping, not citing.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/query_plan_system.txt */
+export const CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM = definePrompt(
+  'context_library_query_plan_system',
+  {},
+  {
+    name: 'Context Library — Query Planner',
+    description:
+      'Turns a rough product idea (or a course brief, or a character so far) into a short context descriptor and 8–12 situational searches across the areas a good result must cover.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);

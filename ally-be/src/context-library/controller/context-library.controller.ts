@@ -40,16 +40,18 @@ import {
   ContextChunkListQueryDto,
   ContextGrantDto,
   ContextResumeDto,
+  ContextSearchDto,
   ContextUploadDto,
 } from '../dto/context-library.dto';
 import { ClChunkSource } from '../entity/cl-chunk-links.entity';
 import { ClCollection } from '../entity/cl-collection.entity';
 import { ClSource } from '../entity/cl-source.entity';
-import { ClChunkStatus } from '../enum/context-library.enum';
+import { ClChunkStatus, ClUseCase } from '../enum/context-library.enum';
 import { COLLECTION_PROFILES, requireProfile } from '../profiles';
 import { templateCsv } from '../util/bulk.util';
 import { ContextAccessService } from '../service/context-access.service';
 import { ClActor, ContextChunkService } from '../service/context-chunk.service';
+import { ContextRetrievalService } from '../service/context-retrieval.service';
 import { ContextUploadService } from '../service/context-upload.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_CONTEXT_LIBRARY] };
@@ -85,6 +87,7 @@ export class ContextLibraryController {
     private readonly uploads: ContextUploadService,
     private readonly chunkService: ContextChunkService,
     private readonly access: ContextAccessService,
+    private readonly retrieval: ContextRetrievalService,
     @InjectRepository(ClCollection)
     private readonly collections: Repository<ClCollection>,
     @InjectRepository(ClSource) private readonly sources: Repository<ClSource>,
@@ -350,6 +353,37 @@ export class ContextLibraryController {
       actorFor(user),
       dto.apply === 'true',
     );
+  }
+
+  // ── Search (the Library search box; admin_preview, excluded from usage) ──
+
+  @Post('search')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, VIEW)
+  @ApiOperation({
+    summary: 'Search the library with the real pipeline',
+    description:
+      'Fast by default (no re-rank), so results never reshuffle under the cursor; `explain` adds ' +
+      'per-candidate diagnostics and `rerank` runs the graded re-rank to compare.',
+  })
+  async search(@Body() dto: ContextSearchDto) {
+    const response = await this.retrieval.search({
+      useCase: ClUseCase.ADMIN_PREVIEW,
+      queries: [dto.query],
+      collections: dto.collectionId ? [dto.collectionId] : undefined,
+      limit: dto.limit ?? 20,
+      explain: Boolean(dto.explain),
+      fast: !dto.rerank,
+      queryOrigin: 'human',
+    });
+    return {
+      results: response.results.map((r) => ({
+        chunk: r.chunk,
+        band: r.band,
+        score: r.score,
+        diagnostics: r.diagnostics,
+      })),
+      noConfidentMatch: response.noConfidentMatch,
+    };
   }
 
   // ── Settings ──────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 title: Overview
 tags: [meta, structure]
 summary: Repository overview and active directories layout description.
-last_reconciled: 2026-07-28
+last_reconciled: 2026-11-09
 ---
 
 # Workspace Overview
@@ -22,9 +22,9 @@ This repository (`helloallytech.github.io`, served at **tech.helloally.ai**) is 
 - `index.md` — Catalog / sidebar navigation source.
 - `welcome.md`, `getting-started.md` — Entry pages.
 - `platform/` — Cross-cutting docs: `overview.md`, `architecture.md`, `tech-stack.md`, `agent-guide.md`.
-- `product/` — **Deprecated 2026-08-07**, superseded by the Stacks MCP. Was *Product Management Best Practices*: `best-practices.md` (hub + house rules), one page per subsection (`ui.md`, `gamification.md`, `data-visualisation.md`, `prioritisation.md`, `user-personas.md`, `ai-product-patterns.md`) and a craft reference (`chart-dashboard-principles.md`). **Frozen** — no new pages, no new principles, and the existing principle numbering must not shift because platform pages cite it. Product guidance now comes from Stacks at planning time (`contributing/planning-with-stacks.md`).
+- `product/` — **Deprecated 2026-08-07**, superseded by the Stacks MCP and, since 2026-11-09, by the Context Library. Was *Product Management Best Practices*: `best-practices.md` (hub + house rules), one page per subsection (`ui.md`, `gamification.md`, `data-visualisation.md`, `prioritisation.md`, `user-personas.md`, `ai-product-patterns.md`) and a craft reference (`chart-dashboard-principles.md`). **Frozen** — no new pages, no new principles, and the existing principle numbering must not shift because platform pages cite it. Product guidance now comes from the Context Library, while planning and while coding (`contributing/planning-with-context-library.md`).
 - `repos/` — One page per repository: `ally-be`, `ally-ai`, `ally-ai-learn`, `ally-web`, `ally-mobile`, `infra`.
-- `contributing/` — `dev-setup.md`, `guide.md` (SDLC rules).
+- `contributing/` — `dev-setup.md`, `guide.md` (SDLC rules), `planning-with-context-library.md` (searching and citing the Context Library).
 - `overview.md`, `memory.md`, `context.md`, `log.md` — Meta/session state.
 - `skills/` — Custom agent skills (currently just the example skill).
 

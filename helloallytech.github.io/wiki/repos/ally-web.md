@@ -2,7 +2,7 @@
 title: ally-web — Web Applications
 tags: [repo, frontend, nx, react, vite]
 summary: An Nx monorepo containing Ally's two user-facing web applications — a Vite+React helpline dashboard for counselors (port 8080) and a Vite+React admin dashboard for super admins (port 8081) — plus a shared UI library.
-last_reconciled: 2026-09-22
+last_reconciled: 2026-11-09
 ---
 
 # ally-web — Web Applications
@@ -18,7 +18,7 @@ last_reconciled: 2026-09-22
 The applications integrate with the `ally-be` backend (REST + Socket.IO) and with LiveKit for real-time voice/video.
 
 > [!NOTE]
-> This page documents *how the frontend is built*. For *how it should behave* — required screen states, permission-aware UI, chart honesty rules, and the personas each dashboard serves — search Stacks before you plan ([Planning with the Stacks MCP](../contributing/planning-with-stacks.md)). The former in-wiki guidance ([UI & Interaction](../product/ui.md), [Data Visualisation](../product/data-visualisation.md)) is **deprecated** as of 2026-08-07 and no longer a gate, but still worth reading for the Ally-specific traps it records.
+> This page documents *how the frontend is built*. For *how it should behave* — required screen states, permission-aware UI, chart honesty rules, and the personas each dashboard serves — search the Context Library before you plan, and again as those decisions come up mid-build ([Working with the Context Library](../contributing/planning-with-context-library.md)). The former in-wiki guidance ([UI & Interaction](../product/ui.md), [Data Visualisation](../product/data-visualisation.md)) is **deprecated** as of 2026-08-07 and no longer a gate, but still worth reading for the Ally-specific traps it records.
 >
 > The super-admin Analytics surface is where those chart rules are implemented rather than just stated. `apps/ally-admin-dashboard/src/pages/Analytics/` holds the shared kit every chart routes through: `chartKit.tsx` (the `ChartCard` wrapper that requires a provenance line and handles the loading / error / empty / thin-data states, the axis factories, and `MIN_N_FOR_SCORE`) and `chartScales.ts` (the approved palette, keyed on meaning). Adding a chart means using those factories — `colorScale` is a required argument specifically so a chart cannot fall back to a palette whose colours mean nothing.
 >

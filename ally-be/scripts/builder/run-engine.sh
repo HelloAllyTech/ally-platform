@@ -82,16 +82,17 @@ INSTRUCTIONS_JSON="$(
   } | jq -R . | jq -sc .
 )"
 
-# Stacks, the product library every repo's AGENTS.md tells its agents to
-# consult. Those AGENTS.md files are loaded into every phase (instructions,
-# above), so without the server each agent was told to call a tool it did not
-# have. The bridge reads STACKS_API_KEY from the environment opencode starts it
-# in (builder-session.yml sets it), so no key is written into this file.
-STACKS_BRIDGE="${HERE}/../../.claude/stacks-bridge.mjs"
-STACKS_MCP='{}'
-if [ -f "$STACKS_BRIDGE" ] && [ -n "${STACKS_API_KEY:-}" ]; then
-  STACKS_MCP="$(jq -nc --arg bridge "$STACKS_BRIDGE" \
-    '{stacks: {type: "local", command: ["node", $bridge], enabled: true}}')"
+# The Context Library, which every repo's AGENTS.md tells its agents to consult.
+# Those AGENTS.md files are loaded into every phase (instructions, above), so
+# without the server each agent would be told to call a tool it does not have.
+# A remote MCP server: opencode substitutes {env:…} when it connects, so the
+# read-only key stays in the environment builder-session.yml sets and is never
+# written into this file.
+CONTEXT_MCP='{}'
+if [ -n "${ALLY_CONTEXT_LIBRARY_URL:-}" ] && [ -n "${ALLY_CONTEXT_LIBRARY_KEY:-}" ]; then
+  CONTEXT_MCP="$(jq -nc --arg url "$ALLY_CONTEXT_LIBRARY_URL" \
+    '{"context-library": {type: "remote", url: $url, enabled: true,
+      headers: {Authorization: "Bearer {env:ALLY_CONTEXT_LIBRARY_KEY}"}}}')"
 fi
 
 # One agent, `reviewer`, whose read-only-ness is enforced by NOT OFFERING the
@@ -109,7 +110,7 @@ jq -n \
   --arg helper_env "${BUILDER_HELPER_ENV}" \
   --argjson instructions "${INSTRUCTIONS_JSON:-[]}" \
   --argjson reviewer_steps "${BUILDER_REVIEWER_STEPS:-150}" \
-  --argjson stacks "$STACKS_MCP" '
+  --argjson context "$CONTEXT_MCP" '
 {
   "$schema": "https://opencode.ai/config.json",
   mcp: ({
@@ -119,7 +120,7 @@ jq -n \
       enabled: true,
       environment: { BUILDER_HELPER_ENV: $helper_env }
     }
-  } + $stacks),
+  } + $context),
   # Loop detection is an "ask" by default, and --auto answers every ask with
   # yes, so it never fired. Denied, a repeated identical call is refused and
   # the model is told.

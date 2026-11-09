@@ -3029,6 +3029,53 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
     configuredBy: 'LLM_FAST_MODEL',
     promptOverride: 'context_library_enrich_system',
   },
+  {
+    id: 'context-library-rerank',
+    task: LlmTask.CONTEXT_LIBRARY_RERANK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Any use case searches the Context Library (Builder, Bug Hunter, the character interview, Course Copilot, the Ally guide, Debrief, engineers)',
+    detail:
+      'One listwise call per search over up to 50 fused candidates, grading each 0–3; capped at ' +
+      '2.5 s, after which the search falls back to retriever agreement. A different model family ' +
+      'from the Gemini judge that grades samples of these searches, so the loop cannot grade its own work.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_rerank_system',
+  },
+  {
+    id: 'context-library-citation-check',
+    task: LlmTask.CONTEXT_LIBRARY_CITATION_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A PRD, blueprint or answer cites Context Library codes',
+    detail:
+      'One call per saved version that adds citations, over the new ones only. Codes never ' +
+      'surfaced in the session are stripped in code before this runs.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_citation_check_system',
+  },
+  {
+    id: 'context-library-query-plan',
+    task: LlmTask.CONTEXT_LIBRARY_QUERY_PLAN,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A Builder interview (or a Course Copilot brief) starts',
+    detail:
+      'Once per session: a short context descriptor plus 8–12 situational searches, fanned out ' +
+      'in parallel to build the guiding brief. Runs alongside the first turn, never before it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_query_plan_system',
+  },
 ];
 
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [

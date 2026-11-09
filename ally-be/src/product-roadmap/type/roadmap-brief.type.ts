@@ -26,7 +26,9 @@ export enum RoadmapBriefEvidenceSource {
   ROADMAP = 'roadmap',
   CODEBASE = 'codebase',
   WIKI = 'wiki',
+  /** Briefs written before the Context Library replaced Stacks; kept so they still read. */
   STACKS = 'stacks',
+  PRINCIPLES = 'principles',
   STRATEGY = 'strategy',
 }
 

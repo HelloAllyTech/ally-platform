@@ -257,3 +257,32 @@ export class ContextResumeDto {
   @Min(0)
   raiseCapBy?: number;
 }
+
+export class ContextSearchDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(500)
+  query!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  collectionId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  explain?: boolean;
+
+  @ApiPropertyOptional({ description: 'Run the graded re-rank (slower)' })
+  @IsOptional()
+  @IsBoolean()
+  rerank?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+}

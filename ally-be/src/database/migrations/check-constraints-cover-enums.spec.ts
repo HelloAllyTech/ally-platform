@@ -20,6 +20,7 @@ import {
   ClSegmentStatus,
   ClSourceKind,
   ClSourceStatus,
+  ClUsageType,
 } from '../../context-library/enum/context-library.enum';
 import {
   BuilderEventType,
@@ -247,6 +248,7 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_cl_chunk_relations_type', Object.values(ClRelationType)],
     ['CHK_cl_chunk_relations_origin', Object.values(ClRelationOrigin)],
     ['CHK_cl_bulk_uploads_status', Object.values(ClBulkUploadStatus)],
+    ['CHK_cl_usage_events_type', Object.values(ClUsageType)],
     ['CHK_builder_sessions_status', Object.values(BuilderSessionStatus)],
     ['CHK_builder_sessions_stage', Object.values(BuilderStage)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],

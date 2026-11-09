@@ -111,9 +111,12 @@ describe('turn receipts', () => {
         },
       },
       {
-        name: 'stacks_get',
-        input: { ids: ['x'] },
-        result: { ok: true, chunks: [{ title: 'Progressive disclosure' }] },
+        name: 'principles_get',
+        input: { codes: ['FP-0142'] },
+        result: {
+          ok: true,
+          items: [{ code: 'FP-0142', statement: 'Disclose progressively' }],
+        },
       },
       // The reply itself is not something the turn did.
       { name: 'ask_admin', input: { prompt: 'Q?' }, result: { ok: true } },
@@ -138,7 +141,7 @@ describe('turn receipts', () => {
       expect(receipt).toEqual({
         read: [
           'ally-be/src/skill-experiment/x.ts',
-          'Stacks: Progressive disclosure',
+          'FP-0142: Disclose progressively',
         ],
         searched: ['Platform map "challenger" — 2 matches'],
         changed: ['Summary revised'],

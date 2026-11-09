@@ -149,3 +149,18 @@ export enum ClAudienceRule {
   /** A learner or trainer: global chunks plus their own organisation's. Required. */
   ORGANISATION = 'organisation',
 }
+
+/** What a use case did with a chunk. The learning loops read these, never people's ratings. */
+export enum ClUsageType {
+  SURFACED = 'surfaced',
+  READ = 'read',
+  PROBED = 'probed',
+  CITED = 'cited',
+  APPLIED_VERIFIED = 'applied_verified',
+  CITE_REJECTED = 'cite_rejected',
+  UNUSED = 'unused',
+  SHIPPED = 'shipped',
+  AGENT_APPLIED = 'agent_applied',
+  AGENT_CONTRADICTED = 'agent_contradicted',
+  NOT_RELEVANT = 'not_relevant',
+}
