@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AssistantLine, Orb, StepFrame, TellMeSomethingElse } from "@components/v2";
 import { ROUTES } from "@constants";
 
+import { CheckupScreen } from "./CheckupScreen";
 import { COPY } from "./copy";
 import { MakeItYoursScreen } from "./MakeItYours";
 import {
@@ -33,6 +34,7 @@ const WIDTH: Partial<Record<OnboardingScreen, "result" | "wide">> = {
   safety: "result",
   design: "wide",
   make: "wide",
+  checkup: "result",
   live: "result",
 };
 
@@ -146,6 +148,8 @@ export const OnboardingView: React.FC<{
             editor={editor}
           />
         );
+      case "checkup":
+        return <CheckupScreen view={view} onContinue={() => s.pass("checkup")} />;
       case "share":
         return (
           <ShareScreen

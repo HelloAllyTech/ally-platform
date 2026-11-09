@@ -38,6 +38,7 @@ export * from "./productRoadmap";
 export * from "./whatsappBot";
 export * from "./chatbots";
 export * from "./botDrafts";
+export * from "./checkup";
 export * from "./characterInterview";
 export * from "./cohorts";
 export * from "./helplineAdmin";

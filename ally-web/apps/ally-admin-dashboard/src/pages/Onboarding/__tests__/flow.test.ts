@@ -53,8 +53,8 @@ describe("one screen at a time (chunk 20d)", () => {
     expect(screenFor(gaps(1), { ...NOTHING_PASSED, reading: true })).toBe("question");
   });
 
-  it("goes design → building → make it yours → share → live", () => {
-    const all = { reading: true, safety: true, built: false, make: false };
+  it("goes design → building → make it yours → checkup → share → live", () => {
+    const all = { reading: true, safety: true, built: false, make: false, checkup: false };
     expect(screenFor(view({ step: "design" }), all)).toBe("design");
     // The builder writes the assistant in the design turn: Building shows while it does.
     expect(screenFor(view({ step: "design" }), all, true)).toBe("building");
@@ -62,7 +62,11 @@ describe("one screen at a time (chunk 20d)", () => {
     // Built: the finished build stays up until Continue.
     expect(screenFor(view({ step: "share" }), all)).toBe("building");
     expect(screenFor(view({ step: "share" }), { ...all, built: true })).toBe("make");
-    expect(screenFor(view({ step: "share" }), { ...all, built: true, make: true })).toBe("share");
+    // The checkup (20a-2) comes between Make it yours and Share.
+    expect(screenFor(view({ step: "share" }), { ...all, built: true, make: true })).toBe("checkup");
+    expect(
+      screenFor(view({ step: "share" }), { ...all, built: true, make: true, checkup: true }),
+    ).toBe("share");
     expect(screenFor(view({ step: "published", status: "published" }), all)).toBe("live");
   });
 
@@ -72,6 +76,7 @@ describe("one screen at a time (chunk 20d)", () => {
       safety: true,
       built: true,
       make: false,
+      checkup: false,
     });
     expect(passedFromStep(view({ step: "share" }), { make: true }).make).toBe(true);
     expect(passedFromStep(view({ step: "reading" }), {}).reading).toBe(false);
@@ -80,9 +85,11 @@ describe("one screen at a time (chunk 20d)", () => {
   it("counts each question as a step in the footer", () => {
     const v = view({ step: "gaps", transcript: safetyThenAnswers(1) as never });
     const position = stepPosition("question", v);
-    // Start, Reading, Learned, Safety, 1 answered + 3 left, Design, Building, Make it yours, Share.
-    expect(position).toMatchObject({ number: 6, total: 12, name: "A few questions" });
-    expect(stepPosition("share", v).number).toBe(12);
+    // Start, Reading, Learned, Safety, 1 answered + 3 left, Design, Building, Make it yours,
+    // Checkup, Share.
+    expect(position).toMatchObject({ number: 6, total: 13, name: "A few questions" });
+    expect(stepPosition("checkup", v)).toMatchObject({ number: 12, name: "Checkup" });
+    expect(stepPosition("share", v).number).toBe(13);
   });
 
   it("splits the builder's message into the question and the line under it", () => {

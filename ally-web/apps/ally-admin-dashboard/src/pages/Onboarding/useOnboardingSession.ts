@@ -274,7 +274,8 @@ export const useOnboardingSession = (
     backScreen: async () => {
       if (!view || !flow) return;
       // Browser-only screens step back without asking the server.
-      if (flow.screen === "share") return pass("make", false);
+      if (flow.screen === "share") return pass("checkup", false);
+      if (flow.screen === "checkup") return pass("make", false);
       if (flow.screen === "question" && answeredSinceSafety(view) === 0 && view.safety?.on) {
         return pass("safety", false);
       }

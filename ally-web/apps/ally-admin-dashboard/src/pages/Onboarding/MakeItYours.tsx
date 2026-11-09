@@ -216,7 +216,7 @@ export const MakeItYoursScreen: React.FC<{
           />
         </div>
         <PrimaryButton enterHint={COPY.frame.enterHint} onClick={onContinue}>
-          {COPY.make.continue}
+          {COPY.make.checkup}
         </PrimaryButton>
       </div>
       {editor && (

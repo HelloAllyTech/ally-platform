@@ -436,3 +436,40 @@
     flex-wrap: wrap;
   }
 }
+
+/* ── Checkup (20a-2) ── */
+.ally-checkup__summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 24px;
+  align-items: center;
+}
+.ally-checkup__ring {
+  width: 112px;
+  height: 112px;
+  border-radius: 999px;
+  border: 10px solid var(--ally-accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--ally-ink);
+}
+.ally-checkup__ring strong {
+  font: 600 26px/1 var(--ally-font-ui);
+}
+.ally-checkup__ring span {
+  font-size: 13px;
+  color: var(--ally-muted);
+}
+.ally-checkup__trend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ally-accent);
+}
+@media (max-width: 760px) {
+  .ally-checkup__summary {
+    grid-template-columns: 1fr;
+  }
+}

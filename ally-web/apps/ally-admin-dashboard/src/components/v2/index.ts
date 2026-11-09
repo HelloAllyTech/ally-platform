@@ -16,6 +16,8 @@ export {
   SourceChip,
 } from "./Cards";
 export type { DesignCardLabels, LearnedCardLabels } from "./Cards";
+export { CheckRow, GapCard, MeasureCard } from "./Checkup";
+export type { CheckRowLabels, CheckStatus, GapCardLabels } from "./Checkup";
 export { PhonePreview } from "./PhonePreview";
 export { StepFrame } from "./StepFrame";
 export type { StepFrameLabels } from "./StepFrame";

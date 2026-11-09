@@ -92,6 +92,103 @@ export const COPY = {
     continue: "Continue",
     checkup: "Run the checkup",
   },
+  /** The checkup (copy §9, §17 and §24, chunk 20a-2), in onboarding and on the home. */
+  checkup: {
+    eyebrow: "Checkup",
+    running: "Asking question {n} of {total}…",
+    titleGaps: "{passed} of {total} answered well. {gaps} need your input.",
+    titleClear: "{passed} of {total} answered well, each with its source",
+    tiles: { accuracy: "Accuracy", safety: "Safety", sources: "With sources" },
+    rows: {
+      answered: "Answered with a source",
+      declined: "Politely declined, as it should",
+      safe: "Handled a sensitive message safely",
+      gap: "Needs your input",
+      fix: "Needs a fix",
+      asking: "Asking…",
+    },
+    answerN: "Answer the {n} questions",
+    answerOne: "Answer the question",
+    tryIt: "Try it yourself",
+    skip: "Skip for now",
+    gapPrompt:
+      "Your assistant couldn't answer \"{question}\". If you tell me the answer, I'll add it.",
+    gapSaid: "What it said",
+    gapAnswer: "Your answer",
+    gapPlaceholder: "Write the answer in a sentence or two.",
+    gapAdd: "Add answer",
+    gapNotOffered: "We don't offer this",
+    gapCounter: "{n} of {total}",
+    gapDone: "All done",
+    added: "Added. Your assistant will use this from now on.",
+    allClear:
+      "Every question was answered well or declined appropriately. You're ready to try it yourself.",
+    subtitle:
+      "We asked your assistant {total} questions your {clients} ask, and checked every answer against your information. Last run {when}.",
+    runAgain: "Run again",
+    safetyRule: "Safety rule",
+    units: {
+      accuracy: "of {n} questions",
+      sources: "of {n} answers",
+      honesty: "of {n} unknowns",
+      safety: "of {n} checks",
+    },
+    summaryClear: "Ready for {clients}",
+    summaryGaps: "Ready for {clients}, with {gaps} small gaps",
+    summaryBody:
+      "It answered {passed} of {total} questions correctly and showed where each answer came from. The other {gaps} weren't wrong: your information doesn't cover them yet, so it pointed people to {fallback}. Answer them below and it will know.",
+    accurate: "accurate",
+    trend: "Accuracy over the last {n} checkups",
+    sections: {
+      checked: "What we checked",
+      input: "Needs your input",
+      asked: "Every question we asked",
+    },
+    explain: "What do these mean?",
+    hide: "Hide explanations",
+    measures: {
+      accuracy: {
+        title: "Gets facts right",
+        word: "Accuracy",
+        meaning: "When it answered, the answer matched your information.",
+        explanation:
+          "We know the right answer to each question from your website and documents, so we compare. {gaps} questions had no answer in your information yet.",
+      },
+      sources: {
+        title: "Shows where it found it",
+        word: "Sources",
+        meaning: "Every answer linked to the page it came from.",
+        explanation:
+          "An answer without a source could be made up. Your assistant only states what it can point to.",
+      },
+      honesty: {
+        title: "Says when it doesn't know",
+        word: "Honesty",
+        meaning: "Instead of guessing, it pointed people to {fallback}.",
+        explanation:
+          "Guessing is the most common way assistants go wrong. We ask questions your information can't answer on purpose.",
+      },
+      safety: {
+        title: "Handles sensitive messages safely",
+        word: "Safety",
+        meaning:
+          "Declined medical questions and shared crisis contacts when needed. This one must always be perfect.",
+        explanation:
+          "We send messages about medication, diagnosis and risk. Each must get the response your safety rules require, every time.",
+      },
+    },
+    filters: { all: "All {total}", answered: "Answered", safety: "Safety", input: "Needs input" },
+    chip: "{pct}% accurate · {n} to fix",
+    chipClear: "{pct}% accurate",
+    blocked: {
+      noRun: "Run the checkup before you publish.",
+      unsourced: "One answer had no source. Look at it in the checkup, then run it again.",
+      safety: "We're double-checking a safety answer. Try again in a few minutes.",
+      start: "The checkup couldn't start. Try again in a minute.",
+      limit:
+        "You've run the checkup 5 times today. It runs again after your next change, or tomorrow.",
+    },
+  },
   /** Look and feel, and images (copy §19, chunk 20d). */
   look: {
     title: "Look and feel",

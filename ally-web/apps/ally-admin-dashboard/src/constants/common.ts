@@ -808,6 +808,13 @@ export const ApiEndpoints = {
     PAGE_ACCESS: (id: string) => `/v1/chatbots/${id}/page/access`,
     PAGE_ACCESS_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/page/access/${entryId}`,
     CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
+    CHECKUP: (id: string) => `/v1/chatbots/${id}/checkup`,
+    CHECKUP_RUNS: (id: string) => `/v1/chatbots/${id}/checkup/runs`,
+    CHECKUP_RUN: (id: string, runId: string) => `/v1/chatbots/${id}/checkup/runs/${runId}`,
+    CHECKUP_ANSWER: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/answer`,
+    CHECKUP_NOT_OFFERED: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/not-offered`,
   },
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",
@@ -820,6 +827,7 @@ export const ApiEndpoints = {
     DOCUMENTS: (id: string) => `/v1/bot-drafts/${id}/documents`,
     PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,
     ABANDON: (id: string) => `/v1/bot-drafts/${id}/abandon`,
+    CHECKUP: (id: string) => `/v1/bot-drafts/${id}/checkup`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
@@ -1200,6 +1208,7 @@ export const TAG_TYPES = {
   CHATBOTS: "chatbots",
   CHATBOT_DETAIL: "chatbotDetail",
   BOT_DRAFT: "botDraft",
+  CHECKUP: "checkup",
   CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so

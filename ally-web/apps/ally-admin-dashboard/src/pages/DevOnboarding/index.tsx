@@ -49,6 +49,7 @@ function stageState(stage: Stage): {
     safety: index >= STAGES.indexOf("question-1"),
     built: index >= STAGES.indexOf("make"),
     make: index >= STAGES.indexOf("share"),
+    checkup: index >= STAGES.indexOf("share"),
   };
   if (index >= STAGES.indexOf("reading-done")) {
     view.step = "learned";

@@ -121,7 +121,7 @@ export const AssistantHome: React.FC = () => {
       case "page":
         return <PageSection {...props} />;
       case "checkup":
-        return <CheckupSection />;
+        return <CheckupSection {...props} />;
       case "conversations":
         return <ConversationsSection {...props} />;
       case "share":

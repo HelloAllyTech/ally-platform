@@ -17,6 +17,7 @@ export type OnboardingScreen =
   | "design"
   | "building"
   | "make"
+  | "checkup"
   | "share"
   | "live";
 
@@ -27,6 +28,8 @@ export interface PassedScreens {
   /** The finished build, whose Continue leads to Make it yours. */
   built: boolean;
   make: boolean;
+  /** The checkup (20a-2), between Make it yours and Share. */
+  checkup: boolean;
 }
 
 export const NOTHING_PASSED: PassedScreens = {
@@ -34,6 +37,7 @@ export const NOTHING_PASSED: PassedScreens = {
   safety: false,
   built: false,
   make: false,
+  checkup: false,
 };
 
 /**
@@ -76,10 +80,11 @@ export const screenFor = (
   if (step === "design") return drafting ? "building" : "design";
   if (step === "building") return "building";
   if (step === "checkup" || step === "try_it") return "make";
-  // share: the finished build (until Continue), Make it yours (it edits the built assistant), then
-  // who can use it.
+  // share: the finished build (until Continue), Make it yours (it edits the built assistant), the
+  // checkup (20a-2), then who can use it.
   if (!passed.built) return "building";
-  return passed.make ? "share" : "make";
+  if (!passed.make) return "make";
+  return passed.checkup ? "share" : "checkup";
 };
 
 /**
@@ -96,9 +101,10 @@ export const passedFromStep = (
   safety: stored.safety ?? reached(view.step, "design"),
   built: stored.built ?? (!watched.building && reached(view.step, "share")),
   make: stored.make ?? false,
+  checkup: stored.checkup ?? false,
 });
 
-/** Step names for the footer (copy §15), in order. The checkup comes with 20a-2. */
+/** Step names for the footer (copy §15), in order. */
 const NAMES = COPY.frame.stepNames;
 
 export interface StepPosition {
@@ -118,8 +124,8 @@ export const stepPosition = (screen: OnboardingScreen, view: BotDraftView): Step
   const left = view.conversation.questionsLeft ?? 0;
   const questions = Math.max(1, answered + (screen === "question" ? Math.max(left, 1) : left));
   // Start, Reading, What we learned, Safety, the questions, Choose a design, Building, Make it
-  // yours, Share.
-  const total = 4 + questions + 4;
+  // yours, Checkup, Share.
+  const total = 4 + questions + 5;
   const before = 4;
   const index: Record<OnboardingScreen, number> = {
     reading: 2,
@@ -129,6 +135,7 @@ export const stepPosition = (screen: OnboardingScreen, view: BotDraftView): Step
     design: before + questions + 1,
     building: before + questions + 2,
     make: before + questions + 3,
+    checkup: before + questions + 4,
     share: total,
     live: total,
   };
@@ -140,6 +147,7 @@ export const stepPosition = (screen: OnboardingScreen, view: BotDraftView): Step
     design: NAMES.design,
     building: NAMES.building,
     make: NAMES.make,
+    checkup: NAMES.checkup,
     share: NAMES.share,
     live: NAMES.share,
   };

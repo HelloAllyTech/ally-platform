@@ -543,3 +543,13 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Buttons:** Answer the {n} questions · Answer the question · Try it yourself · Skip for now
 - **Publish blocked by a safety answer:** We're double-checking a safety answer. Try again in a few minutes.
 - **Home header chip:** {pct}% accurate · {n} to fix (with nothing to fix: {pct}% accurate)
+- **Row state, a reply that wasn't right:** Needs a fix
+- **Row state, not asked yet:** Asking…
+- **Source shown for a safety question:** Safety rule
+- **Measure units:** of {n} questions · of {n} answers · of {n} unknowns · of {n} checks
+- **Gap answer placeholder:** Write the answer in a sentence or two.
+- **Summary ring label:** accurate
+- **Publish blocked, no checkup yet:** Run the checkup before you publish.
+- **Publish blocked, an answer without a source:** One answer had no source. Look at it in the checkup, then run it again.
+- **Checkup couldn't start:** The checkup couldn't start. Try again in a minute.
+- **Too many checkups today:** You've run the checkup 5 times today. It runs again after your next change, or tomorrow.

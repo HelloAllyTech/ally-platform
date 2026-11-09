@@ -602,3 +602,194 @@ a.ally-source:hover {
     position: static;
   }
 }
+
+/* ── Checkup (20a-2): CheckRow, MeasureCard, GapCard ── */
+.ally-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-lg);
+  overflow: hidden;
+}
+.ally-check {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--ally-line);
+  font-size: 15px;
+  color: var(--ally-ink);
+}
+.ally-check:first-child {
+  border-top: 0;
+}
+.ally-check__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--ally-good);
+}
+.ally-check__pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  white-space: nowrap;
+  background: var(--ally-good-bg);
+  color: var(--ally-good);
+}
+.ally-check__source {
+  min-width: 72px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--ally-faint);
+}
+.ally-check--safe .ally-check__dot {
+  background: var(--ally-info);
+}
+.ally-check--safe .ally-check__pill {
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
+}
+.ally-check--gap .ally-check__dot,
+.ally-check--fix .ally-check__dot {
+  background: var(--ally-warn);
+}
+.ally-check--gap .ally-check__pill,
+.ally-check--fix .ally-check__pill {
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+.ally-check--asking .ally-check__dot {
+  background: var(--ally-line-strong);
+}
+.ally-check--asking .ally-check__pill {
+  background: var(--ally-sunken);
+  color: var(--ally-muted);
+}
+@media (max-width: 640px) {
+  .ally-check {
+    grid-template-columns: 10px 1fr;
+  }
+  .ally-check__pill,
+  .ally-check__source {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+  }
+}
+.ally-measures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.ally-measure {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ally-measure__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+.ally-measure__title {
+  margin: 0;
+  font: 600 17px/1.3 var(--ally-font-ui);
+  color: var(--ally-ink);
+}
+.ally-measure__word {
+  font: 400 12px/1.4 var(--ally-font-label);
+  color: var(--ally-faint);
+}
+.ally-measure__value {
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-measure__value strong {
+  font: 600 34px/1 var(--ally-font-ui);
+  color: var(--ally-ink);
+}
+.ally-measure__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ally-sunken);
+  overflow: hidden;
+}
+.ally-measure__bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ally-accent);
+  transition: width 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ally-measure__bar--good span {
+  background: var(--ally-good);
+}
+.ally-measure__meaning,
+.ally-measure__explain {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ally-ink-2);
+}
+.ally-measure__explain {
+  color: var(--ally-muted);
+}
+.ally-gap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-gap__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+.ally-gap__prompt {
+  margin: 0;
+  font: 400 28px/1.15 var(--ally-font-display);
+  color: var(--ally-ink);
+}
+.ally-gap__counter {
+  font: 400 13px/1.4 var(--ally-font-label);
+  color: var(--ally-faint);
+  white-space: nowrap;
+}
+.ally-gap__said {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-sunken);
+  font-size: 15px;
+  color: var(--ally-ink-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ally-measure__bar span {
+    transition: none;
+  }
+}
+.ally-checkup__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 560px;
+}
+.ally-checkup__tiles .ally-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+}
+.ally-checkup__tiles strong {
+  font: 600 26px/1 var(--ally-font-ui);
+  color: var(--ally-ink);
+}
+.ally-checkup__tiles span {
+  font-size: 13px;
+  color: var(--ally-muted);
+}
