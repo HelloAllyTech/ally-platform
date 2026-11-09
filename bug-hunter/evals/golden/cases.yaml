@@ -167,22 +167,21 @@ cases:
   app: ally-web
   parent: 4d438f9fcd69ad9d3a2b2d733d80533a7fc6483a
   commit: e5ad37b3be546f59917d7681c1d856e30b02c86c
-  expected: escalate
+  expected: fix
   layout: root
   modes:
   - sweep
   - issue
-  risk: true
+  risk: false
   description: On the simulation form, the auto-termination rule field shows a rule by default even when
     no rules have been configured, so an empty configuration looks as if it already has a rule and the
     empty state is never shown.
   description_source: hand
   src_files:
   - apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx
-  - apps/ally-helpline-dashboard/src/pages/auth/Login.tsx
   oracle_tests:
   - apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
-  src_lines: 9
+  src_lines: 2
   lockfile_blob: ac36e034439c488c4e5182ba51ca425f7ea367ec
   tags: []
 - id: ally-web-dd128ff8
@@ -957,4 +956,77 @@ cases:
   - apps/ally-admin-dashboard/src/types/auth.ts
   oracle_tests: []
   src_lines: 37
+  tags: []
+- id: ally-be-819f6ccf
+  kind: bug
+  app: ally-be
+  parent: a60dbeba99be64e3414e783da2a25f4a7b9ae9e5
+  commit: 819f6ccf99631c64ebaf7c20ace3713c113efffc
+  expected: escalate
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: true
+  description: 'LEARN_METADATA_FETCH_ENABLED=true is set in the production environment, yet the slim fetch-by-id
+    dispatch path never activates: dispatches to learn stay inline and learn-core logs show no [metadata-fetch]
+    entries at all. Other feature flags set the same way in the same environment do take effect.'
+  description_source: hand
+  src_files:
+  - src/config/config.service.ts
+  oracle_tests:
+  - src/config/test/config.service.spec.ts
+  src_lines: 9
+  lockfile_blob: baf594754c56a70cb476b9715f7679e5ebb33dd8
+  tags: []
+- id: ally-be-6083b8d8
+  kind: bug
+  app: ally-be
+  parent: 81bdbd27ce4a3c81c4fe0505b8687ff1ce5c9c14
+  commit: 6083b8d8574b380b495c7e67719c243e356f66e3
+  expected: escalate
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: true
+  description: 'Behind the load balancer, the IP-keyed rate limits trip for everyone at once: once a few
+    people have requested a magic link or logged into the AI Lab evaluator, every other client is told
+    to slow down too. Audit log rows also record the same ip_address for every caller, and it is not any
+    user''s address.'
+  description_source: hand
+  src_files:
+  - src/common/constants/network.constants.ts
+  - src/main.ts
+  - src/rate-limit/guard/custom-throttler.guard.ts
+  oracle_tests:
+  - src/common/constants/test/network.constants.spec.ts
+  - src/rate-limit/guard/test/custom-throttler.guard.spec.ts
+  - src/rate-limit/test/rate-limited-routes.spec.ts
+  src_lines: 27
+  lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
+  tags: []
+- id: ally-be-87c6ecb8
+  kind: bug
+  app: ally-be
+  parent: 548344f2180b4ebc249b1bc1a0d20bfbe0e41bbc
+  commit: 87c6ecb89af024b7a3be8e442f1879acd80652d4
+  expected: escalate
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: true
+  description: A tenant admin's user list shows Ally staff accounts that were recently made platform admins,
+    while staff who were promoted long ago stay hidden as expected. On the local seed data, two of the
+    four platform admins appear in a customer's list.
+  description_source: hand
+  src_files:
+  - src/common/constants/user.constants.ts
+  - src/user/interface/user-filter-options.interface.ts
+  - src/user/repository/user.repository.ts
+  oracle_tests:
+  - src/user/repository/test/user.repository.spec.ts
+  src_lines: 52
+  lockfile_blob: 6f1c15c2ef3076fa643ce2862fa53c8ef6f8bcc4
   tags: []

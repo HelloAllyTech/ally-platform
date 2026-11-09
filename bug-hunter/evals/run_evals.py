@@ -119,6 +119,16 @@ def _run_tests(runner: Runner, tests: list[str]) -> tuple[bool, float, list[RunR
     return all(r.passed for r in results), sum(r.duration_s for r in results), results
 
 
+def genuinely_failed(results: list[RunResult]) -> bool:
+    """A test run counts as "fails on this code" only when tests actually ran: a
+    file that matched nothing is a failed *run*, not a failing *test*."""
+    return (
+        bool(results)
+        and not all(r.passed for r in results)
+        and not any(r.no_tests for r in results)
+    )
+
+
 def score_bug(case: Case, result: AgentResult) -> str:
     if result.escalated:
         return "escalated_correctly" if case.expected == "escalate" else "escalated"
@@ -147,14 +157,6 @@ def run_case(
             "app directory absent at this commit"
             if location is None
             else f"app lived at {location}/ at this commit"
-        )
-        return CaseResult(
-            case.id,
-            case.app,
-            case.kind,
-            case.expected,
-            "error",
-            error=f"not runnable in the sandbox: {why}",
         )
         return CaseResult(
             case.id,
@@ -252,9 +254,10 @@ def run_case(
                     target = app_root / path
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_text(content, encoding="utf-8")
-                    passed, secs, _ = _run_tests(runner, [path])
+                    _passed, secs, runs = _run_tests(runner, [path])
                     sandbox_seconds += secs
-                    result_row.repro_valid = not passed  # must fail on the buggy code
+                    # must fail on the buggy code, and the test must have run at all
+                    result_row.repro_valid = genuinely_failed(runs)
                 if (
                     agent_result.patch
                     and not agent_result.escalated
@@ -355,24 +358,30 @@ def _oracle_check(
     if not patch.strip():
         patch = repo.git("show", "--format=", case.commit)
     sandbox_seconds = 0.0
+    app_path = config.app(case.app).path  # root-layout cases use bare paths
     # the oracle test files must exist to run "before": add only the test files first
     test_patch = repo.git(
         "show",
         "--format=",
         case.commit,
         "--",
-        *[f"{config.app(case.app).path}/{t}" for t in case.oracle_tests],
+        *case_repo_paths(case, app_path, case.oracle_tests),
     )
-    before_ok = _apply_patch(run, test_patch) if test_patch.strip() else True
-    passed_before, secs, before = _run_tests(runner, case.oracle_tests)
+    before_ok = (
+        _apply_patch(run, test_patch, name="oracle-tests.patch")
+        if test_patch.strip()
+        else True
+    )
+    _passed_before, secs, before = _run_tests(runner, case.oracle_tests)
     sandbox_seconds += secs
+    failed_before = genuinely_failed(before)  # ran, and failed
     # then the source part of the fix
     src_patch = repo.git(
         "show",
         "--format=",
         case.commit,
         "--",
-        *[f"{config.app(case.app).path}/{s}" for s in case.src_files],
+        *case_repo_paths(case, app_path, case.src_files),
     )
     applied = (
         _apply_patch(run, src_patch, name="fix-source.patch")
@@ -383,18 +392,20 @@ def _oracle_check(
         _run_tests(runner, case.oracle_tests) if applied else (False, 0.0, [])
     )
     sandbox_seconds += secs
-    proven = before_ok and applied and (not passed_before) and passed_after
+    proven = before_ok and applied and failed_before and passed_after
     row.outcome = "oracle_proven" if proven else "oracle_failed"
     row.patch_applied = applied
     row.oracle_pass = passed_after
-    row.repro_valid = not passed_before
+    row.repro_valid = failed_before
     row.sandbox_seconds = round(sandbox_seconds, 1)
     row.seconds = round(time.monotonic() - started, 1)
     if not proven:
         detail = (
             f"test_patch_applied={before_ok} fix_applied={applied} "
-            f"fails_before={not passed_before} passes_after={passed_after}"
+            f"fails_before={failed_before} passes_after={passed_after}"
         )
+        if any(r.no_tests for r in before + after):
+            detail += " no_tests_ran=True"
         row.error = (
             detail + " | " + " | ".join(r.summary() for r in before + after)[:400]
         )

@@ -1,7 +1,11 @@
 """Run an app's tests, lint and typecheck in the sandbox, from ``apps.yaml`` commands.
 
 Results are pass/fail plus the failing test names and a truncated, scrubbed
-excerpt. Nothing here is judgement: ``passed`` is the exit code.
+excerpt. ``passed`` is the exit code with one rule on top: a test run in which zero
+tests ran is a failure, for every framework. A filter that matches nothing (Jest
+"No tests found", Vitest "No test files found", pytest exit code 5, Flutter with no
+matching test) exits 0 and would otherwise look like a green run; chunk 04's oracle
+check "passed" three ally-web cases exactly that way.
 """
 
 from __future__ import annotations
@@ -35,13 +39,17 @@ class RunResult:
     excerpt: str = ""
     timed_out: bool = False
     skipped: bool = False
+    no_tests: bool = False  # the command ran but zero tests ran: never a pass
 
     def summary(self) -> str:
         if self.skipped:
             return f"{self.app} {self.kind}: skipped (no command configured)"
-        state = (
-            "timed out" if self.timed_out else ("passed" if self.passed else "failed")
-        )
+        if self.timed_out:
+            state = "timed out"
+        elif self.no_tests:
+            state = "failed (no tests ran)"
+        else:
+            state = "passed" if self.passed else "failed"
         line = f"{self.app} {self.kind}: {state} in {self.duration_s}s"
         if self.failing_tests:
             line += f"; {len(self.failing_tests)} failing: " + ", ".join(
@@ -102,6 +110,34 @@ _FLUTTER_FAIL = re.compile(
 )
 _NOISE = re.compile(r"^(?:Test Suites:|Tests:|Snapshots:|Time:|Ran all test suites)")
 
+# "Zero tests ran" per framework. Matched against stdout + stderr of a test run.
+_NO_TESTS = {
+    "typescript": re.compile(
+        r"^(?:No tests found|No test files found|No test suite found)"  # jest/vitest
+        r"|^\s*Tests:\s+0 total"  # jest summary
+        r"|^\s*(?:Test Files|Tests)\s+no tests",  # vitest summary (filter excluded all)
+        re.MULTILINE,
+    ),
+    "python": re.compile(
+        r"^(?:=+ )?no tests ran|^collected 0 items|\d+ deselected / 0 selected",
+        re.MULTILINE,
+    ),
+    "dart": re.compile(
+        r"^No tests (?:were found|match|ran)"
+        r"|^\d+:\d+ \+0(?: ~\d+)?: All tests passed!",
+        re.MULTILINE,
+    ),
+}
+PYTEST_EXIT_NO_TESTS_COLLECTED = 5
+
+
+def no_tests_ran(app: AppConfig, result: ExecResult) -> bool:
+    """True when the test command ran but no test did (empty filter, missing file)."""
+    if app.lang == "python" and result.exit_code == PYTEST_EXIT_NO_TESTS_COLLECTED:
+        return True
+    text = f"{result.stdout}\n{result.stderr}"
+    return bool(_NO_TESTS[app.lang].search(text))
+
 
 def parse_failing_tests(app: AppConfig, output: str) -> list[str]:
     found: list[str] = []
@@ -160,18 +196,21 @@ class Runner:
         if not command:
             return RunResult(self.app, kind, "", True, 0, 0.0, skipped=True)
         result = self.sandbox.exec(command)
+        no_tests = kind == "test" and no_tests_ran(self.app_config, result)
+        passed = result.ok and not no_tests
         return RunResult(
             app=self.app,
             kind=kind,
             command=command,
-            passed=result.ok,
+            passed=passed,
             exit_code=result.exit_code,
             duration_s=result.duration_s,
             failing_tests=(
-                [] if result.ok else parse_failing_tests(self.app_config, result.stdout)
+                [] if passed else parse_failing_tests(self.app_config, result.stdout)
             ),
             excerpt=make_excerpt(result),
             timed_out=result.timed_out,
+            no_tests=no_tests,
         )
 
     def run_tests(

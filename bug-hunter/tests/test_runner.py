@@ -148,3 +148,60 @@ def test_full_suite_needs_no_target_and_web_needs_project(
     assert sb.commands == ["npm test"]
     with pytest.raises(RunnerError):
         Runner(config, sb).run_tests("src/a.test.ts")
+
+
+@pytest.mark.parametrize(
+    "app, exit_code, stdout",
+    [
+        (
+            "ally-be",
+            0,
+            "No tests found, exiting with code 0\n",
+        ),  # jest, passWithNoTests
+        ("ally-be", 0, "Test Suites: 0 total\nTests:       0 total\n"),
+        (
+            "ally-web",
+            0,
+            " RUN  v3.2.4 /work/ally-web/apps/x\n\n"
+            "No test files found, exiting with code 0\n",
+        ),
+        ("ally-web", 0, " Test Files  no tests\n      Tests  no tests\n"),
+        (
+            "ally-ai",
+            5,
+            "collected 0 items\n\n=== no tests ran in 0.01s ===\n",
+        ),  # pytest exit 5
+        ("ally-ai-learn", 0, "collected 4 items / 4 deselected / 0 selected\n"),
+        ("ally-mobile", 0, 'No tests match regular expression "renders".\n'),
+        ("ally-mobile", 0, "00:01 +0: All tests passed!\n"),
+    ],
+)
+def test_zero_tests_ran_is_a_failure(
+    config: BugHunterConfig, app: str, exit_code: int, stdout: str
+) -> None:
+    sb = FakeSandbox(app, exit_code=exit_code, stdout=stdout)
+    result = Runner(config, sb).run_tests()
+    assert not result.passed and result.no_tests
+    assert "failed (no tests ran)" in result.summary()
+
+
+@pytest.mark.parametrize(
+    "app, stdout",
+    [
+        ("ally-be", "PASS src/a.spec.ts\nTests:       3 passed, 3 total\n"),
+        ("ally-web", " Test Files  1 passed (1)\n      Tests  2 passed (2)\n"),
+        ("ally-ai", "collected 2 items\n\n=== 2 passed in 0.5s ===\n"),
+        ("ally-mobile", "00:03 +12: All tests passed!\n"),
+    ],
+)
+def test_runs_with_tests_still_pass(
+    config: BugHunterConfig, app: str, stdout: str
+) -> None:
+    result = Runner(config, FakeSandbox(app, stdout=stdout)).run_tests()
+    assert result.passed and not result.no_tests
+
+
+def test_zero_tests_rule_applies_to_test_runs_only(config: BugHunterConfig) -> None:
+    # a linter printing "collected 0 items" is not a test run
+    sb = FakeSandbox("ally-ai", stdout="collected 0 items\n")
+    assert Runner(config, sb).run_lint().passed

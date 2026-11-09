@@ -21,7 +21,15 @@ poetry run bug-hunter map build --contracts   # refresh the repo map + cross-app
 poetry run bug-hunter cache size          # what the bug hunter keeps on this machine
 poetry run bug-hunter cache clean         # prune kept artefacts by age (30 d) and size (500 MB)
 poetry run bug-hunter runs clean          # sweep what a crashed run left behind
+make eval CASES=<id>                      # one golden case against the baseline agent (Docker)
+make eval-oracle CASES=<id>               # prove one case: oracle fails before, passes after the real fix
 ```
+
+Full eval runs (all cases: oracle check + baseline) go through the manual workflow
+`.github/workflows/bug-hunter-evals.yml` (Actions → "Bug Hunter v2 evals" → Run
+workflow, optional case filter); it uploads the report and `oracle-status.json` as
+artifacts. Locally, run single cases only: each pre-cutover case installs its own
+dependency volume and the harness stops below 5 GB free.
 
 Python 3.12, Poetry, pytest + pytest-asyncio, Black (88), isort, flake8, matching
 `ally-ai` and `ally-ai-learn`. `make lint` and `make test` must pass before anything is
@@ -52,6 +60,8 @@ called done. Unit tests never hit the network or a real model.
 | `src/bug_hunter/context/scratchpad.py` | Per-run notes file; `compact()` folds old tool turns into it |
 | `src/bug_hunter/context/builder.py` | `build_context(node, state)`: declared fields + app context + recall + scratchpad within the node's budget, fixed trimming order |
 | `src/bug_hunter/context/tokens.py` | tiktoken when cached, else an overestimate (3 chars/token); budgets enforced at (1 − safety margin) |
+| `evals/` | Eval harness: `schema.py` (golden cases), `mine_cases.py`, `run_evals.py` (one `Run` per case, disk guard, oracle check, scoring), `agents.py` (baseline), `metrics.py`; `golden/cases.yaml`, `golden/oracle-status.json`, `results/` |
+| `../.github/workflows/bug-hunter-evals.yml` | Manual workflow: full oracle check + baseline on a GitHub runner, reports uploaded as artifacts |
 | `runs/` | Live runs, kept artefacts (`runs/artefacts/`), caches (`runs/cache/`); all gitignored |
 | `docs/bug-hunter/notes/CHUNK-NN-NOTES.md` | Per-chunk code map, decisions, open questions |
 

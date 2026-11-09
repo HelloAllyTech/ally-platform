@@ -54,6 +54,14 @@ class FakeSandbox:
         # command looks like: npx jest <file> --forceExit
         test_file = command.split()[2]
         app_dir = self.app_root
+        if not (app_dir / test_file).exists() or (
+            app_dir / test_file
+        ).read_text().startswith("notests"):
+            # what jest --passWithNoTests / vitest print for a filter that matches
+            # nothing (or a file with no test in it): exit 0, zero tests ran
+            return ExecResult(
+                command, 0, "No tests found, exiting with code 0", "", 0.1
+            )
         try:
             src_name = (app_dir / test_file).read_text().strip().split("tests ")[1]
             passed = "fixed" in (app_dir / src_name).read_text()
@@ -302,3 +310,102 @@ def test_load_agent() -> None:
     assert load_agent("tests.test_evals_harness:FixingAgent").name == "fixing"
     with pytest.raises(ValueError):
         load_agent("nonsense")
+
+
+def _root_layout_repo(config: BugHunterConfig, tmp_path: Path):
+    """Pre-cutover history: the app's files sit at the repository root."""
+    root = tmp_path / "root-repo"
+    (root / "src").mkdir(parents=True)
+    (root / "package-lock.json").write_text("{}")
+    (root / "src/x.ts").write_text("export const x = 'buggy';\n")
+    _git(root, "init", "-q", "-b", "master")
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "feat: x")
+    parent = _git(root, "rev-parse", "HEAD")
+    (root / "src/x.ts").write_text("export const x = 'fixed';\n")
+    (root / "src/x.spec.ts").write_text("tests src/x.ts\n")
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "fix: x")
+    fix = _git(root, "rev-parse", "HEAD")
+    cfg = config.model_copy(update={"repo_root": root})
+    return cfg, Repo(root, ref="master"), parent, fix
+
+
+def test_oracle_check_root_layout_case(
+    config: BugHunterConfig, tmp_path: Path, monkeypatch
+) -> None:
+    cfg, repo, parent, fix = _root_layout_repo(config, tmp_path)
+    monkeypatch.setattr("evals.run_evals.ORACLE_STATUS", tmp_path / "status.json")
+    monkeypatch.setattr("evals.run_evals.CANDIDATES_DIR", tmp_path / "none")
+    case = Case(
+        id="ally-be-root00001",
+        kind="bug",
+        app="ally-be",
+        parent=parent,
+        commit=fix,
+        expected="fix",
+        layout="root",
+        description="x is buggy at the old layout",
+        src_files=["src/x.ts"],
+        oracle_tests=["src/x.spec.ts"],
+    )
+    report, _ = run_evals(
+        cfg,
+        [case],
+        BaselineAgent(),
+        _options(oracle_check=True),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=tmp_path / "r",
+    )
+    row = report.cases[0]
+    assert row.outcome == "oracle_proven", row.error
+    assert FakeSandbox.instances[-1].app_root == FakeSandbox.instances[-1].worktree
+
+
+def test_oracle_is_not_proven_when_no_test_ran(
+    repo_config, tmp_path: Path, monkeypatch
+) -> None:
+    """The oracle names a file the fix commit does not add: the 'before' run matches
+    nothing and exits 0. That must read as unproven, not as 'fails before'."""
+    cfg, repo, bug, _clean = repo_config
+    monkeypatch.setattr("evals.run_evals.ORACLE_STATUS", tmp_path / "status.json")
+    monkeypatch.setattr("evals.run_evals.CANDIDATES_DIR", tmp_path / "none")
+    case = bug.model_copy(update={"oracle_tests": ["src/missing.spec.ts"]})
+    report, _ = run_evals(
+        cfg,
+        [case],
+        BaselineAgent(),
+        _options(oracle_check=True),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=tmp_path / "r",
+    )
+    row = report.cases[0]
+    assert row.outcome == "oracle_failed"
+    assert row.repro_valid is False and "no_tests_ran=True" in row.error
+
+
+def test_repro_that_runs_no_test_is_invalid(repo_config, tmp_path: Path) -> None:
+    cfg, repo, bug, _clean = repo_config
+
+    class Agent:
+        name = "repro-only"
+
+        def run(self, case_input, run):
+            # a "repro" file in which no test runs (describe.skip, wrong pattern…)
+            return AgentResult(
+                found=True, repro_test=("src/other.spec.ts", "notests\n")
+            )
+
+    report, _ = run_evals(
+        cfg,
+        [bug],
+        Agent(),
+        _options(),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=tmp_path / "r",
+    )
+    row = report.cases[0]
+    assert row.outcome == "detected" and row.repro_valid is False

@@ -1,88 +1,28 @@
 {
- "ally-ai-1ff07399": {
-  "checked_at": "2026-11-09T08:02:29+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
- "ally-ai-6d1b48a8": {
-  "checked_at": "2026-11-09T08:02:29+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
- "ally-ai-6e81b510": {
-  "checked_at": "2026-11-09T08:02:02+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
- "ally-ai-7d30a176": {
-  "checked_at": "2026-11-09T08:02:03+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
  "ally-ai-b680c643": {
   "checked_at": "2026-11-09T07:56:09+00:00",
   "detail": null,
   "proven": true
- },
- "ally-ai-e6286217": {
-  "checked_at": "2026-11-09T08:03:00+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
  },
  "ally-ai-e9a0e1c3": {
   "checked_at": "2026-11-09T07:56:17+00:00",
   "detail": null,
   "proven": true
  },
- "ally-ai-f06c8ed5": {
-  "checked_at": "2026-11-09T08:03:00+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
  "ally-ai-learn-1065743a": {
   "checked_at": "2026-11-09T07:56:48+00:00",
   "detail": null,
   "proven": true
- },
- "ally-ai-learn-66d9a037": {
-  "checked_at": "2026-11-09T08:04:34+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
  },
  "ally-ai-learn-7391ff7e": {
   "checked_at": "2026-11-09T07:57:22+00:00",
   "detail": "test_patch_applied=True fix_applied=True fails_before=False passes_after=True | ally-ai-learn test: passed in 16.8s | ally-ai-learn test: passed in 14.3s",
   "proven": false
  },
- "ally-ai-learn-88592f67": {
-  "checked_at": "2026-11-09T08:04:33+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
  "ally-ai-learn-995242d7": {
   "checked_at": "2026-11-09T07:58:21+00:00",
   "detail": null,
   "proven": true
- },
- "ally-ai-learn-a645303c": {
-  "checked_at": "2026-11-09T08:04:33+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
- "ally-ai-learn-b408b775": {
-  "checked_at": "2026-11-09T08:04:34+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
- "ally-ai-learn-b6c51894": {
-  "checked_at": "2026-11-09T08:04:33+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
- },
- "ally-ai-learn-c77f929e": {
-  "checked_at": "2026-11-09T08:04:34+00:00",
-  "detail": "test_patch_applied=False fix_applied=False fails_before=False passes_after=False | ",
-  "proven": false
  },
  "ally-be-89d8e055": {
   "checked_at": "2026-11-09T07:49:59+00:00",
@@ -125,9 +65,9 @@
   "proven": false
  },
  "ally-web-9299e9aa": {
-  "checked_at": "2026-11-09T07:50:53+00:00",
-  "detail": "test_patch_applied=True fix_applied=True fails_before=False passes_after=True | ally-web test: passed in 6.3s | ally-web test: passed in 3.1s",
-  "proven": false
+  "checked_at": "2026-11-09T09:54:29+00:00",
+  "detail": null,
+  "proven": true
  },
  "ally-web-dd128ff8": {
   "checked_at": "2026-11-09T07:53:29+00:00",

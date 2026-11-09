@@ -8,6 +8,9 @@ help:
 	@echo "  make format      Run isort and black"
 	@echo "  make check       Validate config and app paths (bug-hunter config check)"
 	@echo "  make test-docker Integration: run one test file per app in the real sandbox"
+	@echo "  make eval        Golden cases vs an agent: CASES=<filter> AGENT=baseline MODE=issue|sweep (single cases locally)"
+	@echo "  make eval-oracle Prove cases: oracle fails before, passes after the real fix (CASES=<filter>)"
+	@echo "  make eval-mine   Mine bug/clean candidates from git history into evals/golden/candidates/"
 
 # Install dependencies (same flags as the CI step for the Python apps)
 .PHONY: install
