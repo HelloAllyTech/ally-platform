@@ -32,6 +32,8 @@ import {
   ClUseCaseAccessLog,
 } from './entity/cl-use-case-access.entity';
 import { ContextAccessService } from './service/context-access.service';
+import { ContextAgentChunkService } from './service/context-agent-chunk.service';
+import { ContextAgentCuratorService } from './service/context-agent-curator.service';
 import { ContextBriefService } from './service/context-brief.service';
 import { ContextCitationService } from './service/context-citation.service';
 import { ContextReaderKeyService } from './service/context-reader-key.service';
@@ -112,9 +114,13 @@ import { ContextTuningService } from './service/context-tuning.service';
     ContextLoopActionsService,
     ContextLoopsService,
     ContextTuningService,
+    // Agent-written chunks and their curator (phase 5).
+    ContextAgentChunkService,
+    ContextAgentCuratorService,
   ],
   exports: [
     ContextAccessService,
+    ContextAgentChunkService,
     ContextBriefService,
     ContextChunkService,
     ContextCitationService,

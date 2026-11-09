@@ -13,6 +13,9 @@ class VectorDBCollectionNames:
     CONVERSATIONS = "Conversation"
     REFERENCE_DOCUMENTS = "ReferenceDocument"
     ROADMAP_OPPORTUNITIES = "RoadmapOpportunity"
+    # RETIRED: Bug Hunter's notes moved to ally-be's Context Library (Bug Hunter
+    # Notes, Builder Lessons). Kept only because the immutable migration 007 creates
+    # it and 010 drops it. Nothing reads or writes it.
     AGENT_MEMORIES = "AgentMemory"
     KNOWLEDGE_CHUNKS = "KnowledgeChunk"
     # RETIRED: the character corpus moved to ally-be's Context Library (Character
@@ -184,6 +187,9 @@ class RoadmapOpportunityProperties:
 
 class AgentMemoryProperties:
     """
+    RETIRED with the collection (see VectorDBCollectionNames.AGENT_MEMORIES); kept
+    only for the immutable migrations 007 (creates it) and 010 (drops it).
+
     Properties for the AgentMemory collection — semantic search over the notebook an
     Ally agent (Bug Hunter first, Builder next) keeps of what it has learned.
 

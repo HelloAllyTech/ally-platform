@@ -52,9 +52,18 @@ import {
 import { BugHuntLookupKind } from '../enum/bug-hunt-telemetry.enum';
 import { BugHunterEvalService } from '../service/bug-hunter-eval.service';
 import { BugHunterPolicyService } from '../service/bug-hunter-policy.service';
-import { AgentMemoryService } from 'src/agent-memory/service/agent-memory.service';
-import { AgentMemoryAgent } from 'src/agent-memory/enum/agent-memory.enum';
-import { AGENT_MEMORY_IN_CONTEXT } from 'src/agent-memory/constants/agent-memory.constants';
+import {
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
+import { ContextAgentChunkService } from 'src/context-library/service/context-agent-chunk.service';
+import { BUG_HUNTER_NOTES_IN_CONTEXT } from '../constants/bug-hunter.constants';
+import {
+  noteRepos,
+  noteTags,
+  noteText,
+  toNoteHit,
+} from '../util/bug-hunter-notes.util';
 import {
   BugHunterMemorySearchResponseDto,
   SearchBugHunterMemoryQueryDto,
@@ -139,7 +148,7 @@ export class BugHunterPipelineController {
     private readonly telemetryService: BugHunterTelemetryService,
     private readonly evalService: BugHunterEvalService,
     private readonly policyService: BugHunterPolicyService,
-    private readonly memoryService: AgentMemoryService,
+    private readonly notes: ContextAgentChunkService,
     private readonly dossierService: BugHunterDossierService,
     private readonly caseFileService: BugCaseFileService,
     private readonly verifyFixService: BugVerifyFixService,
@@ -300,10 +309,11 @@ export class BugHunterPipelineController {
   @ApiOperation({
     summary: "Search Bug Hunter's notebook by meaning (pipeline only)",
     description:
-      'The nearest active entries for a question, narrowed to the repo in play plus ' +
-      'platform-wide ones. Pass ?runId= and the lookup is recorded as a memory context ' +
-      'lookup with its top relevance, so "asked the notebook and got nothing" is a fact ' +
-      'the pipeline telemetry can count. See docs/bug-hunter-memory-adr.md.',
+      "Bug Hunter's notes are the Context Library's Bug Hunter Notes; this searches them with the " +
+      '`bug_hunter` use case, narrowed to the repo in play plus platform-wide notes, and ' +
+      'returns only good-or-better matches. Pass ?runId= and the lookup is recorded as a ' +
+      'memory context lookup, so "asked for notes and got nothing" is a fact the pipeline ' +
+      'telemetry can count, and what the run was shown is what its feedback is read against.',
   })
   @ApiResponse({ status: 200, type: BugHunterMemorySearchResponseDto })
   async searchMemory(
@@ -312,14 +322,17 @@ export class BugHunterPipelineController {
     const hits = await this.telemetryService.timed(
       query.runId,
       BugHuntLookupKind.MEMORY,
-      () =>
-        this.memoryService.search({
-          agent: AgentMemoryAgent.BUG_HUNTER,
-          query: query.q,
-          repo: query.repo,
-          limit: query.limit,
-          minSimilarity: query.minSimilarity,
-        }),
+      async () =>
+        (
+          await this.notes.search({
+            useCase: ClUseCase.BUG_HUNTER,
+            collection: ClCollectionId.BUG_HUNTER_NOTES,
+            queries: [query.q],
+            repos: query.repo ? [query.repo] : [],
+            limit: query.limit ?? 3,
+            sessionId: query.runId ?? null,
+          })
+        ).map(toNoteHit),
       (rows) => ({
         itemCount: rows.length,
         chars: rows.reduce((sum, r) => sum + r.body.length, 0),
@@ -333,22 +346,24 @@ export class BugHunterPipelineController {
   @ApiOperation({
     summary: "Write one lesson to Bug Hunter's notebook (pipeline only)",
     description:
-      'Under 600 characters, written for a stranger. Lands active and is embedded for ' +
-      'search best-effort; a failed embed is recorded on the row and healed later, never ' +
-      'thrown. Curation of candidates into the active set is OPP-0714.',
+      'Under 600 characters, written for a stranger. Lands as a candidate note in the ' +
+      "Context Library's Bug Hunter Notes; the hourly agent curator folds it into the " +
+      'active set (agree, edit, add or remove), after which it is searchable.',
   })
   async writeMemory(
     @Body() body: WriteBugHunterMemoryDto,
   ): Promise<{ id: string }> {
-    const row = await this.memoryService.write({
-      agent: AgentMemoryAgent.BUG_HUNTER,
-      body: body.body,
+    // The pipeline may not pin: a pin is a person outranking the curator.
+    const row = await this.notes.writeAgentChunk({
+      collection: ClCollectionId.BUG_HUNTER_NOTES,
+      agent: 'bug_hunter',
+      statement: body.body,
       repos: body.repos,
-      tags: body.tags,
-      runId: body.runId ?? null,
-      findingId: body.findingId ?? null,
-      // The pipeline may not pin: a pin is a human outranking the curator.
-      pinned: false,
+      facets: { tags: body.tags },
+      evidence: {
+        runId: body.runId ?? null,
+        findingId: body.findingId ?? null,
+      },
     });
     return { id: row.id };
   }
@@ -358,21 +373,25 @@ export class BugHunterPipelineController {
     summary:
       'Tell the notebook which entries a run used or found wrong (pipeline only)',
     description:
-      'The feedback half of the notebook (OPP-0752). `applied` ids get times_applied+1 and ' +
-      'a last_applied_at; `contradicted` ids get times_contradicted+1. The run is marked as ' +
-      'having reported, which is what lets the nightly retirement pass count "never applied" ' +
-      'against an entry: only runs that reported are counted, so an empty list is a real ' +
+      "The feedback half of Bug Hunter's memory (OPP-0752). `applied` ids become `agent_applied` " +
+      'usage events on their Bug Hunter Notes chunks, `contradicted` ids `agent_contradicted`, ' +
+      'and every other note this run was shown is recorded `unused`. Only runs that reported ' +
+      'count towards the curator\'s "never applied" retirement, so an empty list is a real ' +
       'answer and must be sent.',
   })
   async memoryFeedback(
     @Body() body: BugHunterMemoryFeedbackDto,
   ): Promise<{ applied: number; contradicted: number }> {
-    const counts = await this.memoryService.recordFeedback({
+    const { applied, contradicted } = await this.notes.recordFeedback({
+      useCase: ClUseCase.BUG_HUNTER,
+      collection: ClCollectionId.BUG_HUNTER_NOTES,
+      sessionId: body.runId,
       applied: body.applied,
       contradicted: body.contradicted ?? [],
     });
-    // Best-effort mark on the run: the counters above are the record, this is
-    // the denominator the retirement pass divides by.
+    const counts = { applied, contradicted };
+    // Best-effort mark on the run: the usage events above are the record; this
+    // shows on the run that it reported.
     try {
       const run = await this.runRepository.findOne({
         where: { id: body.runId },
@@ -761,15 +780,25 @@ export class BugHunterPipelineController {
     const memories = await this.telemetryService.timed(
       runId,
       BugHuntLookupKind.MEMORY,
-      () =>
-        this.memoryService.listActive(
-          AgentMemoryAgent.BUG_HUNTER,
-          repo,
-          AGENT_MEMORY_IN_CONTEXT,
-        ),
+      async () => {
+        const rows = await this.notes.listActive({
+          collection: ClCollectionId.BUG_HUNTER_NOTES,
+          repos: [repo],
+          limit: BUG_HUNTER_NOTES_IN_CONTEXT,
+        });
+        // Shown to this run, so its feedback can say which it did not use.
+        await this.notes
+          .recordShown(
+            ClUseCase.BUG_HUNTER,
+            rows.map((r) => r.id),
+            runId || null,
+          )
+          .catch(() => undefined);
+        return rows;
+      },
       (rows) => ({
         itemCount: rows.length,
-        chars: rows.reduce((sum, r) => sum + r.body.length, 0),
+        chars: rows.reduce((sum, r) => sum + noteText(r).length, 0),
       }),
       { repo, mode: 'always_on' },
     );
@@ -786,9 +815,9 @@ export class BugHunterPipelineController {
       engine,
       memories: memories.map((m) => ({
         id: m.id,
-        body: m.body,
-        tags: m.tags,
-        repos: m.repos,
+        body: noteText(m),
+        tags: noteTags(m),
+        repos: noteRepos(m),
       })),
     });
   }
@@ -1209,16 +1238,16 @@ export class BugHunterPipelineController {
     const gotcha = body.postmortem?.repoGotcha?.trim();
     if (gotcha && finding.repo) {
       try {
-        await this.memoryService.write({
-          agent: AgentMemoryAgent.BUG_HUNTER,
-          body: `${finding.repo}: ${gotcha}`.slice(0, 600),
+        await this.notes.writeAgentChunk({
+          collection: ClCollectionId.BUG_HUNTER_NOTES,
+          agent: 'bug_hunter',
+          statement: `${finding.repo}: ${gotcha}`,
           repos: [finding.repo],
-          tags: ['fix-gotcha', 'postmortem'],
-          runId: finding.runId ?? undefined,
-          findingId: finding.id,
+          facets: { tags: ['fix-gotcha', 'postmortem'] },
+          evidence: { runId: finding.runId ?? null, findingId: finding.id },
         });
       } catch {
-        // Logged inside the memory service; nothing more to do here.
+        // A note write never turns a recorded failure into a 500.
       }
     }
     return toFindingDto(finding);

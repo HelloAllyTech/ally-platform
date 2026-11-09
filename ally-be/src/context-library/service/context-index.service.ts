@@ -136,6 +136,15 @@ export class ContextIndexService {
       }
     }
 
+    // A row written by SQL (the phase 5 copy of the agent memories) has no hash yet. Give it the
+    // one the index will hold, or reconciliation would read every such row as stale forever.
+    for (const chunk of active.filter((c) => !c.textHash)) {
+      const profile = getProfile(chunk.collectionId);
+      if (!profile) continue;
+      chunk.textHash = indexHash(chunk, profile);
+      await this.chunks.update({ id: chunk.id }, { textHash: chunk.textHash });
+    }
+
     if (active.length) {
       const items = active
         .map((c) => this.toUpsertItem(c))

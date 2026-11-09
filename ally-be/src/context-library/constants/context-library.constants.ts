@@ -98,3 +98,20 @@ export const CL_MERGE_MIN_CO_SURFACED = 3;
 export const CL_MERGE_SIMILARITY = 0.9;
 /** Archived-as-useless statements the platitude check also rejects. */
 export const CL_LEARNED_PLATITUDES_MAX = 200;
+
+// ── Agent-written chunks (§6.3, phase 5) ────────────────────────────────────
+
+/** The agent curator runs hourly; a pod that dies mid-pass cannot hold the lock past this. */
+export const CL_AGENT_CURATE_LOCK_TTL_SECONDS = 70 * 60;
+/** Candidates older than this are curated even when fewer than the trigger have arrived. */
+export const CL_AGENT_CANDIDATE_MAX_WAIT_HOURS = 24;
+/** At most this many candidates go to the model in one pass; the rest wait for the next. */
+export const CL_AGENT_CANDIDATES_PER_PASS = 40;
+/** Output budget for the curator: a JSON object of operations, never prose. */
+export const CL_AGENT_CURATOR_MAX_TOKENS = 4096;
+/**
+ * "Never applied" retires a chunk only after this many runs that REPORTED what they used were
+ * shown it and applied none (first guess, carried over from Bug Hunter's notes). Runs that
+ * report nothing do not count, so the rule cannot empty a collection whose agent never reports.
+ */
+export const CL_AGENT_UNUSED_AFTER_REPORTS = 30;

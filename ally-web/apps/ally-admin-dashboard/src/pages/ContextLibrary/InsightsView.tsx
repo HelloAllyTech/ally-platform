@@ -3,10 +3,13 @@ import React, { useCallback, useRef, useState } from "react";
 import {
   Archive,
   ArrowUp,
+  Check,
   CircleDot,
+  CircleOff,
   FilePlus2,
   Merge,
   PenLine,
+  Plus,
   Search,
   ShieldAlert,
   SlidersHorizontal,
@@ -72,6 +75,12 @@ const ACTION_ICON: Record<string, LucideIcon> = {
   merge: Merge,
   promote_setup: SlidersHorizontal,
   rollback_setup: Undo2,
+  // The agent curator (Builder Lessons, Bug Hunter Notes).
+  agree: Check,
+  edit: PenLine,
+  add: Plus,
+  remove: Archive,
+  retire: CircleOff,
 };
 
 const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500";

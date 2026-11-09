@@ -19,7 +19,6 @@ import { BuilderMessage } from './entity/builder-message.entity';
 import { BuilderPrdDoc } from './entity/builder-prd-doc.entity';
 import { BuilderPrdVersion } from './entity/builder-prd-version.entity';
 import { BuilderRepoMap } from './entity/builder-repo-map.entity';
-import { BuilderLesson } from './entity/builder-lesson.entity';
 import { BuilderExemplar } from './entity/builder-exemplar.entity';
 import { BuilderMilestone } from './entity/builder-milestone.entity';
 import { BuilderBuildRun } from './entity/builder-build-run.entity';
@@ -46,7 +45,7 @@ import { BuilderBuildService } from './service/builder-build.service';
 import { BuilderEventService } from './service/builder-event.service';
 import { BuilderPullRequestService } from './service/builder-pull-request.service';
 import { BuilderSettingsService } from './service/builder-settings.service';
-import { BuilderLessonCuratorService } from './service/builder-lesson-curator.service';
+import { BuilderLessonsService } from './service/builder-lessons.service';
 import { BuilderExemplarService } from './service/builder-exemplar.service';
 import { BuilderOutcomeService } from './service/builder-outcome.service';
 import { BuilderMetricsService } from './service/builder-metrics.service';
@@ -96,7 +95,6 @@ import {
   BuilderPrdVersionRepository,
 } from './repository/builder-prd.repository';
 import {
-  BuilderLessonRepository,
   BuilderEvidenceRepository,
   BuilderExemplarRepository,
   BuilderRepoCatalogRepository,
@@ -136,7 +134,6 @@ import {
       BuilderPrdDoc,
       BuilderPrdVersion,
       BuilderRepoMap,
-      BuilderLesson,
       BuilderExemplar,
       BuilderMilestone,
       BuilderBuildRun,
@@ -208,7 +205,7 @@ import {
     BuilderEventService,
     BuilderPullRequestService,
     BuilderSettingsService,
-    BuilderLessonCuratorService,
+    BuilderLessonsService,
     BuilderExemplarService,
     BuilderOutcomeService,
     BuilderMetricsService,
@@ -244,7 +241,6 @@ import {
     BuilderRepoMapRepository,
     BuilderRepoCatalogRepository,
     BuilderEvidenceRepository,
-    BuilderLessonRepository,
     BuilderExemplarRepository,
     BuilderBuildRunRepository,
     BuilderBuildEventRepository,

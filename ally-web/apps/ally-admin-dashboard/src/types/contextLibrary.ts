@@ -314,7 +314,13 @@ export type ContextLoopActionType =
   | "learn_query"
   | "promote_setup"
   | "rollback_setup"
-  | "merge";
+  | "merge"
+  // The agent curator, on collections agents write to.
+  | "agree"
+  | "edit"
+  | "add"
+  | "remove"
+  | "retire";
 
 /** The retrieval settings a collection searches with (the profile's `RetrievalDefaults`). */
 export interface ContextSearchSetup {

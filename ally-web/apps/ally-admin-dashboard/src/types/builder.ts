@@ -872,37 +872,7 @@ export interface BuilderPipelineHealth {
   outcomes: BuilderPipelineOutcome[];
 }
 
-/* ── Knowledge: lessons + exemplars ────────────────────────────────────── */
-
-export type BuilderLessonStatus = "candidate" | "active" | "merged" | "retired";
-
-export interface BuilderLesson {
-  id: string;
-  lesson: string;
-  category: string;
-  status: BuilderLessonStatus;
-  /**
-   * A pinned lesson is exempt from the automatic curator's edits and
-   * retirement — a person put it there on purpose, and the periodic
-   * consolidation pass must not touch it.
-   */
-  pinned: boolean;
-  sourceCount: number;
-  timesApplied: number;
-  timesContradicted: number;
-  repos: string[];
-  tags: string[];
-  createdAt: string;
-}
-
-export interface PatchBuilderLessonRequest {
-  id: string;
-  lesson?: string;
-  category?: string;
-  status?: BuilderLessonStatus;
-  pinned?: boolean;
-  tags?: string[];
-}
+/* ── Knowledge: exemplars (lessons live in the Context Library) ────────── */
 
 export interface BuilderExemplar {
   id: string;

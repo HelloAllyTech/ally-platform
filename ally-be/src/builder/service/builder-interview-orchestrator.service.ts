@@ -43,6 +43,7 @@ import { BuilderKnowledgeService } from './builder-knowledge.service';
 import { BuilderPlatformContextService } from './builder-platform-context.service';
 import { BuilderReadinessService } from './builder-readiness.service';
 import { BuilderPrinciplesService } from './builder-principles.service';
+import { BuilderLessonsService } from './builder-lessons.service';
 import {
   BuilderInterviewToolsService,
   BuilderToolExecutionContext,
@@ -397,6 +398,9 @@ export class BuilderInterviewOrchestratorService {
     /** Proactive principles (guiding brief, section focus). Optional, like the rules. */
     @Optional()
     private readonly principles?: BuilderPrinciplesService,
+    /** The lessons block (pinned, then retrieved and frozen per session). Optional, like the rest. */
+    @Optional()
+    private readonly lessons?: BuilderLessonsService,
   ) {}
 
   /**
@@ -755,6 +759,11 @@ export class BuilderInterviewOrchestratorService {
     const sectionFocus = this.principles
       ? await this.principles.sectionFocusBlock(session, turnReadiness)
       : null;
+    // Lessons from previous builds: pinned ones, then the most relevant to this session, chosen
+    // once and frozen so the cached context block stays a stable prefix.
+    const lessonsBlock = this.lessons
+      ? await this.lessons.blockForSession(session, userContent).catch(() => '')
+      : '';
     const system = await this.buildSystemBlocks(
       session.repos ?? undefined,
       exemplars,
@@ -764,6 +773,7 @@ export class BuilderInterviewOrchestratorService {
       sessionId,
       principlesBrief,
       sectionFocus,
+      lessonsBlock,
     );
     const messages: any[] = [
       ...(await this.replayHistory(session, history)),
@@ -2148,11 +2158,12 @@ export class BuilderInterviewOrchestratorService {
     sessionId: string | null = null,
     principlesBrief: string | null = null,
     sectionFocus: string | null = null,
+    lessonsBlock = '',
   ): Promise<AgentSystemBlock[]> {
     const [instructions, context, platformRules, platformMap] =
       await Promise.all([
         this.buildSystemPrompt(),
-        this.knowledgeService.buildContextBlock(repos, exemplars),
+        this.knowledgeService.buildContextBlock(repos, exemplars, lessonsBlock),
         this.knowledgeService.platformRules(),
         this.platformContext?.render() ?? Promise.resolve(''),
       ]);

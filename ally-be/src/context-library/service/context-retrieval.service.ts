@@ -57,6 +57,13 @@ export interface ContextSearchRequest {
   /** Added to the vector side only, when the collection's setup contextualises. */
   contextDescriptor?: string | null;
   excludeCodes?: string[];
+  /**
+   * A hard scope on one list facet, checked at hydration before anything is picked: a chunk
+   * passes when that facet is empty (it applies everywhere) or shares a value with `values`.
+   * How agent notes keep to the repos in play — an ally-mobile gotcha never takes a slot in a
+   * backend sweep, and is never counted as shown there.
+   */
+  facetScope?: { key: string; values: string[] };
   /** Include per-candidate diagnostics ("How was this found?"). */
   explain?: boolean;
   /** Skip the re-rank (Library search box: no reshuffling under the cursor). */
@@ -96,6 +103,20 @@ export interface ContextSearchResponse {
   block: string;
   /** Replays only: chunk ids in fused order, before re-rank. */
   candidateIds?: string[];
+}
+
+/** See `ContextSearchRequest.facetScope`. */
+export function inFacetScope(
+  chunk: Pick<ClChunk, 'facets'>,
+  scope: { key: string; values: string[] },
+): boolean {
+  const raw = chunk.facets?.[scope.key];
+  const own = (Array.isArray(raw) ? raw : raw ? [raw] : []).map((v) =>
+    String(v).toLowerCase(),
+  );
+  if (!own.length) return true;
+  const wanted = new Set(scope.values.map((v) => v.toLowerCase()));
+  return own.some((v) => wanted.has(v));
 }
 
 const CANDIDATE_POOL = 50;
@@ -163,6 +184,7 @@ export class ContextRetrievalService {
           req.strict,
           req.limit,
           req.excludeCodes,
+          req.facetScope,
           req.audience,
           req.fast,
         ]),
@@ -416,6 +438,16 @@ export class ContextRetrievalService {
         continue;
       }
       if (excluded.has(chunk.code)) continue;
+      if (req.facetScope && !inFacetScope(chunk, req.facetScope)) {
+        scored.push({
+          candidate,
+          chunk,
+          grade: null,
+          band: 'low',
+          dropped: 'scope',
+        });
+        continue;
+      }
       scored.push({
         candidate,
         chunk,

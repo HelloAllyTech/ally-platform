@@ -8,7 +8,6 @@ import {
   BUILDER_EPIC_SYSTEM,
   BUILDER_RESEARCH_SYSTEM,
   BUILDER_OUTCOME_SYSTEM,
-  BUILDER_LESSON_CURATOR_SYSTEM,
   BUILDER_EXEMPLAR_RANK_SYSTEM,
   BUILDER_EXEMPLAR_SUMMARY_SYSTEM,
   BUILDER_INTERVIEW_SUMMARY_SYSTEM,
@@ -88,14 +87,6 @@ const cases: [PromptDefinition, string[]][] = [
       ...json('tags', 'lessons', 'category', 'lesson', 'contradictedLessonIds'),
       lessonCategories,
       ...Object.values(BuilderFailureTag),
-    ],
-  ],
-  [
-    BUILDER_LESSON_CURATOR_SYSTEM,
-    [
-      ...['AGREE', 'EDIT', 'ADD', 'REMOVE'].map((op) => `{"op":"${op}"`),
-      ...json('id', 'candidateId', 'lesson', 'category', 'tags'),
-      lessonCategories,
     ],
   ],
   [BUILDER_EXEMPLAR_RANK_SYSTEM, ['JSON array of ids']],

@@ -120,4 +120,112 @@ describe('ContextLoopActionsService.undo', () => {
       BadRequestException,
     );
   });
+
+  describe('agent curator actions', () => {
+    it('undoes an agreement: the candidate is its own lesson again and the target loses the count', async () => {
+      const absorbed: any = {
+        id: 'cand',
+        status: ClChunkStatus.SUPERSEDED,
+        supersededById: 'keep',
+      };
+      const keep: any = {
+        id: 'keep',
+        sourceCount: 3,
+        facets: { repos: ['ally-be', 'ally-web'] },
+        attributes: { sessionIds: ['s1', 's2'] },
+      };
+      const { service, chunks, chunkService } = setup(
+        {
+          id: 'a5',
+          collectionId: 'builder_lessons',
+          action: ClLoopActionType.AGREE,
+          chunkId: 'cand',
+          before: {
+            status: 'candidate',
+            keepId: 'keep',
+            keepSourceCount: 2,
+            keepFacets: { repos: ['ally-be'] },
+            keepAttributes: { sessionIds: ['s1'] },
+          },
+        },
+        absorbed,
+      );
+      chunks.findOne
+        .mockResolvedValueOnce(absorbed)
+        .mockResolvedValueOnce(keep);
+      await service.undo('a5', 9);
+      expect(absorbed.status).toBe(ClChunkStatus.ACTIVE);
+      expect(absorbed.supersededById).toBeNull();
+      expect(keep.sourceCount).toBe(2);
+      expect(keep.facets).toEqual({ repos: ['ally-be'] });
+      expect(keep.attributes).toEqual({ sessionIds: ['s1'] });
+      expect(chunkService.saveChanged).toHaveBeenCalledWith(keep, 'undo', 9);
+    });
+
+    it('undoes an edit by restoring the earlier wording', async () => {
+      const chunk: any = {
+        id: 'c1',
+        statement: 'new words',
+        body: null,
+        facets: { category: 'process' },
+      };
+      const { service } = setup(
+        {
+          id: 'a6',
+          collectionId: 'bug_hunter_notes',
+          action: ClLoopActionType.EDIT,
+          chunkId: 'c1',
+          before: {
+            statement: 'old words',
+            body: null,
+            facets: { category: 'gotcha' },
+          },
+        },
+        chunk,
+      );
+      await service.undo('a6', 1);
+      expect(chunk.statement).toBe('old words');
+      expect(chunk.facets).toEqual({ category: 'gotcha' });
+    });
+
+    it('undoes an addition by archiving, never by returning it to the candidates', async () => {
+      const chunk: any = {
+        id: 'c1',
+        statement: 'tightened',
+        status: ClChunkStatus.ACTIVE,
+      };
+      const { service } = setup(
+        {
+          id: 'a7',
+          collectionId: 'bug_hunter_notes',
+          action: ClLoopActionType.ADD,
+          chunkId: 'c1',
+          before: { status: 'candidate', statement: 'as the agent wrote it' },
+        },
+        chunk,
+      );
+      await service.undo('a7', 1);
+      expect(chunk.status).toBe(ClChunkStatus.ARCHIVED);
+      expect(chunk.statement).toBe('as the agent wrote it');
+    });
+
+    it.each([ClLoopActionType.REMOVE, ClLoopActionType.RETIRE])(
+      'undoes a %s by putting the chunk back as it was',
+      async (action) => {
+        const chunk: any = { id: 'c1', status: ClChunkStatus.ARCHIVED };
+        const { service } = setup(
+          {
+            id: 'a8',
+            collectionId: 'builder_lessons',
+            action,
+            chunkId: 'c1',
+            before: { status: 'active' },
+          },
+          chunk,
+        );
+        await service.undo('a8', 1);
+        expect(chunk.status).toBe(ClChunkStatus.ACTIVE);
+      },
+    );
+  });
 });

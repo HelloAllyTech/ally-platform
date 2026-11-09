@@ -1,4 +1,4 @@
-import { AGENT_MEMORY_BODY_MAX } from 'src/agent-memory/entity/agent-memory.entity';
+import { BUG_HUNTER_NOTE_MAX_CHARS } from 'src/context-library/profiles/bug-hunter-notes.profile';
 import { BugHunterMode } from '../enum/bug-finding.enum';
 import { BUG_HUNT_SWEEP_JOB_TIMEOUT_MINUTES } from './bug-fix-session.constants';
 import { repoCommands, verifyCommandsList } from './bug-hunt-repos.constants';
@@ -35,14 +35,14 @@ const clip = (
 };
 
 /**
- * A notebook entry is rendered whole, up to the 600-character cap the table
+ * A note is rendered whole, up to the 600-character cap the collection
  * already enforces. The 160-character excerpt above is for the known-non-bugs
  * block, where each line is a title plus a note and only the gist matters; a
  * lesson is written to be read in full, and cutting it at 160 dropped exactly
  * the part that says what to do about it ("…passes on a single-wor").
  */
 const clipMemory = (value: string): string =>
-  clip(value, AGENT_MEMORY_BODY_MAX);
+  clip(value, BUG_HUNTER_NOTE_MAX_CHARS);
 
 /** One bug the team has already judged not to be a bug — see `knownNonBugs`. */
 export interface KnownNonBug {
@@ -110,10 +110,11 @@ export interface SweepPromptContext {
    */
   engine?: string;
   /**
-   * The strongest active entries in Bug Hunter's notebook for this repo,
-   * rendered up front so the sweep starts from what past sweeps learned
-   * without having to think to ask. The search tool (Phase 0) covers the
-   * rest. Capped at AGENT_MEMORY_IN_CONTEXT by the caller.
+   * The strongest active Bug Hunter Notes (in the Context
+   * Library's Bug Hunter Notes) for this repo, rendered up front so the sweep
+   * starts from what past sweeps learned without having to think to ask. The
+   * search tool (Phase 0) covers the rest. Capped at
+   * BUG_HUNTER_NOTES_IN_CONTEXT by the caller.
    */
   memories?: SweepMemoryEntry[];
   /**

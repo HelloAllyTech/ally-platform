@@ -291,3 +291,9 @@ export const escalationGuidance = (engine: string | undefined): string =>
  * the field for raw output.
  */
 export const BUG_FINDING_DESCRIPTION_MAX_LENGTH = 5000;
+
+/**
+ * Bug Hunter's notes (the Context Library's Bug Hunter Notes) rendered up front in
+ * a sweep prompt, strongest evidence first, for the repo in play plus platform-wide ones.
+ */
+export const BUG_HUNTER_NOTES_IN_CONTEXT = 12;

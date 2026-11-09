@@ -110,6 +110,16 @@ describe("what changed", () => {
     );
   });
 
+  it("says what the agent curator did to lessons and notes", () => {
+    expect(changeHeadline({ action: "agree", code: "BL-0009" }, "lesson")).toBe(
+      "Folded BL-0009 into a lesson that already said it",
+    );
+    expect(changeHeadline({ action: "add", code: "BN-0003" }, "note")).toBe("Added BN-0003");
+    expect(changeHeadline({ action: "retire", code: "BN-0004" }, "note")).toBe(
+      "Retired BN-0004: it wasn't helping",
+    );
+  });
+
   it("pages back from the oldest change, and only when the page was full", () => {
     const at = (createdAt: string) => ({ createdAt }) as never;
     expect(oldestChange([at("2026-11-08T02:00:00Z"), at("2026-11-07T02:00:00Z")])).toBe(

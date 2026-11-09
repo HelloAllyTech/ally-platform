@@ -342,20 +342,6 @@ export const BUILDER_INTERVIEW_SUMMARY_SYSTEM = definePrompt(
   },
 );
 
-/** src/prompts/builder/lesson_curator_system.txt */
-export const BUILDER_LESSON_CURATOR_SYSTEM = definePrompt(
-  'builder_lesson_curator_system',
-  {},
-  {
-    name: 'Builder — Lesson Curator',
-    description:
-      "Folds the lessons a finished build wrote into Builder's capped lesson set, one AGREE / EDIT / ADD / REMOVE operation per candidate. Answers with a JSON array of operations; every guardrail is enforced in code.",
-    category: 'Builder',
-    runtimes: ['ally-be'],
-    output: 'json',
-  },
-);
-
 /** src/prompts/builder/rule_draft_system.txt */
 export const BUILDER_RULE_DRAFT_SYSTEM = definePrompt(
   'builder_rule_draft_system',
@@ -1449,20 +1435,6 @@ export const OPENAI_TRANSLATION_TOOLTIP_TRANSLATION = definePrompt(
   },
 );
 
-/** src/prompts/agent_memory/curator_system.txt */
-export const AGENT_MEMORY_CURATOR_SYSTEM = definePrompt(
-  'agent_memory_curator_system',
-  {},
-  {
-    name: 'Agent Memory — Notebook Curator',
-    description:
-      "Folds the notes an autonomous agent wrote at the end of a run into its capped notebook, one AGREE / EDIT / ADD / REMOVE operation per candidate, never overriding a person's pinned entry. Bug Hunter today.",
-    category: 'Bug Hunter',
-    runtimes: ['ally-be'],
-    output: 'json',
-  },
-);
-
 /** src/prompts/debrief_chat/summary_system.txt */
 export const DEBRIEF_CHAT_SUMMARY_SYSTEM = definePrompt(
   'debrief_chat_summary_system',
@@ -1632,6 +1604,20 @@ export const CONTEXT_LIBRARY_GAP_LABEL_SYSTEM = definePrompt(
     name: 'Context Library — Gap Label',
     description:
       'Names a cluster of searches that found nothing good, in general words that never repeat a person’s own wording, so the library’s maintainers know what to add.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/agent_curator_system.txt */
+export const CONTEXT_LIBRARY_AGENT_CURATOR_SYSTEM = definePrompt(
+  'context_library_agent_curator_system',
+  {},
+  {
+    name: 'Context Library — Agent Curator',
+    description:
+      "Folds the lessons and notes an agent wrote (Builder Lessons, Bug Hunter Notes) into the collection's capped active set, one AGREE / EDIT / ADD / REMOVE operation per candidate, never overriding a person's pinned entry. Answers with a JSON object of operations; every guardrail is enforced in code.",
     category: 'Context Library',
     runtimes: ['ally-be'],
     output: 'json',

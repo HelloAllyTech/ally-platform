@@ -185,6 +185,18 @@ export enum ClLoopActionType {
   PROMOTE_SETUP = 'promote_setup',
   ROLLBACK_SETUP = 'rollback_setup',
   MERGE = 'merge',
+  // The agent curator (phase 5): ExpeL's four operations over agent-written chunks, plus
+  // retirement by usage and by the active cap.
+  /** A candidate said what an active chunk already says: folded in, its agreement counted. */
+  AGREE = 'agree',
+  /** A chunk's wording rewritten to be more precise or more general. */
+  EDIT = 'edit',
+  /** A candidate taken into the active set. */
+  ADD = 'add',
+  /** An active chunk the curator found stale, wrong or subsumed. */
+  REMOVE = 'remove',
+  /** Archived by evidence: never applied, contradicted more than applied, or over the cap. */
+  RETIRE = 'retire',
 }
 
 /** The self-building benchmark's two halves. The holdout never feeds any other loop. */

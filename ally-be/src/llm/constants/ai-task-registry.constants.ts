@@ -1942,24 +1942,6 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configuredBy: 'BUG_HUNTER_DECIDE_MODEL (compiled in)',
   },
   {
-    id: 'agent-memory-curation',
-    task: LlmTask.AGENT_MEMORY_CURATION,
-    runtime: LlmRuntime.ALLY_BE,
-    // Mechanical editing of short entries against a fixed operation set: cost
-    // and time dominate, and a wrong merge is caught by the next pass.
-    tier: LlmModelTier.FAST,
-    trigger: "Hourly, when an agent's notebook has new candidate entries",
-    detail:
-      'Folds the notes a sweep or fix session wrote into the curated active set: agree, ' +
-      'edit, add or remove, one operation per candidate. Bug Hunter today; Builder when ' +
-      'its lessons move to the same table.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'openai',
-    defaultModel: 'gpt-4o-mini',
-    configuredBy: 'LLM_FAST_MODEL',
-    promptOverride: 'agent_memory_curator_system',
-  },
-  {
     id: 'skill-experiment-judge',
     task: LlmTask.SKILL_EXPERIMENT_JUDGE,
     runtime: LlmRuntime.ALLY_BE,
@@ -2303,19 +2285,6 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-4o-mini',
     configuredBy: 'LLM_FAST_MODEL',
     promptOverride: 'builder_rule_match_system',
-  },
-  {
-    id: 'builder-lesson-curation',
-    task: LlmTask.BUILDER_LESSON_CURATION,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A run finishes and the flywheel folds it in',
-    detail: 'Retrospective bullets into the curated lesson set.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
-    configuredBy: 'BUILDER_MECHANICAL_MODEL',
-    promptOverride: 'builder_lesson_curator_system',
-    configPath: 'builder.mechanicalModel',
   },
   {
     id: 'builder-outcome-categorise',
@@ -3154,6 +3123,26 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-4o-mini',
     configuredBy: 'LLM_FAST_MODEL',
     promptOverride: 'context_library_gap_label_system',
+  },
+  {
+    id: 'context-library-agent-curate',
+    task: LlmTask.CONTEXT_LIBRARY_AGENT_CURATE,
+    runtime: LlmRuntime.ALLY_BE,
+    // Mechanical editing of short entries against a fixed operation set: cost and time
+    // dominate, and a wrong merge is caught by the next pass (or undone from Insights).
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Hourly, when Builder Lessons or Bug Hunter Notes have new candidates an agent wrote',
+    detail:
+      'One call per collection per pass over its candidates and active set: agree, edit, add or ' +
+      'remove, one operation per candidate. Pins, the per-pass change budget and the active cap ' +
+      'are enforced in code; every change is a Context Library loop action an admin can undo. ' +
+      'Replaces the agent-memory and Builder lesson curators.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_agent_curator_system',
   },
 ];
 

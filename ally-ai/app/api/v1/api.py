@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
-    agent_memory,
     agent_runtime,
     analytics_agent,
     context_chunk,
@@ -36,11 +35,6 @@ api_router.include_router(
     roadmap_opportunity.router,
     prefix="/roadmap-opportunities",
     tags=["roadmap_opportunities"],
-)
-api_router.include_router(
-    agent_memory.router,
-    prefix="/agent-memories",
-    tags=["agent_memories"],
 )
 api_router.include_router(
     knowledge_chunk.router,

@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`: Builder's lessons and Bug Hunter's notes moved into the Context Library.
+
+They are now the Builder Lessons and Bug Hunter Notes collections, written by agents as candidates and curated by one hourly agent curator, with usage-based retirement. The agent-memory module, Builder's lesson table and both old curators are gone; ally-ai's `/agent-memories` endpoints are deleted and its migration `010` drops the `AgentMemory` collection.
+
 ## [2026-11-09] update | `repos/ally-ai.md`: `CharacterChunk` retired — the character interview now reads the Context Library's Character Insights collection.
 
 The old corpus's Weaviate collection is dropped only by ally-be's confirmed retire action, after its passages have been distilled; no migration drops it.

@@ -96,22 +96,16 @@ export const BUILDER_GITHUB_FILE_MAX_BYTES = 50_000;
 export const BUILDER_GITHUB_TREE_MAX_ENTRIES = 400;
 export const BUILDER_GITHUB_SEARCH_MAX_RESULTS = 20;
 
-/** Lessons digest size fed into the system prompt. */
-export const BUILDER_LESSONS_IN_CONTEXT = 20;
-
 /**
- * Hard cap on the curated active lesson set.
- *
- * The cap is the reason curation exists at all: the context a prompt can spend
- * on lessons is fixed, so an unbounded table does not mean more memory — it
- * means the newest twenty crowd out everything learned before them. Sized so
- * the whole active set fits in one re-rank call, which is what lets retrieval
- * skip an index entirely.
+ * Lessons in a session's context block (phase 5 of the Context Library). Pinned lessons in scope
+ * always ride along, up to the first cap; then the lessons most relevant to this session, found
+ * by search, up to the second — together no more than the twenty the old "newest lessons" block
+ * carried.
  */
-export const BUILDER_LESSON_ACTIVE_CAP = 80;
-
-/** Candidates needed before an opportunistic consolidation is worth a call. */
-export const BUILDER_LESSON_CANDIDATE_TRIGGER = 10;
+export const BUILDER_PINNED_LESSONS_MAX = 8;
+export const BUILDER_RETRIEVED_LESSONS = 12;
+/** A lesson search never holds an interview turn up longer than this. */
+export const BUILDER_LESSON_SEARCH_TIMEOUT_MS = 3000;
 
 /** Past builds offered to a new session as worked examples. */
 export const BUILDER_EXEMPLARS_IN_CONTEXT = 2;
@@ -128,17 +122,9 @@ export const BUILDER_MILESTONES_MIN = 2;
 export const BUILDER_MILESTONES_MAX = 6;
 
 /**
- * Cadence keys for the flywheel's scheduled passes. Both hourly because the
- * scheduler offers no daily tick and both no-op cheaply when idle — the
- * curator on one COUNT, the sweep on one indexed query.
+ * Cadence keys for the flywheel's scheduled passes. Hourly because it no-ops
+ * cheaply when idle, on one indexed query.
  */
-/** Curator mutex, so an hourly job on N pods is still one pass. */
-export const BUILDER_CURATE_LOCK = 'builder-curate';
-/** Slightly over the cadence: a dead pod must not hold it until the heat death. */
-export const BUILDER_CURATE_LOCK_TTL_SECONDS = 70 * 60;
-
-export const BUILDER_CURATE_INTERVAL = 'hourly';
-export const BUILDER_CURATE_TASK = 'builder-lesson-curate';
 export const BUILDER_OUTCOME_INTERVAL = 'hourly';
 export const BUILDER_OUTCOME_TASK = 'builder-outcome-sweep';
 /** The learning loop's scan of recent admin replies; daily is plenty for tens of sessions a week. */
@@ -335,7 +321,6 @@ export const BUILDER_RECONCILE_TASK = 'builder-run-reconcile';
  */
 export const BUILDER_AI_TASKS = {
   INTERVIEW_SUMMARY: 'builder-interview-summary',
-  LESSON_CURATION: 'builder-lesson-curation',
   EPIC_DECOMPOSITION: 'builder-epic-decomposition',
   OUTCOME_CATEGORISE: 'builder-outcome-categorise',
   CONTEXT_SELECTION: 'builder-context-selection',

@@ -76,6 +76,27 @@ export interface ExtractionSpec {
   criticChecks: readonly string[];
 }
 
+/**
+ * How the agent curator keeps an agent-written collection worth reading (§6.3). Present only on
+ * collections that accept `agent` chunks.
+ */
+export interface AgentCurationSpec {
+  /** The agents allowed to write here (`ClChunk.agent`). */
+  agents: readonly string[];
+  /**
+   * Hard cap on active chunks. The prompt budget an agent spends on these is fixed, so an
+   * unbounded set means the newest crowd out everything learned before them; the curator
+   * retires the weakest unpinned chunks to stay inside it.
+   */
+  activeCap: number;
+  /** Candidates needed before a pass spends a model call (older ones are curated anyway). */
+  candidateTrigger: number;
+  /** At most this many EDIT or REMOVE operations on already-active chunks per pass. */
+  maxActiveChangesPerPass: number;
+  /** Shown to the curator so its edits keep to the collection's vocabulary. */
+  categoryFacet?: string;
+}
+
 export interface CollectionProfile {
   id: ClCollectionId;
   name: string;
@@ -98,6 +119,8 @@ export interface CollectionProfile {
   attributes: Record<string, AttributeSpec>;
   /** Absent for collections that accept no documents. */
   extraction?: ExtractionSpec;
+  /** Present for collections agents write to; absent everywhere else. */
+  agentCuration?: AgentCurationSpec;
   densityCap: DensityCap;
   retrievalDefaults: RetrievalDefaults;
   /** Text behind the statement vector. */

@@ -163,3 +163,77 @@ describe('profile prompt codes', () => {
     }
   });
 });
+
+describe('agent-written collections (phase 5)', () => {
+  const { BUILDER_LESSONS_PROFILE } = require('../builder-lessons.profile');
+  const { BUG_HUNTER_NOTES_PROFILE } = require('../bug-hunter-notes.profile');
+
+  it('registers Builder Lessons and Bug Hunter Notes with their codes and nouns', () => {
+    expect(requireProfile(ClCollectionId.BUILDER_LESSONS)).toBe(
+      BUILDER_LESSONS_PROFILE,
+    );
+    expect(BUILDER_LESSONS_PROFILE.codePrefix).toBe('BL');
+    expect(BUILDER_LESSONS_PROFILE.noun).toBe('lesson');
+    expect(requireProfile(ClCollectionId.BUG_HUNTER_NOTES)).toBe(
+      BUG_HUNTER_NOTES_PROFILE,
+    );
+    expect(BUG_HUNTER_NOTES_PROFILE.codePrefix).toBe('BN');
+    expect(BUG_HUNTER_NOTES_PROFILE.noun).toBe('note');
+    for (const profile of [BUILDER_LESSONS_PROFILE, BUG_HUNTER_NOTES_PROFILE]) {
+      expect(profile.allowedOrigins).toEqual(['agent', 'authored']);
+      expect(profile.extraction).toBeUndefined();
+      expect(profile.agentCuration.activeCap).toBeGreaterThan(0);
+      expect(profile.purpose.length).toBeGreaterThan(80);
+    }
+  });
+
+  it('reaches the use cases the plan grants them, engineers included', () => {
+    for (const useCase of [
+      ClUseCase.BUILDER_INTERVIEW,
+      ClUseCase.BUILDER_RESEARCH,
+      ClUseCase.BUILDER_PRD_REVIEW,
+      ClUseCase.BUILDER_BRIEF,
+      ClUseCase.BUILDER_BUILD,
+      ClUseCase.MCP_DEV,
+    ]) {
+      expect(CONTEXT_USE_CASES[useCase].defaultCollections).toContain(
+        ClCollectionId.BUILDER_LESSONS,
+      );
+    }
+    for (const useCase of [ClUseCase.BUG_HUNTER, ClUseCase.MCP_DEV]) {
+      expect(CONTEXT_USE_CASES[useCase].defaultCollections).toContain(
+        ClCollectionId.BUG_HUNTER_NOTES,
+      );
+    }
+  });
+
+  it('keeps Builder’s lesson categories as the category vocabulary', () => {
+    expect([...BUILDER_LESSONS_PROFILE.facets.category.values]).toEqual([
+      'gotcha',
+      'convention',
+      'estimate',
+      'process',
+    ]);
+  });
+
+  it('renders cards with the code, scope and band', () => {
+    const view = {
+      code: 'BL-0012',
+      statement: 'Run NX_DAEMON=false before the admin suite on CI.',
+      situations: [],
+      exampleQueries: [],
+      keywords: [],
+      topics: [],
+      facets: { category: 'gotcha', repos: ['ally-web'], tags: ['ci'] },
+      attributes: {},
+    };
+    expect(BUILDER_LESSONS_PROFILE.card(view, 'strong')).toBe(
+      '[BL-0012 · gotcha · ally-web · strong] Run NX_DAEMON=false before the admin suite on CI.',
+    );
+    expect(
+      BUG_HUNTER_NOTES_PROFILE.card({ ...view, code: 'BN-0003', facets: {} }),
+    ).toBe(
+      '[BN-0003 · platform] Run NX_DAEMON=false before the admin suite on CI.',
+    );
+  });
+});

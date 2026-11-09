@@ -39,7 +39,6 @@ import {
 } from '../util/builder-autonomy.util';
 import { BuilderSettingsService } from '../service/builder-settings.service';
 import { BuilderNotificationService } from '../service/builder-notification.service';
-import { BuilderLessonCuratorService } from '../service/builder-lesson-curator.service';
 import { BuilderExemplarService } from '../service/builder-exemplar.service';
 import { BuilderMetricsService } from '../service/builder-metrics.service';
 import { BuilderEpicService } from '../service/builder-epic.service';
@@ -59,8 +58,6 @@ import {
   StartBuilderBuildDto,
   UpdateBuilderSessionDto,
   UpdateBuilderSettingsDto,
-  ListBuilderLessonsQueryDto,
-  UpdateBuilderLessonDto,
   BuilderResearchDto,
   AnswerBuilderDecisionDto,
 } from '../dto/builder.dto';
@@ -100,7 +97,6 @@ export class BuilderController {
     private readonly pullRequestService: BuilderPullRequestService,
     private readonly settingsService: BuilderSettingsService,
     private readonly notificationService: BuilderNotificationService,
-    private readonly curatorService: BuilderLessonCuratorService,
     private readonly exemplarService: BuilderExemplarService,
     private readonly metricsService: BuilderMetricsService,
     private readonly epicService: BuilderEpicService,
@@ -652,46 +648,6 @@ export class BuilderController {
       );
     }
     return this.buildService.startBuild(session, user.id, dto);
-  }
-
-  /* ── The lesson library ─────────────────────────────────────────────── */
-
-  @Get('lessons')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
-    permissions: [PERMISSIONS.VIEW_BUILDER],
-  })
-  @ApiOperation({
-    summary: 'The lesson library, with its curation state and counters',
-  })
-  listLessons(@Query() query: ListBuilderLessonsQueryDto) {
-    return this.knowledgeService.listLessons(query);
-  }
-
-  @Patch('lessons/:lessonId')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
-    permissions: [PERMISSIONS.EDIT_BUILDER],
-  })
-  @ApiOperation({
-    summary:
-      'Edit, retire or pin a lesson. A pinned lesson the curator may not touch.',
-  })
-  updateLesson(
-    @Param('lessonId', ParseUUIDPipe) lessonId: string,
-    @Body() dto: UpdateBuilderLessonDto,
-    @CurrentUser() user: TokenUser,
-  ) {
-    return this.knowledgeService.updateLesson(lessonId, dto, user.id);
-  }
-
-  @Post('lessons/consolidate')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
-    permissions: [PERMISSIONS.EDIT_BUILDER],
-  })
-  @ApiOperation({
-    summary: 'Run the consolidation pass now rather than waiting for the tick',
-  })
-  consolidateLessons() {
-    return this.curatorService.consolidate(true);
   }
 
   @Get('scoreboard')

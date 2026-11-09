@@ -3685,54 +3685,15 @@ export const en = {
     drawerAnswerSubmit: "Send answer",
     drawerAnswerFailed: "Couldn't send that answer. Try again.",
     // ── The notebook ─────────────────────────────────────────────────────────
-    notebookTitle: "My notebook",
-    notebookIntro:
-      "What I write down at the end of a run so the next one starts smarter — where bugs hide, what turned out not to be one, how a hard fix was made to work. You can add to it too. I read the strongest entries for a repo before every sweep and search the rest as I work.",
-    notebookRepoLabel: "Repo",
-    notebookRepoAll: "Platform-wide only",
-    notebookEmpty:
-      "Nothing written for this scope yet. It fills in as sweeps finish, or start it off below.",
-    notebookLoading: "Reading the notebook…",
-    notebookError: "Couldn't read the notebook right now.",
-    notebookSeen: "seen {count}×",
-    notebookPinned: "Pinned",
-    notebookByMe: "written by me",
-    notebookByHuman: "added by an admin",
-    notebookPlatformWide: "every repo",
-    notebookRetire: "Retire",
-    notebookRetireConfirmTitle: "Retire this entry?",
-    notebookRetireConfirmBody:
-      "It stops being read before sweeps and stops turning up in searches. Nothing is deleted, and an admin can write it again.",
-    notebookRetireConfirm: "Retire it",
-    notebookRetired: "Retired.",
-    notebookRetireFailed: "Couldn't retire that entry.",
-    notebookAddTitle: "Add an entry",
-    notebookAddHint:
-      "One lesson, written for someone who wasn't there: name the repo, the file or command, and the symptom. Under {max} characters.",
-    notebookAddLabel: "What should the next sweep know?",
-    notebookAddPlaceholder:
-      "e.g. ally-web: the admin dashboard suite needs NX_DAEMON=false or unrelated tests fail with a socket error — rerun before filing it as a bug.",
-    notebookAddTooLong: "{length} of {max} characters — trim it to the one lesson.",
-    notebookAddRepoLabel: "Applies to",
-    notebookAddRepoAll: "Every repo",
-    notebookAddTagsLabel: "Tags (optional, comma-separated)",
-    notebookAddTagsPlaceholder: "flaky-test, false-positive, fix-gotcha",
-    notebookAddPinLabel: "Pin it",
-    notebookAddPinTooltip:
-      "A pinned entry is a person's decision: the hourly curator never edits or retires it.",
-    notebookAddButton: "Add to notebook",
-    notebookAddButtonBusy: "Adding…",
-    notebookAdded: "Added. I'll read it before the next sweep.",
-    notebookAddFailed: "Couldn't add that entry.",
-    notebookReadOnly: "You can read the notebook; adding and retiring needs the Bug Hunter toggle.",
-    // ── What the agent retired on its own (OPP-0752) ─────────────────────────
-    notebookRetiredByMeTitle: "Retired by me recently ({count})",
-    notebookRetiredByMeIntro:
-      "Entries I took out of my own notebook in the last 30 days, each with the rule that fired. Put one back if I got it wrong.",
-    notebookRetiredBecause: "Retired {when} because: {reason}",
-    notebookRestore: "Put it back",
-    notebookRestored: "Back in the notebook. I'll read it before the next sweep.",
-    notebookRestoreFailed: "Couldn't restore that entry.",
+    // My notes are the Context Library's Bug Hunter Notes collection, managed there.
+    notesLink: {
+      title: "Bug Hunter Notes",
+      description:
+        "What I write down at the end of a run so the next one starts smarter. I read the strongest before every sweep and search the rest as I work.",
+      count: (n: number) => (n === 0 ? "No notes yet" : `${n} ${n === 1 ? "note" : "notes"}`),
+      manage: "Manage in Context Library",
+      manageLabel: "Manage Bug Hunter Notes in the Context Library",
+    },
     // ── Multi-repo plan ──────────────────────────────────────────────────────
     planTitle: "This fix spans {count} repos",
     planSubtitle:
@@ -5434,65 +5395,24 @@ export const en = {
       } as Record<string, string>,
     },
 
-    // Knowledge — what the automatic curator has distilled from past builds,
-    // and the runs worth reading in full because they were unusually clean
-    // or unusually expensive.
+    // Knowledge — where Builder's lessons live (the Context Library), and the
+    // runs worth reading in full because they were unusually clean or
+    // unusually expensive.
     knowledge: {
       navLink: "Knowledge",
       title: "Builder knowledge",
       subtitle: "What Builder has learned from past builds, and the runs worth learning from.",
       backToBuilder: "Back to Builder",
-      tabLessons: "Lessons",
-      tabExemplars: "Exemplars",
 
-      lessons: {
-        loadFailed: "Couldn't load Builder's lessons.",
-        empty: "Nothing here yet — lessons appear once a few builds have run.",
-        filterStatusLabel: "Status",
-        filterStatusAll: "All statuses",
-        filterCategoryLabel: "Category",
-        filterCategoryPlaceholder: "Any category…",
-        filterRepoLabel: "Repo",
-        filterRepoPlaceholder: "Any repo…",
-        statusLabels: {
-          candidate: "Candidate",
-          active: "Active",
-          merged: "Merged",
-          retired: "Retired",
-        } as Record<string, string>,
-        columnLesson: "Lesson",
-        columnCategory: "Category",
-        columnStatus: "Status",
-        columnSources: "Sources",
-        columnApplied: "Applied",
-        columnContradicted: "Contradicted",
-        columnRepos: "Repos",
-        columnPinned: "Pinned",
-        edit: "Edit",
-        save: "Save",
-        cancel: "Cancel",
-        saveFailed: "Couldn't save that lesson.",
-        pin: "Pin",
-        unpin: "Unpin",
-        // The curator runs on its own schedule and edits or retires lessons
-        // without asking — pinning is the one way to take a lesson out of its
-        // reach on purpose, and the copy says so rather than just naming the
-        // toggle. (Stacks: "Automated Pipelines as Amplifiers, Not
-        // Replacements" — automation proposes, a person can override it.)
-        pinHint:
-          "A pinned lesson is one the automatic curator may never edit or retire. Pin the ones you've checked and want kept exactly as written.",
-        pinFailed: "Couldn't pin that lesson.",
-        unpinFailed: "Couldn't unpin that lesson.",
-        retire: "Retire",
-        retireConfirmTitle: "Retire this lesson?",
-        retireConfirmBody:
-          "A retired lesson stops being read into new builds. Nothing is deleted — set its status back to bring it back.",
-        retireFailed: "Couldn't retire that lesson.",
-        consolidateNow: "Consolidate now",
-        consolidateHint:
-          "Runs the curator immediately instead of waiting for its next scheduled pass — it reviews candidate lessons and merges duplicates, and never edits or retires a pinned one.",
-        consolidateStarted: "Consolidation started — check back in a moment for the result.",
-        consolidateFailed: "Couldn't start consolidation.",
+      // Lessons are the Context Library's Builder Lessons collection, managed there.
+      lessonsLink: {
+        title: "Builder Lessons",
+        description:
+          "What past builds learned. Each interview reads the pinned lessons and the ones most relevant to it.",
+        count: (n: number) =>
+          n === 0 ? "No lessons yet" : `${n} ${n === 1 ? "lesson" : "lessons"}`,
+        manage: "Manage in Context Library",
+        manageLabel: "Manage Builder Lessons in the Context Library",
       },
 
       exemplars: {
@@ -10810,6 +10730,12 @@ export const en = {
           merge: (code: string, noun: string) => `Merged ${code} into another ${noun}`,
           promote_setup: () => "Changed how this collection is searched",
           rollback_setup: () => "Put the previous search setup back",
+          agree: (code: string, noun: string) =>
+            `Folded ${code} into a ${noun} that already said it`,
+          edit: (code: string) => `Reworded ${code}`,
+          add: (code: string) => `Added ${code}`,
+          remove: (code: string) => `Removed ${code} as stale or wrong`,
+          retire: (code: string) => `Retired ${code}: it wasn't helping`,
         } as Record<string, (code: string, noun: string) => string>,
         unknownAction: (action: string, code: string | null) =>
           code ? `${action} on ${code}` : action,

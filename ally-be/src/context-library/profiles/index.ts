@@ -1,4 +1,6 @@
 import { ClCollectionId } from '../enum/context-library.enum';
+import { BUG_HUNTER_NOTES_PROFILE } from './bug-hunter-notes.profile';
+import { BUILDER_LESSONS_PROFILE } from './builder-lessons.profile';
 import { CHARACTER_INSIGHTS_PROFILE } from './character-insights.profile';
 import { FIRST_PRINCIPLES_PROFILE } from './first-principles.profile';
 import { CollectionProfile } from './profile.types';
@@ -16,6 +18,8 @@ export const COLLECTION_PROFILES: Partial<
 > = {
   [ClCollectionId.FIRST_PRINCIPLES]: FIRST_PRINCIPLES_PROFILE,
   [ClCollectionId.CHARACTER_INSIGHTS]: CHARACTER_INSIGHTS_PROFILE,
+  [ClCollectionId.BUILDER_LESSONS]: BUILDER_LESSONS_PROFILE,
+  [ClCollectionId.BUG_HUNTER_NOTES]: BUG_HUNTER_NOTES_PROFILE,
 };
 
 export function getProfile(

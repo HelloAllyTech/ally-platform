@@ -651,22 +651,23 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['upload', 'file', 's3', 'attachment', 'media'],
   },
   {
-    id: 'agent-memory',
-    name: 'Agent memory (the agents’ notebook)',
+    id: 'agent-lessons',
+    name: 'Agent lessons and notes (Context Library)',
     whatItIs:
-      'A shared notebook where an internal AI agent keeps short lessons (600 characters each) so ' +
-      'its next run does not rediscover them: searched by meaning, tidied hourly by a curator, ' +
-      'and editable by admins who can add, retire and restore entries. Bug Hunter writes to it ' +
-      'today.',
+      'Where an internal AI agent keeps short lessons (600 characters each) so its next run does ' +
+      'not rediscover them: Builder Lessons and Bug Hunter Notes, two Context Library collections. ' +
+      'Agents write candidates, an hourly curator folds them in (agree, edit, add, remove), runs ' +
+      'report which ones they applied, and lessons that never help are retired. Admins add, edit, ' +
+      'pin and archive them in the Context Library.',
     reuseWhen:
       'An internal agent or copilot should remember what it learned last time, keep lessons or ' +
       'gotchas, or have a memory people can edit and retire. Do not build another memory table.',
     extendVia:
-      'Add a value to AgentMemoryAgent (and its CHECK constraint); each agent exposes the ' +
-      'endpoints on its own surface.',
-    modules: ['ally-be:src/agent-memory'],
-    docs: ['ally-be:docs/bug-hunter-memory-adr.md'],
-    adminRoute: '/bug-hunter',
+      'A collection profile with `agentCuration` in src/context-library/profiles/ plus a ' +
+      'migration for its row and grants; the agent writes through ' +
+      'ContextAgentChunkService.writeAgentChunk and reads with its use case.',
+    modules: ['ally-be:src/context-library'],
+    adminRoute: '/context-library',
     keywords: [
       'agent memory',
       'notebook',

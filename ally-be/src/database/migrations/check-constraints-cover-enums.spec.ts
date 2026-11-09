@@ -29,8 +29,6 @@ import {
 import {
   BuilderEventType,
   BuilderExemplarOutcome,
-  BuilderLessonCategory,
-  BuilderLessonStatus,
   BuilderMessageRole,
   BuilderMilestoneStatus,
   BuilderNotificationKind,
@@ -65,11 +63,6 @@ import {
   ROADMAP_CATEGORIES,
   ROADMAP_STAGES,
 } from '../../public-roadmap/constants/public-roadmap.constants';
-import {
-  AgentMemoryAgent,
-  AgentMemoryEmbeddingStatus,
-  AgentMemoryStatus,
-} from '../../agent-memory/enum/agent-memory.enum';
 import {
   FhsAssessmentStatus,
   FhsBenchmarkStatus,
@@ -267,8 +260,6 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_builder_notifications_kind', Object.values(BuilderNotificationKind)],
     ['CHK_builder_milestones_status', Object.values(BuilderMilestoneStatus)],
     ['CHK_builder_prd_versions_author', Object.values(BuilderPrdVersionAuthor)],
-    ['CHK_builder_lessons_status', Object.values(BuilderLessonStatus)],
-    ['CHK_builder_lessons_category', Object.values(BuilderLessonCategory)],
     ['CHK_builder_exemplars_outcome', Object.values(BuilderExemplarOutcome)],
     ['CHK_builder_pr_feedback_kind', Object.values(BuilderPrFeedbackKind)],
     ['CHK_builder_pr_feedback_status', Object.values(BuilderPrFeedbackStatus)],
@@ -282,12 +273,6 @@ describe('CHECK constraints cover their enums', () => {
     [
       'CHK_bug_hunter_eval_runs_prompt_kind',
       Object.values(BugHunterEvalPromptKind),
-    ],
-    ['CHK_agent_memories_agent', Object.values(AgentMemoryAgent)],
-    ['CHK_agent_memories_status', Object.values(AgentMemoryStatus)],
-    [
-      'CHK_agent_memories_embedding_status',
-      Object.values(AgentMemoryEmbeddingStatus),
     ],
     ['CHK_product_updates_kind', [...UPDATE_KINDS]],
     ['CHK_product_updates_audience', [...UPDATE_AUDIENCES]],

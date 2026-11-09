@@ -656,16 +656,9 @@ export const ApiEndpoints = {
     NOTIFICATIONS: "/v1/bug-hunter/notifications",
     NOTIFICATION_READ: (id: string) => `/v1/bug-hunter/notifications/${id}/read`,
     NOTIFICATIONS_READ_ALL: "/v1/bug-hunter/notifications/read-all",
-    // The notebook Bug Hunter reads before hunting and writes at close —
-    // ally-be src/agent-memory, docs/bug-hunter-memory-adr.md.
-    MEMORY: "/v1/bug-hunter/memory",
     FEATURE_MAPS: "/v1/bug-hunter/feature-maps",
     FEATURE_MAPS_REFRESH: "/v1/bug-hunter/feature-maps/refresh",
     FEATURE_MAP_REMOVE: (id: string) => `/v1/bug-hunter/feature-maps/${id}/remove`,
-    MEMORY_RETIRE: (id: string) => `/v1/bug-hunter/memory/${id}/retire`,
-    // What the agent retired on its own recently, with its reason (OPP-0752), and the undo.
-    MEMORY_RETIRED: "/v1/bug-hunter/memory/retired",
-    MEMORY_RESTORE: (id: string) => `/v1/bug-hunter/memory/${id}/restore`,
     // The decision log, scoreboard and replay (OPP-0776, OPP-0783).
     FINDING_DECISIONS: (id: string) => `/v1/bug-hunter/findings/${id}/decisions`,
     RUN_DECISIONS: (id: string) => `/v1/bug-hunter/runs/${id}/decisions`,
@@ -778,9 +771,6 @@ export const ApiEndpoints = {
     // Where a run's time and money go. The scoreboard answers "is Builder
     // getting better"; this answers "and what would make it faster".
     PIPELINE_HEALTH: "/v1/builder/pipeline-health",
-    LESSONS: "/v1/builder/lessons",
-    LESSON_BY_ID: (id: string) => `/v1/builder/lessons/${id}`,
-    LESSONS_CONSOLIDATE: "/v1/builder/lessons/consolidate",
     EXEMPLARS: "/v1/builder/exemplars",
     // Replay eval: recorded interviews (fixtures), suites of runs, and the gate
     // that publishes a Builder prompt change only when its suite passes.
@@ -1270,8 +1260,6 @@ export const TAG_TYPES = {
   BUG_HUNTER_RUNS: "bugHunterRuns",
   BUG_HUNTER_FINDINGS: "bugHunterFindings",
   BUG_HUNTER_NOTIFICATIONS: "bugHunterNotifications",
-  // Bug Hunter's notebook. Also registered in baseApi.ts's `tagTypes`.
-  BUG_HUNTER_MEMORY: "bugHunterMemory",
   // Bug Hunter's feature map. Also registered in baseApi.ts's `tagTypes`.
   BUG_HUNTER_FEATURE_MAP: "bugHunterFeatureMap",
   // Who owns each orchestration decision point (OPP-0783). Also registered in baseApi.ts's `tagTypes`.
@@ -1286,7 +1274,6 @@ export const TAG_TYPES = {
   BUILDER_SETTINGS: "builderSettings",
   BUILDER_NOTIFICATIONS: "builderNotifications",
   BUILDER_DECISIONS: "builderDecisions",
-  BUILDER_LESSONS: "builderLessons",
   BUILDER_EXEMPLARS: "builderExemplars",
   BUILDER_EVAL_FIXTURES: "builderEvalFixtures",
   BUILDER_EVAL_SUITES: "builderEvalSuites",

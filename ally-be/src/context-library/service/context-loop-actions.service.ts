@@ -155,6 +155,59 @@ export class ContextLoopActionsService {
         }
         break;
       }
+      case ClLoopActionType.REMOVE:
+      case ClLoopActionType.RETIRE: {
+        // Back into the active set, as it was.
+        const chunk = await this.requireChunk(action.chunkId);
+        await this.chunkService.snapshot(chunk, 'undo', userId);
+        chunk.status = (before.status as ClChunkStatus) ?? ClChunkStatus.ACTIVE;
+        await this.chunkService.saveChanged(chunk, 'undo', userId);
+        break;
+      }
+      case ClLoopActionType.AGREE: {
+        // The candidate was its own lesson after all: active again, and the chunk it was
+        // folded into loses the agreement and the labels it brought.
+        const absorbed = await this.requireChunk(action.chunkId);
+        await this.chunkService.snapshot(absorbed, 'undo', userId);
+        absorbed.status = ClChunkStatus.ACTIVE;
+        absorbed.supersededById = null;
+        await this.chunkService.saveChanged(absorbed, 'undo', userId);
+        const keep = before.keepId
+          ? await this.chunks.findOne({ where: { id: String(before.keepId) } })
+          : null;
+        if (keep) {
+          if (typeof before.keepSourceCount === 'number')
+            keep.sourceCount = before.keepSourceCount;
+          if (before.keepFacets)
+            keep.facets = before.keepFacets as ClChunk['facets'];
+          if (before.keepAttributes)
+            keep.attributes = before.keepAttributes as ClChunk['attributes'];
+          await this.chunkService.saveChanged(keep, 'undo', userId);
+        }
+        break;
+      }
+      case ClLoopActionType.EDIT: {
+        const chunk = await this.requireChunk(action.chunkId);
+        await this.chunkService.snapshot(chunk, 'undo', userId);
+        if (typeof before.statement === 'string')
+          chunk.statement = before.statement;
+        if (before.body !== undefined)
+          chunk.body = (before.body as string | null) ?? null;
+        if (before.facets) chunk.facets = before.facets as ClChunk['facets'];
+        await this.chunkService.saveChanged(chunk, 'undo', userId);
+        break;
+      }
+      case ClLoopActionType.ADD: {
+        // Not back to candidate — the next pass would only add it again. Undoing an addition
+        // means "this should not be in the set", so it is archived, in its original words.
+        const chunk = await this.requireChunk(action.chunkId);
+        await this.chunkService.snapshot(chunk, 'undo', userId);
+        if (typeof before.statement === 'string')
+          chunk.statement = before.statement;
+        chunk.status = ClChunkStatus.ARCHIVED;
+        await this.chunkService.saveChanged(chunk, 'undo', userId);
+        break;
+      }
       case ClLoopActionType.PROMOTE_SETUP:
       case ClLoopActionType.ROLLBACK_SETUP: {
         await this.collections.update(

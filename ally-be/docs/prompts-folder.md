@@ -58,17 +58,18 @@ prompt for a long-running agent rather than a one-shot generation. Two things di
   no text anywhere — the caller's failure path runs instead of a model call with no
   instructions.
 
-### Builder's one-shot prompts (`builder/`, `agent_memory/`)
+### Builder's one-shot prompts (`builder/`)
 
 Beside the two agent prompts (`interviewer_system`, `platform_rules`), `builder/` holds the
 system prompts of Builder's one-shot calls: the PRD reviewer and its recheck, the discovery
 planner, the replay eval's simulated admin and judge, the correction classifier, the milestone
-planner, the research pass, the outcome categoriser, the lesson curator, the past-build ranker
-and note writer, and the interview summariser. `agent_memory/curator_system.txt` is the
-notebook curator's. These were compiled constants until they moved here; sync seeded the store
+planner, the research pass, the outcome categoriser, the past-build ranker and note writer, and
+the interview summariser. (Builder's lesson curator and Bug Hunter's note curator became one
+prompt, `context_library/agent_curator_system.txt`, when their lessons and notes moved into the
+Context Library.) These were compiled constants until they moved here; sync seeded the store
 with that text, and each `.txt` is now a minimal working base like every other default: it keeps
-the JSON shape, enum values, operation grammar (AGREE / EDIT / ADD / REMOVE) and tool names the
-code parses, and `src/builder/constants/test/builder-system-prompts.spec.ts` checks it does.
+the JSON shape, enum values, operation grammar and tool names the code parses, and
+`src/builder/constants/test/builder-system-prompts.spec.ts` checks it does.
 
 They load through `loadPromptTemplate` (`src/common/util/prompt-template.util.ts`): the
 store's live text, else, when the database can't be read, the shipped `.txt` trimmed as sync

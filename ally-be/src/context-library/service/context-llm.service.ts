@@ -7,6 +7,7 @@ import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.servi
 import { LoggerService } from 'src/logger/logger.service';
 import {
   CONTEXT_LIBRARY_ADJUDICATE_SYSTEM,
+  CONTEXT_LIBRARY_AGENT_CURATOR_SYSTEM,
   CONTEXT_LIBRARY_CITATION_CHECK_SYSTEM,
   CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM,
   CONTEXT_LIBRARY_GAP_LABEL_SYSTEM,
@@ -17,6 +18,7 @@ import {
   CONTEXT_LIBRARY_OVERVIEW_SYSTEM,
 } from 'src/prompt/contracts';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
+import { CL_AGENT_CURATOR_MAX_TOKENS } from '../constants/context-library.constants';
 
 export interface LlmSpend {
   model: string;
@@ -238,6 +240,18 @@ export class ContextLlmService {
       promptCode: CONTEXT_LIBRARY_GAP_LABEL_SYSTEM.code,
       user,
       maxTokens: 300,
+      strong: false,
+    });
+  }
+
+  /** The agent curator's ExpeL pass over one collection's candidates and active set. */
+  agentCurate<T>(user: string) {
+    return this.completeJson<T>({
+      taskId: 'context-library-agent-curate',
+      task: LlmTask.CONTEXT_LIBRARY_AGENT_CURATE,
+      promptCode: CONTEXT_LIBRARY_AGENT_CURATOR_SYSTEM.code,
+      user,
+      maxTokens: CL_AGENT_CURATOR_MAX_TOKENS,
       strong: false,
     });
   }

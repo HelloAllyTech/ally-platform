@@ -13,16 +13,15 @@ import { AgentTurnResult } from 'src/llm-agent/type/agent-llm.type';
 import { BuilderSession } from '../../entity/builder-session.entity';
 import { BuilderSessionStatus } from '../../enum/builder.enum';
 import { BuilderPrdReadiness } from '../../type/builder-prd.type';
-import {
-  BuilderRepoMapRepository,
-  BuilderLessonRepository,
-} from '../../repository/builder-knowledge.repository';
+import { BuilderRepoMapRepository } from '../../repository/builder-knowledge.repository';
 import { BuilderPrdService } from '../../service/builder-prd.service';
 import { BuilderKnowledgeService } from '../../service/builder-knowledge.service';
 import { BuilderInterviewToolsService } from '../../service/builder-interview-tools.service';
 import { BuilderInterviewOrchestratorService } from '../../service/builder-interview-orchestrator.service';
 import { BuilderGithubReadService } from '../../service/builder-github-read.service';
 import { ContextToolsService } from 'src/context-library/service/context-tools.service';
+import { ContextAgentChunkService } from 'src/context-library/service/context-agent-chunk.service';
+import { BuilderLessonsService } from '../../service/builder-lessons.service';
 import { BuilderEvidenceService } from '../../service/builder-evidence.service';
 import { BuilderCatalogService } from '../../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../../service/builder-evidence-log.service';
@@ -93,7 +92,7 @@ export class BuilderEvalSandboxFactory {
     private readonly agentLlmFactory: AgentLlmProviderFactory,
     private readonly resolver: LlmTargetResolverService,
     private readonly repoMapRepository: BuilderRepoMapRepository,
-    private readonly lessonRepository: BuilderLessonRepository,
+    private readonly agentChunks: ContextAgentChunkService,
     private readonly githubRead: BuilderGithubReadService,
     private readonly principles: ContextToolsService,
     private readonly evidence: BuilderEvidenceService,
@@ -237,8 +236,8 @@ export class BuilderEvalSandboxFactory {
     );
     const knowledgeService = new BuilderKnowledgeService(
       this.repoMapRepository,
-      this.lessonRepository,
       prompts,
+      this.agentChunks,
     );
     const evidenceLog = new BuilderEvidenceLogService(
       stores.evidenceRepository as any,
@@ -315,6 +314,11 @@ export class BuilderEvalSandboxFactory {
         get: async () =>
           ({ validatedTurns, situationBrief }) as BuilderSettings,
       } as BuilderSettingsService,
+      undefined,
+      undefined,
+      // Real lessons, read-only: no data source, so the sandbox never freezes a choice onto a
+      // session row.
+      new BuilderLessonsService(undefined, this.agentChunks),
     );
 
     return {

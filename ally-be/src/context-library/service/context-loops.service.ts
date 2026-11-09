@@ -11,6 +11,7 @@ import { ClCollection, ClLoopSettings } from '../entity/cl-collection.entity';
 import { ClLoop } from '../enum/context-library.enum';
 import { getProfile } from '../profiles';
 import { mean, ndcgAt } from '../util/loops.util';
+import { ContextAgentCuratorService } from './context-agent-curator.service';
 import { ContextGapsService } from './context-gaps.service';
 import { ContextJudgeService } from './context-judge.service';
 import { ContextLearningService } from './context-learning.service';
@@ -52,6 +53,7 @@ export class ContextLoopsService implements OnModuleInit {
     private readonly gaps: ContextGapsService,
     private readonly tuning: ContextTuningService,
     private readonly actions: ContextLoopActionsService,
+    private readonly agentCurator: ContextAgentCuratorService,
     @InjectRepository(ClCollection)
     private readonly collections: Repository<ClCollection>,
   ) {}
@@ -104,9 +106,14 @@ export class ContextLoopsService implements OnModuleInit {
         report.effectiveness = await step(ClLoop.EFFECTIVENESS, () =>
           this.learning.recomputeEffectiveness(c.id),
         );
-        report.curated = await step(ClLoop.CURATOR, () =>
-          this.learning.curate(c.id),
-        );
+        // Agent-written collections also retire by usage here (§8): the hourly agent curator
+        // folds candidates in, this takes out what runs keep not applying or contradicting.
+        report.curated = await step(ClLoop.CURATOR, async () => {
+          const curated = await this.learning.curate(c.id);
+          return getProfile(c.id)?.agentCuration
+            ? curated + (await this.agentCurator.retireByUsage(c.id))
+            : curated;
+        });
         report.gaps = await step(ClLoop.GAPS, () => this.gaps.run(c.id));
         report.rolledBack = await step(ClLoop.ROLLBACK, () =>
           this.tuning.rollbackIfWorse(c.id),
