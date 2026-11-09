@@ -8,22 +8,23 @@
 | Gap in revision 1 | Fix |
 |---|---|
 | Nothing proved the feature makes PRDs better, and "applied" was whatever the agent chose to cite, so the effectiveness score rewarded citing, not helping | **§3 Success measures**: a retrieval benchmark, a distillation yield report, and Builder's existing *replay eval* run with principles on vs off. Citations are now **verified** before they count (§8.4) |
-| Staging text sat in Postgres, so nightly **database backups would keep the book text** | Staging text moves to **Redis with a 24h TTL**. Postgres holds only hashes and counts (§6.2) |
-| Text is deleted after distilling, so a better prompt can never re-process old books, and the plan didn't say so | **Re-distil by re-upload**, which merges into existing principles and keeps their codes and history (§6.6) |
+| Staging text sat in Postgres, so nightly **database backups would keep the document text** | Staging text moves to **Redis with a 24h TTL**. Postgres holds only hashes and counts (§6.2) |
+| Text is deleted after distilling, so a better prompt can never re-process old documents, and the plan didn't say so | **Re-distil by re-upload**, which merges into existing principles and keeps their codes and history (§6.6) |
 | The plan guided the agent, not the admin | Every principle carries a **probe question** the interviewer asks you. Conflicting principles become **trade-off decision cards** (reusing Builder's `DecisionCard`). The PRD panel shows **principle coverage per section** (§8) |
 | One blended vector, no re-ranking, no relevance floor, no cap on how much lands in context | **Two vectors** (statement and situations), an **optional re-rank** kept only if the benchmark says it helps, relevance bands instead of raw scores, and a **context budget** (§7, §8.2) |
-| The LLM graded its own output, nothing stopped platitudes, no per-book cap, book text could inject instructions | Separate **critic pass**, **platitude anchors**, **density cap**, **injection screening** (§6.4) |
-| Each section was distilled with no idea what the book is about | A **book thesis pass** runs first and is the cached prefix for every section call (§6.3) |
+| The LLM graded its own output, nothing stopped platitudes, no per-document cap, document text could inject instructions | Separate **critic pass**, **platitude anchors**, **density cap**, **injection screening** (§6.4) |
+| Each section was distilled with no idea what the whole document is about | A **document overview pass** runs first and is the cached prefix for every section call (§6.3) |
 | The proactive brief would go live untested | **Shadow mode** first; on by default only after the replay eval passes (§10, chunks 4–5) |
 
 ## 0. The idea in one paragraph
 
-An admin uploads PDF or EPUB books about product, UX, architecture and engineering practice.
-The browser parses each book into sections. ally-be first works out what the book is about,
+An admin uploads PDF or EPUB documentation about product, UX, architecture and engineering
+practice. The browser parses each document into sections. ally-be first works out what the
+whole document covers,
 then has an LLM **distil** each section into short, punchy, self-contained **principles**
 (rules, heuristics, anti-patterns and trade-offs) in our own words, each with the situations
-it applies to and a question that tests whether a PRD honours it. The book and its text are
-**never kept**: they live in memory for at most a day and are not written to the database.
+it applies to and a question that tests whether a PRD honours it. The document and its text
+are **never kept**: they live in memory for at most a day and are not written to the database.
 Over time this builds a library that the Builder PRD interview searches many times per
 session, turning principles into questions for the admin and checks on the draft. The
 copilots and engineers' Claude Code search it too. Every search, every hit, every principle
@@ -38,10 +39,12 @@ retrieval gets measurably better and the library can be pruned using data.
 | Review gate | **Auto-publish + spot-check.** Principles that pass the quality gate go live at once; borderline ones wait in a short review queue |
 | Processing | **Background on the server.** The browser parses and uploads all sections, then can close. ally-be distils in the background |
 | Replace Stacks in | **All four places:** Builder interview (+ research + PRD review), Roadmap Copilot, Course Copilot, engineers' Claude Code (our own MCP endpoint replaces `stacks-bridge.mjs`) |
-| Seeding | The owner has the books that seeded Stacks and will upload them once the upload screen (chunk 3) is live |
-| Ally house rules | **Books only.** No import of the deprecated `wiki/product/` pages. Hand-adding a principle stays available |
+| Seeding | The owner has the documents that seeded Stacks and will upload them once the upload screen (chunk 3) is live |
+| Ally house rules | **Uploaded documents only.** No import of the deprecated `wiki/product/` pages. Hand-adding a principle stays available |
 | Distillation model | **Builder's configured model** (same resolution as the interview) |
 | Engineer access | **Separate read-only keys** that can only search principles, not the Skills Store keys |
+| What gets uploaded | **Documentation** (PDF, EPUB) of any length, from a short guide to a long manual |
+| Naming | Code, schema, prompts, UI copy and code documentation say **document** (or **source** for the database record) for an upload, and no other term |
 
 ## 2. What exists today (and what we reuse)
 
@@ -57,7 +60,7 @@ retrieval gets measurably better and the library can be pruned using data.
 | PRD review | `ally-be/src/builder/service/builder-prd-review.service.ts`, `PrdReviewFindings.tsx` | Gains a principle check pass |
 | Lesson usage loop (`appliedLessonIds`, `sourceCount`, curator retires unused lessons) | `builder-knowledge.service.ts`, `builder-lesson-curator.service.ts` | Same loop for principles |
 | Builder outcomes (did the PRD ship / build pass) | `builder-outcome.service.ts` | Links "principle applied" to "PRD shipped" |
-| Skills Store prompts (`.txt` default + typed contract) | `ally-be/docs/adding-a-prompt.md` | New prompts: thesis, distiller, critic, consolidator, query planner, re-ranker, citation verifier, PRD principle check |
+| Skills Store prompts (`.txt` default + typed contract) | `ally-be/docs/adding-a-prompt.md` | New prompts: overview, distiller, critic, consolidator, query planner, re-ranker, citation verifier, PRD principle check |
 | Skills Store personal keys | `ally-be/src/prompt/service/skills-store-key.service.ts` | **Pattern only** (hashing, issuing, revoking) for the new read-only principles key |
 | Redis | ally-be (already used for caching, pub/sub, rate limits) | Short-lived staging of section text, with a TTL |
 | `@nestjs/schedule` | ally-be | Background distillation worker (no new SQS queue, so no infra-repo change) |
@@ -75,7 +78,7 @@ guess to be revised once real numbers exist.
 | Measure | What it answers | How | Bar to clear |
 |---|---|---|---|
 | **Retrieval benchmark** | Does a situation-style query find the right principles? | A golden set of ~60 situation queries, each with its labelled relevant principles. Built from thumbs on the admin preview search (chunk 3) plus judged production hits (chunk 6). Metrics: precision@8, recall@20, nDCG@8 | Precision@8 ≥ 0.6 before the proactive brief is on by default. Every retrieval change (alpha, vectors, re-rank, boosts) must not lower nDCG |
-| **Distillation yield report** | Is a book producing sharp principles or noise? | Per source: candidates → kept / merged / reviewed / rejected (with reasons: verbatim, platitude, injection, critic), review rate, plus a 20-principle random sample the admin rates 1–5 | Review rate ≤ 20%; mean sample rating ≥ 3.5; platitude rate falling across prompt versions |
+| **Distillation yield report** | Is a document producing sharp principles or noise? | Per source: candidates → kept / merged / reviewed / rejected (with reasons: verbatim, platitude, injection, critic), review rate, plus a 20-principle random sample the admin rates 1–5 | Review rate ≤ 20%; mean sample rating ≥ 3.5; platitude rate falling across prompt versions |
 | **PRD outcome (replay eval)** | Do PRDs actually get better? | Builder's replay eval: the same fixtures with First Principles off vs on, scored against their human-written checklists, plus the PRD review's finding count | The proactive brief and probes only go on by default if checklist pass rate improves and no fixture regresses. Every First Principles prompt change goes through a `prompt_gate` suite |
 
 Traffic from `admin_preview` and eval runs is tagged and **excluded** from usage stats and
@@ -95,12 +98,12 @@ effectiveness, so tuning and testing don't skew the numbers.
    Postgres fp_ingest_sections (status, hash, counts; never text)
         │  worker (cron, claims rows with FOR UPDATE SKIP LOCKED, concurrency N)
         ▼
-   THESIS (once per book: TOC + intro + conclusion → thesis + vocabulary)
-   DISTIL each section, with the thesis as a cached prefix → candidates
+   OVERVIEW (once per document: outline + opening + closing sections → overview + vocabulary)
+   DISTIL each section, with the overview as a cached prefix → candidates
      → deterministic gate (length, vocab, verbatim, injection)
      → platitude check + CRITIC pass (separate prompt)
      → dedupe vs library: merge as corroboration | review | publish
-   CONSOLIDATE per book: cluster, sharpen, keep best ≤ cap, detect tensions
+   CONSOLIDATE per document: cluster, sharpen, keep best ≤ cap, detect tensions
         ▼
    fp_principles (system of record) ──upsert──► ally-ai Weaviate `FirstPrinciple`
                                                  (vectors: statement, situations; hybrid)
@@ -116,11 +119,12 @@ effectiveness, so tuning and testing don't skew the numbers.
 All tables are prefixed `fp_`. **No document file and no source text is stored in
 Postgres**, so none of it can reach a database backup.
 
-### `fp_sources`: one row per uploaded book
-`id`, `title`, `author`, `year` (pre-filled from PDF metadata or EPUB OPF; editable),
-`kind` (`pdf` | `epub`), `fileHash` (SHA-256), `titleKey` (normalised title + author, to
-catch the same book uploaded as both PDF and EPUB), `thesis` (≤ 150 words, our own summary
-of the book's core argument, used as context and shown in the UI), `pageCount`,
+### `fp_sources`: one row per uploaded document
+`id`, `title`, `publisher` (organisation or author), `docVersion`, `year` (pre-filled from
+PDF metadata or EPUB OPF; all editable), `kind` (`pdf` | `epub`), `fileHash` (SHA-256),
+`titleKey` (normalised title + publisher, to catch the same document uploaded as both PDF
+and EPUB), `overview` (≤ 150 words, our own summary of what the document covers and argues,
+used as context and shown in the UI), `pageCount`,
 `sectionCount`, `sectionsDistilled`, `sectionsFailed`, `status` (`uploading` | `queued` |
 `distilling` | `consolidating` | `complete` | `failed` | `archived`), `yield` jsonb (the §3
 yield report), `distillModel`, `promptVersions` jsonb, `inputTokens`, `outputTokens`,
@@ -152,14 +156,14 @@ re-distil), `uploadedBy`, timestamps.
 | `quality` jsonb | The **critic's** scores 1–5 (specificity, actionability, standalone clarity), platitude similarity, and the gate's verdict and reasons |
 | `status` | `active` · `review` · `archived` · `superseded` (`supersededById`: old codes **redirect** to the successor, so citations in past PRDs still resolve) |
 | `origin` | `distilled` · `manual` |
-| `sourceCount` | How many distinct books independently produced it (corroboration) |
+| `sourceCount` | How many distinct documents independently produced it (corroboration) |
 | `embeddingStatus`, `embeddingAttempts`, `embeddedAt`, `textHash` | Same as Knowledge Base and roadmap. An edit changes `textHash`, which re-embeds |
 | usage counters (denormalised, recomputed nightly, eval + preview traffic excluded) | `timesRetrieved`, `timesSurfaced`, `timesRead`, `timesProbed`, `timesAppliedVerified`, `timesHelpful`, `timesUnhelpful`, `timesInShippedPrd`, `lastRetrievedAt`, `lastAppliedAt`, `effectiveness` (§8.4) |
 | `version`, `createdBy`, `editedBy` | Edits are versioned in `fp_principle_versions` |
 
 ### `fp_principle_sources`: many-to-many, the "inspired by" record
 `principleId`, `sourceId`, `generation`, `sectionPath`, `pageFrom`, `pageTo`, `confidence`,
-`extractedAt`. Records the location (book, chapter, pages) and never the text.
+`extractedAt`. Records the location (document, section, pages) and never the text.
 
 ### `fp_principle_relations` (new): how principles relate
 `fromId`, `toId`, `type` (`tension` · `refines` · `prerequisite` · `related`), `note`
@@ -197,26 +201,27 @@ gaps.
 
 ### 6.1 Browser (ally-admin-dashboard → Builder → First Principles → Library)
 1. Admin drops a `.pdf` / `.epub` (multi-file supported, processed one at a time).
-2. Hash the file (WebCrypto SHA-256). `POST /sources` with the hash, title and author.
+2. Hash the file (WebCrypto SHA-256). `POST /sources` with the hash, title and publisher.
    - Same hash already distilled → "Already in the library (distilled 3 Oct, 64 principles).
      Re-distil with the current prompts?" (§6.6)
-   - Same `titleKey`, different hash (e.g. the EPUB of a book already uploaded as PDF) →
+   - Same `titleKey`, different hash (e.g. the EPUB of a document already uploaded as PDF) →
      warn before going ahead.
 3. Parse:
-   - **PDF** with `pdfjs-dist`. Sections come from `getOutline()` (bookmarks mapped to
-     pages). Fallback: font-size heading detection. Last resort: 8-page windows. Remove
+   - **PDF** with `pdfjs-dist`. Sections come from `getOutline()` (outline entries mapped
+     to pages). Fallback: font-size heading detection. Last resort: 8-page windows. Remove
      running headers and footers (lines repeated across pages) and page numbers. No text
      layer means a scanned PDF: refuse with a clear message (no OCR in v1).
    - **EPUB** with `jszip` + `DOMParser`: OPF spine for order, `nav.xhtml` / NCX for the
      section tree, strip markup to paragraphs.
-   - Skip front and back matter by title (copyright, contents, index, bibliography,
-     acknowledgements, about the author).
+   - Default-skip boilerplate sections by title (table of contents, index, legal or licence
+     notices, copyright, revision history). Each can be re-enabled in the preview.
    - Pack into sections of roughly 2.5–4k tokens on paragraph boundaries, each carrying its
-     `sectionPath` and page range. Mark the intro and conclusion chapters for the thesis pass.
-4. Preview: title/author (editable), section tree with skip toggles, **cost estimate and a
+     `sectionPath` and page range. Mark the opening sections (introduction, overview, summary) and the closing ones for the
+     overview pass.
+4. Preview: title, publisher and version (editable), section tree with skip toggles, **cost estimate and a
    cost cap** (default 1.5× the estimate). Admin confirms.
 5. `POST /sources/:id/sections` in batches (≤ 1 MB each). The tab can then close.
-6. The library page polls source status: a progress bar per book, then its yield report.
+6. The library page polls source status: a progress bar per document, then its yield report.
 
 New ally-web dependencies: `pdfjs-dist`, `jszip` (new, not upgrades).
 
@@ -234,18 +239,20 @@ New ally-web dependencies: `pdfjs-dist`, `jszip` (new, not upgrades).
 - A `@nestjs/schedule` interval claims `pending` sections with `FOR UPDATE SKIP LOCKED`
   (safe across replicas), with a global concurrency cap (start at 3) and a 3-attempt retry
   with backoff. Postgres is the queue, so no new SQS queue and no infra-repo change.
-- **Thesis pass, once per book** (`first_principles_thesis`): the section tree plus the
-  intro and conclusion produce a ≤ 150-word thesis, the book's key terms, and which chapters
-  look like narrative or filler. Without this, each section is distilled blind and generic
-  principles repeat across chapters.
+- **Overview pass, once per document** (`first_principles_overview`): the section tree plus
+  the opening and closing sections produce a ≤ 150-word overview, the document's key terms,
+  and which sections look like reference material, narrative or filler. Without this, each
+  section is distilled blind and generic principles repeat across sections. A document of
+  only one or two sections skips this pass.
 - **Distil each section** (`first_principles_distiller`, JSON output contract). Prefix:
-  rules + controlled vocabularies + book thesis, the same for every section of a book, so
+  rules + controlled vocabularies + document overview, the same for every section of a
+  document, so
   **Anthropic prompt caching** makes calls after the first much cheaper. Then the section
   text and `sectionPath`. Output: **0–4** candidates with every §5 field, including `probe`.
-  Rules: own words only; no quotes; no examples taken from the book's anecdotes; one idea
+  Rules: own words only; no quotes; no examples or case studies lifted from the document; one idea
   per principle; prefer the specific and surprising over the obvious; "0 principles" is a
   valid answer.
-- Stop the book if `costUsd` reaches `costCapUsd`; the admin can raise the cap and resume.
+- Stop the document if `costUsd` reaches `costCapUsd`; the admin can raise the cap and resume.
 
 ### 6.4 Quality gate
 In order, cheapest first:
@@ -253,8 +260,8 @@ In order, cheapest first:
 2. **Verbatim check**: reject any candidate sharing an 8-word run with its section. This
    guarantees we keep meaning, not text.
 3. **Injection screen**: reject candidates that address an AI or carry instructions or
-   payloads ("ignore previous", "system prompt", URLs, code, tool names). Books are
-   untrusted input, and these principles end up in Builder's and engineers' agents. The
+   payloads ("ignore previous", "system prompt", URLs, code, tool names). Uploaded
+   documents are untrusted input, and these principles end up in Builder's and engineers' agents. The
    distiller prompt also treats section text strictly as data.
 4. **Platitude check**: embedding similarity against a maintained list of platitude anchors
    ("know your users", "keep it simple", "communicate with stakeholders"). Similarity ≥ 0.85
@@ -272,21 +279,22 @@ In order, cheapest first:
 Section text is deleted from Redis after step 6. Every rejection is counted by reason in the
 source's yield report.
 
-### 6.5 Consolidation (once per book, after its last section)
-`first_principles_consolidator` over the book's new principles:
+### 6.5 Consolidation (once per document, after its last section)
+`first_principles_consolidator` over the document's new principles:
 - Cluster by similarity and merge each cluster into its sharpest statement; the rest become
   `superseded` (their codes redirect).
-- **Density cap**: keep the best principles up to roughly 1 per 2 sections, minimum 15,
-  maximum 80, ranked by critic score and distinctiveness. The rest are archived with reason
+- **Density cap**, scaled to the document: keep the best principles up to roughly 1 per 2
+  sections (at least 3, at most 80), ranked by critic score and distinctiveness. A short
+  guide yields a handful; a long manual yields dozens. The rest are archived with reason
   `over_cap`, so they stay recoverable. "The absolute core best practices", not everything
-  the book says.
+  the document says.
 - **Tension detection**: compare kept principles against their nearest library neighbours
   and record `tension` / `refines` relations with a one-line note.
 - Source → `complete`; the yield report is finalised.
 
 ### 6.6 Re-distilling and archiving
 - The text is gone after distillation, so **the only way to apply a better prompt to an old
-  book is to drop the file again.** That is accepted, and the UI says so plainly.
+  document is to drop the file again.** That is accepted, and the UI says so plainly.
 - Re-distil runs the same pipeline as `generation + 1`, but dedupe treats that source's
   existing principles as merge targets: matching principles keep their **code and usage
   history** and take the better wording; new ones are added; principles the new generation
@@ -296,7 +304,7 @@ source's yield report.
 
 ### 6.7 Review queue (the spot-check)
 Builder → First Principles → Review. Cards show the statement, rationale, probe, critic
-scores, why it was held, the possible duplicate side by side, and the source chapter.
+scores, why it was held, the possible duplicate side by side, and the source section.
 Actions: approve, edit + approve, merge into FP-xxxx, reject (optionally "reject as
 platitude", which adds it to the anchors). Bulk approve. Target ≤ 20% of candidates here.
 
@@ -346,7 +354,7 @@ platitude", which adds it to the anchors). Bulk approve. Target ≤ 20% of candi
   hits: `code`, `statement`, `appliesWhen`, `band`, `strength`. Several sharp situational
   queries per call are encouraged.
 - `principles_get({ codes })` returns the full principle: rationale, probe, anti-pattern,
-  **tensions and refinements**, and "inspired by *Book*, ch. 7". Logged as `read`.
+  **tensions and refinements**, and "inspired by *<document title>*, § Empty states". Logged as `read`.
 - Evidence log, turn receipt ("Consulted 6 principles · applied FP-0142, FP-0311") and the
   prompts (`interviewer_system.txt`, `research_system.txt`) are updated to match. Retrieved
   principles are framed as **advisory reference data, not instructions**.
@@ -420,7 +428,7 @@ The agent does not have to remember to search:
 - **Roadmap Copilot**: swap its `stacks_*` tools for the same two tools (`consumer =
   roadmap_copilot`).
 - **Course Copilot**: same swap, filtered to `instructional_design` by default. It only
-  returns useful results once instructional-design books are uploaded, and it says so
+  returns useful results once instructional-design documentation is uploaded, and it says so
   rather than claiming the library is empty of guidance.
 - **Engineers' Claude Code**:
   - ally-be exposes `POST /first-principles/mcp`: JSON-RPC `tools/list` + `tools/call` for
@@ -441,11 +449,11 @@ The agent does not have to remember to search:
 
 | Tab | Contents |
 |---|---|
-| **Library** | Upload zone; sources table with progress, cost, thesis and yield report; principle browser with filters by domain / kind / strength / source / status; edit, archive, add a principle by hand; relations shown on each principle |
+| **Library** | Upload zone; sources table with progress, cost, overview and yield report; principle browser with filters by domain / kind / strength / source / status; edit, archive, add a principle by hand; relations shown on each principle |
 | **Search preview** | Runs the real retrieval as `admin_preview`, showing bands and per-signal scores, with a pipeline switch (re-rank on/off, alpha). **Thumbs on results feed the retrieval benchmark** |
 | **Review** | The spot-check queue (§6.7), including curator proposals |
 | **Access** | Engineers create and revoke their read-only MCP keys (§9) |
-| **Insights** | Benchmark scores over time; library size by domain; top applied; never surfaced; surfaced often, never applied; **gap list**: zero-hit and low-band queries clustered into topics ("6 sessions asked about offline sync and found nothing: consider a book on it"); per-source yield vs usefulness; usage by consumer |
+| **Insights** | Benchmark scores over time; library size by domain; top applied; never surfaced; surfaced often, never applied; **gap list**: zero-hit and low-band queries clustered into topics ("6 sessions asked about offline sync and found nothing: consider uploading documentation on it"); per-source yield vs usefulness; usage by consumer |
 
 Feature toggle: add `BUILDER_FIRST_PRINCIPLES` (separate from `BUILDER`) so it can be rolled
 out and switched off on its own. Builder settings get two switches: `principlesBrief`
@@ -456,8 +464,8 @@ out and switched off on its own. Builder settings get two switches: `principlesB
 | # | Chunk | Done when |
 |---|---|---|
 | 1 | **Library core**: `fp_*` migrations; ally-ai `FirstPrinciple` collection with named vectors (or the fallback), `hybrid_search`, upsert/search/embed endpoints; `FirstPrinciplesRetrievalService` with RRF, bands, logging; add a principle by hand via the API | Hand-added principles come back from hybrid search with bands and are logged; prod Weaviate version confirmed; tests and lint green in ally-be and ally-ai |
-| 2 | **Server ingestion**: sources/sections API, Redis staging, worker, thesis → distil → gate (verbatim, injection, platitude, critic) → dedupe → consolidation (cap, tensions), cost cap, re-distil merge, yield report | Posting a real book's sections produces a capped set of principles with a yield report; no section text in Postgres; Redis keys gone afterwards |
-| 3 | **Browser upload + Library / Search preview / Review UI**; thumbs in Search preview | The owner uploads the seed books end to end; a first ~60-query **retrieval benchmark** exists from preview thumbs |
+| 2 | **Server ingestion**: sources/sections API, Redis staging, worker, overview → distil → gate (verbatim, injection, platitude, critic) → dedupe → consolidation (cap, tensions), cost cap, re-distil merge, yield report | Posting a real document's sections produces a capped set of principles with a yield report; no section text in Postgres; Redis keys gone afterwards |
+| 3 | **Browser upload + Library / Search preview / Review UI**; thumbs in Search preview | The owner uploads the seed documents end to end; a first ~60-query **retrieval benchmark** exists from preview thumbs |
 | 4 | **Builder swap**: `principles_*` tools, prompts, receipts, citation parsing, integrity check + verifier; proactive brief in **shadow** mode (logged, not shown) | An interview cites `[FP-…]`, invented codes are stripped, verified applications are recorded; Stacks is no longer called by Builder |
 | 5 | **Guiding the admin**: brief + section focus within the budget, probes as questions, tension decision cards, PRD principle check with Apply, coverage view; **replay eval off vs on** | The replay eval shows an improvement with no fixture regressing, after which `principlesBrief` and `principlesProbes` go on by default |
 | 6 | **Feedback loop + Insights**: thumbs, shipped linkage, LLM hit judge, nightly effectiveness, in-band prior, exploration, re-rank A/B on the benchmark, curator, Insights tab with gap list | Insights shows real numbers; the re-rank decision is made from the benchmark |
@@ -472,18 +480,18 @@ a `prompt_gate` eval suite.
 
 | Risk | Mitigation |
 |---|---|
-| Copyright: keeping the book's text | Parsing happens in the browser; text sits only in Redis with a 24h TTL, never in Postgres or backups; the 8-word verbatim check; only location metadata is stored, never passages |
-| Bland, generic principles | Thesis pass for context, critic pass, platitude anchors, density cap, and the yield report's sample rating; Insights flags "surfaced, never applied" |
-| Prompt injection via an uploaded book | Distiller treats text as data; injection screen in the gate; principles framed as advisory data to every agent; read-only MCP keys |
+| Copyright: keeping the document's text | Parsing happens in the browser; text sits only in Redis with a 24h TTL, never in Postgres or backups; the 8-word verbatim check; only location metadata is stored, never passages |
+| Bland, generic principles | Overview pass for context, critic pass, platitude anchors, density cap, and the yield report's sample rating; Insights flags "surfaced, never applied" |
+| Prompt injection via an uploaded document | Distiller treats text as data; injection screen in the gate; principles framed as advisory data to every agent; read-only MCP keys |
 | The agent games citations | Only surfaced codes count; invented codes are stripped; the verifier must pass before anything counts as applied |
 | Too much in context dilutes the interview | ~25-principle budget, a fixed cached brief, per-turn additions after the cache breakpoint |
-| Library bloat from overlapping books | Merge as corroboration, consolidation per book, density cap, curator merge proposals |
-| A better prompt can't reach old books | Re-distil by re-upload, merging while keeping codes and history (§6.6) |
+| Library bloat from overlapping documents | Merge as corroboration, consolidation per document, density cap, curator merge proposals |
+| A better prompt can't reach old documents | Re-distil by re-upload, merging while keeping codes and history (§6.6) |
 | Feedback loop locks in early favourites | In-band prior only (max ±10%), exploration slot, raw scores logged |
 | Agent claims "the library has nothing on X" | Same tool-message discipline Stacks used; zero-hit queries feed the gap list |
 | It doesn't actually improve PRDs | The replay eval gates the proactive features; if it shows no gain they stay off and we learn why before building more |
-| Long book, worker crash, Redis expiry | Per-section status with retries; expired sections re-sent by re-dropping the file (hash-matched) |
-| Cost | Estimate and cap before confirm; prompt caching on the per-book prefix; tokens and cost per source; concurrency cap |
+| Long document, worker crash, Redis expiry | Per-section status with retries; expired sections re-sent by re-dropping the file (hash-matched) |
+| Cost | Estimate and cap before confirm; prompt caching on the per-document prefix; tokens and cost per source; concurrency cap |
 
 ## 13. Open questions
 
