@@ -36,6 +36,11 @@ format:
 test-docker:
 	@poetry run pytest tests/integration -m docker -v -s
 
+# Repo map of all five real apps + neighbourhoods of real commits; writes runs/cache/map-stats.json
+.PHONY: test-slow
+test-slow:
+	@poetry run pytest tests/slow -m slow -v -s
+
 .PHONY: check
 check:
 	@poetry run bug-hunter config check

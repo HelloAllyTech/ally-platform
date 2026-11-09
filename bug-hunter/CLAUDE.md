@@ -16,6 +16,11 @@ poetry env use "$(uv python find 3.12)"   # once
 make install && make lint && make test
 poetry run bug-hunter config check
 make test-docker                          # real sandbox, one test file per app (needs Docker)
+make test-slow                            # repo map of the five real apps; writes runs/cache/map-stats.json
+poetry run bug-hunter map build --contracts   # refresh the repo map + cross-app hints at HEAD
+poetry run bug-hunter cache size          # what the bug hunter keeps on this machine
+poetry run bug-hunter cache clean         # prune kept artefacts by age (30 d) and size (500 MB)
+poetry run bug-hunter runs clean          # sweep what a crashed run left behind
 ```
 
 Python 3.12, Poetry, pytest + pytest-asyncio, Black (88), isort, flake8, matching
@@ -40,7 +45,14 @@ called done. Unit tests never hit the network or a real model.
 | `src/bug_hunter/tools/runner.py` | `Runner`: run_tests/run_lint/run_typecheck from apps.yaml, parsed results |
 | `src/bug_hunter/tools/lc.py` | The above as LangChain `StructuredTool`s: `read_tools`, `write_tools`, `runner_tools` |
 | `sandbox/*.Dockerfile` | Test images per app, versions mirroring `.github/workflows/test-*.yml` |
-| `runs/` | Per-run worktrees and artefacts (gitignored) |
+| `src/bug_hunter/runs.py` | `Run` lifecycle: worktree + containers always cleaned, artefacts always kept under `runs/artefacts/<run_id>/`; `clean_orphans`, `clean_artefacts`, `cache_report` |
+| `src/bug_hunter/context/app_context.py` | Per-app knowledge: `AGENTS.md` + the app's parts of the root `CLAUDE.md` |
+| `src/bug_hunter/context/repo_map.py` | tree-sitter symbol index + best-effort call graph (NestJS DI aware); `outline`, `find_symbol`, `callers`, `callees`, `tests_for`, `neighbourhood(diff)`; gzip cache per commit under `runs/cache/repo-map/` |
+| `src/bug_hunter/context/contracts.py` | Cross-app hints: ally-be client literals ↔ ally-ai / ally-ai-learn routes, SQS producers ↔ consumers |
+| `src/bug_hunter/context/scratchpad.py` | Per-run notes file; `compact()` folds old tool turns into it |
+| `src/bug_hunter/context/builder.py` | `build_context(node, state)`: declared fields + app context + recall + scratchpad within the node's budget, fixed trimming order |
+| `src/bug_hunter/context/tokens.py` | tiktoken when cached, else an overestimate (3 chars/token); budgets enforced at (1 − safety margin) |
+| `runs/` | Live runs, kept artefacts (`runs/artefacts/`), caches (`runs/cache/`); all gitignored |
 | `docs/bug-hunter/notes/CHUNK-NN-NOTES.md` | Per-chunk code map, decisions, open questions |
 
 ## Rules that apply to this code (short form; `CONTEXT.md` is canonical)

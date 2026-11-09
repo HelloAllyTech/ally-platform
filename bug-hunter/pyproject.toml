@@ -18,6 +18,9 @@ langchain = "^1.0.0"
 langchain-core = "^1.6.5"
 langchain-openai = "^1.1.12"
 langchain-google-genai = "^4.2.0"
+tree-sitter = ">=0.23,<1.0"
+tree-sitter-language-pack = ">=1.0,<2.0"
+tiktoken = ">=0.9,<1.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.1"
@@ -65,5 +68,8 @@ ensure_newline_before_comments = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "--tb=short --strict-markers -m 'not docker'"
-markers = ["docker: needs a Docker daemon; runs the real sandbox (slow)"]
+addopts = "--tb=short --strict-markers -m 'not docker and not slow'"
+markers = [
+    "docker: needs a Docker daemon; runs the real sandbox (slow)",
+    "slow: works on the real monorepo (repo map of all five apps); seconds to a minute",
+]

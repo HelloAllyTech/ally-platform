@@ -22,3 +22,12 @@ nodes:
   fix: 60000
   review: 30000
   learn: 8000
+# Context engine (chunk 03).
+context:
+  token_safety_margin: 0.15   # budgets are enforced at (1 - margin): Gemini counts differently from tiktoken
+  chars_per_token_offline: 3  # overestimate when tiktoken's encoding is not available offline
+  repo_map_keep_commits: 2    # cached map versions kept per app
+# Kept artefacts (diff, scratchpad, report, escalation) under runs/artefacts/<run_id>/.
+artefacts:
+  max_age_days: 30
+  max_size_mb: 500

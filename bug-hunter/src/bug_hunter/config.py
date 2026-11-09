@@ -31,6 +31,9 @@ ENV_CONFIG_DIR = "BUGHUNTER_CONFIG_DIR"
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # bug-hunter/
 DEFAULT_CONFIG_DIR = PACKAGE_ROOT / "config"
 DEFAULT_REPO_ROOT = PACKAGE_ROOT.parent  # ally-platform/
+RUNS_DIR = PACKAGE_ROOT / "runs"  # gitignored: live runs, kept artefacts, caches
+ARTEFACTS_DIR = RUNS_DIR / "artefacts"
+CACHE_DIR = RUNS_DIR / "cache"
 
 CONFIG_FILES = ("apps.yaml", "models.yaml", "limits.yaml")
 
@@ -161,12 +164,25 @@ class SandboxLimits(_Strict):
     pids_limit: int = Field(default=2048, gt=0)
 
 
+class ContextLimits(_Strict):
+    token_safety_margin: float = Field(default=0.15, ge=0, lt=0.9)
+    chars_per_token_offline: int = Field(default=3, ge=1, le=4)
+    repo_map_keep_commits: int = Field(default=2, ge=1)
+
+
+class ArtefactLimits(_Strict):
+    max_age_days: int = Field(default=30, ge=1)
+    max_size_mb: int = Field(default=500, ge=1)
+
+
 class LimitsConfig(_Strict):
     run: RunLimits
     sweep: SweepLimits = Field(default_factory=SweepLimits)
     approval: ApprovalLimits = Field(default_factory=ApprovalLimits)
     sandbox: SandboxLimits
     nodes: dict[str, int] = Field(default_factory=dict)
+    context: ContextLimits = Field(default_factory=ContextLimits)
+    artefacts: ArtefactLimits = Field(default_factory=ArtefactLimits)
 
     @field_validator("nodes")
     @classmethod

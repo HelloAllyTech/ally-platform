@@ -12,6 +12,7 @@ from pathlib import Path
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
+from bug_hunter.context.repo_map import RepoMap
 from bug_hunter.tools.fs import Workspace
 from bug_hunter.tools.git import Git
 from bug_hunter.tools.runner import Runner
@@ -88,6 +89,23 @@ class NoArgs(BaseModel):
     pass
 
 
+class OutlineArgs(BaseModel):
+    file: str = Field(
+        ...,
+        description="Source file relative to the app, e.g. src/user/user.service.ts",
+    )
+
+
+class SymbolArgs(BaseModel):
+    name: str = Field(
+        ..., description="Symbol name or Class.method; partial names match"
+    )
+
+
+class TestsForArgs(BaseModel):
+    target: str = Field(..., description="A file relative to the app, or a symbol name")
+
+
 def _tool(func, name: str, description: str, schema: type[BaseModel]) -> StructuredTool:
     def guarded(**kwargs):
         try:
@@ -141,6 +159,71 @@ def read_tools(workspace: Workspace, git: Git | None = None) -> list[StructuredT
             ),
         ]
     return tools
+
+
+def _edges_text(edges, side: str) -> str:
+    if not edges:
+        return f"no {side} found in the map"
+    lines = []
+    for e in edges[:40]:
+        other = e.caller if side == "callers" else e.callee
+        lines.append(f"{other} (line {e.line}, via {e.method})")
+    if len(edges) > 40:
+        lines.append(f"… {len(edges) - 40} more")
+    return "\n".join(lines)
+
+
+def map_tools(repo_map: RepoMap) -> list[StructuredTool]:
+    """Repo-map lookups: outline, find_symbol, callers, callees, tests_for."""
+
+    def find_symbol(name: str) -> str:
+        hits = repo_map.find_symbol(name)
+        if not hits:
+            return f"no symbol matching {name!r}"
+        return "\n".join(
+            f"{s.kind:<9} {s.file}:{s.start}-{s.end}  {s.qualified}" for s in hits
+        )
+
+    def tests_for(target: str) -> str:
+        tests = repo_map.tests_for(target)
+        return (
+            "\n".join(tests)
+            if tests
+            else f"no tests found for {target!r} (by convention or import)"
+        )
+
+    return [
+        _tool(
+            repo_map.outline,
+            "outline",
+            "Symbols and imports of one source file.",
+            OutlineArgs,
+        ),
+        _tool(
+            find_symbol,
+            "find_symbol",
+            "Where a class, function or method is defined.",
+            SymbolArgs,
+        ),
+        _tool(
+            lambda name: _edges_text(repo_map.callers(name), "callers"),
+            "callers",
+            "Who calls a symbol (best-effort static call graph).",
+            SymbolArgs,
+        ),
+        _tool(
+            lambda name: _edges_text(repo_map.callees(name), "callees"),
+            "callees",
+            "What a symbol calls (best-effort static call graph).",
+            SymbolArgs,
+        ),
+        _tool(
+            tests_for,
+            "tests_for",
+            "Existing test files for a file or symbol.",
+            TestsForArgs,
+        ),
+    ]
 
 
 def write_tools(workspace: Workspace) -> list[StructuredTool]:
