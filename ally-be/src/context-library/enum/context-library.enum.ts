@@ -164,3 +164,38 @@ export enum ClUsageType {
   AGENT_CONTRADICTED = 'agent_contradicted',
   NOT_RELEVANT = 'not_relevant',
 }
+
+/** The nightly loops. Every action one takes is a `cl_loop_actions` row, and reversible. */
+export enum ClLoop {
+  JUDGE = 'judge',
+  QUERY_LEARNING = 'query_learning',
+  EFFECTIVENESS = 'effectiveness',
+  CURATOR = 'curator',
+  GAPS = 'gaps',
+  TUNING = 'tuning',
+  ROLLBACK = 'rollback',
+}
+
+/** What a loop did. Each one has an undo (see ContextLoopActionsService.undo). */
+export enum ClLoopActionType {
+  ARCHIVE = 'archive',
+  DEMOTE = 'demote',
+  PROMOTE = 'promote',
+  LEARN_QUERY = 'learn_query',
+  PROMOTE_SETUP = 'promote_setup',
+  ROLLBACK_SETUP = 'rollback_setup',
+  MERGE = 'merge',
+}
+
+/** The self-building benchmark's two halves. The holdout never feeds any other loop. */
+export enum ClJudgmentSplit {
+  LEARN = 'learn',
+  HOLDOUT = 'holdout',
+}
+
+export enum ClGapKind {
+  /** Platform-wide content: "Upload documents". */
+  PLATFORM = 'platform',
+  /** One organisation's own entries: "Add entries". */
+  ORGANISATION = 'organisation',
+}

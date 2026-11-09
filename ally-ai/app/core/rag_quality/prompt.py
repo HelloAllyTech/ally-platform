@@ -122,11 +122,22 @@ def build_judge_prompt(
     passages: List[JudgedPassage],
     min_similarity: float,
     rubric: Optional[str] = None,
+    corpus_purpose: Optional[str] = None,
 ) -> str:
-    """Assemble the RAG-quality prompt for one retrieval."""
+    """Assemble the RAG-quality prompt for one retrieval.
+
+    `corpus_purpose` lets the caller describe a corpus this service has no entry
+    for. ally-be's Context Library sends each collection's purpose from its
+    profile, so a new collection needs no change here. A known corpus keeps its
+    own description.
+    """
     lines = [rubric or DEFAULT_JUDGE_RUBRIC, ""]
     lines.append("CORPUS:")
-    lines.append(CORPUS_PURPOSE.get(corpus, f"An unrecognised corpus ({corpus})."))
+    lines.append(
+        CORPUS_PURPOSE.get(corpus)
+        or (corpus_purpose or "").strip()
+        or f"An unrecognised corpus ({corpus})."
+    )
     lines.append("")
     lines.append(f"QUERY AS ISSUED: {query}")
     # Stated so the judge can see when everything returned sits just above the

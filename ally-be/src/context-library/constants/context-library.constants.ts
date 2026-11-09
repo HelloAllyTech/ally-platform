@@ -80,3 +80,21 @@ export const CL_BASE_PLATITUDES: readonly string[] = [
   'Be consistent',
   'Always consider security',
 ];
+
+// ── Learning loops (§8 of the plan) ─────────────────────────────────────────
+
+/** Share of live searches the judge grades unless Settings says otherwise (first guess). */
+export const CL_JUDGE_DEFAULT_SAMPLE_RATE = 0.2;
+/** Usage the loops look back over. */
+export const CL_LOOP_WINDOW_DAYS = 90;
+/** Gap queries: a search whose best result was below "good", or that found nothing. */
+export const CL_GAP_WINDOW_DAYS = 30;
+/** Two gap queries this close in meaning are one topic (first guess). */
+export const CL_GAP_CLUSTER_SIMILARITY = 0.8;
+/** A topic needs this many searches before it is worth anyone's attention. */
+export const CL_GAP_MIN_QUERIES = 3;
+/** Co-surfacing near-duplicates: shown together this often and this similar → adjudicate. */
+export const CL_MERGE_MIN_CO_SURFACED = 3;
+export const CL_MERGE_SIMILARITY = 0.9;
+/** Archived-as-useless statements the platitude check also rejects. */
+export const CL_LEARNED_PLATITUDES_MAX = 200;

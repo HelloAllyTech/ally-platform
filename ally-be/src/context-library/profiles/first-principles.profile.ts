@@ -64,6 +64,12 @@ export const PRINCIPLE_STRENGTHS = ['must', 'should', 'consider'] as const;
 export const FIRST_PRINCIPLES_PROFILE: CollectionProfile = {
   id: ClCollectionId.FIRST_PRINCIPLES,
   name: 'First Principles',
+  purpose:
+    'Short, decontextualised product and engineering principles distilled from documentation. ' +
+    'Its readers are agents planning software — the Builder interview turning an idea into a PRD ' +
+    'and technical plan, and engineers’ coding agents. A principle is relevant when it would ' +
+    'change a decision in the situation the query describes; one on the same subject that would ' +
+    'not change that decision is tangential.',
   noun: 'principle',
   nounPlural: 'principles',
   codePrefix: 'FP',

@@ -62,6 +62,8 @@ export interface RetrievalDefaults {
   rerank: boolean;
   mmrLambda: number;
   contextualise: boolean;
+  /** Reciprocal rank fusion constant; absent means RRF_K (60). */
+  rrfK?: number;
 }
 
 export interface ExtractionSpec {
@@ -75,6 +77,12 @@ export interface ExtractionSpec {
 export interface CollectionProfile {
   id: ClCollectionId;
   name: string;
+  /**
+   * What the collection is for and who reads it, in two or three sentences. The judge is told
+   * this, because relevance depends on purpose: the same passage can answer one reader's
+   * question and be beside the point for another's.
+   */
+  purpose: string;
   /** What the UI calls one chunk in this collection. */
   noun: string;
   nounPlural: string;

@@ -698,8 +698,11 @@ export class AiService {
     );
   }
 
-  /** Embeddings with the index's own model, for platitude and duplicate checks. */
-  async contextEmbed(texts: string[]) {
+  /**
+   * Embeddings with the index's own model, for platitude and duplicate checks and gap
+   * clustering. `sensitive` keeps the texts out of request logs (a person's own words).
+   */
+  async contextEmbed(texts: string[], sensitive = false) {
     return this.makeRequest<ContextEmbedResponse, { texts: string[] }>(
       ENDPOINTS.CONTEXT_CHUNK_EMBED,
       { texts },
@@ -708,6 +711,7 @@ export class AiService {
       undefined,
       false,
       60_000,
+      sensitive,
     );
   }
 

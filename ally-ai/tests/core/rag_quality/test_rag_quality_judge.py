@@ -244,3 +244,24 @@ class TestJudgeGuards:
         )
         _, retrieval, _ = await self._run(out, [])
         assert retrieval.missing == "a worked example"
+
+
+def test_caller_supplied_purpose_describes_an_unknown_corpus():
+    """The Context Library describes its own collections; new ones need no change."""
+    prompt = build_judge_prompt(
+        "first screen with no data",
+        "context_library",
+        [],
+        0.0,
+        corpus_purpose="First Principles: short principles for planning agents.",
+    )
+    assert "First Principles: short principles for planning agents." in prompt
+    assert "unrecognised corpus" not in prompt
+
+
+def test_known_corpus_keeps_its_own_purpose():
+    prompt = build_judge_prompt(
+        "q", "whatsapp_qa", [], 0.0, corpus_purpose="something else entirely"
+    )
+    assert "WHATSAPP Q&A" in prompt
+    assert "something else entirely" not in prompt

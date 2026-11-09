@@ -1033,12 +1033,15 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'rag-quality-judge',
     task: LlmTask.RAG_QUALITY_JUDGE,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Scheduled: corpus retrievals are judged',
+    trigger:
+      'Scheduled: corpus retrievals and a sample of Context Library searches are judged',
     detail:
       'Did the passages retrieved actually answer the query, and what was a short ' +
       'retrieval missing? The similarity floor is calibrated from these labels, because ' +
       'a similarity score is not a measure of usefulness — the character corpus returned ' +
-      'nothing for a question one of its own section titles answered.',
+      'nothing for a question one of its own section titles answered. The Context Library ' +
+      'calls it nightly (ally-be ContextJudgeService) on a sample of live searches; its labels ' +
+      'are the benchmark every learning loop reads.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
@@ -3075,6 +3078,23 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-4o-mini',
     configuredBy: 'LLM_FAST_MODEL',
     promptOverride: 'context_library_query_plan_system',
+  },
+  {
+    id: 'context-library-gap-label',
+    task: LlmTask.CONTEXT_LIBRARY_GAP_LABEL,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Nightly: the Context Library gap loop clusters searches that found nothing good',
+    detail:
+      'One call per cluster of three or more similar unanswered searches: a general topic label ' +
+      'for Insights → What’s missing?. Never repeats a person’s own words, so sensitive queries ' +
+      'reach the page only as this label.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_gap_label_system',
   },
 ];
 

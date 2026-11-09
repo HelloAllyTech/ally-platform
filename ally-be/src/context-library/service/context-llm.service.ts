@@ -9,6 +9,7 @@ import {
   CONTEXT_LIBRARY_ADJUDICATE_SYSTEM,
   CONTEXT_LIBRARY_CITATION_CHECK_SYSTEM,
   CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM,
+  CONTEXT_LIBRARY_GAP_LABEL_SYSTEM,
   CONTEXT_LIBRARY_RERANK_SYSTEM,
   CONTEXT_LIBRARY_CONSOLIDATE_SYSTEM,
   CONTEXT_LIBRARY_CRITIC_SYSTEM,
@@ -227,6 +228,17 @@ export class ContextLlmService {
       maxTokens: 1000,
       strong: false,
       timeoutMs: 30_000,
+    });
+  }
+
+  gapLabel<T>(user: string) {
+    return this.completeJson<T>({
+      taskId: 'context-library-gap-label',
+      task: LlmTask.CONTEXT_LIBRARY_GAP_LABEL,
+      promptCode: CONTEXT_LIBRARY_GAP_LABEL_SYSTEM.code,
+      user,
+      maxTokens: 300,
+      strong: false,
     });
   }
 }

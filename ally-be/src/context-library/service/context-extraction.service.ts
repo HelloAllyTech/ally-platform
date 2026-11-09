@@ -10,6 +10,7 @@ import {
   CL_DEDUPE_NEIGHBOURS,
   CL_OVERVIEW_MIN_SEGMENTS,
   CL_PLATITUDE_SIMILARITY,
+  CL_LEARNED_PLATITUDES_MAX,
 } from '../constants/context-library.constants';
 import {
   ClChunkRelation,
@@ -71,6 +72,8 @@ interface CriticVerdict {
 
 /** Profile checks whose failure rejects outright; a doubt only lowers confidence. */
 const REJECTING_CHECKS = new Set(['identifiability', 'stereotype']);
+/** Learned platitude anchors are reloaded this often, so a curator archive reaches the gate. */
+const PLATITUDE_TTL_MS = 60 * 60 * 1000;
 
 export type CandidateOutcome =
   | 'published'
@@ -93,6 +96,7 @@ export class ContextExtractionService {
     ContextExtractionService.name,
   );
   private platitudeVectors: Map<string, number[][]> = new Map();
+  private platitudeLoadedAt: Map<string, number> = new Map();
 
   constructor(
     private readonly dataSource: DataSource,
@@ -315,11 +319,30 @@ export class ContextExtractionService {
     if (!statements.length) return [];
     try {
       let anchors = this.platitudeVectors.get(profile.id);
-      if (!anchors) {
-        const anchorTexts = [...CL_BASE_PLATITUDES];
+      if (
+        !anchors ||
+        Date.now() - (this.platitudeLoadedAt.get(profile.id) ?? 0) >
+          PLATITUDE_TTL_MS
+      ) {
+        // The base set, plus what the curator archived as "shown often, judged off-topic" —
+        // so the next document's version of the same empty idea is stopped at the gate.
+        const learned: Array<{ statement: string }> = await this.dataSource
+          .query(
+            `SELECT c.statement FROM cl_loop_actions a JOIN cl_chunks c ON c.id = a.chunk_id
+           WHERE a.collection_id = $1 AND a.action = 'archive' AND a.undone_at IS NULL
+             AND c.status = 'archived'
+           ORDER BY a."createdAt" DESC LIMIT $2`,
+            [profile.id, CL_LEARNED_PLATITUDES_MAX],
+          )
+          .catch(() => []);
+        const anchorTexts = [
+          ...CL_BASE_PLATITUDES,
+          ...learned.map((r) => r.statement),
+        ];
         const embedded = await this.ai.contextEmbed(anchorTexts);
         anchors = embedded?.vectors ?? [];
         this.platitudeVectors.set(profile.id, anchors);
+        this.platitudeLoadedAt.set(profile.id, Date.now());
       }
       const embedded = await this.ai.contextEmbed(statements);
       return (embedded?.vectors ?? []).map((v) =>

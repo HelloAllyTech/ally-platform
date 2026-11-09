@@ -33,6 +33,7 @@ import {
   inBandBoost,
   mmrSelect,
   rrfFuse,
+  RRF_K,
 } from '../util/fusion.util';
 import { ClAudience, ContextAccessService } from './context-access.service';
 import { toView } from './context-chunk.service';
@@ -62,6 +63,16 @@ export interface ContextSearchRequest {
   fast?: boolean;
 }
 
+/**
+ * For the tuning loop's replays only: run the pipeline with a challenger setup, write nothing
+ * (no log, no usage, no cache), and hand back the fused candidate order so recall can be
+ * measured.
+ */
+export interface ContextReplayOptions {
+  setupOverride?: Record<string, RetrievalDefaults>;
+  replay?: boolean;
+}
+
 export interface ContextSearchResult {
   chunk: ClChunk;
   band: Band;
@@ -83,6 +94,8 @@ export interface ContextSearchResponse {
   noConfidentMatch: boolean;
   /** For the model: one delimited reference block, ready to place in a prompt. */
   block: string;
+  /** Replays only: chunk ids in fused order, before re-rank. */
+  candidateIds?: string[];
 }
 
 const CANDIDATE_POOL = 50;
@@ -90,6 +103,9 @@ const PER_RETRIEVER = 30;
 const RERANK_TIMEOUT_MS = 2500;
 const CACHE_TTL_SECONDS = 600;
 const RETRIEVERS: ContextRetriever[] = ['bm25', 'statement', 'situations'];
+/** Chance that a full result list gives its last slot to a little-seen chunk. */
+const EXPLORATION_RATE = 0.1;
+const EXPLORATION_MAX_SURFACED = 5;
 const DEFAULT_SETUP: RetrievalDefaults = {
   weights: { bm25: 1, statement: 1, situations: 1 },
   rerank: true,
@@ -156,8 +172,12 @@ export class ContextRetrievalService {
     return `cl:search:${req.sessionId}:${hash}`;
   }
 
-  async search(req: ContextSearchRequest): Promise<ContextSearchResponse> {
+  async search(
+    req: ContextSearchRequest,
+    options: ContextReplayOptions = {},
+  ): Promise<ContextSearchResponse> {
     const started = Date.now();
+    const replay = Boolean(options.replay);
     const spec = this.access.spec(req.useCase);
     const audience = this.access.assertAudience(req.useCase, req.audience);
     const queries = Array.from(
@@ -193,10 +213,12 @@ export class ContextRetrievalService {
         block: '',
       };
 
-    const key = this.cacheKey(
-      req,
-      grants.map((g) => g.collectionId),
-    );
+    const key = replay
+      ? null
+      : this.cacheKey(
+          req,
+          grants.map((g) => g.collectionId),
+        );
     if (key) {
       const cached = await this.redis.get(key).catch(() => null);
       if (cached) {
@@ -230,7 +252,8 @@ export class ContextRetrievalService {
     for (const row of collectionRows) {
       setups.set(
         row.id,
-        row.activeSearchSetup ??
+        options.setupOverride?.[row.id] ??
+          row.activeSearchSetup ??
           requireProfile(row.id).retrievalDefaults ??
           DEFAULT_SETUP,
       );
@@ -284,7 +307,7 @@ export class ContextRetrievalService {
           const facetsById = new Map<string, string[]>();
           for (const r of response?.results ?? [])
             for (const h of r.hits) facetsById.set(h.chunk_id, h.facet_values);
-          const fused = rrfFuse(lists);
+          const fused = rrfFuse(lists, setup.rrfK ?? RRF_K);
           // Soft facets: a rank bonus for matching what was asked, never an exclusion.
           const wanted = new Set(this.facetValues(req.facets));
           if (wanted.size) {
@@ -305,6 +328,7 @@ export class ContextRetrievalService {
       );
     } catch (error) {
       latency.retrieve = Date.now() - started;
+      if (replay) throw error;
       void this.log({
         req,
         queries,
@@ -487,6 +511,32 @@ export class ContextRetrievalService {
     for (const s of usable)
       if (!picked.includes(s)) s.dropped = s.dropped ?? 'mmr';
 
+    // Exploration: now and then a full list gives its last slot to a little-seen chunk from
+    // the same bands, so the usage prior can't lock in whatever happened to be shown first.
+    let explored: Scored | null = null;
+    if (
+      !replay &&
+      !this.access.spec(req.useCase).excludeFromUsage &&
+      picked.length === limit &&
+      picked.length > 1 &&
+      Math.random() < EXPLORATION_RATE
+    ) {
+      const lastBand = picked[picked.length - 1].band;
+      explored =
+        usable.find(
+          (s) =>
+            !picked.includes(s) &&
+            s.band === lastBand &&
+            (s.chunk.timesSurfaced ?? 0) < EXPLORATION_MAX_SURFACED,
+        ) ?? null;
+      if (explored) {
+        const out = picked[picked.length - 1];
+        out.dropped = 'exploration';
+        explored.dropped = undefined;
+        picked = [...picked.slice(0, -1), explored];
+      }
+    }
+
     let noConfidentMatch = false;
     if (!picked.length) {
       noConfidentMatch = true;
@@ -515,6 +565,16 @@ export class ContextRetrievalService {
     );
     latency.total = Date.now() - started;
 
+    if (replay) {
+      return {
+        retrievalId: null,
+        results,
+        noConfidentMatch,
+        block: '',
+        candidateIds: candidates.map((c) => c.id),
+      };
+    }
+
     const retrievalId = await this.log({
       req,
       queries,
@@ -530,6 +590,7 @@ export class ContextRetrievalService {
       filterBackoff,
       setups,
       topBand: picked[0]?.band ?? null,
+      exploredId: explored?.chunk.id ?? null,
     });
 
     if (key) {
@@ -617,6 +678,7 @@ export class ContextRetrievalService {
     filterBackoff?: boolean;
     setups?: Map<string, RetrievalDefaults>;
     topBand?: string | null;
+    exploredId?: string | null;
   }): Promise<string | null> {
     try {
       const spec = this.access.spec(args.req.useCase);
@@ -668,6 +730,7 @@ export class ContextRetrievalService {
                 : (s.dropped ?? 'limit'),
               finalRank: finalRank.get(s.chunk.id) ?? null,
               surfaced: finalRank.has(s.chunk.id),
+              explorationSlot: s.chunk.id === args.exploredId,
             }),
           ),
           { chunk: 100 },
@@ -683,9 +746,21 @@ export class ContextRetrievalService {
                 sessionId: args.req.sessionId ?? null,
                 retrievalId: retrieval.id,
                 finalRank: i + 1,
+                explorationSlot: p.chunk.id === args.exploredId,
               }),
             ),
           );
+          // Counters the curator and the exploration slot read. Approximate under races,
+          // which is fine: the loops recompute from the events.
+          await this.chunks
+            .createQueryBuilder()
+            .update()
+            .set({
+              timesSurfaced: () => '"times_surfaced" + 1',
+              lastRetrievedAt: new Date(),
+            })
+            .whereInIds(args.picked.map((p) => p.chunk.id))
+            .execute();
         }
       }
       return retrieval.id;

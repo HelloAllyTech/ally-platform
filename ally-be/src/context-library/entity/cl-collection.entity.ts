@@ -2,6 +2,13 @@ import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.e
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 import { DensityCap, RetrievalDefaults } from '../profiles/profile.types';
 
+export interface ClLoopSettings {
+  /** Share of live searches the judge grades, 0–1. */
+  judgeSampleRate?: number;
+  /** Loops switched off for this collection, by name. */
+  paused?: string[];
+}
+
 /**
  * One Context Library collection: the settings an admin (or a learning loop) can tune.
  *
@@ -38,6 +45,17 @@ export class ClCollection extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'jsonb', name: 'active_search_setup', nullable: true })
   activeSearchSetup?: RetrievalDefaults | null;
+
+  /** The setup in force before the last promotion: what an automatic rollback restores. */
+  @Column({ type: 'jsonb', name: 'previous_search_setup', nullable: true })
+  previousSearchSetup?: RetrievalDefaults | null;
+
+  @Column({ type: 'timestamp', name: 'setup_promoted_at', nullable: true })
+  setupPromotedAt?: Date | null;
+
+  /** Loop switches and the judge's sample rate; null means the defaults in the constants. */
+  @Column({ type: 'jsonb', name: 'loop_settings', nullable: true })
+  loopSettings?: ClLoopSettings | null;
 
   /** Which `Ctx<Collection>_v{N}` index is live. Blue/green: build N+1, judge it, flip this. */
   @Column({ type: 'int', name: 'active_index_version', default: 1 })

@@ -25,6 +25,7 @@ import {
   ClSegmentRun,
 } from './entity/cl-ingest-segment.entity';
 import { ClSource } from './entity/cl-source.entity';
+import { ClGapTopic, ClJudgment, ClLoopAction } from './entity/cl-loop.entity';
 import {
   ClUseCaseAccess,
   ClUseCaseAccessLog,
@@ -42,6 +43,12 @@ import { ContextLlmService } from './service/context-llm.service';
 import { ContextStagingService } from './service/context-staging.service';
 import { ContextUploadService } from './service/context-upload.service';
 import { ContextWorkerService } from './service/context-worker.service';
+import { ContextGapsService } from './service/context-gaps.service';
+import { ContextJudgeService } from './service/context-judge.service';
+import { ContextLearningService } from './service/context-learning.service';
+import { ContextLoopActionsService } from './service/context-loop-actions.service';
+import { ContextLoopsService } from './service/context-loops.service';
+import { ContextTuningService } from './service/context-tuning.service';
 
 /**
  * The Context Library — see docs/context-library/PLAN.md.
@@ -68,6 +75,9 @@ import { ContextWorkerService } from './service/context-worker.service';
       ClRetrievalHit,
       ClUsageEvent,
       ClReaderKey,
+      ClJudgment,
+      ClLoopAction,
+      ClGapTopic,
     ]),
     AiModule,
     LlmAgentModule,
@@ -89,6 +99,13 @@ import { ContextWorkerService } from './service/context-worker.service';
     ContextStagingService,
     ContextUploadService,
     ContextWorkerService,
+    // The learning loops (phase 3).
+    ContextGapsService,
+    ContextJudgeService,
+    ContextLearningService,
+    ContextLoopActionsService,
+    ContextLoopsService,
+    ContextTuningService,
   ],
   exports: [
     ContextAccessService,

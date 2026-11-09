@@ -1610,6 +1610,20 @@ export const CONTEXT_LIBRARY_CITATION_CHECK_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/context_library/gap_label_system.txt */
+export const CONTEXT_LIBRARY_GAP_LABEL_SYSTEM = definePrompt(
+  'context_library_gap_label_system',
+  {},
+  {
+    name: 'Context Library — Gap Label',
+    description:
+      'Names a cluster of searches that found nothing good, in general words that never repeat a person’s own wording, so the library’s maintainers know what to add.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
 /** src/prompts/context_library/query_plan_system.txt */
 export const CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM = definePrompt(
   'context_library_query_plan_system',

@@ -39,6 +39,7 @@ import {
   ContextBulkDto,
   ContextChunkListQueryDto,
   ContextGrantDto,
+  ContextLoopSettingsDto,
   ContextResumeDto,
   ContextSearchDto,
   ContextUploadDto,
@@ -53,6 +54,9 @@ import { ContextAccessService } from '../service/context-access.service';
 import { ClActor, ContextChunkService } from '../service/context-chunk.service';
 import { ContextRetrievalService } from '../service/context-retrieval.service';
 import { ContextUploadService } from '../service/context-upload.service';
+import { ContextGapsService } from '../service/context-gaps.service';
+import { ContextLoopActionsService } from '../service/context-loop-actions.service';
+import { ContextLoopsService } from '../service/context-loops.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_CONTEXT_LIBRARY] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_CONTEXT_LIBRARY] };
@@ -93,6 +97,9 @@ export class ContextLibraryController {
     @InjectRepository(ClSource) private readonly sources: Repository<ClSource>,
     @InjectRepository(ClChunkSource)
     private readonly chunkSources: Repository<ClChunkSource>,
+    private readonly loops: ContextLoopsService,
+    private readonly loopActions: ContextLoopActionsService,
+    private readonly gaps: ContextGapsService,
   ) {}
 
   // ── Collections ────────────────────────────────────────────────────────────
@@ -407,5 +414,89 @@ export class ContextLibraryController {
       dto.weight,
       user?.id ?? null,
     );
+  }
+
+  // ── Insights and the learning loops ────────────────────────────────────────
+
+  @Get('collections/:id/insights')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, VIEW)
+  @ApiOperation({
+    summary:
+      "Is it helping, what's missing, what changed, and never-useful written entries",
+  })
+  insights(@Param('id') id: string, @Query('days') days?: string) {
+    requireProfile(id);
+    return this.loops.insights(id, days ? Number(days) || 30 : 30);
+  }
+
+  @Get('collections/:id/changes')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, VIEW)
+  @ApiOperation({ summary: 'What the learning loops changed, newest first' })
+  changes(
+    @Param('id') id: string,
+    @Query('before') before?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.loopActions.list(
+      id,
+      limit ? Number(limit) || 50 : 50,
+      before ? new Date(before) : undefined,
+    );
+  }
+
+  @Post('changes/:actionId/undo')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary: 'Undo a loop action; the loop will not repeat it on that entry',
+  })
+  undoChange(
+    @Param('actionId', ParseUUIDPipe) actionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.loopActions.undo(actionId, user?.id ?? null);
+  }
+
+  @Post('gaps/:gapId/dismiss')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary: 'Hide a missing topic; it will not be listed again',
+  })
+  async dismissGap(@Param('gapId', ParseUUIDPipe) gapId: string) {
+    await this.gaps.dismiss(gapId);
+    return { dismissed: true };
+  }
+
+  @Get('collections/:id/loops')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, VIEW)
+  @ApiOperation({
+    summary: "A collection's loop switches, judge sample rate and search setup",
+  })
+  loopSettings(@Param('id') id: string) {
+    requireProfile(id);
+    return this.loops.settings(id);
+  }
+
+  @Put('collections/:id/loops')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  setLoopSettings(
+    @Param('id') id: string,
+    @Body() dto: ContextLoopSettingsDto,
+  ) {
+    requireProfile(id);
+    return this.loops.updateSettings(id, dto);
+  }
+
+  @Post('collections/:id/loops/run')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary:
+      'Run the nightly loops (or tuning) for one collection now, in the background',
+  })
+  runLoops(@Param('id') id: string, @Query('kind') kind?: string) {
+    requireProfile(id);
+    const run =
+      kind === 'tuning' ? this.loops.runTuning(id) : this.loops.runNightly(id);
+    void run.catch(() => undefined);
+    return { started: true, kind: kind === 'tuning' ? 'tuning' : 'nightly' };
   }
 }

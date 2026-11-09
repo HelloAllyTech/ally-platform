@@ -383,6 +383,7 @@ export enum LlmTask {
   CONTEXT_LIBRARY_RERANK = 'context_library_rerank',
   CONTEXT_LIBRARY_CITATION_CHECK = 'context_library_citation_check',
   CONTEXT_LIBRARY_QUERY_PLAN = 'context_library_query_plan',
+  CONTEXT_LIBRARY_GAP_LABEL = 'context_library_gap_label',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

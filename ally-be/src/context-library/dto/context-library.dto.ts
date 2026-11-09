@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -285,4 +286,24 @@ export class ContextSearchDto {
   @IsInt()
   @Min(1)
   limit?: number;
+}
+
+export class ContextLoopSettingsDto {
+  @ApiPropertyOptional({
+    description: 'Share of live searches the judge grades, 0–1',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  judgeSampleRate?: number;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Loops switched off for this collection',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  paused?: string[];
 }
