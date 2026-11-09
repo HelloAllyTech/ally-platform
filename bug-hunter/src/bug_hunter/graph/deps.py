@@ -45,6 +45,24 @@ class GraphDeps:
     sandbox_ready: bool = False
     _ensure_sandbox: Callable[[], None] | None = field(default=None, repr=False)
     tool_log: list[dict[str, Any]] = field(default_factory=list)
+    github: Any = None  # GitHubClient; None -> dry-run client built on first use
+    approvals: Any = None  # ApprovalStore; None -> in memory (tests) or Postgres (CLI)
+    push: bool = False  # real pushes need --push and the GitHub App
+    resume_decision: dict[str, Any] | None = None  # set by `bug-hunter resume`
+
+    def github_client(self):
+        if self.github is None:
+            from bug_hunter.graph.github import github_client
+
+            self.github = github_client(self.push, self.write_artefact)
+        return self.github
+
+    def approval_store(self):
+        if self.approvals is None:
+            from bug_hunter.graph.approvals import InMemoryApprovals
+
+            self.approvals = InMemoryApprovals()
+        return self.approvals
 
     def __post_init__(self) -> None:
         if self.counter is None:

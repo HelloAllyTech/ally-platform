@@ -27,6 +27,9 @@ make db-up                                # local Postgres for checkpoints (comp
 poetry run bug-hunter run --app ally-be --issue-text "…"   # one signal through graph v1 (issue mode)
 poetry run bug-hunter run --commit <sha>                   # sweep mode: review one commit's diff
 poetry run bug-hunter replay <run_id> [--resume]           # list checkpoints / continue a killed run
+poetry run bug-hunter resume <run_id> --approve|--reject --reason "…"   # answer a paused human_approval
+poetry run bug-hunter db migrate          # approvals table in the bughunter database
+poetry run bug-hunter run … --push        # real branch push + draft PR (needs the GitHub App; default is a dry run)
 make eval AGENT=graph CASES=<id>          # the real graph on one golden case (costs money)
 poetry run bug-hunter spend show          # today's model spend (runs/spend.json) against the $15/day cap
 poetry run bug-hunter spend add 2.40 --source github --note "run 123 issue"   # record a GitHub run's cost
@@ -72,7 +75,8 @@ called done. Unit tests never hit the network or a real model.
 | `sandbox/*.Dockerfile` | Test images per app, versions mirroring `.github/workflows/test-*.yml` |
 | `src/bug_hunter/graph/state.py` | `BugState` + sub-models (spec §4), `Budget` per node |
 | `src/bug_hunter/graph/build.py` | `build_graph(deps, checkpointer)`, `run_graph`; `deps.py` holds tools/models/context per run |
-| `src/bug_hunter/graph/nodes/` | intake, triage, investigate (tool loop), reproduce (tool loop + code verification + passing-test bounce), escalate, report |
+| `src/bug_hunter/graph/nodes/` | intake, triage, investigate, reproduce (+ passing-test bounce), risk_precheck, fix (guarded tool loop), verify (code, baseline), review (Gemini, blind), risk_gate (re-checks the final diff), open_pr (dry-run default), human_approval (interrupt), escalate, report |
+| `src/bug_hunter/graph/{github,approvals,risk,output,baseline,verify}.py` | Dry-run/unavailable GitHub client, approvals store (+ `migrations/0001_approvals.sql`), risk rules, PR/issue bodies, baseline cache, verification helpers |
 | `src/bug_hunter/graph/loop.py` | ReAct tool loop as a subgraph with finish tools; resumable mid-loop |
 | `src/bug_hunter/graph/routing.py` | Conditional edges, pure functions of the state |
 | `src/bug_hunter/graph/budget.py` | Token/cost accounting (prices in `models.yaml`) and the per-run caps |

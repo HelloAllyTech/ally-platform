@@ -119,6 +119,24 @@ class ScriptedRunner:
         index = min(len(self.calls) - 1, len(self.results) - 1)
         return self.results[index]
 
+    # verify-side commands: scripted separately so the repro script is untouched
+    suite: list[RunResult] = []
+    lint_result: RunResult | None = None
+    typecheck_result: RunResult | None = None
+    suite_calls: list[str] = []
+
+    def run_tests_command(self, command: str) -> RunResult:
+        self.suite_calls.append(command)
+        if self.suite:
+            return self.suite.pop(0) if len(self.suite) > 1 else self.suite[0]
+        return run_result(self.app, True)
+
+    def run_lint(self) -> RunResult:
+        return self.lint_result or run_result(self.app, True)
+
+    def run_typecheck(self) -> RunResult:
+        return self.typecheck_result or run_result(self.app, True)
+
 
 def run_result(
     app: str, passed: bool, excerpt: str = "", no_tests: bool = False, timed_out=False

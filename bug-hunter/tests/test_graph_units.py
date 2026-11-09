@@ -61,9 +61,67 @@ def test_routing_covers_every_edge() -> None:
         failing_output_excerpt="",
         fails_for_the_right_reason=True,
     )
-    assert routing.after_reproduce(_state(status="reproduced", repro=repro)) == "report"
+    assert (
+        routing.after_reproduce(_state(status="reproduced", repro=repro))
+        == "risk_precheck"
+    )
     assert routing.after_reproduce(_state(status="escalated")) == "escalate"
     assert routing.after_reproduce(_state(status="reproduced")) == "escalate"
+    # chunk 06 edges
+    from bug_hunter.graph.state import Patch, Review, Verification
+
+    patch = Patch(
+        branch="",
+        diff_path="",
+        files_changed=["src/x.ts"],
+        lines_changed=1,
+        rationale="r",
+    )
+    assert routing.after_risk_precheck(_state(status="fixing")) == "fix"
+    assert routing.after_risk_precheck(_state(status="escalated")) == "escalate"
+    assert routing.after_fix(_state(status="fixing", patch=patch)) == "verify"
+    assert routing.after_fix(_state(status="fixing")) == "escalate"
+    assert routing.after_fix(_state(status="escalated", patch=patch)) == "escalate"
+    good = Verification(
+        repro_passes=True, app_tests_pass=True, lint_pass=True, typecheck_pass=True
+    )
+    bad = good.model_copy(update={"app_tests_pass": False})
+    assert (
+        routing.after_verify(_state(status="verified", verification=good)) == "review"
+    )
+    assert (
+        routing.after_verify(_state(status="fixing", verification=bad, attempts=1))
+        == "fix"
+    )
+    assert (
+        routing.after_verify(_state(status="fixing", verification=bad, attempts=3))
+        == "escalate"
+    )
+    approve = Review(verdict="approve")
+    changes = Review(verdict="request_changes", issues=["x"])
+    reject = Review(verdict="reject", issues=["y"])
+    assert (
+        routing.after_review(_state(status="reviewed", review=approve)) == "risk_gate"
+    )
+    assert (
+        routing.after_review(_state(status="fixing", review=changes, attempts=1))
+        == "fix"
+    )
+    assert (
+        routing.after_review(_state(status="fixing", review=changes, attempts=3))
+        == "escalate"
+    )
+    assert routing.after_review(_state(status="escalated", review=reject)) == "escalate"
+    assert (
+        routing.after_risk_gate(_state(status="reviewed", risk_level="low"))
+        == "open_pr"
+    )
+    assert (
+        routing.after_risk_gate(_state(status="escalated", risk_level="human_only"))
+        == "escalate"
+    )
+    assert routing.after_open_pr(_state(status="awaiting_human")) == "human_approval"
+    assert routing.after_open_pr(_state(status="escalated")) == "escalate"
 
 
 def test_budget_charges_per_node_and_prices_cached_tokens(

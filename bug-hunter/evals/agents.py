@@ -36,6 +36,7 @@ class AgentResult:
     findings: list[dict[str, Any]] = field(default_factory=list)
     repro_test: tuple[str, str] | None = None  # (app-relative path, content)
     patch: str | None = None  # unified diff against the worktree, repo-relative paths
+    patch_applied: bool = False  # the agent already applied it in the worktree (graph)
     escalated: bool = False
     escalation_reason: str | None = None
     tokens: int = 0
@@ -144,11 +145,23 @@ class GraphAgent:
                 )
         found = state.finding is not None and state.status not in CLOSED
         escalated = state.status == "escalated"
+        patch = None
+        if state.patch and state.status in (
+            "awaiting_human",
+            "pr_opened",
+            "verified",
+            "reviewed",
+        ):
+            try:
+                patch = Path(state.patch.diff_path).read_text(encoding="utf-8")
+            except OSError:
+                patch = None
         return AgentResult(
             found=found or escalated,
             findings=[state.finding.model_dump()] if state.finding else [],
             repro_test=repro_test,
-            patch=None,
+            patch=patch,
+            patch_applied=patch is not None,  # the graph edited the worktree in place
             escalated=escalated,
             escalation_reason=state.stop_reason if escalated else None,
             tokens=state.budget_used.tokens,

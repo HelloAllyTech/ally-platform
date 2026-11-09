@@ -295,10 +295,17 @@ def run_case(
                     and not agent_result.escalated
                     and not oracle_proven(case.id)
                 ):
-                    result_row.patch_applied = _apply_patch(run, agent_result.patch)
+                    result_row.patch_applied = (
+                        agent_result.patch_applied
+                        or _apply_patch(run, agent_result.patch)
+                    )
                     result_row.error = "oracle unproven: fix not scored"
                 elif agent_result.patch and not agent_result.escalated:
-                    result_row.patch_applied = _apply_patch(run, agent_result.patch)
+                    if agent_result.patch_applied:
+                        run.write_artefact("agent.patch", agent_result.patch)
+                        result_row.patch_applied = True  # already in the worktree
+                    else:
+                        result_row.patch_applied = _apply_patch(run, agent_result.patch)
                     if result_row.patch_applied:
                         _add_oracle_tests(run, repo, case, app_path)  # hidden until now
                         passed, secs, _ = _run_tests(runner, case.oracle_tests)

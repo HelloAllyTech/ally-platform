@@ -8,6 +8,7 @@ from typing import Any
 
 from bug_hunter.graph.budget import with_clock
 from bug_hunter.graph.deps import GraphDeps
+from bug_hunter.graph.output import escalation_issue
 from bug_hunter.graph.state import BugState
 
 
@@ -68,6 +69,22 @@ def make_escalate_node(deps: GraphDeps):
         )
         artefacts = dict(state.artefacts)
         artefacts["escalation"] = str(path)
-        return {"status": "escalated", "artefacts": artefacts, "budget_used": budget}
+        update: dict[str, Any] = {
+            "status": "escalated",
+            "artefacts": artefacts,
+            "budget_used": budget,
+        }
+        # GitHub issue labelled bug-hunter (dry-run writes escalation-issue.md)
+        try:
+            title, body = escalation_issue(state, deps.scratchpad.read())
+            issue = deps.github_client().create_or_update_issue(
+                title, body, ["bug-hunter"], state.escalation_url
+            )
+            update["escalation_url"] = issue.url
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 - the artefact is the record; never fail here
+            deps.scratchpad.append_note(f"escalate: issue not created: {exc}")
+        return update
 
     return escalate

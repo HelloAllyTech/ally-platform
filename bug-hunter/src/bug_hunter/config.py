@@ -136,7 +136,7 @@ class Price(_Strict):
     output: float = Field(ge=0)
 
 
-PROMPT_NODES: tuple[str, ...] = ("triage", "investigate", "reproduce")
+PROMPT_NODES: tuple[str, ...] = ("triage", "investigate", "reproduce", "fix", "review")
 
 
 class ModelsConfig(_Strict):

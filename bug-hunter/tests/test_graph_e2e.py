@@ -78,6 +78,7 @@ FINDING_CALL = {
         "confidence": "medium",
     },
 }
+GIVE_UP = ai(tool_calls=[{"name": "give_up", "args": {"reason": "stop here"}}])
 REPRO_CALL = {
     "name": "submit_repro",
     "args": {
@@ -169,6 +170,7 @@ def test_reproduced_bug_writes_only_a_test_file(config, repo, tmp_path) -> None:
             structured(
                 RightReasonJudgement(related=True, why="the assertion is the defect")
             ),
+            GIVE_UP,  # the fix node (chunk 06) shares this model; the test stops there
         ]
     )
     runner = ScriptedRunner(
@@ -193,10 +195,13 @@ def test_reproduced_bug_writes_only_a_test_file(config, repo, tmp_path) -> None:
         runner=runner,
     )
     state = run_graph(build_graph(deps), deps, SIGNAL)
-    assert state.status == "reproduced", state.stop_reason
+    # reproduced, then the scripted fix gave up: the diagnosis half is complete
+    assert state.status == "escalated" and state.stop_reason.startswith(
+        "fix: stop here"
+    )
     assert state.finding and state.finding.title == "x returns 0"
     assert state.repro and state.repro.fails_for_the_right_reason
-    assert state.repro.failure_kind == "genuine"
+    assert state.repro.failure_kind == "genuine" and state.repro.file_hashes
     assert runner.calls[-1] == ("src/x.spec.ts", "x returns 3")  # verified in code
     # the invariant: the only change in the worktree is the new test file
     assert _git(repo, "status", "--porcelain") == "?? ally-be/src/x.spec.ts"
@@ -204,7 +209,7 @@ def test_reproduced_bug_writes_only_a_test_file(config, repo, tmp_path) -> None:
         repo / "ally-be/src/x.ts"
     ).read_text() == "export const x = () => 0; // bug\n"
     nodes = state.budget_used.per_node
-    assert set(nodes) == {"triage", "investigate", "reproduce"}
+    assert set(nodes) == {"triage", "investigate", "reproduce", "fix"}
     assert nodes["reproduce"].calls == 4  # 3 loop calls + the right-reason judgement
     assert "Cost per node" in (tmp_path / "artefacts/report.md").read_text()
     tool_log = json.loads((tmp_path / "artefacts/tool-log.json").read_text())
@@ -536,6 +541,7 @@ def _fix_model_submitting_twice():
                 ]
             ),
             structured(RightReasonJudgement(related=True, why="symptom shows")),
+            GIVE_UP,
         ]
     )
 
@@ -561,7 +567,9 @@ def test_passing_test_bounces_back_then_reproduces(config, repo, tmp_path) -> No
         runner=runner,
     )
     state = run_graph(build_graph(deps), deps, SIGNAL)
-    assert state.status == "reproduced", state.stop_reason
+    assert state.status == "escalated" and state.stop_reason.startswith(
+        "fix: stop here"
+    )
     assert state.repro_attempts == 1 and state.repro.test_path == "src/x2.spec.ts"
     bounce = [
         m
