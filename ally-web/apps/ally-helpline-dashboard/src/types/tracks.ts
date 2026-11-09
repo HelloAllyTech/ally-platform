@@ -683,14 +683,33 @@ export interface ArticleResourceEmbeddabilityResponse {
   resources: { id: string; openExternally: boolean }[];
 }
 
+/** How an article is laid out for the learner. */
+export type ArticleExperience = "CLASSIC" | "MAGAZINE" | "CARDS";
+
+/** An article's cover photo. */
+export interface ArticleCover {
+  url: string;
+  alt?: string;
+}
+
 export interface StartArticleItemPayload extends StartTrackItemBase {
   type: TrackItemType.ARTICLE;
+  /**
+   * Highlight boxes arrive inside it as
+   * `<div data-ally-callout="say|info|warn">…</div>`; the player adds their
+   * icon and label.
+   */
   html: string;
   minReadSeconds: number;
   /** Empty for an article authored without questions. */
   questions?: ArticleQuestion[];
   answeredQuestionCount?: number;
   resources?: ArticleResource[];
+  /** Absent from older servers; anything unknown reads as "CLASSIC". */
+  experience?: ArticleExperience;
+  cover?: ArticleCover | null;
+  /** 0–5 short lines shown as "Key takeaways" at the end. */
+  takeaways?: string[];
 }
 
 /** Response to `POST .../article-questions/:questionId/answer`. */

@@ -19,6 +19,7 @@ import {
 import { CelebrationKind, CelebrationOverlay } from "./components/CelebrationOverlay";
 import { PlayerBottomNav } from "./components/PlayerBottomNav";
 import { AnnotationItemPlayer } from "./components/players/annotation/AnnotationItemPlayer";
+import { isCardsArticle } from "./components/players/articleExperience";
 import { ArticleItemPlayer } from "./components/players/ArticleItemPlayer";
 import { BranchingScenarioPlayer } from "./components/players/BranchingScenarioPlayer";
 import { isStoryScenario } from "./components/players/branchingStory";
@@ -138,16 +139,23 @@ export const TrackPlayer: FC = () => {
     else nav.exitToOverview();
   }, [nav, isPendingTrackCompletion]);
 
+  // A cards article pages itself: its own back/next, arrow keys and swipe
+  // turn its cards, so the course's bottom nav, arrow keys and item swipe
+  // stand down while it is current. It ends on its own way on.
+  const isCardsItem =
+    !!payload && payload.type === TrackItemType.ARTICLE && isCardsArticle(payload);
+
   // Keyboard arrows for page turning.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return;
+      if (isCardsItem) return;
       if (e.key === "ArrowRight" && nav.canAdvance && nav.hasNext) nav.goNext();
       if (e.key === "ArrowLeft" && nav.hasPrev) nav.goPrev();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [nav]);
+  }, [nav, isCardsItem]);
 
   const sectionItems = nav.current
     ? nav.flat.filter(f => f.sectionId === nav.current?.sectionId)
@@ -167,7 +175,10 @@ export const TrackPlayer: FC = () => {
   // and its paused screen carry their own way on (Continue course / Back to
   // course), and the top bar keeps the close button and progress.
   const hideBottomNav =
-    isItemReady && payload?.type === TrackItemType.BRANCHING_SCENARIO && isStoryScenario(payload);
+    (isItemReady &&
+      payload?.type === TrackItemType.BRANCHING_SCENARIO &&
+      isStoryScenario(payload)) ||
+    (isItemReady && isCardsItem);
 
   const renderItem = () => {
     if (loadError) {
@@ -199,6 +210,10 @@ export const TrackPlayer: FC = () => {
             itemId={itemId}
             alreadyCompleted={alreadyCompleted}
             onCompleted={handleCompletion}
+            title={nav.current.item.title}
+            description={nav.current.item.description ?? null}
+            sectionTitle={nav.current.sectionTitle}
+            onRequestNext={goNextOrOverview}
           />
         );
       case TrackItemType.VIDEO:
@@ -320,7 +335,7 @@ export const TrackPlayer: FC = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: directionRef.current * -40 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              drag="x"
+              drag={isCardsItem ? false : "x"}
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.15}
               onDragEnd={(_, info) => {
