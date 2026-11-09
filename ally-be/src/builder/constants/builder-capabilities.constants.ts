@@ -518,6 +518,26 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['image', 'cover', 'generate image', 'illustration'],
   },
   {
+    id: 'image-studio',
+    name: 'Image Studio',
+    whatItIs:
+      'AI image generation behind every authoring image slot: a style gallery, AI-drafted ' +
+      'descriptions, reference images that keep characters and places consistent across scenes, ' +
+      'a vision check, durable jobs and a per-image history with cost.',
+    reuseWhen:
+      'A feature lets an author set an image anywhere. Add a slot kind and use the shared ' +
+      'Generate modal rather than a new generator; new styles go in the style registry.',
+    modules: ['ally-be:src/image-studio'],
+    keywords: [
+      'image studio',
+      'generate image',
+      'style gallery',
+      'scene image',
+      'character consistency',
+      'cast sheet',
+    ],
+  },
+  {
     id: 'bug-hunter',
     name: 'Bug Hunter',
     whatItIs:
