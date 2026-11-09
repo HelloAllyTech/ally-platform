@@ -168,3 +168,138 @@ A collapsed line at the foot of every screen; it opens a one-line input. Sending
 5. **Screenshots vs the deck:** the deck wins; each difference is listed in §3.
 
 Remaining risks: the bot page budget (the shared React chunk is 47 KB of the 70 KB JS budget); screenshot baselines differ by OS font rendering, so they're generated in the Playwright Docker image.
+
+## 3. What was built (2026-11-09)
+
+Branch `feat/agents-v2-chunk-12-shared-store`, not pushed.
+
+| Commit | What |
+|---|---|
+| `921249d68` | Plan approved; screen order Design → Building → Make it yours; deck and step map updated |
+| `62e42e1bc` | Foundation: tokens, fonts, motion, `components/v2/core` and `components/v2`, dev gallery `/dev/v2-components` |
+| `03070547e` | ally-be: `bot_images`, the upload pipeline, publish-checked public route, purge, `settings.brand` |
+| `9eecb9432` | ally-be fix: an onboarding page's link is named from the assistant, not the early logo page |
+| `494e26757` | Onboarding one screen at a time (StepFrame, every screen, keyboard, "Tell me something else") |
+| `ebd25928c` | Make it yours: logo, cover, colour, tone, opening line, live phone preview (`useBrandEditor`) |
+| `1aadaa4d6` | ally-be fix: `BotImage` registered with TypeORM (the entity glob is `*/entity/*.entity.js`) |
+| `fed1a48db` | Bot page restyle in the owner's brand, its own stylesheet, the size check in CI |
+| `02933f5ab` | Look and feel (Settings section), team photos, `GET v1/chatbots/:id/team-names` |
+| `889a6b15d` | Browser tests (Playwright, axe), fixture harness `/dev/onboarding`, a11y fixes |
+| (this) | These notes |
+
+Also on the branch: `70d761be3` (the 5 wrong declines, diagnosed in `CHUNK-20A-EVAL.md`) and `c22288279` (a 20a-1 gap: `bot-draft` missing from the builder capabilities guard).
+
+### Components (DESIGN.md §4)
+
+- `components/v2/core` (React and CSS only, ESLint-fenced so the bot page can import it): Orb, Button, PrimaryButton (with the Enter hint), Kbd, OptionList (letters, arrows, 380 ms auto-advance, announced keys), Chip, AssistantLine, Question, ProgressBar, Toast, ImageSlot; `useEnterToSubmit`; `tokens.css`, `fonts.css`, `core.css`.
+- `components/v2` (dashboard): StepFrame, TellMeSomethingElse, FindingLine, SourceChip, LearnedCard, SafetyCard, DesignCard, BuildSteps, Segmented, ColourPicker, PhonePreview.
+- 20a-2 adds CheckRow, MeasureCard and GapCard in `components/v2`.
+
+### Logic and presentation
+
+- Onboarding logic stays in `useOnboardingSession`. The screen model is pure (`flow.ts`: `screenFor`, `flowFor`, `stepPosition`, `splitQuestion`, `passedFromStep`). What only the browser knows (past the reading result, the safety screen, the finished build, Make it yours) is remembered per draft in `localStorage`, so Resume opens the last screen.
+- `OnboardingView` draws a session's state. The route feeds it the real hooks; `/dev/onboarding` (development only) feeds it fixtures for review and the browser tests.
+- The page's look is `useBrandEditor` (`hooks/brand`), shared by Make it yours and Look and feel.
+
+### Images: storage choice, SVG decision, visibility
+
+- **Storage:** the existing private bucket (`BOT_IMAGES_S3_BUCKET`, else `AUDIO_STORAGE_S3_BUCKET`) under `bot-images/<tenant>/<chatbot>/<hash>-<size>`. A bucket of its own is a **launch item**.
+- **Upload:** through ally-be (`POST v1/chatbots/:id/images`, multipart). The type comes from the bytes. Limits: 5 MB, 6000 px on the longest side, a pixel-bomb cap, 50 images per bot, 30 uploads a minute per user.
+- **Processing:** sharp 0.35.5 re-encodes everything, which removes EXIF and GPS, and turns the image upright first. It stores WebP at 256, 768 and 1600 px (never enlarged) plus the original.
+- **SVG: rasterised, for logos only.** An SVG is rendered to a 1024 px PNG and never stored or served as SVG. Before rendering, it is refused if it has a DOCTYPE or entities, a script, foreignObject, iframe, object, embed, an external href, url() or @import. Rasterising means nothing executable is ever served. The checks mean the renderer never fetches anything.
+- **Visibility:**
+  - The dashboard gets signed URLs that last 15 minutes.
+  - Visitors use `GET v1/public/bot-images/:slug/:file`. It serves a WebP variant only while the page is live and its brand uses that image. Responses are cached `immutable` for a year and carry `Cross-Origin-Resource-Policy: cross-origin`.
+  - Removing an image detaches it at once; Undo restores it. A daily task deletes the files after 30 days.
+- **Onboarding logo:** fetched through the crawl's guarded fetcher (`guardedFetchBuffer`) and stored like an upload. Publish no longer copies the site's logo URL, so nothing is hotlinked.
+- **Checked in the image:** sharp works on `node:24-alpine` for both arm64 and x64. The full production image build ran out of memory in `nest build` locally (the known Docker VM memory limit), not in the npm install that brings sharp.
+
+### Brand object
+
+- **Where it lives:** `settings.brand` on the bot page record. It holds the logo, cover and share image ids, the accent and its contrast-corrected copy, heading style, theme, landing images and team photos.
+- **Saving:** `PATCH v1/chatbots/:id/page/brand` sends only the fields that change. Image ids must belong to this bot and be attached. The accent is darkened until white reads on it at 4.5:1. The first save creates the page, off.
+- **Bot page tab:** its save keeps the brand and ignores a brand sent there.
+- **Public view:** `branding.logoUrl` and `branding.accentColour` are derived from the brand, and the look is added as `branding.look`. It is nested so the public view's top-level field list, which a privacy test pins, is unchanged.
+
+### Budgets (measured)
+
+| | Before 20d | After | Budget |
+|---|---|---|---|
+| Bot page JS (gzipped) | 56.6 KB | 57.5 KB | 70 KB |
+| Bot page CSS (gzipped, fonts excluded) | 22.4 KB | 4.7 KB | 25 KB |
+
+- `ally-web/scripts/check-bot-page-size.mjs` runs in CI (job "Bot page size budget").
+- The page no longer compiles the app's Tailwind.
+- LCP on Lighthouse mobile was not measured here: no Lighthouse run in this session. That is an open item.
+
+### Tests
+
+- **ally-be:**
+  - The upload cases from the brief, with real sharp: a `.exe` renamed `.png`, over 5 MB, too many pixels, SVG with a script or external references refused, EXIF and GPS gone, the image upright, variants made and never enlarged.
+  - Service tests: the 50 limit, rate limit, dedupe, a draft image not public, a live page serving only images its brand uses and never the original, removal / Undo / purge after 30 days, brand validation and contrast, the Bot page tab keeping the brand.
+  - Others: the slug fix, team names.
+  - The full suite passes apart from the pre-existing capabilities guard, which is now fixed.
+- **ally-web unit:**
+  - flow, keyboard (letters, arrows, 380 ms auto-advance, Enter to submit, Esc), `useBrandEditor` (debounced save, Undo, image removal and restore, upload errors), Look and feel (preview follows the brand, viewer can't change).
+  - The admin suite passes (555 files, 8,618 tests).
+- **Browser (Playwright 1.64.1 + axe 4.14.0, `apps/ally-admin-dashboard/e2e`):**
+  - Every onboarding screen, plus the bot page cover, email, pre-chat and chat in light and dark, at 1440 and 390 px. Each is screenshotted, and axe finds no serious or critical issues.
+  - A keyboard-only run from the read to published.
+  - Reduced motion: nothing animates.
+  - 44 tests. Baselines are made in the Playwright Linux image (`e2e/README.md`); CI job "Browser tests (Playwright)".
+  - Screenshots are taken with reduced motion, because entrance animations made them differ run to run. The live screen waits for its QR code. The config starts Vite directly rather than `nx serve`, whose task lock outlived a killed run and blocked the next.
+  - axe found three real issues, all fixed:
+    - the phone preview was `aria-hidden` but focusable; it is now `inert`;
+    - the text on the visitor's bubble used bone instead of white;
+    - initials on the dark logo tile were low contrast; the tile is now white in every theme.
+
+**Tests changed, and why** (no behaviour test changed):
+- `pages/Onboarding/__tests__/Canvas.test.tsx` → `Screens.test.tsx`. Canvas.tsx was replaced by one component per screen. Every case was ported with the same assertions against the new screens.
+- Unchanged and passing: `useOnboardingSession.test.tsx`, `copy.test.ts`, `botPage/__tests__/BotPageFlow.test.tsx`, `pages/WhatsAppBot/__tests__/BotPageTab.test.tsx`, ally-be's bot page, publish and crawl specs. New dependencies were added last and optional in existing constructors, so the specs construct services unchanged.
+
+### Where the screenshots and the deck differ (the deck was followed)
+
+1. **Make it yours:** the screenshot's button is "Build my assistant". With the approved order (Building comes before it), the deck now says Continue (and "Run the checkup" with 20a-2).
+2. **Cover hint:** the screenshot says "PNG, JPG or SVG". The deck says "PNG, JPG or WebP, up to 5 MB", and SVG is accepted for logos only.
+3. **Safety:** the screenshot shows the three panels open. The deck keeps "See what this covers", so they open from that link.
+4. **Pre-chat counter:** the screenshot shows "1 / 2". The page keeps its own "Question 1 of 2" (and the bar).
+5. **Bot page footer:** the 12b "Powered by Ally" stays. The screenshots' "Assistant by Ally" is the 20e landing page credit (copy §18).
+6. **Look and feel:** the landing slots, landing preview switch and "click to remove" captions are not built. Landing waits for 20e; images have Replace and Remove under them.
+7. **Onboarding has no dark mode:** DESIGN.md defines dark tokens only for visitor surfaces, so onboarding baselines are light only. The bot page is tested in light and dark.
+
+### Open items
+
+- **20a-2:**
+  - The 5 wrong Preview declines come first (`CHUNK-20A-EVAL.md`: passage selection band; heading-only chunks).
+  - The checkup slots in after Make it yours: `flow.ts` already names the step, and Make it yours' button becomes "Run the checkup".
+  - CheckRow, MeasureCard and GapCard.
+  - Changing the tone doesn't rewrite the introduction yet. That needs a builder turn, which is a new builder ability; the tone is saved and the opening line stays editable.
+- **20e:** landing images and the landing preview in Look and feel; `brand.landingImages` is stored and validated already. The "Give it a landing page" card stays hidden.
+- **Launch:**
+  - A private bucket of its own for bot images.
+  - A Lighthouse mobile LCP run for the bot page.
+  - Hindi strings marked "needs review" in `botPage/copy/hi.ts`.
+  - The local production image build runs out of memory in `nest build`, a Docker VM memory limit.
+- **Process:** the pre-commit hook runs the helpline suite on whatever Node is first on PATH. On Node 24, about 20 files fail on `AbortSignal` and wait out a 15-minute timeout. On Node 22, the version ally-web requires, it passes. These commits were made with Node 22 first on PATH.
+
+### How Shehbaz tests it
+
+1. **Onboarding:**
+   - Go to AI Chatbots → New assistant and enter `http://host.docker.internal:8701` (the fixture server).
+   - Each step is its own screen and findings tick in. Enter submits, A–D pick, Back works.
+   - "Tell me something else" sends to the builder.
+2. **Make it yours:**
+   - Replace the logo, add a cover, change the colour, tone and opening line, and watch the phone.
+   - Undo appears after each change.
+3. **Publish and visit:**
+   - Publish invite-only and open the link.
+   - The cover, logo, colour and heading match.
+   - Code from `docker logs --since 5m ally-be-app-1 2>&1 | grep "Bot page code"`.
+4. **Look and feel:**
+   - Settings → Look and feel (or the link in Bot page → Branding).
+   - Change the heading style, colour and theme (dark), press Undo, then reload the bot page.
+5. **Uploads:**
+   - Upload a 12 MB photo, an `.exe` renamed `.jpg`, and a phone photo with location.
+   - The first two are refused with copy §19's lines; the third is stored without EXIF or GPS.
+6. **Crisis:** send a crisis phrase on the bot page; still only the crisis reply (12b behaviour, unchanged).
+7. **Browser tests:** see `e2e/README.md`. Review screens without a backend at `/dev/onboarding?screen=make` and `/dev/v2-components`.
