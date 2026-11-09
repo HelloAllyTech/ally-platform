@@ -694,6 +694,24 @@ export const ApiEndpoints = {
     BULK: "/v1/context-library/bulk",
     SEARCH: "/v1/context-library/search",
     USE_CASES: "/v1/context-library/settings/use-cases",
+    // Insights and the learning loops
+    INSIGHTS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/insights`,
+    CHANGES: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/changes`,
+    CHANGE_UNDO: (actionId: string) =>
+      `/v1/context-library/changes/${encodeURIComponent(actionId)}/undo`,
+    GAP_DISMISS: (gapId: string) => `/v1/context-library/gaps/${encodeURIComponent(gapId)}/dismiss`,
+    LOOPS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/loops`,
+    LOOPS_RUN: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/loops/run`,
+    // Read-only keys for engineers' Claude Code, and the MCP endpoint they unlock.
+    READER_KEYS: "/v1/context-library/reader-keys",
+    READER_KEY_BY_ID: (id: string) => `/v1/context-library/reader-keys/${encodeURIComponent(id)}`,
+    READER_KEY_RESTORE: (id: string) =>
+      `/v1/context-library/reader-keys/${encodeURIComponent(id)}/restore`,
+    MCP: "/v1/context-library/mcp",
   },
   BUILDER: {
     SESSIONS: "/v1/builder/sessions",
@@ -728,6 +746,8 @@ export const ApiEndpoints = {
     SESSION_PULL_REQUEST_RESUME: (id: string, prId: string) =>
       `/v1/builder/sessions/${id}/pull-requests/${prId}/resume-automation`,
     SESSION_PR_FEEDBACK: (id: string) => `/v1/builder/sessions/${id}/pr-feedback`,
+    // Principles in play, and the per-session switch (PUT { off }).
+    SESSION_PRINCIPLES: (id: string) => `/v1/builder/sessions/${id}/principles`,
     SETTINGS: "/v1/builder/settings",
     NOTIFICATIONS: "/v1/builder/notifications",
     // The decision feed: every pending decision across sessions, and the one answer endpoint
@@ -1329,6 +1349,11 @@ export const TAG_TYPES = {
   CONTEXT_LIBRARY_SOURCES: "contextLibrarySources",
   CONTEXT_LIBRARY_CHUNKS: "contextLibraryChunks",
   CONTEXT_LIBRARY_USE_CASES: "contextLibraryUseCases",
+  CONTEXT_LIBRARY_INSIGHTS: "contextLibraryInsights",
+  CONTEXT_LIBRARY_LOOPS: "contextLibraryLoops",
+  CONTEXT_LIBRARY_READER_KEYS: "contextLibraryReaderKeys",
+  // Builder's "Principles in play", per session. Also registered in baseApi.ts's `tagTypes`.
+  BUILDER_PRINCIPLES: "builderPrinciples",
 };
 
 /**

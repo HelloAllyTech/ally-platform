@@ -33,6 +33,7 @@ import {
   BuilderRepoMapSummary,
   BuilderRunStatus,
   BuilderPipelineHealth,
+  BuilderPrinciples,
   BuilderScoreboard,
   BuilderSession,
   BuilderSessionDetail,
@@ -184,6 +185,25 @@ export const builderAPI = baseAPI.injectEndpoints({
      * wrong. Answers with readiness and the session status, because a
      * dismissal can be the last thing between the PRD and ready.
      */
+    /** "Principles in play" for one session, with each one's status from usage. */
+    getBuilderPrinciples: builder.query<BuilderPrinciples, string>({
+      query: id => ({
+        url: ApiEndpoints.BUILDER.SESSION_PRINCIPLES(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_PRINCIPLES, id }],
+    }),
+
+    /** The per-session switch. `off: true` stops the brief and the per-turn searches. */
+    setBuilderPrinciplesOff: builder.mutation<{ off: boolean }, { id: string; off: boolean }>({
+      query: ({ id, off }) => ({
+        url: ApiEndpoints.BUILDER.SESSION_PRINCIPLES(id),
+        method: HttpMethod.PUT,
+        body: { off },
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: TAG_TYPES.BUILDER_PRINCIPLES, id }],
+    }),
+
     dismissBuilderReviewFinding: builder.mutation<
       DismissBuilderReviewFindingResponse,
       DismissBuilderReviewFindingRequest
@@ -717,6 +737,8 @@ export const {
   useGetBuilderSessionsQuery,
   useGetArchivedBuilderSessionsQuery,
   useGetBuilderSessionQuery,
+  useGetBuilderPrinciplesQuery,
+  useSetBuilderPrinciplesOffMutation,
   useCreateBuilderSessionMutation,
   useUpdateBuilderSessionMutation,
   useCancelBuilderSessionMutation,

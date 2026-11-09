@@ -1494,3 +1494,43 @@ export interface BuilderPartnerScoreboard {
   decidedByRules: number;
   outcome: { started: number; released: number };
 }
+
+/* ── Principles in play (`GET v1/builder/sessions/:id/principles`) ─────── */
+
+/**
+ * Where a principle stands in this session, from usage rather than anyone grading it: Applied
+ * when a citation passed the check, Trade-off when two in play pull against each other, Cited
+ * when the PRD cites it, Open when surfaced but not yet used.
+ */
+export type BuilderPrincipleStatus = "applied" | "trade_off" | "cited" | "open";
+
+export interface BuilderPrincipleInPlay {
+  code: string;
+  statement: string;
+  collectionId: string;
+  prdSections: string[];
+  /** The question this principle prompts, when its profile has one. */
+  probe: string | null;
+  status: BuilderPrincipleStatus;
+  /** Part of the guiding brief built at session start. */
+  inBrief: boolean;
+}
+
+export interface BuilderPrincipleTension {
+  a: string;
+  b: string;
+  note: string | null;
+}
+
+export interface BuilderPrinciples {
+  /** Principles can run for this session (the service and the session switch allow it). */
+  enabled: boolean;
+  /** Switched off for this session by an admin. */
+  off: boolean;
+  /** The guiding brief has been built. */
+  briefReady: boolean;
+  /** The brief's one-line reading of the idea. */
+  descriptor: string | null;
+  items: BuilderPrincipleInPlay[];
+  tensions: BuilderPrincipleTension[];
+}

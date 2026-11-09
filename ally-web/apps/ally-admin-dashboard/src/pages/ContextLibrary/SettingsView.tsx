@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import { Check, Lock, Minus, ShieldAlert, Users } from "lucide-react";
+import { Check, Lock, Minus, PlugZap, ShieldAlert, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Tooltip } from "@ally-ui-mono/ui-shared";
@@ -11,15 +11,46 @@ import { ContextCollection } from "@types";
 import { UNDO_MS } from "./ChunkSheet";
 import { errorReason } from "./contextLibraryFormat";
 import { InlineError, LoadingRows, StatusWord } from "./ContextLibraryUi";
+import { LoopSettings } from "./LoopSettings";
 
 const cellKey = (useCase: string, collectionId: string) => `${useCase}::${collectionId}`;
+
+/**
+ * Settings: who reads what, the selected collection's learning loops, and Connect Claude Code.
+ */
+export const SettingsView: React.FC<{
+  collections: ContextCollection[];
+  /** The collection in the switcher; the loops are per collection. */
+  collection?: ContextCollection;
+  canEdit: boolean;
+  onConnect: () => void;
+}> = ({ collections, collection, canEdit, onConnect }) => (
+  <div className="space-y-10" data-testid="cl-settings-view">
+    <GrantsMatrix collections={collections} canEdit={canEdit} />
+    <LoopSettings collection={collection} canEdit={canEdit} />
+    <section className="space-y-2" aria-labelledby="cl-settings-connect">
+      <h2 id="cl-settings-connect" className="text-base font-semibold">
+        {en.contextLibrary.connect.title}
+      </h2>
+      <p className="max-w-3xl text-sm text-typography-600">{en.contextLibrary.connect.intro}</p>
+      <button
+        type="button"
+        onClick={onConnect}
+        className="inline-flex min-h-[32px] items-center gap-1.5 rounded border border-border-light bg-white px-3 text-sm hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+        data-testid="cl-settings-connect"
+      >
+        <PlugZap size={14} aria-hidden /> {en.contextLibrary.connect.button}
+      </button>
+    </section>
+  </div>
+);
 
 /**
  * Who reads what: use cases down the side, collections across the top. A switch flips at once
  * with an undo; a lock (set in code) shows why it can never be switched on. Read-only without
  * the edit grant.
  */
-export const SettingsView: React.FC<{ collections: ContextCollection[]; canEdit: boolean }> = ({
+const GrantsMatrix: React.FC<{ collections: ContextCollection[]; canEdit: boolean }> = ({
   collections,
   canEdit,
 }) => {
