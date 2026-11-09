@@ -28,6 +28,7 @@ cases:
   - src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts
   src_lines: 2
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  introduced_by: 8821e5215782e44b07b664de41a450f4f5f60dc9
   tags: []
 - id: ally-be-99584ee6
   kind: bug
@@ -50,6 +51,7 @@ cases:
   - src/course-copilot/service/specialists/test/blueprint-planner.specialist.spec.ts
   src_lines: 2
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  introduced_by: 168f627a948f433b6054f8133e036738b40414ec
   tags: []
 - id: ally-be-d039e256
   kind: bug
@@ -59,7 +61,6 @@ cases:
   expected: escalate
   layout: monorepo
   modes:
-  - sweep
   - issue
   risk: true
   description: 'Production logs show a high volume of `UnauthorizedException: Unauthorized` across many
@@ -96,6 +97,7 @@ cases:
   - src/prompt/util/test/translation-token-guard.util.spec.ts
   src_lines: 4
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  introduced_by: 099de82c1f76fd6f6fb4d8baa5f44f6098fa80ca
   tags: []
 - id: ally-be-adf36739
   kind: bug
@@ -118,6 +120,7 @@ cases:
   - src/badge/service/test/badge-tenant.service.spec.ts
   src_lines: 5
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  introduced_by: a981059deb98b7f8bca10f0ab629e885116b3995
   tags: []
 - id: ally-be-8c4f9caf
   kind: bug
@@ -139,6 +142,7 @@ cases:
   - src/track/service/test/track-cover-image.service.spec.ts
   src_lines: 5
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  introduced_by: 2c2c378e8a99f1623e409d0667a601f89c2abc3a
   tags: []
 - id: ally-web-9299e9aa
   kind: bug
@@ -161,6 +165,7 @@ cases:
   - apps/ally-admin-dashboard/src/pages/WhatsAppBot/__tests__/ChatbotTestTab.test.tsx
   src_lines: 8
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  introduced_by: 88fd1da22fc0b732d3e4245d5edff4e735e48915
   tags: []
 - id: ally-web-e5ad37b3
   kind: bug
@@ -183,6 +188,7 @@ cases:
   - apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
   src_lines: 2
   lockfile_blob: ac36e034439c488c4e5182ba51ca425f7ea367ec
+  introduced_by: bf5dcf9699ad683933b485454cc7935963098bcd
   tags: []
 - id: ally-web-dd128ff8
   kind: bug
@@ -205,6 +211,7 @@ cases:
   - apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
   src_lines: 22
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  introduced_by: f6ed605a08945f1cba2b09824b2bbbd0b99f75ec
   tags: []
 - id: ally-web-f35e117d
   kind: bug
@@ -229,6 +236,7 @@ cases:
   - apps/ally-admin-dashboard/src/pages/Analytics/__tests__/allyGuideChart.test.ts
   src_lines: 23
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  introduced_by: 2cff91d1026a17c5f4be4757c2c22e228fc61de7
   tags: []
 - id: ally-web-eebbfd01
   kind: bug
@@ -252,6 +260,7 @@ cases:
   - apps/ally-helpline-dashboard/src/analytics/__tests__/PageviewTracker.test.tsx
   src_lines: 30
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  introduced_by: 5519e5891bad9218e07be097fd11d4bf547df61b
   tags: []
 - id: ally-web-3b3db9b5
   kind: bug
@@ -279,6 +288,7 @@ cases:
   - apps/ally-helpline-dashboard/src/pages/guided-course/hooks/__tests__/seedRatings.test.ts
   src_lines: 37
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  introduced_by: ec3e51c60e2f4ea8a92f66a3980971ac7f27ffe1
   tags: []
 - id: ally-ai-b680c643
   kind: bug
@@ -301,6 +311,7 @@ cases:
   - tests/prompts/test_resolver.py
   src_lines: 12
   lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
+  introduced_by: 48363e1467d348a6a2bf5b706fdb484e1d9021f2
   tags: []
 - id: ally-ai-e9a0e1c3
   kind: bug
@@ -321,6 +332,7 @@ cases:
   - tests/core/test_openai_text_generation_service_deduplication.py
   src_lines: 14
   lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
+  introduced_by: cfda686b2dd052cc3e2464254b2bd0643ef5032a
   tags: []
 - id: ally-ai-learn-1065743a
   kind: bug
@@ -343,6 +355,7 @@ cases:
   - tests/unit/test_scenario_session_evaluation.py
   src_lines: 6
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
+  introduced_by: a3bc5e6939b582207484eba1f8d57a4e9d88dcf6
   tags: []
 - id: ally-ai-learn-7391ff7e
   kind: bug
@@ -364,6 +377,7 @@ cases:
   - tests/unit/app/core/events/test_factory.py
   src_lines: 16
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
+  introduced_by: 71ddf4d76520a6b90213d046c238b9ccefbdee3a
   tags: []
 - id: ally-ai-learn-995242d7
   kind: bug
@@ -387,6 +401,7 @@ cases:
   - tests/unit/tts/test_sarvam.py
   src_lines: 24
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
+  introduced_by: 51ac5ac4d3a9307454188f123e87829405b4186b
   tags: []
 - id: ally-mobile-83bdf91e
   kind: bug
@@ -414,6 +429,7 @@ cases:
   - test/features/scribe/presentation/scribe_recording_screen_user_joined_chat_id_test.dart
   src_lines: 59
   lockfile_blob: 4006dfa5966ef211c009513b41c55ba27aa83fff
+  introduced_by: d4ae9ebdf5157a7119c5003c0778cc1d37d99dd0
   tags: []
 - id: ally-ai-6e81b510
   kind: clean
@@ -978,6 +994,7 @@ cases:
   - src/config/test/config.service.spec.ts
   src_lines: 9
   lockfile_blob: baf594754c56a70cb476b9715f7679e5ebb33dd8
+  introduced_by: 06f1157e49daa64b25e1105fef256ecc3533739a
   tags: []
 - id: ally-be-6083b8d8
   kind: bug
@@ -1005,6 +1022,7 @@ cases:
   - src/rate-limit/test/rate-limited-routes.spec.ts
   src_lines: 27
   lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
+  introduced_by: 122a80cbcae35f1abeaad6dac4d5f44f08c1892
   tags: []
 - id: ally-be-87c6ecb8
   kind: bug
@@ -1029,4 +1047,5 @@ cases:
   - src/user/repository/test/user.repository.spec.ts
   src_lines: 52
   lockfile_blob: 6f1c15c2ef3076fa643ce2862fa53c8ef6f8bcc4
+  introduced_by: 25d665f80251fce1e5a798533a82d3c2f637b422
   tags: []

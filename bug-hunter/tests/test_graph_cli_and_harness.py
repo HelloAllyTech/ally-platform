@@ -90,3 +90,34 @@ def test_default_cost_cap_comes_from_limits(
     )
     assert report.meta["cost_cap_usd"] == cfg.limits.evals.max_cost_usd == 10
     assert report.meta["stopped_reason"] is None
+
+
+def test_sweep_mode_shows_the_introducing_commit_never_the_fix(
+    repo_config, tmp_path: Path
+) -> None:
+    cfg, repo, bug, _clean = repo_config
+    seen: list[str] = []
+
+    class Recorder:
+        name = "recorder"
+
+        def run(self, case_input, run) -> AgentResult:
+            seen.append(case_input.diff)
+            return AgentResult()
+
+    intro = repo.git("rev-parse", bug.parent).strip()  # the feat that added x.ts
+    case = bug.model_copy(update={"introduced_by": intro})
+    run_evals(
+        cfg,
+        [
+            case,
+            bug.model_copy(update={"id": "ally-be-bug00002"}),
+        ],  # 2nd: no introduced_by → skipped
+        Recorder(),
+        _options(mode="sweep"),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=tmp_path / "r",
+    )
+    assert len(seen) == 1
+    assert "buggy" in seen[0] and "fixed" not in seen[0]  # the feat diff, not the fix

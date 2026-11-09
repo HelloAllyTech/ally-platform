@@ -198,11 +198,16 @@ def run_case(
                 sandbox, created_volumes, _head_lockfile(config, case, repo)
             )
             runner = Runner(config, sandbox)
-            diff = (
-                scrub_code(repo.git("show", "--format=", case.commit))
-                if options.mode == "sweep"
-                else ""
-            )
+            diff = ""
+            if options.mode == "sweep":
+                # a bug case sweeps the commit that introduced the bug; showing the
+                # fix would hand the agent the answer (and read as "intentional")
+                sweep_sha = case.introduced_by if case.kind == "bug" else case.commit
+                if sweep_sha is None:
+                    raise RuntimeError(
+                        f"{case.id}: no introduced_by; run `bug-hunter eval blame`"
+                    )
+                diff = scrub_code(repo.git("show", "--format=", sweep_sha))
             case_input = CaseInput(
                 case,
                 options.mode,
@@ -489,8 +494,13 @@ def run_evals(
         cases = [c for c in cases if c.kind == "bug"]  # clean cases have no oracle
         meta["cases"] = len(cases)
     else:
-        skipped = [c.id for c in cases if options.mode not in c.modes]
-        cases = [c for c in cases if options.mode in c.modes]
+        skipped = [
+            c.id
+            for c in cases
+            if options.mode not in c.modes
+            or (options.mode == "sweep" and c.kind == "bug" and not c.introduced_by)
+        ]
+        cases = [c for c in cases if c.id not in set(skipped)]
         meta["cases"] = len(cases)
         meta["skipped_for_mode"] = skipped
     report = Report(meta=meta)

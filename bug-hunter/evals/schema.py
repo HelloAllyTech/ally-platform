@@ -43,6 +43,10 @@ class Case(BaseModel):
     )
     src_lines: int = 0
     lockfile_blob: str | None = None
+    # Sweep mode reviews the commit that *introduced* the bug (git blame of the lines
+    # the fix removed, at the parent), never the fix itself. None = unknown: the case
+    # is then issue-only.
+    introduced_by: str | None = None
     tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")

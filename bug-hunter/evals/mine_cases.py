@@ -378,6 +378,30 @@ def _pr(
     return number, title, body
 
 
+def introducing_commit(
+    repo: Repo, fix_sha: str, parent: str, src_paths: Iterable[str]
+) -> str | None:
+    """The newest commit, other than the fix, that last touched the lines the fix
+    removed or replaced (``git blame`` at the parent). This is the sweep signal for a
+    bug case: the diff a reviewer would have seen when the bug went in."""
+    candidates: dict[str, str] = {}
+    for path in src_paths:
+        for start, end in repo.removed_ranges(fix_sha, path):
+            try:
+                shas = repo.blame_shas(parent, path, start, end)
+            except subprocess.CalledProcessError:
+                continue
+            for sha in shas:
+                if sha.startswith(fix_sha[:12]) or fix_sha.startswith(sha[:12]):
+                    continue
+                if sha not in candidates:
+                    _p, date, _s, _b = repo.info(sha)
+                    candidates[sha] = date
+    if not candidates:
+        return None
+    return max(candidates, key=lambda sha: (candidates[sha], sha))
+
+
 def later_fixed_shas(
     repo: Repo, fix_shas: Iterable[str], apps: Iterable[str], root_layout: bool = False
 ) -> dict[str, str]:

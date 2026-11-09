@@ -456,6 +456,58 @@ def eval_modes(
     typer.echo(f"{case_id}: modes = {match[0].modes}")
 
 
+@eval_app.command("blame")
+def eval_blame(
+    ids: Annotated[
+        list[str] | None,
+        typer.Argument(
+            help="Case ids (default: every bug case without introduced_by)."
+        ),
+    ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="Recompute even when already set.")
+    ] = False,
+) -> None:
+    """Record, per bug case, the commit that introduced the bug (git blame of the lines
+    the fix removed, at the parent). Sweep mode reviews that commit's diff."""
+    from bug_hunter.config import PACKAGE_ROOT
+    from evals.mine_cases import Repo, introducing_commit
+    from evals.run_evals import case_repo_paths
+    from evals.schema import load_cases, save_cases
+
+    config = _load_or_exit()
+    path = PACKAGE_ROOT / "evals" / "golden" / "cases.yaml"
+    case_file = load_cases(path)
+    repo = Repo(config.repo_root)
+    wanted = set(ids or [])
+    changed = 0
+    for index, case in enumerate(case_file.cases):
+        if case.kind != "bug" or (wanted and case.id not in wanted):
+            continue
+        if case.introduced_by and not force:
+            continue
+        app_path = config.app(case.app).path
+        sha = introducing_commit(
+            repo,
+            case.commit,
+            case.parent,
+            case_repo_paths(case, app_path, case.src_files),
+        )
+        modes = list(case.modes)
+        if sha is None and "sweep" in modes:
+            modes.remove("sweep")
+        case_file.cases[index] = case.model_copy(
+            update={"introduced_by": sha, "modes": modes or ["issue"]}
+        )
+        changed += 1
+        typer.echo(
+            f"{case.id}: introduced_by={sha[:12] if sha else 'none (issue-only)'}"
+            f"{'' if sha else '  modes=' + ','.join(modes or ['issue'])}"
+        )
+    save_cases(path, case_file)
+    typer.echo(f"updated {changed} cases in {path.name}")
+
+
 @eval_app.command("run")
 def eval_run(
     cases_filter: Annotated[

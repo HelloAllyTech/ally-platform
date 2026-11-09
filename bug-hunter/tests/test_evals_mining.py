@@ -152,3 +152,18 @@ def test_helpers() -> None:
         and "Co-Authored-By" not in text
     )
     assert render_candidates([]).startswith("# Candidate golden cases")
+
+
+def test_introducing_commit_is_the_blamed_commit_not_the_fix(
+    config: BugHunterConfig, tmp_path: Path
+) -> None:
+    from evals.mine_cases import introducing_commit
+
+    root = _build_repo(tmp_path / "repo")
+    repo = Repo(root, ref="master")
+    fix_a = _git(root, "log", "--format=%H", "--grep=^fix(a)")
+    feat_a = _git(root, "log", "--format=%H", "--grep=^feat(a)")
+    parent = _git(root, "rev-parse", f"{fix_a}^")
+    assert introducing_commit(repo, fix_a, parent, ["ally-be/src/a.ts"]) == feat_a
+    # a fix that only adds lines has nothing to blame: no sweep signal
+    assert introducing_commit(repo, fix_a, parent, ["ally-be/src/none.ts"]) is None

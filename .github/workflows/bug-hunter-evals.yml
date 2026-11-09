@@ -40,6 +40,11 @@ on:
         default: "baseline"
         type: choice
         options: [baseline, graph]
+      modes:
+        description: "Which eval modes to run (comma-separated): issue, sweep"
+        required: false
+        default: "issue,sweep"
+        type: string
       max_cost_usd:
         description: "Hard cost cap for each eval run (default from limits.yaml: 10)"
         required: false
@@ -149,7 +154,7 @@ jobs:
           CASES: ${{ inputs.cases }}
 
       - name: "Eval, ${{ matrix.mode }} mode"
-        if: always() && (inputs.what == 'all' || inputs.what == 'baseline')
+        if: always() && (inputs.what == 'all' || inputs.what == 'baseline') && contains(inputs.modes, matrix.mode)
         run: |
           poetry run bug-hunter eval run --agent "$AGENT" --mode "$MODE" ${CASES:+--cases "$CASES"} ${MAX_COST:+--max-cost-usd "$MAX_COST"}
         env:
