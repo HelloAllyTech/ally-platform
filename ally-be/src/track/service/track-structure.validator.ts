@@ -46,6 +46,7 @@ import {
   BranchingNode,
   BranchingOutcomeTone,
   BranchingScenarioContent,
+  BRANCHING_MAX_IMAGE_CAST,
   branchingEndingScore,
   isBranchingEnding,
 } from '../type/branching.type';
@@ -361,6 +362,24 @@ export function validateBranchingContent(
     !Object.values(BranchingExperience).includes(content.experience)
   ) {
     fail(`${label}: experience must be classic or story.`);
+  }
+  if (content.imageCast !== undefined) {
+    if (
+      !Array.isArray(content.imageCast) ||
+      content.imageCast.length > BRANCHING_MAX_IMAGE_CAST ||
+      content.imageCast.some(
+        (member) =>
+          !member ||
+          typeof member.characterId !== 'string' ||
+          !member.characterId.trim() ||
+          typeof member.name !== 'string' ||
+          member.name.length > 200,
+      )
+    ) {
+      fail(
+        `${label}: the image cast can have at most ${BRANCHING_MAX_IMAGE_CAST} characters, each with an id and a name.`,
+      );
+    }
   }
 
   const nodesById = new Map<string, BranchingNode>();

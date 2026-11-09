@@ -24,6 +24,16 @@ export class GeminiImageProvider implements ImageGenerationProvider {
     }
   }
 
+  /**
+   * Gemini image models take several reference images as inline parts of the
+   * same turn (Google documents up to 14 for its pro image model; the flash
+   * model fewer). Capped well below either; IMAGE_STUDIO_MAX_REFERENCES caps
+   * what the editor sends.
+   */
+  maxReferences(): number {
+    return 6;
+  }
+
   /** Lazily build the client so the app boots even without a key configured;
    * a Gemini-selected generation then fails clearly instead of at module load. */
   private getClient(): GoogleGenAI {
@@ -56,7 +66,22 @@ export class GeminiImageProvider implements ImageGenerationProvider {
   ): Promise<Buffer> {
     const response = await this.getClient().models.generateContent({
       model: options?.model ?? this.getModel(),
-      contents: prompt,
+      contents: options?.references?.length
+        ? [
+            {
+              role: 'user',
+              parts: [
+                ...options.references.map((reference) => ({
+                  inlineData: {
+                    mimeType: reference.mimeType,
+                    data: reference.data.toString('base64'),
+                  },
+                })),
+                { text: prompt },
+              ],
+            },
+          ]
+        : prompt,
       config: {
         imageConfig: { aspectRatio: this.toAspectRatio(size) },
       },

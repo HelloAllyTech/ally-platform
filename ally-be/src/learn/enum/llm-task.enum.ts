@@ -284,6 +284,11 @@ export enum LlmTask {
   // a prompt they wrote. Not the scenario template above, and not filed into
   // the roleplay cover library.
   GENERATE_COURSE_COVER_IMAGE = 'generate_course_cover_image',
+  // Image Studio (src/image-studio): the generator behind every authoring
+  // image slot — plan the scene, render the image, check the result.
+  IMAGE_STUDIO_COMPOSE = 'image_studio_compose',
+  IMAGE_STUDIO_IMAGE = 'image_studio_image',
+  IMAGE_STUDIO_JUDGE = 'image_studio_judge',
   TRANSLATE_TEXT = 'translate_text',
   TRANSLATE_OBJECT = 'translate_object',
   // Scribe voice note: turning one dictation transcript into note fields.

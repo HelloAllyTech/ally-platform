@@ -107,6 +107,7 @@
     "rxjs": "^7.8.2",
     "sanitize-html": "^2.17.3",
     "sarvamai": "^1.1.6",
+    "sharp": "^0.33.5",
     "socket.io": "^4.8.3",
     "typeorm": "^0.3.28",
     "uuid": "^13.0.0",
