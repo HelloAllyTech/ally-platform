@@ -50,7 +50,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: bug-hunter-evals
+  group: bug-hunter-evals-${{ github.run_id }}
   cancel-in-progress: false
 
 defaults:
@@ -69,9 +69,16 @@ env:
 
 jobs:
   evals:
-    name: Oracle check + baseline
+    # One job per mode, so a cancelled or failed sweep never loses the finished
+    # issue-mode report (the first graph run on GitHub lost both that way). The
+    # oracle check runs once, in the issue job.
+    name: "Evals (${{ matrix.mode }})"
     runs-on: ubuntu-latest
     timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [issue, sweep]
     services:
       postgres:
         image: pgvector/pgvector:pg14
@@ -135,28 +142,20 @@ jobs:
           CASES: ${{ inputs.cases }}
 
       - name: Oracle check
-        if: inputs.what == 'all' || inputs.what == 'oracle'
+        if: matrix.mode == 'issue' && (inputs.what == 'all' || inputs.what == 'oracle')
         run: |
           poetry run bug-hunter eval run --oracle-check ${CASES:+--cases "$CASES"}
         env:
           CASES: ${{ inputs.cases }}
 
-      - name: Eval, issue mode
+      - name: "Eval, ${{ matrix.mode }} mode"
         if: always() && (inputs.what == 'all' || inputs.what == 'baseline')
         run: |
-          poetry run bug-hunter eval run --agent "$AGENT" --mode issue ${CASES:+--cases "$CASES"} ${MAX_COST:+--max-cost-usd "$MAX_COST"}
+          poetry run bug-hunter eval run --agent "$AGENT" --mode "$MODE" ${CASES:+--cases "$CASES"} ${MAX_COST:+--max-cost-usd "$MAX_COST"}
         env:
           CASES: ${{ inputs.cases }}
           AGENT: ${{ inputs.agent }}
-          MAX_COST: ${{ inputs.max_cost_usd }}
-
-      - name: Eval, sweep mode
-        if: always() && (inputs.what == 'all' || inputs.what == 'baseline')
-        run: |
-          poetry run bug-hunter eval run --agent "$AGENT" --mode sweep ${CASES:+--cases "$CASES"} ${MAX_COST:+--max-cost-usd "$MAX_COST"}
-        env:
-          CASES: ${{ inputs.cases }}
-          AGENT: ${{ inputs.agent }}
+          MODE: ${{ matrix.mode }}
           MAX_COST: ${{ inputs.max_cost_usd }}
 
       - name: Disk and Docker after
@@ -170,7 +169,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bug-hunter-eval-results-${{ github.run_number }}
+          name: bug-hunter-eval-results-${{ github.run_number }}-${{ matrix.mode }}
           path: |
             bug-hunter/evals/results/
             bug-hunter/evals/golden/oracle-status.json
@@ -181,7 +180,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bug-hunter-run-artefacts-${{ github.run_number }}
+          name: bug-hunter-run-artefacts-${{ github.run_number }}-${{ matrix.mode }}
           path: bug-hunter/runs/artefacts/
           if-no-files-found: warn
           retention-days: 14

@@ -124,6 +124,12 @@ models), run `run-20261109-110348-6a4770`:
 - No trace link: the local `.env` has an empty `LANGSMITH_API_KEY` (tracing stays off
   without a key; nothing crashes).
 
+Clean case `ally-be-b29aa1be` in issue mode: triage closed it as a feature request
+("expose the review and approve switches on the settings API" is the mined commit
+message, which is what a clean case's issue text is) in 6 s for $0.001. Issue-mode
+clean cases mostly test triage; sweep mode, where the investigator sees the diff, is
+the real false-alarm test.
+
 ## First eval run on GitHub (10-case subset)
 
 PENDING
