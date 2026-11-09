@@ -303,3 +303,131 @@ Also on the branch: `70d761be3` (the 5 wrong declines, diagnosed in `CHUNK-20A-E
    - The first two are refused with copy §19's lines; the third is stored without EXIF or GPS.
 6. **Crisis:** send a crisis phrase on the bot page; still only the crisis reply (12b behaviour, unchanged).
 7. **Browser tests:** see `e2e/README.md`. Review screens without a backend at `/dev/onboarding?screen=make` and `/dev/v2-components`.
+
+## 4. Plan: the assistant home (20d continuation, for approval)
+
+**Why:** Shehbaz's manual test (irisgo.ai, 2026-11-09). After creation the assistant's page is still the 12b-era dashboard: 8 tabs and 7 Settings sections in the old style. The same thing is editable in two or three places through different endpoints, so one save can overwrite another. "Who can use it" is three separate systems. Preview looks nothing like the bot page.
+
+**Decided (2026-11-09):**
+- Build the assistant home now; Checkup, "Change your assistant" and the wrong-decline fix stay in 20a-2.
+- Advanced is visible to every editor, collapsed.
+- A temporary "Classic view" link keeps the old tabs reachable while testing.
+- I write the copy into the deck.
+
+### A. The page (screenshot `03-assistant-home`, built from `components/v2`)
+
+- **Layout:**
+  - Header: "Assistants / {name}", a status pill, **Try it**, **Open page**.
+  - A left section list (a top menu on phones) and the content in the middle.
+  - **Try it** opens a phone panel on the right (a bottom sheet on phones).
+  - 20a-2 later docks "Change your assistant" in the same right panel.
+- **One save model:** every control saves on its own (debounced, "Changed · Undo" toast, "Saved" dot), as Look and feel and onboarding already do. No page-level Save buttons, so there's no unsaved-changes guard to fall through. Each control patches only its own field; nothing sends a whole object built from a stale read.
+- **Route:**
+  - `/chatbots/:botId` renders the new `AssistantHome`.
+  - `?view=classic` renders today's `ChatbotPage`, unchanged (that keeps `WhatsAppBot.test.tsx` and the other tab tests as they are).
+  - Old deep links (`?tab=connectors`, `?tab=settings&section=…`) map to the new sections.
+
+### B. Sections, with where each control comes from (code map: the inventory of 2026-11-09)
+
+| Section | Shows and edits | From today |
+|---|---|---|
+| **Overview** | Status and the one on/off (publish / pause the bot). The live link with Copy and QR. This week's numbers. "Needs your input" (open unanswered count). Archive (owner only) | Overview tab; its checklist is replaced by "what needs attention", and "who can use it" checks page access too |
+| **What it knows** | **From your website:** the learned facts by section, each with its source chip (read-only). **Your notes:** the Owner notes document, editable; a correction goes here. **Documents:** pages read, uploads, library documents (view, upload, add from library, remove). **Needs your input:** unanswered questions, with Answer (creates a document) and Dismiss | Knowledge tab + panels, Unanswered tab, onboarding's learned card |
+| **Personality** | Assistant name (one field: `persona.displayName` and the page's `branding.assistantName` together). Opening line (`persona.greeting`). Tone. Languages. Suggested questions (up to 4). Questions before the chat (up to 8). When it doesn't know (`declineText`). Instructions (`systemPrompt`, collapsed, "for fine-tuning") | Instructions tab, Bot page tab (suggested, pre-chat, language), General (decline) |
+| **Safety** | The pack card (Always / Never / If someone may be at risk; locked). **Your own rules** (add, edit, remove; the pack's lines can't be removed). Disclaimer (one field: per-bot `disclaimerText` and the page's `branding.disclaimer` together). Crisis reply and helpline. Crisis check and consent (can only be tightened) | General → Safety and messages; `chatbots.rules` has **no editor today** |
+| **Page** | Look and feel (logo, cover, link preview image, team photos, heading style, colour, theme) with the live phone. The page switch, its link (slug check), title and tagline, footer link, limits | Look and feel + Bot page tab. **The Bot page Branding card's logo URL and colour fields go**: the brand is the one place |
+| **Conversations** | As today, restyled: list, filters, thread drawer, reveal / block / erase | Conversations tab |
+| **Share** | **Who can use it**, two clearly labelled cards: *On your page* (page access mode and list) and *On WhatsApp* (audience mode and list). They stay separate lists (12b: a page list can't widen WhatsApp). **Channels**: WhatsApp numbers, connect, check. **Team**: who can edit (owner only) | Bot page tab access, Access (people), Channels |
+| **Advanced** (collapsed) | Answer mode, model, temperature. Quick replies. The other WhatsApp messages (fallback, unrecognised number, unsupported media, too many messages). Rate limits. Retrieval and idle time. Show typing (platform admins). Analytics (lazy, as now) | Agent, Quick replies, General (rest), Analytics |
+
+**Try it:**
+- It replaces Preview with the real bot page `Chat` screen in a `PhonePreview`, in the page's brand. It sends through today's `/chatbots/:id/test/stream` (same hook, same fallback), so answers, sources and the crisis path match the live page.
+- For platform admins, a "Details" toggle under each reply keeps today's engine, steps and run id.
+- The Personality and Advanced controls feed it the unsaved draft as today (`chatbot-draft:<id>`).
+
+### C. Data and API changes (ally-be)
+
+- **`PATCH /v1/chatbots/:id/rules`** `{never: string[]}` (EDITOR). It edits the owner's own Never lines. The pack's lines are never stored there, so nothing can weaken the pack (the existing safety lock applies).
+- **Assistant name and disclaimer, one field each:** the page writes them in both stored places in one call (`PATCH /chatbots/:id/persona-page`, or two calls made together by one hook; to decide in code, recorded in the notes).
+- **Small field endpoints** so each control saves only its field: `PATCH /chatbots/:id/page/settings` (suggested, pre-chat, language, limits, title, tagline, footer) in place of the whole-object PUT. The PUT stays for the classic view and its tests.
+- **What it knows → Your notes:** reuses `PATCH …/documents/:docId` (Owner notes is a private paste document). If no Owner notes exists yet (a bot made by the old form), "Add a note" creates it.
+- **No schema change.**
+
+### D. The fixes from the test, in the same pass
+
+1. **An edited fact becomes "From you"**: `byOwner: true` and source "From you" when the owner edits its text (ally-be `applyPatch` on `/facts/n/text`; `bot-draft.service.ts`).
+2. **The reader skips installers**: `.dmg .exe .msi .pkg .apk .deb .rpm .iso .appimage .bin` added to `ASSET` (`crawl/url-scope.ts:100`), with a test.
+3. **Design samples:** the designs prompt (ally-ai `builder/designs`) asks for alternating turns. A code check splits a turn that holds a question and an answer, and drops a sample line with a number, email or URL that's not in the read pages (the same grounding rule as facts).
+4. **Logo choice:** prefer the header `<img>` named logo, then the apple-touch icon, then `og:image` only if it's roughly square (aspect ≤ 2:1); a 1200×630 banner is never the logo (`crawl/brand.ts`).
+5. **"503" on streams:** not a server error (ally-be logged none). Confirm in DevTools once; nothing to fix unless a real 503 shows.
+
+### E. Copy (deck §20, new)
+
+Section names (Overview · What it knows · Personality · Safety · Page · Conversations · Share · Advanced), "From your website", "Your notes", "Needs your input", "Your own rules", "On your page" / "On WhatsApp", "Team", "Try it", "Classic view", and their one-line explanations. Written in the deck's voice; `copy.test.ts` holds the strings to it.
+
+### F. Tests
+
+- **ally-web:**
+  - Each section's controls save their own field (payloads).
+  - Undo.
+  - Viewer is read-only.
+  - Old deep links land on the right section.
+  - Try it sends through the test stream and draws the bot page `Chat`.
+  - "Who can use it" shows both lists.
+  - Classic view still renders the old page (`WhatsAppBot.test.tsx` and the tab tests unchanged).
+  - Playwright screenshots of each section at 1440 and 390 px, plus axe.
+- **ally-be:** the rules endpoint (add, edit, remove; can't touch pack lines; viewer refused), the page settings PATCH, the one-field name and disclaimer, the four fixes.
+- **ally-ai:** design samples split and grounding.
+
+### G. Commit sequence (`[20d]`)
+
+1. Docs: this plan, copy §20.
+2. ally-be: rules endpoint, page settings PATCH, name and disclaimer in one call.
+3. ally-be + ally-ai: fixes 1–4.
+4. ally-web: AssistantHome shell, left list, routing, Classic view, Overview.
+5. What it knows.
+6. Personality and Safety.
+7. Page and Share.
+8. Conversations, Advanced, Try it.
+9. Tests (unit, Playwright, axe) and notes.
+
+### H. Open questions
+
+1. **Correcting a website fact:** a page we read can't be edited (it's that site's text). Proposed: "Correct this" adds the correction to **Your notes**, the fact shows "Corrected by you", and both stay searchable, notes first. Alternative: re-read the page. OK?
+2. **Instructions (`systemPrompt`)** in Personality, collapsed, or in Advanced? Proposed: Personality, collapsed, since owners do tune it.
+3. **Classic view:** remove after your sign-off, in a follow-up commit?
+
+### 4.1 Approved 2026-11-09, with these answers and changes (they override §4 where they differ)
+
+1. **Correct this replaces the original for the assistant.**
+   - The correction is stored as an owner note linked to the original fact.
+   - The original is hidden from search but stays viewable through "Show original"; the fact shows "Corrected by you".
+   - If a later re-read changes that page, it is flagged so the owner chooses which to keep.
+   - How: ally-be finds the sentence(s) in the page's stored text that the fact came from (word-overlap match). It replaces them in that page document with the correction, keeps the original text on the fact, and re-indexes the document, so search no longer finds the old line. The owner note records the correction against the fact id. With no confident match, the correction still goes into the notes and the owner is told the original line couldn't be found. Each correction stores the page's content hash for the re-read check (re-reading isn't built yet; the check runs when it is).
+2. **Extra instructions** (`systemPrompt`) sit in Personality, collapsed, with the note that safety rules always come first. The existing length limit stays.
+3. **Classic view** stays until 20a-2's Checkup lands plus about a week of use, then goes in a follow-up. Until then a test keeps `?view=classic` loading.
+4. **Checkup** is in the left list, with an empty state ("Your first checkup runs after your next change") until 20a-2 fills it.
+5. **Pre-chat questions** move to Page; WhatsApp doesn't use them.
+6. **No Advanced section.** Its items move:
+   - quick replies → Personality, next to suggested questions;
+   - the other WhatsApp messages → Share, inside "On WhatsApp";
+   - rate limits → Page, with the page limits;
+   - analytics → Overview ("this week");
+   - model and answer mode → a **platform-admin-only** engine panel (a header toggle). Owners never see these, or the word "model".
+   - Owner sections: **Overview, What it knows, Personality, Safety, Page, Checkup, Conversations, Share.**
+7. **The old "Advanced setup" form is removed** from AI Chatbots. Onboarding is the only way to create an assistant; platform admins keep engine controls through the panel above. Tests that used the form are updated or removed and listed.
+8. **Concurrency:** each field save sends the value it was based on (`base`). ally-be refuses a stale save with 409 and the current value, and the UI shows it. A test edits one field from two tabs.
+9. **The right side** is left ready for 20a-2's "Change your assistant" panel; Try it uses it for now.
+10. **Own safety rules** sit after the owner's instructions and only add to the pack. 20a-2's "topics to avoid" check enforces them later. A test checks that a rule can be added, and that a pack rule can't be removed or edited.
+11. **Owner-facing text** goes into `ONBOARDING-COPY.md` in the same commit, in the deck's voice.
+
+**Revised commit sequence (`[20d]`):**
+1. Docs.
+2. ally-be: the field save API with `base`/409, own rules, corrections.
+3. ally-be + ally-ai: the four fixes.
+4. ally-web: the AssistantHome shell, left list, routing, Classic view, Overview, Checkup empty state.
+5. What it knows.
+6. Personality and Safety.
+7. Page and Share.
+8. Conversations, Try it, the admin engine panel, the old form removed.
+9. Tests, screenshots and notes.
