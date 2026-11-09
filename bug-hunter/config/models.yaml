@@ -12,7 +12,7 @@ fallbacks:
   fix:         [{ provider: google_genai, model: gemini-2.5-pro }]
 # Active prompt version per model node (prompts/<node>.<version>.md); evals compare versions.
 prompts:
-  triage: v2
+  triage: v3
   investigate: v2
   reproduce: v2
 # USD per 1M tokens, from the providers' price pages (checked 2026-11-09; see

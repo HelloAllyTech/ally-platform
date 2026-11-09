@@ -508,6 +508,9 @@ def run_evals(
         "stopped_reason": None,
         "free_gb_start": guard.free_gb(),
     }
+    disputed = [c.id for c in cases if c.status == "disputed"]
+    cases = [c for c in cases if c.status == "active"]
+    meta["disputed_skipped"] = disputed
     if options.oracle_check:
         cases = [c for c in cases if c.kind == "bug"]  # clean cases have no oracle
         meta["cases"] = len(cases)

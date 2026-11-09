@@ -72,13 +72,14 @@ called done. Unit tests never hit the network or a real model.
 | `sandbox/*.Dockerfile` | Test images per app, versions mirroring `.github/workflows/test-*.yml` |
 | `src/bug_hunter/graph/state.py` | `BugState` + sub-models (spec §4), `Budget` per node |
 | `src/bug_hunter/graph/build.py` | `build_graph(deps, checkpointer)`, `run_graph`; `deps.py` holds tools/models/context per run |
-| `src/bug_hunter/graph/nodes/` | intake, triage, investigate (tool loop), reproduce (tool loop + code verification), escalate, report |
+| `src/bug_hunter/graph/nodes/` | intake, triage, investigate (tool loop), reproduce (tool loop + code verification + passing-test bounce), escalate, report |
 | `src/bug_hunter/graph/loop.py` | ReAct tool loop as a subgraph with finish tools; resumable mid-loop |
 | `src/bug_hunter/graph/routing.py` | Conditional edges, pure functions of the state |
 | `src/bug_hunter/graph/budget.py` | Token/cost accounting (prices in `models.yaml`) and the per-run caps |
 | `src/bug_hunter/graph/failure.py` | Setup vs genuine test failure, per framework |
 | `src/bug_hunter/graph/checkpointer.py` | `PostgresSaver` (schema `bughunter`), `InMemorySaver` only on request |
-| `src/bug_hunter/graph/prompts.py` + `prompts/*.vN.md` | Versioned prompts; active version in `models.yaml` |
+| `src/bug_hunter/graph/prompts.py` + `prompts/*.vN.md` | Versioned prompts; active version in `models.yaml` (triage.v3 = v1 text, investigate.v2, reproduce.v2); never change without a shown proposal |
+| `src/bug_hunter/spend.py` | Daily model-spend ledger `runs/spend.json`; `bug-hunter spend show/add/check`; $15/day refusal |
 | `src/bug_hunter/runs.py` | `Run` lifecycle: worktree + containers always cleaned, artefacts always kept under `runs/artefacts/<run_id>/`; `clean_orphans`, `clean_artefacts`, `cache_report` |
 | `src/bug_hunter/context/app_context.py` | Per-app knowledge: `AGENTS.md` + the app's parts of the root `CLAUDE.md` |
 | `src/bug_hunter/context/repo_map.py` | tree-sitter symbol index + best-effort call graph (NestJS DI aware); `outline`, `find_symbol`, `callers`, `callees`, `tests_for`, `neighbourhood(diff)`; gzip cache per commit under `runs/cache/repo-map/` |

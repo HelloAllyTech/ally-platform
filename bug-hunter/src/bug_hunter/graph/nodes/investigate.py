@@ -8,6 +8,7 @@ from typing import Any
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, ConfigDict, Field
 
+from bug_hunter.context.tokens import truncate_to_tokens
 from bug_hunter.graph.budget import with_clock
 from bug_hunter.graph.deps import GraphDeps
 from bug_hunter.graph.loop import LoopState, ToolLoop, initial_messages, run_loop
@@ -15,6 +16,10 @@ from bug_hunter.graph.nodes.common import node_context, over_budget
 from bug_hunter.graph.prompts import load_prompt
 from bug_hunter.graph.state import CATEGORIES, BugState, Confidence, Finding, Severity
 from bug_hunter.tools.lc import map_tools, read_tools
+
+NEIGHBOURHOOD_MAX_ITEMS = 25
+NEIGHBOURHOOD_MAX_EDGES = 8
+NEIGHBOURHOOD_MAX_TOKENS = 4000  # ~12k chars; the agent can read more with the tools
 
 
 class SubmitFinding(BaseModel):
@@ -96,9 +101,16 @@ def make_investigate_node(deps: GraphDeps):
         neighbourhood = ""
         if deps.mode == "sweep" and deps.diff and deps.repo_map is not None:
             try:
-                neighbourhood = deps.repo_map.neighbourhood(deps.diff).render()
+                neighbourhood = deps.repo_map.neighbourhood(
+                    deps.diff, max_items=NEIGHBOURHOOD_MAX_ITEMS
+                ).render(max_edges=NEIGHBOURHOOD_MAX_EDGES)
             except Exception:  # noqa: BLE001 - help, not a requirement
                 neighbourhood = ""
+            # a 131-file diff rendered to ~270k chars and rode along in every call
+            # (67k tokens × 20 calls): hard cap, whole lines
+            neighbourhood = truncate_to_tokens(
+                neighbourhood, NEIGHBOURHOOD_MAX_TOKENS, deps.counter
+            )
         ctx = node_context(deps, "investigate", state)
         system = prompt.render(
             context=ctx.render(),

@@ -197,6 +197,7 @@ class RunLimits(_Strict):
     max_wall_clock_s: int = Field(gt=0)
     max_cost_usd: float = Field(default=1.5, gt=0)
     max_tool_turns: int = Field(default=30, ge=1)
+    max_repro_attempts: int = Field(default=3, ge=1)
 
 
 class SweepLimits(_Strict):

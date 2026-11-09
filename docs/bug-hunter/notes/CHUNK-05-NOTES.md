@@ -1,7 +1,7 @@
 # Chunk 05 notes: graph v1 (diagnose)
 
 Branch `feat/bug-hunter-v2`, merged from `origin/master` at chunk start (no rebase).
-`make lint` and `make test` pass (257 offline tests). Results sections marked PENDING are
+`make lint` and `make test` pass (273 offline tests). Results sections marked PENDING are
 filled from the runs below.
 
 ## Code map
@@ -278,7 +278,53 @@ Today's total, including estimates for two cancelled GitHub runs without reports
 `spend show` (≈ $21 on 2026-11-09). Standing rules: show prompt proposals first; ask
 before every GitHub dispatch and every multi-case local run, with the expected cost.
 
+## Closing changes (offline, 2026-11-09 evening)
+
+- **triage.v3 = v1 text** (active): the user kept v2 for issue mode but wanted sweep
+  triage back to v1 behaviour; since every v2 triage change was sweep-only, v3 is
+  byte-identical to v1 and the diff v2→v3 removes the two sweep bullets and the sweep
+  "bad" example. investigate.v2 and reproduce.v2 stay active.
+- **Passing-test bounce in code** (`nodes/reproduce.py`): a submitted test that passes
+  on the buggy code, or runs no test, goes back into the reproduce loop with its
+  output as a human message; it counts as an attempt (`BugState.repro_attempts`,
+  `limits.run.max_repro_attempts: 3`); when attempts run out the run escalates with
+  "could not reproduce: … after N bounced attempts". Two e2e tests.
+- **Where `ally-ai-learn-995242d7`'s tokens went** (from its two v2 traces):
+  - *sweep*: the system prompt was 294k characters, of which the repo-map
+    **call-graph neighbourhood of the 131-file introducing commit was ~268k characters
+    (≈67k tokens)**, re-sent on all 20 calls → 1.54M prompt tokens for 5.5k output
+    tokens. Fixed: the neighbourhood is capped (25 items, 8 edges, 4 000 tokens, whole
+    lines) and no longer escapes the budget. Test pins the cap.
+  - *issue*: 61 model calls at ~25k tokens each; `app/worker.py` (4 700 lines) was read
+    11 times in 400-line slices, 268k characters of `read_file` output in total, plus
+    7 `run_tests` (63 s, 42k characters). Compaction held each prompt at ~26k tokens,
+    so the cost was the call count: both loops ran to the 30-turn limit. Fixed in code
+    only where code can: identical read-only calls in one loop now return a one-line
+    pointer instead of the output again. The deeper cause (linear reading of a huge
+    file instead of `outline`/`find_symbol`) is a prompt change and needs the user's
+    go: proposal in the open questions.
+- **Flutter test-name escaping** (`runner.test_name_filter`): `--name` and Jest `-t`
+  are regexes, pytest `-k` is an expression; names are escaped per framework
+  (`tests/test_runner.py::test_test_names_are_escaped_for_the_frameworks_filter`).
+- **`ally-ai-6e81b510` is disputed**: `Case.status: disputed` with the two agent
+  findings in `dispute_note`; disputed cases are kept in `cases.yaml` but skipped by
+  the harness (`meta.disputed_skipped`). Active set: 21 bug, 27 clean.
+- **Spend ledger** (`bug-hunter spend`, `runs/spend.json`) and the standing rules, see
+  above. Today: ≈ $21 (two cancelled runs estimated).
+
+Chunk 05 closes with the subset numbers above; the full 49-case run happens after
+chunk 06, with the user's go and the ledger in view.
+
 ## Open questions and notes for later chunks
+
+- **Prompt proposal (needs go)**: investigate/reproduce should open a file with
+  `outline` or `find_symbol` and read only the ranges that matter; a file over ~1 500
+  lines is never read linearly. Targets the issue-mode token use on `995242d7`.
+- Resolve `ally-ai-6e81b510` with the team: real bug → becomes a bug case (its
+  introducing commit is the "clean" commit itself); not a bug → back to clean.
+- Two more mass-commit introducing commits may exist among the 20; `sweep_diff`
+  scopes them to the app, but a 131-file diff is still a weak sweep signal. Consider
+  scoping to the fix's own files when the commit is over N lines.
 
 - Chunk 06 (fix): `after_reproduce` routes a reproduced bug to `report`; the
   `risk_precheck → fix → verify → review → risk_gate → human_approval → open_pr` chain

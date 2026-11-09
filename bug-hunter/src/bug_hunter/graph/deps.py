@@ -46,6 +46,12 @@ class GraphDeps:
     _ensure_sandbox: Callable[[], None] | None = field(default=None, repr=False)
     tool_log: list[dict[str, Any]] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        if self.counter is None:
+            self.counter = make_counter(
+                self.config.limits.context.chars_per_token_offline
+            )[0]
+
     def ensure_sandbox(self) -> None:
         """Image + dependency install, once, the first time a test must run."""
         if self.sandbox_ready:

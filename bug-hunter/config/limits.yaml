@@ -5,6 +5,7 @@ run:
   max_wall_clock_s: 2700      # 45 minutes per graph run
   max_cost_usd: 1.50          # per graph run; the run escalates with "budget exceeded" past any of the three
   max_tool_turns: 30          # per tool loop (investigate, reproduce); the loop then answers with what it has
+  max_repro_attempts: 3       # a submitted test that passes (or runs nothing) goes back to the agent this many times
 sweep:
   max_runs_per_day: 5
   max_prs_per_day: 3

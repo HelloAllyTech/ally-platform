@@ -148,7 +148,8 @@ class BugState(BaseModel):
     review: Review | None = None
     risk_level: Literal["low", "medium", "high", "human_only"] | None = None
     confidence: Confidence | None = None
-    attempts: int = 0
+    attempts: int = 0  # fix attempts (chunk 06)
+    repro_attempts: int = 0  # submitted tests that passed or ran nothing, bounced back
     status: Status = "new"
     stop_reason: str | None = None  # budget exceeded, cannot reproduce, …
     pr_url: str | None = None

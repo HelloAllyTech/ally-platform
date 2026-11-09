@@ -230,3 +230,30 @@ def test_tool_results_keep_code_identifiers_but_lose_literal_phi(
         "[redacted" not in tool_msg.content
         and "ops@example.com" not in tool_msg.content
     )
+
+
+def test_identical_reads_are_not_paid_for_twice(config, tmp_path) -> None:
+    loop = _loop(
+        config,
+        tmp_path,
+        [
+            ai(tool_calls=[{"name": "echo", "args": {"value": "same"}}]),
+            ai(tool_calls=[{"name": "echo", "args": {"value": "same"}}]),
+            ai(tool_calls=[{"name": "echo", "args": {"value": "other"}}]),
+            ai(tool_calls=[{"name": "finish", "args": {"text": "d"}}]),
+        ],
+    )
+    # echo stands in for a read-only tool
+    import bug_hunter.graph.loop as loop_module
+
+    loop_module.REPEATABLE_READS = (*loop_module.REPEATABLE_READS, "echo")
+    try:
+        out = loop.build().invoke(_initial())
+    finally:
+        loop_module.REPEATABLE_READS = tuple(
+            t for t in loop_module.REPEATABLE_READS if t != "echo"
+        )
+    tool_msgs = [m.content for m in out["messages"] if m.type == "tool"]
+    assert tool_msgs[0].startswith("echo:same")
+    assert "identical echo call already made in turn 1" in tool_msgs[1]
+    assert tool_msgs[2].startswith("echo:other")

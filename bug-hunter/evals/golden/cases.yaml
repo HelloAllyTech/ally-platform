@@ -29,6 +29,8 @@ cases:
   src_lines: 2
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 8821e5215782e44b07b664de41a450f4f5f60dc9
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-99584ee6
   kind: bug
@@ -52,6 +54,8 @@ cases:
   src_lines: 2
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 168f627a948f433b6054f8133e036738b40414ec
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-d039e256
   kind: bug
@@ -74,6 +78,8 @@ cases:
   - src/auth/guards/test/jwt-auth.guard.spec.ts
   src_lines: 3
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-89d8e055
   kind: bug
@@ -98,6 +104,8 @@ cases:
   src_lines: 4
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 099de82c1f76fd6f6fb4d8baa5f44f6098fa80ca
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-adf36739
   kind: bug
@@ -121,6 +129,8 @@ cases:
   src_lines: 5
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: a981059deb98b7f8bca10f0ab629e885116b3995
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-8c4f9caf
   kind: bug
@@ -143,6 +153,8 @@ cases:
   src_lines: 5
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 2c2c378e8a99f1623e409d0667a601f89c2abc3a
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-9299e9aa
   kind: bug
@@ -166,6 +178,8 @@ cases:
   src_lines: 8
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 88fd1da22fc0b732d3e4245d5edff4e735e48915
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-e5ad37b3
   kind: bug
@@ -189,6 +203,8 @@ cases:
   src_lines: 2
   lockfile_blob: ac36e034439c488c4e5182ba51ca425f7ea367ec
   introduced_by: bf5dcf9699ad683933b485454cc7935963098bcd
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-dd128ff8
   kind: bug
@@ -212,6 +228,8 @@ cases:
   src_lines: 22
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: f6ed605a08945f1cba2b09824b2bbbd0b99f75ec
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-f35e117d
   kind: bug
@@ -237,6 +255,8 @@ cases:
   src_lines: 23
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 2cff91d1026a17c5f4be4757c2c22e228fc61de7
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-eebbfd01
   kind: bug
@@ -261,6 +281,8 @@ cases:
   src_lines: 30
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 5519e5891bad9218e07be097fd11d4bf547df61b
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-3b3db9b5
   kind: bug
@@ -289,6 +311,8 @@ cases:
   src_lines: 37
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: ec3e51c60e2f4ea8a92f66a3980971ac7f27ffe1
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-b680c643
   kind: bug
@@ -312,6 +336,8 @@ cases:
   src_lines: 12
   lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
   introduced_by: 48363e1467d348a6a2bf5b706fdb484e1d9021f2
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-e9a0e1c3
   kind: bug
@@ -333,6 +359,8 @@ cases:
   src_lines: 14
   lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
   introduced_by: cfda686b2dd052cc3e2464254b2bd0643ef5032a
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-1065743a
   kind: bug
@@ -356,6 +384,8 @@ cases:
   src_lines: 6
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: a3bc5e6939b582207484eba1f8d57a4e9d88dcf6
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-7391ff7e
   kind: bug
@@ -378,6 +408,8 @@ cases:
   src_lines: 16
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: 71ddf4d76520a6b90213d046c238b9ccefbdee3a
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-995242d7
   kind: bug
@@ -402,6 +434,8 @@ cases:
   src_lines: 24
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: 51ac5ac4d3a9307454188f123e87829405b4186b
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-mobile-83bdf91e
   kind: bug
@@ -430,6 +464,8 @@ cases:
   src_lines: 59
   lockfile_blob: 4006dfa5966ef211c009513b41c55ba27aa83fff
   introduced_by: d4ae9ebdf5157a7119c5003c0778cc1d37d99dd0
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-6e81b510
   kind: clean
@@ -452,6 +488,13 @@ cases:
   - tests/core/text_generations/test_openai_text_generation_service.py
   oracle_tests: []
   src_lines: 33
+  status: disputed
+  dispute_note: '2026-11-09: labelled clean (feat: challenge_description field), but two sweep runs of
+    graph v1/v2 produced concrete findings on it: (1) prompt text says ''Supportive engagement'' while
+    the schema enum requires ''Supportive Engagement'' (structured-output validation risk); (2) challenge_description
+    was added to the schema and service output but not to _language_directive in openai_text_generation_service.py:107-116,
+    so it is never translated. User is checking with the team whether either is a real bug; if so this
+    becomes a bug case, else it returns to clean.'
   tags: []
 - id: ally-ai-7d30a176
   kind: clean
@@ -475,6 +518,8 @@ cases:
   - tests/core/text_generations/test_openai_text_generation_service.py
   oracle_tests: []
   src_lines: 75
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-1ff07399
   kind: clean
@@ -493,6 +538,8 @@ cases:
   - app/core/text_generations/openai_text_generation_service.py
   oracle_tests: []
   src_lines: 29
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-6d1b48a8
   kind: clean
@@ -511,6 +558,8 @@ cases:
   - tests/core/test_prompt_llm_overrides.py
   oracle_tests: []
   src_lines: 10
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-e6286217
   kind: clean
@@ -530,6 +579,8 @@ cases:
   - tests/core/queue/test_transcription_request_handler.py
   oracle_tests: []
   src_lines: 39
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-f06c8ed5
   kind: clean
@@ -549,6 +600,8 @@ cases:
   - tests/core/queue/test_transcription_request_handler.py
   oracle_tests: []
   src_lines: 91
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-b6c51894
   kind: clean
@@ -567,6 +620,8 @@ cases:
   - app/worker.py
   oracle_tests: []
   src_lines: 47
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-88592f67
   kind: clean
@@ -586,6 +641,8 @@ cases:
   - app/core/queue/utils.py
   oracle_tests: []
   src_lines: 30
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-a645303c
   kind: clean
@@ -604,6 +661,8 @@ cases:
   - app/simulated_user_worker.py
   oracle_tests: []
   src_lines: 42
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-c77f929e
   kind: clean
@@ -623,6 +682,8 @@ cases:
   - app/worker.py
   oracle_tests: []
   src_lines: 33
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-b408b775
   kind: clean
@@ -642,6 +703,8 @@ cases:
   - app/core/scenario/base.py
   oracle_tests: []
   src_lines: 28
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-ai-learn-66d9a037
   kind: clean
@@ -661,6 +724,8 @@ cases:
   - tests/unit/graph/test_prompt.py
   oracle_tests: []
   src_lines: 37
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-b29aa1be
   kind: clean
@@ -681,6 +746,8 @@ cases:
   - src/builder/service/builder-settings.service.ts
   oracle_tests: []
   src_lines: 39
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-f3e78b7e
   kind: clean
@@ -700,6 +767,8 @@ cases:
   - src/database/migrations/1970300000000-AddBuilderReview.ts
   oracle_tests: []
   src_lines: 39
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-a2ed4959
   kind: clean
@@ -718,6 +787,8 @@ cases:
   - src/builder/service/builder-metrics.service.ts
   oracle_tests: []
   src_lines: 41
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-d77c088a
   kind: clean
@@ -737,6 +808,8 @@ cases:
   - src/learn/service/scenario-session.service.ts
   oracle_tests: []
   src_lines: 41
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-5017783f
   kind: clean
@@ -755,6 +828,8 @@ cases:
   - src/database/migrations/1883000000000-EnableHistoryTrimForAllScenarios.ts
   oracle_tests: []
   src_lines: 41
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-6b5647ff
   kind: clean
@@ -774,6 +849,8 @@ cases:
   - src/database/migrations/1797000000000-EnableComfortAudioTrimHistoryInterimReply.ts
   oracle_tests: []
   src_lines: 40
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-0f139f7a
   kind: clean
@@ -793,6 +870,8 @@ cases:
   - src/learn/service/scenario-session.service.ts
   oracle_tests: []
   src_lines: 39
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-8c5367c1
   kind: clean
@@ -815,6 +894,8 @@ cases:
   - src/scenario-path/type/scenario-path-session-items.type.ts
   oracle_tests: []
   src_lines: 39
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-7b655598
   kind: clean
@@ -834,6 +915,8 @@ cases:
   - apps/ally-helpline-dashboard/src/constants/routes.ts
   oracle_tests: []
   src_lines: 40
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-da6535f4
   kind: clean
@@ -853,6 +936,8 @@ cases:
   - apps/ally-admin-dashboard/src/constants/en.ts
   oracle_tests: []
   src_lines: 42
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-bbaeab31
   kind: clean
@@ -873,6 +958,8 @@ cases:
   - apps/ally-admin-dashboard/src/types/builder.ts
   oracle_tests: []
   src_lines: 42
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-ffa86627
   kind: clean
@@ -893,6 +980,8 @@ cases:
   - apps/ally-admin-dashboard/src/types/roleplaySessionLogs.ts
   oracle_tests: []
   src_lines: 42
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-2ae8d573
   kind: clean
@@ -914,6 +1003,8 @@ cases:
   - apps/ally-admin-dashboard/src/pages/EventManagement/EventManagement.tsx
   oracle_tests: []
   src_lines: 40
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-1364881b
   kind: clean
@@ -934,6 +1025,8 @@ cases:
   - apps/ally-helpline-dashboard/src/pages/review/constants.ts
   oracle_tests: []
   src_lines: 42
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-382b51ea
   kind: clean
@@ -953,6 +1046,8 @@ cases:
   - apps/ally-admin-dashboard/src/types/auth.ts
   oracle_tests: []
   src_lines: 37
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-web-8890b80b
   kind: clean
@@ -972,6 +1067,8 @@ cases:
   - apps/ally-admin-dashboard/src/types/auth.ts
   oracle_tests: []
   src_lines: 37
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-819f6ccf
   kind: bug
@@ -995,6 +1092,8 @@ cases:
   src_lines: 9
   lockfile_blob: baf594754c56a70cb476b9715f7679e5ebb33dd8
   introduced_by: 06f1157e49daa64b25e1105fef256ecc3533739a
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-6083b8d8
   kind: bug
@@ -1023,6 +1122,8 @@ cases:
   src_lines: 27
   lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
   introduced_by: 122a80cbcae35f1abeaad6dac4d5f44f08c1892
+  status: active
+  dispute_note: ''
   tags: []
 - id: ally-be-87c6ecb8
   kind: bug
@@ -1048,4 +1149,6 @@ cases:
   src_lines: 52
   lockfile_blob: 6f1c15c2ef3076fa643ce2862fa53c8ef6f8bcc4
   introduced_by: 25d665f80251fce1e5a798533a82d3c2f637b422
+  status: active
+  dispute_note: ''
   tags: []

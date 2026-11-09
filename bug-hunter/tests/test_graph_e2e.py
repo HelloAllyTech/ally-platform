@@ -397,9 +397,13 @@ def test_graph_agent_exports_only_an_accepted_repro(
                 ]
             ),
             ai(tool_calls=[REPRO_CALL]),
+            structured(RightReasonJudgement(related=False, why="unrelated failure")),
         ]
     )
-    runner = ScriptedRunner("ally-be", [run_result("ally-be", True)])
+    # the test fails, but the judge says the failure is unrelated to the hypothesis
+    runner = ScriptedRunner(
+        "ally-be", [run_result("ally-be", False, "● other › fails")]
+    )
     models = {
         "triage": ScriptedChatModel(script=[_triage()]),
         "investigate": ScriptedChatModel(script=[ai(tool_calls=[FINDING_CALL])]),
@@ -451,3 +455,149 @@ def test_graph_agent_exports_only_an_accepted_repro(
         fake_run,
     )
     assert result.escalated and result.repro_test is None
+
+
+def test_sweep_neighbourhood_is_capped_in_the_prompt(config, repo, tmp_path) -> None:
+    """A huge diff's call-graph neighbourhood must not ride along in every call."""
+    from bug_hunter.graph.nodes import investigate as inv
+
+    class HugeMap:
+        def neighbourhood(self, diff, max_items=40):
+            class N:
+                def render(self, max_edges=12):
+                    return "\n".join(f"item {i} " + "x" * 200 for i in range(2000))
+
+            return N()
+
+    captured = {}
+    model = ScriptedChatModel(
+        script=[
+            ai(
+                tool_calls=[
+                    {
+                        "name": "report_no_bug",
+                        "args": {"reason": "fine", "confidence": "low"},
+                    }
+                ]
+            )
+        ]
+    )
+    deps = _deps(config, repo, tmp_path, {"investigate": model})
+    deps.mode = "sweep"
+    deps.diff = "+ x"
+    node = inv.make_investigate_node(deps)  # tools built without a map
+    deps.repo_map = HugeMap()  # type: ignore[assignment]  # only the neighbourhood
+    state = _state_for(deps)
+    node(state)
+    system = model.calls[0][0].content
+    captured["len"] = len(system)
+    assert len(system) < 60_000, captured  # ~4k tokens of neighbourhood, not 400k chars
+    assert "item 0" in system and "item 1999" not in system
+
+
+def _state_for(deps):
+    from bug_hunter.graph.build import initial_state
+
+    return initial_state(deps, SIGNAL).model_copy(update={"status": "triaged"})
+
+
+def _fix_model_submitting_twice():
+    return ScriptedChatModel(
+        script=[
+            ai(
+                tool_calls=[
+                    {
+                        "name": "write_test_file",
+                        "args": {
+                            "path": "src/x.spec.ts",
+                            "content": "tests src/x.ts\n",
+                        },
+                    }
+                ]
+            ),
+            ai(tool_calls=[REPRO_CALL]),  # 1st claim: the harness says it passed
+            ai(
+                tool_calls=[
+                    {
+                        "name": "write_test_file",
+                        "args": {
+                            "path": "src/x2.spec.ts",
+                            "content": "tests src/x.ts\n",
+                        },
+                    }
+                ]
+            ),
+            ai(
+                tool_calls=[
+                    {
+                        **REPRO_CALL,
+                        "args": {**REPRO_CALL["args"], "test_path": "src/x2.spec.ts"},
+                    }
+                ]
+            ),
+            structured(RightReasonJudgement(related=True, why="symptom shows")),
+        ]
+    )
+
+
+def test_passing_test_bounces_back_then_reproduces(config, repo, tmp_path) -> None:
+    fix = _fix_model_submitting_twice()
+    runner = ScriptedRunner(
+        "ally-be",
+        [
+            run_result("ally-be", True),
+            run_result("ally-be", False, "● x\n expect 3 got 0"),
+        ],
+    )
+    deps = _deps(
+        config,
+        repo,
+        tmp_path,
+        {
+            "triage": ScriptedChatModel(script=[_triage()]),
+            "investigate": ScriptedChatModel(script=[ai(tool_calls=[FINDING_CALL])]),
+            "fix": fix,
+        },
+        runner=runner,
+    )
+    state = run_graph(build_graph(deps), deps, SIGNAL)
+    assert state.status == "reproduced", state.stop_reason
+    assert state.repro_attempts == 1 and state.repro.test_path == "src/x2.spec.ts"
+    bounce = [
+        m
+        for m in fix.calls[2]
+        if m.type == "human" and "PASSED on the current" in str(m.content)
+    ]
+    assert bounce and "attempt 1 of 3" in str(bounce[0].content)
+    assert runner.calls == [
+        ("src/x.spec.ts", "x returns 3"),
+        ("src/x2.spec.ts", "x returns 3"),
+    ]
+
+
+def test_passing_tests_exhaust_attempts_and_escalate(config, repo, tmp_path) -> None:
+    submit = ai(tool_calls=[REPRO_CALL])
+    fix = ScriptedChatModel(
+        script=[submit, submit, submit, submit]
+    )  # keeps resubmitting
+    runner = ScriptedRunner("ally-be", [run_result("ally-be", True)])  # always passes
+    deps = _deps(
+        config,
+        repo,
+        tmp_path,
+        {
+            "triage": ScriptedChatModel(script=[_triage()]),
+            "investigate": ScriptedChatModel(script=[ai(tool_calls=[FINDING_CALL])]),
+            "fix": fix,
+        },
+        runner=runner,
+    )
+    (repo / "ally-be/src/x.spec.ts").write_text("tests src/x.ts\n")
+    state = run_graph(build_graph(deps), deps, SIGNAL)
+    assert state.status == "escalated"
+    assert state.repro_attempts == config.limits.run.max_repro_attempts == 3
+    assert (
+        "could not reproduce" in state.stop_reason
+        and "3 bounced attempts" in state.stop_reason
+    )
+    assert len(runner.calls) == 4  # the original claim + three bounced resubmissions

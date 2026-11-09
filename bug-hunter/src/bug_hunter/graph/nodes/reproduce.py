@@ -164,11 +164,56 @@ def make_reproduce_node(deps: GraphDeps):
             "started_at": state.started_at,
             "node": "reproduce",
         }
-        out = run_loop(
-            compiled, initial, config, deps.checkpointer, max_turns=loop.max_turns
-        )
+        max_attempts = deps.config.limits.run.max_repro_attempts
+        attempts = 0
+        run_result = None
+        kind = "genuine"
+        current: LoopState = initial
+        while True:
+            out = run_loop(
+                compiled, current, config, deps.checkpointer, max_turns=loop.max_turns
+            )
+            result = out.get("result")
+            if not result or result["tool"] != "submit_repro":
+                break
+            claim = result["args"]
+            if deps.runner is None:
+                break
+            deps.ensure_sandbox()
+            run_result = deps.runner.run_tests(claim["test_path"], claim["test_name"])
+            kind = classify_failure(app_config, run_result)
+            if kind not in ("passed", "no_tests") or attempts >= max_attempts:
+                break
+            # the claim did not hold: the test passed on the buggy code, or no test
+            # ran. Send the agent back with the output; this is an attempt, not a
+            # reproduction (prose alone did not stop agents submitting passing tests)
+            attempts += 1
+            deps.scratchpad.append_note(
+                f"reproduce: attempt {attempts}/{max_attempts}: "
+                f"{claim['test_path']}::{claim['test_name']} -> {kind}; bounced back"
+            )
+            bounce = (
+                f"Your submitted test `{claim['test_path']}::{claim['test_name']}` "
+                + (
+                    "PASSED on the current (buggy) code. A passing test is not a "
+                    "reproduction: either the assertion states behaviour that already "
+                    "holds, or the input never reaches the defective line. Rewrite it "
+                    "so it fails because of the hypothesised defect, run it, and "
+                    "submit again; or finish with cannot_reproduce."
+                    if kind == "passed"
+                    else "ran NO TEST (wrong path or name filter). Check the file path "
+                    "and the exact test name, run it again, and submit again."
+                )
+                + f" (attempt {attempts} of {max_attempts})\n\nOutput:\n"
+                + (run_result.excerpt or "")[-EXCERPT_MAX:]
+            )
+            current = {
+                **out,
+                "messages": [*out["messages"], HumanMessage(content=bounce)],
+                "result": None,
+                "loop_stop": None,
+            }
         budget = with_clock(out["budget_used"], state.started_at)
-        result = out.get("result")
         if not result or result["tool"] != "submit_repro":
             reason = (
                 result["args"]["reason"]
@@ -185,18 +230,17 @@ def make_reproduce_node(deps: GraphDeps):
                 "status": "escalated",
                 "stop_reason": stop[:400],
                 "budget_used": budget,
+                "repro_attempts": attempts,
             }
         args = result["args"]
-        # the agent's claim is verified in code: run exactly that test
-        if deps.runner is None:
+        # the agent's claim was verified in code above: exactly that test was run
+        if deps.runner is None or run_result is None:
             return {
                 "status": "escalated",
                 "stop_reason": "could not reproduce: no sandbox to run the test",
                 "budget_used": budget,
+                "repro_attempts": attempts,
             }
-        deps.ensure_sandbox()
-        run_result = deps.runner.run_tests(args["test_path"], args["test_name"])
-        kind = classify_failure(app_config, run_result)
         excerpt = (run_result.excerpt or "")[-EXCERPT_MAX:]
         command = single_test_command(app_config, args["test_path"], args["test_name"])
         related, judgement = False, describe(kind)
@@ -241,12 +285,25 @@ def make_reproduce_node(deps: GraphDeps):
             f"right reason={related}: {judgement}"
         )
         if related:
-            return {"repro": repro, "status": "reproduced", "budget_used": budget}
+            return {
+                "repro": repro,
+                "status": "reproduced",
+                "budget_used": budget,
+                "repro_attempts": attempts,
+            }
+        exhausted = (
+            f" after {attempts} bounced attempts"
+            if kind in ("passed", "no_tests") and attempts
+            else ""
+        )
         return {
             "repro": repro,
             "status": "escalated",
-            "stop_reason": f"could not reproduce: {describe(kind)}; {judgement}"[:400],
+            "stop_reason": (
+                f"could not reproduce: {describe(kind)}{exhausted}; {judgement}"[:400]
+            ),
             "budget_used": budget,
+            "repro_attempts": attempts,
         }
 
     return reproduce

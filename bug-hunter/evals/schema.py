@@ -47,6 +47,11 @@ class Case(BaseModel):
     # the fix removed, at the parent), never the fix itself. None = unknown: the case
     # is then issue-only.
     introduced_by: str | None = None
+    # "disputed": the label is under review (an agent produced a concrete finding on a
+    # "clean" commit, or a fix turned out not to be one). Disputed cases are kept but
+    # never run or scored until resolved.
+    status: Literal["active", "disputed"] = "active"
+    dispute_note: str = ""
     tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -90,6 +95,12 @@ class CaseFile(BaseModel):
 
     def for_mode(self, cases: list[Case], mode: str) -> list[Case]:
         return [c for c in cases if mode in c.modes]
+
+    def active(self) -> list[Case]:
+        return [c for c in self.cases if c.status == "active"]
+
+    def disputed(self) -> list[Case]:
+        return [c for c in self.cases if c.status == "disputed"]
 
     def by_app(self) -> dict[str, dict[str, int]]:
         out: dict[str, dict[str, int]] = {}

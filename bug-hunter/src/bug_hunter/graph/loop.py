@@ -48,9 +48,13 @@ FINAL_NUDGE = (
 )
 
 
+REPEATABLE_READS = ("read_file", "grep", "glob", "list_dir", "outline", "git_log")
+
+
 class LoopState(TypedDict, total=False):
     messages: list[BaseMessage]
     turns: int
+    seen_calls: dict[str, int]  # identical read-only calls -> turn first made
     result: dict[str, Any] | None  # {"tool": name, "args": {...}}
     loop_stop: str | None  # why it ended without a finish tool
     budget_used: Budget
@@ -151,17 +155,28 @@ class ToolLoop:
         messages = list(state["messages"])
         last = messages[-1]
         assert isinstance(last, AIMessage)
+        seen: dict[str, int] = dict(state.get("seen_calls") or {})
         for call in last.tool_calls:
             if call["name"] in self.finish_names:
                 continue
             tool = self._by_name.get(call["name"])
+            key = json.dumps([call["name"], call["args"]], sort_keys=True, default=str)
             if tool is None:
                 text = f"error: unknown tool {call['name']}"
+            elif key in seen and call["name"] in REPEATABLE_READS:
+                # the same read twice in one loop: the first result is still in the
+                # history (or summarised in the scratchpad); do not pay for it again
+                text = (
+                    f"(identical {call['name']} call already made in turn {seen[key]}; "
+                    "its result is above or summarised in the scratchpad. Read a "
+                    "different range or file.)"
+                )
             else:
                 try:
                     text = str(tool.invoke(call["args"]))
                 except Exception as exc:  # noqa: BLE001 - the model needs the message
                     text = f"error: {exc}"
+            seen.setdefault(key, state.get("turns", 0) + 1)
             # tool results are code and listings: pattern scrub only. The data
             # scrubber's key rules turned `userId: x` in Dart/TS into [redacted:userid]
             # and agents then hunted phantom "placeholders left in the code".
@@ -181,7 +196,11 @@ class ToolLoop:
             messages = self.scratchpad.compact(
                 messages, self.message_budget, self.counter
             )
-        return {"messages": messages, "turns": state.get("turns", 0) + 1}
+        return {
+            "messages": messages,
+            "turns": state.get("turns", 0) + 1,
+            "seen_calls": seen,
+        }
 
     @staticmethod
     def route(state: LoopState) -> str:
