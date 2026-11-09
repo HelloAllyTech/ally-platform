@@ -117,11 +117,9 @@ def test_mining_bugs_and_clean(config: BugHunterConfig, tmp_path: Path) -> None:
     assert all(c.expected == "no_bug" and c.layout == "monorepo" for c in clean)
     folder = tmp_path / "cands"
     md = write_candidates(folder, repo, bugs + clean)
-    assert (
-        (folder / f"{a.id}.patch")
-        .read_text()
-        .startswith("diff --git a/ally-be/src/a.ts")
-    )
+    patch = (folder / f"{a.id}.patch").read_text()
+    assert "diff --git a/ally-be/src/a.ts" in patch
+    assert "a/ally-be/src/a.spec.ts" in patch
     assert "| `ally-be-" in md.read_text() and (folder / "SHORTLIST.md").exists()
     assert len(shortlist(bugs + clean)) == 4
 
