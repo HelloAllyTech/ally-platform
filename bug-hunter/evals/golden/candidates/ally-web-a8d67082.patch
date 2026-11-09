@@ -1,0 +1,175 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+index b716810e85..f3cd4ef888 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+@@ -28,6 +28,13 @@ interface CommentThreadProps {
+   setThreadsOffset: React.Dispatch<React.SetStateAction<number>>;
+   onAddComment: () => void;
+   isScribeReview?: boolean;
++  /**
++   * Ids of comments deleted locally in this session. The list is reseeded from
++   * a force-refetching REVIEW query, which can briefly return a just-deleted
++   * comment (read-after-delete lag) and clobber the optimistic removal. The
++   * reseed excludes these ids so a deleted comment cannot reappear.
++   */
++  deletedCommentIds?: React.MutableRefObject<Set<string>>;
+ }
+ const CommentThread = ({
+   comments,
+@@ -43,6 +50,7 @@ const CommentThread = ({
+   setThreadsOffset,
+   onAddComment,
+   isScribeReview,
++  deletedCommentIds,
+ }: CommentThreadProps) => {
+   const user = useSelector((state: RootState) => state.user.user);
+   const [comment, setComment] = useState("");
+@@ -61,7 +69,10 @@ const CommentThread = ({
+ 
+   useEffect(() => {
+     if (!threadComments || threadComments.data.length === 0) return;
+-    const nextData = threadComments.data ?? [];
++    // Exclude locally-deleted comments so a lagging refetch cannot re-add one.
++    const nextData = (threadComments.data ?? []).filter(
++      comment => !deletedCommentIds?.current.has(comment.id),
++    );
+     if (threadsOffset === 0) {
+       setComments?.(nextData);
+       onCommentChange?.({ comments: nextData, threadId: id });
+@@ -174,6 +185,9 @@ const CommentThread = ({
+     const currentComment = comments.find(comment => comment.id === commentId);
+     const replyCount = currentComment?.replyCount ?? 0;
+     const currentLength = (comments ?? []).length;
++    // Remember this deletion so the reseed effects don't re-add it before the
++    // backend is consistent.
++    deletedCommentIds?.current.add(commentId);
+     setComments?.(prev => {
+       const filteredComments = prev.filter(comment => comment.id !== commentId);
+       onCommentChange?.({ comments: filteredComments, threadId: id });
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
+index 28e56a2c64..b930936c86 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
+@@ -3,7 +3,7 @@ import React from "react";
+ import { render, screen, fireEvent } from "@testing-library/react";
+ import { Provider } from "react-redux";
+ import { configureStore } from "@reduxjs/toolkit";
+-import { describe, it, expect, vi, beforeEach } from "vitest";
++import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+ 
+ import CommentThread from "../CommentThread";
+ 
+@@ -205,6 +205,12 @@ describe("CommentThread Component", () => {
+     mockStore = createMockStore();
+   });
+ 
++  afterEach(() => {
++    // The API mock returns this shared object; reset so per-test mutations
++    // (used by the reseed-guard tests) don't leak into other tests.
++    stableApiResponse.data = [];
++  });
++
+   const renderWithProvider = (component: React.ReactElement) => {
+     return render(<Provider store={mockStore}>{component}</Provider>);
+   };
+@@ -501,4 +507,67 @@ describe("CommentThread Component", () => {
+       expect(screen.getByText("Comment Thread")).toBeInTheDocument();
+     });
+   });
++
++  // --- Reseed guard: a locally-deleted comment must not reappear when the
++  // force-refetching REVIEW query reseeds the list before the backend is
++  // consistent (regression for "deleted comment still shows"). ---
++  describe("Deleted-comment reseed guard", () => {
++    it("excludes a locally-deleted comment when the thread list is reseeded", () => {
++      // Server refetch still returns the just-deleted comment (read-after-delete lag).
++      stableApiResponse.data = [mockComments[0]];
++      const setComments = vi.fn();
++      const deletedCommentIds = { current: new Set<string>([mockComments[0].id]) };
++
++      renderWithProvider(
++        <CommentThread
++          {...defaultProps}
++          comments={[]}
++          setComments={setComments}
++          deletedCommentIds={deletedCommentIds}
++          threadsOffset={0}
++        />,
++      );
++
++      // Reseed ran, but the deleted comment was filtered out.
++      expect(setComments).toHaveBeenCalledWith([]);
++    });
++
++    it("reseeds normally when nothing was deleted", () => {
++      stableApiResponse.data = [mockComments[0]];
++      const setComments = vi.fn();
++      const deletedCommentIds = { current: new Set<string>() };
++
++      renderWithProvider(
++        <CommentThread
++          {...defaultProps}
++          comments={[]}
++          setComments={setComments}
++          deletedCommentIds={deletedCommentIds}
++          threadsOffset={0}
++        />,
++      );
++
++      expect(setComments).toHaveBeenCalledWith([mockComments[0]]);
++    });
++
++    it("registers the id and removes it optimistically when a comment is deleted", () => {
++      const setComments = vi.fn();
++      const deletedCommentIds = { current: new Set<string>() };
++
++      renderWithProvider(
++        <CommentThread
++          {...defaultProps}
++          comments={mockComments}
++          setComments={setComments}
++          deletedCommentIds={deletedCommentIds}
++        />,
++      );
++
++      // CommentCard mock exposes a delete button that calls onDelete(comment.id).
++      fireEvent.click(screen.getAllByTestId("delete-comment")[0]);
++
++      expect(deletedCommentIds.current.has(mockComments[0].id)).toBe(true);
++      expect(setComments).toHaveBeenCalled();
++    });
++  });
+ });
+diff --git a/apps/ally-helpline-dashboard/src/components/selectable-text/SelectableText.tsx b/apps/ally-helpline-dashboard/src/components/selectable-text/SelectableText.tsx
+index f4a14e90b6..f6eb4579f2 100644
+--- a/apps/ally-helpline-dashboard/src/components/selectable-text/SelectableText.tsx
++++ b/apps/ally-helpline-dashboard/src/components/selectable-text/SelectableText.tsx
+@@ -100,6 +100,11 @@ const SelectableText = ({
+   const addCommentDialogRef = useRef<HTMLDivElement | null>(null);
+   const dialogRef = useRef<HTMLDivElement | null>(null);
+   const selectedCommentCalloutRef = useRef<HTMLDivElement | null>(null);
++  // Ids of comments deleted locally this session. The list is reseeded from
++  // force-refetching REVIEW queries (this component's `commentsList` and the
++  // thread's own query), which can briefly return a just-deleted comment and
++  // clobber the optimistic removal. Both reseeds exclude these ids.
++  const deletedCommentIdsRef = useRef<Set<string>>(new Set());
+   const [comments, setComments] = useState<CommentItem[]>(commentsList ?? []);
+   const [dialogPosition, setDialogPosition] = useState<{ top: number; left: number }>({
+     top: 0,
+@@ -111,7 +116,7 @@ const SelectableText = ({
+   }>({ top: 0, left: 0 });
+ 
+   useEffect(() => {
+-    setComments(commentsList ?? []);
++    setComments((commentsList ?? []).filter(c => !deletedCommentIdsRef.current.has(c.id)));
+   }, [commentsList]);
+ 
+   useEffect(() => {
+@@ -424,6 +429,7 @@ const SelectableText = ({
+             onAddComment={onAddComment}
+             threadsOffset={threadsOffset}
+             setThreadsOffset={setThreadsOffset}
++            deletedCommentIds={deletedCommentIdsRef}
+           />
+         </div>
+       )}

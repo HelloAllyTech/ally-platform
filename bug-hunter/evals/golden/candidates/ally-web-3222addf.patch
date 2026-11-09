@@ -1,0 +1,119 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/PromptManagement/PromptManagement.tsx b/apps/ally-admin-dashboard/src/pages/PromptManagement/PromptManagement.tsx
+index ad1bd2cf7d..f5542aab91 100644
+--- a/apps/ally-admin-dashboard/src/pages/PromptManagement/PromptManagement.tsx
++++ b/apps/ally-admin-dashboard/src/pages/PromptManagement/PromptManagement.tsx
+@@ -1,4 +1,4 @@
+-import React, { useEffect, useRef, useState } from "react";
++import React, { useEffect, useMemo, useRef, useState } from "react";
+ 
+ import { toast } from "sonner";
+ 
+@@ -78,9 +78,13 @@ export const PromptManagement: React.FC = () => {
+     setOffset(0);
+   };
+ 
++  const filteredPrompts = useMemo(() => {
++    return prompts.filter(prompt => !prompt.isObsolete);
++  }, [prompts]);
++
+   const handlePromptSelect = (rowIndex: number) => {
+-    if (rowIndex !== null && prompts?.length > 0) {
+-      setSelectedPrompt(prompts[rowIndex]);
++    if (rowIndex !== null && filteredPrompts?.length > 0) {
++      setSelectedPrompt(filteredPrompts[rowIndex]);
+       setIsSidePanelOpen(true);
+     }
+   };
+@@ -137,13 +141,15 @@ export const PromptManagement: React.FC = () => {
+     setOffset(prev => prev + limit);
+   };
+ 
+-  const formatTableData = prompts
+-    .filter(prompt => !prompt.isObsolete)
+-    .map(prompt => ({
+-      ...prompt,
+-      useDashboardOverride: prompt.useDashboardOverride ?? false,
+-      createdAt: prompt.createdAt ? new Date(prompt.createdAt).toLocaleDateString() : "",
+-    }));
++  const formatTableData = useMemo(
++    () =>
++      filteredPrompts.map(prompt => ({
++        ...prompt,
++        useDashboardOverride: prompt.useDashboardOverride ?? false,
++        createdAt: prompt.createdAt ? new Date(prompt.createdAt).toLocaleDateString() : "",
++      })),
++    [filteredPrompts],
++  );
+ 
+   const tableFooter = (
+     <button
+diff --git a/apps/ally-admin-dashboard/src/pages/PromptManagement/__tests__/PromptManagement.test.tsx b/apps/ally-admin-dashboard/src/pages/PromptManagement/__tests__/PromptManagement.test.tsx
+index c3c3f02c13..746add68c7 100644
+--- a/apps/ally-admin-dashboard/src/pages/PromptManagement/__tests__/PromptManagement.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/PromptManagement/__tests__/PromptManagement.test.tsx
+@@ -419,4 +419,65 @@ describe("PromptManagement Component", () => {
+     // Verify the mock was called
+     expect(mockGetPromptsQuery).toHaveBeenCalled();
+   });
++
++  it("should open the correct prompt even if there are obsolete prompts in the results", async () => {
++    const customPrompts = [
++      {
++        id: "1",
++        name: "Normal 1",
++        isObsolete: false,
++        promptCode: "p1",
++        prompt: "p1",
++        description: "d1",
++        createdAt: "2024-01-01T00:00:00Z",
++        updatedAt: "2024-01-01T00:00:00Z",
++      },
++      {
++        id: "2",
++        name: "Obsolete",
++        isObsolete: true,
++        promptCode: "p2",
++        prompt: "p2",
++        description: "d2",
++        createdAt: "2024-01-02T00:00:00Z",
++        updatedAt: "2024-01-02T00:00:00Z",
++      },
++      {
++        id: "3",
++        name: "Normal 2",
++        isObsolete: false,
++        promptCode: "p3",
++        prompt: "p3",
++        description: "d3",
++        createdAt: "2024-01-03T00:00:00Z",
++        updatedAt: "2024-01-03T00:00:00Z",
++      },
++    ] as Prompt[];
++
++    mockGetPromptsQuery.mockReturnValue({
++      data: customPrompts,
++      isFetching: false,
++    });
++
++    const store = createMockStore();
++    render(
++      <Provider store={store}>
++        <PromptManagement />
++      </Provider>,
++    );
++
++    await waitFor(() => {
++      expect(screen.getByTestId("table-row-1")).toBeInTheDocument();
++    });
++
++    // Row 1 should be "Normal 2" (index 2 in unfiltered list, index 1 in filtered list)
++    const row1 = screen.getByTestId("table-row-1");
++    expect(within(row1).getByText("Normal 2")).toBeInTheDocument();
++
++    fireEvent.click(row1);
++
++    await waitFor(() => {
++      expect(screen.getByTestId("prompt-side-panel")).toBeInTheDocument();
++    });
++  });
+ });

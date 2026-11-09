@@ -1,0 +1,298 @@
+diff --git a/src/debrief-feedback/controller/debrief-feedback.controller.ts b/src/debrief-feedback/controller/debrief-feedback.controller.ts
+index 43ab924d7e..3c56600fe0 100644
+--- a/src/debrief-feedback/controller/debrief-feedback.controller.ts
++++ b/src/debrief-feedback/controller/debrief-feedback.controller.ts
+@@ -1,4 +1,12 @@
+-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
++import {
++  Body,
++  Controller,
++  Param,
++  ParseUUIDPipe,
++  Post,
++  UnauthorizedException,
++  UseGuards,
++} from '@nestjs/common';
+ import { DebriefFeedbackService } from '../service/debrief-feedback.service';
+ import { ExecutionManager } from 'src/common/execution/execution-manager';
+ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+@@ -14,12 +22,17 @@ export class DebriefFeedbackController {
+ 
+   @Post()
+   async createFeedback(
+-    @Param('sessionId') sessionId: string,
++    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+     @Body() body: CreateDebriefFeedbackDto,
+   ) {
+     const tenantId = ExecutionManager.getTenantId();
++    const userId = Number(ExecutionManager.getUserId());
++    if (!tenantId || !userId) {
++      throw new UnauthorizedException('Unauthorized access');
++    }
+     return this.feedbackService.createFeedback(
+-      tenantId!,
++      tenantId,
++      userId,
+       sessionId,
+       body.rating,
+       body.comment,
+diff --git a/src/debrief-feedback/controller/test/debrief-feedback.controller.e2e-spec.ts b/src/debrief-feedback/controller/test/debrief-feedback.controller.e2e-spec.ts
+index 899a150cb3..ea9fe14382 100644
+--- a/src/debrief-feedback/controller/test/debrief-feedback.controller.e2e-spec.ts
++++ b/src/debrief-feedback/controller/test/debrief-feedback.controller.e2e-spec.ts
+@@ -11,6 +11,7 @@ import { ExecutionManager } from 'src/common/execution/execution-manager';
+ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+ 
+ describe('DebriefFeedbackController (e2e)', () => {
++  const sessionId = '6f1c2d3e-4a5b-4c6d-8e7f-901234567890';
+   let app: INestApplication;
+   let service: jest.Mocked<DebriefFeedbackService>;
+ 
+@@ -32,10 +33,15 @@ describe('DebriefFeedbackController (e2e)', () => {
+     await app.init();
+ 
+     jest.spyOn(ExecutionManager, 'getTenantId').mockReturnValue('tenant-1');
++    jest.spyOn(ExecutionManager, 'getUserId').mockReturnValue('42');
++  });
++
++  afterEach(async () => {
++    jest.restoreAllMocks();
++    await app.close();
+   });
+ 
+   it('POST /v1/scenario-sessions/:sessionId/debrief-feedback (201)', () => {
+-    const sessionId = 'sess-1';
+     const body = { rating: 'positive', comment: 'Great debrief!' };
+     service.createFeedback.mockResolvedValue({
+       id: 'f-1',
+@@ -51,6 +57,7 @@ describe('DebriefFeedbackController (e2e)', () => {
+         expect(res.body.id).toBe('f-1');
+         expect(service.createFeedback).toHaveBeenCalledWith(
+           'tenant-1',
++          42,
+           sessionId,
+           'positive',
+           'Great debrief!',
+@@ -59,7 +66,6 @@ describe('DebriefFeedbackController (e2e)', () => {
+   });
+ 
+   it('POST /v1/scenario-sessions/:sessionId/debrief-feedback (409 Conflict)', () => {
+-    const sessionId = 'sess-1';
+     service.createFeedback.mockRejectedValue(
+       new ConflictException('Feedback already exists'),
+     );
+@@ -71,10 +77,27 @@ describe('DebriefFeedbackController (e2e)', () => {
+   });
+ 
+   it('POST /v1/scenario-sessions/:sessionId/debrief-feedback (400 Bad Request on invalid rating)', () => {
+-    const sessionId = 'sess-1';
+     return request(app.getHttpServer())
+       .post(`/v1/scenario-sessions/${sessionId}/debrief-feedback`)
+       .send({ rating: 'invalid' })
+       .expect(400);
+   });
++
++  it('POST /v1/scenario-sessions/:sessionId/debrief-feedback (400 on a non-UUID session id)', () => {
++    return request(app.getHttpServer())
++      .post('/v1/scenario-sessions/not-a-uuid/debrief-feedback')
++      .send({ rating: 'positive' })
++      .expect(400)
++      .expect(() => expect(service.createFeedback).not.toHaveBeenCalled());
++  });
++
++  it('POST /v1/scenario-sessions/:sessionId/debrief-feedback (401 without a user in context)', () => {
++    jest.spyOn(ExecutionManager, 'getUserId').mockReturnValue(undefined);
++
++    return request(app.getHttpServer())
++      .post(`/v1/scenario-sessions/${sessionId}/debrief-feedback`)
++      .send({ rating: 'positive' })
++      .expect(401)
++      .expect(() => expect(service.createFeedback).not.toHaveBeenCalled());
++  });
+ });
+diff --git a/src/debrief-feedback/debrief-feedback.module.ts b/src/debrief-feedback/debrief-feedback.module.ts
+index 20dff68024..f775f7627a 100644
+--- a/src/debrief-feedback/debrief-feedback.module.ts
++++ b/src/debrief-feedback/debrief-feedback.module.ts
+@@ -4,10 +4,15 @@ import { DebriefFeedback } from './entity/debrief-feedback.entity';
+ import { DebriefFeedbackService } from './service/debrief-feedback.service';
+ import { DebriefFeedbackController } from './controller/debrief-feedback.controller';
+ import { SkillExperimentObservation } from 'src/skill-experiment/entity/skill-experiment-observation.entity';
++import { ScenarioSessions } from 'src/learn/entity/scenario-sessions.entity';
+ 
+ @Module({
+   imports: [
+-    TypeOrmModule.forFeature([DebriefFeedback, SkillExperimentObservation]),
++    TypeOrmModule.forFeature([
++      DebriefFeedback,
++      SkillExperimentObservation,
++      ScenarioSessions,
++    ]),
+   ],
+   providers: [DebriefFeedbackService],
+   controllers: [DebriefFeedbackController],
+diff --git a/src/debrief-feedback/service/debrief-feedback.service.ts b/src/debrief-feedback/service/debrief-feedback.service.ts
+index 27c4b1ecb5..9792383bbb 100644
+--- a/src/debrief-feedback/service/debrief-feedback.service.ts
++++ b/src/debrief-feedback/service/debrief-feedback.service.ts
+@@ -1,7 +1,13 @@
+-import { ConflictException, Injectable } from '@nestjs/common';
++import {
++  ConflictException,
++  ForbiddenException,
++  Injectable,
++  NotFoundException,
++} from '@nestjs/common';
+ import { InjectRepository } from '@nestjs/typeorm';
+ import { Repository } from 'typeorm';
+ import { DebriefFeedback } from '../entity/debrief-feedback.entity';
++import { ScenarioSessions } from 'src/learn/entity/scenario-sessions.entity';
+ import { SkillExperimentObservation } from 'src/skill-experiment/entity/skill-experiment-observation.entity';
+ import { SkillObservationStatus } from 'src/skill-experiment/enum/skill-experiment.enum';
+ 
+@@ -12,14 +18,34 @@ export class DebriefFeedbackService {
+     private readonly feedbackRepo: Repository<DebriefFeedback>,
+     @InjectRepository(SkillExperimentObservation)
+     private readonly observationRepo: Repository<SkillExperimentObservation>,
++    @InjectRepository(ScenarioSessions)
++    private readonly scenarioSessionRepo: Repository<ScenarioSessions>,
+   ) {}
+ 
+   async createFeedback(
+     tenantId: string,
++    userId: number,
+     scenarioSessionId: string,
+     rating: 'positive' | 'negative',
+     comment?: string,
+   ) {
++    // Only the learner who ran the session may rate its debrief. The rating
++    // judges the session's skill-experiment observation, and feedback is one
++    // row per session, so anyone else rating first would both steer the
++    // experiment and lock the learner out with a 409.
++    const scenarioSession = await this.scenarioSessionRepo.findOne({
++      where: { id: scenarioSessionId, tenantId },
++      select: { id: true, counselorId: true },
++    });
++    if (!scenarioSession) {
++      throw new NotFoundException('Scenario session not found');
++    }
++    if (scenarioSession.counselorId !== userId) {
++      throw new ForbiddenException(
++        'Only the learner who ran this session can rate its debrief',
++      );
++    }
++
+     const existing = await this.feedbackRepo.findOne({
+       where: { scenarioSessionId, tenantId },
+     });
+diff --git a/src/debrief-feedback/service/test/debrief-feedback.service.spec.ts b/src/debrief-feedback/service/test/debrief-feedback.service.spec.ts
+index 43e0b3a7af..9d73db6fa7 100644
+--- a/src/debrief-feedback/service/test/debrief-feedback.service.spec.ts
++++ b/src/debrief-feedback/service/test/debrief-feedback.service.spec.ts
+@@ -1,9 +1,14 @@
+ import { Test, TestingModule } from '@nestjs/testing';
+ import { getRepositoryToken } from '@nestjs/typeorm';
+-import { ConflictException } from '@nestjs/common';
++import {
++  ConflictException,
++  ForbiddenException,
++  NotFoundException,
++} from '@nestjs/common';
+ import { DebriefFeedbackService } from '../debrief-feedback.service';
+ import { DebriefFeedback } from '../../entity/debrief-feedback.entity';
+ import { SkillExperimentObservation } from 'src/skill-experiment/entity/skill-experiment-observation.entity';
++import { ScenarioSessions } from 'src/learn/entity/scenario-sessions.entity';
+ import { SkillObservationStatus } from 'src/skill-experiment/enum/skill-experiment.enum';
+ 
+ describe('DebriefFeedbackService', () => {
+@@ -11,6 +16,9 @@ describe('DebriefFeedbackService', () => {
+   let feedbackRepo: any;
+   let observationRepo: any;
+   let queryBuilder: any;
++  let scenarioSessionRepo: any;
++
++  const LEARNER_ID = 42;
+ 
+   beforeEach(async () => {
+     feedbackRepo = {
+@@ -27,6 +35,11 @@ describe('DebriefFeedbackService', () => {
+       createQueryBuilder: jest.fn(() => queryBuilder),
+       update: jest.fn(),
+     };
++    scenarioSessionRepo = {
++      findOne: jest
++        .fn()
++        .mockResolvedValue({ id: 'sess-1', counselorId: LEARNER_ID }),
++    };
+ 
+     const module: TestingModule = await Test.createTestingModule({
+       providers: [
+@@ -39,6 +52,10 @@ describe('DebriefFeedbackService', () => {
+           provide: getRepositoryToken(SkillExperimentObservation),
+           useValue: observationRepo,
+         },
++        {
++          provide: getRepositoryToken(ScenarioSessions),
++          useValue: scenarioSessionRepo,
++        },
+       ],
+     }).compile();
+ 
+@@ -52,6 +69,7 @@ describe('DebriefFeedbackService', () => {
+ 
+     const result = await service.createFeedback(
+       'tenant-1',
++      LEARNER_ID,
+       sessionId,
+       'positive',
+       'Nice',
+@@ -72,7 +90,7 @@ describe('DebriefFeedbackService', () => {
+     feedbackRepo.findOne.mockResolvedValue(null);
+     queryBuilder.getOne.mockResolvedValue({ id: 'obs-1' });
+ 
+-    await service.createFeedback('tenant-1', 'sess-1', 'negative');
++    await service.createFeedback('tenant-1', LEARNER_ID, 'sess-1', 'negative');
+ 
+     expect(observationRepo.update).toHaveBeenCalledWith(
+       'obs-1',
+@@ -87,7 +105,39 @@ describe('DebriefFeedbackService', () => {
+     feedbackRepo.findOne.mockResolvedValue({ id: 'existing' });
+ 
+     await expect(
+-      service.createFeedback('tenant-1', 'sess-1', 'positive'),
++      service.createFeedback('tenant-1', LEARNER_ID, 'sess-1', 'positive'),
+     ).rejects.toThrow(ConflictException);
+   });
++
++  it('looks the session up within the caller tenant', async () => {
++    feedbackRepo.findOne.mockResolvedValue(null);
++    queryBuilder.getOne.mockResolvedValue(null);
++
++    await service.createFeedback('tenant-1', LEARNER_ID, 'sess-1', 'positive');
++
++    expect(scenarioSessionRepo.findOne).toHaveBeenCalledWith(
++      expect.objectContaining({
++        where: { id: 'sess-1', tenantId: 'tenant-1' },
++      }),
++    );
++  });
++
++  it('rejects a session that does not exist in the tenant', async () => {
++    scenarioSessionRepo.findOne.mockResolvedValue(null);
++
++    await expect(
++      service.createFeedback('tenant-1', LEARNER_ID, 'sess-1', 'positive'),
++    ).rejects.toThrow(NotFoundException);
++    expect(feedbackRepo.save).not.toHaveBeenCalled();
++    expect(observationRepo.update).not.toHaveBeenCalled();
++  });
++
++  it('rejects a rating from anyone but the learner who ran the session', async () => {
++    await expect(
++      service.createFeedback('tenant-1', 7, 'sess-1', 'negative'),
++    ).rejects.toThrow(ForbiddenException);
++    expect(feedbackRepo.findOne).not.toHaveBeenCalled();
++    expect(feedbackRepo.save).not.toHaveBeenCalled();
++    expect(observationRepo.update).not.toHaveBeenCalled();
++  });
+ });

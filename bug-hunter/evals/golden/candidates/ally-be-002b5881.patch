@@ -1,0 +1,162 @@
+diff --git a/src/learn/service/scenario-shared.service.ts b/src/learn/service/scenario-shared.service.ts
+index 86454608e0..ca36620c7b 100644
+--- a/src/learn/service/scenario-shared.service.ts
++++ b/src/learn/service/scenario-shared.service.ts
+@@ -927,14 +927,19 @@ export class ScenarioSharedService {
+     const { voiceId, languageId, language, defaultLanguageId, ...promptData } =
+       metadata ?? {};
+ 
+-    // If language is English (by languageId), return original data
+     const langIsEnglish = isEnglishLanguage(
+       languageId,
+       language,
+       defaultLanguageId,
+     );
+ 
+-    if (langIsEnglish) {
++    // No language selected at all — there is nothing more specific to look
++    // up. Note this is narrower than langIsEnglish: English has its own
++    // regional variants (en-IN, en-GB, en-US) that can each carry distinct
++    // opening dialogue via scenario_translations, so a specific language is
++    // never assumed to already match the raw scenario metadata just because
++    // isEnglishLanguage treats it as "English" — only a missing language does.
++    if (!languageId) {
+       return {
+         langIsEnglish,
+         voiceId,
+@@ -946,37 +951,35 @@ export class ScenarioSharedService {
+       };
+     }
+ 
+-    // Fetch translation for non-English language
++    // Fetch a per-language override for this scenario, if one exists.
+     const translations = await this.scenarioTranslationsRepository.findOne({
+       select: ['id', 'metadata'],
+       where: { scenarioId, languageId },
+     });
+ 
+-    if (!translations?.metadata) {
+-      return { voiceId, promptData };
+-    }
+-
+-    // Accept either object or JSON-string metadata
+-    let translationMetadata: Record<string, any> = {};
+-    if (typeof translations.metadata === 'string') {
+-      try {
+-        translationMetadata = JSON.parse(translations.metadata);
+-      } catch {
+-        // malformed JSON — skip applying translation (or log if desired)
+-        translationMetadata = {};
++    if (translations?.metadata) {
++      // Accept either object or JSON-string metadata
++      let translationMetadata: Record<string, any> = {};
++      if (typeof translations.metadata === 'string') {
++        try {
++          translationMetadata = JSON.parse(translations.metadata);
++        } catch {
++          // malformed JSON — skip applying translation (or log if desired)
++          translationMetadata = {};
++        }
++      } else if (typeof translations.metadata === 'object') {
++        translationMetadata = translations.metadata;
+       }
+-    } else if (typeof translations.metadata === 'object') {
+-      translationMetadata = translations.metadata;
+-    }
+ 
+-    // Apply only the translatable fields if present
+-    for (const field of SCENARIO_SESSION_TRANSLATABLE_FIELDS) {
+-      if (
+-        Object.prototype.hasOwnProperty.call(translationMetadata, field) &&
+-        translationMetadata[field] != null &&
+-        translationMetadata[field] !== ''
+-      ) {
+-        promptData[field] = translationMetadata[field];
++      // Apply only the translatable fields if present
++      for (const field of SCENARIO_SESSION_TRANSLATABLE_FIELDS) {
++        if (
++          Object.prototype.hasOwnProperty.call(translationMetadata, field) &&
++          translationMetadata[field] != null &&
++          translationMetadata[field] !== ''
++        ) {
++          promptData[field] = translationMetadata[field];
++        }
+       }
+     }
+ 
+diff --git a/src/learn/service/test/scenario-shared.service.spec.ts b/src/learn/service/test/scenario-shared.service.spec.ts
+index 427c9934bd..17431f69d6 100644
+--- a/src/learn/service/test/scenario-shared.service.spec.ts
++++ b/src/learn/service/test/scenario-shared.service.spec.ts
+@@ -147,6 +147,7 @@ describe('ScenarioSharedService', () => {
+     const mockScenarioTranslationsRepository = {
+       getUniqueLanguagesFromScenarioTranslations: jest.fn(),
+       getScenarioTranslationsByScenarioId: jest.fn().mockResolvedValue([]),
++      findOne: jest.fn().mockResolvedValue(null),
+     };
+ 
+     const mockScenarioSessionMessagesRepository = {
+@@ -1213,6 +1214,63 @@ describe('ScenarioSharedService', () => {
+       );
+     });
+ 
++    it('should use the scenario_translations override for English (India) opening dialogue instead of the raw scenario metadata', async () => {
++      scenarioVoiceRepository.findOne.mockResolvedValue({
++        id: 'voice-1',
++        name: 'Test Voice',
++        provider: 'deepgram',
++        config: {},
++      } as any);
++      // en-IN is the platform's pinned "default" language id, but this
++      // scenario still has its own en-IN-specific scenario_translations row
++      // (e.g. an India-flavoured opening line) that must win over the raw
++      // scenario metadata (which reads like the generic/English-UK default).
++      (scenarioTranslationsRepository as any).findOne = jest
++        .fn()
++        .mockResolvedValue({
++          id: 'translation-1',
++          metadata: { openingStatements: ['Namaste, kaise ho?'] },
++        });
++
++      const result = await service.createRoomMetadata({
++        scenario: {
++          id: 1,
++          title: 'Test Scenario',
++          description: 'Test Description',
++          prompt: 'Act only as the client in this simulation.',
++          metadata: {
++            voiceId: 'voice-1',
++            languageId: 1,
++            language: 'en-IN',
++            defaultLanguageId: 1,
++            name: 'Alex',
++            age: 28,
++            gender: 'Male',
++            currentLocation: 'London',
++            openingStatements: ['Alright, how are you doing?'],
++          },
++          terminationEvents: [],
++          behaviorInstructions: [],
++          difficultyLevel: 'EASY',
++        } as any,
++        sessionEvents: [],
++        languageDetails: {
++          id: 1,
++          value: 'en-IN',
++          label: 'English (India)',
++        } as any,
++        previousMemory: null,
++      });
++
++      expect(scenarioTranslationsRepository.findOne).toHaveBeenCalledWith({
++        select: ['id', 'metadata'],
++        where: { scenarioId: 1, languageId: 1 },
++      });
++      expect((result.scenario.promptData as any).openingStatements).toEqual([
++        'Namaste, kaise ho?',
++      ]);
++    });
++
+     it('should forward metadata.turnMaxEndpointingDelay onto promptData unchanged (plain pass-through, not explicitly deleted)', async () => {
+       scenarioVoiceRepository.findOne.mockResolvedValue({
+         id: 'voice-1',

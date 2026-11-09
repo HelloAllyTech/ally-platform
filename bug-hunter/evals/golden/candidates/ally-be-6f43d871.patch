@@ -1,0 +1,248 @@
+diff --git a/src/config/config.service.ts b/src/config/config.service.ts
+index 1d99fdc6c7..7f8f7d8886 100644
+--- a/src/config/config.service.ts
++++ b/src/config/config.service.ts
+@@ -245,6 +245,7 @@ export class AppConfigService {
+       apiKey: this.configService.get<string>('LIVEKIT_API_KEY'),
+       apiSecret: this.configService.get<string>('LIVEKIT_API_SECRET'),
+       serverUrl: this.configService.get<string>('LIVEKIT_URL'),
++      environment: this.configService.get<string>('LIVEKIT_ENVIRONMENT'),
+     };
+   }
+ 
+diff --git a/src/livekit/webhook/livekit-webhook.controller.ts b/src/livekit/webhook/livekit-webhook.controller.ts
+index d04241add2..4501457f33 100644
+--- a/src/livekit/webhook/livekit-webhook.controller.ts
++++ b/src/livekit/webhook/livekit-webhook.controller.ts
+@@ -63,17 +63,14 @@ export class LivekitWebhookController {
+ 
+       // Get raw body data for webhook verification
+       const rawBody = await this.getRawBody(req);
+-      this.logger.info(`${rawBody},'rawBody handleWebhook`);
++      this.logger.info(`'rawBody handleWebhook '${rawBody}`);
+       const parsedBody = this.parseJsonBody(rawBody);
+-      this.logger.info(`${parsedBody},'parsedBody handleWebhook`);
++      const roomMetadata = this.parseMetadata(parsedBody?.room?.metadata);
+ 
+       if (
+-        parsedBody &&
+-        typeof parsedBody === 'object' &&
+-        parsedBody.metadata &&
+-        typeof parsedBody.metadata === 'object'
++        roomMetadata?.environment !== this.configService.livekit.environment
+       ) {
+-        this.logger.debug('Webhook payload includes a metadata object');
++        return res.status(HttpStatus.OK).send();
+       }
+ 
+       const event = await this.webhookReceiver.receive(rawBody, authHeader);
+@@ -101,17 +98,34 @@ export class LivekitWebhookController {
+     return Buffer.concat(chunks).toString('utf8');
+   }
+ 
+-  private parseJsonBody(rawBody: string): Record<string, unknown> | null {
++  private parseJsonBody(rawBody: string): Record<string, any> | null {
+     try {
+       const parsed = JSON.parse(rawBody) as unknown;
+       return typeof parsed === 'object' && parsed !== null
+-        ? (parsed as Record<string, unknown>)
++        ? (parsed as Record<string, any>)
+         : null;
+     } catch {
+       return null;
+     }
+   }
+ 
++  private parseMetadata(metadata: unknown): Record<string, any> | null {
++    if (typeof metadata === 'string') {
++      try {
++        const parsed = JSON.parse(metadata) as unknown;
++        return typeof parsed === 'object' && parsed !== null
++          ? (parsed as Record<string, any>)
++          : null;
++      } catch {
++        return null;
++      }
++    }
++
++    return typeof metadata === 'object' && metadata !== null
++      ? (metadata as Record<string, any>)
++      : null;
++  }
++
+   private async processWebhookEvent(event: any) {
+     try {
+       switch (event.event) {
+diff --git a/src/livekit/webhook/test/livekit-webhook.controller.spec.ts b/src/livekit/webhook/test/livekit-webhook.controller.spec.ts
+index fb0e2db31d..b44d7faf7d 100644
+--- a/src/livekit/webhook/test/livekit-webhook.controller.spec.ts
++++ b/src/livekit/webhook/test/livekit-webhook.controller.spec.ts
+@@ -40,6 +40,7 @@ describe('LivekitWebhookController', () => {
+     serverUrl: 'https://livekit.example.com',
+     apiKey: 'test-api-key',
+     apiSecret: 'test-api-secret',
++    environment: 'development',
+   };
+ 
+   beforeEach(async () => {
+@@ -75,7 +76,14 @@ describe('LivekitWebhookController', () => {
+         authorization: 'Bearer test-token',
+       },
+       [Symbol.asyncIterator]: jest.fn().mockImplementation(async function* () {
+-        yield Buffer.from('{"event":"participant_joined"}');
++        yield Buffer.from(
++          JSON.stringify({
++            event: 'participant_joined',
++            room: {
++              metadata: JSON.stringify({ environment: 'development' }),
++            },
++          }),
++        );
+       }),
+     };
+ 
+@@ -168,7 +176,12 @@ describe('LivekitWebhookController', () => {
+       );
+ 
+       expect(mockWebhookReceiver.receive).toHaveBeenCalledWith(
+-        '{"event":"participant_joined"}',
++        JSON.stringify({
++          event: 'participant_joined',
++          room: {
++            metadata: JSON.stringify({ environment: 'development' }),
++          },
++        }),
+         'Bearer test-token',
+       );
+       expect(mockLogger.debug).toHaveBeenCalledWith(
+@@ -259,6 +272,37 @@ describe('LivekitWebhookController', () => {
+       );
+     });
+ 
++    it('should skip webhook processing when room metadata environment does not match', async () => {
++      const differentEnvRequest = {
++        headers: {
++          authorization: 'Bearer test-token',
++        },
++        [Symbol.asyncIterator]: jest
++          .fn()
++          .mockImplementation(async function* () {
++            yield Buffer.from(
++              JSON.stringify({
++                event: 'participant_joined',
++                room: {
++                  metadata: JSON.stringify({ environment: 'production' }),
++                },
++              }),
++            );
++          }),
++      };
++
++      await controller.handleWebhook(
++        differentEnvRequest as any,
++        mockResponse as Response,
++      );
++
++      expect(mockWebhookReceiver.receive).not.toHaveBeenCalled();
++      expect(participantJoinedHandler.handle).not.toHaveBeenCalled();
++      expect(roomFinishedHandler.handle).not.toHaveBeenCalled();
++      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.OK);
++      expect(mockResponse.send).toHaveBeenCalledWith();
++    });
++
+     it('should handle webhook verification error', async () => {
+       const error = new Error('Invalid webhook signature');
+       mockWebhookReceiver.receive.mockRejectedValue(error);
+@@ -340,23 +384,14 @@ describe('LivekitWebhookController', () => {
+           }),
+       };
+ 
+-      const mockEvent = {
+-        event: 'participant_joined',
+-        room: { name: 'test-room' },
+-      };
+-
+-      mockWebhookReceiver.receive.mockResolvedValue(mockEvent as any);
+-
+       await controller.handleWebhook(
+         emptyRequest as any,
+         mockResponse as Response,
+       );
+ 
+-      expect(mockWebhookReceiver.receive).toHaveBeenCalledWith(
+-        '',
+-        'Bearer test-token',
+-      );
++      expect(mockWebhookReceiver.receive).not.toHaveBeenCalled();
+       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.OK);
++      expect(mockResponse.send).toHaveBeenCalledWith();
+     });
+ 
+     it('should handle missing authorization header', async () => {
+@@ -365,7 +400,14 @@ describe('LivekitWebhookController', () => {
+         [Symbol.asyncIterator]: jest
+           .fn()
+           .mockImplementation(async function* () {
+-            yield Buffer.from('{"event":"participant_joined"}');
++            yield Buffer.from(
++              JSON.stringify({
++                event: 'participant_joined',
++                room: {
++                  metadata: JSON.stringify({ environment: 'development' }),
++                },
++              }),
++            );
+           }),
+       };
+ 
+@@ -382,13 +424,24 @@ describe('LivekitWebhookController', () => {
+       );
+ 
+       expect(mockWebhookReceiver.receive).toHaveBeenCalledWith(
+-        '{"event":"participant_joined"}',
++        JSON.stringify({
++          event: 'participant_joined',
++          room: {
++            metadata: JSON.stringify({ environment: 'development' }),
++          },
++        }),
+         undefined,
+       );
+     });
+ 
+     it('should handle large request body', async () => {
+-      const largeData = 'x'.repeat(10000);
++      const largeData = JSON.stringify({
++        event: 'participant_joined',
++        room: {
++          metadata: JSON.stringify({ environment: 'development' }),
++        },
++        payload: 'x'.repeat(10000),
++      });
+       const largeRequest = {
+         headers: {
+           authorization: 'Bearer test-token',
+@@ -426,9 +479,11 @@ describe('LivekitWebhookController', () => {
+         [Symbol.asyncIterator]: jest
+           .fn()
+           .mockImplementation(async function* () {
+-            yield Buffer.from('{"event":');
+-            yield Buffer.from('"participant_');
+-            yield Buffer.from('joined"}');
++            yield Buffer.from('{"event":"participant_joined","room":');
++            yield Buffer.from(
++              '{"metadata":"{\\"environment\\":\\"development\\"}"}',
++            );
++            yield Buffer.from('}');
+           }),
+       };
+ 
+@@ -445,7 +500,7 @@ describe('LivekitWebhookController', () => {
+       );
+ 
+       expect(mockWebhookReceiver.receive).toHaveBeenCalledWith(
+-        '{"event":"participant_joined"}',
++        '{"event":"participant_joined","room":{"metadata":"{\\"environment\\":\\"development\\"}"}}',
+         'Bearer test-token',
+       );
+     });

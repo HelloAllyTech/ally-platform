@@ -1,0 +1,153 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/SummarySidebarWrapper.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/SummarySidebarWrapper.tsx
+index 37756bc2e0..262d8116cd 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/SummarySidebarWrapper.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/SummarySidebarWrapper.tsx
+@@ -24,11 +24,15 @@ const SummarySidebarWrapper: FC<SummarySidebarWrapperProps> = ({
+   // its author configured. `tabList?.[0].id` threw on that empty list.
+   const [selectedTab, setSelectedTab] = useState<number>(tabList?.[0]?.id ?? -1);
+ 
++  // Debrief is the default landing tab while the real scenario metadata is
++  // still loading, but a roleplay can switch it off — in which case fall
++  // through to whichever tab is actually first once tabList resolves.
+   useEffect(() => {
+-    if (tabList?.length) {
++    if (!tabList?.length) return;
++    if (!tabList.some(tab => tab.id === selectedTab)) {
+       setSelectedTab(tabList[0].id);
+     }
+-  }, []);
++  }, [tabList, selectedTab]);
+ 
+   useEffect(() => {
+     onTabChange?.(selectedTab);
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SummarySidebarWrapper.test.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SummarySidebarWrapper.test.tsx
+index 3cf8171df4..b7d7b01776 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SummarySidebarWrapper.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SummarySidebarWrapper.test.tsx
+@@ -107,6 +107,31 @@ describe("SummarySidebarWrapper", () => {
+     expect(screen.queryByRole("button", { name: /Tab One/i })).not.toBeInTheDocument();
+   });
+ 
++  it("resyncs the selected tab when tabList shrinks after data loads, instead of showing a blank panel", () => {
++    // Mirrors real usage: before useGetSimulationSummaryQuery resolves, both
++    // tabs default on and selectedTab initializes to tabList[0] (Debrief).
++    // Once real scenario metadata loads and reveals Debrief is off, the
++    // parent re-renders this component with a shrunk tabList.
++    const { rerender } = render(
++      <SummarySidebarWrapper title="Test Sidebar" tabList={mockTabList} onSidebarClose={vi.fn()} />,
++    );
++
++    expect(screen.getByText("Content One")).toBeInTheDocument();
++
++    rerender(
++      <SummarySidebarWrapper
++        title="Test Sidebar"
++        tabList={[mockTabList[1]]}
++        onSidebarClose={vi.fn()}
++      />,
++    );
++
++    // selectedTab must resync to the surviving tab rather than staying
++    // pinned to the now-removed id, which would render nothing.
++    expect(screen.getByText("Content Two")).toBeInTheDocument();
++    expect(screen.queryByText("Content One")).not.toBeInTheDocument();
++  });
++
+   it("renders children content", () => {
+     render(
+       <SummarySidebarWrapper title="Test Sidebar" tabList={mockTabList}>
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/RoleplaySessionLogPanel.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/RoleplaySessionLogPanel.tsx
+index 9868e79433..33d3796cc4 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/RoleplaySessionLogPanel.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/RoleplaySessionLogPanel.tsx
+@@ -1,4 +1,4 @@
+-import { FC, useMemo, useState } from "react";
++import { FC, useEffect, useMemo, useState } from "react";
+ 
+ import { useTranslation } from "react-i18next";
+ 
+@@ -81,6 +81,17 @@ export const RoleplaySessionLogPanel: FC<RoleplaySessionLogPanelProps> = ({ sess
+   ];
+ 
+   const [selectedTab, setSelectedTab] = useState(tabList[0]?.id);
++
++  // Debrief is the default landing tab while the real scenario metadata is
++  // still loading, but a roleplay can switch it off — in which case fall
++  // through to whichever tab is actually first once tabList resolves.
++  useEffect(() => {
++    if (!tabList.length) return;
++    if (!tabList.some(tab => tab.id === selectedTab)) {
++      setSelectedTab(tabList[0].id);
++    }
++  }, [tabList, selectedTab]);
++
+   const activeContent = tabList.find(tab => tab.id === selectedTab)?.content;
+ 
+   // A roleplay with every post-session tab switched off has nothing to expand
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/RoleplaySessionLogPanel.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/RoleplaySessionLogPanel.test.tsx
+new file mode 100644
+index 0000000000..b9f8d7aa20
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/RoleplaySessionLogPanel.test.tsx
+@@ -0,0 +1,61 @@
++import { render, screen } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++
++import { RoleplaySessionLogPanel } from "../RoleplaySessionLogPanel";
++
++const mockUseGetSimulationSummaryQuery = vi.fn();
++
++vi.mock("@api", () => ({
++  useGetSimulationSummaryQuery: (args: any) => mockUseGetSimulationSummaryQuery(args),
++  useGetAvailableLanguagesQuery: () => ({ data: undefined }),
++}));
++
++vi.mock("@components", () => ({
++  DebriefTab: () => <div data-testid="debrief-tab">Debrief content</div>,
++}));
++
++vi.mock("@containers", () => ({
++  useSimulationSummaryPolling: () => ({ summaryData: undefined, retryMaxReached: false }),
++}));
++
++vi.mock("../../../../calls/components", () => ({
++  SimulationTranscriptTab: () => <div data-testid="transcript-tab">Transcript content</div>,
++}));
++
++vi.mock("@ally-ui-mono/ui-shared", () => ({
++  Tabs: ({ items, activeId, onChange }: any) => (
++    <div>
++      {items.map((item: any) => (
++        <button key={item.id} onClick={() => onChange(item.id)}>
++          {item.label}
++        </button>
++      ))}
++    </div>
++  ),
++}));
++
++describe("RoleplaySessionLogPanel", () => {
++  it("resyncs the selected tab once real data reveals Debrief is off, instead of showing a blank panel", () => {
++    // Before useGetSimulationSummaryQuery resolves, `summary` is undefined, so
++    // resolveFeedbackTabs(undefined) defaults both tabs on and selectedTab
++    // initializes to the Debrief tab (tabList[0]).
++    mockUseGetSimulationSummaryQuery.mockReturnValue({ data: undefined });
++
++    const { rerender } = render(<RoleplaySessionLogPanel sessionId="session-1" />);
++
++    expect(screen.getByTestId("debrief-tab")).toBeInTheDocument();
++
++    // The real scenario metadata now loads and reveals Debrief was switched
++    // off, so tabList shrinks to just Transcript.
++    mockUseGetSimulationSummaryQuery.mockReturnValue({
++      data: { scenario: { metadata: { feedbackTabs: { debrief: false, transcript: true } } } },
++    });
++
++    rerender(<RoleplaySessionLogPanel sessionId="session-1" />);
++
++    // selectedTab must resync to the surviving tab rather than staying pinned
++    // to the now-removed Debrief id, which would render nothing.
++    expect(screen.getByTestId("transcript-tab")).toBeInTheDocument();
++    expect(screen.queryByTestId("debrief-tab")).not.toBeInTheDocument();
++  });
++});

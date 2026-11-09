@@ -1,0 +1,29 @@
+diff --git a/src/progress/service/test/xp-award.service.spec.ts b/src/progress/service/test/xp-award.service.spec.ts
+index 1e96cf4d06..8b54db99a4 100644
+--- a/src/progress/service/test/xp-award.service.spec.ts
++++ b/src/progress/service/test/xp-award.service.spec.ts
+@@ -290,10 +290,10 @@ describe('XpAwardService', () => {
+       );
+     });
+ 
+-    it('never throws when the ledger write fails', async () => {
++    it('throws when the ledger write fails', async () => {
+       xpEventRepository.insertAwards.mockRejectedValue(new Error('pg down'));
+ 
+-      await expect(awardSession(10 * 60 * 1000)).resolves.toBeUndefined();
++      await expect(awardSession(10 * 60 * 1000)).rejects.toThrow('pg down');
+     });
+   });
+ 
+diff --git a/src/progress/service/xp-award.service.ts b/src/progress/service/xp-award.service.ts
+index 1433c99ffc..6b423a44e9 100644
+--- a/src/progress/service/xp-award.service.ts
++++ b/src/progress/service/xp-award.service.ts
+@@ -233,6 +233,7 @@ export class XpAwardService {
+       this.logger.error(
+         `Failed to award session XP for user ${userId} session ${scenarioSessionId}: ${error}`,
+       );
++      throw error;
+     }
+   }
+ 

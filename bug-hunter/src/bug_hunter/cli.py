@@ -418,6 +418,27 @@ def eval_accept(
     )
 
 
+@eval_app.command("modes")
+def eval_modes(
+    case_id: Annotated[str, typer.Argument(help="Case id in cases.yaml.")],
+    modes: Annotated[list[str], typer.Argument(help="sweep and/or issue.")],
+) -> None:
+    """Restrict a case to the given harness modes (e.g. sweep only: no user symptom)."""
+    from bug_hunter.config import PACKAGE_ROOT
+    from evals.schema import load_cases, save_cases
+
+    path = PACKAGE_ROOT / "evals" / "golden" / "cases.yaml"
+    cases = load_cases(path)
+    match = [c for c in cases.cases if c.id == case_id]
+    if not match:
+        typer.echo(f"{case_id}: not in cases.yaml", err=True)
+        raise typer.Exit(code=1)
+    match[0].modes = list(dict.fromkeys(modes))  # validated on save/load
+    save_cases(path, cases)
+    load_cases(path)
+    typer.echo(f"{case_id}: modes = {match[0].modes}")
+
+
 @eval_app.command("run")
 def eval_run(
     cases_filter: Annotated[

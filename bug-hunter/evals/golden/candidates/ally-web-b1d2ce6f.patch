@@ -1,0 +1,57 @@
+diff --git a/apps/ally-admin-dashboard/src/constants/en.ts b/apps/ally-admin-dashboard/src/constants/en.ts
+index 23a4af3d8b..c9ed503775 100644
+--- a/apps/ally-admin-dashboard/src/constants/en.ts
++++ b/apps/ally-admin-dashboard/src/constants/en.ts
+@@ -2953,6 +2953,11 @@ export const en = {
+     drawerReleasingNotice:
+       "I'm running release {tag} now. This page updates as it goes — a backend release takes around 15 minutes.",
+     drawerReleasedNotice: "This is live in production as {tag}.",
++    // No tag: the release was cut from GitHub by a person, not from this tab,
++    // and the run does not say which version it shipped — so the banner says
++    // how it went live rather than printing "as —".
++    drawerReleasedOutOfBandNotice:
++      "This is live in production. It went out in a release somebody ran from GitHub after the fix merged — I didn't start that release. The run is linked below.",
+     drawerReleaseFailedNotice:
+       "Release {tag} went red. The fix is still merged to master — it just isn't deployed. Check the run, then ask me to retry.",
+     drawerFixSessionFailedNotice: "The fix session failed. Start a new session to retry.",
+diff --git a/apps/ally-admin-dashboard/src/pages/BugHunter/BugFindingDrawer.tsx b/apps/ally-admin-dashboard/src/pages/BugHunter/BugFindingDrawer.tsx
+index 4866172b26..083e1c311a 100644
+--- a/apps/ally-admin-dashboard/src/pages/BugHunter/BugFindingDrawer.tsx
++++ b/apps/ally-admin-dashboard/src/pages/BugHunter/BugFindingDrawer.tsx
+@@ -682,7 +682,9 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
+           )}
+           {finding.status === BugFindingStatus.RELEASED && (
+             <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-3">
+-              {en.bugHunter.drawerReleasedNotice.replace("{tag}", finding.releaseTag ?? "—")}
++              {finding.releaseTag
++                ? en.bugHunter.drawerReleasedNotice.replace("{tag}", finding.releaseTag)
++                : en.bugHunter.drawerReleasedOutOfBandNotice}
+             </p>
+           )}
+           {finding.status === BugFindingStatus.RELEASE_FAILED && (
+diff --git a/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/BugFindingDrawer.test.tsx b/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/BugFindingDrawer.test.tsx
+index 0f18cbed5b..5e71d23ffa 100644
+--- a/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/BugFindingDrawer.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/BugFindingDrawer.test.tsx
+@@ -389,6 +389,21 @@ describe("BugFindingDrawer — release to production", () => {
+     expect(screen.getByText(/live in production as v1\.4\.2/i)).toBeInTheDocument();
+     expect(screen.getByText(/Released by user #7/)).toBeInTheDocument();
+   });
++
++  it("says how it went live when a release run from GitHub shipped it, rather than printing a dash for the tag", () => {
++    renderDrawer(
++      finding({
++        status: BugFindingStatus.RELEASED,
++        releaseTag: null,
++        releasedBy: null,
++        releasedAt: "2026-09-26",
++        releaseRunUrl: "https://github.com/helloallytech/ally-be/actions/runs/5150",
++      }),
++    );
++    expect(screen.getByText(/somebody ran from GitHub/i)).toBeInTheDocument();
++    expect(screen.queryByText(/live in production as/i)).not.toBeInTheDocument();
++    expect(screen.queryByText(/Released by user/)).not.toBeInTheDocument();
++  });
+ });
+ 
+ describe("BugFindingDrawer — multi-repo plan", () => {

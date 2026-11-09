@@ -1,0 +1,86 @@
+diff --git a/src/common/constants/user.constants.ts b/src/common/constants/user.constants.ts
+index 5eecfacd76..62cb302ccf 100644
+--- a/src/common/constants/user.constants.ts
++++ b/src/common/constants/user.constants.ts
+@@ -23,6 +23,14 @@ export const SUPER_ADMIN_ROLES: UserRole[] = [
+   UserRole.SUPER_DUPER_ADMIN,
+ ];
+ 
++/**
++ * The elevated super-admin tier. SUPER_DUPER_ADMIN sits above SUPER_ADMIN: gate
++ * the most privileged surfaces on this list so a plain SUPER_ADMIN is excluded.
++ * Mirrors ally-web's SUPER_DUPER_ADMIN_ROLES; kept as an array to leave room for
++ * future peer roles.
++ */
++export const SUPER_DUPER_ADMIN_ROLES: UserRole[] = [UserRole.SUPER_DUPER_ADMIN];
++
+ export enum AppType {
+   APP = 'APP',
+   ADMIN = 'ADMIN',
+diff --git a/src/roleplay-session-logs/controller/roleplay-session-logs.controller.ts b/src/roleplay-session-logs/controller/roleplay-session-logs.controller.ts
+index f27fcb0e0a..62e415abab 100644
+--- a/src/roleplay-session-logs/controller/roleplay-session-logs.controller.ts
++++ b/src/roleplay-session-logs/controller/roleplay-session-logs.controller.ts
+@@ -7,7 +7,7 @@ import {
+   ApiTags,
+ } from '@nestjs/swagger';
+ import { AuthRoles } from '../../auth/decorators/auth-roles.decorator';
+-import { SUPER_ADMIN_ROLES } from '../../common/constants/user.constants';
++import { SUPER_DUPER_ADMIN_ROLES } from '../../common/constants/user.constants';
+ import { RoleplaySessionLogsService } from '../service/roleplay-session-logs.service';
+ import {
+   ListRoleplaySessionLogsQueryDto,
+@@ -25,9 +25,9 @@ export class RoleplaySessionLogsController {
+   ) {}
+ 
+   @Get()
+-  @AuthRoles(...SUPER_ADMIN_ROLES)
++  @AuthRoles(...SUPER_DUPER_ADMIN_ROLES)
+   @ApiOperation({
+-    summary: 'List all roleplay sessions across all orgs (super-admin)',
++    summary: 'List all roleplay sessions across all orgs (super-duper-admin)',
+     description:
+       'Platform-wide (cross-tenant) list of genuine end-user roleplay sessions ' +
+       'with the user, organization, scenario, status, duration and score. ' +
+@@ -43,9 +43,9 @@ export class RoleplaySessionLogsController {
+   }
+ 
+   @Get(':id')
+-  @AuthRoles(...SUPER_ADMIN_ROLES)
++  @AuthRoles(...SUPER_DUPER_ADMIN_ROLES)
+   @ApiOperation({
+-    summary: 'Get a single roleplay session detail (super-admin)',
++    summary: 'Get a single roleplay session detail (super-duper-admin)',
+     description:
+       'Cross-tenant detail for one roleplay session: core fields plus the ' +
+       'post-session summary, scored events and full transcript.',
+diff --git a/src/roleplay-session-logs/controller/test/roleplay-session-logs.controller.spec.ts b/src/roleplay-session-logs/controller/test/roleplay-session-logs.controller.spec.ts
+index ebc190b460..64a7f15433 100644
+--- a/src/roleplay-session-logs/controller/test/roleplay-session-logs.controller.spec.ts
++++ b/src/roleplay-session-logs/controller/test/roleplay-session-logs.controller.spec.ts
+@@ -2,7 +2,7 @@ import { Reflector } from '@nestjs/core';
+ import { RoleplaySessionLogsController } from '../roleplay-session-logs.controller';
+ import { RoleplaySessionLogsService } from '../../service/roleplay-session-logs.service';
+ import { ROLES_KEY } from '../../../auth/decorators/roles.decorator';
+-import { SUPER_ADMIN_ROLES } from '../../../common/constants/user.constants';
++import { SUPER_DUPER_ADMIN_ROLES } from '../../../common/constants/user.constants';
+ 
+ describe('RoleplaySessionLogsController', () => {
+   let controller: RoleplaySessionLogsController;
+@@ -17,13 +17,13 @@ describe('RoleplaySessionLogsController', () => {
+     controller = new RoleplaySessionLogsController(service);
+   });
+ 
+-  it('guards both endpoints with the super-admin roles', () => {
++  it('guards both endpoints with the super-duper-admin roles', () => {
+     const reflector = new Reflector();
+     const listRoles = reflector.get(ROLES_KEY, controller.list);
+     const detailRoles = reflector.get(ROLES_KEY, controller.getById);
+ 
+-    expect(listRoles).toEqual(SUPER_ADMIN_ROLES);
+-    expect(detailRoles).toEqual(SUPER_ADMIN_ROLES);
++    expect(listRoles).toEqual(SUPER_DUPER_ADMIN_ROLES);
++    expect(detailRoles).toEqual(SUPER_DUPER_ADMIN_ROLES);
+   });
+ 
+   it('delegates list to the service', async () => {

@@ -1,0 +1,153 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx b/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
+index ee0dcdfbef..43a05c3c74 100644
+--- a/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
+@@ -69,7 +69,7 @@ const FeedCard: FC<FeedCardProps> = ({
+   const formattedDateTime = formatDateTime(dateTime);
+   const relativeTime = formatRelativeTime(createdAt, t);
+ 
+-  const entries = Object.entries(reactions);
++  const entries = Object.entries(reactions ?? {});
+   const unicodeCodes = entries.map(([code]) => code);
+   const totalReactionCount = entries.reduce((sum, [, count]) => sum + count, 0);
+ 
+@@ -127,7 +127,7 @@ const FeedCard: FC<FeedCardProps> = ({
+   };
+ 
+   const userImage = useMemo(() => {
+-    if (user.id === currentDetails?.id) {
++    if (user?.id === currentDetails?.id) {
+       return currentDetails?.profileImageUrl;
+     }
+     return user?.profileImage;
+diff --git a/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx b/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
+index b271d35a5b..fb6222c7ab 100644
+--- a/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
+@@ -4,14 +4,14 @@ import { AnimatePresence, motion } from "framer-motion";
+ import { useTranslation } from "react-i18next";
+ import { useNavigate, useSearchParams } from "react-router-dom";
+ 
+-import { DropdownField, FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared";
++import { DropdownField, FEATURE_FLAGS_MAP, Tabs } from "@ally-ui-mono/ui-shared";
+ import {
+   useGetScenariosQuery,
+   useGetScenarioPathwaysQuery,
+   useGetScenarioCasesQuery,
+   useUpdateUserPreferencesMutation,
+ } from "@api";
+-import { CreditsDisplay, ScenarioCard, TabGroup } from "@components";
++import { CreditsDisplay, ScenarioCard } from "@components";
+ import { Permissions } from "@constants";
+ import { useUser, useScenarioLanguages } from "@hooks";
+ import { LanguageOption, ScenarioStatus } from "@types";
+@@ -176,11 +176,13 @@ export const Learn: FC = () => {
+         </motion.div>
+         {hasPathPermissions && (
+           <div className="flex flex-row items-center justify-between gap-2 border-b border-typography-300">
+-            <TabGroup
+-              tabs={tabs.map(tab => ({ label: tab.label, value: tab.id }))}
+-              value={activeTab}
+-              className="border-none max-w-[330px]"
+-              onChange={(_, newValue) => handleTabChange(newValue as LearnTabId)}
++            <Tabs
++              items={tabs.map(tab => ({ id: tab.id, label: tab.label }))}
++              activeId={activeTab}
++              onChange={id => handleTabChange(id as LearnTabId)}
++              className="border-none max-w-[330px] font-primary"
++              showCount={false}
++              tabStyles={{ minWidth: "100px" }}
+             />
+ 
+             <div className="w-full flex justify-end">
+diff --git a/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx b/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
+index 285f6ab9e6..ad57cd74e4 100644
+--- a/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
+@@ -1058,7 +1058,7 @@ describe("Tab Navigation", () => {
+         <Learn />
+       </TestWrapper>,
+     );
+-    expect(screen.getByTestId("tab-group")).not.toBeNull();
++    expect(screen.getByTestId("tabs")).not.toBeNull();
+   });
+ 
+   it("should render Simulations tab", () => {
+diff --git a/apps/ally-helpline-dashboard/src/pages/review/Review.tsx b/apps/ally-helpline-dashboard/src/pages/review/Review.tsx
+index cb8aec3cb7..df9db147d0 100644
+--- a/apps/ally-helpline-dashboard/src/pages/review/Review.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/review/Review.tsx
+@@ -4,10 +4,10 @@ import { motion } from "framer-motion";
+ import { useTranslation } from "react-i18next";
+ import { useNavigate, useSearchParams } from "react-router-dom";
+ 
+-import { FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared";
++import { FEATURE_FLAGS_MAP, Tabs } from "@ally-ui-mono/ui-shared";
+ import { useGetReviewsQuery, useGetReviewThreadsQuery, useGetScribeReviewsQuery } from "@api";
+ import { NoResults, ReviewsEmptyState } from "@assets";
+-import { FallbackUI, TabGroup, ToggleButtonGroup } from "@components";
++import { FallbackUI, ToggleButtonGroup } from "@components";
+ import { ROUTES } from "@constants";
+ import ScribeReview from "@pages/review/components/ScribeReview";
+ import {
+@@ -327,11 +327,12 @@ const ReviewWithTabs: FC = () => {
+         </motion.div>
+         <div className="w-full max-w-4xl px-4 sm:px-6 lg:px-8 pt-3">
+           <div className="flex flex-row items-center justify-between gap-2 border-b border-typography-300">
+-            <TabGroup
+-              tabs={TABS}
+-              value={activeTab}
+-              className="border-none max-w-[330px] text-base font-primary "
+-              onChange={(_, newValue) => handleTabSwitch(newValue)}
++            <Tabs
++              items={TABS.map(tab => ({ id: tab.value, label: tab.label }))}
++              activeId={activeTab}
++              onChange={handleTabSwitch}
++              className="border-none max-w-[330px] text-base font-primary"
++              showCount={false}
+             />
+           </div>
+         </div>
+diff --git a/apps/ally-helpline-dashboard/src/pages/review/__tests__/Review.test.tsx b/apps/ally-helpline-dashboard/src/pages/review/__tests__/Review.test.tsx
+index 5300801ed6..538260fdc9 100644
+--- a/apps/ally-helpline-dashboard/src/pages/review/__tests__/Review.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/review/__tests__/Review.test.tsx
+@@ -49,10 +49,38 @@ vi.mock("@api", () => ({
+ 
+ vi.mock("@ally-ui-mono/ui-shared", () => ({
+   FEATURE_FLAGS_MAP: mockFeatureFlags,
++  Tabs: ({ items, activeId, onChange, className }: any) => (
++    <div data-testid="tabs" className={className}>
++      {items?.map((item: any) => (
++        <button
++          key={item.id}
++          data-testid={`tab-${item.id}`}
++          onClick={() => onChange(item.id)}
++          className={activeId === item.id ? "active" : ""}
++        >
++          {item.label}
++        </button>
++      ))}
++    </div>
++  ),
+ }));
+ 
+ vi.mock("@ally-ui-mono/ui-shared/index", () => ({
+   FEATURE_FLAGS_MAP: mockFeatureFlags,
++  Tabs: ({ items, activeId, onChange, className }: any) => (
++    <div data-testid="tabs" className={className}>
++      {items?.map((item: any) => (
++        <button
++          key={item.id}
++          data-testid={`tab-${item.id}`}
++          onClick={() => onChange(item.id)}
++          className={activeId === item.id ? "active" : ""}
++        >
++          {item.label}
++        </button>
++      ))}
++    </div>
++  ),
+   InfiniteScroll: ({ children, onInfiniteScroll, isLoading }: any) => (
+     <div data-testid="infinite-scroll" data-is-loading={isLoading}>
+       {children}

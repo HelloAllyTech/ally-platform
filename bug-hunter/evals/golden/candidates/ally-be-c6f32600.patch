@@ -1,0 +1,201 @@
+diff --git a/src/bug-hunter/constants/bug-fix-session.constants.ts b/src/bug-hunter/constants/bug-fix-session.constants.ts
+index 9484564532..12ffed4bd6 100644
+--- a/src/bug-hunter/constants/bug-fix-session.constants.ts
++++ b/src/bug-hunter/constants/bug-fix-session.constants.ts
+@@ -31,6 +31,14 @@ export const BUG_HUNTER_AGENT_ROADMAP_OWNER = 'Bug Hunter Agent';
+  */
+ export const BUG_HUNT_SWEEP_WORKFLOW_FILE = 'bug-hunt-sweep.yml';
+ 
++/**
++ * The `timeout-minutes` every repo's `bug-hunt-sweep.yml` job carries, quoted
++ * to the sweep agent as its real budget — same reasoning as
++ * `BUG_FIX_SESSION_JOB_TIMEOUT_MINUTES` below, and double it, because a sweep
++ * works through every finding it discovers rather than one.
++ */
++export const BUG_HUNT_SWEEP_JOB_TIMEOUT_MINUTES = 120;
++
+ /**
+  * Repos a fix session may be dispatched for — i.e. those carrying
+  * `bug-fix-session.yml`. `ally-mobile` is fixable (opens a PR) but never
+diff --git a/src/bug-hunter/constants/bug-hunt-sweep-prompt.ts b/src/bug-hunter/constants/bug-hunt-sweep-prompt.ts
+index e6ae93f3f9..faebcc94fb 100644
+--- a/src/bug-hunter/constants/bug-hunt-sweep-prompt.ts
++++ b/src/bug-hunter/constants/bug-hunt-sweep-prompt.ts
+@@ -1,4 +1,5 @@
+ import { BugHunterMode } from '../enum/bug-finding.enum';
++import { BUG_HUNT_SWEEP_JOB_TIMEOUT_MINUTES } from './bug-fix-session.constants';
+ import { repoCommands } from './bug-hunt-repos.constants';
+ import {
+   BUG_HUNT_ESCALATION_GUIDANCE,
+@@ -90,6 +91,9 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
+   return [
+     `You are running a repo-wide bug sweep on the "${repo}" repo, checked out at master in your current working directory. Read this repo's CLAUDE.md before you change anything. Bug Hunter is in ${mode.toUpperCase()} mode.`,
+     ``,
++    `HOW YOU ARE RUNNING — read this before you plan anything:`,
++    `You are a single non-interactive process on a throwaway CI runner. The moment you end your turn the process exits and the runner is destroyed. There is no "later" for you: nothing re-invokes you, no background task ever notifies you, and any work not already pushed to GitHub or reported to Bug Hunter is lost with the machine. So NEVER start a long command in the background and end your turn intending to pick it up when it finishes — that silently throws away the rest of the sweep. Run long commands in the FOREGROUND and wait for them, however many minutes they take; ${BUG_HUNT_SWEEP_JOB_TIMEOUT_MINUTES} minutes is the real budget for everything below, and a single command is allowed to spend a large part of it. The full suite in Phase 1 and each commit in Phase 3 are the slowest, and both are meant to be — a commit here may fire a pre-commit hook that re-runs lint and the whole suite, which is expected and is NOT a hang.`,
++    ``,
+     `Work through these phases IN ORDER. Report progress as you go with:`,
+     `  curl -sS -X POST "${reportUrl}" -H "Content-Type: application/json" ${auth} -d '{"repo":"${repo}","stage":"<stage>","summary":"<one line>"}'`,
+     `Valid stages: finder_result, verify, fix_attempt, test_written, doc_updated, pr_opened, merged, escalated, error.`,
+@@ -167,7 +171,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
+     `## Phase 4 — Close`,
+     `Exactly once, whatever happened, including if you found nothing at all:`,
+     `  curl -sS -X POST "${closeUrl}" -H "Content-Type: application/json" ${auth} -d '{"status":"completed","foundCount":<n>,"autoMergedCount":<n>,"prOpenedCount":<n>,"dismissedCount":<n>}'`,
+-    `A run left open looks to an admin like a sweep still working. If you hit something that stopped you entirely, close with {"status":"failed",...} instead and report an error stage explaining what.`,
++    `A run left open looks to an admin like a sweep still working. If you hit something that stopped you entirely, close with {"status":"failed",...} instead and report an error stage explaining what. The workflow re-reads this run the moment you exit and fails the job if it is still open, so stopping without closing is not a quiet outcome — it is a red run and an admin asking why.`,
+     ``,
+     `Finally: if a fix made a README, TESTING.md, DATA_SCHEMA.md or a CLAUDE.md "gotchas" section stale, update it in the same PR and report doc_updated naming the file.`,
+   ]
+diff --git a/src/bug-hunter/constants/test/bug-hunt-sweep-prompt.spec.ts b/src/bug-hunter/constants/test/bug-hunt-sweep-prompt.spec.ts
+index b8f30e927b..6a28508ac7 100644
+--- a/src/bug-hunter/constants/test/bug-hunt-sweep-prompt.spec.ts
++++ b/src/bug-hunter/constants/test/bug-hunt-sweep-prompt.spec.ts
+@@ -195,4 +195,38 @@ describe('buildSweepPrompt', () => {
+     expect(p).toContain('/runs/abc-123/report');
+     expect(p).toContain('/runs/abc-123/close');
+   });
++
++  // ── one-shot runtime ─────────────────────────────────────────────────────
++  //
++  // `claude -p` exits 0 whenever the agent produces a final response. A fix
++  // session backgrounded its pre-commit-hooked `git commit`, said it would
++  // push "once it finishes", and ended its turn — the runner died with the
++  // work in its tree and the job stayed green. The sweep commits in the same
++  // way, once per fix, across a 300-turn run, so it is exposed to the same
++  // mistake more often rather than less.
++
++  it('tells the agent it gets one process and no second chance', () => {
++    const p = build();
++
++    expect(p).toMatch(/single non-interactive process/i);
++    expect(p).toMatch(/NEVER start a long command in the background/i);
++  });
++
++  it('quotes the sweep job’s own budget, not the fix session’s', () => {
++    // The two workflows cap differently — 120 vs 60 — and a sweep told it has
++    // an hour would ration work it has time for.
++    expect(build()).toMatch(/120 minutes is the real budget/);
++  });
++
++  it('warns that a commit runs the full suite and is not a hang', () => {
++    expect(build()).toMatch(
++      /pre-commit hook that re-runs lint and the whole suite/i,
++    );
++    expect(build()).toMatch(/NOT a hang/);
++  });
++
++  it('warns that the workflow fails the job on a run left open', () => {
++    expect(build()).toMatch(/re-reads this run the moment you exit/i);
++    expect(build()).toMatch(/fails the job if it is still open/i);
++  });
+ });
+diff --git a/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts b/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
+index 5c6b1bc4dd..49ac51690c 100644
+--- a/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
++++ b/src/bug-hunter/controller/bug-hunter-pipeline.controller.ts
+@@ -246,6 +246,25 @@ export class BugHunterPipelineController {
+     return { runId: run.id, mode };
+   }
+ 
++  @Get('runs/:id/status')
++  @ApiOperation({
++    summary: 'Whether a run is still open (pipeline only)',
++    description:
++      'Read by each sweep workflow immediately after `claude -p` exits. The ' +
++      'CLI exits 0 whenever the agent produces a final response — including ' +
++      'when it ends its turn mid-protocol without closing its run — so a ' +
++      'green job is not evidence the sweep finished. A run still RUNNING at ' +
++      'that point was abandoned, and the workflow fails itself rather than ' +
++      'leaving it open forever. Deliberately narrower than the admin ' +
++      "controller's run detail: a CI gate needs the status and nothing else.",
++  })
++  async getRunStatus(
++    @Param('id', ParseUUIDPipe) id: string,
++  ): Promise<{ status: BugHuntRunStatus }> {
++    const run = await this.bugHunterService.getRun(id);
++    return { status: run.status };
++  }
++
+   @Post('runs/:id/findings')
+   @ApiOperation({
+     summary:
+diff --git a/src/bug-hunter/controller/test/bug-hunter-pipeline.controller.spec.ts b/src/bug-hunter/controller/test/bug-hunter-pipeline.controller.spec.ts
+new file mode 100644
+index 0000000000..808a630f26
+--- /dev/null
++++ b/src/bug-hunter/controller/test/bug-hunter-pipeline.controller.spec.ts
+@@ -0,0 +1,74 @@
++import { BugHunterPipelineController } from '../bug-hunter-pipeline.controller';
++import { BugHuntRun } from '../../entity/bug-hunt-run.entity';
++import { BugHuntRunStatus } from '../../enum/bug-hunt-run.enum';
++
++/**
++ * Direct-instantiation style, matching the rest of this module's specs — the
++ * `ApiAuthGuard` on this controller only ever runs on a real HTTP request, so
++ * calling the method directly needs no guard/provider scaffolding.
++ */
++describe('BugHunterPipelineController', () => {
++  let controller: BugHunterPipelineController;
++  let bugHunterService: { getRun: jest.Mock };
++
++  beforeEach(() => {
++    bugHunterService = { getRun: jest.fn() };
++    controller = new BugHunterPipelineController(
++      bugHunterService as never,
++      {} as never,
++      {} as never,
++      {} as never,
++      {} as never,
++    );
++  });
++
++  // Read by every repo's `bug-hunt-sweep.yml` the moment `claude -p` exits.
++  // The CLI exits 0 even when the agent ends its turn mid-protocol, so a green
++  // job proves nothing — a run still RUNNING at that point was abandoned, and
++  // there is no reconcile pass that would ever notice.
++  describe('getRunStatus', () => {
++    it('reports a run the sweep agent left open', async () => {
++      bugHunterService.getRun.mockResolvedValue({
++        id: 'run-1',
++        status: BugHuntRunStatus.RUNNING,
++      } as BugHuntRun);
++
++      await expect(controller.getRunStatus('run-1')).resolves.toEqual({
++        status: BugHuntRunStatus.RUNNING,
++      });
++      expect(bugHunterService.getRun).toHaveBeenCalledWith('run-1');
++    });
++
++    it.each([
++      BugHuntRunStatus.COMPLETED,
++      BugHuntRunStatus.FAILED,
++      BugHuntRunStatus.SKIPPED_DISABLED,
++    ])('reports %s for a run that closed itself', async (status) => {
++      bugHunterService.getRun.mockResolvedValue({
++        id: 'run-1',
++        status,
++      } as BugHuntRun);
++
++      await expect(controller.getRunStatus('run-1')).resolves.toEqual({
++        status,
++      });
++    });
++
++    it('exposes only the status, never the rest of the run', async () => {
++      // A CI gate needs one field. Widening this to the admin controller's run
++      // detail would put a run's findings and events behind the machine key
++      // for no reason.
++      bugHunterService.getRun.mockResolvedValue({
++        id: 'run-1',
++        status: BugHuntRunStatus.COMPLETED,
++        repo: 'ally-be',
++        totalTokenCostUsd: '12.3400',
++        metadata: { errorMessage: 'something internal' },
++      } as unknown as BugHuntRun);
++
++      expect(Object.keys(await controller.getRunStatus('run-1'))).toEqual([
++        'status',
++      ]);
++    });
++  });
++});

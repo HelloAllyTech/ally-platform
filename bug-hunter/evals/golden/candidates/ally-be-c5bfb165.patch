@@ -1,0 +1,33 @@
+diff --git a/src/authorization/service/group.service.ts b/src/authorization/service/group.service.ts
+index fcd814ebf1..dd10fe5064 100644
+--- a/src/authorization/service/group.service.ts
++++ b/src/authorization/service/group.service.ts
+@@ -50,7 +50,15 @@ export class GroupService {
+     }
+     const userGroups = await this.getUserRolesByUserId(userId);
+     const groupIds = userGroups.map((group) => group.id);
+-    await this.cache.set(`user:groups:${userId}`, JSON.stringify(groupIds));
++    // TTL (30 min) matches getUserPermissions, which writes the same
++    // `user:groups:<id>` key. Without it, a last-writer-wins race between the
++    // two writers can pin the key permanently, so an out-of-band group change
++    // (e.g. a role promotion applied by a raw SQL migration) is never busted.
++    await this.cache.set(
++      `user:groups:${userId}`,
++      JSON.stringify(groupIds),
++      1800,
++    );
+     return groupIds;
+   }
+ 
+diff --git a/src/authorization/service/test/group-service.spec.ts b/src/authorization/service/test/group-service.spec.ts
+index 1c73f4ff9a..216eb7a337 100644
+--- a/src/authorization/service/test/group-service.spec.ts
++++ b/src/authorization/service/test/group-service.spec.ts
+@@ -187,6 +187,7 @@ describe('GroupService', () => {
+       expect(redisService.set).toHaveBeenCalledWith(
+         'user:groups:2',
+         JSON.stringify([10, 20]),
++        1800,
+       );
+       expect(groupRepo.findUserRoleByUserId).toHaveBeenCalledWith(2);
+     });

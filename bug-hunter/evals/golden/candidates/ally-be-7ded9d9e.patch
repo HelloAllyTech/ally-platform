@@ -1,0 +1,156 @@
+diff --git a/src/builder/eval/sandbox/builder-eval-sandbox.factory.ts b/src/builder/eval/sandbox/builder-eval-sandbox.factory.ts
+index 16cbd5da08..66febc7b3c 100644
+--- a/src/builder/eval/sandbox/builder-eval-sandbox.factory.ts
++++ b/src/builder/eval/sandbox/builder-eval-sandbox.factory.ts
+@@ -30,6 +30,7 @@ import { BuilderReadinessService } from '../../service/builder-readiness.service
+ import { BuilderPrdReviewService } from '../../service/builder-prd-review.service';
+ import { BuilderPlatformContextService } from '../../service/builder-platform-context.service';
+ import { BuilderSettingsService } from '../../service/builder-settings.service';
++import { BuilderSettings } from '../../entity/builder-settings.entity';
+ import { BuilderEvalOverrides } from '../type/builder-eval.type';
+ import { SandboxStores } from './builder-eval-stores';
+ 
+@@ -52,6 +53,8 @@ export interface BuilderEvalSandbox {
+   passes: SandboxPass[];
+   /** Estimated spend so far, all model calls in the replay. */
+   costUsd: () => number;
++  /** Which interview loop this replay runs. */
++  validatedTurns: boolean;
+ }
+ 
+ /**
+@@ -74,8 +77,11 @@ export interface BuilderEvalSandbox {
+  *   real interviews, and summed into the run's cost;
+  * - exemplar selection, which is off: it writes to the session row and is a
+  *   ranking call the replay does not need to repeat;
+- * - the validated-turns switch, from the run's overrides (every suite stamps
+- *   it), falling back to the live setting — so a suite can replay either loop.
++ * - the validated-turns switch, from the run's overrides. Every suite stamps
++ *   it when it starts; one with no stamp was started before the switch
++ *   existed and replays the legacy loop it began on — never the live
++ *   setting, or a suite resumed across the deploy that added the switch
++ *   would change loops halfway through and measure neither.
+  */
+ @Injectable()
+ export class BuilderEvalSandboxFactory {
+@@ -92,7 +98,6 @@ export class BuilderEvalSandboxFactory {
+     private readonly evidence: BuilderEvidenceService,
+     private readonly catalog: BuilderCatalogService,
+     private readonly platformContext: BuilderPlatformContextService,
+-    private readonly settingsService: BuilderSettingsService,
+   ) {}
+ 
+   create(options: {
+@@ -120,6 +125,7 @@ export class BuilderEvalSandboxFactory {
+     } as unknown as BuilderSession;
+ 
+     const overrides = options.overrides ?? {};
++    const validatedTurns = overrides.validatedTurns === true;
+     const realPrompts = this.promptSharedService;
+     const prompts = new Proxy(realPrompts, {
+       get(target, property, receiver) {
+@@ -301,12 +307,7 @@ export class BuilderEvalSandboxFactory {
+       readiness,
+       this.platformContext,
+       {
+-        get: async () => ({
+-          ...(await this.settingsService.get()),
+-          ...(overrides.validatedTurns !== undefined
+-            ? { validatedTurns: overrides.validatedTurns }
+-            : {}),
+-        }),
++        get: async () => ({ validatedTurns }) as BuilderSettings,
+       } as BuilderSettingsService,
+     );
+ 
+@@ -319,6 +320,7 @@ export class BuilderEvalSandboxFactory {
+       llmCompletion,
+       passes,
+       costUsd: () => cost,
++      validatedTurns,
+     };
+   }
+ }
+diff --git a/src/builder/eval/service/builder-eval-runner.service.ts b/src/builder/eval/service/builder-eval-runner.service.ts
+index 3cbee7ef8b..f67e9a2c5e 100644
+--- a/src/builder/eval/service/builder-eval-runner.service.ts
++++ b/src/builder/eval/service/builder-eval-runner.service.ts
+@@ -306,6 +306,7 @@ export class BuilderEvalRunnerService {
+       .flatMap((row) => row.toolResults ?? [])
+       .filter((result) => !BUILDER_TERMINAL_TOOLS.has(String(result?.name)));
+     const metrics: BuilderEvalMetrics = {
++      loop: sandbox.validatedTurns ? 'validated' : 'legacy',
+       turns,
+       // Questions delivered, not ask_admin calls made: the same count on the
+       // legacy loop, where every call was delivered.
+diff --git a/src/builder/eval/test/builder-eval-sandbox.factory.spec.ts b/src/builder/eval/test/builder-eval-sandbox.factory.spec.ts
+index 2996111065..3ee61da79f 100644
+--- a/src/builder/eval/test/builder-eval-sandbox.factory.spec.ts
++++ b/src/builder/eval/test/builder-eval-sandbox.factory.spec.ts
+@@ -114,7 +114,6 @@ describe('BuilderEvalSandboxFactory', () => {
+         renderContextSection: jest.fn().mockResolvedValue(''),
+       } as any,
+       { render: jest.fn().mockResolvedValue('') } as any,
+-      { get: jest.fn().mockResolvedValue({ validatedTurns: true }) } as any,
+     );
+     return { factory, requests, promptSharedService, llmUsage, githubRead };
+   };
+@@ -219,4 +218,45 @@ describe('BuilderEvalSandboxFactory', () => {
+       'LIVE builder_interviewer_system',
+     );
+   });
++
++  /**
++   * Every suite stamps the loop it runs. One with no stamp was started before
++   * validated turns existed, and must keep replaying the loop it began on — a
++   * suite resumed across that deploy would otherwise switch loops halfway and
++   * measure neither.
++   */
++  it('replays the legacy loop for a suite with no loop stamped', async () => {
++    const { factory, requests } = build();
++    const sandbox = factory.create({
++      evalRunId: 'run-1',
++      title: 'Old',
++      userId: 7,
++    });
++
++    await playOneTurn(sandbox);
++
++    expect(sandbox.validatedTurns).toBe(false);
++    expect(requests[0].system[0].text).not.toContain('# How a turn ends');
++    expect(requests[0].tools.map((tool: any) => tool.name)).not.toContain(
++      'finish_turn',
++    );
++  });
++
++  it('replays validated turns when the suite was stamped with them', async () => {
++    const { factory, requests } = build();
++    const sandbox = factory.create({
++      evalRunId: 'run-1',
++      title: 'New',
++      userId: 7,
++      overrides: { validatedTurns: true },
++    });
++
++    await playOneTurn(sandbox);
++
++    expect(sandbox.validatedTurns).toBe(true);
++    expect(requests[0].system[0].text).toContain('# How a turn ends');
++    expect(requests[0].tools.map((tool: any) => tool.name)).toContain(
++      'finish_turn',
++    );
++  });
+ });
+diff --git a/src/builder/eval/type/builder-eval.type.ts b/src/builder/eval/type/builder-eval.type.ts
+index 558461d914..3e4a1727b9 100644
+--- a/src/builder/eval/type/builder-eval.type.ts
++++ b/src/builder/eval/type/builder-eval.type.ts
+@@ -125,6 +125,8 @@ export interface BuilderEvalGates {
+ }
+ 
+ export interface BuilderEvalMetrics {
++  /** The interview loop the run replayed; absent on runs from before it was recorded. */
++  loop?: 'validated' | 'legacy';
+   turns: number;
+   /** ask_admin calls. */
+   questions: number;

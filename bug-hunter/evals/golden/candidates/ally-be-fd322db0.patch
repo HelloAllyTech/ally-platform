@@ -1,0 +1,147 @@
+diff --git a/src/builder/constants/builder.constants.ts b/src/builder/constants/builder.constants.ts
+index 954331f66d..ab27b66d4a 100644
+--- a/src/builder/constants/builder.constants.ts
++++ b/src/builder/constants/builder.constants.ts
+@@ -151,6 +151,31 @@ export const BUILDER_WORKFLOW_FILE = 'builder-session.yml';
+  * because review → fix → new head sha → review is a loop that would otherwise
+  * only stop when a human closed the pull request.
+  */
++/**
++ * The GitHub logins Builder's own runners push and comment as.
++ *
++ * `isOwnActor` decides two things at once: whose comments are not feedback to
++ * itself, and whose commits it may act on top of. Getting it wrong is silent in
++ * both directions, and it was wrong — the predicate matched `ally-builder*` and
++ * `*[bot]`, while every commit a runner pushes is authored by
++ * `adminbughunterhelloallyai`.
++ *
++ * So Builder did not recognise its own pushes. Two features were disabled by it
++ * and neither said so: a branch that fell behind was never brought up to date
++ * (it looked like somebody else's work), and a failing check on Builder's own
++ * commit was filed OBSERVED rather than PENDING — which `countPending` ignores,
++ * so the fix loop never fired on its own red CI. The comment on `isOwnActor`
++ * describes that failure exactly; the list simply did not contain the name.
++ *
++ * A list rather than a pattern: these are real accounts, and a prefix match is
++ * how a human called `ally-builder-reviews` would quietly gain the right to
++ * have their pushes overwritten.
++ */
++export const BUILDER_OWN_ACTORS = [
++  'adminbughunterhelloallyai',
++  'ally-builder',
++] as const;
++
+ export const BUILDER_MAX_REVIEW_RUNS_PER_PR = 2;
+ 
+ /**
+diff --git a/src/builder/service/builder-pull-request.service.ts b/src/builder/service/builder-pull-request.service.ts
+index 51f6513971..fcfff67381 100644
+--- a/src/builder/service/builder-pull-request.service.ts
++++ b/src/builder/service/builder-pull-request.service.ts
+@@ -33,6 +33,7 @@ import {
+ import { isBuilderRepo } from '../constants/builder-repos.constants';
+ import {
+   BUILDER_MAX_REVIEW_RUNS_PER_PR,
++  BUILDER_OWN_ACTORS,
+   BUILDER_RELEASE_TIMEOUT_MS,
+   BUILDER_WORKFLOW_REF,
+   isUnfixableCheck,
+@@ -1052,7 +1053,13 @@ export class BuilderPullRequestService {
+    */
+   private isOwnActor(author: string): boolean {
+     const login = author.toLowerCase();
+-    return login.startsWith('ally-builder') || login.endsWith('[bot]');
++    // Exact match against the known accounts, plus the GitHub App suffix. The
++    // old prefix match missed the account runners actually push as, which
++    // disabled branch updates and self-fixing red CI without a word.
++    return (
++      BUILDER_OWN_ACTORS.some((actor) => login === actor) ||
++      login.endsWith('[bot]')
++    );
+   }
+ 
+   /**
+diff --git a/src/builder/service/test/builder-pull-request.service.spec.ts b/src/builder/service/test/builder-pull-request.service.spec.ts
+index 0a68a3813e..37dcde6d0d 100644
+--- a/src/builder/service/test/builder-pull-request.service.spec.ts
++++ b/src/builder/service/test/builder-pull-request.service.spec.ts
+@@ -1433,4 +1433,79 @@ describe('BuilderPullRequestService', () => {
+       );
+     });
+   });
++
++  /**
++   * Whose pushes are Builder's own.
++   *
++   * One predicate decides two things — whose comments are not feedback to
++   * itself, and whose commits it may act on top of — and it was wrong in
++   * production for both. It matched `ally-builder*` while every runner pushes
++   * as `adminbughunterhelloallyai`, so Builder read its own branches as
++   * somebody else's: it never brought a stale branch up to date, and it filed
++   * its own failing checks as OBSERVED, which `countPending` ignores, so the
++   * fix loop never fired on its own red CI.
++   */
++  describe('recognising its own pushes', () => {
++    beforeEach(() => {
++      settingsService.get.mockResolvedValue({
++        enabled: true,
++        autoFixEnabled: true,
++        maxFixRunsPerPr: 3,
++      });
++    });
++
++    it('treats the account runners actually push as its own', async () => {
++      github.getCommitAuthor.mockResolvedValue({
++        login: 'adminbughunterhelloallyai',
++        name: 'adminbughunterhelloallyai',
++      });
++
++      await reconcileWith({ headSha: 'abc1234def', mergeableState: 'behind' });
++
++      expect(github.updatePullRequestBranch).toHaveBeenCalled();
++    });
++
++    it('still treats a GitHub App as its own', async () => {
++      github.getCommitAuthor.mockResolvedValue({
++        login: 'some-app[bot]',
++        name: 'Some App',
++      });
++
++      await reconcileWith({ headSha: 'abc1234def', mergeableState: 'behind' });
++
++      expect(github.updatePullRequestBranch).toHaveBeenCalled();
++    });
++
++    /**
++     * Exact match, not a prefix: a person called `ally-builder-reviews` must
++     * not quietly gain the right to have their pushes merged over.
++     */
++    it('does not claim a person whose name merely starts the same way', async () => {
++      github.getCommitAuthor.mockResolvedValue({
++        login: 'ally-builder-reviews',
++        name: 'A Person',
++      });
++
++      await reconcileWith({ headSha: 'abc1234def', mergeableState: 'behind' });
++
++      expect(github.updatePullRequestBranch).not.toHaveBeenCalled();
++    });
++
++    /** The other half of the same predicate: its own red CI is its to fix. */
++    it('files its own failing check as pending work', async () => {
++      github.getCommitAuthor.mockResolvedValue({
++        login: 'adminbughunterhelloallyai',
++        name: 'adminbughunterhelloallyai',
++      });
++
++      await reconcileWith({ headSha: 'abc1234def' }, openPr(), {
++        state: 'failure',
++        failed: ['Jest'],
++      });
++
++      expect(feedbackRepository.upsertIfNew).toHaveBeenCalledWith(
++        expect.objectContaining({ status: BuilderPrFeedbackStatus.PENDING }),
++      );
++    });
++  });
+ });

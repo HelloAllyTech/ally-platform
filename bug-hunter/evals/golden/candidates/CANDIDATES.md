@@ -1,16 +1,18 @@
 # Candidate golden cases
 
 Review, then accept by id: `poetry run bug-hunter eval accept <id> [<id> …]`.
-Bug rows: `lines` = source lines changed by the real fix (tests excluded); `tests` = oracle test files;
-`risk` = touches a risk path (expected outcome: escalate); `lock=HEAD` = same lockfile as master,
-so the sandbox reuses one dependency volume. `layout` old = pre-cutover subtree history (app at the
-worktree root; PR numbers refer to the archived repo). Clean rows: feat/chore commits no later fix
+Bug rows: `lines` = source lines changed by the real fix (tests excluded);
+`tests` = oracle test files; `risk` = touches a risk path (expected outcome:
+escalate); `lock=HEAD` = same lockfile as master, so the sandbox reuses one
+dependency volume. `layout` old = pre-cutover subtree history (app at the
+worktree root; PR numbers refer to the archived repo). Clean rows: feat/chore
+commits no later fix
 touched within the window.
 
 ## ally-ai  (4 bug, 13 clean)
 
-| id | kind | date | lines | tests | risk | lock=HEAD | PR | title |
-|---|---|---|---|---|---|---|---|---|
+| id | kind | date | layout | lines | tests | risk | lock=HEAD | PR | title |
+|---|---|---|---|---|---|---|---|---|---|
 | `ally-ai-11eef73c` | bug | 2026-11-06 | mono | 7 | 1 |  | yes | #217 | the no-topics prompt line no longer leads the model into talk the check refuses (#23) |
 | `ally-ai-b680c643` | bug | 2026-10-26 | mono | 12 | 1 |  | no | #69 | The prompt code resolution function does not correctly handle nested directory structures… |
 | `ally-ai-e9a0e1c3` | bug | 2026-11-02 | mono | 14 | 1 |  | no | #169 | A block of code is duplicated within the `generate_scenario_evaluation` method, likely du… |
@@ -31,8 +33,8 @@ touched within the window.
 
 ## ally-ai-learn  (5 bug, 64 clean)
 
-| id | kind | date | lines | tests | risk | lock=HEAD | PR | title |
-|---|---|---|---|---|---|---|---|---|
+| id | kind | date | layout | lines | tests | risk | lock=HEAD | PR | title |
+|---|---|---|---|---|---|---|---|---|---|
 | `ally-ai-learn-fb3d48fb` | bug | 2026-10-24 | mono | 2 | 1 |  | yes | #51 | Actor evaluation is failing with a generic exception, leading to an ERROR log. This indic… |
 | `ally-ai-learn-1065743a` | bug | 2026-10-24 | mono | 6 | 1 |  | yes | #45 | An error is occurring in the actor evaluation service for scenario sessions. This could p… |
 | `ally-ai-learn-7391ff7e` | bug | 2026-10-27 | mono | 16 | 1 |  | yes | #71 | The `_create_event_by_detection_type` function in `app/core/events/factory.py` uses bare … |
@@ -105,8 +107,8 @@ touched within the window.
 
 ## ally-be  (280 bug, 404 clean)
 
-| id | kind | date | lines | tests | risk | lock=HEAD | PR | title |
-|---|---|---|---|---|---|---|---|---|
+| id | kind | date | layout | lines | tests | risk | lock=HEAD | PR | title |
+|---|---|---|---|---|---|---|---|---|---|
 | `ally-be-bd603f41` | bug | 2026-10-28 | mono | 1 | 3 |  | yes | #127 | remove infra from ship-volume tracking |
 | `ally-be-d0fd4c85` | bug | 2026-09-28 | old | 1 | 1 |  | no | #564 | propagate errors in XpAwardService (#564) |
 | `ally-be-dc599d6c` | bug | 2026-09-24 | old | 1 | 1 |  | no |  | remove redundant disconnect handler |
@@ -794,14 +796,14 @@ touched within the window.
 
 ## ally-mobile  (1 bug, 0 clean)
 
-| id | kind | date | lines | tests | risk | lock=HEAD | PR | title |
-|---|---|---|---|---|---|---|---|---|
+| id | kind | date | layout | lines | tests | risk | lock=HEAD | PR | title |
+|---|---|---|---|---|---|---|---|---|---|
 | `ally-mobile-83bdf91e` | bug | 2026-11-06 | mono | 59 | 3 |  | yes |  | reconnect in place on Try again, and stop starting sessions muted |
 
 ## ally-web  (248 bug, 378 clean)
 
-| id | kind | date | lines | tests | risk | lock=HEAD | PR | title |
-|---|---|---|---|---|---|---|---|---|
+| id | kind | date | layout | lines | tests | risk | lock=HEAD | PR | title |
+|---|---|---|---|---|---|---|---|---|---|
 | `ally-web-520d8159` | bug | 2026-09-03 | old | 1 | 1 |  | no |  | re-enable Scan now button when a watched scan stalls |
 | `ally-web-a4cc6436` | bug | 2026-08-31 | old | 1 | 1 |  | no |  | stop RaiseBudgetDialog from submitting a ceiling removal on an empty field |
 | `ally-web-bfbf5e6e` | bug | 2026-08-19 | old | 1 | 1 |  | no |  | register eslint-plugin-react-hooks in the flat config |

@@ -1,0 +1,47 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/quiz/QuizResults.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/quiz/QuizResults.tsx
+index a2a295b954..650227e37e 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/quiz/QuizResults.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/quiz/QuizResults.tsx
+@@ -40,7 +40,7 @@ const QuestionRow: FC<{
+   const isPending = isPendingResult(result);
+   const graded = isGraded(result);
+   // Ungraded with no key: there is no right or wrong to report.
+-  const hasVerdict = result.correct !== null;
++  const hasVerdict = result.correct !== null && graded;
+ 
+   const statusIcon = isPending ? (
+     <span className="inline-block h-4 w-4 rounded-full bg-warning-300" aria-hidden />
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/quiz/__tests__/QuizResults.likert.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/quiz/__tests__/QuizResults.likert.test.tsx
+index c6cd10cbda..d7698de215 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/quiz/__tests__/QuizResults.likert.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/quiz/__tests__/QuizResults.likert.test.tsx
+@@ -228,4 +228,29 @@ describe("QuizResults - survey, ungraded and correct answers", () => {
+     );
+     expect(screen.getByText("Finish grading")).toBeInTheDocument();
+   });
++
++  it("shows an ungraded question as neutral even when `correct` is false", () => {
++    renderResults(
++      baseResult({
++        scorePct: 100,
++        passed: true,
++        questions: [
++          {
++            questionId: "tf",
++            correct: false,
++            graded: false,
++            pointsAwarded: 0,
++            pointsPossible: 0,
++          },
++        ],
++      }),
++      [trueFalse],
++    );
++    // Should not show incorrect icon
++    expect(screen.queryByTestId("cross-icon")).not.toBeInTheDocument();
++    // Should not show incorrect label
++    expect(screen.queryByText("Incorrect")).not.toBeInTheDocument();
++    // Should show "Not scored"
++    expect(screen.getByText("Not scored")).toBeInTheDocument();
++  });
+ });

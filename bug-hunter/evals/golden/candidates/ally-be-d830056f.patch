@@ -1,0 +1,80 @@
+diff --git a/src/ai-chat/provider/gemini-llm.provider.ts b/src/ai-chat/provider/gemini-llm.provider.ts
+index c9cb533e70..2f1b06080e 100644
+--- a/src/ai-chat/provider/gemini-llm.provider.ts
++++ b/src/ai-chat/provider/gemini-llm.provider.ts
+@@ -4,7 +4,10 @@ import {
+   GoogleGenAI,
+ } from '@google/genai';
+ import { AppConfigService } from 'src/config/config.service';
+-import { modelSupportsTemperature } from 'src/common/util/llm-model.util';
++import {
++  isGemini3OrLater,
++  modelSupportsTemperature,
++} from 'src/common/util/llm-model.util';
+ import {
+   LlmProvider,
+   LlmMessage,
+@@ -33,6 +36,12 @@ const geminiSampling = (config: LlmProviderConfig) =>
+     ? { temperature: config.temperature ?? 0.7 }
+     : {};
+ 
++/** Gemini 3+ deprecated thinking_budget. */
++const geminiThinking = (config: LlmProviderConfig) =>
++  config.thinkingBudget !== undefined && !isGemini3OrLater(config.model)
++    ? { thinkingConfig: { thinkingBudget: config.thinkingBudget } }
++    : {};
++
+ /**
+  * Gemini coaching-chat provider. Mirrors {@link OpenAiLlmProvider} against the
+  * `@google/genai` SDK so a prompt that selects a `gemini-*` model runs for real
+@@ -133,13 +142,11 @@ export class GeminiLlmProvider implements LlmProvider {
+       config: {
+         systemInstruction,
+         ...geminiSampling(config),
++        ...geminiThinking(config),
+         maxOutputTokens: config.maxTokens ?? 1500,
+         ...(config.responseFormat === 'json' && {
+           responseMimeType: 'application/json',
+         }),
+-        ...(config.thinkingBudget !== undefined && {
+-          thinkingConfig: { thinkingBudget: config.thinkingBudget },
+-        }),
+       },
+     });
+ 
+diff --git a/src/ai-chat/provider/test/gemini-llm.provider.spec.ts b/src/ai-chat/provider/test/gemini-llm.provider.spec.ts
+index d2789a306b..57fba1585c 100644
+--- a/src/ai-chat/provider/test/gemini-llm.provider.spec.ts
++++ b/src/ai-chat/provider/test/gemini-llm.provider.spec.ts
+@@ -103,6 +103,19 @@ describe('GeminiLlmProvider', () => {
+     );
+   });
+ 
++  it('omits thinkingBudget for Gemini 3+, which deprecated it', async () => {
++    mockGenerateContent.mockResolvedValue({ text: 'ok' });
++    const provider = makeProvider('key');
++
++    await provider.getCompletion(MESSAGES, {
++      model: 'gemini-3.5-pro',
++      thinkingBudget: 100,
++    });
++
++    const arg = mockGenerateContent.mock.calls[0][0];
++    expect(arg.config).not.toHaveProperty('thinkingConfig');
++  });
++
+   it('streams text chunks, skipping empty ones', async () => {
+     mockGenerateContentStream.mockResolvedValue(
+       (async function* () {
+diff --git a/src/llm/constants/ai-task-registry.constants.ts b/src/llm/constants/ai-task-registry.constants.ts
+index 66e97aaed0..5e2e288783 100644
+--- a/src/llm/constants/ai-task-registry.constants.ts
++++ b/src/llm/constants/ai-task-registry.constants.ts
+@@ -796,6 +796,7 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
+     id: 'drift-judge',
+     task: LlmTask.DRIFT_JUDGE,
+     runtime: LlmRuntime.ALLY_AI,
++    // This model is used to judge conversation drift.
+     trigger: 'Scheduled: conversation drift is judged',
+     detail: 'Did the character wander off its brief?',
+     kind: AiTaskKind.COMPLETION,

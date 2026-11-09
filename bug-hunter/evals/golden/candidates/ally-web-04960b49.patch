@@ -1,0 +1,70 @@
+diff --git a/apps/ally-admin-dashboard/src/components/notion-table/Cell.tsx b/apps/ally-admin-dashboard/src/components/notion-table/Cell.tsx
+index 635a922c5a..c138e58755 100644
+--- a/apps/ally-admin-dashboard/src/components/notion-table/Cell.tsx
++++ b/apps/ally-admin-dashboard/src/components/notion-table/Cell.tsx
+@@ -69,6 +69,17 @@ const DropdownDisplayText = ({
+   );
+ };
+ 
++/** Read-only rendering of a number cell's value, plain text instead of a disabled input. */
++const NumberDisplayText = ({ value }: { value: number | string | null | undefined }) => {
++  const hasValue = value !== undefined && value !== null && value !== "";
++
++  return (
++    <span className={`break-words ${hasValue ? "" : "text-typography-500"}`}>
++      {hasValue ? value : "--"}
++    </span>
++  );
++};
++
+ export const Cell = ({
+   value: initialValue,
+   rowIndex: index,
+@@ -269,7 +280,13 @@ export const Cell = ({
+       );
+       break;
+     case cellTypes.number:
+-      element = (
++      // A disabled number input can never be edited, and browsers never
++      // dispatch clicks to disabled form controls, so it swallows the
++      // row-click affordance on a read-only table. Render plain text instead,
++      // matching the dropdown branches above.
++      element = isDisabled ? (
++        <NumberDisplayText value={value.value} />
++      ) : (
+         <NumberInput value={value.value} onChange={updateCellValue} disabled={isDisabled} />
+       );
+       break;
+diff --git a/apps/ally-admin-dashboard/src/components/notion-table/__tests__/Cell.test.tsx b/apps/ally-admin-dashboard/src/components/notion-table/__tests__/Cell.test.tsx
+index 87f3799597..88cd6208d7 100644
+--- a/apps/ally-admin-dashboard/src/components/notion-table/__tests__/Cell.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/notion-table/__tests__/Cell.test.tsx
+@@ -437,20 +437,20 @@ describe("Cell", () => {
+       });
+     });
+ 
+-    it("respects disabled state for number input", () => {
+-      const disabledValue = { value: 42, disabled: true };
+-      render(<Cell {...defaultProps} value={disabledValue} column={numberColumn} />);
+-
+-      const input = screen.getByTestId("number-input-field");
+-      expect(input).toBeDisabled();
+-    });
+-
+     it("handles zero value", () => {
+       render(<Cell {...defaultProps} value={0} column={numberColumn} />);
+ 
+       const input = screen.getByTestId("number-input-field");
+       expect(input).toHaveValue(0);
+     });
++
++    it("renders the value as plain text instead of a disabled input when disabled", () => {
++      const disabledValue = { value: 42, disabled: true };
++      render(<Cell {...defaultProps} value={disabledValue} column={numberColumn} />);
++
++      expect(screen.queryByTestId("number-input")).not.toBeInTheDocument();
++      expect(screen.getByText("42")).toBeInTheDocument();
++    });
+   });
+ 
+   describe("Select Component Cell", () => {

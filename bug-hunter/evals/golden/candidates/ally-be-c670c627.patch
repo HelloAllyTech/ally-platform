@@ -1,0 +1,49 @@
+diff --git a/src/analytics/repository/filler-analytics.repository.ts b/src/analytics/repository/filler-analytics.repository.ts
+index ee76650937..94c8dd7aad 100644
+--- a/src/analytics/repository/filler-analytics.repository.ts
++++ b/src/analytics/repository/filler-analytics.repository.ts
+@@ -28,6 +28,11 @@ export class FillerAnalyticsRepository {
+    * to, which is a configuration gap. Counting them would make a push to
+    * configure more scenarios look like a model regression. They are surfaced
+    * separately so the configuration gap stays visible rather than vanishing.
++   *
++   * `since`/`until` are both INCLUSIVE calendar dates (`yyyy-mm-dd`). Postgres
++   * casts a bare date literal to midnight, so `until` is widened to the start
++   * of the following day before comparison — a plain `<=` would silently drop
++   * every row from `until` itself.
+    */
+   async findingRates(opts: {
+     since: string;
+@@ -71,7 +76,8 @@ export class FillerAnalyticsRepository {
+                 j."repeatedFillers",
+                 j."distinctPhraseRatio"
+            FROM filler_judgment_sessions j
+-          WHERE j."occurredAt" >= $1 AND j."occurredAt" <= $2${filter}
++          WHERE j."occurredAt" >= $1
++            AND j."occurredAt" < ($2::date + INTERVAL '1 day')${filter}
+        ),
+        findings AS (
+          SELECT a."sessionJudgmentId",
+diff --git a/src/analytics/repository/test/filler-analytics.repository.spec.ts b/src/analytics/repository/test/filler-analytics.repository.spec.ts
+index 2517bda77e..c92614e3e2 100644
+--- a/src/analytics/repository/test/filler-analytics.repository.spec.ts
++++ b/src/analytics/repository/test/filler-analytics.repository.spec.ts
+@@ -105,6 +105,18 @@ describe('FillerAnalyticsRepository.findingRates', () => {
+     expect(sqlOf()).toContain('CASE WHEN SUM(s."fillersJudged") > 0');
+   });
+ 
++  it('treats `until` as the whole day, not just its midnight instant', async () => {
++    // `until` arrives as a bare date (e.g. '2026-09-01'), which Postgres casts
++    // to midnight. A plain `occurredAt <= $2` would therefore exclude every
++    // row from that day — the newest day on every rolling chart, and the last
++    // day of any custom range an admin picks.
++    await repository.findingRates(window);
++    const sql = sqlOf();
++
++    expect(sql).not.toMatch(/occurredAt"\s*<=\s*\$2/);
++    expect(sql).toMatch(/occurredAt"\s*<\s*\(\$2::date \+ INTERVAL '1 day'\)/);
++  });
++
+   it('applies the language filter as a bound parameter', async () => {
+     await repository.findingRates({ ...window, language: 'ml' });
+ 

@@ -1,0 +1,148 @@
+diff --git a/apps/ally-admin-dashboard/src/components/builder/PrdDocPanel.tsx b/apps/ally-admin-dashboard/src/components/builder/PrdDocPanel.tsx
+index be3a12212b..e3fa3f6a1d 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/PrdDocPanel.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/PrdDocPanel.tsx
+@@ -81,6 +81,8 @@ interface PrdDocPanelProps {
+    * through, so this panel stays free of the design's API hooks.
+    */
+   designSection?: React.ReactNode;
++  /** Why the PRD cannot be edited, shown when `editable` is false. */
++  lockedReason?: string;
+ }
+ 
+ /**
+@@ -105,6 +107,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
+   createdByName = null,
+   transcript,
+   designSection,
++  lockedReason,
+ }) => {
+   const strings = en.builder.prd;
+   const [editingKey, setEditingKey] = useState<string | null>(null);
+@@ -334,7 +337,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
+ 
+       {!editable && (
+         <p className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-typography-600">
+-          {strings.lockedWhileBuilding}
++          {lockedReason ?? strings.lockedWhileBuilding}
+         </p>
+       )}
+ 
+diff --git a/apps/ally-admin-dashboard/src/constants/en.ts b/apps/ally-admin-dashboard/src/constants/en.ts
+index 669c5cdaaf..73da19bd59 100644
+--- a/apps/ally-admin-dashboard/src/constants/en.ts
++++ b/apps/ally-admin-dashboard/src/constants/en.ts
+@@ -3567,6 +3567,8 @@ export const en = {
+       saveFailed: "Couldn't save that edit.",
+       lockedWhileBuilding:
+         "The PRD is locked while a build is running — it's what the build is working from. Stop the build to edit it.",
++      lockedCompleted:
++        "This session is complete and its pull requests are open — the PRD stays as it was built. Start a new session for further changes.",
+       sections: {
+         summary: "Summary",
+         problem: "Problem",
+diff --git a/apps/ally-admin-dashboard/src/pages/Builder/BuilderSession.tsx b/apps/ally-admin-dashboard/src/pages/Builder/BuilderSession.tsx
+index 256dacb2c9..5a4aabf269 100644
+--- a/apps/ally-admin-dashboard/src/pages/Builder/BuilderSession.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Builder/BuilderSession.tsx
+@@ -277,7 +277,16 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
+ 
+   const effectiveStatus = status ?? session.status;
+   const isTerminal = ["COMPLETED", "FAILED", "CANCELLED"].includes(effectiveStatus);
+-  const prdEditable = !PRD_FROZEN.includes(effectiveStatus) && !isTerminal;
++  // Editable after a failed or stopped build — that is exactly when the PRD
++  // needs fixing before the next one, and the backend accepts the edit. Only a
++  // running build (which reads it) and a completed session (whose pull
++  // requests were built from it) hold it. It used to lock every terminal
++  // status and blame "a build is running" for it.
++  const prdEditable = !PRD_FROZEN.includes(effectiveStatus) && effectiveStatus !== "COMPLETED";
++  const prdLockedReason =
++    effectiveStatus === "COMPLETED"
++      ? en.builder.prd.lockedCompleted
++      : en.builder.prd.lockedWhileBuilding;
+   // A session that ever reached a build shows the build view, including after
+   // it finished: coming back to a completed session to read what happened is
+   // the main reason to open one, and dropping back to the interview would
+@@ -441,6 +450,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
+                   readiness={readiness}
+                   versionNumber={versionNumber}
+                   editable={prdEditable}
++                  lockedReason={prdLockedReason}
+                   onSaveSection={handleSaveSection}
+                   sessionTitle={session.title}
+                   repos={session.repos ?? []}
+@@ -527,6 +537,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
+                   readiness={readiness}
+                   versionNumber={versionNumber}
+                   editable={prdEditable}
++                  lockedReason={prdLockedReason}
+                   onSaveSection={handleSaveSection}
+                   sessionTitle={session.title}
+                   repos={session.repos ?? []}
+@@ -580,6 +591,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
+               readiness={readiness}
+               versionNumber={versionNumber}
+               editable={prdEditable}
++              lockedReason={prdLockedReason}
+               onSaveSection={handleSaveSection}
+               sessionTitle={session.title}
+               repos={session.repos ?? []}
+diff --git a/apps/ally-admin-dashboard/src/pages/Builder/__tests__/BuilderSession.test.tsx b/apps/ally-admin-dashboard/src/pages/Builder/__tests__/BuilderSession.test.tsx
+index be06232ae8..a7dffea121 100644
+--- a/apps/ally-admin-dashboard/src/pages/Builder/__tests__/BuilderSession.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Builder/__tests__/BuilderSession.test.tsx
+@@ -17,6 +17,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
+ // SteerComposer and CollapsibleAside render only in the build layout, which no
+ // test reached until the restart cases below.
+ let startDialogProps: any;
++let prdPanelProps: any[] = [];
+ vi.mock("@components/builder", async () => ({
+   // The real rule, not a stub: it is what decides whether Start is blocked.
+   designBuildBlock: (await vi.importActual<any>("../../../components/builder/designGate"))
+@@ -27,7 +28,10 @@ vi.mock("@components/builder", async () => ({
+   ChatMessage: () => <div>ChatMessage</div>,
+   CollapsibleAside: ({ children }: any) => <div>{children}</div>,
+   ConfirmCancelDialog: () => null,
+-  PrdDocPanel: () => <div>PrdDocPanel</div>,
++  PrdDocPanel: (props: any) => {
++    prdPanelProps.push(props);
++    return <div>PrdDocPanel</div>;
++  },
+   ReadinessRing: () => <div>ReadinessRing</div>,
+   StartBuildDialog: (props: any) => {
+     startDialogProps = props;
+@@ -215,6 +219,34 @@ describe("BuilderSession", () => {
+     expect(startDialogProps.designBlock).toBeNull();
+   });
+ 
++  /**
++   * After a failed or stopped build is exactly when the PRD needs fixing, and
++   * the backend accepts the edit. The panel used to lock every finished
++   * session and say "a build is running".
++   */
++  it("keeps the PRD editable after a failed build, and locks it once complete", () => {
++    sessionResult = {
++      data: { ...baseSession, status: "FAILED", currentStage: "GATE" },
++      isLoading: false,
++      isError: false,
++    };
++    prdPanelProps = [];
++    const { unmount } = render(<BuilderSession />);
++    expect(prdPanelProps.length).toBeGreaterThan(0);
++    expect(prdPanelProps.every(props => props.editable === true)).toBe(true);
++    unmount();
++
++    sessionResult = {
++      data: { ...baseSession, status: "COMPLETED", currentStage: "DONE" },
++      isLoading: false,
++      isError: false,
++    };
++    prdPanelProps = [];
++    render(<BuilderSession />);
++    expect(prdPanelProps.every(props => props.editable === false)).toBe(true);
++    expect(prdPanelProps[0].lockedReason).toMatch(/session is complete/);
++  });
++
+   it("follows the session row when a build finishes while the page is open", () => {
+     sessionResult = {
+       data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },

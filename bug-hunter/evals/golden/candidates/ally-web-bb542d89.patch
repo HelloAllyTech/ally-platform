@@ -1,0 +1,68 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateTrack/components/GenerateCoverImageModal.tsx b/apps/ally-admin-dashboard/src/pages/CreateTrack/components/GenerateCoverImageModal.tsx
+index dc191f5eec..3fe0d99b0d 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateTrack/components/GenerateCoverImageModal.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateTrack/components/GenerateCoverImageModal.tsx
+@@ -81,7 +81,11 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
+       }).unwrap();
+       if (isMountedRef.current) setGeneratedUrl(imageUrl);
+     } catch (err: any) {
+-      if (isMountedRef.current) setError(err?.data?.message || GENERATE_FAILED_MESSAGE);
++      // Validation errors carry an array of field messages; only a sentence is shown as-is.
++      const message = err?.data?.message;
++      if (isMountedRef.current) {
++        setError(typeof message === "string" && message ? message : GENERATE_FAILED_MESSAGE);
++      }
+     }
+   };
+ 
+@@ -162,7 +166,7 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
+                 onChange={event => updatePrompt(event.target.value)}
+                 disabled={isGenerating}
+                 maxLength={COVER_PROMPT_MAX_LENGTH}
+-                rows={10}
++                rows={14}
+                 className="w-full border border-border-light rounded-md px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary-400 resize-y disabled:bg-gray-50 disabled:text-typography-500"
+               />
+               <p className="text-xs text-typography-500">
+@@ -175,7 +179,7 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
+                   className="flex items-center gap-2 rounded-md bg-secondary-50 px-3 py-2 text-sm text-typography-700"
+                 >
+                   <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-500" />
+-                  Generating your image — this usually takes 20–60 seconds.
++                  Generating your image — this can take a minute or more.
+                 </div>
+               )}
+               {error && !isGenerating && (
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateTrack/components/__tests__/GenerateCoverImageModal.test.tsx b/apps/ally-admin-dashboard/src/pages/CreateTrack/components/__tests__/GenerateCoverImageModal.test.tsx
+index e05053ee65..0600f20b60 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateTrack/components/__tests__/GenerateCoverImageModal.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateTrack/components/__tests__/GenerateCoverImageModal.test.tsx
+@@ -122,6 +122,19 @@ describe("GenerateCoverImageModal", () => {
+     expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn't generate an image/);
+   });
+ 
++  it("does not show raw validation arrays to the trainer", async () => {
++    mockGenerate.mockReturnValueOnce(
++      rejectWith({
++        data: { message: ["prompt must be shorter than or equal to 4000 characters"] },
++      }),
++    );
++    renderModal();
++
++    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
++
++    expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn't generate an image/);
++  });
++
+   it("won't send a prompt that is too short to describe anything", () => {
+     renderModal({ initialPrompt: "  cat  " });
+     expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
+@@ -147,7 +160,7 @@ describe("GenerateCoverImageModal", () => {
+ 
+     expect(promptBox()).toBeDisabled();
+     expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
+-    expect(screen.getByRole("status")).toHaveTextContent(/20–60 seconds/);
++    expect(screen.getByRole("status")).toHaveTextContent(/a minute or more/);
+   });
+ 
+   it("closes on Escape and on Cancel", () => {

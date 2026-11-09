@@ -1,0 +1,152 @@
+diff --git a/src/learn/service/scenario.service.ts b/src/learn/service/scenario.service.ts
+index 18c9fc4e2b..cc04f63a9a 100644
+--- a/src/learn/service/scenario.service.ts
++++ b/src/learn/service/scenario.service.ts
+@@ -1629,6 +1629,27 @@ export class ScenarioService {
+     const originalBehaviorInstructions =
+       await this.scenarioSharedService.getBehaviorInstructionsByScenarioId(id);
+ 
++    // Tenant assignments of the source, for a source that is NOT global.
++    //
++    // A copy nobody can reach is not a copy. `scenario_tenants` is the only
++    // thing that makes a simulation startable outside a course/case/path:
++    // `validateStartScenarioSession` requires an explicit row for the caller's
++    // tenant on the standalone start branch, and the learner catalog
++    // inner-joins the same table. Duplicating a tenant-scoped simulation
++    // without them produced a copy that looks complete in the studio, can be
++    // published, can be reached by id — and then refuses every Practice click
++    // with "Scenario is not available for your organization", permanently,
++    // with nothing in the duplicate flow ever backfilling the rows.
++    //
++    // Copying the source's own set can only ever reproduce the audience the
++    // source already had, never widen it; the isGlobal branch below is the
++    // same intent for the global case and was the only half implemented.
++    const sourceScenarioTenants = scenario.isGlobal
++      ? []
++      : await this.dataSource
++          .getRepository(ScenarioTenants)
++          .find({ where: { scenarioId: id } });
++
+     const newScenario = {
+       title: `Copy of ${scenario.title}`,
+       description: scenario.description,
+@@ -1696,6 +1717,16 @@ export class ScenarioService {
+           }),
+         );
+         await scenarioTenantRepo.save(scenarioTenants);
++      } else if (sourceScenarioTenants.length > 0) {
++        const scenarioTenantRepo = manager.getRepository(ScenarioTenants);
++        await scenarioTenantRepo.save(
++          sourceScenarioTenants.map(({ tenantId }) =>
++            scenarioTenantRepo.create({
++              scenarioId: newScenarioData.id,
++              tenantId,
++            }),
++          ),
++        );
+       }
+ 
+       // Copy behavior instructions from the original scenario
+diff --git a/src/learn/service/test/scenario.service.spec.ts b/src/learn/service/test/scenario.service.spec.ts
+index d2b4d5449c..383491be91 100644
+--- a/src/learn/service/test/scenario.service.spec.ts
++++ b/src/learn/service/test/scenario.service.spec.ts
+@@ -221,6 +221,12 @@ describe('ScenarioService', () => {
+     const mockDataSource = {
+       createEntityManager: jest.fn(),
+       transaction: jest.fn(),
++      // duplicateScenario reads the source's scenario_tenants rows through
++      // this. Defaults to "no assignments" so tests that don't care are
++      // unaffected.
++      getRepository: jest.fn().mockReturnValue({
++        find: jest.fn().mockResolvedValue([]),
++      }),
+     };
+ 
+     const mockScenarioPathSharedService = {
+@@ -4571,7 +4577,7 @@ describe('ScenarioService', () => {
+         expect(mockTriggerWarningsRepo.save).not.toHaveBeenCalled();
+       });
+ 
+-      it('should not create tenant mappings when isGlobal is false', async () => {
++      it('should not assign every tenant when isGlobal is false and the source has no assignments', async () => {
+         const mockNewScenario = {
+           id: 2,
+           title: 'Copy of Test Scenario',
+@@ -4619,6 +4625,76 @@ describe('ScenarioService', () => {
+         expect(mockScenarioTenantRepo.save).not.toHaveBeenCalled();
+       });
+ 
++      // Regression: a duplicate of a tenant-scoped simulation used to be
++      // created with zero scenario_tenants rows, and nothing ever backfilled
++      // them. `validateStartScenarioSession` requires an explicit row for the
++      // caller's tenant on the standalone start branch, so every Practice
++      // click on the copy failed for good with "Scenario is not available for
++      // your organization" while the original kept working.
++      it('should carry the source scenario tenant assignments to a non-global duplicate', async () => {
++        const mockNewScenario = {
++          id: 2,
++          title: 'Copy of Test Scenario',
++          status: ScenarioStatus.DRAFT,
++          isGlobal: false,
++        };
++
++        scenarioSharedService.getAdminScenario.mockResolvedValue({
++          ...mockScenario,
++          isGlobal: false,
++        } as any);
++        scenarioEventsRepository.find.mockResolvedValue([]);
++        triggerWarningsService.getTriggerWarningsByScenarioId.mockResolvedValue(
++          [],
++        );
++        scenarioSharedService.getBehaviorInstructionsByScenarioId.mockResolvedValue(
++          undefined,
++        );
++
++        const sourceTenantFind = jest.fn().mockResolvedValue([
++          { id: 'st-1', scenarioId, tenantId: 'tenant-1' },
++          { id: 'st-2', scenarioId, tenantId: 'tenant-2' },
++        ]);
++        (dataSource.getRepository as jest.Mock).mockReturnValue({
++          find: sourceTenantFind,
++        });
++
++        const mockScenarioRepo = {
++          save: jest.fn().mockResolvedValue(mockNewScenario),
++        };
++
++        const mockScenarioTenantRepo = {
++          create: jest.fn((data) => data),
++          save: jest.fn().mockResolvedValue([]),
++        };
++
++        const mockEntityManager = {
++          getRepository: jest.fn((entity) => {
++            if (entity === Scenarios) return mockScenarioRepo;
++            if (entity === ScenarioTenants) return mockScenarioTenantRepo;
++            return {};
++          }),
++        };
++
++        (dataSource.transaction as jest.Mock).mockImplementation(async (cb) =>
++          cb(mockEntityManager),
++        );
++
++        const result = await service.duplicateScenario(scenarioId);
++
++        expect(result).toEqual(mockNewScenario);
++        expect(sourceTenantFind).toHaveBeenCalledWith({
++          where: { scenarioId },
++        });
++        // The copy is reachable by exactly the tenants the source was, and no
++        // others — findAll (the isGlobal path) must stay out of it.
++        expect(tenantService.findAll).not.toHaveBeenCalled();
++        expect(mockScenarioTenantRepo.save).toHaveBeenCalledWith([
++          { scenarioId: 2, tenantId: 'tenant-1' },
++          { scenarioId: 2, tenantId: 'tenant-2' },
++        ]);
++      });
++
+       it('should use ExecutionManager.getUserId for createdBy and updatedBy', async () => {
+         const customUserId = 999;
+         (ExecutionManager.getUserId as jest.Mock).mockReturnValue(customUserId);

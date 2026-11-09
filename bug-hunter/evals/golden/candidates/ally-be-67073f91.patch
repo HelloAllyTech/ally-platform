@@ -1,0 +1,146 @@
+diff --git a/src/progress/repository/xp-event.repository.ts b/src/progress/repository/xp-event.repository.ts
+index 41582fd366..38464b5af0 100644
+--- a/src/progress/repository/xp-event.repository.ts
++++ b/src/progress/repository/xp-event.repository.ts
+@@ -63,6 +63,32 @@ export class XpEventRepository extends Repository<XpEvent> {
+     return inserted.reduce((sum, row) => sum + Number(row.xp), 0);
+   }
+ 
++  /**
++   * Serialises this user's daily-cap check-then-insert inside the current transaction.
++   *
++   * MUST be called before getPracticeXpAwardedOn()/countPersonalBestsAwardedOn(). Without
++   * it, two SCENARIO_SESSION_ENDED events for the same learner arriving close together —
++   * plausible since the unfinalised-session sweeper fires them without waiting on
++   * listeners — can both read the same stale "already awarded today" total under READ
++   * COMMITTED, both pass the cap check, and both insert: the ledger's unique index only
++   * dedupes the *same* sourceId, not the daily total.
++   *
++   * An advisory lock rather than SELECT ... FOR UPDATE because there may be no
++   * `xp_events` row for today yet to lock. pg_advisory_xact_lock releases automatically
++   * at COMMIT or ROLLBACK, so there is no unlock path to forget.
++   */
++  async lockUserDay(
++    manager: EntityManager,
++    userId: number,
++    tenantId: string,
++    awardedOn: string,
++  ): Promise<void> {
++    await manager.query(
++      `SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))`,
++      [`xp-events:${userId}:${tenantId}`, awardedOn],
++    );
++  }
++
+   /**
+    * Practice XP already banked today, used to apply the daily cap. Counts the minute
+    * award and its streak bonus only — completion, track and personal-best awards are
+diff --git a/src/progress/service/test/xp-award.service.spec.ts b/src/progress/service/test/xp-award.service.spec.ts
+index ae79677864..b31674730a 100644
+--- a/src/progress/service/test/xp-award.service.spec.ts
++++ b/src/progress/service/test/xp-award.service.spec.ts
+@@ -45,6 +45,7 @@ describe('XpAwardService', () => {
+           provide: XpEventRepository,
+           useValue: {
+             insertAwards: jest.fn().mockResolvedValue(0),
++            lockUserDay: jest.fn().mockResolvedValue(undefined),
+             getPracticeXpAwardedOn: jest.fn().mockResolvedValue(0),
+             countPersonalBestsAwardedOn: jest.fn().mockResolvedValue(0),
+           },
+@@ -182,6 +183,29 @@ describe('XpAwardService', () => {
+       );
+     });
+ 
++    /**
++     * THE REGRESSION CASE. Without the lock, two SCENARIO_SESSION_ENDED events for the
++     * same learner arriving close together — plausible via the unfinalised-session
++     * sweeper — can both read the same stale "already awarded today" total and both pass
++     * the daily cap. Do not delete this test.
++     */
++    it("takes the advisory lock BEFORE reading today's practice total", async () => {
++      xpEventRepository.insertAwards.mockResolvedValue(20);
++      const order: string[] = [];
++      xpEventRepository.lockUserDay.mockImplementation(async () => {
++        order.push('lock');
++      });
++      xpEventRepository.getPracticeXpAwardedOn.mockImplementation(async () => {
++        order.push('read');
++        return 0;
++      });
++
++      await awardSession(10 * 60 * 1000);
++
++      // Reversed, and two concurrent awards both read a stale total and both pass the cap.
++      expect(order).toEqual(['lock', 'read']);
++    });
++
+     it('adds nothing to the rollup when the ledger rejected every row as a duplicate', async () => {
+       xpEventRepository.insertAwards.mockResolvedValue(0);
+ 
+@@ -272,6 +296,36 @@ describe('XpAwardService', () => {
+ 
+       expect(xpEventRepository.insertAwards).not.toHaveBeenCalled();
+     });
++
++    /**
++     * THE REGRESSION CASE. Same race as the practice cap: without the lock, two
++     * concurrent personal-best awards for the same learner can both read "0 today" and
++     * both insert, pushing the learner past the one-per-day cap. Do not delete this test.
++     */
++    it("takes the advisory lock BEFORE reading today's personal-best count", async () => {
++      xpEventRepository.insertAwards.mockResolvedValue(
++        XP_AWARD.PER_SKILL_PERSONAL_BEST,
++      );
++      const order: string[] = [];
++      xpEventRepository.lockUserDay.mockImplementation(async () => {
++        order.push('lock');
++      });
++      xpEventRepository.countPersonalBestsAwardedOn.mockImplementation(
++        async () => {
++          order.push('read');
++          return 0;
++        },
++      );
++
++      await service.awardSkillPersonalBest({
++        userId: USER_ID,
++        tenantId: TENANT_CODE,
++        scenarioSessionId: SESSION_ID,
++      });
++
++      // Reversed, and two concurrent awards both read a stale count and both pass the cap.
++      expect(order).toEqual(['lock', 'read']);
++    });
+   });
+ 
+   describe('awardForTrackItem', () => {
+diff --git a/src/progress/service/xp-award.service.ts b/src/progress/service/xp-award.service.ts
+index a05f31b55e..71a00343ce 100644
+--- a/src/progress/service/xp-award.service.ts
++++ b/src/progress/service/xp-award.service.ts
+@@ -81,6 +81,12 @@ export class XpAwardService {
+       if (minuteXp === 0 && completionXp === 0) return;
+ 
+       await this.dataSource.transaction(async (manager) => {
++        await this.xpEventRepository.lockUserDay(
++          manager,
++          userId,
++          tenantId,
++          awardedOn,
++        );
+         const alreadyToday =
+           await this.xpEventRepository.getPracticeXpAwardedOn(
+             manager,
+@@ -187,6 +193,12 @@ export class XpAwardService {
+       const awardedOn = toBusinessDateString(now);
+ 
+       await this.dataSource.transaction(async (manager) => {
++        await this.xpEventRepository.lockUserDay(
++          manager,
++          userId,
++          tenantId,
++          awardedOn,
++        );
+         const already =
+           await this.xpEventRepository.countPersonalBestsAwardedOn(
+             manager,

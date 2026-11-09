@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Kind = Literal["bug", "clean"]
 Expected = Literal["fix", "escalate", "no_bug"]
+Mode = Literal["sweep", "issue"]
+ALL_MODES: tuple[Mode, ...] = ("sweep", "issue")
 
 
 class Case(BaseModel):
@@ -27,8 +29,14 @@ class Case(BaseModel):
     )
     expected: Expected
     layout: Literal["monorepo", "root"] = "monorepo"
+    # Which harness modes the case is valid for. A fix with no user-visible symptom
+    # (a duplicated block, a bare except) is sweep-only: no issue would be filed.
+    modes: list[Mode] = Field(default_factory=lambda: list(ALL_MODES), min_length=1)
     risk: bool = False
-    description: str = Field(min_length=10)
+    description: str = Field(
+        min_length=10, description="issue-mode report: symptom only"
+    )
+    description_source: Literal["commit", "hand"] = "commit"
     src_files: list[str] = Field(default_factory=list, description="app-relative")
     oracle_tests: list[str] = Field(
         default_factory=list, description="app-relative; bug cases only"
@@ -75,6 +83,9 @@ class CaseFile(BaseModel):
             for c in self.cases
             if c.app in wanted or c.kind in wanted or c.id in wanted
         ]
+
+    def for_mode(self, cases: list[Case], mode: str) -> list[Case]:
+        return [c for c in cases if mode in c.modes]
 
     def by_app(self) -> dict[str, dict[str, int]]:
         out: dict[str, dict[str, int]] = {}

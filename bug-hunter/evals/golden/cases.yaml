@@ -1,0 +1,960 @@
+# Golden cases for the bug-hunter evals. Curated by hand from candidates in
+# evals/golden/candidates/ (bug-hunter eval mine, then eval accept <ids>).
+# Bug cases: `parent` has the bug, `commit` is the real fix, `oracle_tests`
+# are its tests (hidden from the agent). Clean cases: `commit` is a
+# feat/chore
+# no fix touched
+# within 30 days; the agent should report no bug.
+cases:
+- id: ally-be-b82759ae
+  kind: bug
+  app: ally-be
+  parent: 06249390baebdf056d062c848666798473d23b56
+  commit: b82759ae0cdedba637925afea3b87d134dd518f6
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'Creating a character with the character-interview bot keeps failing: partway through the
+    interview a pop-up says ''failed to create the character'', several times in a row on a fresh session.
+    Retrying the same answers sometimes works.'
+  description_source: hand
+  src_files:
+  - src/scenario-character/constants/character-interview.constants.ts
+  oracle_tests:
+  - src/scenario-character/constants/test/character-interview.constants.spec.ts
+  - src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts
+  src_lines: 2
+  lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  tags: []
+- id: ally-be-99584ee6
+  kind: bug
+  app: ally-be
+  parent: 7a649a2e6b1043a5d53cefa817fb1b8a54e95043
+  commit: 99584ee64af858cbeafc3b361db7edb291f89833
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'Course copilot blueprint repair is unreliable: the logs show a warning that the blueprint
+    repair returned invalid JSON and the repair is abandoned, leaving the generated plan incomplete. It
+    happens more on large course blueprints.'
+  description_source: hand
+  src_files:
+  - src/course-copilot/service/specialists/specialist.util.ts
+  oracle_tests:
+  - src/course-copilot/service/specialists/test/blueprint-planner.specialist.spec.ts
+  src_lines: 2
+  lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  tags: []
+- id: ally-be-d039e256
+  kind: bug
+  app: ally-be
+  parent: f1d350da68a88c60fcc5e1c72738fa88801caf8e
+  commit: d039e256c4b03534a7aa8aa614c878699528fdba
+  expected: escalate
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: true
+  description: 'Production logs show a high volume of `UnauthorizedException: Unauthorized` across many
+    endpoints, including /api/v1 routes used by the mobile app. Every entry carries the same generic message,
+    so it is impossible to tell an expired token from a malformed or missing one when diagnosing client
+    login problems.'
+  description_source: hand
+  src_files:
+  - src/auth/guards/jwt-auth.guard.ts
+  oracle_tests:
+  - src/auth/guards/test/jwt-auth.guard.spec.ts
+  src_lines: 3
+  lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  tags: []
+- id: ally-be-89d8e055
+  kind: bug
+  app: ally-be
+  parent: 11f079b0be10fafd9c8c3e43381ac74cc57ec198
+  commit: 89d8e0555d807800c9b83aebf3ec6fd87eccd936
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'Prompt translation fails for some languages with a token-mismatch error: the translated
+    text is rejected because required tokens such as {name} and [laughs] are reported missing, even though
+    the translator kept them in the output. Users of those languages then see the English prompt text
+    instead of their selected language.'
+  description_source: hand
+  src_files:
+  - src/prompt/util/translation-token-guard.util.ts
+  oracle_tests:
+  - src/prompt/util/test/translation-token-guard.util.spec.ts
+  src_lines: 4
+  lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  tags: []
+- id: ally-be-adf36739
+  kind: bug
+  app: ally-be
+  parent: 74d038b6fb18c8d198064f042a4245edafe9b0cc
+  commit: adf367395f74c123562641ef9d605793567ad835
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Assigning a badge to tenants fails with only 'DB error' in the response and the log line
+    gives no detail about the underlying database error, so the failing assignment cannot be diagnosed
+    or retried with confidence.
+  description_source: hand
+  src_files:
+  - src/badge/service/badge-tenant.service.ts
+  oracle_tests:
+  - src/badge/service/test/badge-tenant.service.spec.ts
+  src_lines: 5
+  lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  tags: []
+- id: ally-be-8c4f9caf
+  kind: bug
+  app: ally-be
+  parent: 7293e18d7a7f1d0575bae6a5570ac166a1b89468
+  commit: 8c4f9caf3ce17694d1f54b9904a2fef3907408a3
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Generating a cover image for a course fails with an error from the image provider even
+    when the default image prompt is used unchanged. Custom prompts for the same course work.
+  description_source: hand
+  src_files:
+  - src/track/service/track-cover-image.service.ts
+  oracle_tests:
+  - src/track/service/test/track-cover-image.service.spec.ts
+  src_lines: 5
+  lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  tags: []
+- id: ally-web-9299e9aa
+  kind: bug
+  app: ally-web
+  parent: 5a3158a0398bf3ca2021396c6e8b86ae43e0002f
+  commit: 9299e9aaf073849373e170ad73aa851922f82ebb
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: In the WhatsApp bot Preview tab, once a test conversation goes past 20 messages every further
+    test message fails with the error 'history must contain no more than 20 elements'. The thread on screen
+    is fine; only new messages fail.
+  description_source: hand
+  src_files:
+  - apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx
+  oracle_tests:
+  - apps/ally-admin-dashboard/src/pages/WhatsAppBot/__tests__/ChatbotTestTab.test.tsx
+  src_lines: 8
+  lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  tags: []
+- id: ally-web-e5ad37b3
+  kind: bug
+  app: ally-web
+  parent: 4d438f9fcd69ad9d3a2b2d733d80533a7fc6483a
+  commit: e5ad37b3be546f59917d7681c1d856e30b02c86c
+  expected: escalate
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: true
+  description: On the simulation form, the auto-termination rule field shows a rule by default even when
+    no rules have been configured, so an empty configuration looks as if it already has a rule and the
+    empty state is never shown.
+  description_source: hand
+  src_files:
+  - apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx
+  - apps/ally-helpline-dashboard/src/pages/auth/Login.tsx
+  oracle_tests:
+  - apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
+  src_lines: 9
+  lockfile_blob: ac36e034439c488c4e5182ba51ca425f7ea367ec
+  tags: []
+- id: ally-web-dd128ff8
+  kind: bug
+  app: ally-web
+  parent: e9a0e1c386650a26a763de9e8d88969739a275dd
+  commit: dd128ff887f929e725a0113c66ded0c7ccf84423
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'When editing a simulation, a memory configured to unlock in a specific state still behaves
+    as if it has an unlock condition after that state is deleted: it never unlocks, and the saved simulation
+    keeps a reference to the removed state.'
+  description_source: hand
+  src_files:
+  - apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+  oracle_tests:
+  - apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+  src_lines: 22
+  lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  tags: []
+- id: ally-web-f35e117d
+  kind: bug
+  app: ally-web
+  parent: d536f0de7a67328a3905a4281782976ea1976468
+  commit: f35e117d5fe2d1deda52dc86c5cdeb78f86b4c88
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: On the Ally console analytics tab, a chart whose every rate was withheld (fewer learners
+    than the minimum group) says 'No Ally activity in this window' even though there was activity in that
+    window. The summary card for the same period correctly says the rate is withheld.
+  description_source: hand
+  src_files:
+  - apps/ally-admin-dashboard/src/pages/Analytics/allyGuideChart.ts
+  - apps/ally-admin-dashboard/src/pages/Analytics/tabs/AllyGuideTab.tsx
+  oracle_tests:
+  - apps/ally-admin-dashboard/src/pages/Analytics/__tests__/AllyGuideTab.test.tsx
+  - apps/ally-admin-dashboard/src/pages/Analytics/__tests__/allyGuideChart.test.ts
+  src_lines: 23
+  lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  tags: []
+- id: ally-web-eebbfd01
+  kind: bug
+  app: ally-web
+  parent: 097bb398c904e27865ec21fbee07bee9a6e163c0
+  commit: eebbfd010cd39f8b675b4f2887d78fe632812d2b
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'helpline-v1.50.3 shows ''Sorry — this page stopped working'' on every page right after
+    load. The browser console says: useLocation() may be used only in the context of a <Router> component.
+    The admin dashboard is unaffected.'
+  description_source: hand
+  src_files:
+  - apps/ally-helpline-dashboard/src/analytics/PageviewTracker.tsx
+  - apps/ally-helpline-dashboard/src/analytics/index.ts
+  oracle_tests:
+  - apps/ally-helpline-dashboard/src/analytics/__tests__/PageviewTracker.test.tsx
+  src_lines: 30
+  lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  tags: []
+- id: ally-web-3b3db9b5
+  kind: bug
+  app: ally-web
+  parent: 1ef63b4f621e8a33c90c686a420dc4abdace5b47
+  commit: 3b3db9b5fb87006db0fdee086ea0d48535b2a946
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'In the guided course, a thumbs-up or thumbs-down given on an earlier visit is gone after
+    a reload: the message shows as unrated, and rating it again shows a fresh ''Thanks'' as if it were
+    the first rating.'
+  description_source: hand
+  src_files:
+  - apps/ally-helpline-dashboard/src/pages/guided-course/contract/bootstrap.ts
+  - apps/ally-helpline-dashboard/src/pages/guided-course/fixture/fixtureServer.ts
+  - apps/ally-helpline-dashboard/src/pages/guided-course/hooks/useGuideJourney.ts
+  - apps/ally-helpline-dashboard/src/pages/guided-course/stage/Messages.tsx
+  - apps/ally-helpline-dashboard/src/pages/guided-course/stage/Stage.tsx
+  oracle_tests:
+  - apps/ally-helpline-dashboard/src/pages/guided-course/__tests__/GuidedCourse.finale.test.tsx
+  - apps/ally-helpline-dashboard/src/pages/guided-course/hooks/__tests__/seedRatings.test.ts
+  src_lines: 37
+  lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  tags: []
+- id: ally-ai-b680c643
+  kind: bug
+  app: ally-ai
+  parent: a66cd8e6f6c776f2df124f2d3b1ad15e24c8e515
+  commit: b680c6432addd524c016f5e3b56a9a1524360d3e
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'Local prompt code resolution fails for prompts stored in nested directories: a prompt
+    placed under a subdirectory of the prompts folder cannot be resolved by its code and is reported as
+    not found, while prompts at the top level resolve.'
+  description_source: hand
+  src_files:
+  - app/prompts/resolver.py
+  oracle_tests:
+  - tests/prompts/test_resolver.py
+  src_lines: 12
+  lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
+  tags: []
+- id: ally-ai-e9a0e1c3
+  kind: bug
+  app: ally-ai
+  parent: 408fe99e3f127a318625b13229b31c5272bf4c6d
+  commit: e9a0e1c386650a26a763de9e8d88969739a275dd
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  risk: false
+  description: A block of code is duplicated within the `generate_scenario_evaluation` method of the OpenAI
+    text generation service, apparently a copy-paste error.
+  description_source: hand
+  src_files:
+  - app/core/text_generations/openai_text_generation_service.py
+  oracle_tests:
+  - tests/core/test_openai_text_generation_service_deduplication.py
+  src_lines: 14
+  lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
+  tags: []
+- id: ally-ai-learn-1065743a
+  kind: bug
+  app: ally-ai-learn
+  parent: f49c59c4095996a1fdd7b73edcd6548c8f55274b
+  commit: 1065743a09f886cb378e9cdf48d5ecd562e72d59
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Actor evaluation for scenario sessions logs an ERROR-level exception with a traceback whenever
+    the evaluation fails, which pages on-call for what is an expected and already-handled failure; the
+    session itself is not affected.
+  description_source: hand
+  src_files:
+  - app/core/scenario_session_evaluation/service.py
+  oracle_tests:
+  - tests/unit/test_scenario_session_evaluation.py
+  src_lines: 6
+  lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
+  tags: []
+- id: ally-ai-learn-7391ff7e
+  kind: bug
+  app: ally-ai-learn
+  parent: 22a8206c26334d25b9ea70e352498dea02c3e9f7
+  commit: 7391ff7e2841e9f8fe06c24f72b5c8af6be92a90
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  risk: false
+  description: '`_create_event_by_detection_type` in app/core/events/factory.py uses bare `except Exception`
+    blocks around event construction, so invalid event data is swallowed silently instead of surfacing
+    the validation error.'
+  description_source: hand
+  src_files:
+  - app/core/events/factory.py
+  oracle_tests:
+  - tests/unit/app/core/events/test_factory.py
+  src_lines: 16
+  lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
+  tags: []
+- id: ally-ai-learn-995242d7
+  kind: bug
+  app: ally-ai-learn
+  parent: 0bad55183ad1e6b1bc7c1402d3eec7216acdd941
+  commit: 995242d7ab49e7fd1328972ee8b54e5919bcf856
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: The Sarvam TTS provider frequently fails with the error 'Text must contain at least one
+    character from the allowed set', and when it does the learner hears nothing for that turn. It happens
+    mid-session, not on every turn.
+  description_source: hand
+  src_files:
+  - app/tts/sarvam.py
+  oracle_tests:
+  - tests/unit/test_tts_new_structure.py
+  - tests/unit/tts/test_sarvam.py
+  src_lines: 24
+  lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
+  tags: []
+- id: ally-mobile-83bdf91e
+  kind: bug
+  app: ally-mobile
+  parent: 26a6448434f388494ea577571cfe37d910b6de11
+  commit: 83bdf91eff81191e5ded7499eb1c8611a616c9fb
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'Two Scribe problems from field recordings. After a transient socket error the recording
+    screen shows ''Try again'', but tapping it leaves the screen instead of retrying, so the counsellor
+    has to navigate back and start over. And every session starts paused: the only warning is a small
+    dismissible tooltip, so a counsellor can sit through a session with the timer running while nothing
+    is recorded.'
+  description_source: hand
+  src_files:
+  - lib/features/scribe/presentation/network_disconnected.dart
+  - lib/features/scribe/presentation/scribe_recording_screen.dart
+  oracle_tests:
+  - test/features/scribe/presentation/scribe_recording_screen_connected_test.dart
+  - test/features/scribe/presentation/scribe_recording_screen_try_again_test.dart
+  - test/features/scribe/presentation/scribe_recording_screen_user_joined_chat_id_test.dart
+  src_lines: 59
+  lockfile_blob: 4006dfa5966ef211c009513b41c55ba27aa83fff
+  tags: []
+- id: ally-ai-6e81b510
+  kind: clean
+  app: ally-ai
+  parent: 29d93ad72f9d4756ae2a27fb1dd1e3ae857a5dd3
+  commit: 6e81b5103580f51e18b1c29576b5cf1f4fac2151
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Add challenge description to simulation evaluation
+  description_source: commit
+  src_files:
+  - app/core/text_generations/openai_text_generation_service.py
+  - app/core/text_generations/structured_output_models.py
+  - app/schemas/summary.py
+  - tests/api/v1/endpoints/test_summary.py
+  - tests/core/text_generations/test_openai_text_generation_service.py
+  oracle_tests: []
+  src_lines: 33
+  tags: []
+- id: ally-ai-7d30a176
+  kind: clean
+  app: ally-ai
+  parent: 74b57a1b933a3654a91d0f4dec7fcb71c60d17ba
+  commit: 7d30a176d410319997666acfa9e909e5abc30d4d
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: let the supervisor note reference its own live notes
+  description_source: commit
+  src_files:
+  - app/api/v1/endpoints/summary.py
+  - app/core/summaries/summary_service.py
+  - app/core/text_generations/base.py
+  - app/core/text_generations/openai_text_generation_service.py
+  - app/schemas/summary.py
+  - tests/core/text_generations/test_openai_text_generation_service.py
+  oracle_tests: []
+  src_lines: 75
+  tags: []
+- id: ally-ai-1ff07399
+  kind: clean
+  app: ally-ai
+  parent: de6b7bfedb1ad71877c01b3c1959cdc6e1611e6a
+  commit: 1ff07399bbce693a1036ba0429daa0e11aa1f3f4
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: summary condense + dynamic-summary sub-calls honor per-prompt override
+  description_source: commit
+  src_files:
+  - app/core/text_generations/openai_text_generation_service.py
+  oracle_tests: []
+  src_lines: 29
+  tags: []
+- id: ally-ai-6d1b48a8
+  kind: clean
+  app: ally-ai
+  parent: 1ff07399bbce693a1036ba0429daa0e11aa1f3f4
+  commit: 6d1b48a8ce7715af9fdee91880bdbcf70b6f502c
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: use gemini-2.5-flash in override tests (2.0-flash deprecated)
+  description_source: commit
+  src_files:
+  - tests/core/test_prompt_llm_overrides.py
+  oracle_tests: []
+  src_lines: 10
+  tags: []
+- id: ally-ai-e6286217
+  kind: clean
+  app: ally-ai
+  parent: ba930decd4ce839c45dd370362419cfac6d17024
+  commit: e62862175948f7be8a8995bc8c023e3047e8dd5e
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: deliver transcript before summarization (phase 1)
+  description_source: commit
+  src_files:
+  - app/core/queue/transcription_request_handler.py
+  - tests/core/queue/test_transcription_request_handler.py
+  oracle_tests: []
+  src_lines: 39
+  tags: []
+- id: ally-ai-f06c8ed5
+  kind: clean
+  app: ally-ai
+  parent: 9fc1b765eb881debc4c1d4d9f294952be651df73
+  commit: f06c8ed5dcbfc64b2242b52addc365113339e9b2
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: recover failed summaries — keep transcript, retry, manual edit
+  description_source: commit
+  src_files:
+  - app/core/queue/transcription_request_handler.py
+  - tests/core/queue/test_transcription_request_handler.py
+  oracle_tests: []
+  src_lines: 91
+  tags: []
+- id: ally-ai-learn-b6c51894
+  kind: clean
+  app: ally-ai-learn
+  parent: 1361d05a885339755df409dc2cef868ae879973a
+  commit: b6c5189482c2d0e45dc0566327c2fe77bb0c9842
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: say whether the feature engaged, and why not
+  description_source: commit
+  src_files:
+  - app/worker.py
+  oracle_tests: []
+  src_lines: 47
+  tags: []
+- id: ally-ai-learn-88592f67
+  kind: clean
+  app: ally-ai-learn
+  parent: bde5e1918ec048fc619503b858305071b628e323
+  commit: 88592f67772ef051269d20a698358116ed385790
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: tag the emergency-finalize end-of-session message with a reason
+  description_source: commit
+  src_files:
+  - app/core/emergency_finalize.py
+  - app/core/queue/utils.py
+  oracle_tests: []
+  src_lines: 30
+  tags: []
+- id: ally-ai-learn-a645303c
+  kind: clean
+  app: ally-ai-learn
+  parent: 51a29d9b54c6f88fb3a9795b7e556cf426a22afb
+  commit: a645303c47aaed107ef8c7271224abb7fda35686
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Run V2V Test launcher on Roleplay Session Logs
+  description_source: commit
+  src_files:
+  - app/simulated_user_worker.py
+  oracle_tests: []
+  src_lines: 42
+  tags: []
+- id: ally-ai-learn-c77f929e
+  kind: clean
+  app: ally-ai-learn
+  parent: e4fee756f468dd845bd941cc8f4644b4910f4ac2
+  commit: c77f929e5a8ac1a45bcfd9a8e1fffa7f72b485ff
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: redefine response_latency_ms as time-to-first-audio
+  description_source: commit
+  src_files:
+  - app/core/metrics/turn_metrics.py
+  - app/worker.py
+  oracle_tests: []
+  src_lines: 33
+  tags: []
+- id: ally-ai-learn-b408b775
+  kind: clean
+  app: ally-ai-learn
+  parent: 4861f2a85fc1ef3dd42184cb4e5649f4fea20383
+  commit: b408b775cb1c007853520cc14eb80a039635b505
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: add thinking-filler back-channel to mask turn latency
+  description_source: commit
+  src_files:
+  - app/core/livekit/fillers.py
+  - app/core/scenario/base.py
+  oracle_tests: []
+  src_lines: 28
+  tags: []
+- id: ally-ai-learn-66d9a037
+  kind: clean
+  app: ally-ai-learn
+  parent: b281c731340201da3f8c41fa11513c110bcae829
+  commit: 66d9a037bec7c959ef2a3766d8b2ce8b029b7f46
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: inject regional dialect block for English variants
+  description_source: commit
+  src_files:
+  - app/core/graph/prompt.py
+  - tests/unit/graph/test_prompt.py
+  oracle_tests: []
+  src_lines: 37
+  tags: []
+- id: ally-be-b29aa1be
+  kind: clean
+  app: ally-be
+  parent: 759978c4fe3035edcd722d3f36b4f267dce01456
+  commit: b29aa1be17d59c7c4aa3cd3c799d449a962133d1
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: expose the review and approve switches on the settings API
+  description_source: commit
+  src_files:
+  - src/builder/controller/builder.controller.ts
+  - src/builder/dto/builder.dto.ts
+  - src/builder/service/builder-settings.service.ts
+  oracle_tests: []
+  src_lines: 39
+  tags: []
+- id: ally-be-f3e78b7e
+  kind: clean
+  app: ally-be
+  parent: 6790f67c2f6084ba3586288f561b2485197d2fe2
+  commit: f3e78b7e30211896cfdb8f78be22b9ccfa747f60
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: run the review phase in the engine
+  description_source: commit
+  src_files:
+  - src/builder/enum/builder.enum.ts
+  - src/database/migrations/1970300000000-AddBuilderReview.ts
+  oracle_tests: []
+  src_lines: 39
+  tags: []
+- id: ally-be-a2ed4959
+  kind: clean
+  app: ally-be
+  parent: 47e0ad5b1d743411d1ed624ac696e6f5b78c97ea
+  commit: a2ed49592827ad1d0f4c0ba8244005d53c1f33ea
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: split machine time from waiting for a person
+  description_source: commit
+  src_files:
+  - src/builder/service/builder-metrics.service.ts
+  oracle_tests: []
+  src_lines: 41
+  tags: []
+- id: ally-be-d77c088a
+  kind: clean
+  app: ally-be
+  parent: 8921d60c5ae5fc0893b667a5c2cfdcf20d9945e8
+  commit: d77c088a4373877768b67294f418e62f6ff9cdf1
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: v2v-test a track item via trackItemProgressId
+  description_source: commit
+  src_files:
+  - src/learn/dto/start-v2v-test-session.dto.ts
+  - src/learn/service/scenario-session.service.ts
+  oracle_tests: []
+  src_lines: 41
+  tags: []
+- id: ally-be-5017783f
+  kind: clean
+  app: ally-be
+  parent: f47cac0b71a227898c6d3475012739dc503a9743
+  commit: 5017783fb4001c932736b9d4be5e77b5a3cd2c8f
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: backfill historyTrimEnabled=true for all scenarios
+  description_source: commit
+  src_files:
+  - src/database/migrations/1883000000000-EnableHistoryTrimForAllScenarios.ts
+  oracle_tests: []
+  src_lines: 41
+  tags: []
+- id: ally-be-6b5647ff
+  kind: clean
+  app: ally-be
+  parent: b112742663cef21650f78c922cdd608d89517807
+  commit: 6b5647ff9551c6ea4cd2f86fc7dc44098111ceaf
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: enable comfort audio, trim history, and interim reply for all existing roleplays
+  description_source: commit
+  src_files:
+  - src/database/migrations/1796000000000-AddExpressivityGuidancePrompts.ts
+  - src/database/migrations/1797000000000-EnableComfortAudioTrimHistoryInterimReply.ts
+  oracle_tests: []
+  src_lines: 40
+  tags: []
+- id: ally-be-0f139f7a
+  kind: clean
+  app: ally-be
+  parent: 21bc0bfcaff5c74225f442cc882bf80a0a990fc6
+  commit: 0f139f7ada3826f29bc3f43964cf89a5e6acf3f3
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: add language translation support to scenario session endpoints
+  description_source: commit
+  src_files:
+  - src/learn/controller/learn.controller.ts
+  - src/learn/service/scenario-session.service.ts
+  oracle_tests: []
+  src_lines: 39
+  tags: []
+- id: ally-be-8c5367c1
+  kind: clean
+  app: ally-be
+  parent: 578ff42b63998a3655924ae888eaf0adc1165317
+  commit: 8c5367c170e1f43fdff325ddb0ac1433629132a4
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Add translation support for pathways
+  description_source: commit
+  src_files:
+  - src/learn/dto/create-scenario.dto.ts
+  - src/learn/dto/update-scenario.dto.ts
+  - src/scenario-path/controller/scenario-path-session.controller.ts
+  - src/scenario-path/service/scenario-path-session.service.ts
+  - src/scenario-path/type/scenario-path-session-items.type.ts
+  oracle_tests: []
+  src_lines: 39
+  tags: []
+- id: ally-web-7b655598
+  kind: clean
+  app: ally-web
+  parent: cc918a07ee242a9519e00f79c7ad0ba32d74f43c
+  commit: 7b6555980428d9cb23198c251b5e0d24dd012bfb
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: deep-link COURSE_DISCUSSION_REPLY notifications to the post
+  description_source: commit
+  src_files:
+  - apps/ally-helpline-dashboard/src/components/notification-feed/NotificationPanel.tsx
+  - apps/ally-helpline-dashboard/src/constants/routes.ts
+  oracle_tests: []
+  src_lines: 40
+  tags: []
+- id: ally-web-da6535f4
+  kind: clean
+  app: ally-web
+  parent: ebc13e95298001bda267ec15375874c09be0d504
+  commit: da6535f49ad69ed1ecca3f460f46444cdaa0dae2
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: say when nothing is indexed, instead of blaming the floor
+  description_source: commit
+  src_files:
+  - apps/ally-admin-dashboard/src/components/character-corpus/CharacterCorpusPanel.tsx
+  - apps/ally-admin-dashboard/src/constants/en.ts
+  oracle_tests: []
+  src_lines: 42
+  tags: []
+- id: ally-web-bbaeab31
+  kind: clean
+  app: ally-web
+  parent: 004e5b4c38ba3dc8b198e3d04059e7af7455040c
+  commit: bbaeab313214743e92cb3a5e4d881347db1faeea
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: show where the losses come from
+  description_source: commit
+  src_files:
+  - apps/ally-admin-dashboard/src/constants/en.ts
+  - apps/ally-admin-dashboard/src/pages/Builder/BuilderScoreboard.tsx
+  - apps/ally-admin-dashboard/src/types/builder.ts
+  oracle_tests: []
+  src_lines: 42
+  tags: []
+- id: ally-web-ffa86627
+  kind: clean
+  app: ally-web
+  parent: 9a3410b1c08c58c29799a8ca601244a07fd4a505
+  commit: ffa866270685e84e0f5cb8a97b7e548f616a929d
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: add language column and filter
+  description_source: commit
+  src_files:
+  - apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/RoleplaySessionLogs.tsx
+  - apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/useRoleplaySessionLogs.ts
+  - apps/ally-admin-dashboard/src/types/roleplaySessionLogs.ts
+  oracle_tests: []
+  src_lines: 42
+  tags: []
+- id: ally-web-2ae8d573
+  kind: clean
+  app: ally-web
+  parent: 06ef16ccfcfea442559d372cd860920035052a11
+  commit: 2ae8d5731e963d22f5cf75c553d9d05d58b193e4
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: permission-aware event management for multi-tenant admins
+  description_source: commit
+  src_files:
+  - apps/ally-admin-dashboard/src/components/event-side-panel/EventSidePanel.tsx
+  - apps/ally-admin-dashboard/src/constants/en.ts
+  - apps/ally-admin-dashboard/src/constants/permissions.ts
+  - apps/ally-admin-dashboard/src/pages/EventManagement/EventManagement.tsx
+  oracle_tests: []
+  src_lines: 40
+  tags: []
+- id: ally-web-1364881b
+  kind: clean
+  app: ally-web
+  parent: 8890b80b868a62d2f2fc5eeb0fbf4c81874a821e
+  commit: 1364881b7f0300927dcd382cfb0018edb1a7d2b2
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: unify scribe review structure with simulation
+  description_source: commit
+  src_files:
+  - apps/ally-helpline-dashboard/src/pages/review/Review.tsx
+  - apps/ally-helpline-dashboard/src/pages/review/components/ScribeReview.tsx
+  - apps/ally-helpline-dashboard/src/pages/review/constants.ts
+  oracle_tests: []
+  src_lines: 42
+  tags: []
+- id: ally-web-382b51ea
+  kind: clean
+  app: ally-web
+  parent: 6765aa323d70ff2e2bebe1391c0c6bf1ebe21f9d
+  commit: 382b51ea300219cf0122d6ea7b747145ca70770e
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Add 'Failures by session mode' chart to scribe failure tab
+  description_source: commit
+  src_files:
+  - apps/ally-admin-dashboard/src/pages/Analytics/tabs/ScribeSummaryFailureTab.tsx
+  - apps/ally-admin-dashboard/src/types/auth.ts
+  oracle_tests: []
+  src_lines: 37
+  tags: []
+- id: ally-web-8890b80b
+  kind: clean
+  app: ally-web
+  parent: 5bebabc7e0a7a48fa9d33332fadb8877c3c8c778
+  commit: 8890b80b868a62d2f2fc5eeb0fbf4c81874a821e
+  expected: no_bug
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Add 'Top failure reasons' list to scribe summary-failure tab
+  description_source: commit
+  src_files:
+  - apps/ally-admin-dashboard/src/pages/Analytics/tabs/ScribeSummaryFailureTab.tsx
+  - apps/ally-admin-dashboard/src/types/auth.ts
+  oracle_tests: []
+  src_lines: 37
+  tags: []

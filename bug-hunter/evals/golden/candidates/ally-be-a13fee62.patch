@@ -1,0 +1,177 @@
+diff --git a/src/ai-chat/service/ai-chat.service.ts b/src/ai-chat/service/ai-chat.service.ts
+index 6be802c5d4..27094ea221 100644
+--- a/src/ai-chat/service/ai-chat.service.ts
++++ b/src/ai-chat/service/ai-chat.service.ts
+@@ -50,13 +50,6 @@ export class AiChatService {
+     providerType?: string;
+     onComplete?: (fullResponse: string) => Promise<void>;
+     usage?: ChatUsageAttribution;
+-    /**
+-     * Cap on verbatim history turns sent to the model (default 10). A caller
+-     * that already bounds its own history passes its bound so none of it is
+-     * cut. Leading system-role history is pinned and not counted — see
+-     * pruneMessages.
+-     */
+-    maxHistoryMessages?: number;
+   }): Observable<SseMessageEvent> {
+     const subject = new Subject<SseMessageEvent>();
+ 
+@@ -80,7 +73,6 @@ export class AiChatService {
+       providerType?: string;
+       onComplete?: (fullResponse: string) => Promise<void>;
+       usage?: ChatUsageAttribution;
+-      maxHistoryMessages?: number;
+     },
+   ): Promise<void> {
+     const { systemPrompt, chatHistory, userMessage, llmConfig } = params;
+@@ -92,11 +84,7 @@ export class AiChatService {
+     ];
+ 
+     const maxContextTokens = this.configService.aiChat.maxContextTokens;
+-    const prunedMessages = this.pruneMessages(
+-      messages,
+-      maxContextTokens,
+-      params.maxHistoryMessages,
+-    );
++    const prunedMessages = this.pruneMessages(messages, maxContextTokens);
+ 
+     const provider = this.llmProviderFactory.getProvider(params.providerType);
+     let fullResponse = '';
+diff --git a/src/ai-chat/service/test/ai-chat.service.spec.ts b/src/ai-chat/service/test/ai-chat.service.spec.ts
+index 339169e193..587496ca9a 100644
+--- a/src/ai-chat/service/test/ai-chat.service.spec.ts
++++ b/src/ai-chat/service/test/ai-chat.service.spec.ts
+@@ -130,12 +130,12 @@ describe('AiChatService usage recording', () => {
+  * The debrief chat sends [summary (system), unsummarised overflow, last 10],
+  * but pruning used to keep only the last 10 history items and, over the token
+  * budget, dropped index 1 first — so the summary it paid to generate never
+- * reached the model. These pin what pruning keeps.
++ * reached the model. These pin what pruning keeps: the summary, then the last
++ * 10 verbatim turns.
+  */
+ describe('AiChatService history pruning', () => {
+   const run = async (params: {
+     chatHistory: LlmMessage[];
+-    maxHistoryMessages?: number;
+     maxContextTokens?: number;
+   }): Promise<LlmMessage[]> => {
+     let sent: LlmMessage[] = [];
+@@ -164,7 +164,6 @@ describe('AiChatService history pruning', () => {
+           chatHistory: params.chatHistory,
+           userMessage: 'now',
+           llmConfig: { model: 'gpt-4o-mini' },
+-          maxHistoryMessages: params.maxHistoryMessages,
+         })
+         .pipe(toArray()),
+     );
+@@ -191,18 +190,6 @@ describe('AiChatService history pruning', () => {
+     expect(sent[sent.length - 1]).toEqual({ role: 'user', content: 'now' });
+   });
+ 
+-  it("lets a caller's already-bounded history through whole", async () => {
+-    const history = [summary, ...turns(19)];
+-
+-    const sent = await run({ chatHistory: history, maxHistoryMessages: 19 });
+-
+-    expect(sent).toEqual([
+-      { role: 'system', content: 'sys' },
+-      ...history,
+-      { role: 'user', content: 'now' },
+-    ]);
+-  });
+-
+   it('drops the oldest verbatim turns before the summary when over the token budget', async () => {
+     // 4 turns of 400 chars (~100 tokens each) + a short summary, prompt and
+     // user message: a 250-token budget leaves room for two turns.
+diff --git a/src/learn/constants/scenario-session-chat.constants.ts b/src/learn/constants/scenario-session-chat.constants.ts
+index b1e21f5ff4..4952835918 100644
+--- a/src/learn/constants/scenario-session-chat.constants.ts
++++ b/src/learn/constants/scenario-session-chat.constants.ts
+@@ -10,13 +10,3 @@ export const CHAT_HISTORY_WINDOW_SIZE = 10;
+  * this threshold, they are batch-summarized into the running summary.
+  */
+ export const CHAT_SUMMARIZATION_BATCH_THRESHOLD = 10;
+-
+-/**
+- * Most verbatim messages one turn's history can hold: the window, plus an
+- * overflow that is summarised as soon as it reaches the batch threshold (so it
+- * never exceeds threshold − 1). Passed to AiChatService as its history cap so
+- * this already-bounded history reaches the model whole. The running summary
+- * rides ahead of it as a pinned system message and is not counted.
+- */
+-export const CHAT_MAX_HISTORY_MESSAGES =
+-  CHAT_HISTORY_WINDOW_SIZE + CHAT_SUMMARIZATION_BATCH_THRESHOLD - 1;
+diff --git a/src/learn/service/scenario-session-chat.service.ts b/src/learn/service/scenario-session-chat.service.ts
+index f958354585..59b4619672 100644
+--- a/src/learn/service/scenario-session-chat.service.ts
++++ b/src/learn/service/scenario-session-chat.service.ts
+@@ -21,7 +21,6 @@ import { LlmTask } from '../enum/llm-task.enum';
+ import { ExecutionManager } from 'src/common/execution/execution-manager';
+ import {
+   CHAT_HISTORY_WINDOW_SIZE,
+-  CHAT_MAX_HISTORY_MESSAGES,
+   CHAT_SUMMARIZATION_BATCH_THRESHOLD,
+ } from '../constants/scenario-session-chat.constants';
+ import { extractTimestampsFromText } from 'src/common/util/time.util';
+@@ -201,9 +200,11 @@ export class ScenarioSessionChatService {
+         temperature,
+         maxTokens: this.configService.aiChat.maxTokens,
+       },
+-      // The history is already bounded (summary + overflow + window); let all
+-      // of it through rather than AiChatService's generic 10-message default.
+-      maxHistoryMessages: CHAT_MAX_HISTORY_MESSAGES,
++      // AiChatService keeps its default of the last 10 verbatim turns, with the
++      // running summary pinned ahead of them. The not-yet-summarised overflow
++      // is cut, as it always was: sending it whole would add up to nine more
++      // turns to every reply in a long chat, and the summary is what carries
++      // the older conversation.
+       // The debrief chat is part of delivering the roleplay, so its spend is
+       // recorded against the session it is about.
+       usage: {
+diff --git a/src/learn/service/test/scenario-session-chat.service.spec.ts b/src/learn/service/test/scenario-session-chat.service.spec.ts
+index 865deb4852..9e3547440b 100644
+--- a/src/learn/service/test/scenario-session-chat.service.spec.ts
++++ b/src/learn/service/test/scenario-session-chat.service.spec.ts
+@@ -6,7 +6,6 @@ import {
+ } from 'src/ai-chat/interface/llm-provider.interface';
+ import { ExecutionManager } from 'src/common/execution/execution-manager';
+ import { LoggerService } from 'src/logger/logger.service';
+-import { CHAT_MAX_HISTORY_MESSAGES } from '../../constants/scenario-session-chat.constants';
+ 
+ /**
+  * What one debrief-chat turn actually sends the model. Runs the real
+@@ -143,11 +142,12 @@ describe('ScenarioSessionChatService.streamChat — what reaches the model', ()
+     );
+   });
+ 
+-  it('delivers the running summary and the unsummarised overflow, not just the last 10', async () => {
++  it('delivers the running summary ahead of the last 10 messages', async () => {
+     // 25 earlier messages, the first 10 already folded into the summary:
+-    // 5 overflow (10..14) + a 10-message window (15..24).
++    // 5 overflow (10..14) + a 10-message window (15..24). The overflow is cut
++    // by the 10-turn cap, as before; the summary now survives it.
+     const prior = priorMessages(25);
+-    const { service, saved, sent, streamSpy, provider } = setup({
++    const { service, saved, sent, provider } = setup({
+       prior,
+       summary: 'They practised reflective listening.',
+       summarizedMessageCount: 10,
+@@ -158,9 +158,6 @@ describe('ScenarioSessionChatService.streamChat — what reaches the model', ()
+ 
+     // Below the batch threshold: no new summarisation call.
+     expect(provider.getCompletion).not.toHaveBeenCalled();
+-    expect(streamSpy.mock.calls[0][0].maxHistoryMessages).toBe(
+-      CHAT_MAX_HISTORY_MESSAGES,
+-    );
+     expect(sent[0]).toEqual([
+       { role: 'system', content: 'You are a clinical supervisor.' },
+       {
+@@ -168,7 +165,7 @@ describe('ScenarioSessionChatService.streamChat — what reaches the model', ()
+         content:
+           'Summary of earlier conversation:\nThey practised reflective listening.',
+       },
+-      ...prior.slice(10).map((m) => ({
++      ...prior.slice(15).map((m) => ({
+         role: m.senderId === -1 ? 'assistant' : 'user',
+         content: m.content,
+       })),

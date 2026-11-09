@@ -1,0 +1,38 @@
+diff --git a/src/badge/service/badge-tenant.service.ts b/src/badge/service/badge-tenant.service.ts
+index 1df7c5943e..d0df1aeba7 100644
+--- a/src/badge/service/badge-tenant.service.ts
++++ b/src/badge/service/badge-tenant.service.ts
+@@ -146,7 +146,7 @@ export class BadgeTenantService {
+         `Failed to assign badge ${badge.id} to tenants`,
+         error.stack,
+       );
+-      return [];
++      throw error;
+     }
+   }
+ 
+diff --git a/src/badge/service/test/badge-tenant.service.spec.ts b/src/badge/service/test/badge-tenant.service.spec.ts
+index f6e85fd1f8..663882d371 100644
+--- a/src/badge/service/test/badge-tenant.service.spec.ts
++++ b/src/badge/service/test/badge-tenant.service.spec.ts
+@@ -276,16 +276,16 @@ describe('BadgeTenantService', () => {
+       expect(result).toEqual(['tenant-1', 'tenant-2']);
+     });
+ 
+-    it('should return empty array on error', async () => {
++    it('should throw an error on DB error', async () => {
+       const badge = {
+         id: 'badge-1',
+         visibilityType: BadgeVisibilityType.PUBLIC,
+       } as Badge;
+       mockTenantsRepository.find.mockRejectedValue(new Error('DB error'));
+ 
+-      const result = await service.assignBadgeToTenants(badge);
+-
+-      expect(result).toEqual([]);
++      await expect(service.assignBadgeToTenants(badge)).rejects.toThrow(
++        'DB error',
++      );
+     });
+   });
+ 

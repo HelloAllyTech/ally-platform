@@ -1,0 +1,92 @@
+diff --git a/apps/ally-admin-dashboard/src/components/Simulation-event-map-table/SimulationEventMapTable.tsx b/apps/ally-admin-dashboard/src/components/Simulation-event-map-table/SimulationEventMapTable.tsx
+index af7bac1130..557006d381 100644
+--- a/apps/ally-admin-dashboard/src/components/Simulation-event-map-table/SimulationEventMapTable.tsx
++++ b/apps/ally-admin-dashboard/src/components/Simulation-event-map-table/SimulationEventMapTable.tsx
+@@ -132,6 +132,17 @@ export const SimulationEventMapTable: FC<SimulationEventMapTableProps> = ({
+   const isSavingRef = useRef(false);
+   const reloadTimeoutRef = useRef<NodeJS.Timeout>();
+ 
++  /**
++   * Row count for the server-sync effect to read, deliberately NOT a dependency
++   * of it. The effect re-seeds local state from the server, so depending on a
++   * count the effect's own callers change made every local edit re-trigger it:
++   * adding a row grew the count, the effect re-seeded the server's rows, and the
++   * blank row the admin had just added vanished while its side panel stayed
++   * open on it. Version-mode deletes came back the same way, since that path
++   * only filters local state.
++   */
++  const mappedEventsLengthRef = useRef(0);
++
+   // Create a memoized map for quick event lookup
+   const sessionEventsMap = useMemo(() => createSessionEventsMap(sessionEvents), [sessionEvents]);
+ 
+@@ -173,12 +184,16 @@ export const SimulationEventMapTable: FC<SimulationEventMapTableProps> = ({
+         ),
+       );
+ 
+-      if (mappedEvents.length <= 1) updateEventOrderMapping(formattedEvents);
++      if (mappedEventsLengthRef.current <= 1) updateEventOrderMapping(formattedEvents);
+       setMappedEvents(formattedEvents);
+     } else {
+       setMappedEvents([createNewEvent()]);
+     }
+-  }, [mappedEvents.length, mappedScenarioEventsData, sessionEventsMap, versionId, versionEvents]);
++  }, [mappedScenarioEventsData, sessionEventsMap, versionId, versionEvents]);
++
++  useEffect(() => {
++    mappedEventsLengthRef.current = mappedEvents.length;
++  }, [mappedEvents]);
+ 
+   // Version mode: report the full event set to the parent on every change so it
+   // can be saved into the version config (never to the live scenario). Deps are
+diff --git a/apps/ally-admin-dashboard/src/components/Simulation-event-map-table/__tests__/SimulationEventMapTable.test.tsx b/apps/ally-admin-dashboard/src/components/Simulation-event-map-table/__tests__/SimulationEventMapTable.test.tsx
+index 94e44afd0b..eeb84cf4ac 100644
+--- a/apps/ally-admin-dashboard/src/components/Simulation-event-map-table/__tests__/SimulationEventMapTable.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/Simulation-event-map-table/__tests__/SimulationEventMapTable.test.tsx
+@@ -313,6 +313,46 @@ describe("SimulationEventMapTable", () => {
+     expect(screen.getByTestId("side-panel-open")).toBeInTheDocument();
+   });
+ 
++  // The seeding effect re-seeds from the server/version snapshot. If a purely
++  // local row count can re-trigger it, the row the admin just added is wiped
++  // out from under them — and the Add button, which disables itself while a
++  // blank row is waiting to be filled in, re-enables to prove it.
++  it("keeps the newly added blank row instead of re-seeding it away", async () => {
++    vi.mocked(api.useGetSessionEventsQuery).mockReturnValue({
++      data: { data: [{ id: "e1", name: "Event 1" }] },
++      isLoading: false,
++    } as any);
++    vi.mocked(api.useGetMappedScenarioEventsQuery).mockReturnValue({
++      data: {
++        data: [
++          {
++            eventId: "e1",
++            name: "Event 1",
++            score: 0,
++            emoji: "🫥",
++            message: "",
++            feedbackStatus: false,
++            branchingStatus: false,
++            branchInstruction: "",
++            checklistVisibilityStatus: false,
++          },
++        ],
++      },
++      isLoading: false,
++    } as any);
++
++    render(<SimulationEventMapTable simulationId={"123"} />);
++
++    const addButton = () => screen.getByText("Add Event").closest("button") as HTMLButtonElement;
++    await waitFor(() => expect(addButton()).not.toBeDisabled());
++
++    fireEvent.click(addButton());
++
++    // Give the seeding effect every chance to run and clobber the new row.
++    await waitFor(() => expect(screen.getByTestId("side-panel-open")).toBeInTheDocument());
++    expect(addButton()).toBeDisabled();
++  });
++
+   it("shows delete button when rows are selected and calls delete mutation", async () => {
+     const deleteMock = vi.fn().mockResolvedValueOnce({});
+     vi.mocked(api.useGetSessionEventsQuery).mockReturnValue({

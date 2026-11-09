@@ -1,0 +1,186 @@
+diff --git a/src/analytics/repository/highlights-analytics.repository.ts b/src/analytics/repository/highlights-analytics.repository.ts
+index 4ae995c4b1..87078449ae 100644
+--- a/src/analytics/repository/highlights-analytics.repository.ts
++++ b/src/analytics/repository/highlights-analytics.repository.ts
+@@ -313,10 +313,11 @@ export class HighlightsAnalyticsRepository {
+    * Definition, deliberately identical to the tab's "completed simulation" so
+    * the two charts reconcile: `eventStatus = COMPLETED`, timestamped by
+    * `COALESCE(endedAt, createdAt)`. Duration is the persisted
+-   * `scenario_session_details."callDuration"` (seconds, already net of paused
+-   * time) — the same figure that feeds `user_daily_scores.minutesPlayed`, so
+-   * this chart and the practice-minutes chart cannot disagree about what a
+-   * minute of practice is.
++   * `scenario_session_details."callDuration"` — **milliseconds**, already net
++   * of paused time, hence `/ 60000.0` and not `/ 60.0`. It is the same figure
++   * that feeds `user_daily_scores.minutesPlayed` (emitted as
++   * `callDuration / 1000 / 60`), so this chart and the practice-minutes chart
++   * cannot disagree about what a minute of practice is.
+    *
+    * Sessions with a NULL or non-positive duration are excluded rather than
+    * counted as zero: a session that produced no measurable time is a session
+@@ -340,17 +341,17 @@ export class HighlightsAnalyticsRepository {
+         'bucket',
+       )
+       .addSelect(
+-        'round((avg(d."callDuration") / 60.0)::numeric, 1)::float',
++        'round((avg(d."callDuration") / 60000.0)::numeric, 1)::float',
+         'avgMinutes',
+       )
+       .addSelect(
+         `round((percentile_cont(0.5) WITHIN GROUP ` +
+-          `(ORDER BY d."callDuration") / 60.0)::numeric, 1)::float`,
++          `(ORDER BY d."callDuration") / 60000.0)::numeric, 1)::float`,
+         'medianMinutes',
+       )
+       .addSelect(
+         `round((percentile_cont(0.95) WITHIN GROUP ` +
+-          `(ORDER BY d."callDuration") / 60.0)::numeric, 1)::float`,
++          `(ORDER BY d."callDuration") / 60000.0)::numeric, 1)::float`,
+         'p95Minutes',
+       )
+       .addSelect('COUNT(*)::int', 'sessions')
+@@ -396,6 +397,8 @@ export class HighlightsAnalyticsRepository {
+    *
+    * Computed over the raw sessions rather than re-averaged from the buckets: a
+    * mean of per-bucket means weights a quiet Sunday the same as a busy Monday.
++   *
++   * `callDuration` is milliseconds — see {@link getPlayTimeByBucket}.
+    */
+   async getPlayTimeOverall(
+     start: Date,
+@@ -405,7 +408,7 @@ export class HighlightsAnalyticsRepository {
+     const qb = this.dataSource
+       .createQueryBuilder()
+       .select(
+-        'round((avg(d."callDuration") / 60.0)::numeric, 1)::float',
++        'round((avg(d."callDuration") / 60000.0)::numeric, 1)::float',
+         'avgMinutes',
+       )
+       .addSelect('COUNT(*)::int', 'sessions')
+diff --git a/src/learn/entity/scenario-session-details.entity.ts b/src/learn/entity/scenario-session-details.entity.ts
+index ef41b8edbc..a67ffa46b2 100644
+--- a/src/learn/entity/scenario-session-details.entity.ts
++++ b/src/learn/entity/scenario-session-details.entity.ts
+@@ -18,8 +18,13 @@ export class ScenarioSessionDetails extends BaseEntity {
+   @Column({ type: 'uuid' })
+   scenarioSessionId!: string;
+ 
++  // MILLISECONDS, net of paused time — every writer persists
++  // `endedAt - startedAt - pausedMs` unconverted. Divide by 1000 before
++  // treating it as seconds (the single-session GET does exactly that in its
++  // response, which is why the API payload reads as seconds while the column
++  // does not).
+   @Column({ type: 'int', nullable: true })
+-  callDuration?: number; // in seconds
++  callDuration?: number;
+ 
+   @Column({ type: 'jsonb', nullable: true })
+   summary?: Record<string, any>;
+diff --git a/src/roleplay-session-logs/controller/roleplay-session-logs.controller.ts b/src/roleplay-session-logs/controller/roleplay-session-logs.controller.ts
+index 62e415abab..f27fcb0e0a 100644
+--- a/src/roleplay-session-logs/controller/roleplay-session-logs.controller.ts
++++ b/src/roleplay-session-logs/controller/roleplay-session-logs.controller.ts
+@@ -7,7 +7,7 @@ import {
+   ApiTags,
+ } from '@nestjs/swagger';
+ import { AuthRoles } from '../../auth/decorators/auth-roles.decorator';
+-import { SUPER_DUPER_ADMIN_ROLES } from '../../common/constants/user.constants';
++import { SUPER_ADMIN_ROLES } from '../../common/constants/user.constants';
+ import { RoleplaySessionLogsService } from '../service/roleplay-session-logs.service';
+ import {
+   ListRoleplaySessionLogsQueryDto,
+@@ -25,9 +25,9 @@ export class RoleplaySessionLogsController {
+   ) {}
+ 
+   @Get()
+-  @AuthRoles(...SUPER_DUPER_ADMIN_ROLES)
++  @AuthRoles(...SUPER_ADMIN_ROLES)
+   @ApiOperation({
+-    summary: 'List all roleplay sessions across all orgs (super-duper-admin)',
++    summary: 'List all roleplay sessions across all orgs (super-admin)',
+     description:
+       'Platform-wide (cross-tenant) list of genuine end-user roleplay sessions ' +
+       'with the user, organization, scenario, status, duration and score. ' +
+@@ -43,9 +43,9 @@ export class RoleplaySessionLogsController {
+   }
+ 
+   @Get(':id')
+-  @AuthRoles(...SUPER_DUPER_ADMIN_ROLES)
++  @AuthRoles(...SUPER_ADMIN_ROLES)
+   @ApiOperation({
+-    summary: 'Get a single roleplay session detail (super-duper-admin)',
++    summary: 'Get a single roleplay session detail (super-admin)',
+     description:
+       'Cross-tenant detail for one roleplay session: core fields plus the ' +
+       'post-session summary, scored events and full transcript.',
+diff --git a/src/roleplay-session-logs/controller/test/roleplay-session-logs.controller.spec.ts b/src/roleplay-session-logs/controller/test/roleplay-session-logs.controller.spec.ts
+index 64a7f15433..ebc190b460 100644
+--- a/src/roleplay-session-logs/controller/test/roleplay-session-logs.controller.spec.ts
++++ b/src/roleplay-session-logs/controller/test/roleplay-session-logs.controller.spec.ts
+@@ -2,7 +2,7 @@ import { Reflector } from '@nestjs/core';
+ import { RoleplaySessionLogsController } from '../roleplay-session-logs.controller';
+ import { RoleplaySessionLogsService } from '../../service/roleplay-session-logs.service';
+ import { ROLES_KEY } from '../../../auth/decorators/roles.decorator';
+-import { SUPER_DUPER_ADMIN_ROLES } from '../../../common/constants/user.constants';
++import { SUPER_ADMIN_ROLES } from '../../../common/constants/user.constants';
+ 
+ describe('RoleplaySessionLogsController', () => {
+   let controller: RoleplaySessionLogsController;
+@@ -17,13 +17,13 @@ describe('RoleplaySessionLogsController', () => {
+     controller = new RoleplaySessionLogsController(service);
+   });
+ 
+-  it('guards both endpoints with the super-duper-admin roles', () => {
++  it('guards both endpoints with the super-admin roles', () => {
+     const reflector = new Reflector();
+     const listRoles = reflector.get(ROLES_KEY, controller.list);
+     const detailRoles = reflector.get(ROLES_KEY, controller.getById);
+ 
+-    expect(listRoles).toEqual(SUPER_DUPER_ADMIN_ROLES);
+-    expect(detailRoles).toEqual(SUPER_DUPER_ADMIN_ROLES);
++    expect(listRoles).toEqual(SUPER_ADMIN_ROLES);
++    expect(detailRoles).toEqual(SUPER_ADMIN_ROLES);
+   });
+ 
+   it('delegates list to the service', async () => {
+diff --git a/src/roleplay-session-logs/service/roleplay-session-logs.service.ts b/src/roleplay-session-logs/service/roleplay-session-logs.service.ts
+index e5da7254c8..188603f6e3 100644
+--- a/src/roleplay-session-logs/service/roleplay-session-logs.service.ts
++++ b/src/roleplay-session-logs/service/roleplay-session-logs.service.ts
+@@ -440,13 +440,15 @@ export class RoleplaySessionLogsService {
+   }
+ 
+   /**
+-   * Prefer the agent-reported `callDuration` (seconds). Otherwise derive it from
+-   * the session window minus paused time, but only when both endpoints exist.
++   * Prefer the persisted `callDuration`, which is stored in **milliseconds**
++   * net of paused time (see ScenarioSessionDetails.callDuration) — hence the
++   * /1000. Otherwise derive it from the session window minus paused time, but
++   * only when both endpoints exist.
+    */
+   private resolveDurationSeconds(r: RoleplaySessionLogRawRow): number | null {
+-    const callDuration = this.toNumberOrNull(r.callDuration);
+-    if (callDuration !== null && callDuration > 0) {
+-      return callDuration;
++    const callDurationMs = this.toNumberOrNull(r.callDuration);
++    if (callDurationMs !== null && callDurationMs > 0) {
++      return Math.round(callDurationMs / 1000);
+     }
+     if (r.startedAt && r.endedAt) {
+       const pausedMs = this.toNumberOrNull(r.totalPausedMs) ?? 0;
+diff --git a/src/roleplay-session-logs/service/test/roleplay-session-logs.service.spec.ts b/src/roleplay-session-logs/service/test/roleplay-session-logs.service.spec.ts
+index 82e19660d1..59505260a9 100644
+--- a/src/roleplay-session-logs/service/test/roleplay-session-logs.service.spec.ts
++++ b/src/roleplay-session-logs/service/test/roleplay-session-logs.service.spec.ts
+@@ -158,9 +158,9 @@ describe('RoleplaySessionLogsService', () => {
+       expect(data[0].durationSeconds).toBe(240);
+     });
+ 
+-    it('prefers the agent-reported callDuration when present', async () => {
++    it('prefers the persisted callDuration, converting ms to seconds', async () => {
+       repo.list.mockResolvedValue({
+-        rows: [{ ...baseRow, callDuration: '123' }],
++        rows: [{ ...baseRow, callDuration: '123000' }],
+         total: 1,
+       });
+ 

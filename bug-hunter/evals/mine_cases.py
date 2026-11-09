@@ -510,8 +510,10 @@ def write_candidates(folder: Path, repo: Repo, candidates: list[Candidate]) -> P
     )
     for c in candidates:
         if c.kind == "bug":
-            app_prefix = _prefix_for(repo, c)
-            paths = [f"{app_prefix}/{p}" for p in c.src_files + c.test_files]
+            prefix = "" if c.layout == "root" else _prefix_for(repo, c)
+            paths = [
+                f"{prefix}/{p}" if prefix else p for p in c.src_files + c.test_files
+            ]
             (folder / f"{c.id}.patch").write_text(
                 repo.diff(c.sha, paths), encoding="utf-8"
             )

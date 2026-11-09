@@ -1,0 +1,64 @@
+diff --git a/src/tenant/dto/delete-organization-logo.dto.ts b/src/tenant/dto/delete-organization-logo.dto.ts
+index d5bd2dbfc7..0472f05ff8 100644
+--- a/src/tenant/dto/delete-organization-logo.dto.ts
++++ b/src/tenant/dto/delete-organization-logo.dto.ts
+@@ -9,5 +9,5 @@ export class DeleteLogoDto {
+   })
+   @IsString()
+   @IsNotEmpty()
+-  LogoUrl!: string;
++  logoUrl!: string;
+ }
+diff --git a/src/tenant/service/tenant.service.ts b/src/tenant/service/tenant.service.ts
+index 490469e71b..3e5eb9d83f 100644
+--- a/src/tenant/service/tenant.service.ts
++++ b/src/tenant/service/tenant.service.ts
+@@ -265,13 +265,13 @@ export class TenantService {
+       throw new Error('S3 bucket name for assets bucket is not defined');
+     }
+ 
+-    const LogoUrl = deleteLogoDto.LogoUrl;
++    const logoUrl = deleteLogoDto.logoUrl;
+     const s3LogoUrlPattern =
+       /^https:\/\/[^.]+\.s3\.[^.]+\.amazonaws\.com\/(.+)$/;
+-    const LogoUrlMatch = LogoUrl.match(s3LogoUrlPattern);
+-    const storageKey = LogoUrlMatch ? LogoUrlMatch[1] : null;
++    const logoUrlMatch = logoUrl.match(s3LogoUrlPattern);
++    const storageKey = logoUrlMatch ? logoUrlMatch[1] : null;
+     if (!storageKey) {
+-      this.logger.warn(`Invalid or unrecognized S3 URL: ${LogoUrl}`);
++      this.logger.warn(`Invalid or unrecognized S3 URL: ${logoUrl}`);
+       return { success: false };
+     }
+     if (!storageKey) {
+diff --git a/src/tenant/service/test/tenant.service.spec.ts b/src/tenant/service/test/tenant.service.spec.ts
+index a5a42ba7d0..7d8679960a 100644
+--- a/src/tenant/service/test/tenant.service.spec.ts
++++ b/src/tenant/service/test/tenant.service.spec.ts
+@@ -518,7 +518,7 @@ describe('TenantService', () => {
+       s3Service.deleteObject.mockResolvedValue(undefined as any);
+ 
+       const res = await service.deleteOrganizationLogo({
+-        LogoUrl:
++        logoUrl:
+           'https://test-public-bucket.s3.ap-south-1.amazonaws.com/org-logos/x.png',
+       } as any);
+ 
+@@ -531,7 +531,7 @@ describe('TenantService', () => {
+ 
+     it('should return success false for invalid url', async () => {
+       const res = await service.deleteOrganizationLogo({
+-        LogoUrl: 'not-a-valid-s3-url',
++        logoUrl: 'not-a-valid-s3-url',
+       } as any);
+ 
+       expect(s3Service.deleteObject).not.toHaveBeenCalled();
+@@ -542,7 +542,7 @@ describe('TenantService', () => {
+       s3Service.deleteObject.mockRejectedValue(new Error('S3 error'));
+ 
+       const res = await service.deleteOrganizationLogo({
+-        LogoUrl:
++        logoUrl:
+           'https://test-public-bucket.s3.ap-south-1.amazonaws.com/org-logos/x.png',
+       } as any);
+ 

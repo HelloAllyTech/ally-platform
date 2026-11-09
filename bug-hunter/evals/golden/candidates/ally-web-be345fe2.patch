@@ -1,0 +1,140 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/app-tooltip/AppTooltip.tsx b/apps/ally-helpline-dashboard/src/components/app-tooltip/AppTooltip.tsx
+index 61f98e40f4..3c03cb6531 100644
+--- a/apps/ally-helpline-dashboard/src/components/app-tooltip/AppTooltip.tsx
++++ b/apps/ally-helpline-dashboard/src/components/app-tooltip/AppTooltip.tsx
+@@ -1,4 +1,4 @@
+-import React from "react";
++import React, { useEffect } from "react";
+ 
+ import { Tooltip } from "@ally-ui-mono/ui-shared";
+ import { useGetActiveTooltipsQuery } from "@api";
+@@ -9,7 +9,21 @@ interface AppTooltipProps {
+   children: React.ReactElement;
+ }
+ 
++// RTK Query only honours `refetchOnMountOrArgChange`'s window once a query has
++// fulfilled at least once — with no `fulfilledTimeStamp` to compare against,
++// its mount-time `condition()` check forces a fresh request regardless of the
++// window (see isForcedQuery in @reduxjs/toolkit/query). That is exactly the
++// case that matters here: while getActiveTooltips is persistently failing,
++// every single remount re-hit it with no backoff at all, worse than the
++// bound below implies. Track the last failure across mounts/instances (they
++// all share this one query, since it takes no argument) and skip
++// re-subscribing until the cooldown passes.
++const RETRY_COOLDOWN_MS = 30_000;
++let nextRetryAt = 0;
++
+ const AppTooltip: React.FC<AppTooltipProps> = ({ location, children }) => {
++  const skipRetry = Date.now() < nextRetryAt;
++
+   // Refresh the active-tooltip list so a superadmin toggling a tooltip off (or on)
+   // reaches users without a hard reload — otherwise the list is fetched once and
+   // cached for the whole session (this is a separate RTK cache from the admin app,
+@@ -17,12 +31,23 @@ const AppTooltip: React.FC<AppTooltipProps> = ({ location, children }) => {
+   // this component wraps controls on nearly every routed page, so an unconditional
+   // force-refetch on mount re-hit a failing endpoint on every page navigation with
+   // no backoff (see PracticeStreakHeatmap for the same pattern).
+-  const { data: tooltips = [], isLoading } = useGetActiveTooltipsQuery(undefined, {
++  const {
++    data: tooltips = [],
++    isLoading,
++    isError,
++  } = useGetActiveTooltipsQuery(undefined, {
++    skip: skipRetry,
+     refetchOnMountOrArgChange: 30,
+     refetchOnFocus: true,
+     refetchOnReconnect: true,
+   });
+ 
++  useEffect(() => {
++    if (isError) {
++      nextRetryAt = Date.now() + RETRY_COOLDOWN_MS;
++    }
++  }, [isError]);
++
+   if (isLoading) return children;
+ 
+   const tooltip = tooltips.find(t => t.location === location);
+diff --git a/apps/ally-helpline-dashboard/src/components/app-tooltip/__tests__/AppTooltip.errorLoop.test.tsx b/apps/ally-helpline-dashboard/src/components/app-tooltip/__tests__/AppTooltip.errorLoop.test.tsx
+new file mode 100644
+index 0000000000..0957af38f4
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/components/app-tooltip/__tests__/AppTooltip.errorLoop.test.tsx
+@@ -0,0 +1,77 @@
++import React from "react";
++
++import { render, screen, waitFor } from "@testing-library/react";
++import { describe, it, expect, vi } from "vitest";
++
++import { TooltipLocation } from "@constants";
++
++vi.mock("@constants", () => ({
++  TooltipLocation: { LOGIN_BUTTON: "login_button" },
++}));
++
++// Stands in for the real getActiveTooltips endpoint (see ../../../api/tooltips.ts)
++// with a query that always errors, built with the real `createApi` machinery
++// rather than a mocked hook — so the test exercises RTK Query's actual
++// mount/refetch decision instead of a stand-in for it. Exposes the attempt
++// spy and a Provider so the test below never has to touch RTK Query
++// internals directly.
++vi.mock("@api", async () => {
++  const React = await import("react");
++  const { configureStore } = await import("@reduxjs/toolkit");
++  const { createApi, fakeBaseQuery } = await import("@reduxjs/toolkit/query/react");
++  const { Provider } = await import("react-redux");
++  const { vi: vitestVi } = await import("vitest");
++
++  const attempt = vitestVi.fn(async () => ({ error: { status: 500, data: "boom" } }));
++
++  const testTooltipsApi = createApi({
++    reducerPath: "testTooltipsApi",
++    baseQuery: fakeBaseQuery(),
++    endpoints: (builder: any) => ({
++      getActiveTooltips: builder.query({ queryFn: attempt }),
++    }),
++  });
++
++  const store = configureStore({
++    reducer: { [testTooltipsApi.reducerPath]: testTooltipsApi.reducer },
++    middleware: (getDefaultMiddleware: any) =>
++      getDefaultMiddleware().concat(testTooltipsApi.middleware),
++  });
++
++  return {
++    useGetActiveTooltipsQuery: testTooltipsApi.useGetActiveTooltipsQuery,
++    __attempt: attempt,
++    __TestProvider: ({ children }: { children: React.ReactNode }) =>
++      React.createElement(Provider, { store }, children),
++  };
++});
++
++import * as api from "@api";
++import AppTooltip from "../AppTooltip";
++
++const attempt = (api as any).__attempt as ReturnType<typeof vi.fn>;
++const TestProvider = (api as any).__TestProvider as React.FC<{ children: React.ReactNode }>;
++
++describe("AppTooltip while getActiveTooltips is persistently failing", () => {
++  it("does not re-hit getActiveTooltips on every remount, e.g. on ordinary page navigation", async () => {
++    // Each iteration simulates AppTooltip mounting fresh on a newly routed
++    // page, seconds apart — the scenario telemetry showed hitting the
++    // endpoint 66 times in under 5 minutes.
++    for (let i = 0; i < 5; i++) {
++      const { unmount } = render(
++        <TestProvider>
++          <AppTooltip location={TooltipLocation.LOGIN_BUTTON}>
++            <button>Click me</button>
++          </AppTooltip>
++        </TestProvider>,
++      );
++      await screen.findByText("Click me");
++      await waitFor(() => expect(attempt).toHaveBeenCalled());
++      unmount();
++    }
++
++    // A persistently failing endpoint should be retried on a cooldown, not
++    // once per remount.
++    expect(attempt.mock.calls.length).toBeLessThan(5);
++  });
++});

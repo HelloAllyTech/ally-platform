@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -122,7 +123,12 @@ def repo_config(config: BugHunterConfig, tmp_path: Path):
 
 
 def _options(**over) -> HarnessOptions:
-    base = dict(mode="issue", docker=FakeDocker(), sandbox_factory=FakeSandbox)
+    base = dict(
+        mode="issue",
+        docker=FakeDocker(),
+        sandbox_factory=FakeSandbox,
+        runs_dir=Path(tempfile.mkdtemp(prefix="bh-eval-runs-")),
+    )
     base.update(over)
     return HarnessOptions(**base)
 

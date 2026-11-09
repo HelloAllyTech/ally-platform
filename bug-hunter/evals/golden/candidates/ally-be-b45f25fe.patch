@@ -1,0 +1,113 @@
+diff --git a/src/learn/repository/scenario-session.repository.ts b/src/learn/repository/scenario-session.repository.ts
+index e105ab4554..fa6626d093 100644
+--- a/src/learn/repository/scenario-session.repository.ts
++++ b/src/learn/repository/scenario-session.repository.ts
+@@ -194,6 +194,10 @@ export class ScenarioSessionRepository extends Repository<ScenarioSessions> {
+       )
+       .select('counselor.id', 'id')
+       .addSelect('counselor.name', 'name')
++      // Display names are not unique within a tenant — prod has three separate
++      // accounts called "Sandeep Malhotra" — so the email rides along as the
++      // tiebreaker the picker shows when two options would read identically.
++      .addSelect('counselor.email', 'email')
+       .distinct(true)
+       .orderBy('counselor.name', 'ASC')
+       .getRawMany();
+diff --git a/src/learn/repository/test/scenario-session.repository.spec.ts b/src/learn/repository/test/scenario-session.repository.spec.ts
+index 51c621e370..30648cae65 100644
+--- a/src/learn/repository/test/scenario-session.repository.spec.ts
++++ b/src/learn/repository/test/scenario-session.repository.spec.ts
+@@ -432,7 +432,7 @@ describe('ScenarioSessionRepository', () => {
+ 
+   describe('getAdminScenarioSessionFilterOptions', () => {
+     it('should return the distinct counselors and scenarios of the tenant logs', async () => {
+-      const counselors = [{ id: '1', name: 'Asha' }];
++      const counselors = [{ id: '1', name: 'Asha', email: 'asha@example.com' }];
+       const scenarios = [{ id: '2', title: 'Crisis call', translations: null }];
+       mockQueryBuilder.getRawMany
+         .mockResolvedValueOnce(counselors)
+@@ -457,6 +457,11 @@ describe('ScenarioSessionRepository', () => {
+         'counselor',
+         'counselor.id = scenarioSession.counselorId',
+       );
++      // The email is what lets the picker tell two same-named people apart.
++      expect(mockQueryBuilder.addSelect).toHaveBeenCalledWith(
++        'counselor.email',
++        'email',
++      );
+       expect(mockQueryBuilder.innerJoin).toHaveBeenCalledWith(
+         Scenarios,
+         'scenario',
+diff --git a/src/learn/service/scenario-session.service.ts b/src/learn/service/scenario-session.service.ts
+index 0c8011efb9..cf0ee45e90 100644
+--- a/src/learn/service/scenario-session.service.ts
++++ b/src/learn/service/scenario-session.service.ts
+@@ -382,6 +382,12 @@ export class ScenarioSessionService {
+    * list itself uses, so a filter chip reads identically to the rows it
+    * selects; `translations` is dropped from the payload afterwards, as it is
+    * an authoring detail no client needs.
++   *
++   * Each person carries their email because display names collide in practice:
++   * one production tenant has three distinct accounts named "Sandeep Malhotra"
++   * and two more duplicated names. The client shows the email only for the
++   * names that actually repeat, so the common case stays clean — but it cannot
++   * make that call without something to disambiguate by.
+    */
+   async getAdminScenarioSessionFilterOptions(languageCode?: string) {
+     const { counselors, scenarios } =
+@@ -393,6 +399,7 @@ export class ScenarioSessionService {
+       counselors: counselors.map((counselor: any) => ({
+         id: Number(counselor.id),
+         name: counselor.name,
++        email: counselor.email,
+       })),
+       scenarios: scenarios.map((scenario: any) => ({
+         id: Number(scenario.id),
+diff --git a/src/learn/service/test/scenario-session.service.spec.ts b/src/learn/service/test/scenario-session.service.spec.ts
+index 9da00ffaf0..f1cdaa1897 100644
+--- a/src/learn/service/test/scenario-session.service.spec.ts
++++ b/src/learn/service/test/scenario-session.service.spec.ts
+@@ -995,7 +995,7 @@ describe('ScenarioSessionService', () => {
+     it('should return the counselors and scenarios present in the logs', async () => {
+       scenarioSessionRepository.getAdminScenarioSessionFilterOptions.mockResolvedValue(
+         {
+-          counselors: [{ id: '4', name: 'Asha' }],
++          counselors: [{ id: '4', name: 'Asha', email: 'asha@example.com' }],
+           scenarios: [{ id: '9', title: 'English Title', translations: null }],
+         } as any,
+       );
+@@ -1003,7 +1003,7 @@ describe('ScenarioSessionService', () => {
+       const result = await service.getAdminScenarioSessionFilterOptions();
+ 
+       expect(result).toEqual({
+-        counselors: [{ id: 4, name: 'Asha' }],
++        counselors: [{ id: 4, name: 'Asha', email: 'asha@example.com' }],
+         scenarios: [{ id: 9, title: 'English Title' }],
+       });
+       expect(
+@@ -1048,6 +1048,25 @@ describe('ScenarioSessionService', () => {
+ 
+       expect(result.scenarios).toEqual([{ id: 9, title: 'English Title' }]);
+     });
++
++    it('should keep same-named people as separate options carrying their own email', async () => {
++      scenarioSessionRepository.getAdminScenarioSessionFilterOptions.mockResolvedValue(
++        {
++          counselors: [
++            { id: '99', name: 'Shubham Bhoite', email: 'a@example.com' },
++            { id: '123', name: 'Shubham Bhoite', email: 'b@example.com' },
++          ],
++          scenarios: [],
++        } as any,
++      );
++
++      const result = await service.getAdminScenarioSessionFilterOptions();
++
++      expect(result.counselors).toEqual([
++        { id: 99, name: 'Shubham Bhoite', email: 'a@example.com' },
++        { id: 123, name: 'Shubham Bhoite', email: 'b@example.com' },
++      ]);
++    });
+   });
+ 
+   describe('getScenarioSession', () => {

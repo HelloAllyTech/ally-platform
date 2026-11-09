@@ -1,0 +1,119 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ProductRoadmap.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ProductRoadmap.tsx
+index 3a56b63f0a..04416ff183 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ProductRoadmap.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ProductRoadmap.tsx
+@@ -53,6 +53,7 @@ import { SavedViewTabs } from "./SavedViewTabs";
+ import { SplitOpportunityModal } from "./SplitOpportunityModal";
+ import { useProductRoadmapRealtime } from "./useProductRoadmapRealtime";
+ import { useSavedViews } from "./useSavedViews";
++import { canManageRoadmap } from "./utils/access";
+ import { seedForHandle } from "./utils/builder";
+ import { EMPTY_ADVANCED_FILTERS, RoadmapAdvancedFilterValues } from "./utils/filters";
+ import { monthKeyOf, shiftMonthKey } from "./utils/monthBoard";
+@@ -137,10 +138,11 @@ enum RoadmapTab {
+  *   VIEW  — reach the tab and read everything. The route gate.
+  *   VOTE  — file an opportunity, cast votes, comment, keep saved views.
+  *   EDIT  — manage: stages, editing/deleting anyone's opportunity, taxonomy, split/merge,
+- *           release notes, pinning views.
+- * A SUPER_ADMIN holds VIEW + VOTE; only a SUPER_DUPER_ADMIN holds EDIT. Every manage affordance
+- * below is hidden behind `canManage` — and the backend rejects it independently, so hiding it is
+- * a courtesy rather than the enforcement.
++ *           month-board lane moves, opening a Builder session, pinning views.
++ * VIEW and VOTE come from the permission set every platform admin carries. EDIT is the
++ * permission AND the `product_roadmap_manage` feature toggle — see `canManage` below. Every
++ * manage affordance is hidden behind that flag, and the backend rejects it independently, so
++ * hiding it is a courtesy rather than the enforcement.
+  *
+  * URL is the state store for what should survive a refresh or a shared link:
+  *   ?tab=<id>          selects the top-level tab
+@@ -148,10 +150,14 @@ enum RoadmapTab {
+  */
+ export const ProductRoadmap: React.FC = () => {
+   const [searchParams, setSearchParams] = useSearchParams();
+-  const { permissions, user } = useUser();
++  const { permissions, features, user } = useUser();
+ 
+   const canVote = !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP);
+-  const canManage = !!permissions?.includes(Permissions.EDIT_PRODUCT_ROADMAP);
++  /**
++   * The permission AND the `product_roadmap_manage` toggle — see canManageRoadmap for why the
++   * permission alone stopped meaning anything, and for the fail-closed rule.
++   */
++  const canManage = canManageRoadmap(permissions, features);
+   /**
+    * Whether the Bugs tab exists for this reader.
+    *
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/access.test.ts b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/access.test.ts
+new file mode 100644
+index 0000000000..cc95ba8e49
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/access.test.ts
+@@ -0,0 +1,33 @@
++import { describe, expect, it } from "vitest";
++
++import { FeatureToggleKey, Permissions } from "@constants";
++
++import { canManageRoadmap } from "../utils/access";
++
++const EDIT = Permissions.EDIT_PRODUCT_ROADMAP;
++const TOGGLE = FeatureToggleKey.PRODUCT_ROADMAP_MANAGE;
++
++describe("canManageRoadmap", () => {
++  it("manages with both the permission and the toggle", () => {
++    expect(canManageRoadmap([EDIT], [TOGGLE])).toBe(true);
++  });
++
++  it("does NOT manage on the permission alone", () => {
++    // The case that matters: post role-collapse every platform admin holds EDIT_PRODUCT_ROADMAP,
++    // so the toggle is the whole distinction and the permission proves nothing on its own.
++    expect(canManageRoadmap([EDIT], ["bug_hunter"])).toBe(false);
++  });
++
++  it("does NOT manage on the toggle alone", () => {
++    expect(canManageRoadmap([Permissions.VOTE_PRODUCT_ROADMAP], [TOGGLE])).toBe(false);
++  });
++
++  it("fails closed when toggles could not be loaded", () => {
++    expect(canManageRoadmap([EDIT], [])).toBe(false);
++    expect(canManageRoadmap([EDIT], undefined)).toBe(false);
++  });
++
++  it("fails closed when permissions have not arrived yet", () => {
++    expect(canManageRoadmap(undefined, [TOGGLE])).toBe(false);
++  });
++});
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/utils/access.ts b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/utils/access.ts
+new file mode 100644
+index 0000000000..42600021e3
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/utils/access.ts
+@@ -0,0 +1,29 @@
++import { FeatureToggleKey, Permissions } from "@constants";
++import { hasFeature } from "@utils";
++
++/**
++ * Whether this reader gets the roadmap's manage affordances: stage transitions, editing or
++ * deleting anyone's opportunity, the goal taxonomy, split/merge, month-board lane moves, opening
++ * a Builder session, pinning a view for everyone.
++ *
++ * BOTH halves, in the order ally-be checks them. Every manage endpoint carries
++ * `@RequireFeatureToggle(PRODUCT_ROADMAP_MANAGE, { permissions: [EDIT_PRODUCT_ROADMAP] })` — the
++ * permission AND the per-user toggle, never either.
++ *
++ * The permission on its own stopped separating anyone at the role collapse
++ * (CreatePlatformAdminRole1895000000001): PLATFORM_ADMIN carries what SUPER_DUPER_ADMIN used to,
++ * so EDIT_PRODUCT_ROADMAP now sits on every platform admin and the toggle is the entire
++ * distinction. Checking only the permission showed every manage control to every admin and let a
++ * 403 be the first news of it.
++ *
++ * Extracted rather than inlined for the same reason as seedForHandle: it is one `&&`, and it is
++ * the only thing between a read-only admin and a board full of buttons that answer 403.
++ */
++export const canManageRoadmap = (
++  permissions: string[] | undefined,
++  features: string[] | undefined,
++): boolean =>
++  !!permissions?.includes(Permissions.EDIT_PRODUCT_ROADMAP) &&
++  // Empty when the toggle fetch failed (see useUser) — so this fails closed to a read-only
++  // board rather than open to controls that cannot work.
++  hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP_MANAGE);

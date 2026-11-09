@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -134,6 +135,36 @@ def test_pause_keeps_resume_info(repo_config, tmp_path: Path) -> None:
     assert result["deleted"] == ["r3"]
 
 
+def test_clean_orphans_skips_runs_whose_owner_is_alive(
+    repo_config, tmp_path: Path
+) -> None:
+    runs = tmp_path / "runs"
+    run = Run.start(
+        repo_config,
+        "ally-be",
+        "HEAD",
+        run_id="live",
+        runs_dir=runs,
+        docker=FakeDocker(),
+    )
+    run._restore_sigterm()
+    # pretend another live process owns it
+    (runs / "live" / "owner.json").write_text(
+        json.dumps({"pid": os.getpid() + 0, "started_at": "x"})
+    )
+    import bug_hunter.runs as runs_module
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(runs_module.os, "getpid", lambda: -1)
+    try:
+        removed = clean_orphans(repo_config, runs_dir=runs, docker=FakeDocker())
+    finally:
+        monkey.undo()
+    assert removed["runs"] == [] and removed["skipped_live"] == ["live"]
+    assert (runs / "live" / "worktree").exists()
+    run.finish()
+
+
 def test_clean_orphans_sweeps_crashed_runs(repo_config, tmp_path: Path) -> None:
     runs = tmp_path / "runs"
     # simulate a crash: a live run dir with a worktree and artefacts, no status
@@ -174,8 +205,6 @@ def test_clean_artefacts_by_age_then_size(repo_config, tmp_path: Path) -> None:
         (folder / "status.json").write_text(json.dumps({"status": "completed"}))
         (folder / "blob").write_bytes(b"x" * size)
         stamp = now - age_days * 86400
-        import os
-
         os.utime(folder, (stamp, stamp))
     result = clean_artefacts(
         repo_config, artefacts_dir=artefacts, max_age_days=30, max_size_mb=3, now=now

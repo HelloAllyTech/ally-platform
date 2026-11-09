@@ -62,6 +62,7 @@ class HarnessOptions:
     oracle_check: bool = False
     dry_run: bool = False
     min_free_gb: float | None = None
+    runs_dir: Path = RUNS_DIR  # tests pass a temp dir; never share the live one
     docker: DockerRunner = subprocess_docker
     sandbox_factory: Callable[..., Sandbox] | None = None  # tests inject a fake
 
@@ -161,7 +162,7 @@ def run_case(
             error=f"not runnable in the sandbox: {why}",
         )
     with Run.start(
-        config, case.app, ref, runs_dir=RUNS_DIR, docker=options.docker
+        config, case.app, ref, runs_dir=options.runs_dir, docker=options.docker
     ) as run:
         result_row = CaseResult(
             case.id, case.app, case.kind, case.expected, "error", run_id=run.run_id
@@ -396,6 +397,11 @@ def run_evals(
         "stopped_reason": None,
         "free_gb_start": guard.free_gb(),
     }
+    if not options.oracle_check:
+        skipped = [c.id for c in cases if options.mode not in c.modes]
+        cases = [c for c in cases if options.mode in c.modes]
+        meta["cases"] = len(cases)
+        meta["skipped_for_mode"] = skipped
     report = Report(meta=meta)
     if options.dry_run:
         meta["plan"] = plan(config, cases)

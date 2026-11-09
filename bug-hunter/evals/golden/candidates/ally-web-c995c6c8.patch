@@ -1,0 +1,177 @@
+diff --git a/apps/ally-helpline-dashboard/src/api/reviews.ts b/apps/ally-helpline-dashboard/src/api/reviews.ts
+index fa9f5a9118..7f3809550b 100644
+--- a/apps/ally-helpline-dashboard/src/api/reviews.ts
++++ b/apps/ally-helpline-dashboard/src/api/reviews.ts
+@@ -35,6 +35,7 @@ const reviewsAPI = baseAPI.injectEndpoints({
+         url: ApiEndpoints.REVIEWS.GET_REVIEW_BY_ID(id),
+         method: HttpMethod.GET,
+       }),
++      forceRefetch: () => true,
+       providesTags: [TAG_TYPES.REVIEW],
+     }),
+     /**
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index 122068e185..35aaf748de 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -46,6 +46,7 @@ interface CommentCardProps {
+   onToggleHide?: (hidden: boolean, id: string) => void;
+   updateReplyCount?: (replyCount: number) => void;
+   isReply?: boolean;
++  onCommentChange?: (comment: CommentItem) => void;
+ }
+ const CommentCard = ({
+   comment,
+@@ -62,6 +63,7 @@ const CommentCard = ({
+   onToggleHide,
+   updateReplyCount,
+   isReply = false,
++  onCommentChange,
+ }: CommentCardProps) => {
+   const user = useSelector((state: RootState) => state.user.user);
+   const [createComment, { data: createCommentData }] = useCreateCommentMutation();
+@@ -100,7 +102,7 @@ const CommentCard = ({
+   useEffect(() => {
+     setReplyCount(comment?.replyCount || 0);
+     updateReplyCount?.(comment?.replyCount || 0);
+-  }, [comment?.replyCount]);
++  }, [comment?.replyCount, comment?.id]);
+ 
+   useEffect(() => {
+     if (commentThreadScrollRef?.current) {
+@@ -195,19 +197,33 @@ const CommentCard = ({
+     try {
+       let action: ReactionsType;
+       let nextEmoji = selectedEmoji;
++      const reactions = { ...(comment.reactions || {}) };
+ 
+       if (selectedEmoji === emoji) {
+         action = ReactionsType.REMOVE;
++        reactions[selectedEmoji] = (reactions[selectedEmoji] || 0) - 1;
+         nextEmoji = "";
+       } else if (selectedEmoji) {
+         action = ReactionsType.UPDATE;
++        if (reactions[selectedEmoji] === 1) {
++          delete reactions[selectedEmoji];
++        } else {
++          reactions[selectedEmoji] = (reactions[selectedEmoji] || 0) - 1;
++        }
++        if (reactions[emoji]) {
++          reactions[emoji] = (reactions[emoji] || 0) + 1;
++        } else {
++          reactions[emoji] = 1;
++        }
+         nextEmoji = emoji;
+       } else {
+         action = ReactionsType.ADD;
++        reactions[emoji] = (reactions[emoji] || 0) + 1;
+         nextEmoji = emoji;
+       }
+ 
+       await sendReaction(emoji, action);
++      onCommentChange?.({ ...comment, myReaction: nextEmoji, reactions });
+       setSelectedEmoji(nextEmoji);
+       setShowEmojiPicker(false);
+     } catch (error) {
+@@ -215,6 +231,9 @@ const CommentCard = ({
+     }
+   };
+ 
++  const onEachReplyChange = (reply: CommentItem) => {
++    setReplies(prev => prev.map(r => (r.id === reply.id ? reply : r)));
++  };
+   const handleCancelReply = () => {
+     setReplyText("");
+     setShowReplyInput(false);
+@@ -584,6 +603,7 @@ const CommentCard = ({
+                         onUpdateComment={handleUpdateReply}
+                         onToggleHide={handleToggleHide}
+                         isReply
++                        onCommentChange={onEachReplyChange}
+                       />
+                     ))}
+                   </InfiniteScroll>
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+index 90024412e4..d6132af2ea 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+@@ -177,6 +177,14 @@ const CommentThread = ({
+       return newComments;
+     });
+   };
++
++  const onEachCommentChange = (comment: CommentItem) => {
++    setComments?.(prev => {
++      const newComments = prev.map(c => (c.id === comment.id ? comment : c));
++      onCommentChange?.(newComments, id);
++      return newComments;
++    });
++  };
+   return (
+     <div className="bg-white rounded-lg p-4 shadow-lg border w-[400px]">
+       <div className="text-base font-medium border-b-[0.5px] pb-2 border-border-light">
+@@ -208,6 +216,7 @@ const CommentThread = ({
+                 onDelete={handleDeleteComment}
+                 onUpdateComment={onUpdateComment}
+                 updateReplyCount={count => updateReplyCount(count, comment.id)}
++                onCommentChange={onEachCommentChange}
+               />
+             ))}
+           </InfiniteScroll>
+diff --git a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+index 8064bb56fd..2e31eb9e33 100644
+--- a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+@@ -1,6 +1,6 @@
+ import { useEffect, useMemo, useRef, useState } from "react";
+ 
+-import { useSelector } from "react-redux";
++import { useDispatch, useSelector } from "react-redux";
+ import { useNavigate, useParams } from "react-router-dom";
+ import { toast } from "sonner";
+ 
+@@ -20,7 +20,8 @@ import {
+   Transcription,
+   NativeEmoji,
+ } from "@components";
+-import { KeyboardKeys, REVIEW_PRIVACY_OPTIONS } from "@constants";
++import { KeyboardKeys, REVIEW_PRIVACY_OPTIONS, TAG_TYPES } from "@constants";
++import { baseAPI } from "@src/api/baseAPI";
+ import { RootState } from "@store";
+ import { CommentItem, ReactionsType, SimulationTranscriptMessage, Thread } from "@types";
+ import { getFormattedDateTime, getFormattedTimeFromDuration } from "@utils";
+@@ -31,6 +32,7 @@ export const ReviewDetails = () => {
+   const { reviewId } = useParams<{ reviewId: string }>();
+   const { user } = useSelector((state: RootState) => state.user);
+   const navigate = useNavigate();
++  const dispatch = useDispatch();
+   const [transcriptOffset, setTranscriptOffset] = useState(0);
+   const [commentsCount, setCommentsCount] = useState(0);
+   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+@@ -61,6 +63,12 @@ export const ReviewDetails = () => {
+     });
+   const [addReactions] = useAddReactionMutation();
+   const [updateReview, { isLoading: isUpdateReviewLoading }] = useUpdateReviewMutation();
++
++  useEffect(() => {
++    return () => {
++      dispatch(baseAPI.util.invalidateTags([TAG_TYPES.REVIEW]));
++    };
++  }, []);
+   useEffect(() => {
+     setTranscriptList([]);
+     setTranscriptOffset(0);
+diff --git a/apps/ally-helpline-dashboard/src/routes/__tests__/PrivateRouteLayout.test.tsx b/apps/ally-helpline-dashboard/src/routes/__tests__/PrivateRouteLayout.test.tsx
+index 51e53a90dc..40189c4b77 100644
+--- a/apps/ally-helpline-dashboard/src/routes/__tests__/PrivateRouteLayout.test.tsx
++++ b/apps/ally-helpline-dashboard/src/routes/__tests__/PrivateRouteLayout.test.tsx
+@@ -115,6 +115,9 @@ vi.mock("@constants", () => ({
+     SIMULATION_SUMMARY_FULL: "/simulation-summary/:sessionId",
+     REVIEW: "/review",
+   },
++  TAG_TYPES: {
++    REVIEW: "REVIEW",
++  },
+ }));
+ 
+ // Mock types

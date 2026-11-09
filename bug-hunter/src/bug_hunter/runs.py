@@ -34,6 +34,7 @@ from bug_hunter.tools.git import Git, GitError
 from bug_hunter.tools.sandbox import DockerRunner, Sandbox, subprocess_docker
 
 STATUS_FILE = "status.json"
+OWNER_FILE = "owner.json"  # pid of the process running a live run
 RESUME_FILE = "resume.json"
 PAUSED = "paused"
 
@@ -113,6 +114,9 @@ class Run:
         )
         run.git = Git(config.repo_root)
         run.dir.mkdir(parents=True, exist_ok=False)
+        (run.dir / OWNER_FILE).write_text(
+            json.dumps({"pid": os.getpid(), "started_at": run.started_at})
+        )
         run.artefacts.mkdir()
         try:
             run.worktree = run.git.create_worktree(runs_dir, run.run_id, ref)
@@ -230,11 +234,15 @@ def clean_orphans(
     """Remove what a crashed run left behind: live run dirs (artefacts are kept
     first), stale git worktrees and ``bughunter-*`` containers."""
     removed: dict[str, list[str]] = {"runs": [], "worktrees": [], "containers": []}
+    skipped_live: list[str] = []
     git = Git(config.repo_root, git_runner) if git_runner else Git(config.repo_root)
     if runs_dir.is_dir():
         for entry in sorted(runs_dir.iterdir()):
             if not entry.is_dir() or entry.name in ("artefacts", "cache"):
                 continue
+            if _owner_alive(entry):
+                skipped_live.append(entry.name)
+                continue  # another process is still running this one
             worktree = entry / "worktree"
             if worktree.exists():
                 try:
@@ -261,6 +269,7 @@ def clean_orphans(
                         )
             shutil.rmtree(entry, ignore_errors=True)
             removed["runs"].append(entry.name)
+    removed["skipped_live"] = skipped_live
     try:
         git._git(["worktree", "prune"])
     except GitError:
@@ -276,6 +285,23 @@ def clean_orphans(
     except Exception:  # noqa: BLE001 - no docker is fine
         pass
     return removed
+
+
+def _owner_alive(run_dir: Path) -> bool:
+    """True if the run's owner process still exists (so it is not an orphan)."""
+    try:
+        pid = int(json.loads((run_dir / OWNER_FILE).read_text())["pid"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    if pid == os.getpid():
+        return False  # our own leftovers are ours to clean
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 def _status_of(kept: Path) -> dict[str, Any]:

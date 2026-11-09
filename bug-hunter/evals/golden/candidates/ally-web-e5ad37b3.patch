@@ -1,0 +1,215 @@
+diff --git a/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx b/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx
+index ebce390d8f..765fa26be2 100644
+--- a/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx
++++ b/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/AutoTerminationRuleField.tsx
+@@ -43,7 +43,7 @@ export const AutoTerminationRuleField: React.FC<AutoTerminationRuleFieldProps> =
+ 
+   const { setValue, watch } = formMethods;
+ 
+-  const watchedRules = watch(TERMINATION_RULES_FIELD) || [createEmptyRule()];
++  const watchedRules = watch(TERMINATION_RULES_FIELD) || [];
+ 
+   const { data: sessionEventsData } = useGetSessionEventsQuery({
+     offset: DEFAULT_OFFSET,
+diff --git a/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx b/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
+index 2ac71648a8..d47e4f3220 100644
+--- a/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/auto-termination-rule-field/__tests__/AutoTerminationRuleField.test.tsx
+@@ -177,7 +177,7 @@ describe("AutoTerminationRuleField", () => {
+       expect(screen.queryByText("Auto Termination Rules")).not.toBeInTheDocument();
+     });
+ 
+-    it("displays one rule card by default", () => {
++    it("displays no rule cards by default when terminationEvents is empty", () => {
+       mockUseGetSessionEventsQuery.mockReturnValue({
+         data: { data: [] },
+       });
+@@ -190,8 +190,9 @@ describe("AutoTerminationRuleField", () => {
+         </TestWrapper>,
+       );
+ 
+-      const dropdowns = screen.getAllByTestId("custom-dropdown");
+-      expect(dropdowns).toHaveLength(1);
++      const dropdowns = screen.queryAllByTestId("custom-dropdown");
++      expect(dropdowns).toHaveLength(0);
++      expect(screen.getByText("Add Rule")).toBeInTheDocument();
+     });
+   });
+ 
+@@ -214,7 +215,7 @@ describe("AutoTerminationRuleField", () => {
+       });
+     });
+ 
+-    it("displays event options from API response", () => {
++    it("displays event options from API response when a rule exists", () => {
+       const mockEvents = [
+         { id: "event-1", name: "Event One" },
+         { id: "event-2", name: "Event Two" },
+@@ -225,8 +226,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: mockEvents },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -238,13 +243,17 @@ describe("AutoTerminationRuleField", () => {
+       expect(screen.getByText("Event Three")).toBeInTheDocument();
+     });
+ 
+-    it("handles empty API response", () => {
++    it("handles empty API response when a rule exists", () => {
+       mockUseGetSessionEventsQuery.mockReturnValue({
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -253,13 +262,17 @@ describe("AutoTerminationRuleField", () => {
+       expect(select).toBeInTheDocument();
+     });
+ 
+-    it("handles undefined API response", () => {
++    it("handles undefined API response when a rule exists", () => {
+       mockUseGetSessionEventsQuery.mockReturnValue({
+         data: undefined,
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -275,8 +288,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -298,8 +315,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -452,8 +473,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: mockEvents },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -584,8 +609,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -599,8 +628,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: [] },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+@@ -685,8 +718,9 @@ describe("AutoTerminationRuleField", () => {
+         </TestWrapper>,
+       );
+ 
+-      // Should render with default empty rule
+-      expect(screen.getByTestId("custom-dropdown")).toBeInTheDocument();
++      // Should render with no rules, only the add button
++      expect(screen.queryByTestId("custom-dropdown")).not.toBeInTheDocument();
++      expect(screen.getByText("Add Rule")).toBeInTheDocument();
+     });
+ 
+     it("handles events with missing id or name fields", () => {
+@@ -700,8 +734,12 @@ describe("AutoTerminationRuleField", () => {
+         data: { data: mockEvents },
+       });
+ 
++      const defaultValues = {
++        terminationEvents: [{ id: "", message: "", name: "" }],
++      };
++
+       render(
+-        <TestWrapper>
++        <TestWrapper defaultValues={defaultValues}>
+           {(formMethods: any) => <AutoTerminationRuleField formMethods={formMethods} />}
+         </TestWrapper>,
+       );
+diff --git a/apps/ally-helpline-dashboard/src/pages/auth/Login.tsx b/apps/ally-helpline-dashboard/src/pages/auth/Login.tsx
+index 10d3303772..0dd8693e74 100644
+--- a/apps/ally-helpline-dashboard/src/pages/auth/Login.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/auth/Login.tsx
+@@ -199,6 +199,13 @@ export const Login: FunctionComponent = () => {
+         accessTokenRef.current = response?.data.accessToken;
+         refreshTokenRef.current = response?.data.refreshToken;
+         setIsOpenTermsAndAgreement(true);
++      } else if (response?.error) {
++        const error = response.error as FetchBaseQueryError;
++        const errorData = error.data as { message: string } | undefined;
++        if (errorData?.message?.toLowerCase() === User.USER_SUSPENDED) {
++          navigate(ROUTES.SUSPENDED_USER);
++          return;
++        }
+       } else {
+         // Avoid showing error because of security reasons
+       }

@@ -1,0 +1,177 @@
+diff --git a/src/builder/service/builder-pull-request.service.ts b/src/builder/service/builder-pull-request.service.ts
+index 2a1dfd0b40..85781d53bd 100644
+--- a/src/builder/service/builder-pull-request.service.ts
++++ b/src/builder/service/builder-pull-request.service.ts
+@@ -419,6 +419,7 @@ export class BuilderPullRequestService {
+     // the review cap stops a second review, and nothing else looked again.
+     await this.considerApproval(pullRequest, { remote, rollup });
+     await this.considerMergePrompt(pullRequest, remote);
++    await this.clearStaleSessionError(pullRequest.sessionId);
+   }
+ 
+   /**
+@@ -436,6 +437,52 @@ export class BuilderPullRequestService {
+    * Nothing outstanding, because a clean mergeable state says nothing about a
+    * finding a fix run has not finished with — the diff is about to change.
+    */
++  /**
++   * Drop a session-level error that the pull requests have since disproved.
++   *
++   * `settleRun` writes a failed run's error onto the run AND onto the session,
++   * and only a new dispatch clears the session copy. That is fine while runs
++   * keep coming. It is not fine when they cannot: a session that is over budget,
++   * or parked on a question, or blocked on a dead credential, has no next
++   * dispatch — so the banner stays forever.
++   *
++   * Which would be merely untidy if the text were vague. It is not. The gate
++   * error says "nothing proves the change works", and it sits above pull
++   * requests whose every required check is green. The page is telling the
++   * reader the opposite of what the evidence says, and pointing at the wrong
++   * thing to go and fix.
++   *
++   * So the claim is re-tested against the evidence rather than left standing:
++   * every open pull request green, nothing actionable outstanding, and the
++   * session's headline error has been overtaken by events.
++   *
++   * Only the error. The status is a separate question — a parked run or a spent
++   * budget still means this session is not finished, and saying otherwise would
++   * trade one false statement for another.
++   */
++  private async clearStaleSessionError(sessionId: string): Promise<void> {
++    const session = await this.sessionRepository.findOne({
++      where: { id: sessionId },
++    });
++    if (!session?.error) return;
++
++    const pullRequests = await this.repository.listBySession(sessionId);
++    const live = pullRequests.filter(
++      (row) => !row.merged && row.state !== 'closed',
++    );
++    if (!live.length) return;
++    if (!live.every((row) => row.ciStatus === 'success')) return;
++
++    for (const row of live) {
++      if (await this.feedbackRepository.countActionable(row.id)) return;
++    }
++
++    await this.sessionRepository.update({ id: sessionId }, { error: null });
++    this.logger.info(
++      `Cleared a stale error on session ${sessionId}: every open pull request is green.`,
++    );
++  }
++
+   private async considerMergePrompt(
+     pullRequest: BuilderPullRequest,
+     remote: { state: string; merged: boolean; mergeableState: string | null },
+diff --git a/src/builder/service/test/builder-pull-request.service.spec.ts b/src/builder/service/test/builder-pull-request.service.spec.ts
+index eef0b878b8..40ab857e34 100644
+--- a/src/builder/service/test/builder-pull-request.service.spec.ts
++++ b/src/builder/service/test/builder-pull-request.service.spec.ts
+@@ -1873,3 +1873,107 @@ describe('BuilderPullRequestService — carrying a review across our own update'
+     expect(github.approvePullRequest).toHaveBeenCalled();
+   });
+ });
++
++/**
++ * The banner that would not go away.
++ *
++ * `settleRun` writes a failed run's error onto the run AND the session, and only
++ * a new dispatch clears the session copy. Fine while runs keep coming; not fine
++ * when they cannot. A session over budget, parked on a question, or blocked on a
++ * dead credential has no next dispatch, so the banner stays forever.
++ *
++ * Which would be untidy if the text were vague. It is not: the gate error says
++ * "nothing proves the change works" while sitting above pull requests whose
++ * every required check is green. The page states the opposite of the evidence.
++ */
++describe('BuilderPullRequestService — clearing an error the PRs disproved', () => {
++  let service: any;
++  let sessionRepository: any;
++  let repository: any;
++  let feedbackRepository: any;
++
++  const green = (over: Record<string, any> = {}) => ({
++    id: 'pr-1',
++    merged: false,
++    state: 'open',
++    ciStatus: 'success',
++    ...over,
++  });
++
++  beforeEach(() => {
++    sessionRepository = {
++      findOne: jest.fn().mockResolvedValue({ id: 's-1', error: 'gate failed' }),
++      update: jest.fn(),
++    };
++    repository = { listBySession: jest.fn().mockResolvedValue([green()]) };
++    feedbackRepository = { countActionable: jest.fn().mockResolvedValue(0) };
++
++    service = Object.create(BuilderPullRequestService.prototype);
++    Object.assign(service, {
++      sessionRepository,
++      repository,
++      feedbackRepository,
++      logger: { info: jest.fn(), warn: jest.fn() },
++    });
++  });
++
++  it('clears it once every open pull request is green', async () => {
++    await service.clearStaleSessionError('s-1');
++
++    expect(sessionRepository.update).toHaveBeenCalledWith(
++      { id: 's-1' },
++      { error: null },
++    );
++  });
++
++  it('leaves it alone while a pull request is red', async () => {
++    repository.listBySession.mockResolvedValue([
++      green(),
++      green({ id: 'pr-2', ciStatus: 'failure' }),
++    ]);
++
++    await service.clearStaleSessionError('s-1');
++
++    expect(sessionRepository.update).not.toHaveBeenCalled();
++  });
++
++  /** Unread checks are not passed checks. */
++  it('leaves it alone when a pull request has no CI verdict yet', async () => {
++    repository.listBySession.mockResolvedValue([green({ ciStatus: null })]);
++
++    await service.clearStaleSessionError('s-1');
++
++    expect(sessionRepository.update).not.toHaveBeenCalled();
++  });
++
++  it('leaves it alone while there is feedback still to act on', async () => {
++    feedbackRepository.countActionable.mockResolvedValue(1);
++
++    await service.clearStaleSessionError('s-1');
++
++    expect(sessionRepository.update).not.toHaveBeenCalled();
++  });
++
++  /**
++   * A session whose pull requests are all merged or closed has no open evidence
++   * either way, and its last error is the only account of what happened.
++   */
++  it('leaves it alone when nothing is open', async () => {
++    repository.listBySession.mockResolvedValue([
++      green({ merged: true, state: 'closed' }),
++    ]);
++
++    await service.clearStaleSessionError('s-1');
++
++    expect(sessionRepository.update).not.toHaveBeenCalled();
++  });
++
++  it('does no work on a session that has no error', async () => {
++    sessionRepository.findOne.mockResolvedValue({ id: 's-1', error: null });
++
++    await service.clearStaleSessionError('s-1');
++
++    expect(repository.listBySession).not.toHaveBeenCalled();
++    expect(sessionRepository.update).not.toHaveBeenCalled();
++  });
++});

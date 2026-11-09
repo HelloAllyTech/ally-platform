@@ -1,0 +1,33 @@
+diff --git a/apps/ally-admin-dashboard/src/components/builder/RaiseBudgetDialog.tsx b/apps/ally-admin-dashboard/src/components/builder/RaiseBudgetDialog.tsx
+index 7a66775496..85785415ce 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/RaiseBudgetDialog.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/RaiseBudgetDialog.tsx
+@@ -66,6 +66,7 @@ export const RaiseBudgetDialog: React.FC<RaiseBudgetDialogProps> = ({
+   }, [isOpen, budget.spentUsd, budget.budgetUsd]);
+ 
+   const handleSubmit = async () => {
++    if (!value.trim()) return;
+     const parsed = Number(value);
+     if (!Number.isFinite(parsed) || parsed < 0) return;
+ 
+diff --git a/apps/ally-admin-dashboard/src/components/builder/__tests__/RaiseBudgetDialog.test.tsx b/apps/ally-admin-dashboard/src/components/builder/__tests__/RaiseBudgetDialog.test.tsx
+index d0822aef74..20ed724b6e 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/__tests__/RaiseBudgetDialog.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/__tests__/RaiseBudgetDialog.test.tsx
+@@ -117,6 +117,16 @@ describe("RaiseBudgetDialog", () => {
+     await vi.waitFor(() => expect(success).toHaveBeenCalledWith("Budget raised."));
+   });
+ 
++  it("does not submit a zero-budget removal when the field is cleared", async () => {
++    render(<RaiseBudgetDialog {...baseProps} />);
++
++    fireEvent.change(screen.getByRole("textbox"), { target: { value: "" } });
++    fireEvent.click(screen.getByRole("button", { name: "Raise and continue" }));
++
++    await new Promise(resolve => setTimeout(resolve, 0));
++    expect(raiseBudget).not.toHaveBeenCalled();
++  });
++
+   it("surfaces the server's own refusal, which names the figure it wanted", async () => {
+     raiseBudget.mockReturnValue({
+       unwrap: () =>

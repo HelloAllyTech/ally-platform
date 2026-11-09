@@ -1,0 +1,188 @@
+diff --git a/src/language/repository/languages.repository.ts b/src/language/repository/languages.repository.ts
+index 28d40bf3f6..df63f44c72 100644
+--- a/src/language/repository/languages.repository.ts
++++ b/src/language/repository/languages.repository.ts
+@@ -20,6 +20,10 @@ export class LanguagesRepository extends Repository<Languages> {
+     return this.findOne({ where: { translationCode: languageCode } });
+   }
+ 
++  getLanguageByValue(value: string): Promise<Languages | null> {
++    return this.findOne({ where: { value } });
++  }
++
+   getLanguages(
+     searchName?: string,
+     options?: Pagination,
+diff --git a/src/language/service/shared-language.service.ts b/src/language/service/shared-language.service.ts
+index 86f1922393..b0b01bfb4a 100644
+--- a/src/language/service/shared-language.service.ts
++++ b/src/language/service/shared-language.service.ts
+@@ -41,6 +41,10 @@ export class SharedLanguageService {
+     return this.languagesRepository.getLanguageByLanguageCode(languageCode);
+   }
+ 
++  async getLanguageByValue(value: string): Promise<Languages | null> {
++    return this.languagesRepository.getLanguageByValue(value);
++  }
++
+   async getValidLanguageCodes(languageIds: number[]) {
+     const { languages } = await this.getValidLanguages(languageIds);
+ 
+diff --git a/src/learn/service/scenario-shared.service.ts b/src/learn/service/scenario-shared.service.ts
+index c01090eaac..f7ed94d1c2 100644
+--- a/src/learn/service/scenario-shared.service.ts
++++ b/src/learn/service/scenario-shared.service.ts
+@@ -28,6 +28,7 @@ import {
+   ScenarioDifficultyLevel,
+ } from '../type/scenario.type';
+ import { LanguageCode } from '../type/scenario-language-voice.type';
++import { LanguageCode as LanguageValueCode } from '../enum/scenario-language';
+ import { SessionEvents } from 'src/session-event/entity/session-events.entity';
+ import { ScenarioVoices } from '../entity/scenario-voices.entity';
+ import { ScenarioVoicesRepository } from '../repository/scenario-voices.repository';
+@@ -36,7 +37,6 @@ import { extractEventIds } from 'src/session-event/util/session-event.util';
+ import { MAX_COMBINATION_EVENT_DEPTH } from 'src/session-event/constants/event.constant';
+ import { SharedLanguageService } from 'src/language/service/shared-language.service';
+ import { DEFAULT_LANGUAGE_CODE } from 'src/language/constants/language.constant';
+-import { DEFAULT_LANGUAGE_TRANSLATION_CODE } from '../constants/scenario-session.constants';
+ import { SessionEventSharedService } from 'src/session-event/service/session-event-shared.service';
+ import { ScenarioBehaviorInstructionRepository } from '../repository/scenario-behavior-instruction.repository';
+ import { ScenarioBehaviorInstructionBehaviorRepository } from '../repository/scenario-behavior-instruction-behavior.repository';
+@@ -661,9 +661,14 @@ export class ScenarioSharedService {
+   }
+ 
+   async getLanguageDetailsForScenarioSession(languageId: number | undefined) {
++    // Pin the canonical English row to en-IN by `value` (unique). Looking up
++    // by translationCode='en' is ambiguous now that en-IN, en-GB, and en-US
++    // all share that code — Postgres heap order would decide the winner and
++    // mis-classify en-IN sessions as "non-English" when the wrong row is
++    // returned.
+     const enLanguageDetails =
+-      await this.sharedLanguageService.getLanguageByLanguageCode(
+-        DEFAULT_LANGUAGE_CODE,
++      await this.sharedLanguageService.getLanguageByValue(
++        LanguageValueCode.EN_IN,
+       );
+ 
+     if (!languageId) {
+@@ -750,10 +755,15 @@ export class ScenarioSharedService {
+     if (metadata?.defaultLanguageId != null) {
+       return Number(metadata.defaultLanguageId);
+     }
+-    const en = await this.sharedLanguageService.getLanguageByLanguageCode(
+-      DEFAULT_LANGUAGE_TRANSLATION_CODE,
++    // Old scenarios (no defaultLanguageId in metadata) had their primary
++    // openingStatements authored under English (India). Pin the fallback to
++    // en-IN by `value` — looking up by translationCode='en' is ambiguous now
++    // that en-IN, en-GB, and en-US all share that code, and which row wins
++    // depends on Postgres heap order.
++    const enIn = await this.sharedLanguageService.getLanguageByValue(
++      LanguageValueCode.EN_IN,
+     );
+-    return en?.id ?? null;
++    return enIn?.id ?? null;
+   }
+ 
+   /**
+diff --git a/src/learn/service/test/scenario-shared.service.spec.ts b/src/learn/service/test/scenario-shared.service.spec.ts
+index 66ad281dae..c4dbb77aea 100644
+--- a/src/learn/service/test/scenario-shared.service.spec.ts
++++ b/src/learn/service/test/scenario-shared.service.spec.ts
+@@ -155,6 +155,7 @@ describe('ScenarioSharedService', () => {
+       getValidLanguages: jest.fn(),
+       getLanguagesByIds: jest.fn(),
+       getLanguageByLanguageCode: jest.fn(),
++      getLanguageByValue: jest.fn(),
+     };
+ 
+     const module: TestingModule = await Test.createTestingModule({
+@@ -576,7 +577,7 @@ describe('ScenarioSharedService', () => {
+   describe('getLanguageDetailsForScenarioSession', () => {
+     it('should return enLanguageDetails and null languageDetails when languageId is undefined', async () => {
+       const enDetails = { id: 1, value: 'en' };
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(
++      sharedLanguageService.getLanguageByValue.mockResolvedValue(
+         enDetails as any,
+       );
+ 
+@@ -593,7 +594,7 @@ describe('ScenarioSharedService', () => {
+     it('should return languageDetails when languageId provided and found', async () => {
+       const enDetails = { id: 1, value: 'en' };
+       const langDetails = { id: 2, value: 'es-ES' };
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(
++      sharedLanguageService.getLanguageByValue.mockResolvedValue(
+         enDetails as any,
+       );
+       sharedLanguageService.getLanguagesByIds.mockResolvedValue([
+@@ -609,7 +610,7 @@ describe('ScenarioSharedService', () => {
+ 
+     it('should return null languageDetails when getLanguagesByIds returns empty', async () => {
+       const enDetails = { id: 1, value: 'en' };
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(
++      sharedLanguageService.getLanguageByValue.mockResolvedValue(
+         enDetails as any,
+       );
+       sharedLanguageService.getLanguagesByIds.mockResolvedValue([]);
+@@ -647,7 +648,7 @@ describe('ScenarioSharedService', () => {
+       sessionEventSharedService.findSessionEventById
+         .mockResolvedValueOnce({ id: 'evt-1', name: 'Termination 1' } as any)
+         .mockResolvedValueOnce({ id: 'evt-2', name: 'Termination 2' } as any);
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue({
++      sharedLanguageService.getLanguageByValue.mockResolvedValue({
+         id: 1,
+       } as any);
+ 
+@@ -673,7 +674,7 @@ describe('ScenarioSharedService', () => {
+       scenariosRepository.getAdminScenarioById.mockResolvedValue(
+         scenarioResult as any,
+       );
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(null);
++      sharedLanguageService.getLanguageByValue.mockResolvedValue(null);
+ 
+       const result = await service.getAdminScenario(1);
+ 
+@@ -705,7 +706,7 @@ describe('ScenarioSharedService', () => {
+           },
+         ] as any,
+       );
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue({
++      sharedLanguageService.getLanguageByValue.mockResolvedValue({
+         id: 1,
+       } as any);
+ 
+@@ -757,7 +758,7 @@ describe('ScenarioSharedService', () => {
+       const roomMetadata = { version: '1.0', scenario: {} };
+ 
+       scenariosRepository.getAdminScenarioById.mockResolvedValue(scenario);
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(
++      sharedLanguageService.getLanguageByValue.mockResolvedValue(
+         enDetails as any,
+       );
+       sharedLanguageService.getLanguagesByIds.mockResolvedValue([
+@@ -795,7 +796,7 @@ describe('ScenarioSharedService', () => {
+       const roomMetadata = { version: '1.0', scenario: {} };
+ 
+       scenariosRepository.getAdminScenarioById.mockResolvedValue(scenario);
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(
++      sharedLanguageService.getLanguageByValue.mockResolvedValue(
+         enDetails as any,
+       );
+       sharedLanguageService.getLanguagesByIds.mockResolvedValue([
+@@ -841,7 +842,7 @@ describe('ScenarioSharedService', () => {
+       scenariosRepository.getAdminScenarioById.mockResolvedValue({
+         ...scenario,
+       });
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(
++      sharedLanguageService.getLanguageByValue.mockResolvedValue(
+         enDetails as any,
+       );
+       sharedLanguageService.getLanguagesByIds.mockResolvedValue([
+@@ -884,7 +885,7 @@ describe('ScenarioSharedService', () => {
+         [],
+       );
+       scenariosRepository.getAdminScenarioById.mockResolvedValue(scenario);
+-      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(
++      sharedLanguageService.getLanguageByValue.mockResolvedValue(
+         enDetails as any,
+       );
+       sharedLanguageService.getLanguagesByIds.mockResolvedValue([

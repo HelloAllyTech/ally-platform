@@ -1,0 +1,97 @@
+diff --git a/src/learn/service/scenario-session.service.ts b/src/learn/service/scenario-session.service.ts
+index 3df20c8ad4..8bda63bedc 100644
+--- a/src/learn/service/scenario-session.service.ts
++++ b/src/learn/service/scenario-session.service.ts
+@@ -121,6 +121,7 @@ import { SharedLanguageService } from 'src/language/service/shared-language.serv
+ import { SessionEventTranslationService } from 'src/session-event/service/session-event-translation.service';
+ import { TranscriptTranslationService } from 'src/transcript-translation/service/transcript-translation.service';
+ import { StartV2VTestSessionDto } from '../dto/start-v2v-test-session.dto';
++import { SimulationStateDto } from '../dto/simulation-state.dto';
+ import { ModuleRef } from '@nestjs/core';
+ import { ScenarioEngine } from '../enum/scenario-engine.enum';
+ import { RoleplaySessionService } from 'src/roleplay-studio/service/roleplay-session.service';
+@@ -700,6 +701,7 @@ export class ScenarioSessionService {
+       const stateNames: StateNames[] = this.getStateNames(
+         scenario?.metadata?.currentState,
+         scenario?.metadata?.stateNames,
++        scenario?.metadata?.states,
+       );
+       // Reminders are only shown to the learner when remindersEnabled is on for the scenario
+       const reminders = this.getReminders(
+@@ -2252,6 +2254,7 @@ export class ScenarioSessionService {
+     const stateNames: StateNames[] = this.getStateNames(
+       scenario?.metadata?.currentState,
+       scenario?.metadata?.stateNames,
++      scenario?.metadata?.states,
+     );
+ 
+     // Fetch-pointer metadata when enabled (see startScenarioSession).
+@@ -2546,8 +2549,23 @@ export class ScenarioSessionService {
+     return { eventChecklist: eventChecklistDto };
+   }
+ 
+-  getStateNames(currentState?: boolean, stateNames?: StateNames[]) {
+-    if (currentState && stateNames?.length) {
++  getStateNames(
++    currentState?: boolean,
++    stateNames?: StateNames[],
++    states?: SimulationStateDto[],
++  ) {
++    if (!currentState) return [];
++    // `states` (hasStates main-agent prompts, edited via StatesEditor) carries
++    // the real names for skills built on the newer states structure. Prefer
++    // it over the legacy `stateNames` — which StatesEditor never populates —
++    // so those skills don't fall back to the generic "State 1" defaults.
++    if (states?.length) {
++      return states.map((state) => ({
++        name: state.name,
++        stateId: state.id,
++      }));
++    }
++    if (stateNames?.length) {
+       return stateNames.map((stateName: StateNames) => {
+         return {
+           name: stateName.name,
+diff --git a/src/learn/service/test/scenario-session.service.spec.ts b/src/learn/service/test/scenario-session.service.spec.ts
+index d6fb604848..1ed8ae317e 100644
+--- a/src/learn/service/test/scenario-session.service.spec.ts
++++ b/src/learn/service/test/scenario-session.service.spec.ts
+@@ -3383,6 +3383,38 @@ describe('ScenarioSessionService', () => {
+         mockScenario.metadata.stateInstructions,
+       );
+     });
++
++    it('should derive names from `states` (hasStates prompts) instead of the legacy stateNames fallback', () => {
++      const stateNames = service.getStateNames(
++        true,
++        [
++          { stateId: '1', name: 'State 1' },
++          { stateId: '2', name: 'State 2' },
++        ],
++        [
++          {
++            id: 'state-a',
++            name: 'Opening rapport',
++            guidelines: 'Be warm',
++            scoreLower: null,
++            scoreUpper: 50,
++            ragEnabled: false,
++          },
++          {
++            id: 'state-b',
++            name: 'De-escalation',
++            guidelines: 'Stay calm',
++            scoreLower: 50,
++            scoreUpper: null,
++            ragEnabled: false,
++          },
++        ],
++      );
++      expect(stateNames).toEqual([
++        { name: 'Opening rapport', stateId: 'state-a' },
++        { name: 'De-escalation', stateId: 'state-b' },
++      ]);
++    });
+   });
+ 
+   describe('getReminders', () => {

@@ -1,0 +1,198 @@
+diff --git a/src/builder/repository/builder-session.repository.ts b/src/builder/repository/builder-session.repository.ts
+index 513e533a48..55542f0092 100644
+--- a/src/builder/repository/builder-session.repository.ts
++++ b/src/builder/repository/builder-session.repository.ts
+@@ -1,6 +1,7 @@
+ import { Injectable } from '@nestjs/common';
+ import { DataSource, Repository } from 'typeorm';
+ import { BuilderSession } from '../entity/builder-session.entity';
++import { BuilderSessionStatus } from '../enum/builder.enum';
+ 
+ @Injectable()
+ export class BuilderSessionRepository extends Repository<BuilderSession> {
+@@ -8,6 +9,22 @@ export class BuilderSessionRepository extends Repository<BuilderSession> {
+     super(BuilderSession, dataSource.createEntityManager());
+   }
+ 
++  /**
++   * Sessions that ended badly, newest first.
++   *
++   * For the outcome sweep, which re-tests a FAILED verdict against what the
++   * session's pull requests actually did. Bounded rather than exhaustive: a
++   * verdict nobody has looked at in weeks is not what this is for, and an
++   * unbounded scan on every tick is how a cheap sweep becomes a slow one.
++   */
++  listRecentlyFailed(take = 50): Promise<BuilderSession[]> {
++    return this.find({
++      where: { status: BuilderSessionStatus.FAILED },
++      order: { updatedAt: 'DESC' },
++      take,
++    });
++  }
++
+   /**
+    * True when the slug is already taken. Checked against soft-deleted rows
+    * too: the branch those sessions pushed still exists on the remote, so
+diff --git a/src/builder/service/builder-pull-request.service.ts b/src/builder/service/builder-pull-request.service.ts
+index 37b98877eb..816d8c0a48 100644
+--- a/src/builder/service/builder-pull-request.service.ts
++++ b/src/builder/service/builder-pull-request.service.ts
+@@ -354,6 +354,16 @@ export class BuilderPullRequestService {
+    * error anyone sees, and never a half-applied state.
+    */
+   async reconcileOpenPullRequests(): Promise<void> {
++    // First, and deliberately before the GitHub guard.
++    //
++    // This sweep is pure database work, and it is the only path that can reach
++    // a session whose pull requests have all MERGED — `listReconcilable`
++    // filters on `merged: false`, so the loop below iterates nothing for them.
++    // Putting the outcome reconciliation inside that loop meant it could never
++    // run for the one case it was written for: a session left saying FAILED
++    // above work that had already shipped.
++    await this.reconcileSessionOutcomes();
++
+     if (!this.github.isConfigured) return;
+ 
+     for (const pullRequest of await this.repository.listReconcilable()) {
+@@ -369,6 +379,27 @@ export class BuilderPullRequestService {
+     }
+   }
+ 
++  /**
++   * Re-test the FAILED sessions against what their pull requests actually did.
++   *
++   * Runs over sessions rather than over open pull requests, because the
++   * evidence that matters most — a merge — is exactly what removes a pull
++   * request from the open set.
++   */
++  private async reconcileSessionOutcomes(): Promise<void> {
++    for (const session of await this.sessionRepository.listRecentlyFailed()) {
++      try {
++        await this.clearStaleSessionError(session.id);
++      } catch (error) {
++        this.logger.warn(
++          `Could not settle session ${session.id}: ${
++            error instanceof Error ? error.message : String(error)
++          }`,
++        );
++      }
++    }
++  }
++
+   private async reconcileOne(pullRequest: BuilderPullRequest): Promise<void> {
+     const remote = await this.github.getPullRequest(
+       pullRequest.repo,
+diff --git a/src/builder/service/test/builder-bookkeeping.spec.ts b/src/builder/service/test/builder-bookkeeping.spec.ts
+index d501aed307..0147a208dc 100644
+--- a/src/builder/service/test/builder-bookkeeping.spec.ts
++++ b/src/builder/service/test/builder-bookkeeping.spec.ts
+@@ -256,3 +256,90 @@ describe('Builder bookkeeping — the blocking-run guard', () => {
+     );
+   });
+ });
++
++/**
++ * The sweep has to run over SESSIONS, not over open pull requests.
++ *
++ * `listReconcilable` filters on `merged: false`, so a session whose pull
++ * requests have all merged is iterated by nothing. Putting the outcome
++ * reconciliation inside that loop — as the first two attempts at this did —
++ * meant it could never run for the one case it exists for: a session left
++ * saying FAILED above work that had already shipped and deployed.
++ */
++describe('Builder bookkeeping — the outcome sweep runs over sessions', () => {
++  it('reaches a failed session whose pull requests have all merged', async () => {
++    const sessionRepository = {
++      listRecentlyFailed: jest
++        .fn()
++        .mockResolvedValue([{ id: 's-1' }, { id: 's-2' }]),
++    };
++    const svc = Object.create(
++      BuilderPullRequestService.prototype,
++    ) as BuilderPullRequestService;
++    const settled: string[] = [];
++    Object.assign(svc, {
++      sessionRepository,
++      // No open pull requests anywhere: the loop below the sweep sees nothing.
++      repository: { listReconcilable: jest.fn().mockResolvedValue([]) },
++      github: { isConfigured: true },
++      logger: { info: jest.fn(), warn: jest.fn() },
++      clearStaleSessionError: jest.fn(async (id: string) => {
++        settled.push(id);
++      }),
++    });
++
++    await (svc as any).reconcileOpenPullRequests();
++
++    expect(settled).toEqual(['s-1', 's-2']);
++  });
++
++  /**
++   * Pure database work, so it must not be gated behind the GitHub guard — a
++   * dead credential already cost a whole afternoon of silence today.
++   */
++  it('still sweeps when GitHub is not configured', async () => {
++    const svc = Object.create(
++      BuilderPullRequestService.prototype,
++    ) as BuilderPullRequestService;
++    const clearStaleSessionError = jest.fn();
++    Object.assign(svc, {
++      sessionRepository: {
++        listRecentlyFailed: jest.fn().mockResolvedValue([{ id: 's-1' }]),
++      },
++      repository: { listReconcilable: jest.fn() },
++      github: { isConfigured: false },
++      logger: { info: jest.fn(), warn: jest.fn() },
++      clearStaleSessionError,
++    });
++
++    await (svc as any).reconcileOpenPullRequests();
++
++    expect(clearStaleSessionError).toHaveBeenCalledWith('s-1');
++  });
++
++  /** One bad session must not stop the rest of the sweep. */
++  it('carries on past a session that throws', async () => {
++    const clearStaleSessionError = jest
++      .fn()
++      .mockRejectedValueOnce(new Error('nope'))
++      .mockResolvedValue(undefined);
++    const svc = Object.create(
++      BuilderPullRequestService.prototype,
++    ) as BuilderPullRequestService;
++    Object.assign(svc, {
++      sessionRepository: {
++        listRecentlyFailed: jest
++          .fn()
++          .mockResolvedValue([{ id: 's-1' }, { id: 's-2' }]),
++      },
++      repository: { listReconcilable: jest.fn().mockResolvedValue([]) },
++      github: { isConfigured: true },
++      logger: { info: jest.fn(), warn: jest.fn() },
++      clearStaleSessionError,
++    });
++
++    await (svc as any).reconcileOpenPullRequests();
++
++    expect(clearStaleSessionError).toHaveBeenCalledTimes(2);
++  });
++});
+diff --git a/src/builder/service/test/builder-pull-request.service.spec.ts b/src/builder/service/test/builder-pull-request.service.spec.ts
+index 05bc7151a6..8d5165b897 100644
+--- a/src/builder/service/test/builder-pull-request.service.spec.ts
++++ b/src/builder/service/test/builder-pull-request.service.spec.ts
+@@ -64,7 +64,13 @@ describe('BuilderPullRequestService', () => {
+       update: jest.fn(),
+       findOne: jest.fn(),
+     };
+-    sessionRepository = { findOne: jest.fn() };
++    sessionRepository = {
++      findOne: jest.fn(),
++      update: jest.fn(),
++      // The outcome sweep runs first on every reconcile tick; nothing failed
++      // by default.
++      listRecentlyFailed: jest.fn().mockResolvedValue([]),
++    };
+     notificationService = {
+       prsOpened: jest.fn(),
+       fixRunStarted: jest.fn(),

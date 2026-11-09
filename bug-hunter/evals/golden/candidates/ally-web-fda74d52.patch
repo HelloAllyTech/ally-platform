@@ -1,0 +1,217 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/text-field/TextField.tsx b/apps/ally-helpline-dashboard/src/components/text-field/TextField.tsx
+index 34b8bd82f7..da1832fbae 100644
+--- a/apps/ally-helpline-dashboard/src/components/text-field/TextField.tsx
++++ b/apps/ally-helpline-dashboard/src/components/text-field/TextField.tsx
+@@ -1,6 +1,7 @@
+ import { FC, useId, WheelEventHandler } from "react";
+ 
+ import { TextArea, TextInput } from "@ally-ui-mono/ui-shared";
++import { formFieldProtectionProps } from "@constants/formFieldProtection";
+ 
+ import { TextFieldProps } from "./types";
+ 
+@@ -66,21 +67,8 @@ const TextField: FC<TextFieldProps> = ({
+     style: inputStyles,
+     ref: inputRef,
+     onWheel: handleWheel,
+-    // Opt these fields out of browser/extension form helpers that inject into
+-    // inputs and can steal focus mid-typing (observed on Edge: focus lost after
+-    // one keystroke, gone in InPrivate where extensions are disabled). There is
+-    // no single universal opt-out, so we set the hints each common family
+-    // honors. Callers can still override via `props`.
+-    autoComplete: "off",
+-    // Password managers
+-    "data-lpignore": "true", // LastPass
+-    "data-1p-ignore": "true", // 1Password
+-    "data-bwignore": "true", // Bitwarden
+-    "data-form-type": "other", // Dashlane / generic
+-    // Writing assistants (Grammarly, Microsoft Editor, etc.)
+-    "data-gramm": "false",
+-    "data-gramm_editor": "false",
+-    "data-enable-grammarly": "false",
++    // Callers can still override the protection hints via `props`.
++    ...formFieldProtectionProps,
+     ...registerProps,
+     ...(onChange ? { onChange } : {}),
+     ...(props as Record<string, unknown>),
+diff --git a/apps/ally-helpline-dashboard/src/constants/formFieldProtection.ts b/apps/ally-helpline-dashboard/src/constants/formFieldProtection.ts
+new file mode 100644
+index 0000000000..ad6e3ec13b
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/constants/formFieldProtection.ts
+@@ -0,0 +1,23 @@
++/**
++ * Opt-out hints for browser/extension form helpers (password managers,
++ * writing assistants) that inject UI into inputs and can steal focus
++ * mid-typing — observed on Edge as "focus lost after one keystroke", gone in
++ * InPrivate where extensions are disabled.
++ *
++ * There is no single universal opt-out, so we set the hints each common
++ * family honors. Spread these onto every free-text input the scribe flows
++ * render — TextField applies them already; raw Carbon controls (the "carbon"
++ * variant fields, the summary-loading notes box) must spread them explicitly.
++ */
++export const formFieldProtectionProps = {
++  autoComplete: "off",
++  // Password managers
++  "data-lpignore": "true", // LastPass
++  "data-1p-ignore": "true", // 1Password
++  "data-bwignore": "true", // Bitwarden
++  "data-form-type": "other", // Dashlane / generic
++  // Writing assistants (Grammarly, Microsoft Editor, etc.)
++  "data-gramm": "false",
++  "data-gramm_editor": "false",
++  "data-enable-grammarly": "false",
++} as const;
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/CustomFieldValuesPanel.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/CustomFieldValuesPanel.tsx
+index dbd4ac8976..2f727d9ec6 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/CustomFieldValuesPanel.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/CustomFieldValuesPanel.tsx
+@@ -16,6 +16,7 @@ import { useGetCustomFieldValuesQuery } from "@api";
+ import TextField from "@components/text-field";
+ import { Permissions } from "@constants";
+ import { carbonField } from "@constants/carbonFieldStyles";
++import { formFieldProtectionProps } from "@constants/formFieldProtection";
+ import { useCustomFieldsEnabled } from "@hooks";
+ import { RootState } from "@store";
+ import {
+@@ -219,6 +220,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
+                 labelText={field.name}
+                 hideLabel
+                 placeholder="mm/dd/yyyy"
++                {...formFieldProtectionProps}
+               />
+             </DatePicker>
+           ) : (
+@@ -272,6 +274,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
+             disabled={!isEditable}
+             value={value ?? ""}
+             onChange={e => handleChange(field.fieldDefinitionId, e.target.value || null)}
++            {...formFieldProtectionProps}
+             // Scrolling over a focused number input silently changes its value
+             // in the browser — blur so the page scrolls instead of the value.
+             onWheel={e => {
+@@ -349,6 +352,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
+                 e.target.value ? new Date(e.target.value).toISOString() : null,
+               )
+             }
++            {...formFieldProtectionProps}
+           />
+         </div>
+       );
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryFieldInput.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryFieldInput.tsx
+index 858ede088a..0d3efd56a9 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryFieldInput.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryFieldInput.tsx
+@@ -3,6 +3,7 @@ import { FC, ReactNode } from "react";
+ import { DropdownField, Select, SelectItem, TextArea } from "@ally-ui-mono/ui-shared";
+ import { TextField } from "@components";
+ import { carbonField } from "@constants/carbonFieldStyles";
++import { formFieldProtectionProps } from "@constants/formFieldProtection";
+ import { SummaryFieldKey } from "@types";
+ 
+ import { FieldType, SummaryField } from "../types";
+@@ -89,6 +90,7 @@ const SummaryFieldInput: FC<SummaryFieldInputProps> = ({
+             placeholder={field.placeholder}
+             value={value ?? ""}
+             onChange={e => onChange(field.key, e.target.value)}
++            {...formFieldProtectionProps}
+           />
+         </div>
+       );
+@@ -104,6 +106,7 @@ const SummaryFieldInput: FC<SummaryFieldInputProps> = ({
+           placeholder={field.placeholder}
+           value={value ?? ""}
+           onChange={e => onChange(field.key, e.target.value)}
++          {...formFieldProtectionProps}
+           // Scrolling over a focused number input silently changes its value
+           // in the browser — blur so the page scrolls instead of the value.
+           onWheel={e => {
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryLoading.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryLoading.tsx
+index d091be5c7a..401d7d7aaf 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryLoading.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryLoading.tsx
+@@ -15,6 +15,7 @@ import {
+ } from "@assets/icons";
+ import { Button, ButtonVariant, InfoBanner, ShinyText } from "@components";
+ import { Permissions, SESSION_STORAGE_KEYS } from "@constants";
++import { formFieldProtectionProps } from "@constants/formFieldProtection";
+ import { RootState } from "@store";
+ import { ChatSummaryStatus } from "@types";
+ 
+@@ -192,6 +193,7 @@ const SummaryLoading: FC<SummaryLoadingProps> = ({
+           onChange={e => onNotesChange(e.target.value)}
+           placeholder={t("summaryLoading.notesPlaceholder")}
+           className="w-full font-primary"
++          {...formFieldProtectionProps}
+         />
+       </div>
+     );
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/__snapshots__/SummaryLoading.test.tsx.snap b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/__snapshots__/SummaryLoading.test.tsx.snap
+index c1e96981ad..b638faab6b 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/__snapshots__/SummaryLoading.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/__snapshots__/SummaryLoading.test.tsx.snap
+@@ -58,7 +58,15 @@ exports[`SummaryLoading > should match snapshot when FAILED 1`] = `
+         </div>
+         <textarea
+           aria-label="Add Notes (optional)"
++          autocomplete="off"
+           class="w-full font-primary"
++          data-1p-ignore="true"
++          data-bwignore="true"
++          data-enable-grammarly="false"
++          data-form-type="other"
++          data-gramm="false"
++          data-gramm_editor="false"
++          data-lpignore="true"
+           disabled=""
+           id="notes"
+           placeholder="write down your thoughts"
+@@ -154,7 +162,15 @@ exports[`SummaryLoading > should match snapshot when IN_PROGRESS 1`] = `
+         </div>
+         <textarea
+           aria-label="Add Notes (optional)"
++          autocomplete="off"
+           class="w-full font-primary"
++          data-1p-ignore="true"
++          data-bwignore="true"
++          data-enable-grammarly="false"
++          data-form-type="other"
++          data-gramm="false"
++          data-gramm_editor="false"
++          data-lpignore="true"
+           disabled=""
+           id="notes"
+           placeholder="write down your thoughts"
+@@ -249,7 +265,15 @@ exports[`SummaryLoading > should match snapshot when NO_AUDIO 1`] = `
+         </div>
+         <textarea
+           aria-label="Add Notes (optional)"
++          autocomplete="off"
+           class="w-full font-primary"
++          data-1p-ignore="true"
++          data-bwignore="true"
++          data-enable-grammarly="false"
++          data-form-type="other"
++          data-gramm="false"
++          data-gramm_editor="false"
++          data-lpignore="true"
+           disabled=""
+           id="notes"
+           placeholder="write down your thoughts"
+@@ -334,7 +358,15 @@ exports[`SummaryLoading > should match snapshot when SUCCESS 1`] = `
+         </div>
+         <textarea
+           aria-label="Add Notes (optional)"
++          autocomplete="off"
+           class="w-full font-primary"
++          data-1p-ignore="true"
++          data-bwignore="true"
++          data-enable-grammarly="false"
++          data-form-type="other"
++          data-gramm="false"
++          data-gramm_editor="false"
++          data-lpignore="true"
+           disabled=""
+           id="notes"
+           placeholder="write down your thoughts"

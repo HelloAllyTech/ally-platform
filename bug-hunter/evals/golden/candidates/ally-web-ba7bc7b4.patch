@@ -1,0 +1,162 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
+index 5e3552741f..8d624a50ca 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
+@@ -311,6 +311,13 @@ const CallSummary: FC<CallSummaryProps> = ({
+   };
+ 
+   const handleSave = async () => {
++    // Track whether any persistence step failed. A failed save must NOT fall
++    // through to postProcess/navigate as if it succeeded — otherwise the edit
++    // only lives in local component state (the field still *looks* updated on
++    // screen) while the DB, and anything that reads it like the call-logs
++    // table column, keep the old value with no error shown. See handleSave's
++    // two catch blocks below.
++    let saveFailed = false;
+     if (hasDataChanged()) {
+       const tags = summaryData?.tags?.split(", ");
+       let tagsInput: Tag[] = [];
+@@ -326,9 +333,10 @@ const CallSummary: FC<CallSummaryProps> = ({
+         await updateCallSummary({
+           chatId,
+           data: { summary: { ...summaryData, tags: tagsInput } },
+-        });
++        }).unwrap();
+       } catch (error) {
+         logger.info(`Error updating call summary:, ${error}`);
++        saveFailed = true;
+       }
+     }
+     if (hasCustomFieldsChanged()) {
+@@ -341,8 +349,15 @@ const CallSummary: FC<CallSummaryProps> = ({
+         setDirtyFieldIds(new Set());
+       } catch (error) {
+         logger.info(`Error saving custom field values: ${error}`);
++        saveFailed = true;
+       }
+     }
++    if (saveFailed) {
++      // Surface the failure and keep the (still-dirty) edits so the user can
++      // retry, instead of silently navigating away as though the save worked.
++      toast.error(t("summary.saveFailed", "Couldn't save your changes. Please try again."));
++      return;
++    }
+     postProcess?.();
+     if (!isInSidebar && shouldAllowEdit) {
+       if (callSummary?.details?.callInfo?.isSummaryFeedbackAdded) {
+@@ -412,7 +427,18 @@ const CallSummary: FC<CallSummaryProps> = ({
+ 
+   const isFailedSummary = callSummary?.summaryStatus === ChatSummaryStatus.FAILED;
+ 
+-  if (canShowSummary && (callSummary?.details?.summary || isFailedSummary)) {
++  // A manual note (created via "Create Note") has summaryStatus SUCCESS but no
++  // AI-generated `details.summary` — there was no audio to summarise. Treat that
++  // as ready-to-edit too, otherwise the panel is stuck forever on SummaryLoading's
++  // "Setting up your summary screen" and the fields (incl. custom fields) never
++  // render. FAILED already renders the form for manual entry; SUCCESS-with-empty
++  // -summary must as well.
++  const isResolvedEmptySummary = callSummary?.summaryStatus === ChatSummaryStatus.SUCCESS;
++
++  if (
++    canShowSummary &&
++    (callSummary?.details?.summary || isFailedSummary || isResolvedEmptySummary)
++  ) {
+     return (
+       <>
+         {isFailedSummary ? (
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
+index 748618e06f..793c23ec1f 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
+@@ -1,4 +1,5 @@
+ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
++import { toast } from "sonner";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ 
+ import { useGetCallSummaryQuery } from "@api";
+@@ -263,7 +264,11 @@ describe("CallSummary Component", () => {
+     expect(screen.getByRole("progressbar")).toBeInTheDocument();
+   });
+ 
+-  it("renders summary fields and notes", () => {
++  it("renders the editable summary form for a resolved note even when no AI summary was generated", () => {
++    // A manual note (Create Note, no audio) has summaryStatus SUCCESS but no
++    // details.summary. It must render the editable form so the counsellor can
++    // fill/edit fields — NOT get stuck on SummaryLoading's "Setting up your
++    // summary screen". Regression guard for the audio-less-note bug.
+     const callSummaryWithSuccess = {
+       summaryStatus: ChatSummaryStatus.SUCCESS,
+       details: {
+@@ -281,11 +286,11 @@ describe("CallSummary Component", () => {
+         isSummaryLoading={false}
+       />,
+     );
+-    // SummaryLoading component renders the generated state when summaryStatus is SUCCESS and details.summary is absent
+-    expect(screen.getByText("Summary is generated")).toBeInTheDocument();
+-    expect(screen.getByText("You can review the session now.")).toBeInTheDocument();
+-    // Notes section is rendered in the SummaryLoading component
+-    expect(screen.getByText("Add Notes (optional)")).toBeInTheDocument();
++    // The stuck loading screen must NOT be shown for a resolved note...
++    expect(screen.queryByText("Summary is generated")).not.toBeInTheDocument();
++    expect(screen.queryByText("You can review the session now.")).not.toBeInTheDocument();
++    // ...the editable form renders instead (AI disclaimer banner + notes value).
++    expect(screen.getByText("Initial notes")).toBeInTheDocument();
+   });
+ 
+   it("shows a Retry summary action on a failed summary and triggers retry", async () => {
+@@ -490,3 +495,55 @@ describe("CallSummary — custom field save does not revert fields the user didn
+     expect(values).toEqual([{ fieldDefinitionId: "cf-topic", value: "Depression" }]);
+   });
+ });
++
++describe("CallSummary — a failed custom field save surfaces an error instead of faking success", () => {
++  const summaryCall = {
++    summaryStatus: ChatSummaryStatus.SUCCESS,
++    counselorId: 1,
++    details: { callInfo: { notes: "" }, summary: { callQuality: 85, tags: [] } },
++  };
++  const topicField = (value: string | null) => ({
++    fieldDefinitionId: "cf-topic",
++    name: "Topic",
++    fieldType: CustomFieldType.TEXT,
++    sectionKey: "section",
++    sectionLabel: "Section",
++    editPermission: CustomFieldEditPermission.BOTH,
++    value,
++  });
++
++  beforeEach(() => {
++    vi.clearAllMocks();
++    // Real timers so the awaited (rejected) upsert promise settles before we assert.
++    mockGetCustomFieldsEnabled.mockImplementation(() => customFieldsActiveResult);
++    mockGetCustomFieldValues.mockReturnValue({ data: [topicField("Anxiety")] });
++    mockUseSelector.mockReturnValue({ user: { userId: 1 }, permissions: [] });
++  });
++
++  it("shows an error toast when the custom field upsert rejects", async () => {
++    mockUpsertCustomFieldValues.mockImplementation(() => ({
++      unwrap: () => Promise.reject(new Error("boom")),
++    }));
++
++    render(<CallSummary chatId={1} callSummary={summaryCall} canEditCustomFields={true} />);
++
++    fireEvent.change(screen.getByLabelText("Topic"), { target: { value: "Depression" } });
++    fireEvent.click(screen.getByRole("button", { name: "Save report" }));
++
++    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
++  });
++
++  it("does not show an error toast when the upsert succeeds", async () => {
++    mockUpsertCustomFieldValues.mockImplementation(() => ({
++      unwrap: () => Promise.resolve({ success: true }),
++    }));
++
++    render(<CallSummary chatId={1} callSummary={summaryCall} canEditCustomFields={true} />);
++
++    fireEvent.change(screen.getByLabelText("Topic"), { target: { value: "Depression" } });
++    fireEvent.click(screen.getByRole("button", { name: "Save report" }));
++
++    await waitFor(() => expect(mockUpsertCustomFieldValues).toHaveBeenCalledTimes(1));
++    expect(toast.error).not.toHaveBeenCalled();
++  });
++});

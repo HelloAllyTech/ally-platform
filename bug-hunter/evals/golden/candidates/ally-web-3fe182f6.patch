@@ -1,0 +1,37 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/StrategyRankingManager.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/StrategyRankingManager.tsx
+index 3fc653a54a..ef01a8604f 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/StrategyRankingManager.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/StrategyRankingManager.tsx
+@@ -179,7 +179,7 @@ export const StrategyRankingManager: React.FC<StrategyRankingManagerProps> = ({
+    */
+   const commitWeight = async (key: keyof RoadmapRankWeights, raw: string) => {
+     const value = Number(raw);
+-    if (!Number.isInteger(value) || value < 0 || value > 10) {
++    if (raw.trim() === "" || !Number.isInteger(value) || value < 0 || value > 10) {
+       setInvalidWeightKeys(prev => ({ ...prev, [key]: true }));
+       return;
+     }
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/StrategyRankingManager.test.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/StrategyRankingManager.test.tsx
+index 9e14cc265a..7610c7e98f 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/StrategyRankingManager.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/StrategyRankingManager.test.tsx
+@@ -60,4 +60,19 @@ describe("StrategyRankingManager", () => {
+     expect(screen.getByText(/enter a whole number between 0 and 10/i)).toBeInTheDocument();
+     expect(votesInput).toHaveValue(15);
+   });
++
++  /**
++   * The bug: Number("") is 0, not NaN, so clearing the box entirely passed every validation
++   * check and silently committed a weight of 0 — indistinguishable from deliberately typing 0.
++   */
++  it("marks the weight box invalid and never calls the API when the field is cleared", () => {
++    render(<StrategyRankingManager onClose={vi.fn()} />);
++
++    const votesInput = screen.getByLabelText("Vote count") as HTMLInputElement;
++    fireEvent.change(votesInput, { target: { value: "" } });
++    fireEvent.blur(votesInput);
++
++    expect(mockUpdateWeights).not.toHaveBeenCalled();
++    expect(screen.getByText(/enter a whole number between 0 and 10/i)).toBeInTheDocument();
++  });
+ });

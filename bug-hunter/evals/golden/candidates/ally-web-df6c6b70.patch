@@ -1,0 +1,103 @@
+diff --git a/apps/ally-admin-dashboard/src/components/builder/__tests__/RepoChain.test.tsx b/apps/ally-admin-dashboard/src/components/builder/__tests__/RepoChain.test.tsx
+index 6230a69562..b5bc2e6418 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/__tests__/RepoChain.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/builder/__tests__/RepoChain.test.tsx
+@@ -153,7 +153,9 @@ describe("RepoChain", () => {
+     );
+   });
+ 
+-  it("moves the primary past a pull request that is not ready to the next one that is", () => {
++  it("offers no primary anywhere while the first unmerged pull request is not ready", () => {
++    // Build order is merge order: ally-web was built on ally-be's changes, so
++    // a green ally-web must not be offered ahead of a red ally-be.
+     render(
+       <RepoChain
+         {...threeBuilt}
+@@ -170,14 +172,15 @@ describe("RepoChain", () => {
+       />,
+     );
+ 
+-    const primaries = screen.getAllByRole("button").filter(b => b.dataset.kind === "primary");
+-    expect(primaries).toHaveLength(1);
+-    expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge first" })).toBe(
+-      primaries[0],
++    expect(screen.queryAllByRole("button").filter(b => b.dataset.kind === "primary")).toHaveLength(
++      0,
+     );
+     expect(within(rowFor("ally-be")).getByRole("button", { name: "Merge" })).toBeDisabled();
+     expect(within(rowFor("ally-be")).getByText("Fix CI on the pull request")).toBeInTheDocument();
++    expect(within(rowFor("ally-web")).getByText("Merge after ally-be")).toBeInTheDocument();
++    expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge" })).toBeDisabled();
+     expect(within(rowFor("ally-mobile")).getByText("Merge after ally-web")).toBeInTheDocument();
++    expect(within(rowFor("ally-mobile")).getByRole("button", { name: "Merge" })).toBeDisabled();
+   });
+ 
+   describe("while Builder is still working a pull request", () => {
+@@ -201,7 +204,7 @@ describe("RepoChain", () => {
+       line: null,
+     });
+ 
+-    it("says Builder is reviewing it, and moves the primary to the next ready row", () => {
++    it("says Builder is reviewing it, and offers no primary anywhere", () => {
+       render(
+         <RepoChain
+           {...threeBuilt}
+@@ -218,11 +221,11 @@ describe("RepoChain", () => {
+       expect(quiet).toBeDisabled();
+       expect(quiet).toHaveAttribute("title", "Builder is still working on this pull request");
+ 
+-      const primaries = screen.getAllByRole("button").filter(b => b.dataset.kind === "primary");
+-      expect(primaries).toHaveLength(1);
+-      expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge first" })).toBe(
+-        primaries[0],
+-      );
++      expect(
++        screen.queryAllByRole("button").filter(b => b.dataset.kind === "primary"),
++      ).toHaveLength(0);
++      expect(within(rowFor("ally-web")).getByText("Merge after ally-be")).toBeInTheDocument();
++      expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge" })).toBeDisabled();
+     });
+ 
+     it("leaves the row ready once the review run has finished", () => {
+diff --git a/apps/ally-admin-dashboard/src/components/builder/issueBuild.ts b/apps/ally-admin-dashboard/src/components/builder/issueBuild.ts
+index 5d4dc06d27..994e6494d7 100644
+--- a/apps/ally-admin-dashboard/src/components/builder/issueBuild.ts
++++ b/apps/ally-admin-dashboard/src/components/builder/issueBuild.ts
+@@ -253,13 +253,13 @@ export const chainRows = (
+ 
+   const openIndexes = base.flatMap((row, index) => (row.open ? [index] : []));
+   const firstOpen = openIndexes[0] ?? -1;
+-  // When the first unmerged pull request needs a person, reading it is the one
+-  // prominent action and nothing is offered as a primary merge. Otherwise the
+-  // primary goes to the first unmerged pull request that is actually ready —
+-  // never to one Builder is still reviewing or opencode is still fixing.
++  // A chain merges in build order — a later repo is built against the earlier
++  // ones' changes — so the primary is only ever the FIRST unmerged pull
++  // request, and only once it is ready. If it is not (red CI, still being
++  // reviewed or fixed), there is no primary merge anywhere; if it needs a
++  // person, reading it on GitHub is the one prominent action instead.
+   const reviewFirstIndex = firstOpen >= 0 && base[firstOpen].needsHuman ? firstOpen : -1;
+-  const primaryIndex =
+-    reviewFirstIndex >= 0 ? -1 : (openIndexes.find(index => base[index].ready) ?? -1);
++  const primaryIndex = firstOpen >= 0 && base[firstOpen].ready ? firstOpen : -1;
+ 
+   return base.map(({ open, ...row }, index) => {
+     const prRow = row.pr?.row ?? null;
+@@ -267,13 +267,15 @@ export const chainRows = (
+     if (prRow?.merged) mergeRole = "merged";
+     else if (prRow?.state === "closed") mergeRole = "closed";
+     else if (open && index === primaryIndex) mergeRole = "primary";
+-    else if (open && (index === firstOpen || (primaryIndex >= 0 && index < primaryIndex)))
+-      mergeRole = "notReady";
++    else if (open && index === firstOpen) mergeRole = "notReady";
+     else if (open) mergeRole = "after";
+ 
+     const previousOpen = [...openIndexes].reverse().find(candidate => candidate < index);
+     return {
+       ...row,
++      // A later pull request waits for the one before it to merge: its Merge
++      // stays quiet and disabled until then.
++      mergeable: row.mergeable && mergeRole !== "after",
+       mergeRole,
+       reviewFirst: index === reviewFirstIndex,
+       // "Merge first" only while later pull requests wait on this one.

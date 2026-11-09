@@ -1,0 +1,65 @@
+diff --git a/apps/ally-admin-dashboard/src/constants/en.ts b/apps/ally-admin-dashboard/src/constants/en.ts
+index b4772e9463..a6d8ae379a 100644
+--- a/apps/ally-admin-dashboard/src/constants/en.ts
++++ b/apps/ally-admin-dashboard/src/constants/en.ts
+@@ -2502,7 +2502,7 @@ export const en = {
+     columnPrPendingTooltip:
+       "Everything else I found — opened as a pull request and waiting on your review. Each one is in my bugs table above.",
+     columnCostTooltip:
+-      "Estimated USD, from the same LLM usage data as the platform's cost analytics. Not a live figure while the sweep is still going.",
++      "USD reported by the Claude Code CLI for that run, including prompt-cache pricing — falls back to a cache-blind token estimate for older runs. Not a live figure while the sweep is still going.",
+     columnTokensTooltip:
+       "Raw input/output tokens behind the estimated cost. Shown as — for runs from before this was tracked.",
+     triggerScheduled: "Nightly",
+diff --git a/apps/ally-admin-dashboard/src/pages/BugHunter/RunHistoryTable.tsx b/apps/ally-admin-dashboard/src/pages/BugHunter/RunHistoryTable.tsx
+index d629fc71ff..7c4104a175 100644
+--- a/apps/ally-admin-dashboard/src/pages/BugHunter/RunHistoryTable.tsx
++++ b/apps/ally-admin-dashboard/src/pages/BugHunter/RunHistoryTable.tsx
+@@ -31,6 +31,10 @@ const formatTokens = (input: number | null, output: number | null): string =>
+     ? "—"
+     : `${input.toLocaleString()} in / ${output.toLocaleString()} out`;
+ 
++/** Prefers the CLI's own reported cost (prices prompt-cache correctly) over the cache-blind token estimate. */
++const formatCost = (run: BugHuntRun): string =>
++  `$${run.cliReportedCostUsd != null ? run.cliReportedCostUsd.toFixed(4) : run.totalTokenCostUsd}`;
++
+ /** A column header with a help tooltip — the pattern from the ally-web admin tooltip convention, applied per-column instead of per-field. */
+ const HeaderWithTooltip: FC<{ label: string; tooltip: string }> = ({ label, tooltip }) => (
+   <span className="inline-flex items-center gap-1">
+@@ -220,7 +224,7 @@ export const RunHistoryTable: FC = () => {
+                   <TableCell className="py-3 pr-4">{run.autoMergedCount}</TableCell>
+                   <TableCell className="py-3 pr-4">{run.prOpenedCount}</TableCell>
+                   <TableCell className="py-3 pr-4">{run.dismissedCount}</TableCell>
+-                  <TableCell className="py-3 pr-4">${run.totalTokenCostUsd}</TableCell>
++                  <TableCell className="py-3 pr-4">{formatCost(run)}</TableCell>
+                   <TableCell className="py-3 pr-4 whitespace-nowrap">
+                     {formatTokens(run.totalInputTokens, run.totalOutputTokens)}
+                   </TableCell>
+diff --git a/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/RunHistoryTable.test.tsx b/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/RunHistoryTable.test.tsx
+index 80c9d3db20..437e02f890 100644
+--- a/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/RunHistoryTable.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/RunHistoryTable.test.tsx
+@@ -51,6 +51,7 @@ const run = (id: string, repo: string) => ({
+   prOpenedCount: 0,
+   dismissedCount: 0,
+   totalTokenCostUsd: "0.0000",
++  cliReportedCostUsd: null,
+   totalInputTokens: null,
+   totalOutputTokens: null,
+   createdAt: "13 Aug 2026",
+diff --git a/apps/ally-admin-dashboard/src/types/bugHunter.ts b/apps/ally-admin-dashboard/src/types/bugHunter.ts
+index f1bf719d5f..946426f247 100644
+--- a/apps/ally-admin-dashboard/src/types/bugHunter.ts
++++ b/apps/ally-admin-dashboard/src/types/bugHunter.ts
+@@ -241,8 +241,10 @@ export interface BugHuntRun {
+   autoMergedCount: number;
+   prOpenedCount: number;
+   dismissedCount: number;
+-  /** USD, snapshotted from llm_usage at close time — not a live figure while RUNNING. */
++  /** USD, snapshotted from llm_usage at close time — not a live figure while RUNNING. Cache-blind; prefer cliReportedCostUsd when present. */
+   totalTokenCostUsd: string;
++  /** USD, from the Claude Code CLI's own total_cost_usd — prices cache reads/writes at their real rate. Null for runs closed before this was captured. */
++  cliReportedCostUsd: number | null;
+   /** Raw token counts behind totalTokenCostUsd. Null for runs closed before this was tracked. */
+   totalInputTokens: number | null;
+   totalOutputTokens: number | null;

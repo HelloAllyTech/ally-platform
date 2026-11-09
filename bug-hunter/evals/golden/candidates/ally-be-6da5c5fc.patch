@@ -1,0 +1,243 @@
+diff --git a/src/auth/controller/test/auth-controller.spec.ts b/src/auth/controller/test/auth-controller.spec.ts
+index 5acb9dcd23..4bd39f013e 100644
+--- a/src/auth/controller/test/auth-controller.spec.ts
++++ b/src/auth/controller/test/auth-controller.spec.ts
+@@ -7,7 +7,7 @@ import { AuthController } from '../auth.controller';
+ import { Test, TestingModule } from '@nestjs/testing';
+ import { AuthService } from 'src/auth/service/auth.service';
+ import { PermissionsService } from 'src/authorization/service/permissions.service';
+-import { UserRole } from 'src/common/constants/user.constants';
++import { AppType, UserRole } from 'src/common/constants/user.constants';
+ 
+ const mockAuthService = {
+   login: jest.fn(),
+@@ -107,6 +107,7 @@ describe('AuthController', () => {
+     const result = await controller.generateOtpV2({
+       email: 'test@example.com',
+       allowedRoles: [UserRole.CLIENT],
++      appType: AppType.APP,
+     });
+     expect(result).toEqual({ success: true });
+   });
+diff --git a/src/auth/dto/login.dto.ts b/src/auth/dto/login.dto.ts
+index a95cbe5a5c..0ccdf6d3bd 100644
+--- a/src/auth/dto/login.dto.ts
++++ b/src/auth/dto/login.dto.ts
+@@ -8,7 +8,7 @@ import {
+   IsNumber,
+ } from 'class-validator';
+ import { ApiProperty } from '@nestjs/swagger';
+-import { UserRole } from 'src/common/constants/user.constants';
++import { UserRole, AppType } from 'src/common/constants/user.constants';
+ 
+ export class LoginDto {
+   @ApiProperty({
+@@ -46,6 +46,15 @@ export class GenerateOtpV2Dto {
+   @IsEnum(UserRole, { each: true })
+   @ArrayNotEmpty()
+   allowedRoles!: UserRole[];
++
++  @ApiProperty({
++    description: 'App type for OTP generation (optional)',
++    example: AppType.APP,
++    enum: AppType,
++    required: false,
++  })
++  @IsEnum(AppType)
++  appType?: AppType;
+ }
+ 
+ export class VerifyOtpV2Dto {
+diff --git a/src/auth/service/auth.service.ts b/src/auth/service/auth.service.ts
+index 5d89a1cc19..b40625e99b 100644
+--- a/src/auth/service/auth.service.ts
++++ b/src/auth/service/auth.service.ts
+@@ -242,7 +242,7 @@ export class AuthService {
+   async generateOtpV2(
+     generateOtpDto: GenerateOtpV2Dto,
+   ): Promise<GenerateOtpV2ResponseDto> {
+-    const { email, allowedRoles } = generateOtpDto;
++    const { email, allowedRoles, appType } = generateOtpDto;
+     if (!email) {
+       throw new BadRequestException('Email is required');
+     }
+@@ -311,6 +311,7 @@ export class AuthService {
+       email,
+       otp,
+       magicLinkToken: magicToken,
++      appType,
+     });
+     return {
+       success: true,
+diff --git a/src/common/constants/user.constants.ts b/src/common/constants/user.constants.ts
+index f83d30399e..10314c6865 100644
+--- a/src/common/constants/user.constants.ts
++++ b/src/common/constants/user.constants.ts
+@@ -9,6 +9,11 @@ export enum UserRole {
+   SCRIBE_REVIEWER = 'SCRIBE_REVIEWER',
+ }
+ 
++export enum AppType {
++  APP = 'APP',
++  ADMIN = 'ADMIN',
++}
++
+ export enum PreferenceName {
+   SUMMARY_HIDDEN_FIELDS = 'SUMMARY_HIDDEN_FIELDS',
+   SUMMARY_HIDDEN_SECTIONS = 'SUMMARY_HIDDEN_SECTIONS',
+diff --git a/src/config/config.service.ts b/src/config/config.service.ts
+index dfec0e174c..648476a9a9 100644
+--- a/src/config/config.service.ts
++++ b/src/config/config.service.ts
+@@ -249,6 +249,7 @@ export class AppConfigService {
+   get app() {
+     return {
+       baseUrl: this.configService.get<string>('APP_BASE_URL'),
++      adminBaseUrl: this.configService.get<string>('ADMIN_APP_BASE_URL'),
+     };
+   }
+ 
+diff --git a/src/notification/event/notification.event.consumer.ts b/src/notification/event/notification.event.consumer.ts
+index c4eecdfcb0..29891f78e7 100644
+--- a/src/notification/event/notification.event.consumer.ts
++++ b/src/notification/event/notification.event.consumer.ts
+@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
+ import { OnEvent } from '@nestjs/event-emitter';
+ import { NotificationService } from '../service/notification.service';
+ import { NotificationErrorType } from '../type/notification.error.type';
++import { AppType } from 'src/common/constants/user.constants';
+ @Injectable()
+ export class NotificationEventConsumer {
+   constructor(private readonly notificationService: NotificationService) {}
+@@ -16,11 +17,13 @@ export class NotificationEventConsumer {
+     email: string;
+     otp: string;
+     magicLinkToken?: string;
++    appType?: AppType;
+   }) {
+     this.notificationService.sendEmailOTP(
+       payload.email,
+       payload.otp,
+       payload.magicLinkToken,
++      payload.appType,
+     );
+   }
+ }
+diff --git a/src/notification/event/test/notification.event.consumer.spec.ts b/src/notification/event/test/notification.event.consumer.spec.ts
+index fe8e551294..84bd5163d7 100644
+--- a/src/notification/event/test/notification.event.consumer.spec.ts
++++ b/src/notification/event/test/notification.event.consumer.spec.ts
+@@ -55,6 +55,7 @@ describe('NotificationEventConsumer', () => {
+         mockOtpPayload.email,
+         mockOtpPayload.otp,
+         undefined,
++        undefined,
+       );
+     });
+   });
+diff --git a/src/notification/service/email.service.ts b/src/notification/service/email.service.ts
+index eaf650c84a..48959c0d97 100644
+--- a/src/notification/service/email.service.ts
++++ b/src/notification/service/email.service.ts
+@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
+ import { AppConfigService } from '../../config/config.service';
+ import { LoggerService } from '../../logger/logger.service';
+ import { SESService } from 'src/aws/service/ses.service';
++import { AppType } from 'src/common/constants/user.constants';
+ 
+ @Injectable()
+ export class EmailService {
+@@ -18,6 +19,7 @@ export class EmailService {
+     to: string;
+     otp: string;
+     magicLinkToken?: string;
++    appType?: AppType;
+   }): Promise<boolean> {
+     if (this.config.isDevelopment) {
+       // TODO: Remove this once email otp is verified in dev
+@@ -32,8 +34,13 @@ export class EmailService {
+     }
+     const minutes = Math.floor(this.config.otp.ttl / 60);
+ 
++    const baseUrl =
++      params.appType === AppType.ADMIN
++        ? this.config.app.adminBaseUrl
++        : this.config.app.baseUrl;
++
+     const magicLink = params.magicLinkToken
+-      ? `${this.config.app.baseUrl}/auth/verify?token=${params.magicLinkToken}`
++      ? `${baseUrl}/auth/verify?token=${params.magicLinkToken}`
+       : undefined;
+ 
+     const subject = 'Your Ally Verification Code';
+diff --git a/src/notification/service/notification.service.ts b/src/notification/service/notification.service.ts
+index b5e407edb0..6522fe0946 100644
+--- a/src/notification/service/notification.service.ts
++++ b/src/notification/service/notification.service.ts
+@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
+ import { NotificationErrorType } from '../type/notification.error.type';
+ import { SlackService } from './slack.service';
+ import { EmailService } from './email.service';
++import { AppType } from 'src/common/constants/user.constants';
+ @Injectable()
+ export class NotificationService {
+   private ignoreStatusCode = [401];
+@@ -18,8 +19,13 @@ export class NotificationService {
+     this.slackService.sendMessage(slackMessage, channel);
+   }
+ 
+-  async sendEmailOTP(to: string, otp: string, magicLinkToken?: string) {
+-    await this.emailService.sendEmailOTP({ to, otp, magicLinkToken });
++  async sendEmailOTP(
++    to: string,
++    otp: string,
++    magicLinkToken?: string,
++    appType?: AppType,
++  ) {
++    await this.emailService.sendEmailOTP({ to, otp, magicLinkToken, appType });
+   }
+ 
+   async sendEmailSummaryNotification({
+diff --git a/src/notification/service/test/email.service.spec.ts b/src/notification/service/test/email.service.spec.ts
+index 4a03848ba4..cfe832c0e8 100644
+--- a/src/notification/service/test/email.service.spec.ts
++++ b/src/notification/service/test/email.service.spec.ts
+@@ -1,6 +1,7 @@
+ import { Test, TestingModule } from '@nestjs/testing';
+ import { EmailService } from '../email.service';
+ import { AppConfigService } from 'src/config/config.service';
++import { AppType } from 'src/common/constants/user.constants';
+ import { EventEmitter2 } from '@nestjs/event-emitter';
+ import { SESService } from 'src/aws/service/ses.service';
+ 
+@@ -154,6 +155,30 @@ describe('EmailService', () => {
+       });
+       expect(result).toBe(true);
+     });
++
++    it('should use adminBaseUrl when appType is ADMIN', async () => {
++      mockConfig.app.adminBaseUrl = 'https://admin.example.com';
++      const params = {
++        to: 'test@example.com',
++        otp: '123456',
++        magicLinkToken: 'test-magic-token',
++        appType: AppType.ADMIN,
++      };
++      mockSESService.sendEmail.mockResolvedValue(true);
++
++      const result = await service.sendEmailOTP(params);
++
++      expect(mockSESService.sendEmail).toHaveBeenCalledWith({
++        from: 'test@example.com',
++        to: 'test@example.com',
++        subject: 'Your Ally Verification Code',
++        body: expect.stringContaining(
++          'https://admin.example.com/auth/verify?token=test-magic-token',
++        ),
++        isHtml: false,
++      });
++      expect(result).toBe(true);
++    });
+   });
+ 
+   describe('sendSummaryNotification', () => {

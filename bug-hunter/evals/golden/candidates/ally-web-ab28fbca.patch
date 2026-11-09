@@ -1,0 +1,300 @@
+diff --git a/apps/ally-admin-dashboard/src/hooks/__tests__/useBuilderStream.test.tsx b/apps/ally-admin-dashboard/src/hooks/__tests__/useBuilderStream.test.tsx
+index 3e3dbd1882..ca46bc77af 100644
+--- a/apps/ally-admin-dashboard/src/hooks/__tests__/useBuilderStream.test.tsx
++++ b/apps/ally-admin-dashboard/src/hooks/__tests__/useBuilderStream.test.tsx
+@@ -84,4 +84,26 @@ describe("mapServerMessagesToFeed", () => {
+ 
+     expect(feed).toEqual([{ id: "srv_u1", role: "user", content: "continue" }]);
+   });
++
++  it("shows a resumed structured answer as the admin's words, without the ids for the model", () => {
++    const feed = mapServerMessagesToFeed([
++      message({
++        id: "a1",
++        content: "",
++        metadata: { questions: [{ id: "q1", prompt: "Which repos?" } as never] },
++      }),
++      message({
++        id: "u1",
++        role: "user",
++        content: '[answers question q1] ally-be, my own [selected ids: be | custom: "my own"]',
++        metadata: {
++          questionId: "q1",
++          answer: { selectedOptionIds: ["be"], customValues: ["my own"] },
++        },
++      }),
++    ]);
++
++    const card = feed.find(entry => entry.question);
++    expect(card?.answeredWith).toBe("ally-be, my own");
++  });
+ });
+diff --git a/apps/ally-admin-dashboard/src/hooks/__tests__/useCharacterInterviewStream.test.tsx b/apps/ally-admin-dashboard/src/hooks/__tests__/useCharacterInterviewStream.test.tsx
+index d4e4b12a72..61017ff7c4 100644
+--- a/apps/ally-admin-dashboard/src/hooks/__tests__/useCharacterInterviewStream.test.tsx
++++ b/apps/ally-admin-dashboard/src/hooks/__tests__/useCharacterInterviewStream.test.tsx
+@@ -45,6 +45,44 @@ describe("mapServerMessagesToFeed", () => {
+ 
+     expect(feed).toHaveLength(0);
+   });
++
++  // The server stores an answered card's turn for the model — prefix, labels, then the selected
++  // ids. A resumed feed showed that suffix on both the locked card and the bubble, where the live
++  // feed had shown only the admin's words.
++  it("shows a resumed structured answer as the admin's words alone", () => {
++    const feed = mapServerMessagesToFeed([
++      {
++        id: "a1",
++        seq: 1,
++        role: "assistant",
++        content: "",
++        metadata: {
++          questions: [
++            {
++              id: "q1",
++              prompt: "What is her home life like?",
++              kind: "singleSelect",
++              options: [{ id: "husband_distant", label: "Lives with her husband, but distant" }],
++            },
++          ],
++        },
++      },
++      {
++        id: "u1",
++        seq: 2,
++        role: "user",
++        content:
++          "[answers question q1] Lives with her husband, but distant [selected ids: husband_distant]",
++        metadata: { questionId: "q1", answer: { selectedOptionIds: ["husband_distant"] } },
++      },
++    ] as never);
++
++    const card = feed.find(entry => entry.question);
++    expect(card?.answeredWith).toBe("Lives with her husband, but distant");
++    expect(card?.answeredAnswer).toEqual({ selectedOptionIds: ["husband_distant"] });
++    const bubble = feed.find(entry => entry.role === "user");
++    expect(bubble?.content).toBe("Lives with her husband, but distant");
++  });
+ });
+ 
+ /** A response whose body streams `frames` as SSE, the way the server does. */
+diff --git a/apps/ally-admin-dashboard/src/hooks/useBuilderStream.ts b/apps/ally-admin-dashboard/src/hooks/useBuilderStream.ts
+index 33219461bb..621f2188ca 100644
+--- a/apps/ally-admin-dashboard/src/hooks/useBuilderStream.ts
++++ b/apps/ally-admin-dashboard/src/hooks/useBuilderStream.ts
+@@ -16,6 +16,8 @@ import {
+ } from "@types";
+ import { logger } from "@utils";
+ 
++import { userTurnText } from "../utils/userTurnText";
++
+ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+ 
+ let messageIdCounter = 0;
+@@ -63,9 +65,6 @@ export const parseSseBuffer = (
+   return { events, rest, droppedCount };
+ };
+ 
+-/** Strips the deterministic answer prefix the server adds to a user turn. */
+-const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
+-
+ /**
+  * Rebuilds the chat feed from persisted rows, re-emitting the question cards
+  * an assistant turn asked and marking them answered from the *later* user row
+@@ -84,7 +83,7 @@ export const mapServerMessagesToFeed = (
+     const questionId = message.metadata?.questionId;
+     if (message.role === "user" && questionId) {
+       answersByQuestionId.set(questionId, {
+-        text: (message.content ?? "").replace(ANSWER_PREFIX_RE, ""),
++        text: userTurnText(message.content),
+         answer: message.metadata?.answer,
+       });
+     }
+@@ -94,7 +93,7 @@ export const mapServerMessagesToFeed = (
+   }
+ 
+   for (const message of serverMessages) {
+-    const content = (message.content ?? "").replace(ANSWER_PREFIX_RE, "");
++    const content = userTurnText(message.content);
+ 
+     if (message.role === "user") {
+       // An answer is drawn once, on the card it answers.
+diff --git a/apps/ally-admin-dashboard/src/hooks/useCharacterInterviewStream.ts b/apps/ally-admin-dashboard/src/hooks/useCharacterInterviewStream.ts
+index b1241411a8..fca2900f68 100644
+--- a/apps/ally-admin-dashboard/src/hooks/useCharacterInterviewStream.ts
++++ b/apps/ally-admin-dashboard/src/hooks/useCharacterInterviewStream.ts
+@@ -15,6 +15,8 @@ import {
+ } from "@types";
+ import { logger } from "@utils";
+ 
++import { userTurnText } from "../utils/userTurnText";
++
+ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+ 
+ let messageIdCounter = 0;
+@@ -57,8 +59,6 @@ export const parseSseBuffer = (
+   return { events, rest };
+ };
+ 
+-const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
+-
+ /**
+  * Rebuilds the chat feed from persisted character_interview_messages rows —
+  * the resume path. Question cards are reconstructed from the assistant row's
+@@ -74,7 +74,7 @@ export const mapServerMessagesToFeed = (
+     if (row.role !== "user") continue;
+     const questionId = row.metadata?.questionId;
+     if (questionId) {
+-      answeredQuestions.set(String(questionId), (row.content ?? "").replace(ANSWER_PREFIX_RE, ""));
++      answeredQuestions.set(String(questionId), userTurnText(row.content));
+       if (row.metadata?.answer) {
+         answeredAnswers.set(String(questionId), row.metadata.answer);
+       }
+@@ -91,7 +91,7 @@ export const mapServerMessagesToFeed = (
+       feed.push({
+         id: baseId,
+         role: "user",
+-        content: content.replace(ANSWER_PREFIX_RE, ""),
++        content: userTurnText(content),
+       });
+       return;
+     }
+diff --git a/apps/ally-admin-dashboard/src/hooks/useCourseCopilotStream.ts b/apps/ally-admin-dashboard/src/hooks/useCourseCopilotStream.ts
+index c48ae5c92e..d40fa15574 100644
+--- a/apps/ally-admin-dashboard/src/hooks/useCourseCopilotStream.ts
++++ b/apps/ally-admin-dashboard/src/hooks/useCourseCopilotStream.ts
+@@ -18,6 +18,8 @@ import {
+ } from "@types";
+ import { logger } from "@utils";
+ 
++import { userTurnText } from "../utils/userTurnText";
++
+ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+ 
+ /**
+@@ -117,18 +119,6 @@ export const parseSseBuffer = (
+   return { events, rest, droppedCount };
+ };
+ 
+-/** Strips the deterministic answer prefix the server adds to a user turn. */
+-const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
+-
+-/**
+- * …and the structured-answer suffix (" [selected ids: a | custom: \"…\"]"),
+- * which is for the model, not the trainer: the card shows the labels.
+- */
+-const ANSWER_SUFFIX_RE = /\s*\[(?:none of these|selected ids:|custom:)[^\]]*\]\s*$/i;
+-
+-const answerText = (content: string | null | undefined): string =>
+-  (content ?? "").replace(ANSWER_PREFIX_RE, "").replace(ANSWER_SUFFIX_RE, "");
+-
+ /**
+  * The newest question card in the feed for `questionId` — the one an answer to it is for. Marking
+  * and rolling back both look the card up this way, so they always agree on which card it is.
+@@ -175,7 +165,7 @@ export const mapServerMessagesToFeed = (
+     const questionId = row.metadata?.questionId;
+     if (row.role === "user" && questionId) {
+       answersByQuestionId.set(String(questionId), {
+-        text: answerText(row.content),
++        text: userTurnText(row.content),
+         answer: row.metadata?.answer,
+       });
+     }
+@@ -189,7 +179,7 @@ export const mapServerMessagesToFeed = (
+   safeRows.forEach((row, index) => {
+     const baseId = `srv_${row.id ?? row.seq ?? index}`;
+     const metadata = row.metadata ?? {};
+-    const content = answerText(row.content);
++    const content = userTurnText(row.content);
+ 
+     if (row.role === "user") {
+       // The hidden kickoff turn was never shown as a bubble when it was sent; showing it on resume
+diff --git a/apps/ally-admin-dashboard/src/utils/__tests__/userTurnText.test.ts b/apps/ally-admin-dashboard/src/utils/__tests__/userTurnText.test.ts
+new file mode 100644
+index 0000000000..9a89f08d8f
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/utils/__tests__/userTurnText.test.ts
+@@ -0,0 +1,45 @@
++import { describe, expect, it } from "vitest";
++
++import { userTurnText } from "../userTurnText";
++
++/** The shapes ally-be's `renderUserContent` writes (Builder, Course Copilot, character interview). */
++describe("userTurnText", () => {
++  it("strips the answered-question prefix and the selected-ids suffix", () => {
++    expect(userTurnText("[answers question q1] Warm and guarded [selected ids: guarded]")).toBe(
++      "Warm and guarded",
++    );
++  });
++
++  it("strips a multi-part suffix", () => {
++    expect(
++      userTurnText(
++        '[answers question q2] Teachers, Peer supporters [selected ids: t | custom: "Peer supporters"]',
++      ),
++    ).toBe("Teachers, Peer supporters");
++  });
++
++  it("strips a none-of-these suffix", () => {
++    expect(userTurnText("[answers question q3] None of these [none of these]")).toBe(
++      "None of these",
++    );
++  });
++
++  // A custom value is free text; a bracket inside its quotes must not end the match early and
++  // leave the suffix half-stripped.
++  it("strips a suffix whose custom value contains a bracket", () => {
++    expect(userTurnText('[answers question q4] [draft] v2 [custom: "[draft] v2"]')).toBe(
++      "[draft] v2",
++    );
++  });
++
++  it("leaves an admin's own words alone, brackets included", () => {
++    expect(userTurnText("Make the [intro] shorter")).toBe("Make the [intro] shorter");
++    expect(userTurnText("Free-typed answer")).toBe("Free-typed answer");
++  });
++
++  it("treats missing or non-string content as empty", () => {
++    expect(userTurnText(null)).toBe("");
++    expect(userTurnText(undefined)).toBe("");
++    expect(userTurnText(42 as never)).toBe("");
++  });
++});
+diff --git a/apps/ally-admin-dashboard/src/utils/index.ts b/apps/ally-admin-dashboard/src/utils/index.ts
+index 81a61bcb00..54a88e3e14 100644
+--- a/apps/ally-admin-dashboard/src/utils/index.ts
++++ b/apps/ally-admin-dashboard/src/utils/index.ts
+@@ -17,3 +17,4 @@ export * from "./navigation";
+ export * from "./errorMessage";
+ export * from "./agentAuthored";
+ export * from "./characterData";
++export * from "./userTurnText";
+diff --git a/apps/ally-admin-dashboard/src/utils/userTurnText.ts b/apps/ally-admin-dashboard/src/utils/userTurnText.ts
+new file mode 100644
+index 0000000000..ec5d760eca
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/utils/userTurnText.ts
+@@ -0,0 +1,23 @@
++/**
++ * What an admin's persisted chat turn should read as on screen.
++ *
++ * Builder, Course Copilot and the character interview all store an answered question's turn for
++ * the model, not for the admin: a `[answers question <id>] ` prefix, the words the admin chose,
++ * and — for a structured answer — a suffix such as ` [selected ids: a, b | custom: "x"]` (or
++ * `[none of these]`), so the agent can act on the exact selections. The live feed shows only the
++ * admin's words, so a resumed one must too; the card already shows the labels.
++ */
++
++/** The prefix the server adds to a turn that answers a question card. */
++const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
++
++/**
++ * The structured-answer suffix. Custom values are quoted and may themselves contain `]`, so a
++ * quoted run is consumed whole rather than stopping at the first bracket.
++ */
++const ANSWER_SUFFIX_RE = /\s*\[(?:none of these|selected ids:|custom:)(?:[^\]"]|"[^"]*")*\]\s*$/i;
++
++export const userTurnText = (content: string | null | undefined): string =>
++  (typeof content === "string" ? content : "")
++    .replace(ANSWER_PREFIX_RE, "")
++    .replace(ANSWER_SUFFIX_RE, "");

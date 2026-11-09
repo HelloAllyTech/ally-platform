@@ -1,0 +1,162 @@
+diff --git a/src/learn/service/simulation-credits.service.ts b/src/learn/service/simulation-credits.service.ts
+index c9d39df880..73b45a0150 100644
+--- a/src/learn/service/simulation-credits.service.ts
++++ b/src/learn/service/simulation-credits.service.ts
+@@ -11,6 +11,7 @@ import { SimulationCreditsResponseDto } from '../dto/simulation-credits-response
+ import { UpdateSimulationCreditsDto } from '../dto/update-simulation-credits.dto';
+ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+ import { PermissionValidator } from 'src/authorization/service/permission-validator.service';
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ import { UserService } from 'src/user/service/user.service';
+ import { AppConfigService } from 'src/config/config.service';
+ import { PostHog } from 'posthog-node';
+@@ -35,6 +36,7 @@ export class SimulationCreditsService {
+     private readonly userService: UserService,
+     private readonly configService: AppConfigService,
+     private readonly posthog: PostHog,
++    private readonly tenantScopeService: TenantScopeService,
+   ) {}
+ 
+   async getSimulationCredits(
+@@ -61,6 +63,7 @@ export class SimulationCreditsService {
+       if (!isValidUser) {
+         throw new BadRequestException('User not found');
+       }
++      await this.assertUserInCallerScope(targetUserId);
+     }
+     const credits =
+       await this.simulationCreditsRepository.findByUserId(targetUserId);
+@@ -86,6 +89,7 @@ export class SimulationCreditsService {
+     updateDto: UpdateSimulationCreditsDto,
+   ): Promise<{ success: boolean }> {
+     const { userId, creditLimit } = updateDto;
++    await this.assertUserInCallerScope(userId);
+     // check if the user is allowed to start a scenario session to make sure given id  belongs to a learner role
+     const isCreateScenarioSessionAllowed =
+       await this.permissionValidator.validatePermissions(userId, [
+@@ -117,6 +121,28 @@ export class SimulationCreditsService {
+     return { success: true };
+   }
+ 
++  /**
++   * Every platform admin holds SYSTEM_ACCESS and EDIT_SIMULATION_CREDITS, so
++   * one restricted to some organizations could read and set the credits of
++   * any user on the platform. Hold them to users in those organizations.
++   * Answers like an unknown user, so a user id outside scope reveals nothing.
++   */
++  private async assertUserInCallerScope(userId: number): Promise<void> {
++    const { tenantIds } = await this.tenantScopeService.resolveScope();
++    if (tenantIds === null) {
++      return;
++    }
++    const user = await this.userService.get(userId);
++    try {
++      if (!user?.tenantId) {
++        throw new BadRequestException();
++      }
++      await this.tenantScopeService.assertTenantInScope(user.tenantId);
++    } catch {
++      throw new BadRequestException('User not found');
++    }
++  }
++
+   async consumeCredits(
+     userId: number,
+     creditsToConsume: number,
+diff --git a/src/learn/service/test/simulation-credits.service.spec.ts b/src/learn/service/test/simulation-credits.service.spec.ts
+index 40752364af..60518b7119 100644
+--- a/src/learn/service/test/simulation-credits.service.spec.ts
++++ b/src/learn/service/test/simulation-credits.service.spec.ts
+@@ -1,3 +1,4 @@
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ import { Test, TestingModule } from '@nestjs/testing';
+ import { SimulationCreditsService } from '../simulation-credits.service';
+ import { SimulationCreditsRepository } from '../../repository/simulation-credits.repository';
+@@ -11,6 +12,17 @@ import {
+ } from '@nestjs/common';
+ import { PostHog } from 'posthog-node';
+ 
++// An unrestricted platform admin unless a test says otherwise; when
++// restricted, they hold 'allowed-tenant' only.
++const mockTenantScopeService = {
++  resolveScope: jest
++    .fn()
++    .mockResolvedValue({ tenantIds: null, restricted: false }),
++  assertTenantInScope: jest.fn(async (tenantId: string) => {
++    if (tenantId !== 'allowed-tenant') throw new Error('out of scope');
++  }),
++};
++
+ describe('SimulationCreditsService', () => {
+   let service: SimulationCreditsService;
+   let mockSimulationCreditsRepository: any;
+@@ -63,6 +75,7 @@ describe('SimulationCreditsService', () => {
+         { provide: PermissionValidator, useValue: mockPermissionValidator },
+         { provide: UserService, useValue: mockUserService },
+         { provide: AppConfigService, useValue: mockConfigService },
++        { provide: TenantScopeService, useValue: mockTenantScopeService },
+       ],
+     }).compile();
+ 
+@@ -253,6 +266,61 @@ describe('SimulationCreditsService', () => {
+     });
+   });
+ 
++  describe('as a platform admin restricted to one organization', () => {
++    beforeEach(() => {
++      mockTenantScopeService.resolveScope.mockResolvedValue({
++        tenantIds: ['allowed-tenant'],
++        restricted: true,
++      });
++      mockPermissionValidator.validatePermissions.mockResolvedValue(true);
++      mockUserService.isValidUser.mockResolvedValue(true);
++      mockSimulationCreditsRepository.findByUserId.mockResolvedValue(
++        mockCredits,
++      );
++      mockSimulationCreditsRepository.createOrUpdate.mockResolvedValue(
++        mockCredits,
++      );
++    });
++
++    afterEach(() => {
++      mockTenantScopeService.resolveScope.mockResolvedValue({
++        tenantIds: null,
++        restricted: false,
++      });
++    });
++
++    it('reads and sets the credits of a user in their organization', async () => {
++      mockUserService.get.mockResolvedValue({
++        id: 2,
++        tenantId: 'allowed-tenant',
++      });
++
++      await expect(service.getSimulationCredits(1, 2)).resolves.toMatchObject({
++        creditLimit: 100,
++      });
++      await expect(
++        service.updateSimulationCredits({ userId: 2, creditLimit: 150 }),
++      ).resolves.toEqual({ success: true });
++    });
++
++    it('answers like an unknown user for anyone in another organization', async () => {
++      mockUserService.get.mockResolvedValue({
++        id: 3,
++        tenantId: 'other-tenant',
++      });
++
++      await expect(service.getSimulationCredits(1, 3)).rejects.toThrow(
++        new BadRequestException('User not found'),
++      );
++      await expect(
++        service.updateSimulationCredits({ userId: 3, creditLimit: 150 }),
++      ).rejects.toThrow(new BadRequestException('User not found'));
++      expect(
++        mockSimulationCreditsRepository.createOrUpdate,
++      ).not.toHaveBeenCalled();
++    });
++  });
++
+   describe('consumeCredits', () => {
+     it('should consume credits successfully when enough credits available', async () => {
+       mockSimulationCreditsRepository.consumeCredits.mockResolvedValue({

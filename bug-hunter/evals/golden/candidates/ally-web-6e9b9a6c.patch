@@ -1,0 +1,104 @@
+diff --git a/apps/ally-helpline-dashboard/src/assets/icons/index.ts b/apps/ally-helpline-dashboard/src/assets/icons/index.ts
+index 0e9414a3f4..130e2cf331 100644
+--- a/apps/ally-helpline-dashboard/src/assets/icons/index.ts
++++ b/apps/ally-helpline-dashboard/src/assets/icons/index.ts
+@@ -111,6 +111,9 @@ import ProgressLadderIcon from "./progress-ladder.svg?react";
+ import RedirectIcon from "./redirect-icon.svg?react";
+ import ReferralsProvided from "./referrals-provided.svg?react";
+ import Refresh from "./refresh.svg?react";
++// The nav rail's copy of warning-triangle: cropped to the glyph like its sibling
++// tab icons (the original carries ~3px of padding) and in their ink, not blue.
++import ReportProblemNavIcon from "./report-problem-nav-icon.svg?react";
+ import ResumeIcon from "./resume-icon.svg?react";
+ import ReviewIcon from "./review-icon.svg?react";
+ import ReviewNavIcon from "./review-nav-icon.svg?react";
+@@ -248,6 +251,7 @@ export {
+   ResumeIcon,
+   ReviewIcon,
+   ReviewNavIcon,
++  ReportProblemNavIcon,
+   ReviewsEmptyState,
+   RoundCheckmark,
+   ScenarioIcon,
+diff --git a/apps/ally-helpline-dashboard/src/components/nav-sidebar/NavSideBar.tsx b/apps/ally-helpline-dashboard/src/components/nav-sidebar/NavSideBar.tsx
+index 66625ebadb..40990ba8bf 100644
+--- a/apps/ally-helpline-dashboard/src/components/nav-sidebar/NavSideBar.tsx
++++ b/apps/ally-helpline-dashboard/src/components/nav-sidebar/NavSideBar.tsx
+@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
+ import { Tooltip } from "@ally-ui-mono/ui-shared";
+ import { CustomImage, FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared";
+ import { useGetLogoUrlQuery, useGetUnreadReviewCountQuery } from "@api";
+-import { DockToRight, LogoutIllustration, RedirectIcon, WarningTriangle } from "@assets";
++import { DockToRight, LogoutIllustration, RedirectIcon, ReportProblemNavIcon } from "@assets";
+ import {
+   AppTooltip,
+   ConfirmationDialog,
+@@ -511,7 +511,7 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
+             first so the modal isn't left rendering behind it. */}
+         <Tab
+           id={TabId.REPORT_PROBLEM}
+-          Icon={WarningTriangle}
++          Icon={ReportProblemNavIcon}
+           title="Report a problem"
+           tKey="user.reportProblem"
+           activeTab={activeTab}
+diff --git a/apps/ally-helpline-dashboard/src/components/nav-sidebar/__test__/NavSideBar.test.tsx b/apps/ally-helpline-dashboard/src/components/nav-sidebar/__test__/NavSideBar.test.tsx
+index 1f78a575cb..0e17680516 100644
+--- a/apps/ally-helpline-dashboard/src/components/nav-sidebar/__test__/NavSideBar.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/nav-sidebar/__test__/NavSideBar.test.tsx
+@@ -86,7 +86,7 @@ vi.mock("@assets", () => ({
+   DockToRight: (props: any) => <svg {...props} data-testid="dock-to-right" />,
+   RedirectIcon: (props: any) => <svg {...props} data-testid="redirect-icon" />,
+   LogoutIllustration: (props: any) => <svg data-testid="logout-illustration" {...props} />,
+-  WarningTriangle: (props: any) => <svg {...props} data-testid="warning-triangle-icon" />,
++  ReportProblemNavIcon: (props: any) => <svg {...props} data-testid="report-problem-icon" />,
+ }));
+ 
+ vi.mock("@components", () => ({
+@@ -527,20 +527,35 @@ describe("NavSideBar", () => {
+     });
+ 
+     it("still works when storage is unavailable", () => {
+-      const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+-        throw new Error("SecurityError");
++      // Throws for the pin's key only: the expanded rail mounts other storage
++      // readers (the language selector, when its flag is on) that are not
++      // under test here.
++      const { getItem: realGet, setItem: realSet } = Storage.prototype;
++      const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
++        this: Storage,
++        key: string,
++      ) {
++        if (key === PINNED_KEY) throw new Error("SecurityError");
++        return realGet.call(this, key);
+       });
+-      const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+-        throw new Error("SecurityError");
++      const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
++        this: Storage,
++        key: string,
++        value: string,
++      ) {
++        if (key === PINNED_KEY) throw new Error("SecurityError");
++        realSet.call(this, key, value);
+       });
+ 
+-      renderComponent();
+-      expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-24");
+-      fireEvent.click(screen.getByTitle("Expand sidebar"));
+-      expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-64");
+-
+-      getItem.mockRestore();
+-      setItem.mockRestore();
++      try {
++        renderComponent();
++        expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-24");
++        fireEvent.click(screen.getByTitle("Expand sidebar"));
++        expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-64");
++      } finally {
++        getItem.mockRestore();
++        setItem.mockRestore();
++      }
+     });
+   });
+ 

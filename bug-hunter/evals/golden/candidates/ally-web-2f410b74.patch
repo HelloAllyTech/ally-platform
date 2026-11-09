@@ -1,0 +1,172 @@
+diff --git a/apps/ally-admin-dashboard/src/components/scenario-version-panel/ScenarioVersionPanel.tsx b/apps/ally-admin-dashboard/src/components/scenario-version-panel/ScenarioVersionPanel.tsx
+index b653ccbb0c..fb0623d0ec 100644
+--- a/apps/ally-admin-dashboard/src/components/scenario-version-panel/ScenarioVersionPanel.tsx
++++ b/apps/ally-admin-dashboard/src/components/scenario-version-panel/ScenarioVersionPanel.tsx
+@@ -222,7 +222,9 @@ export const ScenarioVersionPanel: React.FC<ScenarioVersionPanelProps> = ({
+         ) : (
+           <ul className="divide-y divide-border-light">
+             {versions.map(version => {
+-              const isActive = version.id === activeVersionId;
++              // No selected version means the editor is on the live scenario,
++              // which the `isLive` version stands for — so it's the active row.
++              const isActive = activeVersionId ? version.id === activeVersionId : !!version.isLive;
+               const isPublished = version.status === ScenarioVersionStatus.PUBLISHED;
+               const isRenamingThis = renamingId === version.id;
+               return (
+@@ -299,7 +301,10 @@ export const ScenarioVersionPanel: React.FC<ScenarioVersionPanelProps> = ({
+                       >
+                         <Branch className="w-3.5 h-3.5" />
+                       </button>
+-                      {!isPublished && (
++                      {/* The live-mirroring version is the editor's handle on
++                          the live scenario; deleting it would strand that
++                          content (the server refuses it too). */}
++                      {!isPublished && !version.isLive && (
+                         <button
+                           className={`${rowActionBtnClass} hover:text-destructive-500`}
+                           onClick={() => setDeleteTarget(version)}
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx b/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+index facd3f9c9e..46243b9493 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+@@ -200,8 +200,12 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
+     // (a write), and the version panel is hidden there anyway.
+     { skip: !simulationId || viewMode },
+   );
++  // With no version explicitly selected the editor is on the live scenario, so
++  // the header must name the version that MIRRORS it (`isLive`) — not merely
++  // the newest one, which after a branch would mislabel live edits as "v2".
+   const currentVersion =
+     scenarioVersions.find(v => v.id === activeVersionId) ??
++    scenarioVersions.find(v => v.isLive) ??
+     scenarioVersions.find(v => v.status === ScenarioVersionStatus.PUBLISHED) ??
+     scenarioVersions[0];
+   // An explicitly-selected non-draft (archived) version is read-only — edits
+@@ -1314,10 +1318,13 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
+                 onEditVersion={async version => {
+                   // Save the outgoing draft/live edits before the form reset.
+                   await flushPendingEdits();
+-                  if (version.status === ScenarioVersionStatus.PUBLISHED) {
+-                    // The published version IS the live scenario — edit it via
+-                    // the live path. Clearing activeVersionId makes the load
+-                    // effect re-sync the form from the live record.
++                  if (version.isLive || version.status === ScenarioVersionStatus.PUBLISHED) {
++                    // This version IS the live scenario — edit it via the live
++                    // path. Clearing activeVersionId makes the load effect
++                    // re-sync the form from the live record. Its stored config
++                    // is a stale seed (the studio saves live edits to the
++                    // scenario row, not to this version), so loading that
++                    // instead would blank the form.
+                     setActiveVersionId(undefined);
+                     setVersionEvents(undefined);
+                     draftMappedEventsRef.current = undefined;
+diff --git a/apps/ally-admin-dashboard/src/types/scenarioVersion.ts b/apps/ally-admin-dashboard/src/types/scenarioVersion.ts
+index de82093efe..ce96beeabc 100644
+--- a/apps/ally-admin-dashboard/src/types/scenarioVersion.ts
++++ b/apps/ally-admin-dashboard/src/types/scenarioVersion.ts
+@@ -12,6 +12,14 @@ export type ScenarioVersion = {
+   /** Full UpdateScenarioDto-shaped snapshot of the studio form. */
+   config: Record<string, unknown>;
+   status: ScenarioVersionStatus;
++  /**
++   * Server-computed: this version MIRRORS the live scenario rather than holding
++   * a snapshot of its own. Editing it means editing the live record (the
++   * studio's default state, when no version is selected), so its `config` is a
++   * stale seed that must never be loaded into the form — the live GET is the
++   * source of truth. Set on the list endpoint only.
++   */
++  isLive?: boolean;
+   parentVersionId?: string | null;
+   createdBy?: number | null;
+   updatedBy?: number | null;
+diff --git a/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts b/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
+index d253f5d833..b36eb5c283 100644
+--- a/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
++++ b/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
+@@ -7,6 +7,7 @@ import { extractValidData } from "../common";
+ import {
+   getCreateSimulationSubSectionById,
+   formatSimulationResponseData,
++  formatVersionConfigToForm,
+   buildFeedbackTabsPayload,
+   buildToggleDefaultValues,
+ } from "../createSimulation";
+@@ -1080,4 +1081,52 @@ describe("createSimulation utils", () => {
+       expect(guardrailsField).not.toHaveProperty("readOnly");
+     });
+   });
++
++  describe("formatVersionConfigToForm", () => {
++    it("derives the three primary-language ids from metadata.defaultLanguageId", () => {
++      // A version snapshot stores `defaultLanguageId` (a metadata field); the
++      // live GET instead exposes the three `*PrimaryLanguageId` keys the server
++      // derives from it. Without the derivation a forked Tamil sim loaded with
++      // primary=null, so the panels fell back to English: the Tamil source text
++      // showed under the English tab and the Tamil tab read as blank.
++      const form = formatVersionConfigToForm({
++        title: "t",
++        description: "the brief",
++        defaultLanguageId: 6,
++      });
++
++      expect(form.challengeDescriptionPrimaryLanguageId).toBe(6);
++      expect(form.openingDialoguePrimaryLanguageId).toBe(6);
++      expect(form.remindersPrimaryLanguageId).toBe(6);
++    });
++
++    it("prefers an explicitly stored primary-language id over the derived one", () => {
++      const form = formatVersionConfigToForm({
++        defaultLanguageId: 6,
++        challengeDescriptionPrimaryLanguageId: 1,
++      });
++
++      expect(form.challengeDescriptionPrimaryLanguageId).toBe(1);
++      // The other two still derive.
++      expect(form.remindersPrimaryLanguageId).toBe(6);
++    });
++
++    it("leaves the primary-language ids null when the snapshot has no language", () => {
++      const form = formatVersionConfigToForm({ title: "t" });
++
++      expect(form.challengeDescriptionPrimaryLanguageId).toBeNull();
++    });
++
++    it("carries the challenge description through a version snapshot", () => {
++      const form = formatVersionConfigToForm({
++        title: "t",
++        description: "the brief",
++        translationDescription: { "6": "sample" },
++      });
++
++      expect(form.description).toBe("the brief");
++      expect(form.translationDescription).toEqual({ "6": "sample" });
++    });
++  });
++
+ });
+diff --git a/apps/ally-admin-dashboard/src/utils/createSimulation.ts b/apps/ally-admin-dashboard/src/utils/createSimulation.ts
+index 619f617633..dc72d17fb9 100644
+--- a/apps/ally-admin-dashboard/src/utils/createSimulation.ts
++++ b/apps/ally-admin-dashboard/src/utils/createSimulation.ts
+@@ -31,9 +31,21 @@ export const getCreateSimulationSubSectionById = (id: string) => {
+ export const formatVersionConfigToForm = (config: Record<string, any>) => {
+   const cfg = config ?? {};
+ 
++  // The three `*PrimaryLanguageId` keys are read off the live GET, where the
++  // server derives all three from `metadata.defaultLanguageId`. They're absent
++  // from a version snapshot (which stores the metadata field itself), so derive
++  // them the same way. Without this they load as null and the panels fall back
++  // to English — putting a non-English sim's primary text under the English tab
++  // and showing its real language tab as blank.
++  const primaryLanguageId = cfg.defaultLanguageId != null ? Number(cfg.defaultLanguageId) : null;
++
+   const adminShape = {
+     ...cfg,
+     metadata: { ...cfg },
++    openingDialoguePrimaryLanguageId: cfg.openingDialoguePrimaryLanguageId ?? primaryLanguageId,
++    challengeDescriptionPrimaryLanguageId:
++      cfg.challengeDescriptionPrimaryLanguageId ?? primaryLanguageId,
++    remindersPrimaryLanguageId: cfg.remindersPrimaryLanguageId ?? primaryLanguageId,
+     competency: cfg.competency ?? (cfg.competencyId ? { id: cfg.competencyId } : undefined),
+     // config stores trigger warnings as a string[] of ids; formatSim expects
+     // objects under `triggerWarnings`.

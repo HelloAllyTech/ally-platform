@@ -1,0 +1,120 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+index 4bd0dc0405..6fcb8691f4 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+@@ -1,5 +1,6 @@
+ import { useRef, useState, useEffect } from "react";
+ 
++import isEqual from "react-fast-compare";
+ import { useTranslation } from "react-i18next";
+ import { useSelector } from "react-redux";
+ 
+@@ -74,19 +75,34 @@ const CommentThread = ({
+       comment => !deletedCommentIds?.current.has(comment.id),
+     );
+     if (threadsOffset === 0) {
+-      setComments?.(nextData);
+-      onCommentChange?.({ comments: nextData, threadId: id });
++      if (!isEqual(comments, nextData)) {
++        setComments?.(nextData);
++        onCommentChange?.({ comments: nextData, threadId: id });
++      }
+     } else if (hasMore) {
+       setComments?.((prev: CommentItem[]) => {
+         const prevList = prev ?? [];
+         const existingComments = new Set(prevList.map(comment => comment.id));
+         const newComments = nextData.filter(comment => !existingComments.has(comment.id));
+-        onCommentChange?.({ comments: [...prevList, ...newComments], threadId: id });
+-        return [...prevList, ...newComments];
++        const finalComments = [...prevList, ...newComments];
++        if (!isEqual(prev, finalComments)) {
++          onCommentChange?.({ comments: finalComments, threadId: id });
++          return finalComments;
++        }
++        return prev;
+       });
+     }
+     setHasMore(nextData.length > 0);
+-  }, [threadComments, deletedCommentIds, hasMore, id, onCommentChange, setComments, threadsOffset]);
++  }, [
++    threadComments,
++    comments,
++    deletedCommentIds,
++    hasMore,
++    id,
++    onCommentChange,
++    setComments,
++    threadsOffset,
++  ]);
+ 
+   const handleCommentAddition = () => {
+     onCommentAddition(comment);
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
+index 350b9d94df..e83ef00015 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
+@@ -1,6 +1,6 @@
+-import React from "react";
++import React, { useState } from "react";
+ 
+-import { render, screen, fireEvent } from "@testing-library/react";
++import { render, screen, fireEvent, act } from "@testing-library/react";
+ import { Provider } from "react-redux";
+ import { configureStore } from "@reduxjs/toolkit";
+ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+@@ -528,7 +528,7 @@ describe("CommentThread Component", () => {
+       renderWithProvider(
+         <CommentThread
+           {...defaultProps}
+-          comments={[]}
++          comments={[mockComments[0]]}
+           setComments={setComments}
+           deletedCommentIds={deletedCommentIds}
+           threadsOffset={0}
+@@ -577,4 +577,44 @@ describe("CommentThread Component", () => {
+       expect(setComments).toHaveBeenCalled();
+     });
+   });
+-});
++
++  describe("Infinite re-render guard", () => {
++    it('does not fall into an infinite loop due to unstable onCommentChange', async () => {
++        const onCommentChange = vi.fn();
++        const TestParent = () => {
++            const [comments, setComments] = useState([]);
++            const [threadsOffset, setThreadsOffset] = useState(0);
++
++            stableApiResponse.data = [mockComments[0]];
++
++            return (
++                <CommentThread
++                    comments={comments}
++                    setComments={setComments}
++                    onCommentChange={() => onCommentChange()} // Unstable function
++                    id="thread-1"
++                    threadsOffset={threadsOffset}
++                    setThreadsOffset={setThreadsOffset}
++                    onCommentAddition={() => {}}
++                    onDeleteComment={() => {}}
++                    messageId="message-1"
++                    selection={{ startIndex: 0, endIndex: 0 }}
++                    onAddComment={() => {}}
++                    deletedCommentIds={{ current: new Set() }}
++                />
++            );
++        };
++        render(
++            <Provider store={mockStore}>
++                <TestParent />
++            </Provider>,
++        );
++
++        await act(async () => {
++          await new Promise(resolve => setTimeout(resolve, 500));
++        });
++    
++        expect(onCommentChange).toHaveBeenCalledTimes(1);
++    });
++  });
++});
+\ No newline at end of file

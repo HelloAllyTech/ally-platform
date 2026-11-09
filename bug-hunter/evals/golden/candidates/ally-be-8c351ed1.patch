@@ -1,0 +1,73 @@
+diff --git a/src/builder/constants/builder.constants.ts b/src/builder/constants/builder.constants.ts
+index e34af3f7db..77998c6604 100644
+--- a/src/builder/constants/builder.constants.ts
++++ b/src/builder/constants/builder.constants.ts
+@@ -303,6 +303,18 @@ export const BUILDER_ANNOUNCED_KINDS: BuilderNotificationKind[] = [
+   BuilderNotificationKind.BUILD_FAILED,
+   BuilderNotificationKind.BUDGET_REACHED,
+   BuilderNotificationKind.FIX_RUN_STARTED,
++  // Merged but not deployed. The strongest case in this list by the rule
++  // above: master has moved on, the pull request reads as done, and everyone
++  // assumes the change is live — so nobody goes back to look. Auto-release was
++  // built on the promise that this shouts, and without it here the watcher
++  // would only have written a row nobody opens.
++  BuilderNotificationKind.RELEASE_FAILED,
++  // Merged and deliberately not released, because the change could not be
++  // attributed to exactly one deployable. Quieter, and still not good news
++  // that keeps: it sits on master until a person ships it by hand. Low volume
++  // by construction — at most one per merged pull request, and only for the
++  // ones Builder refuses to guess about.
++  BuilderNotificationKind.RELEASE_SKIPPED,
+ ];
+ 
+ /* ── Lane A evidence lookups ─────────────────────────────────────────────── */
+diff --git a/src/builder/service/test/builder-notification.service.spec.ts b/src/builder/service/test/builder-notification.service.spec.ts
+index 510952e326..8720109bae 100644
+--- a/src/builder/service/test/builder-notification.service.spec.ts
++++ b/src/builder/service/test/builder-notification.service.spec.ts
+@@ -78,6 +78,45 @@ describe('BuilderNotificationService announcements', () => {
+     expect(repository.save).toHaveBeenCalled();
+   });
+ 
++  /**
++   * The promise auto-release was built on.
++   *
++   * "Merged but not deployed" reads as done from every angle — master has moved
++   * on, the pull request is closed, CI is green — so the only thing that makes
++   * it visible is the shout. Without this the watcher would write a row nobody
++   * opens, and the feature would be worse than not releasing at all.
++   */
++  it('shouts when a merged pull request did not reach production', async () => {
++    const { service, slack } = build();
++
++    await service.releaseFailed(
++      session,
++      'ally-be',
++      42,
++      'v1.2.3',
++      'failure',
++      'https://run',
++    );
++
++    expect(slack.sendMessage).toHaveBeenCalled();
++    expect(slack.sendMessage.mock.calls[0][0]).toContain('NOT deployed');
++  });
++
++  /** Merged and waiting on a person is not good news that keeps either. */
++  it('announces a release it refused to guess at', async () => {
++    const { service, slack } = build();
++
++    await service.releaseSkipped(
++      session,
++      'ally-web',
++      7,
++      'it also changes shared code',
++    );
++
++    expect(slack.sendMessage).toHaveBeenCalled();
++    expect(slack.sendMessage.mock.calls[0][0]).toContain('manual release');
++  });
++
+   it('only announces the kinds with someone waiting', async () => {
+     const announced: BuilderNotificationKind[] = [];
+     for (const [kind, call] of [

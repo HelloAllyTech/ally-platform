@@ -1,0 +1,188 @@
+diff --git a/src/common/constants/user.constants.ts b/src/common/constants/user.constants.ts
+index 926ecea372..6e7c5b29f8 100644
+--- a/src/common/constants/user.constants.ts
++++ b/src/common/constants/user.constants.ts
+@@ -40,9 +40,37 @@ export const SUPER_ADMIN_ROLES: UserRole[] = [
+  */
+ export const SUPER_DUPER_ADMIN_ROLES: UserRole[] = [UserRole.SUPER_DUPER_ADMIN];
+ 
++/**
++ * Every group name that means "this is an Ally staff account", live and retired.
++ *
++ * The live one is PLATFORM_ADMIN. The other three are the tiers
++ * `CreatePlatformAdminRole1895000000001` collapsed into it, whose `groups` rows
++ * were deliberately left in place for rollback safety — so an account still
++ * carrying one is still staff, and any check that asks "is this person one of
++ * us?" has to name all four.
++ *
++ * Use this, NOT `SUPER_ADMIN_ROLES`, for that question. `SUPER_ADMIN_ROLES`
++ * lists only the two retired super-admin tiers, so an account promoted through
++ * the Ally admins screen since the collapse — which grants PLATFORM_ADMIN and
++ * nothing else — does not match it. A check written against that list reads
++ * every present-day admin as an ordinary app user, silently and plausibly.
++ * `TenantCohortMemberRepository` spells the same four names out in raw SQL for
++ * the same reason.
++ */
++export const PLATFORM_TIER_ROLES: UserRole[] = [
++  UserRole.PLATFORM_ADMIN,
++  UserRole.SUPER_ADMIN,
++  UserRole.SUPER_DUPER_ADMIN,
++  UserRole.MULTI_TENANT_ADMIN,
++];
++
+ /**
+  * Platform-tier groups that the generic role picker must never grant or revoke.
+  *
++ * The same four names as `PLATFORM_TIER_ROLES`, aliased rather than repeated so
++ * a fifth tier is added in one place — but kept as its own export because the
++ * rule it encodes is a different one, spelled out below.
++ *
+  * PLATFORM_ADMIN is owned by the dedicated Ally admins screen
+  * (POST/DELETE /v1/platform-admins), which also writes the per-user feature
+  * toggles that decide what an admin can actually reach. Granting it through
+@@ -67,12 +95,7 @@ export const SUPER_DUPER_ADMIN_ROLES: UserRole[] = [UserRole.SUPER_DUPER_ADMIN];
+  * that platform-admin.service itself calls to grant PLATFORM_ADMIN, so guarding
+  * it would break the very screen this constant protects.
+  */
+-export const PLATFORM_MANAGED_ROLES: UserRole[] = [
+-  UserRole.PLATFORM_ADMIN,
+-  UserRole.SUPER_ADMIN,
+-  UserRole.SUPER_DUPER_ADMIN,
+-  UserRole.MULTI_TENANT_ADMIN,
+-];
++export const PLATFORM_MANAGED_ROLES: UserRole[] = PLATFORM_TIER_ROLES;
+ 
+ export enum AppType {
+   APP = 'APP',
+diff --git a/src/user/interface/user-filter-options.interface.ts b/src/user/interface/user-filter-options.interface.ts
+index 5adf7efd92..f0ccce1b31 100644
+--- a/src/user/interface/user-filter-options.interface.ts
++++ b/src/user/interface/user-filter-options.interface.ts
+@@ -10,7 +10,8 @@ export interface UserFilterOptions {
+   statuses?: string;
+   search?: string;
+   /**
+-   * Opt in to listing holders of a platform role (SUPER_ADMIN_ROLES), who are
++   * Opt in to listing holders of a platform role (PLATFORM_TIER_ROLES — the live
++   * PLATFORM_ADMIN plus the three tiers the role collapse retired), who are
+    * filtered out of this list by default so a tenant's user list only ever
+    * shows that tenant's own people. Honoured only for callers who can manage
+    * the super-admin tier (view:super-duper-admins) — see
+diff --git a/src/user/repository/test/user.repository.spec.ts b/src/user/repository/test/user.repository.spec.ts
+index a3a1332e25..4b1dd973ed 100644
+--- a/src/user/repository/test/user.repository.spec.ts
++++ b/src/user/repository/test/user.repository.spec.ts
+@@ -4,7 +4,7 @@ import { UserRepository } from '../user.repository';
+ import { User } from 'src/user/entity/user.entity';
+ import { UserSortBy, SortOrder } from 'src/user/enum/user.enum';
+ import { UserFilterOptions } from 'src/user/interface/user-filter-options.interface';
+-import { SUPER_ADMIN_ROLES } from 'src/common/constants/user.constants';
++import { PLATFORM_TIER_ROLES } from 'src/common/constants/user.constants';
+ 
+ describe('UserRepository', () => {
+   let repository: UserRepository;
+@@ -106,7 +106,7 @@ describe('UserRepository', () => {
+       expect(mockQueryBuilder.getRawMany).not.toHaveBeenCalled();
+     });
+ 
+-    it('should exclude super admin by default', async () => {
++    it('should exclude every platform tier by default, PLATFORM_ADMIN included', async () => {
+       const mockUsers = [{ user_id: 1, user_name: 'User 1' }];
+ 
+       (mockQueryBuilder.getCount as jest.Mock).mockResolvedValue(1);
+@@ -116,11 +116,31 @@ describe('UserRepository', () => {
+ 
+       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+         expect.stringContaining('NOT EXISTS'),
+-        expect.objectContaining({ superAdminRoles: SUPER_ADMIN_ROLES }),
++        expect.objectContaining({ platformRoles: PLATFORM_TIER_ROLES }),
+       );
+       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+-        expect.stringContaining('g_excl.name IN (:...superAdminRoles)'),
+-        expect.objectContaining({ superAdminRoles: SUPER_ADMIN_ROLES }),
++        expect.stringContaining('g_excl.name IN (:...platformRoles)'),
++        expect.objectContaining({ platformRoles: PLATFORM_TIER_ROLES }),
++      );
++
++      // Named literally rather than left to the constant. This list is what
++      // keeps Ally staff out of a customer's own user list, and the value it
++      // used to hold — the two retired super-admin tiers — matched nobody
++      // promoted since the role collapse, so every admin granted PLATFORM_ADMIN
++      // by the Ally admins screen appeared in the tenant list they sit in.
++      // Asserting the constant alone would follow that mistake if it came back.
++      const [, params] = (
++        mockQueryBuilder.andWhere as jest.Mock
++      ).mock.calls.find(([sql]: [string]) =>
++        String(sql).includes('g_excl.name'),
++      );
++      expect(params.platformRoles).toEqual(
++        expect.arrayContaining([
++          'PLATFORM_ADMIN',
++          'SUPER_ADMIN',
++          'SUPER_DUPER_ADMIN',
++          'MULTI_TENANT_ADMIN',
++        ]),
+       );
+     });
+ 
+@@ -167,7 +187,7 @@ describe('UserRepository', () => {
+         expect.stringContaining('g.name IN (:...roles)'),
+         expect.objectContaining({
+           roles: ['ADMIN', 'USER'],
+-          superAdminRoles: SUPER_ADMIN_ROLES,
++          platformRoles: PLATFORM_TIER_ROLES,
+         }),
+       );
+     });
+@@ -237,7 +257,7 @@ describe('UserRepository', () => {
+       expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(1);
+       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+         expect.stringContaining('NOT EXISTS'),
+-        expect.objectContaining({ superAdminRoles: SUPER_ADMIN_ROLES }),
++        expect.objectContaining({ platformRoles: PLATFORM_TIER_ROLES }),
+       );
+     });
+ 
+@@ -338,7 +358,7 @@ describe('UserRepository', () => {
+       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+         expect.stringContaining('NOT EXISTS'),
+         expect.objectContaining({
+-          superAdminRoles: SUPER_ADMIN_ROLES,
++          platformRoles: PLATFORM_TIER_ROLES,
+           roles: ['ADMIN'],
+         }),
+       );
+diff --git a/src/user/repository/user.repository.ts b/src/user/repository/user.repository.ts
+index 80cf40b4e0..e3c4e825fe 100644
+--- a/src/user/repository/user.repository.ts
++++ b/src/user/repository/user.repository.ts
+@@ -10,7 +10,7 @@ import { ExecutionManager } from 'src/common/execution/execution-manager';
+ import { UserGroup } from 'src/authorization/entity/user-group.entity';
+ import {
+   UserRole,
+-  SUPER_ADMIN_ROLES,
++  PLATFORM_TIER_ROLES,
+ } from 'src/common/constants/user.constants';
+ import { Chat, ChatStatus } from 'src/chat/entity/chat.entity';
+ 
+@@ -102,10 +102,18 @@ export class UserRepository extends Repository<User> {
+         SELECT 1
+         FROM user_groups ug_excl
+         INNER JOIN groups g_excl ON g_excl.id = ug_excl."groupId"
+-        WHERE ug_excl."userId" = "user"."id" AND g_excl.name IN (:...superAdminRoles)
++        WHERE ug_excl."userId" = "user"."id" AND g_excl.name IN (:...platformRoles)
+       )`,
+         );
+-        params.superAdminRoles = SUPER_ADMIN_ROLES;
++        // All four platform group names, not just the two retired super-admin
++        // tiers. PLATFORM_ADMIN is the only one the Ally admins screen has
++        // granted since the role collapse, so naming only the retired pair let
++        // every staff account promoted since then through the exclusion and
++        // into the tenant user list this hides them from — visible to that
++        // tenant's own ADMINs, who cannot manage them and should not see them.
++        // TenantCohortMemberRepository's PLATFORM_ROLE_EXCLUSION_SQL says it
++        // matches this filter; until now it named four while this named two.
++        params.platformRoles = PLATFORM_TIER_ROLES;
+       }
+ 
+       if (filters?.roles) {
