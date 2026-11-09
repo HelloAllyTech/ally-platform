@@ -16,6 +16,10 @@ from bug_hunter.config import DEFAULT_CONFIG_DIR, DEFAULT_REPO_ROOT, load_config
 def _dummy_provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-not-a-real-key")
+    # unit tests never trace: on CI the job env turns LangSmith on for the evals, and
+    # the suite's fake tool calls showed up in the project
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
     monkeypatch.delenv("BUGHUNTER_CONFIG_DIR", raising=False)
     monkeypatch.delenv("BUGHUNTER_REPO_ROOT", raising=False)
 
