@@ -121,3 +121,32 @@ def test_sweep_mode_shows_the_introducing_commit_never_the_fix(
     )
     assert len(seen) == 1
     assert "buggy" in seen[0] and "fixed" not in seen[0]  # the feat diff, not the fix
+
+
+def test_sweep_diff_scopes_a_mass_commit_to_the_app(
+    repo_config, tmp_path: Path
+) -> None:
+    import subprocess
+
+    from evals.run_evals import sweep_diff
+
+    cfg, repo, bug, _clean = repo_config
+    root = cfg.repo_root
+    (root / "other").mkdir()
+    (root / "other/big.txt").write_text("\n".join(f"line {i}" for i in range(600)))
+    (root / "ally-be/src/y.ts").write_text("export const y = 1;\n")
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "add", "."],
+        cwd=root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "mass"],
+        cwd=root,
+        check=True,
+    )
+    sha = repo.git("rev-parse", "HEAD").strip()
+    diff = sweep_diff(repo, sha, "ally-be")
+    assert "y.ts" in diff and "big.txt" not in diff
+    small = sweep_diff(repo, bug.commit, "ally-be")
+    assert "x.ts" in small

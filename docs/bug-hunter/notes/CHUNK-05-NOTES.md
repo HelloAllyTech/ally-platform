@@ -170,7 +170,62 @@ still at the parent, and a case without one is issue-only (`ally-be-d039e256`). 
 bug cases have an introducing commit; for `ally-be-89d8e055` it is Bug Hunter v1's PR
 #101, the change that wrote the over-strict regexes.
 
-SWEEP_RESULTS_PENDING
+### Sweep mode, corrected signal (run 42620978689, commit `9310851d`)
+
+| Case | Expected | Outcome | Tokens | Cost | s | What happened |
+|---|---|---|---|---|---|---|
+| `ally-be-819f6ccf` | escalate | detected | 842k | $0.32 | 208 | From PR diff alone: finding = the real fix, test fails for the right reason (escalation itself is chunk 06) |
+| `ally-be-89d8e055` | fix | escalated | 212k | $0.22 | 273 | Reviewed Bug Hunter v1's PR #101; hypothesised a *different* defect (multi-word audio tags); its test passed on the buggy code, so it escalated instead of claiming |
+| `ally-web-9299e9aa` | fix | escalated | 1.50M | $0.80 | 526 | Chased phantom `[redacted:*]` placeholders (scrubber bug below) until the token cap |
+| `ally-mobile-83bdf91e` | fix | escalated | 825k | $0.68 | 517 | Same phantom placeholders in Dart; could not reproduce |
+| `ally-ai-b680c643` | fix | missed | 768k | $0.54 | 308 | Triage flagged the right line, the investigator then judged the resolver "cleanly resolves nested prompts": a genuine miss |
+| `ally-ai-learn-995242d7` | fix | missed | 6k | $0.002 | 8 | Its introducing commit is `51ac5ac4 "testing"`, 131 files / 6.5k lines; triage: "no concrete symptom". Mass commits are now cut to the app's files (`sweep_diff`) |
+| `ally-ai-6e81b510` | no_bug | **false alarm** | 1.06M | $0.49 | 286 | Finding: prompt says "Supportive engagement", schema enum says "Supportive Engagement". Possibly a real latent bug on a "clean" commit; to review |
+| 3 other clean | no_bug | clean | 2k–474k | ≤$0.23 | 9–165 | Two closed at triage, `ally-ai-learn-b6c51894` investigated a critical-looking PHI-logging change and concluded no bug |
+
+Totals: detection 4/6, false alarms 1/4, $3.28, 44 min for the step.
+
+### Scrubber bug found: the data scrubber ran on code
+
+Tool results and the sweep signal went through `scrub` (the data scrubber with key
+rules), so `userId: widget.userId` in Dart/TS became `[redacted:userid]` and two sweep
+agents investigated "placeholders left in the code". Fixed: tool results and
+`commit_sweep` signals use `scrub_code` (pattern scrub: emails, phones, keys, tokens);
+issue text and test output keep the data scrubber. Tests pin both.
+
+### Variance
+
+The same case through the same graph: `ally-be-89d8e055` reproduced in two local runs
+and the GitHub issue run, and escalated in a third local run because the written test
+passed on the buggy code; `ally-web-9299e9aa` reproduced once and escalated twice. The
+diagnosis was the real root cause every time; *reproduce* is the unstable stage.
+Costs per bug case ranged $0.19–$0.95; detection-only (no repro) would be ~$0.15–0.30.
+
+### Trace links (local runs, your LangSmith workspace, project `ally-bug-hunter`)
+
+- `ally-ai-b680c643`, detected + reproduced (right reason): https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c086-3b62-751d-bef1-cd4f4ba25501?trace_id=01a1c086-3b62-751d-bef1-cd4f4ba25501
+- `ally-be-89d8e055`, right root cause, test passed on buggy code → escalated: https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c07a-e9b1-737c-b7a1-31716add3c9f?trace_id=01a1c07a-e9b1-737c-b7a1-31716add3c9f
+- `ally-web-9299e9aa`, right root cause, could not drive the component in a test → escalated: https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c07e-8c10-7745-b7d0-55d3b0e78c73?trace_id=01a1c07e-8c10-7745-b7d0-55d3b0e78c73
+- CI tracing proven with the one-case check (run 42625069046): https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c07e-39c3-77b6-9c68-47e47de44328
+
+### Prompt tuning proposed before the full run
+
+1. **reproduce.v2**: require the agent to run the test *and read the failure* before
+   `submit_repro`; a passing test must never be submitted ("a repro that passes proves
+   nothing"), and after a pass the agent must flip the assertion to the buggy
+   behaviour's opposite, not to the fixed behaviour. Two of the escalations were tests
+   asserting the fixed behaviour in a way that already held.
+2. **reproduce.v2**: when the existing test file for the suspected module exists, start
+   by copying its setup (imports, mocks, render helpers) verbatim; the ally-web and
+   mobile misses were all setup, not logic.
+3. **Right-reason judge**: accept a failing assertion on the observable symptom even
+   when the test does not assert call arguments (the `b680c643` rejection); reject only
+   setup failures, flaky timing and failures on unrelated lines.
+4. **investigate.v2 (sweep)**: "the diff is the *suspect*, not the fix: assume the code
+   at HEAD contains whatever this diff introduced; trace what the new lines do at
+   runtime before judging intent". The `b680c643` miss read the diff as a tidy refactor.
+5. **triage.v2 (sweep)**: a large diff with no symptom is still a candidate if it touches
+   runtime code paths; "not_a_bug: no symptom described" is for reports, not diffs.
 
 ## How to test
 

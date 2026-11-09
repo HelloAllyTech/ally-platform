@@ -118,6 +118,21 @@ def case_repo_paths(case: Case, app_path: str, rels: list[str]) -> list[str]:
     return [f"{app_path}/{r}" if case.layout == "monorepo" else r for r in rels]
 
 
+SWEEP_DIFF_MAX_LINES = 400
+
+
+def sweep_diff(repo: Repo, sha: str, app_path: str) -> str:
+    """The diff a sweep reviews. A mass commit (one golden case's introducing commit
+    is a 131-file "testing" commit) is cut down to the app's own files; a real sweep
+    would review it hunk by hunk too."""
+    full = repo.git("show", "--format=", sha)
+    changed = sum(1 for line in full.splitlines() if line[:1] in "+-")
+    if changed <= SWEEP_DIFF_MAX_LINES:
+        return full
+    scoped = repo.git("show", "--format=", sha, "--", app_path) if app_path else ""
+    return scoped or full
+
+
 def _run_tests(runner: Runner, tests: list[str]) -> tuple[bool, float, list[RunResult]]:
     results = [runner.run_tests(test) for test in tests]
     return all(r.passed for r in results), sum(r.duration_s for r in results), results
@@ -207,7 +222,7 @@ def run_case(
                     raise RuntimeError(
                         f"{case.id}: no introduced_by; run `bug-hunter eval blame`"
                     )
-                diff = scrub_code(repo.git("show", "--format=", sweep_sha))
+                diff = scrub_code(sweep_diff(repo, sweep_sha, app_path))
             case_input = CaseInput(
                 case,
                 options.mode,

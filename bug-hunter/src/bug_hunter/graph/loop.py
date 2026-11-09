@@ -34,7 +34,7 @@ from bug_hunter.context.scratchpad import Scratchpad
 from bug_hunter.context.tokens import TokenCounter, effective_budget, make_counter
 from bug_hunter.graph.budget import charge, exceeded
 from bug_hunter.graph.state import Budget
-from bug_hunter.safety.phi import scrub
+from bug_hunter.safety.phi import scrub_code
 
 TOOL_RESULT_MAX_CHARS = 12_000
 NUDGE = (
@@ -162,7 +162,10 @@ class ToolLoop:
                     text = str(tool.invoke(call["args"]))
                 except Exception as exc:  # noqa: BLE001 - the model needs the message
                     text = f"error: {exc}"
-            text = scrub(text)
+            # tool results are code and listings: pattern scrub only. The data
+            # scrubber's key rules turned `userId: x` in Dart/TS into [redacted:userid]
+            # and agents then hunted phantom "placeholders left in the code".
+            text = scrub_code(text)
             if len(text) > TOOL_RESULT_MAX_CHARS:
                 text = text[:TOOL_RESULT_MAX_CHARS] + "\n… (truncated)"
             if self.on_tool_call:

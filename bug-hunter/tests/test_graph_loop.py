@@ -202,3 +202,31 @@ def test_long_loops_do_not_hit_the_recursion_limit(config, tmp_path) -> None:
     loop = _loop(config, tmp_path, script, max_turns=30)
     out = run_loop(loop.build(), _initial(), None, None, max_turns=loop.max_turns)
     assert out["result"]["args"]["text"] == "late" and out["turns"] == 20
+
+
+def test_tool_results_keep_code_identifiers_but_lose_literal_phi(
+    config, tmp_path
+) -> None:
+    """Dart/TS like `userId: widget.userId` must survive; a literal email must not."""
+    code = "final userId = widget.userId; // contact ops@example.com\nemail: user.email"
+    echo = StructuredTool.from_function(
+        func=lambda value: code, name="echo", description="echo", args_schema=EchoArgs
+    )
+    loop = _loop(
+        config,
+        tmp_path,
+        [
+            ai(tool_calls=[{"name": "echo", "args": {"value": "x"}}]),
+            ai(tool_calls=[{"name": "finish", "args": {"text": "d"}}]),
+        ],
+        tools=[echo],
+    )
+    out = loop.build().invoke(_initial())
+    tool_msg = next(m for m in out["messages"] if m.type == "tool")
+    assert (
+        "widget.userId" in tool_msg.content and "email: user.email" in tool_msg.content
+    )
+    assert (
+        "[redacted" not in tool_msg.content
+        and "ops@example.com" not in tool_msg.content
+    )

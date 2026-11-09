@@ -179,3 +179,43 @@ def test_checkpointer_does_not_relabel_the_callers_exceptions(monkeypatch) -> No
     with pytest.raises(ZeroDivisionError):
         with module.open_checkpointer(url="postgresql://u:p@h/db"):
             1 / 0
+
+
+def test_intake_scrubs_a_sweep_signal_as_code(config, tmp_path) -> None:
+    from bug_hunter.context.scratchpad import Scratchpad
+    from bug_hunter.graph.deps import GraphDeps
+    from bug_hunter.graph.nodes.intake import make_intake_node
+    from bug_hunter.tools.fs import Workspace
+
+    deps = GraphDeps(
+        config=config,
+        run_id="r",
+        app="ally-be",
+        mode="sweep",
+        worktree=tmp_path,
+        app_root=tmp_path,
+        workspace=Workspace(tmp_path, config, "ally-be", app_root=tmp_path),
+        models={},
+        scratchpad=Scratchpad(tmp_path / "pad.md"),
+        write_artefact=lambda name, content: tmp_path / name,
+        diff="+ final userId = widget.userId;",
+    )
+    code_signal = Signal(
+        source="commit_sweep",
+        ref="abc",
+        raw_summary="+ final userId = widget.userId; // ops@example.com",
+        reported_by="agent",
+    )
+    out = make_intake_node(deps)(_state(signal=code_signal, app="ally-be"))
+    assert "widget.userId" in out["signal"].raw_summary
+    assert "ops@example.com" not in out["signal"].raw_summary
+    issue = Signal(
+        source="issue",
+        ref="1",
+        raw_summary="userId: 42, phone +91 98765 43210",
+        reported_by="staff",
+    )
+    out = make_intake_node(deps)(_state(signal=issue, app="ally-be"))
+    assert (
+        "42" not in out["signal"].raw_summary and "[phone]" in out["signal"].raw_summary
+    )

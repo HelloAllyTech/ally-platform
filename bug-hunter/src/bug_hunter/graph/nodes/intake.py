@@ -12,8 +12,10 @@ from bug_hunter.safety.phi import scrub, scrub_code
 
 def make_intake_node(deps: GraphDeps):
     def intake(state: BugState) -> dict[str, Any]:
+        # a commit sweep's summary is code (diff): pattern scrub only; reports are data
+        scrubber = scrub_code if state.signal.source == "commit_sweep" else scrub
         signal = state.signal.model_copy(
-            update={"raw_summary": scrub(state.signal.raw_summary)}
+            update={"raw_summary": scrubber(state.signal.raw_summary)}
         )
         artefacts = dict(state.artefacts)
         artefacts["scratchpad"] = str(deps.scratchpad.path)
