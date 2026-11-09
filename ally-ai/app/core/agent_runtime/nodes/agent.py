@@ -9,6 +9,7 @@ from typing import Any, Dict, Literal, Tuple, Union
 
 from app.core.agent_runtime import conversation
 from app.core.agent_runtime.budget import MUST_SEARCH_AFTER, recent, tool_budget
+from app.core.agent_runtime.check import Rejection
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import allowed_tools
@@ -52,8 +53,14 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         # only search. Asking alone was not enough in the eval.
         must_search = bool(
             tools
-            and state.get("feedback") in MUST_SEARCH_AFTER
-            and not state.get("tool_calls")
+            and (
+                (
+                    state.get("feedback") in MUST_SEARCH_AFTER
+                    and not state.get("tool_calls")
+                )
+                # Sent back to search again with other words (chunk 20a-2).
+                or state.get("feedback") == Rejection.SEARCH_AGAIN.value
+            )
         )
         step, meta = await conversation.agent_step(
             state["question"],

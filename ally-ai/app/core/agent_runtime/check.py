@@ -16,6 +16,7 @@ becomes a decline with no text, which ally-be sends as the bot's decline wording
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -243,11 +244,28 @@ def organisation_of(bot: BotConfig) -> Organisation:
     display = (persona.get("display_name") or "").strip()
     names: List[str] = [display] if display else []
     topics: List[str] = []
-    for topic in bot.get("knowledge_topics") or []:
-        prefix = re.split(r"\s[–—-]\s", topic, maxsplit=1)
-        if len(prefix) == 2 and prefix[0].strip():
-            names.append(prefix[0].strip())
-        topics.append(prefix[-1].strip())
+    split = [
+        [part.strip() for part in re.split(r"\s[–—-]\s", topic, maxsplit=1)]
+        for topic in bot.get("knowledge_topics") or []
+    ]
+    # The name is the side the titles share: "Ally FAQ – About Ally" puts it first,
+    # a crawled page's "Batch timings — Bright Minds Academy" last (chunk 20a-2).
+    lefts = Counter(parts[0] for parts in split if len(parts) == 2)
+    rights = Counter(parts[1] for parts in split if len(parts) == 2)
+    for parts in split:
+        if len(parts) != 2 or not parts[0]:
+            topics.append(parts[-1])
+            continue
+        left, right = parts
+        right_is_name = right and (
+            right == display or (rights[right] >= 2 and lefts[left] < 2)
+        )
+        if right_is_name and left != display:
+            names.append(right)
+            topics.append(left)
+        else:
+            names.append(left)
+            topics.append(right)
     terms: List[str] = []
     for name in names:
         terms.append(name)
@@ -315,6 +333,7 @@ class Rejection(StrEnum):
     SEARCH_FIRST = "search_first"
     MENTIONS_SOURCES = "mentions_sources"
     USE_FOUND = "use_found"
+    SEARCH_AGAIN = "search_again"
 
 
 def rejection_feedback(
@@ -369,6 +388,12 @@ REJECTIONS: Dict[Rejection, str] = {
         "A search found passages. If they answer what was asked, answer from them "
         "and cite them. If they are about something else, say plainly what you don't "
         "have and what you can help with."
+    ),
+    Rejection.SEARCH_AGAIN: (
+        "You said you don't have this after one search. Search once more with "
+        "different words: the key words of the question, without the business's "
+        "name. Then answer from the passages that answer it and cite them, or say "
+        "plainly what you don't have."
     ),
 }
 
@@ -459,8 +484,12 @@ def _enforce_safety_pack(verdict: Verdict, ctx: CheckContext) -> None:
 # when it cites a passage for where to go instead: it is what the unanswered queue
 # is for.
 _NO_INFORMATION = re.compile(
-    r"^\W*(?:sorry\W+)?(?:i\s+)?(?:don'?t|do not|can'?t find|couldn'?t find|"
+    r"^\W*(?:sorry\W+)?(?:i\s+)?(?:don['’]?t|do not|can['’]?t find|couldn['’]?t find|"
     r"have no)\s+(?:have\s+)?(?:any\s+)?(?:information|info|details|anything)"
+    # "I don't have a refund policy": the assistant itself has none to give
+    # (chunk 20a-2). "We don't have a cancellation fee" is the business's answer,
+    # so this form needs "I".
+    r"|^\W*(?:sorry\W+)?i\s+(?:don['’]?t|do not)\s+have\s+(?:a|an|the|any)\s+\w"
     r"|^\W*(?:mere paas|mujhe)\b.{0,40}\b(?:jaankari|jankari)\b.{0,20}\bnahi",
     re.IGNORECASE,
 )
@@ -488,6 +517,9 @@ class CheckContext:
     history: Sequence[Dict[str, str]]
     #: The bot's safety pack id (chunk 20a), None without one.
     safety_pack: Optional[str] = None
+    #: One search ran and another is allowed (chunk 20a-2): a decline is sent back
+    #: to search again with different words before it is accepted.
+    can_search_again: bool = False
 
 
 @dataclass
@@ -524,6 +556,7 @@ def check_reply(
     organisation: Organisation = Organisation(),
     history: Sequence[Dict[str, str]] = (),
     safety_pack: Optional[str] = None,
+    can_search_again: bool = False,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -546,6 +579,7 @@ def check_reply(
         organisation=organisation,
         history=history,
         safety_pack=safety_pack,
+        can_search_again=can_search_again,
     )
     verdict = _read_draft(step, ctx)
     _ground(verdict, step, ctx)
@@ -663,6 +697,14 @@ def _require_sources(
             # A nudge: the passages may be about something else, so a decline the
             # rewrite still chooses is kept in its own words.
             verdict.rejection, verdict.keeps_text = Rejection.USE_FOUND, True
+        elif ctx.can_search_again and ctx.passages and ctx.turn_type == "question":
+            # One search, it found passages but not the answer, and the agent gave
+            # up. On short web pages the first query often lands on a heading; a
+            # second query with other words found the answer every time in the
+            # 20a eval's reruns (chunk 20a-2). Kept in its own words if the rewrite
+            # still declines.
+            logger.info("Agent declined after one search; searching again")
+            verdict.rejection, verdict.keeps_text = Rejection.SEARCH_AGAIN, True
 
 
 # ------------------------------------------------------------------ 3. wording fixes

@@ -84,6 +84,8 @@ describe('checkupTotals', () => {
     // must_pass questions that failed or couldn't be graded
     expect(totals.mustPassFailed).toBe(3);
     expect(totals.ms.slowest).toBe(1000);
+    expect(totals.fallbacks).toBe(0);
+    expect(checkupTotals([row({ fallback: true })]).fallbacks).toBe(1);
   });
 
   it('a safety question that failed counts against safety', () => {

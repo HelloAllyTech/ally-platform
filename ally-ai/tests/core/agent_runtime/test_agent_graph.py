@@ -335,6 +335,8 @@ class TestRevision:
         llm = FakeLLM(
             search("What is Ally?"),
             reply("decline", "The documents don't describe what Ally is."),
+            # Sent back to search again with other words (chunk 20a-2).
+            search("Ally platform overview"),
             reply("answer", "Ally is a not-for-profit platform."),  # uncited
         )
         state = await agent_run("what is ally?", llm)

@@ -11,6 +11,7 @@ from app.core.agent_runtime.check import (
     organisation_of,
     plain_text,
     rejection_feedback,
+    says_it_has_nothing,
     unsupported_details,
 )
 from app.core.agent_runtime.prompt import NO_TOPICS, format_topics
@@ -670,3 +671,65 @@ class TestTopicsOfferedOnce:
             organisation=self.BOT,
         )
         assert rejection is None
+
+
+class TestOrganisationFromPageTitles:
+    """Crawled pages are titled "Page — Business" (chunk 20a): the business is the
+    shared side, never the page label (chunk 20a-2)."""
+
+    BOT = {
+        "persona": {"display_name": "Bright Minds Academy assistant"},
+        "knowledge_topics": [
+            "Bright Minds Academy — Coaching for Class 8 to 12 in Kothrud",
+            "Batch timings — Bright Minds Academy",
+            "Courses — Bright Minds Academy",
+            "Contact — Bright Minds Academy",
+        ],
+    }
+
+    def test_the_business_is_the_name_and_page_labels_are_topics(self):
+        org = organisation_of(self.BOT)
+        assert "Bright Minds Academy" in org.terms
+        assert "Batch timings" not in org.terms
+        assert "Courses" not in org.terms
+        assert "Batch timings" in org.topics
+
+    def test_an_ordinary_question_doesnt_name_the_organisation(self):
+        org = organisation_of(self.BOT)
+        assert not org.named_in("What are the morning and evening batch timings?")
+        assert org.named_in("Where is Bright Minds Academy?")
+
+    def test_shared_prefixes_still_name_the_organisation(self):
+        org = organisation_of(
+            {"knowledge_topics": ["Ally FAQ – About Ally", "Ally FAQ – Pricing"]}
+        )
+        assert "Ally FAQ" in org.terms
+        assert org.topics == ("About Ally", "Pricing")
+
+
+class TestSaysItHasNothing:
+    """A reply that opens by saying it has nothing is a decline, whatever the model
+    labelled it (chunk 20a-2: curly apostrophes, and "I don't have a …")."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "I don’t have a refund policy. Ask your organisation instead.",
+            "I don’t have information about that.",
+            "Sorry, I don’t have the batch timings.",
+            "I don't have any details on parking.",
+        ],
+    )
+    def test_declines(self, text):
+        assert says_it_has_nothing(text)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "We don’t have a cancellation fee.",
+            "I don’t have to ask: yes, it is free.",
+            "Yes, there is parking in the basement.",
+        ],
+    )
+    def test_answers(self, text):
+        assert not says_it_has_nothing(text)

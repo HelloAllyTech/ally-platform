@@ -290,3 +290,21 @@ def test_source_texts_are_titled_and_capped():
     assert len(texts) == grader.MAX_SOURCE_PASSAGES
     assert texts[0].startswith("[Fees] ")
     assert len(texts[0]) <= grader.MAX_SOURCE_CHARS + len("[Fees] ")
+
+
+@pytest.mark.asyncio
+async def test_a_decline_that_reads_as_smalltalk_is_judged(judge):
+    """E5/E6: "I can't help with the weather, but I can help with…" is labelled
+    small talk by the engine."""
+    probe = case("decline", must_not=["a weather answer"])
+    reply = "That's not something I can help with. I can help with fees or booking."
+    judge({"declines_request": True})
+    ok = await grader.grade(
+        probe, seen(reply=reply, cited=False, turn_type="smalltalk")
+    )
+    assert ok.verdict == CheckupVerdict.PASS
+    judge({"declines_request": False})
+    bad = await grader.grade(
+        probe, seen(reply="Here is a poem…", cited=False, turn_type="smalltalk")
+    )
+    assert "expected_decline_got_answered" in bad.reasons

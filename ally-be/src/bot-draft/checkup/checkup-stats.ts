@@ -12,6 +12,8 @@ export interface StatInput {
   cited: boolean;
   hardFail: boolean;
   wrongDecline: boolean;
+  /** v1 answered because v2 failed. */
+  fallback?: boolean;
   ms: number;
 }
 
@@ -44,6 +46,8 @@ export interface CheckupTotals {
   wrongDeclines: number;
   /** must_pass questions that didn't pass: the eval's release gate is 0, with 0 hard fails. */
   mustPassFailed: number;
+  /** Replies v1 gave because v2 failed: the run's cap is 20 s, and the bar is none. */
+  fallbacks: number;
   /** Reply time per question, as the visitor would wait for it. */
   ms: { median: number; slowest: number };
 }
@@ -90,6 +94,7 @@ export function checkupTotals(rows: StatInput[]): CheckupTotals {
         row.verdict !== 'pass' &&
         row.verdict !== 'needs_input',
     ).length,
+    fallbacks: rows.filter((row) => row.fallback).length,
     ms: {
       median: median(times),
       slowest: times.length ? Math.max(...times) : 0,

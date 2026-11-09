@@ -75,8 +75,14 @@ export class KbIngestService {
       // reindexed PDF loses its page-level citations and falls back to document-level ones. That
       // is the deliberate cost of not depending on an S3 object that may no longer be there;
       // re-uploading the file restores page numbers.
+      //
+      // The exception is an onboarded assistant's pasted document (Agents v2 chunk 20a-2): it has
+      // no file, only the stored text, so extracting again is cheap and recovers its headings,
+      // which it keeps inside their sections (`headingAware`). Everything else reindexes as before.
       const extracted: ExtractedDocument =
-        action === 'reindex' && document.rawText
+        action === 'reindex' &&
+        document.rawText &&
+        !(await this.headingAware(document))
           ? { text: document.rawText, pages: [], sections: [] }
           : await this.extract(document);
 
@@ -114,6 +120,7 @@ export class KbIngestService {
       buffer,
       text: document.rawText || undefined,
       sourceUrl: document.sourceUrl ?? undefined,
+      headingsInSections: await this.headingAware(document),
     });
 
     await this.documentRepository.update(
@@ -130,6 +137,24 @@ export class KbIngestService {
     );
 
     return extracted;
+  }
+
+  /**
+   * Whether a pasted document keeps its headings inside their sections (Agents v2 chunk 20a-2):
+   * only an onboarded assistant's own documents (crawled pages, Owner notes), which only the v2
+   * agent answers from. v1 can still answer for any bot (the platform switch and v2's fallback),
+   * so every other document chunks exactly as before.
+   */
+  private async headingAware(document: KbDocument): Promise<boolean> {
+    if (document.sourceType !== KbDocumentSourceType.PASTE) return false;
+    if (document.tags?.includes('onboarding')) return true;
+    if (!document.ownerChatbotId) return false;
+    const rows = await this.documentRepository.manager.query<
+      { safety_pack: string | null }[]
+    >(`SELECT safety_pack FROM chatbots WHERE id = $1`, [
+      document.ownerChatbotId,
+    ]);
+    return Boolean(rows[0]?.safety_pack);
   }
 
   /**

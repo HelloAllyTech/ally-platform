@@ -12,7 +12,14 @@ from typing import Any, Dict, Literal
 
 from langgraph.graph import END
 
-from app.core.agent_runtime.budget import MAX_REVISIONS, over_time, recent
+from app.core.agent_runtime.budget import (
+    MAX_REVISIONS,
+    SEARCH_AGAIN_RESERVE_SECONDS,
+    can_send_back,
+    recent,
+    time_left,
+    tool_budget,
+)
 from app.core.agent_runtime.check import (
     check_reply,
     organisation_of,
@@ -59,11 +66,15 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             organisation=organisation_of(state["bot"]),
             history=recent(state.get("history")) or (),
             safety_pack=(state["bot"].get("persona") or {}).get("safety_pack"),
+            can_search_again=len(state.get("tool_calls") or []) == 1
+            and tool_budget(state) > 0
+            and (state.get("revisions") or 0) < MAX_REVISIONS
+            and time_left(state) >= SEARCH_AGAIN_RESERVE_SECONDS,
         )
         revisions = state.get("revisions") or 0
-        # Past the time budget the reply is final: a rewrite would run past
-        # ally-be's timeout and v1 would answer instead.
-        if rejection and revisions < MAX_REVISIONS and not over_time(state):
+        # Without time for a rewrite the reply is final: a rewrite cut off by the
+        # hard cap fails the run, and v1 would answer instead.
+        if rejection and can_send_back(state, rejection):
             return {
                 # What would go out if this draft were final (wording fixed, details
                 # trimmed). Kept so a rewrite that is refused outright falls back to

@@ -215,8 +215,8 @@ def draft_patches(
     )[:600]
     if introduction:
         patches.append(replace("/introduction", introduction))
-    instructions = catalogue.honest_about_booking(
-        tasks.keep_grounded(out.instructions, source)
+    instructions = tasks.without_details(
+        catalogue.honest_about_booking(tasks.keep_grounded(out.instructions, source))
     )[:4000]
     if instructions:
         patches.append(replace("/instructions", instructions))

@@ -12,7 +12,10 @@ import type {
   CheckupGradeResponse,
 } from '../../ai/dto/checkup.dto';
 import { AiService } from '../../ai/service/ai.service';
-import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
+import {
+  AgentRuntimeUsed,
+  ChatbotMemberRole,
+} from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
 import {
   ChatbotService,
@@ -324,7 +327,14 @@ export class CheckupService {
             url: String(c.source_url ?? ''),
           })),
           verdict: grade?.verdict ?? 'error',
-          reasons: grade?.reasons ?? ['not_graded'],
+          // v1 answered because v2 failed (usually the run's 20 s cap): kept on the result so
+          // the numbers can count it, never hidden in the reply time.
+          reasons: [
+            ...(grade?.reasons ?? ['not_graded']),
+            ...(tested?.runtime === AgentRuntimeUsed.V2_FALLBACK
+              ? [`v1_fallback:${tested.fallbackReason ?? 'unknown'}`]
+              : []),
+          ],
           hardFail: grade?.hard_fail ?? false,
           wrongDecline: grade?.wrong_decline ?? false,
           answerPageOffered: grade?.answer_page_offered ?? null,
@@ -415,6 +425,7 @@ export class CheckupService {
           cited: row.citations.length > 0,
           hardFail: row.hardFail,
           wrongDecline: row.wrongDecline,
+          fallback: row.reasons.some((r) => r.startsWith('v1_fallback')),
           ms: row.ms,
         },
       ];

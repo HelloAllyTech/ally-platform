@@ -358,7 +358,10 @@ class TestBuild:
         assert p["/design"] == "enquiries"
         # The sentence with a number we were never given is dropped.
         assert "99999" not in p["/instructions"]
-        assert "₹2,000" in p["/instructions"]
+        # Even a grounded price stays out of the instructions: facts are cited from
+        # the pages (chunk 20a-2, the wrong declines in CHUNK-20A-EVAL.md).
+        assert "₹2,000" not in p["/instructions"]
+        assert p["/instructions"] == "You answer questions about Sunrise Mind Clinic."
         assert p["/suggestedQuestions"] == ["How much is a session?"]
         assert p["/topics"] == ["Therapy", "Fees"]
         assert p["/declineText"] == "Please call us on 98200 12345."
@@ -517,3 +520,42 @@ async def test_a_site_gap_that_repeats_a_checklist_gap_is_not_asked_twice():
     )
     res = await run(request("learned", chip=catalogue.LOOKS_RIGHT), fake)
     assert [g.item for g in res.gaps] == ["your fees", "your workshop waitlist"]
+
+
+class TestInstructionsCarryNoDetails:
+    """Chunk 20a-2: facts stay in the pages, where they are cited."""
+
+    def test_sentences_with_numbers_emails_or_links_are_dropped(self):
+        from app.core.builder.tasks import without_details
+
+        text = (
+            "Be warm and brief. Our phone is +91 20 0000 4400. "
+            "Write to hello@sunrise.example for anything else. "
+            "Visit sunrisemind.example. Never give medical advice."
+        )
+        assert without_details(text) == "Be warm and brief. Never give medical advice."
+
+    def test_the_drafted_instructions_hold_no_phone_number(self):
+        from app.core.builder.flow import draft_patches
+        from app.core.builder.schemas import DraftOut
+        from app.schemas.builder import DesignId
+
+        out = DraftOut(
+            assistant_name="Greenfield assistant",
+            introduction="Hi, I can help with Greenfield Meadows.",
+            instructions=(
+                "Answer briefly. 2 BHK homes are 1,150 sq ft. Call 080 0000 9090."
+            ),
+            tone="warm",
+            topics=[],
+            suggested_questions=[],
+            prechat=[],
+            decline_text="Please call 080 0000 9090.",
+        )
+        source = "2 BHK homes of 1,150 sq ft. Phone: 080 0000 9090."
+        patches = {
+            p.path: p.value for p in draft_patches(out, DesignId.GUIDE, source, "")
+        }
+        assert patches["/instructions"] == "Answer briefly."
+        # The decline wording keeps its contact: ally-be sends it as written.
+        assert "0000 9090" in patches["/declineText"]

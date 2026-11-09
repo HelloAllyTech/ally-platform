@@ -150,7 +150,8 @@ def summarise(label: str, view: Dict[str, Any]) -> Tuple[List[str], bool]:
         f"- Said it didn't know, rightly: {of('honesty')}",
         f"- Safety: {of('safety')}",
         f"- **Hard fails: {t['hardFails']}** · **Wrong declines: {t['wrongDeclines']}**"
-        f" · must_pass not passed: {t['mustPassFailed']} · not graded: {t['errors']}",
+        f" · must_pass not passed: {t['mustPassFailed']} · not graded: {t['errors']}"
+        f" · v1 fallbacks: {t.get('fallbacks', 0)}",
         f"- Reply time: median {t['ms']['median'] / 1000:.1f} s,"
         f" slowest {t['ms']['slowest'] / 1000:.1f} s",
         "",
@@ -196,7 +197,8 @@ def summarise(label: str, view: Dict[str, Any]) -> Tuple[List[str], bool]:
             )
     lines += ["", *failing, ""]
     bad = (
-        totals["hardFails"] > 0
+        totals.get("fallbacks", 0) > 0
+        or totals["hardFails"] > 0
         or totals["wrongDeclines"] > 0
         or totals["mustPassFailed"] > 0
     )
@@ -244,7 +246,14 @@ def main() -> int:
             parser.error("--fixtures needs --bots")
         bots: Dict[str, str] = json.loads(args.bots.read_text())
         spec = yaml.safe_load(args.fixtures.read_text())
-        totals = {"hardFails": 0, "wrongDeclines": 0, "questions": 0, "ms": []}
+        totals = {
+            "hardFails": 0,
+            "wrongDeclines": 0,
+            "mustPassFailed": 0,
+            "fallbacks": 0,
+            "questions": 0,
+            "ms": [],
+        }
         for key, site in spec["sites"].items():
             bot = bots.get(key)
             if not bot:
@@ -261,6 +270,8 @@ def main() -> int:
             failed = failed or bad
             totals["hardFails"] += view["totals"]["hardFails"]
             totals["wrongDeclines"] += view["totals"]["wrongDeclines"]
+            totals["mustPassFailed"] += view["totals"]["mustPassFailed"]
+            totals["fallbacks"] += view["totals"].get("fallbacks", 0)
             totals["questions"] += view["totals"]["questions"]
             totals["ms"] += [
                 r["ms"] for r in view["results"] if r["verdict"] != "error"
@@ -275,6 +286,8 @@ def main() -> int:
             f"**Fixtures, all sites:** {totals['questions']} graded replies · "
             f"hard fails {totals['hardFails']} · "
             f"wrong declines {totals['wrongDeclines']} · "
+            f"must_pass not passed {totals['mustPassFailed']} · "
+            f"v1 fallbacks {totals['fallbacks']} · "
             f"reply time median {times[len(times) // 2] / 1000:.1f} s, "
             f"slowest {times[-1] / 1000:.1f} s",
             "",

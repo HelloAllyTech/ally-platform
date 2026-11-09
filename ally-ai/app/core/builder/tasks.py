@@ -439,6 +439,27 @@ def keep_grounded(text: str, source: str) -> str:
     return joiner.join(kept).strip()
 
 
+_DETAIL = re.compile(
+    r"\d{2,}"  # a price, phone, time or size
+    r"|[\w.+-]+@[\w-]+\.[\w.]+"  # an email
+    r"|https?://|www\.|\b[\w-]+\.(?:com|in|org|net|io|ai|example)\b",  # a link
+    re.IGNORECASE,
+)
+
+
+def without_details(text: str) -> str:
+    """`text` without any sentence carrying a number, email or link (chunk 20a-2).
+
+    For the assistant's instructions: facts belong in the pages it searches and
+    cites. A price or phone number in the instructions makes the agent write
+    details no passage holds, which the check then strips or sends back, and that
+    turned answers into declines in the 20a eval."""
+    sentences = re.split(r"(?<=[.!?])\s+|\n", text or "")
+    kept = [s for s in sentences if s.strip() and not _DETAIL.search(s)]
+    joiner = "\n" if "\n" in (text or "") else " "
+    return joiner.join(kept).strip()
+
+
 #: What each "don't know" quick reply means for the decline wording: the detail
 #: itself, from what we learned, never the chip's own words ("call Our phone number").
 DECLINE_HINTS: Dict[str, str] = {

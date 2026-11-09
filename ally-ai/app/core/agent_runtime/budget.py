@@ -17,6 +17,13 @@ MUST_SEARCH_AFTER = (Rejection.UNCITED, Rejection.SEARCH_FIRST)
 #: honest reply; more would only add latency.
 MAX_REVISIONS = 1
 
+#: Time a send-back needs before the run's hard cap (RUN_TIMEOUT_SECONDS): one
+#: model step for a rewrite; a search and a step to search again (chunk 20a-2).
+#: With less left, the checked draft is final. A rewrite cut off by the cap fails
+#: the whole run, and ally-be's v1 fallback then answers 7-10 s later.
+REWRITE_RESERVE_SECONDS = 8.0
+SEARCH_AGAIN_RESERVE_SECONDS = 11.0
+
 
 def recent(
     history: Optional[Sequence[Dict[str, str]]],
@@ -31,6 +38,28 @@ def over_time(state: AgentState) -> bool:
     started = state.get("started_at")
     return bool(
         started and time.time() - started > settings.AGENT_RUNTIME.RUN_BUDGET_SECONDS
+    )
+
+
+def time_left(state: AgentState) -> float:
+    """Seconds before the run's hard cap (RUN_TIMEOUT_SECONDS)."""
+    started = state.get("started_at")
+    if not started:
+        return settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS
+    return settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS - (time.time() - started)
+
+
+def can_send_back(state: AgentState, rejection: Rejection) -> bool:
+    """Whether a refused draft can still be rewritten inside the hard cap."""
+    reserve = (
+        SEARCH_AGAIN_RESERVE_SECONDS
+        if rejection == Rejection.SEARCH_AGAIN
+        else REWRITE_RESERVE_SECONDS
+    )
+    return (
+        (state.get("revisions") or 0) < MAX_REVISIONS
+        and not over_time(state)
+        and time_left(state) >= reserve
     )
 
 
