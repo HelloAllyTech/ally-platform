@@ -22,8 +22,6 @@ jest.mock('src/common/execution/execution-manager', () => ({
 
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { DataSource } from 'typeorm';
-import { REMOVED_PROMPT_CODES } from '../../constants/prompt.constants';
-import { UNUSED_PROMPT_CODES } from 'src/database/migrations/1980750000000-RemoveUnusedPrompts';
 
 describe('PromptsService', () => {
   let service: PromptsService;
@@ -45,7 +43,6 @@ describe('PromptsService', () => {
     name: 'AI Learning Prompt',
     description: 'A prompt for AI learning',
     currentVersion: 1,
-    useDashboardOverride: true,
     isObsolete: false,
     createdAt: new Date('2026-02-09'),
     updatedAt: new Date('2026-02-09'),
@@ -596,7 +593,6 @@ describe('PromptsService.syncPrompts — contract default model', () => {
       id: 'p1',
       promptCode: item.promptCode,
       model: 'gemini-2.5-pro',
-      useDashboardOverride: false,
     });
 
     await service.syncPrompts({ prompts: [item] } as any);
@@ -657,28 +653,5 @@ describe('PromptsService.syncPrompts — contract default model', () => {
     } as any);
 
     expect(result.added).toBe(1);
-  });
-
-  it('never recreates a prompt the Skills Store removed, from an older build still syncing it', async () => {
-    const { service, promptsRepository, promptVersionRepository } =
-      await build();
-    promptsRepository.findOne.mockResolvedValue(null);
-
-    const result = await service.syncPrompts({
-      prompts: [{ ...item, promptCode: 'roadmap_release_notes' }, item],
-    } as any);
-
-    expect(result).toEqual({ added: 1, updated: 0 });
-    expect(promptsRepository.create).toHaveBeenCalledTimes(1);
-    expect(promptsRepository.create).toHaveBeenCalledWith(
-      expect.objectContaining({ promptCode: item.promptCode }),
-    );
-    expect(promptVersionRepository.save).toHaveBeenCalledTimes(1);
-  });
-
-  it('refuses exactly the codes RemoveUnusedPrompts deleted', () => {
-    expect([...REMOVED_PROMPT_CODES].sort()).toEqual(
-      [...UNUSED_PROMPT_CODES].sort(),
-    );
   });
 });

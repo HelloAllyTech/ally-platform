@@ -54,7 +54,6 @@ describe('LanguageGlossaryService', () => {
       findOne: jest.fn().mockResolvedValue({
         id: 'p1',
         promptCode: 'glossary_generation',
-        useDashboardOverride: true,
         currentVersion: 2,
         provider: 'gemini',
         model: 'gemini-2.5-pro',

@@ -1544,15 +1544,6 @@ export class AiService {
           continue;
         }
 
-        // Strip prefix 'ally_ai_'
-        const rawCode = p.promptCode.slice(ALLY_AI_PROMPT_PREFIX.length);
-        /**
-         * Replace underscores with slashes to match ally-ai's folder structure.
-         * Example: 'summary_summary' -> 'summary/summary'
-         * Example: 'user_identify_user' -> 'user/identify_user'
-         * We use a global replace with /_/g to handle nested structures if any.
-         */
-        const mappedKey = rawCode.replace(/_/g, '/');
         const entry = {
           prompt: p.prompt,
           availableVariables: p.availableVariables || [],
@@ -1567,10 +1558,8 @@ export class AiService {
           ...(p.temperature != null ? { temperature: p.temperature } : {}),
         };
         // ally-ai looks prompts up by their full code (`ally_ai_<dir>_<file>`).
-        // The slash-mapped key is kept for older ally-ai builds during a
-        // rolling deploy. Every prompt's live text is sent: the Skills Store is
-        // the source of truth.
-        overrides[mappedKey] = entry;
+        // Every prompt's live text is sent: the Skills Store is the source of
+        // truth.
         overrides[p.promptCode] = entry;
       }
       return overrides;

@@ -35,15 +35,6 @@ export class UpdatePromptDto {
   @IsString()
   prompt?: string;
 
-  @ApiProperty({
-    description:
-      'Retired and ignored: every prompt serves its live Skills Store version. Kept so older clients that still send it are not refused.',
-    required: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  useDashboardOverride?: boolean;
-
   @IsOptional()
   @IsString()
   kind?: string;

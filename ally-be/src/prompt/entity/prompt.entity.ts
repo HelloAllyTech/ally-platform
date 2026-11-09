@@ -84,14 +84,6 @@ export class Prompt extends BaseWithoutTenantEntity {
   @Column({ type: 'text', nullable: true })
   defaultPrompt?: string;
 
-  /**
-   * Retired. The Skills Store is the source of truth: every prompt serves its
-   * live version. Kept (always true) only so readers on an older build still
-   * resolve the store during a rolling deploy.
-   */
-  @Column({ type: 'boolean', default: true })
-  useDashboardOverride!: boolean;
-
   /** See {@link PromptContract}. Null until sync writes the code's contract. */
   @Column({ type: 'jsonb', nullable: true })
   contract?: PromptContract | null;
