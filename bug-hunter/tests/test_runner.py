@@ -201,6 +201,29 @@ def test_runs_with_tests_still_pass(
     assert result.passed and not result.no_tests
 
 
+def test_suite_that_fails_to_compile_is_a_genuine_failure(
+    config: BugHunterConfig,
+) -> None:
+    """Jest prints 'Tests: 0 total' when a suite fails to run; with exit 1 that is a
+    real failure (the oracle test importing a symbol the fix adds), not 'no tests'."""
+    out = (
+        "FAIL src/user/repository/test/user.repository.spec.ts\n"
+        "  ● Test suite failed to run\n\n"
+        "    error TS2305: Module 'x' has no exported member 'PLATFORM_TIER_ROLES'.\n\n"
+        "Test Suites: 1 failed, 1 total\nTests:       0 total\n"
+    )
+    result = Runner(config, FakeSandbox("ally-be", exit_code=1, stdout=out)).run_tests(
+        "src/user/repository/test/user.repository.spec.ts"
+    )
+    assert not result.passed and not result.no_tests
+    # the explicit message still counts on a non-zero exit (jest without
+    # --passWithNoTests exits 1)
+    sb = FakeSandbox(
+        "ally-be", exit_code=1, stdout="No tests found, exiting with code 1"
+    )
+    assert Runner(config, sb).run_tests().no_tests
+
+
 def test_zero_tests_rule_applies_to_test_runs_only(config: BugHunterConfig) -> None:
     # a linter printing "collected 0 items" is not a test run
     sb = FakeSandbox("ally-ai", stdout="collected 0 items\n")

@@ -110,23 +110,28 @@ _FLUTTER_FAIL = re.compile(
 )
 _NOISE = re.compile(r"^(?:Test Suites:|Tests:|Snapshots:|Time:|Ran all test suites)")
 
-# "Zero tests ran" per framework. Matched against stdout + stderr of a test run.
-_NO_TESTS = {
+# "Zero tests ran" per framework, matched against stdout + stderr of a test run.
+# Explicit messages count whatever the exit code. The summary-count patterns count
+# only on exit 0: a Jest suite that fails to compile also prints "Tests: 0 total",
+# and that is a genuine failure, not an empty run.
+_NO_TESTS_EXPLICIT = {
     "typescript": re.compile(
-        r"^(?:No tests found|No test files found|No test suite found)"  # jest/vitest
-        r"|^\s*Tests:\s+0 total"  # jest summary
-        r"|^\s*(?:Test Files|Tests)\s+no tests",  # vitest summary (filter excluded all)
-        re.MULTILINE,
+        r"^(?:No tests found|No test files found|No test suite found)", re.MULTILINE
     ),
     "python": re.compile(
         r"^(?:=+ )?no tests ran|^collected 0 items|\d+ deselected / 0 selected",
         re.MULTILINE,
     ),
-    "dart": re.compile(
-        r"^No tests (?:were found|match|ran)"
-        r"|^\d+:\d+ \+0(?: ~\d+)?: All tests passed!",
+    "dart": re.compile(r"^No tests (?:were found|match|ran)", re.MULTILINE),
+}
+_NO_TESTS_SUMMARY = {
+    "typescript": re.compile(
+        r"^\s*Tests:\s+0 total"  # jest
+        r"|^\s*(?:Test Files|Tests)\s+no tests",  # vitest (filter excluded all)
         re.MULTILINE,
     ),
+    "python": re.compile(r"(?!x)x"),  # pytest signals it with exit code 5
+    "dart": re.compile(r"^\d+:\d+ \+0(?: ~\d+)?: All tests passed!", re.MULTILINE),
 }
 PYTEST_EXIT_NO_TESTS_COLLECTED = 5
 
@@ -136,7 +141,9 @@ def no_tests_ran(app: AppConfig, result: ExecResult) -> bool:
     if app.lang == "python" and result.exit_code == PYTEST_EXIT_NO_TESTS_COLLECTED:
         return True
     text = f"{result.stdout}\n{result.stderr}"
-    return bool(_NO_TESTS[app.lang].search(text))
+    if _NO_TESTS_EXPLICIT[app.lang].search(text):
+        return True
+    return result.exit_code == 0 and bool(_NO_TESTS_SUMMARY[app.lang].search(text))
 
 
 def parse_failing_tests(app: AppConfig, output: str) -> list[str]:

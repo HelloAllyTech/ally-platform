@@ -15,7 +15,7 @@ from bug_hunter.runs import Run
 from bug_hunter.tools.sandbox import DockerResult, ExecResult
 from evals.agents import AgentResult, BaselineAgent, CaseInput, load_agent
 from evals.mine_cases import Repo
-from evals.run_evals import DiskGuard, HarnessOptions, plan, run_evals
+from evals.run_evals import DiskGuard, HarnessOptions, app_root_for, plan, run_evals
 from evals.schema import Case
 
 
@@ -409,3 +409,23 @@ def test_repro_that_runs_no_test_is_invalid(repo_config, tmp_path: Path) -> None
     )
     row = report.cases[0]
     assert row.outcome == "detected" and row.repro_valid is False
+
+
+def test_root_layout_app_is_found_when_the_fix_adds_its_source_file(
+    config: BugHunterConfig, tmp_path: Path
+) -> None:
+    cfg, repo, parent, fix = _root_layout_repo(config, tmp_path)
+    case = Case(
+        id="ally-be-root00002",
+        kind="bug",
+        app="ally-be",
+        parent=parent,
+        commit=fix,
+        expected="fix",
+        layout="root",
+        description="the fix adds a brand new source file",
+        src_files=["src/new.ts"],  # absent at parent
+        oracle_tests=["src/x.spec.ts"],
+    )
+    assert app_root_for(repo, case, "ally-be") is None  # old behaviour: "absent"
+    assert app_root_for(repo, case, "ally-be", markers=("package-lock.json",)) == ""

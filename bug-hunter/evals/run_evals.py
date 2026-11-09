@@ -90,18 +90,20 @@ def worktree_ref(case: Case) -> str:
     return case.parent if case.kind == "bug" else case.commit
 
 
-def app_root_for(repo: Repo, case: Case, app_path: str) -> str | None:
+def app_root_for(
+    repo: Repo, case: Case, app_path: str, markers: tuple[str, ...] = ()
+) -> str | None:
     """Where the app lives in a worktree at the case's ref: ``app_path`` (monorepo),
-    ``""`` (old root layout), or None if it is not there at all."""
+    ``""`` (old root layout), or None if it is not there at all. For the root layout
+    the app is present when any of the case's source files, or a marker such as the
+    app's lockfile, exists at the ref (a fix may *add* its first source file)."""
     ref = worktree_ref(case)
     if case.layout == "root":
-        return (
-            ""
-            if repo.git(
-                "ls-tree", ref, "--", case.src_files[0] if case.src_files else "."
-            ).strip()
-            else None
-        )
+        probes = [*case.src_files, *markers] or ["."]
+        for probe in probes:
+            if repo.git("ls-tree", ref, "--", probe).strip():
+                return ""
+        return None
     if repo.git("ls-tree", "-d", ref, "--", app_path).strip():
         return app_path
     for alias, app in APP_PATH_ALIASES.items():
@@ -151,7 +153,9 @@ def run_case(
     app_path = config.app(case.app).path
     started = time.monotonic()
     sandbox_seconds = 0.0
-    location = app_root_for(repo, case, app_path)
+    location = app_root_for(
+        repo, case, app_path, markers=(config.app(case.app).lockfile,)
+    )
     if location is None or location not in (app_path, ""):
         why = (
             "app directory absent at this commit"

@@ -2,7 +2,7 @@
 
 Read this file, then `spec.md`, then the current chunk brief, before any Bug Hunter v2 work.
 
-**Current chunk: 04 — `docs/bug-hunter/chunks/chunk-04.md`** (01–03 done: `notes/CHUNK-0N-NOTES.md`)
+**Current chunk: 05 — `docs/bug-hunter/chunks/chunk-05.md`** (01–04 done: `notes/CHUNK-0N-NOTES.md`)
 
 ## What we are building
 
