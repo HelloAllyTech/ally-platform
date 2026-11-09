@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from "react";
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
 
 import { Permissions, ROUTES, FeatureToggleKey, OrgToggle } from "@constants";
 import {
@@ -68,7 +68,22 @@ import {
 import { DefaultRedirect } from "./DefaultRedirect";
 import { PrivateLayout } from "./PrivateLayout";
 import { PublicRoute } from "./PublicRoute";
+import { AssistantHome } from "../pages/AssistantHome";
 import { OnboardingSession, OnboardingStart } from "../pages/Onboarding";
+
+/**
+ * One assistant: the assistant home (chunk 20d), edge to edge, or with `?view=classic` the old
+ * tabbed page, unchanged, until it is removed after 20a-2's Checkup.
+ */
+const ChatbotDetailRoute: React.FC = () => {
+  const [params] = useSearchParams();
+  const classic = params.get("view") === "classic";
+  return (
+    <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed={!classic}>
+      {classic ? <ChatbotPage /> : <AssistantHome />}
+    </PrivateLayout>
+  );
+};
 
 // Lazy-loaded so IBM Carbon + Carbon Charts (+ d3) and the scoped Carbon
 // stylesheet ship as their own chunk, loaded only when the Analytics tab opens.
@@ -86,6 +101,9 @@ const DesignSystem = lazy(() =>
 const DevV2Components = import.meta.env.DEV ? lazy(() => import("../pages/DevV2Components")) : null;
 // Onboarding's screens from fixtures, for review and the Playwright tests (chunk 20d).
 const DevOnboarding = import.meta.env.DEV ? lazy(() => import("../pages/DevOnboarding")) : null;
+const DevAssistantHome = import.meta.env.DEV
+  ? lazy(() => import("../pages/DevAssistantHome"))
+  : null;
 
 export const RouteLayout: React.FC = () => {
   return (
@@ -130,6 +148,16 @@ export const RouteLayout: React.FC = () => {
             element={
               <Suspense fallback={null}>
                 <DevOnboarding />
+              </Suspense>
+            }
+          />
+        )}
+        {DevAssistantHome && (
+          <Route
+            path="/dev/assistant-home/*"
+            element={
+              <Suspense fallback={null}>
+                <DevAssistantHome />
               </Suspense>
             }
           />
@@ -685,14 +713,7 @@ export const RouteLayout: React.FC = () => {
             </PrivateLayout>
           }
         />
-        <Route
-          path={ROUTES.CHATBOT_DETAIL}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
-              <ChatbotPage />
-            </PrivateLayout>
-          }
-        />
+        <Route path={ROUTES.CHATBOT_DETAIL} element={<ChatbotDetailRoute />} />
         <Route
           path={ROUTES.WHATSAPP_BOT_LEGACY}
           element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}

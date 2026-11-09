@@ -12,7 +12,6 @@ import { Chatbot, ChatbotStatus } from "@types";
 import { BotSettingsTab } from "./BotSettingsTab";
 import { AllConnectorsTab } from "./ConnectorsTab";
 import { CorpusTab } from "./CorpusTab";
-import { CreateChatbotPanel } from "./CreateChatbotPanel";
 import { fill, LoadError, StatusPill } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
 import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
@@ -36,7 +35,6 @@ type HomeTab = "bots" | "connectors" | "defaults" | "library";
 export const WhatsAppBot: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, isLoading, isError, refetch } = useGetChatbotsQuery();
-  const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
   const canCreate = Boolean(data?.canCreate);
 
@@ -67,12 +65,7 @@ export const WhatsAppBot: React.FC = () => {
           <p className="text-sm text-typography-600">{en.whatsappBot.subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* The old form stays for platform admins, as "Advanced setup" (chunk 20a). */}
-          {canCreate && (
-            <Button variant={ButtonVariant.SECONDARY} onClick={() => setCreating(true)}>
-              {ONBOARDING_COPY.advancedSetup}
-            </Button>
-          )}
+          {/* Onboarding is the only way to make an assistant (chunk 20d). */}
           <Button variant={ButtonVariant.PRIMARY} onClick={() => navigate(ROUTES.CHATBOT_NEW)}>
             {ONBOARDING_COPY.newAssistant}
           </Button>
@@ -91,16 +84,18 @@ export const WhatsAppBot: React.FC = () => {
             <ChatbotGrid
               bots={data?.chatbots ?? []}
               canCreate={canCreate}
-              onCreate={() => setCreating(true)}
+              onCreate={() => navigate(ROUTES.CHATBOT_NEW)}
             />
           ))}
         {activeTab === "connectors" && (
-          <AllConnectorsTab bots={data?.chatbots ?? []} onCreateAgent={() => setCreating(true)} />
+          <AllConnectorsTab
+            bots={data?.chatbots ?? []}
+            onCreateAgent={() => navigate(ROUTES.CHATBOT_NEW)}
+          />
         )}
         {activeTab === "defaults" && <DefaultsTab />}
         {activeTab === "library" && <CorpusTab />}
       </div>
-      <CreateChatbotPanel isOpen={creating} onClose={() => setCreating(false)} />
     </div>
   );
 };

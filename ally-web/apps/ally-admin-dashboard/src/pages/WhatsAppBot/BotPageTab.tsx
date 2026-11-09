@@ -775,7 +775,7 @@ const PrechatEditor: React.FC<{
 };
 
 /** The page's own list: invited emails, or organisations whose active users may sign in. */
-const AccessList: React.FC<{ botId: string; canEdit: boolean; mode: BotPageAccess }> = ({
+export const AccessList: React.FC<{ botId: string; canEdit: boolean; mode: BotPageAccess }> = ({
   botId,
   canEdit,
   mode,

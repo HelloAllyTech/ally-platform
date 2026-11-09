@@ -220,7 +220,6 @@ export const COPY = {
   },
   newAssistant: "New assistant",
   continueSetup: "Continue setup",
-  advancedSetup: "Advanced setup",
 } as const;
 
 /** "{n} pages" with its values filled in; an unknown name is left as it is. */

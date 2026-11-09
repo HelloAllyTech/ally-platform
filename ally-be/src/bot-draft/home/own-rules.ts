@@ -22,6 +22,7 @@ export interface SafetyView {
   pack: {
     id: string;
     name: string;
+    industryLabel: string;
     always: string[];
     never: string[];
     atRisk: string[];
@@ -46,6 +47,7 @@ export function safetyView(
       ? {
           id: pack.id,
           name: pack.name,
+          industryLabel: pack.industryLabel,
           always: pack.always,
           never: pack.never,
           atRisk: pack.atRisk,

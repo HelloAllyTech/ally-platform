@@ -61,7 +61,7 @@ export const PeopleTab: React.FC<{ bot: Chatbot; canEdit: boolean; canManage: bo
   </div>
 );
 
-const WhoCanChat: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot, canEdit }) => {
+export const WhoCanChat: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot, canEdit }) => {
   const [updateBot] = useUpdateChatbotMutation();
   const { data: entries = [], isLoading, isError, refetch } = useGetChatbotAudienceQuery(bot.id);
   const [add, { isLoading: isAdding }] = useAddChatbotAudienceMutation();
@@ -225,7 +225,7 @@ const WhoCanChat: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({ bot, canEdit
   );
 };
 
-const Team: React.FC<{ bot: Chatbot; canManage: boolean }> = ({ bot, canManage }) => {
+export const Team: React.FC<{ bot: Chatbot; canManage: boolean }> = ({ bot, canManage }) => {
   const {
     data: members = NO_MEMBERS,
     isLoading,

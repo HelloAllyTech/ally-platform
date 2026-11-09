@@ -1,0 +1,438 @@
+/*
+ * The assistant home (chunk 20d, screenshot 03-assistant-home), on the v2 tokens. Section list on
+ * the left, the section in the middle, a panel on the right for Try it. Below 960px the list
+ * becomes a row of chips and the panel a sheet over the page.
+ */
+
+.ally-home {
+  min-height: 100%;
+  padding: 0 32px 64px;
+}
+.ally-home--loading {
+  min-height: 60vh;
+}
+
+.ally-home__top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--ally-bg);
+  padding: 20px 0 16px;
+  border-bottom: 1px solid var(--ally-line);
+}
+.ally-home__crumb {
+  color: var(--ally-faint);
+}
+.ally-home__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+.ally-home__title {
+  font: 400 32px/1.15 var(--ally-font-display);
+  margin: 0;
+}
+.ally-home__status--live {
+  background: var(--ally-good-bg);
+  color: var(--ally-good);
+}
+.ally-home__status--paused {
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+.ally-home__status--draft {
+  background: var(--ally-sunken);
+  color: var(--ally-muted);
+}
+.ally-home__saving {
+  color: var(--ally-faint);
+}
+.ally-home__actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.ally-home__actions a.ally-btn {
+  text-decoration: none;
+}
+
+.ally-home__body {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 32px;
+  padding-top: 24px;
+}
+.ally-home__body--panel {
+  grid-template-columns: 200px minmax(0, 1fr) 380px;
+}
+
+.ally-home__nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: sticky;
+  top: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ally-home__nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--ally-radius-sm);
+  background: transparent;
+  color: var(--ally-ink-2);
+  font: 500 15px/1.3 var(--ally-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.ally-home__nav-item:hover {
+  background: var(--ally-sunken);
+}
+.ally-home__nav-item[aria-current="page"] {
+  background: var(--ally-surface);
+  color: var(--ally-ink);
+  box-shadow: inset 0 0 0 1px var(--ally-line);
+}
+.ally-home__nav-item:focus-visible {
+  outline: 2px solid var(--ally-accent);
+  outline-offset: 2px;
+}
+.ally-home__count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+  font: 600 12px/1.6 var(--ally-font-ui);
+  text-align: center;
+}
+
+.ally-home__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+  min-width: 0;
+}
+.ally-home__section-head h2 {
+  font-size: 26px;
+  margin: 0;
+}
+.ally-home__section-head h2:focus {
+  outline: none;
+}
+.ally-home__section-head p {
+  margin: 4px 0 4px;
+}
+.ally-home__group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ally-home__group-title {
+  margin: 0;
+  font: 600 16px/1.3 var(--ally-font-ui);
+}
+.ally-home__group-hint {
+  margin-top: -10px;
+}
+.ally-home__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ally-home__strong {
+  font-weight: 600;
+  margin: 0;
+}
+.ally-home__danger {
+  color: var(--ally-danger);
+}
+
+/* Overview */
+.ally-home__link {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+}
+.ally-home__qr img {
+  display: block;
+  border-radius: var(--ally-radius-sm);
+}
+.ally-home__link-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.ally-home__url {
+  word-break: break-all;
+}
+.ally-home__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.ally-home__stat {
+  padding: 12px 14px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+  border: 1px solid var(--ally-line);
+}
+.ally-home__stat dd {
+  margin: 4px 0 0;
+  font: 400 28px/1.1 var(--ally-font-display);
+}
+
+/* Collapsed groups */
+.ally-home__details > summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--ally-ink-2);
+}
+.ally-home__details-body {
+  padding-top: 14px;
+}
+
+/* Lists of lines, rules and questions */
+.ally-home__lines {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.ally-home__line,
+.ally-home__rule,
+.ally-home__rule-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ally-home__line .ally-input,
+.ally-home__rule-form .ally-input {
+  flex: 1;
+}
+.ally-home__rules,
+.ally-home__facts,
+.ally-home__questions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ally-home__rule {
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+  border: 1px solid var(--ally-line);
+}
+.ally-home__rule-actions {
+  display: flex;
+  gap: 12px;
+  flex: none;
+}
+.ally-home__original {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ally-line-strong);
+  color: var(--ally-muted);
+}
+.ally-home__question {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.ally-home__select {
+  width: auto;
+  min-height: 40px;
+  padding: 8px 12px;
+}
+.ally-home__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.ally-home__limits {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.ally-home__docs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ally-home__docs li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ally-line);
+}
+.ally-home__docs li:last-child {
+  border-bottom: 0;
+}
+.ally-home__doc-status--indexed {
+  background: var(--ally-good-bg);
+  color: var(--ally-good);
+}
+.ally-home__doc-status--failed {
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+.ally-home__qr img {
+  width: 128px;
+  height: 128px;
+}
+
+/* Who can use it */
+.ally-home__choices {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ally-home__choice {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-sm);
+  cursor: pointer;
+}
+.ally-home__choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ally-home__choice.is-on {
+  border-color: var(--ally-accent);
+  background: var(--ally-accent-soft);
+}
+.ally-home__choice input {
+  margin-top: 4px;
+  accent-color: var(--ally-accent);
+}
+
+/* Older pieces shown inside a section keep their own look until they're redrawn. */
+.ally-home__classic {
+  font-family: var(--ally-font-ui);
+  min-width: 0;
+}
+.ally-home__look .ally-look {
+  background: transparent;
+}
+
+/* The right panel: Try it, or (platform admins) the engine. */
+.ally-home__panel {
+  position: sticky;
+  top: 120px;
+  align-self: start;
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+}
+.ally-home__panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.ally-home__panel-title {
+  font-size: 22px;
+  margin: 0;
+}
+.ally-home__try .ally-phone {
+  margin: 0 auto;
+}
+.ally-home__try-page {
+  height: 100%;
+}
+
+@media (max-width: 1279px) {
+  .ally-home__body--panel {
+    grid-template-columns: 180px minmax(0, 1fr) 340px;
+  }
+}
+
+@media (max-width: 959px) {
+  .ally-home {
+    padding: 0 16px 48px;
+  }
+  .ally-home__top {
+    padding-top: 12px;
+  }
+  .ally-home__title {
+    font-size: 26px;
+  }
+  .ally-home__actions {
+    margin-left: 0;
+    width: 100%;
+  }
+  .ally-home__body,
+  .ally-home__body--panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding-top: 12px;
+  }
+  .ally-home__nav ul {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 6px;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .ally-home__nav-item {
+    width: auto;
+    white-space: nowrap;
+    border: 1px solid var(--ally-line);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 14px;
+  }
+  .ally-home__panel {
+    position: fixed;
+    inset: auto 0 0 0;
+    top: auto;
+    z-index: 20;
+    max-height: 88vh;
+    padding: 16px;
+    background: var(--ally-bg);
+    border-top: 1px solid var(--ally-line);
+    border-radius: var(--ally-radius-lg) var(--ally-radius-lg) 0 0;
+    box-shadow: var(--ally-shadow-phone);
+  }
+  .ally-home__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ally-home__limits {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ally-home__rule {
+    flex-wrap: wrap;
+  }
+}

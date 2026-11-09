@@ -6,7 +6,11 @@ import {
   PrechatFieldDto,
 } from '../../chatbot/dto/bot-page.dto';
 import { Chatbot } from '../../chatbot/entity/chatbot.entity';
-import { PrechatFieldType } from '../../chatbot/enum/bot-page.enum';
+import {
+  BotPageAccess,
+  BotPageStatus,
+  PrechatFieldType,
+} from '../../chatbot/enum/bot-page.enum';
 import {
   BOT_PAGE_BOUNDS,
   BotPageLanguage,
@@ -37,6 +41,9 @@ export interface HomeState {
     'name' | 'description' | 'persona' | 'settings' | 'safetyPack'
   >;
   page: BotPageSettings;
+  /** The page row's own columns, and whether "Anyone with the link" may be chosen. */
+  pageRow: { status: BotPageStatus; access: BotPageAccess };
+  publicAllowed: boolean;
 }
 
 /** What a field writes: columns on the bot and keys of the page's settings. */
@@ -45,6 +52,7 @@ export interface HomeWrite {
     Pick<Chatbot, 'name' | 'description' | 'persona' | 'settings'>
   >;
   page?: Partial<BotPageSettings>;
+  pageRow?: Partial<HomeState['pageRow']>;
 }
 
 /** A value that can't be saved; the message is shown under the field. */
@@ -284,6 +292,37 @@ export const HOME_FIELDS = {
     },
     write: (value) => ({ page: { language: value } }),
   } as HomeField<BotPageLanguage>,
+
+  /** The page on or off. */
+  pageStatus: {
+    read: (s) => s.pageRow.status,
+    parse: (value) => {
+      if (value !== BotPageStatus.ON && value !== BotPageStatus.OFF) {
+        throw new HomeFieldInvalid('Choose on or off.');
+      }
+      return value as BotPageStatus;
+    },
+    write: (value) => ({ pageRow: { status: value } }),
+  } as HomeField<BotPageStatus>,
+
+  /** Who can open the page. Public only while the platform allows it (12b). */
+  pageAccess: {
+    read: (s) => s.pageRow.access,
+    parse: (value) => {
+      if (!Object.values(BotPageAccess).includes(value as BotPageAccess)) {
+        throw new HomeFieldInvalid('Choose who can use it.');
+      }
+      return value as BotPageAccess;
+    },
+    write: (value, s) => {
+      if (value === BotPageAccess.PUBLIC && !s.publicAllowed) {
+        throw new HomeFieldInvalid(
+          'Public links are turned off for now. Choose organisation or specific people.',
+        );
+      }
+      return { pageRow: { access: value } };
+    },
+  } as HomeField<BotPageAccess>,
 
   busyText: overrideText(
     'rateLimitText',

@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { Chatbot } from '../../chatbot/entity/chatbot.entity';
 import { ChatbotPage } from '../../chatbot/entity/chatbot-page.entity';
-import { PrechatFieldType } from '../../chatbot/enum/bot-page.enum';
+import {
+  BotPageAccess,
+  BotPageStatus,
+  PrechatFieldType,
+} from '../../chatbot/enum/bot-page.enum';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import {
   BotPageSettings,
@@ -46,6 +50,8 @@ function stateWith(over: Partial<HomeState['chatbot']> = {}): HomeState {
   return {
     chatbot,
     page: defaultBotPageSettings({ ...chatbot, crisisSafetyOn: false }),
+    pageRow: { status: BotPageStatus.ON, access: BotPageAccess.INVITE },
+    publicAllowed: false,
   };
 }
 
@@ -121,6 +127,23 @@ describe('Assistant home fields', () => {
         consentText: 'I agree.',
       },
     ]);
+  });
+
+  it('turns the page on or off, and refuses public while the platform does', () => {
+    expect(
+      HOME_FIELDS.pageStatus.write(BotPageStatus.OFF, stateWith()),
+    ).toEqual({
+      pageRow: { status: BotPageStatus.OFF },
+    });
+    expect(() =>
+      HOME_FIELDS.pageAccess.write(BotPageAccess.PUBLIC, stateWith()),
+    ).toThrow('Public links are turned off for now.');
+    expect(
+      HOME_FIELDS.pageAccess.write(BotPageAccess.PUBLIC, {
+        ...stateWith(),
+        publicAllowed: true,
+      }),
+    ).toEqual({ pageRow: { access: BotPageAccess.PUBLIC } });
   });
 
   it('versions values without regard to key order', () => {
@@ -257,6 +280,9 @@ function harness(over: { safetyPack?: string | null } = {}) {
     view: async (bot: Chatbot) => ({
       saved: Boolean(page),
       slug: 'sunrise-mind',
+      status: page?.status ?? BotPageStatus.OFF,
+      access: page?.access ?? BotPageAccess.INVITE,
+      publicAllowed: false,
       settings: mergeBotPageSettings(
         defaultBotPageSettings({ ...bot, crisisSafetyOn: false }),
         page?.settings as Partial<BotPageSettings> | undefined,
@@ -395,6 +421,16 @@ describe('AssistantHomeService', () => {
       (r) => r.status === 'fulfilled',
     ) as PromiseFulfilledResult<{ value: string }>;
     expect(chatbot.persona.greeting).toBe(won.value.value);
+  });
+
+  it('saves who can open the page to the page itself', async () => {
+    const { service, page } = harness();
+    await service.saveField('bot-1', {
+      field: 'pageAccess',
+      value: BotPageAccess.ORGANISATION,
+      version: versionOf(BotPageAccess.INVITE),
+    });
+    expect(page()!.access).toBe(BotPageAccess.ORGANISATION);
   });
 
   it('different fields never conflict', async () => {
@@ -588,6 +624,26 @@ describe('AssistantHomeService', () => {
       });
     });
 
+    it('adds to the notes as the owner last edited them', async () => {
+      const h = withPage();
+      h.drafts.poke({
+        source: { ...h.drafts.row().source, ownerNotesDocumentId: 'notes-1' },
+      });
+      h.knowledge.getForChatbot
+        .mockResolvedValueOnce({
+          rawText:
+            'Welcome to Sunrise Mind. Individual sessions cost ₹2,000 and last 50 minutes.',
+        })
+        .mockResolvedValueOnce({ rawText: 'Edited in the home.' } as never);
+      await h.service.correctFact('bot-1', 'f1', {
+        text: 'Sessions cost ₹2,500.',
+        version: versionOf('Sessions cost ₹2,000.'),
+      });
+      expect(h.publisher.ownerNotes).toHaveBeenCalledWith(expect.anything(), {
+        ownerNotes: 'Edited in the home.\nSessions cost ₹2,500.',
+      });
+    });
+
     it('refuses a stale correction and an unknown fact', async () => {
       const h = withPage();
       await expect(
@@ -643,6 +699,9 @@ describe('Assistant home copy', () => {
     () => changeOwnRules([], { op: 'remove', id: 'own-0' }),
     () => HOME_FIELDS.suggestedQuestions.parse(['a', 'b', 'c', 'd', 'e']),
     () => HOME_FIELDS.language.parse('fr'),
+    () => HOME_FIELDS.pageStatus.parse('maybe'),
+    () => HOME_FIELDS.pageAccess.parse('everyone'),
+    () => HOME_FIELDS.pageAccess.write(BotPageAccess.PUBLIC, stateWith()),
   ])('refuses in the deck’s words (%#)', (run) => {
     expect(deck).toContain(message(run));
   });

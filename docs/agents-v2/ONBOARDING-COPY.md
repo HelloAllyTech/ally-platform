@@ -378,6 +378,9 @@ says when a save can't be made. More lines for the home's sections are added her
   - A choice question needs its options.
   - A consent question needs its wording.
   - Choose a language.
+  - Choose on or off.
+  - Choose who can use it.
+  - Public links are turned off for now. Choose organisation or specific people.
 - **Your own rules:**
   - Write the rule in a few words.
   - A rule can be at most 200 characters.
@@ -386,3 +389,73 @@ says when a save can't be made. More lines for the home's sections are added her
   - That rule is no longer there.
   - Touching a safety pack rule: the builder's line in §12 ("That would turn off a safety rule, so I can't make that change. I can add a rule of your own instead.")
 - **Correct this:** Write the correction in up to 500 characters.
+
+### The home's screens
+
+- **Breadcrumb:** Assistants
+- **Couldn't load:** We couldn't load this assistant. Try again.
+- **Header actions:** Try it · Open page
+- **Status:** Live · Paused · Not live yet
+- **Sections:** Overview · What it knows · Personality · Safety · Page · Checkup · Conversations · Share
+- **Section subtitles:**
+  - Overview: How your assistant is doing, and what needs you.
+  - What it knows: Everything your assistant answers from.
+  - Personality: How it introduces itself and how it talks.
+  - Safety: Rules your assistant always follows.
+  - Page: How your page looks, and what it asks before a chat.
+  - Checkup: A check that your assistant answers well and stays safe.
+  - Conversations: What people asked, and what your assistant said.
+  - Share: Who can use your assistant, and where.
+- **Saving:** Changes save as you go · Saving… · Saved · Couldn't save. Try again.
+- **Overview:**
+  - Live: Your assistant is live
+  - Paused: Your assistant is paused. People see a note that it's away.
+  - Not live: Your assistant isn't live yet
+  - Buttons: Pause · Turn on
+  - Link: Your link · Copy link · Link copied · Download QR code
+  - Numbers: Last 30 days · People · Messages · Answered · Couldn't answer · All numbers
+  - Needs you: Needs your input · {n} questions it couldn't answer · 1 question it couldn't answer · Review · Nothing needs you right now.
+  - Remove: Remove assistant · Remove {name}? Its page stops working and nobody can chat with it. Conversations are kept.
+- **What it knows:**
+  - Groups: From your website · Your notes · Documents · Needs your input
+  - Facts: Correct this · Show original · Hide original · Corrected by you · Original
+  - Correcting: What's right? · Save correction · Cancel
+  - Corrected on the page: Corrected. Your assistant now uses your words.
+  - Corrected in notes only: Saved to your notes. We couldn't find this line on the page, so the original may still come up.
+  - Notes hint: Anything else your assistant should know. It reads these alongside your website.
+  - Notes placeholder: For example: we're closed on public holidays.
+  - Documents hint: Pages we read, and files you added.
+  - Documents: Upload or remove documents · Ready · Reading · Couldn't read
+  - No facts: Nothing was read from a website for this assistant.
+- **Personality:**
+  - Name: Name · The name your assistant uses.
+  - Introduction: Introduction · The first thing it says.
+  - Tone: Tone · Warm · Balanced · Formal
+  - Languages: Languages · English · Hindi · The visitor's language
+  - Suggested questions: Suggested questions · Shown under the chat box. Up to 4. · Add a question
+  - Quick replies: Quick replies · Short answers it sends on WhatsApp.
+  - When it doesn't know: When it doesn't know · What it says, and where it sends people.
+  - Extra instructions: Extra instructions · Your own guidance for how it answers. Safety rules always come first.
+- **Safety:**
+  - Your own rules: Your own rules · Things your assistant must never do, on top of the rules above. · Add a rule · Never… · Edit · Remove · Always on
+  - Disclaimer: Disclaimer · Shown before every chat.
+  - At risk: When someone may be at risk · What it says before pointing people to help.
+- **Page:**
+  - Business name: Business name · Shown at the top of your page.
+  - Page switch: Your page is on · Your page is off · Turn on · Turn off
+  - Questions before the chat: Questions before the chat · Asked one at a time before the chat starts. Up to 8. · Question {n} · Add a question · Required
+  - Question types: Short answer · Email · Phone · Choice · Date · Agreement
+  - Options: Options, one per line
+  - Agreement text: What they agree to
+  - Limits: Limits · Messages per person per hour · Longest message, in characters · Messages per day, across everyone
+  - Too many messages: When someone sends too many messages
+- **Checkup:** Checkup · Your first checkup runs after your next change.
+- **Share:**
+  - Title: Who can use it
+  - On your page: On your page · People who can open your assistant's page.
+  - On WhatsApp: On WhatsApp · Numbers that can message your assistant on WhatsApp.
+  - WhatsApp messages: Messages on WhatsApp
+  - WhatsApp numbers: WhatsApp numbers
+  - Team: Team · People who can change this assistant.
+- **Try it:** Try your assistant · Chats here aren't saved. · Close · New chat
+- **Platform admins only:** Engine · How this assistant answers. Only platform admins see this. · Classic view

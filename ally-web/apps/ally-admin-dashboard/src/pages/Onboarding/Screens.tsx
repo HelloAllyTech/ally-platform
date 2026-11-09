@@ -507,7 +507,7 @@ const copyLink = async (link: string) => {
   }
 };
 
-const Qr: React.FC<{ link: string }> = ({ link }) => {
+export const Qr: React.FC<{ link: string }> = ({ link }) => {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let current = true;

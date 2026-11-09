@@ -36,6 +36,7 @@ export * from "./builder";
 export * from "./whatsappBot";
 export * from "./chatbots";
 export * from "./botPage";
+export * from "./assistantHome";
 export * from "./characterInterview";
 export * from "./featureToggles";
 export * from "./cohorts";

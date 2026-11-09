@@ -16,6 +16,7 @@ import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.servi
 import { BotPageSettings } from '../../chatbot/type/bot-page.type';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
+import { BotDraftEntity } from '../entity/bot-draft.entity';
 import { BotDraftActor } from '../enum/bot-draft.enum';
 import { SafetyLockedError } from '../safety-pack/safety-lock';
 import { BotDraftPublishService } from '../service/bot-draft-publish.service';
@@ -93,7 +94,7 @@ export class AssistantHomeService {
     return this.dataSource.transaction(async (manager) => {
       const chatbot = await this.lock(manager, chatbotId);
       const view = await this.pages.view(chatbot);
-      const state: HomeState = { chatbot, page: view.settings };
+      const state = stateOf(chatbot, view);
       const current = field.read(state);
       if (versionOf(current) !== dto.version) {
         throw stale(dto.field, current);
@@ -104,12 +105,20 @@ export class AssistantHomeService {
           .getRepository(Chatbot)
           .update({ id: chatbotId }, { ...write.chatbot, updatedBy: userId() });
       }
-      if (write.page) {
-        await this.writePage(manager, chatbot, view, write.page);
+      if (write.page || write.pageRow) {
+        await this.writePage(
+          manager,
+          chatbot,
+          view,
+          write.page ?? {},
+          write.pageRow ?? {},
+        );
       }
       const next: HomeState = {
+        ...state,
         chatbot: { ...chatbot, ...(write.chatbot ?? {}) },
         page: { ...view.settings, ...(write.page ?? {}) },
+        pageRow: { ...state.pageRow, ...(write.pageRow ?? {}) },
       };
       const saved = field.read(next);
       return { field: dto.field, value: saved, version: versionOf(saved) };
@@ -203,7 +212,9 @@ export class AssistantHomeService {
       }
     }
 
-    const ownerNotes = [draft.draftConfig.ownerNotes.trim(), text]
+    // The notes as they stand: the home edits the Owner notes document directly, so it, not the
+    // draft's copy, is the latest.
+    const ownerNotes = [(await this.currentNotes(draft)).trim(), text]
       .filter(Boolean)
       .join('\n');
     const notesDocumentId = await this.publisher.ownerNotes(draft, {
@@ -247,9 +258,19 @@ export class AssistantHomeService {
 
   // ── helpers ───────────────────────────────────────────────────────────
 
+  private async currentNotes(draft: BotDraftEntity): Promise<string> {
+    const id = draft.source?.ownerNotesDocumentId;
+    if (!id) return draft.draftConfig.ownerNotes;
+    try {
+      const document = await this.knowledge.getForChatbot(id);
+      return document.isArchived ? '' : (document.rawText ?? '');
+    } catch {
+      return draft.draftConfig.ownerNotes;
+    }
+  }
+
   private async state(chatbot: Chatbot): Promise<HomeState> {
-    const view = await this.pages.view(chatbot);
-    return { chatbot, page: view.settings };
+    return stateOf(chatbot, await this.pages.view(chatbot));
   }
 
   private async lock(
@@ -273,6 +294,7 @@ export class AssistantHomeService {
     chatbot: Chatbot,
     view: { saved: boolean; slug: string; settings: BotPageSettings },
     patch: Partial<BotPageSettings>,
+    row: Partial<HomeState['pageRow']>,
   ): Promise<void> {
     const repository = manager.getRepository(ChatbotPage);
     const existing = await repository.findOne({
@@ -282,6 +304,7 @@ export class AssistantHomeService {
       await repository.update(
         { id: existing.id },
         {
+          ...row,
           settings: { ...existing.settings, ...patch } as never,
           updatedBy: userId(),
         },
@@ -295,11 +318,29 @@ export class AssistantHomeService {
       slug: view.slug,
       status: BotPageStatus.OFF,
       access: BotPageAccess.INVITE,
+      ...row,
       settings: { ...settings, ...patch } as never,
       createdBy: userId(),
       updatedBy: userId(),
     });
   }
+}
+
+function stateOf(
+  chatbot: Chatbot,
+  view: {
+    settings: BotPageSettings;
+    status: BotPageStatus;
+    access: BotPageAccess;
+    publicAllowed: boolean;
+  },
+): HomeState {
+  return {
+    chatbot,
+    page: view.settings,
+    pageRow: { status: view.status, access: view.access },
+    publicAllowed: view.publicAllowed,
+  };
 }
 
 function userId(): number | null {

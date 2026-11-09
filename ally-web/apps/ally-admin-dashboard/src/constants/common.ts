@@ -797,6 +797,10 @@ export const ApiEndpoints = {
     PAGE_LOGO_URL: (id: string) => `/v1/chatbots/${id}/page/logo-url`,
     PAGE_BRAND: (id: string) => `/v1/chatbots/${id}/page/brand`,
     TEAM_NAMES: (id: string) => `/v1/chatbots/${id}/team-names`,
+    HOME: (id: string) => `/v1/chatbots/${id}/home`,
+    RULES: (id: string) => `/v1/chatbots/${id}/rules`,
+    FACT_CORRECTION: (id: string, factId: string) =>
+      `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
     IMAGES: (id: string) => `/v1/chatbots/${id}/images`,
     IMAGE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}`,
     IMAGE_RESTORE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}/restore`,

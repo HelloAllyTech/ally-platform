@@ -1,5 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AssistantHomeView,
   BotImageKind,
   BotImageView,
   BotPageAccessEntry,
@@ -22,6 +23,11 @@ import {
   CreateKbUploadUrlResponse,
   CreatePrivateChatbotDocumentRequest,
   GetChatbotsResponse,
+  HomeFact,
+  HomeFieldName,
+  HomeFieldState,
+  HomeSafety,
+  RuleChange,
   TestChatbotRequest,
   TestChatbotResponse,
   UpdateChatbotDocumentRequest,
@@ -191,6 +197,91 @@ export const chatbotsApi = baseAPI.injectEndpoints({
         body: { members },
       }),
       invalidatesTags: (_r, _e, { id }) => botTags(id),
+    }),
+
+    // ── assistant home (chunk 20d) ───────────────────────────────────────
+
+    getAssistantHome: builder.query<AssistantHomeView, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.HOME(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:home` }],
+    }),
+
+    /**
+     * Save one field. A save based on a value that changed since is refused (409, with what it
+     * says now). A saved value goes straight into the cached home, so other fields being edited
+     * keep their versions; the bot and its page are refetched for the screens that show them.
+     */
+    saveHomeField: builder.mutation<
+      { field: HomeFieldName } & HomeFieldState<unknown>,
+      { id: string; field: HomeFieldName; value: unknown; version: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getAssistantHome", id, home => {
+              (home.fields as Record<string, HomeFieldState<unknown>>)[data.field] = {
+                value: data.value,
+                version: data.version,
+              };
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+      invalidatesTags: (r, _e, { id }) =>
+        r ? [...botTags(id), { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }] : [],
+    }),
+
+    changeOwnRule: builder.mutation<HomeSafety, { id: string; version: string } & RuleChange>({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.RULES(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getAssistantHome", id, home => {
+              home.safety = data;
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+    }),
+
+    correctFact: builder.mutation<
+      { fact: HomeFact; appliedTo: "page" | "notes" },
+      { id: string; factId: string; text: string; version: string }
+    >({
+      query: ({ id, factId, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.FACT_CORRECTION(id, factId),
+        method: HttpMethod.POST,
+        body,
+      }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getAssistantHome", id, home => {
+              home.facts = home.facts.map(f => (f.id === data.fact.id ? data.fact : f));
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+      // The page document changed, and the notes may be new.
+      invalidatesTags: (r, _e, { id }) => (r ? botTags(id) : []),
     }),
 
     // ── bot page (chunk 12b) ─────────────────────────────────────────────
@@ -377,6 +468,10 @@ export const chatbotsApi = baseAPI.injectEndpoints({
 });
 
 export const {
+  useGetAssistantHomeQuery,
+  useSaveHomeFieldMutation,
+  useChangeOwnRuleMutation,
+  useCorrectFactMutation,
   useGetChatbotsQuery,
   useGetChatbotQuery,
   useCreateChatbotMutation,

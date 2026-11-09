@@ -145,7 +145,6 @@ vi.mock("../ConnectorsTab", () => ({
   BotConnectorsTab: withRoles("bot-connectors"),
 }));
 vi.mock("../CorpusTab", () => ({ CorpusTab: stub("library") }));
-vi.mock("../CreateChatbotPanel", () => ({ CreateChatbotPanel: () => null }));
 vi.mock("../TemplatesTab", () => ({ TemplatesTab: stub("replies") }));
 vi.mock("../ChatbotOverviewTab", () => ({ ChatbotOverviewTab: withRoles("overview") }));
 vi.mock("../AgentTab", () => ({ AgentTab: withRoles("agent") }));
