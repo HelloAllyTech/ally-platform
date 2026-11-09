@@ -352,6 +352,44 @@ void main() {
       expect(payload.branchingRecap, isEmpty);
     });
 
+    group('BRANCHING_SCENARIO experience', () {
+      StartItemPayload parse(Map<String, dynamic> extra, {String type = 'BRANCHING_SCENARIO'}) =>
+          StartItemPayload.fromJson({
+            'trackItemProgressId': 'prog-x',
+            'type': type,
+            'startNodeId': 'n1',
+            'nodes': [
+              {'id': 'n1', 'text': 'Scene one.'},
+            ],
+            ...extra,
+          });
+
+      test('STORY plays as story', () {
+        expect(parse({'experience': 'STORY'}).branchingExperience, BranchingExperience.story);
+      });
+
+      test('CLASSIC plays as classic', () {
+        expect(parse({'experience': 'CLASSIC'}).branchingExperience, BranchingExperience.classic);
+      });
+
+      test('missing or null plays as classic', () {
+        expect(parse({}).branchingExperience, BranchingExperience.classic);
+        expect(parse({'experience': null}).branchingExperience, BranchingExperience.classic);
+      });
+
+      test('an unknown value or a non-string plays as classic', () {
+        expect(parse({'experience': 'CINEMATIC'}).branchingExperience, BranchingExperience.classic);
+        expect(parse({'experience': 1}).branchingExperience, BranchingExperience.classic);
+      });
+
+      test('is not set on other item types', () {
+        expect(
+          parse({'experience': 'STORY', 'gameKey': 'x'}, type: 'GAME').branchingExperience,
+          isNull,
+        );
+      });
+    });
+
     test('parses a BUCKET_SORT payload, stripping no answer key', () {
       final payload = StartItemPayload.fromJson({
         'trackItemProgressId': 'prog-8',
