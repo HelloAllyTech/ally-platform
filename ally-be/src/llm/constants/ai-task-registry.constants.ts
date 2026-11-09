@@ -1561,6 +1561,61 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'openai.imageModel',
   },
   {
+    id: 'image-studio-compose',
+    task: LlmTask.IMAGE_STUDIO_COMPOSE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'An author presses Generate or "Suggest from content" in the Image Studio pop-up on any image slot',
+    detail:
+      'One call per press (not per variation): screens the request against the ' +
+      'depiction rules, drafts or tidies the description, writes alt text and the ' +
+      'scene the image prompt is compiled from. JSON mode. A keyword backstop ' +
+      'runs when this call fails, and generation continues from the raw description.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'image_studio_compose',
+  },
+  {
+    id: 'image-studio-image',
+    task: LlmTask.IMAGE_STUDIO_IMAGE,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'The Image Studio worker renders one image an author asked for (a cover, scene, portrait, quiz or article image, badge icon or cast sheet)',
+    detail:
+      'One call per variation (1–4 per press, up to 20 in a "fill empty scenes" ' +
+      'batch), plus one silent retry when the check fails. Text-only images use ' +
+      'IMAGE_STUDIO_TEXT_PROVIDER/MODEL; images with reference images (scenes with ' +
+      'a cast, cast sheets, refine) use IMAGE_STUDIO_REFERENCE_PROVIDER/MODEL ' +
+      '(Gemini by default). An outage falls back to the other provider. Durable ' +
+      'job rows in generated_images; cost estimated per image in costUsd.',
+    kind: AiTaskKind.IMAGE,
+    provider: 'openai',
+    defaultModel: 'gpt-image-1.5',
+    configuredBy:
+      'IMAGE_STUDIO_TEXT_PROVIDER / IMAGE_STUDIO_TEXT_MODEL / IMAGE_STUDIO_REFERENCE_PROVIDER / IMAGE_STUDIO_REFERENCE_MODEL',
+    configPath: 'openai.imageModel',
+  },
+  {
+    id: 'image-studio-judge',
+    task: LlmTask.IMAGE_STUDIO_JUDGE,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'The Image Studio worker checks a freshly generated image before the author sees it',
+    detail:
+      'Vision call with the generated image (and its reference images): fails it ' +
+      'for visible text, wrong people, unsafe depiction, anatomy errors or a ' +
+      'character who does not match their reference. A failed image is regenerated ' +
+      'once. Off with IMAGE_STUDIO_JUDGE_ENABLED=false; skipped when no OpenAI key.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'IMAGE_STUDIO_JUDGE_MODEL',
+    configPath: 'imageStudio.judgeModel',
+  },
+  {
     id: 'analytics-suggestions',
     task: LlmTask.ANALYTICS_SUGGESTIONS,
     runtime: LlmRuntime.ALLY_BE,

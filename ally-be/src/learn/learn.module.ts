@@ -1,3 +1,4 @@
+import { ImageStudioModule } from 'src/image-studio/image-studio.module';
 import { StageDirectorMemoriesService } from './service/stage-director-memories.service';
 import { CohortModule } from 'src/cohort/cohort.module';
 import { forwardRef, Module } from '@nestjs/common';
@@ -154,6 +155,7 @@ import { SettingsModule } from 'src/settings/settings.module';
 
 @Module({
   imports: [
+    ImageStudioModule,
     // Languages now point at an llm_models catalog row; the resolver needs to
     // read it when assembling session metadata.
     LlmModule,

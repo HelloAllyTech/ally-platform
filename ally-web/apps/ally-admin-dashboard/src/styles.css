@@ -129,7 +129,7 @@ html [data-sonner-toast][data-styled="true"] [data-button] {
     font-family: "IBM Plex Serif", serif;
     /* Carbon text-primary. carbon-serif.scss turns off Carbon's own body rule, so text
        with no colour class fell back to the browser's pure black. */
-    color: theme("colors.typography.900");
+    color: theme("textColor.typography.900");
   }
 
   svg text {
@@ -348,5 +348,65 @@ html [data-sonner-toast][data-styled="true"] [data-button] {
   }
   .idea-capture-surface {
     transition-duration: 1ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------
+   Dark mode — the top-bar switch puts `dark` (and Carbon's `cds--g100` zone) on <html>.
+   Tailwind colour classes re-theme through the variables in dark-mode.tailwind.js; this
+   block only covers what isn't a Tailwind class.
+   --------------------------------------------------------------------------------------- */
+html.dark,
+html.dark body {
+  background-color: #161616;
+}
+
+/* carbon-serif.scss pins Carbon's interactive tokens to brand navy in every zone. Solid
+   buttons keep it (white label on navy reads fine), but navy links, focus rings and
+   interactive icons vanish on #161616, so lift those to the light end of the brand ramp.
+   `html.dark.cds--g100` out-ranks that block's single-class selectors. */
+html.dark.cds--g100 {
+  --cds-link-primary: #7ea2dd;
+  --cds-link-primary-hover: #aec5ea;
+  --cds-focus: #ffffff;
+  --cds-border-interactive: #4a7dcf;
+  --cds-icon-interactive: #ffffff;
+  --cds-support-info: #7ea2dd;
+}
+
+/* Custom SVGs (the "Ally" wordmark and other brand marks) hard-code brand navy, which almost
+   disappears on #161616. Lift it to the light end of the brand ramp. */
+html.dark [fill="#264D8E" i] {
+  fill: #7ea2dd;
+}
+
+html.dark [stroke="#264D8E" i] {
+  stroke: #7ea2dd;
+}
+
+/* The monochrome custom SVG icons (sidebar glyphs, eye, tick…) are all drawn in #212121 ink.
+   Illustrated avatars use other darks and keep their colours. */
+html.dark svg [fill="#212121" i] {
+  fill: #c6c6c6;
+}
+
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #6f6f6f;
+}
+
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #8d8d8d;
+}
+
+/* Fade the switch so the whole console doesn't snap; skipped for reduced-motion users. */
+@media (prefers-reduced-motion: no-preference) {
+  html.color-mode-transition,
+  html.color-mode-transition *,
+  html.color-mode-transition *::before,
+  html.color-mode-transition *::after {
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease,
+      color 200ms ease !important;
   }
 }
