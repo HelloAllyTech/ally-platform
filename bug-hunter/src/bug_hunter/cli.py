@@ -680,8 +680,17 @@ def run_cmd(
     run_id: Annotated[
         str | None, typer.Option(help="Run id (default: generated).")
     ] = None,
+    push: Annotated[
+        bool,
+        typer.Option(
+            "--push",
+            help="Really push the branch and open the draft PR (needs the GitHub "
+            "App). Default: dry run into the run's artefacts.",
+        ),
+    ] = False,
 ) -> None:
-    """One bug signal through graph v1: triage → investigate → reproduce → report."""
+    """One bug signal through the graph: triage → investigate → reproduce → fix →
+    verify → review → risk gate → draft PR (dry-run by default) → human approval."""
     import json as _json
 
     from bug_hunter.graph.build import build_graph, run_graph
@@ -763,7 +772,16 @@ def run_cmd(
                     ref=checkout,
                     checkpointer=saver,
                 )
-                typer.echo(f"run {run.run_id}: {mode} mode, {app_name} at {checkout}")
+                deps.push = push
+                if not no_checkpoint:
+                    from bug_hunter.graph.approvals import PostgresApprovals
+                    from bug_hunter.graph.checkpointer import db_url
+
+                    deps.approvals = PostgresApprovals(db_url())
+                typer.echo(
+                    f"run {run.run_id}: {mode} mode, {app_name} at {checkout}"
+                    + ("" if push else " (PR dry-run)")
+                )
                 graph = build_graph(deps, saver)
                 state = run_graph(graph, deps, signal)
                 state.trace_url = trace_url(run.run_id)
@@ -786,6 +804,96 @@ def run_cmd(
                             "cost_usd": round(state.budget_used.cost_usd, 4),
                             "artefacts": str(run.kept_artefacts),
                             "trace": state.trace_url,
+                            "patch": state.patch.diff_path if state.patch else None,
+                            "pr": state.pr_url,
+                            "risk_level": state.risk_level,
+                        },
+                        indent=1,
+                    )
+                )
+                if state.status == "awaiting_human":
+                    typer.echo(
+                        f"paused for approval: bug-hunter resume {run.run_id} "
+                        "--approve|--reject --reason '…'"
+                    )
+    except CheckpointerError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("resume")
+def resume_cmd(
+    run_id: Annotated[str, typer.Argument(help="The run paused at human_approval.")],
+    approve: Annotated[
+        bool, typer.Option("--approve", help="Approve the fix.")
+    ] = False,
+    reject: Annotated[bool, typer.Option("--reject", help="Reject the fix.")] = False,
+    reason: Annotated[str, typer.Option(help="One line; required for reject.")] = "",
+    by: Annotated[str, typer.Option(help="Who decided (default: $USER).")] = "",
+) -> None:
+    """Record the human decision and continue the paused run (chunk 09 adds the UI)."""
+    import json as _json
+    import os as _os
+
+    from bug_hunter.graph.approvals import PostgresApprovals
+    from bug_hunter.graph.build import build_graph, run_graph
+    from bug_hunter.graph.checkpointer import (
+        CheckpointerError,
+        db_url,
+        open_checkpointer,
+    )
+    from bug_hunter.graph.deps import GraphDeps
+    from bug_hunter.runs import Run
+
+    if approve == reject:
+        typer.echo("give exactly one of --approve or --reject", err=True)
+        raise typer.Exit(code=1)
+    if reject and not reason.strip():
+        typer.echo("--reject needs --reason", err=True)
+        raise typer.Exit(code=1)
+    config = _load_or_exit()
+    decision = {
+        "decision": "approved" if approve else "rejected",
+        "by": by or _os.environ.get("USER", "unknown"),
+        "reason": reason,
+    }
+    try:
+        with open_checkpointer() as saver:
+            thread = {"configurable": {"thread_id": run_id}}
+            history = list(saver.list(thread, limit=1))
+            if not history:
+                typer.echo(f"{run_id}: no checkpoints", err=True)
+                raise typer.Exit(code=1)
+            values = history[0].checkpoint.get("channel_values", {})
+            if values.get("status") != "awaiting_human":
+                typer.echo(
+                    f"{run_id}: not awaiting approval (status {values.get('status')})"
+                )
+                raise typer.Exit(code=1)
+            app_name = values["app"]
+            ref = values.get("ref") or "origin/master"
+            mode = values.get("mode") or "issue"
+            with Run.start(config, app_name, ref, run_id=f"{run_id}-resume") as run:
+                deps = GraphDeps.for_run(
+                    config,
+                    run,
+                    app_name,
+                    mode,
+                    ref=ref,
+                    checkpointer=saver,
+                    with_repo_map=False,
+                )
+                deps.run_id = run_id
+                deps.approvals = PostgresApprovals(db_url())
+                graph = build_graph(deps, saver)
+                state = run_graph(graph, deps, None, resume_with=decision)
+                typer.echo(
+                    _json.dumps(
+                        {
+                            "run_id": run_id,
+                            "status": state.status,
+                            "decision": state.approval_decision,
+                            "reason": state.approval_reason,
                         },
                         indent=1,
                     )
@@ -793,6 +901,20 @@ def run_cmd(
     except CheckpointerError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1)
+
+
+db_app = typer.Typer(help="The bug hunter's own Postgres: checkpoints and approvals.")
+app.add_typer(db_app, name="db")
+
+
+@db_app.command("migrate")
+def db_migrate() -> None:
+    """Apply bug-hunter/migrations/*.sql (approvals table) to the bughunter database."""
+    from bug_hunter.graph.approvals import PostgresApprovals
+    from bug_hunter.graph.checkpointer import db_url
+
+    applied = PostgresApprovals.migrate(db_url())
+    typer.echo("applied: " + ", ".join(applied))
 
 
 @app.command("replay")
