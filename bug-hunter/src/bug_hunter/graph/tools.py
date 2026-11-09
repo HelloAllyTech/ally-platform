@@ -100,3 +100,57 @@ def outline_first_read_tools(deps: GraphDeps) -> list[StructuredTool]:
         handle_validation_error=True,
     )
     return [guarded if t.name == "read_file" else t for t in tools]
+
+
+def fix_edit_tool(deps: GraphDeps, protected: list[str]) -> StructuredTool:
+    """``edit_file`` for the fix node: exact single replace, and the fix rules enforced
+    before anything is written (no tests, no test/CI config, no risk paths, never the
+    reproduction test files)."""
+    from bug_hunter.tools.lc import EditFileArgs
+
+    workspace = deps.workspace
+
+    def edit_file(path: str, old_str: str, new_str: str) -> str:
+        try:
+            target = workspace._abs(path)
+            workspace.policy.check_fix_write(target, deps.app, protected)
+            return workspace.edit_file(path, old_str, new_str)
+        except Exception as exc:  # noqa: BLE001 - the model needs the message
+            return f"error: {exc}"
+
+    return StructuredTool.from_function(
+        func=edit_file,
+        name="edit_file",
+        description=(
+            "Replace one exact occurrence of old_str with new_str in a source file. "
+            "Tests, test/CI configuration and risk paths are refused."
+        ),
+        args_schema=EditFileArgs,
+        handle_validation_error=True,
+    )
+
+
+def repro_only_run_tests(
+    deps: GraphDeps, test_path: str, test_name: str
+) -> StructuredTool:
+    """``run_tests`` that can only run the reproduction test (the fix loop's signal)."""
+    from bug_hunter.tools.lc import NoArgs
+
+    def run_repro() -> str:
+        if deps.runner is None:
+            return "error: no sandbox available in this run"
+        deps.ensure_sandbox()
+        result = deps.runner.run_tests(test_path, test_name)
+        text = result.summary()
+        if result.excerpt and (not result.passed or result.timed_out):
+            text += "\n" + result.excerpt
+        return text
+
+    return StructuredTool.from_function(
+        func=run_repro,
+        name="run_repro_test",
+        description=(
+            f"Run the reproduction test {test_path}::{test_name} in the sandbox."
+        ),
+        args_schema=NoArgs,
+    )

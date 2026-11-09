@@ -244,6 +244,10 @@ class Runner:
             return self._run("test", self.app_config.test)
         return self._run("test", single_test_command(self.app_config, target, name))
 
+    def run_tests_command(self, command: str) -> RunResult:
+        """A test command already rendered (e.g. one Nx project's suite)."""
+        return self._run("test", command)
+
     def run_lint(self) -> RunResult:
         return self._run("lint", self.app_config.lint)
 

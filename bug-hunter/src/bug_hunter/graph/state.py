@@ -24,6 +24,7 @@ Status = Literal[
     "awaiting_human",
     "pr_opened",
     "escalated",
+    "rejected",
     "closed_not_bug",
     "closed_duplicate",
     "failed",
@@ -71,6 +72,10 @@ class Repro(BaseModel):
     fails_for_the_right_reason: bool  # judged in the reproduce node
     failure_kind: Literal["genuine", "setup", "passed", "no_tests"] = "genuine"
     judgement: str = ""  # why the failure does / does not match the hypothesis
+    file_hashes: dict[str, str] = Field(
+        default_factory=dict,
+        description="sha256 of each repro test file; fix may not change them",
+    )
 
 
 class Patch(BaseModel):
@@ -87,10 +92,26 @@ class Verification(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     repro_passes: bool
-    app_tests_pass: bool
+    app_tests_pass: bool  # no *new* failures against the baseline
     lint_pass: bool
     typecheck_pass: bool
     new_failures: list[str] = Field(default_factory=list)
+    baseline_failures: list[str] = Field(
+        default_factory=list
+    )  # pre-existing, not blamed
+    repro_files_unchanged: bool = True  # hashes from reproduce still match
+    commands_run: list[str] = Field(default_factory=list)
+    summary: str = ""
+
+    @property
+    def passed(self) -> bool:
+        return (
+            self.repro_passes
+            and self.app_tests_pass
+            and self.lint_pass
+            and self.typecheck_pass
+            and self.repro_files_unchanged
+        )
 
 
 class Review(BaseModel):
@@ -153,6 +174,10 @@ class BugState(BaseModel):
     status: Status = "new"
     stop_reason: str | None = None  # budget exceeded, cannot reproduce, …
     pr_url: str | None = None
+    pr_branch: str | None = None
+    approval_id: str | None = None
+    approval_decision: Literal["approved", "rejected"] | None = None
+    approval_reason: str | None = None
     escalation_url: str | None = None
     scratchpad_path: str = ""
     artefacts: dict[str, str] = Field(default_factory=dict)  # name -> path

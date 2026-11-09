@@ -31,6 +31,29 @@ DENY_PATTERNS: tuple[str, ...] = (
     ".github/**",
 )
 
+# The fix node may not touch these even though other writers could (test and CI
+# configuration): loosening a config is the other way to make a red test green.
+FIX_DENY_PATTERNS = (
+    "**/jest.config.*",
+    "**/vitest.config.*",
+    "**/vitest.workspace.*",
+    "**/vite.config.*",
+    "**/pytest.ini",
+    "**/setup.cfg",
+    "**/tox.ini",
+    "**/conftest.py",
+    "**/.eslintrc*",
+    "**/eslint.config.*",
+    "**/tsconfig*.json",
+    "**/analysis_options.yaml",
+    "**/project.json",
+    "**/nx.json",
+    "**/.flake8",
+    "**/pyproject.toml",
+    "**/package.json",
+    "**/pubspec.yaml",
+)
+
 # Readable, never writable.
 LOCKFILE_PATTERNS: tuple[str, ...] = (
     "package-lock.json",
@@ -138,6 +161,33 @@ class PathPolicy:
         if self.is_lockfile(rel):
             raise PathDenied(f"{path}: lockfiles are read-only")
         self.app_rel(resolved, app)
+        return resolved
+
+    def check_fix_write(
+        self, path: str | Path, app: str, protected: Iterable[str] = ()
+    ) -> Path:
+        """``check_write`` plus the fix node's rules (CONTEXT rule 6 and chunk 06):
+        no existing tests, no test configuration, no CI, no risk paths, and never the
+        reproduction test files (``protected``, app-relative)."""
+        resolved = self.check_write(path, app)
+        rel = self.rel(resolved)
+        app_rel = self.app_rel(resolved, app)
+        if self.is_test_path(resolved, app):
+            raise PathDenied(f"{path}: fix may not edit tests (add tests in reproduce)")
+        rule = matches_any(app_rel, FIX_DENY_PATTERNS) or matches_any(
+            rel, FIX_DENY_PATTERNS
+        )
+        if rule:
+            raise PathDenied(
+                f"{path}: fix may not edit test or CI configuration ({rule})"
+            )
+        if app_rel in set(protected):
+            raise PathDenied(
+                f"{path}: this is the reproduction test; fix may not touch it"
+            )
+        hits = self.touches_risk([resolved], app)
+        if hits:
+            raise PathDenied(f"{path}: risk path, human-only ({hits[0]})")
         return resolved
 
     def is_test_path(self, path: str | Path, app: str) -> bool:

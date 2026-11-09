@@ -6,11 +6,15 @@ run:
   max_cost_usd: 1.50          # per graph run; the run escalates with "budget exceeded" past any of the three
   max_tool_turns: 30          # per tool loop (investigate, reproduce); the loop then answers with what it has
   max_repro_attempts: 3       # a submitted test that passes (or runs nothing) goes back to the agent this many times
+  max_fix_lines_changed: 80   # a fix diff over this many changed lines escalates instead of opening a PR
 sweep:
   max_runs_per_day: 5
   max_prs_per_day: 3
 approval:
   expiry_days: 7
+# Pull requests (chunk 06). push is a CLI flag, never a default; auto_merge stays off until chunk 09.
+pr:
+  auto_merge: false
 sandbox:
   cpus: 2
   memory_mb: 8192            # ally-web's three Vitest suites run a 5 GB Node heap each

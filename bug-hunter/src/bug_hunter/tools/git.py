@@ -174,6 +174,21 @@ class Git:
         )
         return self.head(worktree)
 
+    def stash_paths(self, worktree: Path, paths: Sequence[str]) -> bool:
+        """Set aside the tracked changes to ``paths`` (the fix) so the baseline can run
+        on the untouched code; untracked files (the repro test) stay. Returns whether
+        anything was stashed."""
+        if not paths:
+            return False
+        out = self._git(
+            ["stash", "push", "--quiet", "-m", "bughunter-baseline", "--", *paths],
+            cwd=worktree,
+        )
+        return "No local changes" not in (out.stdout + out.stderr)
+
+    def unstash(self, worktree: Path) -> None:
+        self._git(["stash", "pop", "--quiet"], cwd=worktree)
+
     # --- push: only open_pr may call this ------------------------------------------
 
     def push(self, worktree: Path, branch: str, remote: str = "origin") -> None:

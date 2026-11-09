@@ -20,6 +20,7 @@ from bug_hunter.graph.nodes.common import charge_all, node_context, over_budget
 from bug_hunter.graph.prompts import load_prompt
 from bug_hunter.graph.state import BugState, Repro
 from bug_hunter.graph.tools import outline_first_read_tools
+from bug_hunter.graph.verify import hashes_for
 from bug_hunter.tools.lc import RunTestsArgs, WriteTestFileArgs
 from bug_hunter.tools.runner import RunResult, single_test_command
 
@@ -280,6 +281,7 @@ def make_reproduce_node(deps: GraphDeps):
             fails_for_the_right_reason=related,
             failure_kind=kind,
             judgement=judgement,
+            file_hashes=hashes_for(deps.app_root, [args["test_path"]]),
         )
         deps.scratchpad.append_note(
             f"reproduce: {args['test_path']}::{args['test_name']} -> {kind}; "

@@ -44,6 +44,8 @@ apps:
     # nothing and vitest exits 0 with "No test files found" (TESTING.md's --testFile
     # is not a Vitest option either; both verified in the sandbox).
     test_one: "npx nx test {project} -- {project_file} --testNamePattern={name}"
+    # verify (chunk 06) runs only the Nx projects a fix touches; the full suite runs in the PR's CI
+    test_project: "npx nx test {project}"
     lint: "npm run lint && npm run format:check && npm run lint:colors"
     typecheck: >-
       npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json

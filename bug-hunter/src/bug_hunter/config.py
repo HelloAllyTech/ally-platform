@@ -62,6 +62,7 @@ class AppConfig(_Strict):
     lang: Literal["typescript", "python", "dart"]
     test: str
     test_one: str | None = None
+    test_project: str | None = None  # ally-web: one Nx project's suite ({project})
     lint: str | None = None
     typecheck: str | None = None
     test_dirs: list[str] = Field(default_factory=list)
@@ -198,6 +199,7 @@ class RunLimits(_Strict):
     max_cost_usd: float = Field(default=1.5, gt=0)
     max_tool_turns: int = Field(default=30, ge=1)
     max_repro_attempts: int = Field(default=3, ge=1)
+    max_fix_lines_changed: int = Field(default=80, ge=1)
 
 
 class SweepLimits(_Strict):
@@ -207,6 +209,10 @@ class SweepLimits(_Strict):
 
 class ApprovalLimits(_Strict):
     expiry_days: int = Field(default=7, ge=1)
+
+
+class PrConfig(_Strict):
+    auto_merge: bool = False
 
 
 class SandboxLimits(_Strict):
@@ -244,6 +250,7 @@ class LimitsConfig(_Strict):
     run: RunLimits
     sweep: SweepLimits = Field(default_factory=SweepLimits)
     approval: ApprovalLimits = Field(default_factory=ApprovalLimits)
+    pr: PrConfig = Field(default_factory=PrConfig)
     sandbox: SandboxLimits
     nodes: dict[str, int] = Field(default_factory=dict)
     context: ContextLimits = Field(default_factory=ContextLimits)
