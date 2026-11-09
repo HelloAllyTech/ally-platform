@@ -860,3 +860,353 @@ class WeaviateDB(VectorDB):
         except Exception as e:
             logger.exception(f"near_vector_search failed: {type(e).__name__}")
             raise VectorDBSearchFailedException("Failed to run similarity search")
+
+    # ---- Context Library primitives -------------------------------------------------
+    #
+    # The methods below serve app/core/context_library. They are additive: nothing above
+    # calls them, and they leave the single-vector methods' behaviour untouched. Unlike
+    # those, they take the collection name as caller data — a Context Library collection
+    # is created on demand per versioned name — so the caller (ContextChunkService)
+    # validates every name against CONTEXT_COLLECTION_PATTERN before it reaches here.
+
+    async def collection_exists(self, collection_name: str) -> bool:
+        """
+        Whether a collection exists.
+
+        Raised as VectorDBSearchFailedException on failure rather than answered False:
+        "cannot reach Weaviate" read as "no such collection" would turn an outage into
+        an empty result, and the caller would report that the index holds nothing.
+        """
+        try:
+            async with self._semaphore:
+                return bool(await self.client.collections.exists(collection_name))
+        except Exception as e:
+            logger.exception(f"collection_exists failed: {type(e).__name__}")
+            raise VectorDBSearchFailedException("Failed to check the collection")
+
+    async def ensure_collection(
+        self, collection_name: str, **create_kwargs: Any
+    ) -> bool:
+        """
+        Create a collection unless it already exists. Returns True when this call
+        created it.
+
+        Idempotent under a race: two writers can both see "missing" and both try to
+        create. The loser's create fails, so a failed create is followed by a second
+        existence check, and only a collection that is STILL missing is an error.
+
+        Creating explicitly matters because Weaviate's auto-schema would otherwise
+        create a missing collection on first insert with an inferred configuration — no
+        named vectors, default tokenisation — which retrieval would then silently run
+        against.
+        """
+        if await self.collection_exists(collection_name):
+            return False
+        try:
+            async with self._semaphore:
+                await self.client.collections.create(
+                    name=collection_name, **create_kwargs
+                )
+            logger.info(f"Created collection {collection_name}")
+            return True
+        except Exception as e:
+            if await self.collection_exists(collection_name):
+                logger.info(f"Collection {collection_name} was created concurrently")
+                return False
+            logger.exception(f"ensure_collection failed: {type(e).__name__}")
+            raise VectorDBInsertFailedException("Failed to create the collection")
+
+    async def delete_collection(self, collection_name: str) -> bool:
+        """
+        Drop a whole collection. Returns False when it did not exist.
+
+        No guard lives here beyond existence: the confirmation that a caller really
+        meant this collection is the service's job, which knows what a legitimate name
+        looks like.
+        """
+        if not await self.collection_exists(collection_name):
+            return False
+        try:
+            async with self._semaphore:
+                await self.client.collections.delete(collection_name)
+            return True
+        except Exception as e:
+            logger.exception(f"delete_collection failed: {type(e).__name__}")
+            raise VectorDBDeleteFailedException("Failed to delete the collection")
+
+    async def insert_with_named_vectors(
+        self,
+        collection_name: str,
+        documents: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Insert-or-replace many objects that carry NAMED vectors, in one round trip.
+
+        Each document is ``{"id", "properties", "vectors": {name: vector}}``. Returns
+        ``{"succeeded": [id], "failed": [{"id", "error"}]}`` — the same per-object
+        contract as `create_documents_bulk`, for the same reason: `insert_many` reports
+        per-object errors by batch INDEX instead of raising, so they are mapped back to
+        ids here or they are lost.
+
+        Batch import overwrites an existing object with the same UUID, which is what
+        makes this an upsert: the caller uses its own row id as the object UUID.
+
+        A document with no non-empty vector at all is refused before the request. These
+        collections have no vectorizer, so such an object would be stored, match BM25,
+        and never be reachable by any vector retriever — a silent half-indexed state.
+        """
+        if not documents:
+            return {"succeeded": [], "failed": []}
+
+        failed: List[Dict[str, str]] = []
+        writable: List[Dict[str, Any]] = []
+        for doc in documents:
+            vectors = {
+                name: vector
+                for name, vector in (doc.get("vectors") or {}).items()
+                if vector
+            }
+            if not vectors:
+                failed.append(
+                    {"id": str(doc.get("id", "")), "error": "missing embedding vectors"}
+                )
+                continue
+            writable.append({**doc, "vectors": vectors})
+
+        if not writable:
+            return {"succeeded": [], "failed": failed}
+
+        try:
+            collection = self.client.collections.get(collection_name)
+            batch = [
+                wvc.data.DataObject(
+                    uuid=str(doc["id"]),
+                    properties=doc["properties"],
+                    vector=doc["vectors"],
+                )
+                for doc in writable
+            ]
+            async with self._semaphore:
+                result = await collection.data.insert_many(batch)
+
+        except WeaviateInsertManyAllFailedError as e:
+            # Every object failed: still a per-object outcome, not a request failure.
+            logger.error(f"Named-vector insert: all {len(writable)} object(s) failed")
+            failed.extend({"id": str(doc["id"]), "error": str(e)} for doc in writable)
+            return {"succeeded": [], "failed": failed}
+
+        except Exception as e:
+            logger.exception(f"Named-vector insert failed: {type(e).__name__}")
+            raise VectorDBInsertFailedException("Failed to bulk insert documents")
+
+        errors = getattr(result, "errors", None) or {}
+        succeeded: List[str] = []
+        for index, doc in enumerate(writable):
+            error = errors.get(index)
+            if error is None:
+                succeeded.append(str(doc["id"]))
+            else:
+                message = getattr(error, "message", None) or str(error)
+                logger.warning(
+                    f"Named-vector insert rejected one object in {collection_name}"
+                )
+                failed.append({"id": str(doc["id"]), "error": message})
+
+        return {"succeeded": succeeded, "failed": failed}
+
+    async def delete_by_property_values(
+        self,
+        collection_name: str,
+        property_name: str,
+        values: List[str],
+    ) -> int:
+        """
+        Delete every object whose `property_name` is one of `values`. Returns the count.
+
+        Uses `contains_any`, so it is exact only on a FIELD-tokenised property (the
+        Context Library's `chunk_id` is one); on a word-tokenised property it would
+        match on shared words. An empty `values` raises rather than reaching Weaviate,
+        for the same reason as `delete_by_filter`: a filter that degrades to match-all
+        empties the collection.
+        """
+        if not values:
+            raise ValueError(
+                "delete_by_property_values requires at least one value; an empty list "
+                "must never reach Weaviate as a match-all"
+            )
+        try:
+            collection = self.client.collections.get(collection_name)
+            async with self._semaphore:
+                result = await collection.data.delete_many(
+                    where=Filter.by_property(property_name).contains_any(list(values))
+                )
+            failed_count = int(getattr(result, "failed", 0) or 0)
+            if failed_count:
+                logger.error(
+                    f"delete_by_property_values left {failed_count} object(s) "
+                    f"in {collection_name}"
+                )
+            return int(getattr(result, "successful", 0) or 0)
+        except Exception as e:
+            logger.exception(f"delete_by_property_values failed: {type(e).__name__}")
+            raise VectorDBDeleteFailedException("Failed to delete documents")
+
+    async def list_ids_with_properties(
+        self,
+        collection_name: str,
+        properties: List[str],
+        limit: int = 200,
+        after: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        One cursor page of ``{"id", **properties}``, for reconciliation sweeps that need
+        a little more than the id — the Context Library compares `text_hash` to spot a
+        stale vector without fetching the text.
+
+        Cursor (`after`) paging for the reason given on `list_document_ids`: offset
+        paging over a collection being written to can skip objects.
+        """
+        try:
+            collection = self.client.collections.get(collection_name)
+            async with self._semaphore:
+                result = await collection.query.fetch_objects(
+                    limit=limit,
+                    after=after,
+                    return_properties=list(properties),
+                )
+            return [
+                {"id": str(obj.uuid), **(obj.properties or {})}
+                for obj in result.objects
+            ]
+        except Exception as e:
+            logger.exception(f"list_ids_with_properties failed: {type(e).__name__}")
+            raise VectorDBSearchFailedException("Failed to list document ids")
+
+    async def bm25_search(
+        self,
+        collection_name: str,
+        query: str,
+        query_properties: Optional[List[str]] = None,
+        limit: int = 10,
+        filters: Optional[Dict[str, Any]] = None,
+        any_of: Optional[List[Dict[str, Any]]] = None,
+        contains_all: Optional[Dict[str, List[str]]] = None,
+        return_properties: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Keyword (BM25) search with PRE-filters. One dict per hit: {"id", "score",
+        **properties}, in rank order.
+
+        Filters are applied inside the query for the reason `_build_property_filter`
+        gives: a post-filter over a fixed top-k starves recall. An empty `any_of` means
+        "match nothing" and returns [] without I/O, exactly as in `near_vector_search`.
+        """
+        if any_of is not None and not any_of:
+            return []
+        try:
+            collection = self.client.collections.get(collection_name)
+            query_filters = self._compose_filters(filters, any_of, contains_all)
+            async with self._semaphore:
+                result = await collection.query.bm25(
+                    query=query,
+                    query_properties=query_properties,
+                    filters=query_filters,
+                    limit=limit,
+                    return_metadata=MetadataQuery(score=True),
+                    return_properties=return_properties,
+                )
+            hits: List[Dict[str, Any]] = []
+            for obj in result.objects:
+                score = getattr(obj.metadata, "score", None)
+                hits.append(
+                    {
+                        "id": str(obj.uuid),
+                        "score": float(score) if score is not None else 0.0,
+                        **(obj.properties or {}),
+                    }
+                )
+            return hits
+        except Exception as e:
+            logger.exception(f"bm25_search failed: {type(e).__name__}")
+            raise VectorDBSearchFailedException("Failed to run keyword search")
+
+    async def named_vector_search(
+        self,
+        collection_name: str,
+        vector: List[float],
+        target_vector: str,
+        limit: int = 10,
+        filters: Optional[Dict[str, Any]] = None,
+        any_of: Optional[List[Dict[str, Any]]] = None,
+        contains_all: Optional[Dict[str, List[str]]] = None,
+        return_properties: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        `near_vector_search` against ONE named vector of a multi-vector collection. One
+        dict per hit: {"id", "similarity", **properties}, in rank order.
+
+        A separate method rather than a `target_vector` argument on
+        `near_vector_search`, so the single-vector path keeps its exact behaviour —
+        including its similarity floor, which this deliberately does not have: the
+        Context Library fuses ranks across retrievers, and a floor would drop hits
+        before fusion could weigh them.
+        """
+        if any_of is not None and not any_of:
+            return []
+        try:
+            collection = self.client.collections.get(collection_name)
+            query_filters = self._compose_filters(filters, any_of, contains_all)
+            async with self._semaphore:
+                result = await collection.query.near_vector(
+                    near_vector=vector,
+                    target_vector=target_vector,
+                    limit=limit,
+                    filters=query_filters,
+                    return_metadata=MetadataQuery(distance=True),
+                    return_properties=return_properties,
+                )
+            hits: List[Dict[str, Any]] = []
+            for obj in result.objects:
+                distance = getattr(obj.metadata, "distance", None)
+                similarity = 1.0 - distance if distance is not None else 0.0
+                hits.append(
+                    {
+                        "id": str(obj.uuid),
+                        "similarity": similarity,
+                        **(obj.properties or {}),
+                    }
+                )
+            return hits
+        except Exception as e:
+            logger.exception(f"named_vector_search failed: {type(e).__name__}")
+            raise VectorDBSearchFailedException("Failed to run similarity search")
+
+    @classmethod
+    def _compose_filters(
+        cls,
+        filters: Optional[Dict[str, Any]],
+        any_of: Optional[List[Dict[str, Any]]],
+        contains_all: Optional[Dict[str, List[str]]],
+    ):
+        """
+        AND together equality filters, an `any_of` disjunction and `contains_all`
+        conditions, reusing `_build_property_filter` and `_build_condition` so every
+        search path shares one notion of each operator.
+
+        An empty `contains_all` value list is skipped: "contains all of nothing" is
+        vacuously true, so dropping it does not widen anything — unlike an empty
+        `any_of` or an empty equality set, which the callers and
+        `_build_property_filter` treat as "match nothing".
+        """
+        parts = []
+        base = _build_property_filter(filters)
+        if base is not None:
+            parts.append(base)
+        if any_of:
+            parts.append(Filter.any_of([cls._build_condition(e) for e in any_of]))
+        for prop, values in (contains_all or {}).items():
+            if values:
+                parts.append(Filter.by_property(prop).contains_all(list(values)))
+        if not parts:
+            return None
+        return parts[0] if len(parts) == 1 else Filter.all_of(parts)

@@ -1493,3 +1493,91 @@ export const OPENAI_TRACK_CONTENT_TRANSLATION = definePrompt(
     output: 'structured',
   },
 );
+
+// ── Context Library (docs/context-library/PLAN.md) ──────────────────────────
+// System prompts are static; the document part, candidates or entry go in the user
+// message as delimited data, so no variables are needed.
+
+/** src/prompts/context_library/overview_system.txt */
+export const CONTEXT_LIBRARY_OVERVIEW_SYSTEM = definePrompt(
+  'context_library_overview_system',
+  {},
+  {
+    name: 'Context Library — Document Overview',
+    description:
+      'Reads the outline and opening and closing parts of an uploaded document and writes a ≤150-word overview, its key terms and which sections are filler, so each part can be extracted with the whole document in mind. Names no one.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_first_principles_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_FIRST_PRINCIPLES_SYSTEM = definePrompt(
+  'context_library_extract_first_principles_system',
+  {},
+  {
+    name: 'Context Library — Extract First Principles',
+    description:
+      'Distils one part of a product, UX or engineering document into short, standalone principles for the Builder PRD interview: statement, rationale, situations, example searches, facets, probe and anti-pattern. Own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/critic_system.txt */
+export const CONTEXT_LIBRARY_CRITIC_SYSTEM = definePrompt(
+  'context_library_critic_system',
+  {},
+  {
+    name: 'Context Library — Critic',
+    description:
+      'Checks each extracted candidate against the part it came from: grounded, standalone (with a rewrite when not), specific, actionable, names, and the collection’s own checks. Decides what is published.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/adjudicate_system.txt */
+export const CONTEXT_LIBRARY_ADJUDICATE_SYSTEM = definePrompt(
+  'context_library_adjudicate_system',
+  {},
+  {
+    name: 'Context Library — Duplicate Adjudicator',
+    description:
+      'Decides whether a new candidate is the same as, refines, conflicts with or differs from its nearest chunks in the collection, so the library keeps one chunk per idea and records trade-offs.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/consolidate_system.txt */
+export const CONTEXT_LIBRARY_CONSOLIDATE_SYSTEM = definePrompt(
+  'context_library_consolidate_system',
+  {},
+  {
+    name: 'Context Library — Consolidator',
+    description:
+      'Tidies the chunks just extracted from one document: merges repeats, ranks the rest for the density cap, and records relations between them.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/enrich_system.txt */
+export const CONTEXT_LIBRARY_ENRICH_SYSTEM = definePrompt(
+  'context_library_enrich_system',
+  {},
+  {
+    name: 'Context Library — Enrich Written Entry',
+    description:
+      'Adds situations, example searches, keywords and missing facets to an entry an admin wrote, without changing its text, so it is found with the words people search with.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);

@@ -373,6 +373,14 @@ export enum LlmTask {
   GUIDE_RED_TEAM = 'guide_red_team',
   GUIDE_CURATOR = 'guide_curator',
 
+  // Context Library (docs/context-library/PLAN.md): extraction and its checks.
+  CONTEXT_LIBRARY_OVERVIEW = 'context_library_overview',
+  CONTEXT_LIBRARY_EXTRACT = 'context_library_extract',
+  CONTEXT_LIBRARY_CRITIC = 'context_library_critic',
+  CONTEXT_LIBRARY_ADJUDICATE = 'context_library_adjudicate',
+  CONTEXT_LIBRARY_CONSOLIDATE = 'context_library_consolidate',
+  CONTEXT_LIBRARY_ENRICH = 'context_library_enrich',
+
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',
 }

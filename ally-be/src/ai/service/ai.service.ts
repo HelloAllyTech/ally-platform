@@ -8,6 +8,14 @@ import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import axios, { AxiosError } from 'axios';
 import {
+  ContextChunkBulkUpsertResponse,
+  ContextChunkIdsResponse,
+  ContextChunkSearchRequest,
+  ContextChunkSearchResponse,
+  ContextChunkUpsertItem,
+  ContextEmbedResponse,
+} from '../dto/context-chunk.dto';
+import {
   aiFailureToHttpException,
   AiUpstreamError,
   classifyAiFailure,
@@ -605,6 +613,112 @@ export class AiService {
       request,
       true,
       'put',
+      undefined,
+      false,
+      60_000,
+    );
+  }
+
+  // ── Context Library index ─────────────────────────────────────────────────
+  // The derived Weaviate index for `cl_chunks`. Every call names one versioned collection
+  // (`Ctx<Collection>_v{N}`); ally-ai refuses any other name. Explicit timeouts, as above.
+
+  /** Index up to 100 chunks; per-item failures come back in `failed`, never thrown. */
+  async contextChunksBulkUpsert(
+    collection: string,
+    items: ContextChunkUpsertItem[],
+  ) {
+    return this.makeRequest<
+      ContextChunkBulkUpsertResponse,
+      { items: ContextChunkUpsertItem[] }
+    >(
+      `${ENDPOINTS.CONTEXT_CHUNK_BULK_UPSERT}?collection=${encodeURIComponent(collection)}`,
+      { items },
+      true,
+      'post',
+      undefined,
+      false,
+      120_000,
+    );
+  }
+
+  async contextChunksDelete(collection: string, chunkIds: string[]) {
+    return this.makeRequest<{ deleted: number }, { chunk_ids: string[] }>(
+      `${ENDPOINTS.CONTEXT_CHUNK_DELETE}?collection=${encodeURIComponent(collection)}`,
+      { chunk_ids: chunkIds },
+      true,
+      'post',
+      undefined,
+      false,
+      30_000,
+    );
+  }
+
+  /** One page of indexed ids with their text hashes, for reconciliation. */
+  async contextChunksIds(
+    collection: string,
+    after?: string | null,
+    limit = 200,
+  ) {
+    const params = new URLSearchParams({ collection, limit: String(limit) });
+    if (after) params.set('after', after);
+    return this.makeRequest<ContextChunkIdsResponse, undefined>(
+      `${ENDPOINTS.CONTEXT_CHUNK_IDS}?${params.toString()}`,
+      undefined,
+      true,
+      'get',
+      undefined,
+      false,
+      30_000,
+    );
+  }
+
+  /**
+   * Run every query against every requested retriever and return each ranked list
+   * separately; fusion happens in ally-be so each signal can be logged and tuned.
+   * `sensitive` redacts the body from logs (a learner's or an admin's own words).
+   */
+  async contextChunksSearch(
+    collection: string,
+    request: ContextChunkSearchRequest,
+    sensitive = false,
+  ) {
+    return this.makeRequest<
+      ContextChunkSearchResponse,
+      ContextChunkSearchRequest
+    >(
+      `${ENDPOINTS.CONTEXT_CHUNK_SEARCH}?collection=${encodeURIComponent(collection)}`,
+      request,
+      true,
+      'post',
+      undefined,
+      false,
+      15_000,
+      sensitive,
+    );
+  }
+
+  /** Embeddings with the index's own model, for platitude and duplicate checks. */
+  async contextEmbed(texts: string[]) {
+    return this.makeRequest<ContextEmbedResponse, { texts: string[] }>(
+      ENDPOINTS.CONTEXT_CHUNK_EMBED,
+      { texts },
+      true,
+      'post',
+      undefined,
+      false,
+      60_000,
+    );
+  }
+
+  /** Drop a whole index version after a blue/green switch. Refused unless named twice. */
+  async contextDeleteCollection(collection: string) {
+    const params = new URLSearchParams({ collection, confirm: collection });
+    return this.makeRequest<{ deleted: boolean }, undefined>(
+      `${ENDPOINTS.CONTEXT_CHUNK_COLLECTION}?${params.toString()}`,
+      undefined,
+      true,
+      'delete',
       undefined,
       false,
       60_000,

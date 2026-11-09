@@ -2,7 +2,7 @@
 title: ally-be — Core Backend
 tags: [repo, backend, nestjs, api]
 summary: ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth, real-time voice sessions, the audio/transcription pipeline, AI-driven feedback, and analytics for the counselor-training platform.
-last_reconciled: 2026-10-29
+last_reconciled: 2026-11-09
 ---
 
 # ally-be — Core Backend
@@ -59,6 +59,7 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
 - `audio/`, `audio-ingest/` — audio storage plus SQS-based async transcription pipeline with DLQ handling.
 - `conversational-guardrails/` — real-time boundary detection (binary classification) with multi-language support and automatic agent redirect.
 - `prompt/`, `prompts/` — versioned system prompts with dashboard sync and per-tenant runtime override resolution.
+- `context-library/` — the **Context Library**: one central system for the context Ally's agents retrieve. Documents (PDF, EPUB) are parsed in memory with the Knowledge Base extractors and dropped; their text lives only in Redis for at most a day while each target collection's extractor distils it into short, standalone **chunks** (the file and its text are never stored). Admins can also write entries or bulk-upload them (CSV/JSON, stored exactly as written). Chunks live in **collections** (First Principles first), each read only by the **use cases** granted to it; locks on a collection's profile can never be overridden in Settings. An automated gate decides what is published (verbatim, injection, platitude and attribution checks, then a critic that checks each chunk against its part); borderline chunks go live at low confidence rather than into a review queue. `cl_chunks` is the system of record; ally-ai holds one derived Weaviate index per collection. Plan: `docs/context-library/PLAN.md`.
 - `skill-experiment/` — **auto-improve** for System Skills (prompts): an admin switches it on per skill and writes a rubric; the skill's outputs are judged by an LLM against it, a prompt-designer call drafts a revised variant from the judge's reasons, and the variant is A/B tested against the current best on live traffic until the best version reaches the target score, then pauses with that version serving for the admin to apply, resume or turn off. Drafts must keep every runtime placeholder token of the original exactly (checked in code — a draft that drops, renames or invents one is never served), the judge never sees which variant it is scoring, and a failing challenger falls back to the skill's own text so no user loses their result. Only skills whose call sites report outputs ("connected" skills) can run one; ally-be picks the text for all three runtimes, so connecting an ally-ai skill needs no ally-ai change. `SKILL_EXPERIMENTS_SCHEDULE=off` freezes every loop. Reference: `docs/skill-experiments.md`; the concept, the pause reasons and the known limits are on [Auto-improve](../platform/auto-improve.md).
 - `voice-preview/` — TTS voice preview across ElevenLabs, Deepgram, Sarvam, Google, and Hume.
 

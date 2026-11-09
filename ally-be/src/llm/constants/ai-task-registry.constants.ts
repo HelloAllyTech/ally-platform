@@ -2926,6 +2926,111 @@ const GUIDE_TASKS: AiTaskEntry[] = [
   },
 ];
 
+/**
+ * Context Library (docs/context-library/PLAN.md). Extraction writes the chunks, so it runs on
+ * Builder's interview model (the owner's decision); the checks around it are mechanical and
+ * high-volume, so they run on the fast tier. Every row reads its prompt's own model first.
+ */
+const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
+  {
+    id: 'context-library-overview',
+    task: LlmTask.CONTEXT_LIBRARY_OVERVIEW,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'An admin adds a document to the Context Library',
+    detail:
+      'Once per document of more than three parts: the outline plus opening and closing parts ' +
+      'become a ≤150-word overview and key terms, shared by every collection the document feeds ' +
+      'and sent as the cached prefix of each extraction call.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'LLM_REASONING_MODEL — the call passes BUILDER_INTERVIEW_MODEL explicitly when it is set, so in practice the chunks are written by Builder’s interview model',
+    promptOverride: 'context_library_overview_system',
+  },
+  {
+    id: 'context-library-extract',
+    task: LlmTask.CONTEXT_LIBRARY_EXTRACT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'A document part is extracted into a Context Library collection',
+    detail:
+      'One call per part per target collection (~2,500-token parts, up to 8 principles or 12 ' +
+      'insights each). The prompt is the collection’s own extractor; the overview and ' +
+      'vocabularies are an identical prefix across a document, so prompt caching applies.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'LLM_REASONING_MODEL — the call passes BUILDER_INTERVIEW_MODEL explicitly when it is set, so in practice the chunks are written by Builder’s interview model',
+    promptOverride: 'context_library_extract_first_principles_system',
+  },
+  {
+    id: 'context-library-critic',
+    task: LlmTask.CONTEXT_LIBRARY_CRITIC,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Candidates extracted from a document part are checked before publishing',
+    detail:
+      'One call per part per collection, with the part text: grounded, standalone (with a ' +
+      'rewrite), specificity, actionability, names and the collection’s own checks. A separate ' +
+      'call from the extractor because models grade their own output generously.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_critic_system',
+  },
+  {
+    id: 'context-library-adjudicate',
+    task: LlmTask.CONTEXT_LIBRARY_ADJUDICATE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A new chunk is close to existing ones in its collection',
+    detail:
+      'Only for candidates between the merge and publish similarity thresholds: same, refines, ' +
+      'conflicts or different, against the nearest three. Keeps people out of the easy cases.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_adjudicate_system',
+  },
+  {
+    id: 'context-library-consolidate',
+    task: LlmTask.CONTEXT_LIBRARY_CONSOLIDATE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A document finishes extracting into a collection',
+    detail:
+      'Once per document per collection: merges repeats, ranks for the density cap (enforced in ' +
+      'code), and records relations.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_consolidate_system',
+  },
+  {
+    id: 'context-library-enrich',
+    task: LlmTask.CONTEXT_LIBRARY_ENRICH,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'An admin writes or bulk-uploads an entry, or an agent writes a lesson',
+    detail:
+      'Adds situations, example searches, keywords and missing facets without touching the ' +
+      'entry text. One call per entry; bulk uploads run them in small parallel batches.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_enrich_system',
+  },
+];
+
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...AI_LEARN_TASKS,
   ...ALLY_AI_TASKS,
@@ -2934,6 +3039,7 @@ export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...BUG_HUNTER_TASKS,
   ...COURSE_COPILOT_TASKS,
   ...GUIDE_TASKS,
+  ...CONTEXT_LIBRARY_TASKS,
 ];
 
 /**

@@ -63,6 +63,16 @@ export const ENDPOINTS = {
   // Also `.../document`, like the delete above: the document id and `/audience` are
   // appended by the caller.
   KNOWLEDGE_CHUNK_SET_AUDIENCE: 'api/v1/knowledge-chunks/document',
+  // Context Library (docs/context-library/PLAN.md). One Weaviate collection per Context
+  // Library collection and index version (`Ctx<Collection>_v{N}`), named in a `collection`
+  // query parameter that ally-ai validates against that pattern. Postgres `cl_chunks` is the
+  // system of record; these are its derived index.
+  CONTEXT_CHUNK_BULK_UPSERT: 'api/v1/context-chunks/bulk-upsert',
+  CONTEXT_CHUNK_DELETE: 'api/v1/context-chunks/delete',
+  CONTEXT_CHUNK_IDS: 'api/v1/context-chunks/ids',
+  CONTEXT_CHUNK_SEARCH: 'api/v1/context-chunks/search',
+  CONTEXT_CHUNK_EMBED: 'api/v1/context-chunks/embed',
+  CONTEXT_CHUNK_COLLECTION: 'api/v1/context-chunks/collection',
   KNOWLEDGE_AGENT_ANSWER: 'api/v1/knowledge-agent/answer',
   KNOWLEDGE_AGENT_CRISIS_CHECK: 'api/v1/knowledge-agent/crisis-check',
   /** Agents v2: the LangGraph runtime. 404 while ally-ai's AGENT_RUNTIME__ENABLED is off. */

@@ -9,6 +9,19 @@ import {
 } from '../../debrief/enum/debrief-run.enum';
 import { join } from 'path';
 import {
+  ClBulkUploadStatus,
+  ClChunkConfidence,
+  ClChunkOrigin,
+  ClChunkStatus,
+  ClEmbeddingStatus,
+  ClRelationOrigin,
+  ClRelationType,
+  ClSegmentRunStatus,
+  ClSegmentStatus,
+  ClSourceKind,
+  ClSourceStatus,
+} from '../../context-library/enum/context-library.enum';
+import {
   BuilderEventType,
   BuilderExemplarOutcome,
   BuilderLessonCategory,
@@ -222,6 +235,18 @@ describe('CHECK constraints cover their enums', () => {
    * commit; there is no other check.
    */
   it.each([
+    // Context Library (docs/context-library/PLAN.md).
+    ['CHK_cl_sources_kind', Object.values(ClSourceKind)],
+    ['CHK_cl_sources_status', Object.values(ClSourceStatus)],
+    ['CHK_cl_ingest_segments_status', Object.values(ClSegmentStatus)],
+    ['CHK_cl_segment_runs_status', Object.values(ClSegmentRunStatus)],
+    ['CHK_cl_chunks_origin', Object.values(ClChunkOrigin)],
+    ['CHK_cl_chunks_status', Object.values(ClChunkStatus)],
+    ['CHK_cl_chunks_confidence', Object.values(ClChunkConfidence)],
+    ['CHK_cl_chunks_embedding_status', Object.values(ClEmbeddingStatus)],
+    ['CHK_cl_chunk_relations_type', Object.values(ClRelationType)],
+    ['CHK_cl_chunk_relations_origin', Object.values(ClRelationOrigin)],
+    ['CHK_cl_bulk_uploads_status', Object.values(ClBulkUploadStatus)],
     ['CHK_builder_sessions_status', Object.values(BuilderSessionStatus)],
     ['CHK_builder_sessions_stage', Object.values(BuilderStage)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],

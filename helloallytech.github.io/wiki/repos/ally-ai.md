@@ -2,7 +2,7 @@
 title: ally-ai — AI Copilot Service
 tags: [repo, ai, fastapi, weaviate, python]
 summary: ally-ai (internally "Lifeline AI") is the FastAPI AI copilot service that provides conversation analysis, summaries, transcription, drift/language-quality scoring, and Weaviate-backed semantic search for the Ally counselor-training platform.
-last_reconciled: 2026-09-03
+last_reconciled: 2026-11-09
 ---
 
 # ally-ai — AI Copilot Service
@@ -36,6 +36,7 @@ The app is a FastAPI application (`app/main.py`) whose lifespan initializes the 
 - `/conversation` — conversation analysis
 - `/summary` — session summaries
 - `/reference-documents` — reference document semantic search / management
+- `/context-chunks` — the Context Library's derived index: one Weaviate collection per collection and index version (`Ctx<Collection>_v{N}`, any other name refused), created on demand with two self-provided named vectors (`statement`, `situations`) on a flat cosine index. Bulk upsert, delete, id listing for reconciliation, embedding, and search, which returns each retriever's ranked list separately (field-boosted BM25 and the two vectors) for ally-be to fuse, with audience and facet filters applied inside the query.
 - `/drift` — response-drift scoring
 - `/language-quality` — language quality scoring
 - `/filler-quality` — judges the *thinking fillers* a voice session played: the short back-channels the AI client utters the instant the learner stops speaking, while its real reply is still forming. Speed was already measured per turn in ally-ai-learn; quality was not, and the gap is not neutral — because the filler is the character's first words, response latency is measured to it, so a filler that arrives instantly but sounds nothing like the character (or answers the turn before last) makes the roleplay worse while improving every latency chart. Findings sit on three dimensions: `character_fit`, `context_fit`, and `safety` — the last covering a filler that commits to something the real reply, generated separately and afterwards, may contradict a second later.

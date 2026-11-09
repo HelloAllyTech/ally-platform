@@ -8,6 +8,9 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`: the Context Library.
+- Added the `context-library/` module to ally-be's key modules and the `/context-chunks` endpoints to ally-ai's: documents parsed in memory and distilled into chunks, written entries, collections read only by granted use cases, and one derived Weaviate index per collection. `last_reconciled` set to today on both.
+
 ## [2026-11-06] update | `repos/ally-mobile.md`: rewritten for the Flutter app.
 - The page described the retired React Native app (deleted in the 2026-11 rename). Rewrote Tech Stack, Architecture & Feature Areas, Integration Points, Local Setup, Testing and Key Documentation from the Flutter code in `ally-mobile/lib/` and `pubspec.yaml`; `last_reconciled` set to today. Also repointed the `ally-mobile` entry in `platform/agent-guide.md` and the index line.
 

@@ -139,6 +139,7 @@ export enum FeatureToggleKey {
   // Course Copilot: the agent that interviews a trainer and builds a whole
   // DRAFT course (Track 2.0) from the answers, then edits it on request.
   COURSE_COPILOT = 'course_copilot',
+  CONTEXT_LIBRARY = 'context_library',
 
   // Ally guide (plans/ally-guide/plan.md §10.5). ALLY_GUIDE is the Ally
   // Console (settings, releases, traces) and reaches every organisation;
@@ -505,6 +506,15 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     label: 'Builder',
     description:
       'Interview an agent into a PRD, then have it build the feature and open pull requests for review — from the Builder tab or from a Product Roadmap card.',
+    legacyGrants: SUPER_ADMIN_TIER,
+  },
+  {
+    key: FeatureToggleKey.CONTEXT_LIBRARY,
+    label: 'Context Library',
+    description:
+      'Add documentation and written entries to the central library that Builder, Bug Hunter, the character interview, Course Copilot, the Ally guide and Debrief retrieve from; see what it learned and who may read each collection.',
+    // Backfilled ON for platform-tier admins by its access migration; inert like every key
+    // added after the role-collapse cutover.
     legacyGrants: SUPER_ADMIN_TIER,
   },
   {

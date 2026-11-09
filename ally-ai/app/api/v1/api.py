@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     agent_memory,
     agent_runtime,
     analytics_agent,
+    context_chunk,
     conversation,
     debrief,
     debrief_quality,
@@ -45,6 +46,11 @@ api_router.include_router(
     knowledge_chunk.router,
     prefix="/knowledge-chunks",
     tags=["knowledge_chunks"],
+)
+api_router.include_router(
+    context_chunk.router,
+    prefix="/context-chunks",
+    tags=["context_chunks"],
 )
 api_router.include_router(
     knowledge_agent.router,
