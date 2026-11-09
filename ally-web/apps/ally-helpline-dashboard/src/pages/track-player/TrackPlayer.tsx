@@ -21,6 +21,7 @@ import { PlayerBottomNav } from "./components/PlayerBottomNav";
 import { AnnotationItemPlayer } from "./components/players/annotation/AnnotationItemPlayer";
 import { ArticleItemPlayer } from "./components/players/ArticleItemPlayer";
 import { BranchingScenarioPlayer } from "./components/players/BranchingScenarioPlayer";
+import { isStoryScenario } from "./components/players/branchingStory";
 import { BucketSortPlayer } from "./components/players/BucketSortPlayer";
 import { GameItemPlayer } from "./components/players/GameItemPlayer";
 import { JournalItemPlayer } from "./components/players/JournalItemPlayer";
@@ -162,6 +163,11 @@ export const TrackPlayer: FC = () => {
   // thread itself waits until the item content has loaded.
   const hasDiscussion = nav.current?.item.hasDiscussion === true;
   const isItemReady = !!payload && !loadError && !isLoadingItem;
+  // A story scenario plays full-screen: no course nav under it. Its endings
+  // and its paused screen carry their own way on (Continue course / Back to
+  // course), and the top bar keeps the close button and progress.
+  const hideBottomNav =
+    isItemReady && payload?.type === TrackItemType.BRANCHING_SCENARIO && isStoryScenario(payload);
 
   const renderItem = () => {
     if (loadError) {
@@ -345,14 +351,16 @@ export const TrackPlayer: FC = () => {
           </AnimatePresence>
         </div>
 
-        <PlayerBottomNav
-          hasPrev={nav.hasPrev}
-          hasNext={nav.hasNext}
-          canAdvance={nav.canAdvance}
-          onPrev={nav.goPrev}
-          onNext={goNextOrOverview}
-          isLastItem={!nav.hasNext}
-        />
+        {!hideBottomNav && (
+          <PlayerBottomNav
+            hasPrev={nav.hasPrev}
+            hasNext={nav.hasNext}
+            canAdvance={nav.canAdvance}
+            onPrev={nav.goPrev}
+            onNext={goNextOrOverview}
+            isLastItem={!nav.hasNext}
+          />
+        )}
 
         <CelebrationOverlay
           kind={celebration}
