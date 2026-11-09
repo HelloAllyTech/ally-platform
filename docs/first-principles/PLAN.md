@@ -38,6 +38,7 @@ retrieval gets measurably better and the library can be pruned using data.
 | Name | **First Principles** (admin tab: Builder → First Principles; each item is a *principle*) |
 | Review gate | **Auto-publish + spot-check.** Principles that pass the quality gate go live at once; borderline ones wait in a short review queue |
 | Processing | **Background on the server.** The browser parses and uploads all sections, then can close. ally-be distils in the background |
+| Uploading | **Drop many documents at once and keep adding while it runs.** They queue in the browser for parsing, then on the server for distilling, in the order dropped (reorderable) |
 | Replace Stacks in | **All four places:** Builder interview (+ research + PRD review), Roadmap Copilot, Course Copilot, engineers' Claude Code (our own MCP endpoint replaces `stacks-bridge.mjs`) |
 | Seeding | The owner has the documents that seeded Stacks and will upload them once the upload screen (chunk 3) is live |
 | Ally house rules | **Uploaded documents only.** No import of the deprecated `wiki/product/` pages. Hand-adding a principle stays available |
@@ -89,15 +90,16 @@ effectiveness, so tuning and testing don't skew the numbers.
 
 ```
  Admin browser (ally-admin-dashboard)
-   PDF (pdfjs) / EPUB (jszip + DOMParser)
-   → clean → split into sections → SHA-256 of file
-        │  POST /first-principles/sources             (metadata + hash, no text)
+   drop many PDF / EPUB files → browser queue
+   Web Worker, 2 at a time: SHA-256 → clean → split into sections
+        │  POST /first-principles/sources/check       (all hashes + titles of the drop)
+        │  POST /first-principles/sources             (per document: metadata + hash, no text)
         │  POST /first-principles/sources/:id/sections (batched section text)
         ▼
  ally-be  ── first-principles module ─────────────────────────────────────────
    Redis  fp:section:{id}  (section text, TTL 24h, deleted once distilled)
-   Postgres fp_ingest_sections (status, hash, counts; never text)
-        │  worker (cron, claims rows with FOR UPDATE SKIP LOCKED, concurrency N)
+   Postgres fp_sources (queue order, status) + fp_ingest_sections (hash, counts; never text)
+        │  worker (cron, FOR UPDATE SKIP LOCKED, by queuePosition then ordinal, concurrency N)
         ▼
    OVERVIEW (once per document: outline + opening + closing sections → overview + vocabulary)
    DISTIL each section, with the overview as a cached prefix → candidates
@@ -127,13 +129,15 @@ catch the same document uploaded as both PDF and EPUB), `overview` (≤ 150 word
 summary of what the document covers and argues, naming no people or organisations; used as
 context and shown in the UI), `pageCount`,
 `sectionCount`, `sectionsDistilled`, `sectionsFailed`, `status` (`uploading` | `queued` |
-`distilling` | `consolidating` | `complete` | `failed` | `archived`), `yield` jsonb (the §3
+`distilling` | `consolidating` | `paused` | `complete` | `failed` | `cancelled` |
+`archived`), `batchId` (documents dropped together), `queuePosition` (distilling order;
+reorderable), `queuedAt`, `pausedAt`, `estimatedStartAt`, `yield` jsonb (the §3
 yield report), `distillModel`, `promptVersions` jsonb, `inputTokens`, `outputTokens`,
 `cachedInputTokens`, `costUsd`, `costCapUsd`, `generation` (1 for the first distil, +1 per
 re-distil), `uploadedBy`, timestamps.
 
 ### `fp_ingest_sections`: progress tracking (no text)
-`id`, `sourceId`, `ordinal`, `sectionPath` (e.g. "Part II › Ch 7 › Empty states"),
+`id`, `sourceId`, `ordinal`, `sectionPath` (e.g. "Design guide › Lists › Empty states"),
 `pageFrom`, `pageTo`, `textHash`, `tokenCount`, `status` (`pending` | `claimed` | `done` |
 `failed` | `skipped` | `expired`), `attempts`, `claimedAt`, `error`, `candidatesFound`,
 `candidatesKept`. The text itself is in Redis (§6.2).
@@ -200,18 +204,27 @@ gaps.
 
 ## 6. Ingestion
 
-### 6.1 Browser (ally-admin-dashboard → Builder → First Principles → Library)
-1. Admin drops a `.pdf` / `.epub` (multi-file supported, processed one at a time).
-2. Hash the file (WebCrypto SHA-256). `POST /sources` with the hash and title.
+### 6.1 Browser: the upload queue (ally-admin-dashboard → Builder → First Principles → Library)
+The admin drops **any number of `.pdf` / `.epub` files at once**, and can drop more while the
+queue is running. Each file moves through the queue on its own:
+
+`hashing → checking → parsing → ready → uploading → queued on server → distilling → complete`
+
+1. **Hash** each file (WebCrypto SHA-256) and `POST /sources/check` with all the hashes and
+   titles in one call. Duplicates are caught **within the drop** as well as against the
+   library:
    - Same hash already distilled → "Already in the library (distilled 3 Oct, 64 principles).
-     Re-distil with the current prompts?" (§6.6)
-   - Same `titleKey`, different hash (e.g. the EPUB of a document already uploaded as PDF) →
-     warn before going ahead.
-3. Parse:
+     Re-distil with the current prompts?" (§6.6). Default: skip.
+   - Same hash twice in one drop → the second copy is removed from the queue.
+   - Same `titleKey`, different hash (e.g. the EPUB of a document already uploaded or queued
+     as PDF) → flagged for a decision. Default: skip.
+2. **Parse** in a **Web Worker**, two files at a time, so the page stays responsive with a
+   large drop:
    - **PDF** with `pdfjs-dist`. Sections come from `getOutline()` (outline entries mapped
      to pages). Fallback: font-size heading detection. Last resort: 8-page windows. Remove
      running headers and footers (lines repeated across pages) and page numbers. No text
-     layer means a scanned PDF: refuse with a clear message (no OCR in v1).
+     layer means a scanned PDF: that file is marked failed with a clear message (no OCR in
+     v1) and the rest of the queue carries on.
    - **EPUB** with `jszip` + `DOMParser`: OPF spine for order, `nav.xhtml` / NCX for the
      section tree, strip markup to paragraphs.
    - Only the title is read from file metadata. Author, creator, publisher and contributor
@@ -223,19 +236,37 @@ gaps.
    - Pack into sections of roughly 2.5–4k tokens on paragraph boundaries, each carrying its
      `sectionPath` and page range. Mark the opening sections (introduction, overview,
      summary) and the closing ones for the overview pass.
-4. Preview: title and version (editable), section tree with skip toggles, **cost estimate
-   and a cost cap** (default 1.5× the estimate). Admin confirms.
-5. `POST /sources/:id/sections` in batches (≤ 1 MB each). The tab can then close.
-6. The library page polls source status: a progress bar per document, then its yield report.
+3. **Ready**: each parsed file shows its title, version, section count and cost estimate.
+   - **Auto-queue** (default on): a parsed file goes straight to upload with default skips
+     and a cost cap of 1.5× its estimate. No click per document.
+   - With auto-queue off, or for any file the admin opens, the preview allows editing title
+     and version, toggling sections and changing the cap, then **Queue** or **Queue all**.
+   - The drop shows a running **batch total**: documents, sections, estimated cost and
+     estimated finish time, with an optional **batch cost cap**.
+4. **Upload**: `POST /sources` (one per document, with `batchId`), then
+   `POST /sources/:id/sections` in batches (≤ 1 MB each), one document at a time so a
+   failed upload never blocks the others. Each file's bytes and parsed text are released
+   from memory as soon as its sections are uploaded.
+5. **The tab only has to stay open until the last file is uploaded**, which is usually
+   seconds to a few minutes even for a large drop. Until then the queue shows "Keep this tab
+   open: 3 documents still parsing", and closing the tab triggers a browser warning. Files
+   not yet uploaded when the tab closes simply need dropping again; the hash check resumes
+   them.
+6. The **Queue** panel (§10) then shows the server-side progress of every document.
 
 New ally-web dependencies: `pdfjs-dist`, `jszip` (new, not upgrades).
 
 ### 6.2 Staging without retention
 - Section text goes to **Redis** under `fp:section:{id}` with a **24h TTL**, and is deleted
   the moment that section is distilled. Postgres only ever sees `textHash`, counts and status.
-- If a key expires before it is distilled (worker down for a day), the section becomes
-  `expired` and the UI asks for the file to be dropped again. The hash check means only the
-  missing sections are re-sent.
+- If a key expires before it is distilled (worker down for a day, or a very long queue),
+  the section becomes `expired` and the UI asks for that file to be dropped again. The hash
+  check means only the missing sections are re-sent.
+- With many documents queued, the server computes each document's `estimatedStartAt` from
+  the sections ahead of it and recent throughput. When a drop would push a document past
+  ~20h, the batch total says so before queueing ("the last 4 documents would wait past the
+  24h text limit: queue them later or raise concurrency"), rather than letting them expire
+  silently.
 - Chunk 2 checks Redis persistence settings. A snapshot taken during the window can hold
   text until the next snapshot overwrites it, which is acceptable and short-lived. Postgres
   backups, which are kept for much longer, never see it.
@@ -244,6 +275,18 @@ New ally-web dependencies: `pdfjs-dist`, `jszip` (new, not upgrades).
 - A `@nestjs/schedule` interval claims `pending` sections with `FOR UPDATE SKIP LOCKED`
   (safe across replicas), with a global concurrency cap (start at 3) and a 3-attempt retry
   with backoff. Postgres is the queue, so no new SQS queue and no infra-repo change.
+- **Order across documents**: sections are claimed by `queuePosition`, then `ordinal`, so
+  documents finish one after another rather than all crawling along together. Spare
+  concurrency spills over to the next document. A document's overview pass is claimed
+  before any of its sections. Paused and cancelled documents are skipped; **cancel** deletes
+  that document's Redis text at once.
+- **Cross-document dedupe is serialised**: the dedupe-and-publish step (§6.4 step 6) runs
+  under a Postgres advisory lock, so two documents distilled in parallel cannot both publish
+  the same principle. Everything before that step stays parallel.
+- A failed section or document never blocks the queue: it is marked, retried up to its
+  limit, and the worker moves on.
+- When a whole batch finishes, the admin gets a notification through Builder's existing
+  notification bell: "12 documents distilled: 418 principles, 37 to review, 1 failed".
 - **Overview pass, once per document** (`first_principles_overview`): the section tree plus
   the opening and closing sections produce a ≤ 150-word overview, the document's key terms,
   and which sections look like reference material, narrative or filler. Without this, each
@@ -458,7 +501,8 @@ The agent does not have to remember to search:
 
 | Tab | Contents |
 |---|---|
-| **Library** | Upload zone; sources table with progress, cost, overview and yield report; principle browser with filters by domain / kind / strength / source / status; edit, archive, add a principle by hand; relations shown on each principle |
+| **Queue** | Drop zone for many files at once. One row per document across both stages (browser parsing/uploading, then server distilling): status, position, progress bar, cost so far, estimated finish. Actions: drag to reorder, pause / resume, cancel, retry failed sections, open preview. Batch totals at the top, and the "keep this tab open" banner while anything is still uploading |
+| **Library** | Sources table with cost, overview and yield report; principle browser with filters by domain / kind / strength / source / status; edit, archive, add a principle by hand; relations shown on each principle |
 | **Search preview** | Runs the real retrieval as `admin_preview`, showing bands and per-signal scores, with a pipeline switch (re-rank on/off, alpha). **Thumbs on results feed the retrieval benchmark** |
 | **Review** | The spot-check queue (§6.7), including curator proposals |
 | **Access** | Engineers create and revoke their read-only MCP keys (§9) |
@@ -473,8 +517,8 @@ out and switched off on its own. Builder settings get two switches: `principlesB
 | # | Chunk | Done when |
 |---|---|---|
 | 1 | **Library core**: `fp_*` migrations; ally-ai `FirstPrinciple` collection with named vectors (or the fallback), `hybrid_search`, upsert/search/embed endpoints; `FirstPrinciplesRetrievalService` with RRF, bands, logging; add a principle by hand via the API | Hand-added principles come back from hybrid search with bands and are logged; prod Weaviate version confirmed; tests and lint green in ally-be and ally-ai |
-| 2 | **Server ingestion**: sources/sections API, Redis staging, worker, overview → distil → gate (verbatim, injection, platitude, critic) → dedupe → consolidation (cap, tensions), cost cap, re-distil merge, yield report | Posting a real document's sections produces a capped set of principles with a yield report; no section text in Postgres; Redis keys gone afterwards |
-| 3 | **Browser upload + Library / Search preview / Review UI**; thumbs in Search preview | The owner uploads the seed documents end to end; a first ~60-query **retrieval benchmark** exists from preview thumbs |
+| 2 | **Server ingestion**: sources/check/sections API, Redis staging, worker with cross-document ordering, pause/cancel/reorder, advisory-locked dedupe, overview → distil → gate (verbatim, injection, platitude, critic) → dedupe → consolidation (cap, tensions), cost cap, re-distil merge, yield report | Posting the sections of several real documents at once produces capped sets of principles with yield reports, in queue order, with no duplicate principles across them; no section text in Postgres; Redis keys gone afterwards |
+| 3 | **Browser upload queue** (multi-file drop, Web Worker parsing, auto-queue, batch totals) **+ Queue / Library / Search preview / Review UI**, batch-complete notification; thumbs in Search preview | The owner drops all the seed documents in one go and they distil end to end; a first ~60-query **retrieval benchmark** exists from preview thumbs |
 | 4 | **Builder swap**: `principles_*` tools, prompts, receipts, citation parsing, integrity check + verifier; proactive brief in **shadow** mode (logged, not shown) | An interview cites `[FP-…]`, invented codes are stripped, verified applications are recorded; Stacks is no longer called by Builder |
 | 5 | **Guiding the admin**: brief + section focus within the budget, probes as questions, tension decision cards, PRD principle check with Apply, coverage view; **replay eval off vs on** | The replay eval shows an improvement with no fixture regressing, after which `principlesBrief` and `principlesProbes` go on by default |
 | 6 | **Feedback loop + Insights**: thumbs, shipped linkage, LLM hit judge, nightly effectiveness, in-band prior, exploration, re-rank A/B on the benchmark, curator, Insights tab with gap list | Insights shows real numbers; the re-rank decision is made from the benchmark |
@@ -499,6 +543,8 @@ a `prompt_gate` eval suite.
 | Feedback loop locks in early favourites | In-band prior only (max ±10%), exploration slot, raw scores logged |
 | Agent claims "the library has nothing on X" | Same tool-message discipline Stacks used; zero-hit queries feed the gap list |
 | It doesn't actually improve PRDs | The replay eval gates the proactive features; if it shows no gain they stay off and we learn why before building more |
+| A large drop overwhelms the browser or the queue | Web Worker parsing two at a time; memory released per file; auto-queue so there's no click per document; estimated start times warn before a document would outlive the 24h text limit; batch cost cap |
+| Two documents distilled together publish the same principle | Dedupe-and-publish runs under an advisory lock |
 | Long document, worker crash, Redis expiry | Per-section status with retries; expired sections re-sent by re-dropping the file (hash-matched) |
 | Cost | Estimate and cap before confirm; prompt caching on the per-document prefix; tokens and cost per source; concurrency cap |
 
