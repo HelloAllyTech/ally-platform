@@ -636,7 +636,7 @@ cost attribution and the per-org session caps only, and does **not** tenant-scop
 gate) so a stuck session can be debugged and taken over by another Builder user;
 `BuilderSessionService.getSession` checks existence only. Notifications still go to the creator.
 
-**Exception: private plan sessions** (migration `1980990000000`). A session with
+**Exception: private plan sessions** (migration `1981000000000`). A session with
 `visibility = 'private'` is an unfiled roadmap plan (`kind = 'plan'`) and is its author's alone: every
 Builder list (mission control, archive, Now, pending decisions) spreads `SHARED_SESSIONS_ONLY`, History
 excludes other authors' private sessions in SQL, and `BuilderSessionVisibilityInterceptor` answers 404 on
@@ -685,7 +685,7 @@ tables are the protocol between the two.
 | `builder_history`       | BaseWithoutTenant | `id` (uuid), `entryType` (decision / ask / tell / start / putback), `decisionId`, `kind`, `sessionId` (no FK), `sessionTitle` (frozen), `prompt`, `chosenOptionIds` (jsonb array), `chosenLabel`, `customText`, `answerText`, `recommendedOptionId`, `matchedRecommendation`, `oneWay`, `ruleId`, `surface` (now / session / slack / rule), `client` (phone / tablet / desktop), `actorUserId`, `raisedAt`, `decidedAt`, `waitSeconds`, `msToDecide`, `undoneAt`, `appliedAt`, `applyError`, `tellStatus`, `appliedRunId` | The Builder tab's History (migration `1980780000000`): every decision, ask and tell, append-only. A decision is never stored, so this freezes the card as it was answered — the recommendation is frozen **before** the answer is applied. Written at the point of effect by `BuilderDecisionService` (Now and the session page), `BuilderSlackService` (Slack merges) and, later, rules. Best-effort: a failed insert never fails the action. Only `undoneAt` (a reversible answer taken back inside its 8 s undo window, held in Redis under `builder-undo:<decisionId>`), the apply fields and the tell fields change after insert. Undone rows count in no metric. |
 | `builder_rules`         | BaseWithoutTenant | `id` (uuid), `statement` (text), `scope` (everywhere / area:<name> / session:<id> / opportunity:<id>), `area`, `effect` (guide / decide), `match` (jsonb `{kind, questionType?, optionId}`, required for decide), `sourceHistoryId`, `supersedesId`, `active`, `createdBy`, `updatedBy` | The Builder tab's Rules (migration `1980800000000`): what a person decided once that binds future work. Guide rules are rendered into every interview turn and run spec (`BuilderRuleContextService`) and outrank Builder's lessons; decide rules answer matching budget / stuck-PR / failed-build decisions on a 60 s tick while autonomy is above `assist` (surface `rule` in `builder_history`). A merge rule only flips `builder_settings.autoMergeEnabled`. Append-only by supersession: `active` is the only column that changes. Times applied = `builder_history` rows with its `ruleId` (indexed). |
 
-**Plan columns** (migration `1980990000000`, plans/roadmap-owns-planning rev 5.1):
+**Plan columns** (migration `1981000000000`, plans/roadmap-owns-planning rev 5.1):
 `builder_sessions.kind` (varchar(16), CHECK `build`/`plan`, default `build`), `visibility` (varchar(16),
 CHECK `private`/`shared`, default `shared`), `leadUserId` (int, nullable, no FK — the plan's current
 lead; `createdBy` stays the immutable author); partial indexes `idx_builder_sessions_private_author`
