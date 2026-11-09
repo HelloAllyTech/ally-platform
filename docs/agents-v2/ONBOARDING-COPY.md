@@ -459,3 +459,49 @@ says when a save can't be made. More lines for the home's sections are added her
   - Team: Team · People who can change this assistant.
 - **Try it:** Try your assistant · Chats here aren't saved. · Close · New chat
 - **Platform admins only:** Engine · How this assistant answers. Only platform admins see this. · Classic view
+
+## 21. Overview and feedback (Q2a)
+
+- **Feedback under an answer:** Was this helpful? (thumbs up · thumbs down)
+- **After thumbs down:** What was wrong? · Wrong information · Didn't answer my question · Something else
+- **Optional note placeholder:** Tell us more (optional)
+- **Thanks:** Thanks, this helps the team improve it.
+- **Overview headline:** This week: {conversations} conversations. {answered_pct} answered with a source. {unknown} questions it didn't know.
+- **Overview labels:** Conversations · Answered with a source · Didn't know · Handed to a person · Thumbs up · Safety replies
+- **Comparison:** vs {value} last week
+- **Unanswered list title:** Questions it didn't know
+- **Unanswered action:** Answer it
+- **Thumbs-down list title:** Answers people weren't happy with
+- **Thumbs-down actions:** Correct this · It was fine
+- **Checkup card:** Last checkup: {passed} of {total} answered well · View checkup
+- **Empty state:** No conversations yet this week. Share your link to get started.
+
+## 22. Website widget (13)
+
+- **Share section title:** On your website
+- **Body:** Add a chat bubble to your website. Copy this line into your site, just before the closing body tag.
+- **Copy button:** Copy code · Copied
+- **Allowed websites label:** Websites where it can appear
+- **Allowed websites hint:** Add your domain, for example yourclinic.in. It won't open anywhere else.
+- **Options:** Bubble position: Right · Left · Bubble label · Open on its own after {n} seconds · Show on phones
+- **Default bubble label:** Ask us
+- **Public note (while public links are off):** For now, only people in your organisation or people you invite can chat in the bubble. Public chat is coming soon.
+- **Help titles:** Add it to WordPress · Add it to Wix · Add it to Shopify · Add it to any website
+- **Conversation badge:** Website
+
+## 23. Inbox and handing over (11a)
+
+- **Nav label:** Inbox
+- **Filters:** Needs a person · Live now · All
+- **Channel filter:** All channels · WhatsApp · Bot page · Website
+- **Chat actions:** Take over · Hand back to assistant
+- **Taken over banner:** You're replying. Your assistant is paused in this chat.
+- **Someone else has it:** {name} is replying in this chat.
+- **Safety label:** Safety
+- **To the visitor, hand-over in hours:** I've asked the team to join. They usually reply within {hours}.
+- **To the visitor, hand-over out of hours:** The team is away now. They'll reply when they're back at {time}.
+- **To the visitor, auto hand-back:** The team couldn't reply this time, so I'm back to help. You can ask for a person again any time.
+- **Human reply name shown to visitor:** {first name} from {business}
+- **Notification:** {business}: someone needs a person
+- **Email subject:** A conversation needs you
+- **Settings:** Hand back to the assistant after {hours} hours without a reply · Email me if nobody opens it within {minutes} minutes
