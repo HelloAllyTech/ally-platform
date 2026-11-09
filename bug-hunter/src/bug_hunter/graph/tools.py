@@ -18,11 +18,15 @@ from langchain_core.tools import StructuredTool
 from bug_hunter.graph.deps import GraphDeps
 from bug_hunter.tools.lc import ReadFileArgs, read_tools
 
+# Structural declarations always count; variables only when exported, otherwise a
+# file of constants drowns the classes and functions the agent is looking for.
 _DEF = re.compile(
-    r"^(?P<indent>\s*)(?:export\s+)?(?:default\s+)?(?:async\s+)?"
-    r"(?:class|def|function|interface|enum|type|const|let|var|abstract class|mixin)"
+    r"^(?P<indent>\s*)(?P<export>export\s+)?(?:default\s+)?(?:async\s+)?"
+    r"(?P<kind>abstract class|class|def|function|interface|enum|mixin"
+    r"|type|const|let|var)"
     r"\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
 )
+_VARIABLE_KINDS = ("const", "let", "var", "type")
 
 
 def cheap_outline(path: Path, display: str, max_items: int = 120) -> str:
@@ -31,7 +35,11 @@ def cheap_outline(path: Path, display: str, max_items: int = 120) -> str:
     items = []
     for number, line in enumerate(lines, 1):
         match = _DEF.match(line)
-        if match and len(match.group("indent")) <= 4:
+        if (
+            match
+            and len(match.group("indent")) <= 4
+            and (match.group("kind") not in _VARIABLE_KINDS or match.group("export"))
+        ):
             items.append(f"  {number:>5}  {line.strip()[:100]}")
             if len(items) >= max_items:
                 items.append("  … (more declarations omitted)")
