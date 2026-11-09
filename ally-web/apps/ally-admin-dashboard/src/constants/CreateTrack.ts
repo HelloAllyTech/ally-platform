@@ -47,6 +47,16 @@ export const MAX_ARTICLE_QUESTIONS = 10;
 /** Curated external links per article. Mirrors the server's own cap. */
 export const MAX_ARTICLE_RESOURCES = 10;
 
+/** Key takeaways per article, and the length of each. Mirror the server's caps. */
+export const MAX_ARTICLE_TAKEAWAYS = 5;
+export const MAX_ARTICLE_TAKEAWAY_LENGTH = 200;
+
+/** Cover photo description (alt text). Mirrors the server's cap. */
+export const MAX_ARTICLE_COVER_ALT_LENGTH = 300;
+
+/** Reading speed behind the article editor's "about N min" estimate. */
+export const ARTICLE_WORDS_PER_MINUTE = 200;
+
 /* ---- Question media ----------------------------------------------------- */
 
 /**

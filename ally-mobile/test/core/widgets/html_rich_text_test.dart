@@ -68,4 +68,83 @@ void main() {
     final heading = tester.widget<RichText>(find.textContaining('Serif heading', findRichText: true));
     expect(heading.text.style?.fontFamily, 'IBMPlexSerif-Medium');
   });
+
+  testWidgets('a callout div without a calloutBuilder is unwrapped like any div', (tester) async {
+    await pump(tester, '<div data-ally-callout="say"><p>Said plainly</p></div>');
+    expect(_allText(tester), 'Said plainly');
+  });
+
+  testWidgets('calloutBuilder gets the lower-cased kind and wraps the rendered content', (tester) async {
+    final kinds = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HtmlRichText(
+            html: '<p>Before</p><div class="x" data-ally-callout="WARN"><p>Inside</p></div>',
+            calloutBuilder: (kind, content) {
+              kinds.add(kind);
+              return Container(key: const Key('box'), child: content(const TextStyle(color: Color(0xFF123456))));
+            },
+          ),
+        ),
+      ),
+    );
+    expect(kinds, ['warn']);
+    final inside = tester.widget<RichText>(
+      find.descendant(of: find.byKey(const Key('box')), matching: find.textContaining('Inside', findRichText: true)),
+    );
+    expect(inside.text.style?.color, const Color(0xFF123456));
+    expect(inside.text.style?.fontFamily, 'IBMPlexSerif-Regular');
+  });
+
+  testWidgets('dropCapStyle sets the first letter of the first top-level paragraph only', (tester) async {
+    const cap = TextStyle(fontSize: 44);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: HtmlRichText(
+            html: '<h2>Heading</h2><p><b>Once</b> upon</p><p>Second</p>',
+            dropCapStyle: cap,
+          ),
+        ),
+      ),
+    );
+    final first = tester.widget<RichText>(find.textContaining('Once upon', findRichText: true));
+    final spans = <TextSpan>[];
+    first.text.visitChildren((span) {
+      if (span is TextSpan && span.style == cap) spans.add(span);
+      return true;
+    });
+    expect(spans.map((s) => s.text), ['O']);
+    final second = tester.widget<RichText>(find.textContaining('Second', findRichText: true));
+    var capped = false;
+    second.text.visitChildren((span) {
+      if (span is TextSpan && span.style == cap) capped = true;
+      return true;
+    });
+    expect(capped, isFalse);
+  });
+
+  testWidgets('pullQuoteStyle turns a blockquote into a pull quote', (tester) async {
+    const quote = TextStyle(fontSize: 18, fontStyle: FontStyle.italic);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: HtmlRichText(
+            html: '<blockquote><p>Listen more</p></blockquote>',
+            pullQuoteStyle: quote,
+            pullQuoteBorderColor: Color(0xFF0957D0),
+          ),
+        ),
+      ),
+    );
+    final text = tester.widget<RichText>(find.textContaining('Listen more', findRichText: true));
+    expect(text.text.style, quote);
+    final rule = tester.widget<Container>(
+      find.ancestor(of: find.textContaining('Listen more', findRichText: true), matching: find.byType(Container)).first,
+    );
+    final border = (rule.decoration! as BoxDecoration).border! as Border;
+    expect(border.left.color, const Color(0xFF0957D0));
+    expect(border.left.width, 3);
+  });
 }

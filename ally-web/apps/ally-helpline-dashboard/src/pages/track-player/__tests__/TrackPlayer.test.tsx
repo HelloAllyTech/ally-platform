@@ -339,4 +339,79 @@ describe("TrackPlayer", () => {
       expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument();
     });
   });
+
+  describe("article reading experiences", () => {
+    // Two articles, the second current, so the course nav has somewhere to go.
+    const articleTrack = {
+      ...mockTrackDetail,
+      totalItems: 2,
+      sections: [
+        {
+          ...mockTrackDetail.sections[0],
+          items: [
+            {
+              ...mockTrackDetail.sections[0].items[0],
+              id: "item0",
+              title: "Earlier item",
+              status: TrackItemStatus.COMPLETED,
+            },
+            { ...mockTrackDetail.sections[0].items[0], order: 2 },
+          ],
+        },
+      ],
+    };
+    const startItem = vi.fn();
+    const renderWith = (experience?: "CLASSIC" | "MAGAZINE" | "CARDS") => {
+      (api.useGetLearnTrackDetailQuery as vi.Mock).mockReturnValue({
+        data: articleTrack,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      startItem.mockReset().mockReturnValue({
+        unwrap: vi.fn().mockResolvedValue({
+          type: TrackItemType.ARTICLE,
+          trackItemProgressId: "p1",
+          html: "<h2>Part one</h2><p>Hello</p>",
+          minReadSeconds: 0,
+          experience,
+        }),
+      });
+      (api.useStartTrackItemMutation as vi.Mock).mockReturnValue([startItem]);
+      render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={["/track/track1/item1"]}>
+            <Routes>
+              <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
+            </Routes>
+          </MemoryRouter>
+        </Provider>,
+      );
+    };
+
+    it("hides the course's bottom nav under a cards article, which pages itself", async () => {
+      renderWith("CARDS");
+      await screen.findByTestId("article-cards");
+      expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Start reading/ })).toBeInTheDocument();
+      // The top bar (close button, progress) stays; the cover card repeats the title.
+      expect(screen.getByRole("button", { name: "Exit" })).toBeInTheDocument();
+      expect(screen.getAllByRole("heading", { level: 1, name: "Test Item Title" })).toHaveLength(2);
+    });
+
+    it("leaves the arrow keys to the cards, not the course", async () => {
+      renderWith("CARDS");
+      await screen.findByTestId("article-cards");
+      fireEvent.keyDown(window, { key: "ArrowLeft" });
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      await screen.findByText("Hello");
+      expect(startItem).toHaveBeenCalledTimes(1);
+      expect(startItem).toHaveBeenCalledWith({ itemId: "item1" });
+    });
+
+    it("keeps the bottom nav for magazine and classic articles", async () => {
+      renderWith("MAGAZINE");
+      await screen.findByTestId("article-magazine");
+      expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument();
+    });
+  });
 });

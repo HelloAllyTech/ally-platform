@@ -135,6 +135,57 @@ class ArticleResource {
   final String url;
 }
 
+/// How an article is presented. [classic] is the plain page; [magazine]
+/// leads with the cover photo and editorial type; [cards] is one section
+/// per swipeable card. Same text, questions and completion in every mode.
+enum ArticleExperience { classic, magazine, cards }
+
+/// Lenient, like [branchingExperienceFromString]: missing, non-string or a
+/// value a newer server adds all read as [ArticleExperience.classic].
+ArticleExperience articleExperienceFromString(Object? value) {
+  if (value is! String) return ArticleExperience.classic;
+  switch (value.toUpperCase()) {
+    case 'MAGAZINE':
+      return ArticleExperience.magazine;
+    case 'CARDS':
+      return ArticleExperience.cards;
+    default:
+      return ArticleExperience.classic;
+  }
+}
+
+/// The photo an article opens with (`cover: {url, alt?}`).
+class ArticleCover {
+  const ArticleCover({required this.url, this.alt});
+
+  final String url;
+
+  /// For screen readers.
+  final String? alt;
+
+  /// Null for anything but an object with a non-blank string `url`.
+  static ArticleCover? maybeFromJson(Object? json) {
+    if (json is! Map) return null;
+    final url = json['url'];
+    if (url is! String || url.trim().isEmpty) return null;
+    final alt = json['alt'];
+    return ArticleCover(url: url.trim(), alt: alt is String && alt.trim().isNotEmpty ? alt : null);
+  }
+}
+
+/// Most takeaways an article shows.
+const articleMaxTakeaways = 5;
+
+/// `takeaways`: the strings only, blanks dropped, at most
+/// [articleMaxTakeaways]. Anything but a list reads as none.
+List<String> parseArticleTakeaways(Object? json) {
+  if (json is! List) return const [];
+  return [
+    for (final value in json)
+      if (value is String && value.trim().isNotEmpty) value.trim(),
+  ].take(articleMaxTakeaways).toList();
+}
+
 class VideoInterjection {
   VideoInterjection({
     required this.id,
@@ -478,6 +529,9 @@ class StartItemPayload {
     this.minReadSeconds,
     this.articleQuestions,
     this.articleResources,
+    this.articleExperience,
+    this.articleCover,
+    this.articleTakeaways,
     this.videoSource,
     this.videoUrl,
     this.durationSeconds,
@@ -539,6 +593,9 @@ class StartItemPayload {
                 .where((r) => r.url.isNotEmpty)
                 .toList()
           : null,
+      articleExperience: type == 'ARTICLE' ? articleExperienceFromString(json['experience']) : null,
+      articleCover: type == 'ARTICLE' ? ArticleCover.maybeFromJson(json['cover']) : null,
+      articleTakeaways: type == 'ARTICLE' ? parseArticleTakeaways(json['takeaways']) : null,
       videoSource: type == 'VIDEO' ? json['source'] as String? : null,
       videoUrl: json['url'] as String?,
       durationSeconds: (json['durationSeconds'] as num?)?.toDouble(),
@@ -667,6 +724,16 @@ class StartItemPayload {
   final int? minReadSeconds;
   final List<ArticleQuestion>? articleQuestions;
   final List<ArticleResource>? articleResources;
+
+  /// `experience`: CLASSIC, MAGAZINE or CARDS. Missing or unknown reads as
+  /// classic.
+  final ArticleExperience? articleExperience;
+
+  /// `cover`; null when absent or its url is blank.
+  final ArticleCover? articleCover;
+
+  /// `takeaways`, cleaned by [parseArticleTakeaways].
+  final List<String>? articleTakeaways;
 
   // VIDEO
   /// 's3' gets real native playback; 'youtube'/'vimeo'/'loom' fall back to

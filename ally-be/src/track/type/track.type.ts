@@ -112,11 +112,57 @@ export interface ArticleResource {
   url: string;
 }
 
+/**
+ * How the learner sees an article. The text is the same in every mode; only
+ * the presentation changes, so switching never touches progress or answers.
+ */
+export enum ArticleExperience {
+  /** A simple page of text. The default, and what every older article is. */
+  CLASSIC = 'CLASSIC',
+  /** Cover photo, big headline and editorial type, for longer reads. */
+  MAGAZINE = 'MAGAZINE',
+  /**
+   * One section per card, swiped through on a phone. A new card starts at
+   * each top-level `<h2>`, and each inline question gets a card of its own.
+   */
+  CARDS = 'CARDS',
+}
+
+/** An uploaded photo that opens the article (Magazine and Cards lead with it). */
+export interface ArticleCover {
+  /** An uploaded file (https). */
+  url: string;
+  /** What the photo shows, for screen readers. Translatable. */
+  alt?: string;
+}
+
 export interface ArticleContent {
   html: string;
   imageUrls?: string[];
   questions?: ArticleQuestion[];
   resources?: ArticleResource[];
+  /** Absent ⇒ CLASSIC. */
+  experience?: ArticleExperience;
+  cover?: ArticleCover;
+  /** Short points shown at the end of the article. Translatable. */
+  takeaways?: string[];
+}
+
+/**
+ * Marks a highlight box in an article's HTML:
+ * `<div data-ally-callout="say"><p>…</p></div>`. The box's label and icon are
+ * drawn by each player from the kind, in the learner's language, so only the
+ * kind is stored. A player that does not know a kind shows the text plainly.
+ */
+export const ARTICLE_CALLOUT_ATTR = 'data-ally-callout';
+
+export enum ArticleCalloutKind {
+  /** "Try saying": a line the counsellor could use. */
+  SAY = 'say',
+  /** "Good to know". */
+  INFO = 'info',
+  /** "Watch out". */
+  WARN = 'warn',
 }
 
 /** Matches the placeholder an article question is anchored to in the HTML. */

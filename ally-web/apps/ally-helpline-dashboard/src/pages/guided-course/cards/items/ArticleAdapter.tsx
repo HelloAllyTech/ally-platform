@@ -6,7 +6,12 @@ import { ArticleItemPlayer } from "../../../track-player/components/players/Arti
 
 import type { ItemAdapterProps } from "./types";
 
-/** Article, in the Shelf at reading width. The Shelf body doesn't scroll: the player's read gate owns scrolling. */
+/**
+ * Article, in the Shelf at reading width. The Shelf body doesn't scroll: the
+ * player's read gate owns scrolling. Always classic: a magazine hero and an
+ * outline rail need the full player's width, and cards would need the Shelf
+ * to give up its own frame. Callouts, cover and takeaways still show.
+ */
 const ArticleAdapter: FC<ItemAdapterProps<StartArticleItemPayload>> = ({
   payload,
   itemId,
@@ -18,6 +23,7 @@ const ArticleAdapter: FC<ItemAdapterProps<StartArticleItemPayload>> = ({
     itemId={itemId}
     alreadyCompleted={alreadyCompleted}
     onCompleted={onCompleted}
+    forceClassic
   />
 );
 

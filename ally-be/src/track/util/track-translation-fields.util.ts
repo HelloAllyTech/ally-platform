@@ -452,6 +452,42 @@ function walkJournalContent(
  * `TrackTranslationContent.media`), and ROLEPLAY/CASE contribute only their
  * heading, since the linked scenario and case own their own translations.
  */
+/**
+ * The key takeaways and the cover photo's description travel with the
+ * article: a learner reading it in Hindi should not meet English points at
+ * the end, or hear an English description from a screen reader. Takeaways
+ * are keyed by position; there are at most five and they carry no ids.
+ */
+function walkArticlePresentation(
+  content: ArticleContent,
+  visit: FieldVisitor,
+): void {
+  const cover = content.cover;
+  if (cover?.alt) {
+    visitField(
+      {
+        path: 'content.cover.alt',
+        kind: TranslatableFieldKind.PROSE,
+        get: () => cover.alt,
+        set: (value) => (cover.alt = value),
+      },
+      visit,
+    );
+  }
+  const takeaways = content.takeaways ?? [];
+  takeaways.forEach((_, index) => {
+    visitField(
+      {
+        path: `content.takeaways[${index}]`,
+        kind: TranslatableFieldKind.PROSE,
+        get: () => takeaways[index],
+        set: (value) => (takeaways[index] = value),
+      },
+      visit,
+    );
+  });
+}
+
 function walkItem(item: TrackItem, visit: FieldVisitor): void {
   walkHeading(item, visit);
 
@@ -477,6 +513,7 @@ function walkItem(item: TrackItem, visit: FieldVisitor): void {
       for (const question of (item.content as ArticleContent).questions ?? []) {
         walkQuizQuestion(question, visit, `content.questions[${question.id}]`);
       }
+      walkArticlePresentation(item.content as ArticleContent, visit);
       break;
 
     case TrackItemType.QUIZ:

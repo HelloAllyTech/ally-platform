@@ -50,7 +50,32 @@ export interface ArticleResource {
   url: string;
 }
 
+/**
+ * How the learner reads the same article. Mirrors ally-be's `ArticleExperience`.
+ * The text is identical in every mode — only the presentation changes.
+ */
+export enum ArticleExperience {
+  /** A simple page of text. The default. */
+  CLASSIC = "CLASSIC",
+  /** Cover photo, big headline and polished type. */
+  MAGAZINE = "MAGAZINE",
+  /** One section per swipe: a new card at each top-level `<h2>` and at each question. */
+  CARDS = "CARDS",
+}
+
+/** The article's optional cover photo — an uploaded file (https). */
+export interface ArticleCover {
+  url: string;
+  /** Read out by screen readers. */
+  alt?: string;
+}
+
 export interface ArticleContent {
+  /**
+   * The body. Besides the formatting tags it can carry two kinds of marker
+   * div: `<div data-ally-question="<id>"></div>` question placeholders, and
+   * `<div data-ally-callout="say|info|warn"><p>…</p></div>` highlight boxes.
+   */
   html: string;
   imageUrls?: string[];
   /**
@@ -62,6 +87,12 @@ export interface ArticleContent {
    */
   questions?: McqSingleQuestion[];
   resources?: ArticleResource[];
+  /** Absent = CLASSIC. Stored only for MAGAZINE / CARDS, so classic content stays unchanged. */
+  experience?: ArticleExperience;
+  /** Shown at the top in Magazine and Cards. Optional in every mode. */
+  cover?: ArticleCover;
+  /** Up to 5 short points shown at the end of the article. */
+  takeaways?: string[];
 }
 
 export type VideoSource = "s3" | "youtube" | "vimeo" | "loom";

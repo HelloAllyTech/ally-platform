@@ -652,4 +652,68 @@ void main() {
       expect(result.completion!.sectionCompleted, isTrue);
     });
   });
+
+  group('ARTICLE reading experience', () {
+    StartItemPayload article(Map<String, dynamic> extra) => StartItemPayload.fromJson({
+      'trackItemProgressId': 'p',
+      'type': 'ARTICLE',
+      'html': '<p>Body</p>',
+      ...extra,
+    });
+
+    test('experience parses case-insensitively; missing, unknown or non-string is classic', () {
+      expect(article({'experience': 'MAGAZINE'}).articleExperience, ArticleExperience.magazine);
+      expect(article({'experience': 'cards'}).articleExperience, ArticleExperience.cards);
+      expect(article({'experience': 'Classic'}).articleExperience, ArticleExperience.classic);
+      expect(article({}).articleExperience, ArticleExperience.classic);
+      expect(article({'experience': null}).articleExperience, ArticleExperience.classic);
+      expect(article({'experience': 'SCROLLYTELLING'}).articleExperience, ArticleExperience.classic);
+      expect(article({'experience': 3}).articleExperience, ArticleExperience.classic);
+      expect(article({'experience': {'kind': 'CARDS'}}).articleExperience, ArticleExperience.classic);
+    });
+
+    test('cover needs a non-blank string url; alt is optional', () {
+      final cover = article({
+        'cover': {'url': 'https://cdn.test/c.jpg', 'alt': 'A counsellor listening'},
+      }).articleCover;
+      expect(cover!.url, 'https://cdn.test/c.jpg');
+      expect(cover.alt, 'A counsellor listening');
+
+      expect(article({'cover': {'url': 'https://cdn.test/c.jpg'}}).articleCover!.alt, isNull);
+      expect(article({'cover': {'url': 'https://cdn.test/c.jpg', 'alt': 7}}).articleCover!.alt, isNull);
+      expect(article({}).articleCover, isNull);
+      expect(article({'cover': null}).articleCover, isNull);
+      expect(article({'cover': {'url': ''}}).articleCover, isNull);
+      expect(article({'cover': {'url': '   '}}).articleCover, isNull);
+      expect(article({'cover': {'url': 42}}).articleCover, isNull);
+      expect(article({'cover': 'https://cdn.test/c.jpg'}).articleCover, isNull);
+    });
+
+    test('takeaways keep non-blank strings only, at most 5', () {
+      expect(
+        article({
+          'takeaways': ['One', '', 2, null, '  ', ' Two ', 'Three', 'Four', 'Five', 'Six'],
+        }).articleTakeaways,
+        ['One', 'Two', 'Three', 'Four', 'Five'],
+      );
+      expect(article({}).articleTakeaways, isEmpty);
+      expect(article({'takeaways': 'One'}).articleTakeaways, isEmpty);
+      expect(article({'takeaways': null}).articleTakeaways, isEmpty);
+    });
+
+    test('other item types leave the article fields null', () {
+      final video = StartItemPayload.fromJson({
+        'trackItemProgressId': 'p',
+        'type': 'VIDEO',
+        'source': 's3',
+        'url': 'https://x.test/v.mp4',
+        'experience': 'CARDS',
+        'cover': {'url': 'https://x.test/c.jpg'},
+        'takeaways': ['One'],
+      });
+      expect(video.articleExperience, isNull);
+      expect(video.articleCover, isNull);
+      expect(video.articleTakeaways, isNull);
+    });
+  });
 }

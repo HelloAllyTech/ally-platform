@@ -13,7 +13,9 @@ import '../../../core/widgets/html_rich_text.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import '../data/start_item_payload.dart';
+import 'article/article_cards_view.dart';
 import 'article/article_player.dart';
+import 'article/article_reading.dart';
 import 'branching/branching_scenario_player.dart';
 import 'bucket_sort/bucket_sort_player.dart';
 import 'celebration_modal.dart';
@@ -243,11 +245,26 @@ class _CourseItemPlayerScreenState
     final completedCount = flat.where((f) => _isItemCompleted(f.item)).length;
     final isTrackLoadPending = trackAsync.isLoading && detail == null;
     final isTrackError = trackAsync.hasError && detail == null;
-    final immersive = _storyImmersive &&
+    final storyImmersive = _storyImmersive &&
         !isTrackError &&
         !_loadError &&
         !_isLoadingItem &&
         _payload?.type == 'BRANCHING_SCENARIO';
+    // An article's reading layout picks its chrome up front (it follows
+    // from the payload, so no callback): Magazine with a cover floats the
+    // top bar over the photo; Cards draws its own header and buttons.
+    final articleLayout =
+        !isTrackError &&
+            !isTrackLoadPending &&
+            !_loadError &&
+            !_isLoadingItem &&
+            _payload?.type == 'ARTICLE' &&
+            (current != null || widget.item?.id == _currentItemId)
+        ? articleLayoutOf(_payload!)
+        : null;
+    final immersive = storyImmersive || articleLayout == ArticleLayout.magazineImmersive;
+    final showTopBar = !immersive && articleLayout != ArticleLayout.cards;
+    final showBottomNav = !storyImmersive && articleLayout != ArticleLayout.cards;
     final topBar = _PlayerTopBar(
       sectionTitle: current?.sectionTitle ?? '',
       itemTitle: current?.item.title ?? '',
@@ -271,7 +288,8 @@ class _CourseItemPlayerScreenState
         if (!didPop && !celebrationShown) _exitToOverview();
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        // Cards' warm page runs up behind the status bar too.
+        backgroundColor: articleLayout == ArticleLayout.cards ? articleCardsBackground : Colors.white,
         body: Stack(
           children: [
             // Immersive: the body starts at the very top of the screen (the
@@ -281,7 +299,7 @@ class _CourseItemPlayerScreenState
               top: !immersive,
               child: Column(
                 children: [
-                  if (!immersive) topBar,
+                  if (showTopBar) topBar,
                   Expanded(
                     key: const ValueKey('player-body'),
                     child: _buildBody(
@@ -289,6 +307,7 @@ class _CourseItemPlayerScreenState
                       isTrackLoadPending: isTrackLoadPending,
                       current: current,
                       languageCode: detail?.languageCode,
+                      isLastItem: !hasNext,
                     ),
                   ),
                   if (current?.item.hasDiscussion ?? false)
@@ -297,7 +316,7 @@ class _CourseItemPlayerScreenState
                       itemId: _currentItemId,
                       highlightPostId: widget.highlightPostId,
                     ),
-                  if (!immersive)
+                  if (showBottomNav)
                     _PlayerBottomNav(
                       hasPrev: hasPrev,
                       isLastItem: !hasNext,
@@ -355,6 +374,7 @@ class _CourseItemPlayerScreenState
     required bool isTrackLoadPending,
     required _FlatTrackItem? current,
     required String? languageCode,
+    required bool isLastItem,
   }) {
     final errorStyle = CourseText.system(const TextStyle(fontSize: 14), AppColors.mediumEmphasis);
     if (isTrackError && !isTrackLoadPending) {
@@ -394,6 +414,12 @@ class _CourseItemPlayerScreenState
           itemId: _currentItemId,
           alreadyCompleted: alreadyCompleted,
           onCompleted: _handleCompletion,
+          itemTitle: item.title,
+          sectionTitle: current?.sectionTitle ?? '',
+          description: item.description,
+          onExit: _exitToOverview,
+          onRequestNext: _goNextOrOverview,
+          isLastItem: isLastItem,
         );
       case 'VIDEO':
         return VideoItemPlayer(

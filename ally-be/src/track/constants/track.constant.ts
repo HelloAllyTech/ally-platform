@@ -30,6 +30,11 @@ export const TRACK_MAX_ARTICLE_QUESTIONS = 10;
  */
 export const TRACK_MAX_ARTICLE_RESOURCES = 10;
 
+/** Key takeaways per ARTICLE: a handful of points, not a second article. */
+export const TRACK_MAX_ARTICLE_TAKEAWAYS = 5;
+export const TRACK_MAX_ARTICLE_TAKEAWAY_LENGTH = 200;
+export const TRACK_MAX_ARTICLE_COVER_ALT_LENGTH = 300;
+
 /**
  * Likert bounds. A scale needs two points to be a choice and past ten stops
  * being a scale anyone reads point by point; twenty statements is already a
