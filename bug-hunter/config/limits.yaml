@@ -1,7 +1,7 @@
 # Budgets, caps and attempts (docs/bug-hunter/CONTEXT.md rule 7; spec §7, §12, §13a).
 run:
   max_fix_attempts: 3
-  max_tokens: 400000          # per graph run, all nodes
+  max_tokens: 1500000         # per graph run, billed tokens of every call (history re-sent each turn, mostly cached); cost is the tighter cap
   max_wall_clock_s: 2700      # 45 minutes per graph run
   max_cost_usd: 1.50          # per graph run; the run escalates with "budget exceeded" past any of the three
   max_tool_turns: 30          # per tool loop (investigate, reproduce); the loop then answers with what it has

@@ -173,10 +173,15 @@ def make_reproduce_node(deps: GraphDeps):
                 if result
                 else (out.get("loop_stop") or "reproduce ended without a test")
             )
-            deps.scratchpad.append_note(f"reproduce: could not reproduce: {reason}")
+            stop = (
+                reason  # a budget stop is reported as such, not as a repro failure
+                if "budget exceeded" in reason
+                else f"could not reproduce: {reason}"
+            )
+            deps.scratchpad.append_note(f"reproduce: {stop}")
             return {
                 "status": "escalated",
-                "stop_reason": f"could not reproduce: {reason}"[:400],
+                "stop_reason": stop[:400],
                 "budget_used": budget,
             }
         args = result["args"]
