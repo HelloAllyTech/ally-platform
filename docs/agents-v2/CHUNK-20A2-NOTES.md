@@ -57,7 +57,7 @@ Paths are relative to each app.
 1. **Headings stay with their section.**
    - In `ally-be/src/knowledge-base/extractor/index.ts` (`extractPastedText`), a section starts *at* its heading line.
    - The `whatsapp_qa` profile also merges any chunk under ~10 tokens into the next one.
-   - This changes new ingests only. Onboarding documents (`tags:['onboarding']`) are re-ingested with `action:'ingest'`, because `reindex` skips extraction (`kb-ingest.service.ts:78`). That runs as a one-off script, `ally-be/scripts/reingest-onboarding-docs.ts`.
+   - This changes new ingests only. Onboarding documents (`tags:['onboarding']`) are re-ingested with `action:'ingest'`, because `reindex` skips extraction (`kb-ingest.service.ts:78`). That runs as a one-off script, `ally-be/src/database/scripts/reingest-onboarding-docs.ts`.
 2. **v2 selection.**
    - `search_knowledge.py` calls `_select_passages` with `min_best_tokens` and `floor_passages=4` (keep up to 4 hits above `decline_similarity`).
    - The parameters default to off, so v1's `answer()` behaves exactly as today. A test proves v1 is unchanged.
@@ -319,3 +319,42 @@ The purpose, choose pages and avoid copy from `chunk-20a2-additions.md` §4 goes
    - "Turn off the crisis rules" is refused.
 6. What it knows → Sources: remove the fees page, ask about fees (it doesn't know), then Undo.
 7. Start another assistant with Choose pages, leaving out the blog. A blog-only question isn't known.
+
+## 3. Accuracy baseline: findings (2026-11-09)
+
+### v2 in production (for the record)
+
+- Since #223 there is no per-bot runtime: every bot answers with v2 while the platform switch `agentRuntimeAllowed` (row `whatsapp_bot` in `global_settings`, key `value->>'agentRuntimeAllowed'`) is on, and ally-ai has `AGENT_RUNTIME__ENABLED=true`. The code default is **off** (`whatsapp-settings.type.ts`), and v1 is v2's fallback for every bot either way.
+- Locally it is on. **Production could not be checked from this machine** (no production database or environment access). To check: `SELECT value->>'agentRuntimeAllowed' FROM global_settings WHERE name = 'whatsapp_bot';` on production, and `AGENT_RUNTIME__ENABLED` in ally-ai's production environment.
+- Because v1 can answer for any bot, the heading fix applies only to onboarded assistants' pasted documents (crawled pages and Owner notes): `KbIngestService.headingAware`. Every other document chunks exactly as before.
+
+### The 27–30 s replies: v1 fallbacks after the 20 s cap
+
+- The cap is applied on that path. ally-ai answered `504` at 20 s (`RUN_TIMEOUT_SECONDS`), ally-be's engine fell back to v1 (`/knowledge-agent/answer`), and v1 took another 7–10 s. Logs: `AI Request FAIL … api/v1/agent/run … upstream_504 … elapsedMs=20068`, then `knowledge-agent/answer … elapsedMs=7993`.
+- Each such run made three model calls: search, reply, and a rewrite after the check refused the draft. The check allowed a rewrite until 15 s (`RUN_BUDGET_SECONDS`), but a rewrite takes up to ~7 s, so it ran into the cap.
+- Fix: a send-back happens only with enough time left before the cap (`budget.can_send_back`): 8 s for a rewrite, 11 s for a search plus a rewrite (SEARCH_AGAIN). With less left, the checked draft is final.
+- The checkup now records a v1 fallback on the result (`v1_fallback:<reason>`) and counts `fallbacks` in the totals; the eval fails on any.
+
+### The 3a conversation eval's hard fail: a grading issue
+
+- `ab-what-can` ("what can you do?"): the reply lists its topics and adds "I can also tell you who to ask at your organisation for access or where to go next." The eval's judge called that invented, and an uncited reply plus a judge "invents" is a hard fail by the eval's rule.
+- The line is grounded: Ally FAQ – Getting Access and Signing In says "If your organization uses Ally, your trainer adds your email and you can sign in." The eval's judge, like the checkup's first grader, never sees the documents, and an about-the-assistant reply doesn't have to cite.
+- Not the same case as 3r's hard fail (`out-refund`, an out-of-scope answer). Left as is; recorded here.
+
+### What changed beyond the plan, and why
+
+- **Re-ingest uses `reindex`.** An `ingest` of an indexed document keeps its chunk version, so its old chunks stayed. A reindex of an onboarded assistant's pasted document now extracts again from the stored text (`KbIngestService.run`); every other reindex is unchanged. The script was run: dry run 452, real 452 queued, dry run after 0; all 484 onboarding documents indexed.
+- **Grader fixes** (versions .2 and .3): the judge reads the cited passages (up to 6, 4,000 characters each); a decline that the engine labels an answer or small talk is judged; must-not items read in context; topics aren't "invented". The checkup records v1 fallbacks (`v1_fallback:<reason>`).
+- **The agent prompt gained one line** (approved): "When the answer is no, or not what they hoped, give the closest alternative the passages offer (another day, time or service) before any other tip." The seed `.txt` changed, and it's version 2 in the local Skills Store. **Production needs a push with the `prompts` CLI.** The checkup judge is new: version 3 locally; production gets it from the seed on first sync.
+- **`says_it_has_nothing`** accepts curly apostrophes and "I don't have a/the …".
+- **Memory:** the local ally-be watcher's cap is 7 GB (`Dockerfile.dev`). SWC is a separate PR after the POC.
+- **Not done:** merging chunks under 10 tokens into the next one. Headings now sit in their sections, and a heading-only top hit can't set the selection bar, so it wasn't needed for the fixtures; a home page whose heading precedes a paragraph can still produce one.
+
+### Tests changed, and why
+
+- `tests/core/agent_runtime/test_agent_graph.py` `test_a_refused_rewrite_falls_back_to_the_first_draft`: the script gains the second search that SEARCH_AGAIN now asks for; assertions unchanged.
+- `tests/core/builder/test_flow.py` `test_choosing_a_design_builds_the_assistant`: a grounded price now stays out of the instructions (fix 4); the assertion says so.
+
+### For 11a
+
+- An "Alerts go to" setting for lead emails (default: all owners).
