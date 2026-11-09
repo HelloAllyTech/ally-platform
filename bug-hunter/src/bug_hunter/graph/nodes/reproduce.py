@@ -203,9 +203,14 @@ def make_reproduce_node(deps: GraphDeps):
         if kind == "genuine":
             system_j = (
                 "You judge whether a failing test demonstrates a specific hypothesised "
-                "bug. Setup problems, wrong expectations in the test, flaky timing and "
-                "unrelated failures do not count. Be strict: 'related' only when the "
-                "failing assertion is the defect showing."
+                "bug. Say related=true when the failing assertion is about the "
+                "observable symptom the hypothesis predicts (a wrong value, a missing "
+                "call, a rejected input, a thrown error) and the failure would go away "
+                "if the hypothesised defect were fixed. The test does not have to "
+                "assert internal call arguments or the mechanism; the symptom is "
+                "enough. Say related=false only for setup failures (import, module, "
+                "fixture, compile, timeout), flaky timing, assertions on unrelated "
+                "code, or a failure that the hypothesised fix would not change."
             )
             user_j = (
                 f"Hypothesis:\n{state.finding.hypothesis}\n\nRoot cause claimed:\n"
