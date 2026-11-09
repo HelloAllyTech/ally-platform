@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { FeatureToggleKey, Permissions } from "@constants";
 
-import { canManageRoadmap, canOpenRoadmapBuilder, canQuickAddRoadmap } from "../utils/access";
+import {
+  canFileIdeas,
+  canManageRoadmap,
+  canOpenRoadmapBuilder,
+  canQuickAddRoadmap,
+} from "../utils/access";
 
 const EDIT = Permissions.EDIT_PRODUCT_ROADMAP;
 const TOGGLE = FeatureToggleKey.PRODUCT_ROADMAP_MANAGE;
@@ -59,9 +64,15 @@ describe("canOpenRoadmapBuilder", () => {
 describe("canQuickAddRoadmap", () => {
   const VOTE = Permissions.VOTE_PRODUCT_ROADMAP;
   const QUICK_ADD = FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD;
+  const IDEAS = FeatureToggleKey.PRODUCT_PLANNING_IDEAS;
 
-  it("quick-adds with the vote permission and the toggle", () => {
-    expect(canQuickAddRoadmap([VOTE], [QUICK_ADD])).toBe(true);
+  it("quick-adds with the vote permission, Ideas and the toggle", () => {
+    expect(canQuickAddRoadmap([VOTE], [IDEAS, QUICK_ADD])).toBe(true);
+  });
+
+  it("does NOT quick-add without Product Planning — Ideas", () => {
+    // Both filing doors agree on who may file: quick add is Ideas plus its own toggle.
+    expect(canQuickAddRoadmap([VOTE], [QUICK_ADD])).toBe(false);
   });
 
   it("does NOT quick-add on the vote permission alone", () => {
@@ -70,17 +81,40 @@ describe("canQuickAddRoadmap", () => {
   });
 
   it("does NOT quick-add on the toggle alone", () => {
-    expect(canQuickAddRoadmap([Permissions.VIEW_PRODUCT_ROADMAP], [QUICK_ADD])).toBe(false);
+    expect(canQuickAddRoadmap([Permissions.VIEW_PRODUCT_ROADMAP], [IDEAS, QUICK_ADD])).toBe(false);
   });
 
   it("is independent of roadmap manage", () => {
     // A curator is not a quick-adder, and a quick-adder is not a curator.
-    expect(canQuickAddRoadmap([EDIT, VOTE], [TOGGLE])).toBe(false);
+    expect(canQuickAddRoadmap([EDIT, VOTE], [IDEAS, TOGGLE])).toBe(false);
     expect(canManageRoadmap([EDIT, VOTE], [QUICK_ADD])).toBe(false);
   });
 
   it("fails closed when toggles could not be loaded", () => {
     expect(canQuickAddRoadmap([VOTE], [])).toBe(false);
     expect(canQuickAddRoadmap([VOTE], undefined)).toBe(false);
+  });
+});
+
+describe("canFileIdeas", () => {
+  const VOTE = Permissions.VOTE_PRODUCT_ROADMAP;
+  const IDEAS = FeatureToggleKey.PRODUCT_PLANNING_IDEAS;
+
+  it("files with the vote permission and Product Planning — Ideas", () => {
+    expect(canFileIdeas([VOTE], [IDEAS])).toBe(true);
+  });
+
+  it("does NOT file on the vote permission alone", () => {
+    // An org-restricted admin, or one with Ideas switched off, keeps voting but loses filing.
+    expect(canFileIdeas([VOTE], [FeatureToggleKey.PRODUCT_ROADMAP])).toBe(false);
+  });
+
+  it("does NOT file on the toggle alone", () => {
+    expect(canFileIdeas([Permissions.VIEW_PRODUCT_ROADMAP], [IDEAS])).toBe(false);
+  });
+
+  it("fails closed when toggles could not be loaded", () => {
+    expect(canFileIdeas([VOTE], [])).toBe(false);
+    expect(canFileIdeas([VOTE], undefined)).toBe(false);
   });
 });

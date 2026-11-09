@@ -1,7 +1,10 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { In, IsNull, Not } from 'typeorm';
 import { BuilderSessionService } from '../builder-session.service';
-import { BuilderSessionStatus } from '../../enum/builder.enum';
+import {
+  BuilderSessionStatus,
+  BuilderSessionVisibility,
+} from '../../enum/builder.enum';
 import {
   BUILDER_HANDOFF_CONTEXT_MAX,
   BUILDER_MAX_ACTIVE_SESSIONS_PER_TENANT,
@@ -145,6 +148,47 @@ describe('BuilderSessionService', () => {
       expect(sessionRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ slug: 'builder-tab-3' }),
       );
+    });
+
+    it('survives two creates racing for one slug: the loser takes the next suffix', async () => {
+      // Both saw "builder-tab" free; the unique index rejects the second INSERT.
+      const collision = Object.assign(new Error('duplicate key'), {
+        driverError: { code: '23505', constraint: 'idx_builder_sessions_slug' },
+      });
+      sessionRepository.save.mockRejectedValueOnce(collision);
+      sessionRepository.slugExists
+        .mockResolvedValueOnce(false) // first look: "builder-tab" free
+        .mockResolvedValueOnce(true) // retry: the winner holds "builder-tab"
+        .mockResolvedValueOnce(false); // "builder-tab-2"
+
+      const session = await service.createSession(1, { title: 'Builder tab' });
+
+      expect(sessionRepository.save).toHaveBeenCalledTimes(2);
+      expect(session.slug).toBe('builder-tab-2');
+    });
+
+    it('rethrows anything that is not a slug collision', async () => {
+      const other = Object.assign(new Error('boom'), {
+        driverError: { code: '23505', constraint: 'some_other_index' },
+      });
+      sessionRepository.save.mockRejectedValueOnce(other);
+
+      await expect(service.createSession(1, { title: 'x' })).rejects.toBe(
+        other,
+      );
+      expect(sessionRepository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives up after five lost races rather than looping forever', async () => {
+      const collision = Object.assign(new Error('duplicate key'), {
+        driverError: { code: '23505', constraint: 'idx_builder_sessions_slug' },
+      });
+      sessionRepository.save.mockRejectedValue(collision);
+
+      await expect(service.createSession(1, { title: 'x' })).rejects.toBe(
+        collision,
+      );
+      expect(sessionRepository.save).toHaveBeenCalledTimes(5);
     });
 
     it('refuses a tenant already at the concurrent-session cap, naming the way out', async () => {
@@ -490,7 +534,11 @@ describe('BuilderSessionService', () => {
       const result = await service.listSessions();
 
       expect(sessionRepository.find).toHaveBeenCalledWith({
-        where: { archivedAt: IsNull() },
+        // Private (unfiled) plans never reach Builder's feed.
+        where: {
+          visibility: BuilderSessionVisibility.SHARED,
+          archivedAt: IsNull(),
+        },
         order: { updatedAt: 'DESC' },
       });
       expect(result).toEqual([
@@ -509,6 +557,7 @@ describe('BuilderSessionService', () => {
 
       expect(sessionRepository.find).toHaveBeenCalledWith({
         where: {
+          visibility: BuilderSessionVisibility.SHARED,
           createdBy: 7,
           archivedAt: IsNull(),
           status: In([BuilderSessionStatus.COMPLETED]),
@@ -534,7 +583,10 @@ describe('BuilderSessionService', () => {
       });
 
       expect(sessionRepository.findAndCount).toHaveBeenCalledWith({
-        where: { archivedAt: Not(IsNull()) },
+        where: {
+          visibility: BuilderSessionVisibility.SHARED,
+          archivedAt: Not(IsNull()),
+        },
         order: { archivedAt: 'DESC' },
         take: 12,
         skip: 0,

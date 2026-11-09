@@ -65,6 +65,7 @@ import { RoadmapSplitMergeService } from '../service/roadmap-split-merge.service
 import { RoadmapBuilderService } from '../service/roadmap-builder.service';
 import { RoadmapBoardService } from '../service/roadmap-board.service';
 import { RoadmapAccessService } from '../service/roadmap-access.service';
+import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 
 /**
  * The board itself.
@@ -87,6 +88,7 @@ export class RoadmapOpportunityController {
     private readonly boardService: RoadmapBoardService,
     private readonly access: RoadmapAccessService,
     private readonly multiplierService: RoadmapMultiplierService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
@@ -283,6 +285,9 @@ export class RoadmapOpportunityController {
     @CurrentUser() user: TokenUser,
     @Body() dto: CreateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
+    // Filing is the Product Planning — Ideas toggle's (rev 5.1 §B.12): on by
+    // default for platform admins, withheld from org-restricted ones.
+    await this.planAccess.assertIdeas(user.id);
     return this.opportunityService.create(user.id, dto, {
       canManage: await this.access.canManage(user.id),
       enforceReadiness: true,
@@ -319,6 +324,9 @@ export class RoadmapOpportunityController {
     @CurrentUser() user: TokenUser,
     @Body() dto: QuickAddOpportunityDto,
   ): Promise<OpportunityResponseDto> {
+    // Quick add is a second filing door, so it needs Ideas too: both doors
+    // must agree on who may file.
+    await this.planAccess.assertIdeas(user.id);
     return this.opportunityService.create(user.id, dto, {
       canManage: await this.access.canManage(user.id),
       enforceReadiness: false,

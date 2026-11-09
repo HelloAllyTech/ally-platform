@@ -60,6 +60,10 @@ export class BuilderSettingsService {
         | 'verifierModel'
         | 'validatedTurns'
         | 'situationBrief'
+        | 'planningEnabled'
+        | 'planCeilingUsd'
+        | 'planIdeaCeilingUsd'
+        | 'planCloseConfirmVotes'
       >
     >,
     userId: number,

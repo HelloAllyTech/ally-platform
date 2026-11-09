@@ -63,6 +63,28 @@ export const BUILDER_PRD_FROZEN_STATUSES: BuilderSessionStatus[] = [
  * stages inside a phase (TESTING, E2E_VERIFY, OPENING_PRS, REPORTING) are
  * still agent-asserted.
  */
+/**
+ * What a session is for. BUILD is every session Builder has ever had: a PRD
+ * interview that becomes build runs. PLAN is the roadmap's idea-to-outcome plan
+ * (plans/roadmap-owns-planning rev 5.1), which reuses these tables from its
+ * first message and can later be sent to build on the same session.
+ */
+export enum BuilderSessionKind {
+  BUILD = 'build',
+  PLAN = 'plan',
+}
+
+/**
+ * Who may see a session. SHARED is every session Builder has ever had. PRIVATE
+ * is a plan its author has not filed yet: visible to that author only, and
+ * never in Builder's own lists (mission control, Now, History). See
+ * the session repository's visibleToWhere and the visibility interceptor.
+ */
+export enum BuilderSessionVisibility {
+  PRIVATE = 'private',
+  SHARED = 'shared',
+}
+
 export enum BuilderStage {
   SETUP = 'SETUP',
   PLANNING = 'PLANNING',

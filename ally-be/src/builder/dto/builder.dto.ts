@@ -7,6 +7,7 @@ import {
   IsBoolean,
   IsEnum,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -507,6 +508,44 @@ export class UpdateBuilderSettingsDto {
   @IsOptional()
   @IsBoolean()
   situationBrief?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Master switch for the roadmap's plan flow (idea to outcome). Who may use it is the two Product Planning admin toggles.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  planningEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'USD ceiling for one plan from first message to PRD ready, private drafts included. Warns at 80%, then stops until the lead raises it.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.5)
+  @Max(100)
+  planCeilingUsd?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'The part of the plan ceiling the private Idea stage may use. At 80% the copilot wraps up instead of stopping the author.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1)
+  @Max(20)
+  planIdeaCeilingUsd?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Closing a plan as not pursuing when its idea has more votes than this needs a second Lead to confirm.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  planCloseConfirmVotes?: number;
 }
 
 export class ListBuilderSessionsQueryDto {

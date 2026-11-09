@@ -54,7 +54,12 @@ import { RoadmapSortControl } from "./RoadmapSortControl";
 import { SavedViewTabs } from "./SavedViewTabs";
 import { useProductRoadmapRealtime } from "./useProductRoadmapRealtime";
 import { useSavedViews } from "./useSavedViews";
-import { canManageRoadmap, canOpenRoadmapBuilder, canQuickAddRoadmap } from "./utils/access";
+import {
+  canFileIdeas,
+  canManageRoadmap,
+  canOpenRoadmapBuilder,
+  canQuickAddRoadmap,
+} from "./utils/access";
 import { seedForHandle } from "./utils/builder";
 import { EMPTY_ADVANCED_FILTERS, RoadmapAdvancedFilterValues } from "./utils/filters";
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
@@ -192,6 +197,8 @@ export const ProductRoadmap: React.FC = () => {
    * who hold the quick-add toggle. Independent of canManage — see canQuickAddRoadmap.
    */
   const canQuickAdd = canQuickAddRoadmap(permissions, features);
+  /** The guided-interview door: VOTE plus the Product Planning — Ideas toggle (canFileIdeas). */
+  const canFile = canFileIdeas(permissions, features);
   /**
    * Whether the Bugs tab exists for this reader.
    *
@@ -914,7 +921,7 @@ export const ProductRoadmap: React.FC = () => {
             without the filer doing the reframing alone, and two doors to one act made people
             pick before they knew which they needed.
           */}
-          {canVote && (
+          {canFile && (
             <Tooltip label="New opportunity" align="bottom">
               <button
                 type="button"

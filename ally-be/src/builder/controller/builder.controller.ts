@@ -10,7 +10,9 @@ import {
   Post,
   Query,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
+import { BuilderSessionVisibilityInterceptor } from '../interceptor/builder-session-visibility.interceptor';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -86,6 +88,8 @@ import { BuilderSessionStatus } from '../enum/builder.enum';
 @ApiTags('Builder')
 @ApiBearerAuth()
 @ApiSecurity('access-token')
+// PRIVATE sessions (unfiled plans) are their author's alone on every :sessionId route.
+@UseInterceptors(BuilderSessionVisibilityInterceptor)
 @Controller({ path: 'builder', version: '1' })
 export class BuilderController {
   private readonly logger = LoggerService.getInstance(BuilderController.name);
@@ -816,6 +820,18 @@ export class BuilderController {
                 ? String(dto.maxPrAutomationUsd)
                 : null,
             }
+          : {}),
+        ...(dto.planningEnabled !== undefined
+          ? { planningEnabled: dto.planningEnabled }
+          : {}),
+        ...(dto.planCeilingUsd !== undefined
+          ? { planCeilingUsd: String(dto.planCeilingUsd) }
+          : {}),
+        ...(dto.planIdeaCeilingUsd !== undefined
+          ? { planIdeaCeilingUsd: String(dto.planIdeaCeilingUsd) }
+          : {}),
+        ...(dto.planCloseConfirmVotes !== undefined
+          ? { planCloseConfirmVotes: dto.planCloseConfirmVotes }
           : {}),
         // The level sets the switches, and wins over any given alongside it.
         ...(dto.autonomyLevel

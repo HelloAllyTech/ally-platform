@@ -636,6 +636,14 @@ cost attribution and the per-org session caps only, and does **not** tenant-scop
 gate) so a stuck session can be debugged and taken over by another Builder user;
 `BuilderSessionService.getSession` checks existence only. Notifications still go to the creator.
 
+**Exception: private plan sessions** (migration `1980990000000`). A session with
+`visibility = 'private'` is an unfiled roadmap plan (`kind = 'plan'`) and is its author's alone: every
+Builder list (mission control, archive, Now, pending decisions) spreads `SHARED_SESSIONS_ONLY`, History
+excludes other authors' private sessions in SQL, and `BuilderSessionVisibilityInterceptor` answers 404 on
+every `:sessionId` route for anyone but the author. `src/builder/repository/test/builder-session-visibility.spec.ts` lists every
+file that reads `builder_sessions` with the reason it cannot leak one — a new reader fails it until
+classified. Every pre-existing row is `kind = 'build'`, `visibility = 'shared'`.
+
 Two things here are worth knowing before you touch them. First, **status and stage are deliberately
 different kinds of thing**: `status` is what ally-be owns and can transition on its own (an admin starts
 a build, answers, cancels), while `currentStage` is only ever learned from an event a runner reports.
@@ -677,6 +685,16 @@ tables are the protocol between the two.
 | `builder_history`       | BaseWithoutTenant | `id` (uuid), `entryType` (decision / ask / tell / start / putback), `decisionId`, `kind`, `sessionId` (no FK), `sessionTitle` (frozen), `prompt`, `chosenOptionIds` (jsonb array), `chosenLabel`, `customText`, `answerText`, `recommendedOptionId`, `matchedRecommendation`, `oneWay`, `ruleId`, `surface` (now / session / slack / rule), `client` (phone / tablet / desktop), `actorUserId`, `raisedAt`, `decidedAt`, `waitSeconds`, `msToDecide`, `undoneAt`, `appliedAt`, `applyError`, `tellStatus`, `appliedRunId` | The Builder tab's History (migration `1980780000000`): every decision, ask and tell, append-only. A decision is never stored, so this freezes the card as it was answered — the recommendation is frozen **before** the answer is applied. Written at the point of effect by `BuilderDecisionService` (Now and the session page), `BuilderSlackService` (Slack merges) and, later, rules. Best-effort: a failed insert never fails the action. Only `undoneAt` (a reversible answer taken back inside its 8 s undo window, held in Redis under `builder-undo:<decisionId>`), the apply fields and the tell fields change after insert. Undone rows count in no metric. |
 | `builder_rules`         | BaseWithoutTenant | `id` (uuid), `statement` (text), `scope` (everywhere / area:<name> / session:<id> / opportunity:<id>), `area`, `effect` (guide / decide), `match` (jsonb `{kind, questionType?, optionId}`, required for decide), `sourceHistoryId`, `supersedesId`, `active`, `createdBy`, `updatedBy` | The Builder tab's Rules (migration `1980800000000`): what a person decided once that binds future work. Guide rules are rendered into every interview turn and run spec (`BuilderRuleContextService`) and outrank Builder's lessons; decide rules answer matching budget / stuck-PR / failed-build decisions on a 60 s tick while autonomy is above `assist` (surface `rule` in `builder_history`). A merge rule only flips `builder_settings.autoMergeEnabled`. Append-only by supersession: `active` is the only column that changes. Times applied = `builder_history` rows with its `ruleId` (indexed). |
 
+**Plan columns** (migration `1980990000000`, plans/roadmap-owns-planning rev 5.1):
+`builder_sessions.kind` (varchar(16), CHECK `build`/`plan`, default `build`), `visibility` (varchar(16),
+CHECK `private`/`shared`, default `shared`), `leadUserId` (int, nullable, no FK — the plan's current
+lead; `createdBy` stays the immutable author); partial indexes `idx_builder_sessions_private_author`
+and `idx_builder_sessions_lead`. `builder_settings.planningEnabled` (bool, default false — master switch
+for the plan flow), `planCeilingUsd` (numeric(10,4), default 5), `planIdeaCeilingUsd` (numeric(10,4),
+default 1 — the private Idea stage's share), `planCloseConfirmVotes` (int, default 10), and
+`planClinicalReviewerIds` / `planPrivacyReviewerIds` (jsonb arrays of user ids, default `[]` — the named
+sign-off people, not toggles).
+
 **Builder tab columns** (migration `1980790000000`): `builder_settings.inProgressLimit` (int, default 3) — how many sessions a person wants in progress at once; Up next refuses Start at the limit and offers Put back, never queueing silently (separate from `maxConcurrentBuilds`, the runner budget). `builder_pull_requests.slackChannel` / `slackMessageTs` — where the merge prompt was posted, so it is edited to "Answered in Ally" once the pull request merges from any surface.
 
 > ⚠️ The `CHECK` constraints on every Builder table are hand-written (varchar + CHECK, not Postgres
@@ -689,6 +707,20 @@ tables are the protocol between the two.
 to set up). Prompt-cache effectiveness is the main lever on this agent's cost, and with only one of the
 two counters a twenty-turn interview's real spend is unknowable. Build-run usage reports under
 `LlmTask.BUILDER_BUILD`.
+
+---
+
+### 3.14a Product Planning (`product-planning`)
+
+The roadmap's idea-to-outcome plan (plans/roadmap-owns-planning rev 5.1). A plan **reuses the Builder
+session tables** (see 3.14, plan columns); these two tables sit beside them. **Not multi-tenant.** Who may
+do what is two admin toggles, `product_planning_ideas` (default on, platform-only) and
+`product_planning_lead` (granted per admin, platform-only), read through `PlanAccessService`.
+
+| Table                | Base | Key columns | Notes |
+| -------------------- | ---- | ----------- | ----- |
+| `plan_events`        | none (append-only) | `id` (uuid), `sessionId` (uuid FK → `builder_sessions` ON DELETE CASCADE), `kind` (varchar(32), CHECK = `PlanEventKind`), `actorUserId` (int, nullable = system), `detail` (jsonb, nullable), `at` (timestamptz) | Who did what to a plan: taken on, handed back, filed, budget raised, sign-off given. **Never updated**; the plan's timeline merges it with `builder_messages` and `builder_history`. Index `(sessionId, at)`. |
+| `plan_spend_entries` | none (append-only) | `id` (uuid), `sessionId` (uuid, nullable, FK → `builder_sessions` ON DELETE CASCADE), `stage` (varchar(16), nullable, CHECK = `PlanStage`), `actorUserId`, `specialist`, `taskId` (AI task registry id), `provider`, `model`, `tokensIn`/`tokensOut`/`cachedTokens`/`cacheWriteTokens` (int), `costUsd` (numeric(12,6)), `priced` (bool), `at` | The spend meter's ledger. Written **awaited** and priced at write time from `MODEL_PRICING` (`PlanSpendService`) — unlike `llm_usage`, which is fire-and-forget and unpriced. `priced = false` means the model had no price: cost 0 and the meter says "approximate". `sessionId` null only for work that belongs to no plan (the weekly signal scout). Index `(sessionId, at)`. |
 
 ---
 

@@ -184,6 +184,39 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   @Column({ type: 'boolean', default: true })
   situationBrief!: boolean;
 
+  // ── Product planning (plans/roadmap-owns-planning rev 5.1) ────────────────
+
+  /**
+   * Master switch for the roadmap's plan flow. Off by default so unfinished
+   * phases merge safely; who may use it is decided by the two Product Planning
+   * admin toggles, not here.
+   */
+  @Column({ type: 'boolean', default: false })
+  planningEnabled!: boolean;
+
+  /** USD ceiling for one plan from first message to PRD ready, drafts included. */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 5 })
+  planCeilingUsd!: string;
+
+  /** The part of planCeilingUsd the private Idea stage may use (soft wrap-up). */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 1 })
+  planIdeaCeilingUsd!: string;
+
+  /** Closing a plan whose idea has more votes than this needs a second Lead. */
+  @Column({ type: 'int', default: 10 })
+  planCloseConfirmVotes!: number;
+
+  /**
+   * Named people, not a toggle: who may sign off a high-severity clinical
+   * safety finding. User ids; edited only by Admin User Management holders.
+   */
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  planClinicalReviewerIds!: number[];
+
+  /** Named people who may sign off a PHI-touching privacy finding. */
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  planPrivacyReviewerIds!: number[];
+
   @Column({ type: 'int', nullable: true })
   updatedBy?: number | null;
 }
