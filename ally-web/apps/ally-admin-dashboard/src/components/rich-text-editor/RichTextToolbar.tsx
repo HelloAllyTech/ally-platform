@@ -17,6 +17,8 @@ import {
 } from "@icons";
 import { type Editor } from "@tiptap/react";
 
+import { CalloutMenu } from "./CalloutMenu";
+
 interface ToolbarButtonProps {
   onClick: () => void;
   isActive?: boolean;
@@ -55,12 +57,15 @@ interface RichTextToolbarProps {
   onInsertImage?: (file: File) => Promise<void> | void;
   /** When provided, renders a button that anchors a question at the cursor. */
   onInsertQuestion?: () => void;
+  /** When set, renders the "Highlight box" menu (article builder only). */
+  allowCallouts?: boolean;
 }
 
 export const RichTextToolbar: FC<RichTextToolbarProps> = ({
   editor,
   onInsertImage,
   onInsertQuestion,
+  allowCallouts = false,
 }) => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -204,6 +209,13 @@ export const RichTextToolbar: FC<RichTextToolbarProps> = ({
           <ToolbarButton onClick={onInsertQuestion} title="Insert multiple choice question">
             <McqBlock size={iconSize} />
           </ToolbarButton>
+        </>
+      )}
+
+      {allowCallouts && (
+        <>
+          <ToolbarDivider />
+          <CalloutMenu editor={editor} />
         </>
       )}
     </div>
