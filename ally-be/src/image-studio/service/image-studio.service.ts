@@ -129,10 +129,21 @@ export class ImageStudioService {
     private readonly tracks: Repository<Track>,
   ) {}
 
+  /**
+   * On, and able to draw: a switched-on studio with no image-provider key
+   * would offer Generate and then fail every image after a long wait.
+   */
+  private isAvailable(): boolean {
+    return (
+      this.configService.imageStudio.enabled &&
+      !!(this.configService.openai?.apiKey || this.configService.gemini?.apiKey)
+    );
+  }
+
   getConfig(): ImageStudioConfigDto {
     const config = this.configService.imageStudio;
     return {
-      enabled: config.enabled,
+      enabled: this.isAvailable(),
       maxVariants: IMAGE_STUDIO_MAX_VARIANTS,
       maxReferences: config.maxReferences,
       maxBatch: IMAGE_STUDIO_MAX_BATCH,
@@ -173,7 +184,7 @@ export class ImageStudioService {
   }
 
   private assertEnabled(): void {
-    if (!this.configService.imageStudio.enabled) {
+    if (!this.isAvailable()) {
       throw new ServiceUnavailableException(
         'AI image generation is turned off.',
       );

@@ -21,8 +21,14 @@ const studioConfig = (overrides: Record<string, unknown> = {}) => ({
     costPerImageUsd: 0,
     ...overrides,
   },
-  openai: { imageModel: 'gpt-image-1.5' },
-  gemini: { imageModel: 'gemini-2.5-flash-image' },
+  openai: { apiKey: 'sk-test', imageModel: 'gpt-image-1.5' },
+  gemini: { apiKey: 'g-test', imageModel: 'gemini-2.5-flash-image' },
+  ...(overrides.noKeys
+    ? {
+        openai: { imageModel: 'gpt-image-1.5' },
+        gemini: { imageModel: 'gemini-2.5-flash-image' },
+      }
+    : {}),
 });
 
 const safeCompose = () => ({
@@ -169,6 +175,14 @@ describe('ImageStudioService.generate', () => {
 
   it('refuses everything when Image Studio is off', async () => {
     const { service } = build({ config: { enabled: false } });
+    await expect(
+      service.generate(user, request() as any),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('reports itself off, and refuses, when no image provider has a key', async () => {
+    const { service } = build({ config: { noKeys: true } });
+    expect(service.getConfig().enabled).toBe(false);
     await expect(
       service.generate(user, request() as any),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
