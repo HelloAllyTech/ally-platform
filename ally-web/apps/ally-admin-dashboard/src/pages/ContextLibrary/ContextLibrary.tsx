@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 
-import { BarChart3, Library, Settings2 } from "lucide-react";
+import { BarChart3, Library, PlugZap, Settings2 } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useGetContextCollectionsQuery, useGetPermissionsQuery } from "@api";
@@ -21,6 +21,7 @@ import {
 } from "./AddDocuments";
 import { BulkUpload } from "./BulkUpload";
 import { ChunkSheet } from "./ChunkSheet";
+import { ConnectSheet } from "./ConnectSheet";
 import {
   capitalise,
   errorReason,
@@ -31,6 +32,7 @@ import {
 import { InlineError, LoadingRows, Segmented } from "./ContextLibraryUi";
 import { DocumentSheet, DocumentsView } from "./DocumentsView";
 import { EntryForm } from "./EntryForm";
+import { InsightsView } from "./InsightsView";
 import { LibraryView } from "./LibraryView";
 import { SettingsView } from "./SettingsView";
 import { addDocuments } from "./upload/uploadStore";
@@ -48,7 +50,7 @@ export const parseView = (value: string | null): ContextLibraryView =>
 /**
  * The Context Library: Library (default) · Insights · Settings, deep-linked with `?view=`, and
  * a collection switcher remembered in `?collection=`. Every overlay is a URL parameter pushed
- * as a history entry (`?chunk=`, `?document=`, `?sheet=new|bulk`), so Back closes it and a
+ * as a history entry (`?chunk=`, `?document=`, `?sheet=new|bulk|connect`), so Back closes it and a
  * link to one opens it.
  *
  * Documents can be dropped anywhere on the page. The upload dock that follows them lives in
@@ -240,15 +242,23 @@ export const ContextLibrary: React.FC = () => {
             ))}
           </select>
         </label>
-        {canEdit && (
-          <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => pushOverlay({ sheet: "connect" })}
+            className="inline-flex h-10 items-center gap-2 rounded border border-border-light bg-white px-3 text-sm hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+            data-testid="cl-connect-button"
+          >
+            <PlugZap size={16} aria-hidden /> {strings.connect.button}
+          </button>
+          {canEdit && (
             <AddMenu
               canUpload={current ? current.takesDocuments : documentCollections.length > 0}
               canWrite={current ? takesEntries(current) : entryCollections.length > 0}
               onChoose={onAdd}
             />
-          </div>
-        )}
+          )}
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -299,11 +309,24 @@ export const ContextLibrary: React.FC = () => {
       <div role="tabpanel" id={`cl-panel-${view}`} aria-labelledby={`cl-tab-${view}`}>
         {view === "library" && renderLibrary()}
         {view === "insights" && (
-          <p className="py-12 text-center text-sm text-typography-600" data-testid="cl-insights">
-            {strings.insights.placeholder}
-          </p>
+          <InsightsView
+            collection={current}
+            collections={collections}
+            canEdit={canEdit}
+            onPickCollection={setCollection}
+            onUpload={() => fileInputRef.current?.click()}
+            onNewEntry={() => pushOverlay({ sheet: "new" })}
+            onOpenChunk={code => pushOverlay({ chunk: code })}
+          />
         )}
-        {view === "settings" && <SettingsView collections={collections} canEdit={canEdit} />}
+        {view === "settings" && (
+          <SettingsView
+            collections={collections}
+            collection={current}
+            canEdit={canEdit}
+            onConnect={() => pushOverlay({ sheet: "connect" })}
+          />
+        )}
       </div>
 
       {dragging && <DropOverlay count={dragCount} collections={collections} targets={targets} />}
@@ -349,6 +372,7 @@ export const ContextLibrary: React.FC = () => {
           }
         />
       )}
+      {sheet === "connect" && <ConnectSheet onClose={() => closeOverlay("sheet")} />}
       {sheet === "bulk" && canEdit && (
         <BulkUpload
           collections={collections}

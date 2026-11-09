@@ -4827,6 +4827,36 @@ export const en = {
         count === 1 ? "I'm working on 1 answer…" : `I'm working on ${count} answers…`,
     },
 
+    // "Principles in play" on a session: First Principles from the Context Library, with a
+    // status that comes from usage (never from anyone grading them).
+    principles: {
+      heading: "Principles in play",
+      count: (count: number) => `${count} in play`,
+      status: {
+        applied: "Applied",
+        trade_off: "Trade-off",
+        cited: "Cited",
+        open: "Open",
+      } as Record<string, string>,
+      finding: "Finding principles for this idea…",
+      off: "Principles are off for this session.",
+      unavailable: "Principles aren't available right now. The interview carries on without them.",
+      none: "None yet. Principles appear as the interview reaches them.",
+      readAs: (descriptor: string) => `Read as: ${descriptor}`,
+      inBrief: "In the brief",
+      sections: (sections: string) => `For ${sections}`,
+      tensionsHeading: "Trade-offs",
+      tension: (a: string, b: string) => `${a} and ${b} pull against each other`,
+      switchLabel: "Use principles in this session",
+      on: "On",
+      offWord: "Off",
+      turnedOn: "Principles switched on for this session",
+      turnedOff: "Principles switched off for this session. The interview carries on without them.",
+      failed: "That didn't go through. Nothing changed.",
+      loadFailed: "Couldn't load the principles.",
+      retry: "Retry",
+      open: (code: string) => `Open ${code} in the Context Library`,
+    },
     // The Builder tab: Now · Rules · History. One name per thing, in copy and in code:
     // Decision, Waiting on you, In progress, Up next, Start, Put back, Ask, Tell, Rule,
     // Decide for me, History, Limit. The agent speaks about the work; the app about itself.
@@ -4835,6 +4865,8 @@ export const en = {
       tabTitle: (count: number) =>
         count ? `(${count}) Builder · Ally Admin` : "Builder · Ally Admin",
       more: "More Builder pages",
+      principlesLink: "Principles",
+      principlesLinkLabel: "Open First Principles in the Context Library",
       overflow: {
         sessions: "All sessions",
         pipeline: "Pipeline",
@@ -10678,9 +10710,187 @@ export const en = {
       toggled: (useCase: string, collection: string, on: boolean) =>
         `${useCase} ${on ? "now reads" : "no longer reads"} ${collection}`,
       empty: "No use cases yet.",
+      // The selected collection's learning loops. Here, under Settings, "chunk" is allowed.
+      loops: {
+        title: "Learning loops",
+        heading: (collection: string) => `Learning loops: ${collection}`,
+        intro:
+          "They run nightly on how this collection is used. Every change they make can be undone under Insights → What changed?",
+        pick: "Choose a collection at the top of the page to see its learning loops.",
+        names: {
+          judge: "Judge",
+          query_learning: "Query learning",
+          effectiveness: "Usage ranking",
+          curator: "Curator",
+          gaps: "Gaps",
+          tuning: "Tuning",
+          rollback: "Rollback",
+        } as Record<string, string>,
+        help: {
+          judge: "Grades a sample of searches for relevance.",
+          query_learning:
+            "Adds wordings that found a chunk only by luck to that chunk's example queries.",
+          effectiveness: "Moves chunks that get used a little higher in results.",
+          curator:
+            "Archives, demotes or merges extracted chunks that never help. Never touches written ones.",
+          gaps: "Groups searches that found nothing into missing topics.",
+          tuning:
+            "Tries other search setups at most weekly, and keeps one only if it ranks better on searches set aside for checking.",
+          rollback: "Puts the previous search setup back if results get worse after a change.",
+        } as Record<string, string>,
+        switchLabel: (name: string) => `${name} runs for this collection`,
+        on: "On",
+        paused: "Paused",
+        toggled: (name: string, collection: string, on: boolean) =>
+          `${name} ${on ? "switched on" : "paused"} for ${collection}`,
+        sampleRate: "Judge sample rate",
+        sampleRateHelp:
+          "Share of live searches the judge grades. More gives steadier numbers sooner, and costs more.",
+        sampleRateValue: (percent: number) => `${percent}% of searches`,
+        sampleRateSaved: (percent: number, collection: string) =>
+          `The judge now grades ${percent}% of searches in ${collection}`,
+        setup: {
+          heading: "Search setup in force",
+          weights: "Weights",
+          keyword: "Keyword",
+          meaning: "Meaning",
+          situations: "Situations",
+          rerank: "Re-rank",
+          diversity: "Diversity",
+          diversityHelp:
+            "1.00 ranks purely by relevance; lower values spread results across different chunks.",
+          fusion: "Fusion constant",
+          fusionHelp:
+            "How the keyword and meaning rankings are blended. Higher gives lower-ranked matches more say.",
+          on: "On",
+          off: "Off",
+          isDefault: "The collection's starting setup. Tuning hasn't changed it.",
+          changed: (date: string) => `Last changed ${date}`,
+          none: "No search setup yet.",
+        },
+        run: {
+          nightly: "Run nightly loops now",
+          tuning: "Run tuning now",
+          started: "Started — changes will appear under Insights → What changed?",
+          failed: "Couldn't start. Try again.",
+        },
+      },
     },
     insights: {
-      placeholder: "Insights arrive once the library has been searched for a while",
+      pickCollection: "Insights are per collection. Choose one to see how it's doing.",
+      window: (days: number) => `Last ${days} days`,
+      helping: {
+        heading: "Is it helping?",
+        precision: "Results judged useful",
+        precisionHelp: (nounPlural: string) =>
+          `Share of the ${nounPlural} shown in searches that the judge rated useful.`,
+        precisionUnit: "judged results",
+        holdout: "Ranking quality",
+        holdoutHelp:
+          "How close the order shown was to the best possible order, on searches set aside for checking. 1.00 is perfect.",
+        holdoutUnit: "searches",
+        noneJudgedTitle: "Nothing judged yet",
+        noneJudged: (percent: number) =>
+          `Each night the judge grades a sample of searches (${percent}% of them). The numbers appear here after the first night with searches.`,
+        judgePaused:
+          "The judge is paused for this collection, so nothing is being graded. Switch it on in Settings.",
+        weeklyLabel: "Share judged useful, week by week",
+        week: (label: string, percent: string, judged: number) =>
+          `Week of ${label}: ${percent} of ${judged} judged`,
+        weekNone: (label: string) => `Week of ${label}: nothing judged`,
+        usageHeading: "Where it's used",
+        usageCaption: (nounPlural: string) =>
+          `How often each use case was shown ${nounPlural}, opened them, cited them and acted on them.`,
+        columns: {
+          useCase: "Use case",
+          surfaced: "Shown",
+          read: "Read",
+          cited: "Cited",
+          applied: "Applied",
+        },
+        rejected: (count: number) => `${count} turned down`,
+        rejectedHelp:
+          "Citations the check turned down because the code didn't match what was shown.",
+        noUsage: (days: number) => `Not searched in the last ${days} days.`,
+      },
+      missing: {
+        heading: "What's missing?",
+        intro: "Topics searches keep asking about that found nothing good.",
+        none: "Nothing missing that searches have noticed.",
+        searches: (count: number) => `${count} ${count === 1 ? "search" : "searches"}`,
+        askedAs: "Asked as",
+        upload: "Upload documents",
+        addEntries: (nounPlural: string) => `Add ${nounPlural}`,
+        dismiss: "Dismiss",
+        dismissLabel: (label: string) => `Dismiss "${label}"`,
+        dismissed: (label: string) => `"${label}" won't be listed again`,
+      },
+      changes: {
+        heading: "What changed?",
+        intro: (noun: string) =>
+          `What the system changed on its own, newest first. Undo anything: it won't do the same to that ${noun} again.`,
+        none: "No changes yet. The learning loops run nightly.",
+        undo: "Undo",
+        undoLabel: (what: string) => `Undo: ${what}`,
+        undone: "Undone",
+        undoneToast: "Undone. The system won't make that change again.",
+        undoFailed: "Couldn't undo that. Nothing changed.",
+        showMore: "Show more",
+        loadingMore: "Loading…",
+        actions: {
+          archive: (code: string) => `Archived ${code}`,
+          demote: (code: string) => `Marked ${code} low confidence`,
+          promote: (code: string) => `Raised ${code} back to standard confidence`,
+          learn_query: (code: string) => `Taught ${code} a new way to be found`,
+          merge: (code: string, noun: string) => `Merged ${code} into another ${noun}`,
+          promote_setup: () => "Changed how this collection is searched",
+          rollback_setup: () => "Put the previous search setup back",
+        } as Record<string, (code: string, noun: string) => string>,
+        unknownAction: (action: string, code: string | null) =>
+          code ? `${action} on ${code}` : action,
+        anEntry: (noun: string) => `a ${noun}`,
+      },
+      owners: {
+        heading: "For owners",
+        intro: (nounPlural: string) =>
+          `Written ${nounPlural} that keep being shown but never help. The system never rewrites or archives them, so whether to rewrite one is up to its owner.`,
+        none: (nounPlural: string) => `No written ${nounPlural} stand out as unhelpful.`,
+        stats: (surfaced: number, offTopic: number, judged: number) =>
+          `Shown ${surfaced} ${surfaced === 1 ? "time" : "times"} · judged off-topic ${offTopic} of ${judged}`,
+      },
+    },
+    connect: {
+      button: "Connect Claude Code",
+      title: "Connect Claude Code",
+      intro:
+        "Lets engineers' Claude Code search this library while it works, and cite what it used.",
+      introKeys:
+        "Keys are personal and read-only. They reach only what engineers may read: nothing clinical, learner-facing or organisation-specific.",
+      createHeading: "Create a key",
+      labelLabel: "Name it after the machine it's for",
+      labelPlaceholder: "My laptop",
+      create: "Create key",
+      creating: "Creating…",
+      createFailed: "Couldn't create a key. Nothing changed.",
+      newKeyHeading: (label: string) => `Your key for ${label}`,
+      newKeyWarning: "Copy it now. You won't see this key again.",
+      copyKey: "Copy key",
+      copied: "Copied",
+      copyFailed: "Couldn't copy. Select the text and copy it yourself.",
+      done: "I've copied it",
+      shellHeading: "Set these in your shell",
+      shellHelp:
+        "Add both lines to your shell profile, then restart Claude Code. Never commit either.",
+      keyPlaceholder: "<your key>",
+      copyCommands: "Copy both lines",
+      keysHeading: "Your keys",
+      noKeys: "No keys yet.",
+      created: (date: string) => `Created ${date}`,
+      lastUsed: (date: string) => `last used ${date}`,
+      neverUsed: "never used",
+      revoke: "Revoke",
+      revokeLabel: (label: string) => `Revoke ${label}`,
+      revoked: (label: string) => `${label} revoked`,
     },
   },
 };

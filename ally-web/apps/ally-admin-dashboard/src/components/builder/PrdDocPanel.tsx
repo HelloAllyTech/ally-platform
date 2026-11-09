@@ -17,6 +17,8 @@ import { en } from "@constants";
 import { BuilderChatMessage, BuilderPrdDocument, BuilderPrdReadiness } from "@types";
 import { asAgentText, asAgentTextList } from "@utils";
 
+import { CitedText, prdMarkdownComponents } from "./CitationChip";
+import { linkCitations } from "./prdCitations";
 import { downloadPrdMarkdown, downloadPrdPdf, PrdExportMeta } from "./prdExport";
 import { PrdReviewFindings } from "./PrdReviewFindings";
 import { ReadinessRing } from "./ReadinessRing";
@@ -25,7 +27,6 @@ import {
   BUILDER_EASING,
   prefersReducedMotion,
 } from "../../pages/Builder/builderMotion";
-import { sharedMarkdownComponents } from "../markdown/markdownComponents";
 
 /**
  * Every list in this panel is written by the agent, so none of it can be
@@ -253,13 +254,14 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
 
   // Takes `unknown`, not `string`: every markdown section on this panel is
   // agent-written, and one that arrived as an object used to reach
-  // ReactMarkdown and throw.
+  // ReactMarkdown and throw. Citations such as `[FP-0142]` render as chips that open the
+  // principle in the Context Library; the exports keep the text as written.
   const renderMarkdown = (raw: unknown) => {
     const value = asAgentText(raw);
     return value.trim() ? (
       <div className="prose prose-sm mt-1 max-w-none text-sm text-typography-800">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={sharedMarkdownComponents}>
-          {value}
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={prdMarkdownComponents}>
+          {linkCitations(value)}
         </ReactMarkdown>
       </div>
     ) : (
@@ -385,7 +387,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-typography-700">
-                      {asAgentText(requirement.description)}
+                      <CitedText text={asAgentText(requirement.description)} />
                     </p>
                     {criteria.length > 0 && (
                       <>
@@ -394,7 +396,9 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
                         </p>
                         <ul className="mt-0.5 list-disc pl-5 text-sm text-typography-700">
                           {criteria.map((criterion, index) => (
-                            <li key={index}>{criterion}</li>
+                            <li key={index}>
+                              <CitedText text={criterion} />
+                            </li>
                           ))}
                         </ul>
                       </>
@@ -429,7 +433,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
                     </Tag>
                   </span>
                   <span className="min-w-0 flex-1 text-sm text-typography-700">
-                    {asAgentText(assumption.text)}
+                    <CitedText text={asAgentText(assumption.text)} />
                   </span>
                 </li>
               ))}
@@ -470,7 +474,9 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
           {openQuestions.length ? (
             <ul className="mt-1 list-disc pl-5 text-sm text-typography-700">
               {openQuestions.map((question, index) => (
-                <li key={index}>{question}</li>
+                <li key={index}>
+                  <CitedText text={question} />
+                </li>
               ))}
             </ul>
           ) : (

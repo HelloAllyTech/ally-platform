@@ -293,3 +293,148 @@ export interface ContextSearchRequest {
   collectionId?: string;
   explain?: boolean;
 }
+
+/* ── Insights and the learning loops ─────────────────────────────────── */
+
+/** The nightly learning loops. Each one can be paused per collection. */
+export type ContextLoop =
+  | "judge"
+  | "query_learning"
+  | "effectiveness"
+  | "curator"
+  | "gaps"
+  | "tuning"
+  | "rollback";
+
+/** What a loop did. Each one can be undone. */
+export type ContextLoopActionType =
+  | "archive"
+  | "demote"
+  | "promote"
+  | "learn_query"
+  | "promote_setup"
+  | "rollback_setup"
+  | "merge";
+
+/** The retrieval settings a collection searches with (the profile's `RetrievalDefaults`). */
+export interface ContextSearchSetup {
+  weights: { bm25: number; statement: number; situations: number };
+  rerank: boolean;
+  /** MMR λ: 1 is pure relevance, lower spreads results out. */
+  mmrLambda: number;
+  contextualise: boolean;
+  /** Reciprocal rank fusion constant; absent means 60. */
+  rrfK?: number;
+}
+
+/** `GET collections/:id/loops`, and what `PUT` returns. */
+export interface ContextLoopSettings {
+  collectionId?: string;
+  /** 0–1: the share of live searches the judge grades. */
+  judgeSampleRate: number;
+  paused: string[];
+  loops: string[];
+  searchSetup: ContextSearchSetup | null;
+  searchSetupIsDefault: boolean;
+  setupPromotedAt: string | null;
+}
+
+export interface ContextLoopSettingsPatch {
+  judgeSampleRate?: number;
+  paused?: string[];
+}
+
+/** One entry in "What changed?": something a loop did, newest first. */
+export interface ContextLoopChange {
+  id: string;
+  loop: string;
+  action: string;
+  /** The entry it changed; null for collection-wide changes (search setup). */
+  code: string | null;
+  /** The loop's own one-line explanation. */
+  reason: string;
+  evidence: Record<string, unknown> | null;
+  createdAt: string;
+  undoneAt: string | null;
+  canUndo: boolean;
+}
+
+/** A topic searches keep asking about and the library can't answer. */
+export interface ContextGapTopic {
+  id: string;
+  label: string;
+  kind: "platform" | "organisation";
+  queryCount: number;
+  /** Never sensitive queries: those appear only through the label. */
+  exampleQueries: string[];
+  lastSeenAt: string | null;
+  action: "upload_documents" | "add_entries";
+}
+
+export interface ContextUseCaseUsage {
+  useCase: string;
+  surfaced: number;
+  read: number;
+  cited: number;
+  applied: number;
+  rejectedCitations: number;
+}
+
+export interface ContextWeeklyPrecision {
+  week: string;
+  /** Null when nothing was judged that week. */
+  precision: number | null;
+  judged: number;
+}
+
+/** A written (or imported, synced) entry that is shown but never helps. */
+export interface ContextNeverUseful {
+  code: string;
+  statement: string;
+  origin: ContextChunkOrigin;
+  surfaced: number;
+  judged: number;
+  judgedOffTopic: number;
+}
+
+export interface ContextInsights {
+  collectionId?: string;
+  days?: number;
+  helping: {
+    /** Null until something has been judged. */
+    precision: number | null;
+    judgedResults: number;
+    judgedSearches: number;
+    holdoutNdcg: number | null;
+    holdoutSearches: number;
+    weekly: ContextWeeklyPrecision[];
+    byUseCase: ContextUseCaseUsage[];
+  };
+  missing: ContextGapTopic[];
+  changes: ContextLoopChange[];
+  forOwners: ContextNeverUseful[];
+  settings: ContextLoopSettings;
+}
+
+export interface ContextChangesQuery {
+  collectionId: string;
+  /** ISO timestamp: changes strictly older than this. */
+  before?: string;
+  limit?: number;
+}
+
+/* ── Reader keys (Connect Claude Code) ───────────────────────────────── */
+
+/** One of your read-only keys. The key itself is never listed, only its prefix. */
+export interface ContextReaderKey {
+  id: string;
+  label: string;
+  keyPrefix: string;
+  lastUsedAt?: string | null;
+  createdAt?: string;
+}
+
+/** `POST reader-keys`: the only response that ever carries the key. */
+export interface ContextReaderKeyCreated extends ContextReaderKey {
+  key: string;
+}

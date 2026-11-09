@@ -196,6 +196,13 @@ describe("BuilderRoom", () => {
     expect(screen.getByText("Writing code")).toBeInTheDocument();
   });
 
+  it("links the header to First Principles in the Context Library", () => {
+    renderRoom();
+    expect(
+      screen.getByRole("link", { name: "Open First Principles in the Context Library" }),
+    ).toHaveAttribute("href", "/context-library?collection=first_principles");
+  });
+
   it("sends with the layout and time-to-decide, offers Undo, and Z takes it back", async () => {
     renderRoom();
     await act(async () => {
