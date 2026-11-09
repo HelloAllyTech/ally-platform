@@ -56,6 +56,7 @@ import { CourseDiscussionModule } from './course-discussion/course-discussion.mo
 import { ProgressModule } from './progress/progress.module';
 import { CohortModule } from './cohort/cohort.module';
 import { ScenarioCoverImageLibraryModule } from './scenario-cover-image-library/scenario-cover-image-library.module';
+import { ImageStudioModule } from './image-studio/image-studio.module';
 import { ComfortAudioModule } from './comfort-audio/comfort-audio.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
@@ -144,6 +145,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     LlmModule,
     ConversationalGuardrailsModule,
     ScenarioCoverImageLibraryModule,
+    ImageStudioModule,
     ComfortAudioModule,
     KnowledgeBaseModule,
     WhatsAppModule,

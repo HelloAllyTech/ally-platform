@@ -12,6 +12,7 @@ import {
   useGetCharacterLibraryEnabledQuery,
 } from "@api";
 import { Sidebar, AccessDenied, ErrorBoundary } from "@components";
+import { ColorModeToggle } from "@components/color-mode-toggle/ColorModeToggle";
 import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
@@ -253,7 +254,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
             scrollbar and empty white space you can scroll into below the page. */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* The app-wide top bar. On a phone it carries the menu button; from md up it exists for the
-              global idea-capture mic, pinned top-right on every screen. */}
+              global idea-capture mic and the light/dark switch, pinned top-right on every screen. */}
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:h-12 md:px-4">
             {/* 44px target: the only way into navigation on a phone. */}
             <button
@@ -267,7 +268,8 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
             >
               <Menu size={24} aria-hidden="true" />
             </button>
-            <div className="ml-auto flex items-center">
+            <div className="ml-auto flex items-center gap-1">
+              <ColorModeToggle />
               <IdeaCaptureLauncher />
             </div>
           </div>

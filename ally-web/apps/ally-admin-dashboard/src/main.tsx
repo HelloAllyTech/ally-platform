@@ -7,6 +7,7 @@ import { Provider } from "react-redux";
 import { initAnalytics, AnalyticsProvider } from "@ally-ui-mono/ui-shared";
 
 import App from "./App";
+import { initColorMode } from "./hooks/useColorMode";
 import { store } from "./store";
 // Tailwind + global serif base rules first, then the Carbon design-language
 // layer (tokens + component styles) so it cascades on top of Tailwind's reset.
@@ -18,6 +19,7 @@ const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement)
 const GOOGLE_AUTH_CLIENT_ID = import.meta.env.VITE_GOOGLE_AUTH_CLIENT_ID || "";
 
 initAnalytics();
+initColorMode();
 
 const AppWithProviders = GOOGLE_AUTH_CLIENT_ID ? (
   <GoogleOAuthProvider clientId={GOOGLE_AUTH_CLIENT_ID}>

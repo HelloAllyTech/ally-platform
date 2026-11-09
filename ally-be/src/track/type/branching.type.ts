@@ -95,7 +95,20 @@ export interface BranchingScenarioContent {
   settings?: BranchingScenarioSettings;
   startNodeId: string;
   nodes: BranchingNode[];
+  /**
+   * Authoring only (Image Studio): the Character Library characters who
+   * appear in this story's scene images, so every generated scene keeps them
+   * recognisable. Learners never read it.
+   */
+  imageCast?: BranchingImageCastMember[];
 }
+
+export interface BranchingImageCastMember {
+  characterId: string;
+  name: string;
+}
+
+export const BRANCHING_MAX_IMAGE_CAST = 6;
 
 export function isBranchingEnding(node: BranchingNode): boolean {
   return !node.choices || node.choices.length === 0;
