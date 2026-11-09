@@ -13,10 +13,12 @@ For each candidate, answer in JSON only:
       "specificity": 1,
       "actionability": 1,
       "names": ["any person or organisation named anywhere in the candidate"],
-      "checks": {"check name from the request": "pass | fail | doubt"},
+      "checks": {"each check name listed in the request's checks": "pass | fail | doubt"},
       "note": "one short reason when anything fails"
     }
   ]
 }
 
 Scores are 1 (vague) to 5 (specific and directly usable). "supported" means the part states or clearly implies it; "partial" means it goes beyond the part; "unsupported" means the part does not say it.
+
+Each check in the request's "checks" is defined in its "checkDefinitions": grade it against that definition, not against what the name suggests. Answer "doubt" when you cannot tell.

@@ -89,7 +89,7 @@ retrieval technique.
 Setup, once per engineer:
 
 1. In the admin dashboard, open **Context Library → Connect Claude Code** and create a read-only
-   key. The sheet shows both values and has a **Test connection** button.
+   key. The sheet shows both values; the key is shown once, so copy it then.
 2. Export `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` in your shell profile, then
    start a new agent session and approve the `context-library` server when it prompts.
 

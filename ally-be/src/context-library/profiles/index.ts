@@ -1,7 +1,9 @@
 import { ClCollectionId } from '../enum/context-library.enum';
+import { CHARACTER_INSIGHTS_PROFILE } from './character-insights.profile';
 import { FIRST_PRINCIPLES_PROFILE } from './first-principles.profile';
 import { CollectionProfile } from './profile.types';
 
+export * from './critic-checks';
 export * from './profile.types';
 export * from './profile.util';
 
@@ -13,6 +15,7 @@ export const COLLECTION_PROFILES: Partial<
   Record<ClCollectionId, CollectionProfile>
 > = {
   [ClCollectionId.FIRST_PRINCIPLES]: FIRST_PRINCIPLES_PROFILE,
+  [ClCollectionId.CHARACTER_INSIGHTS]: CHARACTER_INSIGHTS_PROFILE,
 };
 
 export function getProfile(

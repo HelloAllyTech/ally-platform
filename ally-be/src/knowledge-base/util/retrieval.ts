@@ -1,6 +1,12 @@
 import { KnowledgeChunkPassage } from 'src/ai/dto/knowledge.dto';
 import { KbRetrievalOutcome } from '../enum/knowledge-base.enum';
 
+/** What shaping did to one candidate, and why. */
+export interface ShapingDecision {
+  passage: KnowledgeChunkPassage;
+  outcome: KbRetrievalOutcome;
+}
+
 /**
  * Shape a raw similarity ranking into the passages a grounded answer should actually see.
  *
@@ -18,36 +24,17 @@ import { KbRetrievalOutcome } from '../enum/knowledge-base.enum';
  *    document. This targets the overlap the chunker put there, not merely equal text.
  *  - per-document cap: no single document may supply more than `perDocumentLimit` passages.
  *
- * The cap is a breadth guarantee, and it is the more important of the two here. A character
- * grounded entirely in one handbook is that handbook's archetype; two or three sources
- * disagreeing slightly is what a real person's details look like. It costs recall on the
- * genuine case where one source is the only source, which is the right trade for material whose
- * purpose is variety.
- */
-export function shapePassages(
-  passages: KnowledgeChunkPassage[],
-  options: { limit: number; perDocumentLimit: number },
-): KnowledgeChunkPassage[] {
-  return shapeWithDecisions(passages, options).kept;
-}
-
-/** What shaping did to one candidate, and why. */
-export interface ShapingDecision {
-  passage: KnowledgeChunkPassage;
-  outcome: KbRetrievalOutcome;
-}
-
-/**
- * `shapePassages`, plus a verdict on every candidate it was given.
+ * The cap is a breadth guarantee: an answer grounded entirely in one document is that
+ * document's view, and two or three sources is what a considered answer looks like. It costs
+ * recall on the genuine case where one source is the only source.
  *
+ * Returns the survivors (`kept`) and a verdict on every candidate it was given (`decisions`).
  * The retrieval log records the dropped candidates as well as the survivors, because the drops
  * are where the diagnostic value is. A corpus whose shaping constantly fires
  * DROPPED_SPAN_OVERLAP is a corpus whose chunk profile is cutting mid-thought; one constantly
  * firing DROPPED_DOCUMENT_CAP has one document answering everything. Neither is visible from
  * the survivors alone — the results look fine, because they are the ones that looked fine.
- *
- * Deliberately the same walk as before rather than a second implementation: `shapePassages`
- * delegates here, so the log can never describe a shaping the caller didn't get.
+ * One walk produces both, so the log can never describe a shaping the caller didn't get.
  */
 export function shapeWithDecisions(
   passages: KnowledgeChunkPassage[],
@@ -102,21 +89,4 @@ function overlaps(
   passage: KnowledgeChunkPassage,
 ): boolean {
   return passage.char_start < span.end && span.start < passage.char_end;
-}
-
-/**
- * Merge a top-up pass into a first pass, keeping the first pass's ordering ahead of it and
- * dropping any chunk both passes returned.
- *
- * The two passes are separate searches over disjoint document sets, so their similarity scores
- * are comparable but their ranks are not — interleaving by score would undo the boost the split
- * exists to create. Preferred material stays ahead by construction; the top-up only fills the
- * space preferred material did not.
- */
-export function concatDistinct(
-  first: KnowledgeChunkPassage[],
-  second: KnowledgeChunkPassage[],
-): KnowledgeChunkPassage[] {
-  const seen = new Set(first.map((passage) => passage.chunk_id));
-  return [...first, ...second.filter((p) => !seen.has(p.chunk_id))];
 }

@@ -240,7 +240,7 @@ describe('KnowledgeBaseService — the Ally guide library', () => {
     it('still answers the admin preview, asked for by name', async () => {
       documentRepository.retrievableIds = jest
         .fn()
-        .mockResolvedValue({ preferred: [], rest: [GLOBAL_DOC] });
+        .mockResolvedValue([GLOBAL_DOC]);
 
       await service.search({ corpus: LIB, query: 'q' } as any, {
         consumer: KbRetrievalConsumer.ADMIN_PREVIEW,

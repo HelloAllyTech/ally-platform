@@ -12,14 +12,15 @@ import {
   MAX_CHARACTER_KNOWLEDGE_SOURCES_COUNT,
   MAX_CHARACTER_LINGUISTIC_STYLE_SAMPLES_COUNT,
 } from '../constants/scenario-character.constants';
-import { KnowledgeChunkPassage } from 'src/ai/dto/knowledge.dto';
-import { KbSearchDto } from 'src/knowledge-base/dto/knowledge-base.dto';
+import { ClUseCase } from 'src/context-library/enum/context-library.enum';
 import {
-  KbCharacterTopic,
-  KbCorpus,
-  KbRetrievalConsumer,
-} from 'src/knowledge-base/enum/knowledge-base.enum';
-import { KnowledgeBaseService } from 'src/knowledge-base/service/knowledge-base.service';
+  CHARACTER_INSIGHT_ASPECTS,
+  CharacterInsightAspect,
+} from 'src/context-library/profiles/character-insights.profile';
+import {
+  ContextRetrievalService,
+  ContextSearchResult,
+} from 'src/context-library/service/context-retrieval.service';
 import {
   closingToolDefinition,
   withValidatedAsk,
@@ -30,13 +31,13 @@ import {
 } from '../util/character-interview-turn.util';
 
 /**
- * How many served chunk ids a session carries.
+ * How many served insight codes a session carries.
  *
  * A ~25-question interview searching a few times per phase will not approach this; the cap
  * exists so a pathological loop cannot grow an unbounded array on a row rewritten every turn.
- * Oldest ids fall off first, which at worst re-sends a passage from early in the interview.
+ * Oldest codes fall off first, which at worst re-sends an insight from early in the interview.
  */
-const MAX_SERVED_CHUNK_IDS = 200;
+const MAX_SERVED_CODES = 200;
 
 /** Mutable per-turn context threaded through tool executions. */
 export interface InterviewToolExecutionContext {
@@ -181,7 +182,7 @@ export class CharacterInterviewToolsService {
   constructor(
     private readonly sessionRepository: CharacterInterviewSessionRepository,
     private readonly dataSource: DataSource,
-    private readonly knowledgeBaseService: KnowledgeBaseService,
+    private readonly retrieval: ContextRetrievalService,
   ) {}
 
   /**
@@ -277,20 +278,25 @@ export class CharacterInterviewToolsService {
       {
         name: 'search_corpus',
         description:
-          'Search the character-library corpus — clinical and lived-experience ' +
-          'reference material an Ally admin has curated — for passages that can ' +
-          'make the next question specific or the draft real. Read-only; the ' +
-          'turn does NOT end, so search and then continue in the same turn.\n\n' +
+          'Search Character Insights — short, general insights into how people in a ' +
+          'particular situation live, feel and talk, distilled from clinical and ' +
+          'lived-experience material an Ally admin has curated — for what can make the ' +
+          'next question specific or the draft real. Read-only; the turn does NOT end, so ' +
+          'search and then continue in the same turn.\n\n' +
           'Search when a phase turns on knowledge you should not invent: how a ' +
           'condition actually presents, what a day in some life is really like, ' +
           'how someone in that situation actually talks. Query in your own words, ' +
           'as a full question — not keywords. Pass `topics` for the part of the ' +
-          'person you are working on; it boosts material a curator mapped there ' +
-          'without hiding anything else.\n\n' +
-          'An EMPTY result is a real, useful answer and not an error to retry. It ' +
-          'means the corpus does not cover this. Do not rephrase and search again ' +
-          'more than once, and NEVER present invented detail as though it came ' +
-          'from the corpus — say what you are drawing on instead.',
+          'person you are working on; it boosts insights about that part without ' +
+          'hiding anything else.\n\n' +
+          'Each result is an insight card with a code (e.g. CI-0042): the insight, what ' +
+          'it looks like, how it might sound, and the stereotype to avoid. Insights are ' +
+          'general, never about a real person — adapt them to this character, never copy ' +
+          "a voice sample as the character's own words, and never present one as a fact " +
+          'about everyone in that situation.\n\n' +
+          'An EMPTY result is a real, useful answer and not an error to retry. Do not ' +
+          'rephrase and search again more than once, and NEVER present invented detail ' +
+          'as though it came from the library — say what you are drawing on instead.',
         input_schema: {
           type: 'object',
           properties: {
@@ -307,13 +313,7 @@ export class CharacterInterviewToolsService {
                 'restricts.',
               items: {
                 type: 'string',
-                enum: [
-                  'identity',
-                  'life_context',
-                  'inner_life',
-                  'history_and_presenting_concern',
-                  'speech_and_language',
-                ],
+                enum: [...CHARACTER_INSIGHT_ASPECTS],
               },
             },
           },
@@ -573,23 +573,22 @@ export class CharacterInterviewToolsService {
   }
 
   /**
-   * Retrieve grounding passages for the interview, and remember what this session has
-   * already been shown.
+   * Retrieve Character Insights for the interview, and remember what this session has already
+   * been shown.
    *
    * TWO THINGS ARE DELIBERATE HERE.
    *
    * An empty result comes back as ok:TRUE with an explicit note, never ok:false. Every other
    * tool uses ok:false to mean "you got this wrong, repair and retry", and the model obliges —
-   * so reporting "the corpus has nothing on this" as a failure would send it into a rephrase
-   * loop against a corpus that genuinely does not cover the topic, burning turns to arrive
-   * back where it started. "I found nothing" is a correct answer to a good question.
+   * so reporting "nothing matched" as a failure would send it into a rephrase loop against a
+   * library that genuinely does not cover the topic, burning turns to arrive back where it
+   * started. "I found nothing" is a correct answer to a good question.
    *
-   * A passage this session has already been given comes back as a REFERENCE rather than its
-   * full text. The interview loop resends the entire transcript every turn, so an 800-token
-   * passage retrieved twice is not paid for twice — it is paid for on every turn from then
-   * on, twice over. Tracking the served chunk ids costs a jsonb write and removes that
-   * entirely; the model still learns the passage matched its new query, which is the part
-   * carrying information.
+   * An insight this session has already been given comes back as a REFERENCE (its code) rather
+   * than its card. The interview loop resends the entire transcript every turn, so a card
+   * retrieved twice is not paid for twice — it is paid for on every turn from then on, twice
+   * over. Tracking the served codes costs a jsonb write and removes that entirely; the model
+   * still learns the insight matched its new query, which is the part carrying information.
    */
   private async executeSearchCorpus(
     input: Record<string, any>,
@@ -599,102 +598,109 @@ export class CharacterInterviewToolsService {
     if (!query) {
       return {
         modelResult: { ok: false, error: 'A query is required to search.' },
-        summary: 'Corpus search skipped - no query',
+        summary: 'Insight search skipped - no query',
       };
     }
 
-    const topics = this.normalizeCharacterTopics(input?.topics);
+    const topics = this.normalizeAspects(input?.topics);
 
-    let passages: KnowledgeChunkPassage[];
+    let results: ContextSearchResult[];
+    let noConfidentMatch = false;
     try {
-      ({ passages } = await this.knowledgeBaseService.search(
-        {
-          corpus: KbCorpus.CHARACTER_LIBRARY,
-          query,
-          characterTopics: topics,
-        } as KbSearchDto,
-        {
-          consumer: KbRetrievalConsumer.INTERVIEW_AGENT,
-          sessionId: context.session.id,
-          userId: context.userId,
-        },
-      ));
+      ({ results, noConfidentMatch } = await this.retrieval.search({
+        useCase: ClUseCase.CHARACTER_INTERVIEW,
+        queries: [query],
+        // Soft: a boost for insights about these aspects, never an exclusion.
+        facets: topics.length ? { aspect: topics } : undefined,
+        sessionId: context.session.id,
+        queryOrigin: 'agent_tool',
+      }));
     } catch (error) {
-      // The interview is worth more than its grounding. A vector store that is down must
-      // degrade the questions, not end the session - and the model has to be TOLD that is
-      // what happened, or it will read an empty result as "the corpus has nothing" and say
-      // so to the admin, which would be a lie about the library's contents.
+      // The interview is worth more than its grounding. A library that is down must degrade
+      // the questions, not end the session - and the model has to be TOLD that is what
+      // happened, or it will read an empty result as "nothing matched" and say so to the
+      // admin, which would be a claim about the library's contents it cannot make. The query
+      // is an admin describing a person, so it is never logged.
       const message = error instanceof Error ? error.message : 'unknown error';
       this.logger.warn(
-        `Interview session ${context.session.id}: corpus search failed - ${message}`,
+        `Interview session ${context.session.id}: insight search failed - ${message}`,
       );
       return {
         modelResult: {
           ok: false,
           error:
-            'The reference corpus could not be reached, so this search returned ' +
-            'nothing. This is NOT evidence the corpus lacks the material - do not ' +
+            'The insight library could not be reached, so this search returned ' +
+            'nothing. That says nothing about what the library holds - do not ' +
             'tell the admin it has nothing. Carry on from what you already know.',
         },
-        summary: 'Corpus search failed (retrieval unavailable)',
+        summary: 'Insight search failed (retrieval unavailable)',
       };
     }
 
-    const alreadyServed = new Set(this.servedChunkIds(context.session));
+    const alreadyServed = new Set(this.servedCodes(context.session));
     const fresh: string[] = [];
 
-    const results = passages.map((passage) => {
-      const seen = alreadyServed.has(passage.chunk_id);
-      if (!seen) fresh.push(passage.chunk_id);
+    const insights = results.map((result) => {
+      const code = result.chunk.code;
+      const seen = alreadyServed.has(code);
+      if (!seen) fresh.push(code);
       return {
-        chunkId: passage.chunk_id,
-        document: passage.document_title,
-        ...(passage.section_path ? { section: passage.section_path } : {}),
-        similarity: Number(passage.similarity.toFixed(4)),
+        code,
+        band: result.band,
         ...(seen
           ? {
-              text: null,
+              card: null,
               note: 'Already provided earlier in this interview - reuse it from above rather than asking for it again.',
             }
-          : { text: passage.text }),
+          : { card: result.card }),
       };
     });
 
     if (fresh.length) {
-      await this.rememberServedChunks(context.session, fresh);
+      await this.rememberServedCodes(context.session, fresh);
     }
 
     return {
       modelResult: {
         ok: true,
-        passages: results,
-        ...(results.length
-          ? {}
+        insights,
+        ...(insights.length
+          ? noConfidentMatch
+            ? {
+                note:
+                  'No confident match: the closest insight is below, labelled low. ' +
+                  'Use it only if it truly fits this character.',
+              }
+            : {}
           : {
               note:
-                'The corpus has nothing on this. That is a real answer, not a ' +
-                'failure - draw on what the admin has told you, and do not imply ' +
-                'any of it came from reference material.',
+                'No insight matched this. That is a real answer, not a failure - ' +
+                'draw on what the admin has told you, and do not imply any of it ' +
+                'came from reference material.',
             }),
       },
-      summary: results.length
-        ? `Corpus: ${results.length} passage(s) for "${query}"`
-        : `Corpus: nothing found for "${query}"`,
+      summary: insights.length
+        ? `Insights: ${insights.length} for "${query}"`
+        : `Insights: nothing matched "${query}"`,
     };
   }
 
-  /** Only the topics the schema defines; anything else is dropped rather than sent on. */
-  private normalizeCharacterTopics(raw: unknown): KbCharacterTopic[] {
+  /** Only the aspects the schema defines; anything else is dropped rather than sent on. */
+  private normalizeAspects(raw: unknown): CharacterInsightAspect[] {
     if (!Array.isArray(raw)) return [];
-    const allowed = new Set<string>(Object.values(KbCharacterTopic));
-    return raw
-      .map((value) => String(value ?? '').trim())
-      .filter((value) => allowed.has(value)) as KbCharacterTopic[];
+    const allowed = new Set<string>(CHARACTER_INSIGHT_ASPECTS);
+    return Array.from(
+      new Set(
+        raw
+          .map((value) => String(value ?? '').trim())
+          .filter((value) => allowed.has(value)),
+      ),
+    ) as CharacterInsightAspect[];
   }
 
-  private servedChunkIds(session: CharacterInterviewSession): string[] {
-    const served = session.metadata?.servedChunkIds;
-    return Array.isArray(served) ? served.map((id) => String(id)) : [];
+  private servedCodes(session: CharacterInterviewSession): string[] {
+    const served = session.metadata?.servedCodes;
+    return Array.isArray(served) ? served.map((code) => String(code)) : [];
   }
 
   /**
@@ -703,26 +709,26 @@ export class CharacterInterviewToolsService {
    * Read-modify-write on a jsonb column, safe here only because one interview turn runs at a
    * time per session - the orchestrator's loop is sequential and a session has a single
    * admin. Capped because the set is a token optimisation, not a record: an unbounded array
-   * on a hot row would eventually cost more to carry than the duplicate passages it saves.
+   * on a hot row would eventually cost more to carry than the duplicate insights it saves.
    */
-  private async rememberServedChunks(
+  private async rememberServedCodes(
     session: CharacterInterviewSession,
-    chunkIds: string[],
+    codes: string[],
   ): Promise<void> {
-    const merged = [...this.servedChunkIds(session), ...chunkIds].slice(
-      -MAX_SERVED_CHUNK_IDS,
+    const merged = [...this.servedCodes(session), ...codes].slice(
+      -MAX_SERVED_CODES,
     );
-    session.metadata = { ...(session.metadata ?? {}), servedChunkIds: merged };
+    session.metadata = { ...(session.metadata ?? {}), servedCodes: merged };
     try {
       await this.sessionRepository.update(
         { id: session.id },
         { metadata: session.metadata },
       );
     } catch (error) {
-      // Losing the set costs tokens, never correctness - the next search just resends a
-      // passage the model already has. Not worth failing a turn over.
+      // Losing the set costs tokens, never correctness - the next search just resends an
+      // insight the model already has. Not worth failing a turn over.
       this.logger.warn(
-        `Interview session ${session.id}: could not record served chunks - ${
+        `Interview session ${session.id}: could not record served insights - ${
           error instanceof Error ? error.message : 'unknown error'
         }`,
       );

@@ -6,8 +6,9 @@ to a COLLECTION rather than to a filter value.
 
 That resolution is the whole point. A leak BETWEEN corpora would rarely expose anyone's
 data; it would do something subtler and harder to notice, which is answer a health
-worker's clinical question out of material written to ground a fictional character.
-That reads as good clinical prose. (Leaks WITHIN a corpus are the other boundary: the
+worker's clinical question out of material written for another reader — a learner's
+course guide, or (before it was retired) the character interview's corpus. That reads as
+good clinical prose. (Leaks WITHIN a corpus are the other boundary: the
 Ally guide's library holds organisations' own protocols beside the global material, so
 its searches always carry an audience — see `ChunkAudience`.) The
 reasons for a collection per corpus rather than one collection plus a scope
@@ -28,7 +29,6 @@ class KbCorpus(str, Enum):
     kb_documents.corpus, so the two must not drift."""
 
     WHATSAPP_QA = "whatsapp_qa"
-    CHARACTER_LIBRARY = "character_library"
     # The Ally guide's library: material on becoming and being a helper, global or
     # one organisation's own. The one corpus here that is NOT Ally-global
     # throughout — see migration 008 for what that changes.
@@ -41,10 +41,19 @@ class KbCorpus(str, Enum):
 
 CORPUS_COLLECTIONS: dict[KbCorpus, str] = {
     KbCorpus.WHATSAPP_QA: VectorDBCollectionNames.KNOWLEDGE_CHUNKS,
-    KbCorpus.CHARACTER_LIBRARY: VectorDBCollectionNames.CHARACTER_CHUNKS,
     KbCorpus.ALLY_GUIDE_LIBRARY: VectorDBCollectionNames.GUIDE_LIBRARY_CHUNKS,
     KbCorpus.DEBRIEF_KNOWLEDGE: VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS,
 }
+
+
+#: Collections of corpora retired into ally-be's Context Library. Nothing reads or
+#: writes them. Each is dropped once, by ally-be's confirmed platform-admin retirement
+#: (DELETE /knowledge-chunks/retired-collection) after its documents have been distilled
+#: — never by a migration, because a migration runs on deploy, before anyone confirmed
+#: the import finished. The only names that route accepts.
+RETIRED_CORPUS_COLLECTIONS: frozenset[str] = frozenset(
+    {VectorDBCollectionNames.CHARACTER_CHUNKS}
+)
 
 
 def collection_for(corpus: KbCorpus) -> str:

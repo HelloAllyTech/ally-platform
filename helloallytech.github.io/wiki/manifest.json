@@ -26,7 +26,7 @@
         "environment"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1355,
+      "words": 1358,
       "url": "https://tech.helloally.ai/#/wiki/contributing/dev-setup.md",
       "skip_reason": ""
     },
@@ -74,7 +74,7 @@
         "context-library"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1691,
+      "words": 1705,
       "url": "https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md",
       "skip_reason": ""
     },
@@ -127,7 +127,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 12879,
+      "words": 12918,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -545,7 +545,7 @@
         "python"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 4096,
+      "words": 4070,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
       "skip_reason": ""
     },

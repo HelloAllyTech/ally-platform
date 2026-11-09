@@ -348,3 +348,56 @@ class TestGetChunkEndpoint(_ResolvedKeyAPITest):
 
     def test_get_chunk_rejects_non_uuid(self, client: TestClient):
         assert client.get("/api/v1/knowledge-chunks/not-a-uuid").status_code == 422
+
+
+class TestRetiredCollectionEndpoint(_ResolvedKeyAPITest):
+    """Dropping a retired corpus's collection: confirmed, and never a live corpus."""
+
+    DROP = "app.core.vector_db.weaviate.WeaviateDB.delete_collection"
+    URL = "/api/v1/knowledge-chunks/retired-collection"
+
+    @pytest.mark.parametrize("deleted", [True, False])
+    def test_drops_the_retired_collection(self, client: TestClient, deleted):
+        with patch(self.DROP) as mock_drop:
+            mock_drop.return_value = deleted
+            response = client.delete(
+                self.URL,
+                params={"collection": "CharacterChunk", "confirm": "CharacterChunk"},
+            )
+
+        assert response.status_code == 200
+        assert response.json() == {"deleted": deleted}
+        mock_drop.assert_called_once_with("CharacterChunk")
+
+    @pytest.mark.parametrize(
+        "name", ["KnowledgeChunk", "GuideLibraryChunk", "CtxFirstPrinciples_v1"]
+    )
+    def test_refuses_any_collection_that_is_not_retired(self, client, name):
+        with patch(self.DROP) as mock_drop:
+            response = client.delete(
+                self.URL, params={"collection": name, "confirm": name}
+            )
+
+        assert response.status_code == 400
+        mock_drop.assert_not_called()
+
+    @pytest.mark.parametrize("confirm", [None, "", "characterchunk"])
+    def test_requires_exact_confirmation(self, client, confirm):
+        params = {"collection": "CharacterChunk"}
+        if confirm is not None:
+            params["confirm"] = confirm
+        with patch(self.DROP) as mock_drop:
+            response = client.delete(self.URL, params=params)
+
+        assert response.status_code == 400
+        mock_drop.assert_not_called()
+
+    def test_unreachable_index_is_503(self, client):
+        with patch(self.DROP) as mock_drop:
+            mock_drop.side_effect = VectorDBDeleteFailedException("down")
+            response = client.delete(
+                self.URL,
+                params={"collection": "CharacterChunk", "confirm": "CharacterChunk"},
+            )
+
+        assert response.status_code == 503

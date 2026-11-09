@@ -308,11 +308,11 @@ describe('chunkDocument', () => {
 describe('per-corpus chunk profiles', () => {
   /**
    * Sizing differs because what reads the passage differs: a 1600-character WhatsApp reply
-   * grounds on one clinical idea, while a drafted character needs a whole observation held
+   * grounds on one clinical idea, while the Ally guide's protocols need a whole procedure held
    * together. The splitting hierarchy is deliberately NOT parameterised — a passage that
    * respects headings and sentences is right for both.
    */
-  const character = KB_CHUNK_PROFILES[KbCorpus.CHARACTER_LIBRARY];
+  const larger = KB_CHUNK_PROFILES[KbCorpus.ALLY_GUIDE_LIBRARY];
   const whatsapp = KB_CHUNK_PROFILES[KbCorpus.WHATSAPP_QA];
 
   it('defaults to the WhatsApp profile when no profile is given', () => {
@@ -322,20 +322,20 @@ describe('per-corpus chunk profiles', () => {
     );
   });
 
-  it('produces fewer, larger chunks for the character library', () => {
+  it('produces fewer, larger chunks for a larger profile', () => {
     const text = longProse(40);
     const qa = chunkDocument(doc({ text }), whatsapp);
-    const library = chunkDocument(doc({ text }), character);
+    const library = chunkDocument(doc({ text }), larger);
 
     expect(library.length).toBeLessThan(qa.length);
     const largest = Math.max(...library.map((c) => c.tokenCount));
     expect(largest).toBeGreaterThan(whatsapp.targetTokens);
-    expect(largest).toBeLessThanOrEqual(character.maxTokens);
+    expect(largest).toBeLessThanOrEqual(larger.maxTokens);
   });
 
   it('keeps every invariant under the larger profile', () => {
     const text = longProse(40);
-    const chunks = chunkDocument(doc({ text }), character);
+    const chunks = chunkDocument(doc({ text }), larger);
 
     expect(chunks.length).toBeGreaterThan(1);
     chunks.forEach((chunk, i) => {
@@ -358,7 +358,7 @@ describe('per-corpus chunk profiles', () => {
           { path: 'Speech', start: text.indexOf('Speech'), end: text.length },
         ],
       }),
-      character,
+      larger,
     );
 
     expect(chunks.length).toBeGreaterThan(1);
@@ -368,7 +368,7 @@ describe('per-corpus chunk profiles', () => {
   });
 
   it('overlaps neighbours in every profile, so a straddling thought survives', () => {
-    const chunks = chunkDocument(doc({ text: longProse(40) }), character);
+    const chunks = chunkDocument(doc({ text: longProse(40) }), larger);
     expect(chunks.length).toBeGreaterThan(1);
     // Adjacent chunks share characters — which is exactly why retrieval has to drop
     // span-overlapping neighbours (see util/retrieval.ts).

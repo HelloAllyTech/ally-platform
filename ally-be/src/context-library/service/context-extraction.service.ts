@@ -32,7 +32,12 @@ import {
   ClSegmentStatus,
   ClSourceStatus,
 } from '../enum/context-library.enum';
-import { CollectionProfile, normaliseTag, requireProfile } from '../profiles';
+import {
+  CRITIC_CHECKS,
+  CollectionProfile,
+  normaliseTag,
+  requireProfile,
+} from '../profiles';
 import {
   GateCandidate,
   GateReason,
@@ -70,8 +75,15 @@ interface CriticVerdict {
   note?: string;
 }
 
-/** Profile checks whose failure rejects outright; a doubt only lowers confidence. */
-const REJECTING_CHECKS = new Set(['identifiability', 'stereotype']);
+/**
+ * Profile checks whose failure rejects outright. Any other failed check, and any doubt, only
+ * lowers confidence — except on a sensitive chunk, where every failure and every doubt rejects.
+ */
+const REJECTING_CHECKS = new Set([
+  'identifiability',
+  'stereotype',
+  'treatment_protocol',
+]);
 /** Learned platitude anchors are reloaded this often, so a curator archive reaches the gate. */
 const PLATITUDE_TTL_MS = 60 * 60 * 1000;
 
@@ -427,6 +439,13 @@ export class ContextExtractionService {
         noun: profile.noun,
         statementMaxChars: profile.statementMaxChars,
         checks: profile.extraction.criticChecks,
+        // What each check tests, so the critic grades against a stated rule, not a name.
+        checkDefinitions: Object.fromEntries(
+          profile.extraction.criticChecks.map((name) => [
+            name,
+            CRITIC_CHECKS[name] ?? name,
+          ]),
+        ),
         candidates: afterPlatitude.map((s, index) => ({
           index,
           ...s.candidate,
@@ -538,7 +557,9 @@ export class ContextExtractionService {
     if (verdict.grounded === 'partial') low = true;
     if ((verdict.specificity ?? 3) < 3 || (verdict.actionability ?? 3) < 3)
       low = true;
-    if (Object.values(verdict.checks ?? {}).includes('doubt')) low = true;
+    // A failed check that does not reject on its own still means the critic found a problem.
+    const results = Object.values(verdict.checks ?? {});
+    if (results.includes('doubt') || results.includes('fail')) low = true;
 
     // Sensitive chunks are never published on doubt (the strict rule).
     if (sensitive && low)

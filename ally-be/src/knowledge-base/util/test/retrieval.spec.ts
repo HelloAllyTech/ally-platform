@@ -1,5 +1,8 @@
 import { KnowledgeChunkPassage } from 'src/ai/dto/knowledge.dto';
-import { concatDistinct, shapePassages } from '../retrieval';
+import { shapeWithDecisions } from '../retrieval';
+
+const shapePassages = (...args: Parameters<typeof shapeWithDecisions>) =>
+  shapeWithDecisions(...args).kept;
 
 /**
  * Shaping is invisible when it works and invisible when it doesn't: the caller gets a plausible
@@ -163,33 +166,5 @@ describe('shapePassages', () => {
 
   it('returns nothing for nothing', () => {
     expect(shapePassages([], opts)).toEqual([]);
-  });
-});
-
-describe('concatDistinct', () => {
-  it('keeps the first pass ahead of the top-up', () => {
-    // The two passes search disjoint document sets, so their similarities are comparable but
-    // their ranks are not. Interleaving by score would undo the boost the split exists for.
-    const first = [passage({ chunk_id: 'a', similarity: 0.6 })];
-    const second = [passage({ chunk_id: 'b', similarity: 0.95 })];
-    expect(concatDistinct(first, second).map((p) => p.chunk_id)).toEqual([
-      'a',
-      'b',
-    ]);
-  });
-
-  it('drops a chunk both passes returned', () => {
-    const first = [passage({ chunk_id: 'a' })];
-    const second = [passage({ chunk_id: 'a' }), passage({ chunk_id: 'b' })];
-    expect(concatDistinct(first, second).map((p) => p.chunk_id)).toEqual([
-      'a',
-      'b',
-    ]);
-  });
-
-  it('handles either side being empty', () => {
-    const one = [passage({ chunk_id: 'a' })];
-    expect(concatDistinct(one, [])).toHaveLength(1);
-    expect(concatDistinct([], one)).toHaveLength(1);
   });
 });

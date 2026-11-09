@@ -1526,6 +1526,20 @@ export const CONTEXT_LIBRARY_EXTRACT_FIRST_PRINCIPLES_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/context_library/extract_character_insights_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_CHARACTER_INSIGHTS_SYSTEM = definePrompt(
+  'context_library_extract_character_insights_system',
+  {},
+  {
+    name: 'Context Library — Extract Character Insights',
+    description:
+      'Distils one part of a clinical or lived-experience document into short, general insights for the character interview: statement, what it looks like, voice samples in its own words, the stereotype to avoid, aspect, basis and themes. Never about an identifiable person, never treatment guidance; own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
 /** src/prompts/context_library/critic_system.txt */
 export const CONTEXT_LIBRARY_CRITIC_SYSTEM = definePrompt(
   'context_library_critic_system',

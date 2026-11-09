@@ -15,6 +15,11 @@ class VectorDBCollectionNames:
     ROADMAP_OPPORTUNITIES = "RoadmapOpportunity"
     AGENT_MEMORIES = "AgentMemory"
     KNOWLEDGE_CHUNKS = "KnowledgeChunk"
+    # RETIRED: the character corpus moved to ally-be's Context Library (Character
+    # Insights). Kept only because the immutable migrations 005 and 006 create and
+    # patch it, and so ally-be's confirmed retirement can name it
+    # (RETIRED_CORPUS_COLLECTIONS in app/core/knowledge_base/corpus.py). Nothing reads
+    # or writes it.
     CHARACTER_CHUNKS = "CharacterChunk"
     GUIDE_LIBRARY_CHUNKS = "GuideLibraryChunk"
     DEBRIEF_KNOWLEDGE_CHUNKS = "DebriefKnowledgeChunk"
@@ -234,8 +239,9 @@ class AgentMemoryProperties:
 class KnowledgeChunkProperties:
     """
     Properties for a passage-level retrieval collection — the WhatsApp Q&A bot's
-    KnowledgeChunk, the character library's CharacterChunk, and the Ally guide's
-    library, GuideLibraryChunk.
+    KnowledgeChunk, the Ally guide's library, GuideLibraryChunk, and Debrief guidance,
+    DebriefKnowledgeChunk. (The retired character corpus's CharacterChunk was created
+    from the same list.)
 
     Distinct from ReferenceDocument, which is left untouched: that collection stores one
     object per document with a SINGLE embedding of the whole body, which is why it can
@@ -264,16 +270,16 @@ class KnowledgeChunkProperties:
     would cost latency on every answer.
 
     SHARED BY EVERY CORPUS, INSTANTIATED ONCE PER CORPUS. These properties describe a
-    passage, which is the same shape whatever the passage is for, so `CharacterChunk`
-    (grounding the character-library interview agent) is created from this exact list.
+    passage, which is the same shape whatever the passage is for, so every corpus's
+    collection is created from this exact list.
     What is NOT shared is the collection itself — see VectorDBCollectionNames — and the
     reasons are the ones this file already gives for keeping ReferenceDocument separate,
     plus two that are specific to corpora:
 
       * A similarity THRESHOLD only means something against one distribution. Chunk size
-        is chosen per corpus (400 tokens for a 1600-character WhatsApp reply, 800 for a
-        character vignette), and a longer passage embeds more diffusely — so one index
-        holding both sizes would have one threshold straddling two distributions.
+        is chosen per corpus (400 tokens for a 1600-character WhatsApp reply, 600 for
+        an organisation's protocol), and a longer passage embeds more diffusely — so one
+        index holding both sizes would have one threshold straddling two distributions.
       * Filtered ANN search is weaker than unfiltered. HNSW traverses a graph built over
         every vector in the collection, so scoping by a low-selectivity filter costs
         recall or degrades to a scan. A collection per corpus traverses only its own.
@@ -299,17 +305,10 @@ class KnowledgeChunkProperties:
     of a filtered traversal is accepted here, and is the reason it is not also used for
     corpora.
 
-    THE CHARACTER CORPUS INHERITS THESE TWO PROPERTIES AND LEAVES THEM AT THEIR CLOSED
-    DEFAULTS (`is_global = false`, no tenant ids), because nothing writes an audience
-    for it. Retrieval for that corpus must therefore pass
-    `ChunkAudience.unrestricted()` — which is correct for material that is Ally-global
-    rather than a customer's, and is why that constructor exists as more than admin
-    tooling.
-
-    THE ALLY GUIDE LIBRARY IS THE OPPOSITE CASE, and the reason the audience pair
-    matters most there. It holds platform documents (`is_global = true`) beside one
-    organisation's own protocols and handbooks (`tenant_ids = [that organisation]`),
-    and every search for a learner names who is asking: their organisation plus the
+    THE ALLY GUIDE LIBRARY is the reason the audience pair matters most. It holds
+    platform documents (`is_global = true`) beside one organisation's own protocols
+    and guides (`tenant_ids = [that organisation]`), and every search for a
+    learner names who is asking: their organisation plus the
     global documents, or the global documents alone for an anonymous visitor. It is
     never searched unrestricted on a learner's behalf.
 

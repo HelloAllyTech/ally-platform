@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { LlmUsageModule } from 'src/analytics/llm-usage.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
-import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
+import { ContextLibraryModule } from '../context-library/context-library.module';
 import { ScenarioCharacter } from './entity/scenario-character.entity';
 import { CharacterInterviewSession } from './entity/character-interview-session.entity';
 import { CharacterInterviewMessage } from './entity/character-interview-message.entity';
@@ -30,9 +30,9 @@ import { CharacterInterviewMessageRepository } from './repository/character-inte
     LlmUsageModule,
     LlmAgentModule,
     // For search_corpus: the interview agent grounds its questions and drafts on the
-    // character-library corpus through KnowledgeBaseService, never by reaching into the
-    // knowledge-base repositories itself.
-    KnowledgeBaseModule,
+    // Character Insights collection through ContextRetrievalService (use case
+    // `character_interview`), never by reaching into the Context Library's tables itself.
+    ContextLibraryModule,
   ],
   controllers: [ScenarioCharacterController, CharacterInterviewController],
   providers: [

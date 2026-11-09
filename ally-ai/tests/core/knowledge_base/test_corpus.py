@@ -15,6 +15,7 @@ import pytest
 
 from app.core.knowledge_base.corpus import (
     CORPUS_COLLECTIONS,
+    RETIRED_CORPUS_COLLECTIONS,
     KbCorpus,
     collection_for,
 )
@@ -46,10 +47,18 @@ def test_wire_values_match_ally_be():
     # ally-be asks for a corpus this service does not recognise.
     assert {c.value for c in KbCorpus} == {
         "whatsapp_qa",
-        "character_library",
         "ally_guide_library",
         "debrief_knowledge",
     }
+
+
+def test_a_retired_corpus_resolves_to_nothing_and_its_collection_is_retired():
+    # The character corpus moved to ally-be's Context Library. Asking for it must fail
+    # loudly rather than read its old collection, and only its collection may be dropped
+    # through the retired-collection route — never a live corpus's.
+    assert "character_library" not in {c.value for c in KbCorpus}
+    assert RETIRED_CORPUS_COLLECTIONS == {VectorDBCollectionNames.CHARACTER_CHUNKS}
+    assert not RETIRED_CORPUS_COLLECTIONS & set(CORPUS_COLLECTIONS.values())
 
 
 def test_every_collection_has_a_migration_that_creates_it():

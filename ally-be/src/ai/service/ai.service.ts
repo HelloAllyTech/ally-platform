@@ -530,8 +530,8 @@ export class AiService {
   //
   // Every one of these takes a `corpus`, which ally-ai resolves to that corpus's own Weaviate
   // collection — one per corpus, not one collection with a scope argument. That is what makes the
-  // boundary structural: there is no filter to leave unset, so a character-library document can
-  // never be retrieved by the WhatsApp bot. See ally-ai migration 005 for why (a similarity
+  // boundary structural: there is no filter to leave unset, so one corpus's document can never be
+  // retrieved for another's consumer. See ally-ai migration 005 for why (a similarity
   // threshold only means something against one chunk-size distribution; filtered ANN search is
   // weaker than unfiltered; and re-chunking one corpus must not touch the other's live index).
   //
@@ -613,6 +613,24 @@ export class AiService {
       request,
       true,
       'put',
+      undefined,
+      false,
+      60_000,
+    );
+  }
+
+  /**
+   * Drop the whole Weaviate collection of a retired corpus (today only the character corpus's
+   * `CharacterChunk`). Called once, by the confirmed platform-admin retirement after the corpus
+   * has been distilled into the Context Library. `deleted: false` means it was already gone.
+   */
+  async dropRetiredKnowledgeCollection(collection: string) {
+    const params = new URLSearchParams({ collection, confirm: collection });
+    return this.makeRequest<{ deleted: boolean }, undefined>(
+      `${ENDPOINTS.KNOWLEDGE_CHUNK_RETIRED_COLLECTION}?${params.toString()}`,
+      undefined,
+      true,
+      'delete',
       undefined,
       false,
       60_000,

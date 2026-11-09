@@ -19,22 +19,11 @@ class JudgedPassage(TypedDict, total=False):
 
 
 # What each corpus is FOR. Without this the judge cannot label relevance
-# honestly: a passage on "what makes a speech sample useful" answers a craft
-# question and is tangential to a subject question, and the same text would be
-# scored differently depending on which corpus asked.
+# honestly: the same passage answers one reader's question and is tangential to
+# another's, and would be scored differently depending on which corpus asked.
+# (The character corpus moved to ally-be's Context Library, which judges its
+# own collections; its rows are no longer sent here.)
 CORPUS_PURPOSE = {
-    "character_library": (
-        "The CHARACTER LIBRARY corpus. Its reader is an interviewer agent "
-        "building a fictional client for counsellor practice. It holds two "
-        "kinds of material: CRAFT guidance on how to construct a believable "
-        "person (what makes a speech sample useful, why a stance belongs in a "
-        "scenario's states rather than in static backstory), and "
-        "LIVED-EXPERIENCE or observational material about what a situation is "
-        "actually like (how a condition presents, what a working life "
-        "involves, how someone in that position really talks). Clinical "
-        "guidelines and treatment protocols do NOT belong here and are "
-        "tangential at best."
-    ),
     "whatsapp_qa": (
         "The WHATSAPP Q&A corpus. Its reader is a bot answering a mental "
         "healthcare worker's question, with citations. It holds clinical "

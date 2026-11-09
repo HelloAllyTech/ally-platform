@@ -19,7 +19,6 @@ import {
   KB_MAX_PASTE_CHARS,
 } from '../constants/knowledge-base.constants';
 import {
-  KbCharacterTopic,
   KbCorpus,
   KbDocumentSourceType,
   KbDocumentStatus,
@@ -80,18 +79,6 @@ export class CreateKbDocumentDto {
   @IsOptional()
   @IsEnum(KbCorpus)
   corpus: KbCorpus = KbCorpus.WHATSAPP_QA;
-
-  @ApiPropertyOptional({
-    enum: KbCharacterTopic,
-    isArray: true,
-    description:
-      'Which parts of a character this grounds. A ranking hint, not a restriction; ' +
-      'empty is the default and a fine answer. Character library only.',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsEnum(KbCharacterTopic, { each: true })
-  characterTopics?: KbCharacterTopic[];
 
   @ApiProperty()
   @IsString()
@@ -167,7 +154,7 @@ export class CreateKbDocumentDto {
  * A document added to an owned corpus (KB_OWNED_CORPORA) by its owner — the platform or one
  * organisation.
  *
- * Deliberately WITHOUT `corpus`, `isGlobal`, `tenantIds` and `characterTopics`. The route
+ * Deliberately WITHOUT `corpus`, `isGlobal` and `tenantIds`. The route
  * decides the corpus and the owner, and the audience follows the owner; a body that could
  * name them would let one organisation's admin publish to the platform, or target another
  * organisation, by editing a request.
@@ -223,21 +210,6 @@ export class UpdateKbDocumentDto {
   @IsString()
   @MaxLength(16)
   language?: string;
-
-  @ApiPropertyOptional({
-    enum: KbCharacterTopic,
-    isArray: true,
-    description:
-      'Which parts of a character this document helps ground. Editable after upload, ' +
-      'and cheap to change: it is a RANKING hint read at query time, so it never ' +
-      'invalidates a chunk or triggers a re-index — unlike the content, and unlike ' +
-      '`corpus`, which is immutable. An empty array clears the hint, which is a ' +
-      'legitimate choice rather than a missing value.',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsEnum(KbCharacterTopic, { each: true })
-  characterTopics?: KbCharacterTopic[];
 }
 
 export class ReplaceKbDocumentContentDto {
@@ -324,7 +296,7 @@ export class GetKbDocumentsQueryDto {
   // `Boolean("false")` is `true` — so `?includeArchived=false` arrived as true and archived
   // documents were ALWAYS included. That made the WhatsApp Corpus tab's "Show archived"
   // checkbox inert in both positions from the day it shipped, and it is why three archived
-  // documents kept rendering in the character panel after being archived.
+  // documents kept rendering in a corpus panel after being archived.
   //
   // Explicit string comparison instead, and only "true" is true: an absent parameter, an empty
   // one, or any typo all mean "no", which is the safe direction for a flag that widens a list.
@@ -376,8 +348,6 @@ export class GetKbOwnedDocumentsQueryDto extends PickType(
 export class KbDocumentResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty({ enum: KbCorpus }) corpus!: KbCorpus;
-  @ApiProperty({ enum: KbCharacterTopic, isArray: true })
-  characterTopics!: KbCharacterTopic[];
   @ApiProperty() title!: string;
   @ApiProperty({ enum: KbDocumentSourceType })
   sourceType!: KbDocumentSourceType;
@@ -507,8 +477,8 @@ export class KbSearchDto {
       'Narrow to documents carrying ANY of these tags — same overlap semantics as ' +
       'the corpus list filter. Topical metadata about the material (e.g. "dementia", ' +
       '"adolescent"), resolved to document ids in Postgres the way `corpus` is.\n\n' +
-      "Deliberately NOT a map of interview question to tag. The interview's " +
-      'phases live in a prompt that changes without a migration, so tags keyed to ' +
+      "Deliberately NOT a map of an agent's questions to tags. An agent's " +
+      'questions live in a prompt that changes without a migration, so tags keyed to ' +
       'them would go quietly stale; and hand-partitioning mostly costs recall, ' +
       'excluding the passage that was relevant in a way nobody anticipated. ' +
       'Which tags to ask for is a decision for the caller — a prompt change, not ' +
@@ -519,20 +489,6 @@ export class KbSearchDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
-
-  @ApiPropertyOptional({
-    enum: KbCharacterTopic,
-    isArray: true,
-    description:
-      'Which parts of a character this query is about. A BOOST, not a filter: documents a ' +
-      'curator mapped to any of these topics are searched first, and the rest of the corpus ' +
-      'tops the result up if that comes back short. Omitting it searches the whole corpus in ' +
-      'one pass, which is what the admin retrieval preview wants.',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsEnum(KbCharacterTopic, { each: true })
-  characterTopics?: KbCharacterTopic[];
 }
 
 /**

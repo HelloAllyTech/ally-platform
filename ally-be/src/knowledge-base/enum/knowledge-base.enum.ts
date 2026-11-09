@@ -11,17 +11,16 @@
  * itself. A filter can be forgotten; a required argument cannot. Each corpus also gets its
  * OWN Weaviate collection rather than a discriminator on a shared one — a similarity
  * threshold only means something against one distribution, and chunk size differs per corpus
- * (400 tokens for a 1600-character WhatsApp reply, 800 for a character vignette).
+ * (400 tokens for a 1600-character WhatsApp reply, 600 for the Ally guide's procedures).
+ *
+ * The character corpus (`character_library`) was retired into the Context Library's Character
+ * Insights collection (docs/context-library/PLAN.md, phase 4). Rows that still carry that value
+ * are read and finally deleted only by `ContextKbImportService`, with literal SQL, until a
+ * platform admin retires them.
  */
 export enum KbCorpus {
   /** Grounds the WhatsApp Q&A bot's answers. */
   WHATSAPP_QA = 'whatsapp_qa',
-  /**
-   * Grounds the Character Library interview agent — clinical and lived-experience
-   * material it draws on to make its questions specific and its drafts real, rather
-   * than inventing a plausible-sounding person from nothing.
-   */
-  CHARACTER_LIBRARY = 'character_library',
   /**
    * Grounds the Ally guide (plans/ally-guide/plan.md §7.6) — material about becoming and
    * being a helper. The first corpus that is not Ally-global throughout: a document is
@@ -103,34 +102,6 @@ export const KB_LOGGED_CORPORA: string[] = [
 export const KB_JUDGEABLE_CORPORA: string[] = Object.values(KbCorpus);
 
 /**
- * What part of a character a document helps ground.
- *
- * A curator who uploads a dementia caregiving handbook and a book on adolescent anxiety
- * knows which belongs where; similarity search only sees that both are "mental health".
- * Declaring it lets that knowledge improve ranking.
- *
- * A BOOST, never a filter. Retrieval searches the documents mapped to the asked-about
- * topic first and tops up from the rest of the corpus — so mapped material wins ties, and
- * the passage that turns out relevant in a way nobody anticipated is still reachable. That
- * matters most here: the unanticipated detail is often the one that makes a character feel
- * like a person.
- *
- * Named for the SUBJECT, not for the interviewer prompt's phase numbering. The prompt's
- * wording and ordering change without a migration — they changed twice today — so a
- * mapping keyed to "phase 4" or to question text would be stale on arrival. These five
- * subjects have survived every edit, because they are what a person is made of rather than
- * how the interview happens to be sequenced. A stale mapping here costs a little ranking
- * quality; a stale filter would silently hide sources.
- */
-export enum KbCharacterTopic {
-  IDENTITY = 'identity',
-  LIFE_CONTEXT = 'life_context',
-  INNER_LIFE = 'inner_life',
-  HISTORY_AND_PRESENTING_CONCERN = 'history_and_presenting_concern',
-  SPEECH_AND_LANGUAGE = 'speech_and_language',
-}
-
-/**
  * Where a corpus document came from. Immutable after creation: a PDF is not a URL, so
  * changing the source means replacing the document, not editing this field.
  */
@@ -181,8 +152,8 @@ export enum KbChunkUploadStatus {
  *
  * Recorded because the alternative is reading one population's behaviour as another's. The
  * admin retrieval preview exists for an operator to probe thresholds — deliberately odd
- * queries, repeated, often against material they just uploaded — and the interview agent's
- * queries are the ones a floor should actually be calibrated against. Pooled, an afternoon of
+ * queries, repeated, often against material they just uploaded — and the agents' queries are
+ * the ones a floor should actually be calibrated against. Pooled, an afternoon of
  * threshold-tuning would move every distribution the tuning was meant to inform.
  *
  * This is the same trap the language judge fell into: a metric that looked like a quality
@@ -190,8 +161,6 @@ export enum KbChunkUploadStatus {
  * Segment every retrieval trend by `consumer` before believing it.
  */
 export enum KbRetrievalConsumer {
-  /** The character interview agent's search_corpus tool. */
-  INTERVIEW_AGENT = 'interview_agent',
   /** The admin retrieval preview — POST /knowledge-base/search. */
   ADMIN_PREVIEW = 'admin_preview',
   /**
@@ -233,8 +202,8 @@ export enum KbRetrievalConsumer {
  * passages and declines on all of them looks healthy in every count except this one.
  *
  * Null for consumers that have no decline step of their own: the admin preview shows whatever
- * comes back, and the interview agent judges passages in its own reasoning rather than at a
- * threshold.
+ * comes back, and the Ally guide and Debrief judge passages in their own reasoning rather than
+ * at a threshold.
  */
 export enum KbRetrievalDisposition {
   /** Passages were used to ground an answer. */
@@ -268,10 +237,12 @@ export enum KbRetrievalOutcome {
   DROPPED_OVER_LIMIT = 'dropped_over_limit',
 }
 
-/** Which of the two passes a candidate came from — the curator's boost, or the top-up. */
+/**
+ * Which pass a candidate came from. Every search is one pass over the corpus now (`rest`);
+ * `preferred` — documents a curator mapped to the asked-about character topic, searched first —
+ * went with the character corpus and remains only on rows logged before it was retired.
+ */
 export enum KbRetrievalPass {
-  /** A document mapped to one of the asked-about character topics. */
   PREFERRED = 'preferred',
-  /** The rest of the corpus, searched only when the first pass came back short. */
   REST = 'rest',
 }

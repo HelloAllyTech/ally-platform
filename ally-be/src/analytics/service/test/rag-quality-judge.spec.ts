@@ -19,8 +19,8 @@ describe('RagQualityJudgeService', () => {
 
   const retrieval = (over: Record<string, unknown> = {}) => ({
     id: 'ret-1',
-    corpus: 'character_library',
-    consumer: 'interview_agent',
+    corpus: 'whatsapp_qa',
+    consumer: 'whatsapp_bot',
     query: 'how specific should a character be?',
     min_similarity: 0.35,
     returned_count: 1,
@@ -181,7 +181,7 @@ describe('RagQualityJudgeService', () => {
       ([opts]: [{ consumer?: string; limit?: number }]) => opts.consumer,
     );
     expect(consumers).toEqual(
-      expect.arrayContaining(['interview_agent', 'admin_preview']),
+      expect.arrayContaining(['whatsapp_bot', 'admin_preview']),
     );
     const [firstOpts] = repo.selectRetrievals.mock.calls[0];
     expect(firstOpts.limit).toBe(60);
@@ -198,7 +198,7 @@ describe('RagQualityJudgeService', () => {
     const [url, body, config] = post.mock.calls[0];
     expect(url).toBe('http://ai.test/api/v1/rag-quality/judge');
     expect(body.query).toBe('how specific should a character be?');
-    expect(body.corpus).toBe('character_library');
+    expect(body.corpus).toBe('whatsapp_qa');
     expect(body.min_similarity).toBe(0.45);
     expect(body.passages[0].chunk_id).toBe('c1');
     expect(body.passages[0].text).toBe('A generic option is not a person.');

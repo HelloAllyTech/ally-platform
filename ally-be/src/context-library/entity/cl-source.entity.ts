@@ -38,7 +38,11 @@ export class ClSource extends BaseWithoutTenantEntity {
   @Column({ type: 'varchar', length: 16, nullable: true })
   language?: string | null;
 
-  /** SHA-256 of the uploaded bytes. Null for migrated corpora, which have no file. */
+  /**
+   * SHA-256 of the uploaded bytes. A retired Knowledge Base corpus's documents have no file:
+   * theirs is SHA-256 of `kb_migration:<corpus>:<kb document id>`, which is what makes the
+   * import idempotent (see ContextKbImportService).
+   */
   @Index('idx_cl_sources_file_hash')
   @Column({ type: 'varchar', length: 64, name: 'file_hash', nullable: true })
   fileHash?: string | null;

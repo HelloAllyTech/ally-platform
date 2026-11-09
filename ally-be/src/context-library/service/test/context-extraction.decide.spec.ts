@@ -1,3 +1,4 @@
+import { CHARACTER_INSIGHTS_PROFILE } from '../../profiles/character-insights.profile';
 import { FIRST_PRINCIPLES_PROFILE } from '../../profiles/first-principles.profile';
 import { ClChunkConfidence } from '../../enum/context-library.enum';
 import { wordRuns } from '../../util/gate.util';
@@ -147,5 +148,67 @@ describe('ContextExtractionService.decide', () => {
         runs,
       ).reject,
     ).toBe('sensitive_doubt');
+  });
+  describe('Character Insights', () => {
+    const insight = service.toGateCandidate(CHARACTER_INSIGHTS_PROFILE, {
+      statement:
+        'Early word-finding trouble often shows as talking around a word rather than silence',
+      detail:
+        'Describing what a thing does instead of naming it, then laughing it off.',
+      voiceSamples: ['The thing you boil water in, you know the one.'],
+      aspect: 'speech_and_language',
+      basis: 'clinical_presentation',
+      themes: ['Dementia', 'Ageing'],
+      situations: ['drafting an older character with memory changes'],
+      exampleQueries: ['how does early dementia change speech'],
+    });
+
+    it('maps aspect, basis and free themes onto the profile', () => {
+      expect(insight.facets).toEqual({
+        aspect: 'speech_and_language',
+        basis: 'clinical_presentation',
+        themes: ['dementia', 'ageing'],
+      });
+      expect(insight.attributes?.voiceSamples).toEqual([
+        'The thing you boil water in, you know the one.',
+      ]);
+    });
+
+    it('rejects treatment guidance outright, and lowers confidence on other failed checks', () => {
+      expect(
+        service.decide(
+          CHARACTER_INSIGHTS_PROFILE,
+          insight,
+          [],
+          { ...pass, checks: { treatment_protocol: 'fail' } },
+          runs,
+        ).reject,
+      ).toBe('treatment_protocol');
+      const d = service.decide(
+        CHARACTER_INSIGHTS_PROFILE,
+        insight,
+        [],
+        { ...pass, checks: { clinical_plausibility: 'fail' } },
+        runs,
+      );
+      expect(d.reject).toBeUndefined();
+      expect(d.confidence).toBe(ClChunkConfidence.LOW);
+    });
+
+    it('rejects a sensitive insight on any failed check', () => {
+      const sensitive = {
+        ...insight,
+        facets: { ...insight.facets, sensitivity: 'sensitive' },
+      };
+      expect(
+        service.decide(
+          CHARACTER_INSIGHTS_PROFILE,
+          sensitive,
+          [],
+          { ...pass, checks: { clinical_plausibility: 'fail' } },
+          runs,
+        ).reject,
+      ).toBe('clinical_plausibility');
+    });
   });
 });

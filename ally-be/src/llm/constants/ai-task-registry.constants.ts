@@ -2960,8 +2960,12 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
     trigger: 'A document part is extracted into a Context Library collection',
     detail:
       'One call per part per target collection (~2,500-token parts, up to 8 principles or 12 ' +
-      'insights each). The prompt is the collection’s own extractor; the overview and ' +
-      'vocabularies are an identical prefix across a document, so prompt caching applies.',
+      'insights each). The prompt is the collection’s own extractor — ' +
+      '`context_library_extract_first_principles_system` for First Principles, ' +
+      '`context_library_extract_character_insights_system` for Character Insights (including ' +
+      'the one-off distillation of the retired character corpus) — and each prompt’s own model ' +
+      'is read first. The overview and vocabularies are an identical prefix across a document, ' +
+      'so prompt caching applies.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',

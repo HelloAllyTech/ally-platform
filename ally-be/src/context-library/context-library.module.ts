@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from 'src/ai/ai.module';
+import { AwsModule } from 'src/aws/aws.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { RedisModule } from 'src/redis/redis.module';
@@ -44,6 +45,7 @@ import { ContextStagingService } from './service/context-staging.service';
 import { ContextUploadService } from './service/context-upload.service';
 import { ContextWorkerService } from './service/context-worker.service';
 import { ContextGapsService } from './service/context-gaps.service';
+import { ContextKbImportService } from './service/context-kb-import.service';
 import { ContextJudgeService } from './service/context-judge.service';
 import { ContextLearningService } from './service/context-learning.service';
 import { ContextLoopActionsService } from './service/context-loop-actions.service';
@@ -80,6 +82,8 @@ import { ContextTuningService } from './service/context-tuning.service';
       ClGapTopic,
     ]),
     AiModule,
+    // S3, for deleting a retired Knowledge Base corpus's stored files.
+    AwsModule,
     LlmAgentModule,
     PromptModule,
     RedisModule,
@@ -99,6 +103,8 @@ import { ContextTuningService } from './service/context-tuning.service';
     ContextStagingService,
     ContextUploadService,
     ContextWorkerService,
+    // One-off imports of retired Knowledge Base corpora (phase 4).
+    ContextKbImportService,
     // The learning loops (phase 3).
     ContextGapsService,
     ContextJudgeService,

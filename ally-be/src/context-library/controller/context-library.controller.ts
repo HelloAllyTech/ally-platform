@@ -41,6 +41,7 @@ import {
   ContextGrantDto,
   ContextLoopSettingsDto,
   ContextResumeDto,
+  ContextRetireCorpusDto,
   ContextSearchDto,
   ContextUploadDto,
 } from '../dto/context-library.dto';
@@ -55,6 +56,7 @@ import { ClActor, ContextChunkService } from '../service/context-chunk.service';
 import { ContextRetrievalService } from '../service/context-retrieval.service';
 import { ContextUploadService } from '../service/context-upload.service';
 import { ContextGapsService } from '../service/context-gaps.service';
+import { ContextKbImportService } from '../service/context-kb-import.service';
 import { ContextLoopActionsService } from '../service/context-loop-actions.service';
 import { ContextLoopsService } from '../service/context-loops.service';
 
@@ -100,6 +102,7 @@ export class ContextLibraryController {
     private readonly loops: ContextLoopsService,
     private readonly loopActions: ContextLoopActionsService,
     private readonly gaps: ContextGapsService,
+    private readonly kbImport: ContextKbImportService,
   ) {}
 
   // ── Collections ────────────────────────────────────────────────────────────
@@ -498,5 +501,46 @@ export class ContextLibraryController {
       kind === 'tuning' ? this.loops.runTuning(id) : this.loops.runNightly(id);
     void run.catch(() => undefined);
     return { started: true, kind: kind === 'tuning' ? 'tuning' : 'nightly' };
+  }
+
+  // ── Retired Knowledge Base corpora (one-off, §6.5) ────────────────────────────
+
+  @Get('migrations/character-library')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary:
+      'How far the character corpus has been distilled into Character Insights',
+  })
+  characterCorpusStatus() {
+    return this.kbImport.status();
+  }
+
+  @Post('migrations/character-library/import')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary: 'Distil the retired character corpus into Character Insights',
+    description:
+      'Platform admins only. Idempotent: documents already imported are skipped. Each old ' +
+      'document becomes one source; its stored passages are staged in Redis (24h) and ' +
+      'distilled by the worker. No document text is written to Postgres or S3.',
+  })
+  importCharacterCorpus(@CurrentUser() user: TokenUser) {
+    return this.kbImport.import(actorFor(user));
+  }
+
+  @Post('migrations/character-library/retire')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary: 'Delete the retired character corpus',
+    description:
+      'Platform admins only, and only once the import reports complete. Drops its Weaviate ' +
+      'collection and deletes its documents, passages, stored files and retrieval logs. ' +
+      'Requires { "confirm": "retire character_library" }.',
+  })
+  retireCharacterCorpus(
+    @CurrentUser() user: TokenUser,
+    @Body() dto: ContextRetireCorpusDto,
+  ) {
+    return this.kbImport.retire(dto.confirm, actorFor(user));
   }
 }

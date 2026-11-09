@@ -1,7 +1,6 @@
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import {
-  KbCharacterTopic,
   KbCorpus,
   KbDocumentSourceType,
   KbDocumentStatus,
@@ -55,20 +54,6 @@ export class KbDocument extends BaseWithoutTenantEntity {
   @Index('idx_kb_documents_corpus')
   @Column({ type: 'varchar', length: 32, default: KbCorpus.WHATSAPP_QA })
   corpus!: KbCorpus;
-
-  /**
-   * Which parts of a character this document helps ground — a curator's hint that
-   * BOOSTS those topics in retrieval rather than restricting to them. Empty means
-   * "no hint", which is a perfectly good answer and the default. Only meaningful
-   * for the character-library corpus.
-   */
-  @Column({
-    name: 'character_topics',
-    type: 'text',
-    array: true,
-    default: () => "'{}'",
-  })
-  characterTopics!: KbCharacterTopic[];
 
   @Index('idx_kb_documents_title')
   @Column({ type: 'text' })

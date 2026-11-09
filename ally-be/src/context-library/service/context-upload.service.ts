@@ -27,7 +27,7 @@ import {
   ClSourceStatus,
 } from '../enum/context-library.enum';
 import { requireProfile } from '../profiles';
-import { segmentDocument } from '../util/segment.util';
+import { PreparedSegment, segmentDocument } from '../util/segment.util';
 import { ClActor } from './context-chunk.service';
 import { ContextStagingService } from './context-staging.service';
 import { ContextWorkerService } from './context-worker.service';
@@ -284,9 +284,32 @@ export class ContextUploadService {
           }
         }
 
-        const prepared = segmentDocument(extracted);
-        const extractable = prepared.filter((s) => !s.skippedReason);
-        if (!extractable.length) {
+        const generation =
+          options.reextract && previous.length ? previous[0].generation + 1 : 1;
+        const queued = await this.queuePrepared({
+          prepared: segmentDocument(extracted),
+          targets,
+          costCapUsd: options.costCapUsd,
+          source: {
+            title,
+            docVersion: options.docVersion ?? null,
+            year: options.year ?? null,
+            kind,
+            language: extracted.language ?? null,
+            fileHash,
+            titleKey: key,
+            ownerTenantId: actor.tenantId,
+            pageCount: extracted.pages.length,
+            extractionWarnings: extracted.sections.length
+              ? []
+              : ['No headings found; parts follow paragraph boundaries.'],
+            batchId,
+            queuePosition: String(Date.now() * 1000 + results.length),
+            generation,
+            uploadedBy: actor.userId,
+          },
+        });
+        if (!queued) {
           results.push({
             fileName,
             outcome: 'no_text',
@@ -295,91 +318,16 @@ export class ContextUploadService {
           });
           continue;
         }
-        const tokens = extractable.reduce((sum, s) => sum + s.tokenCount, 0);
-        const estimate =
-          this.estimateCost(tokens, extractable.length) * targets.length;
-        const generation =
-          options.reextract && previous.length ? previous[0].generation + 1 : 1;
-
-        const source = await this.sources.save(
-          this.sources.create({
-            title,
-            docVersion: options.docVersion ?? null,
-            year: options.year ?? null,
-            kind,
-            language: extracted.language ?? null,
-            fileHash,
-            titleKey: key,
-            targetCollections: targets,
-            ownerTenantId: actor.tenantId,
-            pageCount: extracted.pages.length,
-            segmentCount: extractable.length,
-            extractionWarnings: extracted.sections.length
-              ? []
-              : ['No headings found; parts follow paragraph boundaries.'],
-            status: ClSourceStatus.QUEUED,
-            batchId,
-            queuePosition: String(Date.now() * 1000 + results.length),
-            costCapUsd: String(
-              Math.max(
-                0.05,
-                options.costCapUsd ??
-                  Math.round(estimate * CL_COST_CAP_MULTIPLIER * 10000) / 10000,
-              ),
-            ),
-            generation,
-            uploadedBy: actor.userId,
-          }),
-        );
-
-        const rows = await this.segments.save(
-          prepared.map((s) =>
-            this.segments.create({
-              sourceId: source.id,
-              ordinal: s.ordinal,
-              sectionPath: s.sectionPath,
-              pageFrom: s.pageFrom,
-              pageTo: s.pageTo,
-              textHash: s.textHash,
-              tokenCount: s.tokenCount,
-              forOverview: s.forOverview,
-              status: s.skippedReason
-                ? ClSegmentStatus.SKIPPED
-                : ClSegmentStatus.PENDING,
-              skippedReason: s.skippedReason,
-            }),
-          ),
-        );
-        const byOrdinal = new Map(rows.map((r) => [r.ordinal, r]));
-        for (const s of extractable) {
-          await this.staging.put(byOrdinal.get(s.ordinal)!.id, {
-            text: s.text,
-            leadIn: s.leadIn,
-            nextHeading: s.nextHeading,
-          });
-        }
-        const runRows = extractable.flatMap((s) =>
-          targets.map((collectionId) =>
-            this.runs.create({
-              segmentId: byOrdinal.get(s.ordinal)!.id,
-              sourceId: source.id,
-              collectionId,
-              queuePosition: source.queuePosition,
-              ordinal: s.ordinal,
-              status: ClSegmentRunStatus.PENDING,
-            }),
-          ),
-        );
-        await this.runs.save(runRows, { chunk: 200 });
+        const { source, estimate } = queued;
 
         const start = await this.estimatedStart(runsQueuedInThisDrop);
-        runsQueuedInThisDrop += runRows.length;
+        runsQueuedInThisDrop += queued.runs;
         results.push({
           fileName,
           outcome: 'queued',
           sourceId: source.id,
           title,
-          segments: extractable.length,
+          segments: queued.segments,
           estimatedCostUsd: Math.round(estimate * 100) / 100,
           estimatedStartAt: start.toISOString(),
           outlivesTtl:
@@ -400,6 +348,102 @@ export class ContextUploadService {
 
     if (results.some((r) => r.outcome === 'queued')) this.worker.kick();
     return results;
+  }
+
+  /**
+   * Record a prepared document and queue it: the source row, one segment row per part (no
+   * text), each extractable part's text staged in Redis for at most a day, and one run per
+   * part × target collection. Shared by uploads and the one-off Knowledge Base imports, so a
+   * migrated corpus is distilled exactly as a dropped file is. Returns null, writing nothing,
+   * when no part has text to extract. The caller kicks the worker.
+   */
+  async queuePrepared(args: {
+    prepared: PreparedSegment[];
+    targets: string[];
+    source: Omit<
+      Partial<ClSource>,
+      | 'id'
+      | 'status'
+      | 'segmentCount'
+      | 'targetCollections'
+      | 'costCapUsd'
+      | 'queuePosition'
+    > & { title: string; titleKey: string; queuePosition: string };
+    costCapUsd?: number | null;
+  }): Promise<{
+    source: ClSource;
+    segments: number;
+    runs: number;
+    estimate: number;
+  } | null> {
+    const { prepared, targets } = args;
+    const extractable = prepared.filter((s) => !s.skippedReason);
+    if (!extractable.length) return null;
+    const tokens = extractable.reduce((sum, s) => sum + s.tokenCount, 0);
+    const estimate =
+      this.estimateCost(tokens, extractable.length) * targets.length;
+
+    const source = await this.sources.save(
+      this.sources.create({
+        ...args.source,
+        targetCollections: targets,
+        segmentCount: extractable.length,
+        status: ClSourceStatus.QUEUED,
+        costCapUsd: String(
+          Math.max(
+            0.05,
+            args.costCapUsd ??
+              Math.round(estimate * CL_COST_CAP_MULTIPLIER * 10000) / 10000,
+          ),
+        ),
+      }),
+    );
+
+    const rows = await this.segments.save(
+      prepared.map((s) =>
+        this.segments.create({
+          sourceId: source.id,
+          ordinal: s.ordinal,
+          sectionPath: s.sectionPath,
+          pageFrom: s.pageFrom,
+          pageTo: s.pageTo,
+          textHash: s.textHash,
+          tokenCount: s.tokenCount,
+          forOverview: s.forOverview,
+          status: s.skippedReason
+            ? ClSegmentStatus.SKIPPED
+            : ClSegmentStatus.PENDING,
+          skippedReason: s.skippedReason,
+        }),
+      ),
+    );
+    const byOrdinal = new Map(rows.map((r) => [r.ordinal, r]));
+    for (const s of extractable) {
+      await this.staging.put(byOrdinal.get(s.ordinal)!.id, {
+        text: s.text,
+        leadIn: s.leadIn,
+        nextHeading: s.nextHeading,
+      });
+    }
+    const runRows = extractable.flatMap((s) =>
+      targets.map((collectionId) =>
+        this.runs.create({
+          segmentId: byOrdinal.get(s.ordinal)!.id,
+          sourceId: source.id,
+          collectionId,
+          queuePosition: source.queuePosition,
+          ordinal: s.ordinal,
+          status: ClSegmentRunStatus.PENDING,
+        }),
+      ),
+    );
+    await this.runs.save(runRows, { chunk: 200 });
+    return {
+      source,
+      segments: extractable.length,
+      runs: runRows.length,
+      estimate,
+    };
   }
 
   // ── Queue controls ─────────────────────────────────────────────────────────

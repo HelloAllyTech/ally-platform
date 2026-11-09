@@ -115,6 +115,12 @@ class KnowledgeChunkDeleteResponse(BaseModel):
     )
 
 
+class RetiredCollectionDeleteResponse(BaseModel):
+    deleted: bool = Field(
+        ..., description="False when the collection was already gone — not an error."
+    )
+
+
 class AudienceSelector(BaseModel):
     """
     Who a retrieval is being performed for. Maps onto `ChunkAudience` in the service.

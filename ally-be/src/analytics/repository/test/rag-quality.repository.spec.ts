@@ -19,8 +19,8 @@ describe('RagQualityRepository', () => {
 
   const retrieval: RagRetrievalRow = {
     id: 'ret-1',
-    corpus: 'character_library',
-    consumer: 'interview_agent',
+    corpus: 'whatsapp_qa',
+    consumer: 'whatsapp_bot',
     query: 'how does dementia change speech?',
     min_similarity: 0.35,
     returned_count: 2,
@@ -76,7 +76,6 @@ describe('RagQualityRepository', () => {
       expect(sql).toContain('r.corpus = ANY(');
       expect(params).toContainEqual([
         'whatsapp_qa',
-        'character_library',
         'ally_guide_library',
         'debrief_knowledge',
       ]);
@@ -96,29 +95,19 @@ describe('RagQualityRepository', () => {
       expect(sql).toContain('judge_prompt_version');
       // $1 is the judgeable-corpus list; the pinned pair follows it.
       expect(params).toEqual([
-        [
-          'whatsapp_qa',
-          'character_library',
-          'ally_guide_library',
-          'debrief_knowledge',
-        ],
+        ['whatsapp_qa', 'ally_guide_library', 'debrief_knowledge'],
         'gemini-2.5-pro',
         'v1',
       ]);
     });
 
     it('can narrow to one consumer, so a batch can be sampled across both', async () => {
-      await repository.selectRetrievals({ consumer: 'interview_agent' });
+      await repository.selectRetrievals({ consumer: 'whatsapp_bot' });
       const [sql, params] = query.mock.calls[0];
       expect(sql).toContain('r.consumer = $2');
       expect(params).toEqual([
-        [
-          'whatsapp_qa',
-          'character_library',
-          'ally_guide_library',
-          'debrief_knowledge',
-        ],
-        'interview_agent',
+        ['whatsapp_qa', 'ally_guide_library', 'debrief_knowledge'],
+        'whatsapp_bot',
       ]);
     });
   });
@@ -285,7 +274,7 @@ describe('RagQualityRepository', () => {
       const [, params] = query.mock.calls[1];
       expect(params).toContain(0.4213);
       expect(params).toContain('dropped_document_cap');
-      expect(params).toContain('interview_agent');
+      expect(params).toContain('whatsapp_bot');
     });
 
     it('writes both units in ONE transaction', async () => {

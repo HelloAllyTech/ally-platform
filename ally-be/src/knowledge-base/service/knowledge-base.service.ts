@@ -106,11 +106,7 @@ import { KbDocumentChunkRepository } from '../repository/kb-document-chunk.repos
 import { KbDocumentTenantRepository } from '../repository/kb-document-tenant.repository';
 import { KbDocumentRepository } from '../repository/kb-document.repository';
 import { KbIngestService } from './kb-ingest.service';
-import {
-  concatDistinct,
-  shapePassages,
-  shapeWithDecisions,
-} from '../util/retrieval';
+import { shapeWithDecisions } from '../util/retrieval';
 import {
   KbRetrievalRepository,
   RetrievalPassageRecord,
@@ -205,7 +201,6 @@ export class KnowledgeBaseService {
     return {
       id: entity.id,
       corpus: entity.corpus,
-      characterTopics: entity.characterTopics ?? [],
       title: entity.title,
       sourceType: entity.sourceType,
       sourceUrl: entity.sourceUrl ?? null,
@@ -354,7 +349,7 @@ export class KnowledgeBaseService {
     return this.insertAndQueue(
       userId,
       dto,
-      { corpus: dto.corpus, characterTopics: dto.characterTopics ?? [] },
+      { corpus: dto.corpus },
       { isGlobal, tenantIds, ownerTenantId: null },
     );
   }
@@ -366,10 +361,7 @@ export class KnowledgeBaseService {
   private async insertAndQueue(
     userId: number,
     dto: KbDocumentSource,
-    placement: {
-      corpus: KbCorpus;
-      characterTopics: NonNullable<CreateKbDocumentDto['characterTopics']>;
-    },
+    placement: { corpus: KbCorpus },
     audience: {
       isGlobal: boolean;
       tenantIds: string[];
@@ -384,7 +376,6 @@ export class KnowledgeBaseService {
       // this column did; a row written now must say which corpus it belongs to, or the day the
       // default changes every new document silently lands in the wrong one.
       corpus: placement.corpus,
-      characterTopics: placement.characterTopics,
       title: dto.title.trim(),
       sourceType: dto.sourceType,
       sourceUrl: dto.sourceUrl ?? null,
@@ -634,11 +625,6 @@ export class KnowledgeBaseService {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
         ...(dto.language !== undefined ? { language: dto.language } : {}),
-        // Free to change: a ranking hint read at query time, so it invalidates no chunk and
-        // triggers no re-index. An empty array is a real value — "no hint" — not a no-op.
-        ...(dto.characterTopics !== undefined
-          ? { characterTopics: dto.characterTopics }
-          : {}),
         updatedBy: userId,
       },
     );
@@ -843,23 +829,22 @@ export class KnowledgeBaseService {
   }
 
   /**
-   * The one retrieval path. Everything that grounds an answer on this corpus goes through
-   * here — the WhatsApp answering agent, the character interview's search tool, and the admin
-   * preview, which is the same call with no generation after it and is therefore worth
-   * trusting as a preview.
+   * The unrestricted retrieval path — the admin retrieval preview. The WhatsApp answering
+   * agent retrieves inside ally-ai with the same scope rules, and searches FOR someone go
+   * through `searchForAudience`.
    *
-   * Three things happen that a bare vector search does not do:
+   * Two things happen that a bare vector search does not do:
    *
    * 1. Scope becomes the query. `retrievableIds` resolves ONE corpus's indexed, unarchived
    *    document ids in Postgres and they travel as ally-ai's `document_ids`. There is no
    *    "search everything" branch to fall into — an empty id set returns no passages rather
    *    than the whole shared collection, which is the failure this shape exists to make
    *    impossible.
-   * 2. Curator hints boost rather than filter. Documents mapped to the asked-about
-   *    `characterTopics` are searched first; the rest of the corpus tops the result up only
-   *    if the first pass came back short. Mapped material therefore wins ties and near-ties
-   *    without ever hiding the unmapped passage that turns out to matter.
-   * 3. The ranking is shaped for reading, not scoring — see `shapePassages`.
+   * 2. The ranking is shaped for reading, not scoring — see `shapeWithDecisions`.
+   *
+   * One pass. The two-pass topic boost (mapped documents first, the rest as a top-up) served
+   * only the character corpus, and went with it into the Context Library; the log keeps the
+   * same shape, with the pass recorded as `rest`.
    *
    * And every retrieval is recorded — see `KbRetrieval`. Not for an audit trail: the numbers
    * above (the floor most of all) were chosen by reasoning, and the first measurement showed
@@ -878,10 +863,9 @@ export class KnowledgeBaseService {
       );
     }
     const startedAt = Date.now();
-    const { preferred, rest } = await this.documentRepository.retrievableIds({
+    const ids = await this.documentRepository.retrievableIds({
       corpus: dto.corpus,
       tags: dto.tags,
-      characterTopics: dto.characterTopics,
     });
 
     const limit = dto.limit ?? 8;
@@ -906,72 +890,49 @@ export class KnowledgeBaseService {
     // eight. Capped so a large limit cannot turn into an unbounded ally-ai query.
     const fetchLimit = Math.min(limit * 3, 50);
 
-    const first = preferred.length
+    const raw = ids.length
       ? await this.searchDocuments(
           dto.corpus,
           dto.query,
-          preferred,
+          ids,
           fetchLimit,
           minSimilarity,
           audience,
         )
       : [];
 
-    // Only top up when shaping the first pass would not already fill the limit. Checked
-    // against the SHAPED count rather than the raw one, or a first pass of eight
-    // near-duplicates from one document would suppress the top-up and then collapse to two.
-    const shapedFirst = shapePassages(first, {
-      limit,
-      perDocumentLimit: KB_MAX_PASSAGES_PER_DOCUMENT,
-    });
-    const topUpRan = shapedFirst.length < limit && rest.length > 0;
-    const second = topUpRan
-      ? await this.searchDocuments(
-          dto.corpus,
-          dto.query,
-          rest,
-          fetchLimit,
-          minSimilarity,
-          audience,
-        )
-      : [];
-
-    const candidates = concatDistinct(first, second);
-    const { kept: passages, decisions } = shapeWithDecisions(candidates, {
+    const { kept: passages, decisions } = shapeWithDecisions(raw, {
       limit,
       perDocumentLimit: KB_MAX_PASSAGES_PER_DOCUMENT,
     });
 
     this.logger.info(
-      `[KB_RETRIEVAL] corpus=${dto.corpus} preferred_docs=${preferred.length} ` +
-        `rest_docs=${rest.length} topics=${(dto.characterTopics ?? []).join(',') || 'none'} ` +
-        `min_similarity=${minSimilarity} raw=${first.length}+${second.length} ` +
+      `[KB_RETRIEVAL] corpus=${dto.corpus} docs=${ids.length} ` +
+        `min_similarity=${minSimilarity} raw=${raw.length} ` +
         `returned=${passages.length}/${limit}`,
     );
 
-    const firstPassChunkIds = new Set(first.map((p) => p.chunk_id));
     await this.recordRetrieval(
       {
         corpus: dto.corpus,
         consumer: context.consumer ?? KbRetrievalConsumer.ADMIN_PREVIEW,
         query: dto.query,
-        characterTopics: dto.characterTopics ?? [],
         tags: dto.tags ?? [],
         minSimilarity,
         requestedLimit: limit,
         fetchLimit,
-        preferredDocumentCount: preferred.length,
-        restDocumentCount: rest.length,
-        firstPassHits: first.length,
-        // Null, not zero, when the top-up never ran — see KbRetrieval.secondPassHits.
-        secondPassHits: topUpRan ? second.length : null,
+        // One pass over the corpus: no preferred bucket, and null when there was nothing to
+        // search — the shape `searchForAudience` and the WhatsApp bot's rows also have.
+        preferredDocumentCount: 0,
+        restDocumentCount: ids.length,
+        firstPassHits: 0,
+        secondPassHits: ids.length ? raw.length : null,
         returnedCount: passages.length,
         latencyMs: Date.now() - startedAt,
         sessionId: context.sessionId ?? null,
         createdBy: context.userId ?? null,
-        // An admin's console query or the interview agent's own composed question — neither is
-        // someone else's words, so neither is withheld. The WhatsApp bot's rows arrive from
-        // ally-ai with this set.
+        // An admin's console query is not someone else's words, so it is not withheld. The
+        // WhatsApp bot's rows arrive from ally-ai with this set.
         querySensitive: false,
       },
       decisions.map((decision, index) => ({
@@ -979,9 +940,7 @@ export class KnowledgeBaseService {
         documentId: decision.passage.document_id,
         rank: index + 1,
         similarity: decision.passage.similarity,
-        pass: firstPassChunkIds.has(decision.passage.chunk_id)
-          ? KbRetrievalPass.PREFERRED
-          : KbRetrievalPass.REST,
+        pass: KbRetrievalPass.REST,
         outcome: decision.outcome,
       })),
     );
@@ -1075,13 +1034,12 @@ export class KnowledgeBaseService {
         corpus: request.corpus,
         consumer: context.consumer,
         query: request.query,
-        characterTopics: [],
         tags: [],
         minSimilarity,
         requestedLimit: limit,
         fetchLimit,
-        // Shaped like a topic-less `search()`: no preferred bucket, one pass over the rest,
-        // null when there was nothing to search — so the two read the same in the log.
+        // Shaped like `search()`: no preferred bucket, one pass over the rest, null when
+        // there was nothing to search — so the two read the same in the log.
         preferredDocumentCount: 0,
         restDocumentCount: ids.length,
         firstPassHits: 0,
@@ -1172,7 +1130,7 @@ export class KnowledgeBaseService {
     return this.insertAndQueue(
       userId,
       dto,
-      { corpus: owner.corpus, characterTopics: [] },
+      { corpus: owner.corpus },
       owner.tenantId === null
         ? { isGlobal: true, tenantIds: [], ownerTenantId: null }
         : {
@@ -1221,7 +1179,7 @@ export class KnowledgeBaseService {
     return this.insertAndQueue(
       userId,
       dto,
-      { corpus: KbCorpus.WHATSAPP_QA, characterTopics: [] },
+      { corpus: KbCorpus.WHATSAPP_QA },
       {
         isGlobal: false,
         tenantIds: [],
@@ -1391,28 +1349,10 @@ export class KnowledgeBaseService {
         query,
         limit,
         min_similarity: minSimilarity,
-        // The character library is Ally-global by construction — craft guidance and
-        // observational material, curated once for every tenant's characters — so its
-        // retrieval asks for global documents ONLY.
-        //
-        // Stated rather than left to the default, because the default is not wrong so much as
-        // out of date. `audience` is optional on this request and ally-ai treats an omission as
-        // unrestricted, which was exactly right while the only caller was an admin tuning
-        // console. This path now has a second caller — the interview agent's search_corpus —
-        // and an agent inheriting "unrestricted" would retrieve a tenant-targeted document for
-        // an interview it has nothing to do with. The WhatsApp corpus keeps the console
-        // default, which is its own feature's decision to make.
-        ...(corpus === KbCorpus.CHARACTER_LIBRARY
-          ? { audience: { tenant_id: null, include_global: true } }
-          : {}),
-        // Scopes WITHIN the corpus — the corpus itself is the collection. This is the
-        // curator's topic boost: the mapped documents on the first pass, the rest on the
-        // second.
+        // Scopes WITHIN the corpus — the corpus itself is the collection.
         document_ids: documentIds,
         // And WHO is asking, applied as a filter inside the query rather than to its
-        // results. Both passes carry it: a top-up that dropped the audience would answer
-        // out of another organisation's material precisely when the first pass came back
-        // short.
+        // results.
         audience,
       },
       corpus,

@@ -2,8 +2,9 @@
 
 Corpus-agnostic. Every route takes a `corpus` query parameter that resolves to that
 corpus's own Weaviate collection (see app/core/knowledge_base/corpus.py), so the same
-plumbing serves the WhatsApp Q&A bot and the character-library interview agent without
-either being able to read the other's passages.
+plumbing serves the WhatsApp Q&A bot, the Ally guide and Debrief without any of them
+being able to read another's passages. One route takes no corpus: dropping the
+collection of a corpus retired into ally-be's Context Library.
 
 This module is the plumbing: ally-be pushes chunks here after extracting and chunking a
 document, deletes a document's chunks when it re-chunks or archives, and reconciles ids
@@ -16,7 +17,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.core.dependencies import get_knowledge_chunk_service
+from app.core.dependencies import get_knowledge_chunk_service, get_vector_db
+from app.core.knowledge_base.corpus import RETIRED_CORPUS_COLLECTIONS
 from app.core.knowledge_base.knowledge_chunk_service import KnowledgeChunkService
 from app.exceptions.custom_exceptions import (
     EmbeddingFailedException,
@@ -34,6 +36,7 @@ from app.schemas.knowledge_chunk import (
     KnowledgeChunkIdsResponse,
     KnowledgeChunkSearchRequest,
     KnowledgeChunkSearchResponse,
+    RetiredCollectionDeleteResponse,
 )
 from app.utils.logger import get_logger
 
@@ -101,13 +104,9 @@ async def search_knowledge_chunks(
     /knowledge-agent/answer so tuning retrieval costs nothing in generation tokens and
     cannot be confounded by the prompt.
 
-    Also the character interview agent's retrieval path: ally-be calls this per corpus
-    and composes the answer in its own tool-calling loop, rather than reusing the
-    WhatsApp answering agent's decline thresholds and reply framing.
-
     `document_ids` scopes WITHIN the corpus and is not the corpus boundary — the
-    collection is. ally-be uses it for the curator's topic boost: search the documents
-    mapped to what is being asked about, then top up from the rest.
+    collection is. ally-be resolves the corpus's retrievable documents in Postgres and
+    sends their ids, so the scope is the query itself.
     """
     try:
         passages = await service.search(
@@ -219,6 +218,54 @@ async def delete_document_chunks(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete document chunks",
+        )
+
+
+@router.delete(
+    "/retired-collection",
+    response_model=RetiredCollectionDeleteResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["knowledge_chunks"],
+)
+async def delete_retired_collection(
+    collection: str = Query(..., description="A retired corpus's collection"),
+    confirm: str | None = Query(
+        None, description="Must repeat `collection` exactly, or nothing is dropped"
+    ),
+    vector_db=Depends(get_vector_db),
+):
+    """
+    Drop the whole collection of a corpus retired into ally-be's Context Library.
+
+    Called once, by ally-be's confirmed platform-admin retirement, after the corpus's
+    documents have been distilled there. Only names in RETIRED_CORPUS_COLLECTIONS are
+    accepted (400 otherwise), so no live corpus can be dropped through here, and
+    `confirm` must repeat the name. A missing collection answers `deleted: false`.
+    """
+    if collection not in RETIRED_CORPUS_COLLECTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only a retired corpus's collection can be dropped here",
+        )
+    if confirm != collection:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="confirm must equal collection exactly",
+        )
+    try:
+        deleted = await vector_db.delete_collection(collection)
+        logger.info(f"Dropped retired collection {collection}: deleted={deleted}")
+        return RetiredCollectionDeleteResponse(deleted=deleted)
+    except (VectorDBDeleteFailedException, VectorDBSearchFailedException):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The vector index is unavailable",
+        )
+    except Exception:
+        logger.exception("Unexpected error dropping a retired collection")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to drop the collection",
         )
 
 

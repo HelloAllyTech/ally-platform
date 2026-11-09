@@ -15,6 +15,8 @@ export interface FacetSpec {
   label: string;
   /** Controlled vocabulary. Absent means free text (still normalised to lower-kebab). */
   values?: readonly string[];
+  /** What the UI shows for each vocabulary value; absent values show as written. */
+  valueLabels?: Readonly<Record<string, string>>;
   multi: boolean;
   required?: boolean;
 }
@@ -70,7 +72,7 @@ export interface ExtractionSpec {
   /** Skills Store prompt code of this collection's extractor. */
   promptCode: string;
   maxCandidatesPerSegment: number;
-  /** Extra critic checks this profile needs, by name (see CRITIC_CHECKS). */
+  /** Extra critic checks this profile needs, by name (defined in `CRITIC_CHECKS`). */
   criticChecks: readonly string[];
 }
 

@@ -307,3 +307,15 @@ export class ContextLoopSettingsDto {
   @IsString({ each: true })
   paused?: string[];
 }
+
+/** Retiring a Knowledge Base corpus deletes it; the body must repeat the exact phrase. */
+export class ContextRetireCorpusDto {
+  @ApiProperty({
+    description:
+      'Exactly "retire character_library". Anything else deletes nothing.',
+    example: 'retire character_library',
+  })
+  @IsString()
+  @MaxLength(80)
+  confirm!: string;
+}

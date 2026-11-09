@@ -53,8 +53,8 @@ class TestPromptBuilder:
         # Relevance is not corpus-independent: craft guidance answers a craft
         # question and is tangential to a subject question. Without the purpose
         # the judge cannot label either honestly.
-        prompt = build_judge_prompt("q", "character_library", [_passage()], 0.35)
-        assert CORPUS_PURPOSE["character_library"] in prompt
+        prompt = build_judge_prompt("q", "whatsapp_qa", [_passage()], 0.35)
+        assert CORPUS_PURPOSE["whatsapp_qa"] in prompt
 
     def test_every_corpus_says_what_it_is_for(self):
         # A corpus without a purpose is judged as "an unrecognised corpus", which
@@ -71,7 +71,7 @@ class TestPromptBuilder:
     def test_includes_the_query_verbatim_and_the_floor(self):
         prompt = build_judge_prompt(
             "how specific should a character be?",
-            "character_library",
+            "whatsapp_qa",
             [_passage()],
             0.35,
         )
@@ -79,7 +79,7 @@ class TestPromptBuilder:
         assert "SIMILARITY FLOOR IN FORCE: 0.35" in prompt
 
     def test_carries_each_passage_with_its_id_score_and_text(self):
-        prompt = build_judge_prompt("q", "character_library", [_passage()], 0.35)
+        prompt = build_judge_prompt("q", "whatsapp_qa", [_passage()], 0.35)
         assert "[c1]" in prompt
         assert "Designing Clients · How speech changes" in prompt
         assert "similarity 0.5123" in prompt
@@ -97,14 +97,14 @@ class TestPromptBuilder:
         assert "TANGENTIAL IS NOT A SOFTER IRRELEVANT" in DEFAULT_JUDGE_RUBRIC
 
     def test_an_empty_retrieval_asks_for_nothing_useful_and_a_gap(self):
-        prompt = build_judge_prompt("q", "character_library", [], 0.35)
+        prompt = build_judge_prompt("q", "whatsapp_qa", [], 0.35)
         assert "PASSAGES RETURNED: none." in prompt
         assert "nothing_useful" in prompt
         assert "missing" in prompt
 
     def test_a_custom_rubric_replaces_the_default(self):
         prompt = build_judge_prompt(
-            "q", "character_library", [_passage()], 0.35, rubric="ONLY THIS"
+            "q", "whatsapp_qa", [_passage()], 0.35, rubric="ONLY THIS"
         )
         assert prompt.startswith("ONLY THIS")
         assert "IGNORE THE SIMILARITY SCORES" not in prompt
@@ -120,7 +120,7 @@ class TestJudgeGuards:
             "app.core.llm.dispatch.generate_structured",
             new=AsyncMock(return_value=(output, {"model": "gemini-2.5-pro"})),
         ):
-            return await judge_retrieval("q", "character_library", passages, 0.35)
+            return await judge_retrieval("q", "whatsapp_qa", passages, 0.35)
 
     async def test_keeps_a_judgment_for_a_passage_we_sent(self):
         out = RagQualityOutput(
@@ -193,7 +193,7 @@ class TestJudgeGuards:
     async def test_does_not_call_the_model_for_a_blank_query(self):
         with patch("app.core.llm.dispatch.generate_structured", new=AsyncMock()) as spy:
             kept, retrieval, model = await judge_retrieval(
-                "   ", "character_library", [_passage()], 0.35
+                "   ", "whatsapp_qa", [_passage()], 0.35
             )
         spy.assert_not_called()
         assert kept == [] and retrieval is None
@@ -220,7 +220,7 @@ class TestJudgeGuards:
             ),
         ):
             _, _, model = await judge_retrieval(
-                "q", "character_library", [_passage("c1")], 0.35
+                "q", "whatsapp_qa", [_passage("c1")], 0.35
             )
         assert model == "gemini-2.5-flash"
 

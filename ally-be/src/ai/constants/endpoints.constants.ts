@@ -44,7 +44,7 @@ export const ENDPOINTS = {
   AGENT_MEMORY_SEARCH: 'api/v1/agent-memories/search',
   AGENT_MEMORY_IDS: 'api/v1/agent-memories/ids',
 
-  // ── Knowledge corpora (WhatsApp Q&A, character library) ───────────────────
+  // ── Knowledge corpora (WhatsApp Q&A, Ally guide library, Debrief guidance) ──
   // Same ownership rule as the roadmap collection above: ally-ai owns the `KnowledgeChunk`
   // Weaviate collection, ally-be's Postgres (kb_documents + kb_document_chunks) stays the
   // system of record, and the vector store is a DERIVED index. The Weaviate object uuid IS
@@ -52,10 +52,10 @@ export const ENDPOINTS = {
   //
   // ONE COLLECTION PER CORPUS, not one collection with a scope argument: every call below takes
   // a `corpus` that ally-ai resolves to its own Weaviate collection. So the boundary is
-  // structural — there is no filter to leave unset, and the WhatsApp bot cannot retrieve a
-  // character-library passage even if a caller forgets everything. `document_ids` still exists
-  // on the search call, but it scopes WITHIN a corpus (the curator's topic boost), which is a
-  // ranking concern rather than a correctness one.
+  // structural — there is no filter to leave unset, and the WhatsApp bot cannot retrieve
+  // another corpus's passage even if a caller forgets everything. `document_ids` still exists
+  // on the search call, but it scopes WITHIN a corpus, which is a ranking concern rather than a
+  // correctness one.
   KNOWLEDGE_CHUNK_BULK_UPSERT: 'api/v1/knowledge-chunks/bulk-upsert',
   KNOWLEDGE_CHUNK_SEARCH: 'api/v1/knowledge-chunks/search',
   KNOWLEDGE_CHUNK_DELETE_BY_DOCUMENT: 'api/v1/knowledge-chunks/document',
@@ -63,6 +63,11 @@ export const ENDPOINTS = {
   // Also `.../document`, like the delete above: the document id and `/audience` are
   // appended by the caller.
   KNOWLEDGE_CHUNK_SET_AUDIENCE: 'api/v1/knowledge-chunks/document',
+  // Drops the Weaviate collection of a corpus that has been retired into the Context Library.
+  // ally-ai refuses any name that is not on its retired list, and any request that does not
+  // repeat the name in `confirm`.
+  KNOWLEDGE_CHUNK_RETIRED_COLLECTION:
+    'api/v1/knowledge-chunks/retired-collection',
   // Context Library (docs/context-library/PLAN.md). One Weaviate collection per Context
   // Library collection and index version (`Ctx<Collection>_v{N}`), named in a `collection`
   // query parameter that ally-ai validates against that pattern. Postgres `cl_chunks` is the

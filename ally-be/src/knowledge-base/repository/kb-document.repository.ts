@@ -218,13 +218,8 @@ export class KbDocumentRepository extends Repository<KbDocument> {
   }
 
   /**
-   * The retrievable documents of one corpus, split by whether a curator mapped them to
-   * the topic being asked about.
-   *
-   * This split IS the boost. Retrieval searches `preferred` first and tops up from
-   * `rest`, so a curator's hint wins ties without ever hiding the unmapped passage that
-   * turns out to matter. Archived documents appear in neither: their vectors are deleted,
-   * so returning their ids would only ask ally-ai about chunks it no longer holds.
+   * The retrievable documents of one corpus. Archived documents are excluded: their vectors
+   * are deleted, so returning their ids would only ask ally-ai about chunks it no longer holds.
    *
    * Returning ids rather than a filter flag is what keeps the corpus boundary honest —
    * ally-ai's search takes `document_ids`, so the scope becomes the query itself.
@@ -232,10 +227,9 @@ export class KbDocumentRepository extends Repository<KbDocument> {
   async retrievableIds(options: {
     corpus: KbCorpus;
     tags?: string[];
-    characterTopics?: string[];
-  }): Promise<{ preferred: string[]; rest: string[] }> {
+  }): Promise<string[]> {
     const query = this.createQueryBuilder('doc')
-      .select(['doc.id', 'doc.characterTopics'])
+      .select(['doc.id'])
       .where('doc.corpus = :corpus', { corpus: options.corpus })
       .andWhere('doc.archivedAt IS NULL')
       // Only an indexed document has vectors to match against; the others are still
@@ -249,16 +243,7 @@ export class KbDocumentRepository extends Repository<KbDocument> {
     }
 
     const rows = await query.getMany();
-    const wanted = new Set(options.characterTopics ?? []);
-    const preferred: string[] = [];
-    const rest: string[] = [];
-    for (const row of rows) {
-      const mapped =
-        wanted.size > 0 &&
-        (row.characterTopics ?? []).some((topic) => wanted.has(topic));
-      (mapped ? preferred : rest).push(row.id);
-    }
-    return { preferred, rest };
+    return rows.map((row) => row.id);
   }
 
   /**
