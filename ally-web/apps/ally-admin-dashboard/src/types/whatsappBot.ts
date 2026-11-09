@@ -5,29 +5,14 @@
  * collection, so this is a scope that cannot be forgotten rather than a filter that can. The
  * WhatsApp Q&A bot was the first, which is why these endpoints live in this file — the data
  * layer is shared, the screens are not.
+ *
+ * The character corpus (`character_library`) was retired into the Context Library's Character
+ * Insights collection; the API now rejects that value.
  */
 export enum KbCorpus {
   WHATSAPP_QA = "whatsapp_qa",
-  CHARACTER_LIBRARY = "character_library",
   /** The Debrief agent's guidance (Debriefs → Knowledge). */
   DEBRIEF_KNOWLEDGE = "debrief_knowledge",
-}
-
-/**
- * Which part of a character a document helps ground. A curator's hint that BOOSTS those topics
- * in retrieval — mapped documents are searched first and the rest of the corpus tops up a short
- * result — never a restriction. Empty is the default and a perfectly good answer.
- *
- * Named for the SUBJECT, not for the interviewer prompt's phase numbering: that wording and
- * ordering change without a migration, so a mapping keyed to "phase 4" would be stale on
- * arrival.
- */
-export enum KbCharacterTopic {
-  IDENTITY = "identity",
-  LIFE_CONTEXT = "life_context",
-  INNER_LIFE = "inner_life",
-  HISTORY_AND_PRESENTING_CONCERN = "history_and_presenting_concern",
-  SPEECH_AND_LANGUAGE = "speech_and_language",
 }
 
 /** Types for the WhatsApp Q&A bot admin tab. Mirrors ally-be's DTOs. */
@@ -65,8 +50,6 @@ export const KB_IN_FLIGHT_STATUSES: KbDocumentStatus[] = [
 export interface KbDocument {
   id: string;
   corpus: KbCorpus;
-  /** Only meaningful for the character library; empty elsewhere. */
-  characterTopics: KbCharacterTopic[];
   title: string;
   sourceType: KbDocumentSourceType;
   sourceUrl: string | null;
@@ -136,7 +119,6 @@ export interface CreateKbUploadUrlResponse {
 
 export interface CreateKbDocumentRequest {
   corpus?: KbCorpus;
-  characterTopics?: KbCharacterTopic[];
   title: string;
   sourceType: KbDocumentSourceType;
   text?: string;
@@ -168,11 +150,6 @@ export interface UpdateKbDocumentRequest {
   title?: string;
   tags?: string[];
   language?: string;
-  /**
-   * Free to change: a ranking hint read at query time, so it invalidates no chunk and
-   * triggers no re-index. `[]` clears it, which is a real answer ("no hint"), not a no-op.
-   */
-  characterTopics?: KbCharacterTopic[];
 }
 
 export interface ReplaceKbDocumentContentRequest {
@@ -208,8 +185,6 @@ export interface KbStats {
 
 export interface KbSearchRequest {
   corpus?: KbCorpus;
-  /** Boosts documents a curator mapped to these topics; never restricts to them. */
-  characterTopics?: KbCharacterTopic[];
   query: string;
   limit?: number;
   minSimilarity?: number;

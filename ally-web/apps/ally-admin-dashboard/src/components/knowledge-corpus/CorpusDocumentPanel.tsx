@@ -18,7 +18,7 @@ import {
 } from "@api";
 import { EntityField, EntitySidePanel } from "@components";
 import { DOCUMENT_MAX_PASTE_CHARS, en } from "@constants";
-import { KbCharacterTopic, KbCorpus, KbDocument, KbDocumentSourceType } from "@types";
+import { KbCorpus, KbDocument, KbDocumentSourceType } from "@types";
 
 import { CorpusAudienceField } from "./CorpusAudienceField";
 import { DocumentUploadField } from "./DocumentUploadField";
@@ -42,8 +42,6 @@ interface CorpusDocumentPanelProps {
    * is immutable, because moving a document would change what every citation over it meant.
    */
   corpus?: KbCorpus;
-  /** Character topics to file a new document under. Character library only. */
-  characterTopics?: KbCharacterTopic[];
   /**
    * Opened from one organisation's WhatsApp page: a new document is aimed at that organisation
    * by default, and every request names it (an org-restricted admin's are refused otherwise).
@@ -89,7 +87,6 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
   isOpen,
   document,
   corpus = KbCorpus.WHATSAPP_QA,
-  characterTopics = [],
   scopeTenantId,
   onClose,
 }) => {
@@ -260,7 +257,6 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
         await createDocument({
           ...scope,
           corpus,
-          ...(characterTopics.length ? { characterTopics } : {}),
           title: title.trim(),
           sourceType,
           ...(sourceType === KbDocumentSourceType.PASTE ? { text: text.trim() } : {}),
@@ -400,10 +396,9 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
         <p className="text-xs text-typography-500">{en.whatsappBot.corpus.sourceTypeLocked}</p>
       )}
 
-      {/* WhatsApp corpus only. Every corpus carries `isGlobal`/`tenantIds`, but only this
-          one's retrieval filters on them — the character library is Ally-global and its
-          retrieval names `unrestricted()`. An organisation picker on that corpus would
-          promise a targeting nothing enforces. */}
+      {/* WhatsApp corpus only. Every corpus carries `isGlobal`/`tenantIds`, but this panel
+          offers the organisation picker only where retrieval is known to filter on them; on
+          any other corpus it would promise a targeting nothing here enforces. */}
       {(document?.corpus ?? corpus) === KbCorpus.WHATSAPP_QA && (
         <CorpusAudienceField
           isGlobal={isGlobal}

@@ -37,7 +37,7 @@ const RESPONSE = {
   ],
   superficialMatches: 18,
   byConsumer: [
-    { consumer: "interview_agent", retrievals: 80, judged: 70, emptyRetrievals: 6 },
+    { consumer: "whatsapp_bot", retrievals: 80, judged: 70, emptyRetrievals: 6 },
     { consumer: "admin_preview", retrievals: 40, judged: 26, emptyRetrievals: 11 },
   ],
   floorCurve: [
@@ -50,7 +50,7 @@ const RESPONSE = {
       query: "how does early-stage dementia change speech?",
       sufficiency: "nothing_useful",
       missing: "a first-person account of word-finding trouble",
-      consumer: "interview_agent",
+      consumer: "admin_preview",
       returnedCount: 0,
       minSimilarity: 0.35,
       occurredAt: "2026-09-10T15:41:00.000Z",
@@ -80,13 +80,11 @@ vi.mock("@constants", () => ({
       failed: "Couldn't load retrieval quality",
       consumer: "Asked by",
       allConsumers: "Everything",
-      interviewAgent: "Interview agent",
       whatsappBot: "WhatsApp bot",
       queryWithheld: "Question withheld — asked by a health worker",
       adminPreview: "Admin preview",
       corpus: "Corpus",
       allCorpora: "Both",
-      characterLibrary: "Character library",
       whatsappQa: "WhatsApp Q&A",
       referenceDocuments: "Reference documents",
       roadmapOpportunities: "Roadmap duplicates",
@@ -193,24 +191,29 @@ describe("RetrievalQualityTab", () => {
 
   it("separates the two consumers instead of pooling them", () => {
     render(<RetrievalQualityTab range="30d" />);
-    expect(screen.getByTestId("rag-consumer-row-interview_agent")).toHaveTextContent("80");
+    expect(screen.getByTestId("rag-consumer-row-whatsapp_bot")).toHaveTextContent("80");
     expect(screen.getByTestId("rag-consumer-row-admin_preview")).toHaveTextContent("40");
   });
 
   it("narrows the whole payload to one consumer on request", () => {
     render(<RetrievalQualityTab range="30d" />);
-    fireEvent.click(screen.getByTestId("rag-consumer-interview_agent"));
+    fireEvent.click(screen.getByTestId("rag-consumer-reference_search"));
     expect(querySpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ consumer: "interview_agent" }),
+      expect.objectContaining({ consumer: "reference_search" }),
     );
   });
 
   it("narrows to one corpus, because floor and chunk size differ per corpus", () => {
     render(<RetrievalQualityTab range="30d" />);
-    fireEvent.click(screen.getByTestId("rag-corpus-character_library"));
-    expect(querySpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ corpus: "character_library" }),
-    );
+    fireEvent.click(screen.getByTestId("rag-corpus-whatsapp_qa"));
+    expect(querySpy).toHaveBeenLastCalledWith(expect.objectContaining({ corpus: "whatsapp_qa" }));
+  });
+
+  it("offers nothing for the retired character corpus, which the API now rejects", () => {
+    // Character Insights moved to the Context Library, which has its own Insights view.
+    render(<RetrievalQualityTab range="30d" />);
+    expect(screen.queryByTestId("rag-consumer-interview_agent")).toBeNull();
+    expect(screen.queryByTestId("rag-corpus-character_library")).toBeNull();
   });
 
   it("warns when a window mixes two judges rather than averaging them", () => {
@@ -294,7 +297,7 @@ describe("RetrievalQualityTab", () => {
 
   it("does not claim that about a corpus it does judge", () => {
     render(<RetrievalQualityTab range="30d" />);
-    fireEvent.click(screen.getByTestId("rag-corpus-character_library"));
+    fireEvent.click(screen.getByTestId("rag-corpus-whatsapp_qa"));
     expect(screen.queryByTestId("rag-unjudged-corpus")).toBeNull();
   });
 });

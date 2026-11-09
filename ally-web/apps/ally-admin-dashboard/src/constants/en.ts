@@ -1142,13 +1142,11 @@ export const en = {
     failed: "Couldn't load retrieval quality",
     consumer: "Asked by",
     allConsumers: "Everything",
-    interviewAgent: "Interview agent",
     whatsappBot: "WhatsApp bot",
     queryWithheld: "Question withheld — asked by a health worker",
     adminPreview: "Admin preview",
     corpus: "Corpus",
     allCorpora: "Both",
-    characterLibrary: "Character library",
     whatsappQa: "WhatsApp Q&A",
     referenceDocuments: "Reference documents",
     roadmapOpportunities: "Roadmap duplicates",
@@ -1195,51 +1193,18 @@ export const en = {
     missingPrefix: "Judge wanted:",
   },
 
-  characterCorpus: {
-    trigger: "Reference corpus",
-    title: "Reference corpus",
-    subtitle:
-      "Craft guidance on building believable people, plus lived-experience and observational material. This is what the interview agent reaches for so its questions are specific and its drafts are real rather than plausible \u2014 clinical guidelines and protocols belong in the WhatsApp bot's corpus, not here.",
-    empty: "Nothing here yet",
-    emptyBody:
-      "Add a case account, a first-person piece, notes on how people in a particular situation actually talk, or distilled craft principles for writing characters — anything the agent should know that an admin shouldn't have to type.",
-    add: "Add material",
-    topics: "Grounds",
-    topicsHelp:
-      "Which parts of a character this helps with. A hint that ranks it higher for those, never a restriction — leave it blank if you're not sure.",
-    topicsNone: "No hint",
-    saveTopics: "Save",
-    topicsSaved: "Saved",
-    topicsFailed: "Couldn't save that",
-    preview: "Try a search",
-    previewHelp:
-      "Ask what the agent would ask, and see what comes back with its match score. Scores below the floor are never returned.",
-    previewPlaceholder: "e.g. how does early-stage dementia change how someone speaks?",
-    previewRun: "Search",
-    previewEmpty:
-      "Nothing matched at this floor — the agent would be told so, and would not invent a source.",
-    // Three states, three sentences. "Nothing matched" is only the truthful one when there is
-    // something to match against; the other two name what to do instead of implying a
-    // threshold problem.
-    previewNothingIndexed:
-      "No passages are indexed yet, so a search cannot match anything. Add material, or wait for indexing to finish.",
-    previewIndexFailed:
-      "Indexing failed, so there are no passages to search. Check the failed document above and re-upload it.",
-    previewEmptyTryFloor:
-      "Nothing matched at the default floor. Similarity search is brittle across phrasing, so try a lower floor before concluding the corpus is missing this — the agent also retries at a different angle.",
-    floor: "Match floor",
-    archive: "Archive",
-    unarchive: "Restore",
-    archived: "Archived",
-    archiveFailed: "Couldn't archive that",
-    archiveHelp:
-      "Archiving deletes the passages so the agent stops using this, and keeps the document here so any citation already recorded still resolves. It is reversible.",
-    previewFailed: "The search failed",
-    score: "match",
-    indexed: "Indexed",
-    inProgress: "In progress",
-    failed: "Failed",
-    passages: "Passages",
+  /**
+   * The Character Library's door to what the character interview draws on. The material lives
+   * in the Context Library's Character Insights collection, so this summarises and links rather
+   * than offering a second place to manage it.
+   */
+  characterInsights: {
+    title: "Character Insights",
+    description: "What the interview draws on.",
+    count: (n: number) =>
+      n === 0 ? "No insights yet" : `${n} ${n === 1 ? "insight" : "insights"}`,
+    manage: "Manage in Context Library",
+    manageLabel: "Manage Character Insights in the Context Library",
   },
 
   characterInterview: {

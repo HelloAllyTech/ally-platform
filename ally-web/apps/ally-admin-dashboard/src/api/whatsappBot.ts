@@ -73,17 +73,17 @@ const botRow = (arg: BotRowArg) => (typeof arg === "string" ? { id: arg } : arg)
 /**
  * WhatsApp Q&A bot admin endpoints, plus the shared knowledge-corpus ones.
  *
- * The corpus endpoints are NOT WhatsApp-specific — they take a `corpus` and serve the character
- * library too. They live here because the WhatsApp bot was their first consumer and moving them
+ * The corpus endpoints are NOT WhatsApp-specific — they take a `corpus` and serve the Debrief
+ * guidance too. They live here because the WhatsApp bot was their first consumer and moving them
  * would churn every import for no behavioural gain. The DATA layer is shared deliberately; the
- * SCREENS are not, and should not be: one is a bot's reference library and the other is
- * character-grounding material, and a single UI trying to be both would serve neither.
+ * SCREENS are not, and should not be: one is a bot's reference library and the other is a
+ * debrief's guidance, and a single UI trying to be both would serve neither.
  *
  * Injected onto `baseAPI` rather than creating a new api, so no store change is needed. Every tag
  * used here is also registered in baseApi.ts's `tagTypes` — an unregistered tag is silently ignored
  * by RTK Query and the invalidation never fires, which is the documented scar in that file.
  *
- * The document tag is shared across corpora, so a character-library write also refetches the
+ * The document tag is shared across corpora, so a Debrief-guidance write also refetches the
  * WhatsApp list. Deliberate: one wasted request beats registering a second tag and discovering
  * months later that a typo made its invalidation a no-op.
  */
