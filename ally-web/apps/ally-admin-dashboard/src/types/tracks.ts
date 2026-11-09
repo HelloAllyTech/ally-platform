@@ -337,6 +337,14 @@ export interface BreathingExerciseContent {
 
 export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
 
+/** How the learner sees the same story. Mirrors ally-be's `BranchingExperience`. */
+export enum BranchingExperience {
+  /** Text first, in a card. Images are optional and small. The default. */
+  CLASSIC = "CLASSIC",
+  /** Cinematic: each scene's photo fills most of the screen; a scene without one reuses the previous scene's. */
+  STORY = "STORY",
+}
+
 export interface BranchingImage {
   /** An uploaded file (https). */
   url: string;
@@ -350,7 +358,11 @@ export interface BranchingChoice {
   nextNodeId: string;
 }
 
-/** A scene with no choices is an ending; only endings carry outcome/score/takeaway. */
+/**
+ * A scene with no choices is an ending; only endings carry outcome/score/takeaway.
+ * A scene with exactly one choice is a "single-button scene": the learner sees one
+ * button labelled with that choice's text.
+ */
 export interface BranchingNode {
   id: string;
   title?: string;
@@ -372,6 +384,8 @@ export interface BranchingScenarioSettings {
 
 export interface BranchingScenarioContent {
   intro?: string;
+  /** Absent = CLASSIC. Stored only when STORY, so classic content stays unchanged. */
+  experience?: BranchingExperience;
   settings?: BranchingScenarioSettings;
   startNodeId: string;
   nodes: BranchingNode[];

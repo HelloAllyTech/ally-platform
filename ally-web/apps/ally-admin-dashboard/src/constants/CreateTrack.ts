@@ -297,7 +297,10 @@ export const MAX_BUCKET_SORT_EXPLANATION = 500;
 /* ---- Branching scenario (BRANCHING_SCENARIO) — limits mirror ally-be ---- */
 
 export const MAX_BRANCHING_NODES = 100;
-export const MIN_BRANCHING_CHOICES = 2;
+/** Fewest choices a non-ending scene may have: 1 is a single-button scene. */
+export const MIN_BRANCHING_CHOICES = 1;
+/** Fewest choices a scene that "asks the learner to choose" shows; going to 1 is the one-button switch. */
+export const MIN_BRANCHING_DECISION_CHOICES = 2;
 export const MAX_BRANCHING_CHOICES = 6;
 export const MAX_BRANCHING_NODE_TEXT = 1500;
 export const MAX_BRANCHING_CHOICE_TEXT = 250;

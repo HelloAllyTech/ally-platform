@@ -269,3 +269,85 @@ describe("BranchingScenarioPlayer", () => {
     expect(screen.queryByText(/scoreVsPass/)).toBeNull();
   });
 });
+
+describe("BranchingScenarioPlayer — one-choice scenes", () => {
+  beforeEach(() => {
+    recordResult.mockReset();
+  });
+
+  it("renders a lone choice as one button (no choice list) and records it as the choice", async () => {
+    mockResolve(result());
+    renderPlayer();
+    // The start scene has two choices: a list.
+    expect(screen.getByRole("list", { name: "tracks2.branching.choicesLabel" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Listen" }));
+    // "Scene two" has one choice: a single button, no list.
+    expect(screen.queryByRole("list", { name: "tracks2.branching.choicesLabel" })).toBeNull();
+    const button = screen.getByRole("button", { name: "Ask" });
+    expect(button.className).toContain("bg-primary-500");
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(recordResult).toHaveBeenCalledWith({ itemId: "item-1", path: ["c1", "c3"] }),
+    );
+  });
+});
+
+describe("BranchingScenarioPlayer — story experience", () => {
+  beforeEach(() => {
+    recordResult.mockReset();
+  });
+
+  const renderWith = (p: StartBranchingScenarioItemPayload, forceClassic?: boolean) =>
+    render(
+      <BranchingScenarioPlayer
+        payload={p}
+        itemId="item-1"
+        onCompleted={vi.fn()}
+        onRequestNext={vi.fn()}
+        onBackToCourse={vi.fn()}
+        forceClassic={forceClassic}
+      />,
+    );
+
+  it("stages the scene beside its photo, then reuses that photo for a scene without one", () => {
+    const { container } = renderWith(payload({ experience: "STORY" }));
+    expect(screen.getByTestId("branching-story")).toBeTruthy();
+    expect(screen.getByAltText("A room")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Start" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Listen" }));
+    expect(screen.getByText("Scene two")).toBeTruthy();
+    // Borrowed photo: same image, decorative (empty alt).
+    const photo = container.querySelector("img");
+    expect(photo?.getAttribute("src")).toBe("https://x/y.png");
+    expect(photo?.getAttribute("alt")).toBe("");
+    // The previous choice still shows, as the quote above the scene.
+    expect(screen.getByText(/tracks2.branching.youChose.*Listen/)).toBeTruthy();
+  });
+
+  it("keeps the ending's actions inside the story panel", async () => {
+    mockResolve(result());
+    renderWith(payload({ experience: "STORY" }));
+    fireEvent.click(screen.getByRole("button", { name: "Listen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    expect(
+      await screen.findByRole("button", { name: "tracks2.branching.continueCourse" }),
+    ).toBeTruthy();
+    expect(screen.getByTestId("branching-story")).toBeTruthy();
+    expect(screen.getByText("Listening works")).toBeTruthy();
+  });
+
+  it("plays classic when a story scenario has no photos", () => {
+    const p = payload({ experience: "STORY" });
+    renderWith({ ...p, nodes: p.nodes.map(n => ({ ...n, image: undefined })) });
+    expect(screen.queryByTestId("branching-story")).toBeNull();
+    expect(screen.getByText("Scene one")).toBeTruthy();
+  });
+
+  it("plays classic when the host forces it", () => {
+    renderWith(payload({ experience: "STORY" }), true);
+    expect(screen.queryByTestId("branching-story")).toBeNull();
+    expect(screen.getByAltText("A room")).toBeTruthy();
+  });
+});

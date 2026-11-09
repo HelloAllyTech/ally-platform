@@ -215,6 +215,18 @@ BranchingOutcome? branchingOutcomeFromString(String? value) {
   }
 }
 
+/// How a branching scenario is presented. [story] is the cinematic layout
+/// (full-bleed scene photo under a bottom sheet); [classic] is the original
+/// card layout. Same graph, recording and scoring either way.
+enum BranchingExperience { classic, story }
+
+/// Lenient: anything but `STORY` (missing, null, a value a newer server adds)
+/// plays as [BranchingExperience.classic].
+BranchingExperience branchingExperienceFromString(Object? value) {
+  if (value is String && value.toUpperCase() == 'STORY') return BranchingExperience.story;
+  return BranchingExperience.classic;
+}
+
 class BranchingChoice {
   BranchingChoice({required this.id, required this.text, required this.nextNodeId});
 
@@ -491,6 +503,7 @@ class StartItemPayload {
     this.branchingExhausted,
     this.branchingNextRoundAt,
     this.branchingRecap,
+    this.branchingExperience,
     this.bucketSortIntro,
     this.bucketSortBuckets,
     this.bucketSortItems,
@@ -592,6 +605,9 @@ class StartItemPayload {
           ? (json['recap'] as List<dynamic>? ?? [])
                 .map((e) => BranchingRecapEntry.fromJson(e as Map<String, dynamic>))
                 .toList()
+          : null,
+      branchingExperience: type == 'BRANCHING_SCENARIO'
+          ? branchingExperienceFromString(json['experience'])
           : null,
       bucketSortIntro: type == 'BUCKET_SORT'
           ? ((json['bucketSort'] as Map<String, dynamic>?)?['intro'] as String?)
@@ -696,6 +712,9 @@ class StartItemPayload {
 
   /// Non-empty only while [branchingExhausted].
   final List<BranchingRecapEntry>? branchingRecap;
+
+  /// `experience`: CLASSIC or STORY. Missing or unknown plays as classic.
+  final BranchingExperience? branchingExperience;
 
   // BUCKET_SORT
   final String? bucketSortIntro;

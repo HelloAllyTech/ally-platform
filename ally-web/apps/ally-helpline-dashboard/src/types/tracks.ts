@@ -748,6 +748,9 @@ export interface StartGameItemPayload extends StartTrackItemBase {
 
 export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
 
+/** How the scenario is staged: cards (CLASSIC) or full-screen photo and panel (STORY). */
+export type BranchingExperience = "CLASSIC" | "STORY";
+
 export interface BranchingChoice {
   id: string;
   text: string;
@@ -759,7 +762,7 @@ export interface BranchingNode {
   title?: string;
   text: string;
   image?: { url: string; alt?: string };
-  /** Absent or empty means this scene is an ending. */
+  /** Absent or empty means this scene is an ending; one choice is a single "continue" button. */
   choices?: BranchingChoice[];
   outcome?: BranchingOutcomeTone;
   score?: number;
@@ -777,6 +780,8 @@ export interface BranchingRecapRun {
 /** The whole story ships to the learner; the server scores the path walked. */
 export interface StartBranchingScenarioItemPayload extends StartTrackItemBase {
   type: TrackItemType.BRANCHING_SCENARIO;
+  /** Absent from older servers; anything but "STORY" plays classic. */
+  experience?: BranchingExperience;
   intro: string | null;
   startNodeId: string;
   nodes: BranchingNode[];

@@ -40,6 +40,7 @@ import {
   TrackGameKey,
 } from '../type/game.type';
 import {
+  BranchingExperience,
   BranchingImage,
   BranchingNode,
   BranchingOutcomeTone,
@@ -350,6 +351,12 @@ export function validateBranchingContent(
   }
   if (content.intro !== undefined && typeof content.intro !== 'string') {
     fail(`${label}: intro must be text.`);
+  }
+  if (
+    content.experience !== undefined &&
+    !Object.values(BranchingExperience).includes(content.experience)
+  ) {
+    fail(`${label}: experience must be classic or story.`);
   }
 
   const nodesById = new Map<string, BranchingNode>();
