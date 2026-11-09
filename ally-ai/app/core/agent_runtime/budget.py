@@ -71,4 +71,8 @@ def tool_budget(state: AgentState) -> int:
         return 0
     if over_time(state):
         return 0
+    # Another search needs time for itself and the reply after it (chunk 20a-2):
+    # one started late ran the reply past the hard cap, and v1 answered instead.
+    if calls and time_left(state) < SEARCH_AGAIN_RESERVE_SECONDS:
+        return 0
     return max(0, settings.AGENT_RUNTIME.MAX_TOOL_CALLS - len(calls))

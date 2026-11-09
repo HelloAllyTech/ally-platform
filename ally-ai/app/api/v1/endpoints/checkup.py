@@ -12,9 +12,15 @@ from fastapi import APIRouter, Depends
 from app.api.v1.endpoints.knowledge_agent import knowledge_errors
 from app.core.checkup.grader import grade as grade_case
 from app.core.checkup.grader import source_chunk_ids, source_texts
+from app.core.checkup.questions import write_questions
 from app.core.dependencies import get_knowledge_agent_service
 from app.core.knowledge_agent.agent import KnowledgeAgentService
-from app.schemas.checkup import GradeRequest, GradeResponse
+from app.schemas.checkup import (
+    GradeRequest,
+    GradeResponse,
+    QuestionsRequest,
+    QuestionsResponse,
+)
 
 router = APIRouter()
 
@@ -56,3 +62,14 @@ async def grade(
                 ]
             ),
         )
+
+
+@router.post("/questions", response_model=QuestionsResponse, tags=["checkup"])
+async def questions(payload: QuestionsRequest):
+    """
+    Checkup questions from a business's learned details. Each keeps the ids of the
+    details that answer it, so ally-be can store them as the question's expected
+    facts and source; a question naming a detail it wasn't given is dropped.
+    """
+    with knowledge_errors("Unexpected error writing checkup questions"):
+        return await write_questions(payload)

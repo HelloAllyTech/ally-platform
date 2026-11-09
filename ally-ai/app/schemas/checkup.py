@@ -130,3 +130,34 @@ class GradeResponse(BaseModel):
     cited_expected_source: Optional[bool] = None
     judge: Optional[JudgeFindings] = None
     grader_version: str
+
+
+class LearnedDetail(BaseModel):
+    id: str
+    section: str = ""
+    text: str
+
+
+class QuestionsRequest(BaseModel):
+    business: str
+    audience: str = "clients"
+    language: str = "en"
+    facts: List[LearnedDetail]
+    count: int = Field(12, ge=1, le=20)
+    prompts: Optional[Dict[str, Any]] = None
+
+
+class WrittenQuestion(BaseModel):
+    question: str
+    fact_ids: List[str] = Field(default_factory=list)
+
+
+class QuestionsOut(BaseModel):
+    """What the model writes."""
+
+    questions: List[WrittenQuestion] = Field(default_factory=list)
+
+
+class QuestionsResponse(BaseModel):
+    questions: List[WrittenQuestion]
+    dropped: int = 0

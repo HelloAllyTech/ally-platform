@@ -134,7 +134,9 @@ def fixture_url(key: str, host: str, page: str) -> str:
     return f"http://{host}:{site['port']}{page}"
 
 
-def summarise(label: str, view: Dict[str, Any]) -> Tuple[List[str], bool]:
+def summarise(
+    label: str, view: Dict[str, Any], count_partials: bool = True
+) -> Tuple[List[str], bool]:
     totals = view["totals"]
     t = totals
 
@@ -196,13 +198,43 @@ def summarise(label: str, view: Dict[str, Any]) -> Tuple[List[str], bool]:
                 f" {', '.join(row['reasons'])}. “{reply}”"
             )
     lines += ["", *failing, ""]
+    partials = blocking_partials(view["results"])
+    lines += [
+        f"**Partials that count** (must_pass, failing in {PARTIAL_RUNS} or more "
+        f"runs): {len(partials)} of at most {MAX_PARTIALS}"
+        + (f" ({', '.join(partials)})" if partials else ""),
+        "",
+    ]
     bad = (
         totals.get("fallbacks", 0) > 0
         or totals["hardFails"] > 0
         or totals["wrongDeclines"] > 0
-        or totals["mustPassFailed"] > 0
+        or totals["ms"]["slowest"] >= SLOWEST_MS
+        or (count_partials and len(partials) > MAX_PARTIALS)
     )
     return lines, bad
+
+
+#: The gate (Shehbaz, 9-10 Nov 2026): hard fails and wrong declines count in any
+#: run; a must_pass partial answer counts only when it fails in 2 or more runs, and
+#: at most 2 may remain per suite (each listed in CHUNK-20A2-EVAL.md).
+PARTIAL_RUNS = 2
+MAX_PARTIALS = 2
+SLOWEST_MS = 20_000
+
+
+def blocking_partials(results: List[Dict[str, Any]]) -> List[str]:
+    """must_pass questions failing, without a hard fail, in PARTIAL_RUNS+ runs."""
+    failing: Dict[str, int] = {}
+    names: Dict[str, str] = {}
+    for row in results:
+        if row.get("tier") != "must_pass" or row["verdict"] != "fail":
+            continue
+        if row["hardFail"] or row["wrongDecline"]:
+            continue
+        failing[row["caseId"]] = failing.get(row["caseId"], 0) + 1
+        names[row["caseId"]] = row.get("externalId") or row["question"]
+    return sorted(names[c] for c, n in failing.items() if n >= PARTIAL_RUNS)
 
 
 def main() -> int:
@@ -251,6 +283,7 @@ def main() -> int:
             "wrongDeclines": 0,
             "mustPassFailed": 0,
             "fallbacks": 0,
+            "partials": [],
             "questions": 0,
             "ms": [],
         }
@@ -265,13 +298,17 @@ def main() -> int:
             ]
             import_suite(api, bot, f"fixture-{key}", cases)
             view = run_suite(api, bot, f"fixture-{key}", args.attempts)
-            section, bad = summarise(f"{key} ({args.attempts}×)", view)
+            # Partials count across the whole fixture suite, not per site.
+            section, bad = summarise(
+                f"{key} ({args.attempts}×)", view, count_partials=False
+            )
             lines += section
             failed = failed or bad
             totals["hardFails"] += view["totals"]["hardFails"]
             totals["wrongDeclines"] += view["totals"]["wrongDeclines"]
             totals["mustPassFailed"] += view["totals"]["mustPassFailed"]
             totals["fallbacks"] += view["totals"].get("fallbacks", 0)
+            totals["partials"] += blocking_partials(view["results"])
             totals["questions"] += view["totals"]["questions"]
             totals["ms"] += [
                 r["ms"] for r in view["results"] if r["verdict"] != "error"
@@ -281,6 +318,7 @@ def main() -> int:
                 f" {view['totals']['hardFails']} hard fails",
                 flush=True,
             )
+        failed = failed or len(totals["partials"]) > MAX_PARTIALS
         times = sorted(totals["ms"]) or [0]
         lines[2:2] = [
             f"**Fixtures, all sites:** {totals['questions']} graded replies · "
@@ -288,6 +326,8 @@ def main() -> int:
             f"wrong declines {totals['wrongDeclines']} · "
             f"must_pass not passed {totals['mustPassFailed']} · "
             f"v1 fallbacks {totals['fallbacks']} · "
+            f"partials that count {len(totals['partials'])} "
+            f"({', '.join(totals['partials']) or 'none'}) · "
             f"reply time median {times[len(times) // 2] / 1000:.1f} s, "
             f"slowest {times[-1] / 1000:.1f} s",
             "",

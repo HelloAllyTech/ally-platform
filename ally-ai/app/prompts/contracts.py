@@ -584,6 +584,29 @@ class CheckupJudgeInputs(PromptInputs):
     reply: str
 
 
+class CheckupQuestionsInputs(PromptInputs):
+    """`checkup/questions.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_checkup_questions",
+        name="Checkup: Write Test Questions",
+        description=(
+            "Writes an assistant's checkup questions from what we learned about the "
+            "business (chunk 20a-2), each answered by one or two learned details. Code "
+            "keeps each question's details as its expected facts and source, and drops "
+            "a question that names a detail it wasn't given."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    audience: str
+    business: str
+    facts: str
+    count: str
+    language: str
+
+
 class BuilderSystemInputs(PromptInputs):
     """`builder/system.txt`."""
 

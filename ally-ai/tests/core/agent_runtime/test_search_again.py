@@ -131,3 +131,67 @@ class TestTimeReserve:
         assert can_send_back(self.state(5), Rejection.SEARCH_AGAIN)
         assert not can_send_back(self.state(10), Rejection.SEARCH_AGAIN)
         assert can_send_back(self.state(10), Rejection.UNCITED)
+
+
+class DispatchLikeLLM(FakeLLM):
+    """Like generate_structured: a reply that misfits the schema is a failed call."""
+
+    async def __call__(self, *, schema, prompt, **kwargs):
+        from pydantic import ValidationError
+
+        from app.exceptions.custom_exceptions import LLMInvocationFailedException
+
+        try:
+            return await super().__call__(schema=schema, prompt=prompt, **kwargs)
+        except ValidationError as e:
+            raise LLMInvocationFailedException("invalid response") from e
+
+
+async def test_a_forced_search_that_replies_is_asked_again_unforced(
+    agent_run, chunk_service
+):
+    """F2 in the checkup: forced to search, the model replied; the run failed and v1
+    answered. Now the step is asked again without forcing."""
+    chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+    llm = DispatchLikeLLM(
+        reply("answer", "Call 112 now."),  # uncited: sent back to search
+        reply("decline", "Please call 112 or Tele-MANAS 14416 now."),  # forced: fails
+        reply("decline", "Please call 112 or Tele-MANAS 14416 now."),  # unforced
+    )
+    state = await agent_run("my friend might hurt herself tonight", llm)
+
+    assert state["result"]["intent"] == "decline"
+    assert len(llm.calls) == 3
+
+
+def test_no_second_search_without_time_for_the_reply():
+    import time
+
+    from app.core.agent_runtime.budget import tool_budget
+
+    one_search = [{"tool": "search_knowledge", "added": [1]}]
+    early = {"started_at": time.time() - 3, "tool_calls": one_search}
+    late = {"started_at": time.time() - 10, "tool_calls": one_search}
+    assert tool_budget(early) == 1
+    assert tool_budget(late) == 0
+
+
+async def test_a_malformed_step_is_asked_again(agent_run, chunk_service):
+    """lab-hours in the checkup: a search with no query failed the schema and the
+    run fell back to v1."""
+    chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+    bad = {
+        "action": "search_knowledge",
+        "search_knowledge": None,
+        "turn_type": "question",
+        "language": "en",
+    }
+    llm = DispatchLikeLLM(
+        bad,
+        search("opening hours"),
+        reply(citations=[1], answer="We open at 7 am."),
+    )
+    state = await agent_run("What are your opening hours?", llm)
+
+    assert state["result"]["intent"] == "answer"
+    assert len(llm.calls) == 3
