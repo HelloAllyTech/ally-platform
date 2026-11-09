@@ -817,6 +817,16 @@
       "answerQuestionsToContinue": "Answer the questions to continue",
       "resourcesHeading": "Resources",
       "openExternally": "Open externally",
+      "takeaways": "Key takeaways",
+      "minRead": "{{count}} min read",
+      "quickChecks_one": "{{count}} quick check",
+      "quickChecks_other": "{{count}} quick checks",
+      "startReading": "Start reading",
+      "callout": {
+        "say": "Try saying",
+        "info": "Good to know",
+        "warn": "Watch out"
+      },
       "question": {
         "title": "Quick check",
         "submit": "Check answer",
