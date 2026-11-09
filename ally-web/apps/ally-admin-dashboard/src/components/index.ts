@@ -80,6 +80,7 @@ export * from "./filler-tag-picker";
 export * from "./icon-uploader";
 export * from "./editable-table";
 export * from "./image-library";
+export * from "./image-studio";
 export * from "./report-section";
 export * from "./create-badge-popup";
 export * from "./create-badge-side-panel";

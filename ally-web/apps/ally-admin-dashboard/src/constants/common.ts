@@ -214,6 +214,20 @@ export const ApiEndpoints = {
       `/v1/learn/admin/tracks/${id}/translations/${languageId}/unpublish`,
   },
 
+  // Image Studio — AI images for every authoring slot (ally-be docs/image-studio.md).
+  IMAGE_STUDIO: {
+    CONFIG: "/v1/image-studio/config",
+    STYLES: "/v1/image-studio/styles",
+    SLOTS: "/v1/image-studio/slots",
+    DESCRIBE: "/v1/image-studio/describe",
+    JOBS: "/v1/image-studio/jobs",
+    JOBS_BATCH: "/v1/image-studio/jobs/batch",
+    ESTIMATE: "/v1/image-studio/estimate",
+    HISTORY: "/v1/image-studio/history",
+    ACCEPT: (imageId: string) => `/v1/image-studio/images/${imageId}/accept`,
+    CAST_SHEETS: "/v1/image-studio/cast-sheets",
+  },
+
   // Component Library — global, cross-tenant Track/Course item templates.
   COMPONENT_TEMPLATES: {
     LIST: "/v1/learn/admin/component-templates",
@@ -1141,6 +1155,8 @@ export const TAG_TYPES = {
   CUSTOM_FIELD_DEFINITIONS: "customFieldDefinitions",
   CHARACTERS: "characters",
   IMAGE_LIBRARY: "imageLibrary",
+  IMAGE_STUDIO_HISTORY: "imageStudioHistory",
+  IMAGE_STUDIO_CAST_SHEETS: "imageStudioCastSheets",
   PROMPTS: "prompts",
   CONVERSATIONAL_GUARDRAILS: "conversationalGuardrails",
   USER_BADGES: "userBadges",

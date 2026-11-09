@@ -17,6 +17,11 @@ import {
   DropdownField,
   FileUpload,
 } from "@components";
+import {
+  IMAGE_STUDIO_COPY,
+  LazyCastSheetsSection,
+  useImageStudioEnabled,
+} from "@components/image-studio";
 import { LanguageTabPanel } from "@components/language-tab-panel";
 import type { LanguageOption } from "@components/linguistic-style-samples/scenarioLanguageUtils";
 import { ButtonVariant } from "@components/types";
@@ -38,6 +43,9 @@ import { asList } from "@utils/characterData";
 
 import { CharacterKnowledgeSourcesField } from "./CharacterKnowledgeSourcesField";
 import { DialectSamplesField } from "./DialectSamplesField";
+
+/** Mirrors ally-be's `scenario_characters.appearance` limit. */
+const APPEARANCE_MAX_LENGTH = 500;
 
 /** A voice as the language catalog nests it (gender/age hoisted out of config). */
 interface VoiceCatalogEntry {
@@ -142,6 +150,7 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const isSavingRef = useRef(false);
 
+  const imageStudioEnabled = useImageStudioEnabled();
   const [createCharacter, { isLoading: isCreating }] = useCreateCharacterMutation();
   const [updateCharacter, { isLoading: isUpdating }] = useUpdateCharacterMutation();
 
@@ -363,6 +372,10 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
         knowledgeSources: asList(rest.knowledgeSources).filter(
           source => source.title.trim() !== "",
         ),
+        // Untouched stays out of the payload; emptied is cleared.
+        ...(rest.appearance !== undefined
+          ? { appearance: rest.appearance?.trim() ? rest.appearance.trim() : null }
+          : {}),
       };
 
       // If no ID exists or ID is temporary, create new character
@@ -420,6 +433,7 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
       (formData.coverImageUrl || "") !== (initialData.coverImageUrl || "") ||
       (formData.coverVideoUrl || "") !== (initialData.coverVideoUrl || "") ||
       (formData.characterProfileText || "") !== (initialData.characterProfileText || "") ||
+      (formData.appearance || "") !== (initialData.appearance || "") ||
       JSON.stringify(formData.voices || {}) !== JSON.stringify(initialData.voices || {}) ||
       JSON.stringify(formData.languageCharacteristics || {}) !==
         JSON.stringify(initialData.languageCharacteristics || {}) ||
@@ -431,6 +445,9 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
   };
 
   const dropdownCustomStyle = { border: "none", paddingLeft: "0", minWidth: 280 };
+  /** Cast sheets belong to a saved character. */
+  const savedCharacterId =
+    formData.id && !formData.id.startsWith("temp-") ? formData.id : undefined;
 
   if (!isOpen) return null;
 
@@ -556,6 +573,26 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
               />
             </Field>
 
+            <Field label={IMAGE_STUDIO_COPY.appearanceLabel}>
+              <div className="flex flex-col gap-1">
+                <TextInput
+                  id="character-appearance"
+                  labelText={IMAGE_STUDIO_COPY.appearanceLabel}
+                  hideLabel
+                  value={formData.appearance || ""}
+                  onChange={e =>
+                    handleFieldChange("appearance", e.target.value.slice(0, APPEARANCE_MAX_LENGTH))
+                  }
+                  maxLength={APPEARANCE_MAX_LENGTH}
+                  placeholder={IMAGE_STUDIO_COPY.appearancePlaceholder}
+                  className="w-full"
+                />
+                <span className="text-xs text-typography-500">
+                  {IMAGE_STUDIO_COPY.appearanceHelper}
+                </span>
+              </div>
+            </Field>
+
             {/* Voice, style and samples are per language and describe the same
                 thing — how this person sounds in that language — so one tab
                 strip governs all three rather than three of them. */}
@@ -664,9 +701,38 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
                   label="Cover Image"
                   hideHeader={true}
                   fileType={FILE_TYPE.IMAGE}
+                  enableAiGeneration={!readOnly}
+                  imageSlotKind="character_portrait"
+                  imageSlotKey={`character:${savedCharacterId ?? "new"}:portrait`}
                 />
               </div>
             </Field>
+
+            {imageStudioEnabled && (
+              <Field label={IMAGE_STUDIO_COPY.castSheetsLabel}>
+                {savedCharacterId ? (
+                  <LazyCastSheetsSection
+                    characterId={savedCharacterId}
+                    characterName={formData.name}
+                    portraitUrl={formData.coverImageUrl || undefined}
+                    context={{
+                      persona: {
+                        name: formData.name,
+                        age: formData.age,
+                        gender: formData.gender,
+                        profession: formData.profession ?? undefined,
+                        currentLocation: formData.currentLocation,
+                        appearance: formData.appearance ?? undefined,
+                      },
+                    }}
+                  />
+                ) : (
+                  <p className="text-sm text-typography-500 md:mt-2">
+                    {IMAGE_STUDIO_COPY.castSheetsSaveFirst}
+                  </p>
+                )}
+              </Field>
+            )}
 
             <Field label="Cover Video">
               <div className="w-full">

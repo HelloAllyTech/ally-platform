@@ -1,3 +1,4 @@
+import { imageJobStore, isImageSettled } from "./imageStudioJobStore";
 import { useAllyGuideAccess } from "./useAllyGuideAccess";
 import { AllySocketStatus, useAllySocket } from "./useAllySocket";
 import { useBuilderSocket } from "./useBuilderSocket";
@@ -11,11 +12,7 @@ import { useCourseCopilotSocket } from "./useCourseCopilotSocket";
 import { useCourseCopilotStream } from "./useCourseCopilotStream";
 import { useCreatePortal } from "./useCreatePortal";
 import { useDebounce } from "./useDebounce";
-import {
-  IMAGE_GENERATION_FAILED_MESSAGE,
-  ImageGenerationError,
-  useImageGenerationJob,
-} from "./useImageGenerationJob";
+import { toImageStudioError, useImageStudioJobs, useSlotImageJobs } from "./useImageStudioJobs";
 import { useIsPlaceholderUsed } from "./useIsPlaceholderUsed";
 import { useLiveKitRoom } from "./useLiveKitRoom";
 import { useResolvedPrimaryLanguageId } from "./useResolvedPrimaryLanguageId";
@@ -58,7 +55,9 @@ export {
   useContentAuthoring,
   useCourseCopilotStream,
   useCourseCopilotSocket,
-  useImageGenerationJob,
-  ImageGenerationError,
-  IMAGE_GENERATION_FAILED_MESSAGE,
+  useImageStudioJobs,
+  useSlotImageJobs,
+  toImageStudioError,
+  imageJobStore,
+  isImageSettled,
 };

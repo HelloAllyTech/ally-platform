@@ -300,7 +300,11 @@ export class GetCastSheetsQueryDto {
   @MaxLength(20 * 37)
   characterIds!: string;
 
-  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(48) styleId!: string;
+  @ApiPropertyOptional({ description: 'Only this style; omit for every style' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(48)
+  styleId?: string;
 }
 
 export class ImageCheckDto {
@@ -312,6 +316,11 @@ export class GeneratedImageDto {
   @ApiProperty() id!: string;
   @ApiProperty() batchId!: string;
   @ApiProperty({ enum: ImageSlotKind }) slotKind!: string;
+  @ApiPropertyOptional({
+    description:
+      'The slot instance this image was made for, echoed from the request',
+  })
+  slotKey?: string;
   @ApiProperty() styleId!: string;
   @ApiProperty() description!: string;
   @ApiProperty() altText!: string;

@@ -10,12 +10,9 @@ import {
   useDeleteCoverImageMutation,
   useGetCoverVideoUrlMutation,
   useDeleteCoverVideoMutation,
-  useLazyGetCoverImageJobQuery,
-  useStartCoverImageJobMutation,
 } from "@api";
 import { DragUpload, Trash, VideoCamera } from "@assets";
-import { Button, CustomDropdownField, ImageLibrary } from "@components";
-import { ButtonVariant } from "@components/types";
+import { ImageLibrary } from "@components";
 import {
   en,
   imageTypes,
@@ -26,24 +23,14 @@ import {
   ASPECT_RATIO,
   ASPECT_RATIO_TOLERANCE,
 } from "@constants";
-import { ImageGenerationError, useImageGenerationJob } from "@hooks";
-import { CoverImageProvider, GenerateCoverImageRequest } from "@types";
+import { AcceptedImage, ImageContext, ImageSlotKind } from "@types";
 import { isNonEmptyString } from "@utils";
+
+import { ImageSourceField } from "../image-studio/ImageSourceField";
+import { compactContext, pageSlotKey } from "../image-studio/utils";
 
 /** Local/dev only: set `VITE_BYPASS_COVER_IMAGE_VALIDATION=true` in `.env` to skip 16:9 checks. */
 const bypassCoverImageAspectCheck = import.meta.env.VITE_BYPASS_COVER_IMAGE_VALIDATION === "true";
-
-const IMAGE_PROVIDER_OPTIONS: { value: CoverImageProvider; label: string }[] = [
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-];
-
-const IMAGE_STYLE_OPTIONS = [
-  { value: "", label: "Default style" },
-  { value: "Photorealistic", label: "Photorealistic" },
-  { value: "Illustration", label: "Illustration" },
-  { value: "3D render", label: "3D render" },
-];
 
 interface FileUploadProps {
   id: string;
@@ -54,11 +41,18 @@ interface FileUploadProps {
   fileType?: string;
   hideHeader?: boolean;
   /**
-   * Render "Generate with AI" controls under the tile (image slots only).
-   * Generation reads the form's `title`/`description` values and substitutes
-   * them into the backend's managed `cover_image_generation` prompt.
+   * Add Image Studio's "✨ Generate" beside the tile (image slots only). The
+   * modal reads the form's `title`/`description` and any persona fields
+   * (`name`, `age`, `gender`, `profession`, `currentLocation`, `appearance`)
+   * as context, unless `imageContext` is given.
    */
   enableAiGeneration?: boolean;
+  /** Which Image Studio slot this is. Default `roleplay_cover`. */
+  imageSlotKind?: ImageSlotKind;
+  /** Stable id of this slot instance; defaults to the page path plus the field id. */
+  imageSlotKey?: string;
+  /** Overrides the context read from the form. */
+  imageContext?: ImageContext;
 }
 
 export const FileUpload = ({
@@ -70,6 +64,9 @@ export const FileUpload = ({
   fileType = FILE_TYPE.IMAGE,
   hideHeader = false,
   enableAiGeneration = false,
+  imageSlotKind = "roleplay_cover",
+  imageSlotKey,
+  imageContext,
 }: FileUploadProps) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   // The File a failed upload was for, kept around so Retry can re-run the
@@ -83,17 +80,8 @@ export const FileUpload = ({
   const [deleteCoverImage] = useDeleteCoverImageMutation();
   const [getCoverVideoUrl] = useGetCoverVideoUrlMutation();
   const [deleteCoverVideo] = useDeleteCoverVideoMutation();
-  const [startCoverImageJob] = useStartCoverImageJobMutation();
-  const [pollCoverImageJob] = useLazyGetCoverImageJobQuery();
-  // A background job polled to completion: generation outlasts the load
-  // balancer's 60 s timeout, which cut the old single request off in production.
-  const { generate: generateCoverImage, isGenerating: isGeneratingImage } = useImageGenerationJob(
-    (input: GenerateCoverImageRequest) => startCoverImageJob(input).unwrap(),
-    (jobId: string) => pollCoverImageJob(jobId).unwrap(),
-  );
-
-  const [aiProvider, setAiProvider] = useState<CoverImageProvider>("openai");
-  const [aiStyleHint, setAiStyleHint] = useState("");
+  // Generated images are shared files (history, other slots): never deleted from here.
+  const generatedUrlsRef = useRef(new Set<string>());
 
   const uploadedFileUrl = watch(id);
   const initialFileUrlRef = useRef("");
@@ -329,7 +317,10 @@ export const FileUpload = ({
     if (!isNonEmptyString(uploadedFileUrl)) return;
 
     try {
-      if (uploadedFileUrl !== initialFileUrlRef.current) {
+      if (
+        uploadedFileUrl !== initialFileUrlRef.current &&
+        !generatedUrlsRef.current.has(uploadedFileUrl)
+      ) {
         const isVideo = uploadedFile?.type.startsWith("video/");
         if (isVideo) {
           await deleteCoverVideo({ coverVideoUrl: uploadedFileUrl }).unwrap();
@@ -357,55 +348,37 @@ export const FileUpload = ({
     setIsImageLibraryOpen(true);
   };
 
-  // AI generation reads the scenario form's title/description and persona
-  // fields (name, age, gender, profession, currentLocation); the backend
-  // substitutes them into the managed `cover_image_generation` prompt.
+  // Image Studio. Generated images are WebP, already in our S3 and already
+  // cropped to the slot's shape, so none of the upload checks (type, size,
+  // 16:9) apply to them.
   const showAiGeneration = enableAiGeneration && fileType === FILE_TYPE.IMAGE;
-  const scenarioTitle = showAiGeneration ? watch("title") : undefined;
-  const personaName = showAiGeneration ? watch("name") : undefined;
-  // The default template is a portrait of the scenario persona, so require
-  // the persona name as well as the title (used for the stored filename).
-  const canGenerate =
-    typeof scenarioTitle === "string" &&
-    scenarioTitle.trim() !== "" &&
-    typeof personaName === "string" &&
-    personaName.trim() !== "";
 
-  const handleGenerateImage = async () => {
-    if (!canGenerate || isGeneratingImage) return;
-    const description = watch("description");
-    const age = watch("age");
-    const gender = watch("gender");
-    const profession = watch("profession");
-    const currentLocation = watch("currentLocation");
+  const formContext = (): ImageContext => {
+    const read = (key: string) => {
+      const value = watch(key);
+      return typeof value === "string" || typeof value === "number" ? String(value) : undefined;
+    };
+    return compactContext({
+      title: read("title"),
+      text: read("description"),
+      persona: {
+        name: read("name"),
+        age: read("age"),
+        gender: read("gender"),
+        profession: read("profession"),
+        currentLocation: read("currentLocation"),
+        appearance: read("appearance"),
+      },
+    });
+  };
 
-    try {
-      const imageUrl = await generateCoverImage({
-        title: scenarioTitle.trim(),
-        name: personaName.trim(),
-        ...(typeof description === "string" &&
-          description.trim() && { description: description.trim() }),
-        ...(age !== "" && age != null && !Number.isNaN(Number(age)) && { age: Number(age) }),
-        ...(typeof gender === "string" && gender.trim() && { gender: gender.trim() }),
-        ...(typeof profession === "string" &&
-          profession.trim() && { profession: profession.trim() }),
-        ...(typeof currentLocation === "string" &&
-          currentLocation.trim() && { currentLocation: currentLocation.trim() }),
-        ...(aiStyleHint && { styleHints: aiStyleHint }),
-        provider: aiProvider,
-      });
-      // Null: the form unmounted while the image was being made.
-      if (!imageUrl) return;
-
-      clearErrors(id);
-      setUploadedFile(null);
-      setValue(id, imageUrl, { shouldValidate: true, shouldDirty: true });
-      toast.success(en.simulation.imageGeneratedSuccessfully);
-    } catch (error) {
-      toast.error(
-        error instanceof ImageGenerationError ? error.message : en.simulation.imageGenerationFailed,
-      );
-    }
+  const handleGeneratedImage = (image: AcceptedImage) => {
+    generatedUrlsRef.current.add(image.url);
+    clearErrors(id);
+    setUploadedFile(null);
+    setPendingRetryFile(null);
+    setValue(id, image.url, { shouldValidate: true, shouldDirty: true });
+    toast.success(en.simulation.imageGeneratedSuccessfully);
   };
 
   // Dropzone setup
@@ -547,47 +520,20 @@ export const FileUpload = ({
           {!isNonEmptyString(uploadedFileUrl) && !isUploading && renderUploadPlaceholder()}
           {isUploading && renderUploadPlaceholder()}
           {renderFilePreview()}
-
-          {isGeneratingImage && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/80">
-              <div className="flex items-center gap-2 text-typography-600">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                {en.simulation.generatingImage}
-              </div>
-            </div>
-          )}
         </div>
 
         {showAiGeneration && (
           // The tile is only ~48% of the panel wide (paired with Cover
-          // Video), so the controls must wrap instead of overflowing into
-          // the neighbouring tile, which would paint over the button and
-          // swallow its clicks.
-          <div className="relative z-10 flex flex-wrap items-center gap-2 mt-2 w-full">
-            <CustomDropdownField
-              customStyle={{ border: "none", paddingLeft: "0", minWidth: 90 }}
-              options={IMAGE_PROVIDER_OPTIONS}
-              placeholder="Provider"
-              defaultOption={IMAGE_PROVIDER_OPTIONS.find(opt => opt.value === aiProvider)}
-              onHandleSelect={option => setAiProvider(option.value as CoverImageProvider)}
-            />
-            <CustomDropdownField
-              customStyle={{ border: "none", paddingLeft: "0", minWidth: 120 }}
-              options={IMAGE_STYLE_OPTIONS}
-              placeholder="Style"
-              defaultOption={IMAGE_STYLE_OPTIONS.find(opt => opt.value === aiStyleHint)}
-              onHandleSelect={option => setAiStyleHint(option.value)}
-            />
-            <Button
-              type="button"
-              variant={ButtonVariant.SECONDARY}
-              onClick={handleGenerateImage}
-              disabled={!canGenerate || isGeneratingImage}
-              className="whitespace-nowrap"
-            >
-              {isGeneratingImage ? en.simulation.generatingImage : en.simulation.generateWithAi}
-            </Button>
-          </div>
+          // Video), so the control must wrap instead of overflowing into the
+          // neighbouring tile, which would paint over it and swallow clicks.
+          <ImageSourceField
+            className="relative z-10 mt-2 flex w-full flex-wrap items-center gap-2"
+            slotKind={imageSlotKind}
+            slotKey={imageSlotKey ?? pageSlotKey(imageSlotKind, id)}
+            context={imageContext ?? formContext()}
+            disabled={isUploading}
+            onAccept={handleGeneratedImage}
+          />
         )}
 
         {renderFileInfo()}
