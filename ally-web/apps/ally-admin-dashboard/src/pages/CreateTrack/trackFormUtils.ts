@@ -65,6 +65,7 @@ import {
 } from "@types";
 
 import { unitsToSourceText } from "./annotationSegmentation";
+import { serializeArticlePresentation, validateArticlePresentation } from "./articleExperience";
 import {
   createBranchingTemplate,
   serializeBranching,
@@ -624,6 +625,7 @@ const validateItem = (item: TrackItemFormValue): string[] => {
           errors.push(`${label}: enter a valid http(s) link`);
         }
       });
+      errors.push(...validateArticlePresentation(item.article));
       break;
     }
     case TrackItemType.VIDEO: {
@@ -1003,6 +1005,7 @@ export const serializeItem = (item: TrackItemFormValue, order: number): TrackStr
         ...(imageUrls.length > 0 ? { imageUrls } : {}),
         ...(questions.length > 0 ? { questions } : {}),
         ...(resources.length > 0 ? { resources } : {}),
+        ...serializeArticlePresentation(item.article),
       };
       break;
     }

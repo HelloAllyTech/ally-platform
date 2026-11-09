@@ -8,6 +8,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 import { ArticleQuestionNode } from "./articleQuestionNode";
+import { CalloutNode } from "./calloutNode";
 import { sanitizeHtml } from "./richTextSanitizer";
 import { RichTextToolbar } from "./RichTextToolbar";
 
@@ -69,6 +70,12 @@ interface RichTextEditorProps {
    * Returning null cancels (e.g. the author is already at the cap).
    */
   onCreateQuestion?: () => string | null;
+  /**
+   * Opt-in highlight boxes — "Try saying", "Good to know", "Watch out" —
+   * (track article builder). Default false; every other editor keeps its
+   * plain toolbar and strips the box markers.
+   */
+  allowCallouts?: boolean;
 }
 
 export const RichTextEditor: FC<RichTextEditorProps> = ({
@@ -82,6 +89,7 @@ export const RichTextEditor: FC<RichTextEditorProps> = ({
   allowImages = false,
   onImageUpload,
   onCreateQuestion,
+  allowCallouts = false,
 }) => {
   const allowQuestions = !!onCreateQuestion;
   // Read inside onUpdate, which TipTap creates once and would otherwise close
@@ -108,6 +116,7 @@ export const RichTextEditor: FC<RichTextEditorProps> = ({
           ]
         : []),
       ...(allowQuestions ? [ArticleQuestionNode] : []),
+      ...(allowCallouts ? [CalloutNode] : []),
       ...(maxLength != null
         ? [
             CharacterCount.configure({
@@ -126,7 +135,7 @@ export const RichTextEditor: FC<RichTextEditorProps> = ({
     },
     onUpdate: ({ editor: updatedEditor }) => {
       const html = updatedEditor.getHTML();
-      const sanitized = sanitizeHtml(html, { allowImages, allowQuestions });
+      const sanitized = sanitizeHtml(html, { allowImages, allowQuestions, allowCallouts });
       // TipTap fires onUpdate for its own initial content load, not only for
       // typing. Reporting that as an edit is destructive: the editor mounts
       // before the form has been populated from the server, so the empty
@@ -142,13 +151,17 @@ export const RichTextEditor: FC<RichTextEditorProps> = ({
   useEffect(() => {
     if (!editor) return;
     const currentHtml = editor.getHTML();
-    const sanitizedValue = sanitizeHtml(value || "", { allowImages, allowQuestions });
+    const sanitizedValue = sanitizeHtml(value || "", {
+      allowImages,
+      allowQuestions,
+      allowCallouts,
+    });
 
     // Avoid infinite loop: only update if content actually differs
     if (normalizeForCompare(currentHtml) !== normalizeForCompare(sanitizedValue)) {
       editor.commands.setContent(sanitizedValue, { emitUpdate: false });
     }
-  }, [editor, value, allowImages, allowQuestions]);
+  }, [editor, value, allowImages, allowQuestions, allowCallouts]);
 
   // Sync editable state
   useEffect(() => {
@@ -187,6 +200,7 @@ export const RichTextEditor: FC<RichTextEditorProps> = ({
         editor={editor}
         onInsertImage={handleInsertImage}
         onInsertQuestion={handleInsertQuestion}
+        allowCallouts={allowCallouts}
       />
       <EditorContent editor={editor} />
       {maxLength != null && (

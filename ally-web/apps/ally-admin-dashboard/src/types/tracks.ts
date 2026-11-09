@@ -50,7 +50,32 @@ export interface ArticleResource {
   url: string;
 }
 
+/**
+ * How the learner reads the same article. Mirrors ally-be's `ArticleExperience`.
+ * The text is identical in every mode — only the presentation changes.
+ */
+export enum ArticleExperience {
+  /** A simple page of text. The default. */
+  CLASSIC = "CLASSIC",
+  /** Cover photo, big headline and polished type. */
+  MAGAZINE = "MAGAZINE",
+  /** One section per swipe: a new card at each top-level `<h2>` and at each question. */
+  CARDS = "CARDS",
+}
+
+/** The article's optional cover photo — an uploaded file (https). */
+export interface ArticleCover {
+  url: string;
+  /** Read out by screen readers. */
+  alt?: string;
+}
+
 export interface ArticleContent {
+  /**
+   * The body. Besides the formatting tags it can carry two kinds of marker
+   * div: `<div data-ally-question="<id>"></div>` question placeholders, and
+   * `<div data-ally-callout="say|info|warn"><p>…</p></div>` highlight boxes.
+   */
   html: string;
   imageUrls?: string[];
   /**
@@ -62,6 +87,12 @@ export interface ArticleContent {
    */
   questions?: McqSingleQuestion[];
   resources?: ArticleResource[];
+  /** Absent = CLASSIC. Stored only for MAGAZINE / CARDS, so classic content stays unchanged. */
+  experience?: ArticleExperience;
+  /** Shown at the top in Magazine and Cards. Optional in every mode. */
+  cover?: ArticleCover;
+  /** Up to 5 short points shown at the end of the article. */
+  takeaways?: string[];
 }
 
 export type VideoSource = "s3" | "youtube" | "vimeo" | "loom";
@@ -337,6 +368,14 @@ export interface BreathingExerciseContent {
 
 export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
 
+/** How the learner sees the same story. Mirrors ally-be's `BranchingExperience`. */
+export enum BranchingExperience {
+  /** Text first, in a card. Images are optional and small. The default. */
+  CLASSIC = "CLASSIC",
+  /** Cinematic: each scene's photo fills most of the screen; a scene without one reuses the previous scene's. */
+  STORY = "STORY",
+}
+
 export interface BranchingImage {
   /** An uploaded file (https). */
   url: string;
@@ -350,7 +389,11 @@ export interface BranchingChoice {
   nextNodeId: string;
 }
 
-/** A scene with no choices is an ending; only endings carry outcome/score/takeaway. */
+/**
+ * A scene with no choices is an ending; only endings carry outcome/score/takeaway.
+ * A scene with exactly one choice is a "single-button scene": the learner sees one
+ * button labelled with that choice's text.
+ */
 export interface BranchingNode {
   id: string;
   title?: string;
@@ -372,6 +415,8 @@ export interface BranchingScenarioSettings {
 
 export interface BranchingScenarioContent {
   intro?: string;
+  /** Absent = CLASSIC. Stored only when STORY, so classic content stays unchanged. */
+  experience?: BranchingExperience;
   settings?: BranchingScenarioSettings;
   startNodeId: string;
   nodes: BranchingNode[];

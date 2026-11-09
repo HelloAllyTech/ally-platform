@@ -14,14 +14,46 @@ import '../theme/app_fonts.dart';
 ///
 /// Named `HtmlRichText`, not `RichText`, to avoid colliding with Flutter's
 /// own `material.dart` `RichText` widget.
+///
+/// Article reading modes add a few opt-in styles: [paragraphStyle],
+/// a raised initial on the first top-level paragraph ([dropCapStyle]),
+/// pull-quote blockquotes ([pullQuoteStyle]) and highlight boxes for
+/// `<div data-ally-callout="kind">` ([calloutBuilder]). With none of them
+/// given it renders exactly as before.
 class HtmlRichText extends StatefulWidget {
-  const HtmlRichText({super.key, required this.html, this.dark = false});
+  const HtmlRichText({
+    super.key,
+    required this.html,
+    this.dark = false,
+    this.paragraphStyle,
+    this.dropCapStyle,
+    this.pullQuoteStyle,
+    this.pullQuoteBorderColor,
+    this.calloutBuilder,
+  });
 
   final String? html;
 
   /// Recolors text for a dark background, same as the RN original's
   /// `variant: 'dark'` (used by the roleplay screen's Session Info panel).
   final bool dark;
+
+  /// Replaces the default paragraph / list text style.
+  final TextStyle? paragraphStyle;
+
+  /// When set, the first letter of the first top-level paragraph is drawn
+  /// in this style (a raised initial: Flutter text can't float a letter
+  /// across lines, so it sits on the first line).
+  final TextStyle? dropCapStyle;
+
+  /// When set, a blockquote is a pull quote: its text in this style
+  /// behind a 3px [pullQuoteBorderColor] rule.
+  final TextStyle? pullQuoteStyle;
+  final Color? pullQuoteBorderColor;
+
+  /// Draws a `data-ally-callout` box. Without it a callout's content shows
+  /// plainly (unwrapped, like any div).
+  final HtmlCalloutBuilder? calloutBuilder;
 
   @override
   State<HtmlRichText> createState() => _HtmlRichTextState();
@@ -42,13 +74,28 @@ class _HtmlRichTextState extends State<HtmlRichText> {
   @override
   void didUpdateWidget(HtmlRichText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.html != widget.html || oldWidget.dark != widget.dark) _blocks = _render();
+    if (oldWidget.html != widget.html ||
+        oldWidget.dark != widget.dark ||
+        oldWidget.paragraphStyle != widget.paragraphStyle ||
+        oldWidget.dropCapStyle != widget.dropCapStyle ||
+        oldWidget.pullQuoteStyle != widget.pullQuoteStyle ||
+        oldWidget.pullQuoteBorderColor != widget.pullQuoteBorderColor) {
+      _blocks = _render();
+    }
   }
 
   List<Widget> _render() {
     final source = widget.html;
     if (source == null || source.trim().isEmpty) return const [];
-    return _renderBlocks(_parseHtml(source).children, widget.dark);
+    final ctx = _RenderContext(
+      dark: widget.dark,
+      paragraphStyle: widget.paragraphStyle ?? _paragraphStyle(widget.dark),
+      dropCapStyle: widget.dropCapStyle,
+      pullQuoteStyle: widget.pullQuoteStyle,
+      pullQuoteBorderColor: widget.pullQuoteBorderColor,
+      calloutBuilder: widget.calloutBuilder,
+    );
+    return _renderBlocks(_parseHtml(source).children, ctx, topLevel: true);
   }
 
   @override
@@ -86,9 +133,48 @@ class _HtmlTextNode {
 }
 
 class _HtmlElementNode {
-  _HtmlElementNode(this.tag);
+  _HtmlElementNode(this.tag, {this.callout});
   final String tag;
+
+  /// The `data-ally-callout` value (lower-cased), when the tag carries one.
+  final String? callout;
   final List<Object> children = [];
+}
+
+/// Builds the box for a `data-ally-callout` block of [kind]. [content]
+/// renders the callout's own HTML, with its text style merged with the
+/// given overrides. Return null to show the content plainly (an unknown
+/// kind).
+typedef HtmlCalloutBuilder = Widget? Function(String kind, Widget Function(TextStyle? textStyle) content);
+
+/// What a render pass needs beyond the node itself.
+class _RenderContext {
+  _RenderContext({
+    required this.dark,
+    required this.paragraphStyle,
+    this.dropCapStyle,
+    this.pullQuoteStyle,
+    this.pullQuoteBorderColor,
+    this.calloutBuilder,
+  });
+
+  final bool dark;
+  final TextStyle paragraphStyle;
+  final TextStyle? dropCapStyle;
+  final TextStyle? pullQuoteStyle;
+  final Color? pullQuoteBorderColor;
+  final HtmlCalloutBuilder? calloutBuilder;
+
+  /// Set once the first top-level paragraph has had its initial.
+  bool dropCapUsed = false;
+
+  _RenderContext withParagraphStyle(TextStyle style) => _RenderContext(
+    dark: dark,
+    paragraphStyle: style,
+    pullQuoteStyle: pullQuoteStyle,
+    pullQuoteBorderColor: pullQuoteBorderColor,
+    calloutBuilder: calloutBuilder,
+  );
 }
 
 const _inlineTags = {
@@ -106,14 +192,15 @@ const _inlineTags = {
 const _skipTags = {'script', 'style'};
 const _voidTags = {'br', 'hr', 'img'};
 
-final _tagTokenizer = RegExp(r'<(/?)([a-zA-Z0-9]+)[^>]*?(/?)>|([^<]+)');
+final _tagTokenizer = RegExp(r'<(/?)([a-zA-Z0-9]+)([^>]*?)(/?)>|([^<]+)');
+final _calloutAttr = RegExp(r'''\bdata-ally-callout\s*=\s*["']([^"']*)["']''', caseSensitive: false);
 
 _HtmlElementNode _parseHtml(String html) {
   final root = _HtmlElementNode('root');
   final stack = [root];
 
   for (final match in _tagTokenizer.allMatches(html)) {
-    final text = match.group(4);
+    final text = match.group(5);
     if (text != null) {
       stack.last.children.add(_HtmlTextNode(text));
       continue;
@@ -121,7 +208,7 @@ _HtmlElementNode _parseHtml(String html) {
 
     final closing = match.group(1) == '/';
     final tag = match.group(2)!.toLowerCase();
-    final selfClosing = match.group(3) == '/';
+    final selfClosing = match.group(4) == '/';
 
     if (closing) {
       for (var i = stack.length - 1; i > 0; i--) {
@@ -133,7 +220,8 @@ _HtmlElementNode _parseHtml(String html) {
       continue;
     }
 
-    final node = _HtmlElementNode(tag);
+    final callout = _calloutAttr.firstMatch(match.group(3)!)?.group(1)?.trim().toLowerCase();
+    final node = _HtmlElementNode(tag, callout: callout);
     stack.last.children.add(node);
     if (!selfClosing && !_voidTags.contains(tag)) {
       stack.add(node);
@@ -222,17 +310,65 @@ TextStyle? _inlineStyle(String tag) {
   }
 }
 
-Widget _paragraph(List<Object> inlineNodes, bool dark, {TextStyle? style}) {
-  final baseStyle = style ?? _paragraphStyle(dark);
+Widget _paragraph(List<Object> inlineNodes, _RenderContext ctx, {TextStyle? style, bool dropCap = false}) {
+  final baseStyle = style ?? ctx.paragraphStyle;
+  var children = _renderInline(inlineNodes, baseStyle);
+  final capStyle = ctx.dropCapStyle;
+  if (dropCap && capStyle != null && !ctx.dropCapUsed) {
+    final withCap = _withInitial(children, capStyle);
+    if (withCap != null) {
+      ctx.dropCapUsed = true;
+      children = withCap;
+    }
+  }
   return Padding(
     padding: const EdgeInsets.only(bottom: 8),
     child: RichText(
       text: TextSpan(
         style: baseStyle,
-        children: _renderInline(inlineNodes, baseStyle),
+        children: children,
       ),
     ),
   );
+}
+
+/// [spans] with their first visible character (a whole grapheme, so an
+/// Indic consonant keeps its vowel sign) split out into [capStyle]. Null
+/// when there is no text to take it from.
+List<InlineSpan>? _withInitial(List<InlineSpan> spans, TextStyle capStyle) {
+  for (var i = 0; i < spans.length; i++) {
+    final span = spans[i];
+    if (span is! TextSpan) continue;
+    final text = span.text;
+    if (text != null && text.trim().isNotEmpty) {
+      final rest = text.trimLeft();
+      final initial = rest.characters.first;
+      return [
+        ...spans.sublist(0, i),
+        TextSpan(
+          style: span.style,
+          children: [
+            TextSpan(text: initial, style: capStyle),
+            TextSpan(text: rest.substring(initial.length)),
+            ...?span.children,
+          ],
+        ),
+        ...spans.sublist(i + 1),
+      ];
+    }
+    final nested = span.children;
+    if (nested != null) {
+      final replaced = _withInitial(nested, capStyle);
+      if (replaced != null) {
+        return [
+          ...spans.sublist(0, i),
+          TextSpan(text: text, style: span.style, children: replaced),
+          ...spans.sublist(i + 1),
+        ];
+      }
+    }
+  }
+  return null;
 }
 
 // RN's styles.paragraph / listItemText: IBM_PLEX_SERIF.REGULAR 14/22 in
@@ -245,17 +381,17 @@ TextStyle _paragraphStyle(bool dark) => TextStyle(
   color: dark ? const Color(0xFFD9D9DC) : AppColors.darkCharcoal,
 );
 
-Widget _listItem(_HtmlElementNode item, bool ordered, int index, bool dark) {
+Widget _listItem(_HtmlElementNode item, bool ordered, int index, _RenderContext ctx) {
   final hasBlockChild = item.children.any(_isBlockChild);
   final body = hasBlockChild
       ? Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: _renderBlocks(item.children, dark),
+          children: _renderBlocks(item.children, ctx),
         )
       : _paragraph(
           item.children,
-          dark,
-          style: _paragraphStyle(dark).copyWith(height: null),
+          ctx,
+          style: ctx.paragraphStyle.copyWith(height: null),
         );
 
   return Padding(
@@ -267,7 +403,7 @@ Widget _listItem(_HtmlElementNode item, bool ordered, int index, bool dark) {
           width: 20,
           child: Text(
             ordered ? '${index + 1}.' : '•',
-            style: _paragraphStyle(dark),
+            style: ctx.paragraphStyle,
           ),
         ),
         Expanded(child: body),
@@ -276,7 +412,17 @@ Widget _listItem(_HtmlElementNode item, bool ordered, int index, bool dark) {
   );
 }
 
-Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
+Widget _renderBlockElement(_HtmlElementNode node, _RenderContext ctx, {bool topLevel = false}) {
+  final dark = ctx.dark;
+  final callout = node.callout;
+  final calloutBuilder = ctx.calloutBuilder;
+  if (callout != null && calloutBuilder != null) {
+    Widget content(TextStyle? textStyle) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: _renderBlocks(node.children, ctx.withParagraphStyle(ctx.paragraphStyle.merge(textStyle))),
+    );
+    return calloutBuilder(callout, content) ?? content(null);
+  }
   switch (node.tag) {
     case 'h1':
       return Padding(
@@ -324,6 +470,22 @@ Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
         color: dark ? const Color(0xFF3D4045) : const Color(0xFFE0E0E0),
       );
     case 'blockquote':
+      final pullQuoteStyle = ctx.pullQuoteStyle;
+      if (pullQuoteStyle != null) {
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.only(left: 14),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(width: 3, color: ctx.pullQuoteBorderColor ?? AppColors.primary),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _renderBlocks(node.children, ctx.withParagraphStyle(pullQuoteStyle)),
+          ),
+        );
+      }
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.only(left: 12),
@@ -337,7 +499,7 @@ Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: _renderBlocks(node.children, dark),
+          children: _renderBlocks(node.children, ctx),
         ),
       );
     case 'ul':
@@ -353,17 +515,17 @@ Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var i = 0; i < items.length; i++)
-              _listItem(items[i], ordered, i, dark),
+              _listItem(items[i], ordered, i, ctx),
           ],
         ),
       );
     case 'p':
-      return _paragraph(node.children, dark);
+      return _paragraph(node.children, ctx, dropCap: topLevel);
     default:
       // Unknown wrappers (e.g. div, section) are unwrapped.
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: _renderBlocks(node.children, dark),
+        children: _renderBlocks(node.children, ctx, topLevel: topLevel),
       );
   }
 }
@@ -378,7 +540,10 @@ String _plainInline(List<Object> nodes) => nodes
     .replaceAll(_whitespaceRun, ' ')
     .trim();
 
-List<Widget> _renderBlocks(List<Object> nodes, bool dark) {
+/// [topLevel]: these blocks are the document's own (or an unwrapped div's),
+/// not a list item's, quote's or callout's — only there can a paragraph
+/// take the raised initial.
+List<Widget> _renderBlocks(List<Object> nodes, _RenderContext ctx, {bool topLevel = false}) {
   final blocks = <Widget>[];
   var inlineBuffer = <Object>[];
 
@@ -388,7 +553,7 @@ List<Widget> _renderBlocks(List<Object> nodes, bool dark) {
           n is _HtmlElementNode ||
           (n is _HtmlTextNode && n.value.trim().isNotEmpty),
     );
-    if (hasContent) blocks.add(_paragraph(inlineBuffer, dark));
+    if (hasContent) blocks.add(_paragraph(inlineBuffer, ctx, dropCap: topLevel));
     inlineBuffer = [];
   }
 
@@ -404,7 +569,7 @@ List<Widget> _renderBlocks(List<Object> nodes, bool dark) {
       continue;
     }
     flushInline();
-    blocks.add(_renderBlockElement(element, dark));
+    blocks.add(_renderBlockElement(element, ctx, topLevel: topLevel));
   }
 
   flushInline();

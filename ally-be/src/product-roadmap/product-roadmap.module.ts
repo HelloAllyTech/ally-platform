@@ -14,6 +14,7 @@ import { RoadmapInterviewNote } from './entity/roadmap-interview-note.entity';
 import { RoadmapIdeaDraft } from './entity/roadmap-idea-draft.entity';
 import { RoadmapIdeaDraftController } from './controller/roadmap-idea-draft.controller';
 import { RoadmapIdeaDraftService } from './service/roadmap-idea-draft.service';
+import { RoadmapIdeaTranscriptionService } from './service/roadmap-idea-transcription.service';
 import { RoadmapOpportunity } from './entity/roadmap-opportunity.entity';
 import { RoadmapOpportunityComment } from './entity/roadmap-opportunity-comment.entity';
 import { RoadmapOpportunityOwner } from './entity/roadmap-opportunity-owner.entity';
@@ -205,6 +206,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapGoalImpactService,
     RoadmapInterviewNoteService,
     RoadmapIdeaDraftService,
+    RoadmapIdeaTranscriptionService,
     RoadmapAiService,
     // The opportunity copilot: the guided interview's tool loop, its tools, and the Vision &
     // strategy page it always reads.

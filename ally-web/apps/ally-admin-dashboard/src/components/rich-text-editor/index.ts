@@ -5,4 +5,13 @@ export {
   ARTICLE_QUESTION_NODE,
   ArticleQuestionNode,
 } from "./articleQuestionNode";
+export {
+  CALLOUT_KINDS,
+  CALLOUT_MARKER_ATTR,
+  CALLOUT_NODE,
+  CALLOUT_STYLES,
+  CalloutNode,
+  isCalloutKind,
+  type CalloutKind,
+} from "./calloutNode";
 export { sanitizeHtml, containsHtmlTags, getVisibleTextLength } from "./richTextSanitizer";

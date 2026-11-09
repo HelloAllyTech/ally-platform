@@ -18,6 +18,7 @@ import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { SettingsService } from 'src/settings/service/settings.service';
 import { toPromptCode } from 'src/prompt/util/prompt-code.util';
 import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
+import { audioUploadType } from 'src/common/util/audio.util';
 import {
   GenerateNoteFromAudioResponseDto,
   VoiceNoteFieldSpec,
@@ -43,20 +44,6 @@ const EXTRACTION_MAX_TOKENS = 16384;
 const MIN_EVIDENCE_WORDS = 3;
 /** AI-task-registry row id; the key for per-task model config. */
 const AI_TASK_ID = 'voice-note-extract';
-
-// OpenAI's transcription API infers the container from the filename extension,
-// so we derive the extension from the real MIME type rather than trusting the
-// client-sent filename (Safari records audio/mp4, Chromium audio/webm).
-const MIME_EXTENSIONS: Record<string, string> = {
-  'audio/webm': 'webm',
-  'audio/ogg': 'ogg',
-  'audio/mp4': 'mp4',
-  'audio/mpeg': 'mp3',
-  'audio/mp3': 'mp3',
-  'audio/wav': 'wav',
-  'audio/x-wav': 'wav',
-  'audio/wave': 'wav',
-};
 
 const VALID_FIELD_TYPES: ReadonlySet<VoiceNoteFieldType> = new Set([
   'text',
@@ -182,11 +169,8 @@ export class VoiceNoteService {
   ): Promise<string> {
     const startedAt = Date.now();
     try {
-      const mimetype = (audio.mimetype || 'audio/webm').split(';')[0].trim();
-      const ext = MIME_EXTENSIONS[mimetype.toLowerCase()] ?? 'webm';
-      const file = await toFile(audio.buffer, `dictation.${ext}`, {
-        type: mimetype,
-      });
+      const { type, ext } = audioUploadType(audio.mimetype);
+      const file = await toFile(audio.buffer, `dictation.${ext}`, { type });
 
       const result = await this.openai.audio.transcriptions.create({
         file,
