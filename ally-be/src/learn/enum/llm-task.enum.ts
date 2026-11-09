@@ -210,6 +210,8 @@ export enum LlmTask {
   ONBOARDING_GAPS = 'onboarding_gaps',
   ONBOARDING_DESIGNS = 'onboarding_designs',
   ONBOARDING_DRAFT = 'onboarding_draft',
+  // Change by chat on the assistant home (chunk 20a-2): one call per request.
+  ONBOARDING_CHANGE = 'onboarding_change',
   // The checkup (chunk 20a-2), made by ally-ai's /checkup/grade: one judge call per graded
   // question that needs a reading for meaning. Customer spend, absent from TASK_AREA.
   CHECKUP_JUDGE = 'checkup_judge',

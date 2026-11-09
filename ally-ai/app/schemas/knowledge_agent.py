@@ -53,6 +53,14 @@ class PersonaSelector(BaseModel):
             "pack the check refuses diagnosis and dosing in code, not only by prompt."
         ),
     )
+    avoid_topics: List[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description=(
+            "Topics the owner asked it not to talk about (chunk 20a-2). They also "
+            "travel in `safety_rules`; the check declines a reply that touches one."
+        ),
+    )
 
 
 class KnowledgeAnswerRequest(BaseModel):

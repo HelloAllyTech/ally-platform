@@ -81,7 +81,9 @@ export type DraftView = ReturnType<typeof draftView>;
 /** The owner's and the builder's changes, for undo (20a-2 shows them on the assistant too). */
 export function changes(events: DraftEvent[]) {
   return events
-    .filter((e) => e.kind === 'patch' || e.kind === 'undo')
+    .filter(
+      (e) => e.kind === 'patch' || e.kind === 'undo' || e.kind === 'change',
+    )
     .slice(-CHANGES_SHOWN)
     .reverse()
     .map((e) => ({

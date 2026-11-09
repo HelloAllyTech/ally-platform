@@ -559,6 +559,28 @@ class UserIdentifyUserInputs(PromptInputs):
     conversations: str
 
 
+class BuilderChangeInputs(PromptInputs):
+    """`builder/change.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_change",
+        name="Assistant Home: Change by Chat",
+        description=(
+            'Turns an owner\'s request ("make it more formal", "don\'t discuss '
+            "prices\") into a proposed change to their assistant's settings (chunk "
+            "20a-2). Code builds the before and after; ally-be applies it only when "
+            "the owner confirms. Safety can't be weakened: the model refuses, and code "
+            "never lets a change reach the safety pack."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    current: str
+    safety: str
+    request: str
+
+
 class CheckupJudgeInputs(PromptInputs):
     """`checkup/judge.txt`."""
 

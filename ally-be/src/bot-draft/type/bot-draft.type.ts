@@ -134,7 +134,9 @@ export type DraftEventKind =
   | 'step'
   | 'publish'
   | 'source'
-  | 'safety';
+  | 'safety'
+  /** A change by chat on the assistant home (chunk 20a-2): `ops` carry each before and after. */
+  | 'change';
 
 /** One entry of the append-only log; patches carry their inverse for undo. */
 export interface DraftEvent {

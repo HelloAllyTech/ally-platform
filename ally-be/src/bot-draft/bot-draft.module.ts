@@ -13,6 +13,7 @@ import {
 } from './controller/bot-draft.controller';
 import { AssistantHomeController } from './home/assistant-home.controller';
 import { AssistantHomeService } from './home/assistant-home.service';
+import { ChangeService } from './home/change.service';
 import { CRAWL_LEARNER } from './crawl/site-crawl.service';
 import { BotDraftPublishService } from './service/bot-draft-publish.service';
 import { BotDraftSessionService } from './service/bot-draft-session.service';
@@ -63,6 +64,7 @@ import { BotDraftService } from './service/bot-draft.service';
     BotDraftSessionService,
     BotDraftPublishService,
     AssistantHomeService,
+    ChangeService,
     CheckupService,
     DraftCheckupService,
     // The crawl hands each batch of pages to the builder's fact extraction.

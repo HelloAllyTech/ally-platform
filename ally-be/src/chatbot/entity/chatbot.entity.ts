@@ -87,7 +87,7 @@ export class Chatbot extends BaseWithoutTenantEntity {
 
   /** The owner's own rules, on top of the pack: lines the assistant must never cross. */
   @Column({ type: 'jsonb', default: () => `'{"never":[]}'` })
-  rules!: { never: string[] };
+  rules!: { never: string[]; avoid?: string[] };
 
   @Column({ type: 'timestamp', name: 'archived_at', nullable: true })
   archivedAt?: Date | null;

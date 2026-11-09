@@ -26,6 +26,8 @@ import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
 import { ENDPOINTS } from '../constants/endpoints.constants';
 import type {
+  BuilderChangeRequest,
+  BuilderChangeResponse,
   BuilderExtractRequest,
   BuilderExtractResponse,
   BuilderStepRequest,
@@ -803,6 +805,20 @@ export class AiService {
       ENDPOINTS.CHECKUP_GRADE,
       request,
       { timeoutMs: CHECKUP_GRADE_TIMEOUT_MS, alertOnFailure: false },
+    );
+  }
+
+  /**
+   * Change by chat (chunk 20a-2): the owner's request as a proposed before and after. Nothing is
+   * applied here. redactBody=true: the payload is the assistant's settings and the owner's words.
+   */
+  async proposeChange(
+    request: BuilderChangeRequest,
+  ): Promise<BuilderChangeResponse> {
+    return this.postKnowledge<BuilderChangeResponse, BuilderChangeRequest>(
+      ENDPOINTS.BUILDER_CHANGE,
+      request,
+      { timeoutMs: BUILDER_LIMITS.stepMs, alertOnFailure: false },
     );
   }
 

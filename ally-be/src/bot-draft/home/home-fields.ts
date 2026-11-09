@@ -38,7 +38,7 @@ import { packFor } from '../safety-pack/safety-packs';
 export interface HomeState {
   chatbot: Pick<
     Chatbot,
-    'name' | 'description' | 'persona' | 'settings' | 'safetyPack'
+    'name' | 'description' | 'persona' | 'settings' | 'safetyPack' | 'rules'
   >;
   page: BotPageSettings;
   /** The page row's own columns, and whether "Anyone with the link" may be chosen. */
@@ -214,6 +214,35 @@ export const HOME_FIELDS = {
       return clean;
     },
     write: (value) => ({ page: { suggestedQuestions: value } }),
+  } as HomeField<string[]>,
+
+  /**
+   * Topics the owner asked it not to talk about (chunk 20a-2): sent with the safety rules and
+   * enforced by ally-ai's check. The owner's own list, so it can be changed either way.
+   */
+  avoidTopics: {
+    read: (s) => s.chatbot.rules?.avoid ?? [],
+    parse: (value) => {
+      if (!Array.isArray(value)) {
+        throw new HomeFieldInvalid('Topics to avoid must be a list.');
+      }
+      const clean = [
+        ...new Set(
+          value
+            .map((topic) => text(80, { label: 'A topic' })(topic))
+            .filter(Boolean),
+        ),
+      ];
+      if (clean.length > 10) {
+        throw new HomeFieldInvalid('Up to 10 topics.');
+      }
+      return clean;
+    },
+    write: (value, s) => ({
+      chatbot: {
+        rules: { never: s.chatbot.rules?.never ?? [], avoid: value },
+      },
+    }),
   } as HomeField<string[]>,
 
   /** Questions before the chat: the page only (WhatsApp doesn't ask them). */

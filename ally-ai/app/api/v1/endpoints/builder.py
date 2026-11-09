@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.v1.endpoints.knowledge_agent import knowledge_errors
 from app.core.builder import tasks
+from app.core.builder.change import ChangeRequest, ChangeResponse, propose_change
 from app.core.builder.runner import execute, stream
 from app.core.config import settings
 from app.schemas.builder import (
@@ -73,3 +74,14 @@ async def extract(payload: ExtractRequest):
     """
     with knowledge_errors("Unexpected error extracting facts"):
         return await tasks.extract(payload)
+
+
+@router.post("/change", response_model=ChangeResponse, tags=["builder"])
+async def change(payload: ChangeRequest):
+    """
+    Change by chat on the assistant home (chunk 20a-2): the owner's request as a
+    proposed before and after. ally-be applies it only when the owner confirms.
+    A request that would weaken safety is refused.
+    """
+    with knowledge_errors("Unexpected error proposing a change"):
+        return await propose_change(payload)

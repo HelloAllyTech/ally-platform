@@ -13,6 +13,7 @@ from app.core.agent_runtime.check import (
     plain_text,
     rejection_feedback,
     says_it_has_nothing,
+    touches_topic,
     unsupported_details,
 )
 from app.core.agent_runtime.prompt import NO_TOPICS, format_topics
@@ -830,3 +831,46 @@ class TestBookingOffers:
         text = "Would you like me to book a slot for you?"
         result, _ = review("decline", text)
         assert result["answer"] == text
+
+
+class TestAvoidTopics:
+    """Topics the owner asked it not to talk about (chunk 20a-2)."""
+
+    def test_a_question_about_an_avoided_topic_gets_the_decline_wording(self):
+        result, _ = review(
+            "answer",
+            "A session costs Rs. 2,000.",
+            citations=[1],
+            question="What are your prices?",
+            avoid_topics=["prices"],
+        )
+        assert result["intent"] == "decline"
+        assert result["answer"] == ""  # ally-be sends the owner's decline wording
+
+    def test_unrelated_questions_are_still_answered(self):
+        result, _ = review(
+            "answer",
+            "We open at 9 am on weekdays.",
+            citations=[1],
+            question="what time do you open?",
+            avoid_topics=["prices"],
+        )
+        assert result["intent"] == "answer"
+        assert result["answer"] == "We open at 9 am on weekdays."
+
+    def test_a_reply_that_brings_one_up_is_declined(self):
+        result, _ = review(
+            "answer",
+            "Our pricing starts at Rs. 2,000.",
+            citations=[1],
+            question="Tell me about sessions",
+            avoid_topics=["prices"],
+        )
+        assert result["intent"] == "decline"
+
+    def test_topic_matching(self):
+        assert touches_topic("How do your prices work?", "prices")
+        assert touches_topic("Is pricing different online?", "prices")
+        assert touches_topic("Do you know other clinics nearby?", "other clinics")
+        assert not touches_topic("Which clinic is closest?", "other clinics")
+        assert not touches_topic("When do you open?", "prices")

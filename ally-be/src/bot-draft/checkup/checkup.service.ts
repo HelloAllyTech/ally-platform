@@ -37,6 +37,9 @@ import type { PlannedCase } from './checkup-generation';
 export const withoutSourcesFooter = (reply: string): string =>
   reply.replace(/\n\nSources:\n[\s\S]*$/, '');
 
+/** A checkup runs this long after the last change, so a burst of edits runs it once. */
+export const AFTER_CHANGE_DELAY_MS = 2 * 60 * 1000;
+
 export const CHECKUP_PROMPT_CODES = ['ally_ai_checkup_judge'] as const;
 
 export const CHECKUP_LIMITS = {
@@ -327,6 +330,27 @@ export class CheckupService {
       },
     );
     return run;
+  }
+
+  private readonly pending = new Map<string, NodeJS.Timeout>();
+
+  /**
+   * A checkup run after a change, 2 minutes after the last one (chunk 20a-2), within the daily
+   * limit. Nothing happens for an assistant without checkup questions.
+   */
+  scheduleAfterChange(
+    chatbotId: string,
+    delayMs = AFTER_CHANGE_DELAY_MS,
+  ): void {
+    clearTimeout(this.pending.get(chatbotId));
+    const timer = setTimeout(() => {
+      this.pending.delete(chatbotId);
+      void this.start(chatbotId, { trigger: 'after_change' }).catch(() => {
+        // No questions yet, or the day's runs are used up: the next change tries again.
+      });
+    }, delayMs);
+    timer.unref?.();
+    this.pending.set(chatbotId, timer);
   }
 
   /** Thread questions in order, one conversation each; every other question on its own. */

@@ -72,6 +72,8 @@ export const ENDPOINTS = {
   /** Onboarding builder (chunk 20a). 404 while ally-ai's BUILDER__ENABLED is off. */
   BUILDER_STEP_STREAM: 'api/v1/builder/step/stream',
   BUILDER_EXTRACT: 'api/v1/builder/extract',
+  /** Change by chat on the assistant home (chunk 20a-2). */
+  BUILDER_CHANGE: 'api/v1/builder/change',
   /** The checkup grader (chunk 20a-2): one verdict per question. */
   CHECKUP_GRADE: 'api/v1/checkup/grade',
   CHECKUP_QUESTIONS: 'api/v1/checkup/questions',

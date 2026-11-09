@@ -89,6 +89,8 @@ class LLMTask(str, Enum):
     # The checkup (chunk 20a-2): one judge call per graded question that needs a
     # reading for meaning (the automatic checks decide the rest).
     CHECKUP_JUDGE = "checkup_judge"
+    # Change by chat on the assistant home (chunk 20a-2): one call per request.
+    ONBOARDING_CHANGE = "onboarding_change"
     # Writes an assistant's checkup questions from its learned details.
     CHECKUP_QUESTIONS = "checkup_questions"
     HELPLINE_RISK_CLASSIFY = "helpline_risk_classify"

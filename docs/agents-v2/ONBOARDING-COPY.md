@@ -532,6 +532,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Choose pages note:** It only learns from the pages you choose. You can change this later.
 - **Topics to avoid label:** Anything it shouldn't talk about?
 - **Topics to avoid placeholder:** For example, prices or other clinics
+- **Topics to avoid errors:** Up to 10 topics. · A topic can be at most 80 characters.
 - **Removing a source:** Remove {page}? Your assistant will forget {n} details that came only from this page.
 
 ### The checkup in onboarding and on the home *(added in 20a-2)*

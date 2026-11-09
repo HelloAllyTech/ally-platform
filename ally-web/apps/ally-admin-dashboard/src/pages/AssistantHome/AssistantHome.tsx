@@ -12,6 +12,7 @@ import { Button, Toast } from "@components/v2";
 import { ROUTES } from "@constants";
 import { Chatbot, ChatbotMemberRole, ChatbotStatus } from "@types";
 
+import { ChangePanel } from "./ChangePanel";
 import { HOME } from "./copy";
 import { EnginePanel } from "./EnginePanel";
 import { SECTION_IDS, SectionId, sectionFromUrl } from "./sections";
@@ -43,7 +44,10 @@ const STATUS_LABEL: Record<ChatbotStatus, string> = {
   [ChatbotStatus.DRAFT]: HOME.status.draft,
 };
 
-type Panel = "try" | "engine" | null;
+type Panel = "try" | "engine" | "change" | null;
+
+/** Screenshot 03: on a wide screen, an editor sees "Change your assistant" open on the right. */
+const WIDE = "(min-width: 1280px)";
 
 /**
  * The assistant home (chunk 20d, screenshot 03-assistant-home): everything about one assistant,
@@ -90,6 +94,15 @@ export const AssistantHome: React.FC = () => {
   useEffect(() => {
     if (fromUrl.tryIt) setParams({});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const editable =
+    !!bot && !!home.data && RANK[bot.myRole] >= RANK[ChatbotMemberRole.EDITOR] && home.data.canEdit;
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!editable || opened.current) return;
+    opened.current = true;
+    if (window.matchMedia?.(WIDE).matches) setPanel(p => p ?? "change");
+  }, [editable]);
 
   if (isLoading || home.isLoading) {
     return <div className="ally-v2 ally-home ally-home--loading" aria-busy="true" />;
@@ -175,6 +188,14 @@ export const AssistantHome: React.FC = () => {
                       {HOME.admin.engine}
                     </Button>
                   )}
+                  {canEdit && (
+                    <Button
+                      aria-pressed={panel === "change"}
+                      onClick={() => setPanel(p => (p === "change" ? null : "change"))}
+                    >
+                      {COPY.change.title}
+                    </Button>
+                  )}
                   {page?.saved && (
                     <a
                       className="ally-btn ally-btn--secondary"
@@ -224,9 +245,30 @@ export const AssistantHome: React.FC = () => {
               {panel && (
                 <aside
                   className="ally-home__panel"
-                  aria-label={panel === "try" ? HOME.tryPanel.title : HOME.admin.engine}
+                  aria-label={
+                    panel === "try"
+                      ? HOME.tryPanel.title
+                      : panel === "change"
+                        ? COPY.change.title
+                        : HOME.admin.engine
+                  }
                 >
-                  {panel === "try" ? (
+                  {panel === "change" ? (
+                    <ChangePanel
+                      botId={bot.id}
+                      canEdit={canEdit}
+                      onClose={() => setPanel(null)}
+                      onApplied={run => {
+                        void refetch();
+                        void home.refetch();
+                        saves.changed(run);
+                      }}
+                      onUndone={() => {
+                        void refetch();
+                        void home.refetch();
+                      }}
+                    />
+                  ) : panel === "try" ? (
                     <TryIt bot={bot} page={page ?? null} onClose={() => setPanel(null)} />
                   ) : (
                     <EnginePanel

@@ -473,3 +473,75 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Change your assistant (chunk 20a-2): the right panel's thread, proposal and history. */
+.ally-change {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ally-change__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-change__ask {
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--ally-surface-2);
+}
+.ally-change__proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-change__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.ally-change__before,
+.ally-change__after {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--ally-line);
+}
+.ally-change__before p,
+.ally-change__after p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.ally-change__before p {
+  color: var(--ally-muted);
+  text-decoration: line-through;
+}
+.ally-change__history ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.ally-change__entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ally-line);
+}
+.ally-change__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ally-change__compose form {
+  display: flex;
+  gap: 8px;
+}
+.ally-change__compose .ally-input {
+  flex: 1;
+  min-width: 0;
+}

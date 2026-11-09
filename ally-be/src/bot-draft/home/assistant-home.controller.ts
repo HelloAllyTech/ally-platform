@@ -15,9 +15,13 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsDefined,
   IsIn,
+  ValidateNested,
   IsString,
   Matches,
   MaxLength,
@@ -28,6 +32,7 @@ import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decor
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { AssistantHomeService } from './assistant-home.service';
+import { ChangeService } from './change.service';
 import { HOME_FIELDS } from './home-fields';
 import type { RuleChange } from './own-rules';
 
@@ -75,6 +80,39 @@ export class ChangeRuleDto {
   version!: string;
 }
 
+export class ProposeChangeDto {
+  @ApiProperty() @IsString() @MaxLength(1000) request!: string;
+}
+
+export class ProposedChangeDto {
+  @ApiProperty()
+  @IsIn([
+    'assistant_name',
+    'introduction',
+    'tone',
+    'instructions',
+    'decline_text',
+    'suggested_questions',
+    'language',
+    'add_rule',
+    'avoid_topic',
+  ])
+  field!: string;
+
+  @ApiPropertyOptional() before?: unknown;
+
+  @ApiProperty() @IsDefined() after!: unknown;
+}
+
+export class ApplyChangeDto {
+  @ApiProperty({ type: [ProposedChangeDto] })
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => ProposedChangeDto)
+  changes!: ProposedChangeDto[];
+}
+
 export class CorrectFactDto {
   @ApiProperty()
   @IsString()
@@ -98,7 +136,42 @@ export class CorrectFactDto {
 @Controller('v1/chatbots')
 @CallerScopedRoute()
 export class AssistantHomeController {
-  constructor(private readonly home: AssistantHomeService) {}
+  constructor(
+    private readonly home: AssistantHomeService,
+    private readonly changes: ChangeService,
+  ) {}
+
+  @Post(':id/changes/propose')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Change by chat: a proposed before and after (nothing is applied)',
+  })
+  propose(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ProposeChangeDto,
+  ) {
+    return this.changes.propose(id, dto.request);
+  }
+
+  @Post(':id/changes/apply')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      'Apply a proposed change; refused as stale if a value changed since',
+  })
+  apply(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ApplyChangeDto) {
+    return this.changes.apply(id, dto.changes);
+  }
+
+  @Post(':id/changes/:eventId/undo')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({ summary: 'Undo a change made by chat' })
+  undo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('eventId', ParseUUIDPipe) eventId: string,
+  ) {
+    return this.changes.undo(id, eventId);
+  }
 
   @Get(':id/home')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)

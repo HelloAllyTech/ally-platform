@@ -1255,6 +1255,20 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_builder_draft',
   },
   {
+    id: 'onboarding-change',
+    task: LlmTask.ONBOARDING_CHANGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner asks for a change in "Change your assistant"',
+    detail:
+      "One call per request: proposes a before and after for a fixed set of settings, or refuses one that would weaken safety. Nothing is applied until the owner confirms; ally-be applies it through the assistant home's field saves.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_change',
+  },
+  {
     id: 'checkup-judge',
     task: LlmTask.CHECKUP_JUDGE,
     runtime: LlmRuntime.ALLY_AI,

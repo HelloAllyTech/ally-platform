@@ -88,12 +88,19 @@ function personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
     // The bot's safety pack and its owner's Never rules (chunk 20a), on every run, in their own
     // field: an editor's instructions can't remove them.
     safety_rules:
-      packRulesBlock(
-        turn.chatbot.safetyPack,
-        turn.chatbot.rules?.never ?? [],
-      ) ?? undefined,
+      packRulesBlock(turn.chatbot.safetyPack, [
+        ...(turn.chatbot.rules?.never ?? []),
+        // Topics the owner asked it not to talk about (chunk 20a-2).
+        ...(turn.chatbot.rules?.avoid ?? []).map(
+          (topic) => `Talk about ${topic}`,
+        ),
+      ]) ?? undefined,
     // The id too: for a health pack, ally-ai's check refuses diagnosis and dosing in code.
     safety_pack: turn.chatbot.safetyPack || undefined,
+    // And for the check, which declines a reply touching one.
+    avoid_topics: turn.chatbot.rules?.avoid?.length
+      ? turn.chatbot.rules.avoid
+      : undefined,
   };
   return Object.values(out).some(Boolean) ? out : undefined;
 }

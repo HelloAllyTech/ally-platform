@@ -280,7 +280,8 @@ export class BotDraftPublishService {
       answerMode: ChatbotAnswerMode.DOCUMENTS_ONLY,
       safetyPack: pack?.id ?? null,
       safetyPackVersion: pack?.version ?? draft.safetyPackVersion ?? null,
-      rules: { never: config.extraNever },
+      // Topics to avoid are set on the assistant itself (Make it yours, the home), so kept.
+      rules: { ...(chatbot.rules ?? {}), never: config.extraNever },
       status,
       updatedBy: Number(ExecutionManager.getUserId() ?? 0) || null,
     } as Partial<Chatbot>;

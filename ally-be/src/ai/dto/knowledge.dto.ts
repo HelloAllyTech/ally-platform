@@ -238,6 +238,8 @@ export interface KnowledgePersonaRequest {
   safety_rules?: string;
   /** The pack's id; ally-ai enforces a health pack's Never rules in its check too. */
   safety_pack?: string;
+  /** Topics the owner asked it not to talk about (chunk 20a-2). */
+  avoid_topics?: string[];
 }
 
 export interface KnowledgeCitation {

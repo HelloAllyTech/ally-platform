@@ -189,6 +189,35 @@ export const COPY = {
         "You've run the checkup 5 times today. It runs again after your next change, or tomorrow.",
     },
   },
+  /** Change your assistant (copy §12), on the assistant home's right (chunk 20a-2). */
+  change: {
+    title: "Change your assistant",
+    placeholder: 'Tell me what to change, for example "make it more formal"',
+    examples: ["Make it more formal", "Add Hindi", "Don't discuss prices", "Add our new branch"],
+    proposal: "Here's the change",
+    before: "Before",
+    after: "After",
+    apply: "Apply",
+    notQuite: "Not quite",
+    history: "Recent changes",
+    undoConfirm: 'Undo "{change}"? Your assistant will go back to how it was before this change.',
+    undo: "Undo",
+    cancel: "Cancel",
+    send: "Send",
+    refusal:
+      "That would turn off a safety rule, so I can't make that change. I can add a rule of your own instead.",
+    fields: {
+      assistant_name: "Your assistant's name",
+      introduction: "The introduction",
+      tone: "The tone",
+      instructions: "Extra instructions",
+      decline_text: "What it says when it doesn't know",
+      suggested_questions: "Suggested questions",
+      language: "Languages",
+      add_rule: "Your own rules",
+      avoid_topic: "Anything it shouldn't talk about?",
+    },
+  },
   /** Look and feel, and images (copy §19, chunk 20d). */
   look: {
     title: "Look and feel",

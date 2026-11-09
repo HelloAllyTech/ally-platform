@@ -480,6 +480,45 @@ def _enforce_safety_pack(verdict: Verdict, ctx: CheckContext) -> None:
         verdict.model_declined = False
 
 
+def _stem(word: str) -> str:
+    word = word.lower()
+    for suffix in ("ing", "es", "s"):
+        if len(word) > 4 and word.endswith(suffix):
+            return word[: -len(suffix)]
+    return word
+
+
+def touches_topic(text: str, topic: str) -> bool:
+    """Whether `text` mentions `topic`: each of the topic's words of four letters or
+    more, by its stem ("prices" matches "price" and "pricing")."""
+    words = [_stem(w) for w in re.findall(r"[\w']+", topic) if len(w) >= 4]
+    if not words:
+        return False
+    stems = {_stem(w) for w in re.findall(r"[\w']+", text or "")}
+    return all(any(s.startswith(w) for s in stems) for w in words)
+
+
+def _enforce_avoid_topics(verdict: Verdict, ctx: CheckContext) -> None:
+    """The owner's topics to avoid, in code (chunk 20a-2): a reply to a question
+    about one, or that brings one up, becomes the bot's decline wording. Other
+    questions are untouched."""
+    if verdict.intent == AgentIntent.DECLINE and not verdict.answer.strip():
+        return
+    hit = next(
+        (
+            t
+            for t in ctx.avoid_topics
+            if touches_topic(ctx.question, t) or touches_topic(verdict.answer, t)
+        ),
+        None,
+    )
+    if hit is None:
+        return
+    logger.info("Reply touched a topic the owner asked it to avoid; declining")
+    verdict.intent, verdict.citations, verdict.answer = AgentIntent.DECLINE, [], ""
+    verdict.model_declined, verdict.rejection = False, None
+
+
 # A reply that opens by saying it doesn't have the information is a decline, even
 # when it cites a passage for where to go instead: it is what the unanswered queue
 # is for.
@@ -523,6 +562,8 @@ class CheckContext:
     #: The owner's wording for when it doesn't know (onboarding's "When it doesn't
     #: know"). Its contact details count as sourced, and every decline carries them.
     decline_text: str = ""
+    #: Topics the owner asked it not to talk about (chunk 20a-2).
+    avoid_topics: Sequence[str] = ()
 
 
 @dataclass
@@ -561,6 +602,7 @@ def check_reply(
     safety_pack: Optional[str] = None,
     can_search_again: bool = False,
     decline_text: Optional[str] = None,
+    avoid_topics: Sequence[str] = (),
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -585,12 +627,14 @@ def check_reply(
         safety_pack=safety_pack,
         can_search_again=can_search_again,
         decline_text=(decline_text or "").strip(),
+        avoid_topics=tuple(avoid_topics),
     )
     verdict = _read_draft(step, ctx)
     _ground(verdict, step, ctx)
     # Safety before wording, and on every reply, declines included: the pack's rules
     # outrank everything the instructions or the model say.
     _enforce_safety_pack(verdict, ctx)
+    _enforce_avoid_topics(verdict, ctx)
     # Fixes that keep the rest of the reply: sent back once, and if the rewrite
     # still needs them, applied to the text (sentences removed) rather than
     # refusing the reply.

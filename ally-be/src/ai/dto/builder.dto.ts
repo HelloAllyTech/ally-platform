@@ -8,6 +8,29 @@ import type {
  * ally-ai's onboarding builder (`/builder/*`, chunk 20a). Shapes mirror
  * `ally-ai/app/schemas/builder.py`; the draft itself is held in step by a shared fixture.
  */
+export interface BuilderChangeRequest {
+  request: string;
+  current: {
+    assistant_name: string;
+    introduction: string;
+    tone: string;
+    instructions: string;
+    decline_text: string;
+    suggested_questions: string[];
+    language: string;
+    own_rules: string[];
+    avoid_topics: string[];
+  };
+  safety_rules: string[];
+  prompts?: Record<string, unknown>;
+}
+
+export interface BuilderChangeResponse {
+  reply: string;
+  refused: boolean;
+  changes: { field: string; before: unknown; after: unknown }[];
+}
+
 export interface BuilderGap {
   key: string;
   item: string;
