@@ -200,6 +200,10 @@ export const en = {
    * account. Telling someone whose entitlements failed to load that the page "isn't turned on
    * for your role" sends them to an admin to fix something that is not broken.
    */
+  colorMode: {
+    switchToDark: "Switch to dark mode",
+    switchToLight: "Switch to light mode",
+  },
   accessCheck: {
     checking: "Checking your access…",
     failedTitle: "Couldn't check your access",
