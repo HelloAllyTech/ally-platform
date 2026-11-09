@@ -1,7 +1,30 @@
-# First Principles — plan (revision 3)
+# First Principles — plan (revision 4)
 
 > Status: **plan, not built.** Owner decisions recorded 2026-11-09 (see §1).
 > Replaces the third-party **Stacks** MCP everywhere it is used today.
+
+## What changed in revision 4: UX review
+
+The experience is designed around one promise: **drop documents, walk away, and find sharper
+interviews waiting.** Measured against that and Builder's own conventions (the room's
+deep-linked tabs, `Sheet`, `CommandPalette`, `DiffBlock`, `DecisionCard`, and the motion rules
+in `builderMotion.ts`), revision 3's UX had these problems:
+
+| Finding | Change |
+|---|---|
+| Six tabs (Queue, Library, Search preview, Review, Access, Insights) split one job across six places | **One "First Principles" tab in the Builder room with three views: Library, Inbox, Insights** (§10.2) |
+| The upload queue was a tab, but uploads run in the background | An **upload dock** that stays visible anywhere in Builder, like a download tray, with a clear "safe to close this tab" moment (§10.3) |
+| Exceptions (duplicates, scanned PDFs, cost cap) would interrupt with questions | **Every exception has a default and appears as a quiet row in the dock**; nothing blocks the rest of the drop (§10.3) |
+| Pipeline jargon (distil, segment, band, RRF, MMR) would leak into the UI | A **copy glossary**: the UI says "extract principles", "part", "Strong match". Diagnostics hide behind "How was this found?" (§10.9) |
+| No payoff moment when a document finishes | A **"what you got"** toast and a highlighted "new from this document" view (§10.3, §10.4) |
+| Review, duplicate decisions, grading and failures were scattered | **One Inbox**, one count, keyboard triage, optimistic actions with undo instead of confirm dialogs (§10.5) |
+| Benchmark labelling was a chore hidden in a debug screen | **Grading tasks in the Inbox**: one search at a time, keys 0–3, stop any time (§10.5) |
+| The interview would recite codes ("FP-0142 suggests…") | **Principles shape natural questions**; a quiet "Guided by" chip carries the reference. At most one principle-led question per turn (§10.7) |
+| Coverage, trade-offs and PRD fixes were three new panels | Coverage lives in the session side panel as **Principles in play**; trade-offs are outcome-worded decision cards with a recommendation; fixes **preview as a diff** before applying (§10.7) |
+| Explicit thumbs everywhere would nag | **Feedback is mostly implicit** (accept, dismiss, "not relevant"); thumbs only on hover |
+| Insights was a wall of charts | **Three answers first** (Is it helping? What's missing? What's noise?), each with one action (§10.6) |
+| Engineer setup was "create a key" | A **Connect Claude Code** sheet: key shown once, a pre-filled config snippet, and a **Test connection** button (§10.8) |
+| No first-run, loading, partial, error or saturated states; no accessibility or motion rules | A **states table**, accessibility rules and motion rules for every surface (§10.9) |
 
 ## What changed in revision 3: RAG design review
 
@@ -52,7 +75,7 @@ it ships.
 
 | Question | Decision |
 |---|---|
-| Name | **First Principles** (admin tab: Builder → First Principles; each item is a *principle*) |
+| Name | **First Principles**: a fourth tab in the Builder room (Now · Rules · History · First Principles); each item is a *principle* |
 | Review gate | **Auto-publish + spot-check.** Principles that pass the quality gate go live at once; borderline ones wait in a short review queue |
 | Processing | **Background on the server.** The browser parses and uploads all segments, then can close. ally-be distils in the background |
 | Uploading | **Drop many documents at once and keep adding while it runs.** They queue in the browser for parsing, then on the server for distilling, in the order dropped (reorderable) |
@@ -109,7 +132,7 @@ real numbers.
   each vector alone, fused, and fused + re-rank. Label every pooled hit 0–3 (0 irrelevant,
   1 related, 2 relevant, 3 exactly what the situation needs). Labelling only what the current
   pipeline shows would bias the set toward it and make recall unmeasurable.
-- **Labellers:** the admin labels in the Search preview's labelling mode (chunk 3). The
+- **Labellers:** the admin grades results through **grading tasks in the Inbox** (§10.5, chunk 3). The
   ally-ai RAG-quality judge, with a First Principles rubric, labels at scale only after its
   agreement with the admin's labels reaches **Cohen's κ ≥ 0.6** on a shared sample.
 - **Splits:** a **tuning** split (thresholds, alpha, weights are chosen on it) and a frozen
@@ -285,7 +308,7 @@ split, and the per-query results, so any two configs can be compared.
 
 ## 6. Ingestion
 
-### 6.1 Browser: the upload queue (ally-admin-dashboard → Builder → First Principles → Queue)
+### 6.1 Browser: the upload queue (the experience is in §10.3)
 The admin drops **any number of `.pdf` / `.epub` files at once**, and can drop more while the
 queue runs. Each file moves on its own:
 
@@ -300,18 +323,21 @@ queue runs. Each file moves on its own:
    scanned PDF with no text layer; no OCR in v1) is marked failed and the queue carries on.
 3. **Ready**: each file shows title, version, segment count, extraction warnings and a cost
    estimate.
-   - **Auto-queue** (default on) sends it straight on with default skips and a cost cap of
-     1.5× the estimate.
-   - Opening a file shows the preview: edit title and version, view the segment list, toggle
-     sections.
+   - **Auto-queue** (always on unless "Review before adding" is chosen) sends it straight on
+     with default skips and a cost cap of 1.5× the estimate.
+   - With "Review before adding", or by opening a row in the dock, a preview sheet lets the
+     admin edit title and version, view the parts, and toggle sections.
    - A running **batch total** shows documents, segments, estimated cost and estimated
      finish, with an optional batch cost cap.
 4. **Upload**: `POST /sources` per document (with `batchId`), then
    `POST /sources/:id/segments` in batches (≤ 1 MB), one document at a time. Memory is
    released per file once it is uploaded.
 5. **The tab only has to stay open until the last file is uploaded**, which usually takes
-   seconds to a few minutes. A banner and a `beforeunload` warning cover that window. Files
-   not yet uploaded can be dropped again; the hash check resumes them.
+   seconds to a few minutes. The dock says so and a `beforeunload` warning covers that window,
+   then the dock says it is safe to close (§10.3). Files not yet uploaded can be dropped
+   again; the hash check resumes them.
+6. Progress after upload comes over Builder's existing WebSocket gateway
+   (`builder.gateway.ts`), with polling as a fallback, so the dock moves without refreshes.
 
 New ally-web dependencies: `pdfjs-dist`, `jszip` (new, not upgrades).
 
@@ -463,11 +489,9 @@ The segment's text is deleted from Redis once all its candidates have passed thr
 - Archiving a source archives principles whose only source it is, and decrements
   `sourceCount` on the rest.
 
-### 6.8 Review queue (the spot-check)
-Builder → First Principles → Review. Cards show the statement, rationale, probe, critic
-results, why it was held, adjudicator reasoning with the neighbour side by side, and the
-source section. Actions: approve, edit + approve, merge into FP-xxxx, add relation, reject
-(optionally "reject as platitude"). Bulk approve. Target ≤ 20% of candidates here.
+### 6.8 Review (the spot-check)
+Held principles, adjudicator "unsure" cases and curator proposals all land in the **Inbox**
+(§10.5). Target ≤ 20% of candidates held.
 
 ## 7. Retrieval
 
@@ -606,15 +630,16 @@ Each of these is built behind a pipeline switch and adopted only on a test-split
    ("Scope has no empty state. FP-0142") come with an **Apply** action.
 
 ### 8.3 Guiding the admin, not just the agent
-- **Probes become questions.** The interviewer turns the highest-band unaddressed principles
-  for the current section into its next question, using the `probe` and citing the code.
-  Logged as `probed`.
-- **Trade-offs become decisions.** Two principles in context with a `tension` relation raise
-  a **decision card** (`builder-decision.service` / `DecisionCard.tsx`); the admin's choice is
-  recorded in the PRD with both codes.
-- **Coverage view.** The PRD panel shows, per section, the principles applied, probed but
-  open, and violated.
-- **Chips** on turn receipts and the PRD panel: code, statement on hover, thumbs up/down.
+- **Probes become natural questions.** The interviewer turns the strongest unaddressed
+  principle for the current section into its next question, in its own voice. The reference
+  travels as a chip under the message, never as prose. At most one principle-led question per
+  turn. Logged as `probed`.
+- **Trade-offs become decisions** when two strong-match principles in the same PRD section
+  have a `tension` relation (at most one per turn).
+- **Coverage** shows as "Principles in play" in the session side panel.
+- **The PRD check** offers fixes as previewable diffs.
+
+How each of these looks and behaves is in §10.7.
 
 ### 8.4 Tracking what was actually used, honestly
 - **Cited:** the PRD cites `[FP-0142]`. Each PRD version save parses citations.
@@ -625,7 +650,9 @@ Each of these is built behind a pipeline switch and adopted only on a test-split
     volume is low, sampled later). It checks the cited text genuinely applies the principle.
     Only a pass becomes `applied_verified`.
 - **Dismissed:** surfaced but never probed, read or cited by session end.
-- **Helpful / unhelpful:** thumbs on chips.
+- **Helpful / unhelpful:** mostly implicit. Accepting a fix or answering a principle-led
+  question counts as helpful; "Not relevant" on a finding or chip counts as unhelpful. Thumbs
+  appear only on hover of a chip.
 - **Shipped:** when `builder-outcome` records a merged build, every `applied_verified`
   principle in that session gets a `shipped` event.
 - **Effectiveness** (nightly, Bayesian-smoothed; eval and preview excluded), with a
@@ -653,7 +680,7 @@ Each of these is built behind a pipeline switch and adopted only on a test-split
     prompt, matching the four Stacks surfaces so habits carry over. Results use the same
     principle cards.
   - Auth: a **separate read-only personal key** (`fp_reader_keys`) sent as
-    `Authorization: Bearer`, created from Builder → First Principles → Access, with a
+    `Authorization: Bearer`, created from the **Connect Claude Code** sheet (§10.8), with a
     per-key rate limit (Redis) and `lastUsedAt`.
   - Each repo's `.mcp.json` points at it. Then delete `stacks-bridge.mjs` and the
     `.claude/skills/stacks` skill (replaced by a `first-principles` skill). Update every
@@ -661,21 +688,295 @@ Each of these is built behind a pipeline switch and adopted only on a test-split
     `planning-with-first-principles.md`.
   - Retrievals log with `consumer = mcp_dev` (retrieval stats only; no applied signal).
 
-## 10. Admin UI (Builder → First Principles)
+## 10. Experience design
 
-| Tab | Contents |
+### 10.1 What it must feel like
+1. **Drop and walk away.** No click is required between dropping files and finding principles
+   in the library. Every question the system could ask has a default; exceptions appear as
+   quiet rows, never as dialogs.
+2. **Show the payoff, not the pipeline.** The admin sees documents become principles. Stages,
+   scores and retrievers exist only behind "How was this found?".
+3. **The interview stays a conversation.** Principles shape the questions; they are never
+   recited. A code is a chip, never a sentence.
+4. **One place for everything that needs you.** Held principles, duplicate decisions, failed
+   documents and grading tasks share one Inbox and one count.
+5. **Fast, and keyboard all the way.** Optimistic actions with undo, instant search, keyboard
+   triage, live progress.
+
+Builder's house rules apply throughout:
+- Carbon components, Tailwind, lucide icons; existing Builder pieces (`Sheet`,
+  `CommandPalette`, `DiffBlock`, `DecisionCard`, `TurnReceipt`, `SessionPanel`) are extended
+  rather than new ones invented.
+- The motion vocabulary in `builderMotion.ts`.
+- Every state is specified before styling (§10.9).
+
+### 10.2 Where it lives
+The Builder room gains a fourth tab: **Now · Rules · History · First Principles**
+(`?tab=principles`). Inside it are three views, each deep-linkable with `?view=`:
+
+| View | Job | Primary action |
+|---|---|---|
+| **Library** (default) | See and search what we know; see each document's result | **Add documents** |
+| **Inbox** (count badge) | Everything that needs a person | Work the next item |
+| **Insights** | Is it helping, what's missing, what's noise | Act on the top suggestion |
+
+Plus three things that aren't tabs:
+- the **upload dock**, visible anywhere in Builder while documents are being added (§10.3)
+- the **principle sheet** (`?principle=FP-0142`), openable from anywhere a code appears
+- the **Connect Claude Code** sheet, from the tab's overflow menu (§10.8)
+
+The command palette gains "Add documents", "Search principles", "Open Inbox" and
+"Go to FP-…".
+
+Revision 3's six tabs map in as follows:
+- Queue → the dock
+- Search preview → the Library search box, plus "How was this found?"
+- Review → the Inbox
+- Access → the Connect sheet
+
+### 10.3 Adding documents
+**Entry points**
+- Drop anywhere on the tab. A full-tab overlay says "Drop to add 4 documents". Files that
+  aren't PDF or EPUB are named in the overlay before the drop ("2 files will be skipped: not
+  PDF or EPUB").
+- The **Add documents** button opens a file picker, so dropping is never required (keyboard
+  and screen readers). Its menu has one option: "Review before adding".
+- The command palette.
+
+**The upload dock** sits bottom-right, is collapsible, and survives navigation within Builder.
+- **Header:** one summary line, "Adding 12 documents · about 4 min left".
+- **Rows:** one per document, with its title, **one progress bar across all stages**, a
+  plain stage label and its time left.
+- **Stage labels:** Reading → Uploading → Waiting (3rd in line) → Extracting principles
+  (14 of 31 parts) → Finishing up → **23 principles added**.
+- **Row actions** on hover or focus: pause, cancel, move up. Cancel offers 6 seconds of undo.
+- **Browser tab title** carries progress: "(5/12) First Principles".
+
+**The tab-close moment**
+- While anything is still reading or uploading, the dock header says "Keep this tab open · 2
+  still uploading", and leaving the page triggers the browser's warning.
+- When the last upload lands, the header changes to **"✓ Safe to close this tab. We'll let
+  you know when it's done."** It is one of only two expressive animations in the feature.
+
+**Exceptions** appear as rows in the dock with the default already applied, so nothing waits:
+
+| Situation | Row says | Actions (default first) |
+|---|---|---|
+| Same file already in the library | "Already in your library" | **Skip** · Re-extract with current settings |
+| Same title, different file | "Looks like the PDF added on 3 Oct" | **Skip** · Add anyway |
+| Scanned PDF, no text | "No text to read: this looks like a scanned PDF. Export a text-based PDF and drop it again." | **Remove** |
+| Cost cap reached | "Paused at the $4.10 limit" | **Continue** · Stop here |
+| Would wait past 24h | "Would start in ~22h, after its text expires" | **Add later** · Add anyway |
+| Some parts failed | "22 of 24 parts done" | **Retry 2 parts** |
+
+**Cost** shows as small text in the dock footer ("≈ $6.20 estimated") and only interrupts if
+the batch limit is set and reached.
+
+**The payoff**
+- When a document finishes, the notification bell and a toast say: "**Design systems guide:
+  23 principles added**, 4 strengthened existing ones, 2 need a look". The action is **See
+  what's new**.
+- That opens the Library filtered to that document, newest first, with new rows briefly
+  highlighted.
+- The toast is the second expressive animation; everything else uses the productive set.
+
+### 10.4 Library
+A dense desktop list, because admins use it for long stretches.
+
+**Top of the view**
+- A search box (`/` focuses it). Results update as you type, debounced to ~250 ms.
+- Filter chips with counts: domain, strength, kind, document, status.
+- Sort: best match / most used / newest.
+- A segmented control: **Principles | Documents**.
+
+**A principle row**
+- The **statement** is the hero.
+- Under it, one muted line: domain · strength · "from 2 documents" · "used in 6 PRDs".
+- The code sits right-aligned in mono, with copy on hover.
+- Strength is shown as icon + word ("Must"), never colour alone.
+- Search results add a match label ("Strong match" / "Good match") with an icon.
+
+**Principle sheet** (existing `Sheet`), in reading order:
+1. the statement
+2. **Why**: the rationale
+3. **When it applies**
+4. **Question it raises**: the probe
+5. **Warning sign**: the anti-pattern
+6. **Related** and **Trade-offs**, as linked chips
+7. **Where it came from**: document title and section, never names
+8. **Usage**: a small sparkline and "applied in 6 PRDs"
+9. **History**
+
+Actions: **Edit** inline (no modal; save on blur, with undo), Archive (undo toast), Copy code.
+
+**"How was this found?"** is a toggle beside the search box. It adds per-row diagnostics:
+keyword, statement and situation ranks, grade, and why anything was dropped. This replaces the
+separate search preview tab. Library search uses the fast pipeline (no re-rank) so results
+never reshuffle under the cursor; the toggle can switch re-rank on to compare.
+
+**Documents view**
+- A table: title, version, added, principles kept, need a look, cost, status.
+- A row opens a sheet with the overview and the yield report written as sentences: "Read 31
+  parts · kept 23 principles · strengthened 6 existing ones · left out 9 as too generic ·
+  2 need a look".
+- Actions: Re-extract (drop the file again) and Archive.
+
+**New principle** (overflow menu) opens a form with **live hints** from the same
+deterministic checks the pipeline uses: a length counter, "Say what 'this approach' is", "No
+names of people or organisations".
+
+### 10.5 Inbox
+**One queue** for:
+- principles held for a look
+- "same or different?" decisions
+- curator suggestions
+- failed or expired documents
+- grading tasks
+
+It is grouped by type with counts, and ordered by impact: anything holding up a document
+first, grading last.
+
+**One item at a time**, in a focused card:
+- The **reason it's here comes first**, in one sentence ("Might be the same as FP-0142").
+- Keyboard: `A` approve · `E` edit · `R` reject · `M` merge · `S` skip · `J`/`K` next and
+  previous · `?` shortcut sheet. Every shortcut also has a visible button with its key shown.
+- "Same or different?" cards show both principles side by side with differences highlighted
+  (`DiffBlock`). Choices: **Same: merge** · **One refines the other** · **They conflict** ·
+  **Different**.
+
+**Optimistic and reversible**
+- An action applies instantly and the next card slides in (productive motion, 240 ms). An
+  undo toast stays for 6 seconds.
+- There are no confirmation dialogs, because every action is reversible: rejected means
+  archived and recoverable.
+- The next three cards are prefetched so the next one is instant.
+
+**Bulk:** when grouped by document, "Approve all 12 from Design systems guide" opens a peek
+list first.
+
+**Grading tasks** build the benchmark:
+- "Grade 8 results for: *designing a first-run screen*". Keys `0`–`3` map to **Not relevant
+  · Related · Relevant · Exactly right**.
+- Progress reads "23 of 60 searches graded · about a minute each".
+- The admin can stop at any point.
+
+**Empty state:** "Nothing needs you. Documents only send things here when a decision is
+needed." It is calm, with no celebration.
+
+**Attention:** a count badge on the tab only. Inbox items never send notifications, so the
+library never nags.
+
+### 10.6 Insights
+Three answers at the top, each with one action:
+
+| Question | Example | Action |
+|---|---|---|
+| **Is it helping?** | "PRDs written with principles pass 18% more checklist items" (replay eval), plus the verified-use trend | View report |
+| **What's missing?** | "Offline sync: 6 sessions searched and found nothing" (gap clusters) | **Add documents** (opens the picker) |
+| **What's noise?** | "14 principles shown 30+ times, never used" | Review in Inbox |
+
+Below the fold:
+- Carbon charts: library by domain, usage by consumer, search quality by split over time,
+  latency.
+- Labelled axes, small-sample warnings, and never colour as the only carrier of meaning.
+
+### 10.7 Inside the interview
+- **Principle-led questions read naturally.** "What should someone see the first time they
+  open this, before they have any scenarios?" sits above a quiet chip, **Guided by:
+  design the empty state first**, with the code on hover. The message itself never says
+  "FP-0142 suggests". At most one per turn.
+- **Principles in play.** A collapsible section in the existing `SessionPanel`, "Principles in
+  play (12)", grouped by PRD section. Each principle carries a status as icon and word:
+  **Applied** ✓, **Open** ○, **Trade-off** ⚠. This *is* the coverage view; there is no
+  separate panel.
+- **Trade-off cards** (`DecisionCard`):
+  - Options are worded as outcomes, not principle names ("Ship the list without first-use
+    tips (faster)" vs "Add first-use tips (clearer)").
+  - The principles appear as small chips.
+  - A **recommended** option comes with a one-line reason, plus **Decide later**.
+  - Raised only when both principles are strong matches in the same PRD section, at most one
+    per turn.
+- **PRD check findings**, grouped by PRD section with must-fix first:
+  - Each finding has one sentence, a principle chip, and **Preview fix**, which opens a
+    `DiffBlock` with the proposed change and Accept / Edit / **Not relevant**.
+  - "Not relevant" is recorded as unhelpful feedback, so feedback needs no extra widget.
+  - "Accept all must-fixes" shows the list first.
+- **Citations in the PRD** render as small superscript chips; hover shows the principle.
+  Exports (`prdExport.ts`) turn them into a short "Principles applied" footnote list.
+- **Turn receipt:** "Consulted 6 principles · used 2", collapsed by default.
+- **No waiting on principles.** Proactive retrieval never delays the first token: the guidance
+  brief builds alongside the first turn and joins from the second if it is late. There is no
+  "searching principles…" spinner; the receipt reports it afterwards.
+
+### 10.8 Connect Claude Code (engineers)
+A three-step sheet:
+1. **Create a key**, named "My laptop" by default. It is shown once, with a copy button.
+2. **Add it to your repo**: a pre-filled `.mcp.json` snippet and env line, each with copy.
+3. **Test connection** runs a real search with the key and shows "Connected: 8 principles for
+   'empty state'", or the exact failure in plain words.
+
+Below the steps: your keys, last used, and Revoke (with undo).
+
+### 10.9 States, copy, accessibility and motion
+**States**
+
+| Surface | First run / empty | Loading | Partial | Error | Saturated |
+|---|---|---|---|---|---|
+| Library | Hero drop zone: "Drop product, UX and engineering documentation. We pull out the principles and delete the text." Three-step strip (Drop → We extract → Your interviews use them). A privacy line: "Files are never stored. Text is deleted as soon as principles are extracted, within 24 hours at most." | Skeleton rows; after 3 s "Still loading…" | — | Inline retry with the reason | Virtualised list (5,000+ rows), chip counts, search first |
+| Search | "Search for a situation, e.g. *first-run screen*" | Previous results stay, dimmed | — | "Search is unavailable right now. This says nothing about what the library holds." | Top 20, then "Show more" |
+| Dock | Hidden | Per-row stage labels | Per-row part counts and retry | Row explains, with a default action | Collapses to its summary line |
+| Inbox | "Nothing needs you" | Card skeleton | — | Action failed → item restored, toast with retry | Grouped counts, bulk by document |
+| Interview | No library yet → principles stay silent, with no empty-state noise | Never blocks a turn | Brief joins late | Soft failure; the receipt says "Principles unavailable this turn" | Budget of ~25 in play |
+
+The tab is hidden entirely without `BUILDER_FIRST_PRINCIPLES`.
+
+**Copy glossary**: internal words never reach the UI.
+
+| Internal | UI |
 |---|---|
-| **Queue** | Drop zone for many files. One row per document across both stages: status, position, progress, extraction warnings, cost so far, estimated finish. Drag to reorder, pause / resume, cancel, retry, open preview. Batch totals and the "keep this tab open" banner |
-| **Library** | Sources with cost, overview and yield report; principle browser with filters; edit, archive, add a principle by hand; relations on each principle |
-| **Search preview** | The real pipeline as `admin_preview`: each stage visible (per-retriever ranks, fused score, grade, band, MMR drops), with a pipeline switch. **Labelling mode** shows the pooled candidates for a benchmark query and records 0–3 grades |
-| **Review** | The spot-check queue (§6.8), including adjudicator "unsure" cases and curator proposals |
-| **Access** | Engineers create and revoke their read-only MCP keys (§9) |
-| **Insights** | Benchmark reports and trends by split; online signals (§3.4); library size by domain; top applied; never surfaced; surfaced often, never applied; **gap list** (zero-hit and low-band queries clustered into topics, "consider uploading documentation on offline sync"); per-source yield vs usefulness |
+| distil | extract principles |
+| segment | part |
+| source | document |
+| band high / medium | Strong match / Good match |
+| status `review` | Needs a look |
+| superseded | Merged into FP-… |
+| over_cap | Not kept: lower priority |
+| platitude | Too generic |
+| ungrounded | Not supported by the document |
+| tension | Trade-off |
+| probe | Question it raises |
+| antiPattern | Warning sign |
+| corroboration (`sourceCount`) | "from N documents" / "strengthened" |
 
-Feature toggle: `BUILDER_FIRST_PRINCIPLES` (separate from `BUILDER`). Builder settings:
-`principlesBrief` (off / shadow / on), `principlesProbes` (off / on), and the active
-**pipeline config** (index version, rerank, contextualisation, weights), changed only after a
-benchmark report.
+**Accessibility**
+- Every drag action has a button.
+- Focus moves to the next Inbox card after an action and returns to the trigger when a sheet
+  closes.
+- Dock progress goes to a polite ARIA live region, throttled to one update every 10 seconds.
+- Match strength, status and strength always pair an icon with a word.
+- Shortcuts are listed in `?` and never the only way to act.
+- Carbon tokens provide contrast.
+
+**Motion** follows `builderMotion.ts`:
+- Productive for rows, progress and card transitions.
+- **Expressive only twice:** "Safe to close this tab" and the document-finished toast.
+- Nothing animates while idle: a waiting document shows a still "Waiting", not a spinner.
+- `prefers-reduced-motion` removes movement, never information.
+
+**Speed targets** (first guesses)
+- Library search updates < 300 ms after typing stops (fast pipeline, cached).
+- The next Inbox card appears < 100 ms after an action (prefetched).
+- Dock updates within 2 s of a server change (WebSocket).
+
+### 10.10 Switches
+- Feature toggle `BUILDER_FIRST_PRINCIPLES` (separate from `BUILDER`) shows or hides the whole
+  tab.
+- In **Builder settings**:
+  - `principlesBrief`: off / shadow / on
+  - `principlesProbes`: off / on
+  - the active **search setup** (index version, re-rank, contextualisation, weights), which
+    can only change by picking a setup that has a benchmark report, with the report's headline
+    numbers shown next to each choice
 
 ## 11. Build order (chunks; each one ships and is tested on its own)
 
@@ -683,11 +984,11 @@ benchmark report.
 |---|---|---|
 | 1 | **Library core + retrieval pipeline + eval runner**: `fp_*` migrations; `FirstPrinciple_v1` (flat index, named vectors, BM25 boosts); ally-ai endpoints; outbox sync and reconciliation; `FirstPrinciplesRetrievalService` (three retrievers, RRF, soft filters, hydration, bands from RRF, MMR, logging, caches); manual add; the benchmark tables and `first-principles:eval` runner | Hand-added principles come back with per-retriever ranks logged; the eval runner produces a report on a small hand-labelled set; prod Weaviate version confirmed; tests and lint green in ally-be and ally-ai |
 | 2 | **Server ingestion**: sources/check/segments API, Redis staging, queue worker, overview → distil (decontextualised, example queries) → gate (deterministic, verbatim, injection, platitude, critic with groundedness + standalone) → dedupe with adjudicator under a lock → consolidation (cap, relations), cost cap, re-distil, yield report | Posting several real documents' segments produces capped, grounded, standalone principles with yield reports, in queue order, with no cross-document duplicates; no segment text in Postgres; Redis keys gone afterwards |
-| 3 | **Browser upload queue** (multi-file drop, Web Worker extraction, normalisation, structure-first segmentation with context-only overlap) **+ Queue / Library / Search preview (with labelling mode) / Review UI** | The owner drops the seed documents in one go and they distil end to end; extraction-recall spot-check on 3 documents; a first **pooled, graded benchmark** of ~60 queries with tuning and test splits |
-| 4 | **Re-rank + Builder swap**: graded re-ranker with fallback; benchmark it (on vs off); `principles_*` tools, principle cards, prompts, receipts, citation parsing, integrity check + verifier; brief in **shadow** mode | Benchmark report decides the re-rank default; an interview cites `[FP-…]`, invented codes are stripped, verified applications recorded; Stacks no longer called by Builder |
-| 5 | **Guiding the admin**: context descriptor, brief + section focus within the budget, probes, tension decision cards, PRD principle check with Apply, coverage view; **replay eval off vs on** | Test-split Recall@50 ≥ 0.9 and nDCG@8 ≥ 0.6, and the replay eval improves with no fixture regressing; then `principlesBrief` and `principlesProbes` go on by default |
-| 6 | **Feedback loop + experiments + Insights**: thumbs, shipped linkage, calibrated LLM judge (κ check) on production samples, position-corrected effectiveness, in-band prior, exploration, curator; experiments from §7.4; Insights tab | Insights shows real numbers; each experiment has a report and an adopt/reject decision |
-| 7 | **Copilots + MCP + Stacks removal**: Roadmap/Course Copilot swap, read-only keys + Access tab, `/mcp` endpoint, `.mcp.json` in every repo, delete `StacksClientService` + bridge + skill + `STACKS_*` config, docs/wiki rewrite | `grep -ri stacks` finds only history notes |
+| 3 | **Browser extraction + the First Principles tab**: multi-file drop and Add documents button, Web Worker extraction, normalisation, structure-first segmentation with context-only overlap; **upload dock** with exceptions-as-rows and the safe-to-close moment; WebSocket progress; **Library** (principles, documents, search with "How was this found?", principle sheet, new principle with live hints, first-run state); **Inbox** (keyboard triage, undo, same-or-different cards, grading tasks); copy glossary applied | The owner drops the seed documents **with no required clicks**, is told when it's safe to close the tab, and gets a "what you got" toast per document; 20 Inbox items triaged by keyboard in under 3 minutes; every surface has its §10.9 states; extraction-recall spot-check on 3 documents; a first **pooled, graded benchmark** of ~60 queries graded through the Inbox |
+| 4 | **Re-rank + Builder swap**: graded re-ranker with fallback; benchmark it (on vs off); `principles_*` tools, principle cards, prompts, citation parsing, integrity check + verifier; **"Guided by" chips, citation chips, collapsed turn receipt**; brief in **shadow** mode | Benchmark report decides the re-rank default; an interview cites `[FP-…]`, invented codes are stripped, verified applications recorded; no principle code appears in the interviewer's prose; Stacks no longer called by Builder |
+| 5 | **Guiding the admin**: context descriptor, brief + section focus within the budget, principle-led questions (one per turn), **Principles in play** in the session panel, outcome-worded trade-off cards with a recommendation, PRD check with **Preview fix** diffs and implicit feedback; **replay eval off vs on** | Test-split Recall@50 ≥ 0.9 and nDCG@8 ≥ 0.6, and the replay eval improves with no fixture regressing; then `principlesBrief` and `principlesProbes` go on by default |
+| 6 | **Feedback loop + experiments + Insights**: thumbs, shipped linkage, calibrated LLM judge (κ check) on production samples, position-corrected effectiveness, in-band prior, exploration, curator; experiments from §7.4; **Insights** with the three answers first | Insights shows real numbers and each answer has a working action; each experiment has a report and an adopt/reject decision |
+| 7 | **Copilots + MCP + Stacks removal**: Roadmap/Course Copilot swap, read-only keys + **Connect Claude Code** sheet with Test connection, `/mcp` endpoint, `.mcp.json` in every repo, delete `StacksClientService` + bridge + skill + `STACKS_*` config, docs/wiki rewrite | `grep -ri stacks` finds only history notes |
 
 Chunks 1–4 make it usable; 5–6 make it good and prove it; 7 finishes the cutover. Stacks
 stays wired for engineers until chunk 7. Every new prompt goes through the Skills Store, and
@@ -717,6 +1018,10 @@ comes with a benchmark report.
 | A large drop overwhelms the browser or the queue | Web Worker, memory released per file, auto-queue, start-time warnings, batch cost cap |
 | It doesn't actually improve PRDs | The replay eval gates the proactive features |
 | Latency or cost creep | Per-stage latency logged, targets per stage, caches, re-rank fallback, experiments must earn their cost |
+| The admin is interrupted or confused by a big drop | Defaults for every exception, exceptions as dock rows, plain-language stage labels, an explicit safe-to-close moment |
+| The library becomes a chore to maintain | One Inbox with keyboard triage, undo instead of confirmations, bulk by document, implicit feedback, no notifications for Inbox items |
+| Principles make the interview feel robotic | Natural questions with a quiet chip, one principle-led question per turn, outcome-worded trade-offs, nothing blocks the first token |
+| Internal jargon confuses users | Copy glossary enforced in review; diagnostics only behind "How was this found?" |
 
 ## 13. Open questions
 
