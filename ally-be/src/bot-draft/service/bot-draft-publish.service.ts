@@ -35,6 +35,8 @@ import {
   BotDraftActor,
   BotDraftStatus,
   BotDraftStep,
+  PurposeId,
+  purposeOf,
 } from '../enum/bot-draft.enum';
 import { packFor } from '../safety-pack/safety-packs';
 import type { BotDraft, DraftEvent } from '../type/bot-draft.type';
@@ -282,6 +284,11 @@ export class BotDraftPublishService {
       safetyPackVersion: pack?.version ?? draft.safetyPackVersion ?? null,
       // Topics to avoid are set on the assistant itself (Make it yours, the home), so kept.
       rules: { ...(chatbot.rules ?? {}), never: config.extraNever },
+      purpose: purposeOf(config),
+      purposeNote:
+        purposeOf(config) === PurposeId.CUSTOM
+          ? config.purposeNote?.trim() || null
+          : null,
       status,
       updatedBy: Number(ExecutionManager.getUserId() ?? 0) || null,
     } as Partial<Chatbot>;

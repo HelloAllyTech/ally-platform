@@ -89,6 +89,18 @@ export class Chatbot extends BaseWithoutTenantEntity {
   @Column({ type: 'jsonb', default: () => `'{"never":[]}'` })
   rules!: { never: string[]; avoid?: string[] };
 
+  /**
+   * What it's for (chunk 20a-2): answer, enquiries, training, guide or custom; null for bots made
+   * before purposes, which run exactly as before. Adds a short section to the agent's instructions
+   * after the owner's and before the safety rules.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  purpose?: string | null;
+
+  /** "Something else": the owner's own description of what it's for. */
+  @Column({ name: 'purpose_note', type: 'text', nullable: true })
+  purposeNote?: string | null;
+
   @Column({ type: 'timestamp', name: 'archived_at', nullable: true })
   archivedAt?: Date | null;
 }

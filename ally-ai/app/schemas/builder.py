@@ -79,6 +79,25 @@ class DesignId(str, Enum):
     SUPPORT = "support"
 
 
+class PurposeId(str, Enum):
+    """What the assistant is for (chunk 20a-2). Replaces the designs: a purpose changes
+    how the assistant uses what it knows, never what it knows."""
+
+    ANSWER = "answer"
+    ENQUIRIES = "enquiries"
+    TRAINING = "training"
+    GUIDE = "guide"
+    CUSTOM = "custom"
+
+
+#: A draft made before purposes keeps working: its design maps to a purpose.
+PURPOSE_OF_DESIGN: Dict[str, "PurposeId"] = {
+    "guide": PurposeId.ANSWER,
+    "support": PurposeId.ANSWER,
+    "enquiries": PurposeId.ENQUIRIES,
+}
+
+
 class PrechatFieldType(str, Enum):
     """ally-be's PrechatFieldType (12b)."""
 
@@ -141,6 +160,16 @@ class BotDraft(_Lenient):
     branding: Branding = Field(default_factory=Branding)
     access: Access = Field(default_factory=Access)
     design: Optional[DesignId] = None
+    purpose: Optional[PurposeId] = None
+    purposeNote: str = Field("", max_length=600)
+
+    def chosen_purpose(self) -> PurposeId:
+        """The purpose, or the one an older draft's design maps to."""
+        if self.purpose:
+            return self.purpose
+        return PURPOSE_OF_DESIGN.get(
+            self.design.value if self.design else "", PurposeId.ANSWER
+        )
 
 
 class LearnedFact(_Lenient):
@@ -202,6 +231,10 @@ class DesignCard(BaseModel):
     wont: List[str]
     sample: List[Dict[str, str]]
     coming_soon: bool = False
+    #: The purpose the builder suggests, shown first with "Recommended for you".
+    recommended: bool = False
+    #: What it honestly can't do yet (copy §24's "Honest limits").
+    limit: str = ""
 
 
 class HistoryTurn(BaseModel):

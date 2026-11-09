@@ -165,6 +165,7 @@ function harness(
       .mockResolvedValue([{ role: 'user', content: 'how much?' }]),
   };
   const engine = { respond: jest.fn().mockResolvedValue(DECISION) };
+  const leads = { afterTurn: jest.fn().mockResolvedValue(false) };
   const unansweredValues = jest.fn().mockReturnThis();
   const unanswered = {
     createQueryBuilder: () => ({
@@ -190,6 +191,7 @@ function harness(
     engine as never,
     { emit } as never,
     { jwt: { accessToken: { secret: 's' } } } as never,
+    leads as never,
     unanswered as never,
   );
   const req = { ip: '203.0.113.9', headers: {} } as never;

@@ -240,6 +240,10 @@ export interface KnowledgePersonaRequest {
   safety_pack?: string;
   /** Topics the owner asked it not to talk about (chunk 20a-2). */
   avoid_topics?: string[];
+  /** What it's for (chunk 20a-2); ally-ai adds the purpose's section before the safety rules. */
+  purpose?: string;
+  /** "Something else": the owner's own description. */
+  purpose_note?: string;
 }
 
 export interface KnowledgeCitation {

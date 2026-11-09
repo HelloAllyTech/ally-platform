@@ -58,6 +58,7 @@ import {
   BotPageVisitor,
   BotPageVisitorService,
 } from './bot-page-visitor.service';
+import { LeadAlertService } from './lead-alert.service';
 import { TurnstileService } from './turnstile.service';
 
 /** What a visitor's browser learns about a page. Nothing internal: no prompts, ids or settings. */
@@ -207,6 +208,7 @@ export class BotPagePublicService {
     private readonly engine: ChatbotEngineService,
     private readonly eventEmitter: EventEmitter2,
     private readonly config: AppConfigService,
+    private readonly leads: LeadAlertService,
     @InjectRepository(WaUnansweredQuestion)
     private readonly unansweredRepository: Repository<WaUnansweredQuestion>,
   ) {}
@@ -599,6 +601,9 @@ export class BotPagePublicService {
       await this.fileUnanswered(inbound.id, conversation.id, text, decision);
     }
     if (decision.alert) this.eventEmitter.emit('exception', decision.alert);
+    // A "Bring in customers" assistant tells its owners about a new lead, once (chunk 20a-2).
+    // Not awaited: the reply never waits on email.
+    void this.leads.afterTurn(chatbot, conversation.id);
     if (isFallback(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },

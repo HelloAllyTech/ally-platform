@@ -524,8 +524,20 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Honest limits:**
   - Enquiries: It can't book or take payments yet. It sends you each new enquiry by email.
   - Training: It doesn't keep track of each person's progress yet.
+- **What each purpose will and won't do** *(added in 20a-2; fixed in code, so a card never promises what doesn't work)*:
+  - Answer questions. It will: Answer questions from your information · Link each answer to where it came from · Say plainly when it doesn't know. It won't: Book, take orders or take payments
+  - Bring in customers. It will: Recommend the service that fits · Ask one question at a time · Pass each person's name and number to you. It won't: Book, take orders or take payments · Promise discounts or slots you haven't listed
+  - Train my team. It will: Explain your procedures in short steps · Quiz your team when they ask · Link each answer to your documents. It won't: Make up a procedure
+  - Guide people step by step. It will: Give one step at a time · Check each step is done before the next · Keep your steps in order, safety steps included. It won't: Skip or reorder steps · Book, take orders or take payments
+- **Sample exchanges when the builder's own don't fit** *(added in 20a-2)*:
+  - Answer questions: "What are your opening hours?" / "Here's when we're open, from our website."
+  - Bring in customers: "Which service would suit me?" / "Happy to help. What are you looking for help with?"
+  - Train my team: "Test me on our procedures." / "Sure. First question: what's the first step?"
+  - Guide people step by step: "How do I get ready?" / "Here's the first step. Tell me when it's done."
+- **Defaults confirmation parts** *(added in 20a-2)*: Pre-chat: {fields} · Access: {access} · name, phone, what they're looking for · nothing before the chat · people in your organisation · anyone you choose
 - **Lead alert email subject:** New enquiry from your assistant
 - **Lead alert body:** {name} asked about {topic}. Phone: {phone}. {summary} Open the conversation: {link}
+- **Lead alert, when a detail wasn't given** *(added in 20a-2)*: Someone (no name) · your services (no topic). An email address stands in for the phone when that's what they gave.
 - **Reading choice:** Read everything · Choose pages
 - **Choose pages title:** Which pages should it read?
 - **Choose pages shortcuts:** Leave out blog and news · Leave out careers

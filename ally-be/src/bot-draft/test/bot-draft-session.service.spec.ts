@@ -16,6 +16,7 @@ import {
   documentParts,
   findingLines,
 } from '../service/bot-draft-session.service';
+import { BotDraftService } from '../service/bot-draft.service';
 import { memoryDrafts } from './memory-drafts';
 
 jest.mock('src/common/execution/execution-manager', () => ({
@@ -141,6 +142,50 @@ describe('BotDraftSessionService.turn', () => {
       values: { languages: 'English, Hindi' },
       pending: 'decline',
     });
+  });
+
+  it('stores the purpose, and Train my team defaults to the organisation only', async () => {
+    const h = harness(
+      { step: BotDraftStep.DESIGN },
+      reply({
+        next_step: 'design',
+        patches: [{ op: 'replace', path: '/purpose', value: 'training' }],
+      }),
+    );
+    await h.turn({ chip: 'purpose:training' });
+    const row = h.store.row();
+    expect(row.draftConfig.purpose).toBe('training');
+    expect(row.draftConfig.access.mode).toBe('organisation');
+  });
+
+  it('never overrides who can use it once the owner chose', async () => {
+    const h = harness(
+      {
+        step: BotDraftStep.DESIGN,
+        draftConfig: {
+          ...BotDraftService.defaultDraft('Sunrise Mind'),
+          access: { mode: 'invite', emails: ['a@b.co'], organisationIds: [] },
+        },
+      },
+      reply({
+        next_step: 'design',
+        patches: [{ op: 'replace', path: '/purpose', value: 'training' }],
+      }),
+    );
+    await h.turn({ chip: 'purpose:training' });
+    expect(h.store.row().draftConfig.access.mode).toBe('invite');
+  });
+
+  it('leaves who can use it alone for other purposes', async () => {
+    const h = harness(
+      { step: BotDraftStep.DESIGN },
+      reply({
+        next_step: 'design',
+        patches: [{ op: 'replace', path: '/purpose', value: 'enquiries' }],
+      }),
+    );
+    await h.turn({ chip: 'purpose:enquiries' });
+    expect(h.store.row().draftConfig.access.mode).toBe('invite');
   });
 
   it('gives a mental health non-profit Mental health safety, from its cause', async () => {

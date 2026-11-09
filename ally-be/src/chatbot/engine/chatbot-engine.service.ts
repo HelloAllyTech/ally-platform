@@ -58,6 +58,16 @@ const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
  */
 export const AGENT_PROMPT_CODES = [AGENT_SYSTEM_PROMPT_CODE];
 const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
+
+/** Purposes with a section of their own in the Skills Store (chunk 20a-2). */
+const PURPOSE_SECTIONS = new Set(['answer', 'enquiries', 'training', 'guide']);
+
+/** The bot's purpose section, loaded only for a bot that has one. */
+export function purposePromptCodes(purpose?: string | null): string[] {
+  return purpose && PURPOSE_SECTIONS.has(purpose)
+    ? [`ally_ai_agent_purpose_${purpose}`]
+    : [];
+}
 /** Used by bots allowed to answer beyond their documents. */
 const GENERAL_ANSWER_PROMPT_CODE = 'ally_ai_knowledge_answer_general';
 /**
@@ -499,9 +509,12 @@ export class ChatbotEngineService {
     let prompts: Record<string, unknown> = {};
     try {
       const rows = await this.promptSharedService.getPromptsByOptions({
-        promptCode: useAgent
-          ? [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES]
-          : KNOWLEDGE_PROMPT_CODES,
+        promptCode: [
+          ...(useAgent
+            ? [...KNOWLEDGE_PROMPT_CODES, ...AGENT_PROMPT_CODES]
+            : KNOWLEDGE_PROMPT_CODES),
+          ...purposePromptCodes(turn.chatbot.purpose),
+        ],
       });
       prompts = (rows ?? []).reduce<Record<string, unknown>>((acc, row) => {
         const entry: Record<string, unknown> = {};

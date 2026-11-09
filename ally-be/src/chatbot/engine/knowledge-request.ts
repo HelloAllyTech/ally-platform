@@ -101,6 +101,9 @@ function personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
     avoid_topics: turn.chatbot.rules?.avoid?.length
       ? turn.chatbot.rules.avoid
       : undefined,
+    // What it's for (chunk 20a-2): a section after the instructions, before the safety rules.
+    purpose: turn.chatbot.purpose || undefined,
+    purpose_note: turn.chatbot.purposeNote?.trim() || undefined,
   };
   return Object.values(out).some(Boolean) ? out : undefined;
 }

@@ -9,6 +9,7 @@ import { ROUTES } from "@constants";
 import { CheckupScreen } from "./CheckupScreen";
 import { COPY } from "./copy";
 import { MakeItYoursScreen } from "./MakeItYours";
+import { defaultsConfirmation } from "./purposes";
 import {
   BuildingScreen,
   DesignScreen,
@@ -126,18 +127,23 @@ export const OnboardingView: React.FC<{
         return (
           <DesignScreen
             designs={view.designs ?? []}
-            chosen={view.draft.design}
+            chosen={view.draft.purpose ?? view.draft.design}
             canChoose={s.canChooseDesign}
             line={working ? undefined : flow.line}
             onChoose={id => {
               const card = view.designs?.find(d => d.id === id);
               if (card) s.chooseDesign(card);
             }}
+            onDescribe={s.say}
           />
         );
       case "building":
         return (
-          <BuildingScreen done={reached(view.step, "share")} onContinue={() => s.pass("built")} />
+          <BuildingScreen
+            done={reached(view.step, "share")}
+            onContinue={() => s.pass("built")}
+            confirmation={defaultsConfirmation(view)}
+          />
         );
       case "make":
         return (

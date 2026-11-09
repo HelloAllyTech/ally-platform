@@ -9,6 +9,8 @@ import { DEFAULT_BOT_PAGE_LIMITS } from '../../chatbot/type/bot-page.type';
 import {
   BotDraftStatus,
   BotDraftStep,
+  DesignId,
+  PurposeId,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
 import { SAFETY_PACKS } from '../safety-pack/safety-packs';
@@ -111,6 +113,29 @@ describe('BotDraftPublishService', () => {
     expect(h.fakes.knowledge.createForChatbot).toHaveBeenCalled();
     expect(h.fakes.botPages.save).not.toHaveBeenCalled();
     expect(h.fakes.pageAccess.add).not.toHaveBeenCalled();
+  });
+
+  it("publishes the purpose, and an older draft's design as its purpose", async () => {
+    const h = harness();
+    const row = h.store.row();
+    row.draftConfig.purpose = PurposeId.CUSTOM;
+    row.draftConfig.purposeNote = ' Help parents choose a class ';
+    await h.service.stage(row);
+    expect(h.fakes.chatbots.update).toHaveBeenLastCalledWith(
+      { id: 'bot-1' },
+      expect.objectContaining({
+        purpose: 'custom',
+        purposeNote: 'Help parents choose a class',
+      }),
+    );
+
+    row.draftConfig.purpose = null;
+    row.draftConfig.design = DesignId.GUIDE;
+    await h.service.stage(row);
+    expect(h.fakes.chatbots.update).toHaveBeenLastCalledWith(
+      { id: 'bot-1' },
+      expect.objectContaining({ purpose: 'answer', purposeNote: null }),
+    );
   });
 
   it('publishes the chatbot, its settings and its page through the 12b services', async () => {

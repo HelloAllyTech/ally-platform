@@ -6,6 +6,13 @@ import type { CrawlProblem } from '../type/bot-draft.type';
  * deck. Everything the builder says in a conversation step comes from ally-ai.
  */
 export const ONBOARDING_COPY = {
+  /** The lead alert for a "Bring in customers" assistant (copy §24, chunk 20a-2). */
+  leadAlert: {
+    subject: 'New enquiry from your assistant',
+    body: '{name} asked about {topic}. Phone: {phone}. {summary} Open the conversation: {link}',
+    someone: 'Someone',
+    yourServices: 'your services',
+  },
   opening:
     "Hi, I'm here to set up your assistant with you. Paste your website and I'll start reading. You can watch what I find on the right.",
   openingChips: ['Use my website', 'Upload documents', 'Describe it instead'],

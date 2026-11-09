@@ -17,6 +17,7 @@ import { BotPageAdminController } from './bot-page-admin.controller';
 import { BotPageGuardMiddleware } from './bot-page-guard.middleware';
 import { BotPageOtpService } from './bot-page-otp.service';
 import { BotPagePublicController } from './bot-page-public.controller';
+import { LeadAlertService } from './lead-alert.service';
 import { BotPagePublicService } from './bot-page-public.service';
 import { BotPageRateLimitService } from './bot-page-rate-limit.service';
 import { BotPageVisitorService } from './bot-page-visitor.service';
@@ -60,6 +61,7 @@ import { TurnstileService } from './turnstile.service';
     TurnstileService,
     BotPagePublicService,
     BotImageService,
+    LeadAlertService,
   ],
   // The access service too: onboarding's publish (chunk 20a) writes the page's list through it.
   // The image service: onboarding stores the logo it found through it (chunk 20d).

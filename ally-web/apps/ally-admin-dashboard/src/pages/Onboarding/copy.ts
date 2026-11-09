@@ -218,6 +218,19 @@ export const COPY = {
       avoid_topic: "Anything it shouldn't talk about?",
     },
   },
+  /** What should your assistant do? (copy §24, chunk 20a-2). */
+  purposes: {
+    title: "What should your assistant do?",
+    recommended: "Recommended for you",
+    customPrompt: "What should your assistant help with? A sentence or two is plenty.",
+    confirmation:
+      "I've set it up for {purpose}: {defaults}. You can change any of this on the next screen.",
+    preChat: "Pre-chat: {fields}",
+    access: "Access: {access}",
+    nothingBefore: "nothing before the chat",
+    organisation: "people in your organisation",
+    anyone: "anyone you choose",
+  },
   /** Look and feel, and images (copy §19, chunk 20d). */
   look: {
     title: "Look and feel",

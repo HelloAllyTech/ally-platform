@@ -71,6 +71,34 @@ export enum DesignId {
   SUPPORT = 'support',
 }
 
+/**
+ * What the assistant is for (chunk 20a-2). Replaces the designs: a purpose changes how the
+ * assistant uses what it knows, never what it knows. Safety packs apply on top of every purpose.
+ */
+export enum PurposeId {
+  ANSWER = 'answer',
+  ENQUIRIES = 'enquiries',
+  TRAINING = 'training',
+  GUIDE = 'guide',
+  CUSTOM = 'custom',
+}
+
+/** A draft made before purposes keeps working: its design maps to a purpose. */
+export const PURPOSE_OF_DESIGN: Record<DesignId, PurposeId> = {
+  [DesignId.GUIDE]: PurposeId.ANSWER,
+  [DesignId.SUPPORT]: PurposeId.ANSWER,
+  [DesignId.ENQUIRIES]: PurposeId.ENQUIRIES,
+};
+
+/** The draft's purpose, or the one an older draft's design maps to; null for neither. */
+export function purposeOf(draft: {
+  purpose?: PurposeId | null;
+  design?: DesignId | null;
+}): PurposeId | null {
+  if (draft.purpose) return draft.purpose;
+  return draft.design ? PURPOSE_OF_DESIGN[draft.design] : null;
+}
+
 /** A "what we learned" section (copy §4). */
 export enum LearnedSection {
   ABOUT = 'about',

@@ -117,6 +117,28 @@ class DesignsOut(BaseModel):
     designs: List[DesignOut] = Field(default_factory=list)
 
 
+# --- purposes (chunk 20a-2) ----------------------------------------------------
+
+
+class PurposeChoice(str, Enum):
+    ANSWER = "answer"
+    ENQUIRIES = "enquiries"
+    TRAINING = "training"
+    GUIDE = "guide"
+
+
+class PurposeCardOut(BaseModel):
+    id: lenient(PurposeChoice, PurposeChoice.ANSWER) = PurposeChoice.ANSWER
+    best_for: str = ""
+    visitor_line: str = ""
+    assistant_line: str = ""
+
+
+class PurposesOut(BaseModel):
+    recommended: lenient(PurposeChoice, PurposeChoice.ANSWER) = PurposeChoice.ANSWER
+    cards: List[PurposeCardOut] = Field(default_factory=list)
+
+
 # --- draft -------------------------------------------------------------------
 
 

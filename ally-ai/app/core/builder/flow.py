@@ -16,13 +16,14 @@ from uuid import uuid4
 from app.core.builder import catalogue, tasks
 from app.core.builder.schemas import ConverseOut, DraftOut, Tone
 from app.schemas.builder import (
+    PURPOSE_OF_DESIGN,
     BuilderStepRequest,
     BuilderStepResponse,
-    DesignId,
     Gap,
     Industry,
     PatchOp,
     PrechatFieldType,
+    PurposeId,
 )
 
 OnEvent = Callable[[str, Dict[str, Any]], None]
@@ -43,6 +44,8 @@ BUILDER_PATHS: Tuple[str, ...] = (
     "/declineText",
     "/branding",
     "/design",
+    "/purpose",
+    "/purposeNote",
 )
 #: ally-be's source for a detail the owner gave (bot-draft.service OWNER_SOURCE).
 OWNER_SOURCE = "owner"
@@ -80,8 +83,10 @@ STEP_GUIDES: Dict[str, str] = {
         "`message` (at most one sentence); the app adds the next question itself."
     ),
     "design": (
-        "The owner is choosing a design from the cards on the right. If they name "
-        "one, set `design`. Booking and payments are coming soon, not available."
+        "The owner is choosing what their assistant is for from the cards: answer "
+        "questions, bring in customers, train their team, guide people step by step, "
+        "or something else. Answer their question about the choice in one or two "
+        "sentences. Booking and payments are coming soon, not available."
     ),
     "building": "The assistant is being built.",
     "share": (
@@ -199,10 +204,10 @@ def owner_fact_patches(out: ConverseOut) -> List[PatchOp]:
 
 
 def draft_patches(
-    out: DraftOut, design: DesignId, source: str, current_decline: str
+    out: DraftOut, purpose: PurposeId, source: str, current_decline: str
 ) -> List[PatchOp]:
     """The drafted assistant, as patches. Any sentence with a number we were never
-    given is dropped; pre-chat questions only for the enquiries design."""
+    given is dropped; pre-chat questions only for Bring in customers."""
     patches: List[PatchOp] = []
     name = " ".join(out.assistant_name.split())[:60]
     if name:
@@ -231,7 +236,7 @@ def draft_patches(
     )[:4]
     patches.append(replace("/suggestedQuestions", suggested))
     patches.append(
-        replace("/prechat", prechat(out) if design == DesignId.ENQUIRIES else [])
+        replace("/prechat", prechat(out) if purpose == PurposeId.ENQUIRIES else [])
     )
     decline = tasks.keep_grounded(out.decline_text, source)[:600]
     if decline or not current_decline:
@@ -472,8 +477,8 @@ async def _gaps(step: Step) -> BuilderStepResponse:
 
     step.status("designing")
     request.answers = answers
-    designs = await tasks.propose_designs(request, step.deadline.left())
-    message = catalogue.DESIGN_MESSAGE
+    designs = await tasks.propose_purposes(request, step.deadline.left())
+    message = catalogue.PURPOSE_MESSAGE
     if ack.strip():
         message = f"{ack.strip()}\n\n{message}"
     return step.respond(
@@ -486,48 +491,63 @@ async def _gaps(step: Step) -> BuilderStepResponse:
     )
 
 
-def _chosen_design(step: Step, out: Optional[ConverseOut]) -> Optional[DesignId]:
+def _offered_ids(step: Step) -> set:
+    return {card.id for card in step.request.designs or [] if not card.coming_soon}
+
+
+def _chosen_purpose(step: Step) -> Tuple[bool, Optional[PurposeId]]:
+    """Whether the owner tapped a card, and the purpose on it (None for a card that
+    can't be chosen). A draft offered the 20a-1 designs (no "answer" card) keeps
+    working: its design maps to a purpose, so its "guide" stays Answer questions."""
     chip = step.request.chip
-    if chip.startswith("design:"):
-        try:
-            return DesignId(chip.removeprefix("design:"))
-        except ValueError:
-            return None
-    if out is not None and out.design.value != "none":
-        return DesignId(out.design.value)
-    return None
+    prefix = next((p for p in ("purpose:", "design:") if chip.startswith(p)), "")
+    if not prefix:
+        return False, None
+    value = chip.removeprefix(prefix)
+    if value not in _offered_ids(step):
+        return True, None
+    if PurposeId.ANSWER.value not in _offered_ids(step):
+        return True, PURPOSE_OF_DESIGN.get(value)
+    try:
+        return True, PurposeId(value)
+    except ValueError:
+        return True, None
 
 
 async def _design(step: Step) -> BuilderStepResponse:
     request = step.request
     if request.designs is None:
         step.status("designing")
-        designs = await tasks.propose_designs(request, step.deadline.left())
+        designs = await tasks.propose_purposes(request, step.deadline.left())
         return step.respond(
-            message=catalogue.DESIGN_MESSAGE, next_step="design", designs=designs
+            message=catalogue.PURPOSE_MESSAGE, next_step="design", designs=designs
         )
-    offered = {card.id for card in request.designs if not card.coming_soon}
-    design = _chosen_design(step, None)
-    if design is None:
+    tapped, chosen = _chosen_purpose(step)
+    if tapped and chosen is None:
+        return step.respond(message=catalogue.PURPOSE_MESSAGE, next_step="design")
+    if chosen is None:
+        note = " ".join(request.message.split())[:600]
+        if request.draft.purpose == PurposeId.CUSTOM and note:
+            # "Something else": the owner's sentence is the purpose.
+            step.patches.append(replace("/purposeNote", note))
+            request.draft.purposeNote = note
+            return await _build(step, PurposeId.CUSTOM)
         out = await step.converse()
-        design = _chosen_design(step, out)
-        if design is None or design.value not in offered:
-            return step.respond(message=out.message, next_step="design")
-    if design.value not in offered:
-        return step.respond(message=catalogue.DESIGN_MESSAGE, next_step="design")
-    step.patches.append(replace("/design", design.value))
-    return await _build(step, design)
+        return step.respond(message=out.message, next_step="design")
+    step.patches.append(replace("/purpose", chosen.value))
+    if chosen == PurposeId.CUSTOM:
+        return step.respond(message=catalogue.CUSTOM_PROMPT, next_step="design")
+    return await _build(step, chosen)
 
 
 async def _building(step: Step) -> BuilderStepResponse:
-    design = step.request.draft.design or DesignId.GUIDE
-    return await _build(step, design)
+    return await _build(step, step.request.draft.chosen_purpose())
 
 
-async def _build(step: Step, design: DesignId) -> BuilderStepResponse:
+async def _build(step: Step, purpose: PurposeId) -> BuilderStepResponse:
     step.status("drafting")
-    out = await tasks.draft_assistant(step.request, design, step.deadline.left())
+    out = await tasks.draft_assistant(step.request, purpose, step.deadline.left())
     step.patches += draft_patches(
-        out, design, step.source, step.request.draft.declineText
+        out, purpose, step.source, step.request.draft.declineText
     )
     return step.respond(message=catalogue.BUILT_MESSAGE, next_step="share")

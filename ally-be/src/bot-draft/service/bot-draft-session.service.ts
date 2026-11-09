@@ -21,6 +21,7 @@ import {
   BotDraftStatus,
   BotDraftStep,
   Industry,
+  PurposeId,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
 import { packFor, packForBusiness } from '../safety-pack/safety-packs';
@@ -45,6 +46,7 @@ export const BUILDER_PROMPT_CODES = [
   'ally_ai_builder_classify',
   'ally_ai_builder_gaps',
   'ally_ai_builder_designs',
+  'ally_ai_builder_purposes',
   'ally_ai_builder_draft',
 ] as const;
 
@@ -221,6 +223,7 @@ export class BotDraftSessionService implements CrawlLearner {
       const result = await this.tryPatch(draft, response.patches, 'draft');
       draft = result.draft;
       refused += result.refused;
+      draft = await this.purposeDefaults(draft, response.patches);
     }
 
     const state = conversation(draft);
@@ -281,6 +284,36 @@ export class BotDraftSessionService implements CrawlLearner {
       draft = await this.drafts.advance(draft, next);
     }
     return draft;
+  }
+
+  /**
+   * The defaults a purpose sets that the builder can't (chunk 20a-2): Train my team is for the
+   * business's own staff, so it's organisation-only, unless the owner already chose who can use
+   * it. Only a default: the owner changes it on Share.
+   */
+  private async purposeDefaults(
+    draft: BotDraftEntity,
+    ops: PatchOp[],
+  ): Promise<BotDraftEntity> {
+    const chose = ops.some(
+      (op) => op.path === '/purpose' && op.value === PurposeId.TRAINING,
+    );
+    const access = draft.draftConfig.access;
+    const untouched =
+      access.mode === 'invite' &&
+      !access.emails.length &&
+      !access.organisationIds.length;
+    if (!chose || !untouched) return draft;
+    const { draft: next } = await this.drafts.applyPatch(
+      draft,
+      [{ op: 'replace', path: '/access/mode', value: 'organisation' }],
+      BotDraftActor.SYSTEM,
+      {
+        target: 'draft',
+        summary: 'Set it to your organisation, for your team',
+      },
+    );
+    return next;
   }
 
   private async tryPatch(

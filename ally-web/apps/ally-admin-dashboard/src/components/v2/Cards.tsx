@@ -190,6 +190,7 @@ export interface DesignCardLabels {
   wont: string;
   choose: string;
   comingSoon: string;
+  recommended?: string;
 }
 
 /** A design (DESIGN.md §4). The Coming soon variant is dimmed, with a badge and no button. */
@@ -206,6 +207,10 @@ export const DesignCard: React.FC<{
   labels: DesignCardLabels;
   index?: number;
   onChoose?: () => void;
+  /** The purpose the builder suggests (chunk 20a-2). */
+  recommended?: boolean;
+  /** What it honestly can't do yet, under what it won't do. */
+  limit?: string;
 }> = ({
   title,
   bestFor,
@@ -219,9 +224,12 @@ export const DesignCard: React.FC<{
   labels,
   index = 0,
   onChoose,
+  recommended,
+  limit,
 }) => (
   <section
     className="ally-design ally-rise"
+    data-recommended={Boolean(recommended)}
     data-soon={Boolean(comingSoon)}
     data-chosen={Boolean(chosen)}
     style={{ ["--ally-i" as string]: Math.min(index, 8) }}
@@ -236,6 +244,9 @@ export const DesignCard: React.FC<{
     >
       <h2 className="ally-design__title">{title}</h2>
       {comingSoon && <span className="ally-badge">{labels.comingSoon}</span>}
+      {recommended && labels.recommended && (
+        <span className="ally-badge ally-badge--accent">{labels.recommended}</span>
+      )}
     </div>
     {comingSoon ? (
       <p className="ally-body" style={{ margin: 0 }}>
@@ -265,6 +276,11 @@ export const DesignCard: React.FC<{
               ))}
             </ul>
           </div>
+        )}
+        {limit && (
+          <p className="ally-small ally-design__limit" style={{ margin: 0 }}>
+            {limit}
+          </p>
         )}
         {sample.length > 0 && (
           <div className="ally-design__sample">

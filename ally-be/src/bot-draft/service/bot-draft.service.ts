@@ -70,6 +70,8 @@ export const DRAFT_PATHS: Record<BotDraftActor, readonly string[]> = {
     '/declineText',
     '/branding',
     '/design',
+    '/purpose',
+    '/purposeNote',
   ],
   [BotDraftActor.OWNER]: [
     '/name',
@@ -87,6 +89,8 @@ export const DRAFT_PATHS: Record<BotDraftActor, readonly string[]> = {
     '/branding',
     '/access',
     '/design',
+    '/purpose',
+    '/purposeNote',
   ],
   // The server itself (undo, the crawl) isn't limited to these lists.
   [BotDraftActor.SYSTEM]: [],
@@ -151,6 +155,8 @@ export class BotDraftService {
       },
       access: { mode: 'invite', emails: [], organisationIds: [] },
       design: null,
+      purpose: null,
+      purposeNote: '',
     };
   }
 
@@ -776,6 +782,8 @@ const FIELD_LABELS: Record<string, string> = {
   access: 'who can use it',
   ownerNotes: 'your notes',
   design: 'its design',
+  purpose: "what it's for",
+  purposeNote: "what it's for",
 };
 const SECTION_LABELS: Record<string, string> = {
   about: 'what we learned about you',

@@ -289,6 +289,17 @@ a.ally-source:hover {
 .ally-design[data-chosen="true"] {
   border-color: var(--ally-accent);
 }
+.ally-design[data-recommended="true"] {
+  border-color: var(--ally-accent);
+  box-shadow: var(--ally-shadow-hover);
+}
+.ally-badge--accent {
+  background: var(--ally-accent-soft);
+  color: var(--ally-accent);
+}
+.ally-design__limit {
+  color: var(--ally-muted);
+}
 .ally-design[data-soon="true"] {
   opacity: 0.6;
   border-style: dashed;

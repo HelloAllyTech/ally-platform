@@ -7,7 +7,7 @@ import pytest
 
 from app.core.builder import catalogue
 from app.core.builder.flow import BUILDER_PATHS, allowed, run_step
-from app.schemas.builder import BuilderStepRequest, DesignId, PatchOp
+from app.schemas.builder import BuilderStepRequest, PatchOp, PurposeId
 from tests.core.builder.fakes import TASKS, FakeLLM, request
 
 GAPS = [
@@ -155,7 +155,7 @@ class TestGaps:
         assert res.chips == catalogue.DECLINE_CHIPS
 
     @pytest.mark.asyncio
-    async def test_the_last_answer_offers_designs(self):
+    async def test_the_last_answer_offers_purposes(self):
         answers = {
             "fees": "x",
             "cancellation": "x",
@@ -163,18 +163,17 @@ class TestGaps:
             "languages": "English",
         }
         fake = FakeLLM(
-            DesignsOut=[
+            PurposesOut=[
                 {
-                    "designs": [
+                    "recommended": "enquiries",
+                    "cards": [
                         {
-                            "id": "guide",
-                            "title": "Client guide",
-                            "best_for": "Questions",
+                            "id": "answer",
+                            "best_for": "Questions about sessions",
                             "visitor_line": "How much is a session?",
                             "assistant_line": "Individual sessions cost ₹2,000.",
                         },
-                        {"id": "enquiries", "title": "New client enquiries"},
-                    ]
+                    ],
                 }
             ]
         )
@@ -190,51 +189,80 @@ class TestGaps:
             fake,
         )
         assert res.next_step == "design"
-        assert res.message == catalogue.DESIGN_MESSAGE
-        assert [d.id for d in res.designs] == ["guide", "enquiries", "coming_soon"]
+        assert res.message == catalogue.PURPOSE_MESSAGE
+        # The recommended purpose first, badged; Something else last.
+        assert [d.id for d in res.designs] == [
+            "enquiries",
+            "answer",
+            "guide",
+            "training",
+            "custom",
+        ]
+        assert [d.recommended for d in res.designs] == [True] + [False] * 4
 
 
-class TestDesigns:
+class TestPurposes:
     @pytest.mark.asyncio
-    async def test_booking_is_only_ever_coming_soon(self):
+    async def test_five_cards_with_what_they_do_fixed_in_code(self):
         fake = FakeLLM(
-            DesignsOut=[
+            PurposesOut=[
                 {
-                    "designs": [
-                        {"id": "support", "title": "Help centre"},
-                        {"id": "support", "title": "Again"},
+                    "recommended": "answer",
+                    "cards": [
                         {
-                            "id": "guide",
-                            "title": "Guide!",
+                            "id": "enquiries",
+                            "best_for": "New clients!",
                             "visitor_line": "Book me in",
                             "assistant_line": "Done, I've booked you for 5 pm.",
                         },
-                    ]
+                    ],
                 }
             ]
         )
-        res = await run(request("design", industry="d2c"), fake)
-        cards = res.designs
-        assert [c.id for c in cards] == ["support", "guide", "coming_soon"]
-        assert (
-            cards[-1].coming_soon and cards[-1].best_for == catalogue.COMING_SOON_BODY
-        )
-        guide = cards[1]
-        assert guide.title == "Guide"
-        # The overpromising sample is replaced by the catalogue's.
-        assert all("booked" not in line["text"] for line in guide.sample)
-        for card in cards[:-1]:
+        res = await run(request("design", industry="saas"), fake)
+        cards = {c.id: c for c in res.designs}
+        assert list(cards) == ["answer", "guide", "enquiries", "training", "custom"]
+        for purpose in catalogue.TAILORED:
+            card = cards[purpose.value]
+            assert card.title == catalogue.PURPOSES[purpose].name
+            assert card.will == list(catalogue.PURPOSES[purpose].will)
+            assert card.limit == catalogue.PURPOSES[purpose].limit
             assert not any("book" in w.lower() for w in card.will)
+        enquiries = cards["enquiries"]
+        assert enquiries.best_for == "New clients"
+        # The overpromising sample is replaced by the catalogue's.
+        assert all("booked" not in line["text"] for line in enquiries.sample)
+        assert (
+            cards["custom"].best_for == catalogue.PURPOSES[PurposeId.CUSTOM].one_liner
+        )
+        assert not any(c.coming_soon for c in res.designs)
+
+    @pytest.mark.asyncio
+    async def test_the_recommendation_is_one_of_the_two_best_for_the_business(self):
+        fake = FakeLLM(PurposesOut=[{"recommended": "training", "cards": []}])
+        res = await run(request("design", industry="diagnostic_lab"), fake)
+        assert res.designs[0].id == "guide" and res.designs[0].recommended
+
+    @pytest.mark.asyncio
+    async def test_an_assistant_for_the_team_can_recommend_training(self):
+        fake = FakeLLM(PurposesOut=[{"recommended": "training", "cards": []}])
+        res = await run(
+            request(
+                "design", industry="mental_health", answers={"audience": "My team"}
+            ),
+            fake,
+        )
+        assert res.designs[0].id == "training"
 
     @pytest.mark.asyncio
     async def test_a_sample_has_one_speaker_per_line(self):
         fake = FakeLLM(
-            DesignsOut=[
+            PurposesOut=[
                 {
-                    "designs": [
+                    "recommended": "answer",
+                    "cards": [
                         {
-                            "id": "guide",
-                            "title": "Client guide",
+                            "id": "answer",
                             "visitor_line": (
                                 "How much is a session? Sessions cost ₹2,000."
                             ),
@@ -242,21 +270,20 @@ class TestDesigns:
                         },
                         {
                             "id": "enquiries",
-                            "title": "New client enquiries",
                             "visitor_line": "Where are you?",
                             "assistant_line": "Where are you? Call us on 98200 12345.",
                         },
-                    ]
+                    ],
                 }
             ]
         )
         res = await run(request("design", industry="mental_health"), fake)
-        guide, enquiries = res.designs[0], res.designs[1]
-        assert guide.sample == [
+        cards = {c.id: c for c in res.designs}
+        assert cards["answer"].sample == [
             {"from": "visitor", "text": "How much is a session?"},
             {"from": "assistant", "text": "Sessions cost ₹2,000."},
         ]
-        assert enquiries.sample[1] == {
+        assert cards["enquiries"].sample[1] == {
             "from": "assistant",
             "text": "Call us on 98200 12345.",
         }
@@ -268,33 +295,34 @@ class TestDesigns:
             "Email hello@sunrise.example for a slot.",
             "See sunrise-booking.com for times.",
         ]
+        default = [
+            {"from": who, "text": text}
+            for who, text in catalogue.PURPOSES[PurposeId.ANSWER].default_sample
+        ]
         for line in made_up:
             fake = FakeLLM(
-                DesignsOut=[
+                PurposesOut=[
                     {
-                        "designs": [
+                        "recommended": "answer",
+                        "cards": [
                             {
-                                "id": "guide",
-                                "title": "Client guide",
+                                "id": "answer",
                                 "visitor_line": "Tell me more?",
                                 "assistant_line": line,
                             },
-                        ]
+                        ],
                     }
                 ]
             )
             res = await run(request("design", industry="mental_health"), fake)
-            default = [
-                {"from": who, "text": text}
-                for who, text in catalogue.DESIGNS[DesignId.GUIDE].default_sample
-            ]
             assert res.designs[0].sample == default, line
 
     @pytest.mark.asyncio
-    async def test_at_least_two_real_choices(self):
-        fake = FakeLLM(DesignsOut=[{"designs": []}])
+    async def test_no_tailoring_still_offers_every_purpose(self):
+        fake = FakeLLM(PurposesOut=[{}])
         res = await run(request("design"), fake)
-        assert len([c for c in res.designs if not c.coming_soon]) == 2
+        assert len(res.designs) == 5
+        assert res.designs[0].recommended
 
 
 DRAFT = {
@@ -345,6 +373,19 @@ CARDS = [
 ]
 
 
+PURPOSE_CARDS = [
+    {
+        "id": purpose.value,
+        "title": "x",
+        "best_for": "x",
+        "will": [],
+        "wont": [],
+        "sample": [],
+    }
+    for purpose in PurposeId
+]
+
+
 class TestBuild:
     @pytest.mark.asyncio
     async def test_choosing_a_design_builds_the_assistant(self):
@@ -355,7 +396,8 @@ class TestBuild:
         assert res.next_step == "share"
         assert res.message == catalogue.BUILT_MESSAGE
         p = paths(res)
-        assert p["/design"] == "enquiries"
+        # An older draft's design maps to its purpose.
+        assert p["/purpose"] == "enquiries"
         # The sentence with a number we were never given is dropped.
         assert "99999" not in p["/instructions"]
         # Even a grounded price stays out of the instructions: facts are cited from
@@ -376,6 +418,45 @@ class TestBuild:
         fake = FakeLLM(DraftOut=[DRAFT])
         res = await run(request("design", designs=CARDS, chip="design:guide"), fake)
         assert paths(res)["/prechat"] == []
+
+    @pytest.mark.asyncio
+    async def test_an_older_drafts_guide_is_answer_questions(self):
+        fake = FakeLLM(DraftOut=[DRAFT])
+        res = await run(request("design", designs=CARDS, chip="design:guide"), fake)
+        assert paths(res)["/purpose"] == "answer"
+
+    @pytest.mark.asyncio
+    async def test_something_else_asks_then_builds_from_the_owners_words(self):
+        res = await run(
+            request("design", designs=PURPOSE_CARDS, chip="purpose:custom"), FakeLLM()
+        )
+        assert res.next_step == "design"
+        assert res.message == catalogue.CUSTOM_PROMPT
+        assert paths(res)["/purpose"] == "custom"
+
+        fake = FakeLLM(DraftOut=[DRAFT])
+        res = await run(
+            request(
+                "design",
+                designs=PURPOSE_CARDS,
+                message="Help parents choose a class",
+                draft={"purpose": "custom"},
+            ),
+            fake,
+        )
+        assert res.next_step == "share"
+        assert paths(res)["/purposeNote"] == "Help parents choose a class"
+        assert "Help parents choose a class" in fake.prompts()[0]
+
+    @pytest.mark.asyncio
+    async def test_training_drafts_for_the_team_and_asks_nothing_first(self):
+        fake = FakeLLM(DraftOut=[DRAFT])
+        res = await run(
+            request("design", designs=PURPOSE_CARDS, chip="purpose:training"), fake
+        )
+        assert paths(res)["/purpose"] == "training"
+        assert paths(res)["/prechat"] == []
+        assert "for the business's own team" in fake.prompts()[0]
 
     @pytest.mark.asyncio
     async def test_coming_soon_cannot_be_chosen(self):
@@ -538,7 +619,6 @@ class TestInstructionsCarryNoDetails:
     def test_the_drafted_instructions_hold_no_phone_number(self):
         from app.core.builder.flow import draft_patches
         from app.core.builder.schemas import DraftOut
-        from app.schemas.builder import DesignId
 
         out = DraftOut(
             assistant_name="Greenfield assistant",
@@ -554,7 +634,7 @@ class TestInstructionsCarryNoDetails:
         )
         source = "2 BHK homes of 1,150 sq ft. Phone: 080 0000 9090."
         patches = {
-            p.path: p.value for p in draft_patches(out, DesignId.GUIDE, source, "")
+            p.path: p.value for p in draft_patches(out, PurposeId.ANSWER, source, "")
         }
         assert patches["/instructions"] == "Answer briefly."
         # The decline wording keeps its contact: ally-be sends it as written.

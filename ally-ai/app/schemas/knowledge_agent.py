@@ -5,7 +5,7 @@ the request. ally-be owns the rows, the phone numbers and the settings; this ser
 owns the retrieval and the wording.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -52,6 +52,22 @@ class PersonaSelector(BaseModel):
             "The pack's id (mental_health, medical, pharmacy, ...). For a health "
             "pack the check refuses diagnosis and dosing in code, not only by prompt."
         ),
+    )
+    purpose: Optional[Literal["answer", "enquiries", "training", "guide", "custom"]] = (
+        Field(
+            None,
+            description=(
+                "What the owner chose the assistant for (chunk 20a-2). Adds a "
+                "short section after the instructions and before the safety rules; "
+                "it changes how the assistant uses what it knows, never what it "
+                "knows."
+            ),
+        )
+    )
+    purpose_note: Optional[str] = Field(
+        None,
+        max_length=600,
+        description='The owner\'s own description, for "Something else".',
     )
     avoid_topics: List[str] = Field(
         default_factory=list,

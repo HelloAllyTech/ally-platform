@@ -23,6 +23,9 @@ class FakeLLM:
     def schemas(self):
         return [call["schema"] for call in self.calls]
 
+    def prompts(self):
+        return [call["prompt"] for call in self.calls]
+
 
 def fact(section, text, url="https://sunrise.example/", by_owner=False, n=0):
     return {

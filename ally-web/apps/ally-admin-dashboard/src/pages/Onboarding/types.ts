@@ -48,6 +48,10 @@ export interface DesignCard {
   wont: string[];
   sample: { from: string; text: string }[];
   coming_soon?: boolean;
+  /** The purpose the builder suggests (chunk 20a-2), first and badged. */
+  recommended?: boolean;
+  /** What it honestly can't do yet. */
+  limit?: string;
 }
 
 export interface PrechatField {
@@ -80,6 +84,9 @@ export interface BotDraftConfig {
   };
   access: { mode: "public" | "organisation" | "invite"; emails: string[] };
   design: string | null;
+  /** What it's for (chunk 20a-2): answer, enquiries, training, guide or custom. */
+  purpose?: string | null;
+  purposeNote?: string;
 }
 
 export interface BotDraftView {

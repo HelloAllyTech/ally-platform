@@ -27,5 +27,7 @@
     "footerLink": null
   },
   "access": { "mode": "invite", "emails": [], "organisationIds": [] },
-  "design": "guide"
+  "design": "guide",
+  "purpose": "enquiries",
+  "purposeNote": ""
 }

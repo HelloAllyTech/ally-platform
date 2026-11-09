@@ -6,6 +6,7 @@ import {
   BotDraftActor,
   DesignId,
   LearnedSection,
+  PurposeId,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
 
@@ -47,6 +48,10 @@ export interface BotDraft {
     organisationIds: string[];
   };
   design: DesignId | null;
+  /** What it's for (chunk 20a-2); null on a draft made before purposes (its design maps). */
+  purpose?: PurposeId | null;
+  /** "Something else": the owner's own description of what it's for. */
+  purposeNote?: string;
 }
 
 /** One sourced fact for "What we learned". A fact without a source is never stored. */

@@ -112,7 +112,37 @@ MAX_PERSONA_PROMPT_CHARS = 4000
 _FENCE = '"""'
 
 
-def format_persona(persona: Optional[Dict[str, Any]]) -> str:
+#: Purposes with a section of their own (chunk 20a-2); "custom" uses the owner's note.
+PURPOSES = ("answer", "enquiries", "training", "guide")
+
+
+def format_purpose(
+    persona: Dict[str, Any], prompts: Optional[Dict[str, Any]] = None
+) -> str:
+    """What the assistant is for: the purpose's seed section, or for "Something else"
+    the owner's own description, fenced like their instructions. Empty when the bot
+    has no purpose, so bots made before purposes run exactly as before."""
+    purpose = (persona.get("purpose") or "").strip()
+    if purpose in PURPOSES:
+        return load_and_format(f"agent/purpose_{purpose}", prompts=prompts).strip()
+    note = (persona.get("purpose_note") or "").strip()[:600]
+    if purpose == "custom" and note:
+        return "\n".join(
+            [
+                "# What you're for",
+                "What the team that runs you wants you to do. The rules after this "
+                "still win.",
+                _FENCE,
+                note.replace(_FENCE, "''"),
+                _FENCE,
+            ]
+        )
+    return ""
+
+
+def format_persona(
+    persona: Optional[Dict[str, Any]], prompts: Optional[Dict[str, Any]] = None
+) -> str:
     """
     Render a chatbot's persona as a block that goes AHEAD of the answer template.
 
@@ -133,7 +163,8 @@ def format_persona(persona: Optional[Dict[str, Any]]) -> str:
         :MAX_PERSONA_PROMPT_CHARS
     ]
     rules = (persona.get("safety_rules") or "").strip()
-    if not (name or tone or instructions or rules):
+    purpose = format_purpose(persona, prompts)
+    if not (name or tone or instructions or rules or purpose):
         return ""
 
     lines = ["# Who you are"]
@@ -151,6 +182,10 @@ def format_persona(persona: Optional[Dict[str, Any]]) -> str:
         # The admin's text cannot close the fence early.
         lines.append(instructions.replace(_FENCE, "''"))
         lines.append(_FENCE)
+    if purpose:
+        # After the owner's instructions and before the safety rules: a purpose
+        # shapes how the assistant uses what it knows, and safety still wins.
+        lines.append(purpose)
     if rules:
         # Built by ally-be from the bot's safety pack, never from an editor's text; it
         # comes after the instructions so nothing in them can talk it away.
@@ -183,7 +218,7 @@ def build_answer_prompt(
     )
     if not body:
         return body
-    return format_persona(persona) + body
+    return format_persona(persona, prompts) + body
 
 
 def build_translate_prompt(

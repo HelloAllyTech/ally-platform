@@ -24,7 +24,7 @@ import {
   PrechatFieldDto,
 } from '../../chatbot/dto/bot-page.dto';
 import { BOT_PAGE_BOUNDS } from '../../chatbot/type/bot-page.type';
-import { DesignId, SafetyPackId } from '../enum/bot-draft.enum';
+import { DesignId, PurposeId, SafetyPackId } from '../enum/bot-draft.enum';
 
 export class BotDraftAccessDto {
   @IsIn(['public', 'organisation', 'invite'])
@@ -120,6 +120,15 @@ export class BotDraftDto {
   @ValidateIf((_o, v) => v !== null)
   @IsEnum(DesignId)
   design!: DesignId | null;
+
+  @IsOptional()
+  @IsEnum(PurposeId)
+  purpose?: PurposeId | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  purposeNote?: string;
 }
 
 // ── requests ────────────────────────────────────────────────────────────

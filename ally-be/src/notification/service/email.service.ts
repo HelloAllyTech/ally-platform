@@ -126,6 +126,27 @@ ${magicLink ? `Or click the link below to login instantly:\n${magicLink}\n` : ''
     });
   }
 
+  /**
+   * A lead alert to one of a "Bring in customers" assistant's owners (Agents v2, chunk 20a-2). Plain
+   * text from the copy deck; the recipient is masked in logs and the subject carries nothing about
+   * the visitor.
+   */
+  async sendLeadAlert(params: {
+    to: string;
+    subject: string;
+    body: string;
+  }): Promise<boolean> {
+    return this.sesService.sendEmail({
+      from: this.config.email.sourceEmail,
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      isHtml: false,
+      purpose: 'lead alert',
+      maskRecipientsInLog: true,
+    });
+  }
+
   async sendSummaryNotification(params: {
     to: string;
     chatId: number;

@@ -209,6 +209,8 @@ export enum LlmTask {
   ONBOARDING_CLASSIFY = 'onboarding_classify',
   ONBOARDING_GAPS = 'onboarding_gaps',
   ONBOARDING_DESIGNS = 'onboarding_designs',
+  // Purposes (chunk 20a-2): tailors the five purpose cards and recommends one.
+  ONBOARDING_PURPOSES = 'onboarding_purposes',
   ONBOARDING_DRAFT = 'onboarding_draft',
   // Change by chat on the assistant home (chunk 20a-2): one call per request.
   ONBOARDING_CHANGE = 'onboarding_change',

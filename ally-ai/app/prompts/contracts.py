@@ -606,6 +606,62 @@ class CheckupJudgeInputs(PromptInputs):
     reply: str
 
 
+class AgentPurposeAnswerInputs(PromptInputs):
+    """`agent/purpose_answer.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_answer",
+        name="Chatbot Agent: Purpose, Answer Questions",
+        description=(
+            'How an assistant whose owner chose "Answer questions" uses what it '
+            "knows (chunk 20a-2). Placed after the owner's instructions and before "
+            "the safety rules, so safety wins."
+        ),
+    )
+
+
+class AgentPurposeEnquiriesInputs(PromptInputs):
+    """`agent/purpose_enquiries.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_enquiries",
+        name="Chatbot Agent: Purpose, Bring in Customers",
+        description=(
+            'How an assistant whose owner chose "Bring in customers" recommends '
+            "what fits and offers to pass details on (chunk 20a-2). Placed after the "
+            "owner's instructions and before the safety rules."
+        ),
+    )
+
+
+class AgentPurposeTrainingInputs(PromptInputs):
+    """`agent/purpose_training.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_training",
+        name="Chatbot Agent: Purpose, Train My Team",
+        description=(
+            'How an assistant whose owner chose "Train my team" explains '
+            "procedures and quizzes staff (chunk 20a-2). Placed after the owner's "
+            "instructions and before the safety rules."
+        ),
+    )
+
+
+class AgentPurposeGuideInputs(PromptInputs):
+    """`agent/purpose_guide.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_guide",
+        name="Chatbot Agent: Purpose, Guide Step by Step",
+        description=(
+            'How an assistant whose owner chose "Guide people step by step" '
+            "gives one step at a time, in the source's order (chunk 20a-2). Placed "
+            "after the owner's instructions and before the safety rules."
+        ),
+    )
+
+
 class CheckupQuestionsInputs(PromptInputs):
     """`checkup/questions.txt`."""
 
@@ -733,6 +789,26 @@ class BuilderDesignsInputs(PromptInputs):
     audience: str
     learned: str
     offered: str
+
+
+class BuilderPurposesInputs(PromptInputs):
+    """`builder/purposes.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_builder_purposes",
+        name="Onboarding Builder: Tailor the Purposes",
+        description=(
+            "Recommends one of the four purposes (answer, enquiries, training, guide) "
+            'and tailors each card\'s "Best for" and sample exchange to the business '
+            "(chunk 20a-2). What each will and won't do is fixed in code."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    audience: str
+    learned: str
+    suggested: str
 
 
 class BuilderDraftInputs(PromptInputs):

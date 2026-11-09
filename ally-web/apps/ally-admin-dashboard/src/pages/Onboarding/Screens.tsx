@@ -342,16 +342,24 @@ export const QuestionScreen: React.FC<{
 
 // ── Choose a design ───────────────────────────────────────────────────────
 
+/**
+ * What should your assistant do? (chunk 20a-2): the five purpose cards, the recommended one first
+ * and badged; "Something else" asks for a sentence. A draft offered the older designs still shows
+ * them, with Coming soon.
+ */
 export const DesignScreen: React.FC<{
   designs: DesignCard[];
   chosen: string | null;
   canChoose: boolean;
   line?: string;
   onChoose: (id: string) => void;
-}> = ({ designs, chosen, canChoose, line, onChoose }) => (
+  /** "Something else": the owner's sentence about what it's for. */
+  onDescribe?: (text: string) => void;
+}> = ({ designs, chosen, canChoose, line, onChoose, onDescribe }) => (
   <>
     {line && <AssistantLine>{line}</AssistantLine>}
-    <h1 className="ally-sr-only">{COPY.frame.stepNames.design}</h1>
+    <h1 className="ally-heading">{COPY.purposes.title}</h1>
+    {chosen === "custom" && canChoose && onDescribe && <DescribePurpose onDescribe={onDescribe} />}
     <div className="ally-designs">
       {designs.map((design, i) =>
         design.coming_soon ? (
@@ -374,7 +382,13 @@ export const DesignScreen: React.FC<{
             sample={design.sample}
             chosen={chosen === design.id}
             canChoose={canChoose}
-            labels={{ ...COPY.designs, comingSoon: COPY.designs.comingSoonBadge }}
+            recommended={design.recommended}
+            limit={design.limit}
+            labels={{
+              ...COPY.designs,
+              comingSoon: COPY.designs.comingSoonBadge,
+              recommended: COPY.purposes.recommended,
+            }}
             onChoose={() => onChoose(design.id)}
           />
         ),
@@ -382,6 +396,36 @@ export const DesignScreen: React.FC<{
     </div>
   </>
 );
+
+const DescribePurpose: React.FC<{ onDescribe: (text: string) => void }> = ({ onDescribe }) => {
+  const [text, setText] = useState("");
+  return (
+    <form
+      className="ally-field"
+      data-testid="describe-purpose"
+      onSubmit={event => {
+        event.preventDefault();
+        if (text.trim()) onDescribe(text.trim());
+      }}
+    >
+      <label className="ally-field__label" htmlFor="purpose-note">
+        {COPY.purposes.customPrompt}
+      </label>
+      <textarea
+        id="purpose-note"
+        className="ally-input"
+        maxLength={600}
+        value={text}
+        onChange={event => setText(event.target.value)}
+      />
+      <div className="ally-btn-row">
+        <PrimaryButton type="submit" disabled={!text.trim()}>
+          {COPY.gaps.ok}
+        </PrimaryButton>
+      </div>
+    </form>
+  );
+};
 
 // ── Building ──────────────────────────────────────────────────────────────
 
@@ -397,10 +441,12 @@ export const useBuildTicks = (done: boolean): number => {
   return done ? total : ticked;
 };
 
-export const BuildingScreen: React.FC<{ done: boolean; onContinue?: () => void }> = ({
-  done,
-  onContinue,
-}) => {
+export const BuildingScreen: React.FC<{
+  done: boolean;
+  onContinue?: () => void;
+  /** What the purpose set up (chunk 20a-2), once it's built. */
+  confirmation?: string | null;
+}> = ({ done, onContinue, confirmation }) => {
   const ticked = useBuildTicks(done);
   useEnterToSubmit(() => onContinue?.(), done && Boolean(onContinue));
   return (
@@ -412,6 +458,7 @@ export const BuildingScreen: React.FC<{ done: boolean; onContinue?: () => void }
         </h1>
       </div>
       <BuildSteps steps={[...COPY.building.steps]} done={ticked} />
+      {done && confirmation && <AssistantLine>{confirmation}</AssistantLine>}
       {done && onContinue && (
         <PrimaryButton enterHint={COPY.frame.enterHint} onClick={onContinue}>
           {COPY.frame.buildingDone}

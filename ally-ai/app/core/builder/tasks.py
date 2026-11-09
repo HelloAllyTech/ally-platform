@@ -31,6 +31,7 @@ from app.core.builder.schemas import (
     DraftOut,
     ExtractOut,
     GapsOut,
+    PurposesOut,
 )
 from app.core.config import settings
 from app.core.llm.dispatch import generate_structured
@@ -48,6 +49,7 @@ from app.schemas.builder import (
     Gap,
     Industry,
     LearnedSection,
+    PurposeId,
 )
 from app.utils.logger import get_logger
 
@@ -332,6 +334,88 @@ async def propose_designs(
     return cards
 
 
+# --- purposes (chunk 20a-2) ---------------------------------------------------
+
+
+async def propose_purposes(
+    request: BuilderStepRequest, timeout: float
+) -> List[DesignCard]:
+    """The five purpose cards, the recommended one first and badged, Something else
+    last. What each will and won't do comes from the catalogue; the model picks the
+    recommended one (from the first two for this business) and tailors "Best for" and
+    the sample. A sample that isn't grounded falls back to the catalogue's."""
+    for_team = (request.answers.get("audience") or "") == "My team"
+    order = catalogue.purpose_order(request.industry, for_team)
+    suggested = order[:2]
+    out = await call(
+        "purposes",
+        PurposesOut,
+        LLMTask.ONBOARDING_PURPOSES,
+        prompts=request.prompts,
+        timeout=timeout,
+        suggested=", ".join(p.value for p in suggested),
+        learned=format_learned(request.learned),
+        audience=request.answers.get("audience") or "(not said)",
+    )
+    recommended = PurposeId(out.recommended.value)
+    if recommended not in suggested:
+        recommended = suggested[0]
+    tailored = {PurposeId(card.id.value): card for card in out.cards}
+    source = corpus(request)
+    ranked = [recommended] + [p for p in order if p != recommended]
+    cards = [
+        _purpose_card(purpose, tailored.get(purpose), source, purpose == recommended)
+        for purpose in ranked
+    ]
+    custom = catalogue.PURPOSES[PurposeId.CUSTOM]
+    cards.append(
+        DesignCard(
+            id=PurposeId.CUSTOM.value,
+            title=custom.name,
+            best_for=custom.one_liner,
+            will=[],
+            wont=[],
+            sample=[],
+        )
+    )
+    return cards
+
+
+def _purpose_card(
+    purpose_id: PurposeId, proposal: Any, source: str, recommended: bool
+) -> DesignCard:
+    purpose = catalogue.PURPOSES[purpose_id]
+    best_for = _clean(getattr(proposal, "best_for", ""), 100)
+    if not best_for or ungrounded(best_for, source):
+        best_for = purpose.one_liner
+    visitor, assistant = split_turn(
+        _clean(getattr(proposal, "visitor_line", ""), 160),
+        _clean(getattr(proposal, "assistant_line", ""), 240),
+    )
+    if (
+        not visitor
+        or not assistant
+        or catalogue.overpromises(assistant)
+        or not sample_grounded(f"{visitor}\n{assistant}", source)
+    ):
+        sample = [{"from": who, "text": text} for who, text in purpose.default_sample]
+    else:
+        sample = [
+            {"from": "visitor", "text": visitor},
+            {"from": "assistant", "text": assistant},
+        ]
+    return DesignCard(
+        id=purpose_id.value,
+        title=purpose.name,
+        best_for=best_for,
+        will=list(purpose.will),
+        wont=list(purpose.wont),
+        sample=sample,
+        recommended=recommended,
+        limit=purpose.limit,
+    )
+
+
 def _card(design_id: DesignId, proposal: Any, source: str = "") -> DesignCard:
     design = catalogue.DESIGNS[design_id]
     title = _clean(getattr(proposal, "title", ""), 40) or design.default_title
@@ -476,8 +560,38 @@ DECLINE_HINTS: Dict[str, str] = {
 }
 
 
+#: What the draft is told about each purpose (the `design` variable of
+#: builder/draft.txt; its text is unchanged).
+PURPOSE_BRIEF: Dict[PurposeId, str] = {
+    PurposeId.ANSWER: (
+        "Answer questions: short, direct answers about the business, each with its "
+        "source."
+    ),
+    PurposeId.ENQUIRIES: (
+        "Bring in customers: helps people find the right service, asking one "
+        "question at a time, then offers to pass their name and number to the "
+        "business. It never promises a discount or a slot that isn't listed."
+    ),
+    PurposeId.TRAINING: (
+        "Train my team: for the business's own staff. Explains procedures in short "
+        "steps from the documents and quizzes staff when they ask."
+    ),
+    PurposeId.GUIDE: (
+        "Guide people step by step: walks people through a process one step at a "
+        "time, in the source's order, checking each step is done."
+    ),
+}
+
+
+def purpose_brief(request: BuilderStepRequest, purpose: PurposeId) -> str:
+    if purpose == PurposeId.CUSTOM:
+        note = " ".join((request.draft.purposeNote or "").split())[:600]
+        return f"Something else, in the owner's words: {note or '(not said)'}"
+    return PURPOSE_BRIEF[purpose]
+
+
 async def draft_assistant(
-    request: BuilderStepRequest, design: DesignId, timeout: float
+    request: BuilderStepRequest, purpose: PurposeId, timeout: float
 ) -> DraftOut:
     decline = (
         DECLINE_HINTS.get(
@@ -488,16 +602,16 @@ async def draft_assistant(
     audience = request.answers.get("audience") or ""
     tone_hint = (
         "plain and friendly, for the business's own team"
-        if audience == "My team"
+        if audience == "My team" or purpose == PurposeId.TRAINING
         else "warm and clear, for the business's clients or customers"
     )
     prechat_rule = (
-        "2 or 3 short questions asked before the chat starts, to pass the person's "
-        "details on: their name (text, required), then an email or phone number "
-        "(email or phone, required), then at most one question that helps the "
-        "business follow up (choice, with its options, not required)."
-        if design == DesignId.ENQUIRIES
-        else "leave empty: this design asks nothing before the chat."
+        "exactly 3 short questions asked before the chat starts, to pass the "
+        "person's details on: their name (text, required), then their phone number "
+        '(phone, required), then "What are you looking for?" (choice, its options '
+        "the services from What we learned, not required)."
+        if purpose == PurposeId.ENQUIRIES
+        else "leave empty: this assistant asks nothing before the chat."
     )
     out = await call(
         "draft",
@@ -505,7 +619,7 @@ async def draft_assistant(
         LLMTask.ONBOARDING_DRAFT,
         prompts=request.prompts,
         timeout=timeout,
-        design=design.value,
+        design=purpose_brief(request, purpose),
         learned=format_learned(request.learned),
         answers=format_answers(request.answers, answer_labels(request.gaps)),
         safety_pack=format_pack(request.safety_pack),

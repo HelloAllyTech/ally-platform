@@ -174,3 +174,19 @@ class TestContract:
         assert draft.model_dump(mode="json", exclude_none=False)["design"] == "guide"
         assert set(type(draft.branding).model_fields) == set(fixture["branding"])
         assert set(type(draft.access).model_fields) == set(fixture["access"])
+
+
+class TestPurposeCopy:
+    def test_every_purpose_line_is_the_decks(self):
+        lines = [
+            catalogue.PURPOSE_MESSAGE,
+            catalogue.CUSTOM_PROMPT,
+            catalogue.RECOMMENDED,
+        ]
+        for purpose in catalogue.PURPOSES.values():
+            lines += [purpose.name, purpose.one_liner, *purpose.will, *purpose.wont]
+            lines += [text for _who, text in purpose.default_sample]
+            if purpose.limit:
+                lines.append(purpose.limit)
+        for line in lines:
+            assert line in DECK, line

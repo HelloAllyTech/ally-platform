@@ -14,6 +14,7 @@ import {
   SafetyScreen,
   ShareScreen,
 } from "../Screens";
+import { defaultsConfirmation } from "../purposes";
 import { reached } from "../steps";
 
 /**
@@ -173,6 +174,94 @@ describe("Designs", () => {
     expect(buttons).toHaveLength(1);
     fireEvent.click(buttons[0]);
     expect(onChoose).toHaveBeenCalledWith("guide");
+  });
+});
+
+describe("What should your assistant do?", () => {
+  const purposes = [
+    {
+      id: "enquiries",
+      title: "Bring in customers",
+      best_for: "New clients",
+      will: ["Recommend the service that fits"],
+      wont: ["Book, take orders or take payments"],
+      sample: [],
+      recommended: true,
+      limit: "It can't book or take payments yet. It sends you each new enquiry by email.",
+    },
+    {
+      id: "answer",
+      title: "Answer questions",
+      best_for: "Questions",
+      will: [],
+      wont: [],
+      sample: [],
+    },
+    { id: "custom", title: "Something else", best_for: "x", will: [], wont: [], sample: [] },
+  ];
+
+  it("shows the recommended purpose first, badged, with its honest limit", () => {
+    const onChoose = vi.fn();
+    render(<DesignScreen designs={purposes} chosen={null} canChoose onChoose={onChoose} />);
+    expect(screen.getByRole("heading", { name: COPY.purposes.title })).toBeTruthy();
+    expect(screen.getAllByText(COPY.purposes.recommended)).toHaveLength(1);
+    expect(screen.getByText(purposes[0].limit!)).toBeTruthy();
+    const buttons = screen.getAllByText(COPY.designs.choose);
+    expect(buttons).toHaveLength(3);
+    fireEvent.click(buttons[0]);
+    expect(onChoose).toHaveBeenCalledWith("enquiries");
+  });
+
+  it("asks for a sentence once Something else is chosen", () => {
+    const onDescribe = vi.fn();
+    render(
+      <DesignScreen
+        designs={purposes}
+        chosen="custom"
+        canChoose
+        onChoose={vi.fn()}
+        onDescribe={onDescribe}
+      />,
+    );
+    const box = screen.getByLabelText(COPY.purposes.customPrompt);
+    fireEvent.change(box, { target: { value: " Help parents choose a class " } });
+    fireEvent.click(screen.getByText(COPY.gaps.ok));
+    expect(onDescribe).toHaveBeenCalledWith("Help parents choose a class");
+  });
+
+  it("confirms the defaults the purpose set, once built", () => {
+    const built = view({
+      designs: purposes,
+      draft: {
+        ...view().draft,
+        purpose: "enquiries",
+        prechat: [
+          { id: "q1", label: "Name", type: "text", required: true },
+          { id: "q2", label: "Phone", type: "phone", required: true },
+        ],
+        access: { mode: "invite", emails: [] },
+      },
+    } as Partial<BotDraftView>);
+    const line = defaultsConfirmation(built)!;
+    expect(line).toBe(
+      "I've set it up for Bring in customers: Pre-chat: name, phone · Access: anyone you choose. You can change any of this on the next screen.",
+    );
+    render(<BuildingScreen done confirmation={line} />);
+    expect(screen.getByText(line)).toBeTruthy();
+
+    const team = view({
+      designs: [{ ...purposes[1], id: "training", title: "Train my team" }],
+      draft: {
+        ...view().draft,
+        purpose: "training",
+        prechat: [],
+        access: { mode: "organisation", emails: [] },
+      },
+    } as Partial<BotDraftView>);
+    expect(defaultsConfirmation(team)).toContain(
+      "Pre-chat: nothing before the chat · Access: people in your organisation",
+    );
+    expect(defaultsConfirmation(view())).toBeNull();
   });
 });
 
