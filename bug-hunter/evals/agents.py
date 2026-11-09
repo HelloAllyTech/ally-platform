@@ -133,7 +133,9 @@ class GraphAgent:
             state = run_graph(graph, deps, signal)
         seconds = time.monotonic() - started
         repro_test = None
-        if state.repro is not None:
+        # only a reproduction the graph itself accepted (ran, failed, for the right
+        # reason) is a claim; a file whose test passed on the buggy code is not
+        if state.repro is not None and state.repro.fails_for_the_right_reason:
             test_file = Path(deps.app_root) / state.repro.test_path
             if test_file.is_file():
                 repro_test = (

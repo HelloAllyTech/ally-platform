@@ -373,3 +373,81 @@ def test_graph_checkpoints_and_resumes_after_a_crash(config, repo, tmp_path) -> 
     # triage was not re-run and the investigate loop kept its first tool turn
     assert state.budget_used.per_node["triage"].calls == 1
     assert sum(1 for m in investigate.calls[-1] if m.type == "tool") == 1
+
+
+def test_graph_agent_exports_only_an_accepted_repro(
+    config, repo, tmp_path, monkeypatch
+) -> None:
+    """A repro whose test passed on the buggy code is not a claim the harness should
+    score; the GitHub run showed 'repro: yes' for two such cases."""
+    from evals.agents import GraphAgent
+    from evals.schema import Case
+
+    repro_passed = ScriptedChatModel(
+        script=[
+            ai(
+                tool_calls=[
+                    {
+                        "name": "write_test_file",
+                        "args": {
+                            "path": "src/x.spec.ts",
+                            "content": "it('x', () => {});\\n",
+                        },
+                    }
+                ]
+            ),
+            ai(tool_calls=[REPRO_CALL]),
+        ]
+    )
+    runner = ScriptedRunner("ally-be", [run_result("ally-be", True)])
+    models = {
+        "triage": ScriptedChatModel(script=[_triage()]),
+        "investigate": ScriptedChatModel(script=[ai(tool_calls=[FINDING_CALL])]),
+        "fix": repro_passed,
+    }
+    monkeypatch.setattr(
+        "bug_hunter.graph.deps.GraphDeps.for_run",
+        classmethod(
+            lambda cls, cfg, run, app, mode, **kw: _deps(
+                cfg, repo, tmp_path, models, runner=runner
+            )
+        ),
+    )
+    monkeypatch.setattr("bug_hunter.graph.tracing.trace_url", lambda run_id: None)
+
+    from types import SimpleNamespace
+
+    fake_run = SimpleNamespace(
+        config=config.model_copy(update={"repo_root": repo}),
+        run_id="run-test",
+        worktree=repo,
+        sandbox=None,
+        ref="HEAD",
+        write_artefact=lambda name, content: tmp_path / name,
+    )
+
+    case = Case(
+        id="ally-be-x",
+        kind="bug",
+        app="ally-be",
+        parent="a" * 40,
+        commit="b" * 40,
+        expected="fix",
+        description="x returns 0 instead of 3",
+        src_files=["src/x.ts"],
+        oracle_tests=["src/x.spec.ts"],
+    )
+    from evals.agents import CaseInput
+
+    result = GraphAgent(checkpoint="memory").run(
+        CaseInput(
+            case,
+            "issue",
+            "ally-be",
+            repo,
+            app_root=repo / "ally-be",
+            description=case.description,
+        ),
+        fake_run,
+    )
+    assert result.escalated and result.repro_test is None

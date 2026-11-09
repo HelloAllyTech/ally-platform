@@ -132,7 +132,45 @@ the real false-alarm test.
 
 ## First eval run on GitHub (10-case subset)
 
-PENDING
+Subset: six bug cases across the five apps including one escalate case, plus four clean
+cases: `ally-be-89d8e055`, `ally-be-819f6ccf` (escalate), `ally-web-9299e9aa`,
+`ally-ai-b680c643`, `ally-ai-learn-995242d7`, `ally-mobile-83bdf91e`; clean
+`ally-be-b29aa1be`, `ally-web-7b655598`, `ally-ai-6e81b510`, `ally-ai-learn-b6c51894`.
+Graph agent, gpt-5 / gpt-5-mini, cap $10 per mode. Three attempts were needed: the first
+run was cancelled, the second died on the loop recursion limit (fixed), the third is
+below. Commit `caa0c93c`.
+
+### Issue mode (run 42616714377)
+
+| Case | Expected | Outcome | Repro | Tokens | Cost | s | What happened |
+|---|---|---|---|---|---|---|---|
+| `ally-be-89d8e055` | fix | detected | verified | 373k | $0.31 | 320 | Finding = the real fix (zero-width marks inside `{name}`/`[laughs]`); test fails for the right reason |
+| `ally-ai-b680c643` | fix | detected | verified | 383k | $0.25 | 220 | Finding = the real fix (`_prompt_code_to_path` keeps underscores); test shows `('a','b_c')` instead of `('a','b/c')` |
+| `ally-ai-learn-995242d7` | fix | detected | verified | 925k | $0.48 | 240 | Finding: TTS error handler defaults `recoverable` to True, so Sarvam errors without the flag never trigger the fallback; plausible, not the commit's own fix (which filters empty text before Sarvam) |
+| `ally-web-9299e9aa` | fix | escalated | – | 1.37M | $0.84 | 370 | Finding = the real fix (history not trimmed to 20) but the written test *passed* on the buggy code; the graph refused to count it and escalated. The same case reproduced correctly in a local run ($0.42) |
+| `ally-mobile-83bdf91e` | fix | escalated | – | 728k | $0.59 | 319 | Finding = the real fix ("Try again" calls `_handleGoBack`); could not build a widget test that reaches the disconnect overlay |
+| `ally-be-819f6ccf` | escalate | escalated_correctly | – | 342k | $0.19 | 167 | Finding = the real fix (`get<boolean>` vs the string `'true'`); escalated because the test passed on the buggy code, *not* because of the risk path (risk_precheck is chunk 06) |
+| 4 clean cases | no_bug | clean | – | ~1.2k each | $0.001 each | 3–4 | Triage closed each as a feature request in one cheap call |
+
+Totals: detection 6/6 (4 with a verified failing test), false alarms 0/4, $2.66, 28 min
+wall-clock for the step. Every one of the six findings names the line the real fix
+changed. The misses are all in *reproduce*, not in diagnosis.
+
+Sweep mode: see below (the first sweep run was invalid, see "Harness bug found").
+
+### Harness bug found: sweep mode showed the fix
+
+The first sweep run scored 2/6 and every triage note read "this change is intentional
+and tested": the harness handed sweep-mode agents `git show <fix commit>`. The
+investigator for `ally-ai-b680c643` even remarked that the risky change in the diff was
+not present in the checked-out code. Fixed in chunk 04's harness: each bug case now
+carries `introduced_by` (newest `git blame` commit on the lines the fix removed, at the
+parent; `bug-hunter eval blame`), sweep mode shows that commit's diff with the worktree
+still at the parent, and a case without one is issue-only (`ally-be-d039e256`). 20 of 21
+bug cases have an introducing commit; for `ally-be-89d8e055` it is Bug Hunter v1's PR
+#101, the change that wrote the over-strict regexes.
+
+SWEEP_RESULTS_PENDING
 
 ## How to test
 
