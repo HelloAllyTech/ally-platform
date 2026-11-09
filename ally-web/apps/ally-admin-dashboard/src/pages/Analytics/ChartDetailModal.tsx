@@ -174,7 +174,7 @@ export const ChartDetailModal = ({
         </div>
 
         {zoomable && zoomed && !showTable && zoomNote && (
-          <p className="text-xs text-typography-600 mb-3 border-l-2 border-[#8d8d8d] pl-2">
+          <p className="text-xs text-typography-600 mb-3 border-l-2 border-neutral-400 pl-2">
             {zoomNote}
           </p>
         )}

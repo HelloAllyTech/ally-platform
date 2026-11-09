@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { LineChart, ScatterChart, SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
 import { Reset, Send } from "@carbon/icons-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -25,6 +24,7 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import { useAskAnalyticsAgentMutation, useGetAnalyticsAgentCatalogQuery } from "@api";
 import { sharedMarkdownComponents } from "@components";
+import { LineChart, ScatterChart, SimpleBarChart, StackedBarChart } from "@components/charts";
 import { en } from "@constants";
 import { AnalyticsAgentMessage, AnalyticsAgentTurnInput, AskAnalyticsAgentResponse } from "@types";
 

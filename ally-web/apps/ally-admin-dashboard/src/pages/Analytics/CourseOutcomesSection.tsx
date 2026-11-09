@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 
-import { LineChart, ScatterChart, SimpleBarChart } from "@carbon/charts-react";
-
 import {
   useGetCurriculumCourseFunnelQuery,
   useGetCurriculumKnowledgeVsSkillQuery,
@@ -9,6 +7,7 @@ import {
   useGetCurriculumQuizOutcomesQuery,
   useGetCurriculumRoleplayGatesQuery,
 } from "@api";
+import { LineChart, ScatterChart, SimpleBarChart } from "@components/charts";
 import { AnalyticsRange } from "@types";
 
 import { AnalyticsTabFilters, asOfStamp, windowLabel } from "./analyticsFilters";
@@ -119,14 +118,13 @@ export const CourseFunnelRows = ({ rows }: { rows: CourseFunnelRow[] }) => (
       const base = r.counts[0];
       const finishedPct = r.pcts[3];
       return (
-        <div key={r.key} className={`${ROW_GRID} border-t border-[#f0f0f0] py-1.5`}>
+        <div key={r.key} className={`${ROW_GRID} border-t border-gray-100 py-1.5`}>
           <span className="flex min-w-0 flex-col">
             <span className="text-xs text-typography-900">{r.label}</span>
             <span className="text-xs text-typography-500">{r.sublabel}</span>
           </span>
           <span
-            className="relative h-5 rounded"
-            style={{ backgroundColor: "#f0f0f0" }}
+            className="relative h-5 rounded bg-gray-100"
             role="img"
             aria-label={`${r.label}: ${FUNNEL_STAGES.map((s, i) => `${s} ${r.counts[i]}`).join(", ")}`}
           >
@@ -178,14 +176,13 @@ export const GateRows = ({ rows }: { rows: GateRow[] }) => (
     {rows.map(r => {
       const first = r.segments.find(s => s.outcome === "Cleared first time");
       return (
-        <div key={r.key} className={`${ROW_GRID} border-t border-[#f0f0f0] py-1.5`}>
+        <div key={r.key} className={`${ROW_GRID} border-t border-gray-100 py-1.5`}>
           <span className="flex min-w-0 flex-col">
             <span className="text-xs text-typography-900">{r.label}</span>
             <span className="text-xs text-typography-500">{r.sublabel}</span>
           </span>
           <span
-            className="flex h-5 overflow-hidden rounded"
-            style={{ backgroundColor: "#f0f0f0" }}
+            className="flex h-5 overflow-hidden rounded bg-gray-100"
             role="img"
             aria-label={`${r.label}: ${r.segments.map(s => `${s.outcome} ${pct(s.pct)}`).join(", ")}`}
           >

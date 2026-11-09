@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { LineChart, ScatterChart } from "@carbon/charts-react";
-
 import { useGetFoundationalSkillsSelfEfficacyQuery } from "@api";
+import { LineChart, ScatterChart } from "@components/charts";
 import { QualityDistributionResponse } from "@types";
 
 import { asOfStamp } from "./analyticsFilters";
@@ -73,7 +72,7 @@ const calibrationTooltip =
 
 /** "Internal" marker for safety numbers from unaudited judge coding. */
 const InternalTag = () => (
-  <span className="rounded border border-[#a2191f] px-1 text-xs font-semibold tracking-wide text-[#a2191f]">
+  <span className="rounded border border-red-700 px-1 text-xs font-semibold tracking-wide text-red-700">
     Internal
   </span>
 );

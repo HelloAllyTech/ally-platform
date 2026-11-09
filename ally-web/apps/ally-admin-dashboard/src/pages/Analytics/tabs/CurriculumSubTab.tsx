@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
-
 import { useGetLanguageMixQuery, useGetScenarioUsageQuery, useGetTrackDropoffQuery } from "@api";
+import { SimpleBarChart, StackedBarChart } from "@components/charts";
 import { AnalyticsBucket } from "@types";
 
 import { AnalyticsTabFilters, asOf, asOfStamp, windowLabel } from "../analyticsFilters";

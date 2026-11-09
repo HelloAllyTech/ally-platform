@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { SimpleBarChart } from "@carbon/charts-react";
-
 import {
   InlineNotification,
   Table,
@@ -13,6 +11,7 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import { AnalyticsWindowQuery, useGetVoiceLatencyByScenarioQuery } from "@api";
 import { Button } from "@components";
+import { SimpleBarChart } from "@components/charts";
 import { ButtonVariant } from "@components/types";
 import { formatDate } from "@utils";
 

@@ -1,12 +1,11 @@
 import { useMemo } from "react";
 
-import { LineChart } from "@carbon/charts-react";
-
 import { InlineNotification, SidePanel, SkeletonPlaceholder } from "@ally-ui-mono/ui-shared";
 import {
   useGetFoundationalSkillsBehavioursQuery,
   useGetFoundationalSkillsLearnerQuery,
 } from "@api";
+import { LineChart } from "@components/charts";
 
 import { useAnalyticsOrgScope } from "./analyticsOrgScope";
 import { CHART_HEIGHT, ScrollableChart, lineOpts, single } from "./chartKit";
@@ -210,7 +209,7 @@ export const FoundationalSkillsLearnerPanel = ({
                     {myHabits.rows.map(x => {
                       const d = habitDefs.get(x.code);
                       return (
-                        <tr key={x.code} className="border-t border-[#f0f0f0] align-top">
+                        <tr key={x.code} className="border-t border-gray-100 align-top">
                           <td className="py-1 pr-3">
                             <span className="text-typography-800">{d?.text ?? x.code}</span>
                             {d && (

@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { StackedBarChart } from "@carbon/charts-react";
-
 import { useGetRoadmapVotingQuery } from "@api";
+import { StackedBarChart } from "@components/charts";
 
 import { ChartDetailModal } from "./ChartDetailModal";
 import { ChartCard, ScrollableChart, buildSource, stackedBarOpts } from "./chartKit";

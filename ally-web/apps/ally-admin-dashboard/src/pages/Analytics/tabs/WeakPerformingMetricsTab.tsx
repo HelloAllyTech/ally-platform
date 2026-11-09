@@ -1,6 +1,5 @@
 import { FC, useMemo, useState } from "react";
 
-import { LineChart, SimpleBarChart } from "@carbon/charts-react";
 import { Link } from "react-router-dom";
 
 import "@carbon/charts/styles.css";
@@ -20,6 +19,7 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import { useGetWeakPerformingMetricsQuery } from "@api";
 import { TooltipIcon } from "@assets";
+import { LineChart, SimpleBarChart } from "@components/charts";
 import { ROUTES } from "@constants";
 import {
   AnalyticsRange,
