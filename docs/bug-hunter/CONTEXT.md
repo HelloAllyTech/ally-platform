@@ -33,7 +33,7 @@ These are product requirements. Every chunk must keep them true, and tests must 
 - Don't add or upgrade dependencies in other apps.
 - Every external call (LLM, GitHub, CloudWatch, Docker) goes through an interface that tests can fake. Unit tests never hit the network or a real model.
 - Run `make test` and `make lint` in `bug-hunter/` before saying anything is done. Commit after each milestone with conventional commits (`feat(bug-hunter): …`).
-- All chunks are built on one branch, `feat/bug-hunter-v2`, and merged to `master` once, after local testing. Commit at the end of each chunk (`feat(bug-hunter): chunk NN …`) so the history reads chunk by chunk. Rebase on `origin/master` at the start of each chunk; stop and report if the rebase conflicts outside `bug-hunter/` and `docs/bug-hunter/`.
+- All chunks are built on one branch, `feat/bug-hunter-v2`, and merged to `master` once, after local testing. Commit at the end of each chunk (`feat(bug-hunter): chunk NN …`) so the history reads chunk by chunk. Merge `origin/master` into the branch at the start of each chunk (never rebase: the branch is shared and must not be force-pushed); stop and report if the merge conflicts outside `bug-hunter/` and `docs/bug-hunter/`. Never push to `master` without the user's explicit go-ahead.
 - End each chunk with `docs/bug-hunter/notes/CHUNK-NN-NOTES.md`: code map, decisions made, how to test it, open questions. Then update the "Current chunk" line at the top of this file.
 
 ## Chunk order
