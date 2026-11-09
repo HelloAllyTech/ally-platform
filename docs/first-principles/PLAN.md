@@ -45,6 +45,7 @@ retrieval gets measurably better and the library can be pruned using data.
 | Engineer access | **Separate read-only keys** that can only search principles, not the Skills Store keys |
 | What gets uploaded | **Documentation** (PDF, EPUB) of any length, from a short guide to a long manual |
 | Naming | Code, schema, prompts, UI copy and code documentation say **document** (or **source** for the database record) for an upload, and no other term |
+| Source metadata | **Title, version and year only.** No author, publisher or contributor names are stored, sent to the server, or written into principles or overviews |
 
 ## 2. What exists today (and what we reuse)
 
@@ -120,11 +121,11 @@ All tables are prefixed `fp_`. **No document file and no source text is stored i
 Postgres**, so none of it can reach a database backup.
 
 ### `fp_sources`: one row per uploaded document
-`id`, `title`, `publisher` (organisation or author), `docVersion`, `year` (pre-filled from
-PDF metadata or EPUB OPF; all editable), `kind` (`pdf` | `epub`), `fileHash` (SHA-256),
-`titleKey` (normalised title + publisher, to catch the same document uploaded as both PDF
-and EPUB), `overview` (≤ 150 words, our own summary of what the document covers and argues,
-used as context and shown in the UI), `pageCount`,
+`id`, `title`, `docVersion`, `year` (title pre-filled from PDF metadata or EPUB OPF; all
+editable), `kind` (`pdf` | `epub`), `fileHash` (SHA-256), `titleKey` (normalised title, to
+catch the same document uploaded as both PDF and EPUB), `overview` (≤ 150 words, our own
+summary of what the document covers and argues, naming no people or organisations; used as
+context and shown in the UI), `pageCount`,
 `sectionCount`, `sectionsDistilled`, `sectionsFailed`, `status` (`uploading` | `queued` |
 `distilling` | `consolidating` | `complete` | `failed` | `archived`), `yield` jsonb (the §3
 yield report), `distillModel`, `promptVersions` jsonb, `inputTokens`, `outputTokens`,
@@ -201,7 +202,7 @@ gaps.
 
 ### 6.1 Browser (ally-admin-dashboard → Builder → First Principles → Library)
 1. Admin drops a `.pdf` / `.epub` (multi-file supported, processed one at a time).
-2. Hash the file (WebCrypto SHA-256). `POST /sources` with the hash, title and publisher.
+2. Hash the file (WebCrypto SHA-256). `POST /sources` with the hash and title.
    - Same hash already distilled → "Already in the library (distilled 3 Oct, 64 principles).
      Re-distil with the current prompts?" (§6.6)
    - Same `titleKey`, different hash (e.g. the EPUB of a document already uploaded as PDF) →
@@ -213,13 +214,17 @@ gaps.
      layer means a scanned PDF: refuse with a clear message (no OCR in v1).
    - **EPUB** with `jszip` + `DOMParser`: OPF spine for order, `nav.xhtml` / NCX for the
      section tree, strip markup to paragraphs.
+   - Only the title is read from file metadata. Author, creator, publisher and contributor
+     fields (PDF info dictionary, EPUB `dc:creator` / `dc:publisher` / `dc:contributor`) are
+     ignored and never sent to the server.
    - Default-skip boilerplate sections by title (table of contents, index, legal or licence
-     notices, copyright, revision history). Each can be re-enabled in the preview.
+     notices, copyright, revision history, about the authors or contributors). Each can be
+     re-enabled in the preview except the authors/contributors pages.
    - Pack into sections of roughly 2.5–4k tokens on paragraph boundaries, each carrying its
-     `sectionPath` and page range. Mark the opening sections (introduction, overview, summary) and the closing ones for the
-     overview pass.
-4. Preview: title, publisher and version (editable), section tree with skip toggles, **cost estimate and a
-   cost cap** (default 1.5× the estimate). Admin confirms.
+     `sectionPath` and page range. Mark the opening sections (introduction, overview,
+     summary) and the closing ones for the overview pass.
+4. Preview: title and version (editable), section tree with skip toggles, **cost estimate
+   and a cost cap** (default 1.5× the estimate). Admin confirms.
 5. `POST /sources/:id/sections` in batches (≤ 1 MB each). The tab can then close.
 6. The library page polls source status: a progress bar per document, then its yield report.
 
@@ -249,14 +254,18 @@ New ally-web dependencies: `pdfjs-dist`, `jszip` (new, not upgrades).
   document, so
   **Anthropic prompt caching** makes calls after the first much cheaper. Then the section
   text and `sectionPath`. Output: **0–4** candidates with every §5 field, including `probe`.
-  Rules: own words only; no quotes; no examples or case studies lifted from the document; one idea
-  per principle; prefer the specific and surprising over the obvious; "0 principles" is a
-  valid answer.
+  Rules: own words only; no quotes; no examples or case studies lifted from the document;
+  **no attributions** (no names of people, authors or organisations, no "as X argues");
+  one idea per principle; prefer the specific and surprising over the obvious;
+  "0 principles" is a valid answer.
 - Stop the document if `costUsd` reaches `costCapUsd`; the admin can raise the cap and resume.
 
 ### 6.4 Quality gate
 In order, cheapest first:
-1. **Deterministic**: length limits, required fields, valid vocabulary values.
+1. **Deterministic**: length limits, required fields, valid vocabulary values, and no
+   attribution phrasing ("according to", "as … argues", "coined by"). The critic (step 5)
+   also flags any person or organisation name, which sends the candidate to review with the
+   name highlighted for removal.
 2. **Verbatim check**: reject any candidate sharing an 8-word run with its section. This
    guarantees we keep meaning, not text.
 3. **Injection screen**: reject candidates that address an AI or carry instructions or
