@@ -93,7 +93,7 @@ export const DRAFT_PATHS: Record<BotDraftActor, readonly string[]> = {
 };
 
 const SECTIONS = new Set<string>(Object.values(LearnedSection));
-const FACT_MAX_CHARS = 500;
+export const FACT_MAX_CHARS = 500;
 /** The source of a fact the owner told us themselves. */
 export const OWNER_SOURCE = 'owner';
 

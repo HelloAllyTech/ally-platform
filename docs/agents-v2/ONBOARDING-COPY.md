@@ -362,3 +362,27 @@ Labels the 20a-1 screens use that the sections above don't name. Same voice.
   - Too many: This assistant has 50 images, the most it can hold. Remove one to add another.
   - Failed: That upload didn't finish. Try again.
 - **Alt text label:** Describe this image for people who can't see it
+
+## 20. Your assistant's home (after it's built)
+
+The page an owner comes back to. Every field saves on its own; the words below are what the server
+says when a save can't be made. More lines for the home's sections are added here as they're built.
+
+- **Changed in another tab:** This changed while you were editing. Here is what it says now.
+- **Field names, as the messages use them:** The name · Your assistant's name · The introduction · The tone · Extra instructions · What it says when it doesn't know · The disclaimer · What it says when someone may be at risk · What it says when someone sends too many messages · What it says to a number it doesn't know · What it says when it can't read a message
+- **Field errors:**
+  - Empty: {Field} can't be empty.
+  - Too long: {Field} can be at most {n} characters.
+  - Suggested questions: Up to 4 suggested questions.
+  - Questions before the chat: Up to 8 questions before the chat.
+  - A choice question needs its options.
+  - A consent question needs its wording.
+  - Choose a language.
+- **Your own rules:**
+  - Write the rule in a few words.
+  - A rule can be at most 200 characters.
+  - You already have this rule.
+  - Up to 20 rules of your own.
+  - That rule is no longer there.
+  - Touching a safety pack rule: the builder's line in §12 ("That would turn off a safety rule, so I can't make that change. I can add a rule of your own instead.")
+- **Correct this:** Write the correction in up to 500 characters.

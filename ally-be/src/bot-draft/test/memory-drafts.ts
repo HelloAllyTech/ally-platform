@@ -99,8 +99,14 @@ export function memoryDrafts(overrides: Partial<BotDraftEntity> = {}) {
   };
   const repository = {
     createQueryBuilder: () => builder,
-    findOne: async ({ where: w }: { where: { id?: string } }) =>
-      w.id === row.id ? clone(row) : null,
+    findOne: async ({
+      where: w,
+    }: {
+      where: { id?: string; chatbotId?: string };
+    }) =>
+      (w.id !== undefined ? w.id === row.id : w.chatbotId === row.chatbotId)
+        ? clone(row)
+        : null,
   };
   const dataSource = { query: jest.fn(async () => []) };
   const events = { publish: jest.fn(async () => undefined) };

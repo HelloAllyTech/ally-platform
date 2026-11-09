@@ -58,6 +58,23 @@ export interface LearnedFact {
   sourceTitle?: string | null;
   /** Edited or added by the owner (then the source is "From you"). */
   byOwner?: boolean;
+  /** Set when the owner corrected this fact after publishing (chunk 20d's "Correct this"). */
+  correction?: FactCorrection;
+}
+
+/**
+ * An owner's correction. It replaces the original for the assistant: in the page's text where the
+ * original sentence was found ("page"), otherwise only in the owner's notes ("notes"). The original
+ * stays here for "Show original"; `pageHash` lets a later re-read notice the page changed.
+ */
+export interface FactCorrection {
+  text: string;
+  originalText: string;
+  appliedTo: 'page' | 'notes';
+  documentId: string | null;
+  notesDocumentId: string | null;
+  pageHash: string | null;
+  at: string;
 }
 
 export interface Learned {

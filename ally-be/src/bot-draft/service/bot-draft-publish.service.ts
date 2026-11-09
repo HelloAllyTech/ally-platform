@@ -248,9 +248,10 @@ export class BotDraftPublishService {
   }
 
   /** The owner's answers as a library document the assistant can cite: created once, then kept. */
-  private async ownerNotes(
+  /** Write the "Owner notes" document from the draft's notes; also used by "Correct this". */
+  async ownerNotes(
     draft: BotDraftEntity,
-    config: BotDraft,
+    config: Pick<BotDraft, 'ownerNotes'>,
   ): Promise<string | null> {
     const text = config.ownerNotes.trim();
     const existingId = draft.source?.ownerNotesDocumentId ?? null;

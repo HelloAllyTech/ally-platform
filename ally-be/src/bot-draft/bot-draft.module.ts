@@ -11,6 +11,8 @@ import {
   BotDraftController,
   ChatbotChangesController,
 } from './controller/bot-draft.controller';
+import { AssistantHomeController } from './home/assistant-home.controller';
+import { AssistantHomeService } from './home/assistant-home.service';
 import { CRAWL_LEARNER } from './crawl/site-crawl.service';
 import { BotDraftPublishService } from './service/bot-draft-publish.service';
 import { BotDraftSessionService } from './service/bot-draft-session.service';
@@ -37,13 +39,18 @@ import { BotDraftService } from './service/bot-draft.service';
     KnowledgeBaseModule,
     AiModule,
   ],
-  controllers: [BotDraftController, ChatbotChangesController],
+  controllers: [
+    BotDraftController,
+    ChatbotChangesController,
+    AssistantHomeController,
+  ],
   providers: [
     BotDraftService,
     BotDraftEventsService,
     SiteCrawlService,
     BotDraftSessionService,
     BotDraftPublishService,
+    AssistantHomeService,
     // The crawl hands each batch of pages to the builder's fact extraction.
     { provide: CRAWL_LEARNER, useExisting: BotDraftSessionService },
   ],
