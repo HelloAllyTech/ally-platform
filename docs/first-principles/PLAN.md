@@ -23,6 +23,10 @@ recorded, so retrieval gets measurably better and the library can be pruned usin
 | Review gate | **Auto-publish + spot-check.** Principles that pass the quality gate go live at once; borderline ones (low score or possible duplicate) wait in a short review queue |
 | Processing | **Background on the server.** The browser parses and uploads all sections, then can close. ally-be distils in the background and deletes each section's text as soon as it is distilled |
 | Replace Stacks in | **All four places:** Builder interview (+ research + PRD review), Roadmap Copilot, Course Copilot, engineers' Claude Code (our own MCP endpoint replaces `stacks-bridge.mjs`) |
+| Seeding | The owner has the books that seeded Stacks and will upload them once the upload screen (chunk 3) is live |
+| Ally house rules | **Books only.** No import of the deprecated `wiki/product/` pages. Hand-adding a principle stays available |
+| Distillation model | **Builder's configured model** (same resolution as the interview) |
+| Engineer access | **Separate read-only keys** that can only search principles, not the Skills Store keys |
 
 ## 2. What exists today (and what we reuse)
 
@@ -36,7 +40,7 @@ recorded, so retrieval gets measurably better and the library can be pruned usin
 | Lesson usage loop (`appliedLessonIds`, `sourceCount`, curator retires unused lessons) | `builder-knowledge.service.ts`, `builder-lesson-curator.service.ts` | Same loop for principles: applied IDs, corroboration count, curator |
 | Builder outcomes (did the PRD ship / build pass) | `builder-outcome.service.ts` | Links "principle applied" to "PRD shipped" |
 | Skills Store prompts (`.txt` default + typed contract) | `ally-be/docs/adding-a-prompt.md` | New prompts: distiller, consolidator, query planner, PRD principle check |
-| Skills Store personal keys | `prompt/service/skills-store-key.service.ts` | Auth for the engineers' MCP endpoint (to confirm during build) |
+| Skills Store personal keys | `ally-be/src/prompt/service/skills-store-key.service.ts` | **Pattern only** (hashing, issuing, revoking) for a new read-only principles key; the keys themselves are not reused |
 | `@nestjs/schedule` | ally-be | Background distillation worker (no new SQS queue, so no infra-repo change) |
 | Server-side PDF/EPUB extractors | `knowledge-base/extractor/` | **Not used.** You asked for parsing in the browser, so the file never leaves the admin's machine. The section heuristics are worth porting to the browser parser |
 
@@ -267,8 +271,10 @@ The agent does not have to remember to search:
   - ally-be exposes `POST /first-principles/mcp`: JSON-RPC `tools/list` + `tools/call`
     for `search_principles`, `get_principles`, `list_domains`, plus a `planning_context`
     prompt, matching the four Stacks surfaces so habits carry over.
-  - Auth: an engineer's personal key (reuse the Skills Store key mechanism) sent as
-    `Authorization: Bearer`.
+  - Auth: a **separate read-only personal key** (`fp_reader_keys`: hashed, owner, label,
+    `lastUsedAt`, `revokedAt`) that can only call the search tools, sent as
+    `Authorization: Bearer`. Engineers create one from Builder → First Principles → Access;
+    the issue/revoke flow copies the Skills Store key service's pattern.
   - Each repo's `.mcp.json` points at it (HTTP transport, key from env). Then delete
     `stacks-bridge.mjs` and the `.claude/skills/stacks` skill (replaced by a
     `first-principles` skill). Update every `CLAUDE.md` / `AGENTS.md` and rewrite
@@ -281,6 +287,7 @@ The agent does not have to remember to search:
 |---|---|
 | **Library** | Upload zone; sources table with progress, counts and cost; principle browser with search box (runs the real retrieval as `admin_preview`, showing scores), filters by domain / kind / strength / source / status, and edit / archive / add manual principle |
 | **Review** | The spot-check queue (§5.3) |
+| **Access** | Engineers create and revoke their read-only keys for the MCP endpoint (§8) |
 | **Insights** | Library size by domain; top applied; **never surfaced** (dead weight or bad keywords); **surfaced often, never applied** (noisy, rewrite or archive); **zero/low-score queries** (what to upload next); per-source yield vs usefulness ("this book gave 140 principles, 3 ever applied"); usage by consumer over time |
 
 Turn receipts and the PRD panel get principle chips (code + statement on hover + thumbs).
@@ -298,7 +305,7 @@ separately.
 | 4 | **Builder swap**: retrieval service + logging, `principles_*` tools, prompts, receipts, citation parsing → `applied` events | An interview cites `[FP-…]` and the events are recorded; Stacks is no longer called by Builder |
 | 5 | **Proactive retrieval**: query planner brief, per-section queries, PRD principle check in review | A rough idea produces a guiding-principles block and review findings |
 | 6 | **Feedback + Insights**: thumbs, shipped linkage, nightly effectiveness, bounded boost, exploration, Insights tab | Insights tab shows real numbers |
-| 7 | **Copilots + MCP + Stacks removal**: Roadmap/Course Copilot swap, `/mcp` endpoint, `.mcp.json` in every repo, delete `StacksClientService` + bridge + skill + `STACKS_*` config, docs/wiki rewrite | `grep -ri stacks` finds only history notes |
+| 7 | **Copilots + MCP + Stacks removal**: Roadmap/Course Copilot swap, read-only keys + Access tab, `/mcp` endpoint, `.mcp.json` in every repo, delete `StacksClientService` + bridge + skill + `STACKS_*` config, docs/wiki rewrite | `grep -ri stacks` finds only history notes |
 
 Chunks 1–4 make it usable; 5–6 make it good; 7 finishes the cutover. Stacks stays wired
 for engineers until chunk 7, so nobody loses guidance while the library fills up.
@@ -315,14 +322,6 @@ for engineers until chunk 7, so nobody loses guidance while the library fills up
 | Long book, worker crash midway | Per-section rows with retry/attempts; the source shows "38/42 sections, 1 failed, retry" |
 | Cost | Estimate shown before confirm; tokens + cost recorded per source; concurrency cap |
 
-## 12. Open questions (answer any time; none block chunk 1)
+## 12. Open questions
 
-1. **Seeding:** the current Stacks corpus can't be exported. Do you still have the books that
-   seeded it, so you can upload them on day one?
-2. **Ally house rules:** the deprecated `wiki/product/` pages hold Ally-specific findings (the
-   minimum group size for tenant metrics, Carbon chart overflow…). Should chunk 3 include a
-   one-off import of those as `manual` principles?
-3. **Distiller model:** use Builder's configured model, or pin a cheaper model for
-   distillation (it is high volume and well-structured)?
-4. **Engineer keys:** is reusing Skills Store keys acceptable for the dev MCP endpoint, or do
-   you want separate read-only keys?
+None. All four earlier questions were answered on 2026-11-09 and are recorded in §1.
