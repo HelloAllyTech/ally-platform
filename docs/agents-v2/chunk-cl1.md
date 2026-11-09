@@ -48,7 +48,7 @@ A lot was built quickly. Before pilots and before Stage 2, the code and docs sho
 
 ### 5. Docs
 
-- `docs/agents-v2/README.md`: a short index: what each doc is for, the current stage, where to start.
+- `docs/agents-v2/README.md`: a short index: what each doc is for, the current stage, where to start. <!-- docs-path-lint: planned -->
 - Finished chunk briefs move to `docs/agents-v2/archive/` (notes stay where they are).
 - Remove duplicated explanations; each topic has one source of truth that others link to.
 - `CONTEXT.md` and `v2-chunks.md` reflect the code as it is after CL1.
@@ -67,5 +67,5 @@ A lot was built quickly. Before pilots and before Stage 2, the code and docs sho
 - [ ] Tools report no unused exports, files or dependencies (or each remaining one is justified)
 - [ ] No leftovers from the old setup form, old Bot page tab or replaced components
 - [ ] No unused prompts, always-on or always-off flags, or comments describing old behaviour
-- [ ] `docs/agents-v2/README.md` exists; finished briefs are archived
+- [ ] `docs/agents-v2/README.md` exists; finished briefs are archived <!-- docs-path-lint: planned -->
 - [ ] Every suite, eval and screenshot baseline passes unchanged

@@ -131,7 +131,7 @@ skills: [skills/reschedule.md]
 evals: evals/cases.yaml
 ```
 
-`collections/slots.yaml`:
+`collections/slots.yaml`: <!-- docs-path-lint: planned -->
 
 ```yaml
 key: slots
@@ -147,7 +147,7 @@ views:
   - { kind: calendar, date_field: starts_at, group_by: practitioner }
 ```
 
-`collections/appointments.yaml`:
+`collections/appointments.yaml`: <!-- docs-path-lint: planned -->
 
 ```yaml
 key: appointments
@@ -173,7 +173,7 @@ views:
   - { kind: calendar, date_field: slot.starts_at }
 ```
 
-`follow_ups/reminder.yaml`:
+`follow_ups/reminder.yaml`: <!-- docs-path-lint: planned -->
 
 ```yaml
 key: appointment_reminder

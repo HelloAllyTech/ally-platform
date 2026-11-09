@@ -58,7 +58,7 @@ The one-screen flow needs from the hook what the two-pane layout didn't: the **c
 | Test | Kind | What it pins |
 |---|---|---|
 | `pages/Onboarding/__tests__/copy.test.ts` | Text | Every `COPY` string appears in `ONBOARDING-COPY.md` |
-| `pages/Onboarding/__tests__/Canvas.test.tsx` | Text and behaviour | Card texts through `COPY`, roles (radio disabled), the patches and publish calls |
+| `pages/Onboarding/__tests__/Canvas.test.tsx` | Text and behaviour | Card texts through `COPY`, roles (radio disabled), the patches and publish calls | <!-- docs-path-lint: ignore -->
 | `pages/Onboarding/__tests__/useOnboardingSession.test.tsx` | Behaviour only | The hook's decisions; no markup |
 | `pages/WhatsAppBot/__tests__/BotPageTab.test.tsx` | Text, roles, test ids | `bot-page-preview` test id, labels, buttons, preview text, save payloads |
 | `botPage/__tests__/BotPageFlow.test.tsx` | Behaviour through roles and English/Hindi strings | The visit end to end (cover → code → pre-chat → chat), headings, labels, alerts, `lang` |
@@ -254,7 +254,7 @@ Also on the branch: `70d761be3` (the 5 wrong declines, diagnosed in `CHUNK-20A-E
     - initials on the dark logo tile were low contrast; the tile is now white in every theme.
 
 **Tests changed, and why** (no behaviour test changed):
-- `pages/Onboarding/__tests__/Canvas.test.tsx` → `Screens.test.tsx`. Canvas.tsx was replaced by one component per screen. Every case was ported with the same assertions against the new screens.
+- `pages/Onboarding/__tests__/Canvas.test.tsx` → `Screens.test.tsx`. Canvas.tsx was replaced by one component per screen. Every case was ported with the same assertions against the new screens. <!-- docs-path-lint: ignore -->
 - Unchanged and passing: `useOnboardingSession.test.tsx`, `copy.test.ts`, `botPage/__tests__/BotPageFlow.test.tsx`, `pages/WhatsAppBot/__tests__/BotPageTab.test.tsx`, ally-be's bot page, publish and crawl specs. New dependencies were added last and optional in existing constructors, so the specs construct services unchanged.
 
 ### Where the screenshots and the deck differ (the deck was followed)

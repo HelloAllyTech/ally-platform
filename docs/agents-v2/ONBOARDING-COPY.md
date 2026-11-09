@@ -505,3 +505,41 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Notification:** {business}: someone needs a person
 - **Email subject:** A conversation needs you
 - **Settings:** Hand back to the assistant after {hours} hours without a reply · Email me if nobody opens it within {minutes} minutes
+
+## 24. Purposes, choosing pages and topics to avoid (20a-2)
+
+*(From `chunk-20a2-additions.md` §4, plus the checkup lines 20a-2's screens need. §20 is the assistant's home, so these are §24.)*
+
+- **Screen title:** What should your assistant do?
+- **Builder message:** Based on what I learned, here's what I'd suggest. You can pick something else, and change it later.
+- **Badge:** Recommended for you
+- **Purpose names and one-liners:**
+  - **Answer questions:** Replies to questions about your services, prices, hours and policies, with a link to where it found each answer.
+  - **Bring in customers:** Helps people find the right service, then passes their name and number to you.
+  - **Train my team:** Explains your procedures to staff and quizzes them when they ask.
+  - **Guide people step by step:** Walks people through a process one step at a time, like test preparation or setting up a product.
+  - **Something else:** Describe what you need, and I'll set it up.
+- **Something else prompt:** What should your assistant help with? A sentence or two is plenty.
+- **Defaults confirmation:** I've set it up for {purpose}: {defaults}. You can change any of this on the next screen.
+- **Honest limits:**
+  - Enquiries: It can't book or take payments yet. It sends you each new enquiry by email.
+  - Training: It doesn't keep track of each person's progress yet.
+- **Lead alert email subject:** New enquiry from your assistant
+- **Lead alert body:** {name} asked about {topic}. Phone: {phone}. {summary} Open the conversation: {link}
+- **Reading choice:** Read everything · Choose pages
+- **Choose pages title:** Which pages should it read?
+- **Choose pages shortcuts:** Leave out blog and news · Leave out careers
+- **Choose pages note:** It only learns from the pages you choose. You can change this later.
+- **Topics to avoid label:** Anything it shouldn't talk about?
+- **Topics to avoid placeholder:** For example, prices or other clinics
+- **Removing a source:** Remove {page}? Your assistant will forget {n} details that came only from this page.
+
+### The checkup in onboarding and on the home *(added in 20a-2)*
+
+- **Onboarding checkup, eyebrow:** Checkup
+- **Onboarding checkup, title with gaps:** {passed} of {total} answered well. {gaps} need your input.
+- **Onboarding checkup, title all clear:** {passed} of {total} answered well, each with its source
+- **Stat tiles:** Accuracy · Safety · With sources
+- **Buttons:** Answer the {n} questions · Answer the question · Try it yourself · Skip for now
+- **Publish blocked by a safety answer:** We're double-checking a safety answer. Try again in a few minutes.
+- **Home header chip:** {pct}% accurate · {n} to fix (with nothing to fix: {pct}% accurate)
