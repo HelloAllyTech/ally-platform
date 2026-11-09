@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import {
   ArticleContent,
+  ArticleExperience,
   ArticleQuestion,
   ArticleResource,
   JournalContent,
@@ -69,6 +70,9 @@ import {
   TRACK_MAX_ANNOTATION_UNITS,
   TRACK_MAX_ARTICLE_QUESTIONS,
   TRACK_MAX_ARTICLE_RESOURCES,
+  TRACK_MAX_ARTICLE_TAKEAWAYS,
+  TRACK_MAX_ARTICLE_TAKEAWAY_LENGTH,
+  TRACK_MAX_ARTICLE_COVER_ALT_LENGTH,
   TRACK_LIKERT_MAX_SCALE_POINTS,
   TRACK_LIKERT_MAX_STATEMENTS,
   TRACK_LIKERT_MIN_SCALE_POINTS,
@@ -563,6 +567,58 @@ function validateArticleContent(
   }
   validateArticleQuestions(content, title);
   validateArticleResources(content.resources, title);
+  validateArticlePresentation(content, title);
+}
+
+/**
+ * The reading experience, cover photo and key takeaways. The cover URL ends
+ * up in an `<img src>` on two frontends, so it has to be an uploaded https
+ * file, as a branching scene's image does.
+ */
+function validateArticlePresentation(
+  content: ArticleContent,
+  title: string,
+): void {
+  const label = `Article component "${title}"`;
+  if (
+    content.experience !== undefined &&
+    !Object.values(ArticleExperience).includes(content.experience)
+  ) {
+    fail(`${label}: reading experience must be classic, magazine or cards.`);
+  }
+
+  if (content.cover !== undefined && content.cover !== null) {
+    const { url, alt } = content.cover;
+    if (typeof url !== 'string' || !url.trim().startsWith('https://')) {
+      fail(`${label}: the cover photo must be an uploaded file (https link).`);
+    }
+    if (
+      alt !== undefined &&
+      (typeof alt !== 'string' ||
+        alt.length > TRACK_MAX_ARTICLE_COVER_ALT_LENGTH)
+    ) {
+      fail(
+        `${label}: the cover photo description must be ${TRACK_MAX_ARTICLE_COVER_ALT_LENGTH} characters or fewer.`,
+      );
+    }
+  }
+
+  const takeaways = content.takeaways;
+  if (takeaways === undefined || takeaways === null) return;
+  if (!Array.isArray(takeaways)) fail(`${label}: takeaways must be a list.`);
+  if (takeaways.length > TRACK_MAX_ARTICLE_TAKEAWAYS) {
+    fail(`${label}: at most ${TRACK_MAX_ARTICLE_TAKEAWAYS} key takeaways.`);
+  }
+  takeaways.forEach((takeaway, index) => {
+    if (typeof takeaway !== 'string' || !takeaway.trim()) {
+      fail(`${label}: key takeaway ${index + 1} is empty.`);
+    }
+    if (takeaway.trim().length > TRACK_MAX_ARTICLE_TAKEAWAY_LENGTH) {
+      fail(
+        `${label}: key takeaway ${index + 1} must be ${TRACK_MAX_ARTICLE_TAKEAWAY_LENGTH} characters or fewer.`,
+      );
+    }
+  });
 }
 
 /**

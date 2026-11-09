@@ -27,6 +27,7 @@ import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service
 import {
   AnsweredArticleQuestion,
   ArticleContent,
+  ArticleExperience,
   ArticleQuestion,
   JournalContent,
   parseArticleQuestionMarkers,
@@ -826,6 +827,9 @@ export class TrackEnrollmentService {
             (question) => answered[question.id],
           ).length,
           resources: article.resources ?? [],
+          experience: article.experience ?? ArticleExperience.CLASSIC,
+          cover: article.cover?.url ? article.cover : null,
+          takeaways: article.takeaways ?? [],
         };
       }
 
