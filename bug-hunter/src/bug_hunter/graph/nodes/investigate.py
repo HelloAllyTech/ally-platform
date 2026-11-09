@@ -15,7 +15,8 @@ from bug_hunter.graph.loop import LoopState, ToolLoop, initial_messages, run_loo
 from bug_hunter.graph.nodes.common import node_context, over_budget
 from bug_hunter.graph.prompts import load_prompt
 from bug_hunter.graph.state import CATEGORIES, BugState, Confidence, Finding, Severity
-from bug_hunter.tools.lc import map_tools, read_tools
+from bug_hunter.graph.tools import outline_first_read_tools
+from bug_hunter.tools.lc import map_tools
 
 NEIGHBOURHOOD_MAX_ITEMS = 25
 NEIGHBOURHOOD_MAX_EDGES = 8
@@ -76,7 +77,7 @@ def finish_tools() -> list[StructuredTool]:
 
 def make_investigate_node(deps: GraphDeps):
     prompt = load_prompt(deps.config, "investigate")
-    tools = read_tools(deps.workspace, deps.git)
+    tools = outline_first_read_tools(deps)
     if deps.repo_map is not None:
         tools += map_tools(deps.repo_map)
     loop = ToolLoop(

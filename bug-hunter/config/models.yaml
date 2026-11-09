@@ -13,8 +13,8 @@ fallbacks:
 # Active prompt version per model node (prompts/<node>.<version>.md); evals compare versions.
 prompts:
   triage: v3
-  investigate: v2
-  reproduce: v2
+  investigate: v3
+  reproduce: v3
 # USD per 1M tokens, from the providers' price pages (checked 2026-11-09; see
 # CHUNK-05-NOTES.md). Every role and fallback model must have a row: cost accounting is
 # code, and an unpriced model would make the per-run cost cap meaningless.

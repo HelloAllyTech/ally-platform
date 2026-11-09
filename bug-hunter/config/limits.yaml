@@ -30,6 +30,7 @@ context:
   token_safety_margin: 0.15   # budgets are enforced at (1 - margin): Gemini counts differently from tiktoken
   chars_per_token_offline: 3  # overestimate when tiktoken's encoding is not available offline
   repo_map_keep_commits: 2    # cached map versions kept per app
+  outline_first_min_lines: 800   # the first read_file of a longer file returns its outline, not its first 400 lines
 # Kept artefacts (diff, scratchpad, report, escalation) under runs/artefacts/<run_id>/.
 artefacts:
   max_age_days: 30

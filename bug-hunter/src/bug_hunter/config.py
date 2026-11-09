@@ -221,6 +221,7 @@ class ContextLimits(_Strict):
     token_safety_margin: float = Field(default=0.15, ge=0, lt=0.9)
     chars_per_token_offline: int = Field(default=3, ge=1, le=4)
     repo_map_keep_commits: int = Field(default=2, ge=1)
+    outline_first_min_lines: int = Field(default=800, ge=1)
 
 
 class ArtefactLimits(_Strict):

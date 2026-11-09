@@ -19,7 +19,8 @@ from bug_hunter.graph.loop import LoopState, ToolLoop, initial_messages, run_loo
 from bug_hunter.graph.nodes.common import charge_all, node_context, over_budget
 from bug_hunter.graph.prompts import load_prompt
 from bug_hunter.graph.state import BugState, Repro
-from bug_hunter.tools.lc import RunTestsArgs, WriteTestFileArgs, read_tools
+from bug_hunter.graph.tools import outline_first_read_tools
+from bug_hunter.tools.lc import RunTestsArgs, WriteTestFileArgs
 from bug_hunter.tools.runner import RunResult, single_test_command
 
 EXCERPT_MAX = 2500
@@ -101,7 +102,7 @@ def make_reproduce_node(deps: GraphDeps):
 
     tools = [
         t
-        for t in read_tools(deps.workspace, deps.git)
+        for t in outline_first_read_tools(deps)
         if t.name in ("read_file", "grep", "glob", "list_dir")
     ] + [
         StructuredTool.from_function(
