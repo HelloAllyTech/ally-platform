@@ -30,6 +30,9 @@ class CaseResult:
     sandbox_seconds: float = 0.0
     run_id: str = ""
     error: str | None = None
+    trace_url: str | None = None
+    status: str | None = None  # agent's final status (graph agents)
+    confidence: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -145,14 +148,25 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Cases",
         "",
-        "| id | kind | expected | outcome | repro | oracle | s | error |",
-        "|---|---|---|---|---|---|---|---|",
+        "| id | kind | expected | outcome | repro | oracle | tokens | cost | s | trace "
+        "| error |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for c in report["cases"]:
         yes_no = lambda v: "–" if v is None else ("yes" if v else "no")  # noqa: E731
+        trace = f"[trace]({c['trace_url']})" if c.get("trace_url") else "–"
         lines.append(
             f"| `{c['id']}` | {c['kind']} | {c['expected']} | {c['outcome']} "
             f"| {yes_no(c['repro_valid'])} | {yes_no(c['oracle_pass'])} "
-            f"| {c['seconds']:.0f} | {(c['error'] or '')[:60]} |"
+            f"| {c['tokens']} | ${c['cost_usd']:.3f} | {c['seconds']:.0f} | {trace} "
+            f"| {(c['error'] or '')[:60]} |"
         )
+    if meta.get("cost_cap_usd") is not None:
+        lines += [
+            "",
+            f"Cost: ${meta.get('cost_usd_total', 0):.2f} of the "
+            f"${meta['cost_cap_usd']:.2f} "
+            f"cap · cases done {meta.get('cases_done', len(report['cases']))}"
+            f" · remaining {meta.get('cases_remaining', 0)}",
+        ]
     return "\n".join(lines)

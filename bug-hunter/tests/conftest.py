@@ -43,3 +43,7 @@ def rewrite_yaml(path: Path, mutate) -> None:
     data = yaml.safe_load(path.read_text())
     mutate(data)
     path.write_text(yaml.safe_dump(data))
+
+
+# Shared with the graph tests: the two-commit bug repo and its harness options.
+from tests.test_evals_harness import repo_config  # noqa: E402,F401

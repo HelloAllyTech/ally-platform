@@ -1,7 +1,9 @@
-"""``bug-hunter`` command line.
+"""``bug-hunter`` command line: ``config``, ``map``, ``runs``, ``cache``, ``eval``,
+``run`` (one bug signal through graph v1) and ``replay`` (inspect or resume a run).
+``sweep`` arrives in chunk 08.
 
-Chunk 01 ships ``bug-hunter config check``. ``run``, ``sweep``, ``eval`` and
-``replay`` arrive with the chunks that build them.
+Keys come from ``bug-hunter/.env`` locally (loaded here, never printed) and from
+repository secrets in CI.
 """
 
 from __future__ import annotations
@@ -25,6 +27,21 @@ app = typer.Typer(
     help="Bug Hunter v2: finds and fixes bugs in the ally-platform apps.",
     no_args_is_help=True,
 )
+
+
+@app.callback()
+def _startup() -> None:
+    """Load bug-hunter/.env (if present) and turn LangSmith tracing on when a key is
+    set. Values are never echoed."""
+    from dotenv import load_dotenv
+
+    from bug_hunter.config import PACKAGE_ROOT
+    from bug_hunter.graph.tracing import configure
+
+    load_dotenv(PACKAGE_ROOT / ".env", override=False)
+    configure()
+
+
 config_app = typer.Typer(help="Inspect and validate the configuration.")
 app.add_typer(config_app, name="config")
 map_app = typer.Typer(help="Repo map: build and inspect the symbol index.")
@@ -461,6 +478,10 @@ def eval_run(
     min_free_gb: Annotated[
         float | None, typer.Option(help="Disk floor (default from limits.yaml).")
     ] = None,
+    max_cost_usd: Annotated[
+        float | None,
+        typer.Option(help="Stop cleanly once the cases cost this much (limits.yaml)."),
+    ] = None,
 ) -> None:
     """Run the golden cases against an agent, one at a time, and write a report."""
     import json as _json
@@ -484,7 +505,11 @@ def eval_run(
         typer.echo("mode must be sweep or issue", err=True)
         raise typer.Exit(code=1)
     options = HarnessOptions(
-        mode=mode, oracle_check=oracle_check, dry_run=dry_run, min_free_gb=min_free_gb
+        mode=mode,
+        oracle_check=oracle_check,
+        dry_run=dry_run,
+        min_free_gb=min_free_gb,
+        max_cost_usd=max_cost_usd,
     )
     report, path = run_evals(config, selected, load_agent(agent), options)
     if dry_run:
@@ -497,6 +522,8 @@ def eval_run(
             {
                 "cases": summary["cases"],
                 "rates": summary["rates"],
+                "cost_usd": report.meta.get("cost_usd_total"),
+                "cost_cap_usd": report.meta.get("cost_cap_usd"),
                 "stopped": report.meta["stopped_reason"],
             },
             indent=1,
@@ -504,6 +531,209 @@ def eval_run(
     )
     if report.meta["stopped_reason"]:
         raise typer.Exit(code=2)
+
+
+# --- run / replay (chunk 05) ----
+
+
+@app.command("run")
+def run_cmd(
+    app_name: Annotated[
+        str | None, typer.Option("--app", help="ally-be, ally-web, ally-ai, …")
+    ] = None,
+    issue_text: Annotated[
+        str | None, typer.Option(help="Issue mode: the report, as a reporter wrote it.")
+    ] = None,
+    commit: Annotated[
+        str | None, typer.Option(help="Sweep mode: review this commit's diff.")
+    ] = None,
+    ref: Annotated[
+        str | None,
+        typer.Option(
+            help="Commit to check out (default origin/master, or the commit)."
+        ),
+    ] = None,
+    no_checkpoint: Annotated[
+        bool,
+        typer.Option("--no-checkpoint", help="In-memory checkpoints (no Postgres)."),
+    ] = False,
+    run_id: Annotated[
+        str | None, typer.Option(help="Run id (default: generated).")
+    ] = None,
+) -> None:
+    """One bug signal through graph v1: triage → investigate → reproduce → report."""
+    import json as _json
+
+    from bug_hunter.graph.build import build_graph, run_graph
+    from bug_hunter.graph.checkpointer import CheckpointerError, open_checkpointer
+    from bug_hunter.graph.deps import GraphDeps
+    from bug_hunter.graph.state import Signal
+    from bug_hunter.graph.tracing import trace_url
+    from bug_hunter.runs import Run
+    from bug_hunter.safety.phi import scrub, scrub_code
+    from bug_hunter.tools.git import Git
+
+    config = _load_or_exit()
+    if bool(issue_text) == bool(commit):
+        typer.echo("give exactly one of --issue-text or --commit", err=True)
+        raise typer.Exit(code=1)
+    git = Git(config.repo_root)
+    diff = ""
+    if commit:
+        mode = "sweep"
+        diff = git._git(["show", "--format=", commit]).stdout
+        touched = [
+            line[6:]
+            for line in diff.splitlines()
+            if line.startswith("+++ b/") and not line.endswith("/dev/null")
+        ]
+        apps_touched = sorted(
+            {
+                name
+                for name, a in config.apps.apps.items()
+                if any(t.startswith(a.path + "/") for t in touched)
+            }
+        )
+        if app_name is None:
+            if len(apps_touched) != 1:
+                typer.echo(
+                    f"--app needed: the commit touches {apps_touched or 'no app'}",
+                    err=True,
+                )
+                raise typer.Exit(code=1)
+            app_name = apps_touched[0]
+        checkout = ref or f"{commit}^"
+        signal = Signal(
+            source="commit_sweep",
+            ref=commit[:12],
+            raw_summary=scrub_code(diff[:6000]),
+            reported_by="agent",
+        )
+    else:
+        mode = "issue"
+        if app_name is None:
+            typer.echo("--app is required in issue mode", err=True)
+            raise typer.Exit(code=1)
+        checkout = ref or "origin/master"
+        signal = Signal(
+            source="issue",
+            ref=run_id or "cli",
+            raw_summary=scrub(issue_text or ""),
+            reported_by="staff",
+        )
+    if app_name not in config.apps.apps:
+        typer.echo(f"unknown app {app_name!r}", err=True)
+        raise typer.Exit(code=1)
+    try:
+        with open_checkpointer(in_memory=no_checkpoint) as saver:
+            with Run.start(config, app_name, checkout, run_id=run_id) as run:
+                deps = GraphDeps.for_run(
+                    config,
+                    run,
+                    app_name,
+                    mode,
+                    diff=diff,
+                    ref=checkout,
+                    checkpointer=saver,
+                )
+                typer.echo(f"run {run.run_id}: {mode} mode, {app_name} at {checkout}")
+                graph = build_graph(deps, saver)
+                state = run_graph(graph, deps, signal)
+                state.trace_url = trace_url(run.run_id)
+                typer.echo(
+                    _json.dumps(
+                        {
+                            "run_id": run.run_id,
+                            "status": state.status,
+                            "finding": state.finding.title if state.finding else None,
+                            "repro": state.repro.test_path if state.repro else None,
+                            "stop_reason": state.stop_reason,
+                            "no_bug_reason": state.no_bug_reason,
+                            "tokens": state.budget_used.tokens,
+                            "cost_usd": round(state.budget_used.cost_usd, 4),
+                            "artefacts": str(run.kept_artefacts),
+                            "trace": state.trace_url,
+                        },
+                        indent=1,
+                    )
+                )
+    except CheckpointerError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("replay")
+def replay_cmd(
+    run_id: Annotated[str, typer.Argument(help="The run to inspect or resume.")],
+    resume: Annotated[
+        bool,
+        typer.Option("--resume", help="Continue the run from its last checkpoint."),
+    ] = False,
+    steps: Annotated[int, typer.Option(help="How many checkpoints to list.")] = 20,
+) -> None:
+    """List a run's checkpoints (node, status, cost), or resume a killed run."""
+    import json as _json
+
+    from bug_hunter.graph.build import build_graph, run_config
+    from bug_hunter.graph.checkpointer import CheckpointerError, open_checkpointer
+    from bug_hunter.graph.deps import GraphDeps
+    from bug_hunter.graph.state import BugState
+    from bug_hunter.runs import Run
+
+    config = _load_or_exit()
+    try:
+        with open_checkpointer() as saver:
+            thread = {"configurable": {"thread_id": run_id}}
+            history = list(saver.list(thread, limit=steps))
+            if not history:
+                typer.echo(f"{run_id}: no checkpoints", err=True)
+                raise typer.Exit(code=1)
+            latest = history[0]
+            values = latest.checkpoint.get("channel_values", {})
+            for item in reversed(history):
+                vals = item.checkpoint.get("channel_values", {})
+                budget = vals.get("budget_used")
+                cost = getattr(budget, "cost_usd", None) if budget is not None else None
+                typer.echo(
+                    f"{item.checkpoint['ts']}  step {item.metadata.get('step')}  "
+                    f"source={item.metadata.get('source')}  "
+                    f"status={vals.get('status')}  "
+                    f"cost=${cost if cost is not None else 0:.3f}"
+                )
+            if not resume:
+                return
+            status = values.get("status")
+            app_name = values.get("app")
+            ref = values.get("ref") or "origin/master"
+            mode = values.get("mode") or "issue"
+            if status in ("escalated", "closed_not_bug", "closed_duplicate", "failed"):
+                typer.echo(f"{run_id}: already finished ({status}); nothing to resume")
+                return
+            with Run.start(config, app_name, ref, run_id=f"{run_id}-resume") as run:
+                deps = GraphDeps.for_run(
+                    config, run, app_name, mode, ref=ref, checkpointer=saver
+                )
+                deps.run_id = run_id  # same thread, so the graph continues it
+                graph = build_graph(deps, saver)
+                final = graph.invoke(None, run_config(deps))
+                state = (
+                    final
+                    if isinstance(final, BugState)
+                    else BugState.model_validate(final)
+                )
+                typer.echo(
+                    _json.dumps(
+                        {
+                            "run_id": run_id,
+                            "status": state.status,
+                            "stop_reason": state.stop_reason,
+                        },
+                        indent=1,
+                    )
+                )
+    except CheckpointerError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

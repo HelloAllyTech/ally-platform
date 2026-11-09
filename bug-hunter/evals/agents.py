@@ -42,6 +42,9 @@ class AgentResult:
     cost_usd: float = 0.0
     seconds: float = 0.0
     notes: str = ""
+    trace_url: str | None = None
+    status: str | None = None  # the graph's final status, for the report
+    confidence: str | None = None
 
 
 class Agent(Protocol):
@@ -64,11 +67,110 @@ class BaselineAgent:
 
 
 def load_agent(spec: str) -> Agent:
-    """``baseline`` or ``package.module:AgentClass``."""
+    """``baseline``, ``graph`` or ``package.module:AgentClass``."""
     if spec == "baseline":
         return BaselineAgent()
+    if spec == "graph":
+        return GraphAgent()
     module_name, _, attr = spec.partition(":")
     if not attr:
         raise ValueError(f"agent spec {spec!r}: expected 'module:Class' or 'baseline'")
     module = importlib.import_module(module_name)
     return getattr(module, attr)()
+
+
+class GraphAgent:
+    """Graph v1 (chunk 05) driven on the case's run. Checkpoints in memory by default;
+    ``BUGHUNTER_EVAL_CHECKPOINT=postgres`` uses the real checkpointer."""
+
+    name = "graph"
+
+    def __init__(self, checkpoint: str | None = None):
+        import os
+
+        self.checkpoint = checkpoint or os.environ.get(
+            "BUGHUNTER_EVAL_CHECKPOINT", "memory"
+        )
+
+    def run(self, case_input: CaseInput, run: Run) -> AgentResult:
+        import time
+
+        from bug_hunter.graph.build import build_graph, run_graph
+        from bug_hunter.graph.checkpointer import open_checkpointer
+        from bug_hunter.graph.deps import GraphDeps
+        from bug_hunter.graph.routing import CLOSED
+        from bug_hunter.graph.state import Signal
+        from bug_hunter.graph.tracing import trace_url
+
+        case = case_input.case
+        if case_input.mode == "sweep":
+            signal = Signal(
+                source="commit_sweep",
+                ref=case.parent[:12],
+                raw_summary=_diff_summary(case_input.diff),
+                reported_by="agent",
+            )
+        else:
+            signal = Signal(
+                source="issue",
+                ref=case.id,
+                raw_summary=case_input.description,
+                reported_by="staff",
+            )
+        started = time.monotonic()
+        with open_checkpointer(in_memory=self.checkpoint != "postgres") as saver:
+            deps = GraphDeps.for_run(
+                run.config,
+                run,
+                case_input.app,
+                case_input.mode,
+                app_root=case_input.app_root,
+                diff=case_input.diff,
+                ref=case.parent,
+                checkpointer=saver,
+            )
+            graph = build_graph(deps, saver)
+            state = run_graph(graph, deps, signal)
+        seconds = time.monotonic() - started
+        repro_test = None
+        if state.repro is not None:
+            test_file = Path(deps.app_root) / state.repro.test_path
+            if test_file.is_file():
+                repro_test = (
+                    state.repro.test_path,
+                    test_file.read_text(encoding="utf-8", errors="replace"),
+                )
+        found = state.finding is not None and state.status not in CLOSED
+        escalated = state.status == "escalated"
+        return AgentResult(
+            found=found or escalated,
+            findings=[state.finding.model_dump()] if state.finding else [],
+            repro_test=repro_test,
+            patch=None,
+            escalated=escalated,
+            escalation_reason=state.stop_reason if escalated else None,
+            tokens=state.budget_used.tokens,
+            cost_usd=state.budget_used.cost_usd,
+            seconds=round(seconds, 1),
+            notes=(
+                f"status={state.status}; "
+                f"{state.no_bug_reason or state.stop_reason or state.root_cause or ''}"
+            )[:500],
+            trace_url=trace_url(run.run_id),
+            status=state.status,
+            confidence=state.confidence,
+        )
+
+
+def _diff_summary(diff: str, max_chars: int = 6000) -> str:
+    """The sweep signal: files touched plus the head of the diff; the full diff is an
+    artefact the investigator can open."""
+    files = [
+        line[6:]
+        for line in diff.splitlines()
+        if line.startswith("+++ b/") and not line.endswith("/dev/null")
+    ]
+    head = diff[:max_chars] + (
+        "\n… (diff truncated; see signal-diff.patch)" if len(diff) > max_chars else ""
+    )
+    return "Files changed: " + ", ".join(files) + "\n\n" + head

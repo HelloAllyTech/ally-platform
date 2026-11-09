@@ -11,6 +11,7 @@ help:
 	@echo "  make eval        Golden cases vs an agent: CASES=<filter> AGENT=baseline MODE=issue|sweep (single cases locally)"
 	@echo "  make eval-oracle Prove cases: oracle fails before, passes after the real fix (CASES=<filter>)"
 	@echo "  make eval-mine   Mine bug/clean candidates from git history into evals/golden/candidates/"
+	@echo "  make db-up       Start the local Postgres (checkpoints) from compose.yaml; make db-down stops it"
 
 # Install dependencies (same flags as the CI step for the Python apps)
 .PHONY: install
@@ -58,3 +59,10 @@ eval-oracle:
 .PHONY: check
 check:
 	@poetry run bug-hunter config check
+
+# Local Postgres for checkpoints (compose.yaml). Data lives in the bughunter-pg-data volume.
+.PHONY: db-up db-down
+db-up:
+	@docker compose -f compose.yaml up -d --wait
+db-down:
+	@docker compose -f compose.yaml down

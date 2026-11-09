@@ -5,8 +5,8 @@
 #   1. oracle check  — prove each bug case: its oracle tests fail at the parent
 #                      commit and pass once the real fix's source diff is applied
 #                      (writes bug-hunter/evals/golden/oracle-status.json)
-#   2. baseline      — the "never finds anything" agent, in issue and sweep mode;
-#                      the numbers every later chunk is measured against
+#   2. evals         — an agent (baseline = never finds anything, or graph = the
+#                      real graph) in issue and sweep mode, under a hard cost cap
 #
 # Every case runs in a throwaway git worktree with the app's tests inside the
 # bug-hunter Docker sandbox (one case at a time; worktree removed after each).
@@ -14,7 +14,9 @@
 # excerpts, patches, result.json) are uploaded as workflow artifacts; nothing is
 # committed by this workflow. Locally, run single cases only (`make eval CASES=<id>`).
 #
-# No secrets: the baseline agent calls no model. Chunks 05+ add the model keys.
+# Secrets (repo): OPENAI_API_KEY, GEMINI_API_KEY (exported as GOOGLE_API_KEY, the name
+# langchain-google-genai reads), LANGSMITH_API_KEY (tracing in project ally-bug-hunter).
+# The baseline agent uses none of them; the graph agent needs the first two.
 
 name: Bug Hunter v2 evals
 
@@ -32,6 +34,17 @@ on:
         default: "all"
         type: choice
         options: [all, oracle, baseline]
+      agent:
+        description: "Agent for the baseline steps: baseline (no model) or graph (chunk 05)"
+        required: false
+        default: "baseline"
+        type: choice
+        options: [baseline, graph]
+      max_cost_usd:
+        description: "Hard cost cap for each eval run (default from limits.yaml: 10)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -44,11 +57,32 @@ defaults:
   run:
     working-directory: bug-hunter
 
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+  LANGSMITH_TRACING: "true"
+  LANGSMITH_PROJECT: ally-bug-hunter
+  # The graph agent checkpoints into the Postgres service below (the real code path).
+  BUGHUNTER_EVAL_CHECKPOINT: postgres
+  BUGHUNTER_CHECKPOINT_DB_URL: postgresql://bughunter:bughunter@localhost:5433/bughunter
+
 jobs:
   evals:
     name: Oracle check + baseline
     runs-on: ubuntu-latest
     timeout-minutes: 240
+    services:
+      postgres:
+        image: pgvector/pgvector:pg14
+        env:
+          POSTGRES_USER: bughunter
+          POSTGRES_PASSWORD: bughunter
+          POSTGRES_DB: bughunter
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bughunter -d bughunter"
+          --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       # The sandbox builds four images (~5 GB) and one dependency volume per
       # distinct lockfile across the cases' history (ally-web's is 1.3 GB each).
@@ -107,19 +141,23 @@ jobs:
         env:
           CASES: ${{ inputs.cases }}
 
-      - name: Baseline, issue mode
+      - name: Eval, issue mode
         if: always() && (inputs.what == 'all' || inputs.what == 'baseline')
         run: |
-          poetry run bug-hunter eval run --agent baseline --mode issue ${CASES:+--cases "$CASES"}
+          poetry run bug-hunter eval run --agent "$AGENT" --mode issue ${CASES:+--cases "$CASES"} ${MAX_COST:+--max-cost-usd "$MAX_COST"}
         env:
           CASES: ${{ inputs.cases }}
+          AGENT: ${{ inputs.agent }}
+          MAX_COST: ${{ inputs.max_cost_usd }}
 
-      - name: Baseline, sweep mode
+      - name: Eval, sweep mode
         if: always() && (inputs.what == 'all' || inputs.what == 'baseline')
         run: |
-          poetry run bug-hunter eval run --agent baseline --mode sweep ${CASES:+--cases "$CASES"}
+          poetry run bug-hunter eval run --agent "$AGENT" --mode sweep ${CASES:+--cases "$CASES"} ${MAX_COST:+--max-cost-usd "$MAX_COST"}
         env:
           CASES: ${{ inputs.cases }}
+          AGENT: ${{ inputs.agent }}
+          MAX_COST: ${{ inputs.max_cost_usd }}
 
       - name: Disk and Docker after
         if: always()

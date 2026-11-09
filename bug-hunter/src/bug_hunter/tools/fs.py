@@ -43,12 +43,27 @@ class Workspace:
     directory (``src/foo.ts``), or to the worktree if they start with another app's
     name; reads may cross apps, writes may not."""
 
-    def __init__(self, worktree: Path, config: BugHunterConfig, app: str):
+    def __init__(
+        self,
+        worktree: Path,
+        config: BugHunterConfig,
+        app: str,
+        app_root: Path | None = None,
+    ):
+        """``app_root`` overrides where the app lives (a pre-cutover worktree has the
+        app's files at the worktree root)."""
         self.worktree = Path(worktree).resolve()
         self.config = config
         self.app = app
-        self.app_dir = self.worktree / config.app(app).path
-        self.policy = PathPolicy(self.worktree, config)
+        self.app_dir = (
+            Path(app_root).resolve()
+            if app_root
+            else self.worktree / config.app(app).path
+        )
+        rel_app = self.app_dir.relative_to(self.worktree).as_posix()
+        self.policy = PathPolicy(
+            self.worktree, config, app_roots={app: "" if rel_app == "." else rel_app}
+        )
 
     # --- helpers ---------------------------------------------------------------------
 
@@ -64,8 +79,11 @@ class Workspace:
 
     def _display(self, path: Path) -> str:
         rel = self.policy.rel(path)
-        app_prefix = self.config.app(self.app).path + "/"
-        return rel[len(app_prefix) :] if rel.startswith(app_prefix) else rel
+        app_path = self.policy.app_path_of(self.app)
+        app_prefix = app_path + "/" if app_path else ""
+        return (
+            rel[len(app_prefix) :] if app_prefix and rel.startswith(app_prefix) else rel
+        )
 
     def _is_hidden_from_listing(self, path: Path) -> bool:
         try:

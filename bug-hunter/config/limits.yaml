@@ -3,6 +3,8 @@ run:
   max_fix_attempts: 3
   max_tokens: 400000          # per graph run, all nodes
   max_wall_clock_s: 2700      # 45 minutes per graph run
+  max_cost_usd: 1.50          # per graph run; the run escalates with "budget exceeded" past any of the three
+  max_tool_turns: 30          # per tool loop (investigate, reproduce); the loop then answers with what it has
 sweep:
   max_runs_per_day: 5
   max_prs_per_day: 3
@@ -34,6 +36,7 @@ artefacts:
 # Eval harness (chunk 04).
 evals:
   min_free_gb: 5              # stop the harness cleanly below this much free host disk
+  max_cost_usd: 10            # stop the harness cleanly once the cases run so far cost this much
   since_months: 12            # how far back to mine fix commits (full history for thin apps)
   max_src_lines: 60           # real-bug candidates: source lines changed (tests excluded)
   max_src_lines_thin_apps: 120   # ally-ai, ally-ai-learn, ally-mobile have few fixes

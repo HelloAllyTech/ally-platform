@@ -9,11 +9,19 @@ override a role's model after the files are loaded.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any, Literal, Mapping
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 AppName = Literal["ally-be", "ally-web", "ally-ai", "ally-ai-learn", "ally-mobile"]
 APP_NAMES: tuple[str, ...] = AppName.__args__  # type: ignore[attr-defined]
@@ -119,10 +127,48 @@ class ModelSpec(_Strict):
     model: str = Field(min_length=1)
 
 
+class Price(_Strict):
+    """USD per 1M tokens."""
+
+    input: float = Field(ge=0)
+    cached_input: float = Field(ge=0)
+    output: float = Field(ge=0)
+
+
+PROMPT_NODES: tuple[str, ...] = ("triage", "investigate", "reproduce")
+
+
 class ModelsConfig(_Strict):
     defaults: ModelDefaults = Field(default_factory=ModelDefaults)
     roles: dict[Role, ModelSpec]
     fallbacks: dict[Role, list[ModelSpec]] = Field(default_factory=dict)
+    prompts: dict[str, str] = Field(default_factory=dict)  # node -> version (v1)
+    prices: dict[str, Price] = Field(default_factory=dict)  # "provider:model" -> Price
+
+    @field_validator("prompts")
+    @classmethod
+    def _prompt_versions(cls, value: dict[str, str]) -> dict[str, str]:
+        for node, version in value.items():
+            if node not in PROMPT_NODES:
+                raise ValueError(
+                    f"prompts.{node}: unknown node; expected {', '.join(PROMPT_NODES)}"
+                )
+            if not re.fullmatch(r"v\d+", version):
+                raise ValueError(f"prompts.{node}: version must look like v1")
+        return value
+
+    @model_validator(mode="after")
+    def _every_model_priced(self) -> "ModelsConfig":
+        specs = list(self.roles.values()) + [
+            s for fb in self.fallbacks.values() for s in fb
+        ]
+        missing = sorted({f"{s.provider}:{s.model}" for s in specs} - set(self.prices))
+        if missing:
+            raise ValueError(f"prices: no row for {', '.join(missing)}")
+        return self
+
+    def price_for(self, spec: ModelSpec) -> Price:
+        return self.prices[f"{spec.provider}:{spec.model}"]
 
     @field_validator("roles")
     @classmethod
@@ -149,6 +195,8 @@ class RunLimits(_Strict):
     max_fix_attempts: int = Field(default=3, ge=1)
     max_tokens: int = Field(gt=0)
     max_wall_clock_s: int = Field(gt=0)
+    max_cost_usd: float = Field(default=1.5, gt=0)
+    max_tool_turns: int = Field(default=30, ge=1)
 
 
 class SweepLimits(_Strict):
@@ -181,6 +229,7 @@ class ArtefactLimits(_Strict):
 
 class EvalLimits(_Strict):
     min_free_gb: float = Field(default=5, ge=0)
+    max_cost_usd: float = Field(default=10, gt=0)
     since_months: int = Field(default=12, ge=1)
     max_src_lines: int = Field(default=60, ge=1)
     max_src_lines_thin_apps: int = Field(default=120, ge=1)

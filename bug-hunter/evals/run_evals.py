@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from bug_hunter.config import PACKAGE_ROOT, RUNS_DIR, BugHunterConfig
+from bug_hunter.graph.prompts import prompt_versions
 from bug_hunter.runs import Run
 from bug_hunter.safety.phi import scrub_code
 from bug_hunter.tools.git import GitError
@@ -62,6 +63,7 @@ class HarnessOptions:
     oracle_check: bool = False
     dry_run: bool = False
     min_free_gb: float | None = None
+    max_cost_usd: float | None = None  # hard cap for the whole eval run (limits.yaml)
     runs_dir: Path = RUNS_DIR  # tests pass a temp dir; never share the live one
     # Old-era lockfiles each cost a dependency volume (ally-web ≈ 1.3 GB). Keep
     # only the volumes for HEAD's lockfiles; drop the others after each case.
@@ -231,6 +233,9 @@ def run_case(
                 agent_result.tokens,
                 agent_result.cost_usd,
             )
+            result_row.trace_url = agent_result.trace_url
+            result_row.status = agent_result.status
+            result_row.confidence = agent_result.confidence
             run.write_artefact(
                 "agent-result.json",
                 json.dumps(
@@ -470,7 +475,7 @@ def run_evals(
         "agent": agent.name,
         "mode": "oracle-check" if options.oracle_check else options.mode,
         "git_sha": git_sha,
-        "prompt_versions": "none (chunk 04)",
+        "prompt_versions": prompt_versions(config),
         "models": {
             role: f"{config.model_for(role).provider}:{config.model_for(role).model}"
             for role in config.models.roles
@@ -492,12 +497,29 @@ def run_evals(
     if options.dry_run:
         meta["plan"] = plan(config, cases)
         return report, None
+    cost_cap = (
+        options.max_cost_usd
+        if options.max_cost_usd is not None
+        else config.limits.evals.max_cost_usd
+    )
+    meta["cost_cap_usd"] = cost_cap
+    spent = 0.0
     try:
-        for case in cases:
+        for index, case in enumerate(cases):
             guard.check(f"before {case.id}")
-            report.cases.append(run_case(config, case, agent, options, guard, repo))
+            if spent >= cost_cap:
+                raise StopHarness(
+                    f"cost cap ${cost_cap:.2f} reached (${spent:.2f} spent) after "
+                    f"{index} of {len(cases)} cases; {len(cases) - index} not run"
+                )
+            row = run_case(config, case, agent, options, guard, repo)
+            report.cases.append(row)
+            spent += row.cost_usd
     except StopHarness as exc:
         meta["stopped_reason"] = str(exc)
+    meta["cost_usd_total"] = round(spent, 4)
+    meta["cases_done"] = len(report.cases)
+    meta["cases_remaining"] = len(cases) - len(report.cases)
     meta["free_gb_end"] = guard.free_gb()
     results_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")

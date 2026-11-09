@@ -73,9 +73,22 @@ def matches_any(rel_path: str, patterns: Iterable[str]) -> str | None:
 class PathPolicy:
     """Path rules for one worktree. ``root`` is the worktree (ally-platform) root."""
 
-    def __init__(self, root: Path, config: BugHunterConfig):
+    def __init__(
+        self,
+        root: Path,
+        config: BugHunterConfig,
+        app_roots: dict[str, str] | None = None,
+    ):
         self.root = Path(root).resolve()
         self.config = config
+        # Where each app lives inside this worktree, relative; "" for a pre-cutover
+        # checkout where the app's files sit at the root. Defaults to apps.yaml paths.
+        self.app_roots = dict(app_roots or {})
+
+    def app_path_of(self, app: str) -> str:
+        if app in self.app_roots:
+            return self.app_roots[app].strip("/")
+        return self.config.app(app).path
 
     # --- resolution ------------------------------------------------------------
 
@@ -96,7 +109,9 @@ class PathPolicy:
     def app_rel(self, path: str | Path, app: str) -> str:
         """Path relative to the app directory, or ``PathDenied`` if outside it."""
         rel = self.rel(path)
-        app_path = self.config.app(app).path
+        app_path = self.app_path_of(app)
+        if app_path == "":
+            return rel
         if rel != app_path and not rel.startswith(app_path + "/"):
             raise PathDenied(f"{path}: not inside {app_path}/")
         return rel[len(app_path) + 1 :] if rel != app_path else ""
