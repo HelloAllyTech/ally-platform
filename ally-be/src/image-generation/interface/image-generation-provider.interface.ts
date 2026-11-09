@@ -21,6 +21,18 @@ export interface ImageGenerationOptions {
    * live API before a fix proposes it — see BugHunterProbeService.
    */
   model?: string;
+  /**
+   * Images the result must stay consistent with (a character's cast sheet, a
+   * setting, a style example, the image being refined), in the order the
+   * prompt labels them ("Image 1 is …"). Present only for providers whose
+   * `supportsReferences` is true; callers check before sending.
+   */
+  references?: ImageReferenceInput[];
+}
+
+export interface ImageReferenceInput {
+  data: Buffer;
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
 }
 
 export enum ImageGenerationProviderType {
@@ -39,6 +51,9 @@ export interface ImageGenerationProvider {
 
   /** Throws if the provider's API key is not configured. */
   assertConfigured(): void;
+
+  /** How many reference images one call may carry; 0 = text-to-image only. */
+  maxReferences(): number;
 
   /**
    * Generate one image for the prompt. `size` is a WIDTHxHEIGHT string

@@ -1651,3 +1651,42 @@ export const CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM = definePrompt(
     output: 'json',
   },
 );
+
+/** src/prompts/image_studio/compose.txt */
+export const IMAGE_STUDIO_COMPOSE = definePrompt(
+  'image_studio_compose',
+  {
+    cast_json: 'optional',
+    context_json: 'optional',
+    description: 'optional',
+    framing: 'required',
+    image_purpose: 'required',
+    style_name: 'required',
+  },
+  {
+    name: 'Image Studio — Scene Composer',
+    description:
+      "Plans one author-requested image: screens the request against the platform's depiction rules (safe-messaging for self-harm content, no real people's details), drafts or tidies the description, writes alt text and a structured scene the image prompt is compiled from. JSON mode; the guardrails are also appended in code.",
+    category: 'Image Studio',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/image_studio/judge.txt */
+export const IMAGE_STUDIO_JUDGE = definePrompt(
+  'image_studio_judge',
+  {
+    cast_names: 'optional',
+    description: 'required',
+    scene_json: 'optional',
+  },
+  {
+    name: 'Image Studio — Image Checker',
+    description:
+      'Looks at a generated image (and its reference images) and fails it only for problems a trainer would reject: visible text, wrong people, unsafe depiction, anatomical errors, a character who does not match their reference. JSON mode; a failed image is regenerated once.',
+    category: 'Image Studio',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
