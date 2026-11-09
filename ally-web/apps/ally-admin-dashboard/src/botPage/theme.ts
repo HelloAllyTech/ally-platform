@@ -1,6 +1,11 @@
 import type { CSSProperties } from "react";
 
-import { ALLY_BRAND_PRIMARY, isHexColour, pickOnPrimary } from "../utils/brandColour";
+import {
+  ALLY_BRAND_PRIMARY,
+  contrastRatio,
+  isHexColour,
+  pickOnPrimary,
+} from "../utils/brandColour";
 
 import type { BotPageBranding } from "./types";
 
@@ -31,7 +36,10 @@ export function surfaceProps(branding: BotPageBranding): {
     style: {
       ...themeVars(colour),
       ["--brand-accent" as string]: colour,
-      ["--brand-on-accent" as string]: pickOnPrimary(colour),
+      // ally-be corrects the accent until white reads on it at 4.5:1, so white is the safe choice;
+      // an older page's uncorrected colour falls back to whichever of bone or ink reads better.
+      ["--brand-on-accent" as string]:
+        contrastRatio(colour, "#FFFFFF") >= 4.5 ? "#FFFFFF" : pickOnPrimary(colour),
     },
     "data-theme": branding.look?.theme ?? "light",
     "data-heading": branding.look?.headingStyle ?? "classic",

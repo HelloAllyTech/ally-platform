@@ -1,4 +1,4 @@
-import { COPY } from "./copy";
+import { COPY, fill } from "./copy";
 import { reached } from "./steps";
 
 import type { BotDraftView, TranscriptEntry } from "./types";
@@ -206,3 +206,73 @@ export const parseEmails = (text: string): string[] =>
     .split(/[\s,;]+/)
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
+
+/** What the one-screen flow shows now (chunk 20d), derived from the draft. */
+export interface OnboardingScreenState {
+  screen: OnboardingScreen;
+  step: StepPosition;
+  /** The footer's "Step {n} of {total} · {step name}". */
+  stepLabel: string;
+  /** The builder's line for this screen: streaming while it works, else its latest message. */
+  line: string;
+  /** A question screen's question and the text under it. */
+  question: { lead: string; title: string; subtitle: string; eyebrow: string | null };
+  /** Quick replies for this screen (none while the builder works). */
+  options: string[];
+  /** The language question takes several answers and an OK. */
+  multiSelect: boolean;
+  /** The question wants a typed answer (with OK), beside any quick replies. */
+  textAnswer: boolean;
+  /** Back can go somewhere from this screen. */
+  canBack: boolean;
+}
+
+/**
+ * Everything a screen shows, from the draft and what the browser has moved past (the hook and the
+ * dev harness both use this, so the harness draws exactly what owners see).
+ */
+export const flowFor = (
+  view: BotDraftView,
+  passed: PassedScreens,
+  live: { sending: boolean; drafting: boolean; streaming: string },
+): OnboardingScreenState => {
+  const { sending, drafting, streaming } = live;
+  const screen = screenFor(view, passed, drafting);
+  const position = stepPosition(screen, view);
+  const latest = latestBuilder(view.transcript);
+  const options = latest && !sending ? (latest.chips ?? []) : [];
+  const left = view.conversation.questionsLeft;
+  const safetyAt = safetyEntry(view);
+  const line = sending
+    ? streaming
+    : screen === "safety" && safetyAt >= 0
+      ? view.transcript[safetyAt].text
+      : (latest?.text ?? "");
+  return {
+    screen,
+    step: position,
+    stepLabel: fill(COPY.frame.step, {
+      n: position.number,
+      total: position.total,
+      "step name": position.name,
+    }),
+    line,
+    question: {
+      ...splitQuestion(latest?.text ?? ""),
+      eyebrow:
+        screen === "question" && left
+          ? left === 1
+            ? COPY.gaps.leftOne
+            : fill(COPY.gaps.left, { n: left })
+          : null,
+    },
+    options,
+    multiSelect: isMultiSelect(options),
+    textAnswer: !sending && wantsText(options),
+    canBack:
+      !sending &&
+      (screen === "share" ||
+        (screen === "question" && answeredSinceSafety(view) === 0) ||
+        (reached(view.step, "safety") && view.step !== "published" && screen !== "live")),
+  };
+};

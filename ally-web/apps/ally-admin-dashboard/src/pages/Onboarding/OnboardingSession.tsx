@@ -19,8 +19,11 @@ import {
   ShareScreen,
 } from "./Screens";
 import { reached } from "./steps";
-import { useOnboardingSession } from "./useOnboardingSession";
-import { useBrandEditor } from "../../hooks/brand/useBrandEditor";
+import {
+  OnboardingSession as OnboardingSessionState,
+  useOnboardingSession,
+} from "./useOnboardingSession";
+import { BrandEditor, useBrandEditor } from "../../hooks/brand/useBrandEditor";
 
 import type { OnboardingScreen } from "./flow";
 
@@ -42,9 +45,31 @@ export const OnboardingSession: React.FC = () => {
   const { draftId = "" } = useParams<{ draftId: string }>();
   const navigate = useNavigate();
   const s = useOnboardingSession(draftId, message => toast.error(message));
+  const editor = useBrandEditor(s.view?.chatbotId ?? null, COPY.look.errors.failed);
+  return (
+    <OnboardingView
+      s={s}
+      editor={editor}
+      onLeave={() => navigate(ROUTES.WHATSAPP_BOT)}
+      onConnectWhatsApp={chatbotId =>
+        navigate(`${ROUTES.CHATBOT_DETAIL.replace(":botId", chatbotId)}?tab=connectors`)
+      }
+    />
+  );
+};
+
+/**
+ * The session drawn from its state: no hooks of its own beyond what screens keep locally, so the
+ * dev harness (`/dev/onboarding`) renders exactly this from fixtures for the browser tests.
+ */
+export const OnboardingView: React.FC<{
+  s: OnboardingSessionState;
+  editor?: BrandEditor;
+  onLeave: () => void;
+  onConnectWhatsApp: (chatbotId: string) => void;
+}> = ({ s, editor, onLeave, onConnectWhatsApp }) => {
   const view = s.view;
   const flow = s.flow;
-  const editor = useBrandEditor(view?.chatbotId ?? null, COPY.look.errors.failed);
 
   if (!view || !flow) {
     return (
@@ -135,9 +160,7 @@ export const OnboardingSession: React.FC = () => {
           <LiveScreen
             view={view}
             published={s.published}
-            onConnectWhatsApp={() =>
-              navigate(`${ROUTES.CHATBOT_DETAIL.replace(":botId", view.chatbotId!)}?tab=connectors`)
-            }
+            onConnectWhatsApp={() => onConnectWhatsApp(view.chatbotId!)}
           />
         ) : (
           <Orb size={56} working />
@@ -162,7 +185,7 @@ export const OnboardingSession: React.FC = () => {
       width={WIDTH[screen] ?? "question"}
       canGoBack={flow.canBack}
       onBack={() => void s.backScreen()}
-      onLeave={() => navigate(ROUTES.WHATSAPP_BOT)}
+      onLeave={onLeave}
       below={
         <>
           {builderLine}

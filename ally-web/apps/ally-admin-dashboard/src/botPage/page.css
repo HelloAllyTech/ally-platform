@@ -85,7 +85,8 @@ body {
   width: 72px;
   height: 72px;
   border-radius: 20px;
-  background: var(--brand-surface);
+  /* White in every theme: logos are drawn for white, and the accent reads on it at 4.5:1. */
+  background: #ffffff;
   box-shadow: 0 10px 30px rgba(23, 23, 28, 0.12);
   display: grid;
   place-items: center;
@@ -138,6 +139,9 @@ body {
   white-space: nowrap;
 }
 .bp-header__status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 1px 0 0;
   font-size: 13px;
   line-height: 1.35;

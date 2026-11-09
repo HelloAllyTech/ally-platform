@@ -89,7 +89,7 @@ export function PageHeader({
     <header className="bp-header">
       <Avatar branding={branding} />
       <div className="bp-header__text">
-        <p className="bp-header__name">{branding.title}</p>
+        <p className="bp-header__name">{branding.assistantName || branding.title}</p>
         {subtitle && (
           <p className="bp-header__status" aria-live="polite">
             {subtitle}

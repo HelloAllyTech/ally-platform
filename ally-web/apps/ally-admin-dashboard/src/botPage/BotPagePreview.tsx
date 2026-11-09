@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { FocusHeadings } from "./components/parts";
 import { pickCopy } from "./copy";
@@ -26,10 +26,16 @@ export function BotPagePreview({
   statusLine?: string;
 }) {
   const copy = useMemo(() => pickCopy(page.language, "en"), [page.language]);
+  // Hidden from assistive technology and out of the tab order: a picture of the page, not a page.
+  const frame = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    frame.current?.setAttribute("inert", "");
+  }, []);
   const noop = () => undefined;
   return (
     <FocusHeadings.Provider value={false}>
       <div
+        ref={frame}
         aria-hidden="true"
         {...surfaceProps(page.branding)}
         className="brand-surface bp-root"

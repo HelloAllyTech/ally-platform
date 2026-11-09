@@ -73,7 +73,8 @@ export function Chat({
     ? pending.text
       ? copy.chat.typing
       : copy.chat.status[pending.status ?? "thinking"]
-    : (statusLine ?? fill(copy.chat.headerIdle, { name: branding.title }));
+    : (statusLine ??
+      fill(copy.chat.headerIdle, { name: branding.assistantName || branding.title }));
 
   return (
     <div className="bp-chat">

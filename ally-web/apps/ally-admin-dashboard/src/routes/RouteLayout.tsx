@@ -84,6 +84,8 @@ const DesignSystem = lazy(() =>
 
 // Agents v2 component gallery (chunk 20d): development builds only, so it never ships.
 const DevV2Components = import.meta.env.DEV ? lazy(() => import("../pages/DevV2Components")) : null;
+// Onboarding's screens from fixtures, for review and the Playwright tests (chunk 20d).
+const DevOnboarding = import.meta.env.DEV ? lazy(() => import("../pages/DevOnboarding")) : null;
 
 export const RouteLayout: React.FC = () => {
   return (
@@ -122,6 +124,16 @@ export const RouteLayout: React.FC = () => {
           }
         />
 
+        {DevOnboarding && (
+          <Route
+            path="/dev/onboarding"
+            element={
+              <Suspense fallback={null}>
+                <DevOnboarding />
+              </Suspense>
+            }
+          />
+        )}
         {DevV2Components && (
           <Route
             path="/dev/v2-components"

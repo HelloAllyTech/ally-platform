@@ -7,20 +7,13 @@ import {
   usePublishBotDraftMutation,
 } from "@api";
 
-import { COPY, fill } from "./copy";
+import { COPY } from "./copy";
 import {
-  OnboardingScreen,
+  OnboardingScreenState,
   PassedScreens,
-  StepPosition,
   answeredSinceSafety,
-  isMultiSelect,
-  safetyEntry,
-  latestBuilder,
-  wantsText,
+  flowFor,
   passedFromStep,
-  screenFor,
-  splitQuestion,
-  stepPosition,
 } from "./flow";
 import { reached } from "./steps";
 import { BotDraftSession, ReadingProgress, useBotDraftSession } from "./useBotDraftSession";
@@ -34,6 +27,8 @@ import type {
   PublishResult,
   TranscriptEntry,
 } from "./types";
+
+export type { OnboardingScreenState };
 
 export { reached };
 
@@ -84,26 +79,6 @@ const writePassed = (draftId: string, passed: Partial<PassedScreens>) => {
     // Private mode or storage off: the flow still works, it just won't remember on reload.
   }
 };
-
-/** What the one-screen flow shows now (chunk 20d), derived from the draft. */
-export interface OnboardingScreenState {
-  screen: OnboardingScreen;
-  step: StepPosition;
-  /** The footer's "Step {n} of {total} · {step name}". */
-  stepLabel: string;
-  /** The builder's line for this screen: streaming while it works, else its latest message. */
-  line: string;
-  /** A question screen's question and the text under it. */
-  question: { lead: string; title: string; subtitle: string; eyebrow: string | null };
-  /** Quick replies for this screen (none while the builder works). */
-  options: string[];
-  /** The language question takes several answers and an OK. */
-  multiSelect: boolean;
-  /** The question wants a typed answer (with OK), beside any quick replies. */
-  textAnswer: boolean;
-  /** Back can go somewhere from this screen. */
-  canBack: boolean;
-}
 
 export interface OnboardingSession {
   /** Null while the draft loads. */
@@ -248,48 +223,17 @@ export const useOnboardingSession = (
     : [];
   const notes = (view?.transcript ?? []).filter(entry => entry.role === "note");
 
-  const flow = useMemo<OnboardingScreenState | null>(() => {
-    if (!view) return null;
-    const passed = passedFromStep(view, stored, watched);
-    const screen = screenFor(view, passed, drafting);
-    const position = stepPosition(screen, view);
-    const latest = latestBuilder(view.transcript);
-    const options = latest && !sending ? (latest.chips ?? []) : [];
-    const left = view.conversation.questionsLeft;
-    const safetyAt = safetyEntry(view);
-    const line = sending
-      ? session.streaming
-      : screen === "safety" && safetyAt >= 0
-        ? view.transcript[safetyAt].text
-        : (latest?.text ?? "");
-    return {
-      screen,
-      step: position,
-      stepLabel: fill(COPY.frame.step, {
-        n: position.number,
-        total: position.total,
-        "step name": position.name,
-      }),
-      line,
-      question: {
-        ...splitQuestion(latest?.text ?? ""),
-        eyebrow:
-          screen === "question" && left
-            ? left === 1
-              ? COPY.gaps.leftOne
-              : fill(COPY.gaps.left, { n: left })
-            : null,
-      },
-      options,
-      multiSelect: isMultiSelect(options),
-      textAnswer: !sending && wantsText(options),
-      canBack:
-        !sending &&
-        (screen === "share" ||
-          (screen === "question" && answeredSinceSafety(view) === 0) ||
-          (reached(step, "safety") && step !== "published" && screen !== "live")),
-    };
-  }, [view, stored, watched, sending, drafting, session.streaming, step]);
+  const flow = useMemo<OnboardingScreenState | null>(
+    () =>
+      view
+        ? flowFor(view, passedFromStep(view, stored, watched), {
+            sending,
+            drafting,
+            streaming: session.streaming,
+          })
+        : null,
+    [view, stored, watched, sending, drafting, session.streaming],
+  );
 
   return {
     view,
