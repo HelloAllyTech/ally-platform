@@ -287,6 +287,7 @@ export class BotDraftService {
         inverse = applied.inverse;
       } else {
         BotDraftService.checkLearnedOps(ops, actor);
+        if (actor === BotDraftActor.OWNER) ops = markOwnerEdits(ops);
         const applied = applyPatch(draft.learned, ops);
         BotDraftService.validateLearned(applied.result, actor);
         patched = { ...draft, learned: applied.result };
@@ -732,6 +733,31 @@ export class BotDraftService {
 }
 
 const currentUserId = (): number => Number(ExecutionManager.getUserId() ?? 0);
+
+/**
+ * A fact the owner rewrote is theirs now: its source shows "From you", not the page it was read
+ * from (chunk 20d). Marked in the same change, so Undo puts the source back with the text.
+ */
+function markOwnerEdits(ops: PatchOp[]): PatchOp[] {
+  return ops.flatMap((op) => {
+    if (op.op === 'replace' && /^\/facts\/\d+\/text$/.test(op.path)) {
+      return [
+        op,
+        {
+          op: 'add',
+          path: op.path.replace(/\/text$/, '/byOwner'),
+          value: true,
+        },
+      ];
+    }
+    if (op.op === 'replace' && /^\/facts\/\d+$/.test(op.path)) {
+      return [
+        { ...op, value: { ...(op.value as LearnedFact), byOwner: true } },
+      ];
+    }
+    return [op];
+  });
+}
 
 /** What an owner's edit changed, as the chat says it (copy §15: "Updated your hours"). */
 const FIELD_LABELS: Record<string, string> = {

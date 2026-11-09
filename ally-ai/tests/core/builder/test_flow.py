@@ -7,7 +7,7 @@ import pytest
 
 from app.core.builder import catalogue
 from app.core.builder.flow import BUILDER_PATHS, allowed, run_step
-from app.schemas.builder import BuilderStepRequest, PatchOp
+from app.schemas.builder import BuilderStepRequest, DesignId, PatchOp
 from tests.core.builder.fakes import TASKS, FakeLLM, request
 
 GAPS = [
@@ -225,6 +225,70 @@ class TestDesigns:
         assert all("booked" not in line["text"] for line in guide.sample)
         for card in cards[:-1]:
             assert not any("book" in w.lower() for w in card.will)
+
+    @pytest.mark.asyncio
+    async def test_a_sample_has_one_speaker_per_line(self):
+        fake = FakeLLM(
+            DesignsOut=[
+                {
+                    "designs": [
+                        {
+                            "id": "guide",
+                            "title": "Client guide",
+                            "visitor_line": (
+                                "How much is a session? Sessions cost ₹2,000."
+                            ),
+                            "assistant_line": "",
+                        },
+                        {
+                            "id": "enquiries",
+                            "title": "New client enquiries",
+                            "visitor_line": "Where are you?",
+                            "assistant_line": "Where are you? Call us on 98200 12345.",
+                        },
+                    ]
+                }
+            ]
+        )
+        res = await run(request("design", industry="mental_health"), fake)
+        guide, enquiries = res.designs[0], res.designs[1]
+        assert guide.sample == [
+            {"from": "visitor", "text": "How much is a session?"},
+            {"from": "assistant", "text": "Sessions cost ₹2,000."},
+        ]
+        assert enquiries.sample[1] == {
+            "from": "assistant",
+            "text": "Call us on 98200 12345.",
+        }
+
+    @pytest.mark.asyncio
+    async def test_a_sample_with_something_we_never_learned_is_replaced(self):
+        made_up = [
+            "Sessions cost ₹3,500.",
+            "Email hello@sunrise.example for a slot.",
+            "See sunrise-booking.com for times.",
+        ]
+        for line in made_up:
+            fake = FakeLLM(
+                DesignsOut=[
+                    {
+                        "designs": [
+                            {
+                                "id": "guide",
+                                "title": "Client guide",
+                                "visitor_line": "Tell me more?",
+                                "assistant_line": line,
+                            },
+                        ]
+                    }
+                ]
+            )
+            res = await run(request("design", industry="mental_health"), fake)
+            default = [
+                {"from": who, "text": text}
+                for who, text in catalogue.DESIGNS[DesignId.GUIDE].default_sample
+            ]
+            assert res.designs[0].sample == default, line
 
     @pytest.mark.asyncio
     async def test_at_least_two_real_choices(self):

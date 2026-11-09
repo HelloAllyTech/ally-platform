@@ -287,6 +287,49 @@ describe('BotDraftService', () => {
     });
   });
 
+  describe('an edited fact', () => {
+    it('becomes the owner’s ("From you"), and Undo puts its source back', async () => {
+      const h = harness();
+      const { draft: edited, event } = await h.service.applyPatch(
+        h.draft(),
+        [{ op: 'replace', path: '/facts/0/text', value: 'Mon–Sun 9–7' }],
+        BotDraftActor.OWNER,
+        { target: 'learned' },
+      );
+      expect(edited.learned.facts[0]).toMatchObject({
+        text: 'Mon–Sun 9–7',
+        byOwner: true,
+      });
+      const undone = await h.service.undo(edited, event.id);
+      expect(undone.learned.facts[0].byOwner).toBeUndefined();
+      expect(undone.learned.facts[0].text).not.toBe('Mon–Sun 9–7');
+    });
+
+    it('stays the builder’s when only the builder adds it', async () => {
+      const h = harness();
+      const { draft } = await h.service.applyPatch(
+        h.draft(),
+        [
+          {
+            op: 'add',
+            path: '/facts/-',
+            value: {
+              id: 'f9',
+              section: 'hours',
+              text: 'Open daily.',
+              sourceUrl: 'https://sunrise.example/',
+            },
+          },
+        ],
+        BotDraftActor.BUILDER,
+        { target: 'learned' },
+      );
+      expect(
+        draft.learned.facts[draft.learned.facts.length - 1].byOwner,
+      ).toBeUndefined();
+    });
+  });
+
   describe('undo', () => {
     it('puts a change back and marks it undone', async () => {
       const h = harness();

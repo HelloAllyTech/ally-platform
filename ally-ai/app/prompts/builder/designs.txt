@@ -9,7 +9,7 @@ You suggest how a business's assistant could help, choosing from designs that wo
 1. Choose 2 or 3 designs, best first, from: {offered}. Never repeat one.
 2. `title`: 2–3 words that fit this business (for example "Client guide", "New client enquiries", "Patient guide", "Admissions guide", "Help centre").
 3. `best_for`: one line, under 12 words.
-4. `visitor_line` and `assistant_line`: a two-line sample exchange that fits this business and uses only what we learned. The assistant never books, takes an order or takes a payment; it can collect details and pass them on.
+4. `visitor_line` and `assistant_line`: a two-line sample exchange that fits this business. `visitor_line` is only the visitor's question; `assistant_line` is only the assistant's reply. Use only what we learned: no price, number, email or link that isn't there. The assistant never books, takes an order or takes a payment; it can collect details and pass them on.
 5. Plain words, sentence case, no exclamation marks, never "AI" or "bot".
 
 # What we learned

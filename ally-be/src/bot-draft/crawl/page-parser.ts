@@ -13,6 +13,9 @@ export interface ParsedPage {
   meta: {
     themeColor: string | null;
     ogImage: string | null;
+    /** og:image's declared size, when the page gives both (og:image:width / og:image:height). */
+    ogImageWidth: number | null;
+    ogImageHeight: number | null;
     robotsNoindex: boolean;
   };
   icons: { appleTouch: string | null; icon: string | null };
@@ -37,7 +40,13 @@ export function parsePage(html: string): ParsedPage {
     headings: [],
     links: [],
     stylesheets: [],
-    meta: { themeColor: null, ogImage: null, robotsNoindex: false },
+    meta: {
+      themeColor: null,
+      ogImage: null,
+      ogImageWidth: null,
+      ogImageHeight: null,
+      robotsNoindex: false,
+    },
     icons: { appleTouch: null, icon: null },
     logo: null,
     scriptCount: 0,
@@ -75,6 +84,10 @@ export function parsePage(html: string): ParsedPage {
           page.meta.themeColor ??= attribs.content.trim();
         if (key === 'og:image' && attribs.content)
           page.meta.ogImage ??= attribs.content.trim();
+        if (key === 'og:image:width' && Number(attribs.content) > 0)
+          page.meta.ogImageWidth ??= Number(attribs.content);
+        if (key === 'og:image:height' && Number(attribs.content) > 0)
+          page.meta.ogImageHeight ??= Number(attribs.content);
         if (key === 'robots' && /noindex/i.test(attribs.content ?? ''))
           page.meta.robotsNoindex = true;
       }

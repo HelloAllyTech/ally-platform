@@ -333,7 +333,7 @@ describe('SiteCrawlService', () => {
           'Home',
           LONG,
           [],
-          '<meta name="theme-color" content="#0f766e"><meta property="og:image" content="/og.png"><link rel="icon" href="/fav.ico">',
+          '<meta name="theme-color" content="#0f766e"><meta property="og:image" content="/og.png"><meta property="og:image:width" content="512"><meta property="og:image:height" content="512"><link rel="icon" href="/fav.ico">',
         ),
       },
     });

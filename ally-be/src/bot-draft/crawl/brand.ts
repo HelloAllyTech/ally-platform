@@ -13,7 +13,8 @@ const MIN_CONTRAST = 3;
 
 /**
  * The site's logo, accent colour and favicon, from the start page (and its stylesheets' colours).
- * Logo: og:image, then the apple-touch-icon, then a header or "logo" image. Colour: theme-color,
+ * Logo: a header or "logo" image, then the apple-touch-icon, then og:image only when its declared
+ * size is no wider than 2:1 (a social card is a banner, not a logo; chunk 20d). Colour: theme-color,
  * then the most common saturated colour in its CSS. A colour that doesn't read on the page is
  * darkened from its own ramp, or dropped.
  */
@@ -39,12 +40,23 @@ export function detectBrand(
   );
   return {
     logoUrl:
-      resolve(page.meta.ogImage) ??
+      resolve(page.logo) ??
       resolve(page.icons.appleTouch) ??
-      resolve(page.logo),
+      (logoShaped(page.meta.ogImageWidth, page.meta.ogImageHeight)
+        ? resolve(page.meta.ogImage)
+        : null),
     accentColour: colour,
     faviconUrl: resolve(page.icons.icon) ?? resolve('/favicon.ico'),
   };
+}
+
+/** A declared size no wider (or taller) than 2:1; an undeclared size isn't trusted. */
+export function logoShaped(
+  width: number | null,
+  height: number | null,
+): boolean {
+  if (!width || !height) return false;
+  return Math.max(width, height) / Math.min(width, height) <= 2;
 }
 
 export function toHex(value: string | null | undefined): string | null {

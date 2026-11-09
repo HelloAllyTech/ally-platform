@@ -83,6 +83,21 @@ describe('url scope', () => {
     expect(isJunk(`https://s.example${path}`)).toBe(true);
   });
 
+  it.each([
+    '/download/IrisGo-1.4.dmg',
+    '/setup.exe',
+    '/installer.msi',
+    '/app.pkg',
+    '/app.apk',
+    '/app_1.0_amd64.deb',
+    '/app.rpm',
+    '/disk.iso',
+    '/App.AppImage',
+    '/firmware.bin',
+  ])('skips the installer %s', (path) => {
+    expect(isJunk(`https://s.example${path}`)).toBe(true);
+  });
+
   it('keeps ordinary pages', () => {
     expect(isJunk('https://s.example/services/couples-therapy')).toBe(false);
   });
@@ -141,10 +156,10 @@ describe('brand', () => {
     expect(light === null || /^#[0-9A-F]{6}$/.test(light)).toBe(true);
   });
 
-  it('prefers og:image for the logo and theme-color for the colour', () => {
+  it('uses a logo-shaped og:image for the logo and theme-color for the colour', () => {
     const brand = detectBrand(
       parsePage(
-        '<head><meta name="theme-color" content="#0f766e"><meta property="og:image" content="/og.png"></head>',
+        '<head><meta name="theme-color" content="#0f766e"><meta property="og:image" content="/og.png"><meta property="og:image:width" content="512"><meta property="og:image:height" content="512"></head>',
       ),
       'https://s.example/',
       [],
@@ -154,6 +169,25 @@ describe('brand', () => {
       accentColour: '#0F766E',
       faviconUrl: 'https://s.example/favicon.ico',
     });
+  });
+  it('prefers the header logo, then the touch icon, and never a banner og:image', () => {
+    const head = (extra: string) =>
+      `<head><meta property="og:image" content="/card.png"><meta property="og:image:width" content="1600"><meta property="og:image:height" content="600">${extra}</head>`;
+    const logoOf = (html: string) =>
+      detectBrand(parsePage(html), 'https://s.example/', []).logoUrl;
+    expect(
+      logoOf(
+        `${head('<link rel="apple-touch-icon" href="/touch.png">')}<body><header><img class="logo" src="/logo.svg"></header></body>`,
+      ),
+    ).toBe('https://s.example/logo.svg');
+    expect(
+      logoOf(head('<link rel="apple-touch-icon" href="/touch.png">')),
+    ).toBe('https://s.example/touch.png');
+    expect(logoOf(head(''))).toBeNull();
+    // An og:image without a declared size isn't trusted either.
+    expect(
+      logoOf('<head><meta property="og:image" content="/og.png"></head>'),
+    ).toBeNull();
   });
 });
 

@@ -308,7 +308,7 @@ async def propose_designs(
         if proposal.id not in offered or proposal.id in seen:
             continue
         seen.add(proposal.id)
-        cards.append(_card(proposal.id, proposal))
+        cards.append(_card(proposal.id, proposal, corpus(request)))
         if len(cards) == 3:
             break
     # Never fewer than two real choices.
@@ -332,13 +332,20 @@ async def propose_designs(
     return cards
 
 
-def _card(design_id: DesignId, proposal: Any) -> DesignCard:
+def _card(design_id: DesignId, proposal: Any, source: str = "") -> DesignCard:
     design = catalogue.DESIGNS[design_id]
     title = _clean(getattr(proposal, "title", ""), 40) or design.default_title
     best_for = _clean(getattr(proposal, "best_for", ""), 100) or design.default_best_for
-    visitor = _clean(getattr(proposal, "visitor_line", ""), 160)
-    assistant = _clean(getattr(proposal, "assistant_line", ""), 240)
-    if not visitor or not assistant or catalogue.overpromises(assistant):
+    visitor, assistant = split_turn(
+        _clean(getattr(proposal, "visitor_line", ""), 160),
+        _clean(getattr(proposal, "assistant_line", ""), 240),
+    )
+    if (
+        not visitor
+        or not assistant
+        or catalogue.overpromises(assistant)
+        or not sample_grounded(f"{visitor}\n{assistant}", source)
+    ):
         sample = [{"from": who, "text": text} for who, text in design.default_sample]
     else:
         sample = [
@@ -357,6 +364,41 @@ def _card(design_id: DesignId, proposal: Any) -> DesignCard:
 
 def _clean(text: str, limit: int) -> str:
     return " ".join((text or "").split()).rstrip("!")[:limit]
+
+
+def split_turn(visitor: str, assistant: str) -> Tuple[str, str]:
+    """One speaker per line. A visitor line that answers its own question ("How much
+    is a session? It's ₹2,000.") keeps only the question; the answer becomes the
+    assistant's line when it has none. An assistant line that starts by repeating the
+    question loses the repeat."""
+    mark = visitor.find("?")
+    if mark != -1 and visitor[mark + 1 :].strip():
+        rest = visitor[mark + 1 :].strip()
+        visitor = visitor[: mark + 1]
+        assistant = assistant or rest
+    if visitor and assistant.lower().startswith(visitor.lower()):
+        assistant = assistant[len(visitor) :].strip()
+    return visitor, assistant
+
+
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_LINK = re.compile(
+    r"(?:https?://|www\.)[^\s,)]+|\b[\w-]+(?:\.[\w-]+)*\."
+    r"(?:com|in|org|net|io|ai|co|uk|health|clinic)\b(?:/[^\s,)]*)?",
+    re.IGNORECASE,
+)
+
+
+def sample_grounded(text: str, source: str) -> bool:
+    """False when a sample states a number, email or link we were never given: the
+    same rule as facts, so a card never shows the business something untrue."""
+    if ungrounded(text, source):
+        return False
+    known = (source or "").lower()
+    for found in _EMAIL.findall(text) + _LINK.findall(text):
+        if found.lower().rstrip(".") not in known:
+            return False
+    return True
 
 
 # --- draft -------------------------------------------------------------------

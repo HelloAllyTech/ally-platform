@@ -98,7 +98,7 @@ export function displayDomain(url: string): string {
 const JUNK_PATH =
   /\/(login|log-in|signin|sign-in|signup|sign-up|register|account|my-account|cart|basket|checkout|wp-admin|wp-login|wp-json|admin|feed|rss|search|tag|tags|category|categories|author|cdn-cgi|xmlrpc)(\/|$|\.)/i;
 const ASSET =
-  /\.(png|jpe?g|gif|webp|svg|ico|css|js|mjs|json|xml|pdf|zip|gz|mp4|mp3|wav|webm|woff2?|ttf|eot|txt|csv|docx?|xlsx?|pptx?)$/i;
+  /\.(png|jpe?g|gif|webp|svg|ico|css|js|mjs|json|xml|pdf|zip|gz|mp4|mp3|wav|webm|woff2?|ttf|eot|txt|csv|docx?|xlsx?|pptx?|dmg|exe|msi|pkg|apk|deb|rpm|iso|appimage|bin)$/i;
 
 /** Pages never worth reading: sign-in, carts, archives, feeds and files. */
 export function isJunk(url: string): boolean {
