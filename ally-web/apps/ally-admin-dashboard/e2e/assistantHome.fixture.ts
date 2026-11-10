@@ -564,6 +564,68 @@ export async function mockAssistantHome(
       ]);
     }
     if (path === `${base}/audience`) return json(route, []);
+    // All numbers on the Overview (CL1): the four analytics routes the classic usage tab read.
+    if (path === "/whatsapp/analytics/overview") {
+      return json(route, {
+        inbound: 1240,
+        outbound: 1212,
+        uniqueContacts: 318,
+        answered: 948,
+        declined: 96,
+        clarified: 41,
+        crisis: 2,
+        template: 120,
+        errors: 3,
+        rateLimited: 2,
+        unidentified: 6,
+        declineRate: 0.092,
+        latencyP50Ms: 6400,
+        latencyP95Ms: 14200,
+      });
+    }
+    if (path === "/whatsapp/analytics/timeseries") {
+      const days = ["2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"];
+      return json(
+        route,
+        days.flatMap((day, i) => [
+          { bucket: `${day}T00:00:00.000Z`, handledBy: "rag", count: 22 + i * 4 },
+          { bucket: `${day}T00:00:00.000Z`, handledBy: "declined", count: 3 + (i % 3) },
+          { bucket: `${day}T00:00:00.000Z`, handledBy: "clarified", count: 1 + (i % 2) },
+          { bucket: `${day}T00:00:00.000Z`, handledBy: "template", count: 4 },
+        ]),
+      );
+    }
+    if (path === "/whatsapp/analytics/languages") {
+      return json(route, [
+        { language: "English", total: 860, answered: 790, declined: 70, declineRate: 0.081 },
+        { language: "Hindi", total: 170, answered: 150, declined: 20, declineRate: 0.118 },
+        { language: "Marathi", total: 9, answered: 7, declined: 2, declineRate: null },
+      ]);
+    }
+    if (path === "/whatsapp/analytics/corpus-coverage") {
+      return json(route, {
+        rows: [
+          {
+            documentId: "d1",
+            title: "Fees and sessions",
+            chunkCount: 6,
+            citations: 212,
+            isArchived: false,
+          },
+          { documentId: "d2", title: "Our team", chunkCount: 4, citations: 96, isArchived: false },
+          {
+            documentId: "d3",
+            title: "Owner notes",
+            chunkCount: 2,
+            citations: 31,
+            isArchived: false,
+          },
+          { documentId: "d4", title: "Careers", chunkCount: 3, citations: 0, isArchived: false },
+        ],
+        totalDocuments: 4,
+        omittedDocuments: 0,
+      });
+    }
     if (path.startsWith("/whatsapp/templates")) return json(route, { templates: [], count: 0 });
     if (path.startsWith("/whatsapp/unanswered")) return json(route, { questions: [], count: 0 });
     if (path === "/whatsapp/conversations/languages") return json(route, []);

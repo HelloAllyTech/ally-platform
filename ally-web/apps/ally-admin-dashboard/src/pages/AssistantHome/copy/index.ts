@@ -2,6 +2,7 @@ import { CHANGE_CONTROLS } from "./change";
 import { CHECKUP_CONTROLS } from "./checkup";
 import { HOW, WHY } from "./how";
 import { LISTS } from "./lists";
+import { ALL_NUMBERS } from "./numbers";
 
 /**
  * Every string the assistant home shows, from `docs/agents-v2/ONBOARDING-COPY.md` §20, word for
@@ -319,6 +320,7 @@ export const HOME = {
   how: HOW,
   why: WHY,
   seeAll: "See everything it follows",
+  allNumbers: ALL_NUMBERS,
 } as const;
 
 /** "{n} questions…" with its values. */

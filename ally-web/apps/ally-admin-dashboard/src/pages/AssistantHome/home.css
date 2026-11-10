@@ -1230,3 +1230,128 @@
   margin: 0 0 6px;
   padding-left: 18px;
 }
+
+/* ── All numbers on the Overview (chunk CL1): the classic usage tab's numbers, in v2 ── */
+.ally-numbers {
+  display: grid;
+  gap: 20px;
+  margin-top: 12px;
+}
+.ally-home__stat dd.ally-numbers__note {
+  margin-top: 4px;
+  font: inherit;
+}
+.ally-numbers__part {
+  display: grid;
+  gap: 10px;
+}
+.ally-numbers__counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+.ally-numbers__counts dd {
+  margin: 2px 0 0;
+  font: 500 18px/1.2 var(--ally-font-ui);
+}
+.ally-numbers__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ally-muted);
+}
+.ally-numbers__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ally-numbers__legend .ally-numbers__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.ally-numbers__days,
+.ally-numbers__docs {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ally-numbers__day {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 10px;
+}
+.ally-numbers__day > :last-child {
+  text-align: right;
+}
+.ally-numbers__bar {
+  display: flex;
+  height: 12px;
+  min-width: 2px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ally-numbers__bar--single {
+  background: var(--ally-accent);
+}
+.ally-numbers__swatch--answered {
+  background: var(--ally-good);
+}
+/* Lighter than Safety replies, so the two never read as one colour. */
+.ally-numbers__swatch--declined {
+  background: color-mix(in srgb, var(--ally-warn) 45%, white);
+}
+.ally-numbers__swatch--clarified {
+  background: var(--ally-accent);
+}
+.ally-numbers__swatch--crisis {
+  background: var(--ally-danger);
+}
+.ally-numbers__swatch--other {
+  background: var(--ally-line-strong);
+}
+.ally-numbers__docs li {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+.ally-numbers__docs .ally-body {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ally-numbers__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.ally-numbers__table th,
+.ally-numbers__table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ally-line);
+  text-align: left;
+}
+.ally-numbers__table th {
+  font-weight: 500;
+  color: var(--ally-muted);
+}
+@media (max-width: 640px) {
+  .ally-numbers__counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ally-numbers__docs li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .ally-numbers__docs .ally-numbers__bar {
+    display: none;
+  }
+}

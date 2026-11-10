@@ -20,6 +20,9 @@ vi.mock("@api", async importOriginal => ({
 vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
 vi.mock("../sections/Scorecard", () => ({ Scorecard: () => null }));
 vi.mock("../../Onboarding/Screens", () => ({ Qr: () => null }));
+vi.mock("../sections/AllNumbers", () => ({
+  AllNumbers: () => <div data-testid="all-numbers" />,
+}));
 
 const { OverviewSection } = await import("../sections/Overview");
 const { HOME } = await import("../copy");
@@ -55,5 +58,26 @@ describe("the Overview's numbers", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: t.last30 }));
     expect(shown()).toEqual(["40", "300", "250", "20"]);
+  });
+
+  it("opens All numbers in place, and an old usage link arrives with it open", () => {
+    numbers.mockReturnValue({ data: undefined });
+    const props = { bot: BOT, page: null, canEdit: true, canManage: false, go: vi.fn() };
+    const { unmount } = render(<OverviewSection {...(props as never)} />);
+    // Nothing loads until it's opened.
+    expect(screen.queryByTestId("all-numbers")).toBeNull();
+    const toggle = screen.getByRole("button", { name: t.seeAllNumbers });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
+    expect(screen.getByTestId("all-numbers")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: HOME.allNumbers.hide }).getAttribute("aria-expanded"),
+    ).toBe("true");
+    // No link to the classic view any more.
+    expect(document.querySelector('a[href*="view=classic"]')).toBeNull();
+    unmount();
+
+    render(<OverviewSection {...({ ...props, openAllNumbers: true } as never)} />);
+    expect(screen.getByTestId("all-numbers")).toBeTruthy();
   });
 });

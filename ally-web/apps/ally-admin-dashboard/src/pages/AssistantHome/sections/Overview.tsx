@@ -15,6 +15,7 @@ import { Qr } from "../../Onboarding/Screens";
 import { copyToClipboard } from "../../WhatsAppBot/shared";
 import { fill, HOME } from "../copy";
 import { Group, SectionHead } from "../fields";
+import { AllNumbers } from "./AllNumbers";
 import { Scorecard } from "./Scorecard";
 
 import type { SectionProps } from "./props";
@@ -23,19 +24,20 @@ const t = HOME.overview;
 
 /**
  * How the assistant is doing (chunk 20d): whether it's live, with the one switch; its link and QR
- * code; the last 7 or 30 days in four numbers (all of them under "All numbers"); and what needs the
- * owner. Owners can remove it here.
+ * code; the last 7 or 30 days in four numbers (all of them under "All numbers", opened in place); and
+ * what needs the owner. Owners can remove it here.
  */
-export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null }> = ({
-  bot,
-  page,
-  canEdit,
-  canManage,
-  go,
-}) => {
+export const OverviewSection: React.FC<
+  SectionProps & {
+    page: BotPageView | null;
+    /** An old link to the classic usage tab (`?tab=usage`) opens with All numbers open. */
+    openAllNumbers?: boolean;
+  }
+> = ({ bot, page, openAllNumbers = false, canEdit, canManage, go }) => {
   const [setStatus, statusState] = useSetChatbotStatusMutation();
   const [archive, archiveState] = useArchiveChatbotMutation();
   const [days, setDays] = useState<7 | 30>(30);
+  const [allNumbers, setAllNumbers] = useState(openAllNumbers);
   // The list already counted the last 30 days; 7 days is asked for when chosen.
   const week = useGetHomeNumbersQuery({ id: bot.id, days: 7 }, { skip: days !== 7 });
   const stats = days === 7 ? week.data : bot.stats;
@@ -134,10 +136,17 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
             </div>
           ))}
         </dl>
-        {/* The classic charts, for now (chunk 20d-2 keeps them; CL1 decides). */}
-        <a className="ally-link ally-small" href={`/chatbots/${bot.id}?view=classic&tab=usage`}>
-          {t.seeAllNumbers}
-        </a>
+        <button
+          type="button"
+          className="ally-link ally-small"
+          aria-expanded={allNumbers}
+          aria-controls="all-numbers"
+          onClick={() => setAllNumbers(open => !open)}
+        >
+          {allNumbers ? HOME.allNumbers.hide : t.seeAllNumbers}
+        </button>
+        {/* Loads only once opened. */}
+        <div id="all-numbers">{allNumbers && <AllNumbers botId={bot.id} />}</div>
       </Group>
 
       {canManage && (

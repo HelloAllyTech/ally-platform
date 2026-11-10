@@ -219,7 +219,13 @@ export const AssistantHome: React.FC = () => {
         return <ShareSection {...props} />;
       case "overview":
       default:
-        return <OverviewSection {...props} page={page ?? null} />;
+        return (
+          <OverviewSection
+            {...props}
+            page={page ?? null}
+            openAllNumbers={params.get("tab") === "usage"}
+          />
+        );
     }
   };
 

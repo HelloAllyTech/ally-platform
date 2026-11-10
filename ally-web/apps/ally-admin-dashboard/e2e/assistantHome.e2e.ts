@@ -38,6 +38,16 @@ test.describe("assistant home sections", () => {
   }
 });
 
+test("All numbers opens in place on the Overview", async ({ page }) => {
+  await mockAssistantHome(page);
+  await open(page, "overview");
+  await page.getByRole("button", { name: "See all numbers" }).click();
+  await expect(page.getByTestId("all-numbers")).toBeVisible();
+  await expect(page.getByRole("img", { name: /8 Nov: \d+ replies/ })).toBeVisible();
+  await expect(page).toHaveScreenshot("home-overview-all-numbers.png", { fullPage: true });
+  await expectNoSeriousA11yIssues(page);
+});
+
 test("change your assistant: a proposal as before and after", async ({ page }) => {
   await mockAssistantHome(page);
   await open(page, "overview");
