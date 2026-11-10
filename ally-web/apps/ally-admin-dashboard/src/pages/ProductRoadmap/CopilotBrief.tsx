@@ -27,6 +27,8 @@ const SOURCE_LABEL: Record<RoadmapBriefEvidenceSource, string> = {
   roadmap: "Roadmap",
   codebase: "Code",
   wiki: "Wiki",
+  principles: "Principles",
+  // History: briefs filed before 2026-11-09, when the Context Library replaced Stacks, cite it.
   stacks: "Stacks",
   strategy: "Strategy",
 };

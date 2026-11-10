@@ -1,5 +1,9 @@
 """Tools: run the tool the agent asked for, and add one trace step for it.
 
+Every tool streams the same way, with no code of its own: `searching` (with the
+input's `query`, when it has one) as it starts, its step, then `found` with the
+passages it added.
+
 The run's first search sets the response's `retrieval` block and is the one
 logged to the retrieval log, as v1's single search is.
 """
@@ -11,7 +15,7 @@ from typing import Any, Dict
 
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import ToolContext, allowed_tools
-from app.core.agent_runtime.trace import Node, trace_step
+from app.core.agent_runtime.trace import Node, status, trace_step
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.utils.logger import get_logger
 
@@ -39,6 +43,7 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             added = []
         else:
             args = tool.input_model.model_validate(step.get(name) or {})
+            status("searching", getattr(args, "query", None) or None)
             result = await tool.handler(
                 args,
                 ToolContext(
@@ -54,6 +59,20 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             records.append(json_safe(result.record))
             summary = result.summary
             added = json_safe(result.passages)
+            titles = list(
+                dict.fromkeys(
+                    p.get("document_title") for p in added if p.get("document_title")
+                )
+            )[:3]
+            status(
+                "found",
+                (
+                    (f"{len(added)} passage" + ("" if len(added) == 1 else "s"))
+                    if added
+                    else "nothing new"
+                ),
+                titles or None,
+            )
             if result.retrieval is not None and first_search:
                 update = {
                     "retrieval": json_safe(result.retrieval),

@@ -115,7 +115,7 @@ describe('BuilderProductMapService', () => {
 
     expect(text).toContain('#### Platform & architecture');
     expect(text).toContain('#### Per-repo pages');
-    // Deprecated product practice (Stacks replaced it), process pages, meta pages, preamble.
+    // Deprecated product practice (the Context Library replaced it), process pages, meta pages, preamble.
     expect(text).not.toContain('product/ui.md');
     expect(text).not.toContain('contributing/guide.md');
     expect(text).not.toContain('log.md');

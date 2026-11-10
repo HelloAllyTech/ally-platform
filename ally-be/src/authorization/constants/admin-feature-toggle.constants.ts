@@ -127,10 +127,12 @@ export enum FeatureToggleKey {
   // Bug Hunter: the autonomous find-and-fix agent (formerly SUPER_DUPER_ADMIN-only)
   BUG_HUNTER = 'bug_hunter',
 
-  // The clinical advisor's sign-off on clinical debrief guidance (plan §8.5):
-  // a document marked clinical is served to the Debrief agent only once
-  // someone holding this has signed off its current text. Off for everyone
-  // until named here, one person at a time.
+  // The clinical advisor: whoever holds this is notified when a debrief or a
+  // flagged point is escalated to the clinical advisor (v9 FR-38). It once also
+  // signed off clinical debrief guidance; that sign-off was dropped when the
+  // guidance moved into the Context Library (docs/context-library/PLAN.md §1,
+  // decision 8). The key keeps its name because grants are stored by it. Off for
+  // everyone until named here, one person at a time.
   DEBRIEF_CLINICAL_SIGN_OFF = 'debrief_clinical_sign_off',
 
   // Builder: the PRD-interview + coding agent that opens PRs
@@ -139,6 +141,7 @@ export enum FeatureToggleKey {
   // Course Copilot: the agent that interviews a trainer and builds a whole
   // DRAFT course (Track 2.0) from the answers, then edits it on request.
   COURSE_COPILOT = 'course_copilot',
+  CONTEXT_LIBRARY = 'context_library',
 
   // Ally guide (plans/ally-guide/plan.md §10.5). ALLY_GUIDE is the Ally
   // Console (settings, releases, traces) and reaches every organisation;
@@ -482,15 +485,15 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
   },
   {
     key: FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
-    label: 'Debriefs — Clinical sign-off',
+    label: 'Debriefs — Clinical advisor',
     description:
-      'Sign off clinical guidance in Debriefs → Knowledge, which the Debrief agent then uses for every organisation. For the clinical advisor.',
+      'Be notified when a debrief or a flagged point is escalated to the clinical advisor, from any organisation. For the clinical advisor.',
     legacyGrants: {
       superAdmin: false,
       superDuperAdmin: false,
       multiTenantAdmin: false,
     },
-    // Signed-off guidance reaches every organisation's debriefs.
+    // Escalations arrive from every organisation's debriefs.
     platformOnly: true,
   },
   {
@@ -506,6 +509,19 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Interview an agent into a PRD, then have it build the feature and open pull requests for review — from the Builder tab or from a Product Roadmap card.',
     legacyGrants: SUPER_ADMIN_TIER,
+  },
+  {
+    key: FeatureToggleKey.CONTEXT_LIBRARY,
+    label: 'Context Library',
+    description:
+      'Add documentation and written entries to the central library that Builder, Bug Hunter, the character interview, Course Copilot, the Ally guide and Debrief retrieve from; see what it learned and who may read each collection.',
+    // Backfilled ON for platform-tier admins by its access migration; inert like every key
+    // added after the role-collapse cutover.
+    legacyGrants: SUPER_ADMIN_TIER,
+    // Every collection, every organisation's entries and Settings. An admin restricted to some
+    // organisations reaches their organisations' entries through the organisation routes
+    // instead, under the Ally organisation-settings toggle (ContextLibraryOrgController).
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.COURSE_COPILOT,

@@ -253,6 +253,24 @@ export interface TestChatbotRequest {
   conversationId?: string;
 }
 
+/** What a streamed Preview reply is doing now (ally-be relays ally-ai's codes). */
+export type ChatbotTestStatusCode =
+  | "thinking"
+  | "searching"
+  | "found"
+  | "checking"
+  | "rewriting"
+  | "writing";
+
+export interface ChatbotTestStatus {
+  code: ChatbotTestStatusCode;
+  label: string;
+  /** The search query, "3 passages", or why a draft went back (a rejection code). */
+  detail?: string;
+  /** Where found passages came from: document titles, at most 3. */
+  documents?: string[];
+}
+
 export interface TestChatbotResponse {
   reply: string;
   handledBy: WaHandledBy;

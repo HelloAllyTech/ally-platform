@@ -1,7 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from "react";
 
-import { ComboChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import {
   useGetActivationQuery,
@@ -13,6 +11,7 @@ import {
   useGetFoundationalSkillsTimeToCompetenceQuery,
   useGetTenantsQuery,
 } from "@api";
+import { ComboChart } from "@components/charts";
 
 import { asOfStamp } from "../analyticsFilters";
 import { useAnalyticsOrgScope } from "../analyticsOrgScope";
@@ -128,7 +127,7 @@ const InlinePicker = <T extends { id: string; label: string }>({
 
 /**
  * One group of the chain strip. The outcome group is the one framed: per
- * Stacks "Prioritize final outcomes over enabling metrics", the enablers come
+ * "Prioritize final outcomes over enabling metrics", the enablers come
  * first because the chain runs that way, but they are means, not the end.
  */
 const TileGroup = ({
@@ -447,7 +446,7 @@ export const EffectivenessSubTab = () => {
           {f && (
             <div className="flex flex-col gap-3">
               <FunnelBars stages={funnelStages(f.stages)} unit="learners" />
-              <div className="flex flex-col gap-1.5 border-t border-[#f0f0f0] pt-2">
+              <div className="flex flex-col gap-1.5 border-t border-gray-100 pt-2">
                 <p className="text-xs font-medium text-typography-700">
                   Of {f.trend.classifiable} classifiable learner
                   {f.trend.classifiable === 1 ? "" : "s"}

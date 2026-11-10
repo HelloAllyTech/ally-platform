@@ -843,9 +843,9 @@ export const ReportSection = forwardRef<ReportSectionHandle, ReportSectionProps>
             };
 
             const historyItemHeader = (
-              <div className="text-base font-normal text-[#1A1A1A] flex flex-row gap-6 items-center">
+              <div className="text-base font-normal text-typography-900 flex flex-row gap-6 items-center">
                 <div className="flex flex-col justify-between gap-2">
-                  <span className="text-xs font-normal text-[#1A1A1A]">
+                  <span className="text-xs font-normal text-typography-900">
                     {formatReportCreatedAt(item.createdAt)}
                   </span>
                   <span className="text-xs font-normal text-typography-600">{`${item.language.label || item.language.id}· ${item.config.turns} turns`}</span>

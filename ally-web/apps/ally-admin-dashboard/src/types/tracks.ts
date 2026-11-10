@@ -50,7 +50,32 @@ export interface ArticleResource {
   url: string;
 }
 
+/**
+ * How the learner reads the same article. Mirrors ally-be's `ArticleExperience`.
+ * The text is identical in every mode — only the presentation changes.
+ */
+export enum ArticleExperience {
+  /** A simple page of text. The default. */
+  CLASSIC = "CLASSIC",
+  /** Cover photo, big headline and polished type. */
+  MAGAZINE = "MAGAZINE",
+  /** One section per swipe: a new card at each top-level `<h2>` and at each question. */
+  CARDS = "CARDS",
+}
+
+/** The article's optional cover photo — an uploaded file (https). */
+export interface ArticleCover {
+  url: string;
+  /** Read out by screen readers. */
+  alt?: string;
+}
+
 export interface ArticleContent {
+  /**
+   * The body. Besides the formatting tags it can carry two kinds of marker
+   * div: `<div data-ally-question="<id>"></div>` question placeholders, and
+   * `<div data-ally-callout="say|info|warn"><p>…</p></div>` highlight boxes.
+   */
   html: string;
   imageUrls?: string[];
   /**
@@ -62,6 +87,12 @@ export interface ArticleContent {
    */
   questions?: McqSingleQuestion[];
   resources?: ArticleResource[];
+  /** Absent = CLASSIC. Stored only for MAGAZINE / CARDS, so classic content stays unchanged. */
+  experience?: ArticleExperience;
+  /** Shown at the top in Magazine and Cards. Optional in every mode. */
+  cover?: ArticleCover;
+  /** Up to 5 short points shown at the end of the article. */
+  takeaways?: string[];
 }
 
 export type VideoSource = "s3" | "youtube" | "vimeo" | "loom";
@@ -337,6 +368,14 @@ export interface BreathingExerciseContent {
 
 export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
 
+/** How the learner sees the same story. Mirrors ally-be's `BranchingExperience`. */
+export enum BranchingExperience {
+  /** Text first, in a card. Images are optional and small. The default. */
+  CLASSIC = "CLASSIC",
+  /** Cinematic: each scene's photo fills most of the screen; a scene without one reuses the previous scene's. */
+  STORY = "STORY",
+}
+
 export interface BranchingImage {
   /** An uploaded file (https). */
   url: string;
@@ -350,7 +389,11 @@ export interface BranchingChoice {
   nextNodeId: string;
 }
 
-/** A scene with no choices is an ending; only endings carry outcome/score/takeaway. */
+/**
+ * A scene with no choices is an ending; only endings carry outcome/score/takeaway.
+ * A scene with exactly one choice is a "single-button scene": the learner sees one
+ * button labelled with that choice's text.
+ */
 export interface BranchingNode {
   id: string;
   title?: string;
@@ -370,8 +413,23 @@ export interface BranchingScenarioSettings {
   maxAttempts?: number | null;
 }
 
+/** A Character Library character cast in a branching scenario's images. */
+export interface BranchingCastMember {
+  /** `scenario_characters.id`. */
+  characterId: string;
+  name: string;
+}
+
 export interface BranchingScenarioContent {
   intro?: string;
+  /**
+   * Characters who appear in this scenario's scene images. Sent as
+   * `castCharacterIds` when a scene image is generated, so each looks the same
+   * in every scene. Absent = no cast (and never written when empty).
+   */
+  imageCast?: BranchingCastMember[];
+  /** Absent = CLASSIC. Stored only when STORY, so classic content stays unchanged. */
+  experience?: BranchingExperience;
   settings?: BranchingScenarioSettings;
   startNodeId: string;
   nodes: BranchingNode[];
@@ -562,6 +620,10 @@ export interface TrackDetail {
    * fills something in; absent on a backend that predates the column.
    */
   landingPage?: TrackLandingPage | null;
+  /** `tracks.imageStyleId`: the course's Image Studio style. Absent on an older backend. */
+  imageStyleId?: string | null;
+  /** `tracks.imageStyleAnchorId`: a `generated_images.id` new images copy the look of. */
+  imageStyleAnchorId?: string | null;
   updatedAt?: string;
   sections: TrackSectionDetail[];
 }
@@ -580,6 +642,10 @@ export interface TrackMetadataInput {
   competencyIds?: string[];
   /** Omit to leave the page unchanged; `null` clears it. */
   landingPage?: TrackLandingPage | null;
+  /** Omit to leave unchanged; `null` clears it. */
+  imageStyleId?: string | null;
+  /** Omit to leave unchanged; `null` clears it. */
+  imageStyleAnchorId?: string | null;
 }
 
 export interface UpdateTrackInput extends TrackMetadataInput {
@@ -816,6 +882,13 @@ export interface TrackFormValues {
   competencyIds?: string[];
   /** The story-led landing page. Null for a course that has not been saved yet. */
   landingPage?: TrackLandingPage | null;
+  /**
+   * The course's Image Studio style. Undefined = not loaded from (or set for)
+   * the server, so it is left out of the save; null clears it.
+   */
+  imageStyleId?: string | null;
+  /** The course's style example (`generated_images.id`); same rules as `imageStyleId`. */
+  imageStyleAnchorId?: string | null;
   sections: TrackSectionFormValue[];
 }
 

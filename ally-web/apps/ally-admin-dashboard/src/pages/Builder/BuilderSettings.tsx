@@ -383,7 +383,7 @@ export const BuilderSettings: React.FC = () => {
           <p className="-mt-3 text-xs text-typography-500">{strings.switchesApplyNow}</p>
 
           {/* One control for how much Builder does on its own, ordered by how
-              much it lets go of. Stacks, "Design autonomy sliders to build user
+              much it lets go of. "Design autonomy sliders to build user
               trust" and "Progressive Delegation": a level a person can read in
               one line beats five interacting switches, and each step up names
               what it risks ("communicate risks and benefits"). The switches

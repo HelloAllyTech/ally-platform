@@ -14,11 +14,30 @@
  * earlier scene — "try a different approach"), as long as every scene can
  * still reach an ending.
  *
- * Text and images only. There is no answer key and no score: nothing here is
- * graded, so the whole content can safely ship to the learner as authored.
- * The component completes when the learner reaches any ending, and replaying
- * it afterwards is free.
+ * A scene with exactly one choice is a single-button scene: no decision, just
+ * a beat in the story, and the choice's text is the button's label.
+ *
+ * Text and images only. There is no answer key: each ending carries its own
+ * score, so the whole content can safely ship to the learner as authored. The
+ * component completes when the learner reaches an ending that clears the pass
+ * mark (any ending, when there is none), and replaying it afterwards is free.
+ *
+ * `experience` only changes how the learner sees the same story: CLASSIC is a
+ * text-first card, STORY a cinematic layout where each scene's photo fills
+ * most of the screen. Nothing about the graph, scoring or attempts depends on
+ * it.
  */
+
+export enum BranchingExperience {
+  /** Text first, in a card. Images are optional and small. The default. */
+  CLASSIC = 'CLASSIC',
+  /**
+   * Cinematic: each scene's photo fills most of the screen, with the text and
+   * buttons beside or below it. A scene without a photo reuses the previous
+   * scene's.
+   */
+  STORY = 'STORY',
+}
 
 export enum BranchingOutcomeTone {
   /** The conversation went somewhere good. */
@@ -51,7 +70,7 @@ export interface BranchingNode {
   /** The scene itself: what the learner sees and hears. */
   text: string;
   image?: BranchingImage;
-  /** Absent or empty ⇒ this scene is an ending. */
+  /** Absent or empty ⇒ this scene is an ending. Exactly one ⇒ a single-button scene. */
   choices?: BranchingChoice[];
   /** Endings only: how the story turned out. Shown as a badge. */
   outcome?: BranchingOutcomeTone;
@@ -71,10 +90,25 @@ export interface BranchingScenarioSettings {
 export interface BranchingScenarioContent {
   /** Optional framing shown above the first scene. Translatable. */
   intro?: string;
+  /** How the learner sees the story. Absent ⇒ CLASSIC. */
+  experience?: BranchingExperience;
   settings?: BranchingScenarioSettings;
   startNodeId: string;
   nodes: BranchingNode[];
+  /**
+   * Authoring only (Image Studio): the Character Library characters who
+   * appear in this story's scene images, so every generated scene keeps them
+   * recognisable. Learners never read it.
+   */
+  imageCast?: BranchingImageCastMember[];
 }
+
+export interface BranchingImageCastMember {
+  characterId: string;
+  name: string;
+}
+
+export const BRANCHING_MAX_IMAGE_CAST = 6;
 
 export function isBranchingEnding(node: BranchingNode): boolean {
   return !node.choices || node.choices.length === 0;

@@ -24,20 +24,16 @@ import { PERMISSIONS } from '../../authorization/constants/permissions.constants
 import {
   CreateKbDocumentDto,
   CreateKbUploadUrlDto,
-  GetKbChunksResponseDto,
   GetKbDocumentsQueryDto,
   GetKbDocumentsResponseDto,
   GetKbStatsQueryDto,
   KbDocumentResponseDto,
-  KbSearchDto,
   KbStatsResponseDto,
   KbUploadUrlResponseDto,
   ReplaceKbDocumentContentDto,
   UpdateKbDocumentAudienceDto,
   UpdateKbDocumentDto,
 } from '../dto/knowledge-base.dto';
-import { ExecutionManager } from '../../common/execution/execution-manager';
-import { KbRetrievalConsumer } from '../enum/knowledge-base.enum';
 import { KnowledgeBaseService } from '../service/knowledge-base.service';
 
 /**
@@ -115,27 +111,6 @@ export class KnowledgeBaseController {
     return this.knowledgeBaseService.stats(dto);
   }
 
-  @Post('search')
-  @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
-    permissions: [PERMISSIONS.VIEW_KNOWLEDGE_BASE],
-  })
-  @ApiOperation({
-    summary: 'Retrieval preview — no LLM call',
-    description:
-      'Returns exactly the passages the agent would retrieve, so thresholds can be tuned ' +
-      'without spending generation tokens or being confounded by the prompt.',
-  })
-  search(@Body() dto: KbSearchDto) {
-    // Tagged ADMIN_PREVIEW explicitly rather than by default. An operator probing thresholds
-    // here generates deliberately strange, repeated queries against material they just
-    // uploaded; filed as agent traffic it would move the very distribution the probing is
-    // meant to read. See KbRetrievalConsumer.
-    return this.knowledgeBaseService.search(dto, {
-      consumer: KbRetrievalConsumer.ADMIN_PREVIEW,
-      userId: Number(ExecutionManager.getUserId() ?? 0) || null,
-    });
-  }
-
   // ORDER MATTERS: 'chunks/:chunkId' must stay above 'documents/:id' patterns that could also
   // match a two-segment path. Kept adjacent so the ordering is visible rather than incidental.
   @Get('chunks/:chunkId')
@@ -160,26 +135,6 @@ export class KnowledgeBaseController {
   @ApiResponse({ status: 200, type: KbDocumentResponseDto })
   get(@Param('id', ParseUUIDPipe) id: string): Promise<KbDocumentResponseDto> {
     return this.knowledgeBaseService.get(id);
-  }
-
-  @Get('documents/:id/chunks')
-  @OrgScopedRoute()
-  @RequireFeatureToggle(FeatureToggleKey.KNOWLEDGE_BASE, {
-    permissions: [PERMISSIONS.VIEW_KNOWLEDGE_BASE],
-  })
-  @ApiOperation({
-    summary: 'A document chunks — what the bot can actually see',
-  })
-  @ApiResponse({ status: 200, type: GetKbChunksResponseDto })
-  listChunks(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
-  ): Promise<GetKbChunksResponseDto> {
-    return this.knowledgeBaseService.listChunks(id, {
-      limit: limit ? Number(limit) : undefined,
-      offset: offset ? Number(offset) : undefined,
-    });
   }
 
   @Patch('documents/:id')

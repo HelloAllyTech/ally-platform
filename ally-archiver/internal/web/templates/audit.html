@@ -1,0 +1,16 @@
+{{define "content"}}
+<h1>Audit log</h1>
+<p class="lead">Every sign-in and operator action, newest first.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Detail</th></tr></thead>
+  <tbody>
+  {{range .Entries}}
+  <tr><td>{{when .At}}</td><td>{{.Actor}}</td><td>{{.Action}}</td><td class="key">{{.Detail}}</td></tr>
+  {{else}}
+  <tr><td colspan="4" class="muted">Nothing yet.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}

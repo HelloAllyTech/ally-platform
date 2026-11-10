@@ -1,6 +1,5 @@
 import { FC, useMemo, useState } from "react";
 
-import { SimpleBarChart } from "@carbon/charts-react";
 import { toast } from "sonner";
 
 import "@carbon/charts/styles.css";
@@ -22,6 +21,7 @@ import {
   useGetGlossaryAdherenceQuery,
   useGetScenarioLanguagesQuery,
 } from "@api";
+import { SimpleBarChart } from "@components/charts";
 
 import { AnalyticsTabFilters } from "../analyticsFilters";
 import { ChartCard, hBarOpts } from "../chartKit";

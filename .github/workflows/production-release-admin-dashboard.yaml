@@ -1,10 +1,10 @@
 # Production Release Pipeline - Ally Admin Dashboard
 #
-# This workflow handles production releases for ally-admin-dashboard (CDN/CloudFront) with semantic versioning
-# 
-# Required GitHub Variables:
-# PRD_AWS_ROLE, PRD_AWS_REGION
-# PRD_ADMIN_DASHBOARD_DISTRIBUTION_ID, PRD_ADMIN_DASHBOARD_S3_BUCKET
+# This workflow handles production releases for ally-admin-dashboard with semantic versioning.
+# Since the 2026-11-07 cutover it deploys to metal01 (Caddy static site via Ansible).
+#
+# Required GitHub Variables: PRD_AWS_ROLE, PRD_AWS_REGION (build-time env download)
+# Required secrets: METAL01_ANSIBLE_SSH_KEY, INFRA_DEPLOY_KEY, ANSIBLE_VAULT_PASSWORD
 #
 # Usage:
 # - Manually trigger this workflow from GitHub Actions
@@ -232,58 +232,32 @@ jobs:
           npx nx build ally-admin-dashboard
           echo ":white_check_mark: Build completed successfully" >> $GITHUB_STEP_SUMMARY
 
-      - name: Set CDN Configuration
+      # S3/CloudFront deploy removed at the 2026-11-07 cutover: admin.helloally.ai
+      # is served by Caddy on metal01; the built bundle travels with ansible (the
+      # vite_static_site role's local-tarball path) instead of the CDN.
+      - name: Pack assets tarball
         run: |
-          echo ":gear: CDN Configuration logged (values redacted)" >> $GITHUB_STEP_SUMMARY
+          tar -czf "$GITHUB_WORKSPACE/admin-assets.tar.gz" -C dist/apps/ally-admin-dashboard .
+          echo ":package: $(du -h "$GITHUB_WORKSPACE/admin-assets.tar.gz" | cut -f1) tarball packed" >> $GITHUB_STEP_SUMMARY
 
-      - name: Sync to S3
+      - name: Deploy admin dashboard via Ansible
+        uses: ./.github/actions/deploy-metal01
+        with:
+          playbook: ally_admin.yml
+          extra-args: >-
+            -e vite_static_site_local_tarball=${{ github.workspace }}/admin-assets.tar.gz
+          ssh-key: ${{ secrets.METAL01_ANSIBLE_SSH_KEY }}
+          infra-deploy-key: ${{ secrets.INFRA_DEPLOY_KEY }}
+          vault-password: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+
+      - name: Verify site
         run: |
-          echo ":cloud: Syncing files to S3..." >> $GITHUB_STEP_SUMMARY
-          
-          # Pass 1: hashed, immutable assets (JS/CSS/images) — cache hard for a year.
-          # Exclude *.html so the SPA entry point is never long-cached. --delete prunes stale files.
-          aws s3 sync dist/apps/ally-admin-dashboard/ s3://${{ secrets.PRD_ADMIN_DASHBOARD_S3_BUCKET }}/ \
-            --delete \
-            --exclude "*.html" \
-            --cache-control "public, max-age=31536000, immutable" \
-            --metadata-directive REPLACE
-
-          # Pass 2: index.html (and any other HTML) — must always revalidate so users
-          # pick up new asset hashes immediately after a deploy instead of a stale shell.
-          aws s3 cp dist/apps/ally-admin-dashboard/ s3://${{ secrets.PRD_ADMIN_DASHBOARD_S3_BUCKET }}/ \
-            --recursive \
-            --exclude "*" --include "*.html" \
-            --content-type "text/html" \
-            --cache-control "no-cache, must-revalidate" \
-            --metadata-directive REPLACE
-          
-          if [ -f "dist/apps/ally-admin-dashboard/.well-known/apple-app-site-association" ]; then
-            aws s3 cp dist/apps/ally-admin-dashboard/.well-known/apple-app-site-association \
-              s3://${{ secrets.PRD_ADMIN_DASHBOARD_S3_BUCKET }}/.well-known/apple-app-site-association \
-              --content-type "application/json" \
-              --cache-control "public, max-age=86400" \
-              --metadata-directive REPLACE
+          code=$(curl -s -o /dev/null -w "%{http_code}" -m 15 https://admin.helloally.ai)
+          if [ "$code" != "200" ]; then
+            echo "::error::admin.helloally.ai returned $code after deploy"
+            exit 1
           fi
-          
-          if [ -f "dist/apps/ally-admin-dashboard/.well-known/assetlinks.json" ]; then
-            aws s3 cp dist/apps/ally-admin-dashboard/.well-known/assetlinks.json \
-              s3://${{ secrets.PRD_ADMIN_DASHBOARD_S3_BUCKET }}/.well-known/assetlinks.json \
-              --content-type "application/json" \
-              --cache-control "public, max-age=86400" \
-              --metadata-directive REPLACE
-          fi
-          
-          echo ":white_check_mark: Files synced to S3 successfully" >> $GITHUB_STEP_SUMMARY
-
-      - name: Invalidate CloudFront
-        run: |
-          echo ":arrows_counterclockwise: Creating CloudFront invalidation..." >> $GITHUB_STEP_SUMMARY
-          INVALIDATION_ID=$(aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.PRD_ADMIN_DASHBOARD_DISTRIBUTION_ID }} \
-            --paths "/*" \
-            --query 'Invalidation.Id' \
-            --output text)
-          echo ":white_check_mark: CloudFront invalidation created: $INVALIDATION_ID" >> $GITHUB_STEP_SUMMARY
+          echo "✅ admin.helloally.ai serving 200" >> $GITHUB_STEP_SUMMARY
 
   create-release:
     name: Create Release Draft
@@ -352,9 +326,7 @@ jobs:
             ### Deployment Information
             - **Environment**: Production
             - **Branch**: master
-            - **Deployment Type**: CloudFront CDN
-            - **S3 Bucket**: ${{ secrets.PRD_ADMIN_DASHBOARD_S3_BUCKET }}
-            - **CloudFront Distribution**: ${{ secrets.PRD_ADMIN_DASHBOARD_DISTRIBUTION_ID }}
+            - **Deployment Type**: metal01 via Ansible `ally_admin.yml` (Caddy static site)
             
             ${{ steps.changelog.outputs.CHANGELOG }}
             

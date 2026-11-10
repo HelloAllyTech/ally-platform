@@ -1,0 +1,42 @@
+name: Release (ally-archiver)
+
+# Tag archiver-vX.Y.Z on master to publish linux binaries; the infra repo's ally_archiver
+# Ansible role downloads them from the release.
+
+on:
+  push:
+    tags: ["archiver-v*"]
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: ally-archiver
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ally-archiver/go.mod
+          cache-dependency-path: ally-archiver/go.sum
+      - run: go test ./...
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w" -o "dist/archiver-linux-$arch" ./cmd/archiver
+          done
+          (cd dist && sha256sum archiver-linux-* > SHA256SUMS)
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --title "ally-archiver ${TAG#archiver-}" --notes "Linux binaries for ally-archiver. See ally-archiver/README.md."

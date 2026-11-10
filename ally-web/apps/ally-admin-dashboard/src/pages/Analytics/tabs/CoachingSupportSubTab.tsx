@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { LineChart, SimpleBarChart } from "@carbon/charts-react";
-
 import { useGetCoachingLoopQuery, useGetScribeAdoptionQuery } from "@api";
+import { LineChart, SimpleBarChart } from "@components/charts";
 import { AnalyticsBucket, AnalyticsGrain } from "@types";
 
 import { AnalyticsTabFilters, asOf, windowLabel } from "../analyticsFilters";

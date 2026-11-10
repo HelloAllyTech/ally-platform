@@ -1,7 +1,6 @@
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import {
-  KbCharacterTopic,
   KbLoggedCorpus,
   KbRetrievalConsumer,
   KbRetrievalDisposition,
@@ -10,8 +9,8 @@ import {
 /**
  * One retrieval, recorded so the numbers that govern retrieval can be chosen from data.
  *
- * This table exists because of a specific embarrassment. The character corpus's similarity
- * floor was set to 0.5 by reasoning about what "actually close" ought to mean; the first real
+ * This table exists because of a specific embarrassment. The (since retired) character
+ * corpus's similarity floor was set to 0.5 by reasoning about what "actually close" ought to mean; the first real
  * measurement — a passage explicitly about repeated questioning, matched against a query
  * explicitly asking about repeated questioning — scored 0.5056. The floor was one paraphrase
  * away from rejecting a direct hit, and nothing in the system would have said so. A cosine
@@ -68,14 +67,6 @@ export class KbRetrieval extends BaseWithoutTenantEntity {
   @Column({ type: 'text' })
   query!: string;
 
-  @Column({
-    name: 'character_topics',
-    type: 'text',
-    array: true,
-    default: () => "'{}'",
-  })
-  characterTopics!: KbCharacterTopic[];
-
   @Column({ type: 'text', array: true, default: () => "'{}'" })
   tags!: string[];
 
@@ -94,7 +85,11 @@ export class KbRetrieval extends BaseWithoutTenantEntity {
   @Column({ type: 'int', name: 'fetch_limit' })
   fetchLimit!: number;
 
-  /** How many documents the curator's topic mapping put in each bucket. */
+  /**
+   * How many documents a curator's topic mapping put in each bucket. Only the retired character
+   * corpus had a mapping, so every search since is one pass: `preferred_document_count` 0 and
+   * `first_pass_hits` 0, with the searched documents and hits in the rest/second-pass columns.
+   */
   @Column({ type: 'int', name: 'preferred_document_count' })
   preferredDocumentCount!: number;
 
@@ -105,9 +100,10 @@ export class KbRetrieval extends BaseWithoutTenantEntity {
   firstPassHits!: number;
 
   /**
-   * NULL when the top-up never ran, which is different from 0 and must stay different: null
-   * means the mapped documents filled the limit on their own (the boost worked), 0 means the
-   * rest of the corpus was searched and had nothing (the corpus has a gap).
+   * NULL when the pass never ran, which is different from 0 and must stay different: null
+   * means there was nothing to search (or, on rows from the character corpus, the mapped
+   * documents filled the limit on their own), 0 means the corpus was searched and had nothing
+   * (the corpus has a gap).
    */
   @Column({ type: 'int', name: 'second_pass_hits', nullable: true })
   secondPassHits?: number | null;

@@ -17,13 +17,13 @@ import {
  * same thing the judge scores. Tier roll-ups are derived at read time, never
  * asked. 0–10 rather than 1–5 because the instrument is a scaling question
  * repeated over time: rate yourself at baseline, then revisit the same
- * questions periodically to see how your view has changed (Stacks: "Scaling
+ * questions periodically to see how your view has changed ("Scaling
  * Questions for Measuring Supervisee Development").
  *
  * The answer is never reported as an outcome on its own. Learners are poor and
  * often over-confident self-assessors, and those performing least well
  * self-assess least well, so every chart that reads it triangulates it with the
- * judge (Stacks: "Include Self-Assessment Despite Known Accuracy Limitations").
+ * judge ("Include Self-Assessment Despite Known Accuracy Limitations").
  *
  * ## Changing anything in this file
  *

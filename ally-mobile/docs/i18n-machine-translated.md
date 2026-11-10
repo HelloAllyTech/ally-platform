@@ -33,6 +33,21 @@ The wording follows the terms the same file already uses: सत्र / ಸೆ�
 | `scribe.notificationTitle` | Recording session | सत्र रिकॉर्ड हो रहा है | ಸೆಷನ್ ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ | सत्र रेकॉर्ड होत आहे | அமர்வு பதிவாகிறது |
 | `scribe.notificationText` | Ally is recording this session. | Ally इस सत्र को रिकॉर्ड कर रहा है। | Ally ಈ ಸೆಷನ್ ಅನ್ನು ರೆಕಾರ್ಡ್ ಮಾಡುತ್ತಿದೆ. | Ally हे सत्र रेकॉर्ड करत आहे. | Ally இந்த அமர்வைப் பதிவு செய்கிறது. |
 
+## Article reading experiences (8)
+
+`courses.article.*` keys added 2026-11-09 for the article Magazine and Cards layouts, highlight boxes and key takeaways. Written for this app (no RN source), using the words the article player already uses (त्वरित जाँच / ತ್ವರಿತ ಪರಿಶೀಲನೆ / त्वरित तपासणी / விரைவு சோதனை for "Quick check"). Needs a native speaker's read.
+
+| Key | English | Hindi | Kannada | Marathi | Tamil |
+|---|---|---|---|---|---|
+| `courses.article.takeaways` | Key takeaways | मुख्य बातें | ಮುಖ್ಯ ಅಂಶಗಳು | महत्त्वाचे मुद्दे | முக்கியக் குறிப்புகள் |
+| `courses.article.minRead` | {{count}} min read | {{count}} मिनट में पढ़ें | {{count}} ನಿಮಿಷದ ಓದು | {{count}} मिनिटांचे वाचन | {{count}} நிமிட வாசிப்பு |
+| `courses.article.quickChecks_one` | {{count}} quick check | {{count}} त्वरित जाँच | {{count}} ತ್ವರಿತ ಪರಿಶೀಲನೆ | {{count}} त्वरित तपासणी | {{count}} விரைவு சோதனை |
+| `courses.article.quickChecks_other` | {{count}} quick checks | {{count}} त्वरित जाँच | {{count}} ತ್ವರಿತ ಪರಿಶೀಲನೆಗಳು | {{count}} त्वरित तपासण्या | {{count}} விரைவு சோதனைகள் |
+| `courses.article.startReading` | Start reading | पढ़ना शुरू करें | ಓದಲು ಪ್ರಾರಂಭಿಸಿ | वाचायला सुरुवात करा | படிக்கத் தொடங்கவும் |
+| `courses.article.callout.say` | Try saying | ऐसे कहकर देखें | ಹೀಗೆ ಹೇಳಿ ನೋಡಿ | असे म्हणून पाहा | இப்படிச் சொல்லிப் பாருங்கள் |
+| `courses.article.callout.info` | Good to know | जानने योग्य बात | ತಿಳಿದಿರಲಿ | हे जाणून घ्या | தெரிந்துகொள்ளுங்கள் |
+| `courses.article.callout.warn` | Watch out | सावधान रहें | ಎಚ್ಚರಿಕೆ | सावध राहा | கவனம் |
+
 ## Not referenced by the app today (80)
 
 These keys are in `en.json` but no code in `lib/` refers to them by name. Most are left over from the early development screens (`home.*`, the `scribe.*` and `conferenceListening.*` debug labels). They are translated only so every locale has every key; they could be deleted instead.

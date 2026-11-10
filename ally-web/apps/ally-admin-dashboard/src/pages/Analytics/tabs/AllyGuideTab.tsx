@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 
-import { ComboChart, LineChart } from "@carbon/charts-react";
-
 import {
   Select,
   SelectItem,
@@ -19,6 +17,7 @@ import {
   useGetAllyGuideEngagementVsLearningQuery,
   useGetTenantsQuery,
 } from "@api";
+import { ComboChart, LineChart } from "@components/charts";
 import { en } from "@constants";
 import { AllyRate, AllyWeek } from "@types";
 

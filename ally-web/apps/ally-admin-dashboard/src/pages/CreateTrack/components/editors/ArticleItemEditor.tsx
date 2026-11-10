@@ -1,16 +1,36 @@
-import { FC, useMemo } from "react";
+import { FC, useMemo, useState } from "react";
 
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
 import { TextArea, Tooltip, htmlToPlainText, escapeHtml } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon, Trash } from "@assets";
-import { RichTextEditor } from "@components/rich-text-editor";
+import {
+  courseSlotPrefix,
+  LazyGenerateImageModal,
+  toContextText,
+  useCourseImage,
+  useImageStudioEnabled,
+} from "@components/image-studio";
+import { GenerateImageAtCursor, RichTextEditor } from "@components/rich-text-editor";
 import { MAX_ARTICLE_QUESTIONS, MAX_ARTICLE_RESOURCES } from "@constants";
-import { ArticleResource, McqSingleQuestion, TrackFormValues, TrackItemType } from "@types";
+import {
+  ArticleCover,
+  ArticleExperience,
+  ArticleResource,
+  McqSingleQuestion,
+  TrackFormValues,
+  TrackItemType,
+} from "@types";
 
+import {
+  ArticleCoverField,
+  ArticleExperiencePicker,
+  ArticleTakeawaysField,
+} from "./ArticlePresentationFields";
 import { ItemEditorFrame } from "./ItemEditorFrame";
 import { McqEditor } from "./quiz/McqEditor";
+import { articleHasCardBreaks, estimateReadingMinutes } from "../../articleExperience";
 import {
   createQuestionOfType,
   parseArticleQuestionMarkers,
@@ -19,6 +39,10 @@ import {
 } from "../../trackFormUtils";
 import { useTrackMediaUpload } from "../../useTrackMediaUpload";
 
+/** In Cards mode, a dashed line above each H2 shows where a new card starts. */
+const CARD_BREAK_CLASS =
+  "[&_.ProseMirror>h2]:mt-5 [&_.ProseMirror>h2]:border-t-2 [&_.ProseMirror>h2]:border-dashed [&_.ProseMirror>h2]:border-primary-200 [&_.ProseMirror>h2]:pt-4";
+
 interface ArticleItemEditorProps {
   sectionIndex: number;
   itemIndex: number;
@@ -26,7 +50,8 @@ interface ArticleItemEditorProps {
 }
 
 /**
- * Article authoring: the body, plus any inline questions it anchors.
+ * Article authoring: how it is presented (reading experience, cover photo,
+ * key takeaways), the body, plus any inline questions it anchors.
  *
  * The two halves are deliberately split. A question is *placed* in the body —
  * the toolbar's question button drops a placeholder at the cursor — but it is
@@ -85,6 +110,23 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
 
   const placedIds = useMemo(() => parseArticleQuestionMarkers(html), [html]);
 
+  const experienceName = `${base}.article.experience` as const;
+  const coverName = `${base}.article.cover` as const;
+  const takeawaysName = `${base}.article.takeaways` as const;
+  const experience = useWatch({ control, name: experienceName }) as ArticleExperience | undefined;
+  const cover = useWatch({ control, name: coverName }) as ArticleCover | undefined;
+  const watchedTakeaways = useWatch({ control, name: takeawaysName });
+  const takeaways = useMemo(() => (watchedTakeaways ?? []) as string[], [watchedTakeaways]);
+  const isCards = experience === ArticleExperience.CARDS;
+  const hasCardBreaks = useMemo(() => articleHasCardBreaks(html), [html]);
+  const readingMinutes = useMemo(() => estimateReadingMinutes(html, takeaways), [html, takeaways]);
+
+  const handleExperienceChange = (next: ArticleExperience) =>
+    // Classic is the default and is stored by leaving the field out.
+    setValue(experienceName, next === ArticleExperience.CLASSIC ? undefined : next, {
+      shouldDirty: true,
+    });
+
   /**
    * The field rows in the order the reader meets them, with anything the
    * author has unplaced pushed to the end.
@@ -104,6 +146,19 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
   }, [questions, placedIds]);
 
   const handleImageUpload = (file: File) => upload(file, "image");
+
+  /* ---- Image Studio: cover and inline pictures ---- */
+  const course = useCourseImage();
+  const imageStudioEnabled = useImageStudioEnabled();
+  const itemTitle = (useWatch({ control, name: `${base}.title` }) ?? "") as string;
+  const serverId = useWatch({ control, name: `${base}.serverId` });
+  const localId = useWatch({ control, name: `${base}.localId` });
+  const itemSlotPrefix = `${courseSlotPrefix(course.trackId)}:item:${serverId || localId || `${sectionIndex}-${itemIndex}`}`;
+  const articleContext = useMemo(
+    () => ({ title: itemTitle, text: toContextText(html) }),
+    [itemTitle, html],
+  );
+  const [inlineRequest, setInlineRequest] = useState<GenerateImageAtCursor | null>(null);
 
   /**
    * Called by the toolbar button. Creates the question and hands back its id
@@ -145,6 +200,30 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
       type={TrackItemType.ARTICLE}
       onDelete={onDelete}
     >
+      <ArticleExperiencePicker
+        name={experienceName}
+        value={experience}
+        onChange={handleExperienceChange}
+        hasCardBreaks={hasCardBreaks}
+      />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ArticleCoverField
+          name={coverName}
+          value={cover}
+          onChange={next => setValue(coverName, next, { shouldDirty: true })}
+          experience={experience}
+          readingMinutes={readingMinutes}
+          slotKey={`${itemSlotPrefix}:cover`}
+          imageContext={articleContext}
+        />
+        <ArticleTakeawaysField
+          name={takeawaysName}
+          value={takeaways}
+          onChange={next => setValue(takeawaysName, next, { shouldDirty: true })}
+        />
+      </div>
+
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-typography-800">Content</label>
         <Controller
@@ -157,11 +236,30 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
               placeholder="Write the article content…"
               allowImages
               onImageUpload={handleImageUpload}
+              onGenerateImage={imageStudioEnabled ? setInlineRequest : undefined}
               onCreateQuestion={handleCreateQuestion}
-              className="min-h-[360px] [&_.ProseMirror]:min-h-[320px]"
+              allowCallouts
+              className={`min-h-[360px] [&_.ProseMirror]:min-h-[320px] ${isCards ? CARD_BREAK_CLASS : ""}`}
             />
           )}
         />
+        {isCards && (
+          <p className="text-xs text-typography-500">
+            In Cards mode, each H2 heading starts a new card.
+          </p>
+        )}
+        {inlineRequest && (
+          <LazyGenerateImageModal
+            slotKind="article_inline"
+            slotKey={`${itemSlotPrefix}:inline`}
+            context={{ title: itemTitle, text: toContextText(inlineRequest.nearbyText) }}
+            onAccept={image => {
+              inlineRequest.insert({ src: image.url, alt: image.altText });
+              setInlineRequest(null);
+            }}
+            onClose={() => setInlineRequest(null)}
+          />
+        )}
       </div>
 
       {fields.length > 0 && (

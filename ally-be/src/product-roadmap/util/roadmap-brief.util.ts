@@ -12,7 +12,16 @@ import {
 } from '../type/roadmap-brief.type';
 
 const RATINGS = new Set<string>(Object.values(RoadmapBriefRating));
-const SOURCES = new Set<string>(Object.values(RoadmapBriefEvidenceSource));
+/**
+ * Sources a new brief may cite. `stacks` is not one: it survives in the enum only so briefs filed
+ * before the Context Library replaced Stacks still read, and a model that still writes it is
+ * citing the principles tool that replaced it.
+ */
+const SOURCES = new Set<string>(
+  Object.values(RoadmapBriefEvidenceSource).filter(
+    (source) => source !== RoadmapBriefEvidenceSource.STACKS,
+  ),
+);
 
 const text = (value: unknown, max: number): string | null => {
   if (typeof value !== 'string') return null;
@@ -76,7 +85,9 @@ export const normaliseOpportunityBrief = (
       if (!claim) return null;
       const source = SOURCES.has(item?.source)
         ? (item.source as RoadmapBriefEvidenceSource)
-        : RoadmapBriefEvidenceSource.ADMIN;
+        : item?.source === RoadmapBriefEvidenceSource.STACKS
+          ? RoadmapBriefEvidenceSource.PRINCIPLES
+          : RoadmapBriefEvidenceSource.ADMIN;
       return { source, claim, ref: text(item?.ref, L.SHORT_TEXT_MAX) };
     },
   );

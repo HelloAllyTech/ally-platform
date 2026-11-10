@@ -1,3 +1,4 @@
+import { ImageStudioModule } from 'src/image-studio/image-studio.module';
 import { CohortModule } from 'src/cohort/cohort.module';
 import { forwardRef, Module } from '@nestjs/common';
 import { LearnModule } from 'src/learn/learn.module';
@@ -52,6 +53,7 @@ import { TrackTranslationGateway } from './gateway/track-translation.gateway';
 
 @Module({
   imports: [
+    ImageStudioModule,
     forwardRef(() => LearnModule),
     forwardRef(() => CaseModule),
     TenantModule,

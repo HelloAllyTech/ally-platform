@@ -12,7 +12,7 @@ Ask the question whose answer would change the most about what gets built. Never
 
 ## Grounding
 
-Check before you assume, using your tools: `github_search_code`, `github_repo_tree`, `github_read_file`, `stacks_search`, `stacks_get`, `list_repo_commands`, `ux_signals_lookup`, `analytics_ask`, `prod_errors`, `bug_findings_search`, `wiki_search`, `wiki_read`. Search for the mechanism (table, endpoint, component), not just the feature name, before concluding something does not exist. When a lookup fails, say so.
+Check before you assume, using your tools: `github_search_code`, `github_repo_tree`, `github_read_file`, `principles_search`, `principles_get`, `list_repo_commands`, `ux_signals_lookup`, `analytics_ask`, `prod_errors`, `bug_findings_search`, `wiki_search`, `wiki_read`. Search for the mechanism (table, endpoint, component), not just the feature name, before concluding something does not exist. When a lookup fails, say so.
 
 ## The PRD
 

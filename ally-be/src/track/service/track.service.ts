@@ -77,6 +77,12 @@ import {
   ContentAccessService,
 } from 'src/authorization/service/content-access.service';
 
+import { findImageStyle } from 'src/image-studio/constants/image-styles.constants';
+
+const normaliseImageStyleId = (
+  styleId: string | null | undefined,
+): string | null => (styleId && findImageStyle(styleId) ? styleId : null);
+
 @Injectable()
 export class TrackService {
   private readonly logger = LoggerService.getInstance(TrackService.name);
@@ -269,6 +275,8 @@ export class TrackService {
       landingPage: createTrackDto.landingPage
         ? normaliseTrackLandingPage(createTrackDto.landingPage)
         : null,
+      imageStyleId: normaliseImageStyleId(createTrackDto.imageStyleId),
+      imageStyleAnchorId: createTrackDto.imageStyleAnchorId ?? null,
       ...(userId ? { createdBy: userId, updatedBy: userId } : {}),
     });
 
@@ -356,6 +364,18 @@ export class TrackService {
       updatePayload.landingPage = updateTrackDto.landingPage
         ? normaliseTrackLandingPage(updateTrackDto.landingPage)
         : null;
+    }
+
+    // Image Studio course style: absent = unchanged, null = cleared. An
+    // unknown style id is dropped rather than refused, so a style retired
+    // from the gallery never blocks saving a course that still names it.
+    if (updateTrackDto.imageStyleId !== undefined) {
+      updatePayload.imageStyleId = normaliseImageStyleId(
+        updateTrackDto.imageStyleId,
+      );
+    }
+    if (updateTrackDto.imageStyleAnchorId !== undefined) {
+      updatePayload.imageStyleAnchorId = updateTrackDto.imageStyleAnchorId;
     }
 
     await this.trackRepository.update(id, updatePayload);
@@ -645,6 +665,8 @@ export class TrackService {
         // otherwise; dropping the tag would silently switch the copy's Course
         // impact reading to the derived roleplay set.
         competencyIds: normaliseTrackCompetencyIds(source.competencyIds),
+        imageStyleId: source.imageStyleId ?? null,
+        imageStyleAnchorId: source.imageStyleAnchorId ?? null,
         ...(userId ? { createdBy: userId, updatedBy: userId } : {}),
       });
 
@@ -1010,6 +1032,8 @@ export class TrackService {
       status: track.status,
       competencyIds: track.competencyIds ?? null,
       isPublicView: track.isPublicView ?? false,
+      imageStyleId: track.imageStyleId ?? null,
+      imageStyleAnchorId: track.imageStyleAnchorId ?? null,
     };
   }
 

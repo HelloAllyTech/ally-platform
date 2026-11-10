@@ -19,7 +19,7 @@ import {
   agentRunIdFor,
   MalformedAgentResponseError,
 } from './agent-runtime';
-import type { AgentRunRef, ChatTurn } from './chatbot-engine.types';
+import type { AgentRunRef, ChatTurn, LiveReply } from './chatbot-engine.types';
 import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
 
 /**
@@ -87,25 +87,36 @@ export class AgentRuntimeRunner {
    *
    * The fallback spends only what is left of the answer budget: a 25s v2 timeout followed by a
    * full v1 budget would outlive the SQS visibility window and get the message redelivered.
+   *
+   * With `live`, on a channel that can stream, the same run goes through `/agent/run/stream`: its
+   * events go to `live` as they happen, and its `final` is handled exactly like `/agent/run`'s
+   * response — so a streamed reply and a waited-for one can't differ.
    */
   async answer(
     turn: ChatTurn,
     request: KnowledgeAnswerRequest,
     knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
+    live?: LiveReply,
   ): Promise<Answered> {
     const runId = agentRunIdFor(turn.providerMessageId);
     const conversationId = turn.conversationId ?? `preview-${randomUUID()}`;
     const startedAt = Date.now();
     try {
-      const response = await this.aiService.runAgent(
-        buildAgentRunRequest(request, {
-          conversationId,
-          runId,
-          chatbotId: turn.chatbot.id,
-          knowledgeTopics: await this.knowledgeTopics(knowledge),
-          declineText: turn.settings.declineText,
-        }),
-      );
+      const body = buildAgentRunRequest(request, {
+        conversationId,
+        runId,
+        chatbotId: turn.chatbot.id,
+        knowledgeTopics: await this.knowledgeTopics(knowledge),
+        declineText: turn.settings.declineText,
+      });
+      const response =
+        live && turn.channel.capabilities?.streaming
+          ? await this.aiService.runAgentStreaming(
+              body,
+              (event) => live.onEvent(event),
+              live.signal,
+            )
+          : await this.aiService.runAgent(body);
       if (!response?.intent) throw new MalformedAgentResponseError();
       const { trace, run_id, ...answer } = response;
       return {
@@ -119,6 +130,8 @@ export class AgentRuntimeRunner {
         },
       };
     } catch (error) {
+      // The person left Preview: nobody is waiting for a v1 answer.
+      if (live?.signal?.aborted) throw error;
       const fallbackReason = agentFailureReason(error);
       this.logger.warn(
         `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}); ` +

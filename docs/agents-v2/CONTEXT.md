@@ -17,8 +17,8 @@ What makes it different: **everything the agent knows, does and learns is visibl
 | Stage | Status | What's in it |
 |---|---|---|
 | Stage 1 | **Live** | Chatbots, WhatsApp connector, channel-agnostic engine in ally-be, knowledge answers in ally-ai, admin page at `/chatbots`. See `stage1-build.md`. |
-| **v2 (Stage 2)** | **Building now** | LangGraph runtime, layered context files, facts, contact profiles and files, history and "Why?", eight built-in abilities with approvals, scheduler, flows, onboarding, sandbox number, website widget, self-learning loop, owner on WhatsApp, home and insights. |
-| v3 (Stage 3) | Later | Connectors, MCP, any API as a tool, skills store and skill creator, forms and WhatsApp Flows, more channels. **Don't build any of this in v2.** |
+| **v2 (Stage 2)** | **Building now** | The agent engine, plus **seven generic building blocks** (Pages, Collections, People, Memory and history, Abilities, Channels and messages, Rules) that any bot is assembled from, and **templates** made of those blocks that anyone can install, customise, export and share. Also: memory you can read (profiles, the agent's notebook), conversation history and "Why?", rich and interactive messages, voice notes in and voice replies, team inbox, website widget, approvals, Never check and learning mode, owner manager mode on WhatsApp, onboarding, privacy controls. See `BUILDING-BLOCKS.md`. |
+| v3 (Stage 3) | Later | **Scheduler and outbound** (reminders, follow-ups, digests, broadcasts), **flows and workflows**, **the self-learning loop**; connectors (calendars, payments, stores, CRMs, ticketing), MCP, any API as a tool, the public template gallery and skills store, forms and WhatsApp Flows, Slack and Teams. **Don't build any of this in v2.** |
 
 ## Documents in this folder, and which one wins
 
@@ -26,7 +26,8 @@ What makes it different: **everything the agent knows, does and learns is visibl
 |---|---|---|
 | `CONTEXT.md` | This file | Background, decisions, glossary |
 | `agents-v2-spec.md` | Product and experience spec for v2 | **The source of truth for scope and user experience.** What the owner sees and how it behaves |
-| `v2-chunks.md` | v2 split into 25 chunks, with rules for every chunk | Build order, and what "done" means per chunk |
+| `BUILDING-BLOCKS.md` | The six blocks every bot is made of, generated tools, and the template format | **The architecture every chunk from 4 on must fit.** If a feature doesn't fit a block, raise it; don't build industry-specific code |
+| `v2-chunks.md` | v2 split into chunks, with rules for every chunk, release gates and what moved to v3 | Build order, and what "done" means per chunk |
 | `chunk-NN.md` | The brief for the current chunk | **The current task.** Do only this |
 | `three-stage-plan.md` | Earlier research and three-stage engineering plan | Engineering detail: graph nodes, state, `/agent/run` contract, gateway, data model, rollout, risks |
 | `stage1-build.md` | How Stage 1 is built today | Real module names, tables, message flow, engine order |
@@ -38,6 +39,8 @@ What makes it different: **everything the agent knows, does and learns is visibl
 2. `agents-v2-spec.md` wins on scope and behaviour.
 3. `three-stage-plan.md` wins on engineering detail only where the spec is silent.
 4. The code wins over every document on facts about the existing system. Write down every mismatch in the notes file.
+
+**v2 scope was revised on 6 Nov 2026:** only the scheduler, flows and the self-learning loop moved to v3; Collections, People relations, Memory as its own block, media and voice, rich messages, the team inbox and templates moved in. Where `agents-v2-spec.md` describes the moved features as v2, `v2-chunks.md` wins.
 
 **Known differences in `three-stage-plan.md`:** its Stage 2 includes a form creator and an 8-step order. Both are superseded. **Forms are v3**, and the order is `v2-chunks.md`. Its `/agent/run` request shape is the **target** contract. Chunk 1 starts smaller (today's request plus `conversation_id`), and the contract grows toward the target in chunks 2–3.
 
@@ -52,7 +55,9 @@ What makes it different: **everything the agent knows, does and learns is visibl
 - **Deterministic where it matters.** The decline gate and citation mapping stay in code.
 - **Layered context files.** These are Markdown layers merged in order: `/platform/SAFETY.md` > `/org/ORG.md` > `/agent/AGENT.md` > `/roles/<role>.md` > `/contacts/<id>/USER.md`, plus `/scratch/`. Higher layers win, and safety only tightens. The agent writes only to the contact and scratch layers. Agent edits to higher layers arrive as proposals the owner approves.
 - **Streaming only where the channel can show it.** Preview and the website widget stream (`step`, `token` and `final` events over SSE, relayed by ally-be). WhatsApp can't edit a sent message, so it gets a typing indicator and one complete reply. No streamed text reaches a person before the crisis check clears, and the `final` event is authoritative: if the run ends in a decline, crisis reply or blocked message, it replaces anything already streamed. ally-ai never streams to a client directly.
-- **Facts stay in data tables, not in Markdown** (prices, hours, slots), so the same question always gets the same answer.
+- **Context is a virtual file tree, stored in the database.** The agent sees one tree of pages (`/org`, `/agent`, `/roles`, `/knowledge`, `/updates`, `/contacts`, `/scratch`) through gateway tools (`list`, `read`, `grep`, `search_knowledge`), and Collections through generated tools (`find_*`, `create_*`, `update_*`, `check_rules`), served by ally-be from versioned tables. Small layers are always loaded; everything else is read on demand from a short index (progressive disclosure), never pasted whole into the prompt. There's no real disk and no new dependency; the tools follow the same pattern as `search_knowledge`.
+- **Everything is built from blocks.** Pages, Collections, People, Memory and history, Abilities, Channels and Rules are generic; a clinic, gym or HR bot is a template, never code. Collections replace separate "facts" and "records" tables: one engine with typed fields, constraints enforced in code, views and permissions. Agent tools for a collection are generated from its schema.
+- **Facts stay in Collections, not in Markdown** (prices, hours, slots), so the same question always gets the same answer; writes go through constraints inside a transaction.
 - **WhatsApp rules are enforced in ally-be at send time:** the 24-hour window and approved templates, quiet hours, and opt-out checked at send.
 - **Prompts live in the Skills Store** (Manage Prompts). The `.txt` files only seed new environments. Never edit prompt text as part of a chunk. If a chunk needs a new prompt, add a new seed file and say so in the notes.
 - **New business data lives in ally-be's Postgres** as normal migrations keyed by `chatbot_id`. Only LangGraph's checkpoint tables live on the ally-ai side, in their own schema.

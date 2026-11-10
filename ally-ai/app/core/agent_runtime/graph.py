@@ -11,7 +11,7 @@ a draft the check refuses goes back to it once.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -37,6 +37,9 @@ from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+#: Receives each live event of a run: (`status` | `step`, its data).
+OnEvent = Callable[[str, Dict[str, Any]], None]
 
 
 def build_graph(
@@ -85,8 +88,14 @@ async def run_agent(
     question: str,
     history: List[Dict[str, str]],
     bot: BotConfig,
+    on_event: Optional[OnEvent] = None,
 ) -> AgentState:
-    """Run the graph once for one message. Returns the final state."""
+    """Run the graph once for one message. Returns the final state.
+
+    `on_event` receives the run's live `status` and `step` events as they happen
+    (the streamed endpoint). Without it nothing is streamed, and the run is the
+    same either way.
+    """
     inputs: Dict[str, Any] = {key: None for key in RUN_SCOPED_KEYS}
     inputs.update(
         run_id=run_id,
@@ -109,10 +118,21 @@ async def run_agent(
     # Never traced to LangSmith. The knowledge path this replaces sends nothing
     # there (its model calls use the provider SDKs directly), and a traced graph run
     # would upload the question and passages — a new PHI destination.
+    # What `ainvoke` does (the last "values" chunk is the final state), plus the
+    # nodes' custom events when someone is listening.
+    modes = ["values", "custom"] if on_event else ["values"]
+    state: AgentState = {}  # type: ignore[typeddict-item]
     with tracing_context(enabled=False):
-        state = await graph.ainvoke(
-            inputs, config, durability=settings.AGENT_RUNTIME.DURABILITY
-        )
+        async for mode, chunk in graph.astream(
+            inputs,
+            config,
+            stream_mode=modes,
+            durability=settings.AGENT_RUNTIME.DURABILITY,
+        ):
+            if mode == "values":
+                state = chunk
+            elif on_event:
+                on_event(chunk["event"], chunk["data"])
     logger.info(
         "Agent run %s: %s (%s)",
         run_id,

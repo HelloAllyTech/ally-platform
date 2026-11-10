@@ -1,4 +1,8 @@
-import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
+import type {
+  AgentStreamEvent,
+  AgentTraceStep,
+  AgentTurnType,
+} from '../../ai/dto/knowledge.dto';
 import type { NotificationErrorType } from '../../notification/type/notification.error.type';
 import type {
   WaHandledBy,
@@ -27,12 +31,32 @@ export interface ChatSender {
 export interface ChannelCapabilities {
   /** Hard cap on one reply's length. The bot's own `maxReplyChars` applies within it. */
   maxReplyChars?: number;
+  /**
+   * The channel can show a reply as it is being made (live status, steps, text revealed): Preview
+   * and, later, the website widget. WhatsApp can't edit a sent message, so it never streams.
+   */
+  streaming?: boolean;
 }
 
 export interface ChatChannel {
   /** A connector type key (`whatsapp`), or `test` for the test console. */
   type: string;
   capabilities?: ChannelCapabilities;
+}
+
+/** The test console: the one channel that streams today. */
+export const PREVIEW_CHANNEL: ChatChannel = {
+  type: 'test',
+  capabilities: { streaming: true },
+};
+
+/**
+ * Where a streaming channel's live events go while the reply is made. Only used when the channel
+ * has `capabilities.streaming`. `signal` aborts when the person goes away, which cancels the run.
+ */
+export interface LiveReply {
+  onEvent(event: AgentStreamEvent): void;
+  signal?: AbortSignal;
 }
 
 /** One message to answer. */

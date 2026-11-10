@@ -47,6 +47,16 @@ export const MAX_ARTICLE_QUESTIONS = 10;
 /** Curated external links per article. Mirrors the server's own cap. */
 export const MAX_ARTICLE_RESOURCES = 10;
 
+/** Key takeaways per article, and the length of each. Mirror the server's caps. */
+export const MAX_ARTICLE_TAKEAWAYS = 5;
+export const MAX_ARTICLE_TAKEAWAY_LENGTH = 200;
+
+/** Cover photo description (alt text). Mirrors the server's cap. */
+export const MAX_ARTICLE_COVER_ALT_LENGTH = 300;
+
+/** Reading speed behind the article editor's "about N min" estimate. */
+export const ARTICLE_WORDS_PER_MINUTE = 200;
+
 /* ---- Question media ----------------------------------------------------- */
 
 /**
@@ -297,7 +307,10 @@ export const MAX_BUCKET_SORT_EXPLANATION = 500;
 /* ---- Branching scenario (BRANCHING_SCENARIO) — limits mirror ally-be ---- */
 
 export const MAX_BRANCHING_NODES = 100;
-export const MIN_BRANCHING_CHOICES = 2;
+/** Fewest choices a non-ending scene may have: 1 is a single-button scene. */
+export const MIN_BRANCHING_CHOICES = 1;
+/** Fewest choices a scene that "asks the learner to choose" shows; going to 1 is the one-button switch. */
+export const MIN_BRANCHING_DECISION_CHOICES = 2;
 export const MAX_BRANCHING_CHOICES = 6;
 export const MAX_BRANCHING_NODE_TEXT = 1500;
 export const MAX_BRANCHING_CHOICE_TEXT = 250;

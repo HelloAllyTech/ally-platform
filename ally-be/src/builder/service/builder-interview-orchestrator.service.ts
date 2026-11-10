@@ -42,6 +42,8 @@ import { BuilderPrdService } from './builder-prd.service';
 import { BuilderKnowledgeService } from './builder-knowledge.service';
 import { BuilderPlatformContextService } from './builder-platform-context.service';
 import { BuilderReadinessService } from './builder-readiness.service';
+import { BuilderPrinciplesService } from './builder-principles.service';
+import { BuilderLessonsService } from './builder-lessons.service';
 import {
   BuilderInterviewToolsService,
   BuilderToolExecutionContext,
@@ -393,6 +395,12 @@ export class BuilderInterviewOrchestratorService {
     /** The admin's rules. Optional, like the two above, so fixtures without it still run. */
     @Optional()
     private readonly ruleContext?: BuilderRuleContextService,
+    /** Proactive principles (guiding brief, section focus). Optional, like the rules. */
+    @Optional()
+    private readonly principles?: BuilderPrinciplesService,
+    /** The lessons block (pinned, then retrieved and frozen per session). Optional, like the rest. */
+    @Optional()
+    private readonly lessons?: BuilderLessonsService,
   ) {}
 
   /**
@@ -742,6 +750,20 @@ export class BuilderInterviewOrchestratorService {
       await checkpoint(false);
     }
 
+    // Proactive principles: the guiding brief builds in the background from the first turn
+    // and joins the cached prefix once it lands; the section focus is a small uncached block
+    // for the first PRD section that is not ready, bounded by a timeout.
+    const turnReadiness = await this.readiness.assess(sessionId, doc);
+    this.principles?.ensureBrief(session, userContent);
+    const principlesBrief = this.principles?.briefBlock(session) ?? null;
+    const sectionFocus = this.principles
+      ? await this.principles.sectionFocusBlock(session, turnReadiness)
+      : null;
+    // Lessons from previous builds: pinned ones, then the most relevant to this session, chosen
+    // once and frozen so the cached context block stays a stable prefix.
+    const lessonsBlock = this.lessons
+      ? await this.lessons.blockForSession(session, userContent).catch(() => '')
+      : '';
     const system = await this.buildSystemBlocks(
       session.repos ?? undefined,
       exemplars,
@@ -749,28 +771,26 @@ export class BuilderInterviewOrchestratorService {
       validatedTurns,
       protocol,
       sessionId,
+      principlesBrief,
+      sectionFocus,
+      lessonsBlock,
     );
     const messages: any[] = [
       ...(await this.replayHistory(session, history)),
       {
         role: 'user',
-        content: this.buildLiveUserTurn(
-          doc.draft,
-          await this.readiness.assess(sessionId, doc),
-          userContent,
-          [
-            ...(turn.discovery
-              ? [
-                  renderDiscoveryBlock(turn.discovery),
-                  'This is the opening turn of the interview: read what matters, then end it ' +
-                    'with `submit_situation_brief`. No question until the admin has answered it.',
-                ]
-              : []),
-            ...(briefAnswered
-              ? [renderBriefForModel(briefAnswered, briefResponse)]
-              : []),
-          ],
-        ),
+        content: this.buildLiveUserTurn(doc.draft, turnReadiness, userContent, [
+          ...(turn.discovery
+            ? [
+                renderDiscoveryBlock(turn.discovery),
+                'This is the opening turn of the interview: read what matters, then end it ' +
+                  'with `submit_situation_brief`. No question until the admin has answered it.',
+              ]
+            : []),
+          ...(briefAnswered
+            ? [renderBriefForModel(briefAnswered, briefResponse)]
+            : []),
+        ]),
       },
     ];
     const tools = this.toolsService.getToolDefinitions({
@@ -1243,7 +1263,7 @@ export class BuilderInterviewOrchestratorService {
           content: JSON.stringify(outcome.modelResult),
         });
         // Per tool, not per iteration: a github_read_file that returns a
-        // large file, or a stacks_search, is exactly the work nobody wants
+        // large file, or a principles_search, is exactly the work nobody wants
         // to pay for twice.
         await checkpoint(false);
         if (outcome.endTurn) {
@@ -2136,11 +2156,14 @@ export class BuilderInterviewOrchestratorService {
     validatedTurns = false,
     protocol = false,
     sessionId: string | null = null,
+    principlesBrief: string | null = null,
+    sectionFocus: string | null = null,
+    lessonsBlock = '',
   ): Promise<AgentSystemBlock[]> {
     const [instructions, context, platformRules, platformMap] =
       await Promise.all([
         this.buildSystemPrompt(),
-        this.knowledgeService.buildContextBlock(repos, exemplars),
+        this.knowledgeService.buildContextBlock(repos, exemplars, lessonsBlock),
         this.knowledgeService.platformRules(),
         this.platformContext?.render() ?? Promise.resolve(''),
       ]);
@@ -2183,6 +2206,10 @@ export class BuilderInterviewOrchestratorService {
     if (handoffContext) {
       blocks.push({ text: this.renderHandoff(handoffContext), cache: true });
     }
+    // The guiding principles: frozen per session once built, so they cache like the hand-off.
+    if (principlesBrief) {
+      blocks.push({ text: principlesBrief, cache: true });
+    }
     // The admin's rules: per session (some are scoped to it) and they change
     // when the admin saves one, so after the shared prefix and uncached.
     const rules =
@@ -2190,6 +2217,8 @@ export class BuilderInterviewOrchestratorService {
         ? await this.ruleContext.renderRulesBlock(sessionId)
         : '';
     if (rules) blocks.push({ text: rules, cache: false });
+    // This turn's section focus: changes every turn, so after the cache breakpoint.
+    if (sectionFocus) blocks.push({ text: sectionFocus, cache: false });
     return blocks;
   }
 
@@ -2204,7 +2233,7 @@ export class BuilderInterviewOrchestratorService {
    * session rating, and the rating's shape, were both in the copilot's brief it was never
    * shown.
    *
-   * "Reference what was said rather than asking from scratch" is Stacks, "Sequencing
+   * "Reference what was said rather than asking from scratch" is "Sequencing
    * clarification questions to avoid user overwhelm".
    */
   private renderHandoff(handoffContext: string): string {
@@ -2267,7 +2296,7 @@ export class BuilderInterviewOrchestratorService {
       'You are a product-requirements interviewer for the Ally platform. Ask the ' +
       'admin ONE question at a time via ask_admin, always with recommended options ' +
       'and a custom answer. Research the codebase with the github_* tools and product ' +
-      'guidance with stacks_search before you assume. Keep the PRD up to date with ' +
+      'principles with principles_search before you assume. Keep the PRD up to date with ' +
       'update_prd as you learn, and drive it to full readiness.'
     );
   }

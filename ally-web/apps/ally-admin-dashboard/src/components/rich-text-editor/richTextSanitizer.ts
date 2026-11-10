@@ -1,6 +1,7 @@
 import DOMPurify from "dompurify";
 
 import { ARTICLE_QUESTION_MARKER_ATTR } from "./articleQuestionNode";
+import { CALLOUT_MARKER_ATTR } from "./calloutNode";
 
 const ALLOWED_TAGS = [
   "p",
@@ -26,53 +27,52 @@ const PURIFY_CONFIG = {
   KEEP_CONTENT: true,
 };
 
-// Opt-in variant for editors that support inline images (track article
-// builder). Only `img[src, alt]` is added on top of the default allowlist.
-const PURIFY_CONFIG_WITH_IMAGES = {
-  ...PURIFY_CONFIG,
-  ALLOWED_TAGS: [...ALLOWED_TAGS, "img"],
-  ALLOWED_ATTR: ["src", "alt"],
-};
-
-// Opt-in variant for the track article builder's inline questions. Adds only
-// the empty `div[data-ally-question]` placeholder that anchors a question in
-// the body — the question itself, options and answer key included, is stored
-// outside the HTML and never passes through here.
-const PURIFY_CONFIG_WITH_QUESTIONS = {
-  ALLOWED_TAGS: [...ALLOWED_TAGS, "div"],
-  ALLOWED_ATTR: [ARTICLE_QUESTION_MARKER_ATTR],
-  ALLOW_DATA_ATTR: false,
-  KEEP_CONTENT: true,
-};
-
-const PURIFY_CONFIG_WITH_IMAGES_AND_QUESTIONS = {
-  ALLOWED_TAGS: [...ALLOWED_TAGS, "img", "div"],
-  ALLOWED_ATTR: ["src", "alt", ARTICLE_QUESTION_MARKER_ATTR],
-  ALLOW_DATA_ATTR: false,
-  KEEP_CONTENT: true,
-};
-
 export interface SanitizeHtmlOptions {
   /** Allow `img[src, alt]` tags. Default false — existing callers unchanged. */
   allowImages?: boolean;
   /** Allow `div[data-ally-question]` question placeholders. Default false. */
   allowQuestions?: boolean;
+  /** Allow `div[data-ally-callout]` highlight boxes. Default false. */
+  allowCallouts?: boolean;
 }
+
+/**
+ * The opt-in variants, all for the track article builder, each adding exactly
+ * one thing on top of the default allowlist:
+ * - images: `img[src, alt]`;
+ * - questions: the empty `div[data-ally-question]` placeholder that anchors a
+ *   question in the body — the question itself, options and answer key
+ *   included, is stored outside the HTML and never passes through here;
+ * - callouts: `div[data-ally-callout]`, the highlight box wrapping its
+ *   paragraphs.
+ * No other attribute, data attribute or tag comes along with them.
+ */
+const buildConfig = ({ allowImages, allowQuestions, allowCallouts }: SanitizeHtmlOptions) => {
+  if (!allowImages && !allowQuestions && !allowCallouts) return PURIFY_CONFIG;
+  return {
+    ...PURIFY_CONFIG,
+    ALLOWED_TAGS: [
+      ...ALLOWED_TAGS,
+      ...(allowImages ? ["img"] : []),
+      ...(allowQuestions || allowCallouts ? ["div"] : []),
+    ],
+    ALLOWED_ATTR: [
+      ...(allowImages ? ["src", "alt"] : []),
+      ...(allowQuestions ? [ARTICLE_QUESTION_MARKER_ATTR] : []),
+      ...(allowCallouts ? [CALLOUT_MARKER_ATTR] : []),
+    ],
+  };
+};
 
 /**
  * Sanitize HTML content to allow only safe formatting tags.
  * Strips all attributes, scripts, images, links, iframes, and embeds
- * (images survive only when `allowImages` is set, and question placeholders
- * only when `allowQuestions` is).
+ * (images survive only when `allowImages` is set, question placeholders only
+ * when `allowQuestions` is, and highlight boxes only when `allowCallouts` is).
  */
 export function sanitizeHtml(html: string, options?: SanitizeHtmlOptions): string {
   if (!html) return "";
-  const { allowImages, allowQuestions } = options ?? {};
-  let config = PURIFY_CONFIG;
-  if (allowImages && allowQuestions) config = PURIFY_CONFIG_WITH_IMAGES_AND_QUESTIONS;
-  else if (allowImages) config = PURIFY_CONFIG_WITH_IMAGES;
-  else if (allowQuestions) config = PURIFY_CONFIG_WITH_QUESTIONS;
-  return DOMPurify.sanitize(html, config) as unknown as string;
+  return DOMPurify.sanitize(html, buildConfig(options ?? {})) as unknown as string;
 }
 
 /**

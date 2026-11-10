@@ -52,6 +52,19 @@ export class ChatbotReplyService {
   }
 
   /**
+   * Whether the message matches one of this bot's crisis keyword replies, for a channel that needs
+   * to know before the engine runs (WhatsApp skips its typing indicator for one).
+   */
+  async isCrisisKeyword(
+    text: string,
+    language?: string | null,
+    chatbotId: string | null = null,
+  ): Promise<boolean> {
+    const match = await this.match(text, language, chatbotId);
+    return match?.template.kind === WaTemplateKind.CRISIS;
+  }
+
+  /**
    * Find the first template that matches, in priority order.
    *
    * ONE ordered pass over all four kinds. The ordering is the safety-critical part: a crisis rule

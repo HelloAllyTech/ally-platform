@@ -1,8 +1,11 @@
 {
   "mcpServers": {
-    "stacks": {
-      "command": "bash",
-      "args": ["-c", "exec node \"${CLAUDE_PROJECT_DIR:-.}/.claude/stacks-bridge.mjs\""]
+    "context-library": {
+      "type": "http",
+      "url": "${ALLY_CONTEXT_LIBRARY_URL}",
+      "headers": {
+        "Authorization": "Bearer ${ALLY_CONTEXT_LIBRARY_KEY}"
+      }
     }
   }
 }

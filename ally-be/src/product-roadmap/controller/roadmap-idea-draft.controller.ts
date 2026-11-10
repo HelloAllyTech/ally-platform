@@ -9,9 +9,13 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiSecurity,
   ApiTags,
@@ -27,6 +31,7 @@ import {
   UpdateIdeaDraftDto,
 } from '../dto/roadmap-idea-draft.dto';
 import { RoadmapIdeaDraftService } from '../service/roadmap-idea-draft.service';
+import { RoadmapIdeaTranscriptionService } from '../service/roadmap-idea-transcription.service';
 
 /** Private, unpublished raw ideas. Same tier as filing an opportunity (VOTE). */
 @ApiTags('Product Roadmap')
@@ -34,7 +39,10 @@ import { RoadmapIdeaDraftService } from '../service/roadmap-idea-draft.service';
 @ApiSecurity('access-token')
 @Controller({ path: 'product-roadmap/idea-drafts', version: '1' })
 export class RoadmapIdeaDraftController {
-  constructor(private readonly drafts: RoadmapIdeaDraftService) {}
+  constructor(
+    private readonly drafts: RoadmapIdeaDraftService,
+    private readonly transcription: RoadmapIdeaTranscriptionService,
+  ) {}
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
     permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
@@ -52,6 +60,29 @@ export class RoadmapIdeaDraftController {
   @ApiOperation({ summary: 'Save a raw idea as a private draft' })
   create(@CurrentUser() user: TokenUser, @Body() dto: CreateIdeaDraftDto) {
     return this.drafts.create(user.id, dto);
+  }
+
+  /**
+   * One spoken phrase from the idea-capture mic, as text. Nothing is saved: the words go back to
+   * the capture screen, and only Save there creates a draft. Memory storage keeps the clip as an
+   * in-memory buffer; 25MB is the transcription API's cap.
+   */
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
+  @Post('transcribe')
+  @UseInterceptors(
+    FileInterceptor('audio', { limits: { fileSize: 25 * 1024 * 1024 } }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      'Transcribe one spoken phrase for idea capture. Audio is processed in memory and never stored.',
+  })
+  async transcribe(
+    @UploadedFile() audio: Express.Multer.File,
+  ): Promise<{ text: string }> {
+    return { text: await this.transcription.transcribe(audio) };
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {

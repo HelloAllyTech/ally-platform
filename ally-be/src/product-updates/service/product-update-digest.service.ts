@@ -68,7 +68,7 @@ export interface DigestContent {
  * waiting on a release, and anything worth a second look.
  *
  * The public page is highlights; this is the detail and the reasoning behind
- * them — Stacks' *Adapt stakeholder communication to their role and cadence*.
+ * them — *Adapt stakeholder communication to their role and cadence*.
  * Sent once a day at a business-timezone hour, and only on a day with
  * something to say.
  */

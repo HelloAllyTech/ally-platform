@@ -322,7 +322,7 @@ describe("downloadPrdPdf — transcript", () => {
 
 describe("downloadPrdPdf — transcript receipts", () => {
   const receipt = {
-    read: ["ally-be/src/builder/x.ts", "Stacks: 2 chunks"],
+    read: ["ally-be/src/builder/x.ts", 'Principles search "empty state"'],
     searched: ['Code search "debrief rating" — 4 matches'],
     changed: ["Requirements: added R4", "Repo plan: ally-be"],
     prdVersion: { from: 3, to: 4 },
@@ -349,7 +349,7 @@ describe("downloadPrdPdf — transcript receipts", () => {
     expect(blocks.slice(reply + 1)).toEqual([
       {
         kind: "placeholder",
-        text: 'Checked: ally-be/src/builder/x.ts; Stacks: 2 chunks; Code search "debrief rating" — 4 matches',
+        text: 'Checked: ally-be/src/builder/x.ts; Principles search "empty state"; Code search "debrief rating" — 4 matches',
       },
       {
         kind: "placeholder",

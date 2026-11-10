@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 
 import { ScaleTypes } from "@carbon/charts";
-import { StackedBarChart } from "@carbon/charts-react";
 
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetTokenConsumptionQuery } from "@api";
+import { StackedBarChart } from "@components/charts";
 
 import { AnalyticsTabFilters, asOf, windowLabel } from "./analyticsFilters";
 import { ChartDetailModal } from "./ChartDetailModal";

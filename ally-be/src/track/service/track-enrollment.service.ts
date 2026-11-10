@@ -27,6 +27,7 @@ import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service
 import {
   AnsweredArticleQuestion,
   ArticleContent,
+  ArticleExperience,
   ArticleQuestion,
   JournalContent,
   parseArticleQuestionMarkers,
@@ -47,6 +48,7 @@ import { GameContent, TrackGameKey } from '../type/game.type';
 import { BucketSortContent } from '../type/bucket-sort.type';
 import { sanitizeBucketSortForLearner } from './track-bucket-sort.sanitizer';
 import {
+  BranchingExperience,
   BranchingScenarioContent,
   resolveBranchingRound,
 } from '../type/branching.type';
@@ -784,6 +786,7 @@ export class TrackEnrollmentService {
           type: item.type,
           trackItemProgressId: progress.id,
           intro: scenario.intro ?? null,
+          experience: scenario.experience ?? BranchingExperience.CLASSIC,
           startNodeId: scenario.startNodeId,
           nodes: scenario.nodes,
           passScore: scenario.settings?.passScore || null,
@@ -824,6 +827,9 @@ export class TrackEnrollmentService {
             (question) => answered[question.id],
           ).length,
           resources: article.resources ?? [],
+          experience: article.experience ?? ArticleExperience.CLASSIC,
+          cover: article.cover?.url ? article.cover : null,
+          takeaways: article.takeaways ?? [],
         };
       }
 

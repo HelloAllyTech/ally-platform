@@ -2,7 +2,7 @@
 title: Platform Overview
 tags: [platform, overview, ecosystem, mission]
 summary: What Ally is, its mission, and the multi-repo ecosystem that makes up the platform.
-last_reconciled: 2026-07-28
+last_reconciled: 2026-11-09
 ---
 
 # Ally Platform Overview
@@ -46,7 +46,7 @@ For the detailed data flow, integration points, message queues, and storage, see
 
 - **Contributors**: start with the [Developer Setup](../contributing/dev-setup.md) and the [Contributing Guide](../contributing/guide.md).
 - **AI agents / assistants**: read the cross-repo [Agent Guide](agent-guide.md) for conventions, common tasks, and gotchas.
-- **Anyone shaping the product** (features, UI, scope): search the Stacks corpus before planning — [Planning with the Stacks MCP](../contributing/planning-with-stacks.md). The in-wiki [Product Management Best Practices](../product/best-practices.md) section it replaced is deprecated and kept for history only.
+- **Anyone shaping the product** (features, UI, scope): search Ally's Context Library before planning, and again whenever a product or engineering judgement comes up — [Working with the Context Library](../contributing/planning-with-context-library.md). The in-wiki [Product Management Best Practices](../product/best-practices.md) section (superseded first by Stacks, now by the Context Library) is deprecated and kept for history only.
 
 ## License
 

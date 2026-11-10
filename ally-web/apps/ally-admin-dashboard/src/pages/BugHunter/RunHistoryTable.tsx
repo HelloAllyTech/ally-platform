@@ -58,7 +58,7 @@ const formatCost = (run: BugHuntRun): string =>
  * that the ten had gone missing.
  *
  * The count is the aggregate; the rows are the records behind it. Making the
- * one reach the other is Stacks' *Correlate Logs and Traces via Shared
+ * one reach the other is *Correlate Logs and Traces via Shared
  * Metadata* — the shared id is `runId`, and the jump from "a number looks wrong"
  * to "here is exactly what produced it" is the whole value of having it.
  *

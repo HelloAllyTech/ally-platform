@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon, Trash } from "@assets";
 import { Button, SegmentedToggle } from "@components";
+import { courseSlotPrefix, ImageSourceField, useCourseImage } from "@components/image-studio";
 import { ButtonVariant } from "@components/types";
 import {
   MAX_QUESTION_IMAGE_BYTES,
@@ -58,6 +59,21 @@ export const QuestionMediaField: FC<QuestionMediaFieldProps> = ({ questionPath }
 
   const mediaName = `${questionPath}.media` as `sections.0.items.0.quiz.questions.0.media`;
   const media = useWatch({ control, name: mediaName }) as QuestionMedia | undefined;
+
+  // Image Studio: the question's stem is what the picture is of.
+  const course = useCourseImage();
+  const itemPath = questionPath.split(".quiz.")[0] as `sections.0.items.0`;
+  const serverId = useWatch({ control, name: `${itemPath}.serverId` });
+  const localId = useWatch({ control, name: `${itemPath}.localId` });
+  const questionId = useWatch({
+    control,
+    name: `${questionPath}.id` as `sections.0.items.0.quiz.questions.0.id`,
+  });
+  const stem = useWatch({
+    control,
+    name: `${questionPath}.prompt` as `sections.0.items.0.quiz.questions.0.prompt`,
+  });
+  const slotKey = `${courseSlotPrefix(course.trackId)}:item:${serverId || localId || itemPath}:question:${questionId || questionPath}`;
 
   const [mode, setMode] = useState<AddMode>("image");
   const [linkInput, setLinkInput] = useState("");
@@ -147,6 +163,27 @@ export const QuestionMediaField: FC<QuestionMediaFieldProps> = ({ questionPath }
     setLinkInput("");
   };
 
+  /** Generated images are WebP and already the right shape: no type/size checks. */
+  const handleGenerated = (url: string, altText: string) =>
+    // Alt is required for a question image; the generator always supplies one.
+    setMedia({ kind: "image", source: "s3", url, alt: altText || media?.alt || "" });
+
+  /** Upload · ✨ Generate for images; a video keeps its upload/link controls only. */
+  const withGenerate = (children: React.ReactNode, offer = true) =>
+    !offer ? (
+      children
+    ) : (
+      <ImageSourceField
+        slotKind="quiz_question"
+        slotKey={slotKey}
+        context={{ text: typeof stem === "string" ? stem : "" }}
+        disabled={isUploading}
+        onAccept={image => handleGenerated(image.url, image.altText)}
+      >
+        {children}
+      </ImageSourceField>
+    );
+
   const embedUrl = media ? getQuestionMediaEmbedUrl(media) : null;
   const isLinkedVideo = media?.kind === "video" && media.source !== "s3";
 
@@ -234,42 +271,45 @@ export const QuestionMediaField: FC<QuestionMediaFieldProps> = ({ questionPath }
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            {isLinkedVideo ? (
-              // A linked clip has no file to replace, so "Replace" would
-              // open a file picker and quietly turn the link into an
-              // upload. Drop the trainer back into the link field with
-              // the current URL instead.
-              <Button
-                variant={ButtonVariant.SECONDARY}
-                className="!h-8 w-fit text-xs"
-                onClick={() => {
-                  setLinkInput(media.url);
-                  setMode("link");
-                  setMedia(undefined);
-                }}
+          {withGenerate(
+            <div className="flex items-center gap-2">
+              {isLinkedVideo ? (
+                // A linked clip has no file to replace, so "Replace" would
+                // open a file picker and quietly turn the link into an
+                // upload. Drop the trainer back into the link field with
+                // the current URL instead.
+                <Button
+                  variant={ButtonVariant.SECONDARY}
+                  className="!h-8 w-fit text-xs"
+                  onClick={() => {
+                    setLinkInput(media.url);
+                    setMode("link");
+                    setMedia(undefined);
+                  }}
+                >
+                  Change link
+                </Button>
+              ) : (
+                <Button
+                  variant={ButtonVariant.SECONDARY}
+                  className="!h-8 w-fit text-xs"
+                  onClick={() => openPicker(media.kind === "image" ? "image" : "video")}
+                  disabled={isUploading}
+                >
+                  {isUploading ? "Uploading…" : "Replace"}
+                </Button>
+              )}
+              <button
+                type="button"
+                onClick={() => setMedia(undefined)}
+                className="inline-flex items-center gap-1 text-xs text-destructive-500 hover:text-destructive-600"
               >
-                Change link
-              </Button>
-            ) : (
-              <Button
-                variant={ButtonVariant.SECONDARY}
-                className="!h-8 w-fit text-xs"
-                onClick={() => openPicker(media.kind === "image" ? "image" : "video")}
-                disabled={isUploading}
-              >
-                {isUploading ? "Uploading…" : "Replace"}
-              </Button>
-            )}
-            <button
-              type="button"
-              onClick={() => setMedia(undefined)}
-              className="inline-flex items-center gap-1 text-xs text-destructive-500 hover:text-destructive-600"
-            >
-              <Trash className="w-3.5 h-3.5" />
-              Remove
-            </button>
-          </div>
+                <Trash className="w-3.5 h-3.5" />
+                Remove
+              </button>
+            </div>,
+            media.kind === "image",
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -302,6 +342,17 @@ export const QuestionMediaField: FC<QuestionMediaFieldProps> = ({ questionPath }
               </div>
               {linkError && <p className="text-xs text-destructive-500">{linkError}</p>}
             </div>
+          ) : mode === "image" ? (
+            withGenerate(
+              <Button
+                variant={ButtonVariant.SECONDARY}
+                className="!h-10 w-fit text-sm"
+                onClick={() => openPicker(mode)}
+                disabled={isUploading}
+              >
+                {isUploading ? "Uploading…" : "Upload image"}
+              </Button>,
+            )
           ) : (
             <Button
               variant={ButtonVariant.SECONDARY}
@@ -309,7 +360,7 @@ export const QuestionMediaField: FC<QuestionMediaFieldProps> = ({ questionPath }
               onClick={() => openPicker(mode)}
               disabled={isUploading}
             >
-              {isUploading ? "Uploading…" : mode === "image" ? "Upload image" : "Upload video"}
+              {isUploading ? "Uploading…" : "Upload video"}
             </Button>
           )}
         </div>

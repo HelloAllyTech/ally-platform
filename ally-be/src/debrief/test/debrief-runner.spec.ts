@@ -84,6 +84,8 @@ function build(opts: {
   assessment?: boolean;
   inCase?: boolean;
   bundle?: unknown;
+  /** What the guidance search finds. */
+  guidance?: unknown[];
 }) {
   const saved: any[] = [];
   const calls: string[] = [];
@@ -149,8 +151,13 @@ function build(opts: {
       return next;
     }),
   };
-  const knowledge = {
-    searchForAudience: jest.fn(async () => ({ passages: [] })),
+  const guidance = {
+    search: jest.fn(
+      async (): Promise<any> => ({
+        results: opts.guidance ?? [],
+        noConfidentMatch: !(opts.guidance ?? []).length,
+      }),
+    ),
   };
   const releases = {
     getGa: async () => ({
@@ -165,14 +172,14 @@ function build(opts: {
     ai as any,
     releases as any,
     { optionsFor: async () => opts.practice ?? [] } as any,
-    knowledge as any,
+    guidance as any,
     {
       // Every model the seed names is in the catalog, as it is in prod.
       getModels: async () =>
         Object.values(DEBRIEF_MODELS).map((model) => ({ model })),
     } as any,
   );
-  return { svc, saved, calls, ai, knowledge, runs };
+  return { svc, saved, calls, ai, guidance, runs };
 }
 
 const safetyWithCue = {
@@ -334,8 +341,21 @@ describe('DebriefRunnerService', () => {
     });
   });
 
-  it('looks guidance up in the debrief knowledge base, as the organisation may read it', async () => {
-    const { svc, knowledge } = build({
+  it('looks guidance up in Debrief Guidance, as the organisation may read it', async () => {
+    const { svc, guidance, ai } = build({
+      guidance: [
+        {
+          chunk: {
+            id: 'c1',
+            code: 'DG-0003',
+            statement: 'Ask about safety directly',
+            body: 'Ask directly and calmly; asking does not plant the idea.',
+            citation: { title: 'Practice guideline: risk' },
+            attributes: {},
+          },
+          band: 'good',
+        },
+      ],
       steps: {
         'safety-reader': [safetyWithCue],
         analyst: [
@@ -352,15 +372,26 @@ describe('DebriefRunnerService', () => {
       },
     });
     await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    expect(knowledge.searchForAudience).toHaveBeenCalledWith(
+    expect(guidance.search).toHaveBeenCalledWith(
       expect.objectContaining({
-        corpus: 'debrief_knowledge',
-        query: 'client hints at self-harm',
+        useCase: 'debrief',
+        collections: ['debrief_guidance'],
+        queries: ['client hints at self-harm'],
+        // 't1' is not an organisation id, so only global guidelines.
+        audience: { tenantId: null },
+        sessionId: 's1',
       }),
-      // 't1' is not an organisation id, so only platform documents.
-      { tenantId: null },
-      expect.objectContaining({ consumer: 'debrief', sessionId: 's1' }),
     );
+    // The Writer reads the guideline as it read a passage: cited by its document, word for word.
+    const writer = (ai.step.mock.calls as any[]).find(
+      ([path]) => path === 'writer',
+    );
+    expect(writer[1].passages).toEqual([
+      {
+        title: 'Practice guideline: risk',
+        text: 'Ask directly and calmly; asking does not plant the idea.',
+      },
+    ]);
   });
 
   it('reads the language from the transcript when the session recorded none, and keeps that on the run', async () => {

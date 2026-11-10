@@ -21,8 +21,6 @@ import {
   BuilderBuildEvent,
   BuilderBuildRun,
   BuilderExemplar,
-  BuilderLesson,
-  BuilderLessonStatus,
   BuilderAutonomyLevel,
   BuilderMilestone,
   BuilderNotification,
@@ -33,13 +31,13 @@ import {
   BuilderRepoMapSummary,
   BuilderRunStatus,
   BuilderPipelineHealth,
+  BuilderPrinciples,
   BuilderScoreboard,
   BuilderSession,
   BuilderSessionDetail,
   BuilderSessionStatus,
   BuilderSettings,
   CreateBuilderSessionRequest,
-  PatchBuilderLessonRequest,
   DismissBuilderReviewFindingRequest,
   DismissBuilderReviewFindingResponse,
   PatchBuilderPrdRequest,
@@ -184,6 +182,25 @@ export const builderAPI = baseAPI.injectEndpoints({
      * wrong. Answers with readiness and the session status, because a
      * dismissal can be the last thing between the PRD and ready.
      */
+    /** "Principles in play" for one session, with each one's status from usage. */
+    getBuilderPrinciples: builder.query<BuilderPrinciples, string>({
+      query: id => ({
+        url: ApiEndpoints.BUILDER.SESSION_PRINCIPLES(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_PRINCIPLES, id }],
+    }),
+
+    /** The per-session switch. `off: true` stops the brief and the per-turn searches. */
+    setBuilderPrinciplesOff: builder.mutation<{ off: boolean }, { id: string; off: boolean }>({
+      query: ({ id, off }) => ({
+        url: ApiEndpoints.BUILDER.SESSION_PRINCIPLES(id),
+        method: HttpMethod.PUT,
+        body: { off },
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: TAG_TYPES.BUILDER_PRINCIPLES, id }],
+    }),
+
     dismissBuilderReviewFinding: builder.mutation<
       DismissBuilderReviewFindingResponse,
       DismissBuilderReviewFindingRequest
@@ -663,45 +680,8 @@ export const builderAPI = baseAPI.injectEndpoints({
       }),
     }),
 
-    /* ── Knowledge: lessons + exemplars ──────────────────────────────────
-     * No polling here — a curated list only changes on an admin's own edit
-     * or a "Consolidate now" run, both of which already invalidate the tag,
-     * unlike the build surfaces above where the agent moves on its own. */
-
-    getBuilderLessons: builder.query<
-      BuilderLesson[],
-      { status?: BuilderLessonStatus; category?: string; repo?: string } | void
-    >({
-      query: params => ({
-        url: ApiEndpoints.BUILDER.LESSONS,
-        method: HttpMethod.GET,
-        params: params
-          ? {
-              ...(params.status ? { status: params.status } : {}),
-              ...(params.category ? { category: params.category } : {}),
-              ...(params.repo ? { repo: params.repo } : {}),
-            }
-          : undefined,
-      }),
-      providesTags: [TAG_TYPES.BUILDER_LESSONS],
-    }),
-
-    patchBuilderLesson: builder.mutation<BuilderLesson, PatchBuilderLessonRequest>({
-      query: ({ id, ...body }) => ({
-        url: ApiEndpoints.BUILDER.LESSON_BY_ID(id),
-        method: HttpMethod.PATCH,
-        body,
-      }),
-      invalidatesTags: [TAG_TYPES.BUILDER_LESSONS],
-    }),
-
-    consolidateBuilderLessons: builder.mutation<{ ok: boolean }, void>({
-      query: () => ({
-        url: ApiEndpoints.BUILDER.LESSONS_CONSOLIDATE,
-        method: HttpMethod.POST,
-      }),
-      invalidatesTags: [TAG_TYPES.BUILDER_LESSONS],
-    }),
+    /* ── Knowledge: exemplars ─────────────────────────────────────────────
+     * Lessons are the Context Library's Builder Lessons collection now. */
 
     getBuilderExemplars: builder.query<BuilderExemplar[], void>({
       query: () => ({
@@ -717,6 +697,8 @@ export const {
   useGetBuilderSessionsQuery,
   useGetArchivedBuilderSessionsQuery,
   useGetBuilderSessionQuery,
+  useGetBuilderPrinciplesQuery,
+  useSetBuilderPrinciplesOffMutation,
   useCreateBuilderSessionMutation,
   useUpdateBuilderSessionMutation,
   useCancelBuilderSessionMutation,
@@ -747,9 +729,6 @@ export const {
   useAnswerBuilderDecisionMutation,
   useGetBuilderPipelineHealthQuery,
   useGetBuilderScoreboardQuery,
-  useGetBuilderLessonsQuery,
-  usePatchBuilderLessonMutation,
-  useConsolidateBuilderLessonsMutation,
   useGetBuilderExemplarsQuery,
   useGetBuilderNowQuery,
   useUndoBuilderDecisionMutation,

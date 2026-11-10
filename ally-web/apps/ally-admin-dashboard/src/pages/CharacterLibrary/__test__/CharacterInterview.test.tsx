@@ -38,8 +38,10 @@ vi.mock("@components", () => ({
     ) : null,
   CharacterSidePanel: () => null,
 }));
-vi.mock("@components/character-corpus", () => ({
-  CharacterCorpusPanel: () => null,
+vi.mock("@components/character-insights", () => ({
+  CharacterInsightsCard: ({ compact }: any) => (
+    <span data-testid="character-insights-card">{compact ? "compact" : "card"}</span>
+  ),
 }));
 vi.mock("@components/character-interview", () => ({
   ChatComposer: () => <div data-testid="chat-composer" />,
@@ -48,7 +50,6 @@ vi.mock("@components/character-interview", () => ({
 }));
 
 vi.mock("@hooks", () => ({
-  useCanCurateCharacterCorpus: vi.fn(() => true),
   useUser: vi.fn(() => ({
     featureFlags: {},
   })),
@@ -82,9 +83,6 @@ vi.mock("@constants", () => ({
     simulation: {
       characters: "Characters",
     },
-    characterCorpus: {
-      trigger: "Reference corpus",
-    },
   },
   LOCAL_STORAGE_KEYS: {
     CHARACTER_INTERVIEW_SESSION_ID: "char_interview_session_id",
@@ -107,7 +105,6 @@ vi.mock("react-router-dom", async importOriginal => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-
 const renderCharacterInterview = () =>
   render(
     <MemoryRouter>
@@ -124,17 +121,19 @@ describe("CharacterInterview", () => {
     vi.clearAllMocks();
     localStorage.clear();
     mockCreateSession.mockReturnValue({ unwrap: () => Promise.resolve({ id: "new-session" }) });
-    mockGetSession.mockReturnValue({ unwrap: () => Promise.resolve({ id: "session-123", status: "ACTIVE", messages: []}) });
+    mockGetSession.mockReturnValue({
+      unwrap: () => Promise.resolve({ id: "session-123", status: "ACTIVE", messages: [] }),
+    });
     mockAbandonSession.mockReturnValue({ unwrap: () => Promise.resolve({}) });
     (api.useAbandonCharacterInterviewSessionMutation as ReturnType<typeof vi.fn>).mockReturnValue([
-        mockAbandonSession,
+      mockAbandonSession,
     ]);
 
     (api.useCreateCharacterInterviewSessionMutation as ReturnType<typeof vi.fn>).mockReturnValue([
-        mockCreateSession,
+      mockCreateSession,
     ]);
     (api.useLazyGetCharacterInterviewSessionQuery as ReturnType<typeof vi.fn>).mockReturnValue([
-        mockGetSession,
+      mockGetSession,
     ]);
   });
 
@@ -144,6 +143,12 @@ describe("CharacterInterview", () => {
     const charactersLink = screen.getByText("Characters");
     // The ArrowDown icon should be inside the clickable element for it to be a single control
     expect(charactersLink.querySelector('[data-testid="arrow-down-icon"]')).toBeInTheDocument();
+  });
+
+  it("links to what the interview draws on, compactly, in the header", async () => {
+    renderCharacterInterview();
+    await screen.findByText("Characters");
+    expect(screen.getByTestId("character-insights-card")).toHaveTextContent("compact");
   });
 
   it("toasts the server's own reason when the interview can't start", async () => {

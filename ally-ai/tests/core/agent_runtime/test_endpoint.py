@@ -129,7 +129,7 @@ class TestRun:
     def test_a_bad_final_state_is_a_mapped_500(self, client, monkeypatch):
         """Building the response is inside the error mapping too."""
         monkeypatch.setattr(
-            "app.api.v1.endpoints.agent_runtime.run_agent",
+            "app.core.agent_runtime.runner.run_agent",
             AsyncMock(return_value={"trace": []}),
         )
         response = client.post(URL, json=BODY)

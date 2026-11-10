@@ -41,9 +41,11 @@ import {
 } from '../dto/chatbot.dto';
 import { effectiveRuntime, isFallback } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
-import type {
-  AgentFailureReason,
-  ChatbotDecision,
+import {
+  PREVIEW_CHANNEL,
+  type AgentFailureReason,
+  type ChatbotDecision,
+  type LiveReply,
 } from '../engine/chatbot-engine.types';
 import { withFirstMessageParts } from '../engine/first-reply';
 import type { ChatbotModelChoice } from '../type/chatbot.type';
@@ -686,7 +688,16 @@ export class ChatbotService {
    * model or document selection before saving it. The sender is the admin themselves; the "who can
    * chat" check is skipped unless asked for, since testing is about the answers.
    */
-  async test(id: string, dto: TestChatbotDto): Promise<ChatbotTestResult> {
+  /**
+   * One Preview message, through the production decision path. With `live` (the streamed route)
+   * the run's status, steps and checked text are sent as they happen; the result is the same
+   * either way, and it is what the streamed route sends as `final`.
+   */
+  async test(
+    id: string,
+    dto: TestChatbotDto,
+    live?: LiveReply,
+  ): Promise<ChatbotTestResult> {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
     const draft = dto.draft ?? {};
     if (draft.model) await this.assertModel(draft.model);
@@ -720,23 +731,26 @@ export class ChatbotService {
     // first reply on WhatsApp: a hello gets the welcome message and the first-message notice.
     const isFirstMessage = !(dto.history ?? []).length;
     const startedAt = Date.now();
-    const decision = await this.engine.respond({
-      chatbot: bot,
-      settings,
-      text: dto.message,
-      history: dto.history ?? [],
-      isFirstMessage,
-      sender: {
-        externalId: `test:${currentUserId()}`,
-        label: 'test console',
-        userId: me[0]?.id ?? null,
-        email: me[0]?.email ?? null,
-        tenantId: dto.asTenantId ?? me[0]?.tenant_id ?? null,
+    const decision = await this.engine.respond(
+      {
+        chatbot: bot,
+        settings,
+        text: dto.message,
+        history: dto.history ?? [],
+        isFirstMessage,
+        sender: {
+          externalId: `test:${currentUserId()}`,
+          label: 'test console',
+          userId: me[0]?.id ?? null,
+          email: me[0]?.email ?? null,
+          tenantId: dto.asTenantId ?? me[0]?.tenant_id ?? null,
+        },
+        channel: PREVIEW_CHANNEL,
+        documentIds: draft.documentIds,
+        conversationId,
       },
-      channel: { type: 'test' },
-      documentIds: draft.documentIds,
-      conversationId,
-    });
+      live,
+    );
 
     // Remembered so the setup checklist can show the bot has been tried; Preview stores nothing else.
     await this.chatbotRepository.update({ id }, { lastTestedAt: new Date() });

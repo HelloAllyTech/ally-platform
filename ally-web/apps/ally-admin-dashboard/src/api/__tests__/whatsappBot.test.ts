@@ -17,9 +17,7 @@ import whatsappBotSource from "../whatsappBot.ts?raw";
  * internal shape change, which is more than can be said for poking at private fields.
  */
 describe("whatsappBot API tag registration", () => {
-  const usedTags = [
-    ...new Set(whatsappBotSource.match(/TAG_TYPES\.[A-Z0-9_]+/g) ?? []),
-  ];
+  const usedTags = [...new Set(whatsappBotSource.match(/TAG_TYPES\.[A-Z0-9_]+/g) ?? [])];
 
   it("uses at least one tag (guards against the regex silently matching nothing)", () => {
     expect(usedTags.length).toBeGreaterThan(0);
@@ -44,18 +42,25 @@ describe("whatsappBot API tag registration", () => {
  */
 describe("WhatsApp bot chart bundle split", () => {
   const chartImporters = Object.entries(
-    import.meta.glob("../../pages/WhatsAppBot/*.tsx", { query: "?raw", import: "default", eager: true }) as Record<
-      string,
-      string
-    >,
+    import.meta.glob("../../pages/WhatsAppBot/*.tsx", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>,
   )
-    .filter(([, source]) => /from "@carbon\/charts/.test(source))
+    // Charts arrive through the themed wrapper (`@components/charts`) or Carbon directly; either
+    // one pulls the chart library in.
+    .filter(([, source]) => /from "(@carbon\/charts|@components\/charts)/.test(source))
     .map(([path]) => path.split("/").pop());
 
   it("finds the WhatsAppBot sources (guards against the glob silently matching nothing)", () => {
     expect(
       Object.keys(
-        import.meta.glob("../../pages/WhatsAppBot/*.tsx", { query: "?raw", import: "default", eager: true }),
+        import.meta.glob("../../pages/WhatsAppBot/*.tsx", {
+          query: "?raw",
+          import: "default",
+          eager: true,
+        }),
       ).length,
     ).toBeGreaterThan(5);
   });

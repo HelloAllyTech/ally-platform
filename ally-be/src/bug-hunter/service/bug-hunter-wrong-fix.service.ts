@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { In, MoreThanOrEqual } from 'typeorm';
 
 import { LoggerService } from 'src/logger/logger.service';
-import { AgentMemoryAgent } from 'src/agent-memory/enum/agent-memory.enum';
-import { AgentMemoryService } from 'src/agent-memory/service/agent-memory.service';
+import { ClCollectionId } from 'src/context-library/enum/context-library.enum';
+import { ContextAgentChunkService } from 'src/context-library/service/context-agent-chunk.service';
 
 import { BugFinding } from '../entity/bug-finding.entity';
 import { BugFindingStatus } from '../enum/bug-finding.enum';
@@ -57,7 +57,7 @@ export class BugHunterWrongFixService {
   constructor(
     private readonly findingRepository: BugFindingRepository,
     private readonly bugHunterService: BugHunterService,
-    private readonly memoryService: AgentMemoryService,
+    private readonly notes: ContextAgentChunkService,
   ) {}
 
   /**
@@ -86,13 +86,13 @@ export class BugHunterWrongFixService {
         summary: `${this.describe(row)}${options.reopen ? ' — reopened; the next attempt reads this first.' : ''}`,
         payload: { wrongFix: row, reopened: options.reopen },
       });
-      await this.memoryService.write({
-        agent: AgentMemoryAgent.BUG_HUNTER,
-        body: this.lesson(finding, row),
+      await this.notes.writeAgentChunk({
+        collection: ClCollectionId.BUG_HUNTER_NOTES,
+        agent: 'bug_hunter',
+        statement: this.lesson(finding, row),
         repos: finding.repo ? [finding.repo] : null,
-        tags: ['wrong-fix', 'fix-gotcha', `link:${row.link}`],
-        findingId: finding.id,
-        pinned: false,
+        facets: { tags: ['wrong-fix', 'fix-gotcha', `link:${row.link}`] },
+        evidence: { findingId: finding.id },
       });
     } catch (error) {
       this.logger.warn(
@@ -117,7 +117,7 @@ export class BugHunterWrongFixService {
     }
   }
 
-  /** Under 600 characters, written for a stranger — the notebook's rule. */
+  /** Under 600 characters, written for a stranger — the rule for Bug Hunter Notes. */
   private lesson(finding: BugFinding, w: BugWrongFix): string {
     const head = `Wrong fix on "${finding.title.slice(0, 90)}"${finding.repo ? ` (${finding.repo})` : ''}: the chain broke at "${BUG_CHAIN_LINK_WORDS[w.link]}" (${w.source}).`;
     const why = ` ${w.reason}`.slice(0, 330);

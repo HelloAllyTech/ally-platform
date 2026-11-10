@@ -1,0 +1,10 @@
+{{define "content"}}
+<form class="login" method="post" action="/login">
+  <h1>Storage archive</h1>
+  <p class="lead">Moves private S3 objects to the Storage Box. Operators only.</p>
+  {{if .Error}}<div class="flash err">{{.Error}}</div>{{end}}
+  <label for="password">Admin password</label>
+  <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+  <button class="primary" type="submit">Sign in</button>
+</form>
+{{end}}

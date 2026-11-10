@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +13,9 @@ import '../../../core/widgets/html_rich_text.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import '../data/start_item_payload.dart';
+import 'article/article_cards_view.dart';
 import 'article/article_player.dart';
+import 'article/article_reading.dart';
 import 'branching/branching_scenario_player.dart';
 import 'bucket_sort/bucket_sort_player.dart';
 import 'celebration_modal.dart';
@@ -125,6 +128,11 @@ class _CourseItemPlayerScreenState
   bool _refetchTrackOnReturn = false;
   bool _wasCurrent = true;
 
+  /// The branching player is showing its story layout: the photo runs up
+  /// behind a see-through top bar and the bottom nav steps aside (story
+  /// endings carry their own Continue / Try again).
+  bool _storyImmersive = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -152,6 +160,7 @@ class _CourseItemPlayerScreenState
       _isLoadingItem = true;
       _loadError = false;
       _payload = null;
+      _storyImmersive = false;
     });
     try {
       final payload = await ref.read(coursesRepositoryProvider).startTrackItem(itemId);
@@ -236,6 +245,36 @@ class _CourseItemPlayerScreenState
     final completedCount = flat.where((f) => _isItemCompleted(f.item)).length;
     final isTrackLoadPending = trackAsync.isLoading && detail == null;
     final isTrackError = trackAsync.hasError && detail == null;
+    final storyImmersive = _storyImmersive &&
+        !isTrackError &&
+        !_loadError &&
+        !_isLoadingItem &&
+        _payload?.type == 'BRANCHING_SCENARIO';
+    // An article's reading layout picks its chrome up front (it follows
+    // from the payload, so no callback): Magazine with a cover floats the
+    // top bar over the photo; Cards draws its own header and buttons.
+    final articleLayout =
+        !isTrackError &&
+            !isTrackLoadPending &&
+            !_loadError &&
+            !_isLoadingItem &&
+            _payload?.type == 'ARTICLE' &&
+            (current != null || widget.item?.id == _currentItemId)
+        ? articleLayoutOf(_payload!)
+        : null;
+    final immersive = storyImmersive || articleLayout == ArticleLayout.magazineImmersive;
+    final showTopBar = !immersive && articleLayout != ArticleLayout.cards;
+    final showBottomNav = !storyImmersive && articleLayout != ArticleLayout.cards;
+    final topBar = _PlayerTopBar(
+      sectionTitle: current?.sectionTitle ?? '',
+      itemTitle: current?.item.title ?? '',
+      description: current?.item.description,
+      sectionItems: sectionItems,
+      currentItemId: _currentItemId,
+      overallPct: overallPct,
+      onExit: _exitToOverview,
+      overlay: immersive,
+    );
 
     // The celebration overlay handles back itself (its own PopScope); this
     // closure keeps the value it was built with, so dismissing the overlay
@@ -249,27 +288,26 @@ class _CourseItemPlayerScreenState
         if (!didPop && !celebrationShown) _exitToOverview();
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        // Cards' warm page runs up behind the status bar too.
+        backgroundColor: articleLayout == ArticleLayout.cards ? articleCardsBackground : Colors.white,
         body: Stack(
           children: [
+            // Immersive: the body starts at the very top of the screen (the
+            // top bar floats over it below) — same tree either way, and the
+            // body keyed, so the player keeps its state across the switch.
             SafeArea(
+              top: !immersive,
               child: Column(
                 children: [
-                  _PlayerTopBar(
-                    sectionTitle: current?.sectionTitle ?? '',
-                    itemTitle: current?.item.title ?? '',
-                    description: current?.item.description,
-                    sectionItems: sectionItems,
-                    currentItemId: _currentItemId,
-                    overallPct: overallPct,
-                    onExit: _exitToOverview,
-                  ),
+                  if (showTopBar) topBar,
                   Expanded(
+                    key: const ValueKey('player-body'),
                     child: _buildBody(
                       isTrackError: isTrackError,
                       isTrackLoadPending: isTrackLoadPending,
                       current: current,
                       languageCode: detail?.languageCode,
+                      isLastItem: !hasNext,
                     ),
                   ),
                   if (current?.item.hasDiscussion ?? false)
@@ -278,20 +316,30 @@ class _CourseItemPlayerScreenState
                       itemId: _currentItemId,
                       highlightPostId: widget.highlightPostId,
                     ),
-                  _PlayerBottomNav(
-                    hasPrev: hasPrev,
-                    isLastItem: !hasNext,
-                    canAdvance: canAdvance,
-                    onPrev: () {
-                      if (hasPrev) _goToItem(flat[currentIndex - 1].item.id);
-                    },
-                    onNext: _goNextOrOverview,
-                  ),
+                  if (showBottomNav)
+                    _PlayerBottomNav(
+                      hasPrev: hasPrev,
+                      isLastItem: !hasNext,
+                      canAdvance: canAdvance,
+                      onPrev: () {
+                        if (hasPrev) _goToItem(flat[currentIndex - 1].item.id);
+                      },
+                      onNext: _goNextOrOverview,
+                    ),
                 ],
               ),
             ),
+            if (immersive)
+              Positioned(
+                key: const ValueKey('player-top-bar-overlay'),
+                top: 0,
+                left: 0,
+                right: 0,
+                child: topBar,
+              ),
             if (_celebration != null)
               Positioned.fill(
+                key: const ValueKey('player-celebration'),
                 child: CelebrationModal(
                   kind: _celebration!,
                   completedCount: completedCount,
@@ -326,6 +374,7 @@ class _CourseItemPlayerScreenState
     required bool isTrackLoadPending,
     required _FlatTrackItem? current,
     required String? languageCode,
+    required bool isLastItem,
   }) {
     final errorStyle = CourseText.system(const TextStyle(fontSize: 14), AppColors.mediumEmphasis);
     if (isTrackError && !isTrackLoadPending) {
@@ -365,6 +414,12 @@ class _CourseItemPlayerScreenState
           itemId: _currentItemId,
           alreadyCompleted: alreadyCompleted,
           onCompleted: _handleCompletion,
+          itemTitle: item.title,
+          sectionTitle: current?.sectionTitle ?? '',
+          description: item.description,
+          onExit: _exitToOverview,
+          onRequestNext: _goNextOrOverview,
+          isLastItem: isLastItem,
         );
       case 'VIDEO':
         return VideoItemPlayer(
@@ -420,6 +475,9 @@ class _CourseItemPlayerScreenState
           onCompleted: _handleCompletion,
           onRequestNext: _goNextOrOverview,
           onBack: _exitToOverview,
+          onImmersiveChanged: (immersive) {
+            if (mounted && immersive != _storyImmersive) setState(() => _storyImmersive = immersive);
+          },
         );
       case 'BUCKET_SORT':
         return BucketSortPlayer(
@@ -576,6 +634,7 @@ class _PlayerTopBar extends ConsumerWidget {
     required this.currentItemId,
     required this.overallPct,
     required this.onExit,
+    this.overlay = false,
   });
 
   final String sectionTitle;
@@ -586,11 +645,96 @@ class _PlayerTopBar extends ConsumerWidget {
   final int overallPct;
   final VoidCallback onExit;
 
+  /// Drawn over a story scene's photo: white on a dark top gradient, no
+  /// description (it would cover the photo), light status-bar icons. The
+  /// caller positions it and this applies the top safe-area inset itself.
+  final bool overlay;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final size = RnSize.of(context);
-    final tiny = CourseText.roboto(CourseType.bodyTiny, AppColors.mediumEmphasis);
-    final plainDescription = htmlToPlainText(description);
+    final tiny = CourseText.roboto(CourseType.bodyTiny, overlay ? Colors.white : AppColors.mediumEmphasis);
+    final plainDescription = overlay ? '' : htmlToPlainText(description);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: withGap<Widget>([
+        Row(
+          children: [
+            Semantics(
+              button: true,
+              label: ref.t('courses.player.exit'),
+              child: GestureDetector(
+                key: const Key('player-exit-button'),
+                behavior: HitTestBehavior.opaque,
+                onTap: onExit,
+                child: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Center(
+                    child: SizedBox(
+                      width: size.raw(16),
+                      height: size.raw(16),
+                      child: SvgPicture.asset(
+                        'assets/icons/close.svg',
+                        colorFilter: overlay ? const ColorFilter.mode(Colors.white, BlendMode.srcIn) : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(sectionTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: tiny),
+                  Text(
+                    itemTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: CourseText.serifMedium(
+                      CourseType.bodyMedium,
+                      overlay ? Colors.white : AppColors.highEmphasis,
+                      weight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(ref.t('courses.player.overallProgress', {'pct': overallPct}), style: tiny),
+          ],
+        ),
+        if (plainDescription.isNotEmpty)
+          Text(
+            plainDescription,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: CourseText.roboto(CourseType.bodySmall, AppColors.mediumEmphasis),
+          ),
+        _SegmentedProgressRail(sectionItems: sectionItems, currentItemId: currentItemId, overlay: overlay),
+      ], () => const SizedBox(height: 8)),
+    );
+    if (overlay) {
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light,
+        child: Container(
+          key: const Key('player-top-bar-overlay-content'),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x99000000), Color(0x00000000)],
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 28), child: content),
+          ),
+        ),
+      );
+    }
     // styles.header: padding 16/12/10, borderBottom 0.5, gap 8.
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
@@ -598,60 +742,7 @@ class _PlayerTopBar extends ConsumerWidget {
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AppColors.strokePrimary, width: 0.5)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: withGap<Widget>([
-          Row(
-            children: [
-              Semantics(
-                button: true,
-                label: ref.t('courses.player.exit'),
-                child: GestureDetector(
-                  key: const Key('player-exit-button'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onExit,
-                  child: SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: Center(
-                      child: SizedBox(
-                        width: size.raw(16),
-                        height: size.raw(16),
-                        child: SvgPicture.asset('assets/icons/close.svg'),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(sectionTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: tiny),
-                    Text(
-                      itemTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: CourseText.serifMedium(CourseType.bodyMedium, AppColors.highEmphasis, weight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(ref.t('courses.player.overallProgress', {'pct': overallPct}), style: tiny),
-            ],
-          ),
-          if (plainDescription.isNotEmpty)
-            Text(
-              plainDescription,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: CourseText.roboto(CourseType.bodySmall, AppColors.mediumEmphasis),
-            ),
-          _SegmentedProgressRail(sectionItems: sectionItems, currentItemId: currentItemId),
-        ], () => const SizedBox(height: 8)),
-      ),
+      child: content,
     );
   }
 }
@@ -661,10 +752,14 @@ class _PlayerTopBar extends ConsumerWidget {
 /// current item is lightBlue[200], the rest grey[200]. Gap 4, height 4,
 /// radius 2.
 class _SegmentedProgressRail extends StatelessWidget {
-  const _SegmentedProgressRail({required this.sectionItems, required this.currentItemId});
+  const _SegmentedProgressRail({required this.sectionItems, required this.currentItemId, this.overlay = false});
 
   final List<_FlatTrackItem> sectionItems;
   final String currentItemId;
+
+  /// Over a photo: completed white, current lightBlue[200], the rest a
+  /// translucent white.
+  final bool overlay;
 
   @override
   Widget build(BuildContext context) {
@@ -677,10 +772,10 @@ class _SegmentedProgressRail extends StatelessWidget {
               height: 4,
               decoration: BoxDecoration(
                 color: flatItem.item.status == TrackItemStatus.completed
-                    ? AppColors.primary
+                    ? (overlay ? Colors.white : AppColors.primary)
                     : flatItem.item.id == currentItemId
                     ? AppColors.lightBlue200
-                    : AppColors.grey200,
+                    : (overlay ? const Color(0x59FFFFFF) : AppColors.grey200),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

@@ -9,7 +9,9 @@ import {
   Patch,
   Post,
   Put,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -35,7 +37,10 @@ import { ChatbotMemberRole } from '../enum/chatbot.enum';
 import { CHATBOT_SECTIONS } from '../sections/chatbot-sections';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { ChatbotAudienceService } from '../service/chatbot-audience.service';
-import { ChatbotSettingsService } from '../service/chatbot-settings.service';
+import {
+  changesAdminOnlySetting,
+  ChatbotSettingsService,
+} from '../service/chatbot-settings.service';
 import {
   CreateKbOwnedDocumentDto,
   CreateKbUploadUrlDto,
@@ -150,6 +155,9 @@ export class ChatbotController {
     @Body() dto: UpdateChatbotSettingsDto,
   ) {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    if (changesAdminOnlySetting(chatbot.settings, dto.settings)) {
+      await this.access.assertPlatformAdmin();
+    }
     return this.settings.updateChatbotSettings(chatbot, dto.settings);
   }
 
@@ -301,5 +309,52 @@ export class ChatbotController {
   })
   test(@Param('id', ParseUUIDPipe) id: string, @Body() dto: TestChatbotDto) {
     return this.chatbots.test(id, dto);
+  }
+
+  @Post(':id/test/stream')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({
+    summary: 'The same test as /test, streamed (SSE)',
+    description:
+      'Events: run_started, status, step, token (reply text, only once the check and the crisis check have cleared it), then final — exactly what /test returns — or error. A bot that does not stream (v1, a quick reply) sends final alone. Closing the connection stops the run.',
+  })
+  async testStream(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TestChatbotDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const stop = new AbortController();
+    let heartbeat: NodeJS.Timeout | undefined;
+    res.on('close', () => {
+      if (!res.writableEnded) stop.abort();
+    });
+    // Headers go out with the first event, so a refusal before the run (no access, bad draft) is
+    // still a plain HTTP error the dashboard can fall back on.
+    const send = (event: string, data: unknown): void => {
+      if (stop.signal.aborted || res.writableEnded) return;
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        // Stop proxies (nginx, the ALB) buffering the stream into one late blob.
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders();
+        heartbeat = setInterval(() => res.write(': ping\n\n'), 10_000);
+      }
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+    try {
+      const result = await this.chatbots.test(id, dto, {
+        onEvent: ({ event, data }) => send(event, data),
+        signal: stop.signal,
+      });
+      send('final', result);
+    } catch (error) {
+      if (!res.headersSent) throw error;
+      send('error', { code: 'internal' });
+    } finally {
+      clearInterval(heartbeat);
+      if (res.headersSent && !res.writableEnded) res.end();
+    }
   }
 }

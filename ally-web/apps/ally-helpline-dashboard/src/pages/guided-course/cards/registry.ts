@@ -1,6 +1,6 @@
 /**
  * Which component renders which card. Ally chooses which card appears, never
- * how it is laid out (Stacks: "Generative UI Design Challenges and
+ * how it is laid out ("Generative UI Design Challenges and
  * Constraints"): every item type has one fixed presentation and one adapter
  * around the classic player, and every special card kind has one renderer.
  *

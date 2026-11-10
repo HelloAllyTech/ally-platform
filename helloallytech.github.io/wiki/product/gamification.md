@@ -1,8 +1,8 @@
 ---
 title: Gamification
 tags: [product, best-practices, gamification, badges, leaderboards, motivation]
-summary: DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. When and how to use badges, streaks, progress and leaderboards in a clinical-adjacent training product — and the cases where gamifying actively harms the outcome.
-last_reconciled: 2026-07-28
+summary: DEPRECATED 2026-08-07, now superseded by the Context Library — kept for history. When and how to use badges, streaks, progress and leaderboards in a clinical-adjacent training product — and the cases where gamifying actively harms the outcome.
+last_reconciled: 2026-11-09
 ---
 
 # Gamification
@@ -10,11 +10,11 @@ last_reconciled: 2026-07-28
 *Part of [Product Management Best Practices](best-practices.md).* **Maturity: Deprecated (2026-08-07) — was Draft.**
 
 > [!WARNING]
-> **Deprecated — superseded by the Stacks MCP.** Product guidance is now retrieved from the
-> external Stacks corpus at planning time; see
-> [Planning with the Stacks MCP](../contributing/planning-with-stacks.md). This page is kept for
+> **Deprecated — superseded by the Context Library.** Product guidance is now retrieved from
+> Ally's Context Library (which replaced the Stacks MCP on 2026-11-09), while planning and while
+> coding; see [Working with the Context Library](../contributing/planning-with-context-library.md). This page is kept for
 > history and because other pages cite its principles by number — do not add new principles here,
-> and treat anything that conflicts with current Stacks guidance as superseded.
+> and treat anything that conflicts with current Context Library guidance as superseded.
 
 ## Why this matters for Ally
 

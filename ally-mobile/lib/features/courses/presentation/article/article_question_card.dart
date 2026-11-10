@@ -24,11 +24,16 @@ class ArticleQuestionCard extends ConsumerStatefulWidget {
     required this.itemId,
     required this.question,
     required this.onAnswered,
+    this.embedded = false,
   });
 
   final String itemId;
   final ArticleQuestion question;
   final ValueChanged<ArticleQuestionAnswerResult> onAnswered;
+
+  /// Inside a Cards-mode card, which draws its own frame and "Quick check"
+  /// kicker: no border, margin or heading of its own.
+  final bool embedded;
 
   @override
   ConsumerState<ArticleQuestionCard> createState() => _ArticleQuestionCardState();
@@ -81,23 +86,27 @@ class _ArticleQuestionCardState extends ConsumerState<ArticleQuestionCard> {
     final resolution = _resolution;
     final promptHtml = question.promptHtml;
 
+    final embedded = widget.embedded;
     // styles.card: marginVertical 16, border 1, radius 16, padding 16, gap 10.
     return Container(
       key: Key('article-question-${question.id}'),
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.strokePrimary),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      margin: embedded ? EdgeInsets.zero : const EdgeInsets.symmetric(vertical: 16),
+      padding: embedded ? EdgeInsets.zero : const EdgeInsets.all(16),
+      decoration: embedded
+          ? null
+          : BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: AppColors.strokePrimary),
+              borderRadius: BorderRadius.circular(16),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: withGap<Widget>([
-          Text(
-            ref.t('courses.article.question.title').toUpperCase(),
-            style: CourseText.roboto(CourseType.bodyTiny, AppColors.lowEmphasis, weight: FontWeight.w500),
-          ),
+          if (!embedded)
+            Text(
+              ref.t('courses.article.question.title').toUpperCase(),
+              style: CourseText.roboto(CourseType.bodyTiny, AppColors.lowEmphasis, weight: FontWeight.w500),
+            ),
           if (promptHtml != null && promptHtml.isNotEmpty)
             HtmlRichText(html: promptHtml)
           else

@@ -1,17 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import {
-  KbCorpus,
-  KbDocumentScope,
-  KbRetrievalConsumer,
-} from 'src/knowledge-base/enum/knowledge-base.enum';
-import {
-  KbOwner,
-  KnowledgeBaseService,
-} from 'src/knowledge-base/service/knowledge-base.service';
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
+import { ContextRetrievalService } from 'src/context-library/service/context-retrieval.service';
 
-/** Passages Ally gets per search unless it asks for fewer or more. */
+/** Entries Ally gets per search unless it asks for fewer or more. */
 export const GUIDE_LIBRARY_DEFAULT_LIMIT = 5;
-/** The most it may ask for: each passage is up to ~780 tokens of tool result. */
+/** The most it may ask for: each entry carries its whole passage. */
 export const GUIDE_LIBRARY_MAX_LIMIT = 8;
 
 export interface GuideLibrarySearchInput {
@@ -27,38 +23,36 @@ export interface GuideLibrarySearchInput {
   limit?: number;
   /** The guide thread this search served, for the retrieval log. */
   threadId?: string | null;
-  /** The learner, for the retrieval log. */
+  /**
+   * The learner. Not written to the Context Library's log, which keys a search by its session
+   * (the thread) rather than by person; kept so callers need not change.
+   */
   userId?: number | null;
 }
 
 export interface GuideLibraryHit {
-  documentId: string;
+  /** The entry's code, e.g. `AG-0042`. */
+  code: string;
+  /** What to cite: the document the passage came from, else the entry's own statement. */
   title: string;
+  /** The passage exactly as written (or, for a distilled entry, what it says). */
   text: string;
-  similarity: number;
-  /** `global` for the platform library, `organisation` for the learner's own org's documents. */
+  /** Fused retrieval score; comparable only within one search. */
+  score: number;
+  /** `global` for Ally's own library, `organisation` for the learner's own organisation's. */
   scope: 'global' | 'organisation';
 }
 
-/** The platform's own library: global documents, managed from the Ally Console. */
-export const PLATFORM_LIBRARY: KbOwner = Object.freeze({
-  corpus: KbCorpus.ALLY_GUIDE_LIBRARY,
-  tenantId: null,
-});
-
-/** One organisation's own documents: available to its learners only. */
-export const organisationLibrary = (tenantId: string): KbOwner => ({
-  corpus: KbCorpus.ALLY_GUIDE_LIBRARY,
-  tenantId,
-});
-
 /**
  * Ally's library (plans/ally-guide/plan.md §6.1, §7.6): material about becoming and being a
- * helper, from the platform and from the learner's own organisation.
+ * helper, from the platform and from the learner's own organisation — the Context Library's Ally
+ * Guide Library (docs/context-library/PLAN.md §9.6).
  *
- * Searches only through `KnowledgeBaseService.searchForAudience`, so who is asking is part of
- * the query: a learner sees the global documents plus their own organisation's, an anonymous
- * visitor the global ones, and nobody another organisation's (§7.14, cross-tenant leakage).
+ * Searches the `ally_guide` use case with the learner's audience, so who is asking is part of
+ * the query: a learner sees the global entries plus their own organisation's, an anonymous
+ * visitor the global ones, and nobody another organisation's (§7.14, cross-tenant leakage). The
+ * retrieval service pre-filters in the index and re-checks every hit in Postgres. The query is a
+ * learner's words: the use case is marked sensitive, so it is never shown back or learned from.
  *
  * A failure to reach the library THROWS rather than returning nothing, so the caller can tell
  * "the library has nothing on that" from "the library is unavailable" — Ally says different
@@ -66,7 +60,7 @@ export const organisationLibrary = (tenantId: string): KbOwner => ({
  */
 @Injectable()
 export class GuideLibraryService {
-  constructor(private readonly knowledgeBase: KnowledgeBaseService) {}
+  constructor(private readonly retrieval: ContextRetrievalService) {}
 
   async search(input: GuideLibrarySearchInput): Promise<GuideLibraryHit[]> {
     const query = (input.query ?? '').trim();
@@ -76,23 +70,28 @@ export class GuideLibraryService {
       GUIDE_LIBRARY_MAX_LIMIT,
     );
 
-    const { passages } = await this.knowledgeBase.searchForAudience(
-      { corpus: KbCorpus.ALLY_GUIDE_LIBRARY, query, limit },
-      { tenantId: input.tenantId },
-      {
-        consumer: KbRetrievalConsumer.ALLY_GUIDE,
-        sessionId: input.threadId ?? null,
-        userId: input.userId ?? null,
-      },
-    );
+    const { results, noConfidentMatch } = await this.retrieval.search({
+      useCase: ClUseCase.ALLY_GUIDE,
+      audience: { tenantId: input.tenantId },
+      collections: [ClCollectionId.ALLY_GUIDE_LIBRARY],
+      queries: [query],
+      limit,
+      sessionId: input.threadId ?? null,
+      queryOrigin: 'agent_tool',
+    });
+    // "No confident match" hands back the single closest low match; Ally treats that as
+    // nothing found rather than stretching a weak passage into an answer.
+    if (noConfidentMatch) return [];
 
-    return passages.map((passage) => ({
-      documentId: passage.document_id,
-      title: passage.document_title,
-      text: passage.text,
-      similarity: passage.similarity,
-      scope:
-        passage.scope === KbDocumentScope.GLOBAL ? 'global' : 'organisation',
+    return results.map(({ chunk, score }) => ({
+      code: chunk.code,
+      title: chunk.citation?.title?.trim() || chunk.statement,
+      text:
+        (chunk.body ?? '').trim() ||
+        String(chunk.attributes?.detail ?? '').trim() ||
+        chunk.statement,
+      score,
+      scope: chunk.isGlobal ? 'global' : 'organisation',
     }));
   }
 }

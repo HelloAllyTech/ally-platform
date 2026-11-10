@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import {
 import { DoubleArrowRight, TooltipIcon, Trash, ArrowDownFilled } from "@assets";
 import { ActionConfirmationPopup, Button, ToggleSwitch } from "@components";
 import { IconUploader } from "@components/icon-uploader";
+import { ImageSourceField } from "@components/image-studio";
 import { ButtonVariant } from "@components/types";
 import { en, TAG_TYPES } from "@constants";
 import { UserBadge, BadgeCategory } from "@types";
@@ -94,6 +95,8 @@ export const CreateBadgeSidePanel: React.FC<CreateBadgeSidePanelProps> = ({
 
   const [uploadBadgeIcon] = useUploadBadgeIconMutation();
   const [deleteBadgeIcon] = useDeleteBadgeIconMutation();
+  // Generated icons are shared Image Studio files, never deleted from here.
+  const generatedIconUrls = useRef(new Set<string>());
 
   const handleIconUpload = useCallback(
     async (payload: { fileName: string; fileSize: number; contentType: string }) => {
@@ -346,7 +349,7 @@ export const CreateBadgeSidePanel: React.FC<CreateBadgeSidePanelProps> = ({
 
   const handleConfirmClose = useCallback(async () => {
     setShowConfirmationModal(false);
-    if (formData.imageUrl && !isEditMode) {
+    if (formData.imageUrl && !isEditMode && !generatedIconUrls.current.has(formData.imageUrl)) {
       await deleteBadgeIcon({ imageUrl: formData.imageUrl || "" }).unwrap();
     }
     onClose();
@@ -410,6 +413,7 @@ export const CreateBadgeSidePanel: React.FC<CreateBadgeSidePanelProps> = ({
   }, [isFormValid]);
 
   const handleDeleteBadgeIcon = useCallback(async () => {
+    if (generatedIconUrls.current.has(formData.imageUrl || "")) return;
     await deleteBadgeIcon({ imageUrl: formData.imageUrl || "" }).unwrap();
   }, [deleteBadgeIcon, formData.imageUrl]);
 
@@ -441,12 +445,24 @@ export const CreateBadgeSidePanel: React.FC<CreateBadgeSidePanelProps> = ({
         <div className="h-[calc(100dvh-72px)] md:h-[calc(100vh-100px)] px-4 md:px-10 md:pl-[46px] pt-2 overflow-y-auto custom-scrollbar">
           {/* Icon Uploader Section */}
           <div className="py-6">
-            <IconUploader
-              imageUrl={formData.imageUrl || ""}
-              onImageDelete={handleDeleteBadgeIcon}
-              onImageChange={url => handleFieldChange("imageUrl", url)}
-              onUpload={handleIconUpload}
-            />
+            <ImageSourceField
+              slotKind="badge_icon"
+              slotKey={`badge:${selectedBadge?.id ?? "new"}:icon`}
+              context={{ title: formData.name, text: formData.description }}
+              onAccept={image => {
+                // Already square and in our S3: stored exactly like an upload's URL.
+                generatedIconUrls.current.add(image.url);
+                handleFieldChange("imageUrl", image.url);
+              }}
+              className="flex flex-col gap-3"
+            >
+              <IconUploader
+                imageUrl={formData.imageUrl || ""}
+                onImageDelete={handleDeleteBadgeIcon}
+                onImageChange={url => handleFieldChange("imageUrl", url)}
+                onUpload={handleIconUpload}
+              />
+            </ImageSourceField>
           </div>
 
           {/* Divider */}

@@ -352,6 +352,44 @@ void main() {
       expect(payload.branchingRecap, isEmpty);
     });
 
+    group('BRANCHING_SCENARIO experience', () {
+      StartItemPayload parse(Map<String, dynamic> extra, {String type = 'BRANCHING_SCENARIO'}) =>
+          StartItemPayload.fromJson({
+            'trackItemProgressId': 'prog-x',
+            'type': type,
+            'startNodeId': 'n1',
+            'nodes': [
+              {'id': 'n1', 'text': 'Scene one.'},
+            ],
+            ...extra,
+          });
+
+      test('STORY plays as story', () {
+        expect(parse({'experience': 'STORY'}).branchingExperience, BranchingExperience.story);
+      });
+
+      test('CLASSIC plays as classic', () {
+        expect(parse({'experience': 'CLASSIC'}).branchingExperience, BranchingExperience.classic);
+      });
+
+      test('missing or null plays as classic', () {
+        expect(parse({}).branchingExperience, BranchingExperience.classic);
+        expect(parse({'experience': null}).branchingExperience, BranchingExperience.classic);
+      });
+
+      test('an unknown value or a non-string plays as classic', () {
+        expect(parse({'experience': 'CINEMATIC'}).branchingExperience, BranchingExperience.classic);
+        expect(parse({'experience': 1}).branchingExperience, BranchingExperience.classic);
+      });
+
+      test('is not set on other item types', () {
+        expect(
+          parse({'experience': 'STORY', 'gameKey': 'x'}, type: 'GAME').branchingExperience,
+          isNull,
+        );
+      });
+    });
+
     test('parses a BUCKET_SORT payload, stripping no answer key', () {
       final payload = StartItemPayload.fromJson({
         'trackItemProgressId': 'prog-8',
@@ -612,6 +650,70 @@ void main() {
       expect(result.firstTryPct, 75);
       expect(result.itemCompleted, isTrue);
       expect(result.completion!.sectionCompleted, isTrue);
+    });
+  });
+
+  group('ARTICLE reading experience', () {
+    StartItemPayload article(Map<String, dynamic> extra) => StartItemPayload.fromJson({
+      'trackItemProgressId': 'p',
+      'type': 'ARTICLE',
+      'html': '<p>Body</p>',
+      ...extra,
+    });
+
+    test('experience parses case-insensitively; missing, unknown or non-string is classic', () {
+      expect(article({'experience': 'MAGAZINE'}).articleExperience, ArticleExperience.magazine);
+      expect(article({'experience': 'cards'}).articleExperience, ArticleExperience.cards);
+      expect(article({'experience': 'Classic'}).articleExperience, ArticleExperience.classic);
+      expect(article({}).articleExperience, ArticleExperience.classic);
+      expect(article({'experience': null}).articleExperience, ArticleExperience.classic);
+      expect(article({'experience': 'SCROLLYTELLING'}).articleExperience, ArticleExperience.classic);
+      expect(article({'experience': 3}).articleExperience, ArticleExperience.classic);
+      expect(article({'experience': {'kind': 'CARDS'}}).articleExperience, ArticleExperience.classic);
+    });
+
+    test('cover needs a non-blank string url; alt is optional', () {
+      final cover = article({
+        'cover': {'url': 'https://cdn.test/c.jpg', 'alt': 'A counsellor listening'},
+      }).articleCover;
+      expect(cover!.url, 'https://cdn.test/c.jpg');
+      expect(cover.alt, 'A counsellor listening');
+
+      expect(article({'cover': {'url': 'https://cdn.test/c.jpg'}}).articleCover!.alt, isNull);
+      expect(article({'cover': {'url': 'https://cdn.test/c.jpg', 'alt': 7}}).articleCover!.alt, isNull);
+      expect(article({}).articleCover, isNull);
+      expect(article({'cover': null}).articleCover, isNull);
+      expect(article({'cover': {'url': ''}}).articleCover, isNull);
+      expect(article({'cover': {'url': '   '}}).articleCover, isNull);
+      expect(article({'cover': {'url': 42}}).articleCover, isNull);
+      expect(article({'cover': 'https://cdn.test/c.jpg'}).articleCover, isNull);
+    });
+
+    test('takeaways keep non-blank strings only, at most 5', () {
+      expect(
+        article({
+          'takeaways': ['One', '', 2, null, '  ', ' Two ', 'Three', 'Four', 'Five', 'Six'],
+        }).articleTakeaways,
+        ['One', 'Two', 'Three', 'Four', 'Five'],
+      );
+      expect(article({}).articleTakeaways, isEmpty);
+      expect(article({'takeaways': 'One'}).articleTakeaways, isEmpty);
+      expect(article({'takeaways': null}).articleTakeaways, isEmpty);
+    });
+
+    test('other item types leave the article fields null', () {
+      final video = StartItemPayload.fromJson({
+        'trackItemProgressId': 'p',
+        'type': 'VIDEO',
+        'source': 's3',
+        'url': 'https://x.test/v.mp4',
+        'experience': 'CARDS',
+        'cover': {'url': 'https://x.test/c.jpg'},
+        'takeaways': ['One'],
+      });
+      expect(video.articleExperience, isNull);
+      expect(video.articleCover, isNull);
+      expect(video.articleTakeaways, isNull);
     });
   });
 }

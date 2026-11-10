@@ -4,7 +4,6 @@ import {
   CreateKbDocumentDto,
   GetKbDocumentsQueryDto,
   GetKbStatsQueryDto,
-  KbSearchDto,
 } from '../knowledge-base.dto';
 import { KbCorpus, KbDocumentSourceType } from '../../enum/knowledge-base.enum';
 
@@ -42,12 +41,6 @@ describe('corpus defaults on the HTTP edge', () => {
     expect(dto.corpus).toBe(KbCorpus.WHATSAPP_QA);
   });
 
-  it('lets the shipped dashboard search without sending a corpus', async () => {
-    const { dto, errors } = await check(KbSearchDto, { query: 'vpn reset' });
-    expect(errors).toHaveLength(0);
-    expect(dto.corpus).toBe(KbCorpus.WHATSAPP_QA);
-  });
-
   it('lets the shipped dashboard create a document without sending a corpus', async () => {
     const { dto, errors } = await check(CreateKbDocumentDto, {
       title: 'Managing risk',
@@ -59,23 +52,30 @@ describe('corpus defaults on the HTTP edge', () => {
   });
 
   it('honours an explicit corpus everywhere', async () => {
-    for (const cls of [
-      GetKbDocumentsQueryDto,
-      GetKbStatsQueryDto,
-      KbSearchDto,
-    ] as const) {
+    for (const cls of [GetKbDocumentsQueryDto, GetKbStatsQueryDto] as const) {
       const { dto } = await check(cls, {
-        corpus: KbCorpus.CHARACTER_LIBRARY,
+        corpus: KbCorpus.WHATSAPP_QA,
         query: 'q',
       });
-      expect(dto.corpus).toBe(KbCorpus.CHARACTER_LIBRARY);
+      expect(dto.corpus).toBe(KbCorpus.WHATSAPP_QA);
+    }
+  });
+
+  it('rejects a corpus retired into the Context Library', async () => {
+    for (const corpus of [
+      'character_library',
+      'ally_guide_library',
+      'debrief_knowledge',
+    ]) {
+      const { errors } = await check(GetKbDocumentsQueryDto, { corpus });
+      expect(errors.map((e) => e.property)).toContain('corpus');
     }
   });
 
   it('still rejects a corpus that does not exist', async () => {
     // A typo must not silently fall back to the WhatsApp corpus.
     const { errors } = await check(GetKbDocumentsQueryDto, {
-      corpus: 'character-library',
+      corpus: 'debrief-knowledge',
     });
     expect(errors.map((e) => e.property)).toContain('corpus');
   });
@@ -88,12 +88,12 @@ describe('corpus defaults on the HTTP edge', () => {
  * as a STRING, and `Boolean("false")` is `true`. So `?includeArchived=false` was read as true
  * and archived documents were ALWAYS returned — which made the WhatsApp Corpus tab's "Show
  * archived" checkbox inert in both positions from the day it shipped, and kept three archived
- * documents rendering in the character panel after they had been archived.
+ * documents rendering in a corpus panel after they had been archived.
  */
 describe('includeArchived on a query string', () => {
   const parse = async (value: unknown) => {
     const dto = plainToInstance(GetKbDocumentsQueryDto, {
-      corpus: KbCorpus.CHARACTER_LIBRARY,
+      corpus: KbCorpus.WHATSAPP_QA,
       includeArchived: value,
     });
     const errors = await validate(dto as object);
@@ -128,7 +128,7 @@ describe('includeArchived on a query string', () => {
 
   it('leaves it undefined when absent, so the repository default applies', async () => {
     const dto = plainToInstance(GetKbDocumentsQueryDto, {
-      corpus: KbCorpus.CHARACTER_LIBRARY,
+      corpus: KbCorpus.WHATSAPP_QA,
     });
     expect(dto.includeArchived).toBeUndefined();
     expect(await validate(dto as object)).toHaveLength(0);

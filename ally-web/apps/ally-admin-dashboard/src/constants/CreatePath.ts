@@ -44,6 +44,9 @@ export const PATH_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         type: FORM_FIELD_TYPES.IMAGE_UPLOAD,
         isMandatory: true,
         fullWidth: true,
+        // Image Studio. Shared with Create Case, which swaps in `case_cover`.
+        aiGenerate: true,
+        imageSlotKind: "path_cover",
       },
     ],
   },

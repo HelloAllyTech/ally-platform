@@ -2,6 +2,7 @@ import { UseFormReturn } from "react-hook-form";
 
 import { EventDetectionConfig } from "@types";
 
+import { ImageSlotKind } from "./imageStudio";
 import { AssignmentStatus } from "./organizationAccess";
 import {
   SessionEventDetectionData,
@@ -463,11 +464,13 @@ export interface FormFieldConfig {
   /** When true, wrap the field in a collapsed accordion. */
   accordion?: boolean;
   /**
-   * IMAGE_UPLOAD only: render the "Generate with AI" controls under the
-   * upload tile. Generation uses the scenario's title/description form
-   * values via the managed `cover_image_generation` prompt.
+   * IMAGE_UPLOAD only: add Image Studio's "✨ Generate" beside the upload
+   * tile. The modal reads the form's title/description (and persona fields,
+   * when the form has them) as context.
    */
   aiGenerate?: boolean;
+  /** IMAGE_UPLOAD with `aiGenerate`: the Image Studio slot. Default `roleplay_cover`. */
+  imageSlotKind?: ImageSlotKind;
   /**
    * `location` slug of a data-driven tooltip (see TooltipLocation). When set,
    * the field renders an info-icon tooltip whose text superadmins author under

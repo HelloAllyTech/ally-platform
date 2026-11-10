@@ -1,0 +1,34 @@
+{{define "content"}}
+<h1>Runs</h1>
+<p class="lead">The last 50 runs, newest first. A live run deletes what earlier runs copied and verified, then copies what has aged.</p>
+{{template "runs-table" .}}
+{{end}}
+
+{{define "runs-table"}}
+<div id="runs" {{if .Busy}}hx-get="/runs/table" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>
+{{if .Busy}}<p><span class="badge on">Running: {{.BusyLabel}}</span> <button class="danger" hx-post="/runs/cancel" hx-target="#runs" hx-swap="outerHTML" hx-confirm="Cancel the current run? It stops after the objects in flight.">Cancel run</button></p>{{end}}
+<div class="scroll">
+<table>
+  <thead><tr><th>#</th><th>Bucket</th><th>Mode</th><th>Status</th><th>Started</th><th class="num">Scanned</th><th class="num">Eligible</th><th class="num">Copied</th><th class="num">Deleted from S3</th><th class="num">Failed</th></tr></thead>
+  <tbody>
+  {{range .Runs}}
+  <tr>
+    <td>{{.ID}}</td>
+    <td class="key">{{.Bucket}}</td>
+    <td>{{.Mode}} <span class="muted">· {{.Trigger}}</span></td>
+    <td>{{if eq .Status "done"}}<span class="badge on">done</span>{{else if eq .Status "running"}}<span class="badge warn">running</span>{{else}}<span class="badge err">{{.Status}}</span>{{end}}{{if .Error}}<div class="muted">{{.Error}}</div>{{end}}</td>
+    <td>{{when .StartedAt}}</td>
+    <td class="num">{{.Scanned}} · {{bytes .ScannedBytes}}</td>
+    <td class="num">{{.Eligible}} · {{bytes .EligibleBytes}}</td>
+    <td class="num">{{.Copied}} · {{bytes .CopiedBytes}}</td>
+    <td class="num">{{.Deleted}} · {{bytes .DeletedBytes}}</td>
+    <td class="num">{{if .Failed}}<span class="badge err">{{.Failed}}</span>{{else}}0{{end}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="10" class="muted">No runs yet. Start with a dry run on the Buckets page.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+</div>
+{{end}}

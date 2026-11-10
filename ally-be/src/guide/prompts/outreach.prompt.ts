@@ -4,7 +4,7 @@ import { asData } from './sentinel.prompt';
  * The outreach writer (plans/ally-guide/plan.md §4.8, §7.7): one short
  * reminder, at a time the learner chose or after an idle stretch. It names
  * what they finished and one small next step — progress and a clear way on
- * keep people going where pressure drives them off (Stacks: Prevent User
+ * keep people going where pressure drives them off (Prevent User
  * Disengagement Through Guided Progress). Frozen into each release bundle.
  *
  * Only course facts go in: no conversation, mood or anything the learner
