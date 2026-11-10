@@ -22,7 +22,12 @@ import {
   AssistantHomeService,
   STALE_MESSAGE,
 } from '../home/assistant-home.service';
-import { HOME_FIELDS, HomeState, versionOf } from '../home/home-fields';
+import {
+  HOME_FIELDS,
+  HomeState,
+  parseWidget,
+  versionOf,
+} from '../home/home-fields';
 import { changeOwnRules, safetyView } from '../home/own-rules';
 import { SafetyLockedError } from '../safety-pack/safety-lock';
 import { SAFETY_PACKS } from '../safety-pack/safety-packs';
@@ -152,6 +157,88 @@ describe('Assistant home fields', () => {
     );
     expect(versionOf('a')).not.toBe(versionOf('b'));
     expect(versionOf('a')).toMatch(/^[0-9a-f]{16}$/);
+  });
+});
+
+describe('The website widget field (chunk 13)', () => {
+  const base = {
+    position: 'left',
+    label: '  Talk to us ',
+    autoOpenSeconds: 10,
+    showOnPhones: false,
+    allowedDomains: [
+      'https://www.SunriseMind.in/contact',
+      'sunrisemind.in',
+      'myclinic.wixsite.com',
+    ],
+  };
+  const refusal = (value: unknown, production = false) => {
+    try {
+      parseWidget(value, production);
+    } catch (error) {
+      return (error as Error).message;
+    }
+    throw new Error('expected a refusal');
+  };
+
+  it('cleans the settings and the websites (one each, normalised)', () => {
+    expect(parseWidget(base, true)).toEqual({
+      position: 'left',
+      label: 'Talk to us',
+      autoOpenSeconds: 10,
+      showOnPhones: false,
+      allowedDomains: ['sunrisemind.in', 'myclinic.wixsite.com'],
+    });
+    expect(
+      parseWidget({ ...base, label: ' ', autoOpenSeconds: null }, true),
+    ).toMatchObject({ label: 'Ask us', autoOpenSeconds: null });
+  });
+
+  it('refuses a shared host as a bare entry, saying why and what to add instead', () => {
+    expect(refusal({ ...base, allowedDomains: ['wixsite.com'] })).toBe(
+      "wixsite.com is shared by many websites, so the bubble could appear on sites that aren't yours. Add your own address on it, for example yourclinic.wixsite.com.",
+    );
+    expect(
+      refusal({ ...base, allowedDomains: ['https://github.io/'] }),
+    ).toMatch(
+      /^https:\/\/github\.io\/ is shared by many websites.*yourclinic\.github\.io\.$/,
+    );
+  });
+
+  it('allows localhost while testing, and refuses it in production', () => {
+    expect(
+      parseWidget({ ...base, allowedDomains: ['localhost'] }, false)
+        .allowedDomains,
+    ).toEqual(['localhost']);
+    expect(refusal({ ...base, allowedDomains: ['localhost'] }, true)).toBe(
+      'localhost only works while testing. Add your real website address.',
+    );
+    expect(refusal({ ...base, allowedDomains: ['127.0.0.1'] }, true)).toBe(
+      'localhost only works while testing. Add your real website address.',
+    );
+  });
+
+  it('refuses what is not a website, too many, and odd settings', () => {
+    expect(refusal({ ...base, allowedDomains: ['my clinic'] })).toBe(
+      "my clinic isn't a website address. Add your domain, for example yourclinic.in.",
+    );
+    expect(
+      refusal({
+        ...base,
+        allowedDomains: Array.from({ length: 11 }, (_, i) => `site${i}.in`),
+      }),
+    ).toBe('You can add up to 10 websites.');
+    expect(refusal({ ...base, position: 'top' })).toBe('Choose right or left.');
+    expect(refusal({ ...base, autoOpenSeconds: 1 })).toBe(
+      'Choose between 3 and 120 seconds.',
+    );
+  });
+
+  it('writes to the page settings only', () => {
+    const value = parseWidget(base, false);
+    expect(HOME_FIELDS.widget.write(value, stateWith())).toEqual({
+      page: { widget: value },
+    });
   });
 });
 
@@ -702,7 +789,32 @@ describe('Assistant home copy', () => {
     () => HOME_FIELDS.pageStatus.parse('maybe'),
     () => HOME_FIELDS.pageAccess.parse('everyone'),
     () => HOME_FIELDS.pageAccess.write(BotPageAccess.PUBLIC, stateWith()),
+    () => HOME_FIELDS.widget.parse('x'),
+    () => parseWidget({ position: 'top', allowedDomains: [] }),
+    () =>
+      parseWidget({ position: 'left', autoOpenSeconds: 1, allowedDomains: [] }),
+    () => parseWidget({ position: 'left', allowedDomains: 'a.in' }),
+    () =>
+      parseWidget({
+        position: 'left',
+        allowedDomains: Array.from({ length: 11 }, (_, i) => `s${i}.in`),
+      }),
+    () =>
+      parseWidget({ position: 'left', allowedDomains: ['localhost'] }, true),
   ])('refuses in the deck’s words (%#)', (run) => {
     expect(deck).toContain(message(run));
   });
+
+  it.each([
+    [['wixsite.com'], 'wixsite.com'],
+    [['my clinic'], 'my clinic'],
+  ])(
+    'words a refused website as the deck does (%#)',
+    (allowedDomains, input) => {
+      const text = message(() =>
+        parseWidget({ position: 'left', allowedDomains }),
+      );
+      expect(deck).toContain(text.split(input).join('{domain}'));
+    },
+  );
 });

@@ -15,7 +15,13 @@ import {
   BOT_PAGE_BOUNDS,
   BotPageLanguage,
   BotPageSettings,
+  BotPageWidget,
+  DEFAULT_WIDGET_LABEL,
 } from '../../chatbot/type/bot-page.type';
+import {
+  MAX_WIDGET_DOMAINS,
+  normaliseDomain,
+} from '../../chatbot/bot-page/widget-host';
 import {
   ChatbotSettingsOverride,
   MAX_SYSTEM_PROMPT_CHARS,
@@ -374,6 +380,13 @@ export const HOME_FIELDS = {
     }),
   } as HomeField<HandoverSettings>,
 
+  /** The website widget (chunk 13): the bubble's look and timing, and where it may appear. */
+  widget: {
+    read: (s) => s.page.widget,
+    parse: (value) => parseWidget(value),
+    write: (value) => ({ page: { widget: value } }),
+  } as HomeField<BotPageWidget>,
+
   busyText: overrideText(
     'rateLimitText',
     500,
@@ -394,6 +407,77 @@ export const HOME_FIELDS = {
 };
 
 export type HomeFieldName = keyof typeof HOME_FIELDS;
+
+/** The widget's settings, checked. Domains are normalised, and refused with a reason the owner reads. */
+export function parseWidget(
+  value: unknown,
+  production = process.env.NODE_ENV === 'production',
+): BotPageWidget {
+  if (!value || typeof value !== 'object') {
+    throw new HomeFieldInvalid('Choose how the bubble looks.');
+  }
+  const v = value as Record<string, unknown>;
+  if (v.position !== 'right' && v.position !== 'left') {
+    throw new HomeFieldInvalid('Choose right or left.');
+  }
+  const label =
+    text(BOT_PAGE_BOUNDS.maxWidgetLabelChars, { label: 'The bubble label' })(
+      v.label ?? '',
+    ) || DEFAULT_WIDGET_LABEL;
+  let autoOpenSeconds: number | null = null;
+  if (v.autoOpenSeconds !== null && v.autoOpenSeconds !== undefined) {
+    const n = Number(v.autoOpenSeconds);
+    if (
+      !Number.isInteger(n) ||
+      n < BOT_PAGE_BOUNDS.minWidgetAutoOpenSeconds ||
+      n > BOT_PAGE_BOUNDS.maxWidgetAutoOpenSeconds
+    ) {
+      throw new HomeFieldInvalid(
+        `Choose between ${BOT_PAGE_BOUNDS.minWidgetAutoOpenSeconds} and ${BOT_PAGE_BOUNDS.maxWidgetAutoOpenSeconds} seconds.`,
+      );
+    }
+    autoOpenSeconds = n;
+  }
+  if (!Array.isArray(v.allowedDomains)) {
+    throw new HomeFieldInvalid('Add your website addresses as a list.');
+  }
+  const domains: string[] = [];
+  for (const entry of v.allowedDomains) {
+    if (typeof entry !== 'string' || !entry.trim()) continue;
+    const checked = normaliseDomain(entry, { production });
+    if ('refused' in checked) {
+      throw new HomeFieldInvalid(domainRefusal(checked.refused, entry.trim()));
+    }
+    if (!domains.includes(checked.domain)) domains.push(checked.domain);
+  }
+  if (domains.length > MAX_WIDGET_DOMAINS) {
+    throw new HomeFieldInvalid(
+      `You can add up to ${MAX_WIDGET_DOMAINS} websites.`,
+    );
+  }
+  return {
+    position: v.position,
+    label,
+    autoOpenSeconds,
+    showOnPhones: v.showOnPhones !== false,
+    allowedDomains: domains,
+  };
+}
+
+/** Why a website can't be added, in the owner's words (ONBOARDING-COPY.md §22). */
+function domainRefusal(
+  reason: 'invalid' | 'shared' | 'local',
+  input: string,
+): string {
+  switch (reason) {
+    case 'shared':
+      return `${input} is shared by many websites, so the bubble could appear on sites that aren't yours. Add your own address on it, for example yourclinic.${input.replace(/^(https?:\/\/)?(www\.)?/i, '').replace(/\/.*$/, '')}.`;
+    case 'local':
+      return 'localhost only works while testing. Add your real website address.';
+    default:
+      return `${input} isn't a website address. Add your domain, for example yourclinic.in.`;
+  }
+}
 
 export function homeField(name: string): HomeField<unknown> | null {
   return Object.prototype.hasOwnProperty.call(HOME_FIELDS, name)

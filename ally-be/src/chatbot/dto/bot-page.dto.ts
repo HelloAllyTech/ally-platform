@@ -237,6 +237,20 @@ export class BotPageLogoUrlDto {
 
 // ── public ──────────────────────────────────────────────────────────────
 
+/** Where the website widget is (chunk 13): the host page's origin, as the browser reports it to the frame. */
+export class BotPageEmbedDto {
+  @ApiProperty({ example: 'https://sunrisemind.in' })
+  @IsString()
+  @MaxLength(300)
+  host!: string;
+
+  @ApiPropertyOptional({ description: 'The page the bubble is on' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  page?: string;
+}
+
 export class BotPageSessionDto {
   @ApiPropertyOptional({
     description: 'Cloudflare Turnstile token (public pages)',
@@ -253,6 +267,12 @@ export class BotPageSessionDto {
   @IsString()
   @MaxLength(256)
   email?: string;
+
+  @ApiPropertyOptional({ type: BotPageEmbedDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BotPageEmbedDto)
+  embed?: BotPageEmbedDto;
 }
 
 export class BotPageVerifyDto {
@@ -264,6 +284,12 @@ export class BotPageVerifyDto {
   @ApiProperty({ example: '123456' })
   @Matches(/^\d{6}$/, { message: 'The code is 6 digits' })
   code!: string;
+
+  @ApiPropertyOptional({ type: BotPageEmbedDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BotPageEmbedDto)
+  embed?: BotPageEmbedDto;
 }
 
 export class BotPageIntakeAnswerDto {

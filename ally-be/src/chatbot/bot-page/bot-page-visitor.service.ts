@@ -13,7 +13,17 @@ export interface BotPageVisitor {
   verifiedAt: Date | null;
   /** When this token was signed, for rotation. */
   issuedAt: Date;
+  /**
+   * In the website widget (chunk 13): the host page's origin the server accepted, and the page the
+   * bubble was on. Re-checked against the allowed websites on every request.
+   */
+  embed?: { host: string; page: string | null } | null;
+  /** How the request carried it: the cookie, or the widget's in-memory token (cookie blocked). */
+  via?: 'cookie' | 'header';
 }
+
+/** A signed visitor, and the token, for the widget when its browser drops the cookie. */
+export type IssuedVisitor = BotPageVisitor & { token: string };
 
 interface VisitorClaims {
   sub?: string;
@@ -21,6 +31,9 @@ interface VisitorClaims {
   bot?: string;
   vat?: number;
   iat?: number;
+  /** The widget's host origin and page (chunk 13). */
+  emb?: string;
+  emp?: string;
 }
 
 const AUDIENCE = 'bot-page';
@@ -32,6 +45,12 @@ const ROTATE_AFTER_SECONDS = 24 * 3600;
 /** A verified email has to be proved again after this long. */
 export const VERIFICATION_TTL_SECONDS = 30 * 24 * 3600;
 export const BOT_PAGE_COOKIE_PATH = '/api/v1/public/bots';
+/** Sent by the bot page when it runs inside the website widget (chunk 13). */
+export const EMBED_HEADER = 'x-ally-embed';
+/** The widget's in-memory visitor token, when its browser blocks even partitioned cookies. */
+export const VISITOR_TOKEN_HEADER = 'x-ally-visitor';
+/** A throwaway cookie the widget sets and reads back to learn whether cookies reach the API. */
+export const EMBED_PROBE_COOKIE = 'ally_bpe_probe';
 
 /**
  * Visitor tokens for the bot page (chunk 12b).
@@ -43,6 +62,13 @@ export const BOT_PAGE_COOKIE_PATH = '/api/v1/public/bots';
  * Carried in an httpOnly, SameSite=Lax cookie scoped to the public bot-page routes and named per
  * bot, so page JavaScript never sees it and one bot's visitor is a stranger to another bot. Lax
  * works because the page and the API are on the same site (see CHUNK-12B-NOTES).
+ *
+ * Inside the website widget (chunk 13) the page is framed by another site, where a Lax cookie is
+ * neither stored nor sent. There it gets its own cookie: still httpOnly, `SameSite=None; Secure;
+ * Partitioned` (CHIPS), so it is kept per host site and can't follow a visitor between sites. The
+ * Origin guard still refuses every browser origin but the page's own, so None doesn't open CSRF.
+ * A browser that drops even that gets the token in the session answer, held in the frame's memory
+ * and sent in a header (CHUNK-13-NOTES).
  */
 @Injectable()
 export class BotPageVisitorService {
@@ -51,16 +77,29 @@ export class BotPageVisitorService {
     private readonly config: AppConfigService,
   ) {}
 
-  static cookieName(chatbotId: string): string {
-    return `ally_bp_${chatbotId.replace(/-/g, '').slice(0, 12)}`;
+  static cookieName(chatbotId: string, embed = false): string {
+    return `ally_bp${embed ? 'e' : ''}_${chatbotId.replace(/-/g, '').slice(0, 12)}`;
   }
 
-  /** The visitor behind the request's cookie for this bot, or null. Never throws. */
+  /** Whether the request comes from the bot page inside the website widget. */
+  static isEmbed(req: Request): boolean {
+    return req.headers[EMBED_HEADER] === '1';
+  }
+
+  /**
+   * The visitor behind the request's cookie for this bot, or null. Never throws. The widget's
+   * requests read only the widget's cookie (or its token), and the page's only the page's, so a
+   * visitor of one is a stranger to the other.
+   */
   async read(req: Request, chatbotId: string): Promise<BotPageVisitor | null> {
-    const token = readCookie(
+    const embed = BotPageVisitorService.isEmbed(req);
+    const cookie = readCookie(
       req.headers.cookie,
-      BotPageVisitorService.cookieName(chatbotId),
+      BotPageVisitorService.cookieName(chatbotId, embed),
     );
+    const header = embed ? req.headers[VISITOR_TOKEN_HEADER] : undefined;
+    const token =
+      cookie ?? (typeof header === 'string' && header ? header : null);
     if (!token) return null;
     try {
       const claims = await this.jwtService.verifyAsync<VisitorClaims & object>(
@@ -71,7 +110,8 @@ export class BotPageVisitorService {
         claims.typ !== TOKEN_TYPE ||
         !claims.sub ||
         claims.bot !== chatbotId ||
-        !claims.iat
+        !claims.iat ||
+        embed !== Boolean(claims.emb)
       ) {
         return null;
       }
@@ -85,6 +125,10 @@ export class BotPageVisitorService {
             ? verifiedAt
             : null,
         issuedAt: new Date(claims.iat * 1000),
+        embed: claims.emb
+          ? { host: claims.emb, page: claims.emp ?? null }
+          : null,
+        via: cookie ? 'cookie' : 'header',
       };
     } catch {
       return null;
@@ -102,13 +146,17 @@ export class BotPageVisitorService {
   }
 
   /** Sign the visitor and set the cookie. Called for a new visitor, after a code, and to rotate. */
-  async issue(res: Response, visitor: BotPageVisitor): Promise<BotPageVisitor> {
+  async issue(res: Response, visitor: BotPageVisitor): Promise<IssuedVisitor> {
+    const embed = visitor.embed ?? null;
     const token = await this.jwtService.signAsync(
       {
         typ: TOKEN_TYPE,
         bot: visitor.chatbotId,
         ...(visitor.verifiedAt
           ? { vat: Math.floor(visitor.verifiedAt.getTime() / 1000) }
+          : {}),
+        ...(embed
+          ? { emb: embed.host, ...(embed.page ? { emp: embed.page } : {}) }
           : {}),
       },
       {
@@ -120,21 +168,32 @@ export class BotPageVisitorService {
         jwtid: randomUUID(),
       },
     );
-    res.cookie(BotPageVisitorService.cookieName(visitor.chatbotId), token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: this.secureCookies(),
-      path: BOT_PAGE_COOKIE_PATH,
-      maxAge: TOKEN_TTL_SECONDS * 1000,
-    });
-    return { ...visitor, issuedAt: new Date() };
+    res.cookie(
+      BotPageVisitorService.cookieName(visitor.chatbotId, Boolean(embed)),
+      token,
+      embed ? EMBED_COOKIE : { ...PAGE_COOKIE, secure: this.secureCookies() },
+    );
+    return { ...visitor, issuedAt: new Date(), token };
   }
 
-  /** Re-sign a token that is more than a day old, so a stolen cookie goes stale. */
+  /**
+   * Re-sign a token that is more than a day old, so a stolen cookie goes stale. Not the widget's
+   * in-memory token: it lives only as long as the frame, and a new one couldn't reach it mid-stream.
+   */
   async rotateIfDue(res: Response, visitor: BotPageVisitor): Promise<void> {
+    if (visitor.via === 'header') return;
     if (Date.now() - visitor.issuedAt.getTime() > ROTATE_AFTER_SECONDS * 1000) {
       await this.issue(res, visitor);
     }
+  }
+
+  /** The widget's cookie check: set a throwaway cookie the same way as the real one. */
+  static setProbe(res: Response): void {
+    res.cookie(EMBED_PROBE_COOKIE, '1', { ...EMBED_COOKIE, maxAge: 60_000 });
+  }
+
+  static readProbe(req: Request): boolean {
+    return readCookie(req.headers.cookie, EMBED_PROBE_COOKIE) === '1';
   }
 
   /** A short, stable, non-reversible tag for logs ("visitor 3fa9c2e1"). */
@@ -154,6 +213,23 @@ export class BotPageVisitorService {
     return createHmac('sha256', base).update(SECRET_LABEL).digest('hex');
   }
 }
+
+const PAGE_COOKIE = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  path: BOT_PAGE_COOKIE_PATH,
+  maxAge: TOKEN_TTL_SECONDS * 1000,
+};
+
+/** The widget's cookie: framed by another site, so None, which needs Secure, and partitioned. */
+const EMBED_COOKIE = {
+  httpOnly: true,
+  sameSite: 'none' as const,
+  secure: true,
+  partitioned: true,
+  path: BOT_PAGE_COOKIE_PATH,
+  maxAge: TOKEN_TTL_SECONDS * 1000,
+};
 
 /** One cookie's value from a `Cookie` header. No cookie-parser in this app, and one is enough. */
 export function readCookie(

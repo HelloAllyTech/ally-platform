@@ -14,6 +14,8 @@ export const BOT_PAGE_IP_LIMITS = {
   messages: { perHour: 120 },
   /** Thumbs up or down (chunk Q2a): generous, since a rating can be changed. */
   feedback: { perHour: 120 },
+  /** The website widget's settings, read on every page of the owner's site a visitor opens (13). */
+  widget: { perHour: 600 },
 } as const;
 
 /**

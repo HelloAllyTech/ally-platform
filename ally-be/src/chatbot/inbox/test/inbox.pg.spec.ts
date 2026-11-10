@@ -133,4 +133,30 @@ describePg('Inbox (Postgres)', () => {
       safety: 1,
     });
   });
+
+  it('marks website chats, and filters Website apart from Bot page (chunk 13)', async () => {
+    const page = await chat('From the page', '2026-11-09T10:00:00Z');
+    const widget = await chat(
+      'From the bubble',
+      '2026-11-09T11:00:00Z',
+      `metadata = '{"source": {"kind": "widget", "host": "https://sunrisemind.in", "page": null}}'::jsonb`,
+    );
+    const inbox = new InboxService(dataSource, {
+      accessibleChatbotIds: async () => null,
+      assert: async () => ({}),
+    } as never);
+
+    const list = await inbox.list();
+    expect(list.find((c) => c.id === widget)?.source).toBe('widget');
+    expect(list.find((c) => c.id === page)?.source).toBeNull();
+    expect((await inbox.list({ channel: 'widget' })).map((c) => c.id)).toEqual([
+      widget,
+    ]);
+    expect(
+      (await inbox.list({ channel: 'web' as never })).map((c) => c.id),
+    ).toEqual([page]);
+    expect(
+      (await inbox.thread(bot, widget)) as { source: string } | null,
+    ).toMatchObject({ source: 'widget' });
+  });
 });

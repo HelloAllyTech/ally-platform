@@ -17,6 +17,7 @@ import { BotPageAdminController } from './bot-page-admin.controller';
 import { BotPageGuardMiddleware } from './bot-page-guard.middleware';
 import { BotPageOtpService } from './bot-page-otp.service';
 import { BotPagePublicController } from './bot-page-public.controller';
+import { WidgetPublicController } from './widget-public.controller';
 import { LeadAlertService } from './lead-alert.service';
 import { BotPagePublicService } from './bot-page-public.service';
 import { BotPageRateLimitService } from './bot-page-rate-limit.service';
@@ -49,6 +50,7 @@ import { TurnstileService } from './turnstile.service';
   controllers: [
     BotPageAdminController,
     BotPagePublicController,
+    WidgetPublicController,
     BotImageController,
     BotImagePublicController,
   ],

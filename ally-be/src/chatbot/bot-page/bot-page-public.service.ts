@@ -14,6 +14,7 @@ import {
   WaMessageStatus,
 } from '../../whatsapp/enum/whatsapp.enum';
 import {
+  BotPageEmbedDto,
   BotPageFeedbackDto,
   BotPageIntakeDto,
   BotPageSessionDto,
@@ -59,7 +60,9 @@ import { AvailableBotPage, BotPageService } from './bot-page.service';
 import {
   BotPageVisitor,
   BotPageVisitorService,
+  IssuedVisitor,
 } from './bot-page-visitor.service';
+import { cleanPageUrl, frameAncestors, hostAllowed } from './widget-host';
 import { SseWriter } from '../../common/sse/sse-writer';
 import { handoverMessage, handoverOf } from '../handover/handover';
 import { HandoverService } from '../handover/handover.service';
@@ -100,7 +103,29 @@ export interface PublicSession {
   intakeDone: boolean;
   /** The masked email the visitor verified, for "Signed in as a***@example.com". */
   signedInAs: string | null;
+  /**
+   * The website widget's visitor token, only when it asked because its browser drops even the
+   * partitioned cookie (chunk 13). Held in the frame's memory, never stored.
+   */
+  visitorToken?: string;
 }
+
+/** What the widget's loader draws the bubble from. No ids, nothing internal. */
+export interface WidgetConfig {
+  position: 'right' | 'left';
+  label: string;
+  autoOpenSeconds: number | null;
+  showOnPhones: boolean;
+  accent: string;
+  logo: string | null;
+  /** The business, for the panel's title ("Chat with {business}"). */
+  title: string;
+  /** The bot page; the panel frames it with `?embed=1`. */
+  pageUrl: string;
+}
+
+/** The widget asks for its token in the session answer with this header (its cookie check failed). */
+export const EMBED_TOKEN_HEADER = 'x-ally-embed-token';
 
 /** A source under an answer: what it's called, and a link when the document has one. */
 export interface PublicCitation {
@@ -149,6 +174,7 @@ const PUBLIC_ERRORS = {
   intake_required: ErrorCode.BOT_PAGE_INTAKE_REQUIRED,
   intake_invalid: ErrorCode.BOT_PAGE_INTAKE_INVALID,
   not_rateable: ErrorCode.BOT_PAGE_NOT_RATEABLE,
+  host_not_allowed: ErrorCode.BOT_PAGE_HOST_NOT_ALLOWED,
 } as const;
 
 export type PublicErrorCode = keyof typeof PUBLIC_ERRORS;
@@ -282,29 +308,35 @@ export class BotPagePublicService {
     const available = await this.page(slug);
     await this.ipLimit(req, 'session', BOT_PAGE_IP_LIMITS.session.perHour);
     const { page, chatbot } = available;
+    const embed = this.embedOf(available, req, dto.embed);
     let visitor = await this.visitors.read(req, chatbot.id);
+    if (visitor) visitor = { ...visitor, embed };
 
     if (page.access === BotPageAccess.PUBLIC) {
       if (!visitor) {
         if (!(await this.turnstile.verify(dto.turnstileToken, req.ip))) {
           throw publicError(HttpStatus.FORBIDDEN, 'bot_check_failed');
         }
-        visitor = this.visitors.newVisitor(chatbot.id);
+        visitor = { ...this.visitors.newVisitor(chatbot.id), embed };
       }
-      visitor = await this.visitors.issue(res, visitor);
-      return this.sessionFor(available, {
-        visitor,
-        email: null,
-        eligibility: { eligible: true },
-      });
+      const issued = await this.visitors.issue(res, visitor);
+      return withToken(
+        req,
+        issued,
+        await this.sessionFor(available, {
+          visitor: issued,
+          email: null,
+          eligibility: { eligible: true },
+        }),
+      );
     }
 
     // Organisation and invite pages: a visitor who proved an email recently, and still may, is in.
     if (visitor?.verifiedAt) {
       const ready = await this.recheck(available, visitor);
       if (ready) {
-        await this.visitors.issue(res, visitor);
-        return this.sessionFor(available, ready);
+        const issued = await this.visitors.issue(res, visitor);
+        return withToken(req, issued, await this.sessionFor(available, ready));
       }
     }
 
@@ -314,9 +346,12 @@ export class BotPagePublicService {
     const email = BotPageAccessService.tryNormaliseEmail(dto.email);
     if (!email) throw publicError(HttpStatus.BAD_REQUEST, 'not_allowed');
 
-    if (!visitor) visitor = this.visitors.newVisitor(chatbot.id);
+    if (!visitor) visitor = { ...this.visitors.newVisitor(chatbot.id), embed };
     // A new code for an address the visitor typed: whatever they had proved before no longer counts.
-    await this.visitors.issue(res, { ...visitor, verifiedAt: null });
+    const issued = await this.visitors.issue(res, {
+      ...visitor,
+      verifiedAt: null,
+    });
 
     const eligibility = await this.pageAccess.eligibility(page, email);
     if (eligibility.eligible) {
@@ -334,7 +369,11 @@ export class BotPagePublicService {
     }
     // The same answer whether or not the address may use the page, so the page can't be used to
     // find out who is invited.
-    return { state: 'needs_code', intakeDone: false, signedInAs: null };
+    return withToken(req, issued, {
+      state: 'needs_code',
+      intakeDone: false,
+      signedInAs: null,
+    });
   }
 
   async verify(
@@ -345,10 +384,12 @@ export class BotPagePublicService {
   ): Promise<PublicSession> {
     const available = await this.page(slug);
     await this.ipLimit(req, 'verify', BOT_PAGE_IP_LIMITS.verify.perHour);
-    const visitor = await this.visitors.read(req, available.chatbot.id);
-    if (!visitor || available.page.access === BotPageAccess.PUBLIC) {
+    const embed = this.embedOf(available, req, dto.embed);
+    const read = await this.visitors.read(req, available.chatbot.id);
+    if (!read || available.page.access === BotPageAccess.PUBLIC) {
       throw publicError(HttpStatus.UNAUTHORIZED, 'start_again');
     }
+    const visitor = { ...read, embed };
     const email = BotPageAccessService.tryNormaliseEmail(dto.email);
     if (!email) throw publicError(HttpStatus.BAD_REQUEST, 'code_wrong');
 
@@ -384,11 +425,15 @@ export class BotPagePublicService {
     this.logger.info(
       `Bot page ${available.page.slug}: visitor ${BotPageVisitorService.logTag(visitor.id)} verified (${email.slice(email.lastIndexOf('@'))})`,
     );
-    return this.sessionFor(available, {
-      visitor: verified,
-      email,
-      eligibility,
-    });
+    return withToken(
+      req,
+      verified,
+      await this.sessionFor(available, {
+        visitor: verified,
+        email,
+        eligibility,
+      }),
+    );
   }
 
   // ── pre-chat, resume, new chat ────────────────────────────────────────
@@ -419,7 +464,10 @@ export class BotPagePublicService {
       ConversationChannel.WEB,
       { idleWindowMinutes: available.botSettings.conversationIdleMinutes },
     );
-    await this.conversations.setMetadata(conversation.id, { intake });
+    await this.conversations.setMetadata(conversation.id, {
+      intake,
+      ...sourceOf(ready, conversation),
+    });
     return { intakeDone: true };
   }
 
@@ -566,7 +614,7 @@ export class BotPagePublicService {
     const { available, ready, text } = admitted;
     const { chatbot, botSettings } = available;
     const contact = (await this.contactOf(available, ready, true))!;
-    const conversation = await this.openWithIntake(available, contact);
+    const conversation = await this.openWithIntake(available, contact, ready);
 
     const inbound = await this.conversations.appendMessage(conversation.id, {
       channel: ConversationChannel.WEB,
@@ -748,7 +796,7 @@ export class BotPagePublicService {
     const available = await this.page(slug);
     const ready = await this.requireReady(available, req);
     const contact = (await this.contactOf(available, ready, true))!;
-    const conversation = await this.openWithIntake(available, contact);
+    const conversation = await this.openWithIntake(available, contact, ready);
     const reply = handoverMessage(
       handoverOf(available.botSettings),
       new Date(),
@@ -809,7 +857,81 @@ export class BotPagePublicService {
     sse.end();
   }
 
+  // ── the website widget (chunk 13) ─────────────────────────────────────
+
+  /**
+   * What the widget's loader needs to draw the bubble, read from the owner's own site. Only for an
+   * allowed website: anywhere else it is 404 (as for a page that is off), so nothing is drawn.
+   */
+  async widgetConfig(
+    slug: string,
+    origin: string | undefined,
+    req: Request,
+  ): Promise<WidgetConfig> {
+    const available = await this.page(slug);
+    await this.ipLimit(req, 'widget', BOT_PAGE_IP_LIMITS.widget.perHour);
+    if (!origin || !this.hostOk(available, origin)) {
+      throw publicError(HttpStatus.FORBIDDEN, 'host_not_allowed');
+    }
+    const { settings } = available;
+    return {
+      position: settings.widget.position,
+      label: settings.widget.label,
+      autoOpenSeconds: settings.widget.autoOpenSeconds,
+      showOnPhones: settings.widget.showOnPhones,
+      accent: settings.branding.accentColour,
+      logo: available.brandImages?.logo?.src ?? settings.branding.logoUrl,
+      title: settings.branding.title,
+      pageUrl: this.pages.link(available.page.slug),
+    };
+  }
+
+  /**
+   * The `frame-ancestors` the embedded page should be served with, for CloudFront and Caddy to set
+   * (LAUNCH-CHECKLIST): the allowed websites and their subdomains, and Ally's own page.
+   */
+  async framePolicy(slug: string): Promise<{ frameAncestors: string }> {
+    const available = await this.page(slug);
+    return {
+      frameAncestors: frameAncestors(
+        available.settings.widget.allowedDomains,
+        this.config.botPage.origin,
+        { production: this.config.nodeEnv === 'production' },
+      ),
+    };
+  }
+
   // ── plumbing ──────────────────────────────────────────────────────────
+
+  /**
+   * In the website widget: the host page the frame reported (the browser's own ancestor origin or
+   * referrer, never the loader's say-so), if it is one of the bot's allowed websites or Ally's own
+   * page. Null outside the widget. Refused with 403 `host_not_allowed` otherwise.
+   */
+  private embedOf(
+    available: AvailableBotPage,
+    req: Request,
+    dto: BotPageEmbedDto | undefined,
+  ): BotPageVisitor['embed'] {
+    if (!BotPageVisitorService.isEmbed(req)) return null;
+    if (!dto?.host || !this.hostOk(available, dto.host)) {
+      throw publicError(HttpStatus.FORBIDDEN, 'host_not_allowed');
+    }
+    const host = new URL(dto.host).origin;
+    return { host, page: cleanPageUrl(dto.page, host) };
+  }
+
+  /** Whether the widget may open on this host now (allowed websites, or Ally's own page). */
+  private hostOk(available: AvailableBotPage, host: string): boolean {
+    try {
+      if (new URL(host).origin === this.config.botPage.origin) return true;
+    } catch {
+      return false;
+    }
+    return hostAllowed(available.settings.widget.allowedDomains, host, {
+      production: this.config.nodeEnv === 'production',
+    });
+  }
 
   /** The visitor behind the cookie, if they may use the page now; otherwise 401 or 403. */
   private async requireReady(
@@ -818,6 +940,11 @@ export class BotPagePublicService {
   ): Promise<ReadyVisitor> {
     const visitor = await this.visitors.read(req, available.chatbot.id);
     if (!visitor) throw publicError(HttpStatus.UNAUTHORIZED, 'start_again');
+    // In the widget: the site it was opened on must still be allowed, so removing a website takes
+    // effect at once, like removing a person.
+    if (visitor.embed && !this.hostOk(available, visitor.embed.host)) {
+      throw publicError(HttpStatus.FORBIDDEN, 'host_not_allowed');
+    }
     if (available.page.access === BotPageAccess.PUBLIC) {
       return { visitor, email: null, eligibility: { eligible: true } };
     }
@@ -904,6 +1031,7 @@ export class BotPagePublicService {
   private async openWithIntake(
     available: AvailableBotPage,
     contact: ChatbotContact,
+    ready: ReadyVisitor,
   ): Promise<ChatbotConversation> {
     const conversation = await this.conversations.openConversation(
       available.chatbot.id,
@@ -911,6 +1039,10 @@ export class BotPagePublicService {
       ConversationChannel.WEB,
       { idleWindowMinutes: available.botSettings.conversationIdleMinutes },
     );
+    const source = sourceOf(ready, conversation);
+    if (source.source) {
+      await this.conversations.setMetadata(conversation.id, source);
+    }
     if (!conversation.metadata?.intake) {
       const previous = await this.latestIntake(contact.id);
       if (previous) {
@@ -986,6 +1118,27 @@ export class BotPagePublicService {
       });
     }
   }
+}
+
+/** The widget's token in the session answer, only when its cookie check failed and it asked. */
+function withToken(
+  req: Request,
+  issued: IssuedVisitor,
+  session: PublicSession,
+): PublicSession {
+  return issued.embed && req.headers[EMBED_TOKEN_HEADER] === '1'
+    ? { ...session, visitorToken: issued.token }
+    : session;
+}
+
+/** A chat started in the website widget is marked so the inbox can show "Website" (chunk 13). */
+function sourceOf(
+  ready: ReadyVisitor,
+  conversation: ChatbotConversation,
+): { source?: { kind: 'widget'; host: string; page: string | null } } {
+  const embed = ready.visitor.embed;
+  if (!embed || conversation.metadata?.source) return {};
+  return { source: { kind: 'widget', host: embed.host, page: embed.page } };
 }
 
 /** Sources a visitor may see: the document's title and its public link, once each. */

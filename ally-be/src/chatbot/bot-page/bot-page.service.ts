@@ -142,16 +142,21 @@ export class BotPageService {
 
     const userId = Number(ExecutionManager.getUserId() ?? 0) || null;
     const existing = await this.findForChatbot(chatbot.id);
-    // The look is changed only through `saveBrand`: a brand sent here is ignored and the stored one
-    // kept, so the Bot page tab and onboarding's publish can't drop or forge it.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { brand: _ignored, ...incoming } =
-      dto.settings as UpdateBotPageDto['settings'] & {
-        brand?: unknown;
-      };
+    // The look is changed only through `saveBrand`, and the website widget (chunk 13) only through
+    // its home field: either sent here is ignored and the stored one kept, so the Bot page tab and
+    // onboarding's publish can't drop or forge them.
+    const incoming = { ...dto.settings } as UpdateBotPageDto['settings'] & {
+      brand?: unknown;
+      widget?: unknown;
+    };
+    delete incoming.brand;
+    delete incoming.widget;
     const settings = {
       ...incoming,
       ...(existing?.settings?.brand ? { brand: existing.settings.brand } : {}),
+      ...(existing?.settings?.widget
+        ? { widget: existing.settings.widget }
+        : {}),
       branding: {
         ...dto.settings.branding,
         logoUrl: dto.settings.branding.logoUrl || null,

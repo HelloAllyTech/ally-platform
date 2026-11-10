@@ -14,9 +14,12 @@ export const INBOX_PAGE = 50;
 
 export type InboxView = 'needs_person' | 'live' | 'all';
 
+/** A channel, or `widget`: the web chats that came from the website widget (chunk 13). */
+export type InboxChannelFilter = ConversationChannel | 'widget';
+
 export interface InboxFilters {
   view?: InboxView;
-  channel?: ConversationChannel;
+  channel?: InboxChannelFilter;
   chatbotId?: string;
   /** Older than this `last_message_at` (ISO), for the next page. */
   before?: string;
@@ -27,6 +30,8 @@ export interface InboxItem {
   chatbotId: string;
   assistant: string;
   channel: ConversationChannel;
+  /** `widget` for a chat started in the website widget (chunk 13): shown as "Website". */
+  source: 'widget' | null;
   visitor: string;
   preview: string;
   lastMessageAt: string;
@@ -63,7 +68,17 @@ export class InboxService {
     };
     if (ids) add('c.chatbot_id = ANY(?::uuid[])', ids);
     if (filters.chatbotId) add('c.chatbot_id = ?', filters.chatbotId);
-    if (filters.channel) add('c.channel = ?', filters.channel);
+    // The website widget's chats are web chats marked `source.kind = widget` (chunk 13): "Website"
+    // shows only those, and "Bot page" the rest.
+    if (filters.channel === 'widget') {
+      add('c.channel = ?', ConversationChannel.WEB);
+      where.push(`c.metadata->'source'->>'kind' = 'widget'`);
+    } else if (filters.channel) {
+      add('c.channel = ?', filters.channel);
+      if (filters.channel === ConversationChannel.WEB) {
+        where.push(`COALESCE(c.metadata->'source'->>'kind', '') <> 'widget'`);
+      }
+    }
     if (filters.before) add('c.last_message_at < ?', filters.before);
     if (filters.view === 'needs_person')
       where.push('c.needs_person_since IS NOT NULL');
@@ -76,7 +91,7 @@ export class InboxService {
       `SELECT c.id, c.chatbot_id, b.name AS assistant, c.channel, c.last_message_at,
               c.handled_by_user_id, u.name AS held_by_name, c.needs_person_since,
               c.needs_person_reason, c.safety_at, c.metadata->'intake' AS intake,
-              ident.external_id,
+              c.metadata->'source'->>'kind' AS source, ident.external_id,
               (SELECT m.text FROM chatbot_messages m WHERE m.conversation_id = c.id
                 ORDER BY m."createdAt" DESC LIMIT 1) AS preview,
               (SELECT COUNT(*) FROM chatbot_messages m
@@ -138,6 +153,7 @@ export class InboxService {
     await this.access.assert(chatbotId, ChatbotMemberRole.VIEWER);
     const [conversation] = (await this.dataSource.query(
       `SELECT c.id, c.chatbot_id, b.name AS assistant, c.channel, c.metadata->'intake' AS intake,
+              c.metadata->'source'->>'kind' AS source,
               c.handled_by_user_id, u.name AS held_by_name, c.needs_person_since,
               c.needs_person_reason, c.safety_at, c.last_message_at
          FROM chatbot_conversations c
@@ -225,6 +241,7 @@ function toItem(row: Record<string, unknown>): InboxItem {
     chatbotId: String(row.chatbot_id),
     assistant: String(row.assistant ?? ''),
     channel: row.channel as ConversationChannel,
+    source: row.source === 'widget' ? 'widget' : null,
     visitor: visitorLabel(row),
     preview: String(row.preview ?? '').slice(0, 140),
     lastMessageAt: new Date(row.last_message_at as string).toISOString(),

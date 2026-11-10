@@ -39,7 +39,11 @@ import { ConversationChannel } from '../enum/conversation.enum';
 import { HandoverService } from '../handover/handover.service';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { InboxEventsService } from './inbox-events.service';
-import { InboxService, type InboxView } from './inbox.service';
+import {
+  InboxService,
+  type InboxChannelFilter,
+  type InboxView,
+} from './inbox.service';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
 /** How often a live inbox stream re-reads which assistants its user can see. */
@@ -51,10 +55,13 @@ export class InboxQueryDto {
   @IsIn(['needs_person', 'live', 'all'])
   view?: InboxView;
 
-  @ApiPropertyOptional({ enum: Object.values(ConversationChannel) })
+  @ApiPropertyOptional({
+    enum: [...Object.values(ConversationChannel), 'widget'],
+    description: '`widget`: web chats from the website widget; `web`: the rest',
+  })
   @IsOptional()
-  @IsIn(Object.values(ConversationChannel))
-  channel?: ConversationChannel;
+  @IsIn([...Object.values(ConversationChannel), 'widget'])
+  channel?: InboxChannelFilter;
 
   @ApiPropertyOptional() @IsOptional() @IsUUID() chatbotId?: string;
 

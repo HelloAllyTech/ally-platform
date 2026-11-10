@@ -12,6 +12,7 @@ import * as express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AppConfigService } from './config/config.service';
+import { WIDGET_CONFIG_PATH } from './chatbot/bot-page/widget-public.controller';
 import { TRUSTED_PROXY_HOPS } from './common/constants/network.constants';
 import { PostHog } from 'posthog-node';
 import { PostHogInterceptor } from 'posthog-node/nestjs';
@@ -27,7 +28,7 @@ async function bootstrap() {
     // deployment. Rate limits keyed by IP and both audit loggers read it; see
     // TRUSTED_PROXY_HOPS for why it is a hop count and never `true`.
     app.set('trust proxy', TRUSTED_PROXY_HOPS);
-    app.enableCors({
+    const corsOptions = {
       origin: (origin: any, callback: any) => {
         const allowedOrigins = appConfigService.cors.allowedOrigins;
         if (!origin || allowedOrigins.includes(origin)) {
@@ -39,6 +40,15 @@ async function bootstrap() {
       },
       credentials: true,
       exposedHeaders: ['Content-Disposition'],
+    };
+    app.enableCors((req: any, callback: any) => {
+      // The website widget's settings (chunk 13) are read from owners' own sites, which can't be on
+      // this list: that one route answers CORS itself, only to the bot's allowed websites.
+      if (String(req.url ?? '').startsWith(WIDGET_CONFIG_PATH)) {
+        callback(null, { origin: false });
+        return;
+      }
+      callback(null, corsOptions);
     });
 
     // The client itself is built and shut down by PostHogModule; pulling it out

@@ -128,6 +128,31 @@ describe('BotPageService', () => {
       ]);
     });
 
+    it('keeps the stored website widget; one sent here is ignored (chunk 13)', async () => {
+      const widget = {
+        position: 'left',
+        label: 'Talk to us',
+        autoOpenSeconds: null,
+        showOnPhones: true,
+        allowedDomains: ['sunrisemind.in'],
+      };
+      pages.findOne.mockResolvedValue({
+        chatbotId: 'bot-1',
+        slug: 'sunrise-mind',
+        settings: { widget },
+      });
+      await service.save(
+        bot,
+        dto({
+          settings: {
+            ...dto().settings,
+            widget: { allowedDomains: ['evil.example'] },
+          } as never,
+        }),
+      );
+      expect(pages.save.mock.calls[0][0].settings.widget).toEqual(widget);
+    });
+
     it('refuses public access while the platform does not allow it', async () => {
       await expect(
         service.save(bot, dto({ access: BotPageAccess.PUBLIC })),

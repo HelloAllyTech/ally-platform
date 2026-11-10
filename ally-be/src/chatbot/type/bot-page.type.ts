@@ -90,6 +90,28 @@ export function brandImageIds(brand: BotPageBrand): string[] {
   ].filter((id): id is string => Boolean(id));
 }
 
+/** The website widget (chunk 13): the chat bubble an owner adds to their own site. */
+export interface BotPageWidget {
+  position: 'right' | 'left';
+  /** The bubble's label ("Ask us"). */
+  label: string;
+  /** Open on its own after this many seconds; null for never. */
+  autoOpenSeconds: number | null;
+  showOnPhones: boolean;
+  /** Where it may open: the owner's domains, normalised (widget-host.ts). Subdomains count. */
+  allowedDomains: string[];
+}
+
+export const DEFAULT_WIDGET_LABEL = 'Ask us';
+
+export const DEFAULT_BOT_PAGE_WIDGET: BotPageWidget = {
+  position: 'right',
+  label: DEFAULT_WIDGET_LABEL,
+  autoOpenSeconds: null,
+  showOnPhones: true,
+  allowedDomains: [],
+};
+
 export interface BotPageSettings {
   branding: BotPageBranding;
   brand: BotPageBrand;
@@ -97,6 +119,7 @@ export interface BotPageSettings {
   prechat: PrechatField[];
   limits: BotPageLimits;
   language: BotPageLanguage;
+  widget: BotPageWidget;
 }
 
 /** Fixed ceilings. A page's own limits can be lower, never higher. */
@@ -113,6 +136,10 @@ export const BOT_PAGE_BOUNDS = {
   maxReplyChars: 4000,
   /** Messages returned when a visitor reloads the page. */
   resumeMessages: 50,
+  /** The widget's bubble label, and its "open on its own" delay in seconds. */
+  maxWidgetLabelChars: 24,
+  minWidgetAutoOpenSeconds: 3,
+  maxWidgetAutoOpenSeconds: 120,
 } as const;
 
 export const DEFAULT_BOT_PAGE_LIMITS: BotPageLimits = {
@@ -197,6 +224,7 @@ export function defaultBotPageSettings(bot: {
     prechat: [],
     limits: { ...DEFAULT_BOT_PAGE_LIMITS },
     language: 'auto',
+    widget: { ...DEFAULT_BOT_PAGE_WIDGET, allowedDomains: [] },
   };
 }
 
@@ -219,5 +247,6 @@ export function mergeBotPageSettings(
     prechat: stored?.prechat ?? defaults.prechat,
     limits: { ...defaults.limits, ...(stored?.limits ?? {}) },
     language: stored?.language ?? defaults.language,
+    widget: { ...defaults.widget, ...(stored?.widget ?? {}) },
   };
 }

@@ -119,7 +119,7 @@ function harness(
     })),
     issue: jest.fn(async (_res: unknown, v: BotPageVisitor) => {
       issued.push(v);
-      return v;
+      return { ...v, token: 'signed-token' };
     }),
     rotateIfDue: jest.fn(),
   };
@@ -190,7 +190,10 @@ function harness(
     orIgnore: () => ({ execute: jest.fn() }),
   });
   const service = new BotPagePublicService(
-    { findAvailable: jest.fn().mockResolvedValue(available) } as never,
+    {
+      findAvailable: jest.fn().mockResolvedValue(available),
+      link: (slug: string) => `https://chat.ally.test/b/${slug}`,
+    } as never,
     pageAccess as never,
     visitors as never,
     otp as never,
@@ -199,7 +202,11 @@ function harness(
     conversations as never,
     engine as never,
     { emit } as never,
-    { jwt: { accessToken: { secret: 's' } } } as never,
+    {
+      jwt: { accessToken: { secret: 's' } },
+      botPage: { origin: 'https://chat.ally.test' },
+      nodeEnv: 'production',
+    } as never,
     leads as never,
     handover as never,
     inboxEvents as never,
@@ -824,6 +831,203 @@ describe('BotPagePublicService', () => {
         'conv-1',
         'asked',
       );
+    });
+  });
+
+  describe('the website widget (chunk 13)', () => {
+    const SITE = 'https://www.sunrisemind.in';
+    const embedReq = (extra: Record<string, string> = {}) =>
+      ({
+        ip: '203.0.113.9',
+        headers: { 'x-ally-embed': '1', ...extra },
+      }) as never;
+
+    function widget(access = BotPageAccess.PUBLIC) {
+      const h = harness(access);
+      h.available.settings.widget.allowedDomains = ['sunrisemind.in'];
+      return h;
+    }
+
+    it('starts a visit only on an allowed website, and remembers which', async () => {
+      const h = widget();
+      await h.service.session(
+        'sunrise',
+        { embed: { host: SITE, page: `${SITE}/fees?utm=x` } },
+        embedReq(),
+        h.res,
+      );
+      expect(h.issued[0].embed).toEqual({
+        host: SITE,
+        page: `${SITE}/fees`,
+      });
+    });
+
+    it('refuses any other website, a missing host, and localhost in production', async () => {
+      for (const host of [
+        'https://evil-sunrisemind.in',
+        'https://other.wixsite.com',
+        'http://localhost:5500',
+        undefined,
+      ]) {
+        const h = widget();
+        expect(
+          await errorCodeOf(
+            h.service.session(
+              'sunrise',
+              host ? { embed: { host } } : {},
+              embedReq(),
+              h.res,
+            ),
+          ),
+        ).toBe(ErrorCode.BOT_PAGE_HOST_NOT_ALLOWED);
+        expect(h.issued).toHaveLength(0);
+      }
+    });
+
+    it('the bot page itself is unchanged: no host needed, no widget visitor', async () => {
+      const h = widget();
+      await h.service.session('sunrise', {}, h.req, h.res);
+      expect(h.issued[0].embed).toBeNull();
+    });
+
+    it('invite pages work in the widget: the code step keeps the host', async () => {
+      const h = widget(BotPageAccess.INVITE);
+      h.pageAccess.eligibility.mockResolvedValue({ eligible: true });
+      await h.service.session(
+        'sunrise',
+        { email: 'asha@example.com', embed: { host: SITE } },
+        embedReq(),
+        h.res,
+      );
+      h.setVisitor({ embed: { host: SITE, page: null } });
+      await h.service.verify(
+        'sunrise',
+        { email: 'asha@example.com', code: '123456', embed: { host: SITE } },
+        embedReq(),
+        h.res,
+      );
+      expect(h.issued.map((v) => v.embed?.host)).toEqual([SITE, SITE]);
+      expect(h.issued[1].verifiedAt).toBeInstanceOf(Date);
+    });
+
+    it('hands over its token only when it asks (its cookie check failed)', async () => {
+      const h = widget();
+      const plain = await h.service.session(
+        'sunrise',
+        { embed: { host: SITE } },
+        embedReq(),
+        h.res,
+      );
+      expect(plain.visitorToken).toBeUndefined();
+      const asked = await h.service.session(
+        'sunrise',
+        { embed: { host: SITE } },
+        embedReq({ 'x-ally-embed-token': '1' }),
+        h.res,
+      );
+      expect(asked.visitorToken).toBe('signed-token');
+      // Never on the bot page itself, even if asked.
+      const page = await h.service.session(
+        'sunrise',
+        {},
+        { ip: '1.2.3.4', headers: { 'x-ally-embed-token': '1' } } as never,
+        h.res,
+      );
+      expect(page.visitorToken).toBeUndefined();
+    });
+
+    it('taking the website off the list refuses the next message at once', async () => {
+      const h = widget();
+      h.setVisitor({ embed: { host: SITE, page: null } });
+      await h.service.admit('sunrise', 'hi', embedReq(), h.res);
+      h.available.settings.widget.allowedDomains = [];
+      expect(
+        await errorCodeOf(h.service.admit('sunrise', 'hi', embedReq(), h.res)),
+      ).toBe(ErrorCode.BOT_PAGE_HOST_NOT_ALLOWED);
+    });
+
+    it('marks the chat as from the website, with the page', async () => {
+      const h = widget();
+      h.setVisitor({ embed: { host: SITE, page: `${SITE}/fees` } });
+      const admitted = await h.service.admit(
+        'sunrise',
+        'how much?',
+        embedReq(),
+        h.res,
+      );
+      await h.service.respond(admitted);
+      expect(h.conversations.setMetadata).toHaveBeenCalledWith('conv-1', {
+        source: { kind: 'widget', host: SITE, page: `${SITE}/fees` },
+      });
+    });
+
+    it('a message in the widget reaches the engine exactly as on the page (crisis included)', async () => {
+      const page = widget();
+      page.setVisitor({});
+      await page.service.respond(
+        await page.service.admit(
+          'sunrise',
+          'I want to end it',
+          page.req,
+          page.res,
+        ),
+      );
+      const framed = widget();
+      framed.setVisitor({ embed: { host: SITE, page: null } });
+      await framed.service.respond(
+        await framed.service.admit(
+          'sunrise',
+          'I want to end it',
+          embedReq(),
+          framed.res,
+        ),
+      );
+      expect(framed.engine.respond.mock.calls[0]).toEqual(
+        page.engine.respond.mock.calls[0],
+      );
+      expect(framed.engine.respond.mock.calls[0][0].channel).toBe(WEB_CHANNEL);
+    });
+
+    it('Talk to a person works in the widget, and the chat is marked', async () => {
+      const h = widget();
+      h.setVisitor({ embed: { host: SITE, page: null } });
+      await h.service.askForPerson('sunrise', embedReq());
+      expect(h.handover.markNeedsPerson).toHaveBeenCalledWith(
+        BOT_ID,
+        'conv-1',
+        'asked',
+      );
+      expect(h.conversations.setMetadata).toHaveBeenCalledWith('conv-1', {
+        source: { kind: 'widget', host: SITE, page: null },
+      });
+    });
+
+    it("gives the loader the bubble's settings only on an allowed website", async () => {
+      const h = widget();
+      h.available.settings.widget.label = 'Talk to us';
+      expect(await h.service.widgetConfig('sunrise', SITE, h.req)).toEqual({
+        position: 'right',
+        label: 'Talk to us',
+        autoOpenSeconds: null,
+        showOnPhones: true,
+        accent: h.available.settings.branding.accentColour,
+        logo: null,
+        title: 'Sunrise Mind',
+        pageUrl: 'https://chat.ally.test/b/sunrise',
+      });
+      for (const origin of ['https://elsewhere.com', undefined]) {
+        expect(
+          await errorCodeOf(h.service.widgetConfig('sunrise', origin, h.req)),
+        ).toBe(ErrorCode.BOT_PAGE_HOST_NOT_ALLOWED);
+      }
+    });
+
+    it('states the frame-ancestors for infra', async () => {
+      const h = widget();
+      expect(await h.service.framePolicy('sunrise')).toEqual({
+        frameAncestors:
+          "frame-ancestors 'self' https://chat.ally.test https://sunrisemind.in https://*.sunrisemind.in",
+      });
     });
   });
 });

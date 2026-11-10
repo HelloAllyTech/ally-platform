@@ -2,6 +2,7 @@ import { JwtService } from '@nestjs/jwt';
 import {
   BOT_PAGE_COOKIE_PATH,
   BotPageVisitorService,
+  EMBED_PROBE_COOKIE,
   readCookie,
 } from '../bot-page-visitor.service';
 
@@ -156,5 +157,115 @@ describe('BotPageVisitorService', () => {
     expect(readCookie('a=1; b=two%20words; c=3', 'b')).toBe('two words');
     expect(readCookie('a=1', 'b')).toBeNull();
     expect(readCookie(undefined, 'b')).toBeNull();
+  });
+
+  describe('in the website widget (chunk 13)', () => {
+    const EMBED = {
+      host: 'https://sunrisemind.in',
+      page: 'https://sunrisemind.in/fees',
+    };
+    const embedReq = (cookie?: string, token?: string) => ({
+      headers: {
+        'x-ally-embed': '1',
+        ...(cookie
+          ? {
+              cookie: `${BotPageVisitorService.cookieName(BOT, true)}=${cookie}`,
+            }
+          : {}),
+        ...(token ? { 'x-ally-visitor': token } : {}),
+      },
+    });
+
+    it('uses its own cookie: httpOnly, SameSite=None, Secure, Partitioned', async () => {
+      const { service, cookies, res } = harness({
+        baseUrl: 'http://localhost:8081',
+      });
+      await service.issue(res as never, {
+        ...service.newVisitor(BOT),
+        embed: EMBED,
+      });
+      const cookie = cookies[BotPageVisitorService.cookieName(BOT, true)];
+      expect(cookie.options).toMatchObject({
+        httpOnly: true,
+        sameSite: 'none',
+        secure: true,
+        partitioned: true,
+        path: BOT_PAGE_COOKIE_PATH,
+      });
+      // The page's own cookie is untouched.
+      expect(cookies[BotPageVisitorService.cookieName(BOT)]).toBeUndefined();
+    });
+
+    it('reads the host back, and keeps the widget and the page apart', async () => {
+      const { service, cookies, res, req } = harness();
+      const visitor = { ...service.newVisitor(BOT), embed: EMBED };
+      await service.issue(res as never, visitor);
+      const token = cookies[BotPageVisitorService.cookieName(BOT, true)].value;
+      expect(await service.read(embedReq(token) as never, BOT)).toMatchObject({
+        id: visitor.id,
+        embed: EMBED,
+        via: 'cookie',
+      });
+      // The widget's token isn't a page visitor, and a page token isn't a widget visitor.
+      expect(await service.read(req(token) as never, BOT)).toBeNull();
+      await service.issue(res as never, service.newVisitor(BOT));
+      const pageToken = cookies[BotPageVisitorService.cookieName(BOT)].value;
+      expect(
+        await service.read(embedReq(undefined, pageToken) as never, BOT),
+      ).toBeNull();
+    });
+
+    it('takes the in-memory token in a header only in the widget, and never rotates it', async () => {
+      const { service, res, req } = harness();
+      const issued = await service.issue(res as never, {
+        ...service.newVisitor(BOT),
+        embed: EMBED,
+      });
+      const read = await service.read(
+        embedReq(undefined, issued.token) as never,
+        BOT,
+      );
+      expect(read).toMatchObject({ id: issued.id, via: 'header' });
+      expect(
+        await service.read(
+          { headers: { 'x-ally-visitor': issued.token } } as never,
+          BOT,
+        ),
+      ).toBeNull();
+      expect(await service.read(req() as never, BOT)).toBeNull();
+
+      const later = { cookie: jest.fn() };
+      await service.rotateIfDue(later as never, {
+        ...read!,
+        issuedAt: new Date(0),
+      });
+      expect(later.cookie).not.toHaveBeenCalled();
+    });
+
+    it('probes with a throwaway cookie set the same way', () => {
+      const cookies: Record<string, Record<string, unknown>> = {};
+      BotPageVisitorService.setProbe({
+        cookie: (
+          name: string,
+          _v: string,
+          options: Record<string, unknown>,
+        ) => {
+          cookies[name] = options;
+        },
+      } as never);
+      expect(cookies[EMBED_PROBE_COOKIE]).toMatchObject({
+        sameSite: 'none',
+        secure: true,
+        partitioned: true,
+      });
+      expect(
+        BotPageVisitorService.readProbe({
+          headers: { cookie: `${EMBED_PROBE_COOKIE}=1` },
+        } as never),
+      ).toBe(true);
+      expect(BotPageVisitorService.readProbe({ headers: {} } as never)).toBe(
+        false,
+      );
+    });
   });
 });

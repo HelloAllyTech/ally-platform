@@ -499,6 +499,13 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Public note (while public links are off):** For now, only people in your organisation or people you invite can chat in the bubble. Public chat is coming soon.
 - **Help titles:** Add it to WordPress · Add it to Wix · Add it to Shopify · Add it to any website
 - **Conversation badge:** Website
+- **Website refused (under the list):**
+  - {domain} is shared by many websites, so the bubble could appear on sites that aren't yours. Add your own address on it, for example yourclinic.{domain}.
+  - {domain} isn't a website address. Add your domain, for example yourclinic.in.
+  - localhost only works while testing. Add your real website address.
+  - You can add up to 10 websites.
+  - Add your website addresses as a list.
+- **Option refusals:** Choose how the bubble looks. · Choose right or left. · Choose between 3 and 120 seconds.
 
 ## 23. Inbox and handing over (11a)
 

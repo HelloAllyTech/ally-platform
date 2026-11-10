@@ -22,6 +22,7 @@ import {
 } from '../dto/bot-page.dto';
 import type { AgentStreamEvent } from '../../ai/dto/knowledge.dto';
 import { BotPagePublicService } from './bot-page-public.service';
+import { BotPageVisitorService } from './bot-page-visitor.service';
 
 /**
  * The bot page's public API (chunk 12b): what a visitor's browser calls. No dashboard auth; a
@@ -43,6 +44,38 @@ export class BotPagePublicController {
   })
   async get(@Param('slug') slug: string) {
     return this.service.view(await this.service.page(slug));
+  }
+
+  @Public()
+  @Post(':slug/embed/probe')
+  @HttpCode(204)
+  @ApiOperation({
+    summary:
+      'Website widget: set a throwaway cookie, to learn whether cookies get through',
+    description:
+      "Set exactly like the widget's visitor cookie (SameSite=None; Secure; Partitioned). The GET reads it back.",
+  })
+  async setProbe(
+    @Param('slug') slug: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    await this.service.page(slug);
+    BotPageVisitorService.setProbe(res);
+  }
+
+  @Public()
+  @Get(':slug/embed/probe')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({
+    summary:
+      'Website widget: whether the probe cookie came back (if not, it asks for an in-memory token)',
+  })
+  async readProbe(
+    @Param('slug') slug: string,
+    @Req() req: Request,
+  ): Promise<{ cookies: boolean }> {
+    await this.service.page(slug);
+    return { cookies: BotPageVisitorService.readProbe(req) };
   }
 
   @Public()
