@@ -30,7 +30,6 @@ import {
   Calendar as CCalendar,
   ChartBar as CChartBar,
   Chat as CChat,
-  Forum as CForum,
   ChatBot as CChatBot,
   UserSpeaker as CUserSpeaker,
   Chemistry as CChemistry,
@@ -181,8 +180,6 @@ export const Launch = createCarbonIcon(CLaunch);
 export const Calendar = createCarbonIcon(CCalendar);
 export const Cancel = createCarbonIcon(CClose);
 export const Chat = createCarbonIcon(CChat);
-/** The inbox tab (chunk 11a): the chats themselves, beside the assistants' Chat bubble. */
-export const Forum = createCarbonIcon(CForum);
 /** Ally Console tab — the companion, distinct from the plain Chat bubble the WhatsApp Bot wears. */
 export const ChatBot = createCarbonIcon(CChatBot);
 export const Chemistry = createCarbonIcon(CChemistry);

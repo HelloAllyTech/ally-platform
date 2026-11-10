@@ -15,7 +15,6 @@ import {
   Bullhorn,
   Catalog,
   Chat,
-  Forum,
   ChatBot,
   Chemistry,
   MachineLearningModel,
@@ -342,9 +341,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Mobile size={20} />;
       case SIDEBAR_ITEMS.WHATSAPP_BOT:
         return <Chat size={20} />;
-      // The chats themselves (chunk 11a), not the assistants: a forum glyph beside the Chat one.
-      case SIDEBAR_ITEMS.INBOX:
-        return <Forum size={20} />;
       // Bug Hunter is the one tab that is a *someone* rather than a section:
       // its own page presents it as a test engineer on the team, and the nav
       // carries the same face so it is recognisable from anywhere. The Debug
@@ -369,7 +365,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     switch (id) {
       case SIDEBAR_ITEMS.BUILDER:
         return <BuilderNavBadge />;
-      case SIDEBAR_ITEMS.INBOX:
+      // The inbox lives in AI Chatbots (chunk 11a): its unread chats show on that tab.
+      case SIDEBAR_ITEMS.WHATSAPP_BOT:
         return <InboxNavBadge />;
       default:
         return undefined;

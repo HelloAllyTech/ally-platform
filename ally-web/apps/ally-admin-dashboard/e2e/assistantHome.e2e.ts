@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { expectNoSeriousA11yIssues } from "./a11y";
 import { BOT_ID, mockAssistantHome } from "./assistantHome.fixture";
+import { mockInbox } from "./inbox.fixture";
 
 /** The assistant home (chunk 20d) from fixtures: every section's baseline, axe, Try it, saving. */
 const SECTIONS = [
@@ -24,8 +25,10 @@ const open = async (page: import("@playwright/test").Page, section: string) => {
 test.describe("assistant home sections", () => {
   for (const section of SECTIONS) {
     test(`${section}: matches its baseline and has no serious a11y issues`, async ({ page }) => {
-      await mockAssistantHome(page);
+      // The Inbox section is this assistant's inbox (chunk 11a), so it needs the inbox's chats too.
+      await (section === "conversations" ? mockInbox(page) : mockAssistantHome(page));
       await open(page, section);
+      if (section === "conversations") await expect(page.getByTestId("inbox-list")).toBeVisible();
       if (section === "overview") await expect(page.getByTestId("share-qr")).toBeVisible();
       if (section === "page") await expect(page.getByTestId("phone-preview")).toBeVisible();
       await expect(page).toHaveScreenshot(`home-${section}.png`, { fullPage: true });

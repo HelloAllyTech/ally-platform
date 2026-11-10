@@ -29,12 +29,16 @@ const ago = (iso: string) =>
  * The inbox (chunk 11a): every channel's chats, live, Safety and Needs a person first. Pick one to
  * read it, take it over, reply and hand it back. A new Needs a person or Safety chat rings and
  * shows a browser notification (with a mute).
+ *
+ * It lives in AI Chatbots: the Inbox tab (every assistant you can see) and each assistant's own
+ * Inbox section (`chatbotId`, that assistant only). A fixed-height panel: the list and the chat
+ * scroll inside it; on a phone, the list or the chat.
  */
-export const Inbox: React.FC = () => {
+export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) => {
   const [params, setParams] = useSearchParams();
   const view = (params.get("view") as InboxView) || "all";
   const channel = (params.get("channel") as InboxChannel) || undefined;
-  const chatbotId = params.get("assistant") || undefined;
+  const chatbotId = locked ?? (params.get("assistant") || undefined);
   const selected = params.get("conversation");
   const { data: items = [], isLoading } = useGetInboxQuery({ view, channel, chatbotId });
   const { data: bots } = useGetChatbotsQuery();
@@ -67,10 +71,14 @@ export const Inbox: React.FC = () => {
   });
 
   const current = items.find(item => item.id === selected);
-  const currentBot = current?.chatbotId ?? params.get("bot");
+  const currentBot = current?.chatbotId ?? locked ?? params.get("bot");
 
   return (
-    <div className="ally-v2 ally-inbox" data-testid="inbox">
+    <div
+      className="ally-v2 ally-inbox"
+      data-testid="inbox"
+      data-chat-open={selected && currentBot ? "true" : undefined}
+    >
       <aside className="ally-inbox__list-pane">
         <header className="ally-inbox__head">
           <h1 className="ally-heading">{INBOX.nav}</h1>
@@ -122,22 +130,26 @@ export const Inbox: React.FC = () => {
             <option value="whatsapp">{INBOX.channels.whatsapp}</option>
             <option value="web">{INBOX.channels.web}</option>
           </select>
-          <label className="sr-only" htmlFor="inbox-assistant">
-            {INBOX.assistant}
-          </label>
-          <select
-            id="inbox-assistant"
-            className="ally-input"
-            value={chatbotId ?? ""}
-            onChange={event => set("assistant", event.target.value || null)}
-          >
-            <option value="">{INBOX.assistant}</option>
-            {(bots?.chatbots ?? []).map(b => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+          {!locked && (
+            <>
+              <label className="sr-only" htmlFor="inbox-assistant">
+                {INBOX.allAssistants}
+              </label>
+              <select
+                id="inbox-assistant"
+                className="ally-input"
+                value={chatbotId ?? ""}
+                onChange={event => set("assistant", event.target.value || null)}
+              >
+                <option value="">{INBOX.allAssistants}</option>
+                {(bots?.chatbots ?? []).map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
         {!isLoading && items.length === 0 && (
           <p className="ally-empty">
@@ -194,7 +206,16 @@ export const Inbox: React.FC = () => {
       </aside>
       <main className="ally-inbox__main">
         {selected && currentBot ? (
-          <ChatView chatbotId={currentBot} id={selected} me={user?.id ?? null} />
+          <>
+            <button
+              type="button"
+              className="ally-link ally-inbox__back"
+              onClick={() => set("conversation", null)}
+            >
+              {INBOX.back}
+            </button>
+            <ChatView chatbotId={currentBot} id={selected} me={user?.id ?? null} />
+          </>
         ) : (
           <p className="ally-empty">{items.length ? "" : INBOX.empty}</p>
         )}

@@ -175,11 +175,6 @@ const buildNavigationItems = (): NavigationItem[] => [
     path: ROUTES.ALLY_CONSOLE,
   },
   {
-    id: SIDEBAR_ITEMS.INBOX,
-    label: "Inbox",
-    path: ROUTES.INBOX,
-  },
-  {
     id: SIDEBAR_ITEMS.WHATSAPP_BOT,
     label: en.whatsappBot.navLabel,
     path: ROUTES.WHATSAPP_BOT,

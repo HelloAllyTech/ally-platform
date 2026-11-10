@@ -1,22 +1,22 @@
 import React from "react";
 
-import { ConversationsTab } from "../../WhatsAppBot/ConversationsTab";
+import { Inbox } from "../../Inbox";
 import { HOME } from "../copy";
 import { SectionHead } from "../fields";
-import { sectionFromUrl } from "../sections";
 
 import type { SectionProps } from "./props";
 
-/** What people asked and what the assistant said: the conversation list and its thread drawer. */
-export const ConversationsSection: React.FC<SectionProps> = ({ bot, go }) => (
+/**
+ * This assistant's inbox (chunk 11a): its chats from every channel, live, to take over and reply.
+ * The same inbox as AI Chatbots → Inbox, held to this assistant. The old list and drawer stay on
+ * the classic view (`?view=classic`).
+ */
+export const ConversationsSection: React.FC<SectionProps> = ({ bot }) => (
   <>
     <SectionHead title={HOME.sections.conversations} subtitle={HOME.subtitles.conversations} />
-    <div className="ally-card ally-home__classic">
-      {/* Its links name the classic tabs; each lands on the section that holds it now. */}
-      <ConversationsTab
-        bot={bot}
-        onGo={id => go(sectionFromUrl(new URLSearchParams({ tab: id })).section)}
-      />
+    {/* The app bar, the assistant's header and this title sit above the panel: about 260px. */}
+    <div style={{ ["--ally-inbox-top" as string]: "260px" }}>
+      <Inbox chatbotId={bot.id} />
     </div>
   </>
 );

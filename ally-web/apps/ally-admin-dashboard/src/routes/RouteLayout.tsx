@@ -69,8 +69,15 @@ import { DefaultRedirect } from "./DefaultRedirect";
 import { PrivateLayout } from "./PrivateLayout";
 import { PublicRoute } from "./PublicRoute";
 import { AssistantHome } from "../pages/AssistantHome";
-import { Inbox } from "../pages/Inbox";
 import { OnboardingSession, OnboardingStart } from "../pages/Onboarding";
+
+/** `/inbox` (an owner's email from before the inbox moved): AI Chatbots → Inbox, same chat. */
+const InboxRedirect: React.FC = () => {
+  const [params] = useSearchParams();
+  const next = new URLSearchParams(params);
+  next.set("tab", "inbox");
+  return <Navigate to={`${ROUTES.WHATSAPP_BOT}?${next.toString()}`} replace />;
+};
 
 /**
  * One assistant: the assistant home (chunk 20d), edge to edge, or with `?view=classic` the old
@@ -692,14 +699,7 @@ export const RouteLayout: React.FC = () => {
             </PrivateLayout>
           }
         />
-        <Route
-          path={ROUTES.INBOX}
-          element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
-              <Inbox />
-            </PrivateLayout>
-          }
-        />
+        <Route path={ROUTES.INBOX} element={<InboxRedirect />} />
         <Route
           path={ROUTES.WHATSAPP_BOT}
           element={

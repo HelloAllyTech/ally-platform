@@ -14,11 +14,12 @@ import { AllConnectorsTab } from "./ConnectorsTab";
 import { CorpusTab } from "./CorpusTab";
 import { fill, LoadError, StatusPill } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
+import { Inbox } from "../Inbox";
 import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
 
 const t = en.whatsappBot.bots;
 
-type HomeTab = "bots" | "connectors" | "defaults" | "library";
+type HomeTab = "bots" | "inbox" | "connectors" | "defaults" | "library";
 
 /**
  * Chatbots home.
@@ -38,16 +39,21 @@ export const WhatsAppBot: React.FC = () => {
   const navigate = useNavigate();
   const canCreate = Boolean(data?.canCreate);
 
+  // The inbox (chunk 11a) is for everyone who can see an assistant: its chats, every channel.
   const tabItems = useMemo(
     () =>
       canCreate
         ? [
             { id: "bots", label: t.homeTabs.bots },
+            { id: "inbox", label: t.homeTabs.inbox },
             { id: "connectors", label: t.homeTabs.connectors },
             { id: "defaults", label: t.homeTabs.defaults },
             { id: "library", label: t.homeTabs.library },
           ]
-        : [{ id: "bots", label: t.homeTabs.bots }],
+        : [
+            { id: "bots", label: t.homeTabs.bots },
+            { id: "inbox", label: t.homeTabs.inbox },
+          ],
     [canCreate],
   );
   const requested = searchParams.get("tab") ?? "bots";
@@ -92,6 +98,12 @@ export const WhatsAppBot: React.FC = () => {
             bots={data?.chatbots ?? []}
             onCreateAgent={() => navigate(ROUTES.CHATBOT_NEW)}
           />
+        )}
+        {activeTab === "inbox" && (
+          // Everything above the panel (the app bar, this title and the tabs) is about 250px.
+          <div style={{ ["--ally-inbox-top" as string]: "250px" }}>
+            <Inbox />
+          </div>
         )}
         {activeTab === "defaults" && <DefaultsTab />}
         {activeTab === "library" && <CorpusTab />}

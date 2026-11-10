@@ -185,6 +185,23 @@ describe("Inbox", () => {
     ).toBe(true);
   });
 
+  it("inside one assistant's home, held to that assistant (no assistant filter)", () => {
+    render(
+      <MemoryRouter initialEntries={["/chatbots/b1?section=conversations"]}>
+        <Inbox chatbotId="b1" />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByLabelText(INBOX.allAssistants)).toBeNull();
+    expect(screen.getByLabelText(INBOX.channels.all)).toBeTruthy();
+  });
+
+  it("an open chat has a way back to the list (for phones)", () => {
+    open("/inbox?conversation=c1&bot=b1");
+    expect(screen.getByTestId("inbox").dataset.chatOpen).toBe("true");
+    fireEvent.click(screen.getByText(INBOX.back));
+    expect(screen.getByTestId("inbox").dataset.chatOpen).toBeUndefined();
+  });
+
   it("an empty inbox says so", () => {
     h.items.current = [];
     open();

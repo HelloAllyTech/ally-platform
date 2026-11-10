@@ -526,6 +526,9 @@ says when a save can't be made. More lines for the home's sections are added her
   - Settings section title: When someone asks for a person
   - Settings labels: They usually reply within · Opening hours (optional) · Days · From · To · Show the team member's first name · Hours before it hands back · Minutes before the email
   - Day names: Sun · Mon · Tue · Wed · Thu · Fri · Sat
+  - The inbox sits in AI Chatbots: a tab named Inbox, and each assistant's own Inbox section, subtitled: Chats from every channel. Take one over to reply yourself.
+  - Assistant filter: All assistants
+  - On a phone, from a chat: Back to chats
   - Settings hint for opening hours: Without opening hours, visitors are always told when you usually reply.
   - List labels: Needs a person · Safety · {name} is replying · Your assistant
   - Reasons: Asked for a person · Couldn't help twice

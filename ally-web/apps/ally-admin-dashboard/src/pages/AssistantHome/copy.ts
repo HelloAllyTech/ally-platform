@@ -15,7 +15,7 @@ export const HOME = {
     safety: "Safety",
     page: "Page",
     checkup: "Checkup",
-    conversations: "Conversations",
+    conversations: "Inbox",
     share: "Share",
   },
   subtitles: {
@@ -25,7 +25,7 @@ export const HOME = {
     safety: "Rules your assistant always follows.",
     page: "How your page looks, and what it asks before a chat.",
     checkup: "A check that your assistant answers well and stays safe.",
-    conversations: "What people asked, and what your assistant said.",
+    conversations: "Chats from every channel. Take one over to reply yourself.",
     share: "Who can use your assistant, and where.",
   },
   saving: {

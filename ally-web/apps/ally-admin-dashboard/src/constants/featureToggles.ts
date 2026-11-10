@@ -133,8 +133,6 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.LOGS, FeatureToggleKey.LOGS],
     [sidebarItems.MOBILE_RELEASES, FeatureToggleKey.MOBILE_RELEASES],
     [sidebarItems.WHATSAPP_BOT, FeatureToggleKey.WHATSAPP_BOT],
-    // The inbox (chunk 11a): the assistants' chats, for whoever can see the assistants.
-    [sidebarItems.INBOX, FeatureToggleKey.WHATSAPP_BOT],
     [sidebarItems.BUG_HUNTER, FeatureToggleKey.BUG_HUNTER],
     [sidebarItems.BUILDER, FeatureToggleKey.BUILDER],
     [sidebarItems.ANALYTICS, FeatureToggleKey.ANALYTICS],

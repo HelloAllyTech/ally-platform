@@ -115,7 +115,6 @@ export const SIDEBAR_ITEMS = {
   LOGS: "logs",
   MOBILE_RELEASES: "mobile-releases",
   WHATSAPP_BOT: "whatsapp-bot",
-  INBOX: "inbox",
   BUG_HUNTER: "bug-hunter",
   BUILDER: "builder",
   COURSE_COPILOT: "course-copilot",

@@ -1487,6 +1487,7 @@ export const en = {
       loadFailed: "Could not load the chatbots.",
       homeTabs: {
         bots: "Chatbots",
+        inbox: "Inbox",
         connectors: "Channels",
         defaults: "Defaults",
         library: "Knowledge library",

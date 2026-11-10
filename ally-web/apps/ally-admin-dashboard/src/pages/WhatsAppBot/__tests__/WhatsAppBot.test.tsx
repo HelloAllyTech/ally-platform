@@ -27,6 +27,7 @@ vi.mock("@constants", async () => {
     loadFailed: "Could not load",
     homeTabs: {
       bots: "Chatbots",
+      inbox: "Inbox",
       connectors: "Connectors",
       defaults: "Defaults",
       library: "Knowledge library",
@@ -124,6 +125,8 @@ vi.mock("@components", () => ({
 }));
 vi.mock("@components/types", () => ({ ButtonVariant: { PRIMARY: "primary" } }));
 
+// The inbox (chunk 11a) has its own tests; here it's just the tab's content.
+vi.mock("../../Inbox", () => ({ Inbox: () => <div data-testid="inbox" /> }));
 vi.mock("../shared", () => ({
   fill: (text: string, values: Record<string, unknown>) =>
     text.replace(/\{(\w+)\}/g, (_m, key: string) => String(values[key])),
@@ -192,11 +195,13 @@ describe("Chatbots home", () => {
     expect(screen.getByTestId("replies").dataset.bot).toBe("");
   });
 
-  it("shows a member only their bots — no creating, no platform tabs", () => {
+  it("shows a member only their bots and the inbox — no creating, no platform tabs", () => {
     mockList = { chatbots: [bot({ myRole: ChatbotMemberRole.VIEWER })], canCreate: false };
     renderAt("/chatbots?tab=defaults");
     expect(screen.queryByText("New chatbot")).toBeNull();
-    expect(screen.queryByTestId("tabs")).toBeNull();
+    // The inbox (chunk 11a) is for everyone who can see an assistant.
+    expect(screen.getByTestId("tabs").textContent).toBe("ChatbotsInbox");
+    expect(screen.queryByTestId("defaults-settings")).toBeNull();
     expect(screen.queryByTestId("defaults-settings")).toBeNull();
     expect(screen.getByText("Policy helper")).toBeTruthy();
   });

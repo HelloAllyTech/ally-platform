@@ -1,6 +1,8 @@
 /** The inbox's words (copy §23, chunk 11a). `inbox.test.ts` holds them to the deck. */
 export const INBOX = {
   nav: "Inbox",
+  allAssistants: "All assistants",
+  back: "Back to chats",
   filters: {
     needs_person: "Needs a person",
     live: "Live now",

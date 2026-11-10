@@ -1,17 +1,34 @@
 /* The inbox (chunk 11a). */
+/* A fixed panel: the page doesn't scroll, the list and the chat scroll inside it. Its height is the
+   window less what sits above it (set by the page that holds it, `--ally-inbox-top`). */
 .ally-inbox {
   display: grid;
-  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
-  min-height: calc(100vh - 64px);
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  height: calc(100vh - var(--ally-inbox-top, 220px));
+  min-height: 420px;
+  overflow: hidden;
   background: var(--ally-bg);
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-lg);
 }
 .ally-inbox__list-pane {
   border-right: 1px solid var(--ally-line);
-  padding: 20px 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Only the chats scroll; the title and filters stay put above them. */
+.ally-inbox__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ally-inbox__back {
+  display: none;
 }
 .ally-inbox__head {
   display: flex;
@@ -105,14 +122,21 @@
   text-align: center;
 }
 .ally-inbox__main {
-  padding: 20px 24px;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
+/* The chat: its header stays at the top, the thread scrolls, the reply box stays at the bottom. */
 .ally-inbox__chat {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 760px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .ally-inbox__chat-head {
   display: flex;
@@ -181,23 +205,42 @@
   align-items: flex-end;
   gap: 8px;
   position: sticky;
-  bottom: 0;
+  bottom: -16px;
+  margin-bottom: -16px;
+  padding: 8px 0 16px;
   background: var(--ally-bg);
-  padding-top: 8px;
+  border-top: 1px solid var(--ally-line);
 }
 .ally-inbox__reply .ally-input {
   width: 100%;
 }
+/* A phone: the list, or the chat with a way back to it. */
 @media (max-width: 959px) {
   .ally-inbox {
     grid-template-columns: minmax(0, 1fr);
+    height: calc(100vh - var(--ally-inbox-top-phone, 180px));
   }
   .ally-inbox__list-pane {
     border-right: 0;
-    border-bottom: 1px solid var(--ally-line);
-    max-height: 50vh;
   }
   .ally-inbox__main {
-    padding: 16px;
+    display: none;
   }
+  .ally-inbox[data-chat-open="true"] .ally-inbox__list-pane {
+    display: none;
+  }
+  .ally-inbox[data-chat-open="true"] .ally-inbox__main {
+    display: flex;
+  }
+  .ally-inbox__back {
+    display: block;
+    align-self: flex-start;
+    margin: 12px 16px 0;
+  }
+  .ally-inbox__chat {
+    padding: 12px 16px;
+  }
+}
+.ally-inbox__main > .ally-empty {
+  padding: 24px;
 }
