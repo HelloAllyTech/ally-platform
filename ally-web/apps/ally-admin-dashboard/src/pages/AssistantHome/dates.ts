@@ -15,7 +15,7 @@ export const dateTime = (iso: string | Date): string =>
     })
     .replace(/\b(AM|PM)\b/g, m => m.toLowerCase());
 
-export const day = (iso: string | Date): string =>
+const day = (iso: string | Date): string =>
   new Date(iso).toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
 
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [

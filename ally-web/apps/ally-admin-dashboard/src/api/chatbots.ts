@@ -18,7 +18,6 @@ import {
   ChatbotSettingsView,
   ChatbotStatus,
   Connector,
-  CreateChatbotRequest,
   CreateChatbotUploadUrlRequest,
   CreateKbUploadUrlResponse,
   CreatePrivateChatbotDocumentRequest,
@@ -62,11 +61,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
     getChatbot: builder.query<Chatbot, string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.BY_ID(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
-    }),
-
-    createChatbot: builder.mutation<Chatbot, CreateChatbotRequest>({
-      query: body => ({ url: ApiEndpoints.CHATBOTS.LIST, method: HttpMethod.POST, body }),
-      invalidatesTags: [TAG_TYPES.CHATBOTS],
     }),
 
     updateChatbot: builder.mutation<Chatbot, UpdateChatbotRequest>({
@@ -431,15 +425,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
     }),
 
-    updateBotImage: builder.mutation<BotImageView, { id: string; imageId: string; alt: string }>({
-      query: ({ id, imageId, alt }) => ({
-        url: ApiEndpoints.CHATBOTS.IMAGE(id, imageId),
-        method: HttpMethod.PATCH,
-        body: { alt },
-      }),
-      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
-    }),
-
     removeBotImage: builder.mutation<void, { id: string; imageId: string }>({
       query: ({ id, imageId }) => ({
         url: ApiEndpoints.CHATBOTS.IMAGE(id, imageId),
@@ -550,7 +535,6 @@ export const {
   useCorrectFactMutation,
   useGetChatbotsQuery,
   useGetChatbotQuery,
-  useCreateChatbotMutation,
   useUpdateChatbotMutation,
   useSetChatbotStatusMutation,
   useArchiveChatbotMutation,
@@ -578,7 +562,6 @@ export const {
   useGetBotImagesQuery,
   useGetChatbotTeamNamesQuery,
   useUploadBotImageMutation,
-  useUpdateBotImageMutation,
   useRemoveBotImageMutation,
   useRestoreBotImageMutation,
   useGetBotPageAccessQuery,

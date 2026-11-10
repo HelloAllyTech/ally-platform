@@ -32,10 +32,7 @@ const fileOf = (url: string | null | undefined) => {
  * Logo, cover and colour on "Make it yours" (copy §16): the brand editor's state drawn as the
  * screenshot's controls. Uploads and saves are the editor's.
  */
-export const BrandControls: React.FC<{ view: BotDraftView; editor: BrandEditor }> = ({
-  view,
-  editor,
-}) => {
+const BrandControls: React.FC<{ view: BotDraftView; editor: BrandEditor }> = ({ view, editor }) => {
   const brand = editor.brand;
   if (!brand) return null;
   const logo = editor.imageFor("logo");
@@ -119,7 +116,7 @@ export const BrandControls: React.FC<{ view: BotDraftView; editor: BrandEditor }
 };
 
 /** The phone on "Make it yours": the chat as visitors will open it, with the current settings. */
-export const MakePreview: React.FC<{
+const MakePreview: React.FC<{
   view: BotDraftView;
   editor: BrandEditor;
   name: string;

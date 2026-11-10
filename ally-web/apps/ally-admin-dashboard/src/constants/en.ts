@@ -1628,34 +1628,6 @@ export const en = {
         lookAndFeel: "Look and feel",
         general: "General",
       },
-      createPanel: {
-        title: "New chatbot",
-        intro:
-          "Start from a template. You can change everything afterwards. It stays a draft until you publish it.",
-        nameLabel: "Name",
-        namePlaceholder: "e.g. Policy helper",
-        descriptionLabel: "What it's for (optional)",
-        presetLabel: "Template",
-        created: "{name} created. Next: give it some knowledge.",
-        failed: "Could not create the chatbot.",
-      },
-      presets: {
-        faq: {
-          label: "FAQ assistant",
-          hint: "Short, friendly answers to common questions.",
-          tone: "warm and concise",
-          prompt:
-            "You help people with everyday questions about how things work. Keep answers short and practical, and point to the next step when there is one.",
-        },
-        policy: {
-          label: "Policy helper",
-          hint: "Precise answers that quote the policy.",
-          tone: "clear and precise",
-          prompt:
-            "You explain policies accurately. Say exactly what the policy says, quote the key line where it helps, and say plainly when something depends on the person's situation.",
-        },
-        blank: { label: "Blank", hint: "No instructions yet.", tone: "", prompt: "" },
-      },
       overview: {
         checklistTitle: "Get this chatbot ready to publish",
         checklistDone: "Published. People can message it now.",

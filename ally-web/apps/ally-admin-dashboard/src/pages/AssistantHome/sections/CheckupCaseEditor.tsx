@@ -11,7 +11,7 @@ const t = HOME.checkupControls;
 const OUTCOMES: CheckupOutcomeChoice[] = ["answer", "dont_know", "decline", "person"];
 
 /** A list of short lines as chips: type one, press Enter (or Add), remove with ×. */
-export const ChipsInput: React.FC<{
+const ChipsInput: React.FC<{
   label: string;
   hint?: string;
   value: string[];

@@ -129,14 +129,6 @@ export interface GetChatbotsResponse {
   canCreate: boolean;
 }
 
-export interface CreateChatbotRequest {
-  name: string;
-  description?: string;
-  persona?: ChatbotPersona;
-  answerMode?: ChatbotAnswerMode;
-  accessMode?: ChatbotAccessMode;
-}
-
 export interface UpdateChatbotRequest {
   id: string;
   name?: string;

@@ -28,12 +28,8 @@ import type {
   TranscriptEntry,
 } from "./types";
 
-export type { OnboardingScreenState };
-
-export { reached };
-
 /** The canvas sections, in order. */
-export type CanvasSection =
+type CanvasSection =
   | "reading"
   | "learned"
   | "safety"
@@ -53,7 +49,7 @@ const STEP_SECTION: Partial<Record<BotDraftStep, CanvasSection>> = {
 };
 
 /** One row of the builder chat, as a screen draws it. */
-export interface ChatRow {
+interface ChatRow {
   id: string;
   from: "builder" | "owner";
   text: string;
@@ -62,7 +58,7 @@ export interface ChatRow {
 }
 
 /** How long the reading result stays up before "What we learned" (chunk-20d §2). */
-export const READING_PAUSE_MS = 1200;
+const READING_PAUSE_MS = 1200;
 
 const passedKey = (draftId: string) => `ally.onboarding.${draftId}.passed`;
 const readPassed = (draftId: string): Partial<PassedScreens> => {

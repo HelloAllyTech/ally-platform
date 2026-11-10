@@ -13,8 +13,6 @@ import type { AppDispatch } from "../../store";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-export { backoff, BACKOFF_MS } from "./useInboxStream.backoff";
-
 export interface InboxStreamEvent {
   type: "hello" | "message" | "state" | "safety" | "read";
   chatbotId?: string;

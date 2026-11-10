@@ -21,7 +21,7 @@ import type { SectionProps } from "./props";
 
 const t = HOME.knows;
 /** The Owner notes document onboarding writes (ally-be `OWNER_NOTES_TITLE`). */
-export const OWNER_NOTES_TITLE = "Owner notes";
+const OWNER_NOTES_TITLE = "Owner notes";
 const SECTION_ORDER = Object.keys(COPY.learned.sections) as (keyof typeof COPY.learned.sections)[];
 
 const message = (error: unknown): string | undefined => {

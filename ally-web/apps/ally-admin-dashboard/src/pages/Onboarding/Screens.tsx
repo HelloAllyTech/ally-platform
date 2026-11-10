@@ -42,7 +42,7 @@ import type { ReadingProgress } from "./useBotDraftSession";
  */
 
 /** "…turned on **Mental health safety**." → the pack name in bold, as the chat showed it. */
-export const withBold = (text: string): React.ReactNode =>
+const withBold = (text: string): React.ReactNode =>
   text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
 
 const MAX_PAGES = 50;
@@ -444,7 +444,7 @@ const DescribePurpose: React.FC<{ onDescribe: (text: string) => void }> = ({ onD
 // ── Building ──────────────────────────────────────────────────────────────
 
 /** While the builder writes, the steps tick at a steady pace, short of the last until it's done. */
-export const useBuildTicks = (done: boolean): number => {
+const useBuildTicks = (done: boolean): number => {
   const total = COPY.building.steps.length;
   const [ticked, setTicked] = useState(0);
   useEffect(() => {

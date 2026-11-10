@@ -18,7 +18,7 @@ export const setSound = (on: boolean): void => {
 };
 
 /** A short two-note chime, made in the browser (no file to load). */
-export function chime(): void {
+function chime(): void {
   if (!soundOn()) return;
   try {
     const AudioContextClass =
@@ -41,7 +41,7 @@ export function chime(): void {
   }
 }
 
-export const notificationsAllowed = (): boolean =>
+const notificationsAllowed = (): boolean =>
   typeof Notification !== "undefined" && Notification.permission === "granted";
 
 export const canAskForNotifications = (): boolean =>

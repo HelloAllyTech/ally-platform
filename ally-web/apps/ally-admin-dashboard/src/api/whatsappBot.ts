@@ -3,7 +3,6 @@ import {
   CreateKbDocumentRequest,
   CreateKbUploadUrlRequest,
   CreateKbUploadUrlResponse,
-  GetKbChunksResponse,
   KbCorpus,
   KbChunk,
   GetKbDocumentsParams,
@@ -270,7 +269,6 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [
         TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
-        TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
         TAG_TYPES.WHATSAPP_BOT_STATS,
         TAG_TYPES.CHATBOT_DETAIL,
       ],
@@ -285,7 +283,6 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [
         TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
-        TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
         TAG_TYPES.WHATSAPP_BOT_STATS,
         TAG_TYPES.CHATBOT_DETAIL,
       ],
@@ -319,19 +316,6 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         TAG_TYPES.WHATSAPP_BOT_STATS,
         TAG_TYPES.CHATBOT_DETAIL,
       ],
-    }),
-
-    /** A document's chunks — literally what the bot can see. */
-    getKbDocumentChunks: builder.query<
-      GetKbChunksResponse,
-      { id: string; limit?: number; offset?: number }
-    >({
-      query: ({ id, limit, offset }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_CHUNKS(id),
-        method: HttpMethod.GET,
-        params: { limit: limit ?? 50, offset: offset ?? 0 },
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS],
     }),
 
     /** Retrieval preview — no LLM call, so thresholds can be tuned without generation cost. */
@@ -800,7 +784,6 @@ export const {
   useReindexKbDocumentMutation,
   useArchiveKbDocumentMutation,
   useUnarchiveKbDocumentMutation,
-  useGetKbDocumentChunksQuery,
   useSearchKbCorpusMutation,
   useGetWaTemplatesQuery,
   useCreateWaTemplateMutation,

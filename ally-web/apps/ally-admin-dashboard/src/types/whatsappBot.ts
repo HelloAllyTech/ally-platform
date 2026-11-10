@@ -197,11 +197,6 @@ export interface KbChunk {
   uploadError: string | null;
 }
 
-export interface GetKbChunksResponse {
-  chunks: KbChunk[];
-  count: number;
-}
-
 export interface KbStats {
   byStatus: Record<string, number>;
   totalChunks: number;

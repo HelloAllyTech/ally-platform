@@ -54,7 +54,7 @@ export interface DesignCard {
   limit?: string;
 }
 
-export interface PrechatField {
+interface PrechatField {
   id: string;
   label: string;
   type: string;
@@ -62,7 +62,7 @@ export interface PrechatField {
   options?: string[];
 }
 
-export interface BotDraftConfig {
+interface BotDraftConfig {
   name: string;
   assistantName: string;
   introduction: string;

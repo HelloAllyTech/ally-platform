@@ -44,7 +44,7 @@ export const NOTHING_PASSED: PassedScreens = {
  * The builder message that announced the safety pack: its first reply after the owner confirmed
  * "What we learned" (every pack's message, including "Facts only", whose text doesn't name it).
  */
-export const safetyEntry = (view: BotDraftView): number => {
+const safetyEntry = (view: BotDraftView): number => {
   const confirmed = view.transcript.findIndex(
     e => e.role === "owner" && e.text === COPY.learned.confirm,
   );
@@ -195,13 +195,13 @@ export const isMultiSelect = (chips: string[]): boolean =>
  * Whether the question wants a typed answer: no quick replies, or only a gap's way out ("Skip for
  * now", "We don't offer this") after the owner chose "Add it now".
  */
-export const wantsText = (chips: string[]): boolean =>
+const wantsText = (chips: string[]): boolean =>
   chips.length === 0 ||
   (chips.every(chip => (COPY.gaps.chips as readonly string[]).includes(chip)) &&
     !chips.includes(COPY.gaps.chips[0]));
 
 /** The builder's latest message, and its quick replies unless it is working. */
-export const latestBuilder = (transcript: TranscriptEntry[]): TranscriptEntry | null => {
+const latestBuilder = (transcript: TranscriptEntry[]): TranscriptEntry | null => {
   for (let i = transcript.length - 1; i >= 0; i -= 1) {
     if (transcript[i].role === "builder") return transcript[i];
   }

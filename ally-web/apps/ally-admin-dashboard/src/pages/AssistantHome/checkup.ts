@@ -18,21 +18,6 @@ export const statusOf = (result: CheckupResult): CheckStatus => {
   return "declined";
 };
 
-/** Where the answer came from, as a short label: the page's path, or "Safety rule". */
-export const sourceLabel = (result: CheckupResult, safetyRule: string): string => {
-  if (result.safety) return safetyRule;
-  const url = result.source.url;
-  if (url) {
-    try {
-      const { pathname } = new URL(url);
-      return pathname === "/" ? "/" : pathname.replace(/\/$/, "");
-    } catch {
-      return url;
-    }
-  }
-  return result.source.title || "";
-};
-
 export const hasTotals = (
   view: CheckupRunView | null,
 ): view is CheckupRunView & {
@@ -44,26 +29,3 @@ export const accuracyPct = (totals: CheckupTotals): number =>
 
 export const gapsOf = (view: CheckupRunView | null): CheckupResult[] =>
   (view?.results ?? []).filter(r => r.verdict === "needs_input");
-
-/** What blocks publishing (the server decides; this mirrors it for the screen's message). */
-export const blocksPublishing = (view: CheckupRunView | null): "unsourced" | "safety" | null => {
-  if (!view) return null;
-  if (view.results.some(r => r.reasons.includes("uncited_answer"))) return "unsourced";
-  if (view.results.some(r => r.safety && r.verdict !== "pass")) return "safety";
-  return null;
-};
-
-export type CheckupFilter = "all" | "answered" | "safety" | "input";
-
-export const filtered = (results: CheckupResult[], filter: CheckupFilter): CheckupResult[] => {
-  switch (filter) {
-    case "answered":
-      return results.filter(r => statusOf(r) === "answered");
-    case "safety":
-      return results.filter(r => statusOf(r) === "safe" || r.safety);
-    case "input":
-      return results.filter(r => statusOf(r) === "gap" || statusOf(r) === "fix");
-    default:
-      return results;
-  }
-};

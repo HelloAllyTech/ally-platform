@@ -20,7 +20,7 @@ const t = COPY.change;
 const c = HOME.changeControls;
 
 /** A recent change as the owner reads it: ally-be records the fields changed ("tone, language"). */
-export const changeLabel = (summary: string): string =>
+const changeLabel = (summary: string): string =>
   summary
     .split(/,\s*/)
     .map(field => (t.fields as Record<string, string>)[field] ?? field)

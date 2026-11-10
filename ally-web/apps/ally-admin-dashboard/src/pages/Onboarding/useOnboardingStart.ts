@@ -15,8 +15,8 @@ import { COPY } from "./copy";
 import type { BotDraftView } from "./types";
 
 /** Copy §13: up to 10 files at a time, 20 MB each. */
-export const MAX_FILES = 10;
-export const MAX_BYTES = 20 * 1024 * 1024;
+const MAX_FILES = 10;
+const MAX_BYTES = 20 * 1024 * 1024;
 const FORMATS: Record<string, { sourceType: string; mime: string }> = {
   pdf: { sourceType: "pdf", mime: "application/pdf" },
   docx: {
