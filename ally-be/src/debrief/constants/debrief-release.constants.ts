@@ -302,7 +302,10 @@ const SEED_RECIPES_BASE = {
     runCeilingUsd: 0.5,
     runFloorUsd: 0.15,
     poolPerSessionUsd: 0.25,
-    monthlyCapUsd: 500,
+    // Lowered from 500 on 2026-11-10 as a safety net while the Debrief agent
+    // is still in development (~$3 a month today). Raise it to a proper level
+    // once the whole loop is finished.
+    monthlyCapUsd: 50,
     deadlineMs: 150_000,
     riskDeadlineMs: 180_000,
     guidancePassagesPerMoment: 2,
