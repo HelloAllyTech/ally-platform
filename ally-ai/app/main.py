@@ -29,10 +29,12 @@ async def lifespan(_: FastAPI):
     initialize_openai_clients()
     logger.info("OpenAI clients initialized")
 
-    # Agents v2 runtime: only opened when switched on, so a deploy with it off
-    # touches no new database. Never raises: if its database is unreachable the
-    # runtime stays off and everything else starts.
-    if settings.AGENT_RUNTIME.ENABLED:
+    # The checkpoint database: opened when the Agents v2 runtime is switched on,
+    # and whenever one is configured, because the Debrief graph checkpoints
+    # every run there too (durable resume, v9 FR-3) whatever the chatbots' flag
+    # says. Never raises: if it is unreachable the runtimes fall back as before
+    # and everything else starts.
+    if settings.AGENT_RUNTIME.ENABLED or settings.AGENT_RUNTIME.CHECKPOINT_DB_URL:
         await open_agent_runtime()
 
     yield
