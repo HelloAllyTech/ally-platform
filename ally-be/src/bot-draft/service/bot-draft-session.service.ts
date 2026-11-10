@@ -45,7 +45,6 @@ export const BUILDER_PROMPT_CODES = [
   'ally_ai_builder_extract',
   'ally_ai_builder_classify',
   'ally_ai_builder_gaps',
-  'ally_ai_builder_designs',
   'ally_ai_builder_purposes',
   'ally_ai_builder_draft',
 ] as const;

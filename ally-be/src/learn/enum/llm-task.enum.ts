@@ -208,7 +208,6 @@ export enum LlmTask {
   ONBOARDING_EXTRACT_FACTS = 'onboarding_extract_facts',
   ONBOARDING_CLASSIFY = 'onboarding_classify',
   ONBOARDING_GAPS = 'onboarding_gaps',
-  ONBOARDING_DESIGNS = 'onboarding_designs',
   // Purposes (chunk 20a-2): tailors the five purpose cards and recommends one.
   ONBOARDING_PURPOSES = 'onboarding_purposes',
   ONBOARDING_DRAFT = 'onboarding_draft',

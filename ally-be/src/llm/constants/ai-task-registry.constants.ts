@@ -1227,26 +1227,12 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_builder_gaps',
   },
   {
-    id: 'onboarding-designs',
-    task: LlmTask.ONBOARDING_DESIGNS,
-    runtime: LlmRuntime.ALLY_AI,
-    trigger: 'The owner answers the last onboarding question',
-    detail:
-      "One call per onboarding: names 2–3 designs from those that work today (guide, enquiries, support) and writes a sample exchange. What each will and won't do is fixed in code; booking and orders are always a coming-soon card.",
-    kind: AiTaskKind.COMPLETION,
-    provider: 'openai',
-    defaultModel: 'gpt-5-mini',
-    configuredBy:
-      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
-    promptOverride: 'ally_ai_builder_designs',
-  },
-  {
     id: 'onboarding-purposes',
     task: LlmTask.ONBOARDING_PURPOSES,
     runtime: LlmRuntime.ALLY_AI,
     trigger: 'The owner answers the last onboarding question',
     detail:
-      "One call per onboarding (chunk 20a-2): recommends one of the purposes (answer questions, bring in customers, train my team, guide step by step) and tailors each card's Best for and sample exchange. What each will and won't do is fixed in code; replaces the designs call.",
+      "One call per onboarding (chunk 20a-2): recommends one of the purposes (answer questions, bring in customers, train my team, guide step by step) and tailors each card's Best for and sample exchange. What each will and won't do is fixed in code.",
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
