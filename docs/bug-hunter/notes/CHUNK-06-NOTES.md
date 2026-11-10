@@ -1,7 +1,7 @@
 # Chunk 06 notes: graph v2 (fix, verify, review, approve)
 
 Branch `feat/bug-hunter-v2`, merged from `origin/master` at chunk start. `make lint` and
-`make test` pass (295 offline tests). **No paid run has happened in this chunk** (user
+`make test` pass (295 offline tests). Paid runs: see Metrics (user
 rule: ledger over the daily cap; real runs only with an explicit go). Sections marked
 PENDING need one.
 
@@ -53,57 +53,91 @@ safety keyword; the dry-run PR writes body/patch/branch and `Git.push` is never 
 hits skip the suite and the baseline sees the untouched code (observed through the
 stash).
 
-## Metrics: first graph-v2 eval (issue mode, 2026-11-10)
+## Metrics: graph v2, issue mode, all 19 bug cases (2026-11-10)
 
-GitHub run 42767847055, commit `1ec27151`, prompts triage.v3, investigate.v3,
-reproduce.v4, fix.v2, review.v2; gpt-5 / gpt-5-mini / gemini-2.5-pro. 19 bug cases (the
-two sweep-only cases have no issue text). **Real cost $9.39** (LangSmith); the report
-shows $7.14 because four crashed cases reported $0 (fixed). 3 h 23 min.
+Two GitHub runs make up the complete set: run 42767847055 (19 cases, commit `1ec27151`,
+$9.39) and run 42831392057 (the 4 cases that crashed in verify, re-run at `f407e405`
+after the harness fixes, $1.35). **Total $10.74.** Prompts: triage.v3, investigate.v3,
+reproduce.v4, fix.v2, review.v2; gpt-5 / gpt-5-mini / gemini-2.5-pro. The two
+sweep-only cases have no issue text. Repro is the graph's own code-verified
+reproduction (see "repro column" below).
 
-| Outcome | Count | Cases |
-|---|---|---|
-| Draft PR (dry-run), review approve | 5 | `99584ee6`, `89d8e055`, `adf36739`, `995242d7`, `87c6ecb8` |
-| of which the hidden oracle passes | **1** | `89d8e055` |
-| Escalated correctly (risk path) | 3 | `d039e256`, `819f6ccf`, `6083b8d8` |
-| Escalated, could not reproduce | 3 | `f35e117d`, `eebbfd01`, `3b3db9b5` (all ally-web) |
-| Escalated by precheck on a wrong suspect | 1 | `8c4f9caf` (suspected `config.service.ts`; the real fix is elsewhere) |
-| No bug (missed at investigate) | 3 | `b82759ae`, `e5ad37b3`, `83bdf91e` |
-| Harness error in verify | 4 | `9299e9aa`, `dd128ff8`, `b680c643`, `1065743a` |
+| Case | Expected | Repro | Review | Fix tries | Ended as | Oracle | Cost |
+|---|---|---|---|---|---|---|---|
+| `ally-be-89d8e055` | fix | yes | approve | 1 | PR | **pass** | $0.46 |
+| `ally-ai-b680c643` (re-run) | fix | yes | request_changes, approve | 2 | PR | **pass** | $0.48 |
+| `ally-be-99584ee6` | fix | yes | approve | 1 | PR | fail | $0.54 |
+| `ally-be-adf36739` | fix | yes | approve | 1 | PR | fail (oracle_shape; human: fail) | $0.63 |
+| `ally-ai-learn-995242d7` | fix | yes | approve | 1 | PR | fail | $0.76 |
+| `ally-web-9299e9aa` (re-run) | fix | yes | approve | 1 | PR | fail | $0.29 |
+| `ally-ai-learn-1065743a` (re-run) | fix | yes | approve | 1 | PR | fail | $0.24 |
+| `ally-be-87c6ecb8` | escalate | yes | approve | 1 | PR | fail (expected escalate) | $0.38 |
+| `ally-be-d039e256` | escalate | no | – | 0 | escalated: could not reproduce | – | $0.41 |
+| `ally-be-819f6ccf` | escalate | yes | – | 0 | escalated: risk path | – | $0.23 |
+| `ally-be-6083b8d8` | escalate | yes | – | 0 | escalated: risk path | – | $0.32 |
+| `ally-be-8c4f9caf` | fix | yes | – | 0 | escalated: risk precheck, wrong suspect | – | $0.45 |
+| `ally-web-f35e117d` | fix | no | – | 0 | escalated: could not reproduce (path prefix bug) | – | $0.65 |
+| `ally-web-eebbfd01` | fix (escalate_acceptable) | no | – | 0 | escalated: could not reproduce | fail: mechanism right, wrong file | $0.80 |
+| `ally-web-3b3db9b5` | fix | no | – | 0 | escalated: could not reproduce (setup) | – | $0.75 |
+| `ally-be-b82759ae` | fix | – | – | 0 | no bug (missed) | – | $0.52 |
+| `ally-web-e5ad37b3` | fix | – | – | 0 | no bug (missed) | – | $0.16 |
+| `ally-web-dd128ff8` (re-run) | fix | – | – | 0 | no bug (missed) | – | $0.34 |
+| `ally-mobile-83bdf91e` | fix | – | – | 0 | no bug (missed) | – | $0.09 |
 
-Review verdicts: approve 5, request_changes 0, reject 0. Fix attempts: 1 on every PR.
-Escalation correctness 3/4: `87c6ecb8` (expected escalate) reached a PR because the
-agent's one-line fix lives in `src/common/constants/`, outside the risk paths, while the
-real fix also changed `src/user/`. By the rules the gate was right; the label reflects
-the real fix's files.
+| Metric | Value |
+|---|---|
+| Detection (found or escalated) | 15/19 (79 %) |
+| Verified reproduction, of cases that reached reproduce | 11/15 (73 %) |
+| Ended as | PR 8, escalated 7, no bug 4 |
+| Review verdicts | approve 8, request_changes 1, reject 0 |
+| Fix pass, oracle | 2/8 (`89d8e055`, `b680c643`) |
+| Fix pass, adjusted (human review for oracle_shape) | 2/8 (`adf36739` human fail; `87c6ecb8` counted as a failure: expected escalate) |
+| Escalation correctness | 3/4 (`87c6ecb8` reached a PR) |
+| Fix attempts | 1 on every PR except `b680c643` (2, after request_changes) |
+| Cost | $10.74 total, $0.57 per case |
 
-Why four of five PRs fail their oracle (re-run locally on the agent's patch, no model):
-- `995242d7` genuine miss: the agent fixed a different defect (the TTS error-fallback
-  flag) than the real one (whitespace-only text reaching Sarvam).
-- `99584ee6` genuine miss: the repair retries, but the oracle's blueprint still loses
-  items (`toHaveLength(3)` fails).
-- `adf36739` implementation-coupled oracle: the agent logs the error as a string, the
-  real fix logs the Error object, and the oracle asserts the object.
-- `87c6ecb8` API-coupled oracle: it imports `PLATFORM_TIER_ROLES`, a constant the real
-  fix introduced; the agent fixed the same behaviour under the existing name.
+Compared with chunk 05 (issue mode, 10-case subset, diagnosis only): detection 6/6 and 4
+verified repros there; on the full bug set 15/19 and 11/15 here, and the fix stage is
+the new bottleneck: 8 PRs, 2 correct.
 
-Fix pass is 1/5 strictly, 3/5 if the two shape-coupled oracles are discounted.
+Per-PR oracle failures (analysed locally on the agent's patch, no model):
+`995242d7` and `99584ee6` are genuine misses (a different defect; items still lost).
+`adf36739`: the human verdict is fail: "doesn't fix the reported log detail;
+rethrowing QueryFailedError changes the client response and may expose query details."
+`87c6ecb8`: oracle-shape-coupled and expected escalate; counted as a failure.
+`9299e9aa` and `1065743a` (re-run) are not analysed yet.
 
-Trace links: fix pass `89d8e055` https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c43b-5e40-7146-8e3b-d70185eff395?trace_id=01a1c43b-5e40-7146-8e3b-d70185eff395&start_time=2026-11-10T06:53:07.520194 · fix fail `995242d7`
-https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c4af-b041-7107-b1df-109859db272e?trace_id=01a1c4af-b041-7107-b1df-109859db272e&start_time=2026-11-10T09:00:10.689498 · escalation `6083b8d8` https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c4c9-4309-721f-8f88-abdec12c5c5b?trace_id=01a1c4c9-4309-721f-8f88-abdec12c5c5b&start_time=2026-11-10T09:28:06.665119
+Trace links: fix pass `b680c643`
+https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c5f7-a6c0-77a3-9a20-9ada61ac1fed ·
+fix fail `995242d7`
+https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c4af-b041-7107-b1df-109859db272e ·
+escalation `6083b8d8`
+https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c4c9-4309-721f-8f88-abdec12c5c5b
 
-### Harness defects this run exposed (fixed in `6512faa47`)
+### The repro column
 
-1. Verify crashed on bounced repro files: `files_changed` came from `git status`, which
-   lists untracked files, and `git stash push` refuses untracked pathspecs. The fix's
-   files are now tracked modified files only; `stash_paths` filters to tracked paths.
-2. Repro validity read "no" for every PR case: the harness checked "fails on the buggy
-   code" after the graph had applied its fix. It now stashes the applied fix first.
-3. Crashed cases lost their cost and bypassed the per-run cap: `GraphAgent` now returns
-   the spend from the last checkpoint with the error.
+Both reports print "repro: no" for every PR case. Root cause: `open_pr` commits the fix on
+the `bughunter/…` branch before the harness scores the repro, so "set the fix aside"
+found nothing to set aside and the repro ran on fixed code. The numbers above come from
+the graph's own verified reproduction (scratchpad). Since `fe00b5b11` the harness runs
+the repro in a clean checkout of the case's parent commit, which is independent of what
+the graph committed.
 
-Compared with chunk 05 (issue mode, 10-case subset): detection 6/6 there, 12/19 here
-on the full bug set; the misses are 3 at investigate, 4 harness errors, 3 ally-web
-reproductions. The printed repro rate (38 %) is wrong for the reason in item 2.
+### Changes after these runs (all offline, tested)
+
+- Risk rules: human-only by topic (tenancy, data exposure, auth, permissions) and when a
+  risk-path file calls or imports what the fix changed (`78df267f4`).
+- Reviewer gets the scrubbed signal; review.v3 active: drift from the report = reject.
+- reproduce.v5 active: neighbour test setup as a template (scrubbed, ≤120 lines / 3k
+  tokens); setup failures (missing provider/hook) bounce back; app-prefixed test paths
+  fixed (`f35e117d`).
+- Baseline and harness repro check in a clean checkout; no stash anywhere.
+- Storage in `~/.bug-hunter` (`BUGHUNTER_HOME`); spend ledger rebuilt after the in-repo
+  copy was deleted; orphan sweep restricted to `run-*` folders.
+- `oracle_shape`, `human_fix_pass`, `escalate_acceptable` (strict file rule) in the cases.
+
+Next: one full 19-case issue-mode eval with these prompts (ask first, with the cost);
+its results are the starting point for chunk 07.
 
 ## Open questions
 
