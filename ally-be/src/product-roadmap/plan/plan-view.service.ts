@@ -24,6 +24,8 @@ export interface PlanView {
   opportunityId: string | null;
   canEdit: boolean;
   canLead: boolean;
+  /** Closed as not pursuing, or waiting on a second Lead to confirm. */
+  closure: { reason: string; by: number; pendingConfirmation: boolean } | null;
   idea: {
     gates: { id: string; met: boolean; note?: string }[];
     draft: {
@@ -40,6 +42,8 @@ export interface PlanView {
     createdBy: number | null;
     createdAt: string;
     stage: string;
+    /** Set on a lead's question for the author; `answered` once the author replied. */
+    authorQuestion: { id: string; answered: boolean } | null;
   }[];
   events: {
     kind: string;
@@ -96,6 +100,11 @@ export class PlanViewService {
           byActor: summary.byActor.filter((a) => a.actorUserId === viewerId),
         };
 
+    const answered = new Set(
+      rows
+        .map((m) => m.metadata?.authorAnswer?.questionId as string | undefined)
+        .filter((id): id is string => !!id),
+    );
     const idea = record.idea ?? {};
     const gates = idea.gates ?? [];
     return {
@@ -111,6 +120,13 @@ export class PlanViewService {
       opportunityId: record.opportunityId ?? null,
       canEdit,
       canLead,
+      closure: record.closed
+        ? {
+            reason: record.closed.reason,
+            by: record.closed.by,
+            pendingConfirmation: !!record.closed.pendingConfirmation,
+          }
+        : null,
       idea: {
         gates,
         draft: idea.draft ?? null,
@@ -131,6 +147,12 @@ export class PlanViewService {
             (m as unknown as { createdAt: Date }).createdAt?.toISOString?.() ??
             '',
           stage: (m.metadata?.planStage as string) ?? 'prd',
+          authorQuestion: m.metadata?.askAuthor?.questionId
+            ? {
+                id: m.metadata.askAuthor.questionId as string,
+                answered: answered.has(m.metadata.askAuthor.questionId),
+              }
+            : null,
         })),
       events: events.map((e) => ({
         kind: e.kind,

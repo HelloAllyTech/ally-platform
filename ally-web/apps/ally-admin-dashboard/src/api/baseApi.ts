@@ -121,6 +121,7 @@ export const baseAPI = createApi({
   reducerPath: "baseAPI",
   baseQuery: baseQueryWithReauth,
   tagTypes: [
+    TAG_TYPES.PRODUCT_PLANS,
     TAG_TYPES.USERS,
     TAG_TYPES.TENANTS,
     TAG_TYPES.SESSION_EVENTS,

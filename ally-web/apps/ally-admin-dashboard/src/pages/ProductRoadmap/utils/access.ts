@@ -82,3 +82,13 @@ export const canFileIdeas = (
 ): boolean =>
   !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
   hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_IDEAS);
+
+/**
+ * Whether this reader gets the planning Lead's tabs (Needs a lead, Signals) and actions.
+ *
+ * The `product_planning_lead` toggle alone: it is platform-only on the server, so an
+ * org-restricted admin never holds it here either. Every lead action is checked again on the
+ * server; this only decides what is shown. Fails closed on an empty `features`.
+ */
+export const canLeadRoadmapPlans = (features: string[] | undefined): boolean =>
+  hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_LEAD);

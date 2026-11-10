@@ -4,6 +4,7 @@ import { FeatureToggleKey, Permissions } from "@constants";
 
 import {
   canFileIdeas,
+  canLeadRoadmapPlans,
   canManageRoadmap,
   canOpenRoadmapBuilder,
   canQuickAddRoadmap,
@@ -116,5 +117,22 @@ describe("canFileIdeas", () => {
   it("fails closed when toggles could not be loaded", () => {
     expect(canFileIdeas([VOTE], [])).toBe(false);
     expect(canFileIdeas([VOTE], undefined)).toBe(false);
+  });
+});
+
+describe("canLeadRoadmapPlans", () => {
+  it("leads with the Product Planning — Lead toggle", () => {
+    expect(canLeadRoadmapPlans([FeatureToggleKey.PRODUCT_PLANNING_LEAD])).toBe(true);
+  });
+
+  it("does not lead on roadmap manage or Builder", () => {
+    expect(
+      canLeadRoadmapPlans([FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, FeatureToggleKey.BUILDER]),
+    ).toBe(false);
+  });
+
+  it("fails closed when toggles could not be loaded", () => {
+    expect(canLeadRoadmapPlans([])).toBe(false);
+    expect(canLeadRoadmapPlans(undefined)).toBe(false);
   });
 });

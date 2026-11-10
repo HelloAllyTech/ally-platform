@@ -20,6 +20,7 @@ import {
   useGetRoadmapInterviewNotesQuery,
   useGetRoadmapOpportunitiesQuery,
   useGetRoadmapProductGoalsQuery,
+  useGetPlanSettingsQuery,
 } from "@api";
 import { Permissions } from "@constants";
 import { useUser } from "@hooks";
@@ -47,6 +48,10 @@ import { OpportunitiesBoard } from "./OpportunitiesBoard";
 import { OpportunitiesListView } from "./OpportunitiesListView";
 import { OpportunityDrawer } from "./OpportunityDrawer";
 import { OpportunityInterviewDrawer } from "./OpportunityInterviewDrawer";
+import { LeadQueueTab } from "./plans/LeadQueueTab";
+import { MyPlansTab } from "./plans/MyPlansTab";
+import { PlanDrawer } from "./plans/PlanDrawer";
+import { SignalsTab } from "./plans/SignalsTab";
 import { QuickAddOpportunityModal } from "./QuickAddOpportunityModal";
 import { ReportBugModal } from "./ReportBugModal";
 import { RoadmapSettingsDrawer } from "./RoadmapSettingsDrawer";
@@ -56,6 +61,7 @@ import { useProductRoadmapRealtime } from "./useProductRoadmapRealtime";
 import { useSavedViews } from "./useSavedViews";
 import {
   canFileIdeas,
+  canLeadRoadmapPlans,
   canManageRoadmap,
   canOpenRoadmapBuilder,
   canQuickAddRoadmap,
@@ -146,6 +152,13 @@ enum RoadmapTab {
   BUGS = "bugs",
   /** The viewer's own saved raw ideas (see IdeaDraftsTab). Needs VOTE: the endpoints do. */
   DRAFTS = "drafts",
+  /**
+   * Planning (plans/roadmap-owns-planning rev 5.2), shown only while planning is switched on.
+   * My ideas replaces My drafts; Needs a lead and Signals are for Product Planning Leads.
+   */
+  MY_IDEAS = "my-ideas",
+  NEEDS_A_LEAD = "needs-a-lead",
+  SIGNALS = "signals",
 }
 
 /**
@@ -199,6 +212,20 @@ export const ProductRoadmap: React.FC = () => {
   const canQuickAdd = canQuickAddRoadmap(permissions, features);
   /** The guided-interview door: VOTE plus the Product Planning — Ideas toggle (canFileIdeas). */
   const canFile = canFileIdeas(permissions, features);
+  /**
+   * Planning is on server-side (builder_settings.planningEnabled). While it is off the plan
+   * routes answer 404 and none of the plan tabs or drawers render, so the roadmap is unchanged.
+   */
+  const { data: planSettings } = useGetPlanSettingsQuery();
+  const planningOn = !!planSettings?.enabled;
+  const canLeadPlans = planningOn && canLeadRoadmapPlans(features);
+  const openPlanId = searchParams.get("plan");
+  const openPlan = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set("plan", id);
+    else next.delete("plan");
+    setSearchParams(next, { replace: true });
+  };
   /**
    * Whether the Bugs tab exists for this reader.
    *
@@ -712,7 +739,9 @@ export const ProductRoadmap: React.FC = () => {
     (tab !== RoadmapTab.BUGS || canViewBugs) &&
     // Drafts are private to the author and the endpoints need VOTE, so a viewer without it
     // falls back instead of landing on a tab that can only 403.
-    (tab !== RoadmapTab.DRAFTS || canVote);
+    (tab !== RoadmapTab.DRAFTS || (canVote && !planningOn)) &&
+    (tab !== RoadmapTab.MY_IDEAS || planningOn) &&
+    ((tab !== RoadmapTab.NEEDS_A_LEAD && tab !== RoadmapTab.SIGNALS) || canLeadPlans);
   /**
    * Queue and Opportunities are the same `?tab=` value split into two strip entries by which
    * view is applied. Queue-ness only overrides Opportunities — a reader on Bugs or User
@@ -1058,8 +1087,16 @@ export const ProductRoadmap: React.FC = () => {
               ]
             : []),
           // The viewer's own parked ideas. Only for those who can file, since only they can save one.
-          ...(canVote
-            ? [{ id: RoadmapTab.DRAFTS, label: "My drafts", count: ideaDrafts?.count ?? 0 }]
+          ...(planningOn
+            ? [{ id: RoadmapTab.MY_IDEAS, label: "My ideas" }]
+            : canVote
+              ? [{ id: RoadmapTab.DRAFTS, label: "My drafts", count: ideaDrafts?.count ?? 0 }]
+              : []),
+          ...(canLeadPlans
+            ? [
+                { id: RoadmapTab.NEEDS_A_LEAD, label: "Needs a lead" },
+                { id: RoadmapTab.SIGNALS, label: "Signals" },
+              ]
             : []),
           {
             id: RoadmapTab.INTERVIEWS,
@@ -1071,7 +1108,16 @@ export const ProductRoadmap: React.FC = () => {
         onChange={setTab}
       />
 
-      {activeTab === RoadmapTab.DRAFTS && canVote && (
+      {activeTab === RoadmapTab.MY_IDEAS && planningOn && (
+        <MyPlansTab canFile={canFile} onOpen={openPlan} />
+      )}
+      {activeTab === RoadmapTab.NEEDS_A_LEAD && canLeadPlans && <LeadQueueTab onOpen={openPlan} />}
+      {activeTab === RoadmapTab.SIGNALS && canLeadPlans && <SignalsTab onOpen={openPlan} />}
+      {planningOn && openPlanId && (
+        <PlanDrawer planId={openPlanId} onClose={() => openPlan(null)} />
+      )}
+
+      {activeTab === RoadmapTab.DRAFTS && canVote && !planningOn && (
         <IdeaDraftsTab
           onContinue={draft => {
             setInterviewDraft(draft);
