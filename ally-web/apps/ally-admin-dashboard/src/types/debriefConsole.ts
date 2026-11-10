@@ -250,6 +250,9 @@ export interface DebriefTenantRow {
   region: "india" | "outside_india";
   /** The organisation set support lines of its own in its Ally guide settings. */
   hasSupportContact: boolean;
+  /** v9 FR-8: this calendar month's debrief spend (shadow and live), and how many runs. */
+  monthSpentUsd?: number;
+  monthRuns?: number;
 }
 
 export interface DebriefReviewRun {
@@ -312,4 +315,18 @@ export interface DebriefModels {
   reply: string;
   judge: string;
   choices: { steps: DebriefModelChoice[]; reply: DebriefModelChoice[] };
+}
+
+/** v9 FR-38 "Registry": one recipe step as a capability, with 30 days of production use. */
+export interface DebriefStepUsage {
+  step: string;
+  model: string | null;
+  backupModel: string | null;
+  inRecipes: string[];
+  done: number;
+  failed: number;
+  skipped: number;
+  medianMs: number | null;
+  estimatedUsd: number;
+  models: string[];
 }

@@ -467,6 +467,7 @@ export const ApiEndpoints = {
     OVERVIEW: "/v1/debriefs/console/overview",
     RUNS: "/v1/debriefs/console/runs",
     RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
+    STEPS: "/v1/debriefs/console/steps",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
     IMPROVER: "/v1/debriefs/console/improver",
     IMPROVER_ANALYSE: "/v1/debriefs/console/improver/analyse",

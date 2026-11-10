@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   Req,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -29,6 +30,7 @@ import { Type } from 'class-transformer';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
+import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefConsoleService } from '../service/debrief-console.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
@@ -152,6 +154,7 @@ type AuthedRequest = { user: { id: number } };
  */
 @ApiTags('Debriefs')
 @Controller('v1/debriefs/console')
+@UseInterceptors(DebriefConsoleAuditInterceptor)
 @ApiBearerAuth()
 @ApiSecurity('access-token')
 export class DebriefConsoleController {
@@ -275,6 +278,19 @@ export class DebriefConsoleController {
   @ApiOperation({ summary: 'Recent runs, newest first' })
   runs(@Query() q: RunsQueryDto) {
     return this.console.listRuns({ mode: q.mode, status: q.status });
+  }
+
+  @Get('steps')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      "The recipe's steps as capabilities: model, and over 30 days how often each ran, failed or was skipped, its time and spend",
+  })
+  steps(@Query('days') days?: string) {
+    const d = Number(days);
+    return this.console.stepUsage(
+      Number.isInteger(d) && d > 0 && d <= 90 ? d : 30,
+    );
   }
 
   @Get('runs/:id')

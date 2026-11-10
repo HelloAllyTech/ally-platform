@@ -9877,6 +9877,21 @@ export const en = {
         budget: "Stopped looking things up: the reply's budget was nearly spent.",
         max_turns: "Stopped looking things up: it reached its limit of passes.",
       },
+      registry: "Steps",
+      registryHelp:
+        "Each step the recipes run, the model the live release names for it, and how it did over the last 30 days of debriefs. Change a step's model under Models above; the order of steps is the recipe's.",
+      registryColumns: {
+        step: "Step",
+        model: "Model (backup)",
+        recipes: "In recipes",
+        ran: "Ran",
+        failed: "Failed",
+        skipped: "Skipped",
+        time: "Typical time",
+        spend: "Estimated spend",
+      },
+      registryEmpty: "No debriefs in the last 30 days.",
+      registryLoadFailed: "the steps",
       stepNames: {
         safety_reader: "Safety reader",
         analyst: "Analyst",
@@ -9901,6 +9916,8 @@ export const en = {
       emptyMessage: "Live debriefs that need a person, and learners' flags, appear here.",
       runsHeading: "Debriefs waiting for a person",
       flagsHeading: "Learners' flags",
+      keyboardHint:
+        "Keyboard: j and k move through the queue, Enter opens the debrief, e escalates to the clinical advisor.",
       distress: "Learner distress",
       judgeBelow: "Judge below the bar",
       judgeHelp:
@@ -10094,7 +10111,14 @@ export const en = {
       heading: "Organisations",
       help: "Switch an organisation on and its learners read the Debrief agent's debrief instead of today's. Switching off is the emergency stop for that organisation.",
       loadFailed: "the organisations",
-      columns: { name: "Organisation", state: "Learners read", region: "Works in" },
+      columns: {
+        name: "Organisation",
+        state: "Learners read",
+        region: "Works in",
+        spend: "Spent this month",
+      },
+      spendLine: (usd: string, runs: number) =>
+        `${usd} · ${runs === 1 ? "1 debrief" : `${runs} debriefs`}`,
       india: "India",
       outsideIndia: "Outside India",
       markOutside: "Mark as outside India",

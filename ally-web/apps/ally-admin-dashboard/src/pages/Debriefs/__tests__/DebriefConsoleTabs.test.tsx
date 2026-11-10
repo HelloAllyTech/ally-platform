@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   resolve: vi.fn(),
   escalate: vi.fn(),
   models: vi.fn(),
+  steps: vi.fn(),
   setModels: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -61,6 +62,7 @@ vi.mock("@api", async importOriginal => ({
   useSetDebriefTenantRegionMutation: () => [h.setRegion, { isLoading: false }],
   useEscalateDebriefMutation: () => [h.escalate, { isLoading: false }],
   useGetDebriefModelsQuery: () => h.models(),
+  useGetDebriefStepsQuery: () => h.steps(),
   useSetDebriefModelsMutation: () => [h.setModels, { isLoading: false }],
 }));
 // The guidance is the Context Library's Debrief Guidance; the link has its own suite.
@@ -263,6 +265,8 @@ describe("Debrief Console tabs", () => {
           isTest: false,
           region: "india",
           hasSupportContact: false,
+          monthSpentUsd: 1.25,
+          monthRuns: 12,
         },
         {
           id: "t2",
@@ -271,6 +275,22 @@ describe("Debrief Console tabs", () => {
           isTest: false,
           region: "outside_india",
           hasSupportContact: false,
+        },
+      ]),
+    );
+    h.steps.mockReturnValue(
+      ok([
+        {
+          step: "writer",
+          model: "gemini-3-flash-preview",
+          backupModel: "gemini-2.5-flash",
+          inRecipes: ["standard", "short"],
+          done: 40,
+          failed: 2,
+          skipped: 0,
+          medianMs: 12000,
+          estimatedUsd: 0.8,
+          models: ["gemini-3-flash-preview"],
         },
       ]),
     );
@@ -550,6 +570,43 @@ describe("Debrief Console tabs", () => {
     await waitFor(() =>
       expect(h.escalate).toHaveBeenCalledWith({ kind: "runs", id: RUN_ROW.id, reason: undefined }),
     );
+  });
+
+  it("Review works by keyboard: j / k move, Enter opens the debrief, e escalates (FR-38)", async () => {
+    render(<ReviewTab />);
+    expect(screen.getByTestId("review-keys")).toHaveTextContent("j and k");
+    expect(screen.getByTestId("review-run")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(window, { key: "j" });
+    expect(screen.getByTestId("review-flag")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(window, { key: "e" });
+    await waitFor(() => expect(h.escalate).toHaveBeenCalledWith({ kind: "flags", id: "flag-1" }));
+    fireEvent.keyDown(window, { key: "k" });
+    expect(screen.getByTestId("review-run")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(window, { key: "Enter" });
+    await waitFor(() => expect(h.run).toHaveBeenCalledWith(RUN_ROW.id));
+  });
+
+  it("Review ignores the keys while someone is typing a reason", () => {
+    render(<ReviewTab />);
+    const box = within(screen.getByTestId("review-flag")).getAllByRole("textbox")[0];
+    fireEvent.keyDown(box, { key: "e" });
+    expect(h.escalate).not.toHaveBeenCalled();
+  });
+
+  it("Organisations shows each organisation's debrief spend this month (FR-8)", () => {
+    render(<OrganisationsTab />);
+    const [first] = screen.getAllByTestId("organisation-spend");
+    expect(first).toHaveTextContent("12 debriefs");
+    expect(first).toHaveTextContent("$1.25");
+  });
+
+  it("Releases lists the recipe's steps with their model and 30 days of use (FR-38 registry)", () => {
+    render(<ReleasesTab />);
+    const row = screen.getByTestId("step-row");
+    expect(row).toHaveTextContent("Writer");
+    expect(row).toHaveTextContent("gemini-3-flash-preview (gemini-2.5-flash)");
+    expect(row).toHaveTextContent("standard, short");
+    expect(row).toHaveTextContent("40");
   });
 
   it("Review: a published debrief with learner distress asks someone to check on them (FR-23)", async () => {

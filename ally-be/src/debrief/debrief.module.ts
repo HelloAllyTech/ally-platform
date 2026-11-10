@@ -1,6 +1,7 @@
 import { LlmModule } from '../llm/llm.module';
 import { Module } from '@nestjs/common';
 import { AiChatModule } from '../ai-chat/ai-chat.module';
+import { AuditModule } from '../audit/audit.module';
 import { LlmUsageModule } from '../analytics/llm-usage.module';
 import { AwsModule } from '../aws/aws.module';
 import { ContextLibraryModule } from '../context-library/context-library.module';
@@ -31,6 +32,7 @@ import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
 import { DebriefReplyAgentService } from './service/debrief-reply-agent.service';
 import { DebriefPublishService } from './service/debrief-publish.service';
+import { DebriefConsoleAuditInterceptor } from './interceptor/debrief-console-audit.interceptor';
 import { DebriefRunJudgeService } from './service/debrief-run-judge.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
@@ -53,6 +55,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
       GuideSignal,
     ]),
     AiChatModule,
+    // v9 FR-38: every Debrief Console view writes an audit event.
+    AuditModule,
     AwsModule,
     // The LLM catalog: a release's models must be active there.
     LlmModule,
@@ -83,6 +87,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefReplyService,
     DebriefReplyAgentService,
     DebriefPublishService,
+    DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,
     GuideCrisisService,

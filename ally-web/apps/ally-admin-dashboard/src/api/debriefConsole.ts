@@ -1,5 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  DebriefStepUsage,
   DebriefCardCorrection,
   DebriefModels,
   DebriefOverview,
@@ -31,6 +32,10 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
         params: status ? { status } : undefined,
       }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefSteps: builder.query<DebriefStepUsage[], void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.STEPS, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     getDebriefRun: builder.query<DebriefRunDetail, string>({
@@ -175,6 +180,7 @@ export const {
   useGetDebriefOverviewQuery,
   useGetDebriefRunsQuery,
   useGetDebriefRunQuery,
+  useGetDebriefStepsQuery,
   useGetImproverStateQuery,
   useRunImproverMutation,
   useScreenIdeaMutation,

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -46,10 +46,11 @@ const EscalateButton: React.FC<{ kind: "flags" | "runs"; id: string; reason?: st
 };
 
 const RunItem: React.FC<{
+  selected?: boolean;
   run: DebriefReviewRun;
   onOpen: () => void;
   onAct: (action: RunAction) => void;
-}> = ({ run, onOpen, onAct }) => {
+}> = ({ run, onOpen, onAct, selected }) => {
   const s = en.debriefs.review;
   // A published debrief is here because the learner showed distress (FR-23)
   // or because the independent judge scored it below the bar (FR-21).
@@ -58,7 +59,11 @@ const RunItem: React.FC<{
   const judgeOnly = published && !run.learnerDistress && run.judgeBelowBar;
   const waiting = run.status !== "below_bar" && !published;
   return (
-    <li className="flex flex-col gap-2 border border-border-light p-4" data-testid="review-run">
+    <li
+      className={`flex flex-col gap-2 border p-4 ${selected ? "border-primary-600 ring-2 ring-primary-200" : "border-border-light"}`}
+      data-testid="review-run"
+      data-selected={selected ? "true" : undefined}
+    >
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Pill tone={waiting ? "warning" : "neutral"}>{en.debriefs.status[run.status]}</Pill>
         {run.hasRiskCue && <Pill tone="info">{en.debriefs.runs.riskCue}</Pill>}
@@ -132,10 +137,11 @@ const RunItem: React.FC<{
   );
 };
 
-const FlagItem: React.FC<{ flag: DebriefReviewFlag; onOpenRun: () => void }> = ({
-  flag,
-  onOpenRun,
-}) => {
+const FlagItem: React.FC<{
+  flag: DebriefReviewFlag;
+  onOpenRun: () => void;
+  selected?: boolean;
+}> = ({ flag, onOpenRun, selected }) => {
   const s = en.debriefs.review;
   const [resolve, { isLoading }] = useResolveDebriefFlagMutation();
   const [note, setNote] = useState("");
@@ -161,7 +167,11 @@ const FlagItem: React.FC<{ flag: DebriefReviewFlag; onOpenRun: () => void }> = (
       ([field, text]) => text.trim() && text !== flag.card?.[field as keyof DebriefCardCorrection],
     );
   return (
-    <li className="flex flex-col gap-2 border border-border-light p-4" data-testid="review-flag">
+    <li
+      className={`flex flex-col gap-2 border p-4 ${selected ? "border-primary-600 ring-2 ring-primary-200" : "border-border-light"}`}
+      data-testid="review-flag"
+      data-selected={selected ? "true" : undefined}
+    >
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {flag.urgent && <Pill tone="warning">{s.urgent}</Pill>}
         {flag.status === "escalated" && <Pill tone="info">{s.escalated}</Pill>}
@@ -271,6 +281,69 @@ export const ReviewTab: React.FC = () => {
   const [act, { isLoading }] = useActOnDebriefRunMutation();
   const [openRun, setOpenRun] = useState<string | null>(null);
   const [pending, setPending] = useState<{ id: string; action: RunAction } | null>(null);
+  const [escalate] = useEscalateDebriefMutation();
+
+  // v9 FR-38: the queue works by keyboard — j / k move, Enter opens the
+  // debrief, e escalates to the clinical advisor. Runs first, then flags, in
+  // the order shown.
+  const items = useMemo(
+    () => [
+      ...(queue.data?.runs ?? []).map(r => ({
+        kind: "runs" as const,
+        id: r.id,
+        runId: r.id,
+        escalated: !!r.escalation,
+      })),
+      ...(queue.data?.flags ?? []).map(f => ({
+        kind: "flags" as const,
+        id: f.id,
+        runId: f.runId,
+        escalated: f.status === "escalated",
+      })),
+    ],
+    [queue.data],
+  );
+  const [selected, setSelected] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected >= items.length) setSelected(Math.max(0, items.length - 1));
+  }, [items.length, selected]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (openRun !== null || pending !== null || items.length === 0) return;
+      const current = items[Math.min(selected, items.length - 1)];
+      if (e.key === "j" || e.key === "k") {
+        e.preventDefault();
+        const next =
+          e.key === "j" ? Math.min(items.length - 1, selected + 1) : Math.max(0, selected - 1);
+        setSelected(next);
+        listRef.current
+          ?.querySelectorAll<HTMLElement>("[data-testid='review-run'],[data-testid='review-flag']")
+          [next]?.scrollIntoView({ block: "nearest" });
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        setOpenRun(current.runId);
+      } else if (e.key === "e" && !current.escalated) {
+        e.preventDefault();
+        escalate({ kind: current.kind, id: current.id })
+          .unwrap()
+          .then(() => toast.success(s.escalatedDone))
+          .catch(err => toast.error(getErrorMessage(err, s.failed)));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [items, selected, openRun, pending, escalate, s]);
+  const isSelected = (kind: "runs" | "flags", id: string) =>
+    items[selected]?.kind === kind && items[selected]?.id === id;
 
   const confirm = async () => {
     if (!pending) return;
@@ -288,6 +361,9 @@ export const ReviewTab: React.FC = () => {
       <div>
         <h2 className="text-xl font-normal text-typography-900">{s.heading}</h2>
         <p className="max-w-3xl pt-1 text-sm text-typography-700">{s.help}</p>
+        <p className="pt-1 text-xs text-typography-700" data-testid="review-keys">
+          {s.keyboardHint}
+        </p>
       </div>
       {queue.isError ? (
         <ErrorPanel what={s.loadFailed} error={queue.error} onRetry={() => void queue.refetch()} />
@@ -296,7 +372,7 @@ export const ReviewTab: React.FC = () => {
       ) : queue.data.runs.length === 0 && queue.data.flags.length === 0 ? (
         <EmptyPanel title={s.emptyTitle} message={s.emptyMessage} />
       ) : (
-        <>
+        <div ref={listRef} className="flex flex-col gap-8">
           {queue.data.runs.length > 0 && (
             <section className="flex flex-col gap-3">
               <h3 className="text-xl font-normal text-typography-900">{s.runsHeading}</h3>
@@ -305,6 +381,7 @@ export const ReviewTab: React.FC = () => {
                   <RunItem
                     key={run.id}
                     run={run}
+                    selected={isSelected("runs", run.id)}
                     onOpen={() => setOpenRun(run.id)}
                     onAct={action => setPending({ id: run.id, action })}
                   />
@@ -317,12 +394,17 @@ export const ReviewTab: React.FC = () => {
               <h3 className="text-xl font-normal text-typography-900">{s.flagsHeading}</h3>
               <ul className="flex flex-col gap-3">
                 {queue.data.flags.map(flag => (
-                  <FlagItem key={flag.id} flag={flag} onOpenRun={() => setOpenRun(flag.runId)} />
+                  <FlagItem
+                    key={flag.id}
+                    flag={flag}
+                    selected={isSelected("flags", flag.id)}
+                    onOpenRun={() => setOpenRun(flag.runId)}
+                  />
                 ))}
               </ul>
             </section>
           )}
-        </>
+        </div>
       )}
       <RunPanel runId={openRun} onClose={() => setOpenRun(null)} />
       <ConfirmDialog
