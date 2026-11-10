@@ -1,3 +1,7 @@
+import {
+  SCENARIO_SESSION_DEBRIEF_READY_EVENT,
+  SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
+} from '../../constants/scenario-session-events.constants';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import { ScenarioInteractionMode } from '../../enum/scenario-interaction-mode.enum';
@@ -4856,6 +4860,58 @@ describe('ScenarioSessionService', () => {
 
     const persistedSummary = () =>
       upsert.mock.calls.map(([row]) => row.summary).find(Boolean);
+
+    // v9 FR-4: in an organisation switched on for the Debrief agent, the
+    // learner reads the agent's debrief, so the "debrief ready" event (and the
+    // supervisor memory) come from it; today's debrief only hands back.
+    describe('when the organisation is switched on for the Debrief agent', () => {
+      const liveFor = (live: boolean) =>
+        (dataSource.query as jest.Mock).mockImplementation(
+          async (sql: string) =>
+            String(sql).includes('agent_config_overrides') && live
+              ? [{ x: 1 }]
+              : [],
+        );
+      const emitted = () =>
+        ((service as any).eventEmitter.emit as jest.Mock).mock.calls.map(
+          (c: any[]) => c[0],
+        );
+
+      it('announces the debrief as before when the organisation is not switched on', async () => {
+        liveFor(false);
+        await service.endScenarioSession(
+          mockScenarioSessionId,
+          mockCounselorId,
+        );
+        await flush();
+        expect(emitted()).toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
+        expect(emitted()).not.toContain(
+          SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
+        );
+      });
+
+      it('hands back to the Debrief agent instead of announcing, and skips the memory update', async () => {
+        liveFor(true);
+        aiService.getScenarioSessionEvaluation.mockResolvedValue({
+          positives: ['Warm opening'],
+          emotional_movement: [],
+          memory_update: { focus_areas: [], trajectory: 'x', next_time: 'y' },
+        } as any);
+        await service.endScenarioSession(
+          mockScenarioSessionId,
+          mockCounselorId,
+        );
+        await flush();
+        expect(persistedSummary()?.feedback).toBeDefined();
+        expect(emitted()).toContain(
+          SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
+        );
+        expect(emitted()).not.toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
+        expect(
+          (service as any).learnerSupervisorMemoryService.recordFromEvaluation,
+        ).not.toHaveBeenCalled();
+      });
+    });
 
     it('a second end while the first evaluation is in flight pays for nothing', async () => {
       let finish!: (value: any) => void;

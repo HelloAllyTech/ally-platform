@@ -30,6 +30,7 @@ import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
 import { DebriefReplyAgentService } from './service/debrief-reply-agent.service';
+import { DebriefPublishService } from './service/debrief-publish.service';
 import { DebriefRunJudgeService } from './service/debrief-run-judge.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
@@ -81,6 +82,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefPracticeService,
     DebriefReplyService,
     DebriefReplyAgentService,
+    DebriefPublishService,
     DebriefAudioService,
     DebriefNotifier,
     GuideCrisisService,

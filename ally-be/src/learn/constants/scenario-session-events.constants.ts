@@ -12,3 +12,16 @@ export interface ScenarioSessionDebriefReadyEvent {
   scenarioSessionId: string;
   tenantId: string;
 }
+
+/**
+ * Today's debrief finished writing a session whose organisation is switched
+ * on for the Debrief agent (after commit). The agent's publish service puts
+ * the live debrief's fields back if it landed first (v9 FR-4, FR-20).
+ */
+export const SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT =
+  'scenario.session.legacy-debrief.written';
+
+export interface ScenarioSessionLegacyDebriefWrittenEvent {
+  scenarioSessionId: string;
+  tenantId: string;
+}

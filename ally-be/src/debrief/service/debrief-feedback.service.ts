@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -19,6 +20,7 @@ import {
 import { DebriefCards } from '../util/debrief-cards.util';
 import { DEBRIEF_SEED_BUNDLE } from '../constants/debrief-release.constants';
 import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefPublishService } from './debrief-publish.service';
 import { LearnerDebriefView } from './debrief-agent.service';
 
 /** A learner can take a flag back for this long after sending it (plan §7.6). */
@@ -152,6 +154,8 @@ export class DebriefFeedbackService {
     @InjectRepository(DebriefFeedback)
     private readonly feedback: Repository<DebriefFeedback>,
     private readonly notifier?: DebriefNotifier,
+    /** v9 FR-20: a debrief a person publishes or corrects is written where today's was. */
+    @Optional() private readonly publisher?: DebriefPublishService,
   ) {}
 
   /** The learner's own published live debrief, or a refusal. */
@@ -528,6 +532,12 @@ export class DebriefFeedbackService {
     await this.review(run, userId, 'published', note, {
       status: DebriefRunStatus.PUBLISHED,
     });
+    // A below-the-bar run was already readable and written; one a person
+    // finishes is written now, with its memory update and ready event.
+    await this.publisher?.applyToSession(
+      { ...run, status: DebriefRunStatus.PUBLISHED } as DebriefRun,
+      { announce: run.status !== DebriefRunStatus.BELOW_BAR },
+    );
     // A learner waiting on "on its way" hears that it is ready (FR-28).
     if (run.status === DebriefRunStatus.NEEDS_PERSON) {
       await this.notifier?.ready({
@@ -639,6 +649,11 @@ export class DebriefFeedbackService {
       cards,
       workspace: { ...(run.workspace ?? {}), versions },
     } as Partial<DebriefRun>);
+    // The session's note follows the correction (v9 FR-20, FR-31).
+    await this.publisher?.applyToSession(
+      { ...run, cards } as unknown as DebriefRun,
+      { announce: false },
+    );
   }
 
   /**

@@ -147,6 +147,10 @@ export class DebriefQualityRepository {
          AND (d.summary->'feedback' ? 'supervisorNote'
               OR d.summary->'feedback' ? 'supervisor_note'
               OR d.summary->'feedback' ? 'positives')
+         -- A note the Debrief agent published is scored by its own
+         -- independent judge (debrief_runs.workspace.judge); scoring it here
+         -- too would judge one debrief twice (v9 FR-21).
+         AND NOT (d.summary->'feedback' ? 'debriefGenerator')
          AND ${settledEndedSessionPredicate('s')}
          AND ${excludeTestTenants('s."tenant_id"')}
          AND EXISTS (

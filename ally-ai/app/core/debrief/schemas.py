@@ -43,6 +43,18 @@ class BehaviourEvidence(BaseModel):
         default=None, description="Exact words from that turn, as written."
     )
     note: str = Field(description="One sentence: what happened and why it mattered.")
+    coverage_category: Optional[
+        Literal["Listening Engagement", "Emotional Attunement", "Supportive Engagement"]
+    ] = Field(
+        default=None,
+        description=(
+            "Which of the three skill-coverage areas this behaviour belongs to: "
+            "Listening Engagement (listening and engaging with what the client "
+            "said), Emotional Attunement (recognising and responding to the "
+            "client's emotions) or Supportive Engagement (offering support and a "
+            "safe, non-judgmental space). Null if none fits."
+        ),
+    )
     detector_agreement: Optional[Literal["agrees", "disagrees"]] = Field(
         default=None,
         description=(

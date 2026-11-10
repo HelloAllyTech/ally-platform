@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -32,6 +33,7 @@ import {
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefPublishService } from './debrief-publish.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import {
   DebriefProgress,
@@ -161,6 +163,8 @@ export class DebriefAgentService implements OnModuleInit {
     private readonly config: AppConfigService,
     private readonly practice: DebriefPracticeService,
     private readonly notifier: DebriefNotifier,
+    /** v9 FR-20: a readable live debrief is written where today's was. */
+    @Optional() private readonly publisher?: DebriefPublishService,
   ) {}
 
   /**
@@ -178,6 +182,7 @@ export class DebriefAgentService implements OnModuleInit {
         run.status,
       )
     ) {
+      await this.publisher?.applyToSession(run);
       await this.notifier.ready(run);
     }
   }

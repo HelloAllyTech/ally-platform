@@ -196,6 +196,14 @@ async def analyse(
     lines = [system or DEFAULT_ANALYST_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
     if learner_level:
         lines.append(f"TRAINEE LEVEL: {learner_level}")
+    # Code-owned (v9 FR-42): skill coverage is computed in ally-be from these
+    # tags, under the three areas today's debrief reports, so the charts
+    # continue across the cutover.
+    lines.append(
+        "SKILL COVERAGE: set coverage_category on every behaviour to the one "
+        "area it belongs to (Listening Engagement, Emotional Attunement or "
+        "Supportive Engagement), or null when none fits."
+    )
     if live_detections:
         # Code-owned (v9 FR-11, eval case 19): the live detector is a second
         # opinion, not ground truth, and a disagreement is never settled by

@@ -428,3 +428,23 @@ async def test_writer_never_states_mixed_evidence_as_fact(dispatch_returns):
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write(evidence, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
     assert "MIXED EVIDENCE" in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_analyst_tags_behaviours_for_skill_coverage(dispatch_returns):
+    """v9 FR-42: ally-be computes skill coverage from these tags."""
+    from app.core.debrief.steps import analyse
+
+    calls = dispatch_returns(EvidenceMap())
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert "SKILL COVERAGE" in calls["prompt"]
+    b = BehaviourEvidence(
+        skill="reflections",
+        opportunity=True,
+        observation="observed",
+        confidence="high",
+        importance=2,
+        note="ok",
+        coverage_category="Emotional Attunement",
+    )
+    assert b.coverage_category == "Emotional Attunement"
