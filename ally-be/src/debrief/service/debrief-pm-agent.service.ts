@@ -22,8 +22,8 @@ import {
   DEBRIEF_PROMPT_CODES,
   DebriefBundle,
   DebriefRecipeKey,
-  IMPROVER_EDITABLE_PROMPTS,
-  IMPROVER_SETTINGS,
+  PM_AGENT_EDITABLE_PROMPTS,
+  PM_AGENT_SETTINGS,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
 import { DebriefRunArm, DebriefRunMode } from '../enum/debrief-run.enum';
@@ -42,7 +42,7 @@ import {
 
 /**
  * The learning skim (v9 FR-8/FR-58): this share of every production run's
- * ceiling funds the learning pool, which pays for the Improver's analysis,
+ * ceiling funds the learning pool, which pays for the PM agent's analysis,
  * screens and replays. Learner-facing work never draws on it; there is no
  * monthly cap — the pool grows with usage and is bounded only by the skim.
  */
@@ -54,15 +54,15 @@ export const SCREEN_MIN_LIFT = 0.2;
 /** Sessions screened at once; each runs both arms side by side. */
 const SCREEN_CONCURRENCY = 3;
 
-export type ImproverIdeaKind =
+export type PmAgentIdeaKind =
   | 'prompt_edit'
   | 'setting'
   | 'needs_code'
   | 'defect'
   | 'needs_person';
 
-export interface ImproverIdea {
-  kind: ImproverIdeaKind;
+export interface PmAgentIdea {
+  kind: PmAgentIdeaKind;
   title: string;
   hypothesis: string;
   evidence: string;
@@ -98,8 +98,8 @@ const mean = (xs: number[]) =>
     ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100
     : null;
 
-/** What the Improver reads each run: aggregates only, never a transcript. */
-export interface ImproverSignals {
+/** What the PM agent reads each run: aggregates only, never a transcript. */
+export interface PmAgentSignals {
   windowDays: number;
   runs: number;
   byStatus: Record<string, number>;
@@ -133,7 +133,7 @@ export interface ImproverSignals {
 }
 
 /**
- * The Improver (plan §11), v0: once a day it reads aggregate signals from
+ * The PM agent (plan §11), v0: once a day it reads aggregate signals from
  * the Debrief agent's runs, writes a short report for people and proposes
  * ideas; ideas it can try itself (a prompt edit or a setting) are screened on
  * the open test set straight away, paired against the current release. A
@@ -147,9 +147,9 @@ export interface ImproverSignals {
  * report, and spend is read from `llm_usage` and the replay runs.
  */
 @Injectable()
-export class DebriefImproverService implements OnModuleInit {
+export class DebriefPmAgentService implements OnModuleInit {
   private readonly logger = LoggerService.getInstance(
-    DebriefImproverService.name,
+    DebriefPmAgentService.name,
   );
 
   constructor(
@@ -165,7 +165,7 @@ export class DebriefImproverService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    scheduledTaskRegistry.register('daily', 'debrief-improver', async () => {
+    scheduledTaskRegistry.register('daily', 'debrief-pm-agent', async () => {
       await this.testSets.build();
       await this.analyse();
     });
@@ -197,7 +197,7 @@ export class DebriefImproverService implements OnModuleInit {
           WHERE task = 'debrief_improver' AND "occurredAt" >= date_trunc('month', now())
           GROUP BY model`,
       );
-    const improver = usage.reduce(
+    const pmAgent = usage.reduce(
       (n, u) => n + computeCostUsd(u.model, Number(u.p), Number(u.c)).costUsd,
       0,
     );
@@ -207,12 +207,12 @@ export class DebriefImproverService implements OnModuleInit {
         WHERE mode = 'replay' AND workspace ? 'judge'
           AND "createdAt" >= date_trunc('month', now())`,
     );
-    return Number(replay[0].usd) + improver + Number(judged[0].n) * 0.04;
+    return Number(replay[0].usd) + pmAgent + Number(judged[0].n) * 0.04;
   }
 
   // --- Signals -------------------------------------------------------------------
 
-  async signals(windowDays = 7): Promise<ImproverSignals> {
+  async signals(windowDays = 7): Promise<PmAgentSignals> {
     const q = (sql: string) =>
       this.dataSource.query(sql, [windowDays]) as Promise<
         Array<Record<string, any>>
@@ -320,7 +320,7 @@ export class DebriefImproverService implements OnModuleInit {
     return { id: release?.id ?? null, bundle };
   }
 
-  /** Ideas the Improver has had, newest first, with what happened to each. */
+  /** Ideas the PM agent has had, newest first, with what happened to each. */
   async history(limit = 30): Promise<Array<Record<string, any>>> {
     return this.dataSource.query(
       `SELECT l.id, l.status, l.text AS title, l.change, l.evidence, l."createdAt",
@@ -357,7 +357,7 @@ export class DebriefImproverService implements OnModuleInit {
     }
     const { id: gaId, bundle } = await this.gaBundle();
     const promptTexts: Record<string, string> = {};
-    for (const code of IMPROVER_EDITABLE_PROMPTS) {
+    for (const code of PM_AGENT_EDITABLE_PROMPTS) {
       const text = await this.context.promptText(
         code,
         bundle.prompts[code] ?? null,
@@ -368,14 +368,14 @@ export class DebriefImproverService implements OnModuleInit {
       maxRevisionRounds:
         bundle.recipes[DebriefRecipeKey.STANDARD].maxRevisionRounds,
       ...Object.fromEntries(
-        Object.keys(IMPROVER_SETTINGS)
+        Object.keys(PM_AGENT_SETTINGS)
           .filter((k) => k !== 'maxRevisionRounds')
           .map((k) => [
             k,
             (bundle.settings as unknown as Record<string, unknown>)[k],
           ]),
       ),
-      allowedRanges: IMPROVER_SETTINGS,
+      allowedRanges: PM_AGENT_SETTINGS,
     };
     const history = (await this.history()).map((h) => ({
       title: h.title,
@@ -386,13 +386,13 @@ export class DebriefImproverService implements OnModuleInit {
         : null,
     }));
     const system = await this.context.promptText(
-      DEBRIEF_PROMPT_CODES.improver,
+      DEBRIEF_PROMPT_CODES.pmAgent,
       null,
     );
     const res = await this.ai.step<{
       model: string;
-      analysis: { report: string; ideas: ImproverIdea[] };
-    }>('improver/analyse', {
+      analysis: { report: string; ideas: PmAgentIdea[] };
+    }>('pm-agent/analyse', {
       signals,
       prompts: promptTexts,
       settings,
@@ -423,7 +423,7 @@ export class DebriefImproverService implements OnModuleInit {
       if (['prompt_edit', 'setting'].includes(idea.change?.ideaKind)) {
         await this.screen(id).catch((e: Error) =>
           this.logger.warn(
-            `[improver] screen ${id} failed: ${(e as Error).message}`,
+            `[pm-agent] screen ${id} failed: ${(e as Error).message}`,
           ),
         );
       }
@@ -431,23 +431,23 @@ export class DebriefImproverService implements OnModuleInit {
     return { report: res.analysis.report, ideas: ideaIds };
   }
 
-  /** Refuses (blocks) anything the Improver may not change, before it costs anything. */
-  blockReason(idea: ImproverIdea): string | null {
+  /** Refuses (blocks) anything the PM agent may not change, before it costs anything. */
+  blockReason(idea: PmAgentIdea): string | null {
     if (idea.kind === 'prompt_edit') {
       if (
         !idea.prompt_code ||
-        !IMPROVER_EDITABLE_PROMPTS.has(idea.prompt_code)
+        !PM_AGENT_EDITABLE_PROMPTS.has(idea.prompt_code)
       ) {
-        return 'that prompt is pinned or not the Improver’s to edit';
+        return 'that prompt is pinned or not the PM agent’s to edit';
       }
       if (!idea.find || idea.replace == null) return 'the edit is incomplete';
     }
     if (idea.kind === 'setting') {
       const range = idea.setting_key
-        ? IMPROVER_SETTINGS[idea.setting_key]
+        ? PM_AGENT_SETTINGS[idea.setting_key]
         : null;
       const v = Number(idea.setting_value);
-      if (!range) return 'that setting is not the Improver’s to change';
+      if (!range) return 'that setting is not the PM agent’s to change';
       if (!Number.isFinite(v) || v < range.min || v > range.max) {
         return `the value is outside ${range.min}–${range.max}`;
       }
@@ -456,8 +456,8 @@ export class DebriefImproverService implements OnModuleInit {
   }
 
   private async saveIdea(
-    idea: ImproverIdea,
-    signals: ImproverSignals,
+    idea: PmAgentIdea,
+    signals: PmAgentSignals,
     gaId: string | null,
   ): Promise<string | null> {
     const lessonKind =
@@ -634,7 +634,7 @@ export class DebriefImproverService implements OnModuleInit {
         : undefined,
     }).catch(async (e) => {
       this.logger.error(
-        `[improver] screen ${ideaId} failed: ${(e as Error).message}`,
+        `[pm-agent] screen ${ideaId} failed: ${(e as Error).message}`,
       );
       await this.writeScreen(ideaId, {
         status: 'failed',
@@ -810,7 +810,7 @@ export class DebriefImproverService implements OnModuleInit {
           body: current.replace(idea.change.find, idea.change.replace),
           baseVersion: latest,
           source: PromptVersionSource.EXPERIMENT,
-          note: `Debrief Improver idea ${ideaId}: ${idea.text}`.slice(0, 500),
+          note: `Debrief PM agent idea ${ideaId}: ${idea.text}`.slice(0, 500),
           evalSummary: idea.evidence?.screen ?? null,
           createdBy: userId,
         },
@@ -835,7 +835,7 @@ export class DebriefImproverService implements OnModuleInit {
       DEBRIEF_AGENT_KEY,
       next as unknown as Record<string, unknown>,
       userId,
-      `Improver idea: ${idea.text}`,
+      `PM agent idea: ${idea.text}`,
     );
     await this.releases.makeGa(
       draft.id,

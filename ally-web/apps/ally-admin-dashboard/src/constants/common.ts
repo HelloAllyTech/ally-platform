@@ -469,10 +469,10 @@ export const ApiEndpoints = {
     RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
     STEPS: "/v1/debriefs/console/steps",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
-    IMPROVER: "/v1/debriefs/console/improver",
-    IMPROVER_ANALYSE: "/v1/debriefs/console/improver/analyse",
+    PM_AGENT: "/v1/debriefs/console/pm-agent",
+    PM_AGENT_ANALYSE: "/v1/debriefs/console/improver/analyse",
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
-      `/v1/debriefs/console/improver/ideas/${id}/${action}`,
+      `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
     RELEASES: "/v1/debriefs/console/releases",
     MODELS: "/v1/debriefs/console/models",
     ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,

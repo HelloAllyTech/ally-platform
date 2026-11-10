@@ -7,8 +7,8 @@ import {
   useBuildDebriefTestSetsMutation,
   useDecideIdeaMutation,
   useGetDebriefOverviewQuery,
-  useGetImproverStateQuery,
-  useRunImproverMutation,
+  useGetPmAgentStateQuery,
+  useRunPmAgentMutation,
   useScreenIdeaMutation,
 } from "@api";
 import { formatUsd } from "@components/ally-guide/allyGuideFormat";
@@ -17,7 +17,7 @@ import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/Con
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
-import { ImproverIdeaRow } from "@types";
+import { PmAgentIdeaRow } from "@types";
 import { getErrorMessage } from "@utils";
 
 import { formatWhen } from "./consoleTable";
@@ -25,10 +25,10 @@ import { formatWhen } from "./consoleTable";
 const SCREENABLE = new Set(["prompt_edit", "setting"]);
 
 const IdeaCard: React.FC<{
-  idea: ImproverIdeaRow;
+  idea: PmAgentIdeaRow;
   onDecide: (d: "approve" | "reject") => void;
 }> = ({ idea, onDecide }) => {
-  const s = en.debriefs.improver;
+  const s = en.debriefs.pmAgent;
   const [screen, { isLoading: screening }] = useScreenIdeaMutation();
   const r = idea.evidence.screen;
   const open = idea.status === "proposed";
@@ -136,12 +136,12 @@ const IdeaCard: React.FC<{
   );
 };
 
-/** The Improver: its report, its test sets, and its ideas with the approval layer. */
-export const ImproverTab: React.FC = () => {
-  const s = en.debriefs.improver;
-  const state = useGetImproverStateQuery();
+/** The PM agent: its report, its test sets, and its ideas with the approval layer. */
+export const PmAgentTab: React.FC = () => {
+  const s = en.debriefs.pmAgent;
+  const state = useGetPmAgentStateQuery();
   const overview = useGetDebriefOverviewQuery();
-  const [run, { isLoading: running }] = useRunImproverMutation();
+  const [run, { isLoading: running }] = useRunPmAgentMutation();
   const [build, { isLoading: building }] = useBuildDebriefTestSetsMutation();
   const [decide, { isLoading: deciding }] = useDecideIdeaMutation();
   const [pending, setPending] = useState<{ id: string; decision: "approve" | "reject" } | null>(
@@ -170,7 +170,7 @@ export const ImproverTab: React.FC = () => {
 
   const o = overview.data;
   return (
-    <div className="flex flex-col gap-8" data-testid="improver-tab">
+    <div className="flex flex-col gap-8" data-testid="pm-agent-tab">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-normal text-typography-900">{s.heading}</h2>
@@ -195,7 +195,7 @@ export const ImproverTab: React.FC = () => {
         <LoadingBlock lines={6} />
       ) : (
         <>
-          <section className="flex flex-col gap-2" data-testid="improver-report">
+          <section className="flex flex-col gap-2" data-testid="pm-agent-report">
             <h3 className="text-xl font-normal text-typography-900">{s.report}</h3>
             {state.data.report ? (
               <>

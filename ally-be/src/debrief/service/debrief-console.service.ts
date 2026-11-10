@@ -27,7 +27,7 @@ import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefAgentService, DebriefRegion } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
-import { DebriefImproverService } from './debrief-improver.service';
+import { DebriefPmAgentService } from './debrief-pm-agent.service';
 
 const num = (v: unknown, d = 2) =>
   v == null ? null : Math.round(Number(v) * 10 ** d) / 10 ** d;
@@ -60,7 +60,7 @@ export class DebriefConsoleService {
     private readonly agent: DebriefAgentService,
     private readonly context: DebriefContextRepository,
     private readonly testSets: DebriefTestSetsService,
-    private readonly improver: DebriefImproverService,
+    private readonly pmAgent: DebriefPmAgentService,
     private readonly releases: AgentReleaseService,
     private readonly config: AppConfigService,
     private readonly llmModels: LlmModelService,
@@ -247,8 +247,8 @@ export class DebriefConsoleService {
         monthSpentUsd: num(mtd.spentUsd),
         monthlyCapUsd: settings.monthlyCapUsd,
         runCeilingUsd: settings.runCeilingUsd,
-        learningSpentUsd: num(await this.improver.learningSpentThisMonth()),
-        learningBudgetUsd: num(await this.improver.learningBudgetThisMonth()),
+        learningSpentUsd: num(await this.pmAgent.learningSpentThisMonth()),
+        learningBudgetUsd: num(await this.pmAgent.learningBudgetThisMonth()),
       },
       testSets: await this.testSets.counts(),
       liveTenants: await this.liveTenants(),
@@ -298,7 +298,7 @@ export class DebriefConsoleService {
       params.push(v);
       return `$${params.length}`;
     };
-    // Production by default: the Improver's replays are its experiments and
+    // Production by default: the PM agent's replays are its experiments and
     // are read from its ideas, not mixed into what learners could see.
     let where = opts.mode
       ? `r.mode = ${p(opts.mode)}`

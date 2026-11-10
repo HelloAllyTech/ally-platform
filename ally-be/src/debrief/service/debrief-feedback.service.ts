@@ -730,7 +730,7 @@ export class DebriefFeedbackService {
     } as any);
   }
 
-  /** Counts the Improver reads: never the learners' notes. */
+  /** Counts the PM agent reads: never the learners' notes. */
   async signals(windowDays: number) {
     const [h] = await this.dataSource.query(
       `SELECT count(*) FILTER (WHERE helpful)::int AS yes,

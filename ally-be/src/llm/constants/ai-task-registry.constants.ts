@@ -1022,15 +1022,15 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
   },
   {
     id: 'debrief-improver',
-    task: LlmTask.DEBRIEF_IMPROVER,
+    task: LlmTask.DEBRIEF_PM_AGENT,
     runtime: LlmRuntime.ALLY_AI,
     trigger: 'Daily, and on demand from the Debrief Console',
     detail:
-      'The Improver: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
+      'The PM agent: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
-    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.improver)',
+    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.pmAgent)',
   },
   {
     id: 'rag-quality-judge',

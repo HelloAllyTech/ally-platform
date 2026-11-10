@@ -9725,11 +9725,11 @@ export const en = {
   debriefs: {
     title: "Debriefs",
     intro:
-      "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the Improver is changing, and which organisations have it.",
+      "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the PM agent is changing, and which organisations have it.",
     tabs: {
       runs: "Runs",
       review: "Review",
-      improver: "Improver",
+      pmAgent: "PM agent",
       releases: "Releases",
       organisations: "Organisations",
       calibration: "Calibration",
@@ -9780,7 +9780,7 @@ export const en = {
         costHelp: "Typical (p50) and expensive (p90) runs. The ceiling is shown underneath.",
         ceiling: (v: string) => `Ceiling ${v}`,
         month: "Spent this month",
-        monthHelp: "Production debriefs only. The Improver's learning budget is separate.",
+        monthHelp: "Production debriefs only. The PM agent's learning budget is separate.",
         cap: (v: string) => `Monthly cap: ${v}.`,
       },
       filterLabel: "Show runs",
@@ -9985,24 +9985,24 @@ export const en = {
         reviewed: "It stays as the learner has it and leaves this queue.",
       } as Record<string, string>,
     },
-    improver: {
-      heading: "The Improver",
-      help: "Each day the Improver reads how debriefs are doing, writes a short report and proposes changes. It tries prompt and setting changes on the open test set on its own; nothing reaches learners until a person approves it here.",
-      loadFailed: "the Improver",
+    pmAgent: {
+      heading: "The PM agent",
+      help: "Each day the PM agent reads how debriefs are doing, writes a short report and proposes changes. It tries prompt and setting changes on the open test set on its own; nothing reaches learners until a person approves it here.",
+      loadFailed: "the PM agent",
       report: "Latest report",
       noReport:
-        "The Improver has not written a report yet. It runs once there are debrief runs to read.",
+        "The PM agent has not written a report yet. It runs once there are debrief runs to read.",
       ranAt: (when: string) => `Written ${when}`,
-      runNow: "Run the Improver now",
+      runNow: "Run the PM agent now",
       running: "Running…",
-      ran: "The Improver has finished",
-      skipped: (why: string) => `The Improver did not run: ${why}`,
-      runFailed: "The Improver could not run",
+      ran: "The PM agent has finished",
+      skipped: (why: string) => `The PM agent did not run: ${why}`,
+      runFailed: "The PM agent could not run",
       budget: (spent: string, of: string) =>
         `Learning budget: ${spent} spent of ${of} set aside this month (20% of every debrief's budget)`,
       testSets: "Test sets",
       testSetsHelp:
-        "Real sessions, split three ways. The Improver screens ideas on the open set; the gate set decides releases; the sealed set is never shown to it.",
+        "Real sessions, split three ways. The PM agent screens ideas on the open set; the gate set decides releases; the sealed set is never shown to it.",
       sets: { debrief_open: "Open", debrief_gate: "Gate", debrief_sealed: "Sealed" } as Record<
         string,
         string
@@ -10044,7 +10044,7 @@ export const en = {
       approveConfirm: "Put it live",
       rejectTitle: "Reject this idea?",
       rejectBody:
-        "The Improver will see it was rejected and will not propose it again unless the numbers change.",
+        "The PM agent will see it was rejected and will not propose it again unless the numbers change.",
       rejectConfirm: "Reject",
       cancel: "Cancel",
       approved: "The change is live",
@@ -10096,7 +10096,7 @@ export const en = {
         notes: "What changed",
         when: "Made",
       },
-      authors: { seed: "Code", human: "A person", curator: "Improver", system: "System" } as Record<
+      authors: { seed: "Code", human: "A person", curator: "PM agent", system: "System" } as Record<
         string,
         string
       >,
@@ -10143,7 +10143,7 @@ export const en = {
     },
     calibration: {
       heading: "Score debriefs by hand",
-      help: "People score a fixed sample of debriefs on the same rubric the quality judge uses, without seeing its scores. How closely the judge agrees with people decides whether the Improver may put changes live without asking.",
+      help: "People score a fixed sample of debriefs on the same rubric the quality judge uses, without seeing its scores. How closely the judge agrees with people decides whether the PM agent may put changes live without asking.",
       loadFailed: "the calibration sample",
       agreementFailed: "agreement",
       kpis: {
@@ -10153,14 +10153,14 @@ export const en = {
         ratersHelp: "Two or more lets us measure how much people agree with each other.",
         mine: "Rated by you",
         mineHelp: "Your scores count wherever the sample moves.",
-        gate: "Improver autonomy",
+        gate: "PM agent autonomy",
         gateHelp:
           "Met only while the judge agrees with people well enough on accuracy, evidence and missed risk.",
         met: "Allowed",
         notMet: "Needs approval",
       },
       ofTarget: (n: number, target: number) => `${n} of ${target}`,
-      gateHeading: "What the Improver's autonomy depends on",
+      gateHeading: "What the PM agent's autonomy depends on",
       gateHelp:
         "Agreement is Cohen's kappa: 1 is perfect, 0 is chance. Each check needs 0.6 or more, measured on at least 20 rated debriefs.",
       gateColumns: { measure: "Check", agreement: "Judge vs people", status: "Status" },

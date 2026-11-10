@@ -10,7 +10,7 @@ import {
   DebriefReviewQueue,
   DebriefRunStatus,
   DebriefTenantRow,
-  ImproverState,
+  PmAgentState,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -42,16 +42,16 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RUN(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.DEBRIEF_CONSOLE, id }],
     }),
-    getImproverState: builder.query<ImproverState, void>({
-      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.IMPROVER, method: HttpMethod.GET }),
+    getPmAgentState: builder.query<PmAgentState, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PM_AGENT, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    runImprover: builder.mutation<
+    runPmAgent: builder.mutation<
       { report: string | null; ideas: string[]; skipped?: string },
       void
     >({
       query: () => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.IMPROVER_ANALYSE,
+        url: ApiEndpoints.DEBRIEF_CONSOLE.PM_AGENT_ANALYSE,
         method: HttpMethod.POST,
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
@@ -181,8 +181,8 @@ export const {
   useGetDebriefRunsQuery,
   useGetDebriefRunQuery,
   useGetDebriefStepsQuery,
-  useGetImproverStateQuery,
-  useRunImproverMutation,
+  useGetPmAgentStateQuery,
+  useRunPmAgentMutation,
   useScreenIdeaMutation,
   useDecideIdeaMutation,
   useGetDebriefReleasesQuery,

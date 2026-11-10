@@ -410,7 +410,7 @@ export const ReviewTab: React.FC = () => {
       <ConfirmDialog
         isOpen={pending !== null}
         title={pending ? s.confirmTitle[pending.action] : ""}
-        cancelLabel={en.debriefs.improver.cancel}
+        cancelLabel={en.debriefs.pmAgent.cancel}
         confirmLabel={pending ? s.confirmLabel[pending.action] : ""}
         isWorking={isLoading}
         onConfirm={() => void confirm()}

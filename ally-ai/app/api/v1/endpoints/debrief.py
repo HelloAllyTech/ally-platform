@@ -11,8 +11,8 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.core.debrief import improver, steps
-from app.core.debrief.improver import ImproverAnalysis
+from app.core.debrief import pm_agent, steps
+from app.core.debrief.pm_agent import PmAgentAnalysis
 from app.core.debrief.safety_reader import (
     LearnerDistress,
     RiskCue,
@@ -301,7 +301,7 @@ async def reviser(req: ReviserRequest) -> CardsResponse:
     return CardsResponse(model=ran, cards=out, reasoning=reasoning_of(out))
 
 
-class ImproverRequest(BaseModel):
+class PmAgentRequest(BaseModel):
     signals: Dict[str, Any]
     prompts: Dict[str, str] = Field(default_factory=dict)
     settings: Dict[str, Any] = Field(default_factory=dict)
@@ -310,16 +310,21 @@ class ImproverRequest(BaseModel):
     system_prompt: Optional[str] = None
 
 
-class ImproverResponse(BaseModel):
+class PmAgentResponse(BaseModel):
     model: str
-    analysis: ImproverAnalysis
+    analysis: PmAgentAnalysis
 
 
-@router.post("/improver/analyse", response_model=ImproverResponse)
-async def improver_analyse(req: ImproverRequest) -> ImproverResponse:
-    model = req.model or settings.DEBRIEF.IMPROVER_MODEL
+# `/improver/analyse` is the PM agent's old name, kept while an ally-be
+# release from before the rename may still call it.
+@router.post("/pm-agent/analyse", response_model=PmAgentResponse)
+@router.post(
+    "/improver/analyse", response_model=PmAgentResponse, include_in_schema=False
+)
+async def pm_agent_analyse(req: PmAgentRequest) -> PmAgentResponse:
+    model = req.model or settings.DEBRIEF.PM_AGENT_MODEL
     try:
-        out, ran = await improver.analyse_signals(
+        out, ran = await pm_agent.analyse_signals(
             req.signals,
             req.prompts,
             req.settings,
@@ -328,7 +333,7 @@ async def improver_analyse(req: ImproverRequest) -> ImproverResponse:
             system=req.system_prompt,
         )
     except Exception as exc:  # noqa: BLE001
-        raise _failed("improver", exc) from exc
+        raise _failed("PM agent", exc) from exc
     if out is None:
-        raise _unusable("improver")
-    return ImproverResponse(model=ran, analysis=out)
+        raise _unusable("PM agent")
+    return PmAgentResponse(model=ran, analysis=out)

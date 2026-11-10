@@ -43,8 +43,8 @@ class LLMTask(str, Enum):
     DEBRIEF_WRITER = "debrief_writer"
     DEBRIEF_EVALUATOR = "debrief_evaluator"
     DEBRIEF_REVISER = "debrief_reviser"
-    # The Improver's own analysis; paid from the learning budget, never production.
-    DEBRIEF_IMPROVER = "debrief_improver"
+    # The PM agent's own analysis; paid from the learning budget, never production.
+    DEBRIEF_PM_AGENT = "debrief_improver"
     # RAG-quality judge: one call per retrieval, labelling each returned
     # passage's relevance and the set's sufficiency. Priced separately because
     # its volume tracks retrievals rather than sessions.

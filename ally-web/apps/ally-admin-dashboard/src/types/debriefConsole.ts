@@ -175,14 +175,14 @@ export interface DebriefCardsData {
   progress_note?: string | null;
 }
 
-export type ImproverIdeaKind = "prompt_edit" | "setting" | "needs_code" | "defect" | "needs_person";
+export type PmAgentIdeaKind = "prompt_edit" | "setting" | "needs_code" | "defect" | "needs_person";
 
-export type ImproverScreen =
+export type PmAgentScreen =
   | { status: "running"; startedAt: string }
   | { status: "failed"; startedAt: string; error?: string }
-  | ImproverScreenResult;
+  | PmAgentScreenResult;
 
-export interface ImproverScreenResult {
+export interface PmAgentScreenResult {
   status: "done";
   cases: number;
   pairs: number;
@@ -199,12 +199,12 @@ export interface ImproverScreenResult {
   ranAt: string;
 }
 
-export interface ImproverIdeaRow {
+export interface PmAgentIdeaRow {
   id: string;
   status: "proposed" | "quarantined" | "approved" | "active" | "blocked" | "rejected" | "retired";
   title: string;
   change: {
-    ideaKind: ImproverIdeaKind;
+    ideaKind: PmAgentIdeaKind;
     promptCode: string | null;
     find: string | null;
     replace: string | null;
@@ -215,18 +215,18 @@ export interface ImproverIdeaRow {
     hypothesis?: string;
     evidence?: string;
     expectedEffect?: string;
-    screen?: ImproverScreen;
+    screen?: PmAgentScreen;
   };
   createdAt: string;
   releaseVersion: number | null;
   releaseStatus: string | null;
 }
 
-export interface ImproverState {
+export interface PmAgentState {
   report: string | null;
   at: string | null;
   learningSpentUsd: number | null;
-  ideas: ImproverIdeaRow[];
+  ideas: PmAgentIdeaRow[];
 }
 
 export interface DebriefReleaseRow {

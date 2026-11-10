@@ -264,7 +264,7 @@ export function betterDraft(a: Draft | null, b: Draft): Draft {
  * checks, then the recipe's steps in order, the check → evaluate ⇄ revise
  * loop, the budget and the deadline, and the fallback ladder when either runs
  * out. Every step is recorded on the run as it happens, so the Console can
- * draw the timeline and the Improver can read what went wrong.
+ * draw the timeline and the PM agent can read what went wrong.
  *
  * The guarantees hold whatever the recipe says: the safety reader always runs
  * and its failure stops the run; nothing is published without passing the

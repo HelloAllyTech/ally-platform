@@ -273,7 +273,7 @@ class DebriefSettings(BaseModel):
     WRITER_MODEL: str = Field("gemini-3-flash-preview")
     EVALUATOR_MODEL: str = Field("gemini-2.5-flash")
     REVISER_MODEL: str = Field("gemini-3-flash-preview")
-    IMPROVER_MODEL: str = Field("gemini-2.5-pro")
+    PM_AGENT_MODEL: str = Field("gemini-2.5-pro")
 
 
 class RagQualityJudgeSettings(BaseModel):

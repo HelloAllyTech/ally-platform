@@ -73,7 +73,7 @@ export class DebriefCalibrationController {
       'Quadratic-weighted κ per 0-10 dimension, κ per hard fail, both withheld below 20 ' +
       'rated debriefs. `gate.met` is true only while κ ≥ 0.6 on accuracy, evidence and ' +
       'specificity, and the missed-risk-cue hard fail: the standing gate on the debrief ' +
-      "Improver's autonomy.",
+      "PM agent's autonomy.",
   })
   getAgreement() {
     return this.calibration.getAgreement();

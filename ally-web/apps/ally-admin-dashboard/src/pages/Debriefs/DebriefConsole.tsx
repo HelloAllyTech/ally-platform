@@ -7,8 +7,8 @@ import { en } from "@constants";
 
 import { CalibrationTab } from "./CalibrationTab";
 import { GuidanceTab } from "./GuidanceTab";
-import { ImproverTab } from "./ImproverTab";
 import { OrganisationsTab } from "./OrganisationsTab";
+import { PmAgentTab } from "./PmAgentTab";
 import { ReleasesTab } from "./ReleasesTab";
 import { ReviewTab } from "./ReviewTab";
 import { RunsTab } from "./RunsTab";
@@ -16,7 +16,7 @@ import { RunsTab } from "./RunsTab";
 export enum DebriefConsoleTab {
   RUNS = "runs",
   REVIEW = "review",
-  IMPROVER = "improver",
+  PM_AGENT = "pm-agent",
   RELEASES = "releases",
   ORGANISATIONS = "organisations",
   CALIBRATION = "calibration",
@@ -27,7 +27,7 @@ export enum DebriefConsoleTab {
 const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.RUNS]: RunsTab,
   [DebriefConsoleTab.REVIEW]: ReviewTab,
-  [DebriefConsoleTab.IMPROVER]: ImproverTab,
+  [DebriefConsoleTab.PM_AGENT]: PmAgentTab,
   [DebriefConsoleTab.RELEASES]: ReleasesTab,
   [DebriefConsoleTab.ORGANISATIONS]: OrganisationsTab,
   [DebriefConsoleTab.CALIBRATION]: CalibrationTab,

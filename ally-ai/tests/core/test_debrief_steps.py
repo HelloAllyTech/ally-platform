@@ -1,4 +1,4 @@
-"""The debrief agent's steps after the Safety reader, and the Improver's
+"""The debrief agent's steps after the Safety reader, and the PM agent's
 analysis: each runs on the model the recipe names with no silent substitute,
 keeps only evidence anchored to the right speaker, and never coerces a missing
 answer into an empty one."""
@@ -6,7 +6,7 @@ answer into an empty one."""
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.debrief.improver import ImproverAnalysis, ImproverIdea
+from app.core.debrief.pm_agent import PmAgentAnalysis, PmAgentIdea
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import (
     BehaviourEvidence,
@@ -176,8 +176,8 @@ async def test_evaluator_with_partial_scores_is_no_answer(dispatch_returns):
 
 
 @pytest.mark.asyncio
-async def test_improver_turns_an_unappliable_edit_into_a_question(dispatch_returns):
-    from app.core.debrief.improver import analyse_signals
+async def test_pm_agent_turns_an_unappliable_edit_into_a_question(dispatch_returns):
+    from app.core.debrief.pm_agent import analyse_signals
 
     def idea(**kw):
         base = dict(
@@ -189,10 +189,10 @@ async def test_improver_turns_an_unappliable_edit_into_a_question(dispatch_retur
             prompt_code="debrief_writer_system",
         )
         base.update(kw)
-        return ImproverIdea(**base)
+        return PmAgentIdea(**base)
 
     dispatch_returns(
-        ImproverAnalysis(
+        PmAgentAnalysis(
             report="r",
             ideas=[
                 idea(find="Warm, direct", replace="Warm and direct"),

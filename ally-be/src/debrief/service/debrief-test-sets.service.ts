@@ -10,10 +10,10 @@ import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
 /**
  * The three test sets, built from real sessions (plan §9.5).
  *
- * - **open**: the Improver screens ideas on it and sees the results.
- * - **gate**: decides whether a change may reach learners; the Improver sees
+ * - **open**: the PM agent screens ideas on it and sees the results.
+ * - **gate**: decides whether a change may reach learners; the PM agent sees
  *   only pass or fail, never per-case results.
- * - **sealed**: never shown to the Improver; drills and the launch check only,
+ * - **sealed**: never shown to the PM agent; drills and the launch check only,
  *   so it stays a fair measure of whether improvements generalise.
  *
  * Stored in the agent harness's `agent_eval_suites` / `agent_eval_cases`
@@ -28,7 +28,7 @@ export enum DebriefTestSet {
 }
 
 const SUITE_NAMES: Record<DebriefTestSet, string> = {
-  [DebriefTestSet.OPEN]: 'Debrief: open set (Improver screens)',
+  [DebriefTestSet.OPEN]: 'Debrief: open set (PM agent screens)',
   [DebriefTestSet.GATE]: 'Debrief: gate set (release decisions)',
   [DebriefTestSet.SEALED]: 'Debrief: sealed set (drills, launch)',
 };

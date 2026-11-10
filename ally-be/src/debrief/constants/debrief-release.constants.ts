@@ -5,7 +5,7 @@
  * A release is an immutable `agent_releases` row (agentKey `debrief`), the same
  * harness the Ally guide uses, so promotion, rollback and the audit trail are
  * shared. The bundle below is version 1, seeded from code; every later version
- * comes from an approved Improver idea or a person, never from editing GA.
+ * comes from an approved PM agent idea or a person, never from editing GA.
  *
  * Prompts live in the Skills Store. `prompts` pins each code to a version
  * number; `null` means "the store's current version", which is what the seed
@@ -49,7 +49,7 @@ export function modelProblem(model: string): string | null {
   if (!computeCostUsd(model, 1, 1).priced) return `${model} has no known price`;
   return null;
 }
-/** Learning-loop calls (Improver, screens) are ledgered apart from production. */
+/** Learning-loop calls (PM agent, screens) are ledgered apart from production. */
 export const DEBRIEF_LEARNING_AGENT_KEY = 'debrief_learning';
 
 export enum DebriefStep {
@@ -148,7 +148,7 @@ export const DEBRIEF_PROMPT_CODES = {
   writer: 'debrief_writer_system',
   reviser: 'debrief_reviser_system',
   rubric: 'debrief_quality_rubric',
-  improver: 'debrief_improver_system',
+  pmAgent: 'debrief_improver_system',
   reply: 'debrief_reply_system',
 } as const;
 
@@ -166,11 +166,11 @@ export const DEBRIEF_REPLY_DEFAULT: DebriefReplyConfig = {
 };
 
 /**
- * Prompts the Improver may propose edits to. The rubric and the Safety
- * reader are pinned (named people only), and the Improver's own instructions
+ * Prompts the PM agent may propose edits to. The rubric and the Safety
+ * reader are pinned (named people only), and the PM agent's own instructions
  * change only through a person.
  */
-export const IMPROVER_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
+export const PM_AGENT_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.writer,
@@ -178,11 +178,11 @@ export const IMPROVER_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Settings the Improver may propose, each with the range it may move in. The
+ * Settings the PM agent may propose, each with the range it may move in. The
  * budget ceiling and cap are the owner's, and the deadlines are learner
  * promises, so neither is here.
  */
-export const IMPROVER_SETTINGS: Record<string, { min: number; max: number }> = {
+export const PM_AGENT_SETTINGS: Record<string, { min: number; max: number }> = {
   maxRevisionRounds: { min: 0, max: 3 },
   guidancePassagesPerMoment: { min: 0, max: 3 },
   standardMinLearnerTurns: { min: 3, max: 10 },
@@ -199,7 +199,7 @@ export const DEBRIEF_MODELS = {
   writerBackup: 'gemini-2.5-flash',
   evaluator: 'gemini-2.5-flash',
   reviser: 'gemini-3-flash-preview',
-  improver: 'gemini-2.5-pro',
+  pmAgent: 'gemini-2.5-pro',
   judge: 'gemini-2.5-pro',
 } as const;
 

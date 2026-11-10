@@ -71,7 +71,7 @@ export class DebriefRun extends BaseWithoutTenantEntity {
   @Column({ type: 'varchar', length: 20, nullable: true })
   recipeKey?: string | null;
 
-  /** The Improver idea (agent_lessons) a replay was screening. */
+  /** The PM agent idea (agent_lessons) a replay was screening. */
   @Column({ type: 'uuid', nullable: true })
   experimentId?: string | null;
 

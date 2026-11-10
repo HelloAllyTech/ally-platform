@@ -90,7 +90,7 @@ export const ReleasesTab: React.FC = () => {
       <ConfirmDialog
         isOpen={target !== null}
         title={target ? s.rollbackTitle(releaseVersionLabel(target.version)) : ""}
-        cancelLabel={en.debriefs.improver.cancel}
+        cancelLabel={en.debriefs.pmAgent.cancel}
         confirmLabel={s.rollbackConfirm}
         isWorking={isLoading}
         onConfirm={() => void confirm()}

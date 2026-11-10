@@ -8,10 +8,10 @@ const h = vi.hoisted(() => ({
   overview: vi.fn(),
   runs: vi.fn(),
   run: vi.fn(),
-  improver: vi.fn(),
+  pmAgent: vi.fn(),
   releases: vi.fn(),
   tenants: vi.fn(),
-  runImprover: vi.fn(),
+  runPmAgent: vi.fn(),
   screen: vi.fn(),
   decide: vi.fn(),
   rollback: vi.fn(),
@@ -47,10 +47,10 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefOverviewQuery: () => h.overview(),
   useGetDebriefRunsQuery: (a: unknown) => h.runs(a),
   useGetDebriefRunQuery: (id: string) => h.run(id),
-  useGetImproverStateQuery: () => h.improver(),
+  useGetPmAgentStateQuery: () => h.pmAgent(),
   useGetDebriefReleasesQuery: () => h.releases(),
   useGetDebriefTenantsQuery: () => h.tenants(),
-  useRunImproverMutation: () => [h.runImprover, { isLoading: false }],
+  useRunPmAgentMutation: () => [h.runPmAgent, { isLoading: false }],
   useScreenIdeaMutation: () => [h.screen, { isLoading: false }],
   useDecideIdeaMutation: () => [h.decide, { isLoading: false }],
   useRollbackDebriefReleaseMutation: () => [h.rollback, { isLoading: false }],
@@ -73,7 +73,7 @@ vi.mock("@components/context-collection-link", () => ({
 }));
 
 // eslint-disable-next-line import/first
-import { ImproverTab } from "../ImproverTab";
+import { PmAgentTab } from "../PmAgentTab";
 // eslint-disable-next-line import/first
 import { GuidanceTab } from "../GuidanceTab";
 // eslint-disable-next-line import/first
@@ -222,7 +222,7 @@ describe("Debrief Console tabs", () => {
         error: null,
       }),
     );
-    h.improver.mockReturnValue(
+    h.pmAgent.mockReturnValue(
       ok({
         report: "Scores are up.",
         at: "2026-10-29T10:00:00Z",
@@ -237,7 +237,7 @@ describe("Debrief Console tabs", () => {
           version: 2,
           status: "ga",
           authorKind: "human",
-          notes: "Improver idea",
+          notes: "PM agent idea",
           createdAt: "",
           promotedAt: "",
           prompts: {},
@@ -334,7 +334,7 @@ describe("Debrief Console tabs", () => {
       h.escalate,
       h.setRegion,
     ].forEach(f => f.mockReturnValue(resolves()));
-    h.runImprover.mockReturnValue(resolves({ report: "r", ideas: [] }));
+    h.runPmAgent.mockReturnValue(resolves({ report: "r", ideas: [] }));
     h.models.mockReturnValue(
       ok({
         releaseVersion: 2,
@@ -378,9 +378,9 @@ describe("Debrief Console tabs", () => {
     expect(h.runs).toHaveBeenLastCalledWith({ status: "needs_person" });
   });
 
-  it("Improver shows its report and an idea with its screen, and approval asks first", async () => {
-    render(<ImproverTab />);
-    expect(screen.getByTestId("improver-report")).toHaveTextContent("Scores are up.");
+  it("PM agent shows its report and an idea with its screen, and approval asks first", async () => {
+    render(<PmAgentTab />);
+    expect(screen.getByTestId("pm-agent-report")).toHaveTextContent("Scores are up.");
     expect(screen.getByTestId("idea-screen")).toHaveTextContent("+0.50 on 6 sessions");
     expect(screen.getByTestId("test-sets")).toHaveTextContent("Sealed: 11");
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
@@ -393,7 +393,7 @@ describe("Debrief Console tabs", () => {
   });
 
   it("an idea that did not do better cannot be approved", () => {
-    h.improver.mockReturnValue(
+    h.pmAgent.mockReturnValue(
       ok({
         report: null,
         at: null,
@@ -403,13 +403,13 @@ describe("Debrief Console tabs", () => {
         ],
       }),
     );
-    render(<ImproverTab />);
+    render(<PmAgentTab />);
     expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
     expect(screen.getByTestId("idea-screen")).toHaveTextContent("Not better");
   });
 
   it("an approved idea reads live only while its release is", () => {
-    h.improver.mockReturnValue(
+    h.pmAgent.mockReturnValue(
       ok({
         report: null,
         at: null,
@@ -420,14 +420,14 @@ describe("Debrief Console tabs", () => {
         ],
       }),
     );
-    render(<ImproverTab />);
+    render(<PmAgentTab />);
     const [first, second] = screen.getAllByTestId("idea");
     expect(first).toHaveTextContent("Live");
     expect(second).toHaveTextContent("No longer live");
   });
 
   it("an idea that needs code can only be rejected, never approved", () => {
-    h.improver.mockReturnValue(
+    h.pmAgent.mockReturnValue(
       ok({
         report: null,
         at: null,
@@ -435,7 +435,7 @@ describe("Debrief Console tabs", () => {
         ideas: [{ ...IDEA, change: { ...IDEA.change, ideaKind: "needs_code" }, evidence: {} }],
       }),
     );
-    render(<ImproverTab />);
+    render(<PmAgentTab />);
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
   });

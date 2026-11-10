@@ -25,7 +25,7 @@ import { DebriefAiClient } from './service/debrief-ai.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
 import { DebriefContextRepository } from './service/debrief-context.repository';
 import { DebriefFeedbackService } from './service/debrief-feedback.service';
-import { DebriefImproverService } from './service/debrief-improver.service';
+import { DebriefPmAgentService } from './service/debrief-pm-agent.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
@@ -38,7 +38,7 @@ import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 
 /**
- * The Debrief agent and its Improver (plan: ally-debriefs-plan.md). Runs on
+ * The Debrief agent and its PM agent (plan: ally-debriefs-plan.md). Runs on
  * the agent harness's releases and learning tables; its AI steps are
  * stateless calls into ally-ai.
  */
@@ -80,7 +80,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefRunJudgeService,
     DebriefAgentService,
     DebriefTestSetsService,
-    DebriefImproverService,
+    DebriefPmAgentService,
     DebriefConsoleService,
     DebriefFeedbackService,
     DebriefPracticeService,

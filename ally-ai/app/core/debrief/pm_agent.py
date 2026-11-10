@@ -1,4 +1,4 @@
-"""The Improver's analysis step: read a window of aggregate signals about the
+"""The PM agent's analysis step: read a window of aggregate signals about the
 Debrief agent and propose what to change.
 
 It sees aggregates, the live prompt texts it may propose edits to, and its own
@@ -28,7 +28,7 @@ IdeaKind = Literal[
 ]
 
 
-class ImproverIdea(BaseModel):
+class PmAgentIdea(BaseModel):
     kind: IdeaKind
     title: str = Field(description="At most 12 words.")
     hypothesis: str = Field(description="What will improve, and why, in two sentences.")
@@ -54,15 +54,15 @@ class ImproverIdea(BaseModel):
     )
 
 
-class ImproverAnalysis(BaseModel):
+class PmAgentAnalysis(BaseModel):
     report: str = Field(
         description="The weekly report for people: plain words, at most 300 words."
     )
-    ideas: List[ImproverIdea] = Field(default_factory=list)
+    ideas: List[PmAgentIdea] = Field(default_factory=list)
 
 
-DEFAULT_IMPROVER_SYSTEM = """\
-You are the Improver. Your job is to make the debriefs Ally writes after \
+DEFAULT_PM_AGENT_SYSTEM = """\
+You are the PM agent. Your job is to make the debriefs Ally writes after \
 practice roleplays better over time, measured by the independent judge's \
 score (bar: 8 out of 10 with no hard fail), safety, cost and speed.
 
@@ -101,7 +101,7 @@ def build_prompt(
 
     return "\n\n".join(
         [
-            system or DEFAULT_IMPROVER_SYSTEM,
+            system or DEFAULT_PM_AGENT_SYSTEM,
             block("signals", signals),
             block("current_prompts", prompts),
             block("settings", settings_),
@@ -117,7 +117,7 @@ async def analyse_signals(
     history: List[Dict[str, Any]],
     model: str,
     system: Optional[str] = None,
-) -> Tuple[Optional[ImproverAnalysis], str]:
+) -> Tuple[Optional[PmAgentAnalysis], str]:
     from app.core.llm.dispatch import (
         PROVIDER_GEMINI,
         generate_structured,
@@ -126,9 +126,9 @@ async def analyse_signals(
     from app.core.llm_usage.tasks import LLMTask
 
     output, meta = await generate_structured(
-        schema=ImproverAnalysis,
+        schema=PmAgentAnalysis,
         prompt=build_prompt(signals, prompts, settings_, history, system),
-        task=LLMTask.DEBRIEF_IMPROVER.value,
+        task=LLMTask.DEBRIEF_PM_AGENT.value,
         provider=infer_provider_from_model(model) or PROVIDER_GEMINI,
         never_fallback=True,
         model=model,
