@@ -86,6 +86,7 @@ let pullRequests: any[] = [];
 let runs: any[] = [];
 let milestones: any[] = [];
 const startBuild = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
+const updateSession = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 vi.mock("@api", () => ({
   useGetBuilderSessionQuery: () => sessionResult,
   usePatchBuilderPrdMutation: () => [vi.fn()],
@@ -95,6 +96,7 @@ vi.mock("@api", () => ({
   useGetBuilderRunsQuery: () => ({ data: runs }),
   useGetBuilderMilestonesQuery: () => ({ data: milestones }),
   useStartBuilderBuildMutation: () => [startBuild, { isLoading: false }],
+  useUpdateBuilderSessionMutation: () => [updateSession],
   // Principles in play: still loading, so the panel stays empty in these tests.
   useGetBuilderPrinciplesQuery: () => ({ data: undefined, isLoading: true }),
   useSetBuilderPrinciplesOffMutation: () => [vi.fn(), { isLoading: false }],
@@ -126,6 +128,8 @@ describe("BuilderSession", () => {
     runs = [];
     milestones = [];
     startBuild.mockClear();
+    updateSession.mockClear();
+    startDialogProps = undefined;
   });
 
   it("closes the embedded drawer instead of navigating away when the session is lost and 'New session' is clicked", async () => {
@@ -235,6 +239,64 @@ describe("BuilderSession", () => {
     };
     render(<BuilderSession />);
     expect(startDialogProps.designBlock).toBeNull();
+  });
+
+  describe("starting a build", () => {
+    const readySession = (overrides: Record<string, unknown> = {}) => {
+      sessionResult = {
+        data: {
+          ...baseSession,
+          status: "PRD_READY",
+          readiness: { ready: true, sections: [] },
+          prd: {
+            title: "",
+            technicalDesign: { status: "approved" },
+            technicalPlan: { repos: [{ repo: "ally-web" }] },
+          },
+          designReadiness: { ready: true, stale: false, blockers: [] },
+          ...overrides,
+        },
+        isLoading: false,
+        isError: false,
+      };
+    };
+
+    /**
+     * The PRD's technical plan already names the repos; asking a person to
+     * pick them again was a question the interview had answered.
+     */
+    it("starts straight away with the planned repos instead of asking", async () => {
+      readySession();
+      render(<BuilderSession />);
+      fireEvent.click(screen.getAllByText("Start build")[0]);
+      await vi.waitFor(() => expect(startBuild).toHaveBeenCalledWith({ id: "session-1" }));
+      expect(updateSession).toHaveBeenCalledWith({ id: "session-1", repos: ["ally-web"] });
+      expect(startDialogProps.isOpen).toBe(false);
+    });
+
+    it("does not re-save repos the session already has", async () => {
+      readySession({ repos: ["ally-be"] });
+      render(<BuilderSession />);
+      fireEvent.click(screen.getAllByText("Start build")[0]);
+      await vi.waitFor(() => expect(startBuild).toHaveBeenCalled());
+      expect(updateSession).not.toHaveBeenCalled();
+    });
+
+    it("still asks when the plan names no repo", async () => {
+      readySession({ prd: { title: "", technicalDesign: { status: "approved" } } });
+      render(<BuilderSession />);
+      fireEvent.click(screen.getAllByText("Start build")[0]);
+      await vi.waitFor(() => expect(startDialogProps.isOpen).toBe(true));
+      expect(startBuild).not.toHaveBeenCalled();
+    });
+
+    it("still asks when the design blocks the build", async () => {
+      readySession({ designReadiness: { ready: true, stale: true, blockers: [] } });
+      render(<BuilderSession />);
+      fireEvent.click(screen.getAllByText("Start build")[0]);
+      await vi.waitFor(() => expect(startDialogProps.isOpen).toBe(true));
+      expect(startBuild).not.toHaveBeenCalled();
+    });
   });
 
   /**
