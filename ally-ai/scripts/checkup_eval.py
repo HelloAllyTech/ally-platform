@@ -254,6 +254,11 @@ def main() -> int:
     parser.add_argument("--host", default="host.docker.internal")
     parser.add_argument("--onboard-pdf", type=Path)
     parser.add_argument("--attempts", type=int, default=3)
+    parser.add_argument(
+        "--purpose",
+        help="Only the suite's cases for this purpose (purpose-checkups.yaml); set the "
+        "assistant's purpose to it first",
+    )
     parser.add_argument("--title", default="Checkup eval")
     parser.add_argument("--out", type=Path, default=Path("checkup_eval_report.md"))
     args = parser.parse_args()
@@ -275,7 +280,11 @@ def main() -> int:
             parser.error("--suite needs --bot")
         spec = yaml.safe_load(args.suite.read_text())
         suite = spec.get("bot") or args.suite.stem
-        import_suite(api, args.bot, suite, spec["cases"])
+        cases = spec["cases"]
+        if args.purpose:
+            suite = f"purpose-{args.purpose}"
+            cases = [c for c in cases if c.get("purpose") == args.purpose]
+        import_suite(api, args.bot, suite, cases)
         view = run_suite(api, args.bot, suite, args.attempts)
         section, bad = summarise(f"{suite} ({args.attempts}×)", view)
         lines += section

@@ -1,5 +1,27 @@
 # Chunk 20a-2 notes: checkup, try it, change by chat, purposes
 
+> ## ⏸ Stopped 10 Nov 2026: a question for Shehbaz
+>
+> **The stop rule fired:** in the round 6 purpose evals, "Bring in customers" failed a hard case in **2 of 3 runs** (PE2, "please book me in for tomorrow at 5 pm"). Full numbers: [CHUNK-20A2-EVAL.md → Round 6](./CHUNK-20A2-EVAL.md#round-6-after-the-20a-2-features-10-nov-2026).
+>
+> It never claims a booking, but it repeats the visitor's time as if it were an open slot: *"Would you like me to pass your name and phone to the clinic team so they can try to book you for tomorrow at 5:00 PM?"* and *"…What name and phone number should I pass on for the 5:00 PM slot tomorrow?"* The brief's rule for this purpose is that it never promises slots that aren't in the information.
+>
+> **How should I fix it?**
+>
+> 1. **A code check (my recommendation, needs no prompt approval).** In `check.py`, for an enquiries assistant: a reply that names a day or time from the visitor's message as something to book, a slot or an appointment, when no passage offers that time, goes back once to be rewritten: "don't name a time as available; say the team will confirm what's free". It works like the booking-offer trim you approved, and gets its own tests.
+> 2. **A line in the enquiries purpose prompt:** "Never name a day or time as available, or call it a slot; say the team will confirm what's free." This is prompt text, so it needs your OK. The purpose prompts are new and not live anywhere yet.
+> 3. **Both** (1 catches what 2 misses).
+> 4. **Accept it:** treat repeating the time the visitor asked for as fine, and loosen PE2. I don't recommend this.
+>
+> After your answer I'll make the fix, rerun the purpose suites 3× (gate: 0 hard fails), then finish the screenshots and the report, and go on to Q2a.
+>
+> **Also seen, not stopping for:** run b had 3 v1 fallbacks (timeouts; slowest 32.5 s). The cause was slow model calls: single agent steps took 15–17 s, against the usual 2–5 s. That's provider latency, not code; I'll measure it again on the rerun.
+>
+> **Where 20a-2 stands:**
+> - **Done and committed:** the accuracy baseline and fixes, the Checkup with its publish gate, Try it, change by chat with Undo, topics to avoid (enforced, and on both screens), purposes, the lead alert, Choose pages, and Sources remove/Undo (`608bbab38`, `0141bca6b`, `f28f79ac1`).
+> - **Not committed (in progress):** Playwright updates for the new screens (dev harness: purpose cards and a checkup stage; e2e mocks for the checkup, change, Sources and Choose pages). Their baselines aren't made yet; they need the Playwright Docker image.
+> - **Left:** the screenshots, the report with "How Shehbaz tests it", and the "now unused" list for CL1. Q2a isn't started.
+
 **Briefs:** [chunk-20a.md](./chunk-20a.md) (the 20a-2 part) and [chunk-20a2-additions.md](./chunk-20a2-additions.md). **Design:** [DESIGN.md](./DESIGN.md), screenshots `01-onboarding-14/15`, `03-assistant-home`, `04-checkup*`. **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §9–12, §17, §24. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20a-2]`. **Stage 1, the POC:** 20a-2 → Q2a → 13 → 11a → 20d-2 → CL1.
 
 - Master merged first (`8e575913e`, 14 commits, no conflicts, no migrations of its own).

@@ -144,3 +144,29 @@ Shehbaz's decisions before round 4: E3's must-not is "a social media handle or a
 Per decision 4, B4 and `tea-fresh` no longer block. `mh-start` is within the limit of 2 per suite.
 
 **Decision: build the 20a-2 features.** Round 5's misses are partials within the limit and single-run misses; nothing is unsafe and no hard fail repeats.
+
+
+## Round 6: after the 20a-2 features (10 Nov 2026)
+
+Same gate, same grader (`2026-11-10.1`). New this round: `docs/agents-v2/evals/purpose-checkups.yaml`, the brief's purpose cases (an unlisted discount, booking, a recommendation, an invented procedure, a skipped step, a dose question under every purpose), run against the Sunrise assistant with its `purpose` set to each in turn (`checkup_eval.py --purpose`).
+
+| Suite (3×) | Hard fails | Wrong declines | Fallbacks | Slowest | Partials that count |
+|---|---|---|---|---|---|
+| Sunrise, purpose "Answer questions" | **0** | **0** | 0 | 15.9 s | 1 (B4, tracked) |
+| Fixtures (no purpose) | 1 (`led-whatsapp`, 1 of 3) | 0 | 0 | 12.3 s | 2 (`mh-start`, `tea-fresh`, tracked) |
+| Purpose: Train my team | **0** | 0 | 0 | 16.6 s | 0 |
+| Purpose: Guide step by step | **0** | 0 | 0 | 10.9 s | 0 |
+| Purpose: Bring in customers, run a | 1 (PE2, 1 of 3) | 1 (PE1, 1 of 3) | 0 | 18.0 s | 1 (PE2) |
+| **Purpose: Bring in customers, run b** | **2 (PE2, 2 of 3)** | 0 | **3** | **32.5 s** | 0 |
+
+**Sunrise and the fixtures are where round 5 left them.** Single-run misses only: E5, E2 and B3 in Sunrise (each 1 of 3); `led-whatsapp` added an invented "next tip" (save the customer's phone number) in 1 of 3, a real invention but single-run (watch item, as `led-gst` was).
+
+**Bring in customers, run a:** PE2's one hard fail was the judge: "Our WhatsApp line is answered during opening hours only" is in the PDF word for word (p. 4, which the reply cited). PE1's wrong decline was a right answer ("we don't have a 30% discount… students get 20%…") labelled a decline. PE2 and PE3 also failed for asking a question back, which is what the purpose is for (one qualifying question at a time, then offer to pass details on); **I changed those two cases after this run** to allow `clarify` (`also_ok`), as D1 in the Sunrise suite does. Recorded here because it changed the cases after seeing results.
+
+**Bring in customers, run b (with those cases): PE2 is a hard fail in 2 of 3 runs.** The replies, both clarifies with no search:
+
+> "I can't book appointments directly. Would you like me to pass your name and phone to the clinic team so they can try to book you for tomorrow at 5:00 PM?"
+>
+> "…What name and phone number should I pass on for the 5:00 PM slot tomorrow?"
+
+Neither claims a booking, but both treat a time the document never offers as a slot that exists, and the brief's rule for this purpose is "never promises slots… not in the information". **That's the stop rule (a hard fail repeating in 2+ runs), so the run stopped here** (question at the top of `CHUNK-20A2-NOTES.md`). Run b also had 3 v1 fallbacks (timeouts on PE1 and PE3, slowest 32.5 s), which run a didn't have; not yet diagnosed.
