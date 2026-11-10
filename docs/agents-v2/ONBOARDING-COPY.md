@@ -629,3 +629,21 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Publish blocked, an answer without a source:** One answer had no source. Look at it in the checkup, then run it again.
 - **Checkup couldn't start:** The checkup couldn't start. Try again in a minute.
 - **Too many checkups today:** You've run the checkup 5 times today. It runs again after your next change, or tomorrow.
+
+## 25. Polish and control pass (20d-2)
+
+*(The brief's lines, plus every new line the 20d-2 screens need. §24 is purposes, so these are §25.)*
+
+- **Checkup intro:** A checkup asks your assistant the questions customers would ask, then checks each answer against your own pages.
+- **Steps:** Writing questions from your pages · Asking your assistant ({n} of {total}) · Checking each answer against your pages · Your result
+- **Results:** Passed · Partly · Failed · Must pass
+- **Add:** Add a question · What should happen · A good answer includes · It must not say · Must pass
+- **Outcomes:** It should answer · It should say it doesn't know · It should politely decline · It should offer a person
+- **Badges:** Written by Ally · Added by you · From a chat
+- **Locked:** Safety questions can't be turned off. They keep your clients safe.
+- **Banner:** You changed your assistant. Run a checkup to see the effect. · Run checkup
+- **Compare:** Before: {a} of {n} · After: {b} of {n}
+- **Change panel:** Describe a change in your own words. I'll show exactly what will change. Nothing changes until you approve it, and you can undo it.
+- **How it works intro:** Everything your assistant follows, in the order it applies. You can edit the parts marked as yours.
+- **Locked layer:** Set by Ally to keep answers accurate and safe. You can add to safety rules, not remove them.
+- **Inbox:** Pick a chat to read it · Add to checkup · Sound for new chats: on · Sound for new chats: off
