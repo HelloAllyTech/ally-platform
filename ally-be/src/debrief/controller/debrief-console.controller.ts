@@ -41,6 +41,7 @@ import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
 import { DebriefSettingsService } from '../service/debrief-settings.service';
+import { DebriefMetricsService } from '../service/debrief-metrics.service';
 import { DebriefBaselineService } from '../service/debrief-baseline.service';
 
 class ReasonDto {
@@ -188,6 +189,7 @@ export class DebriefConsoleController {
     private readonly testSets: DebriefTestSetsService,
     private readonly feedback: DebriefFeedbackService,
     private readonly settings: DebriefSettingsService,
+    private readonly metrics: DebriefMetricsService,
     private readonly baseline: DebriefBaselineService,
   ) {}
 
@@ -301,6 +303,16 @@ export class DebriefConsoleController {
   @ApiOperation({ summary: 'Recent runs, newest first' })
   runs(@Query() q: RunsQueryDto) {
     return this.console.listRuns({ mode: q.mode, status: q.status });
+  }
+
+  @Get('metrics')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Success metrics (v9 §3.3): the weekly steering proxy, guardrails, efficiency, experience by language and device, baselines and monthly uptake lift',
+  })
+  metricsView(@Query('weeks') weeks?: string) {
+    return this.metrics.view(weeks ? Number(weeks) || 12 : 12);
   }
 
   @Get('settings')

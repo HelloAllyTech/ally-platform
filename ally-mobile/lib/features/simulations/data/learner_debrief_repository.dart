@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
@@ -52,6 +53,26 @@ enum DebriefFlagReason {
   somethingElse('something_else');
 
   const DebriefFlagReason(this.wire);
+  final String wire;
+}
+
+/// What a learner did with a debrief that only the app can see, for the
+/// experience metrics (`POST /debriefs/sessions/:id/events`). The wire value
+/// is the body's `kind`. Listening and replies are recorded by the server.
+enum DebriefLearnerEvent {
+  /// The end of the first Work-on-this point was on screen.
+  readThrough('read_through'),
+
+  /// "Practise this next" was tapped.
+  practiseNextClick('practise_next_click'),
+
+  /// The working screen (debrief still being written) was shown.
+  waited('waited'),
+
+  /// The learner left the working screen before the debrief was ready.
+  leftBeforeReady('left_before_ready');
+
+  const DebriefLearnerEvent(this.wire);
   final String wire;
 }
 
@@ -583,8 +604,19 @@ class LearnerDebriefRepository {
   /// The learner had the ready debrief open (v9 FR-31 `openedAt`); the
   /// server records the first one only. 404 without a published debrief.
   Future<void> markOpened(String sessionId) async {
-    await _dio.post<void>('/debriefs/sessions/$sessionId/opened');
+    await _dio.post<void>('/debriefs/sessions/$sessionId/opened', data: {'platform': platform});
   }
+
+  /// One learner event (see [DebriefLearnerEvent]); the server keeps one per
+  /// session, learner and kind. An older server answers 404/400 — callers
+  /// fire and forget.
+  Future<void> recordEvent(String sessionId, DebriefLearnerEvent kind) async {
+    await _dio.post<void>('/debriefs/sessions/$sessionId/events', data: {'kind': kind.wire, 'platform': platform});
+  }
+
+  /// The body's `platform`. `defaultTargetPlatform`, not `dart:io`'s
+  /// `Platform`, so it also answers under tests.
+  static String get platform => defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
   /// Ask Ally: the debrief chat's thread, answered by the Debrief agent.
   /// Same SSE events as the scenario-session chat stream; the history is shared.

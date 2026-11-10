@@ -162,6 +162,24 @@ class LearnerDebriefController extends ChangeNotifier {
     }
   }
 
+  final _eventsSent = <DebriefLearnerEvent>{};
+
+  /// A learner event for the experience metrics, at most once per kind per
+  /// controller (one screen visit). Fire and forget: never awaited by the
+  /// UI, and every failure (an older server's 404/400 included) is swallowed.
+  void recordEvent(DebriefLearnerEvent kind) {
+    if (supervisor || sessionId.isEmpty || !_eventsSent.add(kind)) return;
+    unawaited(_sendEvent(kind));
+  }
+
+  Future<void> _sendEvent(DebriefLearnerEvent kind) async {
+    try {
+      await _repository.recordEvent(sessionId, kind);
+    } catch (_) {
+      // Nothing to show: the metrics are ours, the debrief is the learner's.
+    }
+  }
+
   /// Takes a flag back. A failure leaves the flag as it was.
   Future<void> undoFlag(String flagId) async {
     try {

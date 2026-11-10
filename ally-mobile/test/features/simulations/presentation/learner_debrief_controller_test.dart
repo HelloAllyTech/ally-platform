@@ -13,7 +13,10 @@ LearnerDebriefView _view(String state) => LearnerDebriefView.fromJson({'state': 
 void main() {
   late MockLearnerDebriefRepository repo;
 
-  setUpAll(() => registerFallbackValue(DebriefFlagReason.didntSay));
+  setUpAll(() {
+    registerFallbackValue(DebriefFlagReason.didntSay);
+    registerFallbackValue(DebriefLearnerEvent.waited);
+  });
   setUp(() => repo = MockLearnerDebriefRepository());
 
   LearnerDebriefController make() => LearnerDebriefController(repository: repo, sessionId: 's-1');
@@ -141,6 +144,27 @@ void main() {
     c.dispose();
   });
 
+  test('recordEvent: once per kind, never awaited, and a failure is silent', () async {
+    when(() => repo.recordEvent('s-1', any())).thenThrow(Exception('404'));
+    final c = make();
+    c.recordEvent(DebriefLearnerEvent.waited);
+    c.recordEvent(DebriefLearnerEvent.waited);
+    c.recordEvent(DebriefLearnerEvent.leftBeforeReady);
+    await Future<void>.delayed(Duration.zero);
+    verify(() => repo.recordEvent('s-1', DebriefLearnerEvent.waited)).called(1);
+    verify(() => repo.recordEvent('s-1', DebriefLearnerEvent.leftBeforeReady)).called(1);
+    c.dispose();
+  });
+
+  test('recordEvent: an asynchronous failure is swallowed too', () async {
+    when(() => repo.recordEvent('s-1', any())).thenAnswer((_) => Future<void>.error(Exception('400')));
+    final c = make();
+    c.recordEvent(DebriefLearnerEvent.readThrough);
+    await Future<void>.delayed(Duration.zero);
+    verify(() => repo.recordEvent('s-1', DebriefLearnerEvent.readThrough)).called(1);
+    c.dispose();
+  });
+
   test('supervisor: reads the supervisor view only, and never marks read or opened', () async {
     when(() => repo.getSupervisorDebrief('s-1')).thenAnswer(
       (_) async => LearnerDebriefView.fromSupervisorJson({'state': 'ready', 'cards': readyDebriefJson()['cards']}),
@@ -150,7 +174,9 @@ void main() {
     expect(c.view?.supervisor, isNotNull);
     await c.markRead();
     await c.markOpened();
+    c.recordEvent(DebriefLearnerEvent.waited);
     verifyNever(() => repo.getDebrief(any()));
+    verifyNever(() => repo.recordEvent(any(), any()));
     verifyNever(() => repo.markRead(any()));
     verifyNever(() => repo.markOpened(any()));
     c.dispose();

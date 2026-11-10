@@ -242,6 +242,8 @@ export const ApiEndpoints = {
     // The learner read the debrief to the end (XP, once).
     READ: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/read`,
     OPENED: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/opened`,
+    // What the learner did that only the app sees (v9 §3.3 experience metrics).
+    EVENTS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/events`,
     // Read-aloud: a short-lived link to one card's audio.
     AUDIO: (sessionId: string, section: string) =>
       `/v1/debriefs/sessions/${sessionId}/audio/${encodeURIComponent(section)}`,

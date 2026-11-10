@@ -1,4 +1,4 @@
-import { FC, ReactNode, useRef, useState } from "react";
+import { FC, ReactNode, useCallback, useRef, useState } from "react";
 
 import {
   Bookmark,
@@ -35,7 +35,13 @@ import {
   useIsBeingRead,
 } from "./ReadAloudControls";
 import { useDebriefReadAloud } from "./useDebriefReadAloud";
-import { useMarkOpened, useReadToTheEnd } from "./useReadToTheEnd";
+import {
+  useDebriefEvent,
+  useMarkOpened,
+  useReadToTheEnd,
+  useSeenOnce,
+  useWaitingEvents,
+} from "./useReadToTheEnd";
 
 /** 'hi-IN' → 'hi'; anything unusable → undefined (inherit the page's lang). */
 export const toLangAttribute = (language?: string | null): string | undefined => {
@@ -106,14 +112,16 @@ const scenarioPath = (id: number) => `/scenario/${id}`;
  * its language choice and trigger warnings come first. Rendered only for a
  * roleplay the server says the learner can still open.
  */
-const PractiseLink: FC<{ scenario: { id: number; title: string }; primary?: boolean }> = ({
-  scenario,
-  primary,
-}) => {
+const PractiseLink: FC<{
+  scenario: { id: number; title: string };
+  primary?: boolean;
+  onClick?: () => void;
+}> = ({ scenario, primary, onClick }) => {
   const { t } = useTranslation();
   return (
     <Link
       to={scenarioPath(scenario.id)}
+      onClick={onClick}
       data-testid={primary ? "debrief-practise-next" : "debrief-practise-this"}
       aria-label={t("postSim.debriefCards.practise.label", { title: scenario.title })}
       className={
@@ -215,6 +223,11 @@ const ReadyCards: FC<{
   const readEndRef = useRef<HTMLDivElement>(null);
   useReadToTheEnd(sessionId, readEndRef, !supervisor);
   useMarkOpened(sessionId, !supervisor);
+  // v9 §3.3 read-through: the end of the FIRST Work-on-this card.
+  const report = useDebriefEvent(sessionId, !supervisor);
+  const firstEndRef = useRef<HTMLDivElement>(null);
+  const onFirstEnd = useCallback(() => report("read_through"), [report]);
+  useSeenOnce(firstEndRef, onFirstEnd, !supervisor);
   const corrections = view.corrections ?? [];
   // Sections keep their stored index, the one a flag and a correction name.
   const removed = new Set(corrections.filter(c => c.outcome === "removed").map(c => c.section));
@@ -315,7 +328,7 @@ const ReadyCards: FC<{
             icon={<Target aria-hidden="true" className="h-5 w-5 text-warning-700" />}
           >
             <ul className="flex flex-col gap-4">
-              {growth.map(({ item, index }) => (
+              {growth.map(({ item, index }, shown) => (
                 <ReadableItem
                   key={`${item.turn_index}-${index}`}
                   section={`work_on_this[${index}]`}
@@ -342,6 +355,13 @@ const ReadyCards: FC<{
                     <PractiseLink scenario={practiceFor(item.scenario_id)!} />
                   )}
                   {flagControl(`work_on_this[${index}]`, item.lead)}
+                  {shown === 0 && (
+                    <div
+                      ref={firstEndRef}
+                      data-testid="debrief-first-work-end"
+                      aria-hidden="true"
+                    />
+                  )}
                 </ReadableItem>
               ))}
             </ul>
@@ -359,7 +379,11 @@ const ReadyCards: FC<{
             <Lead>{practise.skill}</Lead>
             <Body>{practise.reason}</Body>
             {practiceFor(practise.scenario_id) && (
-              <PractiseLink scenario={practiceFor(practise.scenario_id)!} primary />
+              <PractiseLink
+                scenario={practiceFor(practise.scenario_id)!}
+                primary
+                onClick={() => report("practise_next_click")}
+              />
             )}
             {flagControl("practise_next", t("postSim.debriefCards.practiseNext"))}
           </Card>
@@ -518,6 +542,9 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
   const readAloud = useDebriefReadAloud(sessionId);
   // Read-aloud is the learner's: its audio links are theirs alone.
   const ready = view.state === "ready" && !!view.cards && !supervisor;
+  // v9 §3.3 "abandoned before ready": waited on the working screen, left early.
+  const reportWaiting = useDebriefEvent(sessionId, !supervisor);
+  useWaitingEvents(view.state === "working", reportWaiting, !supervisor);
   const latestStep = view.steps?.length ? view.steps[view.steps.length - 1] : undefined;
   const progressLine = (): string => {
     const p = view.progress;

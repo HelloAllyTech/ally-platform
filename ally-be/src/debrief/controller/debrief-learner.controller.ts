@@ -40,7 +40,23 @@ import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefAudioService } from '../service/debrief-audio.service';
 import { DebriefReplyService } from '../service/debrief-reply.service';
+import { DebriefLearnerEventsService } from '../service/debrief-learner-events.service';
+import {
+  DEBRIEF_CLIENT_EVENT_KINDS,
+  DEBRIEF_PLATFORMS,
+} from '../entity/debrief-learner-event.entity';
 
+class PlatformDto {
+  @ApiProperty({ required: false, enum: DEBRIEF_PLATFORMS })
+  @IsOptional()
+  @IsString()
+  platform?: string;
+}
+class LearnerEventDto extends PlatformDto {
+  @ApiProperty({ enum: DEBRIEF_CLIENT_EVENT_KINDS })
+  @IsIn(DEBRIEF_CLIENT_EVENT_KINDS as unknown as string[])
+  kind!: (typeof DEBRIEF_CLIENT_EVENT_KINDS)[number];
+}
 class HelpfulDto {
   @ApiProperty()
   @IsBoolean()
@@ -88,6 +104,7 @@ export class DebriefLearnerController {
     private readonly replies: DebriefReplyService,
     private readonly audio: DebriefAudioService,
     private readonly events: EventEmitter2,
+    private readonly learnerEvents: DebriefLearnerEventsService,
     private readonly toggles: FeatureToggleService,
   ) {}
 
@@ -118,11 +135,39 @@ export class DebriefLearnerController {
     description:
       'Sent by the app once the ready debrief has been on screen, in the foreground, for at least 2 seconds.',
   })
-  opened(
+  async opened(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @CurrentUser() user: TokenUser,
+    @Body() body: PlatformDto = {},
   ) {
-    return this.feedback.markOpened(sessionId, user.id);
+    const res = await this.feedback.markOpened(sessionId, user.id);
+    await this.learnerEvents.recordForLearner(
+      sessionId,
+      user.id,
+      'opened',
+      DebriefLearnerEventsService.platform(body?.platform),
+    );
+    return res;
+  }
+
+  @Post('sessions/:sessionId/events')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary: 'Something the learner did that only the app can see (v9 §3.3)',
+    description:
+      'read_through: the end of the first Work-on-this card was on screen. practise_next_click: "Practise this next" was tapped. waited: the working screen was shown. left_before_ready: the learner left while it was still working. Recorded once per session and kind.',
+  })
+  event(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+    @Body() body: LearnerEventDto,
+  ) {
+    return this.learnerEvents.recordForLearner(
+      sessionId,
+      user.id,
+      body.kind,
+      DebriefLearnerEventsService.platform(body.platform),
+    );
   }
 
   @Get('sessions/:sessionId/supervisor')
@@ -148,12 +193,16 @@ export class DebriefLearnerController {
     description:
       'Generated on the first request and cached by the card text, so a second play makes no TTS call.',
   })
-  readAloud(
+  async readAloud(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Param('section') section: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.audio.audioUrl(sessionId, user.id, section);
+    const res = await this.audio.audioUrl(sessionId, user.id, section);
+    void this.learnerEvents
+      .recordForLearner(sessionId, user.id, 'listened', null)
+      .catch(() => undefined);
+    return res;
   }
 
   @Get('sessions/:sessionId')
