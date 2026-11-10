@@ -15,13 +15,7 @@ from typing import Any, List, Type
 from pydantic import BaseModel, BeforeValidator, Field
 from typing_extensions import Annotated
 
-from app.schemas.builder import (
-    CareTopic,
-    DesignId,
-    Industry,
-    LearnedSection,
-    PrechatFieldType,
-)
+from app.schemas.builder import CareTopic, Industry, LearnedSection, PrechatFieldType
 
 
 def lenient(enum: Type[Enum], default: Any) -> Any:
@@ -100,21 +94,6 @@ class GapsOut(BaseModel):
     missing: List[str] = Field(default_factory=list)
     # Up to two things the site itself leaves open, beyond the checklist.
     extra: List[ExtraGap] = Field(default_factory=list)
-
-
-# --- designs -----------------------------------------------------------------
-
-
-class DesignOut(BaseModel):
-    id: lenient(DesignId, DesignId.GUIDE) = DesignId.GUIDE
-    title: str = ""
-    best_for: str = ""
-    visitor_line: str = ""
-    assistant_line: str = ""
-
-
-class DesignsOut(BaseModel):
-    designs: List[DesignOut] = Field(default_factory=list)
 
 
 # --- purposes (chunk 20a-2) ----------------------------------------------------

@@ -1,9 +1,9 @@
 """What the builder knows before it reads anything: the copy it must use word for
-word, the questions each industry needs answered, and the designs that work today.
+word, the questions each industry needs answered, and the purposes it can have.
 
 Owner-facing text here is `docs/agents-v2/ONBOARDING-COPY.md`, exactly; a test holds
 every string to the deck. What the model writes is only ever the parts the deck
-leaves open (a gap's item, a design's sample exchange), and code decides the rest.
+leaves open (a gap's item, a purpose's sample exchange), and code decides the rest.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from app.schemas.builder import DesignId, Industry, LearnedSection, PurposeId
+from app.schemas.builder import Industry, LearnedSection, PurposeId
 
 # --- Copy §2, §3, §6, §7, §8 --------------------------------------------------
 
@@ -61,15 +61,6 @@ DECLINE_CHIPS = [
     "Somewhere else",
 ]
 
-DESIGN_MESSAGE = (
-    "Based on what I learned, here are a few ways your assistant could help. Pick "
-    "one. You can change it later."
-)
-COMING_SOON_BODY = (
-    "Booking and payments are on the way. For now, your assistant can collect "
-    "details and pass them to you."
-)
-#: 20a-1 has no checkup yet, so building ends at Share, with copy §11's message.
 BUILT_MESSAGE = (
     "Your assistant is ready. Choose who can use it, and I'll create your link."
 )
@@ -333,79 +324,6 @@ GAP_CHECKLISTS: Dict[Industry, List[GapCheck]] = {
 }
 
 
-# --- Designs (copy §7) --------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Design:
-    """A design that works today. What it will and won't do is fixed in code, so a
-    card can never promise booking, orders or payments."""
-
-    id: DesignId
-    will: Tuple[str, ...]
-    wont: Tuple[str, ...]
-    default_title: str
-    default_best_for: str
-    default_sample: Tuple[Tuple[str, str], ...]
-
-
-DESIGNS: Dict[DesignId, Design] = {
-    DesignId.GUIDE: Design(
-        DesignId.GUIDE,
-        will=(
-            "Answer questions from your information",
-            "Link each answer to where it came from",
-            "Say plainly when it doesn't know",
-        ),
-        wont=("Book, take orders or take payments",),
-        default_title="Client guide",
-        default_best_for="Answering everyday questions about you",
-        default_sample=(
-            ("visitor", "What are your opening hours?"),
-            ("assistant", "Here's when we're open, from our website."),
-        ),
-    ),
-    DesignId.ENQUIRIES: Design(
-        DesignId.ENQUIRIES,
-        will=(
-            "Ask a few questions before the chat starts",
-            "Answer questions from your information",
-            "Pass each person's details to you",
-        ),
-        wont=("Book, take orders or take payments",),
-        default_title="New client enquiries",
-        default_best_for="Turning first questions into enquiries you can follow up",
-        default_sample=(
-            ("visitor", "I'd like to know more."),
-            ("assistant", "Happy to help. Could I have your name and email first?"),
-        ),
-    ),
-    DesignId.SUPPORT: Design(
-        DesignId.SUPPORT,
-        will=(
-            "Answer how-to and policy questions",
-            "Point people to the right page",
-            "Tell people how to reach your team",
-        ),
-        wont=("Change accounts, orders or payments",),
-        default_title="Help centre",
-        default_best_for="Helping existing customers find answers fast",
-        default_sample=(
-            ("visitor", "How do I change my details?"),
-            ("assistant", "Here's how, from our help page."),
-        ),
-    ),
-}
-
-#: Designs to offer per industry, best first; the model picks 2–3 from these.
-DESIGNS_FOR: Dict[Industry, List[DesignId]] = {
-    Industry.D2C: [DesignId.SUPPORT, DesignId.GUIDE, DesignId.ENQUIRIES],
-    Industry.SAAS: [DesignId.SUPPORT, DesignId.GUIDE, DesignId.ENQUIRIES],
-    Industry.REAL_ESTATE: [DesignId.ENQUIRIES, DesignId.GUIDE],
-    Industry.NON_PROFIT: [DesignId.GUIDE, DesignId.ENQUIRIES, DesignId.SUPPORT],
-}
-DEFAULT_DESIGNS = [DesignId.GUIDE, DesignId.ENQUIRIES, DesignId.SUPPORT]
-
 # --- Purposes (copy §24, chunk 20a-2) ----------------------------------------
 
 PURPOSE_MESSAGE = (
@@ -556,7 +474,7 @@ def purpose_order(industry: Optional[Industry], for_team: bool) -> List[PurposeI
     ]
 
 
-#: A sample exchange may not show the assistant doing what no design can do yet.
+#: A sample exchange may not show the assistant doing what no purpose can do yet.
 _OVERPROMISE = re.compile(
     r"\b(i'?ve booked|i have booked|booked (you|it)|you(?:'re| are) booked|"
     r"booking (is )?confirmed|reserved (a|your)|order (is |has been )?"
@@ -597,7 +515,3 @@ def honest_about_booking(text: str) -> str:
         kept.append(sentence)
     joiner = "\n" if "\n" in (text or "") else " "
     return joiner.join(kept).strip()
-
-
-#: The "coming soon" card, always last and never choosable.
-COMING_SOON_ID = "coming_soon"

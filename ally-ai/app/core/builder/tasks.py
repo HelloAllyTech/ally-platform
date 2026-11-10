@@ -3,7 +3,7 @@ what comes back safe to propose.
 
 What the model may decide is kept small on purpose. It never picks the safety pack
 (ally-be maps the industry), never names a draft path (code builds the patches), and
-never says what a design will do (that is fixed in the catalogue).
+never says what a purpose will do (that is fixed in the catalogue).
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ from app.core.builder.prompt import (
 from app.core.builder.schemas import (
     ClassifyOut,
     ConverseOut,
-    DesignsOut,
     DraftOut,
     ExtractOut,
     GapsOut,
@@ -42,7 +41,6 @@ from app.schemas.builder import (
     BuilderStepRequest,
     CareTopic,
     DesignCard,
-    DesignId,
     ExtractedFact,
     ExtractRequest,
     ExtractResponse,
@@ -281,59 +279,6 @@ def _words(text: str) -> set:
     return {w.rstrip("s") for w in re.findall(r"[a-z]+", text.lower())} - _FILLER
 
 
-# --- designs -----------------------------------------------------------------
-
-
-def offered_designs(industry: Optional[Industry]) -> List[DesignId]:
-    return catalogue.DESIGNS_FOR.get(industry, catalogue.DEFAULT_DESIGNS)
-
-
-async def propose_designs(
-    request: BuilderStepRequest, timeout: float
-) -> List[DesignCard]:
-    """2–3 designs that work today, then the coming-soon card. The model names them
-    and writes a sample; what each will and won't do comes from the catalogue."""
-    offered = offered_designs(request.industry)
-    out = await call(
-        "designs",
-        DesignsOut,
-        LLMTask.ONBOARDING_DESIGNS,
-        prompts=request.prompts,
-        timeout=timeout,
-        offered=", ".join(design.value for design in offered),
-        learned=format_learned(request.learned),
-        audience=request.answers.get("audience") or "(not said)",
-    )
-    cards: List[DesignCard] = []
-    seen = set()
-    for proposal in out.designs:
-        if proposal.id not in offered or proposal.id in seen:
-            continue
-        seen.add(proposal.id)
-        cards.append(_card(proposal.id, proposal, corpus(request)))
-        if len(cards) == 3:
-            break
-    # Never fewer than two real choices.
-    for design_id in offered:
-        if len(cards) >= 2:
-            break
-        if design_id not in seen:
-            seen.add(design_id)
-            cards.append(_card(design_id, None))
-    cards.append(
-        DesignCard(
-            id=catalogue.COMING_SOON_ID,
-            title="Booking and payments",
-            best_for=catalogue.COMING_SOON_BODY,
-            will=[],
-            wont=[],
-            sample=[],
-            coming_soon=True,
-        )
-    )
-    return cards
-
-
 # --- purposes (chunk 20a-2) ---------------------------------------------------
 
 
@@ -413,36 +358,6 @@ def _purpose_card(
         sample=sample,
         recommended=recommended,
         limit=purpose.limit,
-    )
-
-
-def _card(design_id: DesignId, proposal: Any, source: str = "") -> DesignCard:
-    design = catalogue.DESIGNS[design_id]
-    title = _clean(getattr(proposal, "title", ""), 40) or design.default_title
-    best_for = _clean(getattr(proposal, "best_for", ""), 100) or design.default_best_for
-    visitor, assistant = split_turn(
-        _clean(getattr(proposal, "visitor_line", ""), 160),
-        _clean(getattr(proposal, "assistant_line", ""), 240),
-    )
-    if (
-        not visitor
-        or not assistant
-        or catalogue.overpromises(assistant)
-        or not sample_grounded(f"{visitor}\n{assistant}", source)
-    ):
-        sample = [{"from": who, "text": text} for who, text in design.default_sample]
-    else:
-        sample = [
-            {"from": "visitor", "text": visitor},
-            {"from": "assistant", "text": assistant},
-        ]
-    return DesignCard(
-        id=design_id.value,
-        title=title,
-        best_for=best_for,
-        will=list(design.will),
-        wont=list(design.wont),
-        sample=sample,
     )
 
 

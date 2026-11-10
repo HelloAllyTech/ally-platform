@@ -84,7 +84,6 @@ class LLMTask(str, Enum):
     ONBOARDING_EXTRACT_FACTS = "onboarding_extract_facts"
     ONBOARDING_CLASSIFY = "onboarding_classify"
     ONBOARDING_GAPS = "onboarding_gaps"
-    ONBOARDING_DESIGNS = "onboarding_designs"
     ONBOARDING_PURPOSES = "onboarding_purposes"
     ONBOARDING_DRAFT = "onboarding_draft"
     # The checkup (chunk 20a-2): one judge call per graded question that needs a

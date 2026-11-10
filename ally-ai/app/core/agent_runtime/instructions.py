@@ -28,18 +28,6 @@ from app.core.knowledge_agent.prompt import (
 PASSAGES_PLACEHOLDER = "(the parts of your pages it finds for each question)"
 QUESTION_PLACEHOLDER = "(the visitor's message)"
 
-#: The layers, in the order the owner's screen lists them.
-LAYERS = (
-    "base",
-    "safety",
-    "purpose",
-    "business",
-    "tone",
-    "instructions",
-    "avoid",
-    "search",
-)
-
 #: The parts of the text the owner writes (and can edit in place).
 OWNER_LAYERS = {"business", "tone", "instructions", "avoid"}
 

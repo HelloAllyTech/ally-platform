@@ -81,15 +81,9 @@ class TestLenient:
         assert res.dropped == 0
 
     def test_unknown_labels_fall_back_instead_of_failing(self):
-        from app.core.builder.schemas import ClassifyOut, DesignsOut, DraftOut
+        from app.core.builder.schemas import ClassifyOut, DraftOut
 
         assert ClassifyOut.model_validate({"industry": "ngo"}).industry.value == "other"
-        assert (
-            DesignsOut.model_validate({"designs": [{"id": "booking"}]})
-            .designs[0]
-            .id.value
-            == "guide"
-        )
         assert DraftOut.model_validate({"tone": "chirpy"}).tone.value == "warm"
 
 
@@ -107,8 +101,6 @@ class TestCopy:
             catalogue.LANGUAGE_QUESTION,
             catalogue.LANGUAGE_NOTE,
             catalogue.DECLINE_QUESTION,
-            catalogue.DESIGN_MESSAGE,
-            catalogue.COMING_SOON_BODY,
             catalogue.BUILT_MESSAGE,
             *catalogue.FINDINGS.values(),
         ],
@@ -129,10 +121,6 @@ class TestCopy:
     def test_chips_are_the_decks(self, chips):
         assert " · ".join(chips) in DECK
 
-    def test_design_defaults_use_the_decks_example_titles(self):
-        for design in catalogue.DESIGNS.values():
-            assert design.default_title in DECK
-
     def test_every_checklist_item_reads_as_the_decks_pattern(self):
         for checks in catalogue.GAP_CHECKLISTS.values():
             for check in checks:
@@ -150,7 +138,6 @@ class TestPrompts:
             "ally_ai_builder_extract",
             "ally_ai_builder_classify",
             "ally_ai_builder_gaps",
-            "ally_ai_builder_designs",
             "ally_ai_builder_draft",
         ],
     )

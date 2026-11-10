@@ -771,26 +771,6 @@ class BuilderGapsInputs(PromptInputs):
     pages: str
 
 
-class BuilderDesignsInputs(PromptInputs):
-    """`builder/designs.txt`."""
-
-    prompt = PromptInfo(
-        code="ally_ai_builder_designs",
-        name="Onboarding Builder: Propose Designs",
-        description=(
-            "Proposes 2–3 designs that work today (guide, enquiries, support) with a "
-            "title and sample exchange. What each will and won't do is fixed in code; "
-            "booking and orders are always a coming-soon card."
-        ),
-    )
-
-    output_format: ClassVar[Optional[str]] = "structured"
-
-    audience: str
-    learned: str
-    offered: str
-
-
 class BuilderPurposesInputs(PromptInputs):
     """`builder/purposes.txt`."""
 
