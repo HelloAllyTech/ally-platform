@@ -38,10 +38,10 @@ carries the retrieval technique. The `planning_context` MCP prompt remains as th
 point — only an engineer can invoke it, with a whole task description. Setup and citation format:
 [Working with the Context Library](https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md).
 
-The Context Library **replaced** Stacks on 2026-11-09, which had itself replaced the wiki's Product
-Management Best Practices (deprecated 2026-08-07): nothing there is a gate, and the Context Library
-wins on conflict. Those pages still record Ally-specific traps, so check them when a search turns
-up nothing for something Ally-specific.
+The Context Library **replaced** the wiki's Product Management Best Practices (deprecated
+2026-08-07): nothing there is a gate, and the Context Library wins on conflict. Those pages still
+record Ally-specific traps, so check them when a search turns up nothing for something
+Ally-specific.
 
 ## What am I doing?
 

@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-10] update | Pointers to the retired third-party guidance library removed from current pages; the Context Library is named alone.
+
+`contributing/planning-with-context-library.md` (History section), `contributing/dev-setup.md`, `contributing/guide.md`, `index.md`, `memory.md`, `overview.md`, `platform/agent-guide.md`, `platform/overview.md`, `repos/ally-be.md`, this repo's `CLAUDE.md` and the deprecation banners on every `product/` page no longer name the library the Context Library replaced on 2026-11-09. Older entries in this log keep their wording — it is append-only. No page added, moved or retitled; frontmatter unchanged.
+
 ## [2026-11-10] update | `repos/ally-be.md`, `repos/ally-ai.md`, `contributing/planning-with-context-library.md`: the Context Library's post-release steps run by themselves; Builder needs no Context Library setting.
 
 The manual steps after a release — the character import, enrichment of the copied Ally guide and Debrief passages, the smoke checks and retiring each old corpus — are now driven by a rollout service with progress in `cl_rollout_steps`, a 24-hour default grace period between a corpus's smoke check and its retirement, retries with backoff, and a kill switch; the admin routes remain for doing any step by hand. The Context Library's MCP endpoint also accepts the platform's service key, so Builder's design runs reach it with the key they already hold and its workflow needs no new setting.

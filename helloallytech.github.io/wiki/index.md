@@ -23,7 +23,7 @@ Welcome to the **Ally Developer Wiki** catalog. This catalog is parsed by the LL
 
 ## Product Management — ⚠️ Deprecated (2026-08-07)
 
-Superseded by Ally's **Context Library** (which replaced Stacks on 2026-11-09) — see [Working with the Context Library](contributing/planning-with-context-library.md). These pages are frozen and kept for history; nothing in them is a gate, and no new principles go here.
+Superseded by Ally's **Context Library** — see [Working with the Context Library](contributing/planning-with-context-library.md). These pages are frozen and kept for history; nothing in them is a gate, and no new principles go here.
 
 - [Product Management Best Practices](product/best-practices.md) — **Hub (deprecated).** The former house rules + subsection index
 - [UI & Interaction](product/ui.md) — *(deprecated)* States before styling, hierarchy, permission-aware UI, latency, accessibility, i18n
