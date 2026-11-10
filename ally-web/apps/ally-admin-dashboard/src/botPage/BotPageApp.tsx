@@ -43,7 +43,11 @@ const toItem = (m: PublicMessage): ChatItem => ({
   text: m.text,
   citations: m.citations,
   rateable: m.rateable,
+  ...(m.sender ? { sender: m.sender } : {}),
 });
+
+/** Waits between reconnects of the visitor stream, then 30 s (chunk 11a). */
+const STREAM_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000];
 
 /** A refusal or failure in the visitor's language. */
 export function errorText(copy: BotPageCopy, error: unknown, page?: PublicBotPage | null): string {
@@ -181,6 +185,92 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
     [fail],
   );
 
+  // ── A person stepping in (chunk 11a) ──────────────────────────────────
+  // The visitor stream: a team member's replies and changes of hands, live. Connects once there's a
+  // chat (after the first message, or "Talk to a person"), and reconnects with backoff.
+  const [streamKey, setStreamKey] = useState(0);
+  const connectedTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (stage.kind !== "chat") return undefined;
+    let stopped = false;
+    let attempt = 0;
+    let controller: AbortController | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const run = async () => {
+      controller = new AbortController();
+      let chat: string | null = null;
+      try {
+        await api.listen(
+          slug,
+          event => {
+            if (event.type === "hello") {
+              chat = event.conversationId;
+              connectedTo.current = chat;
+              attempt = 0;
+              return;
+            }
+            if (event.type === "message") {
+              setMessages(list => {
+                if (list.some(item => item.id === event.id)) return list;
+                const joined =
+                  event.role === "agent_human" &&
+                  list[list.length - 1]?.role !== "agent_human" &&
+                  event.sender
+                    ? [
+                        {
+                          id: `joined-${event.id}`,
+                          role: "notice" as const,
+                          text: fill(copy.chat.joined, { sender: event.sender }),
+                          citations: [],
+                        },
+                      ]
+                    : [];
+                return [
+                  ...list,
+                  ...joined,
+                  {
+                    id: event.id,
+                    role: event.role,
+                    text: event.text,
+                    citations: [],
+                    ...(event.sender ? { sender: event.sender } : {}),
+                  },
+                ];
+              });
+            }
+            if (event.type === "state" && event.by === "assistant") {
+              setMessages(list => [
+                ...list,
+                {
+                  id: `back-${Date.now()}`,
+                  role: "notice",
+                  text: copy.chat.backToAssistant,
+                  citations: [],
+                },
+              ]);
+            }
+          },
+          controller.signal,
+        );
+      } catch {
+        // Dropped: try again below.
+      }
+      // No chat yet: the next message (or "Talk to a person") reconnects.
+      if (stopped || !chat) {
+        connectedTo.current = null;
+        return;
+      }
+      const wait = STREAM_BACKOFF_MS[Math.min(attempt++, STREAM_BACKOFF_MS.length - 1)];
+      retry = setTimeout(() => void run(), wait);
+    };
+    void run();
+    return () => {
+      stopped = true;
+      clearTimeout(retry);
+      controller?.abort();
+    };
+  }, [api, slug, stage.kind, streamKey, copy]);
+
   if (!page || stage.kind === "loading") {
     if (stage.kind === "error") {
       return (
@@ -242,6 +332,21 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
       setPending(null);
     });
 
+  const askForPerson = () =>
+    void (async () => {
+      setError(null);
+      try {
+        const result = await api.askForPerson(slug);
+        setMessages(m => [
+          ...m,
+          { id: result.messageId, role: "assistant", text: result.reply, citations: [] },
+        ]);
+        if (connectedTo.current !== result.conversationId) setStreamKey(k => k + 1);
+      } catch (err) {
+        fail(err);
+      }
+    })();
+
   const send = (text: string) => {
     const controller = new AbortController();
     abortRef.current?.abort();
@@ -297,6 +402,9 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
         await finishReveal();
         clearInterval(timer);
         setPending(null);
+        if (connectedTo.current !== final.conversationId) setStreamKey(k => k + 1);
+        // A team member has this chat: no reply now; theirs arrives on the visitor stream.
+        if (final.held) return;
         setMessages(m => [
           ...m,
           {
@@ -411,6 +519,7 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
           error={error}
           signedInAs={signedInAs}
           returnedDraft={returnedDraft}
+          onAskPerson={askForPerson}
           onRate={(messageId, feedback) =>
             // A rating that doesn't reach us isn't worth an error on the visitor's screen.
             void api.feedback(slug, messageId, feedback).catch(() => undefined)

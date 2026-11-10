@@ -51,6 +51,13 @@ function fakeApi(over: Partial<Record<keyof Api, unknown>> = {}) {
     intake: vi.fn().mockResolvedValue({ intakeDone: true }),
     conversation: vi.fn().mockRejectedValue(new BotPageApiError("BOT_PAGE_START_AGAIN", 401)),
     newConversation: vi.fn().mockResolvedValue({ ok: true }),
+    // The visitor stream (chunk 11a): ends at once unless a test feeds it.
+    listen: vi.fn().mockResolvedValue(undefined),
+    askForPerson: vi.fn().mockResolvedValue({
+      reply: "I've asked the team to join. They usually reply within a few hours.",
+      messageId: "m9",
+      conversationId: "c1",
+    }),
     send: vi.fn(
       async (
         _slug: string,
@@ -303,6 +310,75 @@ describe("parseSse", () => {
       render(<BotPageApp slug="sunrise-mind" api={resumed(false)} />);
       expect(await screen.findByText("Sessions cost 1500.")).toBeInTheDocument();
       expect(screen.queryByText("Was this helpful?")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("a person stepping in (chunk 11a)", () => {
+    const inChat = (over: Record<string, unknown> = {}) =>
+      fakeApi({
+        conversation: vi.fn().mockResolvedValue({
+          conversationId: "c1",
+          messages: [{ id: "m1", role: "user", text: "Hi", citations: [], createdAt: "" }],
+        }),
+        session: vi.fn().mockResolvedValue({ ...READY, intakeDone: true }),
+        ...over,
+      });
+
+    it("Talk to a person asks the team and shows what the visitor is told", async () => {
+      const user = userEvent.setup();
+      const api = inChat();
+      render(<BotPageApp slug="sunrise-mind" api={api} />);
+      await user.click(await screen.findByRole("button", { name: "Talk to a person" }));
+      expect(api.askForPerson).toHaveBeenCalledWith("sunrise-mind");
+      expect(
+        await screen.findByText(
+          "I've asked the team to join. They usually reply within a few hours.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("a held message gets no reply bubble; the team's reply arrives live, with who joined", async () => {
+      const user = userEvent.setup();
+      let push: ((event: unknown) => void) | undefined;
+      const api = inChat({
+        send: vi.fn().mockResolvedValue({
+          reply: "",
+          citations: [],
+          messageId: "m2",
+          conversationId: "c1",
+          held: true,
+        }),
+        listen: vi.fn(
+          (_slug: string, onEvent: (event: unknown) => void, signal: AbortSignal) =>
+            new Promise<void>(resolve => {
+              push = onEvent;
+              onEvent({ type: "hello", conversationId: "c1", by: "person" });
+              signal.addEventListener("abort", () => resolve());
+            }),
+        ),
+      });
+      render(<BotPageApp slug="sunrise-mind" api={api} />);
+      await screen.findByText("Hi");
+      await user.type(screen.getByLabelText("Your message"), "Are you there?{Enter}");
+      await waitFor(() => expect(api.send).toHaveBeenCalled());
+      expect(screen.queryByText("Was this helpful?")).not.toBeInTheDocument();
+      await waitFor(() => expect(push).toBeDefined());
+      act(() =>
+        push!({
+          type: "message",
+          id: "m3",
+          role: "agent_human",
+          text: "Hi, I'm here to help.",
+          sender: "Asha from Sunrise Mind",
+          createdAt: "",
+        }),
+      );
+      expect(await screen.findByText("Hi, I'm here to help.")).toBeInTheDocument();
+      expect(screen.getByText("Asha from Sunrise Mind has joined the chat.")).toBeInTheDocument();
+      act(() => push!({ type: "state", by: "assistant" }));
+      expect(
+        await screen.findByText("You're chatting with the assistant again."),
+      ).toBeInTheDocument();
     });
   });
 });

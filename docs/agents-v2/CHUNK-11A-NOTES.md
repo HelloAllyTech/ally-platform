@@ -2,7 +2,68 @@
 
 **Brief:** [chunk-11a.md](./chunk-11a.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §23. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[11a]`. **Stage 1, the POC:** 20a-2 ✅ → Q2a ✅ → **11a** (13, the widget, is being built in another session; 20d-2 and CL1 next week).
 
-> **⏸ Waiting for Shehbaz's approval of this plan (§2), and answers to the questions in §3.** Nothing is built yet.
+## Report: 11a is done (10 Nov 2026)
+
+**Approved 10 Nov with these answers:**
+- the phrase list, plus a "Talk to a person" link in the bot page chat (and the widget, when 13 lands);
+- the timing settings as proposed;
+- WhatsApp after 24 hours is refused in plain words until chunk 17;
+- build assuming `sharedStoreWrites` is on (added to the launch checklist, with a backfill);
+- "{first name} from {business}", with an owner setting to show only "{business}".
+
+**First, the commit hook (`9e37ad87d`).** `ally-web/.husky/pre-commit` had no `set -e`, so a failing test run was followed by lint-staged, whose success became the hook's exit code. That's how four API suites failing to load were committed. Fixed and shown both ways: a deliberately broken suite staged → the commit was refused ("Failed tasks: ally-admin-dashboard:test"); with it removed → the fix committed.
+
+### What was built
+
+| | |
+|---|---|
+| **The single switch** | `chatbot_conversations.handled_by_user_id`. `ChatbotEngineService.respond` reads it first on every turn, so WhatsApp, the bot page and the future widget can't answer a held chat. Preview ids must be `preview-<uuid>` (ally-be refuses anything else), so Preview is never held. |
+| **Crisis while held** | Checked first: the keyword templates, then the classifier on its own (`crisisOnly`). The crisis reply goes out at once, the chat stays with the person, and it's marked Safety. Crisis never hands over. |
+| **Asking for a person** | A tested phrase list (English, Hindi, Hinglish) after the crisis check; the "Talk to a person" link; a second "I don't know" in a row. The visitor is told once, in or out of hours. |
+| **Take over / reply / hand back** | First one wins (one `UPDATE … WHERE handled_by_user_id IS NULL`). Replies are stored as `agent_human` with the sender. They go out on WhatsApp through the bot's number (signed `*{first name} from {business}*`; refused up front after 24 hours) and on the bot page through the visitor's live stream. Hand back is by the holder or an owner. Auto hand-back runs after the owner's hours, with a message (on WhatsApp only inside the window). |
+| **The inbox** | A new **Inbox** in the nav with an unread badge. Needs a person · Live now · All; channel and assistant filters. Safety, then Needs a person, then the newest. The chat view shows pre-chat answers, sources, thumbs, Safety rows, the banners, the reply box and the WhatsApp window notice. |
+| **Realtime** | SSE over Redis pub/sub (`InboxEventsService`; ids only, never text, through Redis). The dashboard stream sends a `hello` snapshot first and re-checks access every 5 minutes. The visitor stream sends `hello` with who has the chat. Both reconnect with backoff (1, 2, 5, 10, then 30 s, plus jitter); a reconnect redraws from `hello` and the caches refresh. |
+| **Notifications** | A browser notification and chime for Needs a person and Safety (mute per browser; permission asked from the inbox). Owners are emailed once about a chat nobody opened within the owner's minutes; the email carries no message text. |
+| **Settings** | Share → "When someone asks for a person": reply time, optional opening hours, hours before hand-back, minutes before the email, and the first-name switch. |
+
+**Commits:** `9e37ad87d` (hook) · `98714d2d9` (backend) · the `[11a]` web commit with this report.
+
+### Tests
+
+- **ally-be:** 14,720 passed (full suite).
+  - **The switch:** the engine never answers a held chat (no model call).
+  - **WhatsApp, through the real engine:** nothing is sent and no typing shows while held; a crisis is sent at once while held; a request for a person gets the hand-over message.
+  - **Bot page:** no reply is stored while held; a crisis reply goes out while held; "Talk to a person" works.
+  - **Postgres:** of two simultaneous take-overs, exactly one wins; the list's order and unread counts are right.
+  - **Hand-over service:** declined twice; take over and hand back; replies on each channel; refused after 24 hours; only the holder replies; auto hand-back; the email (once, no text, waits the owner's minutes).
+  - **Pure rules:** phrases in three languages (and what must not match), opening hours, the sender label, the window, and the copy word for word against the deck.
+- **Live, against the local stack:** the inbox list and counts, take over (twice by the same person is fine), a reply stored as `agent_human` under the sender, and hand back.
+- **ally-web:** the full admin suite passes.
+  - Inbox: copy against the deck, the list (badges, unread), take over, reply, hand back, someone else holding it, the WhatsApp window closed, empty, the backoff.
+  - Bot page: Talk to a person; a held message shows no bubble; the team's reply arrives live with "has joined"; back to the assistant.
+- **Screenshots** (1440 and 390 px, axe on each): `inbox-list.png`, `inbox-chat.png`, `bot-handover-{light,dark}.png`, `home-share.png` (the settings).
+
+### How Shehbaz tests it
+
+1. **On a published assistant's bot page** (as an invited visitor), ask a question, then press **Talk to a person**. You're told "I've asked the team to join…".
+2. **In the dashboard**, open **Inbox**. The chat is under **Needs a person**, with a chime and notification (allow notifications once).
+   - Open it and press **Take over**: "You're replying. Your assistant is paused in this chat."
+3. **On the bot page**, ask "How much is a session?". No reply comes from the assistant.
+4. **In the inbox**, write a reply and **Send**. On the bot page it appears under "Asha from {business}" (your first name), after "… has joined the chat."
+5. **On the bot page**, write "I don't want to be here any more". The crisis reply comes at once, even though you have the chat, and the inbox shows **Safety**.
+6. **Hand back to assistant.** The page says "You're chatting with the assistant again."; ask again and the assistant answers.
+7. **WhatsApp** (with `sharedStoreWrites` on): the same, from a phone. A reply more than 24 hours after their last message is refused in plain words.
+8. **Assistant home → Share → "When someone asks for a person"**: set opening hours, then ask for a person outside them ("…back at 9 am tomorrow"). Turn off the first name, and replies are signed with the business name.
+
+### Open items (11b and later)
+
+- **13 (the widget, another session):** the widget must send through `BotPagePublicService.respond` (the switch, the hand-over bookkeeping), show the "Talk to a person" link, and open the visitor stream (`GET …/conversation/events`). Its channel shows as **Website** in the inbox filter once it's distinct from the bot page.
+- **11b:** assigning to people, internal notes, tags, canned replies, SLAs, routing, and the "Alerts go to" setting (noted in 20a-2).
+- **WhatsApp templates (17):** replying after 24 hours.
+- **Safety history:** `safety_at` is stamped from now on; chats with a crisis before today aren't marked.
+- **A rating on a resumed bot page chat** isn't shown as pressed (from Q2a).
+
+> Below: the plan as approved.
 
 ## 1. Code map: what exists today
 

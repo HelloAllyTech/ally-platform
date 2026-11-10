@@ -45,6 +45,17 @@ for (const theme of ["light", "dark"] as const) {
       await expectNoSeriousA11yIssues(page);
     });
 
+    test("talk to a person: the team is asked to join", async ({ page }) => {
+      await mockBotPage(page, { theme }, "ready");
+      await page.goto("/b/sunrise-mind");
+      await page.getByRole("button", { name: "Start" }).click();
+      await page.getByRole("button", { name: "What are your fees?" }).click();
+      await page.getByRole("button", { name: "Talk to a person" }).click();
+      await expect(page.getByText(/asked the team to join/)).toBeVisible();
+      await expect(page).toHaveScreenshot(`bot-handover-${theme}.png`);
+      await expectNoSeriousA11yIssues(page);
+    });
+
     test("was this helpful? a thumbs down asks what was wrong", async ({ page }) => {
       await mockBotPage(page, { theme }, "ready");
       await page.goto("/b/sunrise-mind");

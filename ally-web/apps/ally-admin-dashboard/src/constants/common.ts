@@ -832,6 +832,19 @@ export const ApiEndpoints = {
     CHECKUP_NOT_OFFERED: (id: string, caseId: string) =>
       `/v1/chatbots/${id}/checkup/cases/${caseId}/not-offered`,
   },
+  INBOX: {
+    CONVERSATIONS: "/v1/inbox/conversations",
+    COUNTS: "/v1/inbox/counts",
+    EVENTS: "/v1/inbox/events",
+    THREAD: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}`,
+    TAKE_OVER: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/take-over`,
+    HAND_BACK: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
+    REPLY: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+  },
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",
     CURRENT: "/v1/bot-drafts/current",
@@ -1074,6 +1087,7 @@ export const ROUTES = {
   CHATBOT_DETAIL: "/chatbots/:botId",
   /** Onboarding (chunk 20a). Static, so it outranks `:botId`. */
   CHATBOT_NEW: "/chatbots/new",
+  INBOX: "/inbox",
   CHATBOT_NEW_SESSION: (draftId: string) => `/chatbots/new/${draftId}`,
   TERMS: "/terms",
   PRIVACY: "/privacy",
@@ -1230,6 +1244,7 @@ export const TAG_TYPES = {
   CHECKUP: "checkup",
   SOURCES: "sources",
   SCORECARD: "scorecard",
+  INBOX: "inbox",
   CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so

@@ -15,6 +15,7 @@ import {
   Bullhorn,
   Catalog,
   Chat,
+  Forum,
   ChatBot,
   Chemistry,
   MachineLearningModel,
@@ -39,6 +40,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { CustomImage } from "@ally-ui-mono/ui-shared";
 import { useAnalytics, ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@ally-ui-mono/ui-shared";
+import { useGetInboxCountsQuery } from "@api";
 import {
   ArrowDown,
   Book,
@@ -86,6 +88,23 @@ const defaultProfileUploadValues: {
   profileImageUrl: string;
 } = {
   profileImageUrl: "",
+};
+
+/** Unread chats in the inbox (chunk 11a), refreshed every minute and on every inbox event. */
+const InboxNavBadge: React.FC = () => {
+  const { data } = useGetInboxCountsQuery(undefined, {
+    pollingInterval: 60_000,
+    skipPollingIfUnfocused: true,
+  });
+  if (!data?.unread) return null;
+  return (
+    <span
+      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white"
+      title={`${data.unread} unread`}
+    >
+      {data.unread}
+    </span>
+  );
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobileClose }) => {
@@ -323,6 +342,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Mobile size={20} />;
       case SIDEBAR_ITEMS.WHATSAPP_BOT:
         return <Chat size={20} />;
+      // The chats themselves (chunk 11a), not the assistants: a forum glyph beside the Chat one.
+      case SIDEBAR_ITEMS.INBOX:
+        return <Forum size={20} />;
       // Bug Hunter is the one tab that is a *someone* rather than a section:
       // its own page presents it as a test engineer on the team, and the nav
       // carries the same face so it is recognisable from anywhere. The Debug
@@ -347,6 +369,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     switch (id) {
       case SIDEBAR_ITEMS.BUILDER:
         return <BuilderNavBadge />;
+      case SIDEBAR_ITEMS.INBOX:
+        return <InboxNavBadge />;
       default:
         return undefined;
     }

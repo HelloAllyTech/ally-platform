@@ -93,6 +93,16 @@ export const HOME = {
     pageStatus: { value: "on", version: v(16) },
     pageAccess: { value: "invite", version: v(17) },
     avoidTopics: { value: ["Prices for other clinics"], version: v(18) },
+    handover: {
+      value: {
+        replyWithin: "a few hours",
+        hours: { timeZone: "Asia/Kolkata", days: [1, 2, 3, 4, 5], from: "09:00", to: "18:00" },
+        autoHandBackHours: 12,
+        emailAfterMinutes: 15,
+        showFirstName: true,
+      },
+      version: v(19),
+    },
   },
   safety: {
     pack: PACK,

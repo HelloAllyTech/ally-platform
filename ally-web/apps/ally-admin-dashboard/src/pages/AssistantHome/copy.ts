@@ -102,6 +102,20 @@ export const HOME = {
     instructions: "Extra instructions",
     instructionsHint: "Your own guidance for how it answers. Safety rules always come first.",
   },
+  /** When someone asks for a person (copy §23, chunk 11a). */
+  handover: {
+    title: "When someone asks for a person",
+    replyWithin: "They usually reply within",
+    hours: "Opening hours (optional)",
+    hoursHint: "Without opening hours, visitors are always told when you usually reply.",
+    days: "Days",
+    dayNames: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    from: "From",
+    to: "To",
+    autoHandBack: "Hours before it hands back",
+    emailAfter: "Minutes before the email",
+    showFirstName: "Show the team member's first name",
+  },
   /** The live scorecard on the Overview (copy §21, chunk Q2a). */
   scorecard: {
     thisWeek: "This week",

@@ -72,7 +72,10 @@ export interface PublicCitation {
 
 export interface PublicMessage {
   id: string;
-  role: "user" | "assistant";
+  /** `agent_human`: a team member replying from the inbox (chunk 11a). */
+  role: "user" | "assistant" | "agent_human";
+  /** For a team member's reply: "{first name} from {business}", or the business. */
+  sender?: string;
   text: string;
   citations: PublicCitation[];
   createdAt: string;
@@ -86,7 +89,22 @@ export interface PublicFinal {
   messageId: string;
   conversationId: string;
   rateable?: boolean;
+  /** A team member has this chat (chunk 11a): no reply now; theirs arrives on the visitor stream. */
+  held?: boolean;
 }
+
+/** What the visitor stream carries (chunk 11a). */
+export type VisitorEvent =
+  | { type: "hello"; conversationId: string | null; by: "assistant" | "person" }
+  | {
+      type: "message";
+      id: string;
+      role: "assistant" | "agent_human";
+      text: string;
+      sender?: string;
+      createdAt: string;
+    }
+  | { type: "state"; by: "assistant" | "person" };
 
 /** A visitor's rating of one answer (chunk Q2a). */
 export interface AnswerFeedback {

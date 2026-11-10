@@ -87,7 +87,10 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
   const conversation = useRef<string | undefined>();
 
   const send = async (text: string) => {
-    const history = messages.slice(-MAX_HISTORY).map(m => ({ role: m.role, content: m.text }));
+    const history = messages
+      .filter(m => m.role === "user" || m.role === "assistant")
+      .slice(-MAX_HISTORY)
+      .map(m => ({ role: m.role as "user" | "assistant", content: m.text }));
     setMessages(list => [...list, { id: `u${Date.now()}`, role: "user", text, citations: [] }]);
     setPending({ status: "thinking", text: "" });
     setError(null);

@@ -46,6 +46,10 @@ export const en = {
     tooLong: "{count} of {max} characters",
     headerIdle: "Answers from {name}'s own information",
     typing: "Typing…",
+    /** A person stepping in (copy §23, chunk 11a). */
+    talkToPerson: "Talk to a person",
+    joined: "{sender} has joined the chat.",
+    backToAssistant: "You're chatting with the assistant again.",
     /** "Was this helpful?" under an answer (copy §21, chunk Q2a). */
     feedback: {
       question: "Was this helpful?",

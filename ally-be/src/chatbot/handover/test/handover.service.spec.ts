@@ -315,7 +315,7 @@ describe('HandoverService', () => {
       expect(h.email.sendHandoverAlert).toHaveBeenCalledWith({
         to: 'owner@clinic.example',
         subject: 'A conversation needs you',
-        body: 'Someone talking to Sunrise Mind would like a person. Nobody has opened the conversation yet. Open it: https://admin.example/inbox?conversation=conv-1',
+        body: 'Someone talking to Sunrise Mind would like a person. Nobody has opened the conversation yet. Open it: https://admin.example/inbox?conversation=conv-1&bot=bot-1',
       });
       expect(info.mock.calls.map((c) => String(c[0])).join('\n')).not.toMatch(
         /owner@/,

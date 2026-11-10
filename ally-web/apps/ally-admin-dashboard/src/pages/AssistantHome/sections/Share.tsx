@@ -10,6 +10,7 @@ import { Team, WhoCanChat } from "../../WhatsAppBot/PeopleTab";
 import { HOME } from "../copy";
 import { Collapsed, Group, SectionHead, TextField } from "../fields";
 import { useHomeField } from "../useHomeField";
+import { HandoverSettingsGroup } from "./HandoverSettings";
 
 import type { SectionProps } from "./props";
 
@@ -30,6 +31,7 @@ export const ShareSection: React.FC<SectionProps> = ({ bot, home, canEdit, canMa
   const { data: page } = useGetBotPageQuery(bot.id);
   const failed = HOME.saving.failed;
   const access = useHomeField(bot.id, "pageAccess", home.fields.pageAccess, failed);
+  const handover = useHomeField(bot.id, "handover", home.fields.handover, failed);
   const unknown = useHomeField(bot.id, "unknownNumberText", home.fields.unknownNumberText, failed);
   const media = useHomeField(
     bot.id,
@@ -117,6 +119,8 @@ export const ShareSection: React.FC<SectionProps> = ({ bot, home, canEdit, canMa
           <BotConnectorsTab bot={bot} canManage={canManage} />
         </div>
       </Group>
+
+      <HandoverSettingsGroup field={handover} disabled={!canEdit} />
 
       <Group title={t.team} hint={t.teamHint} testId="share-team">
         <div className="ally-home__classic">

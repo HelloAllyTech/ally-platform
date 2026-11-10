@@ -7,7 +7,13 @@ import type { AnswerFeedback, PublicBotPage, PublicCitation, StatusCode } from "
 
 export interface ChatItem {
   id: string;
-  role: "user" | "assistant";
+  /**
+   * `agent_human`: a team member's reply (chunk 11a), shown under their name. `notice`: a line about
+   * the chat itself ("Asha from Sunrise Mind has joined the chat").
+   */
+  role: "user" | "assistant" | "agent_human" | "notice";
+  /** Who wrote an `agent_human` reply, as the visitor sees it. */
+  sender?: string;
   text: string;
   citations: PublicCitation[];
   /** "Was this helpful?" shows under it (chunk Q2a). */
@@ -33,6 +39,7 @@ export function Chat({
   returnedDraft,
   statusLine,
   onRate,
+  onAskPerson,
 }: {
   page: PublicBotPage;
   copy: BotPageCopy;
@@ -49,6 +56,8 @@ export function Chat({
   statusLine?: string;
   /** A visitor's rating of one answer (chunk Q2a); without it, no thumbs. */
   onRate?(messageId: string, feedback: AnswerFeedback): void;
+  /** "Talk to a person" (chunk 11a); without it, no link (Try it). */
+  onAskPerson?(): void;
 }) {
   const { branding } = page;
   const [draft, setDraft] = useState("");
@@ -105,7 +114,19 @@ export function Chat({
             </li>
           )}
           {messages.map(m =>
-            m.role === "user" ? (
+            m.role === "notice" ? (
+              <li key={m.id} className="bp-msg bp-notice" role="status">
+                {m.text}
+              </li>
+            ) : m.role === "agent_human" ? (
+              <li key={m.id} className="bp-msg ally-rise">
+                <p className="bp-sender">{m.sender}</p>
+                <div className="bp-bubble bp-bubble--assistant bp-bubble--person">
+                  <span className="ally-sr-only">{m.sender}: </span>
+                  {m.text}
+                </div>
+              </li>
+            ) : m.role === "user" ? (
               <li key={m.id} className="bp-msg bp-msg--user ally-rise">
                 <p className="bp-bubble bp-bubble--user">
                   <span className="ally-sr-only">{copy.chat.you}: </span>
@@ -217,6 +238,11 @@ export function Chat({
             ? fill(copy.chat.tooLong, { count: draft.length, max: page.maxMessageChars })
             : ""}
         </p>
+        {onAskPerson && (
+          <button type="button" className="bp-ask-person" onClick={onAskPerson} disabled={busy}>
+            {copy.chat.talkToPerson}
+          </button>
+        )}
       </form>
     </div>
   );

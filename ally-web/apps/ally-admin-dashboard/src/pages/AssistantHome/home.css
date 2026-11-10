@@ -599,3 +599,30 @@
   display: block;
   font-family: var(--ally-font-ui);
 }
+
+/* When someone asks for a person (chunk 11a). */
+.ally-home__hours {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ally-home__days,
+.ally-home__times,
+.ally-home__numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.ally-home__numbers .ally-field {
+  flex: 1 1 180px;
+}
+.ally-home__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}

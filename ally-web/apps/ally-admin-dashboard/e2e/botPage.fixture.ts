@@ -62,9 +62,24 @@ export async function mockBotPage(page: Page, look: Look = {}, state: "new" | "r
     if (path === "/otp/verify")
       return json(route, { state: "ready", intakeDone: false, signedInAs: "a***@example.com" });
     if (path === "/intake") return json(route, { intakeDone: true });
-    if (path.startsWith("/conversation"))
+    if (path.startsWith("/conversation") && !path.endsWith("/events"))
       return json(route, { conversationId: null, messages: [] });
     if (path === "/messages/m2/feedback") return json(route, { rating: "down" });
+    // A person stepping in (chunk 11a).
+    if (path === "/handover") {
+      return json(route, {
+        reply: "I've asked the team to join. They usually reply within a few hours.",
+        messageId: "m3",
+        conversationId: "c1",
+      });
+    }
+    if (path === "/conversation/events") {
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: 'event: hello\ndata: {"conversationId":"c1","by":"assistant"}\n\n',
+      });
+    }
     if (path === "/messages/stream") {
       const final = {
         reply: "Individual sessions are ₹2,000 for 50 minutes, in person or online.",

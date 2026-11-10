@@ -69,6 +69,7 @@ import { DefaultRedirect } from "./DefaultRedirect";
 import { PrivateLayout } from "./PrivateLayout";
 import { PublicRoute } from "./PublicRoute";
 import { AssistantHome } from "../pages/AssistantHome";
+import { Inbox } from "../pages/Inbox";
 import { OnboardingSession, OnboardingStart } from "../pages/Onboarding";
 
 /**
@@ -101,6 +102,7 @@ const DesignSystem = lazy(() =>
 const DevV2Components = import.meta.env.DEV ? lazy(() => import("../pages/DevV2Components")) : null;
 // Onboarding's screens from fixtures, for review and the Playwright tests (chunk 20d).
 const DevOnboarding = import.meta.env.DEV ? lazy(() => import("../pages/DevOnboarding")) : null;
+const DevInbox = import.meta.env.DEV ? lazy(() => import("../pages/DevInbox")) : null;
 const DevAssistantHome = import.meta.env.DEV
   ? lazy(() => import("../pages/DevAssistantHome"))
   : null;
@@ -148,6 +150,16 @@ export const RouteLayout: React.FC = () => {
             element={
               <Suspense fallback={null}>
                 <DevOnboarding />
+              </Suspense>
+            }
+          />
+        )}
+        {DevInbox && (
+          <Route
+            path="/dev/inbox"
+            element={
+              <Suspense fallback={null}>
+                <DevInbox />
               </Suspense>
             }
           />
@@ -677,6 +689,14 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.MOBILE_RELEASES}>
               <MobileReleases />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.INBOX}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
+              <Inbox />
             </PrivateLayout>
           }
         />

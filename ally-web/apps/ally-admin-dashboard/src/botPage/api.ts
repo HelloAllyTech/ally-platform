@@ -8,6 +8,7 @@ import type {
   PublicMessage,
   PublicSession,
   StatusCode,
+  VisitorEvent,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -93,6 +94,34 @@ export const botPageApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  /** "Talk to a person" (chunk 11a): asks the team to join; returns what the visitor is told. */
+  askForPerson: (slug: string) =>
+    call<{ reply: string; messageId: string; conversationId: string }>(url(slug, "/handover"), {
+      method: "POST",
+      body: "{}",
+    }),
+
+  /**
+   * The visitor's live stream (chunk 11a): a team member's replies and changes of hands, as they
+   * happen. Resolves when the stream ends (no chat yet, or the connection dropped).
+   */
+  async listen(
+    slug: string,
+    onEvent: (event: VisitorEvent) => void,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const response = await fetch(url(slug, "/conversation/events"), {
+      credentials: "include",
+      headers: { Accept: "text/event-stream" },
+      signal,
+    });
+    if (!response.ok || !response.body) throw await toError(response);
+    await readSse(response.body, event => {
+      onEvent({ ...(event.data as object), type: event.type } as VisitorEvent);
+      return false;
+    });
+  },
 
   newConversation: (slug: string) =>
     call<{ ok: true }>(url(slug, "/conversation/new"), { method: "POST", body: "{}" }),

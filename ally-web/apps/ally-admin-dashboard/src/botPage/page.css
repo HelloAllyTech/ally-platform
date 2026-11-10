@@ -532,3 +532,33 @@ body {
   font: 400 13px/1.4 var(--ally-font-ui);
   color: var(--brand-muted);
 }
+
+/* A person stepping in (chunk 11a). */
+.bp-sender {
+  margin: 0 0 4px;
+  font: 500 12px/1.3 var(--ally-font-ui);
+  color: var(--brand-muted);
+}
+.bp-bubble--person {
+  box-shadow: inset 3px 0 0 var(--brand-accent);
+}
+.bp-notice {
+  align-self: center;
+  margin: 4px auto;
+  font: 400 12px/1.4 var(--ally-font-ui);
+  color: var(--brand-muted);
+  text-align: center;
+  list-style: none;
+}
+.bp-ask-person {
+  display: block;
+  margin: 2px auto 0;
+  border: 0;
+  background: none;
+  color: var(--brand-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font: 400 13px/1 var(--ally-font-ui);
+  min-height: 36px;
+  padding: 0 8px;
+}

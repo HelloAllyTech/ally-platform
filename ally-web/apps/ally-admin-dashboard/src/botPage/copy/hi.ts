@@ -52,6 +52,10 @@ export const hi: BotPageCopy = {
     headerIdle: "{name} की अपनी जानकारी से जवाब",
     // needs review: drafted in chunk 20d, not yet checked by a Hindi speaker.
     typing: "लिख रहे हैं…",
+    // needs review: drafted in chunk 11a, not yet checked by a Hindi speaker.
+    talkToPerson: "किसी व्यक्ति से बात करें",
+    joined: "{sender} चैट में शामिल हुए हैं।",
+    backToAssistant: "अब आप फिर से सहायक से बात कर रहे हैं।",
     // needs review: drafted in chunk Q2a, not yet checked by a Hindi speaker.
     feedback: {
       question: "क्या यह मददगार था?",

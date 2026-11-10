@@ -505,7 +505,7 @@ export class HandoverService implements OnModuleInit {
           WHERE m.chatbot_id = $1 AND m.role = 'owner' AND u.email IS NOT NULL`,
         [chat.chatbot_id],
       )) as { email: string }[];
-      const link = `${this.config.adminBaseUrl.replace(/\/$/, '')}/inbox?conversation=${chat.id}`;
+      const link = `${this.config.adminBaseUrl.replace(/\/$/, '')}/inbox?conversation=${chat.id}&bot=${chat.chatbot_id}`;
       for (const { email } of owners) {
         await this.email
           .sendHandoverAlert({

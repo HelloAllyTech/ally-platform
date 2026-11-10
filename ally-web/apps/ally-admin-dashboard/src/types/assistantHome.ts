@@ -21,6 +21,16 @@ export interface HomeFieldValues {
   unsupportedMediaText: string;
   /** Topics the owner asked it not to talk about (chunk 20a-2), up to 10. */
   avoidTopics: string[];
+  /** When someone asks for a person (chunk 11a). */
+  handover: HandoverSettings;
+}
+
+export interface HandoverSettings {
+  replyWithin: string;
+  hours: { timeZone: string; days: number[]; from: string; to: string } | null;
+  autoHandBackHours: number;
+  emailAfterMinutes: number;
+  showFirstName: boolean;
 }
 
 export type HomeFieldName = keyof HomeFieldValues;
