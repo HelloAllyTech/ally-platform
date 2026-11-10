@@ -82,6 +82,66 @@ describe('BuilderSessionVisibilityInterceptor', () => {
     ).resolves.toBe('handled');
   });
 
+  describe('plan sessions', () => {
+    const ctx = (method: string, user: object, extra: object = {}) =>
+      ({
+        getType: () => 'http',
+        switchToHttp: () => ({
+          getRequest: () => ({
+            params: { sessionId: SESSION },
+            user,
+            method,
+            ...extra,
+          }),
+        }),
+      }) as never;
+    const plan = (over: object) => ({
+      visibility: SHARED,
+      createdBy: 1,
+      kind: 'plan',
+      leadUserId: 4,
+      ...over,
+    });
+
+    it('confines a Lead-only caller to plan sessions', async () => {
+      const { interceptor } = build({ ...plan({}), kind: 'build' });
+      await expect(
+        interceptor.intercept(
+          ctx(
+            'GET',
+            { id: 4 },
+            { viaAlternateToggle: 'product_planning_lead' },
+          ),
+          next,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('lets everyone who may see a plan read it, but only its lead change it', async () => {
+      const { interceptor } = build(plan({}));
+      await expect(
+        interceptor.intercept(ctx('GET', { id: 9 }), next),
+      ).resolves.toBe('handled');
+      await expect(
+        interceptor.intercept(ctx('POST', { id: 4 }), next),
+      ).resolves.toBe('handled');
+      await expect(
+        interceptor.intercept(ctx('POST', { id: 9 }), next),
+      ).rejects.toThrow(/lead/);
+    });
+
+    it('lets nobody change a plan nobody has taken on, or a private draft through Builder', async () => {
+      const { interceptor } = build(plan({ leadUserId: null }));
+      await expect(
+        interceptor.intercept(ctx('POST', { id: 4 }), next),
+      ).rejects.toThrow(/Take this plan on/);
+      const draft = build(plan({ visibility: PRIVATE, leadUserId: null }));
+      await expect(
+        draft.interceptor.intercept(ctx('POST', { id: 1 }), next),
+      ).rejects.toThrow(/private/);
+    });
+  });
+
   it('does not query for routes without a session, or for a non-UUID id', async () => {
     const { interceptor, repository } = build(null);
     await interceptor.intercept(context({}, { id: 2 }), next);
@@ -130,6 +190,8 @@ describe('Builder session visibility — every reader is accounted for', () => {
       'updates by id inside a turn on a :sessionId route the interceptor checked',
     'builder/service/builder-outcome.service.ts':
       'injects the repository for its sweep; returns nothing to a viewer',
+    'product-roadmap/plan/plan-session.store.ts':
+      'plan reads by id; every list scopes its own WHERE to the author or to shared plans (product-roadmap/plan/*)',
     'builder/service/builder-pull-request.service.ts':
       'by id for a pull request, and the failed-run sweep; returns nothing to a viewer',
   };

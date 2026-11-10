@@ -47,6 +47,7 @@ import {
 } from '../../builder/enum/builder.enum';
 import {
   PlanEventKind,
+  PlanNotificationKind,
   PlanStage,
 } from '../../product-planning/enum/product-planning.enum';
 import {
@@ -271,6 +272,9 @@ describe('CHECK constraints cover their enums', () => {
     ],
     ['CHK_plan_events_kind', Object.values(PlanEventKind)],
     ['CHK_plan_spend_entries_stage', Object.values(PlanStage)],
+    ['CHK_builder_sessions_plan_stage', Object.values(PlanStage)],
+    ['CHK_roadmap_opportunities_plan_stage', Object.values(PlanStage)],
+    ['CHK_plan_notifications_kind', Object.values(PlanNotificationKind)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],
     ['CHK_builder_build_runs_status', Object.values(BuilderRunStatus)],
     ['CHK_builder_build_runs_mode', Object.values(BuilderRunMode)],

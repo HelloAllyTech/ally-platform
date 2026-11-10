@@ -209,6 +209,15 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   @Column({ type: 'numeric', precision: 10, scale: 4, default: 1 })
   planIdeaCeilingUsd!: string;
 
+  /**
+   * Builder's own "new session" door. Turned off once plans start on the
+   * roadmap (plans/roadmap-owns-planning rev 5.2, P7): Builder then builds
+   * plans; it no longer starts its own interviews. On by default so nothing
+   * changes until someone turns it off.
+   */
+  @Column({ type: 'boolean', default: true })
+  builderDirectInterviewEnabled!: boolean;
+
   /** Closing a plan whose idea has more votes than this needs a second Lead. */
   @Column({ type: 'int', default: 10 })
   planCloseConfirmVotes!: number;

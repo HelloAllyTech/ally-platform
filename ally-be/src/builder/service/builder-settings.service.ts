@@ -64,6 +64,7 @@ export class BuilderSettingsService {
         | 'planCeilingUsd'
         | 'planIdeaCeilingUsd'
         | 'planCloseConfirmVotes'
+        | 'builderDirectInterviewEnabled'
       >
     >,
     userId: number,

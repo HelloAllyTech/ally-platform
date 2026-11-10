@@ -49,3 +49,24 @@ export enum PlanEventKind {
   CLOSED = 'closed',
   REOPENED = 'reopened',
 }
+
+/** What a plan notification says (plan_notifications.kind). */
+export enum PlanNotificationKind {
+  ARCHIVE_SOON = 'archive_soon',
+  ARCHIVED = 'archived',
+  PURGE_SOON = 'purge_soon',
+  TAKEN_ON = 'taken_on',
+  HANDED_BACK = 'handed_back',
+  NUDGE = 'nudge',
+  AUTO_RELEASED = 'auto_released',
+  PRD_READY = 'prd_ready',
+  SENT_TO_BUILD = 'sent_to_build',
+  LAUNCHED = 'launched',
+  OUTCOME = 'outcome',
+  CLOSED = 'closed',
+  CLOSE_CONFIRM = 'close_confirm',
+  AUTHOR_QUESTION = 'author_question',
+  AUTHOR_ANSWERED = 'author_answered',
+  CEILING_WARNING = 'ceiling_warning',
+  CHECK_FINDING = 'check_finding',
+}

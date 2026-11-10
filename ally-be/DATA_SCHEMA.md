@@ -694,6 +694,15 @@ for the plan flow), `planCeilingUsd` (numeric(10,4), default 100 — one ceiling
 outcome review, design and build runs included), `planIdeaCeilingUsd` (numeric(10,4), default 1 — where
 the private Idea stage wraps up; never a hard stop) and `planCloseConfirmVotes` (int, default 10). There
 is no human sign-off role: the lead resolves every review finding, with a recorded reason.
+`builder_settings.builderDirectInterviewEnabled` (bool, default true; migration `1981001800000`): Builder's own
+new-session door, turned off once plans start on the roadmap.
+
+**Plan state** (migration `1981001500000`): `builder_sessions.plan` (jsonb, `select: false` — the `PlanRecord`:
+idea-stage verdicts, impact tags, success measure and `measureFrozenAt`, closure, launch checklist, review dates;
+its own column because the interview summary rewrites `metadata` wholesale), `builder_sessions.planStage` /
+`planStageAt` and the same pair on `roadmap_opportunities` (indexed `idx_roadmap_opps_plan_stage`) — the stage
+derived by `derivePlanStage` and written only by `PlanStageService`. A private plan's Idea-stage messages carry
+`metadata.planStage = 'idea'` and are not replayed to the PRD interview.
 
 **Builder tab columns** (migration `1980790000000`): `builder_settings.inProgressLimit` (int, default 3) — how many sessions a person wants in progress at once; Up next refuses Start at the limit and offers Put back, never queueing silently (separate from `maxConcurrentBuilds`, the runner budget). `builder_pull_requests.slackChannel` / `slackMessageTs` — where the merge prompt was posted, so it is edited to "Answered in Ally" once the pull request merges from any surface.
 
@@ -721,6 +730,10 @@ do what is two admin toggles, `product_planning_ideas` (default on, platform-onl
 | -------------------- | ---- | ----------- | ----- |
 | `plan_events`        | none (append-only) | `id` (uuid), `sessionId` (uuid FK → `builder_sessions` ON DELETE CASCADE), `kind` (varchar(32), CHECK = `PlanEventKind`), `actorUserId` (int, nullable = system), `detail` (jsonb, nullable), `at` (timestamptz) | Who did what to a plan: taken on, handed back, filed, budget raised, a finding dismissed. **Never updated**; the plan's timeline merges it with `builder_messages` and `builder_history`. Index `(sessionId, at)`. |
 | `plan_spend_entries` | none (append-only) | `id` (uuid), `sessionId` (uuid, nullable, FK → `builder_sessions` ON DELETE CASCADE), `stage` (varchar(16), nullable, CHECK = `PlanStage`), `actorUserId`, `specialist`, `taskId` (AI task registry id), `provider`, `model`, `tokensIn`/`tokensOut`/`cachedTokens`/`cacheWriteTokens` (int), `costUsd` (numeric(12,6)), `priced` (bool), `at` | The spend meter's ledger. Written **awaited** and priced at write time from `MODEL_PRICING` (`PlanSpendService`) — unlike `llm_usage`, which is fire-and-forget and unpriced. `priced = false` means the model had no price: cost 0 and the meter says "approximate". `sessionId` null only for work that belongs to no plan (the weekly signal scout). Index `(sessionId, at)`. |
+| `plan_notifications` | none | `id` (uuid), `recipientUserId` (int), `sessionId` (uuid FK → `builder_sessions` ON DELETE CASCADE), `kind` (varchar(24), CHECK = `PlanNotificationKind`), `message` (text), `readAt` (timestamptz, nullable), `createdAt` | In-app notices for plan authors and leads, who are usually not Builder users (so not `builder_notifications`). At most one unread per (recipient, plan, kind): a repeat refreshes the row. Index `(recipientUserId, readAt)`. |
+| `plan_checks`        | none | `id` (uuid), `sessionId` (uuid FK CASCADE), `kind` (`safety`/`privacy`/`ai_quality`), `status` (`running`/`findings`/`resolved`/`failed`), `mode` (`shadow`/`live`), `findings` (jsonb: severity, title, detail, mitigation, `resolution` {kind fixed/dismissed, reason, by, at}), `factsHash` (the PRD it judged), `error`, `createdAt`/`updatedAt` | The review board. Which checks a plan needs is code (`requiredChecks` over its impact tags); the lead resolves every finding with a reason (a high-severity one needs a real sentence). A check that judged an older PRD (`factsHash` mismatch) no longer counts. The first 10 of each kind run in `shadow` and never block. Unique `(sessionId, kind)`. |
+| `plan_outcome_reviews` | none | `id` (uuid), `sessionId` (uuid FK CASCADE), `dueDate` (date), `verdict` (`hit`/`partial`/`miss`/`too_early`/`measurement_broken`), `observed` (text), `reasons` (text), `nextSteps` (jsonb), `chunkCode` (the Product Outcomes chunk it wrote), `createdAt` | One outcome review per plan and review date (release + each `reviewAfterDays` of the frozen success measure). Unique `(sessionId, dueDate)`. Also written into the Context Library's **Product Outcomes** collection (`PO-`, §3.22). |
+| `plan_suggestions`   | none | `id` (uuid), `title`, `problem`, `who`, `evidence` (jsonb ids), `whyNow`, `fingerprint` (normalised title hash), `status` (`open`/`dismissed`/`worked_up`), `decidedBy`, `decidedAt`, `sessionId` (the plan started from it), `createdAt` | The weekly signal scout's suggested ideas for Leads. Never filed by the agent; a dismissed fingerprint stays quiet for 90 days. |
 
 ---
 
@@ -990,7 +1003,10 @@ character interview's `search_corpus` tool reads (use case `character_interview`
 Since phase 5 (migration `1981000400000`), two collections agents write to: **Builder Lessons**
 (`builder_lessons`, `BL-`, noun "lesson"; facets `category` / `repos` / `tags`; read by every
 `builder_*` use case, `builder_build` and `mcp_dev`) and **Bug Hunter Notes** (`bug_hunter_notes`,
-`BN-`, noun "note"; facets `tags` / `repos`; read by `bug_hunter` and `mcp_dev`). Agents write
+`BN-`, noun "note"; facets `tags` / `repos`; read by `bug_hunter` and `mcp_dev`). Migration
+`1981001700000` adds a third: **Product Outcomes** (`product_outcomes`, `PO-`, noun "outcome"; facets
+`verdict` / `repos` / `tags`; written by the roadmap's outcome reviewer as `agent: 'planning'`; read by
+every `builder_*` use case, `roadmap_copilot` and `mcp_dev`). Agents write
 through `ContextAgentChunkService.writeAgentChunk`, which lands every chunk as `candidate` (never
 indexed or retrieved, `agent` set); the hourly agent curator (`ContextAgentCuratorService`) folds
 candidates into the active set with AGREE (the candidate is `superseded`, its agreement added to

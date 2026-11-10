@@ -107,6 +107,38 @@ export class PlanSpendService {
     });
   }
 
+  /**
+   * For callers that know only a Builder session id (the PRD interview):
+   * records the call against the plan when the session is one, at the plan's
+   * current stage and on its lead's account. A Builder build session is left
+   * alone. Never throws: spend accounting must not fail the turn.
+   */
+  async recordForBuilderSession(
+    sessionId: string,
+    usage: Omit<PlanModelUsage, 'sessionId' | 'stage' | 'actorUserId'>,
+  ): Promise<void> {
+    try {
+      const rows: {
+        kind: string;
+        planStage: string | null;
+        leadUserId: number | null;
+      }[] = await this.repository.manager.query(
+        `SELECT kind, "planStage", "leadUserId" FROM "builder_sessions" WHERE id = $1`,
+        [sessionId],
+      );
+      const session = rows?.[0];
+      if (!session || session.kind !== 'plan') return;
+      await this.record({
+        ...usage,
+        sessionId,
+        stage: (session.planStage as PlanStage | null) ?? PlanStage.PRD,
+        actorUserId: session.leadUserId ?? null,
+      });
+    } catch {
+      // See above.
+    }
+  }
+
   async record(usage: PlanModelUsage): Promise<PlanSpendEntry> {
     const { costUsd, priced } = PlanSpendService.price(usage);
     return this.repository.save(

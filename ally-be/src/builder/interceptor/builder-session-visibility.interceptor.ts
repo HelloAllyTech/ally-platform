@@ -1,10 +1,15 @@
 import {
   CallHandler,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   NestInterceptor,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  BuilderSessionKind,
+  BuilderSessionVisibility,
+} from '../enum/builder.enum';
 import { Observable } from 'rxjs';
 import {
   BuilderSessionRepository,
@@ -49,6 +54,32 @@ export class BuilderSessionVisibilityInterceptor implements NestInterceptor {
       (viewerId === undefined || !isSessionVisibleTo(facts, viewerId))
     ) {
       throw new NotFoundException('Builder session not found');
+    }
+    if (!facts) return next.handle();
+
+    // A caller let in by the Product Planning Lead toggle (not Builder's own)
+    // reaches plan sessions only; Builder's own sessions stay Builder users'.
+    if (request.viaAlternateToggle && facts.kind !== BuilderSessionKind.PLAN) {
+      throw new NotFoundException('Builder session not found');
+    }
+
+    // A plan is changed only through its own stage's rules (rev 5.2 §B.12):
+    // a private draft through the roadmap's idea flow, a shared plan only by
+    // its current lead. Reads stay open to everyone who may see the plan.
+    const method = String(request.method ?? 'GET').toUpperCase();
+    if (facts.kind === BuilderSessionKind.PLAN && method !== 'GET') {
+      if (facts.visibility === BuilderSessionVisibility.PRIVATE) {
+        throw new ForbiddenException(
+          'This idea is still private. Work on it from My ideas on the roadmap.',
+        );
+      }
+      if (facts.leadUserId !== viewerId) {
+        throw new ForbiddenException(
+          facts.leadUserId
+            ? 'Only this plan’s lead can change it.'
+            : 'Take this plan on from the roadmap before changing it.',
+        );
+      }
     }
     return next.handle();
   }

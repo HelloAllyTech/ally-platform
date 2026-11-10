@@ -84,10 +84,19 @@ export class BuilderSessionRepository extends Repository<BuilderSession> {
   /** Visibility and author only, for the per-route check — no row hydration. */
   findVisibilityFacts(
     sessionId: string,
-  ): Promise<Pick<BuilderSession, 'id' | 'visibility' | 'createdBy'> | null> {
+  ): Promise<Pick<
+    BuilderSession,
+    'id' | 'visibility' | 'createdBy' | 'kind' | 'leadUserId'
+  > | null> {
     return this.findOne({
       where: { id: sessionId },
-      select: { id: true, visibility: true, createdBy: true },
+      select: {
+        id: true,
+        visibility: true,
+        createdBy: true,
+        kind: true,
+        leadUserId: true,
+      },
     });
   }
 

@@ -52,6 +52,9 @@ export interface RoadmapReferenceImage {
   where: '"deletedAt" IS NULL',
 })
 @Index('idx_roadmap_opps_source', ['source'], { where: '"deletedAt" IS NULL' })
+@Index('idx_roadmap_opps_plan_stage', ['planStage'], {
+  where: '"planStage" IS NOT NULL AND "deletedAt" IS NULL',
+})
 export class RoadmapOpportunity extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -209,6 +212,17 @@ export class RoadmapOpportunity extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'uuid', nullable: true })
   builderSessionId?: string | null;
+
+  /**
+   * The plan's stage, mirrored from its session by PlanStageService (the only
+   * writer) for the board's progress bar and the Needs a lead queue. Null when
+   * the opportunity has no plan. Never gates behaviour: that reads the facts.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  planStage?: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  planStageAt?: Date | null;
 
   /**
    * Stamped only when the stage TRANSITIONS into RELEASED, and never re-stamped on a later

@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
+import type { PlanRecord } from 'src/product-planning/type/plan-record.type';
 import {
   BuilderSessionKind,
   BuilderSessionStatus,
@@ -191,6 +192,25 @@ export class BuilderSession extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'int', nullable: true })
   leadUserId?: number | null;
+
+  /**
+   * The plan's own record (PlanRecord): idea-stage verdicts, impact tags,
+   * success measure, closure, launch and review state. Its own column, not
+   * `metadata`, which the interview-summary writer replaces wholesale.
+   * `select: false`: lists return whole rows and never need it.
+   */
+  @Column({ type: 'jsonb', nullable: true, select: false })
+  plan?: PlanRecord | null;
+
+  /**
+   * Where the plan is, derived by code (derivePlanStage) and written only by
+   * PlanStageService. Null for BUILD sessions. Mirrored onto the opportunity.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  planStage?: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  planStageAt?: Date | null;
 
   /** The author: who started the session. Immutable. */
   @Column({ type: 'int' })

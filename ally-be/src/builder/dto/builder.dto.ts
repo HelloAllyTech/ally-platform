@@ -542,6 +542,14 @@ export class UpdateBuilderSettingsDto {
   @Min(0)
   @Max(1000)
   planCloseConfirmVotes?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Builder's own new-session door. Turn it off once plans start on the roadmap; Builder then builds plans.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  builderDirectInterviewEnabled?: boolean;
 }
 
 export class ListBuilderSessionsQueryDto {
