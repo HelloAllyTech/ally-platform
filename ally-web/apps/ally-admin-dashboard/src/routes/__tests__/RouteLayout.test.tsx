@@ -76,7 +76,6 @@ vi.mock("@pages", () => ({
   Logs: () => <div>LogsPage</div>,
   MobileReleases: () => <div>MobileReleasesPage</div>,
   WhatsAppBot: () => <div>WhatsAppBotPage</div>,
-  ChatbotPage: () => <div>ChatbotPage</div>,
   Terms: () => <div>TermsPage</div>,
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,
@@ -108,14 +107,17 @@ describe("RouteLayout", () => {
     vi.clearAllMocks();
   });
 
-  it("opens an assistant on its home, and on the classic page with ?view=classic", () => {
-    window.history.pushState({}, "", "/chatbots/bot-1");
-    const { unmount } = render(<RouteLayout />);
-    expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
-    unmount();
-    window.history.pushState({}, "", "/chatbots/bot-1?view=classic");
-    render(<RouteLayout />);
-    expect(screen.getByText("ChatbotPage")).toBeInTheDocument();
+  it("opens an assistant on its home, and an old ?view=classic link on the home too", () => {
+    for (const path of [
+      "/chatbots/bot-1",
+      "/chatbots/bot-1?view=classic",
+      "/chatbots/bot-1?view=classic&tab=usage",
+    ]) {
+      window.history.pushState({}, "", path);
+      const { unmount } = render(<RouteLayout />);
+      expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("renders Login route", () => {

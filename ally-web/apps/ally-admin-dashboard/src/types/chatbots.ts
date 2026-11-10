@@ -30,13 +30,6 @@ export enum ChatbotMemberRole {
   OWNER = "owner",
 }
 
-export enum ChatbotAudienceKind {
-  USER = "user",
-  ORGANISATION = "organisation",
-  PHONE = "phone",
-  EMAIL = "email",
-}
-
 export interface ChatbotPersona {
   displayName?: string;
   systemPrompt?: string;
@@ -196,21 +189,6 @@ export interface CreatePrivateChatbotDocumentRequest {
   sizeBytes?: number;
   text?: string;
   sourceUrl?: string;
-}
-
-export interface ChatbotMember {
-  userId: number;
-  name: string | null;
-  email: string | null;
-  role: ChatbotMemberRole;
-}
-
-export interface ChatbotAudienceEntry {
-  id: string;
-  kind: ChatbotAudienceKind;
-  value: string;
-  label: string | null;
-  createdAt: string;
 }
 
 /** A bot's changes to the defaults (same shape organisations used to have). */

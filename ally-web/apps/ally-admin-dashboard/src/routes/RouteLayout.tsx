@@ -60,7 +60,6 @@ import {
   EvaluateRecords,
   EvaluateRecordDetail,
   WhatsAppBot,
-  ChatbotPage,
 } from "@pages";
 
 // By path, not through `@pages`: onboarding (chunk 20a) needs nothing the barrel provides.
@@ -80,18 +79,14 @@ const InboxRedirect: React.FC = () => {
 };
 
 /**
- * One assistant: the assistant home (chunk 20d), edge to edge, or with `?view=classic` the old
- * tabbed page, unchanged, until it is removed after 20a-2's Checkup.
+ * One assistant: the assistant home (chunk 20d), edge to edge. The classic tabbed page went in CL1;
+ * an old `?view=classic` link opens the home, and its `tab=` still lands on the right section.
  */
-const ChatbotDetailRoute: React.FC = () => {
-  const [params] = useSearchParams();
-  const classic = params.get("view") === "classic";
-  return (
-    <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed={!classic}>
-      {classic ? <ChatbotPage /> : <AssistantHome />}
-    </PrivateLayout>
-  );
-};
+const ChatbotDetailRoute: React.FC = () => (
+  <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
+    <AssistantHome />
+  </PrivateLayout>
+);
 
 // Lazy-loaded so IBM Carbon + Carbon Charts (+ d3) and the scoped Carbon
 // stylesheet ship as their own chunk, loaded only when the Analytics tab opens.

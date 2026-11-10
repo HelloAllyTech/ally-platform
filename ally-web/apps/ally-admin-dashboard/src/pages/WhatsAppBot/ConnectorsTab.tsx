@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { Select, SelectItem, SkeletonText } from "@ally-ui-mono/ui-shared";
-import { useBindConnectorMutation, useGetChatbotsQuery } from "@api";
+import { useBindConnectorMutation } from "@api";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
@@ -28,93 +28,6 @@ const useMoveChannel = () => {
     }
   };
   return { move, isMoving: isLoading };
-};
-
-/**
- * An agent's channels: the numbers that reach it, connecting a new one, and — for platform
- * admins — adding a number that is already connected but serves no agent.
- */
-export const BotConnectorsTab: React.FC<{ bot: Chatbot; canManage: boolean }> = ({
-  bot,
-  canManage,
-}) => {
-  const [connecting, setConnecting] = useState(false);
-  const { data: numbers = [], isLoading, isError, refetch } = useWaNumbers(bot.id);
-  const { data: list } = useGetChatbotsQuery();
-  const { move, isMoving } = useMoveChannel();
-
-  return (
-    <div className="flex flex-col gap-6 max-w-4xl">
-      <Card
-        title={t.title}
-        subtitle={t.intro}
-        action={
-          canManage &&
-          !connecting && (
-            <Button variant={ButtonVariant.PRIMARY} onClick={() => setConnecting(true)}>
-              {t.newWhatsApp}
-            </Button>
-          )
-        }
-      >
-        {isLoading ? (
-          <SkeletonText paragraph lineCount={3} />
-        ) : isError ? (
-          <LoadError title={t.failed} onRetry={() => void refetch()} />
-        ) : (
-          <ChannelList
-            numbers={numbers}
-            canManage={canManage}
-            emptyTitle={ch.agentEmpty}
-            // Only owners can connect a number, so everyone else is told who to ask.
-            emptyHint={canManage ? ch.agentEmptyHint : t.ownerOnlyHint}
-            trailing={number =>
-              canManage && (
-                <Button
-                  variant={ButtonVariant.SECONDARY}
-                  disabled={isMoving}
-                  onClick={() => void move(number, null)}
-                >
-                  {t.unassign}
-                </Button>
-              )
-            }
-          />
-        )}
-      </Card>
-      {connecting && (
-        <ConnectWhatsAppFlow chatbotId={bot.id} onClose={() => setConnecting(false)} />
-      )}
-      {list?.canCreate && <FreeChannels botId={bot.id} />}
-    </div>
-  );
-};
-
-/** Connected numbers that serve no agent — one click to add one to this agent. */
-const FreeChannels: React.FC<{ botId: string }> = ({ botId }) => {
-  const { data: numbers = [] } = useWaNumbers();
-  const { move, isMoving } = useMoveChannel();
-  const free = numbers.filter(n => !n.chatbotId);
-  if (!free.length) return null;
-  return (
-    <Card title={t.freeTitle}>
-      <ChannelList
-        numbers={free}
-        canManage={false}
-        emptyTitle=""
-        emptyHint=""
-        trailing={number => (
-          <Button
-            variant={ButtonVariant.SECONDARY}
-            disabled={isMoving}
-            onClick={() => void move(number, botId)}
-          >
-            {t.assign}
-          </Button>
-        )}
-      />
-    </Card>
-  );
 };
 
 /**

@@ -1,5 +1,3 @@
-import type { BotPageIntake } from "./botPage";
-
 /**
  * Which knowledge corpus a request is about.
  *
@@ -180,21 +178,6 @@ export interface UpdateKbDocumentRequest {
 export interface ReplaceKbDocumentContentRequest {
   id: string;
   text: string;
-}
-
-export interface KbChunk {
-  id: string;
-  chunkIndex: number;
-  text: string;
-  charStart: number;
-  charEnd: number;
-  /** 0 when the source format has no pages. */
-  pageFrom: number;
-  pageTo: number;
-  sectionPath: string | null;
-  tokenCount: number;
-  uploadStatus: string;
-  uploadError: string | null;
 }
 
 export interface KbStats {
@@ -457,31 +440,6 @@ export interface WaConnectionCheck {
 
 // ── Citations and retrieval (on a conversation's replies) ────────────────────
 
-export interface WaPreviewCitation {
-  passage_number: number;
-  chunk_id: string;
-  document_id: string;
-  document_title: string;
-  page_from: number;
-  page_to: number;
-  section_path: string;
-  similarity: number;
-}
-
-export interface WaPreviewRetrieval {
-  top_k: number;
-  min_similarity: number;
-  decline_similarity: number;
-  hit_count: number;
-  top_similarity: number;
-  passages_used: number;
-  query_language: string;
-  /** The English text actually embedded; null when searched as written. */
-  translated_query: string | null;
-  /** True when the model answered but cited nothing. */
-  unsupported: boolean;
-}
-
 // ── Conversation log ─────────────────────────────────────────────────────────
 
 export enum WaHandledBy {
@@ -502,135 +460,7 @@ export enum WaHandledBy {
   ERROR = "error",
 }
 
-/** A thread summary. Note there is no full phone number — only the last four digits. */
-export interface WaConversationSummary {
-  id: string;
-  contactId: string;
-  startedAt: string;
-  lastMessageAt: string;
-  messageCount: number;
-  lastLanguage: string | null;
-  phoneLast4: string;
-  consentStatus: string;
-  blockedAt: string | null;
-  /** Null for a number that is not on any Ally profile — which is why the thread was refused. */
-  tenantId: string | null;
-  tenantName: string | null;
-  /**
-   * Only while the dashboard reads the shared store (chunk 12b): the channel, and for a bot page
-   * thread the visitor's masked email ("Visitor" when they gave none). Absent, it is WhatsApp.
-   */
-  channel?: WaConversationChannel;
-  visitor?: string | null;
-}
-
-export type WaConversationChannel = "whatsapp" | "web";
-
-export interface GetWaConversationsResponse {
-  conversations: WaConversationSummary[];
-  count: number;
-}
-
-export interface WaConversationMessage {
-  id: string;
-  direction: "inbound" | "outbound";
-  body: string;
-  language: string | null;
-  handledBy: WaHandledBy | null;
-  citations: WaPreviewCitation[];
-  /** Includes the provider and model that ACTUALLY ran, so a behaviour change is explainable. */
-  retrievalMeta:
-    | (WaPreviewRetrieval & {
-        provider?: string;
-        model?: string;
-        prompt_version?: string;
-      })
-    | null;
-  latencyMs: number | null;
-  status: string;
-  errorMessage: string | null;
-  createdAt: string;
-}
-
-export interface WaConversationDetail {
-  /** Chunk 12b, shared store only. */
-  channel?: WaConversationChannel;
-  /** A bot page visitor, in place of `contact`. `id` is the shared store contact, for erasure. */
-  visitor?: { id: string; label: string };
-  conversation: WaConversationSummary & { intake?: BotPageIntake | null };
-  contact: {
-    id: string;
-    phoneLast4: string;
-    consentStatus: string;
-    locale: string | null;
-    blockedAt: string | null;
-    messageCount: number;
-    tenantId: string | null;
-    identifiedAt: string | null;
-    identitySource: string | null;
-    /** Named rather than an id. Null is meaningful: it is why the corpus could not be scoped. */
-    organisation: { id: string; name: string } | null;
-  } | null;
-  messages: WaConversationMessage[];
-}
-
-export interface GetWaConversationsParams {
-  limit?: number;
-  offset?: number;
-  from?: string;
-  to?: string;
-  handledBy?: WaHandledBy;
-  language?: string;
-  declinedOnly?: boolean;
-  search?: string;
-  /** Whitelisted server-side; an unknown key falls back to the default order rather than erroring. */
-  sortBy?: string;
-  sortDir?: "asc" | "desc";
-  /** Narrow to one organisation; absent = every organisation. */
-  chatbotId?: string;
-  /** Chunk 12b: one channel, while the dashboard reads the shared store. */
-  channel?: WaConversationChannel;
-}
-
 // ── Unanswered queue ─────────────────────────────────────────────────────────
-
-export enum WaUnansweredReason {
-  NO_HITS = "no_hits",
-  BELOW_THRESHOLD = "below_threshold",
-  MODEL_DECLINED = "model_declined",
-  ERROR = "error",
-}
-
-export enum WaUnansweredStatus {
-  OPEN = "open",
-  TRIAGED = "triaged",
-  ANSWERED = "answered",
-  DISMISSED = "dismissed",
-}
-
-export interface WaUnansweredQuestion {
-  id: string;
-  messageId: string;
-  conversationId: string;
-  questionText: string;
-  language: string | null;
-  reason: WaUnansweredReason;
-  /** Numeric string from Postgres — how close the corpus came. */
-  topSimilarity: string | null;
-  hitCount: number;
-  status: WaUnansweredStatus;
-  assignedTo: number | null;
-  resolutionNote: string | null;
-  linkedDocumentId: string | null;
-  createdAt: string;
-  /** Chunk 12b, shared store only: where the question was asked. */
-  channel?: WaConversationChannel;
-}
-
-export interface GetWaUnansweredResponse {
-  questions: WaUnansweredQuestion[];
-  count: number;
-}
 
 // ── Usage dashboard ──────────────────────────────────────────────────────────
 

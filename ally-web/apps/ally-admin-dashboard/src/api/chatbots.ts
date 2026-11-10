@@ -3,17 +3,11 @@ import {
   AssistantHomeView,
   BotImageKind,
   BotImageView,
-  BotPageAccessEntry,
-  BotPageAccessKind,
   BotPageBrand,
   BotPageView,
   Chatbot,
-  ChatbotAudienceEntry,
-  ChatbotAudienceKind,
   ChatbotDocumentDetail,
   ChatbotDocumentRow,
-  ChatbotMember,
-  ChatbotMemberRole,
   ChatbotSettingsOverride,
   ChatbotSettingsView,
   ChatbotStatus,
@@ -34,7 +28,6 @@ import {
   TestChatbotRequest,
   TestChatbotResponse,
   UpdateChatbotDocumentRequest,
-  UpdateBotPageRequest,
   UpdateChatbotRequest,
   ChatbotStats,
 } from "@types";
@@ -108,18 +101,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
     }),
 
-    setChatbotDocuments: builder.mutation<
-      ChatbotDocumentRow[],
-      { id: string; documentIds: string[] }
-    >({
-      query: ({ id, documentIds }) => ({
-        url: ApiEndpoints.CHATBOTS.DOCUMENTS(id),
-        method: HttpMethod.PUT,
-        body: { documentIds },
-      }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
-    }),
-
     /** Presign a file for one of the chatbot's own documents; the browser PUTs it there. */
     createChatbotDocumentUploadUrl: builder.mutation<
       CreateKbUploadUrlResponse,
@@ -141,18 +122,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
         url: ApiEndpoints.CHATBOTS.PRIVATE_DOCUMENTS(id),
         method: HttpMethod.POST,
         body,
-      }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
-    }),
-
-    /** Archives a private document; takes a shared one off this chatbot only. Returns its list. */
-    removeChatbotDocument: builder.mutation<
-      ChatbotDocumentRow[],
-      { id: string; documentId: string }
-    >({
-      query: ({ id, documentId }) => ({
-        url: ApiEndpoints.CHATBOTS.DOCUMENT_BY_ID(id, documentId),
-        method: HttpMethod.DELETE,
       }),
       invalidatesTags: (_r, _e, { id }) => botTags(id),
     }),
@@ -179,23 +148,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
         ...botTags(id),
         { type: TAG_TYPES.CHATBOT_DETAIL, id: documentTag(id, documentId) },
       ],
-    }),
-
-    getChatbotMembers: builder.query<ChatbotMember[], string>({
-      query: id => ({ url: ApiEndpoints.CHATBOTS.MEMBERS(id), method: HttpMethod.GET }),
-      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
-    }),
-
-    setChatbotMembers: builder.mutation<
-      ChatbotMember[],
-      { id: string; members: { userId: number; role: ChatbotMemberRole }[] }
-    >({
-      query: ({ id, members }) => ({
-        url: ApiEndpoints.CHATBOTS.MEMBERS(id),
-        method: HttpMethod.PUT,
-        body: { members },
-      }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
     }),
 
     // ── assistant home (chunk 20d) ───────────────────────────────────────
@@ -357,37 +309,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }],
     }),
 
-    updateBotPage: builder.mutation<BotPageView, UpdateBotPageRequest>({
-      query: ({ id, ...body }) => ({
-        url: ApiEndpoints.CHATBOTS.PAGE(id),
-        method: HttpMethod.PUT,
-        body,
-      }),
-      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }],
-    }),
-
-    checkBotPageSlug: builder.query<
-      { slug: string; available: boolean; reason?: string },
-      { id: string; slug: string }
-    >({
-      query: ({ id, slug }) => ({
-        url: ApiEndpoints.CHATBOTS.PAGE_SLUG_AVAILABLE(id),
-        method: HttpMethod.GET,
-        params: { slug },
-      }),
-    }),
-
-    createBotPageLogoUrl: builder.mutation<
-      { presignedUrl: string; imageUrl: string },
-      { id: string; fileName: string; fileSize: number; contentType: string }
-    >({
-      query: ({ id, ...body }) => ({
-        url: ApiEndpoints.CHATBOTS.PAGE_LOGO_URL(id),
-        method: HttpMethod.POST,
-        body,
-      }),
-    }),
-
     // ── bot page look and images (chunk 20d) ─────────────────────────────
 
     updateBotPageBrand: builder.mutation<
@@ -441,63 +362,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
     }),
 
-    getBotPageAccess: builder.query<{ entries: BotPageAccessEntry[] }, string>({
-      query: id => ({ url: ApiEndpoints.CHATBOTS.PAGE_ACCESS(id), method: HttpMethod.GET }),
-      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page-access` }],
-    }),
-
-    addBotPageAccess: builder.mutation<
-      { added: number; skipped: number },
-      { id: string; entries: { kind: BotPageAccessKind; value: string; label?: string }[] }
-    >({
-      query: ({ id, entries }) => ({
-        url: ApiEndpoints.CHATBOTS.PAGE_ACCESS(id),
-        method: HttpMethod.POST,
-        body: { entries },
-      }),
-      invalidatesTags: (_r, _e, { id }) => [
-        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page-access` },
-      ],
-    }),
-
-    removeBotPageAccess: builder.mutation<void, { id: string; entryId: string }>({
-      query: ({ id, entryId }) => ({
-        url: ApiEndpoints.CHATBOTS.PAGE_ACCESS_ENTRY(id, entryId),
-        method: HttpMethod.DELETE,
-      }),
-      invalidatesTags: (_r, _e, { id }) => [
-        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page-access` },
-      ],
-    }),
-
-    getChatbotAudience: builder.query<ChatbotAudienceEntry[], string>({
-      query: id => ({ url: ApiEndpoints.CHATBOTS.AUDIENCE(id), method: HttpMethod.GET }),
-      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
-    }),
-
-    addChatbotAudience: builder.mutation<
-      { added: number; skipped: number },
-      {
-        id: string;
-        entries: { kind: ChatbotAudienceKind; value: string; label?: string }[];
-      }
-    >({
-      query: ({ id, entries }) => ({
-        url: ApiEndpoints.CHATBOTS.AUDIENCE(id),
-        method: HttpMethod.POST,
-        body: { entries },
-      }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
-    }),
-
-    removeChatbotAudience: builder.mutation<void, { id: string; entryId: string }>({
-      query: ({ id, entryId }) => ({
-        url: ApiEndpoints.CHATBOTS.AUDIENCE_ENTRY(id, entryId),
-        method: HttpMethod.DELETE,
-      }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
-    }),
-
     testChatbot: builder.mutation<TestChatbotResponse, TestChatbotRequest>({
       query: ({ id, ...body }) => ({
         url: ApiEndpoints.CHATBOTS.TEST(id),
@@ -541,30 +405,17 @@ export const {
   useGetChatbotSettingsQuery,
   useUpdateChatbotSettingsMutation,
   useGetChatbotDocumentsQuery,
-  useSetChatbotDocumentsMutation,
   useCreateChatbotDocumentUploadUrlMutation,
   useCreatePrivateChatbotDocumentMutation,
-  useRemoveChatbotDocumentMutation,
   useGetChatbotDocumentQuery,
   useUpdateChatbotDocumentMutation,
-  useGetChatbotMembersQuery,
-  useSetChatbotMembersMutation,
-  useGetChatbotAudienceQuery,
-  useAddChatbotAudienceMutation,
-  useRemoveChatbotAudienceMutation,
   useTestChatbotMutation,
   useBindConnectorMutation,
   useGetBotPageQuery,
-  useUpdateBotPageMutation,
-  useLazyCheckBotPageSlugQuery,
-  useCreateBotPageLogoUrlMutation,
   useUpdateBotPageBrandMutation,
   useGetBotImagesQuery,
   useGetChatbotTeamNamesQuery,
   useUploadBotImageMutation,
   useRemoveBotImageMutation,
   useRestoreBotImageMutation,
-  useGetBotPageAccessQuery,
-  useAddBotPageAccessMutation,
-  useRemoveBotPageAccessMutation,
 } = chatbotsApi;

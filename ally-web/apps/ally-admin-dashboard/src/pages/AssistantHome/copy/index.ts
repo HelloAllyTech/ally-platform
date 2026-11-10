@@ -287,7 +287,8 @@ export const HOME = {
   admin: {
     engine: "Engine",
     engineHint: "How this assistant answers. Only platform admins see this.",
-    classic: "Classic view",
+    settings: "Settings",
+    settingsHint: "This assistant's own engine settings. Only platform admins see this.",
   },
   lists: LISTS,
   /** Each section's `?` (chunk 20d-2, deck §25). */
@@ -312,8 +313,8 @@ export const HOME = {
   /** The header's `···` menu (chunk 20d-2). */
   more: {
     more: "More",
-    classic: "Classic view",
     engine: "How it answers",
+    settings: "Settings",
   },
   checkupControls: CHECKUP_CONTROLS,
   changeControls: CHANGE_CONTROLS,

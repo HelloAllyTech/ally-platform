@@ -74,24 +74,6 @@ export interface BotPageView {
   dailyCapReached: boolean;
 }
 
-export interface UpdateBotPageRequest {
-  id: string;
-  status: BotPageStatus;
-  slug: string;
-  access: BotPageAccess;
-  settings: BotPageSettings;
-}
-
-export type BotPageAccessKind = "email" | "organisation";
-
-export interface BotPageAccessEntry {
-  id: string;
-  kind: BotPageAccessKind;
-  value: string;
-  label: string | null;
-  organisationName?: string | null;
-}
-
 /** A bot page conversation's pre-chat answers, as stored on it. */
 export interface BotPageIntake {
   completedAt: string;

@@ -11,7 +11,7 @@ export interface MenuItem {
 }
 
 /**
- * The header's `···` menu (chunk 20d-2): Ally staff's tools (How it answers, Classic view), and on
+ * The header's `···` menu (chunk 20d-2): Ally staff's tools (How it answers, Settings), and on
  * a phone, Open page. A real menu button: Enter or Space opens it, arrows move, Esc closes and
  * focus goes back to the button.
  */

@@ -8,8 +8,7 @@ import type { SectionProps } from "./props";
 
 /**
  * This assistant's inbox (chunk 11a): its chats from every channel, live, to take over and reply.
- * The same inbox as AI Chatbots → Inbox, held to this assistant. The old list and drawer stay on
- * the classic view (`?view=classic`).
+ * The same inbox as AI Chatbots → Inbox, held to this assistant.
  */
 export const ConversationsSection: React.FC<SectionProps> = ({ bot }) => (
   <>

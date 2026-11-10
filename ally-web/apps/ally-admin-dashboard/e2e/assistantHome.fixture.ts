@@ -552,6 +552,20 @@ export async function mockAssistantHome(
         rawText: "We're closed on public holidays.",
       });
     }
+    // The staff Settings panel (CL1): the classic Settings tab, moved into the ··· menu.
+    if (path === `${base}/settings`) {
+      const defaults = {
+        enabled: true,
+        crisisClassifierEnabled: true,
+        consentRequired: true,
+        helplineNumbers: "",
+        rateLimit: { perMinute: 6, perHour: 30, perDay: 100 },
+        retrieval: { minSimilarity: 0.35, declineSimilarity: 0.42 },
+        maxCitations: 3,
+        conversationIdleMinutes: 1440,
+      };
+      return json(route, { chatbotId: BOT_ID, defaults, overrides: {}, effective: defaults });
+    }
     if (path === `${base}/members`) {
       return json(route, [
         {

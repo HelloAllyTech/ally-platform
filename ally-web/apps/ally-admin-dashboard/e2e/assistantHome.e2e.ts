@@ -93,19 +93,21 @@ test("a viewer sees everything and can change nothing", async ({ page }) => {
   await expect(page.getByText("Changes save as you go")).toHaveCount(0);
 });
 
-// Chunk 20d-2: How it answers and Classic view are in the ··· menu, for Ally staff only.
-test("only platform admins see How it answers and Classic view", async ({ page }) => {
+// Chunk 20d-2: How it answers is in the ··· menu, for Ally staff only. CL1 removed Classic view and
+// put this assistant's own Settings beside it.
+test("only platform admins see How it answers and Settings", async ({ page }) => {
   await mockAssistantHome(page);
   await open(page, "overview");
   await expect(page.getByRole("button", { name: "More" })).toHaveCount(
     (page.viewportSize()?.width ?? 1440) < 960 ? 1 : 0,
   );
-  await expect(page.getByRole("link", { name: "Classic view" })).toHaveCount(0);
   await mockAssistantHome(page, { admin: true });
   await page.reload();
   await page.getByRole("button", { name: "More" }).click();
   await expect(page.getByRole("menuitem", { name: "How it answers" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Classic view" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Classic view" })).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  await expect(page.getByTestId("settings-panel")).toBeVisible();
 });
 
 test("a question just added stays until it has words, then saves", async ({ page }) => {

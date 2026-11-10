@@ -11,7 +11,7 @@ import { Chatbot, ChatbotStatus } from "@types";
 import { BotSettingsTab } from "./BotSettingsTab";
 import { AllConnectorsTab } from "./ConnectorsTab";
 import { CorpusTab } from "./CorpusTab";
-import { fill, LoadError, StatusPill } from "./shared";
+import { fill, LoadError } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
 import { Inbox } from "../Inbox";
 import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
@@ -172,16 +172,6 @@ const DefaultsTab: React.FC = () => {
     </div>
   );
 };
-
-const STATUS_TONE: Record<ChatbotStatus, "success" | "warning" | "neutral"> = {
-  [ChatbotStatus.LIVE]: "success",
-  [ChatbotStatus.DRAFT]: "neutral",
-  [ChatbotStatus.PAUSED]: "warning",
-};
-
-export const ChatbotStatusPill: React.FC<{ status: ChatbotStatus }> = ({ status }) => (
-  <StatusPill tone={STATUS_TONE[status]}>{t.status[status]}</StatusPill>
-);
 
 const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () => void }> = ({
   bots,

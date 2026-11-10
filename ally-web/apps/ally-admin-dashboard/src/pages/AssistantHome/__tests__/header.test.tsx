@@ -15,7 +15,7 @@ describe("the ··· menu", () => {
         label="More"
         items={[
           { label: "How it answers", onSelect: engine },
-          { label: "Classic view", href: "/chatbots/b1?view=classic" },
+          { label: "Open page", href: "https://chat.example/b/sunrise" },
         ]}
       />,
     );
@@ -24,7 +24,7 @@ describe("the ··· menu", () => {
     fireEvent.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
     const items = screen.getAllByRole("menuitem");
-    expect(items.map(i => i.textContent)).toEqual(["How it answers", "Classic view"]);
+    expect(items.map(i => i.textContent)).toEqual(["How it answers", "Open page"]);
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();

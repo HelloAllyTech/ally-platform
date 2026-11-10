@@ -16,6 +16,7 @@ import { ChangePanel } from "./ChangePanel";
 import { HOME } from "./copy";
 import { EnginePanel } from "./EnginePanel";
 import { SECTION_IDS, SectionId, sectionFromUrl } from "./sections";
+import { SettingsPanel } from "./SettingsPanel";
 import { COPY } from "../Onboarding/copy";
 import { ChatbotContext } from "../WhatsAppBot/chatbotContext";
 import { LoadError } from "../WhatsAppBot/shared";
@@ -48,7 +49,7 @@ const STATUS_LABEL: Record<ChatbotStatus, string> = {
   [ChatbotStatus.DRAFT]: HOME.status.draft,
 };
 
-type Panel = "try" | "engine" | "change" | null;
+type Panel = "try" | "engine" | "settings" | "change" | null;
 
 /**
  * Wide enough for the panel to sit beside the section (chunk 20d-2). Below it, Change and Try it
@@ -76,7 +77,7 @@ const useMedia = (query: string): boolean => {
  * in the v2 design. A section list on the left (a row of chips on phones), the section in the
  * middle, and a panel on the right for Try it (20a-2 docks "Change your assistant" there). Every
  * field saves on its own with the version it started from; there are no Save buttons and no
- * unsaved-changes prompt. `?view=classic` keeps the old tabs for now (RouteLayout).
+ * unsaved-changes prompt.
  */
 export const AssistantHome: React.FC = () => {
   const { botId = "" } = useParams();
@@ -175,7 +176,9 @@ export const AssistantHome: React.FC = () => {
       ? HOME.tryPanel.title
       : panel === "change"
         ? COPY.change.title
-        : HOME.more.engine;
+        : panel === "settings"
+          ? HOME.more.settings
+          : HOME.more.engine;
 
   const panelContent =
     panel === "change" ? (
@@ -197,6 +200,8 @@ export const AssistantHome: React.FC = () => {
       <TryIt bot={bot} page={page ?? null} onClose={() => setPanel(null)} />
     ) : panel === "engine" ? (
       <EnginePanel bot={bot} onClose={() => setPanel(null)} onTry={() => setPanel("try")} />
+    ) : panel === "settings" ? (
+      <SettingsPanel bot={bot} onClose={() => setPanel(null)} />
     ) : null;
 
   const render = (id: SectionId) => {
@@ -296,14 +301,11 @@ export const AssistantHome: React.FC = () => {
                             },
                           ]
                         : []),
-                      // Ally staff only: how it answers, and the old tabs until CL1.
+                      // Ally staff only: how it answers, and this assistant's own settings.
                       ...(isPlatformAdmin
                         ? [
                             { label: HOME.more.engine, onSelect: () => setPanel("engine") },
-                            {
-                              label: HOME.more.classic,
-                              href: `${ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id)}?view=classic`,
-                            },
+                            { label: HOME.more.settings, onSelect: () => setPanel("settings") },
                           ]
                         : []),
                     ]}
