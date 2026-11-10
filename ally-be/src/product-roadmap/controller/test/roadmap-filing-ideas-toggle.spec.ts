@@ -5,7 +5,7 @@ import { RoadmapIdeaDraftController } from '../roadmap-idea-draft.controller';
 
 /**
  * Every door that files, or leads to filing, needs the Product Planning — Ideas
- * toggle (plans/roadmap-owns-planning rev 5.1 §B.12), checked BEFORE any work.
+ * toggle (plans/roadmap-owns-planning rev 5.2 §B.12), checked BEFORE any work.
  * The route decorators stay as they were (Product Roadmap tab + VOTE); this is
  * the second gate, in the handler, so the old copilot door, Quick Add and the
  * new plan flow can never disagree about who may file.

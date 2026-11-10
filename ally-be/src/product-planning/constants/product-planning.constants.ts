@@ -4,9 +4,9 @@
  * these are what a fresh settings row starts with.
  */
 export const PLANNING_DEFAULTS = {
-  /** Ceiling for one plan from first message to PRD ready, drafts included. */
-  PLAN_CEILING_USD: 5,
-  /** The share of that ceiling the private Idea stage may use (soft wrap-up). */
+  /** One ceiling per plan, first message to outcome review, builds included. */
+  PLAN_CEILING_USD: 100,
+  /** Where the private Idea stage wraps up (soft, never a hard stop). */
   IDEA_CEILING_USD: 1,
   /** Warn at this fraction of a ceiling. */
   WARN_AT_FRACTION: 0.8,

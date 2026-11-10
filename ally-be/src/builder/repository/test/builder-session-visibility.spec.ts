@@ -94,7 +94,7 @@ describe('BuilderSessionVisibilityInterceptor', () => {
 });
 
 /**
- * The bypass guard (plans/roadmap-owns-planning rev 5.1 §B.10).
+ * The bypass guard (plans/roadmap-owns-planning rev 5.2 §B.10).
  *
  * A PRIVATE session is an unfiled idea: its author's alone. Every file that can
  * read builder_sessions is listed here with WHY it cannot leak one. A new file

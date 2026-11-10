@@ -184,7 +184,7 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   @Column({ type: 'boolean', default: true })
   situationBrief!: boolean;
 
-  // ── Product planning (plans/roadmap-owns-planning rev 5.1) ────────────────
+  // ── Product planning (plans/roadmap-owns-planning rev 5.2) ────────────────
 
   /**
    * Master switch for the roadmap's plan flow. Off by default so unfinished
@@ -194,28 +194,24 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   @Column({ type: 'boolean', default: false })
   planningEnabled!: boolean;
 
-  /** USD ceiling for one plan from first message to PRD ready, drafts included. */
-  @Column({ type: 'numeric', precision: 10, scale: 4, default: 5 })
+  /**
+   * One USD ceiling per plan, covering everything from the first message to the
+   * outcome review: private drafts, the PRD, design and build runs, launch and
+   * reviews. Warns at 80%, then stops until the lead raises it.
+   */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 100 })
   planCeilingUsd!: string;
 
-  /** The part of planCeilingUsd the private Idea stage may use (soft wrap-up). */
+  /**
+   * Where the private Idea stage wraps up: at 80% of this the copilot helps the
+   * author file or park instead of exploring further. Never a hard stop.
+   */
   @Column({ type: 'numeric', precision: 10, scale: 4, default: 1 })
   planIdeaCeilingUsd!: string;
 
   /** Closing a plan whose idea has more votes than this needs a second Lead. */
   @Column({ type: 'int', default: 10 })
   planCloseConfirmVotes!: number;
-
-  /**
-   * Named people, not a toggle: who may sign off a high-severity clinical
-   * safety finding. User ids; edited only by Admin User Management holders.
-   */
-  @Column({ type: 'jsonb', default: () => "'[]'" })
-  planClinicalReviewerIds!: number[];
-
-  /** Named people who may sign off a PHI-touching privacy finding. */
-  @Column({ type: 'jsonb', default: () => "'[]'" })
-  planPrivacyReviewerIds!: number[];
 
   @Column({ type: 'int', nullable: true })
   updatedBy?: number | null;

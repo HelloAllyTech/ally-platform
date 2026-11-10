@@ -1,5 +1,5 @@
 /**
- * Where a plan is in its life (plans/roadmap-owns-planning rev 5.1 §B.4).
+ * Where a plan is in its life (plans/roadmap-owns-planning rev 5.2 §B.4).
  *
  * DERIVED by code from facts, never declared by a model: the stage is what the
  * plan's session, readiness, design, runs and reviews add up to. Only the
@@ -38,8 +38,6 @@ export enum PlanEventKind {
   CHECK_REQUIRED = 'check_required',
   CHECK_RESOLVED = 'check_resolved',
   FINDING_DISMISSED = 'finding_dismissed',
-  SIGNOFF_REQUESTED = 'signoff_requested',
-  SIGNOFF_GIVEN = 'signoff_given',
   MEASURE_FROZEN = 'measure_frozen',
   MEASURE_CHANGED = 'measure_changed',
   DESIGN_STARTED = 'design_started',
@@ -50,10 +48,4 @@ export enum PlanEventKind {
   OUTCOME_REVIEWED = 'outcome_reviewed',
   CLOSED = 'closed',
   REOPENED = 'reopened',
-}
-
-/** The two sign-offs a named person, not a toggle, gives (rev 5.1 §B.12). */
-export enum PlanSignOffKind {
-  CLINICAL = 'clinical',
-  PRIVACY = 'privacy',
 }

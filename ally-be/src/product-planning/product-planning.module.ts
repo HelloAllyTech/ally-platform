@@ -8,7 +8,7 @@ import { PlanEventService } from './service/plan-event.service';
 import { PlanSpendService } from './service/plan-spend.service';
 
 /**
- * The roadmap's idea-to-outcome plan (plans/roadmap-owns-planning rev 5.1).
+ * The roadmap's idea-to-outcome plan (plans/roadmap-owns-planning rev 5.2).
  *
  * P0 foundations only: who may do what (PlanAccessService), the append-only
  * event log and the spend ledger. Everything is inert until a later phase calls

@@ -2,7 +2,6 @@ import { ForbiddenException } from '@nestjs/common';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PLATFORM_WIDE_ONLY_MESSAGE } from 'src/authorization/service/tenant-scope.service';
 import { BuilderSessionVisibility } from 'src/builder/enum/builder.enum';
-import { PlanSignOffKind } from '../../enum/product-planning.enum';
 import { PlanAccessService } from '../plan-access.service';
 
 describe('PlanAccessService', () => {
@@ -12,7 +11,7 @@ describe('PlanAccessService', () => {
 
   const build = (
     toggles: Record<number, FeatureToggleKey[]>,
-    options: { withheld?: number[]; settings?: object | null } = {},
+    options: { withheld?: number[] } = {},
   ) => {
     const featureToggleService = {
       hasToggle: jest.fn(async (userId: number, key: FeatureToggleKey) =>
@@ -25,17 +24,7 @@ describe('PlanAccessService', () => {
         (options.withheld ?? []).includes(userId),
       ),
     };
-    const settingsRepository = {
-      findOne: jest.fn(async () =>
-        options.settings === undefined
-          ? { planClinicalReviewerIds: [OTHER], planPrivacyReviewerIds: [] }
-          : options.settings,
-      ),
-    };
-    return new PlanAccessService(
-      featureToggleService as never,
-      settingsRepository as never,
-    );
+    return new PlanAccessService(featureToggleService as never);
   };
 
   const IDEAS = FeatureToggleKey.PRODUCT_PLANNING_IDEAS;
@@ -165,30 +154,6 @@ describe('PlanAccessService', () => {
       };
       expect(
         await build({ [AUTHOR]: [IDEAS, LEAD_KEY] }).canEdit(plan, AUTHOR),
-      ).toBe(false);
-    });
-  });
-
-  describe('isNamedReviewer', () => {
-    it('reads the named lists, not any toggle', async () => {
-      const access = build({ [LEAD]: [LEAD_KEY] });
-      expect(
-        await access.isNamedReviewer(OTHER, PlanSignOffKind.CLINICAL),
-      ).toBe(true);
-      expect(await access.isNamedReviewer(LEAD, PlanSignOffKind.CLINICAL)).toBe(
-        false,
-      );
-      expect(await access.isNamedReviewer(OTHER, PlanSignOffKind.PRIVACY)).toBe(
-        false,
-      );
-    });
-
-    it('answers false with no settings row', async () => {
-      expect(
-        await build({}, { settings: null }).isNamedReviewer(
-          OTHER,
-          PlanSignOffKind.CLINICAL,
-        ),
       ).toBe(false);
     });
   });

@@ -515,17 +515,17 @@ export class UpdateBuilderSettingsDto {
 
   @ApiPropertyOptional({
     description:
-      'USD ceiling for one plan from first message to PRD ready, private drafts included. Warns at 80%, then stops until the lead raises it.',
+      'One USD ceiling per plan, from the first message to the outcome review, design and build runs included. Warns at 80%, then stops until the lead raises it.',
   })
   @IsOptional()
   @IsNumber()
-  @Min(0.5)
-  @Max(100)
+  @Min(1)
+  @Max(1000)
   planCeilingUsd?: number;
 
   @ApiPropertyOptional({
     description:
-      'The part of the plan ceiling the private Idea stage may use. At 80% the copilot wraps up instead of stopping the author.',
+      'Where the private Idea stage wraps up: at 80% of this the copilot helps the author file or park instead of stopping them.',
   })
   @IsOptional()
   @IsNumber()

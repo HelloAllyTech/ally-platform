@@ -1,13 +1,9 @@
 import { ForbiddenException, HttpStatus, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { FeatureToggleService } from 'src/authorization/service/feature-toggle.service';
 import { PLATFORM_WIDE_ONLY_MESSAGE } from 'src/authorization/service/tenant-scope.service';
 import { ErrorCode } from 'src/exception/error-code.enum';
-import { BuilderSettings } from 'src/builder/entity/builder-settings.entity';
 import { BuilderSessionVisibility } from 'src/builder/enum/builder.enum';
-import { PlanSignOffKind } from '../enum/product-planning.enum';
 
 /** The facts about a plan session that every access rule reads. */
 export interface PlanAccessFacts {
@@ -24,12 +20,12 @@ const LEAD_REQUIRED_MESSAGE =
   'Ask whoever manages admin access to grant it.';
 
 /**
- * Who may do what in the plan flow (plans/roadmap-owns-planning rev 5.1 §B.12).
+ * Who may do what in the plan flow (plans/roadmap-owns-planning rev 5.2 §B.12).
  *
  * Two admin toggles decide it — Ideas (author: park, work up, file) and Lead
- * (everything after filing) — plus two rules no toggle expresses: an author
- * always reads their own plan, and a high-severity sign-off belongs to a
- * NAMED person (builder_settings.plan*ReviewerIds), never to a Lead.
+ * (everything after filing) — plus one rule no toggle expresses: an author
+ * always reads their own plan. There is no human sign-off role: the lead
+ * resolves every review finding, with a recorded reason.
  *
  * Enforced INSIDE services and handlers, not only on routes: plan routes call
  * services written for Builder, which assume EDIT_BUILDER, so a route-level
@@ -41,11 +37,7 @@ const LEAD_REQUIRED_MESSAGE =
  */
 @Injectable()
 export class PlanAccessService {
-  constructor(
-    private readonly featureToggleService: FeatureToggleService,
-    @InjectRepository(BuilderSettings)
-    private readonly settingsRepository: Repository<BuilderSettings>,
-  ) {}
+  constructor(private readonly featureToggleService: FeatureToggleService) {}
 
   /**
    * Ideas is default-on and deliberately NOT platformOnly (see its definition),
@@ -107,23 +99,6 @@ export class PlanAccessService {
     }
     if (!plan.leadUserId || plan.leadUserId !== userId) return false;
     return this.canLead(userId);
-  }
-
-  /** Whether this person is named for this sign-off in Builder settings. */
-  async isNamedReviewer(
-    userId: number,
-    kind: PlanSignOffKind,
-  ): Promise<boolean> {
-    const settings = await this.settingsRepository.findOne({
-      where: {},
-      order: { createdAt: 'ASC' },
-    });
-    if (!settings) return false;
-    const ids =
-      kind === PlanSignOffKind.CLINICAL
-        ? settings.planClinicalReviewerIds
-        : settings.planPrivacyReviewerIds;
-    return Array.isArray(ids) && ids.map(Number).includes(userId);
   }
 
   private async assertToggle(

@@ -9,7 +9,7 @@ import { PlanEventKind } from '../enum/product-planning.enum';
 
 /**
  * One thing that happened to a plan: taken on, handed back, filed, a budget
- * raised, a sign-off given (PlanEventKind).
+ * raised, a finding dismissed (PlanEventKind).
  *
  * APPEND-ONLY. No update path exists and none should be added: the timeline
  * and "who decided what" are only trustworthy if rows never change. Hence no

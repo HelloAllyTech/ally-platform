@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Product planning P0 (plans/roadmap-owns-planning rev 5.1): the schema the
+ * Product planning P0 (plans/roadmap-owns-planning rev 5.2): the schema the
  * idea-to-outcome plan builds on. Nothing reads or writes it yet beyond the
  * services that define it, and `builder_settings.planningEnabled` starts off.
  *
@@ -10,9 +10,10 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   BUILD session, SHARED, with no lead — exactly what it was before.
  * - `plan_events`: the append-only "who did what" log beside the transcript.
  * - `plan_spend_entries`: the priced, awaited spend ledger behind the meter.
- * - `builder_settings.plan*`: the master switch, the $5 plan ceiling with its
- *   $1 Idea-stage share, the second-Lead vote threshold, and the named clinical
- *   and privacy reviewers.
+ * - `builder_settings.plan*`: the master switch, one $100 ceiling per plan
+ *   (everything from the first message to the outcome review, design and build
+ *   runs included) with its $1 Idea-stage wrap-up point, and the second-Lead
+ *   vote threshold.
  *
  * CHECK lists mirror BuilderSessionKind, BuilderSessionVisibility, PlanStage
  * and PlanEventKind (check-constraints-cover-enums.spec.ts).
@@ -69,8 +70,7 @@ export class AddProductPlanningFoundations1981001400000 implements MigrationInte
           'parked', 'filed', 'taken_on', 'handed_back', 'auto_released',
           'stage_changed', 'archived', 'restored', 'visibility_changed',
           'author_asked', 'budget_changed', 'check_required', 'check_resolved',
-          'finding_dismissed', 'signoff_requested', 'signoff_given',
-          'measure_frozen', 'measure_changed', 'design_started',
+          'finding_dismissed', 'measure_frozen', 'measure_changed', 'design_started',
           'design_approved', 'build_sent', 'exported', 'launched',
           'outcome_reviewed', 'closed', 'reopened'
         ))
@@ -115,19 +115,15 @@ export class AddProductPlanningFoundations1981001400000 implements MigrationInte
     await queryRunner.query(`
       ALTER TABLE "builder_settings"
         ADD COLUMN IF NOT EXISTS "planningEnabled" boolean NOT NULL DEFAULT false,
-        ADD COLUMN IF NOT EXISTS "planCeilingUsd" numeric(10,4) NOT NULL DEFAULT 5,
+        ADD COLUMN IF NOT EXISTS "planCeilingUsd" numeric(10,4) NOT NULL DEFAULT 100,
         ADD COLUMN IF NOT EXISTS "planIdeaCeilingUsd" numeric(10,4) NOT NULL DEFAULT 1,
-        ADD COLUMN IF NOT EXISTS "planCloseConfirmVotes" integer NOT NULL DEFAULT 10,
-        ADD COLUMN IF NOT EXISTS "planClinicalReviewerIds" jsonb NOT NULL DEFAULT '[]',
-        ADD COLUMN IF NOT EXISTS "planPrivacyReviewerIds" jsonb NOT NULL DEFAULT '[]'
+        ADD COLUMN IF NOT EXISTS "planCloseConfirmVotes" integer NOT NULL DEFAULT 10
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "builder_settings"
-        DROP COLUMN IF EXISTS "planPrivacyReviewerIds",
-        DROP COLUMN IF EXISTS "planClinicalReviewerIds",
         DROP COLUMN IF EXISTS "planCloseConfirmVotes",
         DROP COLUMN IF EXISTS "planIdeaCeilingUsd",
         DROP COLUMN IF EXISTS "planCeilingUsd",

@@ -120,7 +120,7 @@ export enum FeatureToggleKey {
   // per-admin from Admin User Management.
   PRODUCT_ROADMAP_QUICK_ADD = 'product_roadmap_quick_add',
 
-  // Product Planning (plans/roadmap-owns-planning rev 5.1 §B.12): the two roles
+  // Product Planning (plans/roadmap-owns-planning rev 5.2 §B.12): the two roles
   // of the idea-to-outcome plan. IDEAS is the author's door (park, work up and
   // file an idea, through the plan or today's copilot interview and quick add);
   // LEAD takes a filed idea through PRD, design, build, launch and outcome.
@@ -483,7 +483,7 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     // off per admin to remove their filing door.
     legacyGrants: ALL_ADMIN_TIERS,
     defaultEnabled: true,
-    // Org-restricted admins sit outside planning (rev 5.1), but NOT via
+    // Org-restricted admins sit outside planning (rev 5.2), but NOT via
     // `platformOnly`: every platform admin holds this key by default, so
     // platformOnly would make getEnabledKeys run its restriction lookup (an
     // uncached count) on every toggle check for every admin. The restriction
@@ -495,8 +495,8 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     label: 'Product Planning — Lead',
     description:
       "Take on filed ideas and lead them through PRD, design, build, launch and outcome review. Can approve paid design and build runs within a plan's budget.",
-    // Inert: granted per admin from Admin User Management. The first grants are
-    // the pilot cohort, so this toggle is the pilot allow-list.
+    // Inert: granted per admin from Admin User Management. Nobody holds it
+    // until the plan flow launches (one launch, no pilot cohort).
     legacyGrants: SDA_ONLY,
     platformOnly: true,
   },

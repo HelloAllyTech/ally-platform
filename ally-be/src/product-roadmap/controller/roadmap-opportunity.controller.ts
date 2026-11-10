@@ -285,7 +285,7 @@ export class RoadmapOpportunityController {
     @CurrentUser() user: TokenUser,
     @Body() dto: CreateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
-    // Filing is the Product Planning — Ideas toggle's (rev 5.1 §B.12): on by
+    // Filing is the Product Planning — Ideas toggle's (rev 5.2 §B.12): on by
     // default for platform admins, withheld from org-restricted ones.
     await this.planAccess.assertIdeas(user.id);
     return this.opportunityService.create(user.id, dto, {

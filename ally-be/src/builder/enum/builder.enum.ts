@@ -66,7 +66,7 @@ export const BUILDER_PRD_FROZEN_STATUSES: BuilderSessionStatus[] = [
 /**
  * What a session is for. BUILD is every session Builder has ever had: a PRD
  * interview that becomes build runs. PLAN is the roadmap's idea-to-outcome plan
- * (plans/roadmap-owns-planning rev 5.1), which reuses these tables from its
+ * (plans/roadmap-owns-planning rev 5.2), which reuses these tables from its
  * first message and can later be sent to build on the same session.
  */
 export enum BuilderSessionKind {

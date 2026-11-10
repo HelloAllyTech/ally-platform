@@ -9,7 +9,7 @@ import { PlanStage } from '../enum/product-planning.enum';
 
 /**
  * One priced model call (or one runner step) made for a plan: the ledger behind
- * the spend meter (plans/roadmap-owns-planning rev 5.1 §B.11).
+ * the spend meter (plans/roadmap-owns-planning rev 5.2 §B.11).
  *
  * WHY ITS OWN LEDGER. `builder_sessions.totalCostUsd` is runner spend only, and
  * `llm_usage` is written fire-and-forget with no cost column — a plan's

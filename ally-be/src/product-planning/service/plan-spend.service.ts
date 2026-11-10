@@ -61,8 +61,8 @@ export interface PlanCeilingCheck {
   /**
    * ok → under 80%. warn → 80% or more of the plan ceiling. stop → the plan
    * ceiling is reached; the turn must not start until the lead raises it.
-   * wrap_up → the private Idea stage reached 80% of its own share: the copilot
-   * helps the author file or park instead of stopping them (rev 5.1 §B.11).
+   * wrap_up → the private Idea stage reached 80% of its wrap-up point: the
+   * copilot helps the author file or park instead of stopping them (rev 5.2).
    */
   state: PlanCeilingState;
   approximate: boolean;
@@ -73,7 +73,7 @@ const round = (value: number): number =>
 
 /**
  * The plan's spend ledger: every model call made for a plan, priced when it is
- * written, so the meter is correct at any moment (rev 5.1 §B.11).
+ * written, so the meter is correct at any moment (rev 5.2 §B.11).
  *
  * Writes are AWAITED. The fire-and-forget pattern used for `llm_usage` is what
  * left interview spend invisible; a meter that can lag is a meter nobody can

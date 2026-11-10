@@ -129,6 +129,30 @@ describe('PlanSpendService', () => {
     });
   });
 
+  describe('checkCeiling', () => {
+    const service = (rows: object[], settings: object | null) =>
+      new PlanSpendService(
+        { find: jest.fn(async () => rows) } as never,
+        { findOne: jest.fn(async () => settings) } as never,
+      );
+
+    it('defaults to one $100 ceiling per plan, builds included', async () => {
+      const check = await service(
+        [{ stage: PlanStage.BUILDING, costUsd: '79', priced: true }],
+        null,
+      ).checkCeiling('s1', PlanStage.BUILDING);
+      expect(check).toMatchObject({ ceilingUsd: 100, state: 'ok' });
+    });
+
+    it('reads a retuned ceiling from Builder settings', async () => {
+      const check = await service(
+        [{ stage: PlanStage.PRD, costUsd: '40', priced: true }],
+        { planCeilingUsd: '50.0000', planIdeaCeilingUsd: '1.0000' },
+      ).checkCeiling('s1', PlanStage.PRD);
+      expect(check).toMatchObject({ ceilingUsd: 50, state: 'warn' });
+    });
+  });
+
   describe('ceilingState', () => {
     const at = (totalUsd: number, stage: PlanStage) =>
       PlanSpendService.ceilingState(
