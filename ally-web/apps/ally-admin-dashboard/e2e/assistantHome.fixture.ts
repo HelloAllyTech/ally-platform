@@ -114,6 +114,8 @@ export const HOME = {
       },
       version: v(20),
     },
+    // Who can message it on WhatsApp (chunk 20d-2).
+    whatsappAccess: { value: "listed", version: v(21) },
   },
   safety: {
     pack: PACK,
@@ -281,6 +283,56 @@ export async function mockAssistantHome(
   home.canEdit = options.role !== "viewer";
   const bot = { ...CHATBOT, myRole: options.role ?? "owner" };
   const saves: { field: string; value: unknown; version: string }[] = [];
+  const lists: Record<string, { items: Record<string, unknown>[]; version: string }> = {
+    pageAccess: {
+      items: [
+        { id: "pa-1", kind: "email", value: "asha@example.com", label: "Asha" },
+        { id: "pa-2", kind: "email", value: "ravi@example.com", label: null },
+      ],
+      version: v(1001),
+    },
+    audience: {
+      items: [{ id: "au-1", kind: "phone", value: "+919820012345", label: "Front desk" }],
+      version: v(1002),
+    },
+    team: {
+      items: [
+        { id: "7", userId: 7, name: "Shehbaz", email: "s***@example.com", role: "owner" },
+        { id: "8", userId: 8, name: "Meera", email: "m***@example.com", role: "editor" },
+      ],
+      version: v(1003),
+    },
+    documents: { items: DOCUMENTS.map(d => ({ ...d })), version: v(1004) },
+    quickReplies: {
+      items: [
+        {
+          id: "qr-crisis",
+          kind: "crisis",
+          name: "Someone may be at risk",
+          patterns: ["suicide", "kill myself"],
+          responseText: "Please call Tele-MANAS on 14416, any time.",
+          active: true,
+          required: true,
+          state: "default",
+          defaultId: null,
+          defaultResponseText: null,
+        },
+        {
+          id: "qr-parking",
+          kind: "faq",
+          name: "Parking",
+          patterns: ["parking", "park"],
+          responseText: "There is parking behind the clinic.",
+          active: true,
+          required: false,
+          state: "own",
+          defaultId: null,
+          defaultResponseText: null,
+        },
+      ],
+      version: v(1005),
+    },
+  };
 
   await page.route("**/api/v1/**", async route => {
     const request = route.request();
@@ -372,6 +424,44 @@ export async function mockAssistantHome(
           eventId: "00000000-0000-4000-8000-000000000001",
         },
       ]);
+    }
+    // Chunk 20d-2: the home's lists, each with its version.
+    const listMatch = path.match(new RegExp(`^${base}/home/lists/(\\w+)$`));
+    if (listMatch) {
+      const name = listMatch[1] as keyof typeof lists;
+      const current = lists[name];
+      if (method === "PATCH") {
+        const body = request.postDataJSON() as {
+          op: string;
+          id?: string;
+          item?: Record<string, unknown>;
+          version: string;
+        };
+        if (body.version !== current.version) {
+          return json(
+            route,
+            {
+              errorCode: "stale",
+              message: "This changed while you were editing. Here is what it says now.",
+              details: { list: name, ...current },
+            },
+            409,
+          );
+        }
+        if (body.op === "remove") current.items = current.items.filter(i => i.id !== body.id);
+        if (body.op === "add") {
+          current.items = [
+            ...current.items,
+            { id: `added-${current.items.length + 1}`, label: null, ...body.item },
+          ];
+        }
+        current.version = v(2000 + current.items.length);
+      }
+      return json(route, {
+        list: name,
+        ...current,
+        yourOrganisation: { id: "tenant-1", name: "Sunrise Mind" },
+      });
     }
     if (path === `${base}/page`) return json(route, PAGE_VIEW);
     if (path === `${base}/page/access`) return json(route, { entries: [] });

@@ -22,6 +22,7 @@ import {
   MAX_WIDGET_DOMAINS,
   normaliseDomain,
 } from '../../chatbot/bot-page/widget-host';
+import { ChatbotAccessMode } from '../../chatbot/enum/chatbot.enum';
 import {
   ChatbotSettingsOverride,
   MAX_SYSTEM_PROMPT_CHARS,
@@ -44,7 +45,13 @@ import { packFor } from '../safety-pack/safety-packs';
 export interface HomeState {
   chatbot: Pick<
     Chatbot,
-    'name' | 'description' | 'persona' | 'settings' | 'safetyPack' | 'rules'
+    | 'name'
+    | 'description'
+    | 'persona'
+    | 'settings'
+    | 'safetyPack'
+    | 'rules'
+    | 'accessMode'
   >;
   page: BotPageSettings;
   /** The page row's own columns, and whether "Anyone with the link" may be chosen. */
@@ -55,7 +62,10 @@ export interface HomeState {
 /** What a field writes: columns on the bot and keys of the page's settings. */
 export interface HomeWrite {
   chatbot?: Partial<
-    Pick<Chatbot, 'name' | 'description' | 'persona' | 'settings'>
+    Pick<
+      Chatbot,
+      'name' | 'description' | 'persona' | 'settings' | 'accessMode'
+    >
   >;
   page?: Partial<BotPageSettings>;
   pageRow?: Partial<HomeState['pageRow']>;
@@ -257,6 +267,17 @@ export const HOME_FIELDS = {
       },
     }),
   } as HomeField<string[]>,
+
+  /** Who can message on WhatsApp (chunk 20d-2; the classic People tab saved it with the bot). */
+  whatsappAccess: {
+    read: (s) => s.chatbot.accessMode,
+    parse: (value) => {
+      const mode = Object.values(ChatbotAccessMode).find((m) => m === value);
+      if (!mode) throw new HomeFieldInvalid('Choose who can use it.');
+      return mode;
+    },
+    write: (value) => ({ chatbot: { accessMode: value } }),
+  } as HomeField<ChatbotAccessMode>,
 
   /** Questions before the chat: the page only (WhatsApp doesn't ask them). */
   prechat: {

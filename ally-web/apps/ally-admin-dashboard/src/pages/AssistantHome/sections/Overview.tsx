@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 
 import { useNavigate } from "react-router-dom";
 
@@ -9,7 +9,6 @@ import { BotPageView, ChatbotStatus } from "@types";
 
 import { Qr } from "../../Onboarding/Screens";
 import { copyToClipboard } from "../../WhatsAppBot/shared";
-import { UsageTab } from "../../WhatsAppBot/UsageTab";
 import { fill, HOME } from "../copy";
 import { Group, SectionHead } from "../fields";
 import { Scorecard } from "./Scorecard";
@@ -34,7 +33,6 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
   const [archive, archiveState] = useArchiveChatbotMutation();
   const navigate = useNavigate();
   const qr = useRef<HTMLDivElement>(null);
-  const [numbersOpen, setNumbersOpen] = useState(false);
   const live = bot.status === ChatbotStatus.LIVE;
   const open = bot.stats.openUnanswered;
 
@@ -115,18 +113,10 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
             </div>
           ))}
         </dl>
-        <details
-          className="ally-home__details"
-          onToggle={event => setNumbersOpen((event.target as HTMLDetailsElement).open)}
-        >
-          <summary>{t.allNumbers}</summary>
-          {/* The charts load only when asked for (they are the heaviest thing here). */}
-          {numbersOpen && (
-            <div className="ally-home__details-body ally-home__classic">
-              <UsageTab />
-            </div>
-          )}
-        </details>
+        {/* The classic charts, for now (chunk 20d-2 keeps them; CL1 decides). */}
+        <a className="ally-link ally-small" href={`/chatbots/${bot.id}?view=classic&tab=usage`}>
+          {t.seeAllNumbers}
+        </a>
       </Group>
 
       <Group title={t.needsYou} testId="overview-needs">

@@ -24,6 +24,7 @@ import { useInboxStream } from "./useInboxStream";
 
 import "../../components/v2/v2.css";
 import "./inbox.css";
+import "../AssistantHome/ui/scale.css";
 
 const VIEWS: InboxView[] = ["needs_person", "live", "all"];
 

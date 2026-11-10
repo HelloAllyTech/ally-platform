@@ -126,5 +126,7 @@ import { Connector } from '../chatbot/entity/connector.entity';
       inject: [AppConfigService, MetaWhatsAppProvider],
     },
   ],
+  // The assistant home's quick replies (chunk 20d-2) go through the same service.
+  exports: [WhatsAppAdminService],
 })
 export class WhatsAppModule {}

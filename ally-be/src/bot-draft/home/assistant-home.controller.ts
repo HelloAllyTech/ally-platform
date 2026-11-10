@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
+  ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -21,6 +23,8 @@ import {
   IsArray,
   IsDefined,
   IsIn,
+  IsObject,
+  IsOptional,
   ValidateNested,
   IsString,
   Matches,
@@ -35,10 +39,19 @@ import { AssistantHomeService } from './assistant-home.service';
 import { ChangeService } from './change.service';
 import { SourcesService } from './sources.service';
 import { HOME_FIELDS } from './home-fields';
+import { HOME_LISTS, HomeListName, ListChange } from './home-lists';
+import { HomeListsService } from './home-lists.service';
 import type { RuleChange } from './own-rules';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
+/** Quick replies keep the permissions their own screen always needed. */
+const VIEW_REPLIES = {
+  permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_TEMPLATES],
+};
+const EDIT_REPLIES = {
+  permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
+};
 
 const VERSION = /^[0-9a-f]{16}$/;
 
@@ -77,6 +90,36 @@ export class ChangeRuleDto {
   text?: string;
 
   @ApiProperty()
+  @Matches(VERSION)
+  version!: string;
+}
+
+export class ChangeListDto {
+  @ApiProperty({ enum: ['add', 'edit', 'remove', 'reorder'] })
+  @IsIn(['add', 'edit', 'remove', 'reorder'])
+  op!: ListChange['op'];
+
+  @ApiPropertyOptional({ description: 'The entry an edit or remove is about' })
+  @ValidateIf((dto: ChangeListDto) => dto.op === 'edit' || dto.op === 'remove')
+  @IsString()
+  @MaxLength(64)
+  id?: string;
+
+  @ApiPropertyOptional({ description: "What to add, or an edit's fields" })
+  @IsOptional()
+  @IsObject()
+  item?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Quick replies: the new order' })
+  @ValidateIf((dto: ChangeListDto) => dto.op === 'reorder')
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  ids?: string[];
+
+  @ApiProperty({
+    description: 'The version of the list this change started from',
+  })
   @Matches(VERSION)
   version!: string;
 }
@@ -145,7 +188,62 @@ export class AssistantHomeController {
     private readonly home: AssistantHomeService,
     private readonly changes: ChangeService,
     private readonly sources: SourcesService,
+    private readonly lists: HomeListsService,
   ) {}
+
+  // Quick replies first: their own permissions, and `:list` below would match them otherwise.
+  @Get(':id/home/lists/quickReplies')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW_REPLIES)
+  @ApiOperation({ summary: 'Quick replies, with the list version' })
+  readReplies(@Param('id', ParseUUIDPipe) id: string) {
+    return this.lists.read(id, 'quickReplies');
+  }
+
+  @Patch(':id/home/lists/quickReplies')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT_REPLIES)
+  @ApiOperation({
+    summary: 'Add, reword, switch off, remove or reorder a quick reply',
+    description:
+      'Refused with 409 and the current list when the list changed since `version`.',
+  })
+  changeReplies(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ChangeListDto,
+  ) {
+    return this.lists.change(id, 'quickReplies', dto);
+  }
+
+  @Get(':id/home/lists/:list')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({
+    summary:
+      'One of the home lists (page access, WhatsApp audience, team, documents), with its version',
+  })
+  readList(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('list', new ParseEnumPipe(HOME_LISTS)) list: HomeListName,
+  ) {
+    return this.lists.read(id, list);
+  }
+
+  @Patch(':id/home/lists/:list')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Add, edit or remove one entry of a home list',
+    description:
+      'Refused with 409 and the current list when the list changed since `version`.',
+  })
+  changeList(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('list', new ParseEnumPipe(HOME_LISTS)) list: HomeListName,
+    @Body() dto: ChangeListDto,
+  ) {
+    if (list === 'quickReplies') {
+      // Reached only by a path the route above doesn't match; keep its permissions.
+      throw new ForbiddenException();
+    }
+    return this.lists.change(id, list, dto);
+  }
 
   @Get(':id/sources')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)

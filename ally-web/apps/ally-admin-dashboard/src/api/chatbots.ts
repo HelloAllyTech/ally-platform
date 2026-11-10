@@ -26,6 +26,9 @@ import {
   HomeFact,
   HomeFieldName,
   HomeFieldState,
+  HomeList,
+  HomeListChange,
+  HomeListName,
   HomeSafety,
   RuleChange,
   TestChatbotRequest,
@@ -237,6 +240,48 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       },
       invalidatesTags: (r, _e, { id }) =>
         r ? [...botTags(id), { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }] : [],
+    }),
+
+    /** One of the home's lists with its version (chunk 20d-2). */
+    getHomeList: builder.query<HomeList<HomeListName>, { id: string; list: HomeListName }>({
+      query: ({ id, list }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME_LIST(id, list),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_r, _e, { id, list }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:list:${list}` },
+      ],
+    }),
+
+    /**
+     * One add, edit or remove on a home list, with the version it was based on. A change based on
+     * a list that changed since is refused (409, with the list as it is now). The new list goes
+     * straight into the cache.
+     */
+    changeHomeList: builder.mutation<
+      HomeList<HomeListName>,
+      { id: string; list: HomeListName; version: string; change: HomeListChange }
+    >({
+      query: ({ id, list, version, change }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME_LIST(id, list),
+        method: HttpMethod.PATCH,
+        body: { ...change, version },
+      }),
+      async onQueryStarted({ id, list }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getHomeList", { id, list }, current => {
+              current.items = data.items;
+              current.version = data.version;
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+      // The bot (its team, documents) shows elsewhere too.
+      invalidatesTags: (r, _e, { id }) => (r ? botTags(id) : []),
     }),
 
     changeOwnRule: builder.mutation<HomeSafety, { id: string; version: string } & RuleChange>({
@@ -471,6 +516,8 @@ export const {
   useGetAssistantHomeQuery,
   useSaveHomeFieldMutation,
   useChangeOwnRuleMutation,
+  useGetHomeListQuery,
+  useChangeHomeListMutation,
   useCorrectFactMutation,
   useGetChatbotsQuery,
   useGetChatbotQuery,

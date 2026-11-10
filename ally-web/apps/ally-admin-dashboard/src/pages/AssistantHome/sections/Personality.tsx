@@ -4,10 +4,10 @@ import { Segmented } from "@components/v2";
 import type { BotPageLanguage } from "@types";
 
 import { TONES, toneOf } from "../../Onboarding/MakeItYours";
-import { TemplatesTab } from "../../WhatsAppBot/TemplatesTab";
 import { HOME } from "../copy";
 import { Collapsed, Group, LinesField, SectionHead, TextField } from "../fields";
 import { useHomeField } from "../useHomeField";
+import { QuickReplies } from "./QuickReplies";
 
 import type { SectionProps } from "./props";
 
@@ -108,9 +108,7 @@ export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit 
 
       {bot.connectors.length > 0 && (
         <Group title={t.quickReplies} hint={t.quickRepliesHint} testId="personality-quick-replies">
-          <div className="ally-home__classic">
-            <TemplatesTab canEdit={canEdit} />
-          </div>
+          <QuickReplies botId={bot.id} canEdit={canEdit} />
         </Group>
       )}
 

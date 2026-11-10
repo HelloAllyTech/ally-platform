@@ -100,6 +100,8 @@ import { NotificationModule } from '../notification/notification.module';
     // Channels report each decision and deliver the team's replies (chunk 11a).
     HandoverService,
     InboxEventsService,
+    // The assistant home's WhatsApp audience list (chunk 20d-2).
+    ChatbotAudienceService,
   ],
 })
 export class ChatbotModule {}

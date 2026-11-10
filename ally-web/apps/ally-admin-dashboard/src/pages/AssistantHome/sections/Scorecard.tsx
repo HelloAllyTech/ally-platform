@@ -76,13 +76,77 @@ const AnswerBox: React.FC<{
  * against last week, the 7-day trend, the questions it didn't know (Answer it) and the answers
  * people weren't happy with (Correct this · It was fine), and the last checkup.
  */
+/**
+ * "Questions it didn't know" (chunk Q2a), each with Answer it. On the Overview and, the same list,
+ * in What it knows (chunk 20d-2), so the two never disagree.
+ */
+export const UnansweredList: React.FC<{ botId: string; canEdit: boolean; testId?: string }> = ({
+  botId,
+  canEdit,
+  testId = "overview-unanswered",
+}) => {
+  const { data } = useGetScorecardQuery(botId);
+  const [answer, answering] = useAnswerUnansweredMutation();
+  const [open, setOpen] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!data) return null;
+  return (
+    <Group title={t.unansweredTitle} testId={testId}>
+      {data.unanswered.length === 0 ? (
+        <p className="ally-empty">{t.noUnanswered}</p>
+      ) : (
+        <ul className="ally-score__list">
+          {data.unanswered.map(q => (
+            <li key={q.id}>
+              <div className="ally-home__row">
+                <p className="ally-body">“{q.question}”</p>
+                {canEdit && open !== q.id && (
+                  <Button onClick={() => setOpen(q.id)}>{t.answerIt}</Button>
+                )}
+              </div>
+              {open === q.id && (
+                <AnswerBox
+                  busy={answering.isLoading}
+                  onCancel={() => setOpen(null)}
+                  onSave={async text => {
+                    setError(null);
+                    try {
+                      await answer({ id: botId, questionId: q.id, text }).unwrap();
+                      setOpen(null);
+                      setNote(t.saved);
+                      return true;
+                    } catch {
+                      setError(COPY.problems.generic);
+                      return false;
+                    }
+                  }}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {note && (
+        <p className="ally-small" role="status">
+          {note}
+        </p>
+      )}
+      {error && (
+        <p className="ally-error" role="alert">
+          {error}
+        </p>
+      )}
+    </Group>
+  );
+};
+
 export const Scorecard: React.FC<{
   botId: string;
   canEdit: boolean;
   go: (id: SectionId) => void;
 }> = ({ botId, canEdit, go }) => {
   const { data } = useGetScorecardQuery(botId);
-  const [answer, answering] = useAnswerUnansweredMutation();
   const [correct, correcting] = useCorrectFeedbackMutation();
   const [fine, finishing] = useMarkFeedbackFineMutation();
   const [open, setOpen] = useState<string | null>(null);
@@ -158,33 +222,7 @@ export const Scorecard: React.FC<{
         </p>
       )}
 
-      <Group title={t.unansweredTitle} testId="overview-unanswered">
-        {data.unanswered.length === 0 ? (
-          <p className="ally-empty">{t.noUnanswered}</p>
-        ) : (
-          <ul className="ally-score__list">
-            {data.unanswered.map(q => (
-              <li key={q.id}>
-                <div className="ally-home__row">
-                  <p className="ally-body">“{q.question}”</p>
-                  {canEdit && open !== q.id && (
-                    <Button onClick={() => setOpen(q.id)}>{t.answerIt}</Button>
-                  )}
-                </div>
-                {open === q.id && (
-                  <AnswerBox
-                    busy={answering.isLoading}
-                    onCancel={() => setOpen(null)}
-                    onSave={text =>
-                      save(() => answer({ id: botId, questionId: q.id, text }).unwrap())
-                    }
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Group>
+      <UnansweredList botId={botId} canEdit={canEdit} />
 
       <Group title={t.thumbsDownTitle} testId="overview-thumbs-down">
         {data.thumbsDown.length === 0 ? (

@@ -1,4 +1,5 @@
 import type { BotPageAccess, BotPageLanguage, BotPageLimits, PrechatField } from "./botPage";
+import type { ChatbotAccessMode } from "./chatbots";
 
 /** The assistant home's fields (ally-be `bot-draft/home/home-fields.ts`), each with its value's type. */
 export interface HomeFieldValues {
@@ -25,6 +26,8 @@ export interface HomeFieldValues {
   handover: HandoverSettings;
   /** The website widget (chunk 13). */
   widget: WidgetSettings;
+  /** Who can message it on WhatsApp (chunk 20d-2). */
+  whatsappAccess: ChatbotAccessMode;
 }
 
 export interface WidgetSettings {
@@ -110,4 +113,69 @@ export interface StaleField {
   errorCode: "stale";
   message: string;
   details: { field: string; value: unknown; version: string };
+}
+
+/** The home's lists (ally-be `bot-draft/home/home-lists.ts`), changed one entry at a time. */
+export type HomeListName = "pageAccess" | "audience" | "team" | "documents" | "quickReplies";
+
+export interface HomeListEntry {
+  id: string;
+  kind: string;
+  value: string;
+  label: string | null;
+  organisationName?: string | null;
+}
+
+export interface HomeTeamMember {
+  id: string;
+  userId: number;
+  name: string | null;
+  email: string | null;
+  role: string;
+}
+
+export interface HomeDocument {
+  id: string;
+  title: string;
+  status: string;
+  private: boolean;
+  isGlobal: boolean;
+  archived: boolean;
+}
+
+export interface HomeQuickReply {
+  id: string;
+  kind: "crisis" | "command" | "consent" | "faq";
+  name: string;
+  patterns: string[];
+  responseText: string;
+  active: boolean;
+  /** Ally's safety replies can be reworded but never switched off. */
+  required: boolean;
+  /** "own" (the owner's), "default" (Ally's), "customised" (Ally's, reworded) or "off". */
+  state: "own" | "default" | "customised" | "off";
+  defaultId: string | null;
+  defaultResponseText: string | null;
+}
+
+export interface HomeListItems {
+  pageAccess: HomeListEntry;
+  audience: HomeListEntry;
+  team: HomeTeamMember;
+  documents: HomeDocument;
+  quickReplies: HomeQuickReply;
+}
+
+export interface HomeList<K extends HomeListName> {
+  list: K;
+  items: HomeListItems[K][];
+  version: string;
+  yourOrganisation?: { id: string; name: string } | null;
+}
+
+export interface HomeListChange {
+  op: "add" | "edit" | "remove" | "reorder";
+  id?: string;
+  item?: Record<string, unknown>;
+  ids?: string[];
 }

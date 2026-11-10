@@ -11,10 +11,10 @@ import { Button, SourceChip } from "@components/v2";
 import type { HomeFact } from "@types";
 
 import { COPY } from "../../Onboarding/copy";
-import { KnowledgeTab } from "../../WhatsAppBot/KnowledgeTab";
-import { UnansweredTab } from "../../WhatsAppBot/UnansweredTab";
 import { HOME } from "../copy";
-import { Collapsed, Group, SectionHead } from "../fields";
+import { Group, SectionHead } from "../fields";
+import { DocumentsList } from "./DocumentsList";
+import { UnansweredList } from "./Scorecard";
 import { SourcesList } from "./Sources";
 
 import type { SectionProps } from "./props";
@@ -208,29 +208,6 @@ const Notes: React.FC<{ botId: string; canEdit: boolean }> = ({ botId, canEdit }
   );
 };
 
-const statusOf = (status: string): string =>
-  status === "indexed" ? t.ready : status === "failed" ? t.failed : t.reading;
-
-/** The documents it answers from, one line each: name and whether it's ready. */
-const Documents: React.FC<{ botId: string }> = ({ botId }) => {
-  const { data: documents } = useGetChatbotDocumentsQuery(botId);
-  const list = (documents ?? []).filter(d => !d.archived);
-  return (
-    <ul className="ally-home__docs">
-      {list.map(document => (
-        <li key={document.id}>
-          <span>{document.title}</span>
-          <span
-            className={`ally-badge ally-home__doc-status ally-home__doc-status--${document.status}`}
-          >
-            {statusOf(document.status)}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
 /**
  * What the assistant answers from (chunk 20d): the facts read from the website (each correctable),
  * the owner's notes, the documents, and the questions it couldn't answer.
@@ -278,23 +255,10 @@ export const KnowsSection: React.FC<SectionProps> = ({ bot, home, canEdit }) => 
       </Group>
 
       <Group title={t.documents} hint={t.documentsHint} testId="knows-documents">
-        <Documents botId={bot.id} />
-        <Collapsed summary={t.manageDocuments}>
-          <div className="ally-home__classic">
-            <KnowledgeTab bot={bot} canEdit={canEdit} />
-          </div>
-        </Collapsed>
+        <DocumentsList botId={bot.id} canEdit={canEdit} />
       </Group>
 
-      <Group title={t.needsYou} testId="knows-unanswered">
-        {bot.stats.openUnanswered > 0 ? (
-          <div className="ally-home__classic">
-            <UnansweredTab />
-          </div>
-        ) : (
-          <p className="ally-empty">{HOME.overview.allClear}</p>
-        )}
-      </Group>
+      <UnansweredList botId={bot.id} canEdit={canEdit} testId="knows-unanswered" />
     </>
   );
 };

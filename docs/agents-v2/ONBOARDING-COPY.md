@@ -647,3 +647,14 @@ says when a save can't be made. More lines for the home's sections are added her
 - **How it works intro:** Everything your assistant follows, in the order it applies. You can edit the parts marked as yours.
 - **Locked layer:** Set by Ally to keep answers accurate and safe. You can add to safety rules, not remove them.
 - **Inbox:** Pick a chat to read it · Add to checkup · Sound for new chats: on · Sound for new chats: off
+
+### Lists on the home: who can open the page, WhatsApp, the team, documents, quick replies *(added in 20d-2)*
+
+- **Any list:** Add · Remove {item} · We couldn't load this list. Try again. · Try again
+- **On your page:** Email address · Name (optional) · Add many at once · Paste emails, one per line · Add these emails · Nobody is on the list yet, so nobody can open the page. Add the emails of people who should. · No organisation is on the list yet. Add yours so its people can open the page. · Add {organisation} · Your organisation
+- **On WhatsApp:** Who can message it · Anyone who messages it · Anyone with an Ally account · Only the people on this list · Everyone else gets your “not on the list” message. Crisis replies always go out. · Phone number · Email address · Phone · Email · Organisation · Add many at once · Paste phone numbers, one per line · Add these numbers · The list is empty, so no one can message it yet. Add their numbers.
+- **WhatsApp numbers:** Connected · Waiting for WhatsApp · Needs attention · Last message {when} · No messages yet · Connect a WhatsApp number · Connect your WhatsApp number · Finish setup · Check it · It's working. · Stop using it here · Stop using {number} for this assistant? People who message it get no reply until it's connected again. · Stop using it · Keep it · Only the assistant's owner can connect a number. · No number yet.
+- **Team:** Their email address · What they can do · Can view and try it · Can change it · Owner: also manages the team · You · Only an owner can change the team.
+- **Documents:** Upload a file · PDF, Word or EPUB, up to 25 MB. · Add from your library · Documents in your library · There are no other documents in your library. · Your file · From your library · Uploading {name}… · We can only read PDF, Word or EPUB files. · That file is over 25 MB. Try a smaller one. · That upload didn't finish. Try again. · No documents yet. Upload a file, or add one from your library. · Close
+- **Quick replies:** Fixed answers it sends on WhatsApp when someone writes certain words, without searching. · Add a quick reply · Name · When someone writes · Words or phrases, separated by commas · It replies · Save reply · Cancel · Set by Ally · Reworded by you · Off · Reword · Turn off · Turn on · Safety reply: it can be reworded, never turned off. · Use Ally's wording · No quick replies of your own yet. · Yours
+- **Overview, numbers:** See all numbers

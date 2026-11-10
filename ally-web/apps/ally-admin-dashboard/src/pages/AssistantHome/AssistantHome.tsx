@@ -31,6 +31,7 @@ import { ShareSection } from "./sections/Share";
 import { TryIt } from "./TryIt";
 import { HomeSaves, HomeSavesContext, SaveState } from "./useHomeField";
 import "./home.css";
+import "./ui/scale.css";
 
 const RANK: Record<ChatbotMemberRole, number> = {
   [ChatbotMemberRole.VIEWER]: 1,

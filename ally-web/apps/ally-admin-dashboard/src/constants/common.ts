@@ -799,6 +799,7 @@ export const ApiEndpoints = {
     PAGE_BRAND: (id: string) => `/v1/chatbots/${id}/page/brand`,
     TEAM_NAMES: (id: string) => `/v1/chatbots/${id}/team-names`,
     HOME: (id: string) => `/v1/chatbots/${id}/home`,
+    HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
     RULES: (id: string) => `/v1/chatbots/${id}/rules`,
     FACT_CORRECTION: (id: string, factId: string) =>
       `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,

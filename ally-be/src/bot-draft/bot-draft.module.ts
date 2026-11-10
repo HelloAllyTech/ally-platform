@@ -15,6 +15,8 @@ import { AssistantHomeController } from './home/assistant-home.controller';
 import { AssistantHomeService } from './home/assistant-home.service';
 import { ChangeService } from './home/change.service';
 import { SourcesService } from './home/sources.service';
+import { HomeListsService } from './home/home-lists.service';
+import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { ScorecardController } from './scorecard/scorecard.controller';
 import { ScorecardService } from './scorecard/scorecard.service';
 import { ChatbotMessageFeedback } from '../chatbot/entity/chatbot-message-feedback.entity';
@@ -55,6 +57,7 @@ import { BotDraftService } from './service/bot-draft.service';
     BotPageModule,
     KnowledgeBaseModule,
     AiModule,
+    WhatsAppModule,
   ],
   controllers: [
     BotDraftController,
@@ -72,6 +75,7 @@ import { BotDraftService } from './service/bot-draft.service';
     AssistantHomeService,
     ChangeService,
     SourcesService,
+    HomeListsService,
     ScorecardService,
     CheckupService,
     DraftCheckupService,
