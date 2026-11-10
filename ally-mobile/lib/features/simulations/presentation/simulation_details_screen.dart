@@ -15,6 +15,7 @@ import '../../../core/widgets/back_title_header.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 import 'start_simulation/start_simulation_controller.dart';
+import 'widgets/description_narration_button.dart';
 import 'widgets/scenario_language_dropdown.dart';
 import '../../../core/widgets/sized_network_image.dart';
 
@@ -243,6 +244,7 @@ class _SimulationDetailsScreenState
                 child: _CompletedChip(count: scenario.completedAttemptCount),
               ),
             _FieldLabel(ref.t('learn.scenario.scenarioLabel')),
+            DescriptionNarrationButton(audioUrl: scenario.descriptionAudioUrl),
             // RichText style={styles.description}: marginBottom 6.
             Padding(
               padding: const EdgeInsets.only(bottom: 6),

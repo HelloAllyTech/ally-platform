@@ -16,8 +16,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * backstop stays in force for every other writer. Same shape as the old
  * app.bypass_stage_check GUC, but opt-in per transaction and checked in one place.
  */
-export class AllowRoadmapReshapeToSkipVoteBalanceCheck1981900500000 implements MigrationInterface {
-  name = 'AllowRoadmapReshapeToSkipVoteBalanceCheck1981900500000';
+export class AllowRoadmapReshapeToSkipVoteBalanceCheck1981900550000 implements MigrationInterface {
+  name = 'AllowRoadmapReshapeToSkipVoteBalanceCheck1981900550000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

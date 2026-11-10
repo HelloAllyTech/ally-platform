@@ -143,6 +143,7 @@ import { BehaviorInstructionTranslationService } from './service/behavior-instru
 import { AutofillService } from './service/autofill.service';
 import { AgentBuilderChainService } from './service/agent-builder-chain.service';
 import { ScenarioTranslationGateway } from './gateway/scenario-translation.gateway';
+import { ScenarioDescriptionAudioService } from './service/scenario-description-audio.service';
 import { ScenarioTranslationNotificationService } from './service/scenario-translation-notification.service';
 
 import { AuditModule } from 'src/audit/audit.module';
@@ -319,6 +320,7 @@ import { SettingsModule } from 'src/settings/settings.module';
     ScenarioSessionRecordingRepository,
     ScenarioSessionRecordingService,
     ScenarioTranslationNotificationService,
+    ScenarioDescriptionAudioService,
     ScenarioTranslationGateway,
   ],
   exports: [

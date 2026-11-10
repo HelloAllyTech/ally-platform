@@ -144,6 +144,7 @@ import {
   OpenAITranslationsService,
   TranslationProgressCallback,
 } from 'src/common/service/openai-translation.service';
+import { ScenarioDescriptionAudioService } from './scenario-description-audio.service';
 import { ScenarioTranslationNotificationService } from './scenario-translation-notification.service';
 import {
   ScenarioTranslationAction,
@@ -255,6 +256,8 @@ export class ScenarioService {
     private readonly tenantFeatureService: TenantFeatureService,
     private readonly contentAccessService: ContentAccessService,
     @Optional() private readonly imageAssetService?: ImageAssetService,
+    @Optional()
+    private readonly descriptionAudioService?: ScenarioDescriptionAudioService,
   ) {}
 
   async getScenarios(): Promise<GetScenarioDto[]> {
@@ -526,6 +529,11 @@ export class ScenarioService {
     }
 
     if (languageCode) {
+      // The narration reads the base-language description: hide it when the
+      // learner is shown a translated one.
+      if (scenario.translations?.[languageCode]?.description) {
+        scenario.descriptionAudioUrl = null;
+      }
       applyScenarioTranslations(scenario, languageCode);
       scenario.triggerWarnings?.forEach((triggerWarning) => {
         if (
@@ -1043,6 +1051,10 @@ export class ScenarioService {
             savedScenarios[i].metadata,
           );
         }
+      }
+
+      for (const saved of savedScenarios) {
+        void this.descriptionAudioService?.onScenarioSaved(saved.id);
       }
 
       return savedScenarios;
@@ -1749,6 +1761,10 @@ export class ScenarioService {
       const success = manager
         ? await runUpdate(manager)
         : await this.dataSource.transaction(runUpdate);
+
+      if (success) {
+        void this.descriptionAudioService?.onScenarioSaved(id, manager);
+      }
 
       if (
         success &&

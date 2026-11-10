@@ -138,6 +138,8 @@ export enum LlmTask {
   DEBRIEF_REPLY = 'debrief_reply',
   // Read-aloud of a debrief card (Sarvam TTS), cached per card text.
   DEBRIEF_READ_ALOUD = 'debrief_read_aloud',
+  // Narration of a role-play's description (Sarvam TTS), made when it is published or edited.
+  SCENARIO_DESCRIPTION_NARRATION = 'scenario_description_narration',
   // Whether an answer to the reflective question is on topic, for XP.
   DEBRIEF_REFLECTION_CHECK = 'debrief_reflection_check',
   // The debrief PM agent's daily analysis; learning budget, never production.
