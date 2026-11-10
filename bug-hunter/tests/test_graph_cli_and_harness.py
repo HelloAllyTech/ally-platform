@@ -150,3 +150,64 @@ def test_sweep_diff_scopes_a_mass_commit_to_the_app(
     assert "y.ts" in diff and "big.txt" not in diff
     small = sweep_diff(repo, bug.commit, "ally-be")
     assert "x.ts" in small
+
+
+def test_repro_validity_is_measured_with_the_agents_fix_set_aside(
+    repo_config, tmp_path: Path
+) -> None:
+    """A graph agent applies its fix in the worktree; the harness must still see the
+    repro fail on the buggy code (it scored every PR case 'repro: no' before)."""
+    cfg, repo, bug, _clean = repo_config
+
+    class FixingAgent:
+        name = "fixing"
+
+        def run(self, case_input, run) -> AgentResult:
+            x = case_input.app_root / "src/x.ts"
+            x.write_text(x.read_text().replace("buggy", "fixed"))
+            (case_input.app_root / "src/x.repro.spec.ts").write_text("tests src/x.ts\n")
+            patch = run.git.diff(run.worktree)
+            return AgentResult(
+                found=True,
+                repro_test=("src/x.repro.spec.ts", "tests src/x.ts\n"),
+                patch=patch,
+                patch_applied=True,
+            )
+
+    report, _ = run_evals(
+        cfg,
+        [bug],
+        FixingAgent(),
+        _options(),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=tmp_path / "r",
+    )
+    row = report.cases[0]
+    assert row.repro_valid is True, row  # failed on the buggy code
+    assert row.oracle_pass is True  # and the fix passes the hidden oracle
+
+
+def test_a_crashed_agent_keeps_its_cost(repo_config, tmp_path: Path) -> None:
+    cfg, repo, bug, _clean = repo_config
+
+    class CrashingAgent:
+        name = "crashing"
+
+        def run(self, case_input, run) -> AgentResult:
+            return AgentResult(
+                cost_usd=0.45, tokens=900, status="error", error="GitError: x"
+            )
+
+    report, _ = run_evals(
+        cfg,
+        [bug],
+        CrashingAgent(),
+        _options(max_cost_usd=10),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=tmp_path / "r",
+    )
+    row = report.cases[0]
+    assert row.outcome == "error" and row.error == "GitError: x"
+    assert row.cost_usd == 0.45 and report.meta["cost_usd_total"] == 0.45

@@ -199,7 +199,9 @@ def make_fix_node(deps: GraphDeps):
         diff = deps.git.diff(deps.worktree) if deps.git else ""
         files = [
             f
-            for f in (deps.git.changed_files(deps.worktree) if deps.git else [])
+            for f in (
+                deps.git.modified_tracked_files(deps.worktree) if deps.git else []
+            )
             if f.startswith(app_config.path + "/") or deps.app_root == deps.worktree
         ]
         files = [f for f in files if not any(f.endswith(p) for p in protected)]

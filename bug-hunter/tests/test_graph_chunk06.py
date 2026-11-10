@@ -623,3 +623,28 @@ def test_safety_words_in_the_findings_prose_do_not_escalate_precheck(
     _, state = _run(deps)
     assert state.status == "awaiting_human", state.stop_reason
     assert state.risk_level == "low"
+
+
+def test_bounced_repro_files_are_not_part_of_the_fix_and_stash_works(
+    config, repo, tmp_path
+) -> None:
+    """The 19-case eval crashed in verify when a bounced (untracked) repro attempt was
+    listed in files_changed and passed to `git stash push`."""
+    deps = _deps(config, repo, tmp_path, [EDIT_FIX, SUBMIT_FIX])
+    # a leftover repro attempt from a bounce: untracked, not protected
+    (repo / "ally-be/src/x.repro-attempt1.spec.ts").write_text("tests src/x.ts\n")
+    _, state = _run(deps)
+    assert state.status == "awaiting_human", state.stop_reason
+    assert state.patch.files_changed == ["ally-be/src/x.ts"]
+
+
+def test_stash_paths_ignores_untracked_paths(repo) -> None:
+    git = Git(repo)
+    (repo / "ally-be/src/x.ts").write_text(SRC_FIXED)
+    (repo / "ally-be/src/new.spec.ts").write_text("x\n")
+    assert git.modified_tracked_files(repo) == ["ally-be/src/x.ts"]
+    assert git.stash_paths(repo, ["ally-be/src/x.ts", "ally-be/src/new.spec.ts"])
+    assert (repo / "ally-be/src/x.ts").read_text() == SRC_BUGGY
+    assert (repo / "ally-be/src/new.spec.ts").exists()
+    git.unstash(repo)
+    assert (repo / "ally-be/src/x.ts").read_text() == SRC_FIXED

@@ -50,6 +50,7 @@ class AgentResult:
     fix_attempts: int = 0
     final_outcome: str | None = None  # pr | escalated | no_bug | rejected | other
     stop_reason: str | None = None
+    error: str | None = None  # the agent crashed; cost/tokens are still what it spent
 
 
 class Agent(Protocol):
@@ -135,7 +136,23 @@ class GraphAgent:
                 checkpointer=saver,
             )
             graph = build_graph(deps, saver)
-            state = run_graph(graph, deps, signal)
+            try:
+                state = run_graph(graph, deps, signal)
+            except Exception as exc:  # noqa: BLE001 - report the spend, then the error
+                budget = None
+                try:
+                    snap = graph.get_state({"configurable": {"thread_id": run.run_id}})
+                    budget = snap.values.get("budget_used") if snap else None
+                except Exception:  # noqa: BLE001
+                    budget = None
+                return AgentResult(
+                    tokens=getattr(budget, "tokens", 0) or 0,
+                    cost_usd=getattr(budget, "cost_usd", 0.0) or 0.0,
+                    seconds=round(time.monotonic() - started, 1),
+                    trace_url=trace_url(run.run_id),
+                    status="error",
+                    error=f"{type(exc).__name__}: {exc}"[:500],
+                )
         seconds = time.monotonic() - started
         repro_test = None
         # only a reproduction the graph itself accepted (ran, failed, for the right

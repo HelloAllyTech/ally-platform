@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -134,6 +135,23 @@ def sweep_diff(repo: Repo, sha: str, app_path: str) -> str:
         return full
     scoped = repo.git("show", "--format=", sha, "--", app_path) if app_path else ""
     return scoped or full
+
+
+class _AgentCrashed(Exception):
+    """The agent returned an error result; the row is already filled in."""
+
+
+@contextmanager
+def _fix_set_aside(run: Run):
+    """Stash the tracked changes in the run's worktree (an agent's applied fix) for
+    the duration of the block; untracked files (the repro test) stay."""
+    files = run.git.modified_tracked_files(run.worktree) if run.git else []
+    stashed = bool(files) and run.git.stash_paths(run.worktree, files)
+    try:
+        yield
+    finally:
+        if stashed:
+            run.git.unstash(run.worktree)
 
 
 def _run_tests(runner: Runner, tests: list[str]) -> tuple[bool, float, list[RunResult]]:
@@ -259,6 +277,11 @@ def run_case(
             result_row.trace_url = agent_result.trace_url
             result_row.status = agent_result.status
             result_row.confidence = agent_result.confidence
+            if agent_result.error:
+                result_row.outcome = "error"
+                result_row.error = agent_result.error
+                result_row.seconds = round(agent_seconds, 1)
+                raise _AgentCrashed()
             result_row.review_verdicts = list(agent_result.review_verdicts)
             result_row.fix_attempts = agent_result.fix_attempts
             result_row.final_outcome = agent_result.final_outcome
@@ -290,7 +313,13 @@ def run_case(
                     target = app_root / path
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_text(content, encoding="utf-8")
-                    _passed, secs, runs = _run_tests(runner, [path])
+                    if agent_result.patch_applied:
+                        # the graph already applied its fix in this worktree: set the
+                        # fix aside so "fails on the buggy code" is measured on it
+                        with _fix_set_aside(run):
+                            _passed, secs, runs = _run_tests(runner, [path])
+                    else:
+                        _passed, secs, runs = _run_tests(runner, [path])
                     sandbox_seconds += secs
                     # must fail on the buggy code, and the test must have run at all
                     result_row.repro_valid = genuinely_failed(runs)
@@ -320,6 +349,8 @@ def run_case(
             result_row.seconds = round(agent_seconds, 1)
         except StopHarness:
             raise
+        except _AgentCrashed:
+            pass  # outcome, error and cost already on the row
         except (
             Exception
         ) as exc:  # noqa: BLE001 - one broken case must not stop the batch

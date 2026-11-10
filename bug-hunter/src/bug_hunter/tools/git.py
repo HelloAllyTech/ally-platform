@@ -120,6 +120,12 @@ class Git:
         )
         return [line[3:] for line in out.stdout.splitlines() if line.strip()]
 
+    def modified_tracked_files(self, worktree: Path) -> list[str]:
+        """Tracked files with changes (staged or not), relative to the worktree.
+        Untracked files (repro tests, bounced repro attempts) are not part of a fix."""
+        out = self._git(["diff", "--name-only", "HEAD"], cwd=worktree)
+        return [line.strip() for line in out.stdout.splitlines() if line.strip()]
+
     def log(self, worktree: Path, path: str | None = None, n: int = 10) -> str:
         args = [
             "log",
@@ -178,6 +184,8 @@ class Git:
         """Set aside the tracked changes to ``paths`` (the fix) so the baseline can run
         on the untouched code; untracked files (the repro test) stay. Returns whether
         anything was stashed."""
+        tracked = set(self.modified_tracked_files(worktree))
+        paths = [p for p in paths if p in tracked]  # git refuses untracked pathspecs
         if not paths:
             return False
         out = self._git(
