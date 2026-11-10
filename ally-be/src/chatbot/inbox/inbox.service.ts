@@ -8,9 +8,9 @@ import { WHATSAPP_WINDOW_MS } from '../handover/handover';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 
 /** "Live now": a message in the last this many minutes. */
-export const LIVE_MINUTES = 15;
+const LIVE_MINUTES = 15;
 /** Chats per page of the list. */
-export const INBOX_PAGE = 50;
+const INBOX_PAGE = 50;
 
 export type InboxView = 'needs_person' | 'live' | 'all';
 
@@ -217,7 +217,7 @@ export class InboxService {
 }
 
 /** Who the visitor is, as the list shows them: a pre-chat name, a phone's last 4, or "Visitor". */
-export function visitorLabel(row: Record<string, unknown>): string {
+function visitorLabel(row: Record<string, unknown>): string {
   const answers = (
     row.intake as {
       answers?: { label?: string; type?: string; value?: string }[];

@@ -76,8 +76,6 @@ export function draftView(draft: BotDraftEntity) {
   };
 }
 
-export type DraftView = ReturnType<typeof draftView>;
-
 /** The owner's and the builder's changes, for undo (20a-2 shows them on the assistant too). */
 export function changes(events: DraftEvent[]) {
   return events

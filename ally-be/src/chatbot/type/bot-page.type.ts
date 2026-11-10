@@ -66,7 +66,7 @@ export interface BotPageBrand {
   peoplePhotos: Record<string, string>;
 }
 
-export const DEFAULT_BOT_PAGE_BRAND: BotPageBrand = {
+const DEFAULT_BOT_PAGE_BRAND: BotPageBrand = {
   logo: null,
   accent: null,
   accentContrast: null,
@@ -104,7 +104,7 @@ export interface BotPageWidget {
 
 export const DEFAULT_WIDGET_LABEL = 'Ask us';
 
-export const DEFAULT_BOT_PAGE_WIDGET: BotPageWidget = {
+const DEFAULT_BOT_PAGE_WIDGET: BotPageWidget = {
   position: 'right',
   label: DEFAULT_WIDGET_LABEL,
   autoOpenSeconds: null,
@@ -153,7 +153,7 @@ export const DEFAULT_ACCENT_COLOUR = '#264D8E';
 export const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
 /** Prefilled when the bot's crisis safety net is on (the brief's "Not a crisis service"). */
-export const CRISIS_DISCLAIMER =
+const CRISIS_DISCLAIMER =
   'This is an automated assistant. It is not a crisis service: in an emergency, contact your local emergency number.';
 
 /**

@@ -53,7 +53,7 @@ export interface WhatsAppSendResult {
 }
 
 /** How many rows an `UPDATE … RETURNING` run through `query` changed (Postgres: [rows, count]). */
-export function returned(result: unknown): number {
+function returned(result: unknown): number {
   if (!Array.isArray(result)) return 0;
   return Array.isArray(result[0])
     ? (result[0] as unknown[]).length

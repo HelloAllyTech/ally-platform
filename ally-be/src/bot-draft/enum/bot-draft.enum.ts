@@ -84,7 +84,7 @@ export enum PurposeId {
 }
 
 /** A draft made before purposes keeps working: its design maps to a purpose. */
-export const PURPOSE_OF_DESIGN: Record<DesignId, PurposeId> = {
+const PURPOSE_OF_DESIGN: Record<DesignId, PurposeId> = {
   [DesignId.GUIDE]: PurposeId.ANSWER,
   [DesignId.SUPPORT]: PurposeId.ANSWER,
   [DesignId.ENQUIRIES]: PurposeId.ENQUIRIES,

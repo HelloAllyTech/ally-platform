@@ -16,12 +16,7 @@ export const STEP_ORDER: readonly BotDraftStep[] = [
   BotDraftStep.PUBLISHED,
 ];
 
-/** The steps a description-only or upload-only draft skips. */
-export const STEPS_WITHOUT_WEBSITE: readonly BotDraftStep[] = [
-  BotDraftStep.READING,
-];
-
-export function stepIndex(step: BotDraftStep): number {
+function stepIndex(step: BotDraftStep): number {
   return STEP_ORDER.indexOf(step);
 }
 

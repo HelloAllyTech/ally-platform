@@ -2,7 +2,7 @@ import { PrechatFieldType } from '../enum/bot-page.enum';
 import type { PrechatField } from '../type/bot-page.type';
 
 /** One stored pre-chat answer, with the question as it read when answered. */
-export interface IntakeAnswer {
+interface IntakeAnswer {
   id: string;
   label: string;
   type: PrechatFieldType;

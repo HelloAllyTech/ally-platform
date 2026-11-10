@@ -248,7 +248,7 @@ export const PACK_FOR_INDUSTRY: Record<Industry, SafetyPackId> = {
 };
 
 /** Care topic → pack. */
-export const PACK_FOR_TOPIC: Record<CareTopic, SafetyPackId> = {
+const PACK_FOR_TOPIC: Record<CareTopic, SafetyPackId> = {
   [CareTopic.MENTAL_HEALTH]: SafetyPackId.MENTAL_HEALTH,
   [CareTopic.MEDICAL]: SafetyPackId.MEDICAL,
   [CareTopic.MEDICINES]: SafetyPackId.PHARMACY,
@@ -312,17 +312,4 @@ export function packRulesBlock(
     ...lines.map((line) => `- ${line}`),
     '</safety_rules>',
   ].join('\n');
-}
-
-/** What the builder in ally-ai is told about the packs: names and scope, never the power to choose. */
-export function packCatalogue(): {
-  id: string;
-  name: string;
-  summary: string;
-}[] {
-  return Object.values(SAFETY_PACKS).map((pack) => ({
-    id: pack.id,
-    name: pack.name,
-    summary: pack.summary,
-  }));
 }

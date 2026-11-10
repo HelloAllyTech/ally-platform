@@ -395,7 +395,7 @@ export class ChatbotChangesController {
 }
 
 /** "sunrise-mind.example" → "Sunrise Mind": a starting name the owner can change. */
-export function nameFromDomain(domain: string): string {
+function nameFromDomain(domain: string): string {
   const label = domain.replace(/^www\./, '').split('.')[0] ?? domain;
   const words = label.split(/[-_]+/).filter(Boolean);
   const name = words

@@ -51,9 +51,9 @@ export const IMAGE_ERRORS: Record<
 
 export const MAX_IMAGES_PER_BOT = 50;
 /** Uploads per user per minute. */
-export const UPLOADS_PER_MINUTE = 30;
+const UPLOADS_PER_MINUTE = 30;
 /** Removed images keep their files this long, so Undo works. */
-export const PURGE_AFTER_DAYS = 30;
+const PURGE_AFTER_DAYS = 30;
 /** Signed URLs for the dashboard. */
 const SIGNED_URL_SECONDS = 15 * 60;
 /** Content-hashed names never change content, so they cache for a year. */

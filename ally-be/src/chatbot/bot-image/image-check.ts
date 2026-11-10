@@ -22,13 +22,12 @@ export type ImageType = 'png' | 'jpeg' | 'webp' | 'svg';
 
 export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 /** The longest side, in pixels. */
-export const IMAGE_MAX_SIDE = 6000;
+const IMAGE_MAX_SIDE = 6000;
 /** A decompression-bomb guard for sharp: no input over 6000 × 6000 pixels is even decoded. */
-export const IMAGE_MAX_PIXELS = IMAGE_MAX_SIDE * IMAGE_MAX_SIDE;
+const IMAGE_MAX_PIXELS = IMAGE_MAX_SIDE * IMAGE_MAX_SIDE;
 export const VARIANT_WIDTHS = [256, 768, 1600] as const;
-export type VariantSize = (typeof VARIANT_WIDTHS)[number] | 'original';
 /** A rasterised SVG logo's width. */
-export const SVG_RASTER_WIDTH = 1024;
+const SVG_RASTER_WIDTH = 1024;
 
 /** Why an image was refused. Each maps to a line in copy §19. */
 export type ImageProblem = 'too_large' | 'wrong_type' | 'too_many_pixels';

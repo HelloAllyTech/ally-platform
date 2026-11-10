@@ -10,7 +10,7 @@ import { AgentRuntimeUsed, ChatbotRuntime } from '../enum/chatbot.enum';
  * The namespace Agents v2 run ids are derived under. Never change it: a run id stored on a message
  * must still be the one a redelivery of that message would derive.
  */
-export const AGENT_RUN_NAMESPACE = '54b53605-2385-4d61-8b44-a7fd03b0d1e9';
+const AGENT_RUN_NAMESPACE = '54b53605-2385-4d61-8b44-a7fd03b0d1e9';
 
 /**
  * The run id for one inbound message: the same provider message id always gives the same run id,

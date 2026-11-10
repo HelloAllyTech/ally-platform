@@ -18,7 +18,7 @@ export type CheckupOutcome =
   | 'smalltalk'
   | 'other';
 
-export type CheckupVerdict = 'pass' | 'fail' | 'needs_input';
+type CheckupVerdict = 'pass' | 'fail' | 'needs_input';
 
 /** Where the expected answer lives. `gap` means the information doesn't cover it yet. */
 export interface CheckupSource {

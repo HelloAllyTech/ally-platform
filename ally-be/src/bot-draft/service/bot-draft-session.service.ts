@@ -40,7 +40,7 @@ import {
 import { STEP_ORDER, canAdvance } from './step-machine';
 
 /** The builder's prompts, sent with each request so the Skills Store's live text runs. */
-export const BUILDER_PROMPT_CODES = [
+const BUILDER_PROMPT_CODES = [
   'ally_ai_builder_system',
   'ally_ai_builder_extract',
   'ally_ai_builder_classify',
@@ -655,7 +655,7 @@ export function documentParts(
 }
 
 /** How a quick reply reads in the chat: a design by its card's title, not its id. */
-export function chipLabel(draft: BotDraftEntity, chip: string): string {
+function chipLabel(draft: BotDraftEntity, chip: string): string {
   if (!chip.startsWith('design:')) return chip;
   const id = chip.slice('design:'.length);
   return designCards(draft)?.find((card) => card.id === id)?.title ?? id;

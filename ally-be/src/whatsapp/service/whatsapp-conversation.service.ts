@@ -863,4 +863,4 @@ const UNANSWERED_SORT_COLUMNS = {
  * A bound rather than an unbounded read, but a reported one: `omittedDocuments` tells the caller when
  * the corpus is larger than this, so a partial worklist is never presented as a complete one.
  */
-export const COVERAGE_DOCUMENT_LIMIT = 500;
+const COVERAGE_DOCUMENT_LIMIT = 500;

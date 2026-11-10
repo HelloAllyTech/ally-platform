@@ -21,7 +21,7 @@ export const PLACEHOLDER_ID = '00000000-0000-0000-0000-000000000000';
  * Namespace for the contact ids that cannot reuse a `wa_contacts.id`. Must never change: the
  * backfill and the dual-write derive the same id from it independently.
  */
-export const SHARED_CONTACT_NAMESPACE = 'ede5c359-c7b8-4dc9-bd46-222dc01adba4';
+const SHARED_CONTACT_NAMESPACE = 'ede5c359-c7b8-4dc9-bd46-222dc01adba4';
 
 /**
  * The ids a WhatsApp contact may take in the shared store for one bot, in order of preference.

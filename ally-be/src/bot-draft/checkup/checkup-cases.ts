@@ -36,7 +36,7 @@ export const EXPECT_OF: Record<CheckupOutcomeChoice, 'answer' | 'decline'> = {
 };
 
 /** What the grader also checks for a choice, on top of the owner's own facts. */
-export const IMPLIED_FACT: Partial<Record<CheckupOutcomeChoice, string>> = {
+const IMPLIED_FACT: Partial<Record<CheckupOutcomeChoice, string>> = {
   decline: 'Politely declines to help with this',
   person: 'Offers to put them in touch with a person from the team',
 };

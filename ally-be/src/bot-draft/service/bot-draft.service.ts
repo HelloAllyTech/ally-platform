@@ -55,7 +55,7 @@ import { canAdvance, previousStep } from './step-machine';
  * chooses who can use the assistant or adds their own rules; nobody patches the documents or the
  * pack (the server sets those).
  */
-export const DRAFT_PATHS: Record<BotDraftActor, readonly string[]> = {
+const DRAFT_PATHS: Record<BotDraftActor, readonly string[]> = {
   [BotDraftActor.BUILDER]: [
     '/name',
     '/assistantName',

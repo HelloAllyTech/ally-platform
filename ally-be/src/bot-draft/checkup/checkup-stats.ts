@@ -17,7 +17,7 @@ export interface StatInput {
   ms: number;
 }
 
-export interface Measure {
+interface Measure {
   passed: number;
   total: number;
 }
@@ -159,7 +159,7 @@ export function sumDays(days: DayStats[]): WeekStats {
 }
 
 /** Days are India's (the business's) days; weeks start on Monday. */
-export const SCORECARD_TIME_ZONE = 'Asia/Kolkata';
+const SCORECARD_TIME_ZONE = 'Asia/Kolkata';
 
 /** `YYYY-MM-DD` in India for an instant. */
 export function dayOf(at: Date): string {

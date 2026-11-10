@@ -41,13 +41,13 @@ import {
 import type { PlannedCase } from './checkup-generation';
 
 /** The plain-text sources list a channel without a sources view gets (reply-composer.ts). */
-export const withoutSourcesFooter = (reply: string): string =>
+const withoutSourcesFooter = (reply: string): string =>
   reply.replace(/\n\nSources:\n[\s\S]*$/, '');
 
 /** A checkup runs this long after the last change, so a burst of edits runs it once. */
-export const AFTER_CHANGE_DELAY_MS = 2 * 60 * 1000;
+const AFTER_CHANGE_DELAY_MS = 2 * 60 * 1000;
 
-export const CHECKUP_PROMPT_CODES = ['ally_ai_checkup_judge'] as const;
+const CHECKUP_PROMPT_CODES = ['ally_ai_checkup_judge'] as const;
 
 export const CHECKUP_LIMITS = {
   /** Runs an owner can start per assistant per day (evals don't count; they're admin-only). */

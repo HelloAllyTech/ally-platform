@@ -134,7 +134,6 @@ export interface PageChoice {
   exclude: string[];
 }
 
-export const NO_CHOICE: PageChoice = { include: [], exclude: [] };
 /** The most patterns one choice holds, and the longest one. */
 export const PAGE_CHOICE_LIMITS = { patterns: 100, chars: 200 };
 

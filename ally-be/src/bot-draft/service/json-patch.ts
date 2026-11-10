@@ -20,7 +20,7 @@ const decode = (token: string): string =>
 const encode = (token: string | number): string =>
   String(token).replace(/~/g, '~0').replace(/\//g, '~1');
 
-export function splitPath(path: string): string[] {
+function splitPath(path: string): string[] {
   if (!path.startsWith('/'))
     throw new PatchError(path, 'A path starts with "/".');
   return path.slice(1).split('/').map(decode);

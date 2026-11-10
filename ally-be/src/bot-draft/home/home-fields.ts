@@ -60,7 +60,7 @@ export interface HomeState {
 }
 
 /** What a field writes: columns on the bot and keys of the page's settings. */
-export interface HomeWrite {
+interface HomeWrite {
   chatbot?: Partial<
     Pick<
       Chatbot,
@@ -544,7 +544,7 @@ export function readAll(
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** The hand-over settings as the owner sent them, checked (chunk 11a). */
-export function parseHandover(value: unknown): HandoverSettings {
+function parseHandover(value: unknown): HandoverSettings {
   const v = (value ?? {}) as Partial<HandoverSettings>;
   const replyWithin = String(v.replyWithin ?? '').trim();
   if (!replyWithin || replyWithin.length > HANDOVER_LIMITS.replyWithinChars) {

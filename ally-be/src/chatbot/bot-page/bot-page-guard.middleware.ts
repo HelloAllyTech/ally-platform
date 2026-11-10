@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppConfigService } from '../../config/config.service';
 
 /** The largest body a bot page sends: one message, or eight pre-chat answers. */
-export const BOT_PAGE_MAX_BODY_BYTES = 16 * 1024;
+const BOT_PAGE_MAX_BODY_BYTES = 16 * 1024;
 
 /**
  * Two checks in front of the public bot-page routes:

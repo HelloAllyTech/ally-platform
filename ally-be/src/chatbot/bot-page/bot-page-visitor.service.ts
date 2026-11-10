@@ -43,12 +43,12 @@ const SECRET_LABEL = 'bot-page-visitor-v1';
 const TOKEN_TTL_SECONDS = 7 * 24 * 3600;
 const ROTATE_AFTER_SECONDS = 24 * 3600;
 /** A verified email has to be proved again after this long. */
-export const VERIFICATION_TTL_SECONDS = 30 * 24 * 3600;
+const VERIFICATION_TTL_SECONDS = 30 * 24 * 3600;
 export const BOT_PAGE_COOKIE_PATH = '/api/v1/public/bots';
 /** Sent by the bot page when it runs inside the website widget (chunk 13). */
-export const EMBED_HEADER = 'x-ally-embed';
+const EMBED_HEADER = 'x-ally-embed';
 /** The widget's in-memory visitor token, when its browser blocks even partitioned cookies. */
-export const VISITOR_TOKEN_HEADER = 'x-ally-visitor';
+const VISITOR_TOKEN_HEADER = 'x-ally-visitor';
 /** A throwaway cookie the widget sets and reads back to learn whether cookies reach the API. */
 export const EMBED_PROBE_COOKIE = 'ally_bpe_probe';
 

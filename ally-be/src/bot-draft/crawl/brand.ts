@@ -51,10 +51,7 @@ export function detectBrand(
 }
 
 /** A declared size no wider (or taller) than 2:1; an undeclared size isn't trusted. */
-export function logoShaped(
-  width: number | null,
-  height: number | null,
-): boolean {
+function logoShaped(width: number | null, height: number | null): boolean {
   if (!width || !height) return false;
   return Math.max(width, height) / Math.min(width, height) <= 2;
 }

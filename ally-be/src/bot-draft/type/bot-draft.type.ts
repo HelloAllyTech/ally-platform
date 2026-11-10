@@ -10,8 +10,8 @@ import {
   SafetyPackId,
 } from '../enum/bot-draft.enum';
 
-export type BotDraftTone = 'warm' | 'professional' | 'friendly' | 'formal';
-export type BotDraftAccessMode = 'public' | 'organisation' | 'invite';
+type BotDraftTone = 'warm' | 'professional' | 'friendly' | 'formal';
+type BotDraftAccessMode = 'public' | 'organisation' | 'invite';
 
 /**
  * The assistant being built, as one typed document (chunk 20a). The builder in ally-ai proposes
@@ -133,7 +133,7 @@ export interface PatchOp {
   value?: unknown;
 }
 
-export type DraftEventKind =
+type DraftEventKind =
   | 'patch'
   | 'undo'
   | 'step'

@@ -21,7 +21,7 @@ export const MAX_WIDGET_DOMAINS = 10;
  *   (myclinic.wixsite.com) is fine.
  * - `local`: localhost in production.
  */
-export type DomainRefusal = 'invalid' | 'shared' | 'local';
+type DomainRefusal = 'invalid' | 'shared' | 'local';
 
 export type NormalisedDomain =
   | { domain: string }
@@ -54,7 +54,7 @@ export function normaliseDomain(
 }
 
 /** A public suffix (co.in) or a shared hosting domain (github.io), per the Public Suffix List. */
-export function isSharedSuffix(host: string): boolean {
+function isSharedSuffix(host: string): boolean {
   const parsed = psl.parse(host);
   return 'error' in parsed && parsed.error
     ? true
@@ -62,7 +62,7 @@ export function isSharedSuffix(host: string): boolean {
 }
 
 /** The hostname of a host page's origin ("https://www.sunrisemind.in:8443" → "www.sunrisemind.in"). */
-export function hostOf(origin: string | null | undefined): string | null {
+function hostOf(origin: string | null | undefined): string | null {
   if (!origin) return null;
   try {
     const url = new URL(origin);

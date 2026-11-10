@@ -253,7 +253,7 @@ export function changesAdminOnlySetting(
  * and moving the dashboard onto the shared store. `PUT /v1/whatsapp/settings` is otherwise open to
  * anyone with the WhatsApp bot edit permission. A key left out, or sent unchanged, is not a change.
  */
-export const PLATFORM_ADMIN_ONLY_SETTINGS = [
+const PLATFORM_ADMIN_ONLY_SETTINGS = [
   'botPagePublicAllowed',
   'dashboardReadsFrom',
 ] as const;

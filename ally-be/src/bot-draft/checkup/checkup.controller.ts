@@ -99,7 +99,7 @@ export class GapAnswerDto {
 const VERSION = /^[0-9a-f]{16}$/;
 
 /** A question the owner adds or edits (chunk 20d-2). */
-export class CaseFieldsDto {
+class CaseFieldsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

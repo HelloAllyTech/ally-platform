@@ -8,8 +8,8 @@ import { HomeFieldInvalid, versionOf } from './home-fields';
  * only add to the pack: a pack rule can't be removed or edited from here, or anywhere.
  */
 
-export const MAX_OWN_RULES = 20;
-export const OWN_RULE_MAX_CHARS = 200;
+const MAX_OWN_RULES = 20;
+const OWN_RULE_MAX_CHARS = 200;
 
 export interface SafetyRule {
   /** `pack-<n>` or `own-<n>`. */

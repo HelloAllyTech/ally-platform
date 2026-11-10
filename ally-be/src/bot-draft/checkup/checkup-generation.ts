@@ -33,7 +33,7 @@ export interface PlannedCase {
 }
 
 /** The out-of-scope questions every assistant is asked (platform, never removed). */
-export const PLATFORM_OUT_OF_SCOPE: {
+const PLATFORM_OUT_OF_SCOPE: {
   key: string;
   question: string;
   mustNot: string[];

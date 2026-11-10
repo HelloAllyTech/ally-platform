@@ -87,7 +87,7 @@ export interface PublicBotPage {
 }
 
 /** How the page looks to a visitor. Image URLs are on the public image route; no ids. */
-export interface PublicBrandLook {
+interface PublicBrandLook {
   headingStyle: AvailableBotPage['settings']['brand']['headingStyle'];
   theme: AvailableBotPage['settings']['brand']['theme'];
   accent: string;
@@ -95,7 +95,7 @@ export interface PublicBrandLook {
   cover: AvailableBotPage['brandImages']['cover'];
 }
 
-export type SessionState = 'ready' | 'needs_email' | 'needs_code';
+type SessionState = 'ready' | 'needs_email' | 'needs_code';
 
 export interface PublicSession {
   state: SessionState;
@@ -125,7 +125,7 @@ export interface WidgetConfig {
 }
 
 /** The widget asks for its token in the session answer with this header (its cookie check failed). */
-export const EMBED_TOKEN_HEADER = 'x-ally-embed-token';
+const EMBED_TOKEN_HEADER = 'x-ally-embed-token';
 
 /** A source under an answer: what it's called, and a link when the document has one. */
 export interface PublicCitation {
@@ -1159,7 +1159,7 @@ export function publicCitations(
   return out;
 }
 
-export function maskEmail(email: string): string {
+function maskEmail(email: string): string {
   const at = email.lastIndexOf('@');
   if (at < 1) return '***';
   return `${email[0]}***${email.slice(at)}`;

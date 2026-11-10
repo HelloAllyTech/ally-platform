@@ -134,9 +134,9 @@ export interface KnowledgeChunkSearchResponse {
 
 // ── Answering agent ─────────────────────────────────────────────────────────
 
-export type KnowledgeAnswerIntent = 'answer' | 'decline' | 'clarify';
+type KnowledgeAnswerIntent = 'answer' | 'decline' | 'clarify';
 
-export type KnowledgeDeclineReason =
+type KnowledgeDeclineReason =
   | 'none'
   | 'no_hits'
   | 'below_threshold'
@@ -230,7 +230,7 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
   turn_type?: AgentTurnType;
 }
 
-export interface KnowledgePersonaRequest {
+interface KnowledgePersonaRequest {
   display_name?: string;
   system_prompt?: string;
   tone?: string;
@@ -314,7 +314,7 @@ export interface CrisisCheckResponse {
 }
 
 /** What a streamed run is doing now (ally-ai `trace.STATUS_LABELS`). */
-export type AgentStatusCode =
+type AgentStatusCode =
   | 'thinking'
   | 'searching'
   | 'found'

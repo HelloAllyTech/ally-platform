@@ -28,7 +28,7 @@ import { DraftCheckupService } from '../checkup/draft-checkup.service';
 /** The replies that are the assistant answering (not a crisis, a template or the consent gate). */
 const ANSWER_KINDS = ['rag', 'declined', 'clarified'];
 /** Most open items each Overview list shows. */
-export const LIST_LIMIT = 20;
+const LIST_LIMIT = 20;
 
 /**
  * Every live number, per assistant per India day (chunk Q2a), in one query: the job writes it to

@@ -3,8 +3,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { LoggerService } from '../../logger/logger.service';
 import { RedisService } from '../../redis/service/redis.service';
 
-export type BotPageLimitHit = 'visitor' | 'ip' | 'daily_cap';
-
 /** Per-IP ceilings on the public routes, whatever the page's own limits say. */
 export const BOT_PAGE_IP_LIMITS = {
   /** Session starts and code requests. */

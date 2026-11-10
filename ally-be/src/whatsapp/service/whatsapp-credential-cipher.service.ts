@@ -4,7 +4,7 @@ import { AppConfigService } from 'src/config/config.service';
 import { LoggerService } from 'src/logger/logger.service';
 
 /** Marks a value this class wrote, so a future key rotation can tell versions apart. */
-export const WA_CREDENTIAL_CIPHER_PREFIX = 'waenc:v1:';
+const WA_CREDENTIAL_CIPHER_PREFIX = 'waenc:v1:';
 
 /**
  * Organisations' WhatsApp access tokens and app secrets at rest (`wa_business_numbers`).
