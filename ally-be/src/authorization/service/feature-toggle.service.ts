@@ -5,6 +5,7 @@ import { AUDIT_EVENTS } from 'src/audit/constants/audit-event.constants';
 import { AdminFeatureToggleRepository } from '../repository/admin-feature-toggle.repository';
 import {
   DEFAULT_ENABLED_FEATURE_TOGGLE_KEYS,
+  DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED,
   FEATURE_TOGGLES,
   FeatureToggleKey,
   isOrgScopedRoutesOnlyToggle,
@@ -71,6 +72,29 @@ export class FeatureToggleService {
       return stored;
     }
     return stored.filter((key) => !isPlatformOnlyToggle(key));
+  }
+
+  /**
+   * The caller's own toggle list, as the console reads it: getEnabledKeys,
+   * minus the default-on keys an org-restricted admin may not use
+   * (DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED). Only this read pays the
+   * restriction lookup for them — once per page load, not per request.
+   */
+  async getVisibleKeys(userId: number): Promise<string[]> {
+    const keys = await this.getEnabledKeys(userId);
+    const withheld = keys.filter((key) =>
+      (DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED as readonly string[]).includes(
+        key,
+      ),
+    );
+    if (!withheld.length) return keys;
+    if (!(await this.tenantScopeService.isRestricted(userId))) return keys;
+    return keys.filter((key) => !withheld.includes(key));
+  }
+
+  /** Whether this user is restricted to an organization allowlist. */
+  isRestricted(userId: number): Promise<boolean> {
+    return this.tenantScopeService.isRestricted(userId);
   }
 
   /**

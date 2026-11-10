@@ -159,6 +159,21 @@ export class RoadmapBuilderService {
    * The opportunity as Builder is handed it. The transcript is a read of its own because the
    * column is `select: false` — the board reads every card and has no use for it.
    */
+  /**
+   * The rendered hand-off for an opportunity, for a plan session filed from the roadmap: the
+   * same text "Open in Builder Agent" would attach, so a plan's PRD stage starts from what the
+   * filing interview already settled. Null when there is nothing beyond the description.
+   */
+  async handoffTextForOpportunity(
+    opportunityId: string,
+  ): Promise<string | null> {
+    const opportunity = await this.opportunityRepository.findOne({
+      where: { id: opportunityId },
+    });
+    if (!opportunity) return null;
+    return this.handoffText(await this.handoffSource(opportunity));
+  }
+
   private async handoffSource(
     opportunity: RoadmapOpportunity,
   ): Promise<BuilderHandoffSource> {

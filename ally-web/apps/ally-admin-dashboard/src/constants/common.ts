@@ -1244,6 +1244,7 @@ export const TAG_TYPES = {
   // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
+  PRODUCT_PLANS: "productPlans",
   PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
   PRODUCT_ROADMAP_BREADTH: "productRoadmapBreadth",
   PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",

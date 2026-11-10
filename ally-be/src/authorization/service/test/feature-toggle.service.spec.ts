@@ -195,3 +195,44 @@ describe('FeatureToggleService — toggles for organization-restricted admins', 
     });
   });
 });
+
+describe('FeatureToggleService.getVisibleKeys — default-on keys withheld from restricted admins', () => {
+  const USER_ID = 42;
+  const build = (restricted: boolean) => {
+    const tenantScopeService = {
+      isRestricted: jest.fn().mockResolvedValue(restricted),
+    };
+    const service = new FeatureToggleService(
+      { findByUserId: jest.fn().mockResolvedValue([]) } as never,
+      {
+        get: jest.fn().mockResolvedValue(null),
+        set: jest.fn(),
+      } as never,
+      tenantScopeService as never,
+      {
+        getUserRoles: jest.fn().mockResolvedValue(['PLATFORM_ADMIN']),
+      } as never,
+    );
+    return { service, tenantScopeService };
+  };
+
+  it('keeps Product Planning — Ideas for an unrestricted platform admin', async () => {
+    const { service } = build(false);
+    await expect(service.getVisibleKeys(USER_ID)).resolves.toContain(
+      FeatureToggleKey.PRODUCT_PLANNING_IDEAS,
+    );
+  });
+
+  it('hides it from an org-restricted admin, keeping their other defaults', async () => {
+    const { service } = build(true);
+    const keys = await service.getVisibleKeys(USER_ID);
+    expect(keys).not.toContain(FeatureToggleKey.PRODUCT_PLANNING_IDEAS);
+    expect(keys).toContain(FeatureToggleKey.PRODUCT_ROADMAP);
+  });
+
+  it('keeps it off the per-request hot path: getEnabledKeys never asks', async () => {
+    const { service, tenantScopeService } = build(true);
+    await service.getEnabledKeys(USER_ID);
+    expect(tenantScopeService.isRestricted).not.toHaveBeenCalled();
+  });
+});

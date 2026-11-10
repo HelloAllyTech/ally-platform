@@ -960,6 +960,55 @@ export const PRODUCT_UPDATES_CONSOLIDATE = definePrompt(
   },
 );
 
+/** src/prompts/planning/safety_review.txt */
+export const PLANNING_SAFETY_REVIEW = definePrompt(
+  'planning_safety_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/privacy_review.txt */
+export const PLANNING_PRIVACY_REVIEW = definePrompt(
+  'planning_privacy_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/ai_quality_review.txt */
+export const PLANNING_AI_QUALITY_REVIEW = definePrompt(
+  'planning_ai_quality_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/outcome_review.txt */
+export const PLANNING_OUTCOME_REVIEW = definePrompt(
+  'planning_outcome_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/launch_plan.txt */
+export const PLANNING_LAUNCH_PLAN = definePrompt(
+  'planning_launch_plan',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/research_plan.txt */
+export const PLANNING_RESEARCH_PLAN = definePrompt(
+  'planning_research_plan',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/signal_scout.txt */
+export const PLANNING_SIGNAL_SCOUT = definePrompt(
+  'planning_signal_scout',
+  {},
+  { output: 'json' },
+);
+
 /** src/prompts/roadmap/classify_goal.txt */
 export const ROADMAP_CLASSIFY_GOAL = definePrompt(
   'roadmap_classify_goal',

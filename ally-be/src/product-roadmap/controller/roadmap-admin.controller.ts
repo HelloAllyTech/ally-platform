@@ -84,6 +84,7 @@ import {
   ROADMAP_READINESS_CRITERIA,
 } from '../constants/product-roadmap.constants';
 import { RoadmapOpportunityEffort } from '../enum/roadmap-opportunity.enum';
+import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 
 /** Taxonomy, research notes, release notes, AI helpers, and the vector-index repair tools. */
 @ApiTags('Product Roadmap')
@@ -103,6 +104,7 @@ export class RoadmapAdminController {
     private readonly goalImpactService: RoadmapGoalImpactService,
     private readonly strategyContextService: RoadmapStrategyContextService,
     private readonly copilotService: RoadmapCopilotService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   // ── taxonomy ──────────────────────────────────────────────────────────────
@@ -637,6 +639,9 @@ export class RoadmapAdminController {
     @CurrentUser() user: TokenUser,
     @Body() dto: OpportunityInterviewTurnDto,
   ): Promise<OpportunityInterviewTurnResponseDto> {
+    // The copilot is the filing interview: Product Planning — Ideas, like the
+    // door it leads to.
+    await this.planAccess.assertIdeas(user.id);
     return this.copilotService.takeTurn(
       { messages: dto.messages, brief: dto.brief },
       user.id,
@@ -668,6 +673,8 @@ export class RoadmapAdminController {
     @Body() dto: OpportunityInterviewTurnDto,
     @Res() res: Response,
   ): Promise<void> {
+    // Before the stream opens, so a refusal is an ordinary 403 response.
+    await this.planAccess.assertIdeas(user.id);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');

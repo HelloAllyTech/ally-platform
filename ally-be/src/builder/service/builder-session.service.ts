@@ -11,7 +11,11 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderMessage } from '../entity/builder-message.entity';
-import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import {
+  BuilderSessionRepository,
+  isSessionVisibleTo,
+  SHARED_SESSIONS_ONLY,
+} from '../repository/builder-session.repository';
 import { BuilderMessageRepository } from '../repository/builder-message.repository';
 import { BuilderPullRequestRepository } from '../repository/builder-build.repository';
 import { BuilderPrdService } from './builder-prd.service';
@@ -47,6 +51,20 @@ import { isBuilderRepo } from '../constants/builder-repos.constants';
  * Session lifecycle and the non-streaming REST around it. The streamed
  * interview turn itself lives in BuilderInterviewOrchestratorService.
  */
+/** How many times a create re-allocates its slug after losing a race for it. */
+const SLUG_SAVE_ATTEMPTS = 5;
+
+/** Postgres unique violation on the slug index (and nothing else). */
+function isSlugCollision(error: unknown): boolean {
+  const driverError = (
+    error as { driverError?: { code?: string; constraint?: string } }
+  )?.driverError;
+  const code = driverError?.code ?? (error as { code?: string })?.code;
+  const constraint =
+    driverError?.constraint ?? (error as { constraint?: string })?.constraint;
+  return code === '23505' && constraint === 'idx_builder_sessions_slug';
+}
+
 @Injectable()
 export class BuilderSessionService {
   private readonly logger = LoggerService.getInstance(
@@ -139,10 +157,10 @@ export class BuilderSessionService {
         ? String(this.configService.builder.defaultBudgetUsd)
         : null);
 
-    const session = await this.sessionRepository.save(
+    const session = await this.saveWithFreshSlug(title, (slug) =>
       this.sessionRepository.create({
         title: title || 'New build',
-        slug: await this.allocateSlug(title),
+        slug,
         tenantId: params.tenantId ?? null,
         budgetUsd,
         handoffContext: this.boundHandoff(params.handoffContext),
@@ -192,6 +210,31 @@ export class BuilderSessionService {
   private boundHandoff(text?: string | null): string | null {
     const trimmed = (text ?? '').trim();
     return trimmed ? trimmed.slice(0, BUILDER_HANDOFF_CONTEXT_MAX) : null;
+  }
+
+  /**
+   * Save a new session under a slug nobody holds.
+   *
+   * `allocateSlug` checks then the INSERT writes, so two sessions created at
+   * once with the same title both saw the slug free and the second INSERT hit
+   * the unique index — a 500 for whoever lost. The index stays the arbiter:
+   * on a slug collision the loser allocates again (the winner's row is now
+   * visible, so it gets the next suffix) and retries. Any other error, or a
+   * collision that will not clear, is rethrown.
+   */
+  private async saveWithFreshSlug(
+    title: string,
+    build: (slug: string) => BuilderSession,
+  ): Promise<BuilderSession> {
+    for (let attempt = 1; ; attempt++) {
+      const slug = await this.allocateSlug(title);
+      try {
+        return await this.sessionRepository.save(build(slug));
+      } catch (error) {
+        if (!isSlugCollision(error) || attempt >= SLUG_SAVE_ATTEMPTS)
+          throw error;
+      }
+    }
   }
 
   /**
@@ -276,6 +319,7 @@ export class BuilderSessionService {
     const { statuses, createdBy } = params;
     const sessions = await this.sessionRepository.find({
       where: {
+        ...SHARED_SESSIONS_ONLY,
         ...(createdBy !== undefined ? { createdBy } : {}),
         archivedAt: IsNull(),
         ...(statuses?.length ? { status: In(statuses) } : {}),
@@ -299,6 +343,7 @@ export class BuilderSessionService {
   }): Promise<{ sessions: BuilderSessionListItem[]; totalCount: number }> {
     const [sessions, totalCount] = await this.sessionRepository.findAndCount({
       where: {
+        ...SHARED_SESSIONS_ONLY,
         ...(params.createdBy !== undefined
           ? { createdBy: params.createdBy }
           : {}),
@@ -342,6 +387,9 @@ export class BuilderSessionService {
     }
   > {
     const session = await this.getSession(sessionId);
+    if (!isSessionVisibleTo(session, userId)) {
+      throw new NotFoundException('Builder session not found');
+    }
     const [messages, doc, createdByName] = await Promise.all([
       this.messageRepository.listBySession(sessionId),
       this.prdService.getOrCreateDoc(sessionId, userId),

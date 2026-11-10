@@ -40,9 +40,16 @@ import {
   BuilderPrFeedbackStatus,
   BuilderRunMode,
   BuilderRunStatus,
+  BuilderSessionKind,
   BuilderSessionStatus,
+  BuilderSessionVisibility,
   BuilderStage,
 } from '../../builder/enum/builder.enum';
+import {
+  PlanEventKind,
+  PlanNotificationKind,
+  PlanStage,
+} from '../../product-planning/enum/product-planning.enum';
 import {
   CourseCopilotEventType,
   CourseCopilotJobKind,
@@ -258,6 +265,16 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_cl_rollout_steps_status', Object.values(ClRolloutStatus)],
     ['CHK_builder_sessions_status', Object.values(BuilderSessionStatus)],
     ['CHK_builder_sessions_stage', Object.values(BuilderStage)],
+    ['CHK_builder_sessions_kind', Object.values(BuilderSessionKind)],
+    [
+      'CHK_builder_sessions_visibility',
+      Object.values(BuilderSessionVisibility),
+    ],
+    ['CHK_plan_events_kind', Object.values(PlanEventKind)],
+    ['CHK_plan_spend_entries_stage', Object.values(PlanStage)],
+    ['CHK_builder_sessions_plan_stage', Object.values(PlanStage)],
+    ['CHK_roadmap_opportunities_plan_stage', Object.values(PlanStage)],
+    ['CHK_plan_notifications_kind', Object.values(PlanNotificationKind)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],
     ['CHK_builder_build_runs_status', Object.values(BuilderRunStatus)],
     ['CHK_builder_build_runs_mode', Object.values(BuilderRunMode)],

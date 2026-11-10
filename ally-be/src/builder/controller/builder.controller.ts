@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -10,7 +11,9 @@ import {
   Post,
   Query,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
+import { BuilderSessionVisibilityInterceptor } from '../interceptor/builder-session-visibility.interceptor';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -83,6 +86,8 @@ import { BuilderSessionStatus } from '../enum/builder.enum';
 @ApiTags('Builder')
 @ApiBearerAuth()
 @ApiSecurity('access-token')
+// PRIVATE sessions (unfiled plans) are their author's alone on every :sessionId route.
+@UseInterceptors(BuilderSessionVisibilityInterceptor)
 @Controller({ path: 'builder', version: '1' })
 export class BuilderController {
   private readonly logger = LoggerService.getInstance(BuilderController.name);
@@ -114,10 +119,18 @@ export class BuilderController {
     permissions: [PERMISSIONS.EDIT_BUILDER],
   })
   @ApiOperation({ summary: 'Start a Builder session (PRD interview)' })
-  createSession(
+  async createSession(
     @Body() dto: CreateBuilderSessionDto,
     @CurrentUser() user: TokenUser,
   ) {
+    // Retired once plans start on the roadmap (rev 5.2, P7): existing sessions
+    // carry on; new work starts as an idea on the roadmap.
+    const settings = await this.settingsService.get();
+    if (settings.builderDirectInterviewEnabled === false) {
+      throw new ForbiddenException(
+        'New builds now start on the Product Roadmap: file an idea there, and its plan comes here to build.',
+      );
+    }
     return this.sessionService.createSession(user.id, {
       title: dto.title,
       tenantId: user.tenantId ?? null,
@@ -154,6 +167,7 @@ export class BuilderController {
   @Get('sessions/:sessionId')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Session with transcript, PRD draft and readiness rubric',
@@ -168,6 +182,7 @@ export class BuilderController {
   @Patch('sessions/:sessionId')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Rename a session or set its repos / model',
@@ -183,6 +198,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/cancel')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({ summary: 'Stop a session' })
   cancelSession(
@@ -200,6 +216,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/pull-requests/:pullRequestId/resume-automation')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Give a pull request that needs a person back to automation',
@@ -228,6 +245,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/pull-requests/:pullRequestId/merge')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: "Merge one of this session's pull requests",
@@ -261,6 +279,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/archive')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Hide a finished session from the default feed',
@@ -280,6 +299,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/unarchive')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Restore an archived session to the default feed',
@@ -294,6 +314,7 @@ export class BuilderController {
   @Patch('sessions/:sessionId/prd')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Edit the PRD directly (RFC-6902); rejected while a build runs',
@@ -314,6 +335,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/prd/review/findings/:findingId/dismiss')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary:
@@ -336,6 +358,7 @@ export class BuilderController {
   @Get('sessions/:sessionId/prd/versions')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({ summary: 'PRD version history, newest first' })
   async listPrdVersions(
@@ -406,6 +429,7 @@ export class BuilderController {
   @Get('sessions/:sessionId/evidence')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary:
@@ -421,6 +445,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/start-build')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({ summary: 'Dispatch a build run from the ready PRD' })
   async startBuild(
@@ -445,6 +470,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/design')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Draft the technical design (read-only designer run)',
@@ -460,6 +486,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/design/approve')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary:
@@ -486,6 +513,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/budget')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Raise the session spend ceiling',
@@ -511,6 +539,7 @@ export class BuilderController {
   @Get('sessions/:sessionId/budget')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({ summary: 'Live spend against the ceiling' })
   async getSessionBudget(@Param('sessionId', ParseUUIDPipe) sessionId: string) {
@@ -521,6 +550,7 @@ export class BuilderController {
   @Get('sessions/:sessionId/runs')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({ summary: 'Build runs for a session, oldest first' })
   async listRuns(@Param('sessionId', ParseUUIDPipe) sessionId: string) {
@@ -557,6 +587,7 @@ export class BuilderController {
   @Get('sessions/:sessionId/pull-requests')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({ summary: 'Pull requests this session opened' })
   async listPullRequests(@Param('sessionId', ParseUUIDPipe) sessionId: string) {
@@ -567,6 +598,7 @@ export class BuilderController {
   @Get('sessions/:sessionId/pr-feedback')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'CI failures and review comments on this session’s PRs',
@@ -581,6 +613,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/research')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary:
@@ -604,6 +637,7 @@ export class BuilderController {
   @Get('sessions/:sessionId/milestones')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({ summary: 'The milestone series for an epic session' })
   async listMilestones(@Param('sessionId', ParseUUIDPipe) sessionId: string) {
@@ -614,6 +648,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/epic-plan')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary:
@@ -631,6 +666,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/epic-plan/confirm')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary: 'Accept the proposed split and start the first milestone',
@@ -773,6 +809,23 @@ export class BuilderController {
                 : null,
             }
           : {}),
+        ...(dto.planningEnabled !== undefined
+          ? { planningEnabled: dto.planningEnabled }
+          : {}),
+        ...(dto.planCeilingUsd !== undefined
+          ? { planCeilingUsd: String(dto.planCeilingUsd) }
+          : {}),
+        ...(dto.planIdeaCeilingUsd !== undefined
+          ? { planIdeaCeilingUsd: String(dto.planIdeaCeilingUsd) }
+          : {}),
+        ...(dto.planCloseConfirmVotes !== undefined
+          ? { planCloseConfirmVotes: dto.planCloseConfirmVotes }
+          : {}),
+        ...(dto.builderDirectInterviewEnabled !== undefined
+          ? {
+              builderDirectInterviewEnabled: dto.builderDirectInterviewEnabled,
+            }
+          : {}),
         // The level sets the switches, and wins over any given alongside it.
         ...(dto.autonomyLevel
           ? switchesForAutonomyLevel(dto.autonomyLevel)
@@ -879,6 +932,7 @@ export class BuilderController {
   @Post('sessions/:sessionId/messages/stream')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.EDIT_BUILDER],
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
   })
   @ApiOperation({
     summary:

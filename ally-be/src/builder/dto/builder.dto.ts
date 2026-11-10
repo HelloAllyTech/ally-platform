@@ -7,6 +7,7 @@ import {
   IsBoolean,
   IsEnum,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -503,6 +504,52 @@ export class UpdateBuilderSettingsDto {
   @IsOptional()
   @IsBoolean()
   situationBrief?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Master switch for the roadmap's plan flow (idea to outcome). Who may use it is the two Product Planning admin toggles.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  planningEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'One USD ceiling per plan, from the first message to the outcome review, design and build runs included. Warns at 80%, then stops until the lead raises it.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  planCeilingUsd?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Where the private Idea stage wraps up: at 80% of this the copilot helps the author file or park instead of stopping them.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1)
+  @Max(20)
+  planIdeaCeilingUsd?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Closing a plan as not pursuing when its idea has more votes than this needs a second Lead to confirm.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  planCloseConfirmVotes?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Builder's own new-session door. Turn it off once plans start on the roadmap; Builder then builds plans.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  builderDirectInterviewEnabled?: boolean;
 }
 
 export class ListBuilderSessionsQueryDto {

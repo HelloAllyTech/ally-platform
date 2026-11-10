@@ -32,6 +32,7 @@ import { LabEvaluatorService } from 'src/lab/service/lab-evaluator.service';
 import { BUG_REPORT_RATE_LIMIT } from 'src/product-roadmap/constants/product-roadmap.constants';
 import { RoadmapOpportunityController } from 'src/product-roadmap/controller/roadmap-opportunity.controller';
 import { RoadmapAccessService } from 'src/product-roadmap/service/roadmap-access.service';
+import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 import { RoadmapAllocationService } from 'src/product-roadmap/service/roadmap-allocation.service';
 import { RoadmapBoardService } from 'src/product-roadmap/service/roadmap-board.service';
 import { RoadmapBuilderService } from 'src/product-roadmap/service/roadmap-builder.service';
@@ -142,6 +143,7 @@ describe('Rate-limited routes', () => {
           { provide: RoadmapBuilderService, useValue: {} },
           { provide: RoadmapBoardService, useValue: {} },
           { provide: RoadmapAccessService, useValue: {} },
+          { provide: PlanAccessService, useValue: {} },
         ],
         [
           [JwtAuthGuard, authenticateFromHeader],

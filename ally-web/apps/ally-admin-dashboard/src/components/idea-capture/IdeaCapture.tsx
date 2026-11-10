@@ -62,14 +62,16 @@ const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).leng
  * useSpeechCapture for why not the browser's own recognition), so each phrase lands a moment
  * after the speaker pauses. Save waits for any phrase still being transcribed.
  *
- * Access mirrors filing an opportunity (the VOTE permission and the roadmap toggle), because the
- * draft endpoints do; anyone else never sees the button.
+ * Access mirrors filing an opportunity (the VOTE permission, the roadmap toggle and Product
+ * Planning — Ideas), because the draft endpoints do; anyone else never sees the button.
  */
 export const IdeaCaptureLauncher: React.FC = () => {
   const { permissions, features } = useUser();
   const allowed =
     !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
-    hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP);
+    hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP) &&
+    // Parking an idea is filing's first step: Product Planning — Ideas, as ally-be checks.
+    hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_IDEAS);
 
   const navigate = useNavigate();
   const buttonRef = useRef<HTMLButtonElement>(null);

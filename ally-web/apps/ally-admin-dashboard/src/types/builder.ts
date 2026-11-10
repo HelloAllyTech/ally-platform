@@ -644,6 +644,16 @@ export interface BuilderPrFeedback {
 export interface BuilderSettings {
   id: string;
   enabled: boolean;
+  /**
+   * Builder's own new-session door. Off once plans start on the Product Roadmap: new work is
+   * filed as an idea there and its plan comes here to build.
+   */
+  builderDirectInterviewEnabled?: boolean;
+  /** Planning on the roadmap (idea to outcome). */
+  planningEnabled?: boolean;
+  planCeilingUsd?: string;
+  planIdeaCeilingUsd?: string;
+  planCloseConfirmVotes?: number;
   /** Whether Builder reviews its own open pull requests. Writes findings, touches no branch. */
   autoReviewEnabled: boolean;
   /** Whether a review that found nothing may submit an approving review. */

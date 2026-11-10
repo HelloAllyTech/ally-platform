@@ -36,6 +36,8 @@ const builder = (id: ClUseCase, label: string): UseCaseSpec => ({
   defaultCollections: [
     ClCollectionId.FIRST_PRINCIPLES,
     ClCollectionId.BUILDER_LESSONS,
+    // What similar shipped plans achieved, so a PRD sets its target knowing them.
+    ClCollectionId.PRODUCT_OUTCOMES,
   ],
   defaultLimit: 8,
 });
@@ -78,7 +80,10 @@ export const CONTEXT_USE_CASES: Record<ClUseCase, UseCaseSpec> = {
     label: 'Roadmap Copilot',
     audience: ClAudienceRule.PLATFORM,
     querySensitive: false,
-    defaultCollections: [ClCollectionId.FIRST_PRINCIPLES],
+    defaultCollections: [
+      ClCollectionId.FIRST_PRINCIPLES,
+      ClCollectionId.PRODUCT_OUTCOMES,
+    ],
     defaultLimit: 8,
   },
   [ClUseCase.COURSE_COPILOT]: {
@@ -126,6 +131,7 @@ export const CONTEXT_USE_CASES: Record<ClUseCase, UseCaseSpec> = {
       ClCollectionId.LEARNING_DESIGN,
       ClCollectionId.BUILDER_LESSONS,
       ClCollectionId.BUG_HUNTER_NOTES,
+      ClCollectionId.PRODUCT_OUTCOMES,
     ],
     defaultLimit: 8,
   },

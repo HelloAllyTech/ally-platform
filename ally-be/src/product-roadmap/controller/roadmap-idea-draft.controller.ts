@@ -32,6 +32,7 @@ import {
 } from '../dto/roadmap-idea-draft.dto';
 import { RoadmapIdeaDraftService } from '../service/roadmap-idea-draft.service';
 import { RoadmapIdeaTranscriptionService } from '../service/roadmap-idea-transcription.service';
+import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 
 /** Private, unpublished raw ideas. Same tier as filing an opportunity (VOTE). */
 @ApiTags('Product Roadmap')
@@ -42,6 +43,7 @@ export class RoadmapIdeaDraftController {
   constructor(
     private readonly drafts: RoadmapIdeaDraftService,
     private readonly transcription: RoadmapIdeaTranscriptionService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
@@ -58,7 +60,13 @@ export class RoadmapIdeaDraftController {
   })
   @Post()
   @ApiOperation({ summary: 'Save a raw idea as a private draft' })
-  create(@CurrentUser() user: TokenUser, @Body() dto: CreateIdeaDraftDto) {
+  async create(
+    @CurrentUser() user: TokenUser,
+    @Body() dto: CreateIdeaDraftDto,
+  ) {
+    // Parking an idea is the Product Planning — Ideas toggle's. Listing and
+    // discarding your own drafts stay open: they are yours to read and remove.
+    await this.planAccess.assertIdeas(user.id);
     return this.drafts.create(user.id, dto);
   }
 
@@ -80,8 +88,10 @@ export class RoadmapIdeaDraftController {
       'Transcribe one spoken phrase for idea capture. Audio is processed in memory and never stored.',
   })
   async transcribe(
+    @CurrentUser() user: TokenUser,
     @UploadedFile() audio: Express.Multer.File,
   ): Promise<{ text: string }> {
+    await this.planAccess.assertIdeas(user.id);
     return { text: await this.transcription.transcribe(audio) };
   }
 
@@ -90,11 +100,12 @@ export class RoadmapIdeaDraftController {
   })
   @Patch(':id')
   @ApiOperation({ summary: 'Edit one of your drafts' })
-  update(
+  async update(
     @CurrentUser() user: TokenUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateIdeaDraftDto,
   ) {
+    await this.planAccess.assertIdeas(user.id);
     return this.drafts.update(user.id, id, dto);
   }
 
