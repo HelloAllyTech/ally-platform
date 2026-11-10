@@ -9,10 +9,11 @@ This file is a **router**: find your task below, read what it points at, skip th
 Conventions with a canonical home are linked, never restated — if you find a rule written
 twice anywhere in this platform, that's a bug worth fixing.
 
-> **Stacks is not wired up in this repo yet** (no `.mcp.json`/`.claude/skills/stacks`,
-> unlike every other service here — `ally-be/.mcp.json`, `ally-web/.mcp.json`, etc.). Until
-> it is, get product-judgement context by asking in conversation rather than via the
-> `search_chunks` tool other repos use directly.
+> **The Context Library is not wired up in this repo yet** (no `.mcp.json` or
+> `context-library` skill, unlike every other service here — `ally-be/.mcp.json`,
+> `ally-web/.mcp.json`, etc.). Until it is, get product-judgement context by asking in
+> conversation rather than via the `search_context` tool other repos use directly. Setup and
+> rules: [Working with the Context Library](https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md).
 
 ## What am I doing?
 

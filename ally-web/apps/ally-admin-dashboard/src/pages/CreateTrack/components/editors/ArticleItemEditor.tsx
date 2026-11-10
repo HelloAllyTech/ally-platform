@@ -1,11 +1,18 @@
-import { FC, useMemo } from "react";
+import { FC, useMemo, useState } from "react";
 
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
 import { TextArea, Tooltip, htmlToPlainText, escapeHtml } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon, Trash } from "@assets";
-import { RichTextEditor } from "@components/rich-text-editor";
+import {
+  courseSlotPrefix,
+  LazyGenerateImageModal,
+  toContextText,
+  useCourseImage,
+  useImageStudioEnabled,
+} from "@components/image-studio";
+import { GenerateImageAtCursor, RichTextEditor } from "@components/rich-text-editor";
 import { MAX_ARTICLE_QUESTIONS, MAX_ARTICLE_RESOURCES } from "@constants";
 import {
   ArticleCover,
@@ -140,6 +147,19 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
 
   const handleImageUpload = (file: File) => upload(file, "image");
 
+  /* ---- Image Studio: cover and inline pictures ---- */
+  const course = useCourseImage();
+  const imageStudioEnabled = useImageStudioEnabled();
+  const itemTitle = (useWatch({ control, name: `${base}.title` }) ?? "") as string;
+  const serverId = useWatch({ control, name: `${base}.serverId` });
+  const localId = useWatch({ control, name: `${base}.localId` });
+  const itemSlotPrefix = `${courseSlotPrefix(course.trackId)}:item:${serverId || localId || `${sectionIndex}-${itemIndex}`}`;
+  const articleContext = useMemo(
+    () => ({ title: itemTitle, text: toContextText(html) }),
+    [itemTitle, html],
+  );
+  const [inlineRequest, setInlineRequest] = useState<GenerateImageAtCursor | null>(null);
+
   /**
    * Called by the toolbar button. Creates the question and hands back its id
    * for the editor to anchor; returning null leaves the body untouched.
@@ -194,6 +214,8 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
           onChange={next => setValue(coverName, next, { shouldDirty: true })}
           experience={experience}
           readingMinutes={readingMinutes}
+          slotKey={`${itemSlotPrefix}:cover`}
+          imageContext={articleContext}
         />
         <ArticleTakeawaysField
           name={takeawaysName}
@@ -214,6 +236,7 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
               placeholder="Write the article content…"
               allowImages
               onImageUpload={handleImageUpload}
+              onGenerateImage={imageStudioEnabled ? setInlineRequest : undefined}
               onCreateQuestion={handleCreateQuestion}
               allowCallouts
               className={`min-h-[360px] [&_.ProseMirror]:min-h-[320px] ${isCards ? CARD_BREAK_CLASS : ""}`}
@@ -224,6 +247,18 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
           <p className="text-xs text-typography-500">
             In Cards mode, each H2 heading starts a new card.
           </p>
+        )}
+        {inlineRequest && (
+          <LazyGenerateImageModal
+            slotKind="article_inline"
+            slotKey={`${itemSlotPrefix}:inline`}
+            context={{ title: itemTitle, text: toContextText(inlineRequest.nearbyText) }}
+            onAccept={image => {
+              inlineRequest.insert({ src: image.url, alt: image.altText });
+              setInlineRequest(null);
+            }}
+            onClose={() => setInlineRequest(null)}
+          />
         )}
       </div>
 

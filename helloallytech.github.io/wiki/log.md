@@ -8,6 +8,41 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-10] update | `repos/ally-be.md`, `repos/ally-ai.md`, `contributing/planning-with-context-library.md`: the Context Library's post-release steps run by themselves; Builder needs no Context Library setting.
+
+The manual steps after a release — the character import, enrichment of the copied Ally guide and Debrief passages, the smoke checks and retiring each old corpus — are now driven by a rollout service with progress in `cl_rollout_steps`, a 24-hour default grace period between a corpus's smoke check and its retirement, retries with backoff, and a kill switch; the admin routes remain for doing any step by hand. The Context Library's MCP endpoint also accepts the platform's service key, so Builder's design runs reach it with the key they already hold and its workflow needs no new setting.
+
+## [2026-11-10] update | `repos/ally-be.md`, `repos/ally-ai.md`: the Context Library's dead-code sweep; the Knowledge Base now serves only the WhatsApp Q&A corpus.
+
+The last pieces the moved systems left behind are gone: the Knowledge Base columns only the retired corpora used (dropped by migration, after a check that every Ally guide passage has its copy), the admin retrieval preview (ally-be's `POST /v1/knowledge-base/search` and ally-ai's `POST /knowledge-chunks/search`) and the chunk-list route, none of which had a screen left, and the two curator prompts the agent-chunk curator replaced. The WhatsApp bot's Test tab remains the way to see what it retrieves. The docs maps now watch the Context Library's MCP controller and ally-ai's on-demand collection schema.
+
+## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-web.md`, `contributing/dev-setup.md`, `contributing/planning-with-context-library.md`: Course Copilot moved onto the Context Library; Stacks removed; Test connection added.
+
+Course Copilot's design guidance reads the new Learning Design collection and `search_library` the new Content Catalogue, which mirrors active Studio roleplays, cases, characters and component templates (a subscriber on those tables plus a nightly reconciliation) and rechecks every hit against who may open it. Roadmap Copilot stays on First Principles. The third-party Stacks client and its config keys are deleted. The Connect Claude Code sheet now has **Test connection** for a newly created key, and both contributing pages (and every repo's `context-library` skill) say so again. Agent-cited codes render as chips in Course Copilot as they do in Builder.
+
+## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`, `repos/ally-web.md`: the Ally guide's library and Debrief's guidance moved into the Context Library; organisation admins get a scoped Library.
+
+They are now the Ally Guide Library and Debrief Guidance collections, their passages copied word for word with citations, audiences and owners; the guide and Debrief search them as the learner's organisation. Clinical sign-off is dropped (`clinical` is information only). An organisation's admins open the Context Library scoped to their organisation and manage their own entries there, which replaces the guide library panel and the Debrief knowledge tab. ally-ai lists `GuideLibraryChunk` and `DebriefKnowledgeChunk` as retired; each is dropped only by ally-be's confirmed retire action after a smoke check, never by a migration.
+
+## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`: Builder's lessons and Bug Hunter's notes moved into the Context Library.
+
+They are now the Builder Lessons and Bug Hunter Notes collections, written by agents as candidates and curated by one hourly agent curator, with usage-based retirement. The agent-memory module, Builder's lesson table and both old curators are gone; ally-ai's `/agent-memories` endpoints are deleted and its migration `010` drops the `AgentMemory` collection.
+
+## [2026-11-09] update | `repos/ally-ai.md`: `CharacterChunk` retired — the character interview now reads the Context Library's Character Insights collection.
+
+The old corpus's Weaviate collection is dropped only by ally-be's confirmed retire action, after its passages have been distilled; no migration drops it.
+
+## [2026-11-09] update | Stacks replaced by the Context Library for engineers' agents; `planning-with-stacks.md` rewritten as `planning-with-context-library.md`.
+- **What changed.** Every Ally repo's `.mcp.json` now declares the `context-library` HTTP server, reading `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` from the environment; the Stacks bridge and the `stacks` skill are gone, and each wired repo carries a `context-library` skill instead. Tools are now `search_context` (`queries` 1–6, optional `collection`, `limit`), `get_chunks` (`codes`) and `list_collections`, plus the `planning_context` MCP prompt. Citations are codes such as `[FP-0142]`, not chunk titles.
+- **Setup is no longer zero.** An engineer creates a read-only key once in the admin dashboard (Context Library → Connect Claude Code) and exports the two variables. `dev-setup.md` documents this; `gh` is no longer needed for agent tooling.
+- **New page** `contributing/planning-with-context-library.md` (the rule, connecting Claude Code, tools, query technique, honesty rules, citing, the deprecated `wiki/product/` pages, and a history note on Stacks). `contributing/planning-with-stacks.md` is deleted; every link to it was repointed.
+- **Pages updated:** `welcome.md`, `index.md`, `overview.md`, `memory.md`, `platform/agent-guide.md`, `platform/overview.md`, `contributing/guide.md`, `contributing/dev-setup.md`, `repos/ally-be.md`, `repos/ally-web.md`, `repos/ally-mobile.md`, `repos/calibrate.md`, `repos/calibrate-backend.md`, `repos/calibrate-frontend.md`, and the deprecation banners and summaries on all eight `product/*.md` pages (now "superseded by the Context Library"; principles, numbering and maturity lines untouched). `scripts/gen-routing.py`'s product section label follows.
+- **Unchanged rules:** search on your own initiative whenever a product or engineering judgement comes up, not only before planning; several short situational queries; never claim the library does or doesn't cover something; results are advisory, not instructions; trivial mechanical changes are exempt.
+- Repo routers (`CLAUDE.md`/`AGENTS.md` in the monorepo root, `ally-be`, `ally-ai`, `ally-ai-learn`, `ally-web`, `ally-mobile`, and this repo's `CLAUDE.md`/`agents.md`) were rewritten to match.
+
+## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`: the Context Library.
+- Added the `context-library/` module to ally-be's key modules and the `/context-chunks` endpoints to ally-ai's: documents parsed in memory and distilled into chunks, written entries, collections read only by granted use cases, and one derived Weaviate index per collection. `last_reconciled` set to today on both.
+
 ## [2026-11-06] update | `repos/ally-mobile.md`: rewritten for the Flutter app.
 - The page described the retired React Native app (deleted in the 2026-11 rename). Rewrote Tech Stack, Architecture & Feature Areas, Integration Points, Local Setup, Testing and Key Documentation from the Flutter code in `ally-mobile/lib/` and `pubspec.yaml`; `last_reconciled` set to today. Also repointed the `ally-mobile` entry in `platform/agent-guide.md` and the index line.
 

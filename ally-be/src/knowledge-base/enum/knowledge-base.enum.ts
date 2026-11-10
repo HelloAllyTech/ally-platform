@@ -11,47 +11,19 @@
  * itself. A filter can be forgotten; a required argument cannot. Each corpus also gets its
  * OWN Weaviate collection rather than a discriminator on a shared one — a similarity
  * threshold only means something against one distribution, and chunk size differs per corpus
- * (400 tokens for a 1600-character WhatsApp reply, 800 for a character vignette).
+ * (400 tokens for a 1600-character WhatsApp reply; the Ally guide's procedures, since moved to
+ * the Context Library, were cut at 600).
+ *
+ * Three corpora were retired into the Context Library (docs/context-library/PLAN.md): the
+ * character corpus (`character_library`, phase 4, distilled into Character Insights), and the
+ * Ally guide's library (`ally_guide_library`) and Debrief's guidance (`debrief_knowledge`),
+ * phase 6, copied word for word into the Ally Guide Library and Debrief Guidance. Rows that
+ * still carry those values are read and finally deleted only by `ContextKbImportService`, with
+ * literal SQL, until a platform admin retires them. What remains is the WhatsApp Q&A corpus.
  */
 export enum KbCorpus {
   /** Grounds the WhatsApp Q&A bot's answers. */
   WHATSAPP_QA = 'whatsapp_qa',
-  /**
-   * Grounds the Character Library interview agent — clinical and lived-experience
-   * material it draws on to make its questions specific and its drafts real, rather
-   * than inventing a plausible-sounding person from nothing.
-   */
-  CHARACTER_LIBRARY = 'character_library',
-  /**
-   * Grounds the Ally guide (plans/ally-guide/plan.md §7.6) — material about becoming and
-   * being a helper. The first corpus that is not Ally-global throughout: a document is
-   * either the PLATFORM's, available to every learner, or one ORGANISATION's own
-   * protocols and handbooks, available only to that organisation's learners. So it is
-   * searched only through `KnowledgeBaseService.searchForAudience`, and its documents'
-   * audience follows their owner (`kb_documents.owner_tenant_id`) rather than being
-   * targeted by hand — see KB_OWNED_CORPORA.
-   */
-  ALLY_GUIDE_LIBRARY = 'ally_guide_library',
-  /**
-   * Grounds the Debrief agent's guidance lookup (v9 FR-16): practice guidelines, the
-   * debrief style guide, level guides and organisations' protocols. Curated centrally and
-   * targeted by hand (platform-wide or named organisations), like the WhatsApp corpus; a
-   * document marked clinical is served only once the clinical advisor has signed off its
-   * current content.
-   */
-  DEBRIEF_KNOWLEDGE = 'debrief_knowledge',
-}
-
-/**
- * Where a retrieved document sits relative to the person asking. Derived from
- * `kb_documents.is_global` at query time rather than stored, so it can never disagree with
- * the audience that let the passage through.
- */
-export enum KbDocumentScope {
-  /** Available to every organisation, and to anonymous visitors. */
-  GLOBAL = 'global',
-  /** Targeted at organisations — on an audience search, the asker's own. */
-  ORGANISATION = 'organisation',
 }
 
 /**
@@ -101,34 +73,6 @@ export const KB_LOGGED_CORPORA: string[] = [
  * relevance judge can read. Everything else is logged for its distribution and its volume.
  */
 export const KB_JUDGEABLE_CORPORA: string[] = Object.values(KbCorpus);
-
-/**
- * What part of a character a document helps ground.
- *
- * A curator who uploads a dementia caregiving handbook and a book on adolescent anxiety
- * knows which belongs where; similarity search only sees that both are "mental health".
- * Declaring it lets that knowledge improve ranking.
- *
- * A BOOST, never a filter. Retrieval searches the documents mapped to the asked-about
- * topic first and tops up from the rest of the corpus — so mapped material wins ties, and
- * the passage that turns out relevant in a way nobody anticipated is still reachable. That
- * matters most here: the unanticipated detail is often the one that makes a character feel
- * like a person.
- *
- * Named for the SUBJECT, not for the interviewer prompt's phase numbering. The prompt's
- * wording and ordering change without a migration — they changed twice today — so a
- * mapping keyed to "phase 4" or to question text would be stale on arrival. These five
- * subjects have survived every edit, because they are what a person is made of rather than
- * how the interview happens to be sequenced. A stale mapping here costs a little ranking
- * quality; a stale filter would silently hide sources.
- */
-export enum KbCharacterTopic {
-  IDENTITY = 'identity',
-  LIFE_CONTEXT = 'life_context',
-  INNER_LIFE = 'inner_life',
-  HISTORY_AND_PRESENTING_CONCERN = 'history_and_presenting_concern',
-  SPEECH_AND_LANGUAGE = 'speech_and_language',
-}
 
 /**
  * Where a corpus document came from. Immutable after creation: a PDF is not a URL, so
@@ -181,8 +125,8 @@ export enum KbChunkUploadStatus {
  *
  * Recorded because the alternative is reading one population's behaviour as another's. The
  * admin retrieval preview exists for an operator to probe thresholds — deliberately odd
- * queries, repeated, often against material they just uploaded — and the interview agent's
- * queries are the ones a floor should actually be calibrated against. Pooled, an afternoon of
+ * queries, repeated, often against material they just uploaded — and the agents' queries are
+ * the ones a floor should actually be calibrated against. Pooled, an afternoon of
  * threshold-tuning would move every distribution the tuning was meant to inform.
  *
  * This is the same trap the language judge fell into: a metric that looked like a quality
@@ -190,9 +134,11 @@ export enum KbChunkUploadStatus {
  * Segment every retrieval trend by `consumer` before believing it.
  */
 export enum KbRetrievalConsumer {
-  /** The character interview agent's search_corpus tool. */
-  INTERVIEW_AGENT = 'interview_agent',
-  /** The admin retrieval preview — POST /knowledge-base/search. */
+  /**
+   * The admin retrieval preview, `POST /knowledge-base/search`. No longer written: its last screen
+   * left with the character corpus (phase 4) and the route went in the phase 8 sweep. WhatsApp
+   * admins preview through the bot's own Test tab. Kept because older rows carry it.
+   */
   ADMIN_PREVIEW = 'admin_preview',
   /**
    * The WhatsApp Q&A bot, reported by ally-ai rather than written here.
@@ -212,16 +158,9 @@ export enum KbRetrievalConsumer {
   REFERENCE_SEARCH = 'reference_search',
   /** Roadmap duplicate detection. Staff-authored product text, nothing sensitive. */
   ROADMAP_MATCHER = 'roadmap_matcher',
-  /**
-   * The Ally guide's library search, on a learner's behalf. Marked sensitive: Ally composes
-   * the query, but from what the learner just said, so it can carry their words.
-   */
-  ALLY_GUIDE = 'ally_guide',
-  /**
-   * The Debrief agent's guidance lookup, one search per pivotal moment. Marked sensitive:
-   * the query describes a moment in a learner's session.
-   */
-  DEBRIEF = 'debrief',
+  // The Ally guide's library search (`ally_guide`) and Debrief's guidance lookup (`debrief`)
+  // logged here until phase 6 moved both into the Context Library, which logs them as use cases
+  // of its own. Their rows stay in `kb_retrievals` until a platform admin retires each corpus.
 }
 
 /**
@@ -233,8 +172,7 @@ export enum KbRetrievalConsumer {
  * passages and declines on all of them looks healthy in every count except this one.
  *
  * Null for consumers that have no decline step of their own: the admin preview shows whatever
- * comes back, and the interview agent judges passages in its own reasoning rather than at a
- * threshold.
+ * comes back.
  */
 export enum KbRetrievalDisposition {
   /** Passages were used to ground an answer. */
@@ -256,22 +194,26 @@ export enum KbRetrievalDisposition {
  * Every candidate the vector search returned is recorded, not only the ones that survived,
  * because the dropped ones carry most of the diagnostic value: a corpus where shaping is
  * constantly discarding near-duplicates is a corpus whose chunk profile is wrong, and that is
- * invisible if only the survivors are stored.
+ * invisible if only the survivors are stored. The `dropped_*` values came from the admin
+ * retrieval preview's shaping (removed in the phase 8 sweep) and remain on its older rows; the
+ * WhatsApp bot reports what it returned.
  */
 export enum KbRetrievalOutcome {
   RETURNED = 'returned',
   /** Overlapped the character span of a higher-ranked passage from the same document. */
   DROPPED_SPAN_OVERLAP = 'dropped_span_overlap',
-  /** Its document had already contributed KB_MAX_PASSAGES_PER_DOCUMENT passages. */
+  /** Its document had already contributed its cap of passages (three). */
   DROPPED_DOCUMENT_CAP = 'dropped_document_cap',
   /** Ranked below the limit once the survivors above it were counted. */
   DROPPED_OVER_LIMIT = 'dropped_over_limit',
 }
 
-/** Which of the two passes a candidate came from — the curator's boost, or the top-up. */
+/**
+ * Which pass a candidate came from. Every search is one pass over the corpus now (`rest`);
+ * `preferred` — documents a curator mapped to the asked-about character topic, searched first —
+ * went with the character corpus and remains only on rows logged before it was retired.
+ */
 export enum KbRetrievalPass {
-  /** A document mapped to one of the asked-about character topics. */
   PREFERRED = 'preferred',
-  /** The rest of the corpus, searched only when the first pass came back short. */
   REST = 'rest',
 }

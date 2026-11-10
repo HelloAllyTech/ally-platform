@@ -84,7 +84,7 @@ interface AnnotationNormaliseOptions {
  * Writes one ANNOTATED_ARTIFACT item: a fictional helper conversation the
  * learner marks with helpful and unhelpful behaviour labels.
  *
- * Stacks: "Completion Strategy: Sequencing from Worked Examples to Independent
+ * "Completion Strategy: Sequencing from Worked Examples to Independent
  * Problems" — this is the worked example placed before the first roleplay on
  * the same behaviours, so the prompt is told which roleplay comes next.
  * "Deep Processing and Comparison in Case Study Design" — a worked example

@@ -1,6 +1,5 @@
 import { FC, ReactNode, useMemo, useState } from "react";
 
-import { LineChart, SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
 import { Link } from "react-router-dom";
 
 import "@carbon/charts/styles.css";
@@ -18,6 +17,7 @@ import {
   Tile,
 } from "@ally-ui-mono/ui-shared";
 import { useGetLanguageQualityQuery, useSetLanguageReferenceMutation } from "@api";
+import { LineChart, SimpleBarChart, StackedBarChart } from "@components/charts";
 import { ROUTES } from "@constants";
 import { LanguageRateByExperiment } from "@types";
 

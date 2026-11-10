@@ -49,6 +49,7 @@ import {
 import { asAgentText } from "@utils";
 
 import { BUILDER_STATUS_TAG_TYPE } from "./builderMotion";
+import { PrinciplesInPlay } from "./PrinciplesInPlay";
 
 /** The PRD is the build's source of truth while a run is reading it. */
 const PRD_FROZEN: BuilderSessionStatus[] = ["BUILDING", "WAITING_FOR_INPUT"];
@@ -570,6 +571,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
               storageKey="builder.prdAside"
               widthClassName="w-[38%] min-w-[340px] max-w-[520px]"
             >
+              <PrinciplesInPlay sessionId={sessionId} live={sessionIsLive} />
               <ErrorBoundary variant="panel" resetKey={sessionId} className="m-4">
                 <PrdDocPanel
                   prd={prd}
@@ -659,6 +661,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                   agent, so it is the part most likely to throw — and it used to
                   take the transcript beside it down with it. A panel boundary
                   keeps the interview readable when the document is not. */}
+              <PrinciplesInPlay sessionId={sessionId} live={sessionIsLive} />
               <ErrorBoundary variant="panel" resetKey={sessionId} className="m-4">
                 <PrdDocPanel
                   prd={prd}
@@ -715,6 +718,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
           className="w-[32rem]"
           bodyClassName="!p-0"
         >
+          <PrinciplesInPlay sessionId={sessionId} live={sessionIsLive} />
           <ErrorBoundary variant="panel" resetKey={sessionId} className="m-4">
             <PrdDocPanel
               prd={prd}

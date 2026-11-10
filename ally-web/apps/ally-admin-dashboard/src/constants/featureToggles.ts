@@ -61,6 +61,8 @@ export const FeatureToggleKey = {
   /** Signs off clinical guidance in Debriefs → Knowledge (the clinical advisor). */
   DEBRIEF_CLINICAL_SIGN_OFF: "debrief_clinical_sign_off",
   BUILDER: "builder",
+  // The Context Library page: documents, entries and use-case grants. Mirrors ally-be.
+  CONTEXT_LIBRARY: "context_library",
   COURSE_COPILOT: "course_copilot",
   // Ally guide: the Ally Console, the per-organisation Ally tab, and redacted
   // learner transcripts (per-person grant). Mirrors ally-be FeatureToggleKey.
@@ -203,6 +205,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.OPERATIONAL_ADMIN_ACTIONS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUG_HUNTER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUILDER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.CONTEXT_LIBRARY]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.COURSE_COPILOT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.ALLY_GUIDE]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.ALLY_GUIDE_ORG]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,

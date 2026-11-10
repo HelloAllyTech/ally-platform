@@ -19,7 +19,6 @@ import {
   KB_MAX_PASTE_CHARS,
 } from '../constants/knowledge-base.constants';
 import {
-  KbCharacterTopic,
   KbCorpus,
   KbDocumentSourceType,
   KbDocumentStatus,
@@ -80,18 +79,6 @@ export class CreateKbDocumentDto {
   @IsOptional()
   @IsEnum(KbCorpus)
   corpus: KbCorpus = KbCorpus.WHATSAPP_QA;
-
-  @ApiPropertyOptional({
-    enum: KbCharacterTopic,
-    isArray: true,
-    description:
-      'Which parts of a character this grounds. A ranking hint, not a restriction; ' +
-      'empty is the default and a fine answer. Character library only.',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsEnum(KbCharacterTopic, { each: true })
-  characterTopics?: KbCharacterTopic[];
 
   @ApiProperty()
   @IsString()
@@ -164,13 +151,11 @@ export class CreateKbDocumentDto {
 }
 
 /**
- * A document added to an owned corpus (KB_OWNED_CORPORA) by its owner — the platform or one
- * organisation.
+ * A document added by its owner — today, a chatbot on its Knowledge tab (chunk 3d).
  *
- * Deliberately WITHOUT `corpus`, `isGlobal`, `tenantIds` and `characterTopics`. The route
- * decides the corpus and the owner, and the audience follows the owner; a body that could
- * name them would let one organisation's admin publish to the platform, or target another
- * organisation, by editing a request.
+ * Deliberately WITHOUT `corpus`, `isGlobal` and `tenantIds`. The route decides the corpus and
+ * the owner, and the audience follows the owner; a body that could name them would let an
+ * editor publish more widely, or target another organisation, by editing a request.
  */
 export class CreateKbOwnedDocumentDto extends PickType(CreateKbDocumentDto, [
   'title',
@@ -223,21 +208,6 @@ export class UpdateKbDocumentDto {
   @IsString()
   @MaxLength(16)
   language?: string;
-
-  @ApiPropertyOptional({
-    enum: KbCharacterTopic,
-    isArray: true,
-    description:
-      'Which parts of a character this document helps ground. Editable after upload, ' +
-      'and cheap to change: it is a RANKING hint read at query time, so it never ' +
-      'invalidates a chunk or triggers a re-index — unlike the content, and unlike ' +
-      '`corpus`, which is immutable. An empty array clears the hint, which is a ' +
-      'legitimate choice rather than a missing value.',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsEnum(KbCharacterTopic, { each: true })
-  characterTopics?: KbCharacterTopic[];
 }
 
 export class ReplaceKbDocumentContentDto {
@@ -324,7 +294,7 @@ export class GetKbDocumentsQueryDto {
   // `Boolean("false")` is `true` — so `?includeArchived=false` arrived as true and archived
   // documents were ALWAYS included. That made the WhatsApp Corpus tab's "Show archived"
   // checkbox inert in both positions from the day it shipped, and it is why three archived
-  // documents kept rendering in the character panel after being archived.
+  // documents kept rendering in a corpus panel after being archived.
   //
   // Explicit string comparison instead, and only "true" is true: an absent parameter, an empty
   // one, or any typo all mean "no", which is the safe direction for a flag that widens a list.
@@ -363,21 +333,9 @@ export class GetKbDocumentsQueryDto {
   sortDir?: string;
 }
 
-/**
- * One owner's documents. Fewer filters than the corpus console's list: an owner's library is
- * small, and the organisation filter is the route itself. Archived (removed) documents are
- * never listed — removing one is how an owner says they are done with it.
- */
-export class GetKbOwnedDocumentsQueryDto extends PickType(
-  GetKbDocumentsQueryDto,
-  ['limit', 'offset', 'search', 'status', 'sortBy', 'sortDir'] as const,
-) {}
-
 export class KbDocumentResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty({ enum: KbCorpus }) corpus!: KbCorpus;
-  @ApiProperty({ enum: KbCharacterTopic, isArray: true })
-  characterTopics!: KbCharacterTopic[];
   @ApiProperty() title!: string;
   @ApiProperty({ enum: KbDocumentSourceType })
   sourceType!: KbDocumentSourceType;
@@ -407,14 +365,6 @@ export class KbDocumentResponseDto {
       'document as restricted.',
   })
   tenantIds!: string[];
-  @ApiProperty({
-    nullable: true,
-    description:
-      'The organisation that owns it, on a corpus whose documents have owners (the Ally ' +
-      "guide's library). Null for the platform's own documents and for every document of " +
-      'the other corpora.',
-  })
-  ownerTenantId!: string | null;
   @ApiProperty() isArchived!: boolean;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
@@ -430,109 +380,6 @@ export class GetKbDocumentsResponseDto {
   @ApiProperty({ type: [KbDocumentResponseDto] })
   documents!: KbDocumentResponseDto[];
   @ApiProperty() count!: number;
-}
-
-export class KbChunkResponseDto {
-  @ApiProperty() id!: string;
-  @ApiProperty() chunkIndex!: number;
-  @ApiProperty() text!: string;
-  @ApiProperty() charStart!: number;
-  @ApiProperty() charEnd!: number;
-  @ApiProperty({ description: '0 when the format has no pages' })
-  pageFrom!: number;
-  @ApiProperty() pageTo!: number;
-  @ApiProperty({ nullable: true }) sectionPath!: string | null;
-  @ApiProperty() tokenCount!: number;
-  @ApiProperty() uploadStatus!: string;
-  @ApiProperty({ nullable: true }) uploadError!: string | null;
-}
-
-export class GetKbChunksResponseDto {
-  @ApiProperty({ type: [KbChunkResponseDto] }) chunks!: KbChunkResponseDto[];
-  @ApiProperty() count!: number;
-}
-
-export class KbSearchDto {
-  @ApiPropertyOptional({
-    enum: KbCorpus,
-    default: KbCorpus.WHATSAPP_QA,
-    description:
-      "Which corpus to search. Resolves to that corpus's own Weaviate " +
-      'collection, so there is no "all corpora" search and no filter that could ' +
-      'be left unset — a search can only ever return passages from one corpus.\n\n' +
-      'Defaulted for the deploy window; see CreateKbDocumentDto.corpus.',
-  })
-  @IsOptional()
-  @IsEnum(KbCorpus)
-  corpus: KbCorpus = KbCorpus.WHATSAPP_QA;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  query!: string;
-
-  @ApiPropertyOptional({ default: 8 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
-  limit?: number;
-
-  @ApiPropertyOptional({
-    default: 0.35,
-    description:
-      'Cosine similarity floor. Exposed so an admin can tune retrieval live.',
-  })
-  @IsOptional()
-  @Type(() => Number)
-  minSimilarity?: number;
-
-  @ApiPropertyOptional({
-    description:
-      'Retrieve as a worker from this organisation would — the documents targeted at it ' +
-      'plus the ones available to everyone. This is WHO is asking, which is a different ' +
-      'scope from `corpus` (WHICH documents exist): a corpus is one of a few fixed sets ' +
-      'and gets its own collection, an organisation is one of hundreds sharing the same ' +
-      'documents and gets a filter.\n\nOmitted, the search ignores targeting entirely — ' +
-      'right for a console whose job is to show what is indexed, and not what any worker ' +
-      'receives.',
-  })
-  @IsOptional()
-  @IsUUID('4')
-  tenantId?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Narrow to documents carrying ANY of these tags — same overlap semantics as ' +
-      'the corpus list filter. Topical metadata about the material (e.g. "dementia", ' +
-      '"adolescent"), resolved to document ids in Postgres the way `corpus` is.\n\n' +
-      "Deliberately NOT a map of interview question to tag. The interview's " +
-      'phases live in a prompt that changes without a migration, so tags keyed to ' +
-      'them would go quietly stale; and hand-partitioning mostly costs recall, ' +
-      'excluding the passage that was relevant in a way nobody anticipated. ' +
-      'Which tags to ask for is a decision for the caller — a prompt change, not ' +
-      'a schema change.',
-    type: [String],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
-
-  @ApiPropertyOptional({
-    enum: KbCharacterTopic,
-    isArray: true,
-    description:
-      'Which parts of a character this query is about. A BOOST, not a filter: documents a ' +
-      'curator mapped to any of these topics are searched first, and the rest of the corpus ' +
-      'tops the result up if that comes back short. Omitting it searches the whole corpus in ' +
-      'one pass, which is what the admin retrieval preview wants.',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsEnum(KbCharacterTopic, { each: true })
-  characterTopics?: KbCharacterTopic[];
 }
 
 /**

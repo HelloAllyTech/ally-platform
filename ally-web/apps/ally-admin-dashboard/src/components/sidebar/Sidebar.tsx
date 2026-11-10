@@ -34,6 +34,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
+import { LibraryBig } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -306,6 +307,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // companion, and the two would be indistinguishable once the sidebar collapses to icons.
       case SIDEBAR_ITEMS.ALLY_GUIDE:
         return <ChatBot size={20} />;
+      // A library of shelved volumes: the central store every agent looks things up in. Not
+      // Catalog (Component Library's) or Document (Blog's), which sit nearby in the nav.
+      case SIDEBAR_ITEMS.CONTEXT_LIBRARY:
+        return <LibraryBig size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
         return <Roadmap size={20} />;
       case SIDEBAR_ITEMS.SETTINGS:

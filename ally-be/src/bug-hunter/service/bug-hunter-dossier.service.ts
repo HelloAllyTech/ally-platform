@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
 import { LoggerService } from 'src/logger/logger.service';
-import { AgentMemoryAgent } from 'src/agent-memory/enum/agent-memory.enum';
-import { AgentMemoryService } from 'src/agent-memory/service/agent-memory.service';
+import {
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
+import { ContextAgentChunkService } from 'src/context-library/service/context-agent-chunk.service';
 import { FixDossier, clipDossierText } from '../constants/bug-fix-dossier';
 import { BugFindingVerdict } from '../type/bug-finding-verdict.type';
 import { BugFinding } from '../entity/bug-finding.entity';
@@ -16,6 +19,7 @@ import {
 import { BugCaseFileService } from './bug-case-file.service';
 import { BugHunterTelemetryService } from './bug-hunter-telemetry.service';
 import { BugHunterKnowledgeService } from './bug-hunter-knowledge.service';
+import { toNoteHit } from '../util/bug-hunter-notes.util';
 
 export { DOSSIER_MAX_EVENTS_PER_SESSION, DOSSIER_MAX_SESSIONS, groupSessions };
 
@@ -41,7 +45,7 @@ export class BugHunterDossierService {
   constructor(
     private readonly findingRepository: BugFindingRepository,
     private readonly caseFileService: BugCaseFileService,
-    private readonly memoryService: AgentMemoryService,
+    private readonly notes: ContextAgentChunkService,
     private readonly telemetryService: BugHunterTelemetryService,
     private readonly knowledgeService: BugHunterKnowledgeService,
   ) {}
@@ -89,16 +93,23 @@ export class BugHunterDossierService {
           this.telemetryService.timed(
             runId,
             BugHuntLookupKind.MEMORY,
-            () =>
-              this.memoryService.search({
-                agent: AgentMemoryAgent.BUG_HUNTER,
-                query: clipDossierText(
-                  `${finding.title}. ${finding.description}`,
-                  600,
-                ),
-                repo,
-                limit: DOSSIER_NOTEBOOK_LIMIT,
-              }),
+            async () =>
+              (
+                await this.notes.search({
+                  useCase: ClUseCase.BUG_HUNTER,
+                  collection: ClCollectionId.BUG_HUNTER_NOTES,
+                  queries: [
+                    clipDossierText(
+                      `${finding.title}. ${finding.description}`,
+                      600,
+                    ),
+                  ],
+                  repos: [repo],
+                  limit: DOSSIER_NOTEBOOK_LIMIT,
+                  sessionId: runId ?? null,
+                  queryOrigin: 'fix_dossier',
+                })
+              ).map(toNoteHit),
             (hits) => ({
               itemCount: hits.length,
               chars: hits.reduce((sum, h) => sum + h.body.length, 0),
@@ -199,6 +210,7 @@ export class BugHunterDossierService {
         status: n.status,
       })),
       notebook: (notebook ?? []).map((h) => ({
+        code: h.code,
         body: h.body,
         tags: h.tags ?? [],
         similarity: h.similarity,

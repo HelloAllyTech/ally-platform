@@ -320,6 +320,36 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     ],
   },
   {
+    id: 'context-library',
+    name: 'Context Library',
+    whatItIs:
+      'The central library every agent retrieves context from: documents distilled into short ' +
+      'chunks (the files are never kept), entries admins write or bulk-upload, and lessons agents ' +
+      'write, in collections that each use case may only read when granted. One retrieval pipeline ' +
+      '(keyword + two vectors, fused, re-ranked) with usage-driven learning loops.',
+    reuseWhen:
+      'A feature needs an agent to look things up before it acts — guidance, protocols, examples, ' +
+      'lessons — or wants a new kind of reference material searchable by an agent.',
+    extendVia:
+      'A collection profile in src/context-library/profiles/ plus a migration for its row, and a ' +
+      'use case in context-use-cases.constants.ts; agents read it through ContextToolsService.',
+    modules: [
+      'ally-be:src/context-library',
+      'ally-ai:app/core/context_library',
+    ],
+    adminRoute: '/context-library',
+    keywords: [
+      'context library',
+      'first principles',
+      'principles',
+      'knowledge',
+      'rag',
+      'retrieval',
+      'search guidance',
+      'lessons',
+    ],
+  },
+  {
     id: 'course-copilot',
     name: 'Course Copilot',
     whatItIs:
@@ -518,6 +548,26 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['image', 'cover', 'generate image', 'illustration'],
   },
   {
+    id: 'image-studio',
+    name: 'Image Studio',
+    whatItIs:
+      'AI image generation behind every authoring image slot: a style gallery, AI-drafted ' +
+      'descriptions, reference images that keep characters and places consistent across scenes, ' +
+      'a vision check, durable jobs and a per-image history with cost.',
+    reuseWhen:
+      'A feature lets an author set an image anywhere. Add a slot kind and use the shared ' +
+      'Generate modal rather than a new generator; new styles go in the style registry.',
+    modules: ['ally-be:src/image-studio'],
+    keywords: [
+      'image studio',
+      'generate image',
+      'style gallery',
+      'scene image',
+      'character consistency',
+      'cast sheet',
+    ],
+  },
+  {
     id: 'bug-hunter',
     name: 'Bug Hunter',
     whatItIs:
@@ -601,22 +651,23 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['upload', 'file', 's3', 'attachment', 'media'],
   },
   {
-    id: 'agent-memory',
-    name: 'Agent memory (the agents’ notebook)',
+    id: 'agent-lessons',
+    name: 'Agent lessons and notes (Context Library)',
     whatItIs:
-      'A shared notebook where an internal AI agent keeps short lessons (600 characters each) so ' +
-      'its next run does not rediscover them: searched by meaning, tidied hourly by a curator, ' +
-      'and editable by admins who can add, retire and restore entries. Bug Hunter writes to it ' +
-      'today.',
+      'Where an internal AI agent keeps short lessons (600 characters each) so its next run does ' +
+      'not rediscover them: Builder Lessons and Bug Hunter Notes, two Context Library collections. ' +
+      'Agents write candidates, an hourly curator folds them in (agree, edit, add, remove), runs ' +
+      'report which ones they applied, and lessons that never help are retired. Admins add, edit, ' +
+      'pin and archive them in the Context Library.',
     reuseWhen:
       'An internal agent or copilot should remember what it learned last time, keep lessons or ' +
       'gotchas, or have a memory people can edit and retire. Do not build another memory table.',
     extendVia:
-      'Add a value to AgentMemoryAgent (and its CHECK constraint); each agent exposes the ' +
-      'endpoints on its own surface.',
-    modules: ['ally-be:src/agent-memory'],
-    docs: ['ally-be:docs/bug-hunter-memory-adr.md'],
-    adminRoute: '/bug-hunter',
+      'A collection profile with `agentCuration` in src/context-library/profiles/ plus a ' +
+      'migration for its row and grants; the agent writes through ' +
+      'ContextAgentChunkService.writeAgentChunk and reads with its use case.',
+    modules: ['ally-be:src/context-library'],
+    adminRoute: '/context-library',
     keywords: [
       'agent memory',
       'notebook',

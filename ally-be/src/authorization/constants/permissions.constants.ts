@@ -389,6 +389,13 @@ const PERMISSIONS = {
   // the course it made outlives it.
   VIEW_COURSE_COPILOT: 'view:admin:course-copilot',
   EDIT_COURSE_COPILOT: 'edit:admin:course-copilot',
+
+  // === CONTEXT LIBRARY (docs/context-library/PLAN.md) ===
+  // VIEW browses and searches the library; EDIT uploads documents, writes and bulk-uploads
+  // entries, archives, and changes use-case grants. Platform-tier only for now; organisation
+  // admins get their own scoped access when organisation-owned collections arrive.
+  VIEW_CONTEXT_LIBRARY: 'view:admin:context-library',
+  EDIT_CONTEXT_LIBRARY: 'edit:admin:context-library',
   // Ally guide (plans/ally-guide/plan.md §10.5): the Ally Console and the org
   // Ally tab. Reading individual learner transcripts is a separate permission
   // AND a per-person toggle (ally_guide_transcripts), never a role default.
@@ -561,6 +568,8 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.EDIT_BUILDER,
   PERMISSIONS.VIEW_COURSE_COPILOT,
   PERMISSIONS.EDIT_COURSE_COPILOT,
+  PERMISSIONS.VIEW_CONTEXT_LIBRARY,
+  PERMISSIONS.EDIT_CONTEXT_LIBRARY,
   PERMISSIONS.VIEW_ALLY_GUIDE,
   PERMISSIONS.EDIT_ALLY_GUIDE,
   PERMISSIONS.REVIEW_ALLY_GUIDE_TRANSCRIPTS,

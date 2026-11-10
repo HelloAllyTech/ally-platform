@@ -23,6 +23,7 @@ import { AnalyticsAgentModule } from './analytics-agent/analytics-agent.module';
 import { AnalyticsSuggestionsModule } from './analytics-suggestions/analytics-suggestions.module';
 import { BugHunterModule } from './bug-hunter/bug-hunter.module';
 import { BuilderModule } from './builder/builder.module';
+import { ContextLibraryModule } from './context-library/context-library.module';
 import { CourseCopilotModule } from './course-copilot/course-copilot.module';
 import { GuideModule } from './guide/guide.module';
 import { DebriefModule } from './debrief/debrief.module';
@@ -55,6 +56,7 @@ import { CourseDiscussionModule } from './course-discussion/course-discussion.mo
 import { ProgressModule } from './progress/progress.module';
 import { CohortModule } from './cohort/cohort.module';
 import { ScenarioCoverImageLibraryModule } from './scenario-cover-image-library/scenario-cover-image-library.module';
+import { ImageStudioModule } from './image-studio/image-studio.module';
 import { ComfortAudioModule } from './comfort-audio/comfort-audio.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
@@ -110,6 +112,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     AnalyticsSuggestionsModule,
     BugHunterModule,
     BuilderModule,
+    ContextLibraryModule,
     CourseCopilotModule,
     // The Ally guide (plans/ally-guide/plan.md) — off until its kill switch is on.
     GuideModule,
@@ -142,6 +145,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     LlmModule,
     ConversationalGuardrailsModule,
     ScenarioCoverImageLibraryModule,
+    ImageStudioModule,
     ComfortAudioModule,
     KnowledgeBaseModule,
     WhatsAppModule,

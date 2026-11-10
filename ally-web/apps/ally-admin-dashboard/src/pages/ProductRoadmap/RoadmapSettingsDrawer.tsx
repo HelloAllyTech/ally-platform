@@ -51,7 +51,7 @@ interface RoadmapSettingsDrawerProps {
  *
  * ## Why TABS and not one long form
  *
- * Stacks, "Consolidate Similar Nodes Without Over-Generalizing": cluster genuinely equivalent
+ * "Consolidate Similar Nodes Without Over-Generalizing": cluster genuinely equivalent
  * items, but do not generalise so far that important distinctions vanish. These four are NOT
  * equivalent — the Vision & strategy page is the prose the opportunity copilot reads, product
  * goals are the filing category, strategy goals are the outcomes the board is ranked against,

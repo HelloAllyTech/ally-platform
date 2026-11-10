@@ -4,6 +4,7 @@ import { useSelector } from "react-redux";
 import { Navigate, useSearchParams } from "react-router-dom";
 
 import { SidePanel, Tabs } from "@ally-ui-mono/ui-shared";
+import { ContextCollectionLink } from "@components/context-collection-link";
 import { en, FeatureToggleKey, ROUTES } from "@constants";
 import { RootState } from "@store";
 import { hasFeature } from "@utils";
@@ -14,8 +15,10 @@ import { BugFindingsTable } from "./BugFindingsTable";
 import { BUG_HUNTER_PARAM } from "./bugHunterUrlState";
 import { FeatureMapPanel } from "./FeatureMapPanel";
 import { KeyboardShortcutSheet } from "./KeyboardShortcutSheet";
-import { NotebookPanel } from "./NotebookPanel";
 import { ANALYTICS_BUG_AGENT_TAB_ID, ANALYTICS_TAB_PARAM } from "../Analytics/Analytics";
+
+/** The Context Library collection Bug Hunter's notes live in (PLAN §2.2, phase 5). */
+export const BUG_HUNTER_NOTES_COLLECTION = "bug_hunter_notes";
 
 /**
  * Bug Hunter's page: a one-line header, and under it the work.
@@ -43,7 +46,7 @@ import { ANALYTICS_BUG_AGENT_TAB_ID, ANALYTICS_TAB_PARAM } from "../Analytics/An
  *   weight as the work. `?section=about` still opens it.
  *
  * So the Work tab is the bugs table and nothing else, and the strip reads
- * Work | Notebook. Stacks' *Eliminate distractions that don't drive desired
+ * Work | Notebook. *Eliminate distractions that don't drive desired
  * actions* is the general form: every element on the reviewer's surface has
  * to move them toward a decision, or it goes somewhere else.
  *
@@ -151,9 +154,10 @@ export const BugHunter: FC = () => {
   const tabItems = useMemo(
     () => [
       { id: SECTION.work, label: en.bugHunter.sectionWork },
-      // What the agent wrote down for its future self, and what admins added.
-      // Its own tab: it is neither today's work nor a metric, and a reader who
-      // wants to teach the agent something should not have to hunt for where.
+      // What the agent knows: its notes (the Context Library's Bug Hunter Notes,
+      // linked) and the feature map. Its own tab: it is neither today's work nor
+      // a metric, and a reader who wants to teach the agent something should not
+      // have to hunt for where.
       { id: SECTION.notebook, label: en.bugHunter.sectionNotebook },
     ],
     [],
@@ -186,7 +190,12 @@ export const BugHunter: FC = () => {
 
       {section === SECTION.notebook && (
         <div className="mt-6 flex-1">
-          <NotebookPanel canTriage={canTriage} />
+          <div className="max-w-3xl">
+            <ContextCollectionLink
+              collection={BUG_HUNTER_NOTES_COLLECTION}
+              copy={en.bugHunter.notesLink}
+            />
+          </div>
           <FeatureMapPanel canTriage={canTriage} />
         </div>
       )}

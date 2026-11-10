@@ -1,9 +1,11 @@
+import { ImageAssetService } from 'src/image-studio/service/image-asset.service';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource, DeepPartial, EntityManager, In } from 'typeorm';
 
@@ -252,6 +254,7 @@ export class ScenarioService {
     private readonly cohortVisibilityService: CohortVisibilityService,
     private readonly tenantFeatureService: TenantFeatureService,
     private readonly contentAccessService: ContentAccessService,
+    @Optional() private readonly imageAssetService?: ImageAssetService,
   ) {}
 
   async getScenarios(): Promise<GetScenarioDto[]> {
@@ -702,6 +705,14 @@ export class ScenarioService {
       throw new Error(
         'S3 bucket name for learnMediaPublicBucket is not defined',
       );
+    }
+    // A cover can be shared: a character's portrait copied in by the
+    // character picker, a library image, an AI-generated image. Deleting it
+    // when this roleplay's cover changes would blank it everywhere else.
+    if (
+      await this.imageAssetService?.isShared(deleteCoverImageDto.coverImageUrl)
+    ) {
+      return { success: true };
     }
     return this.s3Service.deleteS3Image(
       bucket,

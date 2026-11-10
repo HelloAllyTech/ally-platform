@@ -31,7 +31,7 @@ const jsonb = (value: Record<string, unknown>) =>
   value as unknown as QueryDeepPartialEntity<AgentShadowReport>['summary'];
 
 /**
- * Shadow replay (plans/ally-guide/plan.md §7.4, Stacks: Shadow Deployments
+ * Shadow replay (plans/ally-guide/plan.md §7.4, Shadow Deployments
  * for Safe Agent Validation): the candidate answers recent real GA turns in
  * dry run — the real Sentinel, orchestrator and Tutor, every write stubbed,
  * nothing shown to anyone — and both answers are graded by the same

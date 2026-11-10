@@ -119,8 +119,16 @@ export interface FixDossier {
   }[];
   /** Other bugs still open in the same file — a fix that touches theirs should know. */
   openNeighbours: { id: string; title: string; status: string }[];
-  /** The closest notebook entries, so the session starts from what past sessions learned. */
-  notebook: { body: string; tags: string[]; similarity: number }[];
+  /**
+   * The closest Bug Hunter Notes, so the session starts from what past
+   * sessions learned. `code` lets the session name one when it reports what it applied.
+   */
+  notebook: {
+    code?: string;
+    body: string;
+    tags: string[];
+    similarity: number;
+  }[];
   /**
    * Playbooks for this class of bug, resolved bugs that read like it, and the
    * feature cards for the feature it is in. Optional so a dossier built
@@ -380,7 +388,7 @@ export const renderFixDossier = (dossier: FixDossier): string => {
       `What past sessions wrote down that matches this bug. Notes, not orders — apply what fits.`,
       ...dossier.notebook.map(
         (n) =>
-          `  - ${clipDossierText(n.body, 600)}${n.tags.length ? ` [${n.tags.join(', ')}]` : ''}`,
+          `  - ${n.code ? `${n.code}: ` : ''}${clipDossierText(n.body, 600)}${n.tags.length ? ` [${n.tags.join(', ')}]` : ''}`,
       ),
     );
   }

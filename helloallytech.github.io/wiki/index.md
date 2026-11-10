@@ -23,7 +23,7 @@ Welcome to the **Ally Developer Wiki** catalog. This catalog is parsed by the LL
 
 ## Product Management — ⚠️ Deprecated (2026-08-07)
 
-Superseded by the **Stacks MCP** — see [Planning with the Stacks MCP](contributing/planning-with-stacks.md). These pages are frozen and kept for history; nothing in them is a gate, and no new principles go here.
+Superseded by Ally's **Context Library** (which replaced Stacks on 2026-11-09) — see [Working with the Context Library](contributing/planning-with-context-library.md). These pages are frozen and kept for history; nothing in them is a gate, and no new principles go here.
 
 - [Product Management Best Practices](product/best-practices.md) — **Hub (deprecated).** The former house rules + subsection index
 - [UI & Interaction](product/ui.md) — *(deprecated)* States before styling, hierarchy, permission-aware UI, latency, accessibility, i18n
@@ -50,7 +50,7 @@ Superseded by the **Stacks MCP** — see [Planning with the Stacks MCP](contribu
 ## Contributing
 - [Developer Setup](contributing/dev-setup.md) — Clone repos and run the full local stack
 - [Contributing Guide](contributing/guide.md) — SDLC rules, code standards, PR process
-- [Working with the Stacks MCP](contributing/planning-with-stacks.md) — Run `/stacks:planning_context` whenever a product judgement comes up, while planning and while coding, and cite what you use
+- [Working with the Context Library](contributing/planning-with-context-library.md) — Search the Context Library yourself whenever a product or engineering judgement comes up, while planning and while coding, and cite the codes you use
 - [Release Process](contributing/release-process.md) — Shared production-release process: versioning, pipeline, troubleshooting
 - [Documentation System](contributing/docs-system.md) — How docs are routed, deduplicated, enforced in CI, and kept current
 

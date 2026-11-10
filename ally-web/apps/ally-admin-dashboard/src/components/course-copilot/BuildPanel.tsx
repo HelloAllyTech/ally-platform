@@ -135,7 +135,7 @@ const StatusIcon: React.FC<{ status: CourseCopilotJobStatus }> = ({ status }) =>
  * the one action that fixes a failed one next to it. The outline the build is writing
  * fills in below, so the trainer watches the course appear rather than a list of verbs.
  *
- * Per Stacks, "Managing User Expectations in Asynchronous Agent Design" and "Status
+ * Per "Managing User Expectations in Asynchronous Agent Design" and "Status
  * Communication in Asynchronous Agent Design": show what the agent is doing, what stage
  * it is at, and how long it has been going. An estimated finish time is deliberately NOT
  * shown — jobs run four at a time with very different durations, and a guessed ETA that

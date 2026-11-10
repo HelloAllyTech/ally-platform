@@ -238,10 +238,9 @@ export enum LlmTask {
   // reported by the runner and recorded against BUILDER_BUILD).
   BUILDER_INTERVIEW = 'builder_interview',
   BUILDER_BUILD = 'builder_build',
-  // The flywheel's cheap passes: folding retrospective bullets into the
-  // curated lesson set, categorising how a build actually turned out, and
-  // picking which past lessons/exemplars a new session should see.
-  BUILDER_LESSON_CURATION = 'builder_lesson_curation',
+  // The flywheel's cheap passes: categorising how a build actually turned
+  // out, and picking which past exemplars a new session should see. (Folding
+  // lessons into the curated set is the Context Library's agent curator now.)
   BUILDER_OUTCOME_CATEGORISE = 'builder_outcome_categorise',
   BUILDER_CONTEXT_SELECTION = 'builder_context_selection',
   // Cutting a large PRD into independently shippable milestones.
@@ -284,6 +283,11 @@ export enum LlmTask {
   // a prompt they wrote. Not the scenario template above, and not filed into
   // the roleplay cover library.
   GENERATE_COURSE_COVER_IMAGE = 'generate_course_cover_image',
+  // Image Studio (src/image-studio): the generator behind every authoring
+  // image slot — plan the scene, render the image, check the result.
+  IMAGE_STUDIO_COMPOSE = 'image_studio_compose',
+  IMAGE_STUDIO_IMAGE = 'image_studio_image',
+  IMAGE_STUDIO_JUDGE = 'image_studio_judge',
   TRANSLATE_TEXT = 'translate_text',
   TRANSLATE_OBJECT = 'translate_object',
   // Scribe voice note: turning one dictation transcript into note fields.
@@ -314,12 +318,6 @@ export enum LlmTask {
   // which sums llm_usage by this task tagged with metadata.runId to cost a
   // run, not by stage within it.
   BUG_HUNTER = 'bug_hunter',
-
-  // Agent memory: the curator pass that folds an agent's notebook candidates
-  // into its active set — see AgentMemoryCuratorService. Its own label rather
-  // than BUG_HUNTER because the notebook is agent-scoped and Builder's lessons
-  // are due to move onto the same table (OPP-0714).
-  AGENT_MEMORY_CURATION = 'agent_memory_curation',
 
   // Skill experiments (auto-improve): the judge that scores one skill output
   // against the admin's rubric, the designer that drafts the next variant,
@@ -372,6 +370,20 @@ export enum LlmTask {
   GUIDE_EVALUATOR_VERIFIER = 'guide_evaluator_verifier',
   GUIDE_RED_TEAM = 'guide_red_team',
   GUIDE_CURATOR = 'guide_curator',
+
+  // Context Library (docs/context-library/PLAN.md): extraction and its checks.
+  CONTEXT_LIBRARY_OVERVIEW = 'context_library_overview',
+  CONTEXT_LIBRARY_EXTRACT = 'context_library_extract',
+  CONTEXT_LIBRARY_CRITIC = 'context_library_critic',
+  CONTEXT_LIBRARY_ADJUDICATE = 'context_library_adjudicate',
+  CONTEXT_LIBRARY_CONSOLIDATE = 'context_library_consolidate',
+  CONTEXT_LIBRARY_ENRICH = 'context_library_enrich',
+  CONTEXT_LIBRARY_RERANK = 'context_library_rerank',
+  CONTEXT_LIBRARY_CITATION_CHECK = 'context_library_citation_check',
+  CONTEXT_LIBRARY_QUERY_PLAN = 'context_library_query_plan',
+  CONTEXT_LIBRARY_GAP_LABEL = 'context_library_gap_label',
+  // The agent curator: folds Builder's lessons and Bug Hunter's notes into their collections.
+  CONTEXT_LIBRARY_AGENT_CURATE = 'context_library_agent_curate',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

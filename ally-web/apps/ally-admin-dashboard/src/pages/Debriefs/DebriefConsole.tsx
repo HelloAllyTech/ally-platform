@@ -6,8 +6,8 @@ import { Tabs } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
 import { CalibrationTab } from "./CalibrationTab";
+import { GuidanceTab } from "./GuidanceTab";
 import { ImproverTab } from "./ImproverTab";
-import { KnowledgeTab } from "./KnowledgeTab";
 import { OrganisationsTab } from "./OrganisationsTab";
 import { ReleasesTab } from "./ReleasesTab";
 import { ReviewTab } from "./ReviewTab";
@@ -20,7 +20,8 @@ export enum DebriefConsoleTab {
   RELEASES = "releases",
   ORGANISATIONS = "organisations",
   CALIBRATION = "calibration",
-  KNOWLEDGE = "knowledge",
+  // Kept as `knowledge` so links to the old Knowledge tab still open here.
+  GUIDANCE = "knowledge",
 }
 
 const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
@@ -30,7 +31,7 @@ const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.RELEASES]: ReleasesTab,
   [DebriefConsoleTab.ORGANISATIONS]: OrganisationsTab,
   [DebriefConsoleTab.CALIBRATION]: CalibrationTab,
-  [DebriefConsoleTab.KNOWLEDGE]: KnowledgeTab,
+  [DebriefConsoleTab.GUIDANCE]: GuidanceTab,
 };
 
 const VALID_TABS = new Set<string>(Object.values(DebriefConsoleTab));

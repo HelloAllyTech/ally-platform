@@ -288,7 +288,10 @@ export const CreateCase: FC = () => {
         return renderStep(
           simulationSubSectionData.label,
           <CreateSimulationSubSection
-            items={simulationSubSectionData.fields}
+            items={simulationSubSectionData.fields.map(field =>
+              // The path config is shared; here its cover is a case cover.
+              field.imageSlotKind ? { ...field, imageSlotKind: "case_cover" as const } : field,
+            )}
             formMethods={formMethods}
           />,
         );

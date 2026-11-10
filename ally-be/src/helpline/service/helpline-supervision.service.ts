@@ -72,7 +72,7 @@ const notAssignable = () =>
  *
  * Whatever a supervisor does stays staff-side except the fixed, client-
  * localised notices a talker needs (TRANSFERRING, ACCEPTED with the new alias):
- * a talker is never told a supervisor is watching or stepped in — the Stacks
+ * a talker is never told a supervisor is watching or stepped in — the guidance
  * chunk "Live Observation Variations and Supervisor Presence" weighs the
  * client's welfare and the supervisee's dignity, and a silent hand-over keeps
  * both.

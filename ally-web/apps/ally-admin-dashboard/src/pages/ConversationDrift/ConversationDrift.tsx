@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { LineChart, SimpleBarChart } from "@carbon/charts-react";
-
 import "@carbon/charts/styles.css";
 import "../Analytics/analytics-carbon.scss";
 
@@ -19,6 +17,7 @@ import {
   useGetSimulationsQuery,
   useStartDriftBackfillMutation,
 } from "@api";
+import { LineChart, SimpleBarChart } from "@components/charts";
 import { formatVersionLabel } from "@types";
 
 import { AnalyticsTabFilters } from "../Analytics/analyticsFilters";

@@ -10,7 +10,7 @@ import { GUIDE_SKILL_IDS } from '../skills/guide-skills';
  * arguments are guaranteed to match the closed schema — because the newest
  * Claude models reject a forced tool choice and strictness is what keeps the
  * schema guarantee. Descriptions follow one shape: what it does, when to use
- * it, one example (Stacks: Tool Description Engineering for Selection
+ * it, one example (Tool Description Engineering for Selection
  * Accuracy). Ally has no tool that enrolls, completes, scores or changes the
  * safety mode: those stay with deterministic code.
  */

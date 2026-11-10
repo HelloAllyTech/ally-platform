@@ -3,7 +3,12 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AiService } from 'src/ai/service/ai.service';
 import { AgentToolDefinition } from 'src/llm-agent/type/agent-llm.type';
 import { BuilderGithubReadService } from 'src/builder/service/builder-github-read.service';
-import { BuilderStacksService } from 'src/builder/service/builder-stacks.service';
+import {
+  ContextToolsService,
+  contextToolDefinitions,
+} from 'src/context-library/service/context-tools.service';
+import { ClUseCase } from 'src/context-library/enum/context-library.enum';
+import { BUILDER_PRINCIPLE_TOOLS } from 'src/builder/constants/builder-principles.constants';
 import { BuilderEvidenceService } from 'src/builder/service/builder-evidence.service';
 import {
   BUILDER_REPO_NAMES,
@@ -93,7 +98,7 @@ export class RoadmapCopilotToolsService {
     private readonly interviewNoteRepository: RoadmapInterviewNoteRepository,
     private readonly aiService: AiService,
     private readonly githubRead: BuilderGithubReadService,
-    private readonly stacks: BuilderStacksService,
+    private readonly principles: ContextToolsService,
     private readonly evidence: BuilderEvidenceService,
   ) {}
 
@@ -281,28 +286,12 @@ export class RoadmapCopilotToolsService {
           required: ['path'],
         },
       },
-      {
-        name: 'stacks_search',
-        description:
-          "Search the team's curated product-guidance library — how to judge, size and frame an " +
-          'opportunity, and how features like this one should behave. Specific noun phrases, ' +
-          'not sentences. An empty result is not evidence the library lacks guidance.',
-        input_schema: {
-          type: 'object',
-          properties: { query: { type: 'string' } },
-          required: ['query'],
-        },
-      },
-      {
-        name: 'stacks_get',
-        description:
-          'Fetch the full text of one or two Stacks chunks by id, after a search.',
-        input_schema: {
-          type: 'object',
-          properties: { ids: { type: 'array', items: { type: 'string' } } },
-          required: ['ids'],
-        },
-      },
+      ...contextToolDefinitions({
+        ...BUILDER_PRINCIPLE_TOOLS,
+        when:
+          'Search when judging, sizing or framing an opportunity, and for how features like this ' +
+          'one should behave.',
+      }),
       {
         name: COPILOT_SUBMIT_TOOL,
         description:
@@ -382,7 +371,7 @@ export class RoadmapCopilotToolsService {
                           'roadmap',
                           'codebase',
                           'wiki',
-                          'stacks',
+                          'principles',
                           'strategy',
                         ],
                       },
@@ -458,10 +447,12 @@ export class RoadmapCopilotToolsService {
         return `Searching the wiki for ${q(input?.query)}`;
       case 'wiki_read':
         return `Reading wiki page ${input?.path}`;
-      case 'stacks_search':
-        return `Looking up product guidance on ${q(input?.query)}`;
-      case 'stacks_get':
-        return 'Reading product guidance';
+      case 'principles_search':
+        return `Looking up principles on ${q(
+          Array.isArray(input?.queries) ? input.queries[0] : input?.query,
+        )}`;
+      case 'principles_get':
+        return 'Reading principles';
       default:
         return `Running ${name}`;
     }
@@ -605,19 +596,24 @@ export class RoadmapCopilotToolsService {
           ),
           summary: () => 'Read',
         };
-      case 'stacks_search':
-        return {
-          result: await this.stacks.search(String(input.query ?? ''), 4),
-          summary: (r) =>
-            count(r.results, 'piece of guidance', 'pieces of guidance'),
-        };
-      case 'stacks_get':
-        return {
-          result: await this.stacks.getChunks(
-            Array.isArray(input.ids) ? input.ids.map(String).slice(0, 3) : [],
-          ),
-          summary: (r) => count(r.chunks, 'section', 'sections'),
-        };
+      case 'principles_search': {
+        const out = await this.principles.runSearch(
+          ClUseCase.ROADMAP_COPILOT,
+          BUILDER_PRINCIPLE_TOOLS,
+          input,
+          { sessionId: `roadmap:${ctx.userId}` },
+        );
+        return { result: out.modelResult, summary: () => out.summary };
+      }
+      case 'principles_get': {
+        const out = await this.principles.runGet(
+          ClUseCase.ROADMAP_COPILOT,
+          BUILDER_PRINCIPLE_TOOLS,
+          input,
+          { sessionId: `roadmap:${ctx.userId}` },
+        );
+        return { result: out.modelResult, summary: () => out.summary };
+      }
       default:
         return {
           result: { ok: false, error: `Unknown tool "${name}"` },

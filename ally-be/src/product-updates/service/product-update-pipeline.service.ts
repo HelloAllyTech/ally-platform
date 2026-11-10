@@ -59,7 +59,7 @@ export interface PipelineRunResult {
  *
  * The same pass serves the half-hourly schedule, an admin's "run now" and a
  * backfill; a backfill is only a pass with bigger limits, a replay of the
- * journal through the code that handles today's merges (Stacks: *Replay
+ * journal through the code that handles today's merges (*Replay
  * Capability for Stream Reprocessing*). A Redis lock makes passes exclusive
  * across replicas and across triggers.
  */

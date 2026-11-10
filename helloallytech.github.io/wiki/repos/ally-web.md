@@ -2,7 +2,7 @@
 title: ally-web — Web Applications
 tags: [repo, frontend, nx, react, vite]
 summary: An Nx monorepo containing Ally's two user-facing web applications — a Vite+React helpline dashboard for counselors (port 8080) and a Vite+React admin dashboard for super admins (port 8081) — plus a shared UI library.
-last_reconciled: 2026-09-22
+last_reconciled: 2026-11-09
 ---
 
 # ally-web — Web Applications
@@ -18,7 +18,7 @@ last_reconciled: 2026-09-22
 The applications integrate with the `ally-be` backend (REST + Socket.IO) and with LiveKit for real-time voice/video.
 
 > [!NOTE]
-> This page documents *how the frontend is built*. For *how it should behave* — required screen states, permission-aware UI, chart honesty rules, and the personas each dashboard serves — search Stacks before you plan ([Planning with the Stacks MCP](../contributing/planning-with-stacks.md)). The former in-wiki guidance ([UI & Interaction](../product/ui.md), [Data Visualisation](../product/data-visualisation.md)) is **deprecated** as of 2026-08-07 and no longer a gate, but still worth reading for the Ally-specific traps it records.
+> This page documents *how the frontend is built*. For *how it should behave* — required screen states, permission-aware UI, chart honesty rules, and the personas each dashboard serves — search the Context Library before you plan, and again as those decisions come up mid-build ([Working with the Context Library](../contributing/planning-with-context-library.md)). The former in-wiki guidance ([UI & Interaction](../product/ui.md), [Data Visualisation](../product/data-visualisation.md)) is **deprecated** as of 2026-08-07 and no longer a gate, but still worth reading for the Ally-specific traps it records.
 >
 > The super-admin Analytics surface is where those chart rules are implemented rather than just stated. `apps/ally-admin-dashboard/src/pages/Analytics/` holds the shared kit every chart routes through: `chartKit.tsx` (the `ChartCard` wrapper that requires a provenance line and handles the loading / error / empty / thin-data states, the axis factories, and `MIN_N_FOR_SCORE`) and `chartScales.ts` (the approved palette, keyed on meaning). Adding a chart means using those factories — `colorScale` is a required argument specifically so a chart cannot fall back to a palette whose colours mean nothing.
 >
@@ -69,6 +69,8 @@ Dashboard for mental health counselors. Features: real-time chat, LiveKit voice 
 
 ### ally-admin-dashboard — Admin Dashboard (Vite+React, port 8081)
 Administrative console for super admins built on RTK Query. Features: Simulation Studio (create/edit/publish voice simulation scenarios, cover-image upload to S3, event mapping, voice config, LiveKit live preview), session-event management, user/tenant management, permission-based access control (`PrivateLayout` guards routes), and simulation-credit monitoring. Uses OTP-based login with automatic token refresh (`baseApi.ts`). Reads `VITE_API_BASE_URL` and `VITE_LIVEKIT_URL`. Permissions are enumerated in `src/constants/permissions.ts` (e.g. `edit:scenario`, `edit:user`, `edit:livekit`, `edit:session-events`, `view:admin:scenario`).
+
+The **Context Library** page (`src/pages/ContextLibrary/`) has two views of itself. A platform admin sees every collection, Settings and Connect Claude Code, and can narrow a collection's entries by audience (Global, or one named organisation). An organisation's admin — the Ally organisation-settings toggle with the Ally guide's view permission, the gate the old guide library screen had — sees only collections that take organisation entries (today the Ally Guide Library), for one of their organisations at a time: their own entries to add and edit, Ally's global ones read-only, Insights for their own entries, and every request sent to ally-be's organisation routes. Every entry carries an audience badge (an icon and a word). The Ally Console's Library tab, an organisation's Ally tab and the Debrief console's Guidance tab link to their collections there; the guide library panel and the Debrief knowledge tab, with its clinical sign-off, were removed. A Content Catalogue item is synced from Studio, so its sheet offers no Edit, Archive or Restore — it says so and links to the item in Studio. Connect Claude Code shows a new key once, and while it is on screen **Test connection** sends the MCP endpoint a JSON-RPC `ping` with it and says whether the library answered, turned the key away, or could not be reached. Context Library codes cited by an agent are drawn as chips that open the entry (`src/components/context-citation/`): Builder's PRD (`FP-`) and Course Copilot's chat and blueprint (`LD-` principles, `CC-` catalogue items).
 
 The **Analytics** page carries a tab registry (`src/pages/Analytics/`); its **Analytics Agent** tab is a chat surface for asking analytics questions in English, and is the one tab with a gate of its own — hidden for a plain super-admin, matching the backend's elevated-tier check. See [Analytics Agent](../platform/analytics-agent.md).
 

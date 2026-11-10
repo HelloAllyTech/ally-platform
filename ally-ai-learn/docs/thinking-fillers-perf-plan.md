@@ -8,9 +8,10 @@ kept below as the rationale and the measurement contract; see
 `filler/predictive_filler` prompt, and the interim-reply chain that waits on the
 filler. Back-channel and comfort audio are touched only where they share code.
 
-> Stacks was not reachable from the sessions that wrote and built this. The
-> product judgements (probability gate, cadence caps, continuation rule, early
-> trigger, judge rubric) still need a Stacks check; the thresholds below ship as
+> Stacks (replaced by the Context Library on 2026-11-09) was not reachable from
+> the sessions that wrote and built this. The product judgements (probability
+> gate, cadence caps, continuation rule, early trigger, judge rubric) still need
+> a Context Library check; the thresholds below ship as
 > tunable settings precisely so that check can move them without a code change.
 
 ---
@@ -161,7 +162,7 @@ No behaviour change. This is the yardstick every later phase is judged by.
   sessions: for each played filler, given the persona, the preceding learner turn and the
   reply that followed — *register fit* (1–5), *context fit* (1–5), *non-committal* (pass /
   fail: presupposes or contradicts the real reply), *repetitive* (flag). This is how M7
-  and M8 get numbers; the rubric wording is a Stacks check.
+  and M8 get numbers; the rubric wording is a Context Library check.
 - **Bench harness.** A `--filler-bench` mode on `app/v2v_tester` that drives N scripted
   turns per language and prints p50/p95 of M1 and M6, M2 coverage, M5 repeat rate and the
   M3/M4 counters. Run on English and at least one Indic language.
@@ -189,7 +190,7 @@ This is what turns "filler, then silence" into "filler that ends as the reply be
 started within `FILLER_CONTINUATION_GAP_MS` (start 450 ms — a natural intra-turn pause),
 play one more filler of a *different type* (a hesitation followed by an acknowledgement,
 never two hums), at most **two fillers per turn**. A third silence is left alone; a
-character who keeps muttering reads as stalling. Both numbers are a Stacks check.
+character who keeps muttering reads as stalling. Both numbers are a Context Library check.
 
 **Contiguous hand-off to the interim.** `_interim_play_after_filler` waits on an
 `asyncio.Event` set when the filler decision resolves (played / skipped / ended),
@@ -203,7 +204,7 @@ interim, not a second filler, is the continuation of choice.
 `pending_cleanup` one-cycle-later dance and the shutdown file sweeps. Target ≤ 40 ms from
 `thinking` to first captured frame.
 
-**Probability gate — Stacks check.** With a latency predictor the gate's original job
+**Probability gate — Context Library check.** With a latency predictor the gate's original job
 (avoid fillers on turns that have no gap) is done by the predictor. Proposal: 1.0 when the
 predicted gap ≥ 1.2 s, 0.6 between 0.7 and 1.2 s, and a cadence cap of no more than 3
 filler turns in a row so the character is not heard hesitating on every single reply.
@@ -297,7 +298,7 @@ semantic EOU model's delay is collapsing toward its minimum, cancelling with flu
 instant the learner resumes. A/B on English and Hindi (the EOU model's languages); watch
 learner-resumed-during-filler rate, barge-in rate, and the `replyLatencyMs`
 distribution. Product judgement: a hum during a mid-thought pause can read as
-interruption. Needs Stacks and a PM before it goes past an experiment.
+interruption. Needs a Context Library check and a PM before it goes past an experiment.
 
 ## 7. Phase 4 — cleanup and docs (≈ 1–2 days)
 
@@ -334,7 +335,7 @@ does not show M7/M8 movement, on English and at least one Indic language.
 - **Wrong gap prediction.** Watched by `fillerCutEarlyMs` and `postFillerSilenceMs`;
   stop-and-flush prevents overlap; the tier margin and threshold are tunable.
 - **Continuation reads as stalling.** Bounded to two fillers per turn and different types;
-  the judge's *repetitive* flag and the Stacks check decide the numbers.
+  the judge's *repetitive* flag and the Context Library check decide the numbers.
 - **In-turn generation on a wrong partial.** The prompt forbids presupposing the ending
   and the post-check rejects echoes; the judge's *non-committal* pass/fail measures it.
   Same PHI posture as the interim reply, which already sends partials to the fast model.

@@ -610,6 +610,11 @@ export interface CharacterData {
   coverVideoUrl?: string;
   characterProfileText?: string;
   /**
+   * `scenario_characters.appearance` (≤ 500): one fixed line on how they look,
+   * added to every AI image the character is in. Absent on an older backend.
+   */
+  appearance?: string | null;
+  /**
    * Voice per language, keyed by `languages.id`. A character used to hold a
    * single `voiceId`, which a simulation (one voice PER language) could only
    * receive into one slot — and the applying code keyed it under English by

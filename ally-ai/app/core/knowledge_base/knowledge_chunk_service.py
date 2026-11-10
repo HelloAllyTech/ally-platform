@@ -54,9 +54,9 @@ class ChunkAudience:
     constructor — `ChunkAudience.unrestricted()` — means an unrestricted search is
     something a caller says out loud.
 
-    `ignore_targeting` exists for the admin retrieval console, which is answering "what
-    is in the corpus" rather than "what may this worker see". It is never set on the
-    WhatsApp answering path.
+    `ignore_targeting` exists for a chatbot that answers from documents an admin
+    selected for it: its scope is those `document_ids`, not the asker's organisation.
+    It is never set on the organisation-targeted WhatsApp answering path.
     """
 
     tenant_id: Optional[str] = None

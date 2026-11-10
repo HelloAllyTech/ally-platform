@@ -2300,7 +2300,7 @@ export class AnalyticsController {
       'cleared the floor in force when it was retrieved, so `relevant`/`irrelevant` measure ' +
       'PRECISION and `relevantLost` estimates what a HIGHER floor would have discarded. What ' +
       'a LOWER floor would have found is not in the log at all — that needs the same queries ' +
-      're-run, which the retrieval preview does by hand. ' +
+      're-run at a lower floor. ' +
       '`gaps` is the qualitative half and usually the most actionable: the judge naming what ' +
       'it would have needed is the only thing that separates a corpus gap from a floor set ' +
       'too tight, because both arrive as an empty retrieval. ' +

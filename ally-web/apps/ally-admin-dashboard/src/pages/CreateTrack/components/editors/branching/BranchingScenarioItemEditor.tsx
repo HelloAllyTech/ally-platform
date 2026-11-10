@@ -1,4 +1,4 @@
-import { FC, useMemo, useRef, useState } from "react";
+import { FC, lazy, Suspense, useMemo, useRef, useState } from "react";
 
 import { useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { TextArea, Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon, Trash } from "@assets";
 import { Button } from "@components";
+import { ImageSourceField, useCourseImage, useImageStudioEnabled } from "@components/image-studio";
 import { ButtonVariant } from "@components/types";
 import {
   MAX_BRANCHING_CHOICE_TEXT,
@@ -25,10 +26,13 @@ import {
   BranchingNode,
   BranchingOutcomeTone,
   BranchingScenarioContent,
+  ImageCastOption,
+  ImageReferenceOptions,
   TrackFormValues,
   TrackItemType,
 } from "@types";
 
+import { sceneContext, sceneReferenceOptions, sceneSlotKey } from "../../../branchingImages";
 import {
   addStep,
   BranchingSceneMode,
@@ -63,6 +67,9 @@ const inputClass =
   "border border-border-light rounded-md px-2 py-1 text-sm outline-none focus:border-primary-400 disabled:opacity-60";
 
 const NEW_SCENE = "__new__";
+
+/** Cast and "Fill empty scenes": loaded only when Image Studio is on. */
+const BranchingImageTools = lazy(() => import("./BranchingImageTools"));
 
 const OUTCOME_OPTIONS: { value: BranchingOutcomeTone; label: string }[] = [
   { value: "POSITIVE", label: "Positive" },
@@ -99,6 +106,17 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
   const { control, setValue } = useFormContext<TrackFormValues>();
   const base = `sections.${sectionIndex}.items.${itemIndex}.branching` as const;
   const content = useWatch({ control, name: base }) as BranchingScenarioContent | undefined;
+  const serverId = useWatch({
+    control,
+    name: `sections.${sectionIndex}.items.${itemIndex}.serverId`,
+  });
+  const localId = useWatch({
+    control,
+    name: `sections.${sectionIndex}.items.${itemIndex}.localId`,
+  });
+  const itemId = serverId || localId || `${sectionIndex}-${itemIndex}`;
+  const course = useCourseImage();
+  const imageStudioEnabled = useImageStudioEnabled();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -412,6 +430,25 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
         )}
       </div>
 
+      {imageStudioEnabled && (
+        <Suspense fallback={null}>
+          <BranchingImageTools
+            content={content}
+            trackId={course.trackId}
+            itemId={itemId}
+            courseStyleId={course.courseStyleId}
+            courseTitle={course.courseTitle}
+            onCastChange={cast => {
+              const next: BranchingScenarioContent = { ...content };
+              if (cast.length > 0) next.imageCast = cast;
+              else delete next.imageCast;
+              setValue(base, next, { shouldDirty: true });
+            }}
+            onApplyImage={(nodeId, image) => updateNode(nodeId, { image })}
+          />
+        </Suspense>
+      )}
+
       <TextArea
         id={`${base}.intro`}
         labelText="Introduction (optional) — shown above the first scene"
@@ -607,7 +644,16 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
             </span>
           </div>
 
-          <SceneImageField node={selected} onChange={image => updateNode(selected.id, { image })} />
+          <SceneImageField
+            node={selected}
+            onChange={image => updateNode(selected.id, { image })}
+            slotKey={sceneSlotKey(course.trackId, itemId, selected.id)}
+            referenceOptions={sceneReferenceOptions(content, selected.id)}
+            castOptions={(content.imageCast ?? []).map(member => ({
+              characterId: member.characterId,
+              name: member.name,
+            }))}
+          />
 
           {/* ---- Decision or ending ---- */}
           <div className="border-t border-border-light pt-4 flex flex-col gap-3">
@@ -816,10 +862,21 @@ const ExperienceThumbnail: FC<{ experience: BranchingExperience }> = ({ experien
 interface SceneImageFieldProps {
   node: BranchingNode;
   onChange: (image: BranchingNode["image"]) => void;
+  slotKey: string;
+  /** Parent scenes (`previous`) and the scenario's other scenes (`setting`). */
+  referenceOptions: ImageReferenceOptions;
+  /** The scenario's cast, ticked per generation. */
+  castOptions: ImageCastOption[];
 }
 
 /** One optional picture per scene, uploaded through the same track-media flow as quiz question images. */
-const SceneImageField: FC<SceneImageFieldProps> = ({ node, onChange }) => {
+const SceneImageField: FC<SceneImageFieldProps> = ({
+  node,
+  onChange,
+  slotKey,
+  referenceOptions,
+  castOptions,
+}) => {
   const { upload, isUploading } = useTrackMediaUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const image = node.image;
@@ -858,53 +915,68 @@ const SceneImageField: FC<SceneImageFieldProps> = ({ node, onChange }) => {
         onChange={handleFileChange}
         data-testid="branching-image-file-input"
       />
-      {image ? (
-        <div className="flex flex-col gap-2 border border-border-light rounded-md p-3">
-          <img
-            src={image.url}
-            alt={image.alt || "Scene image preview"}
-            className="max-h-[200px] w-auto self-start rounded-md object-contain"
-          />
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Describe the image (for screen readers)</span>
-            <input
-              type="text"
-              maxLength={MAX_QUESTION_MEDIA_ALT_LENGTH}
-              value={image.alt ?? ""}
-              onChange={event => onChange({ ...image, alt: event.target.value })}
-              placeholder="e.g. A woman sitting alone at a kitchen table"
-              className={`${inputClass} w-full`}
+      <ImageSourceField
+        slotKind="scene"
+        slotKey={slotKey}
+        context={sceneContext(node)}
+        referenceOptions={referenceOptions}
+        castOptions={castOptions}
+        onAccept={generated =>
+          // A generated picture comes with its own description; it replaces the old one.
+          onChange({
+            url: generated.url,
+            ...(generated.altText || image?.alt ? { alt: generated.altText || image?.alt } : {}),
+          })
+        }
+      >
+        {image ? (
+          <div className="flex flex-col gap-2 border border-border-light rounded-md p-3">
+            <img
+              src={image.url}
+              alt={image.alt || "Scene image preview"}
+              className="max-h-[200px] w-auto self-start rounded-md object-contain"
             />
-          </label>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={ButtonVariant.SECONDARY}
-              className="!h-8 w-fit text-xs"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-            >
-              {isUploading ? "Uploading…" : "Replace"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => onChange(undefined)}
-              className="inline-flex items-center gap-1 text-xs text-destructive-500 hover:text-destructive-600"
-            >
-              <Trash className="w-3.5 h-3.5" />
-              Remove
-            </button>
+            <label className="flex flex-col gap-1">
+              <span className={labelClass}>Describe the image (for screen readers)</span>
+              <input
+                type="text"
+                maxLength={MAX_QUESTION_MEDIA_ALT_LENGTH}
+                value={image.alt ?? ""}
+                onChange={event => onChange({ ...image, alt: event.target.value })}
+                placeholder="e.g. A woman sitting alone at a kitchen table"
+                className={`${inputClass} w-full`}
+              />
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={ButtonVariant.SECONDARY}
+                className="!h-8 w-fit text-xs"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? "Uploading…" : "Replace"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => onChange(undefined)}
+                className="inline-flex items-center gap-1 text-xs text-destructive-500 hover:text-destructive-600"
+              >
+                <Trash className="w-3.5 h-3.5" />
+                Remove
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <Button
-          variant={ButtonVariant.SECONDARY}
-          className="!h-9 w-fit text-sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-        >
-          {isUploading ? "Uploading…" : "Upload image"}
-        </Button>
-      )}
+        ) : (
+          <Button
+            variant={ButtonVariant.SECONDARY}
+            className="!h-9 w-fit text-sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            {isUploading ? "Uploading…" : "Upload image"}
+          </Button>
+        )}
+      </ImageSourceField>
     </div>
   );
 };

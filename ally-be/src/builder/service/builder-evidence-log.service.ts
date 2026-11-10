@@ -19,8 +19,8 @@ export const BUILDER_EVIDENCE_TOOLS = new Set([
   'docs_search',
   'wiki_search',
   'wiki_read',
-  'stacks_search',
-  'stacks_get',
+  'principles_search',
+  'principles_get',
   'capability_lookup',
   'ai_tasks_lookup',
   'analytics_ask',
@@ -171,8 +171,8 @@ function describeSource(tool: string, input: Record<string, any>): string {
       return `helloallytech.github.io:${String(input?.path ?? '')}`;
     case 'github_repo_tree':
       return `${repo}:${String(input?.path ?? '')}/`;
-    case 'stacks_get':
-      return `stacks:${(Array.isArray(input?.ids) ? input.ids : []).join(',')}`;
+    case 'principles_get':
+      return `principles:${(Array.isArray(input?.codes) ? input.codes : []).join(',')}`;
     default: {
       const query = String(
         input?.query ?? input?.question ?? input?.search ?? '',

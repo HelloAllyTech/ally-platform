@@ -103,6 +103,16 @@ rules:
       recipe every developer and agent follows to add one. Adding a prompt doesn't change
       the conventions, so it needs no doc change; changing how contracts or sync work does.
 
+  - id: ally-be-context-library-mcp
+    watch:
+      - "ally-be/src/context-library/controller/context-library-mcp.controller.ts"
+    requires: helloallytech.github.io/wiki/contributing/planning-with-context-library.md
+    why: >
+      Engineers' Claude Code reaches the Context Library only through this MCP server, and the
+      wiki page is where its tools, the prompt, the key and the setup are written down. Every
+      repo's `context-library` skill and CLAUDE.md point there, so a changed tool that skips it
+      teaches every agent the old one.
+
   - id: ally-be-weak-metrics-definitions
     watch:
       - "ally-be/src/analytics/repository/weak-metrics-analytics.repository.ts"
@@ -155,10 +165,13 @@ rules:
     watch:
       - "ally-ai/app/core/vector_db/constants.py"
       - "ally-ai/app/migrations/**"
+      - "ally-ai/app/core/context_library/collection_schema.py"
     requires: helloallytech.github.io/wiki/repos/ally-ai.md
     why: >
       Weaviate collections are cross-service state — ally-be's DATA_SCHEMA.md points at this
-      file as the source of truth for the vector side of the platform.
+      file as the source of truth for the vector side of the platform. The Context Library's
+      `Ctx<Collection>_v{N}` collections are created on demand from `collection_schema.py`
+      rather than by a migration, so that file is watched too.
 
   - id: ally-ai-repo-page-architecture
     watch:

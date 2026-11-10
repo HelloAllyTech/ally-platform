@@ -43,6 +43,7 @@ const configStub = {
   promptTranslation: { defaultModel: 'gemini-2.5-pro' },
   translation: { model: 'gemini-2.5-flash' },
   aiChat: { model: 'gpt-4o-mini' },
+  imageStudio: { judgeModel: 'gpt-4o-mini' },
   roadmapCopilot: { model: 'claude-sonnet-5-5', fallbackModel: 'gpt-5' },
   builder: {
     interviewModel: 'claude-sonnet-5',

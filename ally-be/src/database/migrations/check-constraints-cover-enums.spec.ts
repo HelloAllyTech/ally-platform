@@ -9,10 +9,29 @@ import {
 } from '../../debrief/enum/debrief-run.enum';
 import { join } from 'path';
 import {
+  ClBulkUploadStatus,
+  ClChunkConfidence,
+  ClChunkOrigin,
+  ClChunkStatus,
+  ClEmbeddingStatus,
+  ClRelationOrigin,
+  ClRelationType,
+  ClSegmentRunStatus,
+  ClSegmentStatus,
+  ClSourceKind,
+  ClSourceStatus,
+  ClUsageType,
+  ClJudgmentSplit,
+  ClLoop,
+  ClLoopActionType,
+  ClGapKind,
+  ClRolloutCorpus,
+  ClRolloutStatus,
+  ClRolloutStepKind,
+} from '../../context-library/enum/context-library.enum';
+import {
   BuilderEventType,
   BuilderExemplarOutcome,
-  BuilderLessonCategory,
-  BuilderLessonStatus,
   BuilderMessageRole,
   BuilderMilestoneStatus,
   BuilderNotificationKind,
@@ -47,11 +66,6 @@ import {
   ROADMAP_CATEGORIES,
   ROADMAP_STAGES,
 } from '../../public-roadmap/constants/public-roadmap.constants';
-import {
-  AgentMemoryAgent,
-  AgentMemoryEmbeddingStatus,
-  AgentMemoryStatus,
-} from '../../agent-memory/enum/agent-memory.enum';
 import {
   FhsAssessmentStatus,
   FhsBenchmarkStatus,
@@ -222,6 +236,26 @@ describe('CHECK constraints cover their enums', () => {
    * commit; there is no other check.
    */
   it.each([
+    // Context Library (docs/context-library/PLAN.md).
+    ['CHK_cl_sources_kind', Object.values(ClSourceKind)],
+    ['CHK_cl_sources_status', Object.values(ClSourceStatus)],
+    ['CHK_cl_ingest_segments_status', Object.values(ClSegmentStatus)],
+    ['CHK_cl_segment_runs_status', Object.values(ClSegmentRunStatus)],
+    ['CHK_cl_chunks_origin', Object.values(ClChunkOrigin)],
+    ['CHK_cl_chunks_status', Object.values(ClChunkStatus)],
+    ['CHK_cl_chunks_confidence', Object.values(ClChunkConfidence)],
+    ['CHK_cl_chunks_embedding_status', Object.values(ClEmbeddingStatus)],
+    ['CHK_cl_chunk_relations_type', Object.values(ClRelationType)],
+    ['CHK_cl_chunk_relations_origin', Object.values(ClRelationOrigin)],
+    ['CHK_cl_bulk_uploads_status', Object.values(ClBulkUploadStatus)],
+    ['CHK_cl_usage_events_type', Object.values(ClUsageType)],
+    ['CHK_cl_judgments_split', Object.values(ClJudgmentSplit)],
+    ['CHK_cl_loop_actions_loop', Object.values(ClLoop)],
+    ['CHK_cl_loop_actions_action', Object.values(ClLoopActionType)],
+    ['CHK_cl_gap_topics_kind', Object.values(ClGapKind)],
+    ['CHK_cl_rollout_steps_corpus', Object.values(ClRolloutCorpus)],
+    ['CHK_cl_rollout_steps_step', Object.values(ClRolloutStepKind)],
+    ['CHK_cl_rollout_steps_status', Object.values(ClRolloutStatus)],
     ['CHK_builder_sessions_status', Object.values(BuilderSessionStatus)],
     ['CHK_builder_sessions_stage', Object.values(BuilderStage)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],
@@ -232,8 +266,6 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_builder_notifications_kind', Object.values(BuilderNotificationKind)],
     ['CHK_builder_milestones_status', Object.values(BuilderMilestoneStatus)],
     ['CHK_builder_prd_versions_author', Object.values(BuilderPrdVersionAuthor)],
-    ['CHK_builder_lessons_status', Object.values(BuilderLessonStatus)],
-    ['CHK_builder_lessons_category', Object.values(BuilderLessonCategory)],
     ['CHK_builder_exemplars_outcome', Object.values(BuilderExemplarOutcome)],
     ['CHK_builder_pr_feedback_kind', Object.values(BuilderPrFeedbackKind)],
     ['CHK_builder_pr_feedback_status', Object.values(BuilderPrFeedbackStatus)],
@@ -247,12 +279,6 @@ describe('CHECK constraints cover their enums', () => {
     [
       'CHK_bug_hunter_eval_runs_prompt_kind',
       Object.values(BugHunterEvalPromptKind),
-    ],
-    ['CHK_agent_memories_agent', Object.values(AgentMemoryAgent)],
-    ['CHK_agent_memories_status', Object.values(AgentMemoryStatus)],
-    [
-      'CHK_agent_memories_embedding_status',
-      Object.values(AgentMemoryEmbeddingStatus),
     ],
     ['CHK_product_updates_kind', [...UPDATE_KINDS]],
     ['CHK_product_updates_audience', [...UPDATE_AUDIENCES]],

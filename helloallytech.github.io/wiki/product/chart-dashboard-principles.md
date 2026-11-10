@@ -1,17 +1,17 @@
 ---
 title: Chart & Dashboard Design Principles
 tags: [product, best-practices, data-viz, charts, dashboards, reference, agents]
-summary: DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. A constraints-file reference for building charts and dashboards — perception rules, chart anatomy, clarity/simplicity/colour rules, persuasion-vs-deception boundaries, a chart-type lookup, an acceptance checklist, and an anti-pattern list.
-last_reconciled: 2026-07-29
+summary: DEPRECATED 2026-08-07, now superseded by the Context Library — kept for history. A constraints-file reference for building charts and dashboards — perception rules, chart anatomy, clarity/simplicity/colour rules, persuasion-vs-deception boundaries, a chart-type lookup, an acceptance checklist, and an anti-pattern list.
+last_reconciled: 2026-11-09
 ---
 
 # Chart & Dashboard Design Principles
 
 > [!WARNING]
-> **Deprecated — 2026-08-07, superseded by the Stacks MCP.** Product and design guidance is now
-> retrieved from the external Stacks corpus at planning time; see
-> [Planning with the Stacks MCP](../contributing/planning-with-stacks.md). Kept for history — do
-> not add to it, and treat anything conflicting with current Stacks guidance as superseded.
+> **Deprecated — 2026-08-07, now superseded by the Context Library.** Product and design guidance
+> is now retrieved from Ally's Context Library (which replaced the Stacks MCP on 2026-11-09); see
+> [Working with the Context Library](../contributing/planning-with-context-library.md). Kept for history — do
+> not add to it, and treat anything conflicting with current Context Library guidance as superseded.
 
 **Status:** Deprecated (was: a working spec, structured for engineering use). Sections marked `[EXTRAPOLATION]` extend the per-chart rules to dashboards and multi-chart surfaces, which the rules themselves do not cover.
 

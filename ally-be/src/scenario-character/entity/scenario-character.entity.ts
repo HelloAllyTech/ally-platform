@@ -44,6 +44,15 @@ export class ScenarioCharacter extends BaseWithoutTenantEntity {
   characterProfileText?: string;
 
   /**
+   * One line on how the character looks ("early 30s, short beard, blue
+   * kurta"). Image Studio compiles it into every image the character is in, so
+   * they stay recognisable across a course's scenes. Nullable: characters made
+   * before it existed have none.
+   */
+  @Column({ name: 'appearance', type: 'varchar', length: 500, nullable: true })
+  appearance?: string | null;
+
+  /**
    * Voice per language: `{ "<languages.id>": "<scenario_voices.id>" }`.
    *
    * Was a single `voice_id`, which could not express what a character

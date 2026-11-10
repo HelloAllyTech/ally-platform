@@ -4,10 +4,10 @@ import { AuthModule } from 'src/auth/auth.module';
 import { AwsModule } from 'src/aws/aws.module';
 import { LlmUsageModule } from 'src/analytics/llm-usage.module';
 import { CaseModule } from 'src/case/case.module';
+import { ContextLibraryModule } from 'src/context-library/context-library.module';
 import { ImageGenerationModule } from 'src/image-generation/image-generation.module';
 import { LearnModule } from 'src/learn/learn.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
-import { StacksClientService } from 'src/llm-agent/service/stacks-client.service';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { ScenarioCharacterModule } from 'src/scenario-character/scenario-character.module';
 import { TrackModule } from 'src/track/track.module';
@@ -72,6 +72,9 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     AuthModule,
     AwsModule,
     CaseModule,
+    // design_guidance_* on Learning Design, search_library on the Content Catalogue, and the
+    // citation check on the blueprint.
+    ContextLibraryModule,
     ImageGenerationModule,
     LearnModule,
     LlmAgentModule,
@@ -86,7 +89,6 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     CourseCopilotMessageRepository,
     CourseCopilotJobRepository,
     CourseCopilotEventRepository,
-    StacksClientService,
     CourseCopilotEventService,
     CourseCopilotAnalyticsService,
     CourseCopilotGateway,

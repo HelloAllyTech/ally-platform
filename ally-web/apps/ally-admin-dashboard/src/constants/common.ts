@@ -214,6 +214,20 @@ export const ApiEndpoints = {
       `/v1/learn/admin/tracks/${id}/translations/${languageId}/unpublish`,
   },
 
+  // Image Studio — AI images for every authoring slot (ally-be docs/image-studio.md).
+  IMAGE_STUDIO: {
+    CONFIG: "/v1/image-studio/config",
+    STYLES: "/v1/image-studio/styles",
+    SLOTS: "/v1/image-studio/slots",
+    DESCRIBE: "/v1/image-studio/describe",
+    JOBS: "/v1/image-studio/jobs",
+    JOBS_BATCH: "/v1/image-studio/jobs/batch",
+    ESTIMATE: "/v1/image-studio/estimate",
+    HISTORY: "/v1/image-studio/history",
+    ACCEPT: (imageId: string) => `/v1/image-studio/images/${imageId}/accept`,
+    CAST_SHEETS: "/v1/image-studio/cast-sheets",
+  },
+
   // Component Library — global, cross-tenant Track/Course item templates.
   COMPONENT_TEMPLATES: {
     LIST: "/v1/learn/admin/component-templates",
@@ -470,9 +484,6 @@ export const ApiEndpoints = {
       `/v1/debriefs/console/runs/${id}/${action}`,
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
     ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
-    KNOWLEDGE: "/v1/debriefs/console/knowledge",
-    KNOWLEDGE_CLINICAL: (id: string) => `/v1/debriefs/console/knowledge/${id}/clinical`,
-    KNOWLEDGE_SIGN_OFF: (id: string) => `/v1/debriefs/console/knowledge/${id}/sign-off`,
   },
   DEBRIEF_CALIBRATION: {
     SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
@@ -656,22 +667,57 @@ export const ApiEndpoints = {
     NOTIFICATIONS: "/v1/bug-hunter/notifications",
     NOTIFICATION_READ: (id: string) => `/v1/bug-hunter/notifications/${id}/read`,
     NOTIFICATIONS_READ_ALL: "/v1/bug-hunter/notifications/read-all",
-    // The notebook Bug Hunter reads before hunting and writes at close —
-    // ally-be src/agent-memory, docs/bug-hunter-memory-adr.md.
-    MEMORY: "/v1/bug-hunter/memory",
     FEATURE_MAPS: "/v1/bug-hunter/feature-maps",
     FEATURE_MAPS_REFRESH: "/v1/bug-hunter/feature-maps/refresh",
     FEATURE_MAP_REMOVE: (id: string) => `/v1/bug-hunter/feature-maps/${id}/remove`,
-    MEMORY_RETIRE: (id: string) => `/v1/bug-hunter/memory/${id}/retire`,
-    // What the agent retired on its own recently, with its reason (OPP-0752), and the undo.
-    MEMORY_RETIRED: "/v1/bug-hunter/memory/retired",
-    MEMORY_RESTORE: (id: string) => `/v1/bug-hunter/memory/${id}/restore`,
     // The decision log, scoreboard and replay (OPP-0776, OPP-0783).
     FINDING_DECISIONS: (id: string) => `/v1/bug-hunter/findings/${id}/decisions`,
     RUN_DECISIONS: (id: string) => `/v1/bug-hunter/runs/${id}/decisions`,
     SCOREBOARD: "/v1/bug-hunter/scoreboard",
     DECISION_REPLAY: "/v1/bug-hunter/decisions/replay",
     DECISION_OWNERS: "/v1/bug-hunter/decisions/owners",
+  },
+  // Context Library — ally-be src/context-library, docs/context-library/PLAN.md.
+  CONTEXT_LIBRARY: {
+    COLLECTIONS: "/v1/context-library/collections",
+    TEMPLATE: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/template.csv`,
+    // Multipart with upload progress, so sent by the upload client (XHR), not RTK Query.
+    UPLOADS: "/v1/context-library/uploads",
+    QUEUE: "/v1/context-library/queue",
+    SOURCES: "/v1/context-library/sources",
+    SOURCE_BY_ID: (id: string) => `/v1/context-library/sources/${id}`,
+    SOURCE_ACTION: (id: string, action: "pause" | "resume" | "cancel" | "front" | "retry") =>
+      `/v1/context-library/sources/${id}/${action}`,
+    CHUNKS: "/v1/context-library/chunks",
+    CHUNK_BY_CODE: (code: string) => `/v1/context-library/chunks/${encodeURIComponent(code)}`,
+    CHUNK_ACTION: (code: string, action: "archive" | "restore" | "pin" | "unpin") =>
+      `/v1/context-library/chunks/${encodeURIComponent(code)}/${action}`,
+    COLLECTION_CHUNKS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/chunks`,
+    BULK: "/v1/context-library/bulk",
+    SEARCH: "/v1/context-library/search",
+    USE_CASES: "/v1/context-library/settings/use-cases",
+    // Insights and the learning loops
+    INSIGHTS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/insights`,
+    CHANGES: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/changes`,
+    CHANGE_UNDO: (actionId: string) =>
+      `/v1/context-library/changes/${encodeURIComponent(actionId)}/undo`,
+    GAP_DISMISS: (gapId: string) => `/v1/context-library/gaps/${encodeURIComponent(gapId)}/dismiss`,
+    LOOPS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/loops`,
+    LOOPS_RUN: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/loops/run`,
+    // Read-only keys for engineers' Claude Code, and the MCP endpoint they unlock.
+    READER_KEYS: "/v1/context-library/reader-keys",
+    READER_KEY_BY_ID: (id: string) => `/v1/context-library/reader-keys/${encodeURIComponent(id)}`,
+    READER_KEY_RESTORE: (id: string) =>
+      `/v1/context-library/reader-keys/${encodeURIComponent(id)}/restore`,
+    MCP: "/v1/context-library/mcp",
+    // The automatic steps after a release (import or enrichment, smoke check, retirement).
+    ROLLOUT: "/v1/context-library/rollout",
   },
   BUILDER: {
     SESSIONS: "/v1/builder/sessions",
@@ -706,6 +752,8 @@ export const ApiEndpoints = {
     SESSION_PULL_REQUEST_RESUME: (id: string, prId: string) =>
       `/v1/builder/sessions/${id}/pull-requests/${prId}/resume-automation`,
     SESSION_PR_FEEDBACK: (id: string) => `/v1/builder/sessions/${id}/pr-feedback`,
+    // Principles in play, and the per-session switch (PUT { off }).
+    SESSION_PRINCIPLES: (id: string) => `/v1/builder/sessions/${id}/principles`,
     SETTINGS: "/v1/builder/settings",
     NOTIFICATIONS: "/v1/builder/notifications",
     // The decision feed: every pending decision across sessions, and the one answer endpoint
@@ -736,9 +784,6 @@ export const ApiEndpoints = {
     // Where a run's time and money go. The scoreboard answers "is Builder
     // getting better"; this answers "and what would make it faster".
     PIPELINE_HEALTH: "/v1/builder/pipeline-health",
-    LESSONS: "/v1/builder/lessons",
-    LESSON_BY_ID: (id: string) => `/v1/builder/lessons/${id}`,
-    LESSONS_CONSOLIDATE: "/v1/builder/lessons/consolidate",
     EXEMPLARS: "/v1/builder/exemplars",
     // Replay eval: recorded interviews (fixtures), suites of runs, and the gate
     // that publishes a Builder prompt change only when its suite passes.
@@ -802,12 +847,10 @@ export const ApiEndpoints = {
     DOCUMENT_BY_ID: (id: string) => `/v1/knowledge-base/documents/${id}`,
     DOCUMENT_CONTENT: (id: string) => `/v1/knowledge-base/documents/${id}/content`,
     DOCUMENT_TENANTS: (id: string) => `/v1/knowledge-base/documents/${id}/tenants`,
-    DOCUMENT_CHUNKS: (id: string) => `/v1/knowledge-base/documents/${id}/chunks`,
     DOCUMENT_REINDEX: (id: string) => `/v1/knowledge-base/documents/${id}/reindex`,
     DOCUMENT_ARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/archive`,
     DOCUMENT_UNARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/unarchive`,
     CHUNK_BY_ID: (chunkId: string) => `/v1/knowledge-base/chunks/${chunkId}`,
-    SEARCH: "/v1/knowledge-base/search",
     STATS: "/v1/knowledge-base/stats",
     // Bot (ally-be src/whatsapp)
     // Phone → organisation mappings. Surfaced under User Management, but owned by the bot:
@@ -922,13 +965,6 @@ export const ApiEndpoints = {
     // Advice moderation.
     ADVICE: "/v1/guide/admin/advice",
     ADVICE_MODERATE: (id: string) => `/v1/guide/admin/advice/${id}/moderate`,
-    // Library: the platform's, and one organisation's own.
-    LIBRARY_DOCUMENTS: "/v1/guide/admin/library/documents",
-    LIBRARY_UPLOAD_URL: "/v1/guide/admin/library/documents/upload-url",
-    LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/library/documents/${id}`,
-    ORG_LIBRARY_DOCUMENTS: "/v1/guide/admin/org-library/documents",
-    ORG_LIBRARY_UPLOAD_URL: "/v1/guide/admin/org-library/documents/upload-url",
-    ORG_LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/org-library/documents/${id}`,
     // Learning loop (plan §7.13, §10.5 "Evals").
     EVALUATOR_RUBRIC: "/v1/guide/admin/evaluator/rubric",
     EVALUATOR_SUMMARY: "/v1/guide/admin/evaluator/summary",
@@ -1045,6 +1081,9 @@ export const ROUTES = {
   COURSE_COPILOT_SESSION: (id: string) => `/course-copilot/${id}`,
   // The Ally Console (ally guide admin). `?tab=` picks the tab; `?thread=` opens the Turn Inspector.
   ALLY_CONSOLE: "/ally",
+  // `?view=` (library · insights · settings), `?collection=`, `?chunk=` and `?document=` open
+  // their sheets; `?sheet=new|bulk` the add flows.
+  CONTEXT_LIBRARY: "/context-library",
   // Evaluator micro-app (public routes; evaluator email+password auth)
   EVALUATE: "/evaluate",
   EVALUATE_RECORDS: "/evaluate/records",
@@ -1141,6 +1180,8 @@ export const TAG_TYPES = {
   CUSTOM_FIELD_DEFINITIONS: "customFieldDefinitions",
   CHARACTERS: "characters",
   IMAGE_LIBRARY: "imageLibrary",
+  IMAGE_STUDIO_HISTORY: "imageStudioHistory",
+  IMAGE_STUDIO_CAST_SHEETS: "imageStudioCastSheets",
   PROMPTS: "prompts",
   CONVERSATIONAL_GUARDRAILS: "conversationalGuardrails",
   USER_BADGES: "userBadges",
@@ -1158,7 +1199,6 @@ export const TAG_TYPES = {
   ROLEPLAY_SESSION_LOGS: "roleplaySessionLogs",
   COMFORT_AUDIO_LIBRARY: "comfortAudioLibrary",
   WHATSAPP_BOT_DOCUMENTS: "whatsAppBotDocuments",
-  WHATSAPP_BOT_DOCUMENT_CHUNKS: "whatsAppBotDocumentChunks",
   WHATSAPP_BOT_STATS: "whatsAppBotStats",
   WHATSAPP_BOT_TEMPLATES: "whatsAppBotTemplates",
   WHATSAPP_BOT_SETTINGS: "whatsAppBotSettings",
@@ -1225,8 +1265,6 @@ export const TAG_TYPES = {
   BUG_HUNTER_RUNS: "bugHunterRuns",
   BUG_HUNTER_FINDINGS: "bugHunterFindings",
   BUG_HUNTER_NOTIFICATIONS: "bugHunterNotifications",
-  // Bug Hunter's notebook. Also registered in baseApi.ts's `tagTypes`.
-  BUG_HUNTER_MEMORY: "bugHunterMemory",
   // Bug Hunter's feature map. Also registered in baseApi.ts's `tagTypes`.
   BUG_HUNTER_FEATURE_MAP: "bugHunterFeatureMap",
   // Who owns each orchestration decision point (OPP-0783). Also registered in baseApi.ts's `tagTypes`.
@@ -1241,7 +1279,6 @@ export const TAG_TYPES = {
   BUILDER_SETTINGS: "builderSettings",
   BUILDER_NOTIFICATIONS: "builderNotifications",
   BUILDER_DECISIONS: "builderDecisions",
-  BUILDER_LESSONS: "builderLessons",
   BUILDER_EXEMPLARS: "builderExemplars",
   BUILDER_EVAL_FIXTURES: "builderEvalFixtures",
   BUILDER_EVAL_SUITES: "builderEvalSuites",
@@ -1262,7 +1299,6 @@ export const TAG_TYPES = {
   ALLY_GUIDE_BASELINE: "allyGuideBaseline",
   ALLY_GUIDE_CONFIG: "allyGuideConfig",
   ALLY_GUIDE_ADVICE: "allyGuideAdvice",
-  ALLY_GUIDE_LIBRARY: "allyGuideLibrary",
   ALLY_GUIDE_REVIEWS: "allyGuideReviews",
   ALLY_GUIDE_EVALS: "allyGuideEvals",
   ALLY_GUIDE_NOTES: "allyGuideNotes",
@@ -1298,6 +1334,17 @@ export const TAG_TYPES = {
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",
+  // Context Library. Also registered in baseApi.ts's `tagTypes`.
+  CONTEXT_LIBRARY_COLLECTIONS: "contextLibraryCollections",
+  CONTEXT_LIBRARY_QUEUE: "contextLibraryQueue",
+  CONTEXT_LIBRARY_SOURCES: "contextLibrarySources",
+  CONTEXT_LIBRARY_CHUNKS: "contextLibraryChunks",
+  CONTEXT_LIBRARY_USE_CASES: "contextLibraryUseCases",
+  CONTEXT_LIBRARY_INSIGHTS: "contextLibraryInsights",
+  CONTEXT_LIBRARY_LOOPS: "contextLibraryLoops",
+  CONTEXT_LIBRARY_READER_KEYS: "contextLibraryReaderKeys",
+  // Builder's "Principles in play", per session. Also registered in baseApi.ts's `tagTypes`.
+  BUILDER_PRINCIPLES: "builderPrinciples",
 };
 
 /**
