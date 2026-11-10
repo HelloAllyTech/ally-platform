@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - `plan_outcome_reviews`: one outcome review per plan and due date.
  * - `plan_suggestions`: ideas the weekly signal scout suggests to Leads.
  */
-export class AddPlanChecksAndOutcomeReviews1981001600000 implements MigrationInterface {
-  name = 'AddPlanChecksAndOutcomeReviews1981001600000';
+export class AddPlanChecksAndOutcomeReviews1981900200000 implements MigrationInterface {
+  name = 'AddPlanChecksAndOutcomeReviews1981900200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

@@ -255,14 +255,14 @@ interface RankPlaceholders {
 
 /** The query-builder spelling, used everywhere except findOneWithScore. */
 const NAMED_RANK_PLACEHOLDERS: RankPlaceholders = {
-  wVotes: ':wVotes',
-  wVoters: ':wVoters',
-  wEffort: ':wEffort',
-  wGoal: ':wGoal',
-  maxScore: ':maxScore',
-  maxVoters: ':maxVoters',
-  totalGoals: ':totalGoals',
-  weightTotal: ':weightTotal',
+  wVotes: 'CAST(:wVotes AS numeric)',
+  wVoters: 'CAST(:wVoters AS numeric)',
+  wEffort: 'CAST(:wEffort AS numeric)',
+  wGoal: 'CAST(:wGoal AS numeric)',
+  maxScore: 'CAST(:maxScore AS numeric)',
+  maxVoters: 'CAST(:maxVoters AS numeric)',
+  totalGoals: 'CAST(:totalGoals AS numeric)',
+  weightTotal: 'CAST(:weightTotal AS numeric)',
 };
 
 /**
@@ -384,17 +384,17 @@ END)`;
  * types. The migration's CHECK guarantees it is never zero.
  */
 const COMPOSITE_SCORE_SQL = `((
-    :wVotes  * (CASE WHEN :maxScore  > 0
-                     THEN LEAST(COALESCE(alloc.score, 0)::numeric / :maxScore  * 100, 100)
+    CAST(:wVotes AS numeric)  * (CASE WHEN CAST(:maxScore AS numeric)  > 0
+                     THEN LEAST(COALESCE(alloc.score, 0)::numeric / CAST(:maxScore AS numeric)  * 100, 100)
                      ELSE 0 END)
-  + :wVoters * (CASE WHEN :maxVoters > 0
-                     THEN LEAST(COALESCE(voters.cnt, 0)::numeric / :maxVoters * 100, 100)
+  + CAST(:wVoters AS numeric) * (CASE WHEN CAST(:maxVoters AS numeric) > 0
+                     THEN LEAST(COALESCE(voters.cnt, 0)::numeric / CAST(:maxVoters AS numeric) * 100, 100)
                      ELSE 0 END)
-  + :wEffort * ${EFFORT_SCORE_SQL}
-  + :wGoal   * (CASE WHEN :totalGoals > 0
-                     THEN COALESCE(gimp.helped, 0)::numeric / :totalGoals * 100
+  + CAST(:wEffort AS numeric) * ${EFFORT_SCORE_SQL}
+  + CAST(:wGoal AS numeric)   * (CASE WHEN CAST(:totalGoals AS numeric) > 0
+                     THEN COALESCE(gimp.helped, 0)::numeric / CAST(:totalGoals AS numeric) * 100
                      ELSE 0 END)
-) / :weightTotal)`;
+) / CAST(:weightTotal AS numeric))`;
 
 const SORT_COLUMNS: Record<string, string> = {
   /**
@@ -730,17 +730,17 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
               COALESCE(voters.cnt, 0)                                        AS "voterCount",
               COALESCE(gimp.helped, 0)                                       AS "goalsHelped",
               COALESCE(gimp.assessed, 0)                                     AS "goalsAssessed",
-              ((  $4 * (CASE WHEN $8 > 0
-                             THEN LEAST(COALESCE(alloc.score, 0)::numeric / $8 * 100, 100)
+              ((  CAST($4 AS numeric) * (CASE WHEN CAST($8 AS numeric) > 0
+                             THEN LEAST(COALESCE(alloc.score, 0)::numeric / CAST($8 AS numeric) * 100, 100)
                              ELSE 0 END)
-                + $5 * (CASE WHEN $9 > 0
-                             THEN LEAST(COALESCE(voters.cnt, 0)::numeric / $9 * 100, 100)
+                + CAST($5 AS numeric) * (CASE WHEN CAST($9 AS numeric) > 0
+                             THEN LEAST(COALESCE(voters.cnt, 0)::numeric / CAST($9 AS numeric) * 100, 100)
                              ELSE 0 END)
-                + $6 * ${EFFORT_SCORE_SQL}
-                + $7 * (CASE WHEN $10 > 0
-                             THEN COALESCE(gimp.helped, 0)::numeric / $10 * 100
+                + CAST($6 AS numeric) * ${EFFORT_SCORE_SQL}
+                + CAST($7 AS numeric) * (CASE WHEN CAST($10 AS numeric) > 0
+                             THEN COALESCE(gimp.helped, 0)::numeric / CAST($10 AS numeric) * 100
                              ELSE 0 END)
-              ) / $11)                                                       AS "compositeScore",
+              ) / CAST($11 AS numeric))                                                       AS "compositeScore",
               COALESCE((SELECT a.votes FROM roadmap_allocations a
                          WHERE a."opportunityId" = opp.id
                            AND a."userId" = $2 AND a."periodKey" = $3), 0)   AS "myVotes",
@@ -776,14 +776,14 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
                 ON gimp."opportunityId" = opp.id
          LEFT JOIN users owner_user ON owner_user.id = opp."ownerUserId"
          LEFT JOIN ${queueRankSql({
-           wVotes: '$4',
-           wVoters: '$5',
-           wEffort: '$6',
-           wGoal: '$7',
-           maxScore: '$8',
-           maxVoters: '$9',
-           totalGoals: '$10',
-           weightTotal: '$11',
+           wVotes: 'CAST($4 AS numeric)',
+           wVoters: 'CAST($5 AS numeric)',
+           wEffort: 'CAST($6 AS numeric)',
+           wGoal: 'CAST($7 AS numeric)',
+           maxScore: 'CAST($8 AS numeric)',
+           maxVoters: 'CAST($9 AS numeric)',
+           totalGoals: 'CAST($10 AS numeric)',
+           weightTotal: 'CAST($11 AS numeric)',
          })} qrank ON qrank.id = opp.id
         WHERE opp.id = $1 AND opp."deletedAt" IS NULL`,
       [

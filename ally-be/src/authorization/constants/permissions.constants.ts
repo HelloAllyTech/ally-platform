@@ -216,7 +216,6 @@ const PERMISSIONS = {
 
   // === CASES ===
   VIEW_ADMIN_CASES: 'view:admin:cases',
-  VIEW_ADMIN_CASE: 'view:admin:case',
   EDIT_ADMIN_CASE: 'edit:admin:case',
   DELETE_ADMIN_CASE: 'delete:admin:case',
   EDIT_CASE_TENANT: 'edit:case-tenant',
@@ -230,7 +229,6 @@ const PERMISSIONS = {
   VIEW_ADMIN_TRACK: 'view:admin:track',
   EDIT_ADMIN_TRACK: 'edit:admin:track',
   DELETE_ADMIN_TRACK: 'delete:admin:track',
-  EDIT_TENANT_TRACK: 'edit:tenant:track',
   EDIT_TRACK_TENANT: 'edit:track-tenant',
   DELETE_TRACK_TENANT: 'delete:track-tenant',
   VIEW_TRACKS: 'view:tracks',
@@ -515,7 +513,6 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.VIEW_ADMIN_TRACK,
   PERMISSIONS.EDIT_ADMIN_TRACK,
   PERMISSIONS.DELETE_ADMIN_TRACK,
-  PERMISSIONS.EDIT_TENANT_TRACK,
   PERMISSIONS.EDIT_TRACK_TENANT,
   PERMISSIONS.DELETE_TRACK_TENANT,
   PERMISSIONS.EDIT_SCENARIO_TENANT,

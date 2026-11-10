@@ -19,8 +19,8 @@ const GRANTS = [
   'mcp_dev',
 ];
 
-export class AddProductOutcomesCollection1981001700000 implements MigrationInterface {
-  name = 'AddProductOutcomesCollection1981001700000';
+export class AddProductOutcomesCollection1981900300000 implements MigrationInterface {
+  name = 'AddProductOutcomesCollection1981900300000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

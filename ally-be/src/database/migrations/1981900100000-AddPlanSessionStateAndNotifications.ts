@@ -11,8 +11,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - `plan_notifications`: in-app notices for plan authors and leads, who are
  *   usually not Builder users. CHECK mirrors PlanNotificationKind.
  */
-export class AddPlanSessionStateAndNotifications1981001500000 implements MigrationInterface {
-  name = 'AddPlanSessionStateAndNotifications1981001500000';
+export class AddPlanSessionStateAndNotifications1981900100000 implements MigrationInterface {
+  name = 'AddPlanSessionStateAndNotifications1981900100000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

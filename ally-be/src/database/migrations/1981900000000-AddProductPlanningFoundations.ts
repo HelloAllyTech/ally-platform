@@ -18,8 +18,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * CHECK lists mirror BuilderSessionKind, BuilderSessionVisibility, PlanStage
  * and PlanEventKind (check-constraints-cover-enums.spec.ts).
  */
-export class AddProductPlanningFoundations1981001400000 implements MigrationInterface {
-  name = 'AddProductPlanningFoundations1981001400000';
+export class AddProductPlanningFoundations1981900000000 implements MigrationInterface {
+  name = 'AddProductPlanningFoundations1981900000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
