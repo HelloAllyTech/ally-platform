@@ -1,4 +1,12 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import {
+  DEBRIEF_KINDS,
+  DEBRIEF_LEVELS,
+  PASSAGE_SYNC_PREFIX,
+  headingFor,
+  tagOf,
+  withoutByline,
+} from './context-library-passages.helpers';
 
 /**
  * Context Library, phase 6 (docs/context-library/PLAN.md §6.5): import the Ally guide's library
@@ -37,7 +45,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * and one Restore away, but not suddenly served to learners because the gate was retired.
  *
  * Self-contained SQL and string handling, no application imports, so it keeps meaning what it
- * meant when it ran.
+ * meant when it ran. The string helpers live in `./context-library-passages.helpers`: TypeORM
+ * calls `new` on every function a migration file exports, so an exported arrow function here
+ * crashes `migration:run` before any migration loads.
  */
 interface CorpusCopy {
   corpus: 'ally_guide_library' | 'debrief_knowledge';
@@ -48,59 +58,6 @@ const COPIES: CorpusCopy[] = [
   { corpus: 'ally_guide_library', collectionId: 'ally_guide_library' },
   { corpus: 'debrief_knowledge', collectionId: 'debrief_guidance' },
 ];
-
-export const PASSAGE_SYNC_PREFIX = 'kb_document_chunks:';
-
-const STATEMENT_MAX = 200;
-const DEBRIEF_KINDS = [
-  'practice_guideline',
-  'style_guide',
-  'level_guide',
-  'protocol',
-];
-const DEBRIEF_LEVELS = [
-  'lay',
-  'early_professional',
-  'experienced_professional',
-];
-
-/** Lower-kebab, as the Context Library normalises free-text facets. */
-export const tagOf = (value: unknown): string =>
-  String(value ?? '')
-    .toLowerCase()
-    .normalize('NFKC')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
-
-/** "Title by First Last" → "Title". Two to four capitalised words, so "Stand by Me" stays. */
-export const withoutByline = (title: string): string =>
-  String(title ?? '')
-    .replace(/\s+by\s+[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*){1,3}\s*$/, '')
-    .trim();
-
-const clip = (text: string, max: number): string => {
-  const flat = text.replace(/\s+/g, ' ').trim();
-  if (flat.length <= max) return flat;
-  const cut = flat.slice(0, max - 1);
-  const atWord = cut.lastIndexOf(' ');
-  return `${(atWord > max * 0.6 ? cut.slice(0, atWord) : cut).trimEnd()}…`;
-};
-
-/** The heading an imported passage carries until enrichment writes a one-line statement. */
-export const headingFor = (
-  title: string,
-  sectionPath: string | null,
-  body: string,
-): string => {
-  const leaf = (sectionPath ?? '')
-    .split('>')
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .pop();
-  const heading = [title, leaf].filter(Boolean).join(' — ');
-  return clip(heading || body, STATEMENT_MAX) || 'Imported passage';
-};
 
 interface DocumentRow {
   id: string;
