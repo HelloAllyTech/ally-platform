@@ -89,7 +89,7 @@ const DesignSystem = lazy(() =>
 
 export const RouteLayout: React.FC = () => {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+    <BrowserRouter>
       <Routes>
         {/* Public Routes */}
         <Route

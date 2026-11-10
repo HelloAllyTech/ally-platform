@@ -412,11 +412,11 @@ describe("Login", () => {
       fireEvent.click(checkbox);
       fireEvent.click(nextButton);
 
-      expect(localStorage.getItem("adminRememberedEmail")).toBe("test@example.com");
+      expect(localStorage.getItem("rememberedEmail")).toBe("test@example.com");
     });
 
     it("should load remembered email on mount", () => {
-      localStorage.setItem("adminRememberedEmail", "remembered@example.com");
+      localStorage.setItem("rememberedEmail", "remembered@example.com");
 
       renderLogin();
 
