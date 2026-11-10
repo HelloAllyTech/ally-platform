@@ -17,6 +17,7 @@ import {
   ClLoopActionType,
 } from '../enum/context-library.enum';
 import { requireProfile } from '../profiles';
+import { sameAudience } from '../util/audience.util';
 import {
   CuratorStats,
   MAX_LEARNED_QUERIES,
@@ -342,7 +343,9 @@ export class ContextLearningService {
       });
       if (
         both.length !== 2 ||
-        both.some((c) => c.origin !== ClChunkOrigin.DISTILLED || c.pinned)
+        both.some((c) => c.origin !== ClChunkOrigin.DISTILLED || c.pinned) ||
+        // Merging across audiences would hide the absorbed idea from someone who could read it.
+        !sameAudience(both[0], both[1])
       )
         continue;
       try {
