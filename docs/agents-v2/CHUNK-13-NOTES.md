@@ -100,7 +100,10 @@ The widget **is** the bot page in a frame, so it sends through the bot page's se
   - `widgetConfig` and `framePolicy`.
 - **`chatbot/bot-page/bot-page-public.controller.ts`:** `POST`/`GET :slug/embed/probe`.
 - **`chatbot/bot-page/widget-public.controller.ts`:** `GET v1/public/widget/:slug` (sets its own CORS for allowed origins only, without credentials) and `…/frame-policy`.
-- **`main.ts`:** the app's CORS list is kept off `/api/v1/public/widget/` only (a CORS options delegate). Every other route is unchanged.
+- **`common/cors/app-cors.ts`** (used by `main.ts`): the app's CORS list applies to every route except the widget's two, matched whole against the raw URL: `/api/v1/public/widget/<slug>` and `…/<slug>/frame-policy`, each with an optional query.
+  - `/widgetX`, deeper paths, `..` segments and encoded slashes don't match, so they keep the normal list.
+  - Leaving a route out only drops this layer's headers (`origin: false`). It never allows anything, so a mistaken match would fail closed.
+  - `common/cors/test/app-cors.spec.ts` covers the matcher, and the real `cors` middleware over HTTP; also checked live.
 - **`chatbot/inbox/`:** `InboxItem.source`, and the `widget` channel filter (`web` now means the bot page without the widget).
 - **Rate limit:** `BOT_PAGE_IP_LIMITS.widget` (600/h per IP; the settings are read on every page of the owner's site).
 - **`DATA_SCHEMA.md`:** `settings.widget` and `metadata.source`.

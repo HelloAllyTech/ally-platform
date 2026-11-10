@@ -4,13 +4,10 @@ import type { Request, Response } from 'express';
 import { Public } from '../../auth/decorators/auth.metadata';
 import { BotPagePublicService } from './bot-page-public.service';
 
-/** This controller's path, with the app's `api` prefix: main.ts keeps the app's CORS list off it. */
-export const WIDGET_CONFIG_PATH = '/api/v1/public/widget/';
-
 /**
  * The website widget's loader (chunk 13) reads its settings from here, on the owner's own site. So
- * this sits outside the bot page's Origin guard and the app's CORS list (main.ts lets this path
- * through): it answers CORS itself, only to the bot's allowed websites, without credentials.
+ * this sits outside the bot page's Origin guard and the app's CORS list (`common/cors/app-cors.ts`
+ * leaves exactly these two routes out): it answers CORS itself, only to the bot's allowed websites, without credentials.
  */
 @ApiTags('Bot page (public)')
 @Controller('v1/public/widget')
