@@ -159,10 +159,6 @@ export class AgentRuntimeRunner {
   }
 
   /**
-   * The titles of the documents the bot answers from: its "what I cover" list. A bot that
-   * answers from its organisation's library sends none for now (`knowledge_topics: []`).
-   */
-  /**
    * The body `/agent/run` gets for this turn. One place, so the owner's "How it works"
    * (chunk 20d-2, `describe`) is built from exactly what a run sends.
    */
@@ -181,6 +177,10 @@ export class AgentRuntimeRunner {
     });
   }
 
+  /**
+   * The titles of the documents the bot answers from: its "what I cover" list. A bot that
+   * answers from its organisation's library sends none for now (`knowledge_topics: []`).
+   */
   private async knowledgeTopics(
     knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
   ): Promise<string[]> {

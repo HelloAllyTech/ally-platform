@@ -64,7 +64,8 @@ export enum CareTopic {
   LEGAL_FINANCIAL = 'legal_financial',
 }
 
-/** The designs that work today. Booking and orders are always offered as "coming soon". */
+/** The 20a-1 designs, which purposes replaced in 20a-2. Kept so a draft made before purposes still
+ * loads; `PURPOSE_OF_DESIGN` maps it to a purpose. */
 export enum DesignId {
   GUIDE = 'guide',
   ENQUIRIES = 'enquiries',

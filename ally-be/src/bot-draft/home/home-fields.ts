@@ -268,7 +268,7 @@ export const HOME_FIELDS = {
     }),
   } as HomeField<string[]>,
 
-  /** Who can message on WhatsApp (chunk 20d-2; the classic People tab saved it with the bot). */
+  /** Who can message on WhatsApp (chunk 20d-2): the bot's own access mode, which WhatsApp's checks read. */
   whatsappAccess: {
     read: (s) => s.chatbot.accessMode,
     parse: (value) => {
