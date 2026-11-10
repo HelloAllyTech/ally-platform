@@ -1,3 +1,7 @@
+# DEPRECATED (2026-11-10): use "Production Release - Frontends"
+# (production-release-frontends.yaml, tags frontend-vX.Y.Z), which releases
+# both dashboards. Kept briefly as a fallback; scheduled for removal.
+#
 # Production Release Pipeline - Ally Helpline Dashboard
 #
 # This workflow handles production releases for ally-helpline-dashboard with semantic versioning.
