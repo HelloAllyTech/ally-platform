@@ -26,13 +26,6 @@ export enum RoadmapBriefEvidenceSource {
   ROADMAP = 'roadmap',
   CODEBASE = 'codebase',
   WIKI = 'wiki',
-  /**
-   * History only. Briefs are stored once, at filing (`roadmap_opportunities.brief`), and the ones
-   * filed before the Context Library replaced Stacks on 2026-11-09 cite it; this keeps them
-   * readable. A new brief never carries it — `normaliseOpportunityBrief` turns it into
-   * `principles`.
-   */
-  STACKS = 'stacks',
   PRINCIPLES = 'principles',
   STRATEGY = 'strategy',
 }

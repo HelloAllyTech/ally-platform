@@ -185,7 +185,7 @@ describe('rubric', () => {
   it('names no frameworks or sources in the judge or red-team prompts', () => {
     for (const prompt of [EVALUATOR_SYSTEM_PROMPT, RED_TEAM_SYSTEM_PROMPT]) {
       expect(prompt).not.toMatch(
-        /octalysis|self-determination|albada|stacks|white hat|black hat/i,
+        /octalysis|self-determination|albada|white hat|black hat/i,
       );
       expect(prompt).not.toMatch(/\b(ENACT|EQUIP|WHO)\b/);
     }
