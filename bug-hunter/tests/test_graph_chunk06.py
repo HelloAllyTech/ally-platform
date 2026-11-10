@@ -648,3 +648,144 @@ def test_stash_paths_ignores_untracked_paths(repo) -> None:
     assert (repo / "ally-be/src/new.spec.ts").exists()
     git.unstash(repo)
     assert (repo / "ally-be/src/x.ts").read_text() == SRC_FIXED
+
+
+# --- risk rules (a) topic and (b) risk-path dependents ---
+
+TIER_CONSTANTS = (
+    "export const OWNER_TIERS = ['OWNER'];\n" "export const LABEL = 'members';\n"
+)
+MEMBER_REPO = (
+    "import { OWNER_TIERS } from '../../common/constants/team.constants';\n"
+    "export class MemberRepository {\n"
+    "  listVisible(rows: { tier: string }[]) {\n"
+    "    return rows.filter((r) => !OWNER_TIERS.includes(r.tier));\n"
+    "  }\n"
+    "}\n"
+)
+
+
+@pytest.fixture
+def tier_repo(tmp_path: Path):
+    """The 87c6ecb8 shape with invented names: a constant outside the risk paths, used
+    by a repository under src/user/ (a risk path)."""
+    root = tmp_path / "tier"
+    (root / "ally-be/src/common/constants").mkdir(parents=True)
+    (root / "ally-be/src/user/repository").mkdir(parents=True)
+    (root / "ally-be/package-lock.json").write_text("{}")
+    (root / "ally-be/src/common/constants/team.constants.ts").write_text(TIER_CONSTANTS)
+    (root / "ally-be/src/user/repository/member.repository.ts").write_text(MEMBER_REPO)
+    (root / "ally-be/src/x.ts").write_text(SRC_BUGGY)
+    _git(root, "init", "-q", "-b", "master")
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "init")
+    return root
+
+
+def _tier_deps(config, root, tmp_path, finding_title, edit):
+    from bug_hunter.context.repo_map import build_map
+
+    finding = {
+        **FINDING,
+        "args": {
+            **FINDING["args"],
+            "title": finding_title,
+            "hypothesis": "the default list filter misses the newest tier",
+            "root_cause": "src/common/constants/team.constants.ts:1",
+            "suspected_files": ["src/common/constants/team.constants.ts"],
+        },
+    }
+    deps = _deps(
+        config,
+        root,
+        tmp_path,
+        [edit, SUBMIT_FIX],
+        investigate=ScriptedChatModel(script=[ai(tool_calls=[finding])]),
+    )
+    cfg = config.model_copy(update={"repo_root": root})
+    deps.repo_map, _ = build_map(cfg, "ally-be", root=root, cache_root=tmp_path / "map")
+    return deps
+
+
+EDIT_TIERS = ai(
+    tool_calls=[
+        {
+            "name": "edit_file",
+            "args": {
+                "path": "src/common/constants/team.constants.ts",
+                "old_str": "['OWNER']",
+                "new_str": "['OWNER', 'STAFF']",
+            },
+        }
+    ]
+)
+
+
+def test_risk_gate_escalates_a_change_used_by_a_risk_path(
+    config, tier_repo, tmp_path
+) -> None:
+    deps = _tier_deps(
+        config, tier_repo, tmp_path, "list filter misses the newest tier", EDIT_TIERS
+    )
+    _, state = _run(deps)
+    assert state.review and state.review.verdict == "approve"  # reviewer was fine
+    assert state.status == "escalated" and state.risk_level == "human_only"
+    assert (
+        "used by risk-path ally-be/src/user/repository/member.repository.ts"
+        in state.stop_reason
+    )
+    assert "imports OWNER_TIERS" in state.stop_reason and state.pr_url is None
+
+
+def test_a_change_nobody_risky_uses_is_not_escalated(
+    config, tier_repo, tmp_path
+) -> None:
+    edit_label = ai(
+        tool_calls=[
+            {
+                "name": "edit_file",
+                "args": {
+                    "path": "src/common/constants/team.constants.ts",
+                    "old_str": "'members'",
+                    "new_str": "'people'",
+                },
+            }
+        ]
+    )
+    deps = _tier_deps(config, tier_repo, tmp_path, "list label is wrong", edit_label)
+    _, state = _run(deps)
+    assert state.status == "awaiting_human", state.stop_reason
+    assert state.risk_level == "low"
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "tenant admin sees accounts from another organisation",
+        "permission check skipped for archived members",
+        "auth guard accepts an expired session",
+        "export exposes user records to the wrong team",
+    ],
+)
+def test_topic_makes_a_finding_human_only_whatever_the_paths(
+    config, repo, tmp_path, title
+) -> None:
+    topical = {**FINDING, "args": {**FINDING["args"], "title": title}}
+    deps = _deps(
+        config,
+        repo,
+        tmp_path,
+        [EDIT_FIX, SUBMIT_FIX],
+        investigate=ScriptedChatModel(script=[ai(tool_calls=[topical])]),
+    )
+    _, state = _run(deps)
+    assert state.status == "escalated" and state.risk_level == "human_only"
+    assert "topic:" in state.stop_reason and state.patch is None
+
+
+def test_topic_rule_ignores_lookalikes() -> None:
+    from bug_hunter.graph.risk import topic_hits
+
+    assert topic_hits("translation token guard rejects placeholders") == []
+    assert topic_hits("author name is truncated in the byline") == []
+    assert topic_hits("x returns 0", "", "src/x.ts:2") == []

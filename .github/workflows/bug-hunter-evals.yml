@@ -73,6 +73,8 @@ env:
   LANGSMITH_WORKSPACE_ID: 0c854988-4630-4eeb-84c4-ab532b3e578b
   # The graph agent checkpoints into the Postgres service below (the real code path).
   BUGHUNTER_EVAL_CHECKPOINT: postgres
+  # keep the runner's runs/artefacts/caches where the upload step expects them
+  BUGHUNTER_HOME: ${{ github.workspace }}/bug-hunter/runs
   BUGHUNTER_CHECKPOINT_DB_URL: postgresql://bughunter:bughunter@localhost:5433/bughunter
 
 jobs:

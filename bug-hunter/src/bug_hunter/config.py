@@ -39,7 +39,11 @@ ENV_CONFIG_DIR = "BUGHUNTER_CONFIG_DIR"
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # bug-hunter/
 DEFAULT_CONFIG_DIR = PACKAGE_ROOT / "config"
 DEFAULT_REPO_ROOT = PACKAGE_ROOT.parent  # ally-platform/
-RUNS_DIR = PACKAGE_ROOT / "runs"  # gitignored: live runs, kept artefacts, caches
+ENV_HOME = "BUGHUNTER_HOME"
+# Live runs, kept artefacts, caches and the spend ledger live OUTSIDE the repository
+# (default ~/.bug-hunter), so a branch switch or `git clean` can never delete them.
+# Set BUGHUNTER_HOME in the shell or the CI job env (read at import, not from .env).
+RUNS_DIR = Path(os.environ.get(ENV_HOME) or Path.home() / ".bug-hunter").expanduser()
 ARTEFACTS_DIR = RUNS_DIR / "artefacts"
 CACHE_DIR = RUNS_DIR / "cache"
 

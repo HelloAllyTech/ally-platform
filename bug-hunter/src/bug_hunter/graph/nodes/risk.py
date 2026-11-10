@@ -11,7 +11,7 @@ from typing import Any
 
 from bug_hunter.graph.budget import with_clock
 from bug_hunter.graph.deps import GraphDeps
-from bug_hunter.graph.risk import risk_hits, risk_level
+from bug_hunter.graph.risk import risk_hits, risk_level, risky_dependents, topic_hits
 from bug_hunter.graph.state import BugState
 
 
@@ -32,6 +32,10 @@ def make_risk_precheck_node(deps: GraphDeps):
         # risk_gate. Scanning the finding's prose matched a quoted code comment
         # ("… ＳＵＩＣＩＤＥ → suicide …") and escalated a plain regex fix.
         reasons = list(deps.workspace.policy.touches_risk(files, deps.app))
+        # (a) tenancy, data exposure, auth or permissions: human-only whatever the paths
+        reasons += topic_hits(
+            state.finding.title, state.finding.hypothesis, state.root_cause or ""
+        )
         if state.finding.category == "security":
             reasons.append("finding category: security")
         if reasons:
@@ -66,6 +70,22 @@ def make_risk_gate_node(deps: GraphDeps):
             diff = ""
         files = [deps.worktree / f for f in state.patch.files_changed]
         reasons = risk_hits(deps.workspace.policy, deps.app, files, diff)
+        # (b) a risk-path file uses what the fix changed (repo map callers/importers)
+        app_prefix = (
+            "" if deps.app_root == deps.worktree else deps.config.app(deps.app).path
+        )
+        reasons += risky_dependents(
+            deps.repo_map,
+            deps.workspace.policy,
+            deps.app,
+            deps.app_root,
+            diff,
+            app_prefix,
+        )
+        # (a) again on the finding, in case it was reached by another path
+        reasons += topic_hits(
+            state.finding.title, state.finding.hypothesis, state.root_cause or ""
+        )
         level = risk_level(
             human_only_reasons=reasons,
             lines_changed=state.patch.lines_changed,

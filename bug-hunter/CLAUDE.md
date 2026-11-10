@@ -93,7 +93,7 @@ called done. Unit tests never hit the network or a real model.
 | `src/bug_hunter/context/tokens.py` | tiktoken when cached, else an overestimate (3 chars/token); budgets enforced at (1 − safety margin) |
 | `evals/` | Eval harness: `schema.py` (golden cases), `mine_cases.py`, `run_evals.py` (one `Run` per case, disk guard, oracle check, scoring), `agents.py` (baseline), `metrics.py`; `golden/cases.yaml`, `golden/oracle-status.json`, `results/` |
 | `../.github/workflows/bug-hunter-evals.yml` | Manual workflow: full oracle check + baseline on a GitHub runner, reports uploaded as artifacts |
-| `runs/` | Live runs, kept artefacts (`runs/artefacts/`), caches (`runs/cache/`); all gitignored |
+| `~/.bug-hunter/` (`BUGHUNTER_HOME`) | Live runs, kept artefacts (`artefacts/`), caches (`cache/`), spend ledger (`spend.json`); outside the repo so branch switches and `git clean` cannot delete them |
 | `docs/bug-hunter/notes/CHUNK-NN-NOTES.md` | Per-chunk code map, decisions, open questions |
 
 ## Rules that apply to this code (short form; `CONTEXT.md` is canonical)

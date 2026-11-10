@@ -63,3 +63,106 @@ def risk_level(
     if review_verdict != "approve":
         score += 1
     return ("low", "medium", "high")[min(score, 2)]
+
+
+# (a) Human-only by topic, whatever the paths: a finding about tenancy, data exposure,
+# authentication or permissions. Checked on the finding's own words (title, hypothesis,
+# root cause), not on quoted evidence, which is code.
+_TOPIC_RE = re.compile(
+    r"\b(?:tenant|tenants|tenancy|cross-tenant|multi-tenant)\b"
+    r"|\bauth\b|authenticat|authoriz|\bpermission|\bprivilege|\baccess control"
+    r"|\broles?\b|\bimpersonat|\bsuper ?admin|\bplatform admin"
+    r"|data exposure|\bexpos(?:e|es|ed|ing) (?:data|users?|accounts?|records?)"
+    r"|\bleak(?:s|ed|ing)? (?:data|users?|accounts?|records?)|\bPII\b|\bPHI\b"
+    r"|\bvisible to (?:other|another|the wrong)",
+    re.IGNORECASE,
+)
+
+
+def topic_hits(*texts: str) -> list[str]:
+    """Human-only topics named in the finding's text (deduplicated, in order)."""
+    seen: dict[str, None] = {}
+    for text in texts:
+        for m in _TOPIC_RE.finditer(text or ""):
+            seen.setdefault(m.group(0).lower(), None)
+    return [f"topic: {t}" for t in seen]
+
+
+_PLUS_FILE = re.compile(r"^\+\+\+ (?:[a-z]/)?(\S+)", re.MULTILINE)
+_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", re.MULTILINE)
+
+
+def changed_ranges(diff: str, app_prefix: str) -> dict[str, list[tuple[int, int]]]:
+    """``{app-relative file: [(line, line)]}`` for the new-side lines that actually
+    changed (added lines, and the position of removed ones); context lines are not
+    changes. Any prefix style (``a/ b/`` or git's mnemonic ``i/ w/``)."""
+    out: dict[str, list[tuple[int, int]]] = {}
+    current: str | None = None
+    new_line = 0
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            m = _PLUS_FILE.match(line)
+            path = m.group(1) if m else None
+            if path in (None, "/dev/null", "dev/null"):
+                current = None
+                continue
+            if app_prefix and path.startswith(app_prefix + "/"):
+                path = path[len(app_prefix) + 1 :]
+            current = path
+            out.setdefault(current, [])
+        elif line.startswith("--- ") or current is None:
+            continue
+        elif line.startswith("@@"):
+            m = _HUNK.match(line)
+            new_line = int(m.group(1)) if m else 0
+        elif line.startswith("+"):
+            out[current].append((new_line, new_line))
+            new_line += 1
+        elif line.startswith("-"):
+            out[current].append((new_line, new_line))  # removed here; no advance
+        else:
+            new_line += 1
+    return out
+
+
+def risky_dependents(
+    repo_map, policy: PathPolicy, app: str, app_root, diff: str, app_prefix: str
+) -> list[str]:
+    """(b) A changed file is risky when a risk-path file uses what it changed: callers
+    of the changed symbols (call graph) and files importing those names (imports also
+    cover constants, which are referenced, not called)."""
+    if repo_map is None:
+        return []
+    hits: list[str] = []
+    for file, ranges in changed_ranges(diff, app_prefix).items():
+        symbols = [
+            s
+            for start, end in ranges
+            for s in repo_map.symbols_in_range(file, start, end)
+        ]
+        names = {s.name for s in symbols}
+        users: dict[str, str] = {}
+        for sym in symbols:
+            for edge in repo_map._callers.get(sym.id, []):
+                caller = repo_map.symbols.get(edge.caller)
+                if caller is not None and caller.file != file:
+                    users.setdefault(caller.file, f"calls {sym.name}")
+        for importer in repo_map._importers.get(file, []):
+            entry = repo_map.files.get(importer)
+            if entry is None or importer == file:
+                continue
+            imported = {
+                n for imp in entry.imports if imp.resolved == file for n in imp.names
+            }
+            used = names & imported if names else imported
+            if used or (not names and imported):
+                users.setdefault(
+                    importer, f"imports {', '.join(sorted(used or imported))}"
+                )
+        for user, how in users.items():
+            if repo_map.is_test_file(user):
+                continue
+            rule = policy.touches_risk([app_root / user], app)
+            if rule:
+                hits.append(f"{file} is used by risk-path {rule[0]} ({how})")
+    return hits

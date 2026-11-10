@@ -14,7 +14,7 @@ import uuid
 
 import pytest
 
-from bug_hunter.config import PACKAGE_ROOT, load_config
+from bug_hunter.config import load_config
 from bug_hunter.runs import Run
 from bug_hunter.tools.runner import Runner
 from bug_hunter.tools.sandbox import Sandbox, docker_available
@@ -29,7 +29,8 @@ KNOWN_PASSING = {
     "ally-ai-learn": "tests/unit/test_makefile.py",
     "ally-mobile": "test/features/account/presentation/profile_image_format_test.dart",
 }
-RUNS_DIR = PACKAGE_ROOT / "runs"
+from bug_hunter.config import RUNS_DIR  # noqa: E402
+
 TIMINGS = RUNS_DIR / "integration-timings.json"
 
 pytestmark = pytest.mark.docker
