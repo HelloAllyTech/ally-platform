@@ -227,6 +227,10 @@ jobs:
       - name: Build Application
         env:
           NODE_ENV: production
+          # Production serves the admin app under app.helloally.ai/admin/
+          # (frontend consolidation Phase 2). Everything - asset URLs, router
+          # basename, <base> tag - derives from this one value.
+          VITE_BASE_PATH: /admin/
         run: |
           echo ":hammer: Building ally-admin-dashboard (v${{ needs.validate-and-tag.outputs.VERSION }})..." >> $GITHUB_STEP_SUMMARY
           npx nx build ally-admin-dashboard
@@ -252,12 +256,17 @@ jobs:
 
       - name: Verify site
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" -m 15 https://admin.helloally.ai)
+          code=$(curl -s -o /dev/null -w "%{http_code}" -m 15 https://app.helloally.ai/admin/)
           if [ "$code" != "200" ]; then
-            echo "::error::admin.helloally.ai returned $code after deploy"
+            echo "::error::app.helloally.ai/admin/ returned $code after deploy"
             exit 1
           fi
-          echo "✅ admin.helloally.ai serving 200" >> $GITHUB_STEP_SUMMARY
+          redirect=$(curl -s -o /dev/null -w "%{http_code}" -m 15 https://admin.helloally.ai)
+          if [ "$redirect" != "301" ] && [ "$redirect" != "308" ]; then
+            echo "::error::admin.helloally.ai returned $redirect (expected a permanent redirect)"
+            exit 1
+          fi
+          echo "✅ app.helloally.ai/admin/ serving 200; admin.helloally.ai redirects ($redirect)" >> $GITHUB_STEP_SUMMARY
 
   create-release:
     name: Create Release Draft
