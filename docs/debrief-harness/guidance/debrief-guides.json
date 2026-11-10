@@ -1,0 +1,175 @@
+{
+  "_about": "Ally-authored Debrief Guidance entries: the debrief style guide (how to write the card for a kind of moment) and the level guides (how to pitch it for lay helpers and professionals). Drawn from ally-debriefs-prd.md §6–8 and ally-debriefs-plan.md §3, §7.3–7.7, §9.7. Loaded into the Context Library's Debrief Guidance collection as platform-wide, pinned, authored entries by scripts/load-debrief-guides.js. Practice guidelines and organisation protocols are NOT here: they come from real source documents uploaded through Context Library → Add documents. Each entry is matched against one pivotal moment's summary, so each one is about a kind of moment.",
+  "entries": [
+    {
+      "key": "style-missed-risk-cue",
+      "statement": "When a learner missed a risk cue, write it as an important moment: name it kindly, say why it mattered, and give the words to use next time.",
+      "body": "Lead the debrief with the important-moment card, before any strengths. Quote the client's words that carried the cue and the learner's reply. Say plainly why it mattered (the client may have been telling them they were not safe), without blame: these moments are easy to miss in a first conversation. Give one concrete line to try, such as asking directly and calmly: \"It sounds like things feel very heavy right now. Sometimes when people feel this way they think about ending their life. Are you having thoughts like that?\" Close with the support contact. Never call it a failure, never use red or alarm words, never imply the learner caused harm.",
+      "situations": ["client hints at suicide or self-harm and the learner moves on", "learner problem-solves after a risk disclosure", "client mentions abuse or harm to others and it is not picked up"],
+      "exampleQueries": ["Learner changed the subject after the client said she sometimes wishes she wasn't alive", "Client hinted at self-harm and the learner offered advice instead of asking about it", "Learner missed a disclosure of abuse"],
+      "facets": { "kind": "style_guide", "skills": ["risk assessment", "safety"] },
+      "detail": "Important-moment card first; quote the cue; why it mattered without blame; one direct line to try; end with the support contact.",
+      "clinical": true
+    },
+    {
+      "key": "style-risk-cue-handled-well",
+      "statement": "When a learner handled a risk cue well, say so on the important-moment card: \"You noticed an important moment\", with the quote and why it helped.",
+      "body": "A risk cue always gets the important-moment card, even when the learner did the right thing. Celebrate it specifically: quote the moment they asked directly or stayed with the client, and say what that did for the client (it made it safe to talk). Do not invent a weakness inside this card and do not raise a false alarm. If something could be added, put it as a gentle next step elsewhere, not as a correction of a moment handled well.",
+      "situations": ["learner asked directly about suicide and stayed with the client", "learner noticed distress and checked safety"],
+      "exampleQueries": ["Learner asked the client directly whether she was thinking of ending her life and listened", "Learner picked up a self-harm hint and explored it calmly"],
+      "facets": { "kind": "style_guide", "skills": ["risk assessment", "safety"] },
+      "detail": "Important-moment card that celebrates: quote, why it helped, no invented weakness, no false alarm.",
+      "clinical": false
+    },
+    {
+      "key": "style-missed-feeling",
+      "statement": "When a learner missed an emotional moment, quote what the client said, name the feeling underneath, and give one reflective line to try.",
+      "body": "Make this the first Work on this when it is the most important growth point. Recognise: quote the client's words and the learner's reply. Why: the client was sharing a feeling and the reply moved to facts, advice or the next question, so the client may not have felt heard. What to try: one short line that reflects the feeling back in the learner's own words, for example \"That sounds really lonely\" or \"It sounds like you're exhausted from carrying all of this\". Keep the line natural for the session's language; never suggest a scripted or clinical phrase the learner would not say.",
+      "situations": ["client shares a feeling and the learner asks a factual question", "learner moves past sadness, fear, shame or anger"],
+      "exampleQueries": ["Client said she feels completely alone and the learner asked about her job", "Learner moved on when the client started crying", "Missed empathy moment"],
+      "facets": { "kind": "style_guide", "skills": ["empathy", "reflective listening"] },
+      "detail": "Recognise (quote) → why it mattered (client may not have felt heard) → one natural reflective line.",
+      "clinical": false
+    },
+    {
+      "key": "style-early-advice",
+      "statement": "When a learner jumped to advice or solutions too early, name the moment without judging and offer a line that explores first.",
+      "body": "Quote the client's concern and the advice that followed. Why it mattered: advice before the client feels understood often lands as not being listened to, and the client may stop sharing. Do not say advice is always wrong; say it came before understanding. Offer one line that explores first, such as \"Before we think about what to do, can you tell me more about what has been hardest?\" If the learner's advice was reasonable, acknowledge that while showing what to do first.",
+      "situations": ["learner gives suggestions in the first minutes", "learner problem-solves before exploring feelings"],
+      "exampleQueries": ["Learner suggested the client talk to her husband before understanding the problem", "Learner offered solutions immediately after the client described feeling overwhelmed"],
+      "facets": { "kind": "style_guide", "skills": ["exploration", "open questions"] },
+      "detail": "Advice came before understanding; offer one exploring line; acknowledge reasonable advice.",
+      "clinical": false
+    },
+    {
+      "key": "style-dismissive-or-harmful",
+      "statement": "When a learner was dismissive or said something clearly harmful, name it directly and kindly, then say exactly what to say instead.",
+      "body": "Do not soften a clearly harmful move into vagueness, and do not shame. Quote the reply, say in one sentence what it may have done to the client (for example, made them feel judged or that their pain was small), then give the alternative line. Describe the behaviour, never the person: \"this reply may have felt dismissive\", not \"you were dismissive\" or \"you lack empathy\". One harmful moment does not erase what went well; keep the strengths that the transcript supports.",
+      "situations": ["learner minimises the client's problem", "learner blames or lectures the client", "learner is sarcastic or impatient with the persona"],
+      "exampleQueries": ["Learner told the client others have it worse", "Learner said the client was overreacting", "Learner lectured the client about her choices"],
+      "facets": { "kind": "style_guide", "skills": ["empathy", "non-judgement"] },
+      "detail": "Direct and kind; describe the behaviour, not the person; give the line to say instead; keep supported strengths.",
+      "clinical": false
+    },
+    {
+      "key": "style-system-fault",
+      "statement": "When the roleplay persona got stuck, repeated itself or broke character, never blame the learner for it; coach only on what the learner controlled.",
+      "body": "A stuck, looping or off-script persona, a speech-to-text gap, or a dropped connection is a system fault. Do not turn it into a Work on this and do not suggest the learner caused it. Do not quote words from a transcript gap or from garbled speech-to-text. If the fault cut the session short, write the debrief from what is there and say nothing about the missing part being the learner's doing.",
+      "situations": ["persona repeats the same line", "persona slips out of its role", "gap in the transcript", "speech-to-text garbled the learner's words"],
+      "exampleQueries": ["The client persona kept repeating the same sentence", "Two-minute gap in the transcript", "Persona stopped responding"],
+      "facets": { "kind": "style_guide", "skills": [] },
+      "detail": "System faults are never the learner's; no quotes from gaps or garbled text.",
+      "clinical": false
+    },
+    {
+      "key": "style-learner-distress",
+      "statement": "When the learner shows their own distress, out of character, the debrief opens by acknowledging it and giving the support contact; coaching waits.",
+      "body": "The learner's own distress (not the role they are playing) comes before any feedback. Open with a short, warm acknowledgement that the session seems to have been hard for them and give the support contact. Keep the coaching cards for later, under \"Your debrief, when you're ready\". Do not analyse their distress, do not diagnose, and do not use their distress as a growth point.",
+      "situations": ["learner says the scenario reminds them of their own experience", "learner breaks role to say they are upset"],
+      "exampleQueries": ["Learner said this conversation is bringing up her own loss", "Learner stepped out of the roleplay and said she was struggling"],
+      "facets": { "kind": "style_guide", "skills": ["safety"] },
+      "detail": "Acknowledge first, support contact, coaching collapsed; never diagnose or coach on it.",
+      "clinical": false
+    },
+    {
+      "key": "style-excellent-session",
+      "statement": "When a session was excellent, do not invent weaknesses: name the strengths with quotes and give one stretch goal.",
+      "body": "Use up to three What worked cards, each with an exact quote and what it did for the client. Replace Work on this with a single stretch goal that builds on a strength, framed as the next level rather than a fix, for example going deeper on a reflection the learner already made. Do not manufacture a problem to fill a slot.",
+      "situations": ["learner handled the whole session skilfully", "no clear growth point in the transcript"],
+      "exampleQueries": ["Learner reflected feelings throughout and the client opened up", "Very strong session with no clear mistakes"],
+      "facets": { "kind": "style_guide", "skills": [] },
+      "detail": "Quoted strengths, one stretch goal, no invented weaknesses.",
+      "clinical": false
+    },
+    {
+      "key": "style-prioritise-long-session",
+      "statement": "In a long session with many moments, choose the one to three that mattered most to the client and lead with the most important.",
+      "body": "Do not list everything. Rank growth points by what they meant for the client: safety first, then moments where the client stopped sharing or the relationship turned, then technique. Keep to at most three Work on this cards, each about a different moment, and drop minor points. If a pattern repeats, quote its clearest instance once and say it happened more than once.",
+      "situations": ["thirty-minute session", "several missed moments", "a pattern repeats across the session"],
+      "exampleQueries": ["Long session with several missed opportunities to reflect feelings", "Learner interrupted the client many times"],
+      "facets": { "kind": "style_guide", "skills": [] },
+      "detail": "At most three, ranked by what mattered to the client; a repeated pattern quoted once.",
+      "clinical": false
+    },
+    {
+      "key": "style-short-session",
+      "statement": "When a session was short, write one card from what is actually there; never stretch thin evidence into a full debrief.",
+      "body": "With one to five learner turns, write the opening and exactly one card. Choose the single clearest moment, quote it, and keep it encouraging: the learner has started. Do not guess what they would have done later and do not comment on the session's length as a fault.",
+      "situations": ["three learner turns", "session ended early"],
+      "exampleQueries": ["Learner only spoke three times before the session ended", "Very short session"],
+      "facets": { "kind": "style_guide", "skills": [] },
+      "detail": "Opening plus one card; nothing invented; length is not a fault.",
+      "clinical": false
+    },
+    {
+      "key": "style-quotes-and-language",
+      "statement": "Quote the transcript exactly in its own script and language, and write the debrief in the session's language in plain words.",
+      "body": "Copy quotes character for character, keeping Devanagari, Tamil or Kannada script and code-mixed words as spoken; never translate or tidy a quote. In a code-mixed (for example Hinglish) session, write in the dominant language. Explain in plain everyday words; avoid jargon and acronyms. No scores, ratings, percentages or labels for the learner.",
+      "situations": ["Hindi session", "Hinglish session", "Tamil session", "learner quotes mixed with English"],
+      "exampleQueries": ["Hindi session where the learner reflected the client's worry", "Code-mixed Hinglish conversation"],
+      "facets": { "kind": "style_guide", "skills": [] },
+      "detail": "Exact quotes in original script; dominant language; plain words; no scores.",
+      "clinical": false
+    },
+    {
+      "key": "level-lay-work-on-this",
+      "statement": "For lay helpers: explain a growth point in everyday words, with one short line they could say on a call, and no technique names unless explained.",
+      "body": "Lay helpers (community health workers, volunteers, peer supporters) have often just finished an emotionally heavy roleplay and may feel judged. Use everyday language: say \"saying back in your own words what they told you\" rather than \"reflection\", or name the skill and explain it in the same sentence. Keep the try-saying line short and natural, something they could say on a helpline in their language. Acknowledge that the conversation was hard. One clear thing to change matters more than completeness.",
+      "situations": ["lay counsellor misses a feeling", "community health worker gives advice early", "volunteer asks closed questions"],
+      "exampleQueries": ["Lay counsellor asked yes or no questions and the client gave short answers", "Community health worker moved to advice quickly"],
+      "facets": { "kind": "level_guide", "level": ["lay"], "skills": ["empathy", "reflective listening", "open questions"] },
+      "detail": "Everyday words; explain any skill name; one short natural line; acknowledge it was hard.",
+      "clinical": false
+    },
+    {
+      "key": "level-lay-strengths",
+      "statement": "For lay helpers: name each strength as the exact thing they did and what it did for the client, so they know to do it again.",
+      "body": "Generic praise (\"good empathy\") does not tell a lay helper what to repeat. Quote the line and say its effect in plain words: \"When you said 'that must be so tiring', she started telling you more.\" Lay learners use the debrief to feel seen for what went well, so strengths deserve the same care as growth points.",
+      "situations": ["lay counsellor reflects a feeling well", "volunteer keeps calm and listens"],
+      "exampleQueries": ["Lay counsellor said that sounds really hard and the client opened up", "Volunteer stayed calm when the client was angry"],
+      "facets": { "kind": "level_guide", "level": ["lay"], "skills": ["empathy"] },
+      "detail": "Quote the line and its effect on the client; no generic praise.",
+      "clinical": false
+    },
+    {
+      "key": "level-lay-risk-role",
+      "statement": "For lay helpers at a risk moment: coach them to ask directly, listen, stay with the person and connect them to help, not to assess or treat.",
+      "body": "A lay helper's job at a risk moment is to notice it, ask about it directly and calmly, keep the person talking, and connect them to the support contact or follow their organisation's escalation steps. Do not expect clinical risk assessment from them, and do not suggest they manage the risk alone. When the organisation has its own protocol, the protocol's steps come first.",
+      "situations": ["lay counsellor hears a suicide hint", "community health worker unsure what to do after a self-harm disclosure"],
+      "exampleQueries": ["Lay counsellor did not know what to say after the client mentioned wanting to die", "Volunteer heard a self-harm disclosure and moved on"],
+      "facets": { "kind": "level_guide", "level": ["lay"], "skills": ["risk assessment", "safety"] },
+      "detail": "Notice, ask directly, stay, connect to help or escalate per protocol; no clinical assessment expected.",
+      "clinical": true
+    },
+    {
+      "key": "level-professional-work-on-this",
+      "statement": "For professionals: name the skill precisely, tie it to the quoted moment, and keep it brief and credible; skip the basics.",
+      "body": "Professional learners are often sceptical of AI feedback. Use the accurate term (open question, reflection of feeling, complex reflection, summary, validation, agenda-setting, exploring ambivalence) and link it to the exact quote. Every claim must be anchored in the transcript; generic advice loses them. Do not explain what a reflection is. The try-saying line can be more nuanced, for example a double-sided reflection or a summary that links two things the client said.",
+      "situations": ["counsellor uses closed questions", "psychologist misses ambivalence", "professional summarises without the feeling"],
+      "exampleQueries": ["Counsellor asked a series of closed questions during assessment", "Professional missed the client's ambivalence about leaving"],
+      "facets": { "kind": "level_guide", "level": ["early_professional", "experienced_professional"], "skills": ["open questions", "reflective listening", "summarising"] },
+      "detail": "Precise skill term, anchored to the quote, brief; a more nuanced try-saying line.",
+      "clinical": false
+    },
+    {
+      "key": "level-professional-risk",
+      "statement": "For professionals at a risk moment: expect structured exploration of the risk and safety planning, as their organisation's protocol sets out.",
+      "body": "A professional who hears a risk cue is expected to explore it: thoughts, any plan, access to means, intent, past attempts and what is keeping the person safe, then agree next steps or a safety plan and follow the organisation's protocol. Name which part was missing, kindly and specifically, rather than restating the whole sequence. When the organisation has its own protocol, its steps take precedence over this general guide.",
+      "situations": ["counsellor hears suicidal thoughts but does not ask about a plan", "professional ends the session without safety planning"],
+      "exampleQueries": ["Counsellor asked about suicidal thoughts but not about a plan or means", "Psychologist did not agree next steps after a risk disclosure"],
+      "facets": { "kind": "level_guide", "level": ["early_professional", "experienced_professional"], "skills": ["risk assessment", "safety planning"] },
+      "detail": "Thoughts, plan, means, intent, history, protective factors, next steps; name the missing part; protocol first.",
+      "clinical": true
+    },
+    {
+      "key": "level-experienced-stretch",
+      "statement": "For experienced professionals: aim growth points at depth and pacing, not fundamentals they already have.",
+      "body": "When an experienced professional handled the basics well, the useful feedback is about depth: complex reflections that name meaning rather than content, working with ambivalence instead of arguing for change, pacing and silence, and noticing what the client avoided. Keep it to one or two points, framed as refinement.",
+      "situations": ["experienced counsellor's session is solid but stays on the surface", "senior professional talks more than the client"],
+      "exampleQueries": ["Experienced counsellor reflected content but not the meaning behind it", "Senior professional filled every silence"],
+      "facets": { "kind": "level_guide", "level": ["experienced_professional"], "skills": ["complex reflection", "pacing", "ambivalence"] },
+      "detail": "Depth, ambivalence, pacing; one or two points framed as refinement.",
+      "clinical": false
+    }
+  ]
+}
