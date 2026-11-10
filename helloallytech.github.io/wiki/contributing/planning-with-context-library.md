@@ -174,18 +174,9 @@ it.** Anything there that is still true and still load-bearing belongs in the Co
 an entry, added through its page in the admin dashboard; putting it back into the wiki is not the
 path any more.
 
-## History
+## Lessons
 
-From 2026-08-07 product guidance came from **Stacks**, a third-party MCP server reached through a
-committed bridge script and a `stacks` skill in every repo. On **2026-11-09** Stacks was replaced
-by the Context Library, as part of moving every retrieval-shaped system at Ally into one library:
-each repo's `.mcp.json` now declares `context-library`, and the bridge, the `stacks` skill and the
-old tools (`search_chunks`, `list_tags`) are gone. Older plans that cite Stacks items by title are
-history; those titles are not Context Library codes.
-
-Two lessons from the Stacks period still apply:
-
-- **A tool's own description decides when an agent uses it.** While the Stacks server described
+- **A tool's own description decides when an agent uses it.** While a guidance server described
   search as a *planning* tool, sessions stopped searching once implementation began, whatever the
   repo instructions said. The server's descriptions and the repo instructions have to say the same
   thing.

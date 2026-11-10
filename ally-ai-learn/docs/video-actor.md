@@ -284,7 +284,7 @@ layers put the character's **voice** in the room while the learner watches a
 **motionless mouth** — audio and video plainly disagreeing, which reads as a
 broken session rather than as naturalness. It is the one contradiction video
 cannot absorb, because audio-visual agreement is the entire thing the feature
-was added for. Stacks' *Natural Dialogue Preserves Immersion in Simulations*
+was added for. The product guidance *Natural Dialogue Preserves Immersion in Simulations*
 makes the general point for dialogue that feels artificial; a voice with no
 matching mouth is the audio-visual form of it.
 

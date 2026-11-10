@@ -26,7 +26,7 @@
         "environment"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1383,
+      "words": 1372,
       "url": "https://tech.helloally.ai/#/wiki/contributing/dev-setup.md",
       "skip_reason": ""
     },
@@ -57,7 +57,7 @@
         "standards"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1201,
+      "words": 1193,
       "url": "https://tech.helloally.ai/#/wiki/contributing/guide.md",
       "skip_reason": ""
     },
@@ -74,7 +74,7 @@
         "context-library"
       ],
       "last_reconciled": "2026-11-10",
-      "words": 1827,
+      "words": 1737,
       "url": "https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md",
       "skip_reason": ""
     },
@@ -114,7 +114,7 @@
       "summary": "",
       "tags": [],
       "last_reconciled": "",
-      "words": 791,
+      "words": 786,
       "url": "https://tech.helloally.ai/#/wiki/index.md",
       "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
     },
@@ -127,7 +127,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 13455,
+      "words": 13536,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -141,7 +141,7 @@
         "learnings"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 3239,
+      "words": 3229,
       "url": "https://tech.helloally.ai/#/wiki/memory.md",
       "skip_reason": ""
     },
@@ -154,7 +154,7 @@
         "structure"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 303,
+      "words": 296,
       "url": "https://tech.helloally.ai/#/wiki/overview.md",
       "skip_reason": ""
     },
@@ -169,7 +169,7 @@
         "reference"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1355,
+      "words": 1347,
       "url": "https://tech.helloally.ai/#/wiki/platform/agent-guide.md",
       "skip_reason": ""
     },
@@ -308,7 +308,7 @@
         "mission"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 449,
+      "words": 445,
       "url": "https://tech.helloally.ai/#/wiki/platform/overview.md",
       "skip_reason": ""
     },
@@ -389,7 +389,7 @@
         "provenance"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1704,
+      "words": 1697,
       "url": "https://tech.helloally.ai/#/wiki/product/ai-product-patterns.md",
       "skip_reason": ""
     },
@@ -407,7 +407,7 @@
         "agents"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1366,
+      "words": 1355,
       "url": "https://tech.helloally.ai/#/wiki/product/best-practices.md",
       "skip_reason": ""
     },
@@ -425,7 +425,7 @@
         "agents"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 7171,
+      "words": 7164,
       "url": "https://tech.helloally.ai/#/wiki/product/chart-dashboard-principles.md",
       "skip_reason": ""
     },
@@ -443,7 +443,7 @@
         "metrics"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 5676,
+      "words": 5669,
       "url": "https://tech.helloally.ai/#/wiki/product/data-visualisation.md",
       "skip_reason": ""
     },
@@ -460,7 +460,7 @@
         "motivation"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 809,
+      "words": 802,
       "url": "https://tech.helloally.ai/#/wiki/product/gamification.md",
       "skip_reason": ""
     },
@@ -477,7 +477,7 @@
         "tradeoffs"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 856,
+      "words": 849,
       "url": "https://tech.helloally.ai/#/wiki/product/prioritisation.md",
       "skip_reason": ""
     },
@@ -495,7 +495,7 @@
         "i18n"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1744,
+      "words": 1737,
       "url": "https://tech.helloally.ai/#/wiki/product/ui.md",
       "skip_reason": ""
     },
@@ -512,7 +512,7 @@
         "roles"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1109,
+      "words": 1102,
       "url": "https://tech.helloally.ai/#/wiki/product/user-personas.md",
       "skip_reason": ""
     },
@@ -545,7 +545,7 @@
         "python"
       ],
       "last_reconciled": "2026-11-10",
-      "words": 4221,
+      "words": 4335,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
       "skip_reason": ""
     },
@@ -579,7 +579,7 @@
         "api"
       ],
       "last_reconciled": "2026-11-10",
-      "words": 5393,
+      "words": 5827,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-be.md",
       "skip_reason": ""
     },

@@ -11,7 +11,7 @@ last_reconciled: 2026-11-09
 
 > [!WARNING]
 > **Deprecated — superseded by the Context Library.** Product guidance is now retrieved from
-> Ally's Context Library (which replaced the Stacks MCP on 2026-11-09), while planning and while
+> Ally's Context Library, while planning and while
 > coding; see [Working with the Context Library](../contributing/planning-with-context-library.md). This page is kept for
 > history and because other pages cite its principles by number — do not add new principles here,
 > and treat anything that conflicts with current Context Library guidance as superseded.

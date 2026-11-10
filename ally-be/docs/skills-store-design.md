@@ -26,7 +26,7 @@ Decided on 2026-10-24 by Gopi.
 | Should CI make a cheap model call per structured default? | Yes: one call per prompt whose contract says `output: json` (the code parses free text), checking the answer parses. Prompts whose JSON the provider enforces are `output: structured` and need no call |
 | Resolver cache TTL | 60 s |
 | Is a diff in the Skills Store enough review? | Yes, no second approver |
-| Which judges carry the prompt hash? | All of them, through the session record: every judge row links to a session (directly, or through `kb_retrievals.session_id`), and every session records each prompt's version and content hash. Chosen per Stacks' "Instrument Only What Tests Current Assumptions" and "Validate Prompt and Tool Changes Through Multiple Testing Stages" |
+| Which judges carry the prompt hash? | All of them, through the session record: every judge row links to a session (directly, or through `kb_retrievals.session_id`), and every session records each prompt's version and content hash. Chosen per the product guidance "Instrument Only What Tests Current Assumptions" and "Validate Prompt and Tool Changes Through Multiple Testing Stages" |
 
 The phases below describe the order of work; they no longer imply separate releases.
 
