@@ -123,7 +123,7 @@ export const DocumentsList: React.FC<{ botId: string; canEdit: boolean }> = ({
   const remove = (doc: HomeDocument) =>
     void list.change(
       { op: "remove", id: doc.id },
-      // A library document can be added back; an uploaded file is archived (CL1 adds restore).
+      // A library document can be added back; an uploaded file is archived and can't be restored yet.
       doc.private ? undefined : () => ({ op: "add", item: { documentId: doc.id } }),
     );
 

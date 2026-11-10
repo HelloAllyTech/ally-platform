@@ -151,7 +151,7 @@ export const WhatsAppNumbers: React.FC<{ bot: Chatbot; canManage: boolean }> = (
             <h2 className="ally-heading">{t.numbers.connectTitle}</h2>
             <Button onClick={() => setConnecting(false)}>{t.documents.close}</Button>
           </header>
-          {/* Meta's steps are the classic flow, unchanged (CL1 redraws it). */}
+          {/* Meta's steps are still the classic flow, inside the v2 sheet (a redraw is a follow-up). */}
           <div className="ally-home__classic">
             <ConnectWhatsAppFlow chatbotId={bot.id} onClose={() => setConnecting(false)} />
           </div>
