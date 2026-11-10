@@ -11,8 +11,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Order within each array is kept (`WITH ORDINALITY`). Hand-written SQL. Not reversed: nothing
  * reads the old names any more.
  */
-export class RenameRetiredGuidanceToolRecords1981002300000 implements MigrationInterface {
-  name = 'RenameRetiredGuidanceToolRecords1981002300000';
+export class RenameRetiredGuidanceToolRecords1981900500000 implements MigrationInterface {
+  name = 'RenameRetiredGuidanceToolRecords1981900500000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
