@@ -103,6 +103,42 @@ export const HOME = {
     instructionsHint: "Your own guidance for how it answers. Safety rules always come first.",
   },
   /** When someone asks for a person (copy §23, chunk 11a). */
+  /** The website widget (copy §22, chunk 13). */
+  website: {
+    title: "On your website",
+    body: "Add a chat bubble to your website. Copy this line into your site, just before the closing body tag.",
+    copy: "Copy code",
+    copied: "Copied",
+    allowed: "Websites where it can appear",
+    allowedHint: "Add your domain, for example yourclinic.in. It won't open anywhere else.",
+    add: "Add",
+    remove: "Remove",
+    address: "Website address",
+    none: "No websites yet. The bubble won't appear until you add one.",
+    position: "Bubble position",
+    right: "Right",
+    left: "Left",
+    label: "Bubble label",
+    openAfter: "Open on its own after {n} seconds",
+    seconds: "Seconds",
+    phones: "Show on phones",
+    publicNote:
+      "For now, only people in your organisation or people you invite can chat in the bubble. Public chat is coming soon.",
+    help: {
+      wordpress: "Add it to WordPress",
+      wordpressBody:
+        "In WordPress, use a plugin that adds code to every page (such as WPCode), choose the footer, and paste the line.",
+      wix: "Add it to Wix",
+      wixBody:
+        "In Wix, go to Settings, then Custom code. Add the line, choose All pages, and place it in Body - end.",
+      shopify: "Add it to Shopify",
+      shopifyBody:
+        "In Shopify, go to Online Store, then Themes, then Edit code. Open theme.liquid and paste the line just before </body>.",
+      any: "Add it to any website",
+      anyBody: "Paste the line just before </body> on every page where the bubble should appear.",
+      csp: "If your site sets a Content-Security-Policy, allow {scriptOrigin} in script-src and frame-src, and {apiOrigin} in connect-src and img-src.",
+    },
+  },
   handover: {
     title: "When someone asks for a person",
     replyWithin: "They usually reply within",

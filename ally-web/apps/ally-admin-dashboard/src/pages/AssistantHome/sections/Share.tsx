@@ -11,6 +11,7 @@ import { HOME } from "../copy";
 import { Collapsed, Group, SectionHead, TextField } from "../fields";
 import { useHomeField } from "../useHomeField";
 import { HandoverSettingsGroup } from "./HandoverSettings";
+import { WebsiteGroup } from "./Website";
 
 import type { SectionProps } from "./props";
 
@@ -32,6 +33,7 @@ export const ShareSection: React.FC<SectionProps> = ({ bot, home, canEdit, canMa
   const failed = HOME.saving.failed;
   const access = useHomeField(bot.id, "pageAccess", home.fields.pageAccess, failed);
   const handover = useHomeField(bot.id, "handover", home.fields.handover, failed);
+  const widget = useHomeField(bot.id, "widget", home.fields.widget, failed);
   const unknown = useHomeField(bot.id, "unknownNumberText", home.fields.unknownNumberText, failed);
   const media = useHomeField(
     bot.id,
@@ -87,6 +89,16 @@ export const ShareSection: React.FC<SectionProps> = ({ bot, home, canEdit, canMa
           </div>
         )}
       </Group>
+
+      {page && (
+        <WebsiteGroup
+          field={widget}
+          slug={page.slug}
+          pageLink={page.link}
+          publicAllowed={publicAllowed}
+          disabled={!canEdit}
+        />
+      )}
 
       <Group title={t.onWhatsApp} hint={t.onWhatsAppHint} testId="share-whatsapp">
         {connected ? (

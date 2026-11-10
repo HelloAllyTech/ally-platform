@@ -2,12 +2,17 @@ import React, { useMemo, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
 
-import { useGetChatbotsQuery, useGetInboxQuery, type InboxChannel, type InboxView } from "@api";
+import {
+  useGetChatbotsQuery,
+  useGetInboxQuery,
+  type InboxChannelFilter,
+  type InboxView,
+} from "@api";
 import { Button } from "@components/v2";
 import { useUser } from "@hooks";
 
 import { ChatView } from "./ChatView";
-import { fill, INBOX } from "./copy";
+import { channelLabel, fill, INBOX } from "./copy";
 import {
   askForNotifications,
   canAskForNotifications,
@@ -37,7 +42,7 @@ const ago = (iso: string) =>
 export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) => {
   const [params, setParams] = useSearchParams();
   const view = (params.get("view") as InboxView) || "all";
-  const channel = (params.get("channel") as InboxChannel) || undefined;
+  const channel = (params.get("channel") as InboxChannelFilter) || undefined;
   const chatbotId = locked ?? (params.get("assistant") || undefined);
   const selected = params.get("conversation");
   const { data: items = [], isLoading } = useGetInboxQuery({ view, channel, chatbotId });
@@ -129,6 +134,7 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
             <option value="">{INBOX.channels.all}</option>
             <option value="whatsapp">{INBOX.channels.whatsapp}</option>
             <option value="web">{INBOX.channels.web}</option>
+            <option value="widget">{INBOX.channels.widget}</option>
           </select>
           {!locked && (
             <>
@@ -191,7 +197,7 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
                     </span>
                   )}
                   <span className="ally-small">
-                    {item.assistant} · {INBOX.channels[item.channel === "web" ? "web" : "whatsapp"]}
+                    {item.assistant} · {channelLabel(item)}
                   </span>
                   {item.unread > 0 && (
                     <span className="ally-inbox__unread" aria-label={`${item.unread} unread`}>

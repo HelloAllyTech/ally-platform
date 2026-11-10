@@ -43,3 +43,9 @@ export const INBOX = {
 
 export const fill = (text: string, values: Record<string, string | number>): string =>
   text.replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? String(values[key]) : match));
+
+/** A chat's channel as the inbox names it: WhatsApp, Bot page, or Website (the widget, chunk 13). */
+export const channelLabel = (chat: { channel: string; source?: "widget" | null }): string =>
+  chat.source === "widget"
+    ? INBOX.channels.widget
+    : INBOX.channels[chat.channel === "web" ? "web" : "whatsapp"];

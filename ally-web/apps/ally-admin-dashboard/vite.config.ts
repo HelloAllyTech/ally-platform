@@ -1,5 +1,7 @@
 /// <reference types='vitest' />
-import { defineConfig, type Plugin } from "vite";
+import { build, defineConfig, loadEnv, type Plugin } from "vite";
+import { transform } from "esbuild";
+import { readFileSync } from "fs";
 import react from "@vitejs/plugin-react";
 import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { nxCopyAssetsPlugin } from "@nx/vite/plugins/nx-copy-assets.plugin";
@@ -27,6 +29,42 @@ function botPageRoutes(): Plugin {
   };
 }
 
+/**
+ * The website widget's loader (chunk 13), `/widget.js`. The dashboard's build also builds it (from
+ * vite.widget.config.ts) so every deploy ships it; the dev server compiles it on request into the
+ * same plain script, since a snippet's `<script>` can't load a module.
+ */
+function widgetBundle(): Plugin {
+  let mode = "production";
+  return {
+    name: "ally-widget",
+    configResolved: config => void (mode = config.mode),
+    async closeBundle() {
+      if (process.env.VITEST) return;
+      await build({ configFile: path.resolve(projectRoot, "vite.widget.config.ts"), mode });
+    },
+    configureServer: server =>
+      void server.middlewares.use(async (req, res, next) => {
+        if (req.url?.split("?")[0] !== "/widget.js") return next();
+        const env = loadEnv(server.config.mode, projectRoot, "VITE_");
+        const { code } = await transform(
+          readFileSync(path.resolve(projectRoot, "src/widget/loader.ts"), "utf8"),
+          {
+            loader: "ts",
+            format: "iife",
+            target: "es2019",
+            define: {
+              "import.meta.env.VITE_API_BASE_URL": JSON.stringify(env.VITE_API_BASE_URL ?? ""),
+            },
+          },
+        );
+        res.setHeader("Content-Type", "text/javascript");
+        res.setHeader("Cache-Control", "no-store");
+        res.end(code);
+      }),
+  };
+}
+
 export default defineConfig(() => ({
   root: __dirname,
   cacheDir: "../../node_modules/.vite/apps/ally-admin-dashboard",
@@ -51,7 +89,14 @@ export default defineConfig(() => ({
     port: 4300,
     host: "localhost",
   },
-  plugins: [react(), nxViteTsPaths(), nxCopyAssetsPlugin(["*.md"]), svgr(), botPageRoutes()],
+  plugins: [
+    react(),
+    nxViteTsPaths(),
+    nxCopyAssetsPlugin(["*.md"]),
+    svgr(),
+    botPageRoutes(),
+    widgetBundle(),
+  ],
   // Carbon v11 ships SCSS that triggers many Dart-Sass deprecation warnings.
   // quietDeps silences node_modules noise; silenceDeprecations keeps the
   // remaining (expected) Carbon warnings from failing the build.

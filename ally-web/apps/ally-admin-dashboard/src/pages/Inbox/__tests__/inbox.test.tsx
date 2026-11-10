@@ -204,6 +204,15 @@ describe("Inbox", () => {
     expect(screen.getByTestId("inbox").dataset.chatOpen).toBeUndefined();
   });
 
+  it("names website chats Website, and filters them (chunk 13)", () => {
+    h.items.current = [
+      { ...(h.items.current[0] as object), id: "w1", source: "widget", visitor: "Ravi" },
+    ];
+    open();
+    expect(screen.getAllByText(/· Website$/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("option", { name: INBOX.channels.widget })).toBeTruthy();
+  });
+
   it("an empty inbox says so", () => {
     h.items.current = [];
     open();

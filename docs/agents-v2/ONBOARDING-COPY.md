@@ -498,6 +498,17 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Default bubble label:** Ask us
 - **Public note (while public links are off):** For now, only people in your organisation or people you invite can chat in the bubble. Public chat is coming soon.
 - **Help titles:** Add it to WordPress · Add it to Wix · Add it to Shopify · Add it to any website
+- **Help bodies:**
+  - WordPress: In WordPress, use a plugin that adds code to every page (such as WPCode), choose the footer, and paste the line.
+  - Wix: In Wix, go to Settings, then Custom code. Add the line, choose All pages, and place it in Body - end.
+  - Shopify: In Shopify, go to Online Store, then Themes, then Edit code. Open theme.liquid and paste the line just before </body>.
+  - Any website: Paste the line just before </body> on every page where the bubble should appear.
+  - Any website, with a Content-Security-Policy: If your site sets a Content-Security-Policy, allow {scriptOrigin} in script-src and frame-src, and {apiOrigin} in connect-src and img-src.
+- **Websites list:** Add · Remove · No websites yet. The bubble won't appear until you add one.
+- **Website input label:** Website address
+- **Open on its own (input label):** Seconds
+- **Widget, inside the panel:** Close · This chat isn't available on this website.
+- **The panel's name:** Chat with {business}
 - **Conversation badge:** Website
 - **Website refused (under the list):**
   - {domain} is shared by many websites, so the bubble could appear on sites that aren't yours. Add your own address on it, for example yourclinic.{domain}.

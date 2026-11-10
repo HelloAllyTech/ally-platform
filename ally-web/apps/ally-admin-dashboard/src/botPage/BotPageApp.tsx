@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BotPageApiError, botPageApi } from "./api";
 import { Turnstile } from "./components/Turnstile";
 import { fill, pickCopy, type BotPageCopy } from "./copy";
+import { bridge, type EmbedContext, type ToLoader } from "./embed";
 import { AccessCode, AccessEmail } from "./screens/Access";
 import { Chat, type ChatItem, type PendingReply } from "./screens/Chat";
 import { Cover } from "./screens/Cover";
@@ -22,7 +23,7 @@ interface Loaded {
 
 type Stage =
   | { kind: "loading" }
-  | { kind: "error"; message: string; restart: boolean }
+  | { kind: "error"; message: string; restart: boolean; final?: boolean }
   | { kind: "cover" }
   | { kind: "email" }
   | { kind: "code"; email: string }
@@ -64,8 +65,20 @@ export function errorText(copy: BotPageCopy, error: unknown, page?: PublicBotPag
  *
  * The visitor is an httpOnly cookie ally-be sets, so this keeps no identity of its own: a reload
  * asks ally-be for the open conversation and carries on from there.
+ *
+ * With `embed`, it runs inside the website widget on the owner's site (chunk 13): no cover (the
+ * bubble was the invitation), a Close button, and a word to the loader when a reply arrives while
+ * the panel is shut. Everything else, access, safety and the team stepping in, is the same page.
  */
-export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typeof botPageApi }) {
+export function BotPageApp({
+  slug,
+  api = botPageApi,
+  embed = null,
+}: {
+  slug: string;
+  api?: typeof botPageApi;
+  embed?: EmbedContext | null;
+}) {
   const [page, setPage] = useState<PublicBotPage | null>(null);
   const [stage, setStage] = useState<Stage>({ kind: "loading" });
   const [busy, setBusy] = useState(false);
@@ -91,12 +104,13 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
         err instanceof BotPageApiError &&
         (err.code === "BOT_PAGE_NOT_FOUND" ||
           err.code === "BOT_PAGE_START_AGAIN" ||
-          err.code === "BOT_PAGE_NOT_ALLOWED")
+          err.code === "BOT_PAGE_NOT_ALLOWED" ||
+          err.code === "BOT_PAGE_HOST_NOT_ALLOWED")
       ) {
         setStage({
           kind: "error",
           message: errorText(copy, err, page),
-          restart: err.code !== "BOT_PAGE_NOT_FOUND",
+          restart: err.code !== "BOT_PAGE_NOT_FOUND" && err.code !== "BOT_PAGE_HOST_NOT_ALLOWED",
         });
         return;
       }
@@ -123,7 +137,25 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
   );
 
   // Load the page, and carry on an open conversation after a reload.
+  // By value, so a caller passing a new object each render doesn't reload the page.
+  const embedHost = embed?.host ?? null;
+  const embedPage = embed?.page ?? null;
+  const framed = Boolean(embed);
   const load = useCallback(async (): Promise<Loaded> => {
+    if (framed) {
+      // Framed by a site the browser didn't name: refuse, never guess.
+      if (!embedHost) {
+        return {
+          stage: {
+            kind: "error",
+            message: pickCopy("auto").errors.BOT_PAGE_HOST_NOT_ALLOWED,
+            restart: false,
+            final: true,
+          },
+        };
+      }
+      await api.startEmbed(slug, embedHost, embedPage);
+    }
     let loaded: PublicBotPage;
     try {
       loaded = await api.page(slug);
@@ -147,7 +179,7 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
       // No visitor yet, or no longer allowed: the cover starts a visit.
     }
     return { page: loaded, stage: { kind: "cover" } };
-  }, [api, slug]);
+  }, [api, slug, framed, embedHost, embedPage]);
 
   const apply = useCallback((result: Loaded) => {
     if (result.page) setPage(result.page);
@@ -163,6 +195,39 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
       current = false;
     };
   }, [load, apply]);
+
+  // ── The website widget (chunk 13) ─────────────────────────────────────
+  const loader = useRef<{ post(message: ToLoader): void } | null>(null);
+  const panelOpen = useRef(true);
+  const unread = useRef(0);
+  useEffect(() => {
+    if (!embed?.host) return undefined;
+    const link = bridge(embed.host, message => {
+      panelOpen.current = message.type === "ally:opened";
+      if (panelOpen.current) unread.current = 0;
+    });
+    loader.current = link;
+    link.post({ type: "ally:ready" });
+    return () => {
+      link.stop();
+      loader.current = null;
+    };
+  }, [embed?.host]);
+  /** A reply came while the panel was shut: the bubble shows a dot. */
+  const arrivedWhileClosed = useCallback(() => {
+    if (panelOpen.current) return;
+    unread.current += 1;
+    loader.current?.post({ type: "ally:unread", count: unread.current });
+  }, []);
+  const closePanel = embed ? () => loader.current?.post({ type: "ally:close" }) : undefined;
+  // No cover in the widget: the bubble was the invitation. A public page that needs the bot check
+  // still shows it, since the check lives there.
+  const startRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!embed || stage.kind !== "cover" || !page) return;
+    if (page.access === "public" && page.turnstileSiteKey) return;
+    startRef.current?.();
+  }, [embed, stage.kind, page]);
 
   const reload = () => {
     setStage({ kind: "loading" });
@@ -210,6 +275,7 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
               return;
             }
             if (event.type === "message") {
+              arrivedWhileClosed();
               setMessages(list => {
                 if (list.some(item => item.id === event.id)) return list;
                 const joined =
@@ -269,7 +335,7 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
       clearTimeout(retry);
       controller?.abort();
     };
-  }, [api, slug, stage.kind, streamKey, copy]);
+  }, [api, slug, stage.kind, streamKey, copy, arrivedWhileClosed]);
 
   if (!page || stage.kind === "loading") {
     if (stage.kind === "error") {
@@ -278,7 +344,7 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
           copy={copy}
           message={stage.message}
           actionLabel={copy.errors.tryAgain}
-          onAction={reload}
+          onAction={stage.final ? undefined : reload}
         />
       );
     }
@@ -297,6 +363,7 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
       );
       await afterSession(session, page);
     });
+  startRef.current = () => void start();
 
   const sendCode = (email: string) =>
     run(async () => {
@@ -520,6 +587,7 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
           signedInAs={signedInAs}
           returnedDraft={returnedDraft}
           onAskPerson={askForPerson}
+          onClose={closePanel}
           onRate={(messageId, feedback) =>
             // A rating that doesn't reach us isn't worth an error on the visitor's screen.
             void api.feedback(slug, messageId, feedback).catch(() => undefined)
@@ -529,7 +597,17 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
   }
 
   return (
-    <div {...surfaceProps(page.branding)} className="brand-surface bp-root">
+    <div
+      {...surfaceProps(page.branding)}
+      className={`brand-surface bp-root${embed ? " bp-root--embed" : ""}`}
+    >
+      {/* In the widget, every screen but the chat (whose header has it) gets a way to close. */}
+      {closePanel && stage.kind !== "chat" && (
+        <button type="button" className="bp-close bp-close--float" onClick={closePanel}>
+          <span aria-hidden="true">×</span>
+          <span className="ally-sr-only">{copy.embed.close}</span>
+        </button>
+      )}
       {screen}
     </div>
   );

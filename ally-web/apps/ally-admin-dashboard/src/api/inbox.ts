@@ -3,6 +3,8 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import { baseAPI } from "./baseApi";
 
 export type InboxChannel = "whatsapp" | "web" | "email";
+/** The channel filter: a channel, or `widget`, the website widget's web chats (chunk 13). */
+export type InboxChannelFilter = InboxChannel | "widget";
 export type InboxView = "needs_person" | "live" | "all";
 
 /** One chat in the inbox (ally-be `InboxService`). */
@@ -11,6 +13,8 @@ export interface InboxItem {
   chatbotId: string;
   assistant: string;
   channel: InboxChannel;
+  /** `widget`: a chat started in the website widget (chunk 13), shown as "Website". */
+  source: "widget" | null;
   visitor: string;
   preview: string;
   lastMessageAt: string;
@@ -51,7 +55,7 @@ export const inboxApi = baseAPI.injectEndpoints({
   endpoints: builder => ({
     getInbox: builder.query<
       InboxItem[],
-      { view?: InboxView; channel?: InboxChannel; chatbotId?: string }
+      { view?: InboxView; channel?: InboxChannelFilter; chatbotId?: string }
     >({
       query: params => ({
         url: ApiEndpoints.INBOX.CONVERSATIONS,

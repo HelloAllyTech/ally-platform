@@ -75,6 +75,10 @@ export const en = {
       writing: "Writing the reply…",
     },
   },
+  /** The website widget (copy §22, chunk 13). */
+  embed: {
+    close: "Close",
+  },
   errors: {
     BOT_PAGE_NOT_FOUND: "This chat link isn't available. It may have been turned off.",
     BOT_PAGE_BOT_CHECK_FAILED: "We couldn't confirm you're a person. Please try again.",
@@ -90,6 +94,7 @@ export const en = {
     BOT_PAGE_MESSAGE_TOO_LONG: "Please keep your message under {max} characters.",
     BOT_PAGE_INTAKE_REQUIRED: "Please answer the questions first.",
     BOT_PAGE_INTAKE_INVALID: "Please check your answer.",
+    BOT_PAGE_HOST_NOT_ALLOWED: "This chat isn't available on this website.",
     NETWORK: "You seem to be offline. Check your connection and try again.",
     INTERNAL: "Something went wrong. Please try again.",
     tryAgain: "Try again",

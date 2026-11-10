@@ -23,6 +23,18 @@ export interface HomeFieldValues {
   avoidTopics: string[];
   /** When someone asks for a person (chunk 11a). */
   handover: HandoverSettings;
+  /** The website widget (chunk 13). */
+  widget: WidgetSettings;
+}
+
+export interface WidgetSettings {
+  position: "right" | "left";
+  label: string;
+  /** Open on its own after this many seconds (3–120); null for never. */
+  autoOpenSeconds: number | null;
+  showOnPhones: boolean;
+  /** The owner's websites, as ally-be normalised them; subdomains count. */
+  allowedDomains: string[];
 }
 
 export interface HandoverSettings {

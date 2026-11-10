@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { BotPageApp } from "./BotPageApp";
+import { embedContext } from "./embed";
 import "./page.css";
 
 /**
@@ -10,9 +11,11 @@ import "./page.css";
  * It shares no providers, store or styles with the dashboard, so a visitor downloads only this.
  */
 const slug = decodeURIComponent(/^\/b\/([^/?#]+)/.exec(window.location.pathname)?.[1] ?? "");
+/** Framed by another site (the website widget, chunk 13), or null on the page itself. */
+const embed = embedContext();
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
-    <BotPageApp slug={slug} />
+    <BotPageApp slug={slug} embed={embed} />
   </StrictMode>,
 );

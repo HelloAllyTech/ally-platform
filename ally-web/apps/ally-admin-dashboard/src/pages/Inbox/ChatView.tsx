@@ -9,7 +9,7 @@ import {
 import type { InboxThread } from "@api";
 import { Button, PrimaryButton } from "@components/v2";
 
-import { fill, INBOX } from "./copy";
+import { channelLabel, fill, INBOX } from "./copy";
 
 const errorText = (error: unknown): string =>
   (error as { data?: { message?: string } })?.data?.message ?? "Something went wrong. Try again.";
@@ -76,7 +76,7 @@ export const ChatView: React.FC<{ chatbotId: string; id: string; me: number | nu
         <div>
           <h2 className="ally-heading">{thread.visitor}</h2>
           <p className="ally-small">
-            {thread.assistant} · {INBOX.channels[thread.channel === "web" ? "web" : "whatsapp"]}
+            {thread.assistant} · {channelLabel(thread)}
             {thread.safety && <span className="ally-badge ally-inbox__safety">{INBOX.safety}</span>}
           </p>
         </div>

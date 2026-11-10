@@ -103,6 +103,17 @@ export const HOME = {
       },
       version: v(19),
     },
+    // The website widget (chunk 13).
+    widget: {
+      value: {
+        position: "right",
+        label: "Ask us",
+        autoOpenSeconds: null,
+        showOnPhones: true,
+        allowedDomains: ["sunrisemind.in"],
+      },
+      version: v(20),
+    },
   },
   safety: {
     pack: PACK,

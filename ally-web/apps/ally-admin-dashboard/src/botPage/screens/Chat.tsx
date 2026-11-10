@@ -40,6 +40,7 @@ export function Chat({
   statusLine,
   onRate,
   onAskPerson,
+  onClose,
 }: {
   page: PublicBotPage;
   copy: BotPageCopy;
@@ -58,6 +59,8 @@ export function Chat({
   onRate?(messageId: string, feedback: AnswerFeedback): void;
   /** "Talk to a person" (chunk 11a); without it, no link (Try it). */
   onAskPerson?(): void;
+  /** Close the website widget's panel (chunk 13); without it, no button. */
+  onClose?(): void;
 }) {
   const { branding } = page;
   const [draft, setDraft] = useState("");
@@ -101,6 +104,12 @@ export function Chat({
         >
           {copy.chat.newChat}
         </button>
+        {onClose && (
+          <button type="button" className="bp-close" onClick={onClose}>
+            <span aria-hidden="true">×</span>
+            <span className="ally-sr-only">{copy.embed.close}</span>
+          </button>
+        )}
       </PageHeader>
       {signedInAs && (
         <p className="bp-signed-in">{fill(copy.chat.signedInAs, { email: signedInAs })}</p>

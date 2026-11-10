@@ -81,6 +81,10 @@ export const hi: BotPageCopy = {
       writing: "उत्तर लिख रहा है…",
     },
   },
+  /** The website widget (copy §22, chunk 13). */
+  embed: {
+    close: "बंद करें",
+  },
   errors: {
     BOT_PAGE_NOT_FOUND: "यह चैट लिंक उपलब्ध नहीं है। हो सकता है इसे बंद कर दिया गया हो।",
     BOT_PAGE_BOT_CHECK_FAILED: "हम पुष्टि नहीं कर सके कि आप इंसान हैं। कृपया फिर से कोशिश करें।",
@@ -96,6 +100,7 @@ export const hi: BotPageCopy = {
     BOT_PAGE_MESSAGE_TOO_LONG: "कृपया अपना संदेश {max} अक्षरों से छोटा रखें।",
     BOT_PAGE_INTAKE_REQUIRED: "कृपया पहले प्रश्नों के उत्तर दें।",
     BOT_PAGE_INTAKE_INVALID: "कृपया अपना उत्तर जाँचें।",
+    BOT_PAGE_HOST_NOT_ALLOWED: "यह चैट इस वेबसाइट पर उपलब्ध नहीं है।",
     NETWORK: "लगता है आप ऑफ़लाइन हैं। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
     INTERNAL: "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
     tryAgain: "फिर कोशिश करें",

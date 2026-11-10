@@ -63,6 +63,8 @@ export interface PublicSession {
   state: "ready" | "needs_email" | "needs_code";
   intakeDone: boolean;
   signedInAs: string | null;
+  /** In the website widget, only when its cookie check failed: held in memory (chunk 13). */
+  visitorToken?: string;
 }
 
 export interface PublicCitation {
@@ -131,5 +133,6 @@ export type BotPageErrorCode =
   | "BOT_PAGE_MESSAGE_TOO_LONG"
   | "BOT_PAGE_INTAKE_REQUIRED"
   | "BOT_PAGE_INTAKE_INVALID"
+  | "BOT_PAGE_HOST_NOT_ALLOWED"
   | "NETWORK"
   | "INTERNAL";

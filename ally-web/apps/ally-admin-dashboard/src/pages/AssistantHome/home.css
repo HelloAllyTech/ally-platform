@@ -626,3 +626,37 @@
   gap: 6px;
   min-height: 32px;
 }
+
+/* The website widget (chunk 13): the line to copy, and the websites list. */
+.ally-home__snippet {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ally-home__snippet code {
+  flex: 1 1 280px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ally-sunken);
+  font:
+    13px/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.ally-home__domains {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.ally-home__domains li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
