@@ -36,6 +36,13 @@ export const INBOX = {
   nobodyWaiting: "Nobody is waiting for a person.",
   soundOn: "Sound on",
   soundOff: "Sound off",
+  /** The sound toggle's name and tooltip (chunk 20d-2, deck §25). */
+  soundTipOn: "Sound for new chats: on",
+  soundTipOff: "Sound for new chats: off",
+  today: "Today",
+  yesterday: "Yesterday",
+  helpful: "Helpful",
+  notHelpful: "Not helpful",
   turnOnNotifications: "Turn on notifications",
   notifyNeedsPerson: "{business}: someone needs a person",
   notifySafety: "{business}: a safety message",

@@ -658,3 +658,20 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Documents:** Upload a file · PDF, Word or EPUB, up to 25 MB. · Add from your library · Documents in your library · There are no other documents in your library. · Your file · From your library · Uploading {name}… · We can only read PDF, Word or EPUB files. · That file is over 25 MB. Try a smaller one. · That upload didn't finish. Try again. · No documents yet. Upload a file, or add one from your library. · Close
 - **Quick replies:** Fixed answers it sends on WhatsApp when someone writes certain words, without searching. · Add a quick reply · Name · When someone writes · Words or phrases, separated by commas · It replies · Save reply · Cancel · Set by Ally · Reworded by you · Off · Reword · Turn off · Turn on · Safety reply: it can be reworded, never turned off. · Use Ally's wording · No quick replies of your own yet. · Yours
 - **Overview, numbers:** See all numbers
+
+### Explaining each section, and the header *(added in 20d-2)*
+
+- **The `?` button's name:** What is {section}?
+- **Overview, explained:** How many people your assistant talked to, how often it answered from your information, and the questions it couldn't answer yet. Answer those and it learns them.
+- **What it knows, explained:** Your assistant only answers from what's here: the pages it read, your notes and your documents. If something is wrong, correct it here and the next answer uses your words.
+- **Personality, explained:** How your assistant sounds. It never changes what it knows or its safety rules.
+- **Safety, explained:** Ally's safety rules for your kind of practice are always on. You can add rules of your own and topics it should never talk about. You can't turn Ally's rules off.
+- **How it works, explained:** Everything your assistant follows, in the order it applies. The parts marked as yours can be edited here.
+- **Page, explained:** Your page is where people chat with your assistant. Choose how it looks and what it asks first.
+- **Checkup, explained:** A checkup asks your assistant the questions customers would ask, then checks each answer against your own pages.
+- **Inbox, explained:** Every chat from your page, your website and WhatsApp. Take one over to reply yourself; your assistant waits in that chat until you hand it back.
+- **Share, explained:** Who can use your assistant on your page, on your website and on WhatsApp, and who on your team can change it.
+- **Header menu (`···`):** More · How it answers · Classic view · Open page. How it answers and Classic view are for Ally staff only; on phones the menu also holds Open page.
+- **Inbox, the rest (20d-2):** Today · Yesterday (the date line, once a day) · Helpful · Not helpful (a rating under an answer)
+- **When someone asks for a person, the checkbox under Opening hours (20d-2):** Set opening hours
+- **AI Chatbots list page (20d-2):** Your assistants answer people's questions from your own pages, on your page, your website and WhatsApp. · Assistants · No assistants yet · You haven't been added to an assistant yet · Give us your website and we'll set one up with you in about ten minutes. · Ask the assistant's owner to add you to its team. · Not on WhatsApp yet · {count} messages, last 30 days · {count} people

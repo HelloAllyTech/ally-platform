@@ -234,6 +234,26 @@ export function visitorLabel(row: Record<string, unknown>): string {
   return 'Visitor';
 }
 
+/**
+ * Who the visitor is in the inbox (chunk 20d-2): their name when they gave one before the chat,
+ * otherwise "Visitor · 4821": a phone's last 4 on WhatsApp, else 4 digits from the conversation's
+ * id, so the same chat always has the same tag.
+ */
+export function inboxVisitor(row: Record<string, unknown>): string {
+  const label = visitorLabel(row);
+  if (label.startsWith('…')) return `Visitor · ${label.slice(1)}`;
+  if (label === 'Visitor')
+    return `Visitor · ${visitorTag(String(row.id ?? ''))}`;
+  return label;
+}
+
+/** Four digits from an id, the same every time (not a secret, just a short name for a chat). */
+export function visitorTag(id: string): string {
+  let hash = 0;
+  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return String(hash % 10000).padStart(4, '0');
+}
+
 function toItem(row: Record<string, unknown>): InboxItem {
   const held = row.handled_by_user_id as number | null;
   return {
@@ -242,7 +262,7 @@ function toItem(row: Record<string, unknown>): InboxItem {
     assistant: String(row.assistant ?? ''),
     channel: row.channel as ConversationChannel,
     source: row.source === 'widget' ? 'widget' : null,
-    visitor: visitorLabel(row),
+    visitor: inboxVisitor(row),
     preview: String(row.preview ?? '').slice(0, 140),
     lastMessageAt: new Date(row.last_message_at as string).toISOString(),
     unread: Number(row.unread ?? 0),

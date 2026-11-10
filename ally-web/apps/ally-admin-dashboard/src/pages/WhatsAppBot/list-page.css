@@ -1,0 +1,161 @@
+/* The AI Chatbots page (chunk 20d-2): its title, tabs and assistant cards in the v2 look. */
+.ally-list-page {
+  min-height: 100%;
+  padding: 4px 0 48px;
+  background: var(--ally-bg);
+  color: var(--ally-ink);
+  font-family: var(--ally-font-ui);
+}
+.ally-list-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+}
+.ally-list-page__title h1 {
+  margin: 0;
+  font: 400 34px/1.1 var(--ally-font-display);
+  letter-spacing: -0.01em;
+}
+.ally-list-page__title p {
+  margin: 6px 0 0;
+  max-width: 640px;
+  color: var(--ally-muted);
+}
+.ally-list-page__tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--ally-line);
+  scrollbar-width: none;
+}
+.ally-list-page__tab {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ally-muted);
+  font: 500 15px/1 var(--ally-font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ally-list-page__tab[aria-selected="true"] {
+  color: var(--ally-ink);
+  border-bottom-color: var(--ally-ink);
+}
+.ally-list-page__tab:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ally-accent);
+  border-radius: var(--ally-radius-sm);
+}
+.ally-list-page__body {
+  padding-top: 24px;
+}
+.ally-list-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.ally-list-page__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--ally-line);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+.ally-list-page__card:hover {
+  box-shadow: 0 10px 30px rgba(23, 23, 28, 0.08);
+  transform: translateY(-2px);
+}
+.ally-list-page__card:focus-visible {
+  outline: none;
+  border-color: var(--ally-accent);
+  box-shadow: 0 0 0 4px var(--ally-accent-soft);
+}
+.ally-list-page__card--skeleton {
+  height: 156px;
+  background: var(--ally-surface-2);
+  cursor: default;
+}
+.ally-list-page__card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ally-list-page__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ally-list-page__bot {
+  font: 600 17px/1.3 var(--ally-font-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ally-list-page__desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--ally-muted);
+}
+.ally-list-page__status--live {
+  background: var(--ally-good-bg);
+  color: var(--ally-good);
+}
+.ally-list-page__status--paused {
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+.ally-list-page__status--draft {
+  background: var(--ally-sunken);
+  color: var(--ally-muted);
+}
+.ally-list-page__channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ally-list-page__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--ally-faint);
+}
+.ally-list-page__continue {
+  color: var(--ally-accent);
+  font-weight: 600;
+}
+.ally-list-page__role {
+  margin-left: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ally-list-page__card {
+    transition: none;
+  }
+  .ally-list-page__card:hover {
+    transform: none;
+  }
+}
+@media (max-width: 959px) {
+  .ally-list-page__title h1 {
+    font-size: 28px;
+  }
+  .ally-list-page__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

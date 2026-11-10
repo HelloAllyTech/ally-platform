@@ -14,6 +14,25 @@ import { channelLabel, fill, INBOX } from "./copy";
 const errorText = (error: unknown): string =>
   (error as { data?: { message?: string } })?.data?.message ?? "Something went wrong. Try again.";
 
+/** Messages from one sender this close together are one group. */
+const GROUP_MS = 2 * 60 * 1000;
+
+const dayOf = (iso: string) => new Date(iso).toDateString();
+
+/** "Today", "Yesterday", or "9 Nov": once a day, above that day's messages. */
+const dayLabel = (iso: string) => {
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  if (dayOf(iso) === today.toDateString()) return INBOX.today;
+  if (dayOf(iso) === yesterday.toDateString()) return INBOX.yesterday;
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+};
+
+const clock = (iso: string) =>
+  new Date(iso)
+    .toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true })
+    .replace(/\b(AM|PM)\b/g, m => m.toLowerCase());
+
 const time = (iso: string) =>
   new Date(iso).toLocaleString("en-IN", {
     hour: "numeric",
@@ -73,24 +92,20 @@ export const ChatView: React.FC<{ chatbotId: string; id: string; me: number | nu
   return (
     <section className="ally-inbox__chat" data-testid="inbox-chat" aria-label={thread.visitor}>
       <header className="ally-inbox__chat-head">
-        <div>
+        <div className="ally-inbox__chat-name">
           <h2 className="ally-heading">{thread.visitor}</h2>
-          <p className="ally-small">
-            {thread.assistant} · {channelLabel(thread)}
-            {thread.safety && <span className="ally-badge ally-inbox__safety">{INBOX.safety}</span>}
-          </p>
-        </div>
-        <div className="ally-btn-row">
-          {!thread.heldBy && (
-            <PrimaryButton
+          {/* On the name's line, right-aligned (chunk 20d-2). */}
+          {!thread.heldBy ? (
+            <Button
+              className="ally-btn--sm"
               disabled={taking.isLoading}
               onClick={() => void run(() => takeOver({ chatbotId, id }).unwrap())}
             >
               {INBOX.takeOver}
-            </PrimaryButton>
-          )}
-          {thread.heldBy && (
+            </Button>
+          ) : (
             <Button
+              className="ally-btn--sm"
               disabled={handing.isLoading}
               onClick={() => void run(() => handBack({ chatbotId, id }).unwrap())}
             >
@@ -98,6 +113,10 @@ export const ChatView: React.FC<{ chatbotId: string; id: string; me: number | nu
             </Button>
           )}
         </div>
+        <p className="ally-small">
+          {thread.assistant} · {channelLabel(thread)}
+          {thread.safety && <span className="ally-badge ally-inbox__safety">{INBOX.safety}</span>}
+        </p>
       </header>
 
       {thread.heldBy && (
@@ -120,31 +139,55 @@ export const ChatView: React.FC<{ chatbotId: string; id: string; me: number | nu
       )}
 
       <ol className="ally-inbox__thread" aria-live="polite">
-        {thread.messages.map(m => (
-          <li key={m.id} className={`ally-inbox__msg ally-inbox__msg--${m.role}`}>
-            <p className="ally-small ally-inbox__author">
-              {authorOf(m, thread)} · {time(m.at)}
-              {m.handledBy === "crisis" && (
-                <span className="ally-badge ally-inbox__safety">{INBOX.safety}</span>
+        {thread.messages.map((m, index) => {
+          const before = thread.messages[index - 1];
+          const newDay = !before || dayOf(before.at) !== dayOf(m.at);
+          // Messages from one sender within 2 minutes share their name and time.
+          const grouped =
+            !newDay &&
+            before.role === m.role &&
+            authorOf(before, thread) === authorOf(m, thread) &&
+            Date.parse(m.at) - Date.parse(before.at) < GROUP_MS &&
+            m.handledBy !== "crisis";
+          return (
+            <React.Fragment key={m.id}>
+              {newDay && (
+                <li className="ally-inbox__day" aria-hidden="false">
+                  <span>{dayLabel(m.at)}</span>
+                </li>
               )}
-            </p>
-            <p className="ally-inbox__bubble">{m.text}</p>
-            {m.citations.length > 0 && (
-              <p className="ally-small ally-inbox__sources">
-                {m.citations
-                  .map(c => c.title)
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            )}
-            {m.rating && (
-              <p className="ally-small" aria-label={m.rating === "up" ? "Helpful" : "Not helpful"}>
-                {m.rating === "up" ? "👍" : "👎"}
-                {m.ratingReason ? ` ${m.ratingReason.replace("_", " ")}` : ""}
-              </p>
-            )}
-          </li>
-        ))}
+              <li
+                className={`ally-inbox__msg ally-inbox__msg--${m.role}${grouped ? " ally-inbox__msg--grouped" : ""}`}
+              >
+                {!grouped && (
+                  <p className="ally-small ally-inbox__author">
+                    {authorOf(m, thread)} · {clock(m.at)}
+                    {m.handledBy === "crisis" && (
+                      <span className="ally-badge ally-inbox__safety">{INBOX.safety}</span>
+                    )}
+                  </p>
+                )}
+                <p className="ally-inbox__bubble">{m.text}</p>
+                {m.citations.length > 0 && (
+                  <p className="ally-small ally-inbox__sources">
+                    {m.citations
+                      .map(c => c.title)
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+                {m.rating && (
+                  <p className="ally-small ally-inbox__rating">
+                    <span className={`ally-badge ally-inbox__rating--${m.rating}`}>
+                      {m.rating === "up" ? INBOX.helpful : INBOX.notHelpful}
+                    </span>
+                    {m.ratingReason ? ` ${m.ratingReason.replace("_", " ")}` : ""}
+                  </p>
+                )}
+              </li>
+            </React.Fragment>
+          );
+        })}
       </ol>
       <div ref={end} />
 

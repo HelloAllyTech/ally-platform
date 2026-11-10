@@ -227,7 +227,11 @@ export const KnowsSection: React.FC<SectionProps> = ({ bot, home, canEdit }) => 
 
   return (
     <>
-      <SectionHead title={HOME.sections.knows} subtitle={HOME.subtitles.knows} />
+      <SectionHead
+        title={HOME.sections.knows}
+        subtitle={HOME.subtitles.knows}
+        help={HOME.help.knows}
+      />
 
       <Group title={t.website} testId="knows-website">
         {groups.length === 0 ? (

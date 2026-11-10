@@ -41,7 +41,7 @@ test("change your assistant: a proposal as before and after", async ({ page }) =
   await mockAssistantHome(page);
   await open(page, "overview");
   const panel = page.getByTestId("change-panel");
-  // Open by default on a wide screen for an editor; a header button on a phone.
+  // Open by default from 1600 px for an editor; a header button (a sheet) below that.
   if (!(await panel.isVisible())) {
     await page.getByRole("button", { name: "Change your assistant" }).click();
   }
@@ -82,13 +82,19 @@ test("a viewer sees everything and can change nothing", async ({ page }) => {
   await expect(page.getByText("Changes save as you go")).toHaveCount(0);
 });
 
-test("only platform admins see the engine", async ({ page }) => {
+// Chunk 20d-2: How it answers and Classic view are in the ··· menu, for Ally staff only.
+test("only platform admins see How it answers and Classic view", async ({ page }) => {
   await mockAssistantHome(page);
   await open(page, "overview");
-  await expect(page.getByRole("button", { name: "Engine" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "More" })).toHaveCount(
+    (page.viewportSize()?.width ?? 1440) < 960 ? 1 : 0,
+  );
+  await expect(page.getByRole("link", { name: "Classic view" })).toHaveCount(0);
   await mockAssistantHome(page, { admin: true });
   await page.reload();
-  await expect(page.getByRole("button", { name: "Engine" })).toBeVisible();
+  await page.getByRole("button", { name: "More" }).click();
+  await expect(page.getByRole("menuitem", { name: "How it answers" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Classic view" })).toBeVisible();
 });
 
 test("a question just added stays until it has words, then saves", async ({ page }) => {

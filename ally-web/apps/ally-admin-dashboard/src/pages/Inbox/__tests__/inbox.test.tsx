@@ -213,6 +213,48 @@ describe("Inbox", () => {
     expect(screen.getByRole("option", { name: INBOX.channels.widget })).toBeTruthy();
   });
 
+  it("shows the date once a day and groups one sender's messages within 2 minutes (20d-2)", () => {
+    const base = thread().messages[0];
+    h.thread.current = thread({
+      messages: [
+        { ...base, id: "a", at: "2026-11-08T09:00:00.000Z", text: "First" },
+        { ...base, id: "b", at: "2026-11-08T09:01:00.000Z", text: "Second" },
+        { ...base, id: "c", at: "2026-11-09T09:00:00.000Z", text: "Next day" },
+      ],
+    });
+    open("/inbox?conversation=c1&bot=b1");
+    const chat = screen.getByTestId("inbox-chat");
+    expect(chat.querySelectorAll(".ally-inbox__day")).toHaveLength(2);
+    // One name line for the two close together, one for the next day's.
+    expect(chat.querySelectorAll(".ally-inbox__author")).toHaveLength(2);
+    expect(chat.querySelectorAll(".ally-inbox__msg--grouped")).toHaveLength(1);
+  });
+
+  it("puts Take over on the name's line and labels a rating in words (20d-2)", () => {
+    open("/inbox?conversation=c1&bot=b1");
+    const name = screen.getByRole("heading", { name: "Asha" }).parentElement!;
+    expect(name.querySelector("button")?.textContent).toBe(INBOX.takeOver);
+    expect(screen.getByText(INBOX.notHelpful)).toBeTruthy();
+  });
+
+  it("the sound is an icon toggle that says what it does (20d-2)", () => {
+    open();
+    const sound = screen.getByRole("button", { name: /^Sound for new chats/ });
+    const before = sound.getAttribute("aria-label");
+    fireEvent.click(sound);
+    expect(sound.getAttribute("aria-label")).not.toBe(before);
+    expect([INBOX.soundTipOn, INBOX.soundTipOff]).toContain(sound.getAttribute("title"));
+  });
+
+  it("inside an assistant's home, doesn't repeat the Inbox title (20d-2)", () => {
+    render(
+      <MemoryRouter initialEntries={["/x"]}>
+        <Inbox chatbotId="b1" />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("heading", { level: 1, name: INBOX.nav })).toBeNull();
+  });
+
   it("an empty inbox says so", () => {
     h.items.current = [];
     open();

@@ -29,6 +29,8 @@ import { PersonalitySection } from "./sections/Personality";
 import { SafetySection } from "./sections/Safety";
 import { ShareSection } from "./sections/Share";
 import { TryIt } from "./TryIt";
+import { MoreMenu } from "./ui/Menu";
+import { Sheet } from "./ui/Sheet";
 import { HomeSaves, HomeSavesContext, SaveState } from "./useHomeField";
 import "./home.css";
 import "./ui/scale.css";
@@ -47,8 +49,26 @@ const STATUS_LABEL: Record<ChatbotStatus, string> = {
 
 type Panel = "try" | "engine" | "change" | null;
 
-/** Screenshot 03: on a wide screen, an editor sees "Change your assistant" open on the right. */
-const WIDE = "(min-width: 1280px)";
+/**
+ * Wide enough for the panel to sit beside the section (chunk 20d-2). Below it, Change and Try it
+ * open over the page with a scrim, so three columns are never squeezed together; on a wide screen
+ * an editor sees "Change your assistant" open on the right (screenshot 03).
+ */
+const WIDE = "(min-width: 1600px)";
+const PHONE = "(max-width: 959px)";
+
+const useMedia = (query: string): boolean => {
+  const [matches, setMatches] = useState(() => Boolean(window.matchMedia?.(query).matches));
+  useEffect(() => {
+    const list = window.matchMedia?.(query);
+    if (!list) return undefined;
+    const on = () => setMatches(list.matches);
+    on();
+    list.addEventListener?.("change", on);
+    return () => list.removeEventListener?.("change", on);
+  }, [query]);
+  return matches;
+};
 
 /**
  * The assistant home (chunk 20d, screenshot 03-assistant-home): everything about one assistant,
@@ -96,17 +116,42 @@ export const AssistantHome: React.FC = () => {
     if (fromUrl.tryIt) setParams({});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // On a phone the section chips scroll sideways: keep the open one in view.
+  useEffect(() => {
+    document
+      .querySelector<HTMLElement>('.ally-home__nav-item[aria-current="page"]')
+      ?.scrollIntoView?.({ inline: "center", block: "nearest" });
+  }, [section]);
+
+  const wide = useMedia(WIDE);
+  const phone = useMedia(PHONE);
+  // The inbox is two columns of its own: the panel never docks beside it.
+  const docked = wide && section !== "conversations";
+
   const editable =
     !!bot && !!home.data && RANK[bot.myRole] >= RANK[ChatbotMemberRole.EDITOR] && home.data.canEdit;
   const opened = useRef(false);
   useEffect(() => {
     if (!editable || opened.current) return;
     opened.current = true;
-    if (window.matchMedia?.(WIDE).matches) setPanel(p => p ?? "change");
-  }, [editable]);
+    if (window.matchMedia?.(WIDE).matches && section !== "conversations") {
+      setPanel(p => p ?? "change");
+    }
+  }, [editable, section]);
 
   if (isLoading || home.isLoading) {
-    return <div className="ally-v2 ally-home ally-home--loading" aria-busy="true" />;
+    // The header and section at their final size, so nothing moves when they arrive.
+    return (
+      <div className="ally-v2 ally-home ally-home--loading" aria-busy="true">
+        <div className="ally-home__top ally-home__top--skeleton">
+          <span className="ally-skeleton ally-skeleton--title" />
+        </div>
+        <div className="ally-home__body">
+          <span className="ally-home__nav ally-skeleton ally-skeleton--nav" />
+          <span className="ally-skeleton ally-skeleton--card" />
+        </div>
+      </div>
+    );
   }
   if (isError || !bot || home.isError || !home.data) {
     return (
@@ -123,6 +168,35 @@ export const AssistantHome: React.FC = () => {
   const canEdit = RANK[bot.myRole] >= RANK[ChatbotMemberRole.EDITOR] && home.data.canEdit;
   const canManage = RANK[bot.myRole] >= RANK[ChatbotMemberRole.OWNER];
   const props = { bot, home: home.data, canEdit, canManage, go };
+
+  const panelLabel =
+    panel === "try"
+      ? HOME.tryPanel.title
+      : panel === "change"
+        ? COPY.change.title
+        : HOME.more.engine;
+
+  const panelContent =
+    panel === "change" ? (
+      <ChangePanel
+        botId={bot.id}
+        canEdit={canEdit}
+        onClose={() => setPanel(null)}
+        onApplied={run => {
+          void refetch();
+          void home.refetch();
+          saves.changed(run);
+        }}
+        onUndone={() => {
+          void refetch();
+          void home.refetch();
+        }}
+      />
+    ) : panel === "try" ? (
+      <TryIt bot={bot} page={page ?? null} onClose={() => setPanel(null)} />
+    ) : panel === "engine" ? (
+      <EnginePanel bot={bot} onClose={() => setPanel(null)} onTry={() => setPanel("try")} />
+    ) : null;
 
   const render = (id: SectionId) => {
     switch (id) {
@@ -175,27 +249,17 @@ export const AssistantHome: React.FC = () => {
                           : ""}
                 </span>
                 <div className="ally-home__actions">
-                  <Link
-                    className="ally-link ally-small"
-                    to={`${ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id)}?view=classic`}
-                  >
-                    {HOME.admin.classic}
-                  </Link>
-                  {isPlatformAdmin && (
+                  {canEdit && (
                     <Button
-                      aria-pressed={panel === "engine"}
-                      onClick={() => setPanel(p => (p === "engine" ? null : "engine"))}
+                      aria-pressed={panel === "change"}
+                      onClick={() => setPanel(p => (p === "change" ? null : "change"))}
                     >
-                      {HOME.admin.engine}
+                      {COPY.change.title}
                     </Button>
-                  )}
-                  {/* While the panel is open its own Close is right there, so the button steps aside. */}
-                  {canEdit && panel !== "change" && (
-                    <Button onClick={() => setPanel("change")}>{COPY.change.title}</Button>
                   )}
                   {page?.saved && (
                     <a
-                      className="ally-btn ally-btn--secondary"
+                      className="ally-btn ally-btn--secondary ally-home__open-page"
                       href={page.link}
                       target="_blank"
                       rel="noreferrer"
@@ -210,6 +274,31 @@ export const AssistantHome: React.FC = () => {
                   >
                     {HOME.tryIt}
                   </Button>
+                  <MoreMenu
+                    label={HOME.more.more}
+                    items={[
+                      ...(page?.saved
+                        ? [
+                            {
+                              label: HOME.openPage,
+                              href: page.link,
+                              external: true,
+                              phoneOnly: true,
+                            },
+                          ]
+                        : []),
+                      // Ally staff only: how it answers, and the old tabs until CL1.
+                      ...(isPlatformAdmin
+                        ? [
+                            { label: HOME.more.engine, onSelect: () => setPanel("engine") },
+                            {
+                              label: HOME.more.classic,
+                              href: `${ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id)}?view=classic`,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 </div>
               </div>
             </header>
@@ -239,44 +328,23 @@ export const AssistantHome: React.FC = () => {
                 {render(section)}
               </main>
 
-              {panel && (
-                <aside
-                  className="ally-home__panel"
-                  aria-label={
-                    panel === "try"
-                      ? HOME.tryPanel.title
-                      : panel === "change"
-                        ? COPY.change.title
-                        : HOME.admin.engine
-                  }
-                >
-                  {panel === "change" ? (
-                    <ChangePanel
-                      botId={bot.id}
-                      canEdit={canEdit}
-                      onClose={() => setPanel(null)}
-                      onApplied={run => {
-                        void refetch();
-                        void home.refetch();
-                        saves.changed(run);
-                      }}
-                      onUndone={() => {
-                        void refetch();
-                        void home.refetch();
-                      }}
-                    />
-                  ) : panel === "try" ? (
-                    <TryIt bot={bot} page={page ?? null} onClose={() => setPanel(null)} />
-                  ) : (
-                    <EnginePanel
-                      bot={bot}
-                      onClose={() => setPanel(null)}
-                      onTry={() => setPanel("try")}
-                    />
-                  )}
+              {panel && docked && (
+                <aside className="ally-home__panel" aria-label={panelLabel}>
+                  {panelContent}
                 </aside>
               )}
             </div>
+
+            {panel && !docked && (
+              <Sheet
+                label={panelLabel}
+                onClose={() => setPanel(null)}
+                side={phone ? "bottom" : "right"}
+                testId="home-sheet"
+              >
+                {panelContent}
+              </Sheet>
+            )}
 
             {undo && (
               <Toast

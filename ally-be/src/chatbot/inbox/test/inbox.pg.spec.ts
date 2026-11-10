@@ -116,7 +116,7 @@ describePg('Inbox (Postgres)', () => {
       state: 'needs_person',
       needsPersonReason: 'asked',
       unread: 1,
-      visitor: 'Visitor',
+      visitor: expect.stringMatching(/^Visitor · \d{4}$/),
     });
     expect(
       (await inbox.list({ view: 'needs_person' })).map((c) => c.id),

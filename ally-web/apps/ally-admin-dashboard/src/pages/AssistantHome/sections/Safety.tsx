@@ -119,7 +119,11 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit }) =>
 
   return (
     <>
-      <SectionHead title={HOME.sections.safety} subtitle={HOME.subtitles.safety} />
+      <SectionHead
+        title={HOME.sections.safety}
+        subtitle={HOME.subtitles.safety}
+        help={HOME.help.safety}
+      />
 
       {pack && (
         <SafetyCard

@@ -8,9 +8,10 @@ import {
   type InboxChannelFilter,
   type InboxView,
 } from "@api";
-import { Button } from "@components/v2";
+import { Button, Orb } from "@components/v2";
 import { useUser } from "@hooks";
 
+import { ChannelIcon } from "./ChannelIcon";
 import { ChatView } from "./ChatView";
 import { channelLabel, fill, INBOX } from "./copy";
 import {
@@ -87,18 +88,44 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
     >
       <aside className="ally-inbox__list-pane">
         <header className="ally-inbox__head">
-          <h1 className="ally-heading">{INBOX.nav}</h1>
+          {/* Inside an assistant's home the section already says "Inbox". */}
+          {locked ? (
+            <h2 className="ally-sr-only">{INBOX.nav}</h2>
+          ) : (
+            <h1 className="ally-heading">{INBOX.nav}</h1>
+          )}
           <div className="ally-btn-row">
-            <Button
-              variant="ghost"
+            <button
+              type="button"
+              className="ally-icon-btn ally-inbox__sound"
               aria-pressed={sound}
+              aria-label={sound ? INBOX.soundTipOn : INBOX.soundTipOff}
+              title={sound ? INBOX.soundTipOn : INBOX.soundTipOff}
               onClick={() => {
                 setSound(!sound);
                 setSoundState(!sound);
               }}
             >
-              {sound ? INBOX.soundOn : INBOX.soundOff}
-            </Button>
+              <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18">
+                <path d="M4 8h3l4-3v10l-4-3H4z" fill="currentColor" />
+                {sound ? (
+                  <path
+                    d="M13.5 7a4 4 0 0 1 0 6M15.5 5a7 7 0 0 1 0 10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                ) : (
+                  <path
+                    d="M13 8l4 4M17 8l-4 4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+            </button>
             {askNotify && (
               <Button
                 variant="ghost"
@@ -109,54 +136,56 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
             )}
           </div>
         </header>
-        <div className="ally-inbox__filters" role="group" aria-label={INBOX.nav}>
-          {VIEWS.map(v => (
-            <button
-              key={v}
-              type="button"
-              className="ally-inbox__tab"
-              aria-pressed={view === v}
-              onClick={() => set("view", v === "all" ? null : v)}
-            >
-              {INBOX.filters[v]}
-            </button>
-          ))}
-        </div>
-        <div className="ally-inbox__selects">
-          <label className="sr-only" htmlFor="inbox-channel">
-            {INBOX.channels.all}
-          </label>
-          <select
-            id="inbox-channel"
-            className="ally-input"
-            value={channel ?? ""}
-            onChange={event => set("channel", event.target.value || null)}
-          >
-            <option value="">{INBOX.channels.all}</option>
-            <option value="whatsapp">{INBOX.channels.whatsapp}</option>
-            <option value="web">{INBOX.channels.web}</option>
-            <option value="widget">{INBOX.channels.widget}</option>
-          </select>
-          {!locked && (
-            <>
-              <label className="sr-only" htmlFor="inbox-assistant">
-                {INBOX.allAssistants}
-              </label>
-              <select
-                id="inbox-assistant"
-                className="ally-input"
-                value={chatbotId ?? ""}
-                onChange={event => set("assistant", event.target.value || null)}
+        <div className="ally-inbox__controls">
+          <div className="ally-inbox__filters" role="group" aria-label={INBOX.nav}>
+            {VIEWS.map(v => (
+              <button
+                key={v}
+                type="button"
+                className="ally-inbox__tab"
+                aria-pressed={view === v}
+                onClick={() => set("view", v === "all" ? null : v)}
               >
-                <option value="">{INBOX.allAssistants}</option>
-                {(bots?.chatbots ?? []).map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
+                {INBOX.filters[v]}
+              </button>
+            ))}
+          </div>
+          <div className="ally-inbox__selects">
+            <label className="sr-only" htmlFor="inbox-channel">
+              {INBOX.channels.all}
+            </label>
+            <select
+              id="inbox-channel"
+              className="ally-input"
+              value={channel ?? ""}
+              onChange={event => set("channel", event.target.value || null)}
+            >
+              <option value="">{INBOX.channels.all}</option>
+              <option value="whatsapp">{INBOX.channels.whatsapp}</option>
+              <option value="web">{INBOX.channels.web}</option>
+              <option value="widget">{INBOX.channels.widget}</option>
+            </select>
+            {!locked && (
+              <>
+                <label className="sr-only" htmlFor="inbox-assistant">
+                  {INBOX.allAssistants}
+                </label>
+                <select
+                  id="inbox-assistant"
+                  className="ally-input"
+                  value={chatbotId ?? ""}
+                  onChange={event => set("assistant", event.target.value || null)}
+                >
+                  <option value="">{INBOX.allAssistants}</option>
+                  {(bots?.chatbots ?? []).map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
         </div>
         {!isLoading && items.length === 0 && (
           <p className="ally-empty">
@@ -178,7 +207,10 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
                 }}
               >
                 <span className="ally-inbox__item-top">
-                  <strong>{item.visitor}</strong>
+                  <span className="ally-inbox__who">
+                    <ChannelIcon chat={item} />
+                    <strong>{item.visitor}</strong>
+                  </span>
                   <span className="ally-small">{ago(item.lastMessageAt)}</span>
                 </span>
                 <span className="ally-small ally-inbox__preview">{item.preview}</span>
@@ -198,7 +230,7 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
                     </span>
                   )}
                   <span className="ally-small">
-                    {item.assistant} · {channelLabel(item)}
+                    {locked ? channelLabel(item) : `${item.assistant} · ${channelLabel(item)}`}
                   </span>
                   {item.unread > 0 && (
                     <span className="ally-inbox__unread" aria-label={`${item.unread} unread`}>
@@ -224,7 +256,10 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
             <ChatView chatbotId={currentBot} id={selected} me={user?.id ?? null} />
           </>
         ) : (
-          <p className="ally-empty">{items.length ? INBOX.pickChat : INBOX.empty}</p>
+          <div className="ally-inbox__nothing">
+            <Orb size={40} />
+            <p className="ally-body">{items.length ? INBOX.pickChat : INBOX.empty}</p>
+          </div>
         )}
       </main>
     </div>

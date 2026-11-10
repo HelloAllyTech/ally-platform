@@ -1475,27 +1475,27 @@ export const en = {
   whatsappBot: {
     navLabel: "AI Chatbots",
     title: "AI Chatbots",
+    // Chunk 20d-2: the list page in the owner's words (deck §25): assistants, not chatbots.
     subtitle:
-      "AI chatbots answer people's questions from the knowledge you give them, on WhatsApp today and more channels later.",
+      "Your assistants answer people's questions from your own pages, on your page, your website and WhatsApp.",
     bots: {
-      listEmpty: "No chatbots yet",
-      listEmptyMember: "You haven't been added to a chatbot yet",
-      listEmptyHint:
-        "Create one, give it instructions and knowledge, preview it, then add a WhatsApp channel and publish.",
-      listEmptyMemberHint: "Ask an Ally admin to add you to the chatbot you work on.",
+      listEmpty: "No assistants yet",
+      listEmptyMember: "You haven't been added to an assistant yet",
+      listEmptyHint: "Give us your website and we'll set one up with you in about ten minutes.",
+      listEmptyMemberHint: "Ask the assistant's owner to add you to its team.",
       create: "New chatbot",
       loadFailed: "Could not load the chatbots.",
       homeTabs: {
-        bots: "Chatbots",
+        bots: "Assistants",
         inbox: "Inbox",
         connectors: "Channels",
         defaults: "Defaults",
         library: "Knowledge library",
       },
-      status: { draft: "Draft", live: "Published", paused: "Paused" },
+      status: { draft: "Not live yet", live: "Live", paused: "Paused" },
       role: { viewer: "Viewer", editor: "Editor", owner: "Owner" },
-      noConnector: "No channel yet",
-      cardMessages: "{count} messages (30 days)",
+      noConnector: "Not on WhatsApp yet",
+      cardMessages: "{count} messages, last 30 days",
       cardPeople: "{count} people",
       cardDocs: "{count} documents",
       back: "All chatbots",

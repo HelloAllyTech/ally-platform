@@ -139,9 +139,11 @@ body {
   white-space: nowrap;
 }
 .bp-header__status {
+  /* #46 (20d-2): two lines before it's cut, so "Answers from …" reads whole. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   margin: 1px 0 0;
   font-size: 13px;
   line-height: 1.35;
@@ -384,9 +386,10 @@ body {
 }
 .bp-composer__box {
   display: flex;
-  align-items: flex-end;
+  /* #45 (20d-2): the send button sits inside the box, centred, never over its rounded corner. */
+  align-items: center;
   gap: 8px;
-  padding: 6px 6px 6px 20px;
+  padding: 5px 6px 5px 20px;
   border-radius: 32px;
   border: 1px solid var(--brand-line);
   background: var(--brand-surface);
@@ -413,8 +416,8 @@ body {
   box-shadow: none;
 }
 .bp-send {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   flex: none;
   border-radius: 999px;
   border: 0;
@@ -557,13 +560,15 @@ body {
 }
 .bp-ask-person {
   display: block;
-  margin: 2px auto 0;
+  /* #47 (20d-2): readable, and right under the box. */
+  margin: 0 auto;
   border: 0;
   background: none;
-  color: var(--brand-muted);
+  color: var(--brand-ink);
   text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
-  font: 400 13px/1 var(--ally-font-ui);
+  font: 500 14px/1 var(--ally-font-ui);
   min-height: 36px;
   padding: 0 8px;
 }

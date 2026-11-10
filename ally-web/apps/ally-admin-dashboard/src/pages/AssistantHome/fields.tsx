@@ -2,14 +2,34 @@ import React, { useEffect, useId, useState } from "react";
 
 import { Button } from "@components/v2";
 
+import { HOME, fill } from "./copy";
+import { HelpToggle } from "./ui/Help";
+import { RemoveButton } from "./ui/List";
+
 import type { HomeField } from "./useHomeField";
 
-/** A section's heading and its one line (copy §20). */
-export const SectionHead: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
+/**
+ * A section's heading, its one line saying what it is (copy §20), and its `?` with a short
+ * explainer (chunk 20d-2). `action` sits on the heading's line (Checkup's Run again).
+ */
+export const SectionHead: React.FC<{
+  title: string;
+  subtitle: string;
+  help?: string;
+  action?: React.ReactNode;
+}> = ({ title, subtitle, help, action }) => (
   <header className="ally-home__section-head">
-    <h2 className="ally-heading" tabIndex={-1} data-section-heading>
-      {title}
-    </h2>
+    <div className="ally-home__section-title">
+      <h2 className="ally-heading" tabIndex={-1} data-section-heading>
+        {title}
+      </h2>
+      {help && (
+        <HelpToggle label={fill(HOME.help.label, { section: title })}>
+          <p className="ally-small">{help}</p>
+        </HelpToggle>
+      )}
+      {action && <div className="ally-home__section-action">{action}</div>}
+    </div>
     <p className="ally-small">{subtitle}</p>
   </header>
 );
@@ -147,19 +167,15 @@ export const LinesField: React.FC<{
             }}
           />
           {!disabled && (
-            <button
-              type="button"
-              className="ally-link"
-              aria-label={`${removeLabel}: ${line || `${label} ${index + 1}`}`}
+            <RemoveButton
+              label={`${removeLabel}: ${line || `${label} ${index + 1}`}`}
               onClick={() =>
                 update(
                   lines.filter((_, n) => n !== index),
                   true,
                 )
               }
-            >
-              {removeLabel}
-            </button>
+            />
           )}
         </div>
       ))}

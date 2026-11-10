@@ -64,7 +64,7 @@ export const HandoverSettingsGroup: React.FC<{
               )
             }
           />{" "}
-          {t.hours}
+          {t.setHours}
         </label>
         {hours && (
           <>

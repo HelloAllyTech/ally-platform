@@ -75,7 +75,7 @@ describe("Scorecard", () => {
   it("says this week in plain words, against last week", () => {
     render(<Scorecard botId="b1" canEdit go={vi.fn()} />);
     expect(screen.getByTestId("scorecard-headline").textContent).toBe(
-      "This week: 142 conversations. 91% answered with a source. 12 questions it didn't know.",
+      "142 conversations. 91% answered with a source. 12 questions it didn't know.",
     );
     expect(screen.getByText("vs 120 last week")).toBeTruthy();
     expect(screen.getByText("vs 85% last week")).toBeTruthy();

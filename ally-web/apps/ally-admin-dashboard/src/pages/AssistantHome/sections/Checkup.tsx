@@ -69,7 +69,11 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
 
   const head = (
     <div className="ally-home__row">
-      <SectionHead title={HOME.sections.checkup} subtitle={HOME.subtitles.checkup} />
+      <SectionHead
+        title={HOME.sections.checkup}
+        subtitle={HOME.subtitles.checkup}
+        help={HOME.help.checkup}
+      />
       {canEdit && (
         <Button onClick={() => void start()} disabled={running || runState.isLoading}>
           {t.runAgain}

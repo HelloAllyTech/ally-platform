@@ -13,7 +13,11 @@ import type { SectionProps } from "./props";
  */
 export const ConversationsSection: React.FC<SectionProps> = ({ bot }) => (
   <>
-    <SectionHead title={HOME.sections.conversations} subtitle={HOME.subtitles.conversations} />
+    <SectionHead
+      title={HOME.sections.conversations}
+      subtitle={HOME.subtitles.conversations}
+      help={HOME.help.conversations}
+    />
     {/* The app bar, the assistant's header and this title sit above the panel: about 260px. */}
     <div style={{ ["--ally-inbox-top" as string]: "260px" }}>
       <Inbox chatbotId={bot.id} />

@@ -76,6 +76,11 @@ const AnswerBox: React.FC<{
  * against last week, the 7-day trend, the questions it didn't know (Answer it) and the answers
  * people weren't happy with (Correct this · It was fine), and the last checkup.
  */
+/** A card's place while its numbers load (chunk 20d-2), so the page doesn't jump. */
+const CardSkeleton: React.FC<{ height: number }> = ({ height }) => (
+  <div className="ally-card ally-home__skeleton-card" style={{ height }} aria-hidden="true" />
+);
+
 /**
  * "Questions it didn't know" (chunk Q2a), each with Answer it. On the Overview and, the same list,
  * in What it knows (chunk 20d-2), so the two never disagree.
@@ -90,7 +95,7 @@ export const UnansweredList: React.FC<{ botId: string; canEdit: boolean; testId?
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  if (!data) return null;
+  if (!data) return <CardSkeleton height={180} />;
   return (
     <Group title={t.unansweredTitle} testId={testId}>
       {data.unanswered.length === 0 ? (
@@ -152,7 +157,16 @@ export const Scorecard: React.FC<{
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  if (!data) return null;
+  if (!data) {
+    // This week, the two lists and the checkup card, at about their final size.
+    return (
+      <>
+        <CardSkeleton height={440} />
+        <CardSkeleton height={180} />
+        <CardSkeleton height={180} />
+      </>
+    );
+  }
 
   const save = async (run: () => Promise<unknown>): Promise<boolean> => {
     setError(null);

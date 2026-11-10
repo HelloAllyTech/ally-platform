@@ -34,7 +34,6 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
   const navigate = useNavigate();
   const qr = useRef<HTMLDivElement>(null);
   const live = bot.status === ChatbotStatus.LIVE;
-  const open = bot.stats.openUnanswered;
 
   const downloadQr = () => {
     const img = qr.current?.querySelector("img");
@@ -47,7 +46,11 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
 
   return (
     <>
-      <SectionHead title={HOME.sections.overview} subtitle={HOME.subtitles.overview} />
+      <SectionHead
+        title={HOME.sections.overview}
+        subtitle={HOME.subtitles.overview}
+        help={HOME.help.overview}
+      />
 
       <Group testId="overview-status">
         <div className="ally-home__row">
@@ -117,17 +120,6 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
         <a className="ally-link ally-small" href={`/chatbots/${bot.id}?view=classic&tab=usage`}>
           {t.seeAllNumbers}
         </a>
-      </Group>
-
-      <Group title={t.needsYou} testId="overview-needs">
-        {open > 0 ? (
-          <div className="ally-home__row">
-            <p className="ally-body">{open === 1 ? t.needsOne : fill(t.needsMany, { n: open })}</p>
-            <Button onClick={() => go("knows")}>{t.review}</Button>
-          </div>
-        ) : (
-          <p className="ally-empty">{t.allClear}</p>
-        )}
       </Group>
 
       {canManage && (

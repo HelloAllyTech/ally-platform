@@ -37,7 +37,11 @@ export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit 
 
   return (
     <>
-      <SectionHead title={HOME.sections.personality} subtitle={HOME.subtitles.personality} />
+      <SectionHead
+        title={HOME.sections.personality}
+        subtitle={HOME.subtitles.personality}
+        help={HOME.help.personality}
+      />
 
       <Group testId="personality-voice">
         <TextField

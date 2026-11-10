@@ -257,7 +257,11 @@ export const PageSection: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
   const on = status.value === "on";
   return (
     <>
-      <SectionHead title={HOME.sections.page} subtitle={HOME.subtitles.page} />
+      <SectionHead
+        title={HOME.sections.page}
+        subtitle={HOME.subtitles.page}
+        help={HOME.help.page}
+      />
 
       <Group testId="page-status">
         <div className="ally-home__row">

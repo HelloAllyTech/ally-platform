@@ -55,7 +55,11 @@ export const ShareSection: React.FC<SectionProps> = ({ bot, home, canEdit, canMa
 
   return (
     <>
-      <SectionHead title={HOME.sections.share} subtitle={HOME.subtitles.share} />
+      <SectionHead
+        title={HOME.sections.share}
+        subtitle={HOME.subtitles.share}
+        help={HOME.help.share}
+      />
 
       <Group title={t.onPage} hint={t.onPageHint} testId="share-page">
         <fieldset className="ally-home__choices" disabled={!canEdit}>

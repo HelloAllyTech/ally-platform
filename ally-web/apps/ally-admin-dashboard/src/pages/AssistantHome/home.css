@@ -660,3 +660,245 @@
   justify-content: space-between;
   gap: 12px;
 }
+
+/* ── Chunk 20d-2: one header line, the `···` menu, the `?`, skeletons, the phone section list ── */
+.ally-home__title-row {
+  align-items: center;
+  row-gap: 10px;
+}
+.ally-home__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+.ally-home__actions {
+  align-items: center;
+  gap: 8px;
+}
+.ally-more {
+  position: relative;
+}
+.ally-more__button {
+  width: 44px;
+  padding: 0;
+}
+.ally-more__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  box-shadow: 0 12px 30px rgba(23, 23, 28, 0.12);
+}
+.ally-more__menu :is(a, button) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--ally-radius-sm);
+  background: none;
+  color: var(--ally-ink);
+  font: 400 15px/1.3 var(--ally-font-ui);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ally-more__menu :is(a, button):is(:hover, :focus-visible) {
+  background: var(--ally-sunken);
+  outline: none;
+}
+/* Open page has its own button on a wide screen; the menu holds it on a phone. */
+.ally-more__phone,
+.ally-more--phone {
+  display: none;
+}
+
+.ally-home__section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ally-home__section-action {
+  margin-left: auto;
+}
+.ally-help {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ally-line-strong);
+  border-radius: 999px;
+  background: var(--ally-surface);
+  color: var(--ally-muted);
+  font: 600 14px/1 var(--ally-font-ui);
+  cursor: pointer;
+}
+.ally-help[aria-expanded="true"],
+.ally-help:hover {
+  color: var(--ally-ink);
+  border-color: var(--ally-ink-2);
+}
+.ally-help:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--ally-accent-soft);
+  border-color: var(--ally-accent);
+}
+.ally-help__body {
+  flex-basis: 100%;
+  max-width: 620px;
+  padding: 10px 14px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+  border: 1px solid var(--ally-line);
+}
+.ally-help__body p {
+  margin: 0;
+}
+
+.ally-home--loading .ally-home__top--skeleton {
+  height: 92px;
+}
+.ally-skeleton--title {
+  width: 260px;
+  height: 34px;
+  margin-top: 30px;
+}
+.ally-skeleton--nav {
+  display: block;
+  height: 320px;
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-sunken);
+}
+.ally-skeleton--card {
+  width: 100%;
+  max-width: 760px;
+  height: 420px;
+  border-radius: var(--ally-radius-lg);
+}
+
+/* Sources: the count sits by its action, not floating mid-row. */
+.ally-home__sources li,
+.ally-home__source {
+  align-items: center;
+}
+
+@media (max-width: 959px) {
+  .ally-home__open-page {
+    display: none;
+  }
+  .ally-more--phone {
+    display: block;
+  }
+  .ally-more__phone {
+    display: list-item;
+  }
+  .ally-home__actions {
+    flex-wrap: nowrap;
+  }
+  .ally-home__actions > .ally-btn {
+    flex: 1 1 auto;
+  }
+  /* The section chips scroll sideways; a fade says there's more. */
+  .ally-home__nav {
+    position: relative;
+    min-height: 44px;
+  }
+  .ally-home__nav::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 4px;
+    width: 32px;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--ally-bg));
+  }
+  .ally-skeleton--nav {
+    height: 44px;
+  }
+}
+/* #20: the page's name takes the room; its count sits beside its action. */
+[data-testid="knows-sources"] .ally-home__docs li > a {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+[data-testid="knows-sources"] .ally-home__docs li .ally-btn {
+  min-height: 36px;
+}
+.ally-home__skeleton-card {
+  background: var(--ally-surface-2);
+}
+
+/* #6: on a phone, Try it is the chat itself in the sheet, not a phone drawn inside a phone. */
+@media (max-width: 959px) {
+  .ally-sheet--bottom .ally-home__try .ally-phone {
+    width: 100%;
+    height: min(72vh, 640px);
+    padding: 0;
+    border-radius: var(--ally-radius-md);
+    background: none;
+    box-shadow: none;
+    border: 1px solid var(--ally-line);
+  }
+  .ally-sheet--bottom .ally-home__try .ally-phone__screen {
+    border-radius: var(--ally-radius-md);
+  }
+}
+
+/* #11: Look and feel sits in a card like every other group, on the same heading scale. */
+.ally-home__look {
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-lg);
+  padding: 20px;
+}
+.ally-home__look .ally-look__head .ally-heading {
+  /* Its own inline size is for the classic Settings tab. */
+  font: 600 18px/1.3 var(--ally-font-ui) !important;
+}
+.ally-home__look h3.ally-heading {
+  font: 600 15px/1.3 var(--ally-font-ui);
+}
+/* The header already says "Changes save as you go" and "Saved" (#4). */
+.ally-home__look .ally-look__head > .ally-small {
+  display: none;
+}
+
+/* #42, #44: the native checkboxes and radios left in Share, on the v2 look. */
+.ally-home :is(input[type="checkbox"], input[type="radio"]) {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ally-accent);
+  vertical-align: -3px;
+}
+.ally-home label:has(> input[type="checkbox"]),
+.ally-home label:has(> input[type="radio"]) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+/* Team rows: the role and Remove stay together on one line. */
+.ally-list__actions:has(.ally-input--compact) {
+  flex-wrap: nowrap;
+}
+.ally-list__actions .ally-input--compact {
+  min-width: 0;
+  max-width: 260px;
+}
+/* The inbox uses the whole width: it's two columns of its own. */
+.ally-home[data-section="conversations"] .ally-home__main {
+  max-width: none;
+}
+.ally-home[data-section="conversations"] .ally-inbox__head {
+  justify-content: flex-end;
+}

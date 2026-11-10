@@ -145,6 +145,7 @@ export const HOME = {
     replyWithin: "They usually reply within",
     hours: "Opening hours (optional)",
     hoursHint: "Without opening hours, visitors are always told when you usually reply.",
+    setHours: "Set opening hours",
     days: "Days",
     dayNames: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     from: "From",
@@ -156,8 +157,9 @@ export const HOME = {
   /** The live scorecard on the Overview (copy §21, chunk Q2a). */
   scorecard: {
     thisWeek: "This week",
+    // Under the "This week" title, so the sentence doesn't say it again (chunk 20d-2).
     headline:
-      "This week: {conversations} conversations. {answered_pct} answered with a source. {unknown} questions it didn't know.",
+      "{conversations} conversations. {answered_pct} answered with a source. {unknown} questions it didn't know.",
     labels: {
       conversations: "Conversations",
       answered: "Answered with a source",
@@ -379,6 +381,31 @@ export const HOME = {
       ownEmpty: "No quick replies of your own yet.",
       yours: "Yours",
     },
+  },
+  /** Each section's `?` (chunk 20d-2, deck §25). */
+  help: {
+    label: "What is {section}?",
+    overview:
+      "How many people your assistant talked to, how often it answered from your information, and the questions it couldn't answer yet. Answer those and it learns them.",
+    knows:
+      "Your assistant only answers from what's here: the pages it read, your notes and your documents. If something is wrong, correct it here and the next answer uses your words.",
+    personality: "How your assistant sounds. It never changes what it knows or its safety rules.",
+    safety:
+      "Ally's safety rules for your kind of practice are always on. You can add rules of your own and topics it should never talk about. You can't turn Ally's rules off.",
+    how: "Everything your assistant follows, in the order it applies. The parts marked as yours can be edited here.",
+    page: "Your page is where people chat with your assistant. Choose how it looks and what it asks first.",
+    checkup:
+      "A checkup asks your assistant the questions customers would ask, then checks each answer against your own pages.",
+    conversations:
+      "Every chat from your page, your website and WhatsApp. Take one over to reply yourself; your assistant waits in that chat until you hand it back.",
+    share:
+      "Who can use your assistant on your page, on your website and on WhatsApp, and who on your team can change it.",
+  },
+  /** The header's `···` menu (chunk 20d-2). */
+  more: {
+    more: "More",
+    classic: "Classic view",
+    engine: "How it answers",
   },
 } as const;
 
