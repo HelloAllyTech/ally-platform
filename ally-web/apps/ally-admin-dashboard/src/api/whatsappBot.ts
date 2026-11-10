@@ -3,14 +3,11 @@ import {
   CreateKbDocumentRequest,
   CreateKbUploadUrlRequest,
   CreateKbUploadUrlResponse,
-  GetKbChunksResponse,
   KbCorpus,
   KbChunk,
   GetKbDocumentsParams,
   GetKbDocumentsResponse,
   KbDocument,
-  KbSearchRequest,
-  KbSearchResponse,
   KbStats,
   ReplaceKbDocumentContentRequest,
   BulkWaPhoneMappingsRequest,
@@ -71,21 +68,16 @@ type BotRowArg = string | ({ id: string } & WithBot);
 const botRow = (arg: BotRowArg) => (typeof arg === "string" ? { id: arg } : arg);
 
 /**
- * WhatsApp Q&A bot admin endpoints, plus the shared knowledge-corpus ones.
+ * WhatsApp Q&A bot admin endpoints, including its knowledge-corpus documents.
  *
- * The corpus endpoints are NOT WhatsApp-specific — they take a `corpus` and serve the Debrief
- * guidance too. They live here because the WhatsApp bot was their first consumer and moving them
- * would churn every import for no behavioural gain. The DATA layer is shared deliberately; the
- * SCREENS are not, and should not be: one is a bot's reference library and the other is a
- * debrief's guidance, and a single UI trying to be both would serve neither.
+ * The corpus endpoints take a `corpus`, but the WhatsApp Q&A corpus is the only one left: the
+ * character corpus, the Ally guide's library and Debrief's guidance moved into the Context Library
+ * (docs/context-library/PLAN.md).
  *
  * Injected onto `baseAPI` rather than creating a new api, so no store change is needed. Every tag
  * used here is also registered in baseApi.ts's `tagTypes` — an unregistered tag is silently ignored
  * by RTK Query and the invalidation never fires, which is the documented scar in that file.
  *
- * The document tag is shared across corpora, so a Debrief-guidance write also refetches the
- * WhatsApp list. Deliberate: one wasted request beats registering a second tag and discovering
- * months later that a typo made its invalidation a no-op.
  */
 const whatsappBotAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
@@ -270,7 +262,6 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [
         TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
-        TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
         TAG_TYPES.WHATSAPP_BOT_STATS,
         TAG_TYPES.CHATBOT_DETAIL,
       ],
@@ -285,7 +276,6 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [
         TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
-        TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
         TAG_TYPES.WHATSAPP_BOT_STATS,
         TAG_TYPES.CHATBOT_DETAIL,
       ],
@@ -319,28 +309,6 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
         TAG_TYPES.WHATSAPP_BOT_STATS,
         TAG_TYPES.CHATBOT_DETAIL,
       ],
-    }),
-
-    /** A document's chunks — literally what the bot can see. */
-    getKbDocumentChunks: builder.query<
-      GetKbChunksResponse,
-      { id: string; limit?: number; offset?: number }
-    >({
-      query: ({ id, limit, offset }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_CHUNKS(id),
-        method: HttpMethod.GET,
-        params: { limit: limit ?? 50, offset: offset ?? 0 },
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS],
-    }),
-
-    /** Retrieval preview — no LLM call, so thresholds can be tuned without generation cost. */
-    searchKbCorpus: builder.mutation<KbSearchResponse, KbSearchRequest>({
-      query: body => ({
-        url: ApiEndpoints.WHATSAPP_BOT.SEARCH,
-        method: HttpMethod.POST,
-        body,
-      }),
     }),
 
     // ---- Keyword templates ----
@@ -790,8 +758,6 @@ export const {
   useReindexKbDocumentMutation,
   useArchiveKbDocumentMutation,
   useUnarchiveKbDocumentMutation,
-  useGetKbDocumentChunksQuery,
-  useSearchKbCorpusMutation,
   useGetWaTemplatesQuery,
   useCreateWaTemplateMutation,
   useUpdateWaTemplateMutation,

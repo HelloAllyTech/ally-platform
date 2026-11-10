@@ -212,7 +212,7 @@ ansible-playbook -i inventories/development/hosts.yml <playbook>.yml
 | `ally-ai-learn/` | LiveKit voice-training agent (LangGraph) | 8002 (Docker) |
 | `ally-mobile/`, `ally-mobile-flutter/` | Counselor apps | none |
 | `infra/` | Separate repo, gitignored here; `./infra/dev_env.sh` starts the local stack | none |
-| `docs/` | Cross-repo docs, including `docs/agents-v2/` | none |
+| `docs/` | Cross-repo docs, including `docs/agents-v2/` and `docs/context-library/` (plan and build notes) | none |
 
 Each app directory has its own `CLAUDE.md` (mirrored with `AGENTS.md`). Read it before working there.
 

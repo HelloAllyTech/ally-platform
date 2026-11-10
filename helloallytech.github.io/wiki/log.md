@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-10] update | `repos/ally-be.md`, `repos/ally-ai.md`: the Context Library's dead-code sweep; the Knowledge Base now serves only the WhatsApp Q&A corpus.
+
+The last pieces the moved systems left behind are gone: the Knowledge Base columns only the retired corpora used (dropped by migration, after a check that every Ally guide passage has its copy), the admin retrieval preview (ally-be's `POST /v1/knowledge-base/search` and ally-ai's `POST /knowledge-chunks/search`) and the chunk-list route, none of which had a screen left, and the two curator prompts the agent-chunk curator replaced. The WhatsApp bot's Test tab remains the way to see what it retrieves. The docs maps now watch the Context Library's MCP controller and ally-ai's on-demand collection schema.
+
 ## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-web.md`, `contributing/dev-setup.md`, `contributing/planning-with-context-library.md`: Course Copilot moved onto the Context Library; Stacks removed; Test connection added.
 
 Course Copilot's design guidance reads the new Learning Design collection and `search_library` the new Content Catalogue, which mirrors active Studio roleplays, cases, characters and component templates (a subscriber on those tables plus a nightly reconciliation) and rechecks every hit against who may open it. Roadmap Copilot stays on First Principles. The third-party Stacks client and its config keys are deleted. The Connect Claude Code sheet now has **Test connection** for a newly created key, and both contributing pages (and every repo's `context-library` skill) say so again. Agent-cited codes render as chips in Course Copilot as they do in Builder.

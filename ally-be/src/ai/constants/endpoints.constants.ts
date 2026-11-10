@@ -48,7 +48,6 @@ export const ENDPOINTS = {
   // on the search call, but it scopes WITHIN a corpus, which is a ranking concern rather than a
   // correctness one.
   KNOWLEDGE_CHUNK_BULK_UPSERT: 'api/v1/knowledge-chunks/bulk-upsert',
-  KNOWLEDGE_CHUNK_SEARCH: 'api/v1/knowledge-chunks/search',
   KNOWLEDGE_CHUNK_DELETE_BY_DOCUMENT: 'api/v1/knowledge-chunks/document',
   KNOWLEDGE_CHUNK_IDS: 'api/v1/knowledge-chunks/ids',
   // Also `.../document`, like the delete above: the document id and `/audience` are

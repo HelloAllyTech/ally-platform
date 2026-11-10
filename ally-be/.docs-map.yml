@@ -115,6 +115,16 @@ rules:
       person to change the tools, and an out-of-date description there sends the next change to
       the wrong place.
 
+  - id: context-library-mcp
+    watch:
+      - "src/context-library/controller/context-library-mcp.controller.ts"
+    requires: wiki:contributing/planning-with-context-library.md
+    why: >
+      Engineers' Claude Code reaches the Context Library only through this MCP server, and the
+      wiki page is where its tools, the prompt, the key and the setup are written down. Every
+      repo's `context-library` skill and CLAUDE.md point there, so a changed tool that skips it
+      teaches every agent the old one.
+
   - id: agent-entrypoints-in-sync
     watch:
       - "AGENTS.md"

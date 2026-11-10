@@ -46,7 +46,6 @@ describe("KnowledgeBaseService — a chatbot's own documents", () => {
       { s3: { assetsBucket: BUCKET } } as any,
       {} as any,
       {} as any,
-      {} as any,
     );
     jest.spyOn(service, 'get').mockResolvedValue({ id: 'doc' } as any);
   });
@@ -67,7 +66,6 @@ describe("KnowledgeBaseService — a chatbot's own documents", () => {
           corpus: KbCorpus.WHATSAPP_QA,
           title: 'Clinic FAQ',
           isGlobal: false,
-          ownerTenantId: null,
           ownerChatbotId: BOT,
         }),
       );

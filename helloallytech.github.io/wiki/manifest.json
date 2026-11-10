@@ -127,7 +127,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 13222,
+      "words": 13335,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -544,8 +544,8 @@
         "weaviate",
         "python"
       ],
-      "last_reconciled": "2026-11-09",
-      "words": 4177,
+      "last_reconciled": "2026-11-10",
+      "words": 4200,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
       "skip_reason": ""
     },
@@ -578,8 +578,8 @@
         "nestjs",
         "api"
       ],
-      "last_reconciled": "2026-11-09",
-      "words": 5261,
+      "last_reconciled": "2026-11-10",
+      "words": 5289,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-be.md",
       "skip_reason": ""
     },

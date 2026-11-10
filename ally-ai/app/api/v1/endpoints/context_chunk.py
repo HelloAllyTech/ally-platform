@@ -228,7 +228,7 @@ async def embed_texts(
 ):
     """
     Embed texts with the index's own model, for ally-be's platitude and duplicate
-    checks. 502 when the embedding provider fails, as /knowledge-chunks/search does.
+    checks. 502 when the embedding provider fails.
     """
     try:
         result = await service.embed(list(payload.texts))

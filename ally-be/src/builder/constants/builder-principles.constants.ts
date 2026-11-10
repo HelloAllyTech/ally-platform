@@ -36,8 +36,6 @@ export const BUILDER_PRINCIPLE_TOOLS: ContextToolNames = {
   ],
 };
 
-/** Cards in the interview's context at once (brief + section focus + lookups). */
-export const BUILDER_PRINCIPLES_BUDGET = 25;
 /** Cards in the session-start guiding brief. */
 export const BUILDER_PRINCIPLES_BRIEF_CARDS = 15;
 /** The areas the guiding brief plans searches across. */

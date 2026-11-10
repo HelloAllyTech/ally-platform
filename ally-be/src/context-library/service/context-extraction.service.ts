@@ -8,6 +8,7 @@ import {
   CL_DEDUPE_ADJUDICATE_SIMILARITY,
   CL_DEDUPE_MERGE_SIMILARITY,
   CL_DEDUPE_NEIGHBOURS,
+  CL_OVERVIEW_MAX_WORDS,
   CL_OVERVIEW_MIN_SEGMENTS,
   CL_PLATITUDE_SIMILARITY,
   CL_LEARNED_PLATITUDES_MAX,
@@ -219,7 +220,7 @@ export class ContextExtractionService {
       await this.recordSpend(source.id, spend);
       const overview = String(value?.overview ?? '')
         .split(/\s+/)
-        .slice(0, 150)
+        .slice(0, CL_OVERVIEW_MAX_WORDS)
         .join(' ')
         .trim();
       await this.sources.update(source.id, {

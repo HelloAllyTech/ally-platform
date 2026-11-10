@@ -177,7 +177,6 @@ export class KbDocumentRepository extends Repository<KbDocument> {
         'doc.chunkCount',
         'doc.indexedChunkCount',
         'doc.isGlobal',
-        'doc.ownerTenantId',
         'doc.contentHash',
         'doc.chunkVersion',
         'doc.archivedAt',

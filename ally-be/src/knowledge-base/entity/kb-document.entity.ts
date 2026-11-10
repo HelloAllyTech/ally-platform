@@ -35,12 +35,8 @@ import {
  * so the warning is answered structurally instead: ally-ai's retrieval takes a REQUIRED
  * audience argument, and this platform refuses to answer a WhatsApp contact whose
  * organisation it could not resolve rather than falling back to something plausible.
- *
- * The Ally guide's library added OWNERSHIP beside audience — `ownerTenantId`, see there —
- * until it moved to the Context Library (phase 6), where organisation-owned entries live now.
  */
 @Entity('kb_documents')
-@Index('idx_kb_documents_corpus_owner', ['corpus', 'ownerTenantId'])
 @Index('idx_kb_documents_corpus_owner_chatbot', ['corpus', 'ownerChatbotId'])
 export class KbDocument extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -127,23 +123,9 @@ export class KbDocument extends BaseWithoutTenantEntity {
   isGlobal!: boolean;
 
   /**
-   * The organisation a document of the Ally guide's library BELONGED to (null: the platform's
-   * own). Ownership, not audience: who could MANAGE it, where `isGlobal` + `kb_document_tenants`
-   * say who could RETRIEVE it.
-   *
-   * Written by nothing since phase 6, when the library moved to the Context Library and its
-   * passages were copied there with this owner as `cl_chunks.owner_tenant_id`. Kept until a
-   * platform admin retires the old corpus, whose rows still carry it; always null on WhatsApp
-   * Q&A documents. A uuid, like `kb_document_tenants.tenant_id`, so the two compare without a
-   * cast.
-   */
-  @Column({ type: 'uuid', name: 'owner_tenant_id', nullable: true })
-  ownerTenantId?: string | null;
-
-  /**
    * The chatbot this document belongs to, when it was uploaded on that chatbot's Knowledge tab
-   * (`whatsapp_qa` only, chunk 3d). Null is a shared library document. Like `ownerTenantId`, it
-   * says who may SEE and MANAGE the document: the library and every other bot's picker leave it
+   * (`whatsapp_qa` only, chunk 3d). Null is a shared library document. Ownership, not audience:
+   * it says who may SEE and MANAGE the document: the library and every other bot's picker leave it
    * out, and only its chatbot's editors change it. What a bot answers from is still
    * `chatbot_documents`, where an owned document is attached when it is created.
    */

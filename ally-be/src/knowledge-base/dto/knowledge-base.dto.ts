@@ -365,13 +365,6 @@ export class KbDocumentResponseDto {
       'document as restricted.',
   })
   tenantIds!: string[];
-  @ApiProperty({
-    nullable: true,
-    description:
-      "The organisation that owned it, on the Ally guide's library (moved to the Context " +
-      'Library in phase 6). Null for every WhatsApp Q&A document.',
-  })
-  ownerTenantId!: string | null;
   @ApiProperty() isArchived!: boolean;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
@@ -387,95 +380,6 @@ export class GetKbDocumentsResponseDto {
   @ApiProperty({ type: [KbDocumentResponseDto] })
   documents!: KbDocumentResponseDto[];
   @ApiProperty() count!: number;
-}
-
-export class KbChunkResponseDto {
-  @ApiProperty() id!: string;
-  @ApiProperty() chunkIndex!: number;
-  @ApiProperty() text!: string;
-  @ApiProperty() charStart!: number;
-  @ApiProperty() charEnd!: number;
-  @ApiProperty({ description: '0 when the format has no pages' })
-  pageFrom!: number;
-  @ApiProperty() pageTo!: number;
-  @ApiProperty({ nullable: true }) sectionPath!: string | null;
-  @ApiProperty() tokenCount!: number;
-  @ApiProperty() uploadStatus!: string;
-  @ApiProperty({ nullable: true }) uploadError!: string | null;
-}
-
-export class GetKbChunksResponseDto {
-  @ApiProperty({ type: [KbChunkResponseDto] }) chunks!: KbChunkResponseDto[];
-  @ApiProperty() count!: number;
-}
-
-export class KbSearchDto {
-  @ApiPropertyOptional({
-    enum: KbCorpus,
-    default: KbCorpus.WHATSAPP_QA,
-    description:
-      "Which corpus to search. Resolves to that corpus's own Weaviate " +
-      'collection, so there is no "all corpora" search and no filter that could ' +
-      'be left unset — a search can only ever return passages from one corpus.\n\n' +
-      'Defaulted for the deploy window; see CreateKbDocumentDto.corpus.',
-  })
-  @IsOptional()
-  @IsEnum(KbCorpus)
-  corpus: KbCorpus = KbCorpus.WHATSAPP_QA;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  query!: string;
-
-  @ApiPropertyOptional({ default: 8 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
-  limit?: number;
-
-  @ApiPropertyOptional({
-    default: 0.35,
-    description:
-      'Cosine similarity floor. Exposed so an admin can tune retrieval live.',
-  })
-  @IsOptional()
-  @Type(() => Number)
-  minSimilarity?: number;
-
-  @ApiPropertyOptional({
-    description:
-      'Retrieve as a worker from this organisation would — the documents targeted at it ' +
-      'plus the ones available to everyone. This is WHO is asking, which is a different ' +
-      'scope from `corpus` (WHICH documents exist): a corpus is one of a few fixed sets ' +
-      'and gets its own collection, an organisation is one of hundreds sharing the same ' +
-      'documents and gets a filter.\n\nOmitted, the search ignores targeting entirely — ' +
-      'right for a console whose job is to show what is indexed, and not what any worker ' +
-      'receives.',
-  })
-  @IsOptional()
-  @IsUUID('4')
-  tenantId?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Narrow to documents carrying ANY of these tags — same overlap semantics as ' +
-      'the corpus list filter. Topical metadata about the material (e.g. "dementia", ' +
-      '"adolescent"), resolved to document ids in Postgres the way `corpus` is.\n\n' +
-      "Deliberately NOT a map of an agent's questions to tags. An agent's " +
-      'questions live in a prompt that changes without a migration, so tags keyed to ' +
-      'them would go quietly stale; and hand-partitioning mostly costs recall, ' +
-      'excluding the passage that was relevant in a way nobody anticipated. ' +
-      'Which tags to ask for is a decision for the caller — a prompt change, not ' +
-      'a schema change.',
-    type: [String],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
 }
 
 /**

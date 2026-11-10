@@ -171,38 +171,10 @@ export interface KbChunk {
   uploadError: string | null;
 }
 
-export interface GetKbChunksResponse {
-  chunks: KbChunk[];
-  count: number;
-}
-
 export interface KbStats {
   byStatus: Record<string, number>;
   totalChunks: number;
   indexedChunks: number;
-}
-
-export interface KbSearchRequest {
-  corpus?: KbCorpus;
-  query: string;
-  limit?: number;
-  minSimilarity?: number;
-}
-
-export interface KbPassage {
-  chunk_id: string;
-  document_id: string;
-  document_title: string;
-  chunk_index: number;
-  text: string;
-  page_from: number;
-  page_to: number;
-  section_path: string;
-  similarity: number;
-}
-
-export interface KbSearchResponse {
-  passages: KbPassage[];
 }
 
 // ── Keyword templates ────────────────────────────────────────────────────────

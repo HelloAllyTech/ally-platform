@@ -1173,7 +1173,7 @@ export const en = {
     floorHelp:
       "The floor decides which passages reach the agent at all. This is what each candidate would have kept and discarded over the judged passages in this window.",
     floorCaveat:
-      "Every passage here already cleared the floor in force when it was retrieved, so this measures precision and estimates what a HIGHER floor would have lost. What a lower floor would have found is not recorded — re-run the query in the corpus panel's retrieval preview to see that.",
+      "Every passage here already cleared the floor in force when it was retrieved, so this measures precision and estimates what a HIGHER floor would have lost. What a lower floor would have found is not recorded.",
     floor: "Floor",
     kept: "Kept",
     relevant: "Relevant",

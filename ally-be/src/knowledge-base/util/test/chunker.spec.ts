@@ -376,8 +376,8 @@ describe('per-corpus chunk profiles', () => {
   it('overlaps neighbours in every profile, so a straddling thought survives', () => {
     const chunks = chunkDocument(doc({ text: longProse(40) }), larger);
     expect(chunks.length).toBeGreaterThan(1);
-    // Adjacent chunks share characters — which is exactly why retrieval has to drop
-    // span-overlapping neighbours (see util/retrieval.ts).
+    // Adjacent chunks share characters, so two neighbours can both be retrieved for one
+    // thought.
     expect(chunks[1].charStart).toBeLessThan(chunks[0].charEnd);
   });
 });

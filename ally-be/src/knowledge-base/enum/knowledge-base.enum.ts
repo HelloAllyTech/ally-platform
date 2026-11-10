@@ -134,7 +134,11 @@ export enum KbChunkUploadStatus {
  * Segment every retrieval trend by `consumer` before believing it.
  */
 export enum KbRetrievalConsumer {
-  /** The admin retrieval preview — POST /knowledge-base/search. */
+  /**
+   * The admin retrieval preview, `POST /knowledge-base/search`. No longer written: its last screen
+   * left with the character corpus (phase 4) and the route went in the phase 8 sweep. WhatsApp
+   * admins preview through the bot's own Test tab. Kept because older rows carry it.
+   */
   ADMIN_PREVIEW = 'admin_preview',
   /**
    * The WhatsApp Q&A bot, reported by ally-ai rather than written here.
@@ -190,13 +194,15 @@ export enum KbRetrievalDisposition {
  * Every candidate the vector search returned is recorded, not only the ones that survived,
  * because the dropped ones carry most of the diagnostic value: a corpus where shaping is
  * constantly discarding near-duplicates is a corpus whose chunk profile is wrong, and that is
- * invisible if only the survivors are stored.
+ * invisible if only the survivors are stored. The `dropped_*` values came from the admin
+ * retrieval preview's shaping (removed in the phase 8 sweep) and remain on its older rows; the
+ * WhatsApp bot reports what it returned.
  */
 export enum KbRetrievalOutcome {
   RETURNED = 'returned',
   /** Overlapped the character span of a higher-ranked passage from the same document. */
   DROPPED_SPAN_OVERLAP = 'dropped_span_overlap',
-  /** Its document had already contributed KB_MAX_PASSAGES_PER_DOCUMENT passages. */
+  /** Its document had already contributed its cap of passages (three). */
   DROPPED_DOCUMENT_CAP = 'dropped_document_cap',
   /** Ranked below the limit once the survivors above it were counted. */
   DROPPED_OVER_LIMIT = 'dropped_over_limit',

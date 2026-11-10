@@ -11,7 +11,6 @@ import { In, Repository } from 'typeorm';
 import { Tenant } from 'src/tenant/entity/tenant.entity';
 import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
 import { AiService } from 'src/ai/service/ai.service';
-import { KnowledgeAudienceRequest } from 'src/ai/dto/knowledge.dto';
 import { S3Service } from 'src/aws/service/s3.service';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { AppConfigService } from 'src/config/config.service';
@@ -20,8 +19,6 @@ import { ConfigurationException } from 'src/exception/configuration.exception';
 import {
   KB_DOCUMENT_S3_PREFIX,
   KB_MAX_FILE_SIZE_BYTES,
-  KB_MAX_PASSAGES_PER_DOCUMENT,
-  KB_MIN_SIMILARITY_DEFAULT,
   RETIRED_KB_CORPORA,
 } from '../constants/knowledge-base.constants';
 import {
@@ -31,7 +28,6 @@ import {
   GetKbDocumentsQueryDto,
   GetKbStatsQueryDto,
   KbDocumentResponseDto,
-  KbSearchDto,
   ReplaceKbDocumentContentDto,
   UpdateKbDocumentAudienceDto,
   UpdateKbDocumentDto,
@@ -41,20 +37,7 @@ import {
   KbCorpus,
   KbDocumentSourceType,
   KbDocumentStatus,
-  KbRetrievalConsumer,
-  KbRetrievalPass,
 } from '../enum/knowledge-base.enum';
-
-/**
- * Who is retrieving, and on whose behalf. Not part of the DTO because none of it comes from
- * the request body — the consumer is decided by which code path called, and letting a client
- * assert it would let the admin preview file its experiments as agent traffic.
- */
-export interface RetrievalContext {
-  consumer?: KbRetrievalConsumer;
-  sessionId?: string | null;
-  userId?: number | null;
-}
 
 /** The source fields every document is created from, whichever route created it. */
 type KbDocumentSource = Pick<
@@ -75,11 +58,6 @@ import { KbDocumentChunkRepository } from '../repository/kb-document-chunk.repos
 import { KbDocumentTenantRepository } from '../repository/kb-document-tenant.repository';
 import { KbDocumentRepository } from '../repository/kb-document.repository';
 import { KbIngestService } from './kb-ingest.service';
-import { shapeWithDecisions } from '../util/retrieval';
-import {
-  KbRetrievalRepository,
-  RetrievalPassageRecord,
-} from '../repository/kb-retrieval.repository';
 
 /** MIME types accepted for an uploaded corpus document, mapped to their source type. */
 const UPLOAD_CONTENT_TYPES: Record<string, KbDocumentSourceType> = {
@@ -103,7 +81,6 @@ export class KnowledgeBaseService {
     private readonly aiService: AiService,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
-    private readonly retrievalRepository: KbRetrievalRepository,
     // The Tenant entity's plain repository rather than TenantsRepository: this needs one
     // existence check, and importing the tenant module for it would couple two modules that
     // otherwise share nothing (and this codebase has a live circular-import DI trap).
@@ -190,7 +167,6 @@ export class KnowledgeBaseService {
       // isGlobal is true, and returning them would invite a UI that renders a document
       // available to everyone as if it were restricted to three organisations.
       tenantIds: entity.isGlobal ? [] : tenantIds,
-      ownerTenantId: entity.ownerTenantId ?? null,
       isArchived: entity.archivedAt != null,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
@@ -311,7 +287,7 @@ export class KnowledgeBaseService {
       userId,
       dto,
       { corpus: dto.corpus },
-      { isGlobal, tenantIds, ownerTenantId: null },
+      { isGlobal, tenantIds },
     );
   }
 
@@ -326,7 +302,6 @@ export class KnowledgeBaseService {
     audience: {
       isGlobal: boolean;
       tenantIds: string[];
-      ownerTenantId: string | null;
       /** The chatbot the document belongs to (chunk 3d); absent for every other document. */
       ownerChatbotId?: string;
     },
@@ -347,7 +322,6 @@ export class KnowledgeBaseService {
       language: dto.language ?? null,
       tags: dto.tags ?? [],
       isGlobal,
-      ownerTenantId: audience.ownerTenantId,
       ownerChatbotId: audience.ownerChatbotId ?? null,
       // Pasted text is stored up front so the row is self-sufficient; the extractor still runs over
       // it to derive sections, and every other source type fills this in during ingest.
@@ -730,35 +704,6 @@ export class KnowledgeBaseService {
     );
   }
 
-  /** A document's chunks — literally what the bot can see. */
-  async listChunks(
-    id: string,
-    options: { limit?: number; offset?: number } = {},
-  ) {
-    const document = await this.findOrFail(id);
-    const { chunks, count } = await this.chunkRepository.listForDocument(
-      id,
-      document.chunkVersion,
-      options,
-    );
-    return {
-      chunks: chunks.map((chunk) => ({
-        id: chunk.id,
-        chunkIndex: chunk.chunkIndex,
-        text: chunk.text,
-        charStart: chunk.charStart,
-        charEnd: chunk.charEnd,
-        pageFrom: chunk.pageFrom,
-        pageTo: chunk.pageTo,
-        sectionPath: chunk.sectionPath ?? null,
-        tokenCount: chunk.tokenCount,
-        uploadStatus: chunk.uploadStatus,
-        uploadError: chunk.uploadError ?? null,
-      })),
-      count,
-    };
-  }
-
   /** Resolve one chunk — how the conversation log turns a citation into real text. */
   async getChunk(chunkId: string) {
     const chunk = await this.chunkRepository.findOne({
@@ -782,117 +727,6 @@ export class KnowledgeBaseService {
       pageTo: chunk.pageTo,
       sectionPath: chunk.sectionPath ?? null,
     };
-  }
-
-  /**
-   * The unrestricted retrieval path — the admin retrieval preview. The WhatsApp answering
-   * agent retrieves inside ally-ai with the same scope rules, for the contact's organisation.
-   * (Searches for a learner — the Ally guide's library, Debrief's guidance — moved to the
-   * Context Library, whose use cases carry the asker's audience.)
-   *
-   * Two things happen that a bare vector search does not do:
-   *
-   * 1. Scope becomes the query. `retrievableIds` resolves ONE corpus's indexed, unarchived
-   *    document ids in Postgres and they travel as ally-ai's `document_ids`. There is no
-   *    "search everything" branch to fall into — an empty id set returns no passages rather
-   *    than the whole shared collection, which is the failure this shape exists to make
-   *    impossible.
-   * 2. The ranking is shaped for reading, not scoring — see `shapeWithDecisions`.
-   *
-   * One pass. The two-pass topic boost (mapped documents first, the rest as a top-up) served
-   * only the character corpus, and went with it into the Context Library; the log keeps the
-   * same shape, with the pass recorded as `rest`.
-   *
-   * And every retrieval is recorded — see `KbRetrieval`. Not for an audit trail: the numbers
-   * above (the floor most of all) were chosen by reasoning, and the first measurement showed
-   * the floor was one paraphrase from rejecting a direct hit. The log is how they stop being
-   * guesses.
-   */
-  async search(dto: KbSearchDto, context: RetrievalContext = {}) {
-    const startedAt = Date.now();
-    const ids = await this.documentRepository.retrievableIds({
-      corpus: dto.corpus,
-      tags: dto.tags,
-    });
-
-    const limit = dto.limit ?? 8;
-    const minSimilarity =
-      dto.minSimilarity ?? KB_MIN_SIMILARITY_DEFAULT[dto.corpus];
-
-    // WHO is asking, as distinct from WHICH documents are in scope. The corpus decides the
-    // second (its ids travel as `document_ids`); this decides the first, and ally-ai refuses
-    // a request that carries neither.
-    //
-    // Naming an organisation previews what one of its workers would actually retrieve — the
-    // question an admin has when a customer reports a gap. Omitting it searches the corpus
-    // regardless of targeting, which is right for a console whose job is to show what is
-    // indexed, and is NOT what any worker gets. The WhatsApp answering path does not come
-    // through here; it sends the contact's own organisation with its own call.
-    const audience: KnowledgeAudienceRequest = dto.tenantId
-      ? { tenant_id: dto.tenantId, include_global: true }
-      : { unrestricted: true };
-
-    // Over-fetch, because shaping only ever removes passages: asking for `limit` and then
-    // dropping the overlapping neighbours would quietly return three passages for a limit of
-    // eight. Capped so a large limit cannot turn into an unbounded ally-ai query.
-    const fetchLimit = Math.min(limit * 3, 50);
-
-    const raw = ids.length
-      ? await this.searchDocuments(
-          dto.corpus,
-          dto.query,
-          ids,
-          fetchLimit,
-          minSimilarity,
-          audience,
-        )
-      : [];
-
-    const { kept: passages, decisions } = shapeWithDecisions(raw, {
-      limit,
-      perDocumentLimit: KB_MAX_PASSAGES_PER_DOCUMENT,
-    });
-
-    this.logger.info(
-      `[KB_RETRIEVAL] corpus=${dto.corpus} docs=${ids.length} ` +
-        `min_similarity=${minSimilarity} raw=${raw.length} ` +
-        `returned=${passages.length}/${limit}`,
-    );
-
-    await this.recordRetrieval(
-      {
-        corpus: dto.corpus,
-        consumer: context.consumer ?? KbRetrievalConsumer.ADMIN_PREVIEW,
-        query: dto.query,
-        tags: dto.tags ?? [],
-        minSimilarity,
-        requestedLimit: limit,
-        fetchLimit,
-        // One pass over the corpus: no preferred bucket, and null when there was nothing to
-        // search — the shape the WhatsApp bot's rows also have.
-        preferredDocumentCount: 0,
-        restDocumentCount: ids.length,
-        firstPassHits: 0,
-        secondPassHits: ids.length ? raw.length : null,
-        returnedCount: passages.length,
-        latencyMs: Date.now() - startedAt,
-        sessionId: context.sessionId ?? null,
-        createdBy: context.userId ?? null,
-        // An admin's console query is not someone else's words, so it is not withheld. The
-        // WhatsApp bot's rows arrive from ally-ai with this set.
-        querySensitive: false,
-      },
-      decisions.map((decision, index) => ({
-        chunkId: decision.passage.chunk_id,
-        documentId: decision.passage.document_id,
-        rank: index + 1,
-        similarity: decision.passage.similarity,
-        pass: KbRetrievalPass.REST,
-        outcome: decision.outcome,
-      })),
-    );
-
-    return { passages };
   }
 
   // ─────────────────────────────────────────────── a chatbot's own documents (chunk 3d)
@@ -937,7 +771,6 @@ export class KnowledgeBaseService {
       {
         isGlobal: false,
         tenantIds: [],
-        ownerTenantId: null,
         ownerChatbotId: chatbotId,
       },
     );
@@ -1022,54 +855,6 @@ export class KnowledgeBaseService {
         'That file was not uploaded here. Upload it again from this page, then add it.',
       );
     }
-  }
-
-  /**
-   * Persist one retrieval, and never let that failure become the caller's.
-   *
-   * Analytics are worth a table, not a retrieval. A full disk, a lock, a schema not yet
-   * migrated on one instance — any of those would otherwise turn a working search into a 500
-   * for an admin who asked a question, which is a straightforwardly worse product than having
-   * no distribution to calibrate against. Warned rather than swallowed silently, so a log that
-   * has quietly stopped writing is visible before someone builds a decision on the gap.
-   */
-  private async recordRetrieval(
-    retrieval: Parameters<KbRetrievalRepository['record']>[0],
-    passages: RetrievalPassageRecord[],
-  ): Promise<void> {
-    try {
-      await this.retrievalRepository.record(retrieval, passages);
-    } catch (error) {
-      this.logger.warn(
-        `[KB_RETRIEVAL] could not record the retrieval log: ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`,
-      );
-    }
-  }
-
-  private async searchDocuments(
-    corpus: KbCorpus,
-    query: string,
-    documentIds: string[],
-    limit: number,
-    minSimilarity: number,
-    audience: KnowledgeAudienceRequest,
-  ) {
-    const response = await this.aiService.searchKnowledgeChunks(
-      {
-        query,
-        limit,
-        min_similarity: minSimilarity,
-        // Scopes WITHIN the corpus — the corpus itself is the collection.
-        document_ids: documentIds,
-        // And WHO is asking, applied as a filter inside the query rather than to its
-        // results.
-        audience,
-      },
-      corpus,
-    );
-    return response.passages ?? [];
   }
 
   async stats(dto: GetKbStatsQueryDto) {

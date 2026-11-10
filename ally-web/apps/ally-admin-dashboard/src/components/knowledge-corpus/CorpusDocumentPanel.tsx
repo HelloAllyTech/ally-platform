@@ -37,12 +37,6 @@ interface CorpusDocumentPanelProps {
   /** Null = create. */
   document: KbDocument | null;
   /**
-   * Which corpus a NEW document is filed under. Defaults to the WhatsApp corpus so the tab
-   * that has always used this panel keeps behaving identically. Ignored when editing — corpus
-   * is immutable, because moving a document would change what every citation over it meant.
-   */
-  corpus?: KbCorpus;
-  /**
    * Opened from one organisation's WhatsApp page: a new document is aimed at that organisation
    * by default, and every request names it (an org-restricted admin's are refused otherwise).
    */
@@ -86,7 +80,6 @@ const isUploadSource = (source: KbDocumentSourceType) =>
 export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
   isOpen,
   document,
-  corpus = KbCorpus.WHATSAPP_QA,
   scopeTenantId,
   onClose,
 }) => {
@@ -256,7 +249,8 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
       } else {
         await createDocument({
           ...scope,
-          corpus,
+          // The only corpus the Knowledge Base still serves.
+          corpus: KbCorpus.WHATSAPP_QA,
           title: title.trim(),
           sourceType,
           ...(sourceType === KbDocumentSourceType.PASTE ? { text: text.trim() } : {}),
@@ -396,21 +390,16 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
         <p className="text-xs text-typography-500">{en.whatsappBot.corpus.sourceTypeLocked}</p>
       )}
 
-      {/* WhatsApp corpus only. Every corpus carries `isGlobal`/`tenantIds`, but this panel
-          offers the organisation picker only where retrieval is known to filter on them; on
-          any other corpus it would promise a targeting nothing here enforces. */}
-      {(document?.corpus ?? corpus) === KbCorpus.WHATSAPP_QA && (
-        <CorpusAudienceField
-          isGlobal={isGlobal}
-          tenantIds={tenantIds}
-          tenants={tenants}
-          disabled={isSaving}
-          onChange={next => {
-            setIsGlobal(next.isGlobal);
-            setTenantIds(next.tenantIds);
-          }}
-        />
-      )}
+      <CorpusAudienceField
+        isGlobal={isGlobal}
+        tenantIds={tenantIds}
+        tenants={tenants}
+        disabled={isSaving}
+        onChange={next => {
+          setIsGlobal(next.isGlobal);
+          setTenantIds(next.tenantIds);
+        }}
+      />
 
       <EntityField
         label={en.whatsappBot.corpus.languageLabel}

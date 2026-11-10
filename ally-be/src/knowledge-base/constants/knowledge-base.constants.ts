@@ -102,26 +102,6 @@ export const KB_URL_FETCH_TIMEOUT_MS = 20_000;
 export const KB_URL_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
- * Default cosine similarity floor per corpus. PERMISSIVE on purpose.
- *
- * The WhatsApp bot answers a question it was asked, and a weak passage there is recoverable:
- * the answering prompt sees it doesn't address the question and declines, which is a
- * first-class outcome on that path (`KnowledgeDeclineReason`). Recall beats precision, so 0.35.
- *
- * The retired character corpus learned the same lesson from the other side, taking two wrong
- * turns (0.5, then 0.45) before landing here: a floor tuned to look safe mostly buys silence,
- * because single-shot cosine similarity is brittle across paraphrase.
- *
- * Still not a tuned value — `kb_retrievals` + `kb_retrieval_passages` exist to replace it with
- * a precision/recall curve over real traffic. `KbSearchDto.minSimilarity` overrides it per
- * request and the retrieval preview now exposes it, so "nothing matched" can be distinguished
- * from "the floor was too tight" without reading a log.
- */
-export const KB_MIN_SIMILARITY_DEFAULT: Record<KbCorpus, number> = {
-  [KbCorpus.WHATSAPP_QA]: 0.35,
-};
-
-/**
  * Corpora retired into the Context Library (docs/context-library/PLAN.md, phases 4 and 6). Their
  * rows stay in `kb_documents` until a platform admin retires each one, and only that job may
  * touch them: to every route here they are missing documents. Literal values, because they are
@@ -132,13 +112,3 @@ export const RETIRED_KB_CORPORA: readonly string[] = [
   'ally_guide_library',
   'debrief_knowledge',
 ];
-
-/**
- * Max passages one document may contribute to a single retrieval.
- *
- * Three, not one: a chapter genuinely does carry a definition, its qualification and an
- * illustrative case, and forcing breadth to one passage per document would drop two thirds of
- * the only source that covers the topic. Three is also comfortably under a typical limit of 8,
- * so a corpus with three or more relevant documents still returns three or more voices.
- */
-export const KB_MAX_PASSAGES_PER_DOCUMENT = 3;

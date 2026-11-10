@@ -34,33 +34,26 @@ export interface PreparedSegment {
  * Headings that mark boilerplate. Contributor and author pages are always skipped — the
  * library stores no names, so there is nothing to extract from them that it could keep.
  */
-const SKIP_RULES: Array<{ reason: string; pattern: RegExp; locked?: boolean }> =
-  [
-    { reason: 'contents', pattern: /\b(table of contents|contents)\b/i },
-    { reason: 'index', pattern: /^(?:.*›\s*)?index$/i },
-    {
-      reason: 'legal',
-      pattern:
-        /\b(legal notice|licen[cs]e|terms of use|disclaimer|trademarks?)\b/i,
-    },
-    { reason: 'copyright', pattern: /\bcopyright\b/i },
-    {
-      reason: 'revision_history',
-      pattern:
-        /\b(revision history|change ?log|release notes|document history)\b/i,
-    },
-    {
-      reason: 'contributors',
-      pattern:
-        /\b(about the authors?|about the contributors?|contributors|acknowledg(e)?ments?|credits)\b/i,
-      locked: true,
-    },
-  ];
-
-/** Skip reasons an admin cannot turn back on. */
-export const LOCKED_SKIP_REASONS: ReadonlySet<string> = new Set(
-  SKIP_RULES.filter((r) => r.locked).map((r) => r.reason),
-);
+const SKIP_RULES: Array<{ reason: string; pattern: RegExp }> = [
+  { reason: 'contents', pattern: /\b(table of contents|contents)\b/i },
+  { reason: 'index', pattern: /^(?:.*›\s*)?index$/i },
+  {
+    reason: 'legal',
+    pattern:
+      /\b(legal notice|licen[cs]e|terms of use|disclaimer|trademarks?)\b/i,
+  },
+  { reason: 'copyright', pattern: /\bcopyright\b/i },
+  {
+    reason: 'revision_history',
+    pattern:
+      /\b(revision history|change ?log|release notes|document history)\b/i,
+  },
+  {
+    reason: 'contributors',
+    pattern:
+      /\b(about the authors?|about the contributors?|contributors|acknowledg(e)?ments?|credits)\b/i,
+  },
+];
 
 const OVERVIEW_HEADING =
   /\b(introduction|overview|summary|preface|executive summary|conclusions?|key takeaways)\b/i;

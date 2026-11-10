@@ -34,13 +34,12 @@ describe('KnowledgeBaseService.create — when enqueueing fails', () => {
     };
     ingestProducer = { enqueue: jest.fn() };
     // Positional order matches the constructor: document, chunk, documentTenant, ingest,
-    // ai, s3, config, retrieval, tenant, tenantScope.
+    // ai, s3, config, tenant, tenantScope.
     service = new KnowledgeBaseService(
       documentRepository,
       {} as any,
       { replaceForDocument: jest.fn() } as any,
       ingestProducer as any,
-      {} as any,
       {} as any,
       {} as any,
       {} as any,

@@ -831,12 +831,10 @@ export const ApiEndpoints = {
     DOCUMENT_BY_ID: (id: string) => `/v1/knowledge-base/documents/${id}`,
     DOCUMENT_CONTENT: (id: string) => `/v1/knowledge-base/documents/${id}/content`,
     DOCUMENT_TENANTS: (id: string) => `/v1/knowledge-base/documents/${id}/tenants`,
-    DOCUMENT_CHUNKS: (id: string) => `/v1/knowledge-base/documents/${id}/chunks`,
     DOCUMENT_REINDEX: (id: string) => `/v1/knowledge-base/documents/${id}/reindex`,
     DOCUMENT_ARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/archive`,
     DOCUMENT_UNARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/unarchive`,
     CHUNK_BY_ID: (chunkId: string) => `/v1/knowledge-base/chunks/${chunkId}`,
-    SEARCH: "/v1/knowledge-base/search",
     STATS: "/v1/knowledge-base/stats",
     // Bot (ally-be src/whatsapp)
     // Phone → organisation mappings. Surfaced under User Management, but owned by the bot:
@@ -1183,7 +1181,6 @@ export const TAG_TYPES = {
   ROLEPLAY_SESSION_LOGS: "roleplaySessionLogs",
   COMFORT_AUDIO_LIBRARY: "comfortAudioLibrary",
   WHATSAPP_BOT_DOCUMENTS: "whatsAppBotDocuments",
-  WHATSAPP_BOT_DOCUMENT_CHUNKS: "whatsAppBotDocumentChunks",
   WHATSAPP_BOT_STATS: "whatsAppBotStats",
   WHATSAPP_BOT_TEMPLATES: "whatsAppBotTemplates",
   WHATSAPP_BOT_SETTINGS: "whatsAppBotSettings",

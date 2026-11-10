@@ -46,6 +46,7 @@ tombstone (the Context Library wins on conflict; those pages still hold Ally-spe
 | Changing a prompt's variables, answer shape or model | [`docs/adding-a-prompt.md` → Changing an existing prompt](docs/adding-a-prompt.md#changing-an-existing-prompt). **The order matters:** to add a variable, ship the code and deploy before publishing text that uses it; to remove one, publish text without it first. Pinned prompts and drafts are covered there too |
 | **Adding, removing or re-pointing an AI/LLM call** | [`docs/ai-task-registry.md`](docs/ai-task-registry.md) — then add your row to `src/llm/constants/ai-task-registry.constants.ts` **in the same PR**. CI enforces both halves |
 | Calling ally-ai | `src/ai/` — service-to-service auth is `X-API-Key` |
+| Context Library (collections, uploads, retrieval, learning loops, the engineers' MCP) | [`../docs/context-library/NOTES.md`](../docs/context-library/NOTES.md) — code map, decisions, after-deploy steps; [`DATA_SCHEMA.md`](DATA_SCHEMA.md) §3.22 for its tables. The Knowledge Base (`src/knowledge-base/`) now serves only the WhatsApp Q&A corpus |
 | Real-time / WebSocket work | `src/**/*.gateway.ts` — namespaces are `/microphone-chat`, `/cloud-telephony-chat`, `/scenario-report` |
 | Writing or fixing tests | [`TESTING.md`](TESTING.md); Docker variant in [`DOCKER_TESTING_SETUP.md`](DOCKER_TESTING_SETUP.md) |
 | Releasing | [`.github/RELEASE_GUIDE.md`](.github/RELEASE_GUIDE.md) |

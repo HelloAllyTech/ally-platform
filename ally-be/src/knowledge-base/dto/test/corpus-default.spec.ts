@@ -4,7 +4,6 @@ import {
   CreateKbDocumentDto,
   GetKbDocumentsQueryDto,
   GetKbStatsQueryDto,
-  KbSearchDto,
 } from '../knowledge-base.dto';
 import { KbCorpus, KbDocumentSourceType } from '../../enum/knowledge-base.enum';
 
@@ -42,12 +41,6 @@ describe('corpus defaults on the HTTP edge', () => {
     expect(dto.corpus).toBe(KbCorpus.WHATSAPP_QA);
   });
 
-  it('lets the shipped dashboard search without sending a corpus', async () => {
-    const { dto, errors } = await check(KbSearchDto, { query: 'vpn reset' });
-    expect(errors).toHaveLength(0);
-    expect(dto.corpus).toBe(KbCorpus.WHATSAPP_QA);
-  });
-
   it('lets the shipped dashboard create a document without sending a corpus', async () => {
     const { dto, errors } = await check(CreateKbDocumentDto, {
       title: 'Managing risk',
@@ -59,11 +52,7 @@ describe('corpus defaults on the HTTP edge', () => {
   });
 
   it('honours an explicit corpus everywhere', async () => {
-    for (const cls of [
-      GetKbDocumentsQueryDto,
-      GetKbStatsQueryDto,
-      KbSearchDto,
-    ] as const) {
+    for (const cls of [GetKbDocumentsQueryDto, GetKbStatsQueryDto] as const) {
       const { dto } = await check(cls, {
         corpus: KbCorpus.WHATSAPP_QA,
         query: 'q',

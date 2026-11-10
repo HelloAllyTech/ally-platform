@@ -22,7 +22,6 @@ from app.core.dependencies import get_knowledge_chunk_service, get_vector_db
 from app.core.knowledge_base.corpus import RETIRED_CORPUS_COLLECTIONS
 from app.core.knowledge_base.knowledge_chunk_service import KnowledgeChunkService
 from app.exceptions.custom_exceptions import (
-    EmbeddingFailedException,
     VectorDBDeleteFailedException,
     VectorDBInsertFailedException,
     VectorDBSearchFailedException,
@@ -35,8 +34,6 @@ from app.schemas.knowledge_chunk import (
     KnowledgeChunkBulkUpsertResponse,
     KnowledgeChunkDeleteResponse,
     KnowledgeChunkIdsResponse,
-    KnowledgeChunkSearchRequest,
-    KnowledgeChunkSearchResponse,
     RetiredCollectionDeleteResponse,
 )
 from app.utils.logger import get_logger
@@ -87,60 +84,6 @@ async def bulk_upsert_knowledge_chunks(
         )
 
 
-@router.post(
-    "/search",
-    response_model=KnowledgeChunkSearchResponse,
-    status_code=status.HTTP_200_OK,
-    tags=["knowledge_chunks"],
-)
-async def search_knowledge_chunks(
-    payload: KnowledgeChunkSearchRequest,
-    service: KnowledgeChunkService = Depends(get_knowledge_chunk_service),
-):
-    """
-    Retrieval only — no LLM call, no answer.
-
-    Backs the admin retrieval console, where an operator tunes topK and the similarity
-    threshold and needs to see exactly what the agent would see. Separated from
-    /knowledge-agent/answer so tuning retrieval costs nothing in generation tokens and
-    cannot be confounded by the prompt.
-
-    `document_ids` scopes WITHIN the corpus and is not the corpus boundary — the
-    collection is. ally-be resolves the corpus's retrievable documents in Postgres and
-    sends their ids, so the scope is the query itself.
-    """
-    try:
-        passages = await service.search(
-            query=payload.query,
-            limit=payload.limit,
-            min_similarity=payload.min_similarity,
-            document_ids=(
-                [str(d) for d in payload.document_ids] if payload.document_ids else None
-            ),
-            language=payload.language,
-            audience=payload.audience.to_chunk_audience(),
-        )
-        return KnowledgeChunkSearchResponse(passages=passages)
-    except EmbeddingFailedException:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to embed the query",
-        )
-    except VectorDBSearchFailedException:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Vector search is unavailable",
-        )
-    except Exception:
-        logger.exception("Unexpected error searching knowledge chunks")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Search failed"
-        )
-
-
-# ORDER MATTERS: this must stay ABOVE GET /{chunk_id}. FastAPI matches routes in
-# declaration order, so if the parameterised route came first, "/ids" would bind to
-# chunk_id and fail UUID validation with a 422 that looks like a client bug.
 @router.get(
     "/ids",
     response_model=KnowledgeChunkIdsResponse,

@@ -54,9 +54,7 @@ import {
   KnowledgeChunkBulkUpsertRequest,
   KnowledgeChunkBulkUpsertResponse,
   KnowledgeChunkDeleteResponse,
-  KnowledgeChunkSearchRequest,
   KnowledgeCorpus,
-  KnowledgeChunkSearchResponse,
 } from '../dto/knowledge.dto';
 import {
   AddReferenceDocumentRequest,
@@ -689,27 +687,6 @@ export class AiService {
       undefined,
       false,
       60_000,
-    );
-  }
-
-  /** Retrieval only, no LLM. Backs the admin retrieval console. */
-  async searchKnowledgeChunks(
-    request: KnowledgeChunkSearchRequest,
-    corpus: KnowledgeCorpus,
-  ) {
-    return this.makeRequest<
-      KnowledgeChunkSearchResponse,
-      KnowledgeChunkSearchRequest
-    >(
-      withCorpus(ENDPOINTS.KNOWLEDGE_CHUNK_SEARCH, corpus),
-      request,
-      true,
-      'post',
-      undefined,
-      false,
-      30_000,
-      // The query is a worker's question on the WhatsApp path.
-      true,
     );
   }
 
