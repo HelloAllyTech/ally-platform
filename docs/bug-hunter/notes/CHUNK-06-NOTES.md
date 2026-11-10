@@ -53,12 +53,57 @@ safety keyword; the dry-run PR writes body/patch/branch and `Git.push` is never 
 hits skip the suite and the baseline sees the untouched code (observed through the
 stash).
 
-## Metrics
+## Metrics: first graph-v2 eval (issue mode, 2026-11-10)
 
-PENDING: `make eval AGENT=graph` fix-pass over the 20 proven oracles and escalation
-correctness on the 4 risk cases, compared with chunk 05; one end-to-end dry run on a
-real bug (`ally-be-89d8e055`, expected $1–2) producing `pr-body.md`. Both need the
-user's go and a ledger override.
+GitHub run 42767847055, commit `1ec27151`, prompts triage.v3, investigate.v3,
+reproduce.v4, fix.v2, review.v2; gpt-5 / gpt-5-mini / gemini-2.5-pro. 19 bug cases (the
+two sweep-only cases have no issue text). **Real cost $9.39** (LangSmith); the report
+shows $7.14 because four crashed cases reported $0 (fixed). 3 h 23 min.
+
+| Outcome | Count | Cases |
+|---|---|---|
+| Draft PR (dry-run), review approve | 5 | `99584ee6`, `89d8e055`, `adf36739`, `995242d7`, `87c6ecb8` |
+| of which the hidden oracle passes | **1** | `89d8e055` |
+| Escalated correctly (risk path) | 3 | `d039e256`, `819f6ccf`, `6083b8d8` |
+| Escalated, could not reproduce | 3 | `f35e117d`, `eebbfd01`, `3b3db9b5` (all ally-web) |
+| Escalated by precheck on a wrong suspect | 1 | `8c4f9caf` (suspected `config.service.ts`; the real fix is elsewhere) |
+| No bug (missed at investigate) | 3 | `b82759ae`, `e5ad37b3`, `83bdf91e` |
+| Harness error in verify | 4 | `9299e9aa`, `dd128ff8`, `b680c643`, `1065743a` |
+
+Review verdicts: approve 5, request_changes 0, reject 0. Fix attempts: 1 on every PR.
+Escalation correctness 3/4: `87c6ecb8` (expected escalate) reached a PR because the
+agent's one-line fix lives in `src/common/constants/`, outside the risk paths, while the
+real fix also changed `src/user/`. By the rules the gate was right; the label reflects
+the real fix's files.
+
+Why four of five PRs fail their oracle (re-run locally on the agent's patch, no model):
+- `995242d7` genuine miss: the agent fixed a different defect (the TTS error-fallback
+  flag) than the real one (whitespace-only text reaching Sarvam).
+- `99584ee6` genuine miss: the repair retries, but the oracle's blueprint still loses
+  items (`toHaveLength(3)` fails).
+- `adf36739` implementation-coupled oracle: the agent logs the error as a string, the
+  real fix logs the Error object, and the oracle asserts the object.
+- `87c6ecb8` API-coupled oracle: it imports `PLATFORM_TIER_ROLES`, a constant the real
+  fix introduced; the agent fixed the same behaviour under the existing name.
+
+Fix pass is 1/5 strictly, 3/5 if the two shape-coupled oracles are discounted.
+
+Trace links: fix pass `89d8e055` https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c43b-5e40-7146-8e3b-d70185eff395?trace_id=01a1c43b-5e40-7146-8e3b-d70185eff395&start_time=2026-11-10T06:53:07.520194 · fix fail `995242d7`
+https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c4af-b041-7107-b1df-109859db272e?trace_id=01a1c4af-b041-7107-b1df-109859db272e&start_time=2026-11-10T09:00:10.689498 · escalation `6083b8d8` https://smith.langchain.com/o/0c854988-4630-4eeb-84c4-ab532b3e578b/projects/p/2503d054-26fa-4772-9587-e8e6c849e456/r/01a1c4c9-4309-721f-8f88-abdec12c5c5b?trace_id=01a1c4c9-4309-721f-8f88-abdec12c5c5b&start_time=2026-11-10T09:28:06.665119
+
+### Harness defects this run exposed (fixed in `6512faa47`)
+
+1. Verify crashed on bounced repro files: `files_changed` came from `git status`, which
+   lists untracked files, and `git stash push` refuses untracked pathspecs. The fix's
+   files are now tracked modified files only; `stash_paths` filters to tracked paths.
+2. Repro validity read "no" for every PR case: the harness checked "fails on the buggy
+   code" after the graph had applied its fix. It now stashes the applied fix first.
+3. Crashed cases lost their cost and bypassed the per-run cap: `GraphAgent` now returns
+   the spend from the last checkpoint with the error.
+
+Compared with chunk 05 (issue mode, 10-case subset): detection 6/6 there, 12/19 here
+on the full bug set; the misses are 3 at investigate, 4 harness errors, 3 ally-web
+reproductions. The printed repro rate (38 %) is wrong for the reason in item 2.
 
 ## Open questions
 
