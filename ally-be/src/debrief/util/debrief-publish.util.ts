@@ -74,68 +74,125 @@ export function skillCoverageFromEvidence(
 
 const quoted = (q?: string | null) => (q?.trim() ? `“${q.trim()}”` : '');
 
+/** The message a transcript turn came from, for `[[msg:<id>]]` anchors. */
+export type MessageForTurn = (turn: number) => number | undefined;
+
 /**
- * The cards as one note in the learner's language, for the readers that take
- * a note (`summary.feedback.supervisorNote`): the Ally guide's practice
- * history, the session context, the post-session judges. No turn numbers —
- * some of those readers are learner-facing, and the quote is how a moment is
- * found. Headings stay English: they are structure for the judges, and the
- * learner reads the cards, not this.
+ * The cards as today's debrief's note (`summary.feedback.supervisorNote`), so
+ * every reader of that note keeps working: the apps' note view (an older
+ * phone build, and the fallback when the cards cannot load) splits it on the
+ * machine keys `## [what_worked]`, `## [what_it_cost]`, `## [try_next]`,
+ * `## [closing]` and turns `[[msg:<id>]]` into "See this moment"; the judges
+ * and the Ally guide read it as text. The opening goes before the first key,
+ * as the note's unlabelled opening. Body text is the cards' own, in the
+ * learner's language; no turn numbers.
  */
-export function renderSupervisorNote(cards: DebriefCards): string {
-  const parts: string[] = [];
-  if (cards.opening?.trim()) parts.push(cards.opening.trim());
+export function renderSupervisorNote(
+  cards: DebriefCards,
+  messageFor: MessageForTurn = () => undefined,
+): string {
+  const anchor = (turn?: number | null) => {
+    const id = typeof turn === 'number' ? messageFor(turn) : undefined;
+    return id != null ? ` [[msg:${id}]]` : '';
+  };
+  const line = (parts: Array<string | null | undefined>) =>
+    parts
+      .filter((p) => !!p && String(p).trim())
+      .join(' ')
+      .trim();
   const m = cards.important_moment;
-  if (m) {
-    parts.push(
-      [
-        '**An important moment**',
-        [m.lead, quoted(m.quote), m.body].filter(Boolean).join(' '),
-        ...(m.others ?? []).map((o) =>
-          `- ${[quoted(o.quote), o.note].filter(Boolean).join(' ')}`.trim(),
+  const momentText = m
+    ? [
+        line([m.lead, quoted(m.quote) + anchor(m.turn_index), m.body]),
+        ...(m.others ?? []).map(
+          (o) => `- ${line([quoted(o.quote) + anchor(o.turn_index), o.note])}`,
         ),
-      ].join('\n'),
-    );
-  }
-  if (cards.what_worked?.length) {
-    parts.push(
-      [
-        '**What worked**',
-        ...cards.what_worked.map((c) =>
-          `- ${[c.lead, quoted(c.quote), c.body].filter(Boolean).join(' ')}`.trim(),
-        ),
-      ].join('\n'),
-    );
-  }
-  if (cards.work_on_this?.length) {
-    parts.push(
-      [
-        '**Work on this**',
-        ...cards.work_on_this.map((c) =>
-          `- ${[
-            c.lead,
-            quoted(c.quote),
-            c.why,
-            c.try_saying ? `Try saying: ${quoted(c.try_saying)}` : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}`.trim(),
-        ),
-      ].join('\n'),
-    );
-  }
-  if (cards.practise_next) {
-    parts.push(
-      `**Practise this next:** ${cards.practise_next.skill}. ${cards.practise_next.reason}`.trim(),
-    );
-  }
-  if (cards.progress_note?.trim()) parts.push(cards.progress_note.trim());
+      ].join('\n')
+    : null;
+
+  const worked = [
+    ...(m?.handled_well && momentText ? [momentText] : []),
+    ...(cards.what_worked ?? []).map(
+      (c) =>
+        `- ${line([c.lead, quoted(c.quote) + anchor(c.turn_index), c.body])}`,
+    ),
+  ];
+  const cost = [
+    ...(m && !m.handled_well && momentText ? [momentText] : []),
+    ...(cards.work_on_this ?? []).map(
+      (c) =>
+        `- ${line([c.lead, quoted(c.quote) + anchor(c.turn_index), c.why])}`,
+    ),
+  ];
+  const tryNext = [
+    ...(cards.work_on_this ?? [])
+      .filter((c) => c.try_saying?.trim())
+      .map((c) => `- ${quoted(c.try_saying)}`),
+    ...(cards.practise_next
+      ? [line([cards.practise_next.skill + '.', cards.practise_next.reason])]
+      : []),
+  ];
+
+  const parts: string[] = [];
+  const opening = line([cards.opening, cards.progress_note]);
+  if (opening) parts.push(opening);
+  if (worked.length) parts.push(['## [what_worked]', ...worked].join('\n'));
+  if (cost.length) parts.push(['## [what_it_cost]', ...cost].join('\n'));
+  if (tryNext.length) parts.push(['## [try_next]', ...tryNext].join('\n'));
   if (cards.reflective_question?.trim()) {
-    parts.push(
-      `**One question to think about:** ${cards.reflective_question.trim()}`,
-    );
+    parts.push(['## [closing]', cards.reflective_question.trim()].join('\n'));
   }
   return parts.join('\n\n');
+}
+
+/**
+ * The note's growth areas as today's debrief wrote them
+ * (`summary.feedback.areasOfGrowth`), which the feedback-to-skill mapper
+ * reads by position: one per point to work on.
+ */
+export function areasOfGrowthFromCards(
+  cards: DebriefCards,
+): Array<{ improvement: string; recommendation: string }> {
+  return (cards.work_on_this ?? [])
+    .map((c) => ({
+      improvement: [c.lead, c.why].filter(Boolean).join(' ').trim(),
+      recommendation: (c.try_saying ?? '').trim(),
+    }))
+    .filter((a) => a.improvement);
+}
+
+/**
+ * The session's emotional movement as today's debrief stored it
+ * (`summary.feedback.emotionalMovement`, camelCased): one entry per client
+ * message, -5 to +5, with the message's start time. Levels on turns with no
+ * message are dropped.
+ */
+export function emotionalMovementFromEvidence(
+  evidence: Record<string, any> | null | undefined,
+  messageFor: MessageForTurn,
+  startFor: (messageId: number) => number | undefined,
+): Array<{ messageId: string; level: number; startTime?: number }> {
+  const items: Array<{ turn_index?: number; level?: number }> = Array.isArray(
+    evidence?.emotional_movement,
+  )
+    ? evidence!.emotional_movement
+    : [];
+  const out: Array<{ messageId: string; level: number; startTime?: number }> =
+    [];
+  for (const e of items) {
+    if (typeof e?.turn_index !== 'number' || typeof e?.level !== 'number')
+      continue;
+    const id = messageFor(e.turn_index);
+    if (id == null) continue;
+    const level = Math.max(-5, Math.min(5, Math.round(e.level)));
+    const start = startFor(id);
+    out.push({
+      messageId: String(id),
+      level,
+      ...(start != null ? { startTime: start } : {}),
+    });
+  }
+  return out;
 }
 
 /**

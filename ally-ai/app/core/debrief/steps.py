@@ -190,6 +190,7 @@ async def analyse(
     system: Optional[str] = None,
     scenario_session_id: Optional[str] = None,
     live_detections: Optional[List[Dict[str, Any]]] = None,
+    case_memory: Optional[str] = None,
 ) -> Tuple[Optional[EvidenceMap], str]:
     from app.core.llm_usage.tasks import LLMTask
 
@@ -204,6 +205,19 @@ async def analyse(
         "area it belongs to (Listening Engagement, Emotional Attunement or "
         "Supportive Engagement), or null when none fits."
     )
+    # Code-owned (v9 FR-4): the session's emotional movement now comes from
+    # here, on today's debrief's scale.
+    lines.append(
+        "EMOTIONAL MOVEMENT: for every CLIENT turn, rate how the client feels "
+        "at that turn from -5 (very distressed) to +5 (very positive)."
+    )
+    if case_memory:
+        lines.append(
+            "CASE: this session continues a case. Write case_memory_update: "
+            "what the client now carries into the next session, integrating "
+            "CASE MEMORY with this session. About the client and the case "
+            "only, never the trainee."
+        )
     if live_detections:
         # Code-owned (v9 FR-11, eval case 19): the live detector is a second
         # opinion, not ground truth, and a disagreement is never settled by
@@ -220,6 +234,8 @@ async def analyse(
     lines += _json_block("expected_behaviours", expected_behaviours or [])
     if live_detections:
         lines += _json_block("live_detections", live_detections)
+    if case_memory:
+        lines += ["CASE MEMORY:", case_memory, ""]
     lines += _transcript_block(transcript)
     output, meta = await _call(
         EvidenceMapReasoned,
@@ -239,6 +255,12 @@ async def analyse(
     output.pivotal_moments = [
         m for m in output.pivotal_moments if m.turn_index in roles
     ][:5]
+    # A level on a turn that is not the client's describes nobody's feelings.
+    output.emotional_movement = [
+        e for e in output.emotional_movement if roles.get(e.turn_index) == "client"
+    ]
+    if not case_memory:
+        output.case_memory_update = None
     return output, meta["model"]
 
 

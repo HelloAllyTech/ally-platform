@@ -613,6 +613,13 @@ export class DebriefRunnerService {
       if (liveDetections.length) {
         run.workspace = { ...run.workspace, liveDetections };
       }
+      // A case's memory so far: the Analyst returns it updated (v9 FR-4, the
+      // memory the next session of the case reads), the Writer keeps to it.
+      const caseMemory =
+        recipe.key === DebriefRecipeKey.CASE
+          ? await orFallback(() => this.context.caseMemory(session.id), null)
+          : null;
+      if (caseMemory) run.workspace = { ...run.workspace, caseMemory };
       const analystEst = analystStep
         ? reserve(analystStep, transcriptChars)
         : null;
@@ -655,6 +662,7 @@ export class DebriefRunnerService {
                 expected_behaviours: session.expectedBehaviours,
                 learner_level: session.learnerLevel,
                 live_detections: liveDetections,
+                case_memory: caseMemory,
                 system_prompt: await prompt(DEBRIEF_PROMPT_CODES.analyst),
               },
               analystEst,
@@ -665,6 +673,7 @@ export class DebriefRunnerService {
                   turnsLine,
                   'the scenario',
                   n(session.expectedBehaviours.length, 'expected behaviour'),
+                  ...(caseMemory ? ['the case memory'] : []),
                   ...(liveDetections.length
                     ? [
                         `the live detector’s record (${liveDetections.filter((d) => d.detected).length} of ${liveDetections.length} detected)`,
@@ -863,11 +872,6 @@ export class DebriefRunnerService {
       );
       const offered = new Set(practiceOptions.map((o) => o.id));
       const writerStep = stepOf(DebriefStep.WRITER)!;
-      const caseMemory =
-        recipe.key === DebriefRecipeKey.CASE
-          ? await this.context.caseMemory(session.id)
-          : null;
-      if (caseMemory) run.workspace = { ...run.workspace, caseMemory };
       // How the organisation's other trainees did on this roleplay (v9 FR-17):
       // only for 5 or more of them, in words, and never a reason to fail.
       const cohort = await orFallback(

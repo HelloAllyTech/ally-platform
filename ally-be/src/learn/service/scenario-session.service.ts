@@ -1,8 +1,6 @@
 import {
   SCENARIO_SESSION_DEBRIEF_READY_EVENT,
-  SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
   ScenarioSessionDebriefReadyEvent,
-  ScenarioSessionLegacyDebriefWrittenEvent,
 } from '../constants/scenario-session-events.constants';
 import {
   hasLegacyFeedback,
@@ -2079,6 +2077,26 @@ export class ScenarioSessionService {
       this.dataSource,
       scenarioSessionId,
     );
+    if (debriefAgentLive) {
+      // v9 FR-4: the Debrief agent writes this session's whole debrief —
+      // note, skill coverage, emotional movement, case memory, the learner's
+      // memory and the ready event (DebriefPublishService) — so today's
+      // evaluation is not run. The call duration is still recorded here.
+      this.logger.info(
+        `Skipping today's debrief for ${scenarioSessionId}: the organisation reads the Debrief agent's.`,
+      );
+      try {
+        await this.scenarioSessionDetailsRepository.upsert(
+          { scenarioSessionId, callDuration, tenantId },
+          { conflictPaths: ['scenarioSessionId'] },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to record the call duration for ${scenarioSessionId}: ${JSON.stringify((error as Error).message)}`,
+        );
+      }
+      return;
+    }
 
     // Who this session belongs to, and which post-session surfaces the roleplay
     // actually shows. Both are needed before any LLM work: the learner drives
@@ -2178,7 +2196,6 @@ export class ScenarioSessionService {
         // one artefact here that outlives the row we are about to write.
         if (
           useEvaluation &&
-          !debriefAgentLive &&
           sessionContext &&
           aiResult &&
           'memory_update' in aiResult
@@ -2258,22 +2275,10 @@ export class ScenarioSessionService {
       // After the write commits: a listener (the Ally guide's after-action
       // review) reads the feedback back. Only a real debrief, never an error.
       if ((summary as Record<string, any> | undefined)?.feedback) {
-        if (debriefAgentLive) {
-          // The upsert above replaced the summary: the agent's publish
-          // service puts its fields back if it had already landed.
-          this.eventEmitter.emit(
-            SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
-            {
-              scenarioSessionId,
-              tenantId,
-            } satisfies ScenarioSessionLegacyDebriefWrittenEvent,
-          );
-        } else {
-          this.eventEmitter.emit(SCENARIO_SESSION_DEBRIEF_READY_EVENT, {
-            scenarioSessionId,
-            tenantId,
-          } satisfies ScenarioSessionDebriefReadyEvent);
-        }
+        this.eventEmitter.emit(SCENARIO_SESSION_DEBRIEF_READY_EVENT, {
+          scenarioSessionId,
+          tenantId,
+        } satisfies ScenarioSessionDebriefReadyEvent);
       }
     } catch (error) {
       this.logger.error(
@@ -2323,7 +2328,10 @@ export class ScenarioSessionService {
 
     let feedbackToServe = summary.feedback;
 
+    // A note the Debrief agent published is already in the session's language
+    // and is not today's debrief's to re-write in another (v9 FR-4).
     const needsOtherLanguage =
+      !summary.feedback?.debriefGenerator &&
       !!requestedLanguage &&
       requestedLanguage !== baseLanguage &&
       !!summary.feedback &&

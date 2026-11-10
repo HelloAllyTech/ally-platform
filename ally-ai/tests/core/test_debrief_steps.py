@@ -448,3 +448,33 @@ async def test_analyst_tags_behaviours_for_skill_coverage(dispatch_returns):
         coverage_category="Emotional Attunement",
     )
     assert b.coverage_category == "Emotional Attunement"
+
+
+@pytest.mark.asyncio
+async def test_analyst_rates_client_turns_and_updates_case_memory(dispatch_returns):
+    """v9 FR-4: emotional movement and a case's memory now come from here."""
+    from app.core.debrief.schemas import EmotionLevel
+    from app.core.debrief.steps import analyse
+
+    calls = dispatch_returns(
+        EvidenceMap(
+            emotional_movement=[
+                EmotionLevel(turn_index=2, level=-3),
+                # A counsellor turn: dropped.
+                EmotionLevel(turn_index=1, level=2),
+            ],
+            case_memory_update="She is still anxious about exams.",
+        )
+    )
+    out, _ = await analyse(
+        TRANSCRIPT, "en", "gemini-2.5-pro", case_memory="Exams worry her."
+    )
+    assert [(e.turn_index, e.level) for e in out.emotional_movement] == [(2, -3)]
+    assert out.case_memory_update == "She is still anxious about exams."
+    prompt = calls["prompt"]
+    assert "EMOTIONAL MOVEMENT" in prompt and "CASE MEMORY:" in prompt
+
+    calls = dispatch_returns(EvidenceMap(case_memory_update="invented"))
+    out, _ = await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert out.case_memory_update is None
+    assert "CASE MEMORY" not in calls["prompt"]

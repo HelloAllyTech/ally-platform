@@ -10,7 +10,11 @@ export const DEBRIEF_AGENT_FEEDBACK_KEYS: ReadonlySet<string> = new Set([
   'supervisorNote',
   'positives',
   'improvements',
+  'areasOfGrowth',
+  'sessionGlimpse',
   'skillCoverage',
+  'emotionalMovement',
+  'cumulativeMemory',
   'debriefGenerator',
 ]);
 

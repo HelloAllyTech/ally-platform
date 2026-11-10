@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   SCENARIO_SESSION_DEBRIEF_READY_EVENT,
-  SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
   ScenarioSessionDebriefReadyEvent,
-  ScenarioSessionLegacyDebriefWrittenEvent,
 } from '../../learn/constants/scenario-session-events.constants';
 import { LearnerSupervisorMemoryService } from '../../learn/service/learner-supervisor-memory.service';
 import { LoggerService } from '../../logger/logger.service';
@@ -14,7 +12,9 @@ import { DebriefRun } from '../entity/debrief-run.entity';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefCards } from '../util/debrief-cards.util';
 import {
+  areasOfGrowthFromCards,
   claimsFromCards,
+  emotionalMovementFromEvidence,
   DebriefGeneratorStamp,
   memoryUpdateFromCards,
   renderSupervisorNote,
@@ -29,18 +29,18 @@ const READABLE = new Set<string>([
 
 /**
  * v9 FR-20 Publish, FR-42 analytics continuity, FR-45 the post-session judges
- * on the new note, and the part of FR-4 that hands today's debrief's writes
- * over: once a live debrief is readable, the session's summary carries it —
- * its note, its strengths and points to work on, skill coverage computed from
- * its evidence map, a generator stamp — and the learner's supervisor memory
- * and the "debrief ready" event come from it, not from today's debrief.
+ * on the new note, and FR-4: for an organisation switched on for the Debrief
+ * agent, today's debrief no longer runs, so a readable live run writes the
+ * session's whole debrief where today's did — the note (in today's sectioned
+ * format, with message anchors), strengths, points and growth areas, skill
+ * coverage computed from its evidence map, emotional movement, a case's
+ * memory, the note's language and a generator stamp — and the learner's
+ * supervisor memory and the "debrief ready" event come from it.
  *
- * Today's debrief still runs for switched-on organisations (it alone writes
- * emotional movement, the transcript's tags and a case's memory), but its
- * note and skill coverage are kept on the run as `workspace.legacyNote` for
- * comparison. The two writers race on session end in either order, so every
- * write here is idempotent: whichever lands second, the summary ends with the
- * live debrief's fields and the legacy copy is taken only once.
+ * Feedback today's debrief wrote before (a session from before the switch)
+ * is merged over, its note and skill coverage kept once on the run as
+ * `workspace.legacyNote`. Every write is idempotent, so publishing again
+ * (a person publishing, a card corrected) only refreshes the fields.
  */
 @Injectable()
 export class DebriefPublishService {
@@ -83,17 +83,45 @@ export class DebriefPublishService {
         publishedAt: new Date().toISOString(),
       };
       const { positives, improvements } = claimsFromCards(cards);
-      const skillCoverage = skillCoverageFromEvidence(run.workspace?.evidence);
+      const evidence = run.workspace?.evidence;
+      const skillCoverage = skillCoverageFromEvidence(evidence);
+      const { messageFor, startFor } = await this.transcriptIndex(
+        run.scenarioSessionId,
+      );
+      const emotionalMovement = emotionalMovementFromEvidence(
+        evidence,
+        messageFor,
+        startFor,
+      );
+      const caseMemory =
+        typeof evidence?.case_memory_update === 'string' &&
+        evidence.case_memory_update.trim()
+          ? evidence.case_memory_update.trim()
+          : null;
       const ours = {
-        supervisorNote: renderSupervisorNote(cards),
+        supervisorNote: renderSupervisorNote(cards, messageFor),
         positives,
         improvements,
+        areasOfGrowth: areasOfGrowthFromCards(cards),
+        sessionGlimpse: (cards.opening ?? '').trim() || null,
+        // v9 FR-4: what only today's debrief used to write. Left as they are
+        // when the run has none (an Analyst from before it produced them).
+        ...(emotionalMovement.length ? { emotionalMovement } : {}),
+        ...(caseMemory ? { cumulativeMemory: caseMemory } : {}),
         // An evidence map with no area tags (a run from before the Analyst
         // tagged them) leaves today's skill coverage in place rather than
         // writing an empty one the charts would read as "nothing shown".
         ...(skillCoverage.length ? { skillCoverage } : {}),
         debriefGenerator: stamp,
       };
+      // The note's language (normalised primary subtag), so the session view
+      // never asks today's debrief to re-write it in the same language.
+      const language =
+        String(run.language ?? 'en')
+          .replace(/_/g, '-')
+          .split('-')[0]
+          .trim()
+          .toLowerCase() || 'en';
       await this.runs.manager.transaction(async (em) => {
         const [row] = await em.query(
           `SELECT summary FROM scenario_session_details
@@ -129,10 +157,11 @@ export class DebriefPublishService {
                 SET summary = jsonb_set(
                       coalesce(summary, '{}'::jsonb) - 'errorMessage',
                       '{feedback}',
-                      coalesce(summary->'feedback', '{}'::jsonb) || $2::jsonb),
+                      coalesce(summary->'feedback', '{}'::jsonb) || $2::jsonb)
+                      || jsonb_build_object('language', $3::text),
                     "updatedAt" = now()
               WHERE "scenarioSessionId" = $1`,
-            [run.scenarioSessionId, JSON.stringify(ours)],
+            [run.scenarioSessionId, JSON.stringify(ours), language],
           );
         } else {
           await em.query(
@@ -143,10 +172,11 @@ export class DebriefPublishService {
                      coalesce(scenario_session_details.summary, '{}'::jsonb) - 'errorMessage',
                      '{feedback}',
                      coalesce(scenario_session_details.summary->'feedback', '{}'::jsonb)
-                       || (EXCLUDED.summary->'feedback'))`,
+                       || (EXCLUDED.summary->'feedback'))
+                   || jsonb_build_object('language', EXCLUDED.summary->>'language')`,
             [
               run.scenarioSessionId,
-              JSON.stringify({ feedback: ours }),
+              JSON.stringify({ feedback: ours, language }),
               run.tenantId,
             ],
           );
@@ -160,6 +190,40 @@ export class DebriefPublishService {
       );
       return false;
     }
+  }
+
+  /**
+   * Transcript turn → message id and message → start time, numbered exactly as
+   * the run's transcript is (`DebriefQualityRepository.buildTranscript`:
+   * every non-empty message in order, from 1), so anchors and emotion levels
+   * land on the right messages.
+   */
+  private async transcriptIndex(sessionId: string): Promise<{
+    messageFor: (turn: number) => number | undefined;
+    startFor: (messageId: number) => number | undefined;
+  }> {
+    const rows: Array<{
+      id: number;
+      content: string | null;
+      start: number | null;
+    }> = await this.runs.query(
+      `SELECT id, content, "startSeconds" AS start
+           FROM scenario_session_messages
+          WHERE "scenarioSessionId" = $1
+          ORDER BY "createdAt" ASC, id ASC`,
+      [sessionId],
+    );
+    const byTurn = new Map<number, number>();
+    const startById = new Map<number, number>();
+    for (const r of rows ?? []) {
+      if (!(r.content ?? '').trim()) continue;
+      byTurn.set(byTurn.size + 1, Number(r.id));
+      if (r.start != null) startById.set(Number(r.id), Number(r.start));
+    }
+    return {
+      messageFor: (turn) => byTurn.get(turn),
+      startFor: (id) => startById.get(id),
+    };
   }
 
   /** The supervisor memory update and the ready event, from the live debrief. */
@@ -180,24 +244,5 @@ export class DebriefPublishService {
       scenarioSessionId: run.scenarioSessionId,
       tenantId: run.tenantId as string,
     } satisfies ScenarioSessionDebriefReadyEvent);
-  }
-
-  /**
-   * Today's debrief finished writing a switched-on organisation's session.
-   * When the live debrief landed first, its fields were just overwritten:
-   * put them back (and take the legacy copy), without announcing again.
-   */
-  @OnEvent(SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT, { async: true })
-  async onLegacyWritten(
-    event: ScenarioSessionLegacyDebriefWrittenEvent,
-  ): Promise<void> {
-    if (!event?.scenarioSessionId) return;
-    const run = await this.runs.findOne({
-      where: {
-        scenarioSessionId: event.scenarioSessionId,
-        mode: DebriefRunMode.LIVE,
-      },
-    });
-    if (run) await this.applyToSession(run, { announce: false });
   }
 }

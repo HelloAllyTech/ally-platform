@@ -1,7 +1,4 @@
-import {
-  SCENARIO_SESSION_DEBRIEF_READY_EVENT,
-  SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
-} from '../../constants/scenario-session-events.constants';
+import { SCENARIO_SESSION_DEBRIEF_READY_EVENT } from '../../constants/scenario-session-events.constants';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import { ScenarioInteractionMode } from '../../enum/scenario-interaction-mode.enum';
@@ -4885,26 +4882,24 @@ describe('ScenarioSessionService', () => {
         );
         await flush();
         expect(emitted()).toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
-        expect(emitted()).not.toContain(
-          SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
-        );
       });
 
-      it('hands back to the Debrief agent instead of announcing, and skips the memory update', async () => {
+      it('does not run today’s debrief, and only records the call duration', async () => {
         liveFor(true);
-        aiService.getScenarioSessionEvaluation.mockResolvedValue({
-          positives: ['Warm opening'],
-          emotional_movement: [],
-          memory_update: { focus_areas: [], trajectory: 'x', next_time: 'y' },
-        } as any);
+        const detailsUpsert =
+          scenarioSessionDetailsRepository.upsert as jest.Mock;
+        detailsUpsert.mockResolvedValue(undefined);
         await service.endScenarioSession(
           mockScenarioSessionId,
           mockCounselorId,
         );
         await flush();
-        expect(persistedSummary()?.feedback).toBeDefined();
-        expect(emitted()).toContain(
-          SCENARIO_SESSION_LEGACY_DEBRIEF_WRITTEN_EVENT,
+        expect(aiService.getScenarioSessionEvaluation).not.toHaveBeenCalled();
+        expect(scenarioSessionMessagesRepository.find).not.toHaveBeenCalled();
+        expect(persistedSummary()).toBeUndefined();
+        expect(detailsUpsert).toHaveBeenCalledWith(
+          expect.not.objectContaining({ summary: expect.anything() }),
+          { conflictPaths: ['scenarioSessionId'] },
         );
         expect(emitted()).not.toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
         expect(

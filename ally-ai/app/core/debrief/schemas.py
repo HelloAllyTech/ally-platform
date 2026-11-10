@@ -82,6 +82,13 @@ class AiFault(BaseModel):
     )
 
 
+class EmotionLevel(BaseModel):
+    turn_index: int = Field(description="A CLIENT turn.")
+    level: int = Field(
+        ge=-5, le=5, description="-5 very distressed to +5 very positive."
+    )
+
+
 class EvidenceMap(BaseModel):
     behaviours: List[BehaviourEvidence] = Field(default_factory=list)
     pivotal_moments: List[PivotalMoment] = Field(default_factory=list)
@@ -89,6 +96,23 @@ class EvidenceMap(BaseModel):
     ai_faults: List[AiFault] = Field(default_factory=list)
     detected_language: str = Field(
         default="", description="ISO 639-1 code of the counsellor's main language."
+    )
+    # What today's debrief wrote and the new one now must (v9 FR-4): ally-be
+    # maps each turn to its message for the session's emotional movement.
+    emotional_movement: List[EmotionLevel] = Field(
+        default_factory=list,
+        description=(
+            "One entry per CLIENT turn: how the client feels at that turn, "
+            "-5 (very distressed) to +5 (very positive)."
+        ),
+    )
+    case_memory_update: Optional[str] = Field(
+        default=None,
+        description=(
+            "Only when CASE MEMORY is given: what the client now carries into "
+            "the next session of the case, integrating the earlier memory with "
+            "this session, about the client and the case only. Null otherwise."
+        ),
     )
 
 

@@ -120,6 +120,8 @@ class AnalystRequest(StepRequest):
     # What the live detector recorded per expected behaviour (v9 FR-17
     # get_live_detections); empty when the scenario has none.
     live_detections: List[Dict[str, Any]] = Field(default_factory=list)
+    # A case session's memory so far; the Analyst returns the updated one.
+    case_memory: Optional[str] = None
 
 
 class AnalystResponse(BaseModel):
@@ -143,6 +145,7 @@ async def analyst(req: AnalystRequest) -> AnalystResponse:
             system=req.system_prompt,
             scenario_session_id=req.scenario_session_id,
             live_detections=req.live_detections,
+            case_memory=req.case_memory,
         )
     except Exception as exc:  # noqa: BLE001
         raise _failed("analyst", exc) from exc

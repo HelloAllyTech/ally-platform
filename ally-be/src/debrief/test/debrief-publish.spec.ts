@@ -7,7 +7,9 @@ import {
   isDebriefAgentLiveForSession,
 } from '../util/debrief-live.util';
 import {
+  areasOfGrowthFromCards,
   claimsFromCards,
+  emotionalMovementFromEvidence,
   memoryUpdateFromCards,
   renderSupervisorNote,
   skillCoverageFromEvidence,
@@ -83,14 +85,51 @@ describe('publish write-out (v9 FR-20, FR-42)', () => {
     expect(skillCoverageFromEvidence({})).toEqual([]);
   });
 
-  it('renders the cards as one note with no turn numbers', () => {
-    const note = renderSupervisorNote(cards);
-    expect(note).toContain('You stayed with Meena');
-    expect(note).toContain('**Work on this**');
-    expect(note).toContain(
-      'Try saying: “Are you thinking about ending your life?”',
+  it('renders the cards as today’s note: machine keys, message anchors, no turn numbers', () => {
+    const messageFor = (turn: number) => 100 + turn;
+    const note = renderSupervisorNote(cards, messageFor);
+    // The opening comes first, unlabelled.
+    expect(note.startsWith('You stayed with Meena')).toBe(true);
+    // A missed important moment belongs under what it cost.
+    expect(note).toMatch(
+      /## \[what_it_cost\]\nShe told you she saw no point\. “I don't see the point\.” \[\[msg:102\]\]/,
     );
+    expect(note).toContain(
+      '## [what_worked]\n- You named how heavy it felt. “That sounds heavy.” [[msg:103]]',
+    );
+    expect(note).toContain(
+      '## [try_next]\n- “Are you thinking about ending your life?”',
+    );
+    expect(note).toContain('## [closing]\nWhat stopped you asking directly?');
     expect(note).not.toMatch(/turn \d/);
+    // Without a message map there are no anchors, and nothing breaks.
+    expect(renderSupervisorNote(cards)).not.toContain('[[msg:');
+  });
+
+  it('writes growth areas, emotional movement on messages, and nothing for unknown turns', () => {
+    expect(areasOfGrowthFromCards(cards)).toEqual([
+      {
+        improvement:
+          'Ask about suicide plainly. It is how you learn whether she is safe.',
+        recommendation: 'Are you thinking about ending your life?',
+      },
+    ]);
+    const evidence = {
+      emotional_movement: [
+        { turn_index: 2, level: -3 },
+        { turn_index: 4, level: 9 },
+        { turn_index: 99, level: 1 },
+      ],
+    };
+    const messageFor = (t: number) => (t === 99 ? undefined : 100 + t);
+    expect(
+      emotionalMovementFromEvidence(evidence, messageFor, (id) =>
+        id === 102 ? 12.5 : undefined,
+      ),
+    ).toEqual([
+      { messageId: '102', level: -3, startTime: 12.5 },
+      { messageId: '104', level: 5 },
+    ]);
   });
 
   it('lists strengths and points to work on as the groundedness judge reads them', () => {
@@ -145,7 +184,15 @@ function build(summary: Record<string, any> | null) {
   };
   const runs = {
     manager: { transaction: async (f: (e: any) => Promise<void>) => f(em) },
-    query: jest.fn(async () => [{ counselor_id: 7 }]),
+    query: jest.fn(async (sql: string) =>
+      String(sql).includes('scenario_session_messages')
+        ? [
+            { id: 501, content: 'Hi', start: 0 },
+            { id: 502, content: '', start: 1 },
+            { id: 503, content: "I don't see the point.", start: 3 },
+          ]
+        : [{ counselor_id: 7 }],
+    ),
     findOne: jest.fn(),
   };
   const memory = { recordFromEvaluation: jest.fn(async () => undefined) };
@@ -168,6 +215,7 @@ const run = (over: Record<string, any> = {}) =>
     releaseId: 'rel-1',
     releaseVersion: 3,
     cards,
+    language: 'ml-IN',
     workspace: {
       evidence: {
         behaviours: [
@@ -177,6 +225,8 @@ const run = (over: Record<string, any> = {}) =>
             observation: 'observed',
           },
         ],
+        emotional_movement: [{ turn_index: 2, level: -2 }],
+        case_memory_update: 'She carries the exam worry forward.',
       },
     },
     ...over,
@@ -204,6 +254,14 @@ describe('DebriefPublishService', () => {
     )!;
     const ours = JSON.parse(write.params[1]);
     expect(ours.supervisorNote).toContain('You stayed with Meena');
+    // Turn 2 is the second non-empty message (503): the anchor lands on it.
+    expect(ours.supervisorNote).toContain('[[msg:503]]');
+    expect(ours.emotionalMovement).toEqual([
+      { messageId: '503', level: -2, startTime: 3 },
+    ]);
+    expect(ours.cumulativeMemory).toBe('She carries the exam worry forward.');
+    expect(ours.areasOfGrowth).toHaveLength(1);
+    expect(write.params[2]).toBe('ml');
     expect(ours.skillCoverage).toEqual([
       { category: 'Emotional Attunement', percentage: 100 },
     ]);
@@ -278,18 +336,6 @@ describe('DebriefPublishService', () => {
       expect(queries).toHaveLength(0);
       expect(events.emit).not.toHaveBeenCalled();
     }
-  });
-
-  it('puts its fields back after today’s debrief overwrote the summary', async () => {
-    const { svc, runs, queries, events } = build({
-      feedback: { supervisorNote: 'Old note', emotionalMovement: [] },
-    });
-    runs.findOne.mockResolvedValue(run());
-    await svc.onLegacyWritten({ scenarioSessionId: 's1', tenantId: 't1' });
-    expect(
-      queries.some((q) => q.sql.includes('UPDATE scenario_session_details')),
-    ).toBe(true);
-    expect(events.emit).not.toHaveBeenCalled();
   });
 
   it('never throws when the write fails', async () => {
