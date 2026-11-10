@@ -12,6 +12,9 @@ const projectRoot = __dirname;
 
 export default defineConfig(() => ({
   root: __dirname,
+  // Production serves the admin app under app.helloally.ai/admin/ (set via
+  // VITE_BASE_PATH in the release workflow); dev and other builds stay at /.
+  base: process.env.VITE_BASE_PATH || "/",
   cacheDir: "../../node_modules/.vite/apps/ally-admin-dashboard",
   server: {
     port: 8081,
