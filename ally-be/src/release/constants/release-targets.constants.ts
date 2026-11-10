@@ -94,6 +94,18 @@ export const RELEASE_TARGETS: Record<string, ReleaseTarget> = {
   },
 };
 
+/**
+ * Whether a run of the shared frontends workflow shipped `app`, read from the
+ * `[apps=...]` marker its `run-name` puts in the title. A run with no marker
+ * predates it (the first frontend-v1.0.0 release, which shipped both) and is
+ * counted for both apps.
+ */
+export function shippedApp(title: string, app: string | undefined): boolean {
+  if (!app) return true;
+  const marker = /\[apps=([a-z]+)\]/.exec(title)?.[1];
+  return !marker || marker === 'both' || marker === app;
+}
+
 function sameTarget(a: ReleaseTarget, b: ReleaseTarget): boolean {
   return (
     a.repo === b.repo &&

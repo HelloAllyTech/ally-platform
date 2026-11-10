@@ -3,7 +3,10 @@ import { In, IsNull } from 'typeorm';
 
 import { GithubActionsService } from 'src/github/service/github-actions.service';
 import { LoggerService } from 'src/logger/logger.service';
-import { RELEASE_TARGETS } from 'src/release/constants/release-targets.constants';
+import {
+  RELEASE_TARGETS,
+  shippedApp,
+} from 'src/release/constants/release-targets.constants';
 
 import {
   ProductUpdateSource,
@@ -49,18 +52,6 @@ const HISTORY_WORKFLOWS: Record<
     workflow: 'promote-android-production.yml',
   },
 };
-
-/**
- * Whether a run of the shared frontends workflow shipped `app`, read from the
- * `[apps=...]` marker its `run-name` puts in the title. A run with no marker
- * predates it (the first frontend-v1.0.0 release, which shipped both) and is
- * counted for both apps.
- */
-export function shippedApp(title: string, app: string | undefined): boolean {
-  if (!app) return true;
-  const marker = /\[apps=([a-z]+)\]/.exec(title)?.[1];
-  return !marker || marker === 'both' || marker === app;
-}
 
 export interface LivenessResult {
   sourcesLive: number;

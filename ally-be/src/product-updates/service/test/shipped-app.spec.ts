@@ -1,4 +1,4 @@
-import { shippedApp } from '../product-update-liveness.service';
+import { shippedApp } from 'src/release/constants/release-targets.constants';
 
 describe('shippedApp', () => {
   const title = (apps: string) =>
