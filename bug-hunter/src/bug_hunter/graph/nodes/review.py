@@ -56,7 +56,11 @@ def make_review_node(deps: GraphDeps):
         deps.scratchpad.append_note(
             f"review: {verdict.verdict}; issues: {'; '.join(verdict.issues)[:200]}"
         )
-        update: dict[str, Any] = {"review": verdict, "budget_used": budget}
+        update: dict[str, Any] = {
+            "review": verdict,
+            "review_verdicts": [*state.review_verdicts, verdict.verdict],
+            "budget_used": budget,
+        }
         if verdict.verdict == "approve":
             update["status"] = "reviewed"
         elif verdict.verdict == "request_changes":

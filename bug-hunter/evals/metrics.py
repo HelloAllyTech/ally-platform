@@ -8,7 +8,7 @@ Outcomes per case (set by the harness):
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any, Iterable
 
 
@@ -33,6 +33,10 @@ class CaseResult:
     trace_url: str | None = None
     status: str | None = None  # agent's final status (graph agents)
     confidence: str | None = None
+    review_verdicts: list[str] = field(default_factory=list)
+    fix_attempts: int = 0
+    final_outcome: str | None = None
+    stop_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -148,19 +152,43 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Cases",
         "",
-        "| id | kind | expected | outcome | repro | oracle | tokens | cost | s | trace "
-        "| error |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| id | kind | expected | outcome | repro | oracle | review | fix tries "
+        "| ended as | tokens | cost | s | trace | error / stop reason |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
+    verdict_totals: dict[str, int] = {}
+    ending_totals: dict[str, int] = {}
     for c in report["cases"]:
         yes_no = lambda v: "–" if v is None else ("yes" if v else "no")  # noqa: E731
         trace = f"[trace]({c['trace_url']})" if c.get("trace_url") else "–"
+        verdicts = c.get("review_verdicts") or []
+        for v in verdicts:
+            verdict_totals[v] = verdict_totals.get(v, 0) + 1
+        ended = c.get("final_outcome") or "–"
+        if c.get("final_outcome"):
+            ending_totals[ended] = ending_totals.get(ended, 0) + 1
+        note = c.get("error") or (c.get("stop_reason") if ended == "escalated" else "")
         lines.append(
             f"| `{c['id']}` | {c['kind']} | {c['expected']} | {c['outcome']} "
             f"| {yes_no(c['repro_valid'])} | {yes_no(c['oracle_pass'])} "
+            f"| {', '.join(verdicts) or '–'} | {c.get('fix_attempts') or 0} | {ended} "
             f"| {c['tokens']} | ${c['cost_usd']:.3f} | {c['seconds']:.0f} | {trace} "
-            f"| {(c['error'] or '')[:60]} |"
+            f"| {(note or '')[:80]} |"
         )
+    if verdict_totals or ending_totals:
+        lines += [
+            "",
+            "Review verdicts: "
+            + (
+                ", ".join(f"{k} {v}" for k, v in sorted(verdict_totals.items()))
+                or "none"
+            )
+            + " · Ended as: "
+            + (
+                ", ".join(f"{k} {v}" for k, v in sorted(ending_totals.items()))
+                or "none"
+            ),
+        ]
     if meta.get("spend_today_usd") is not None:
         lines += [
             "",

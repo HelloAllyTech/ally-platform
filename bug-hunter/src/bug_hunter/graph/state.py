@@ -170,6 +170,7 @@ class BugState(BaseModel):
     patch: Patch | None = None
     verification: Verification | None = None
     review: Review | None = None
+    review_verdicts: list[str] = Field(default_factory=list)  # every review, in order
     risk_level: Literal["low", "medium", "high", "human_only"] | None = None
     confidence: Confidence | None = None
     attempts: int = 0  # fix attempts (chunk 06)

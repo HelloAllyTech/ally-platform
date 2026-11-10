@@ -14,9 +14,9 @@ fallbacks:
 prompts:
   triage: v3
   investigate: v3
-  reproduce: v3
-  fix: v1
-  review: v1
+  reproduce: v4
+  fix: v2
+  review: v2
 # USD per 1M tokens, from the providers' price pages (checked 2026-11-09; see
 # CHUNK-05-NOTES.md). Every role and fallback model must have a row: cost accounting is
 # code, and an unpriced model would make the per-run cost cap meaningless.

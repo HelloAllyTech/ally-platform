@@ -46,6 +46,10 @@ class AgentResult:
     trace_url: str | None = None
     status: str | None = None  # the graph's final status, for the report
     confidence: str | None = None
+    review_verdicts: list[str] = field(default_factory=list)
+    fix_attempts: int = 0
+    final_outcome: str | None = None  # pr | escalated | no_bug | rejected | other
+    stop_reason: str | None = None
 
 
 class Agent(Protocol):
@@ -174,7 +178,24 @@ class GraphAgent:
             trace_url=trace_url(run.run_id),
             status=state.status,
             confidence=state.confidence,
+            review_verdicts=list(state.review_verdicts),
+            fix_attempts=state.attempts,
+            final_outcome=final_outcome(state.status),
+            stop_reason=state.stop_reason,
         )
+
+
+def final_outcome(status: str) -> str:
+    """pr (draft PR ready or awaiting approval), escalated, no_bug, rejected, other."""
+    if status in ("awaiting_human", "pr_opened"):
+        return "pr"
+    if status == "escalated":
+        return "escalated"
+    if status in ("closed_not_bug", "closed_duplicate"):
+        return "no_bug"
+    if status == "rejected":
+        return "rejected"
+    return "other"
 
 
 def _diff_summary(diff: str, max_chars: int = 6000) -> str:

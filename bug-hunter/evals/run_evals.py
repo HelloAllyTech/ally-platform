@@ -259,6 +259,10 @@ def run_case(
             result_row.trace_url = agent_result.trace_url
             result_row.status = agent_result.status
             result_row.confidence = agent_result.confidence
+            result_row.review_verdicts = list(agent_result.review_verdicts)
+            result_row.fix_attempts = agent_result.fix_attempts
+            result_row.final_outcome = agent_result.final_outcome
+            result_row.stop_reason = agent_result.stop_reason
             run.write_artefact(
                 "agent-result.json",
                 json.dumps(
