@@ -8,7 +8,7 @@ This repository **is** the [Ally Developer Wiki](https://tech.helloally.ai) — 
 - All human-readable content lives in **`wiki/`**. Edit those Markdown files directly.
 - The **`llmwiki/`** folder is the rendering engine — **never modify it** (it lives in a separate upstream repo).
 - When you add or change pages: update the catalog in **`wiki/index.md`** and append an entry to **`wiki/log.md`**. Record durable learnings in `wiki/memory.md` and session state in `wiki/context.md`.
-- **Product work:** product guidance comes from Ally's **Context Library** (see the first bullet; it replaced the Stacks MCP on 2026-11-09), not from this wiki. **`wiki/product/` is deprecated as of 2026-08-07 and frozen** — do not add principles to it, do not add subsections, and do not renumber existing principles (`wiki/platform/analytics-agent.md` cites them by number). Deprecation banners and `Deprecated` maturity lines are already in place on every page; leave them.
+- **Product work:** product guidance comes from Ally's **Context Library** (see the first bullet), not from this wiki. **`wiki/product/` is deprecated as of 2026-08-07 and frozen** — do not add principles to it, do not add subsections, and do not renumber existing principles (`wiki/platform/analytics-agent.md` cites them by number). Deprecation banners and `Deprecated` maturity lines are already in place on every page; leave them.
 - `.nojekyll` keeps GitHub Pages from processing the Markdown; pushing to `main` publishes to **tech.helloally.ai** (the `CNAME`).
 
 ## Generated files — never hand-edit

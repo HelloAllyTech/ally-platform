@@ -176,16 +176,15 @@ path any more.
 
 ## History
 
-From 2026-08-07 product guidance came from **Stacks**, a third-party MCP server reached through a
-committed bridge script and a `stacks` skill in every repo. On **2026-11-09** Stacks was replaced
-by the Context Library, as part of moving every retrieval-shaped system at Ally into one library:
-each repo's `.mcp.json` now declares `context-library`, and the bridge, the `stacks` skill and the
-old tools (`search_chunks`, `list_tags`) are gone. Older plans that cite Stacks items by title are
-history; those titles are not Context Library codes.
+From 2026-08-07 product guidance came from a third-party MCP server reached through a committed
+bridge script and a skill in every repo. On **2026-11-09** it was replaced by the Context Library,
+as part of moving every retrieval-shaped system at Ally into one library: each repo's `.mcp.json`
+now declares `context-library`, and the bridge, the old skill and the old tools are gone. Older
+plans that cite guidance items by title are history; those titles are not Context Library codes.
 
-Two lessons from the Stacks period still apply:
+Two lessons from that period still apply:
 
-- **A tool's own description decides when an agent uses it.** While the Stacks server described
+- **A tool's own description decides when an agent uses it.** While the earlier server described
   search as a *planning* tool, sessions stopped searching once implementation began, whatever the
   repo instructions said. The server's descriptions and the repo instructions have to say the same
   thing.

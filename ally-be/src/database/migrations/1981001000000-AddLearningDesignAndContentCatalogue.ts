@@ -2,7 +2,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Context Library, phase 7 (docs/context-library/PLAN.md §11): the two collections Course Copilot
- * reads instead of the third-party Stacks library and its own `ILike` catalogue search —
+ * reads instead of the third-party guidance library and its own `ILike` catalogue search —
  * **Learning Design** (`learning_design`, `LD-`, noun "principle"; distilled and written) and the
  * **Content Catalogue** (`content_catalogue`, `CC-`, noun "item"; synced from Studio only).
  *
