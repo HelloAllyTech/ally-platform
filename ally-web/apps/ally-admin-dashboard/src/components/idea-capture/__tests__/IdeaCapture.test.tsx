@@ -23,11 +23,14 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 vi.mock("@hooks", () => ({
   useUser: () => ({
     permissions: ["vote:admin:product-roadmap"],
-    features: ["product_roadmap"],
+    features: ["product_roadmap", "product_planning_ideas"],
   }),
 }));
 vi.mock("@constants", () => ({
-  FeatureToggleKey: { PRODUCT_ROADMAP: "product_roadmap" },
+  FeatureToggleKey: {
+    PRODUCT_ROADMAP: "product_roadmap",
+    PRODUCT_PLANNING_IDEAS: "product_planning_ideas",
+  },
   Permissions: { VOTE_PRODUCT_ROADMAP: "vote:admin:product-roadmap" },
   ROUTES: { PRODUCT_ROADMAP: "/product-roadmap" },
 }));

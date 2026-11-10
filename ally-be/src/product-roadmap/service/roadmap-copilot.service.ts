@@ -44,6 +44,21 @@ export interface CopilotTurnInput {
   messages: { role: 'admin' | 'agent'; content: string }[];
   /** The brief from the previous turn, echoed back unchanged. */
   brief?: unknown;
+  /**
+   * Called once per model pass with its usage, awaited. The plan flow passes it to price each
+   * pass into the plan's spend ledger; the stateless endpoints leave it out. A failure inside it
+   * is swallowed: spend accounting must never fail the turn it is accounting for.
+   */
+  onUsage?: (usage: CopilotPassUsage) => Promise<void> | void;
+}
+
+export interface CopilotPassUsage {
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  cacheCreationTokens: number;
 }
 
 /** What the stream carries. `turn` or `error` is always the last frame. */
@@ -244,6 +259,7 @@ export class RoadmapCopilotService {
           iteration,
           turnId,
           userId,
+          onUsage: input.onUsage,
         });
       } catch (error) {
         this.logger.error(
@@ -403,6 +419,7 @@ export class RoadmapCopilotService {
       iteration: number;
       turnId: string;
       userId: number;
+      onUsage?: CopilotTurnInput['onUsage'];
     },
   ): Promise<AgentTurnResult> {
     let turn: AgentTurnResult | null = null;
@@ -436,6 +453,22 @@ export class RoadmapCopilotService {
         userId: pass.userId,
       },
     });
+    if (pass.onUsage) {
+      try {
+        await pass.onUsage({
+          provider: target.provider,
+          model: target.model,
+          inputTokens: turn.usage.inputTokens,
+          outputTokens: turn.usage.outputTokens,
+          cachedTokens: turn.usage.cachedTokens ?? 0,
+          cacheCreationTokens: turn.usage.cacheCreationTokens ?? 0,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `[ROADMAP] Copilot usage callback failed: ${(error as Error)?.message}`,
+        );
+      }
+    }
     return turn;
   }
 

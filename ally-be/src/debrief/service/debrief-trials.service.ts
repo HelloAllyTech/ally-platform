@@ -35,6 +35,8 @@ import {
 
 /** What the judge costs per debrief, as the learning budget counts it. */
 const JUDGE_USD = 0.04;
+/** A sealed case's cost when there is no production run to go by: the default run ceiling. */
+const SEALED_FALLBACK_RUN_USD = 0.5;
 /** How long the active canary is remembered between live runs. */
 const CANARY_CACHE_MS = 60_000;
 
@@ -338,15 +340,50 @@ export class DebriefTrialsService implements OnModuleInit {
       s.sealedCases,
     );
     if (!sessions.length) return null;
+    // Paid from the learning budget: start only when the whole run fits, so
+    // a month's result is never an overspend or a partial measurement.
+    const perCase = (await this.typicalRunCostUsd()) + JUDGE_USD;
+    const leftUsd =
+      (await this.pmAgent.learningBudgetThisMonth()) -
+      (await this.pmAgent.learningSpentThisMonth());
+    const needUsd = sessions.length * perCase;
+    if (needUsd > leftUsd) {
+      const skipped = {
+        step: 'sealed_run',
+        status: 'skipped',
+        reason: 'learning_budget',
+        cases: sessions.length,
+        needUsd: Math.round(needUsd * 100) / 100,
+        leftUsd: Math.round(Math.max(0, leftUsd) * 100) / 100,
+        ranAt: new Date().toISOString(),
+      };
+      this.logger.warn(
+        `[debrief] sealed run skipped: needs about $${skipped.needUsd}, $${skipped.leftUsd} of the learning budget left`,
+      );
+      await this.pmAgent.recordLadderEvent(skipped);
+      return skipped;
+    }
     const scores: number[] = [];
     let hardFails = 0;
     let failures = 0;
+    let stoppedForBudget = 0;
     let cost = 0;
+    let inFlight = 0;
+    let finished = 0;
     await runWithConcurrency(sessions, 3, async (sessionId) => {
-      const run = await this.runner.run(sessionId, {
-        mode: DebriefRunMode.REPLAY,
-      });
+      // The estimate can be wrong: once cases finish, go by what they really
+      // cost, and never start a case that could spend past what was left.
+      const each = Math.max(perCase, finished ? cost / finished : 0);
+      if (cost + (inFlight + 1) * each > leftUsd) {
+        stoppedForBudget++;
+        return;
+      }
+      inFlight++;
+      const run = await this.runner
+        .run(sessionId, { mode: DebriefRunMode.REPLAY })
+        .finally(() => inFlight--);
       cost += Number(run.estimatedCostUsd ?? 0) + JUDGE_USD;
+      finished++;
       const judged = run.cards
         ? await this.judge.judge(run).catch(() => null)
         : null;
@@ -364,11 +401,27 @@ export class DebriefTrialsService implements OnModuleInit {
       median: median(scores),
       hardFails,
       failures,
+      stoppedForBudget,
       costUsd: Math.round(cost * 100) / 100,
       ranAt: new Date().toISOString(),
     };
     await this.pmAgent.recordLadderEvent(result);
     return result;
+  }
+
+  /** A debrief's typical cost lately: the median of the last 100 production runs, or the default run ceiling when there are none. */
+  private async typicalRunCostUsd(): Promise<number> {
+    const [r] = await this.dataSource.query(
+      `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY c)::float AS p50
+         FROM (SELECT COALESCE("actualCostUsd", "estimatedCostUsd")::float AS c
+                 FROM debrief_runs
+                WHERE mode IN ('shadow','live') AND status <> 'skipped'
+                  AND COALESCE("actualCostUsd", "estimatedCostUsd") IS NOT NULL
+                ORDER BY "createdAt" DESC
+                LIMIT 100) t`,
+    );
+    const p50 = Number(r?.p50);
+    return Number.isFinite(p50) && p50 > 0 ? p50 : SEALED_FALLBACK_RUN_USD;
   }
 }
 

@@ -184,6 +184,44 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   @Column({ type: 'boolean', default: true })
   situationBrief!: boolean;
 
+  // ── Product planning (plans/roadmap-owns-planning rev 5.2) ────────────────
+
+  /**
+   * Master switch for the roadmap's plan flow. Off by default so unfinished
+   * phases merge safely; who may use it is decided by the two Product Planning
+   * admin toggles, not here.
+   */
+  @Column({ type: 'boolean', default: false })
+  planningEnabled!: boolean;
+
+  /**
+   * One USD ceiling per plan, covering everything from the first message to the
+   * outcome review: private drafts, the PRD, design and build runs, launch and
+   * reviews. Warns at 80%, then stops until the lead raises it.
+   */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 100 })
+  planCeilingUsd!: string;
+
+  /**
+   * Where the private Idea stage wraps up: at 80% of this the copilot helps the
+   * author file or park instead of exploring further. Never a hard stop.
+   */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 1 })
+  planIdeaCeilingUsd!: string;
+
+  /**
+   * Builder's own "new session" door. Turned off once plans start on the
+   * roadmap (plans/roadmap-owns-planning rev 5.2, P7): Builder then builds
+   * plans; it no longer starts its own interviews. On by default so nothing
+   * changes until someone turns it off.
+   */
+  @Column({ type: 'boolean', default: true })
+  builderDirectInterviewEnabled!: boolean;
+
+  /** Closing a plan whose idea has more votes than this needs a second Lead. */
+  @Column({ type: 'int', default: 10 })
+  planCloseConfirmVotes!: number;
+
   @Column({ type: 'int', nullable: true })
   updatedBy?: number | null;
 }

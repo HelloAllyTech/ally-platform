@@ -1826,6 +1826,25 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     promptOverride: 'the prompt row for each roadmap call',
   },
   {
+    id: 'product-planning-ai',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'A roadmap plan runs a review-board check, drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
+    detail:
+      'The planning_* prompts: the safety, privacy and AI-quality reviewers (cold, from the PRD and ' +
+      'design only), the outcome reviewer (scheduled after release), the launch planner, the ' +
+      "research planner and the weekly signal scout. Every call is priced into the plan's " +
+      'spend ledger (plan_spend_entries). Nothing they write leaves Ally without a person ' +
+      'publishing it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'the planning_* prompt row for each call',
+  },
+  {
     id: 'roadmap-opportunity-copilot',
     task: LlmTask.ROADMAP_OPPORTUNITY_COPILOT,
     runtime: LlmRuntime.ALLY_BE,

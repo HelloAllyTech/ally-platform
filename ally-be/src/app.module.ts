@@ -74,6 +74,7 @@ import { BlogModule } from './blog/blog.module';
 import { LabModule } from './lab/lab.module';
 import { SkillExperimentModule } from './skill-experiment/skill-experiment.module';
 import { ProductRoadmapModule } from './product-roadmap/product-roadmap.module';
+import { ProductPlanningModule } from './product-planning/product-planning.module';
 import { LogsModule } from './logs/logs.module';
 import { PostHogModule } from './posthog/posthog.module';
 import { ChangelogModule } from './changelog/changelog.module';
@@ -163,6 +164,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     LabModule,
     SkillExperimentModule,
     ProductRoadmapModule,
+    ProductPlanningModule,
     LogsModule,
     ChangelogModule,
     ProductUpdatesModule,

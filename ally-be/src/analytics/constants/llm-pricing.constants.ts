@@ -98,6 +98,20 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPer1MUsd: 2,
     cachedInputPer1MUsd: 0.025,
   },
+  // Exact keys, not left to the prefix match: `gpt-4.1` starts with `gpt-4`,
+  // which priced every GPT-4.1 call at GPT-4's $30/$60 — 15x (4.1) and 75x
+  // (4.1 mini) too high. Both are in LLM_MODEL_REGISTRY, so prod can serve
+  // them. OpenAI list prices, cached input included.
+  'gpt-4.1': {
+    inputPer1MUsd: 2,
+    outputPer1MUsd: 8,
+    cachedInputPer1MUsd: 0.5,
+  },
+  'gpt-4.1-mini': {
+    inputPer1MUsd: 0.4,
+    outputPer1MUsd: 1.6,
+    cachedInputPer1MUsd: 0.1,
+  },
   'gpt-4o': {
     inputPer1MUsd: 2.5,
     outputPer1MUsd: 10,

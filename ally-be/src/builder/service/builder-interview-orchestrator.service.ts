@@ -44,6 +44,8 @@ import { BuilderPlatformContextService } from './builder-platform-context.servic
 import { BuilderReadinessService } from './builder-readiness.service';
 import { BuilderPrinciplesService } from './builder-principles.service';
 import { BuilderLessonsService } from './builder-lessons.service';
+import { PlanSpendService } from 'src/product-planning/service/plan-spend.service';
+
 import {
   BuilderInterviewToolsService,
   BuilderToolExecutionContext,
@@ -106,6 +108,9 @@ import {
   BUILDER_PROMPTS,
   BUILDER_AI_TASKS,
 } from '../constants/builder.constants';
+
+/** The registry row interview turns run under; used only to label plan spend rows. */
+const INTERVIEW_SPEND_TASK = 'builder-interview';
 
 /**
  * What the model is told when its own message was cut off at the output cap.
@@ -401,6 +406,9 @@ export class BuilderInterviewOrchestratorService {
     /** The lessons block (pinned, then retrieved and frozen per session). Optional, like the rest. */
     @Optional()
     private readonly lessons?: BuilderLessonsService,
+    /** Prices a plan session's interview into its plan spend ledger. Optional, like the rest. */
+    @Optional()
+    private readonly planSpend?: PlanSpendService,
   ) {}
 
   /**
@@ -572,7 +580,12 @@ export class BuilderInterviewOrchestratorService {
       );
     }
 
-    const history = await this.messageRepository.listBySession(sessionId);
+    // A plan's private Idea stage was a different conversation (the roadmap
+    // copilot, its own protocol). It stays in the visible transcript but is not
+    // replayed to the PRD interview, which starts from the hand-off instead.
+    const history = (
+      await this.messageRepository.listBySession(sessionId)
+    ).filter((m) => m.metadata?.planStage !== 'idea');
     const validatedTurns = await this.validatedTurnsEnabled();
     // The interview protocol rides on validated turns: its brief and its
     // question gate are checked the way a validated reply is.
@@ -1121,7 +1134,7 @@ export class BuilderInterviewOrchestratorService {
         tools,
       });
       turn.stopReason = finalMessage.stopReason;
-      this.recordUsage(
+      await this.recordUsage(
         finalMessage.usage,
         model,
         providerName,
@@ -1307,7 +1320,7 @@ export class BuilderInterviewOrchestratorService {
         system,
         messages,
       });
-      this.recordUsage(
+      await this.recordUsage(
         wrapUpMessage.usage,
         model,
         providerName,
@@ -1474,7 +1487,7 @@ export class BuilderInterviewOrchestratorService {
         false,
       );
       turn.stopReason = finalMessage.stopReason;
-      this.recordUsage(
+      await this.recordUsage(
         finalMessage.usage,
         model,
         providerName,
@@ -2589,15 +2602,27 @@ export class BuilderInterviewOrchestratorService {
     return messages;
   }
 
-  private recordUsage(
+  private async recordUsage(
     usage: AgentUsage | undefined,
     model: string,
     provider: string,
     sessionId: string,
     iteration: number,
-  ): void {
+  ): Promise<void> {
     const input = usage?.inputTokens ?? 0;
     const output = usage?.outputTokens ?? 0;
+    // A plan session's spend meter is a ledger written awaited, so the meter is
+    // never behind the turn (plans/roadmap-owns-planning rev 5.2 §B.11).
+    await this.planSpend?.recordForBuilderSession(sessionId, {
+      specialist: null,
+      taskId: INTERVIEW_SPEND_TASK,
+      provider,
+      model,
+      tokensIn: input,
+      tokensOut: output,
+      cachedTokens: usage?.cachedTokens ?? 0,
+      cacheWriteTokens: usage?.cacheCreationTokens ?? 0,
+    });
     void this.llmUsage.record({
       // The provider that actually ran, not a literal. Attributing a Gemini
       // turn to Anthropic makes per-provider cost unreadable, and this row is

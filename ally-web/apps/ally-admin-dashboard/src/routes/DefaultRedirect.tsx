@@ -108,7 +108,10 @@ export const DefaultRedirect: React.FC = () => {
   // fallback before the per-user tab list is known.
   if (!settled && !forceProceed) {
     return (
-      <div className="flex items-center justify-center h-screen" data-testid="default-redirect-loading">
+      <div
+        className="flex items-center justify-center h-screen"
+        data-testid="default-redirect-loading"
+      >
         <div className="w-8 h-8 border-2 border-gray-300 border-t-typography-800 rounded-full animate-spin" />
       </div>
     );

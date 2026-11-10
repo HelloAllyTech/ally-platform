@@ -120,6 +120,14 @@ export enum FeatureToggleKey {
   // per-admin from Admin User Management.
   PRODUCT_ROADMAP_QUICK_ADD = 'product_roadmap_quick_add',
 
+  // Product Planning (plans/roadmap-owns-planning rev 5.2 §B.12): the two roles
+  // of the idea-to-outcome plan. IDEAS is the author's door (park, work up and
+  // file an idea, through the plan or today's copilot interview and quick add);
+  // LEAD takes a filed idea through PRD, design, build, launch and outcome.
+  // Both platformOnly: an org-restricted admin is excluded from the whole flow.
+  PRODUCT_PLANNING_IDEAS = 'product_planning_ideas',
+  PRODUCT_PLANNING_LEAD = 'product_planning_lead',
+
   // Admin-of-admins surfaces (formerly SUPER_DUPER_ADMIN-only)
   ADMIN_USER_MANAGEMENT = 'admin_user_management',
   MULTI_TENANT_ALLOWLIST_MANAGEMENT = 'multi_tenant_allowlist_management',
@@ -466,6 +474,33 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     legacyGrants: SDA_ONLY,
   },
   {
+    key: FeatureToggleKey.PRODUCT_PLANNING_IDEAS,
+    label: 'Product Planning — Ideas',
+    description:
+      'Park ideas, work them up with the planning copilot and file them to the roadmap. Drafts stay private until you file. Also required for Quick Add.',
+    // Inert, like every key added after the role-collapse cutover. ON by
+    // default so every platform admin who can file today still can; switch it
+    // off per admin to remove their filing door.
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+    // Org-restricted admins sit outside planning (rev 5.2), but NOT via
+    // `platformOnly`: every platform admin holds this key by default, so
+    // platformOnly would make getEnabledKeys run its restriction lookup (an
+    // uncached count) on every toggle check for every admin. The restriction
+    // is enforced where planning happens instead — PlanAccessService, and
+    // getVisibleKeys for the console. See DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED.
+  },
+  {
+    key: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
+    label: 'Product Planning — Lead',
+    description:
+      "Take on filed ideas and lead them through PRD, design, build, launch and outcome review. Can approve paid design and build runs within a plan's budget.",
+    // Inert: granted per admin from Admin User Management. Nobody holds it
+    // until the plan flow launches (one launch, no pilot cohort).
+    legacyGrants: SDA_ONLY,
+    platformOnly: true,
+  },
+  {
     key: FeatureToggleKey.ADMIN_USER_MANAGEMENT,
     label: 'Admin User Management',
     description:
@@ -670,6 +705,15 @@ export function isPlatformOnlyToggle(key: string): boolean {
     (definition) => definition.key === key && definition.platformOnly === true,
   );
 }
+
+/**
+ * Default-on keys an org-restricted admin must still not use. Not `platformOnly`
+ * (see PRODUCT_PLANNING_IDEAS for why); the owning service enforces it, and
+ * FeatureToggleService.getVisibleKeys leaves them out of the caller's own list
+ * so the console hides what the service would refuse.
+ */
+export const DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED: readonly FeatureToggleKey[] =
+  [FeatureToggleKey.PRODUCT_PLANNING_IDEAS];
 
 /** Keys a platform admin holds while they have no row — see FeatureToggleDefinition.defaultEnabled. */
 export const DEFAULT_ENABLED_FEATURE_TOGGLE_KEYS: FeatureToggleKey[] =
