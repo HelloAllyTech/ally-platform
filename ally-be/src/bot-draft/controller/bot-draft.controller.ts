@@ -1,4 +1,3 @@
-import { teamNames } from '../service/team-names';
 import {
   BadRequestException,
   Body,
@@ -22,8 +21,6 @@ import { FeatureToggleKey } from '../../authorization/constants/admin-feature-to
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { AiUpstreamError } from '../../ai/exception/ai-upstream.exception';
 import { LoggerService } from '../../logger/logger.service';
-import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
-import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
 import { ONBOARDING_COPY } from '../copy/onboarding-copy';
 import { displayDomain, startUrlFrom } from '../crawl/url-scope';
 import { SiteCrawlService } from '../crawl/site-crawl.service';
@@ -39,7 +36,7 @@ import {
 import { BotDraftActor, BotDraftStatus } from '../enum/bot-draft.enum';
 import { BotDraftPublishService } from '../service/bot-draft-publish.service';
 import { BotDraftSessionService } from '../service/bot-draft-session.service';
-import { changes, draftView } from '../service/bot-draft-view';
+import { draftView } from '../service/bot-draft-view';
 import { BotDraftEventsService } from '../service/bot-draft-events.service';
 import { BotDraftService } from '../service/bot-draft.service';
 import { DraftCheckupService } from '../checkup/draft-checkup.service';
@@ -358,39 +355,6 @@ export class BotDraftController {
     return draftView(
       await this.drafts.update(draft, { status: BotDraftStatus.ABANDONED }),
     );
-  }
-}
-
-/** A chatbot's change history, from the draft that built it (20a-2 shows it with Undo). */
-@ApiTags('Onboarding')
-@ApiBearerAuth()
-@ApiSecurity('access-token')
-@Controller('v1/chatbots')
-export class ChatbotChangesController {
-  constructor(
-    private readonly drafts: BotDraftService,
-    private readonly access: ChatbotAccessService,
-  ) {}
-
-  @Get(':id/changes')
-  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
-    permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
-  })
-  async changes(@Param('id', ParseUUIDPipe) id: string) {
-    await this.access.assert(id, ChatbotMemberRole.VIEWER);
-    const draft = await this.drafts.findByChatbot(id);
-    return { changes: draft ? changes(draft.events) : [] };
-  }
-
-  @Get(':id/team-names')
-  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
-    permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
-  })
-  async teamNames(@Param('id', ParseUUIDPipe) id: string) {
-    await this.access.assert(id, ChatbotMemberRole.VIEWER);
-    const draft = await this.drafts.findByChatbot(id);
-    // Look and feel's Team photos (chunk 20d): the people onboarding learned about.
-    return { names: draft ? teamNames(draft.learned.facts) : [] };
   }
 }
 

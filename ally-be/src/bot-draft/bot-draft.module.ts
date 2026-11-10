@@ -7,10 +7,8 @@ import { ChatbotMember } from '../chatbot/entity/chatbot-member.entity';
 import { AiModule } from '../ai/ai.module';
 import { BotPageModule } from '../chatbot/bot-page/bot-page.module';
 import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
-import {
-  BotDraftController,
-  ChatbotChangesController,
-} from './controller/bot-draft.controller';
+import { BotDraftController } from './controller/bot-draft.controller';
+import { ChatbotChangesController } from './controller/chatbot-changes.controller';
 import { AssistantHomeController } from './home/assistant-home.controller';
 import { AssistantHomeService } from './home/assistant-home.service';
 import { ChangeService } from './home/change.service';
