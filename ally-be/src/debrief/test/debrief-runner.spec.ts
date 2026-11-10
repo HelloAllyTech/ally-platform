@@ -226,14 +226,15 @@ describe('DebriefRunnerService', () => {
       },
     });
     await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-    const announced = runs.query.mock.calls.map((c: any[]) =>
-      JSON.parse(c[1][1]),
+    const progress = (runs.query.mock.calls as any[][]).filter((c) =>
+      String(c[0]).includes('liveProgress'),
     );
+    const announced = progress.map((c) => JSON.parse(c[1][1]));
     expect(announced.map((p: any) => p.step)).toEqual(
       expect.arrayContaining(['safety_reader', 'guidance_lookup', 'writer']),
     );
     // After the Safety reader found a cue, the panel knows it.
-    expect((runs.query.mock.calls.slice(-1)[0] as any[])[1][2]).toBe(true);
+    expect(progress[progress.length - 1][1][2]).toBe(true);
   });
 
   it('publishes a draft that passes the checks and the bar, without revising', async () => {
@@ -617,6 +618,71 @@ describe('DebriefRunnerService', () => {
         (c) => c[0] === 'writer',
       )![1];
       expect(writer.cohort).toBeNull();
+    });
+  });
+
+  describe('durable runs (v9 FR-3)', () => {
+    const steps = () => ({
+      'safety-reader': [safetyWithCue],
+      analyst: [analyst],
+      writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+      evaluator: [evaluation(9)],
+    });
+
+    it('checkpoints each paid step on the run as it lands', async () => {
+      const { svc, runs } = build({ steps: steps() });
+      await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      const keys = (runs.query.mock.calls as any[][])
+        .filter((c) => String(c[0]).includes("'stepResults'"))
+        .map((c) => c[1][1]);
+      expect(keys).toEqual(
+        expect.arrayContaining([
+          'safety-reader#0',
+          'analyst#0',
+          'writer#0',
+          'evaluator#0',
+        ]),
+      );
+    });
+
+    it('resumes a run without paying again for the steps it already finished', async () => {
+      const { svc, ai, saved } = build({
+        steps: {
+          writer: [{ model: 'gemini-3-flash-preview', cards: cards() }],
+          evaluator: [evaluation(9)],
+        },
+      });
+      const stuck = {
+        id: 'run-1',
+        scenarioSessionId: 's1',
+        mode: DebriefRunMode.LIVE,
+        status: DebriefRunStatus.RUNNING,
+        fallbackRung: 0,
+        workspace: {
+          resumes: 1,
+          stepResults: {
+            'safety-reader#0': { res: safetyWithCue, est: 0.004 },
+            'analyst#0': { res: analyst, est: 0.06 },
+          },
+        },
+      } as any;
+      const run = await svc.resume(stuck);
+      const paid = ai.step.mock.calls.map((c: any[]) => c[0]);
+      expect(paid).not.toContain('safety-reader');
+      expect(paid).not.toContain('analyst');
+      expect(paid).toEqual(expect.arrayContaining(['writer', 'evaluator']));
+      expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
+      const last = saved[saved.length - 1];
+      const replayed = last.steps.filter(
+        (st: any) => st.note === 'resumed from checkpoint',
+      );
+      expect(replayed.map((st: any) => st.step)).toEqual(
+        expect.arrayContaining(['safety_reader', 'analyst']),
+      );
+      // The finished run keeps its outcome, not the checkpoint.
+      expect(last.workspace.stepResults).toBeUndefined();
+      expect(last.workspace.resumes).toBe(1);
+      expect(last.workspace.safety.risk_cues).toHaveLength(1);
     });
   });
 });

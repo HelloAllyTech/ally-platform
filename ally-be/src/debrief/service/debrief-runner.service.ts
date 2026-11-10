@@ -77,6 +77,11 @@ export interface RunOptions {
   settingOverrides?: Partial<DebriefBundle['settings']>;
   experimentId?: string | null;
   arm?: DebriefRunArm | null;
+  /**
+   * v9 FR-3: carry on this run (its worker died) instead of claiming a new
+   * one. Steps whose results were checkpointed are replayed, not paid again.
+   */
+  resume?: DebriefRun | null;
   /** For tests: the clock. */
   now?: () => number;
 }
@@ -326,7 +331,7 @@ export class DebriefRunnerService {
     const { release, bundle } = await this.resolveRelease(opts.release);
     const settings = { ...bundle.settings, ...(opts.settingOverrides ?? {}) };
 
-    const created = await this.claim(sessionId, opts, release);
+    const created = opts.resume ?? (await this.claim(sessionId, opts, release));
     if (!created) {
       return (await this.runs.findOne({
         where: { scenarioSessionId: sessionId, mode: opts.mode },
@@ -335,6 +340,14 @@ export class DebriefRunnerService {
     const run = created;
     const startedAt = now();
     const steps: DebriefRunStepRecord[] = [];
+    // v9 FR-3: each paid step's answer, checkpointed on the run as it lands,
+    // so a run whose worker dies resumes without paying for them again. Kept
+    // out of the in-memory workspace: the finished run does not store them.
+    const { stepResults: checkpoint = {}, ...workspaceNow } = (run.workspace ??
+      {}) as Record<string, any>;
+    const stepResults = checkpoint as Record<string, { res: any; est: number }>;
+    run.workspace = workspaceNow;
+    const resumed = !!opts.resume;
     let estimated = 0;
     let rung = FallbackRung.NONE;
 
@@ -419,7 +432,13 @@ export class DebriefRunnerService {
         languageSource = detected.source;
         run.language = detected.language;
       }
-      run.workspace = { ...run.workspace, languageSource };
+      run.workspace = {
+        ...run.workspace,
+        languageSource,
+        ...(resumed
+          ? { resumes: Number(run.workspace?.resumes ?? 0) || 1 }
+          : {}),
+      };
 
       const recipe: DebriefRecipe =
         session.learnerTurns < settings.standardMinLearnerTurns
@@ -516,6 +535,32 @@ export class DebriefRunnerService {
         explain: StepExplain<T> = {},
       ): Promise<T | null> => {
         announce({ step: s.step, ...(round ? { round } : {}) });
+        const key = `${path}#${round ?? 0}`;
+        const saved = stepResults[key];
+        if (saved) {
+          // Already paid for before the worker died: replay the answer.
+          steps.push({
+            step: s.step,
+            label: s.label,
+            status: 'done',
+            startedAt: new Date(now()).toISOString(),
+            ms: 0,
+            model: saved.res?.model ?? s.model,
+            estimatedUsd: Number(saved.est.toFixed(4)),
+            round,
+            note: 'resumed from checkpoint',
+            why: explain.why ?? null,
+            inputs: explain.inputs ?? [],
+            reasoning:
+              explain.reasoning?.(saved.res) ??
+              (typeof saved.res?.reasoning === 'string'
+                ? saved.res.reasoning
+                : null),
+            output: safeSummary(explain.summarise, saved.res),
+            budgetLeftUsd: budgetLeft(),
+          });
+          return saved.res as T;
+        }
         // A model whose breaker is open goes after its backup, not before.
         const models = modelsToTry(s.model, s.backupModel);
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -549,6 +594,8 @@ export class DebriefRunnerService {
               output: safeSummary(explain.summarise, res),
               budgetLeftUsd: budgetLeft(),
             });
+            stepResults[key] = { res, est };
+            await this.checkpoint(run.id, key, { res, est });
             return res;
           } catch (e) {
             const err = e as DebriefStepError;
@@ -1262,6 +1309,47 @@ export class DebriefRunnerService {
       return finish(DebriefRunStatus.FAILED, {
         error: (e as Error).message.slice(0, 1000),
       });
+    }
+  }
+
+  /**
+   * v9 FR-3: carry on a run whose worker died, on the GA release, with a
+   * fresh deadline. Checkpointed steps are replayed; the rest run as usual.
+   */
+  async resume(run: DebriefRun): Promise<DebriefRun> {
+    return this.run(run.scenarioSessionId, {
+      mode: run.mode,
+      resume: run,
+      experimentId: run.experimentId ?? null,
+      arm: run.arm ?? null,
+    });
+  }
+
+  /**
+   * Save one step's answer on the run as soon as it lands, key by key (the
+   * Safety reader and the Analyst land side by side). A failed save only
+   * means a resume would pay for that step again; it never fails the run.
+   */
+  private async checkpoint(
+    runId: string,
+    key: string,
+    value: { res: unknown; est: number },
+  ): Promise<void> {
+    try {
+      await this.runs.query(
+        `UPDATE debrief_runs
+            SET workspace = jsonb_set(
+                  coalesce(workspace, '{}'::jsonb)
+                    || jsonb_build_object('stepResults', coalesce(workspace->'stepResults', '{}'::jsonb)),
+                  ARRAY['stepResults', $2::text],
+                  $3::jsonb)
+          WHERE id = $1 AND status = 'running'`,
+        [runId, key, JSON.stringify(value)],
+      );
+    } catch (e) {
+      this.logger.warn(
+        `debrief run ${runId}: checkpoint of ${key} not saved: ${(e as Error).message}`,
+      );
     }
   }
 
