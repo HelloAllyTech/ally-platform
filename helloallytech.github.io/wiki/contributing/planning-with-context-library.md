@@ -70,6 +70,31 @@ slash commands for the `context-library` server.
 3. Start a new agent session in an Ally repo and approve the `context-library` server when it
    prompts — project-scoped MCP servers need approval once per project.
 
+**Using the Claude desktop app?** It is launched from the Dock or Finder, not from a shell, so it
+never reads your shell profile — the two variables expand to nothing and the server fails with
+*"'url' is not a valid URL"*. Give the app's launch environment the same values, from a terminal
+that has them:
+
+```bash
+launchctl setenv ALLY_CONTEXT_LIBRARY_URL "$ALLY_CONTEXT_LIBRARY_URL"; launchctl setenv ALLY_CONTEXT_LIBRARY_KEY "$ALLY_CONTEXT_LIBRARY_KEY"
+```
+
+Then quit the app fully (⌘Q) and reopen it. `launchctl setenv` lasts until you log out or
+restart, so to keep it, have a login item run the same two commands (a LaunchAgent with
+`RunAtLoad` that reads the values from your shell profile, so the key is never copied into a
+second file). Sessions launched from a terminal with `claude` need none of this.
+
+**Want the library outside the app directories too** — the monorepo root, or another repo
+entirely? Add it once at user scope, which every session on your machine sees:
+
+```bash
+claude mcp add --scope user --transport http context-library "$ALLY_CONTEXT_LIBRARY_URL" --header "Authorization: Bearer $ALLY_CONTEXT_LIBRARY_KEY"
+```
+
+This writes both values into your own `~/.claude.json` (private to your account, never a repo), so
+re-run it after you rotate the key. Inside an app directory the committed project entry of the
+same name takes precedence, so the desktop-app step above still applies there.
+
 Never commit either value or paste it into a page, issue or PR. The repos only ever reference the
 variable names.
 
@@ -81,7 +106,9 @@ variable names.
 | `CLAUDE.md` / `AGENTS.md` | State the rule above, so it is in context from the first turn |
 | `.claude/skills/context-library/SKILL.md` | A skill whose description names the trigger moments. Its one-line description stays in context every turn, so the rule keeps re-asserting itself deep into a long session |
 
-`ally-mobile` is not wired up yet: there, ask in conversation, or work from a repo that is.
+Every app directory commits all three — `ally-be`, `ally-ai`, `ally-ai-learn`, `ally-web`,
+`ally-mobile` and the wiki source. The monorepo root commits none, so a session started there has
+no library unless you added it at user scope (above).
 
 **Builder's design runs need no key of their own.** Builder's runner reaches the same MCP
 endpoint with the platform's service-to-service key (the `X-API-Key` it already uses for every
@@ -98,6 +125,7 @@ own sessions still use a reader key, as above.
 | Symptom | Likely cause |
 |---|---|
 | No `context-library` server in the session | One of the two variables was unset in the shell that launched the session, or the server was never approved. Export both and start a new session — `.mcp.json` is read at startup |
+| The server fails with *"'url' is not a valid URL"* | The session was launched without the variables — almost always the desktop app, which doesn't read your shell profile. See **Using the Claude desktop app?** above |
 | Every call is refused as unauthorised | The key was revoked or mistyped — create a new one in the Connect Claude Code sheet |
 | Calls cannot connect | The URL is wrong, or the network or server is down. Check the URL against the one the sheet shows; **Test connection** on a newly created key tells a refused key from an unreachable library (the sheet can only test a key while it is showing it) |
 
