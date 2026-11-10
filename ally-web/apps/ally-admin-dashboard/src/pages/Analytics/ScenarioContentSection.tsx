@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 
-import { StackedBarChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import {
   useGetScenarioCalibrationQuery,
@@ -9,6 +7,7 @@ import {
   useGetScenarioProgressionQuery,
   useGetScenarioRepeatImprovementQuery,
 } from "@api";
+import { StackedBarChart } from "@components/charts";
 import { AnalyticsGrain } from "@types";
 
 import { AnalyticsTabFilters, asOfStamp, windowLabel } from "./analyticsFilters";
@@ -346,15 +345,14 @@ export const CalibrationRows = ({ rows }: { rows: CalibrationRowView[] }) => (
     {rows.map(r => (
       <div
         key={r.key}
-        className="grid grid-cols-1 items-center gap-1 border-t border-[#f0f0f0] py-1.5 sm:grid-cols-[minmax(9rem,16rem)_1fr_11rem] sm:gap-3"
+        className="grid grid-cols-1 items-center gap-1 border-t border-gray-100 py-1.5 sm:grid-cols-[minmax(9rem,16rem)_1fr_11rem] sm:gap-3"
       >
         <span className="flex min-w-0 flex-col">
           <span className="text-xs text-typography-900">{r.label}</span>
           <span className="text-xs text-typography-500">{r.sublabel}</span>
         </span>
         <span
-          className="flex h-5 overflow-hidden rounded"
-          style={{ backgroundColor: "#f0f0f0" }}
+          className="flex h-5 overflow-hidden rounded bg-gray-100"
           role="img"
           aria-label={`${r.label}: ${r.segments.map(seg => `${seg.label} ${pct(seg.pct)}`).join(", ")}`}
         >
@@ -578,7 +576,7 @@ export const ScenarioContentSection = ({ query }: Pick<AnalyticsTabFilters, "que
               </thead>
               <tbody>
                 {gaps.map(g => (
-                  <tr key={g.key} className="border-t border-[#f0f0f0] text-typography-700">
+                  <tr key={g.key} className="border-t border-gray-100 text-typography-700">
                     <td className="py-1.5 pr-3">{g.scenario}</td>
                     <td className="py-1.5 pr-3">{g.skill}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{pct(g.opportunityPct)}</td>

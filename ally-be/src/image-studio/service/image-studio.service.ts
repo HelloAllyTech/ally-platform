@@ -77,6 +77,7 @@ export const toGeneratedImageDto = (
   id: row.id,
   batchId: row.batchId,
   slotKind: row.slotKind,
+  ...(row.slotKey ? { slotKey: row.slotKey } : {}),
   styleId: row.styleId,
   description: row.description,
   altText: row.altText ?? '',
@@ -622,7 +623,7 @@ export class ImageStudioService {
   async castSheets(
     user: TokenUser,
     characterIds: string[],
-    styleId: string,
+    styleId?: string,
   ): Promise<CastSheetDto[]> {
     const rows = await this.repository.findCastSheets(
       user.tenantId ?? null,

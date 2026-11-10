@@ -269,12 +269,12 @@ export const WarningAlt = createCarbonIcon(CWarningAlt);
 /* Colour variants — same Carbon glyph, original colour preserved via CSS     */
 /* -------------------------------------------------------------------------- */
 
-export const AddBlue = createCarbonIcon(CAdd, { className: "text-[#0957D0]" });
-export const BlueAdd = createCarbonIcon(CAdd, { className: "text-[#0957D0]" });
+export const AddBlue = createCarbonIcon(CAdd, { className: "text-blue-600" });
+export const BlueAdd = createCarbonIcon(CAdd, { className: "text-blue-600" });
 export const CloseRed = createCarbonIcon(CClose, { className: "text-[#F93535]" });
 export const TrashRed = createCarbonIcon(CTrashCan, { className: "text-[#FE6F64]" });
 export const BookWhite = createCarbonIcon(CBook, { className: "text-white" });
-export const BlackTick = createCarbonIcon(CCheckmark, { className: "text-[#212121]" });
+export const BlackTick = createCarbonIcon(CCheckmark, { className: "text-typography-900" });
 export const TickGreenBackground = createCarbonIcon(CCheckmarkFilled, {
   className: "text-[#66BB6A]",
 });

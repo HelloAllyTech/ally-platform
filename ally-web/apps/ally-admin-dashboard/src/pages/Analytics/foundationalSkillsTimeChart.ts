@@ -472,7 +472,7 @@ export const withheldOrdinals = (
 /**
  * The first and last ordinal the server stated, and the Hard share at each —
  * "whether practice moves learners from simple to complex scenarios"
- * (Stacks: "Simplifying Conditions for Task Class Sequencing").
+ * ("Simplifying Conditions for Task Class Sequencing").
  */
 export const progressionTakeaway = (
   r: PracticeProgressionResponse,

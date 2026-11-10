@@ -68,7 +68,7 @@ export interface DigestContent {
  * waiting on a release, and anything worth a second look.
  *
  * The public page is highlights; this is the detail and the reasoning behind
- * them — Stacks' *Adapt stakeholder communication to their role and cadence*.
+ * them — *Adapt stakeholder communication to their role and cadence*.
  * Sent once a day at a business-timezone hour, and only on a day with
  * something to say.
  */
@@ -302,7 +302,7 @@ ${footer}
    * roadmap, the same figures as Analytics → Highlights → Priority (AAQ-254),
    * which reads the same service.
    *
-   * Voters lead, highest first, as recognition (Stacks: *Social Presence and
+   * Voters lead, highest first, as recognition (*Social Presence and
    * Recognition in Crowdsourced Work*). Admins who have not voted are left off,
    * so nobody is ranked at the bottom of a table.
    *

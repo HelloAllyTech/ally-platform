@@ -35,7 +35,7 @@ const APPROACH_TAG: Record<string, "green" | "blue" | "purple"> = {
  * the PRD from that before it asks anything.
  *
  * Laid out as a checklist with a column for the reviewer's word, with one line of instructions
- * on top saying what to check — Stacks, "Guiding Reviewers with Explicit Instructions and
+ * on top saying what to check — "Guiding Reviewers with Explicit Instructions and
  * Checklists". Unanswered lines are confirmed by the send button, which says so: a brief that is
  * mostly right should cost one correction and one click, not a click per line.
  */

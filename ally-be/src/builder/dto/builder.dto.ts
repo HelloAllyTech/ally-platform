@@ -19,11 +19,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import {
-  BuilderLessonCategory,
-  BuilderLessonStatus,
-  BuilderSessionStatus,
-} from '../enum/builder.enum';
+import { BuilderSessionStatus } from '../enum/builder.enum';
 import {
   BUILDER_SLUG_MAX_LENGTH,
   BUILDER_TITLE_MAX_LENGTH,
@@ -602,62 +598,6 @@ export class ListBuilderSessionsQueryDto {
   @IsNumber()
   @Min(0)
   offset?: number = 0;
-}
-
-export class ListBuilderLessonsQueryDto {
-  @ApiPropertyOptional({
-    enum: BuilderLessonStatus,
-    description: 'Defaults to the active set — what runs actually read.',
-  })
-  @IsOptional()
-  @IsEnum(BuilderLessonStatus)
-  status?: BuilderLessonStatus;
-
-  @ApiPropertyOptional({ enum: BuilderLessonCategory })
-  @IsOptional()
-  @IsEnum(BuilderLessonCategory)
-  category?: BuilderLessonCategory;
-
-  @ApiPropertyOptional({ description: 'Only lessons scoped to this repo' })
-  @IsOptional()
-  @IsString()
-  repo?: string;
-}
-
-export class UpdateBuilderLessonDto {
-  @ApiPropertyOptional({ description: 'Rewrite the lesson text' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(2_000)
-  lesson?: string;
-
-  @ApiPropertyOptional({ enum: BuilderLessonCategory })
-  @IsOptional()
-  @IsEnum(BuilderLessonCategory)
-  category?: BuilderLessonCategory;
-
-  @ApiPropertyOptional({
-    enum: BuilderLessonStatus,
-    description:
-      'Activate or retire it by hand. The curator respects a human decision.',
-  })
-  @IsOptional()
-  @IsEnum(BuilderLessonStatus)
-  status?: BuilderLessonStatus;
-
-  @ApiPropertyOptional({
-    description:
-      'Pinned lessons are always in context and the curator may never edit or retire them.',
-  })
-  @IsOptional()
-  @IsBoolean()
-  pinned?: boolean;
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
 }
 
 export class BuilderResearchDto {

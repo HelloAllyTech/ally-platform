@@ -147,14 +147,13 @@ export const ALLOWED_TABLES: Readonly<Record<string, string>> = Object.freeze({
   // health workers' own questions, and the view nulls `query` on any row flagged
   // sensitive. Model-authored SQL could otherwise reach the column inside an
   // aggregate, so the fence belongs in the relation rather than in a rule someone
-  // has to remember. Queries typed by an admin or composed by the interview agent
-  // are not sensitive and stay readable.
+  // has to remember. Queries typed by an admin are not sensitive and stay readable.
   //
   // The three judgment/passage tables are raw: they carry no query text at all.
   // Segment every one of them by `consumer` — the admin preview is an operator
   // probing thresholds, not traffic.
   analytics_agent_kb_retrievals:
-    'One row per corpus retrieval: the query as issued, the similarity floor used, per-pass hit counts and what was returned. SEGMENT BY `consumer` (interview_agent vs admin_preview) before reading any trend — the preview is an operator probing thresholds.',
+    'One row per corpus retrieval: the query as issued, the similarity floor used, per-pass hit counts and what was returned. SEGMENT BY `consumer` (whatsapp_bot vs admin_preview; ally_guide and debrief rows predate their move to the Context Library) before reading any trend — the preview is an operator probing thresholds.',
   kb_retrieval_passages:
     'Every candidate passage a retrieval considered, INCLUDING the ones shaping discarded (`outcome`), with its `similarity` and which pass it came from. Join to kb_retrieval_passage_judgments on passage_id for the similarity/relevance distribution.',
   kb_retrieval_judgments:

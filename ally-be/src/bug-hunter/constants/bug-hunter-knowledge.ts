@@ -18,12 +18,6 @@ export interface BugKnowledge {
   featureCards: BugHunterFeatureMap[];
 }
 
-export const EMPTY_KNOWLEDGE: BugKnowledge = {
-  playbooks: [],
-  precedents: [],
-  featureCards: [],
-};
-
 export const renderKnowledge = (
   k: BugKnowledge | null | undefined,
 ): string[] =>

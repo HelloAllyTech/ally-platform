@@ -23,6 +23,7 @@ import { AnalyticsAgentModule } from './analytics-agent/analytics-agent.module';
 import { AnalyticsSuggestionsModule } from './analytics-suggestions/analytics-suggestions.module';
 import { BugHunterModule } from './bug-hunter/bug-hunter.module';
 import { BuilderModule } from './builder/builder.module';
+import { ContextLibraryModule } from './context-library/context-library.module';
 import { CourseCopilotModule } from './course-copilot/course-copilot.module';
 import { GuideModule } from './guide/guide.module';
 import { DebriefModule } from './debrief/debrief.module';
@@ -112,6 +113,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     AnalyticsSuggestionsModule,
     BugHunterModule,
     BuilderModule,
+    ContextLibraryModule,
     CourseCopilotModule,
     // The Ally guide (plans/ally-guide/plan.md) — off until its kill switch is on.
     GuideModule,

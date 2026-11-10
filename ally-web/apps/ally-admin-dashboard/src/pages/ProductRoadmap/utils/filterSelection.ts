@@ -3,8 +3,8 @@
  *
  * WHY THIS EXISTS: the six checkbox facets used to render as ~19 always-visible pills in a
  * wrapping row three lines deep — the exact failure RoadmapAdvancedFilters' docblock predicted for
- * inline chip groups, and past the point where extra controls read as information at all (Stacks:
- * "Signal Overload Creates Noise"). They now live behind the admin app's standard FilterDropdown,
+ * inline chip groups, and past the point where extra controls read as information at all
+ * ("Signal Overload Creates Noise"). They now live behind the admin app's standard FilterDropdown,
  * which speaks one flat shape: every section is `string[]`, keyed by section id.
  *
  * The board's own state is not that shape — three facets are enums, two are name arrays, and

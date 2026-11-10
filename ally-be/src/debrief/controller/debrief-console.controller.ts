@@ -33,7 +33,6 @@ import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefConsoleService } from '../service/debrief-console.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefImproverService } from '../service/debrief-improver.service';
-import { DebriefKnowledgeService } from '../service/debrief-knowledge.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
@@ -97,12 +96,6 @@ class ResolveFlagDto {
   @ValidateNested()
   @Type(() => CardCorrectionDto)
   correction?: CardCorrectionDto;
-}
-
-class ClinicalDto {
-  @ApiProperty()
-  @IsBoolean()
-  needsSignOff!: boolean;
 }
 
 class TenantLiveDto {
@@ -170,7 +163,6 @@ export class DebriefConsoleController {
     private readonly improver: DebriefImproverService,
     private readonly testSets: DebriefTestSetsService,
     private readonly feedback: DebriefFeedbackService,
-    private readonly knowledge: DebriefKnowledgeService,
   ) {}
 
   @Get('review')
@@ -454,40 +446,5 @@ export class DebriefConsoleController {
   ) {
     await this.agent.setRegion(tenantId, body.region, req.user.id);
     return { tenantId, region: body.region };
-  }
-
-  @Get('knowledge')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({
-    summary:
-      'The debrief knowledge base: each document, its audience and its clinical sign-off',
-  })
-  knowledgeList(@Req() req: AuthedRequest) {
-    return this.knowledge.listFor(req.user.id);
-  }
-
-  @Put('knowledge/:id/clinical')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({
-    summary: 'Mark a document clinical (served only once signed off), or not',
-    description: 'Marking either way clears any earlier sign-off.',
-  })
-  setClinical(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: ClinicalDto,
-  ) {
-    return this.knowledge.setClinical(id, body.needsSignOff);
-  }
-
-  @Post('knowledge/:id/sign-off')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({
-    summary:
-      "The clinical advisor signs off a clinical document's current text",
-    description:
-      'Only a platform admin with the "Debriefs — Clinical sign-off" toggle on. An edit afterwards needs a new sign-off.',
-  })
-  signOff(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
-    return this.knowledge.signOff(id, req.user.id);
   }
 }

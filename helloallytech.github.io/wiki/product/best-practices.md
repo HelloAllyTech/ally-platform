@@ -1,22 +1,22 @@
 ---
 title: Product Management Best Practices
 tags: [product, best-practices, hub, ux, design, prioritisation, agents]
-summary: DEPRECATED 2026-08-07, superseded by the Stacks MCP — kept for history. The former hub for Ally's product-management conventions — the house rules that apply to every product decision, plus a growing set of subsections (UI, Gamification, Data Visualisation, Prioritisation, User Personas, …).
-last_reconciled: 2026-07-31
+summary: DEPRECATED 2026-08-07, now superseded by the Context Library — kept for history. The former hub for Ally's product-management conventions — the house rules that apply to every product decision, plus a growing set of subsections (UI, Gamification, Data Visualisation, Prioritisation, User Personas, …).
+last_reconciled: 2026-11-09
 ---
 
 # Product Management Best Practices
 
 > [!WARNING]
-> **Deprecated — 2026-08-07. Superseded by the Stacks MCP.**
+> **Deprecated — 2026-08-07. Superseded by the Stacks MCP, and since 2026-11-09 by the Context Library.**
 >
-> Product guidance is no longer maintained in this wiki. It is retrieved from the external
-> **Stacks** corpus at planning time: *before writing an implementation plan, run
-> `/stacks:planning_context` with a description of the task, and incorporate relevant returned
-> guidance, citing chunk titles.* See
-> [Planning with the Stacks MCP](../contributing/planning-with-stacks.md).
+> Product guidance is no longer maintained in this wiki. It is retrieved from Ally's
+> **Context Library**: *whenever a product or engineering judgement comes up — before writing an
+> implementation plan, and again while coding — search it with the `search_context` tool, and
+> incorporate relevant returned guidance, citing chunk codes such as `[FP-0142]`.* See
+> [Working with the Context Library](../contributing/planning-with-context-library.md).
 >
-> **Do not add new principles here** — new product judgement calls go into Stacks. Nothing on
+> **Do not add new principles here** — new product judgement calls go into the Context Library. Nothing on
 > these pages is a gate any more, including the [Data Visualisation](data-visualisation.md)
 > checklist, which was previously enforced as one.
 
@@ -24,7 +24,7 @@ last_reconciled: 2026-07-31
 — [Analytics Agent](../platform/analytics-agent.md) alone references *Data Visualisation* 13 and
 27–28 and *UI & Interaction* 4–5 — so the numbering has to stay stable for those citations to
 resolve. Read them as a record of decisions this team made up to August 2026, and treat anything
-that contradicts current Stacks guidance as superseded.
+that contradicts current Context Library guidance as superseded.
 
 This section was the **product-side counterpart to the engineering docs**. The rest of this
 wiki explains *how the system is built*; this section explained *how we decided what to build
@@ -34,17 +34,17 @@ and how it should behave for the people using it*.
 
 ## 1. Subsections
 
-All subsections are **Deprecated** as of 2026-08-07 — superseded by Stacks. The table is kept so
+All subsections are **Deprecated** as of 2026-08-07 — superseded by Stacks, and now by the Context Library. The table is kept so
 the pages stay reachable and their inbound citations resolve.
 
 | Subsection | Covers | Maturity |
 |---|---|---|
-| [UI & Interaction](ui.md) | Screen and component decisions, states, hierarchy, accessibility, i18n, cross-surface consistency | Deprecated → Stacks |
-| [Gamification](gamification.md) | Badges, streaks, leaderboards, progress — and when *not* to gamify | Deprecated → Stacks |
-| [Data Visualisation](data-visualisation.md) | Charts, dashboards, metrics displays, and the honesty rules for showing numbers | Deprecated → Stacks |
-| [Prioritisation](prioritisation.md) | Deciding what gets built, in what order, and what gets explicitly dropped | Deprecated → Stacks |
-| [User Personas](user-personas.md) | Who we build for — counsellor, learner, trainer/admin, super-admin — and what each one actually needs | Deprecated → Stacks |
-| [AI-Product Patterns](ai-product-patterns.md) | Features where a model proposes and a person decides — disclosure, provenance, human-in-the-loop, recording the "no" | Deprecated → Stacks |
+| [UI & Interaction](ui.md) | Screen and component decisions, states, hierarchy, accessibility, i18n, cross-surface consistency | Deprecated → Context Library |
+| [Gamification](gamification.md) | Badges, streaks, leaderboards, progress — and when *not* to gamify | Deprecated → Context Library |
+| [Data Visualisation](data-visualisation.md) | Charts, dashboards, metrics displays, and the honesty rules for showing numbers | Deprecated → Context Library |
+| [Prioritisation](prioritisation.md) | Deciding what gets built, in what order, and what gets explicitly dropped | Deprecated → Context Library |
+| [User Personas](user-personas.md) | Who we build for — counsellor, learner, trainer/admin, super-admin — and what each one actually needs | Deprecated → Context Library |
+| [AI-Product Patterns](ai-product-patterns.md) | Features where a model proposes and a person decides — disclosure, provenance, human-in-the-loop, recording the "no" | Deprecated → Context Library |
 
 **Maturity** was one of `Draft` (written, not yet battle-tested), `Adopted` (the team follows
 it), or `Deprecated` (kept for history; says what replaced it). Every page in this section is now
@@ -97,8 +97,8 @@ not contradict these.
 10. **Instrument the decision.** If a feature ships without a way to tell whether it worked,
     the next prioritisation conversation about it will be pure opinion.
 11. ~~**File it back.**~~ *Superseded.* Product judgement calls no longer come back here — they
-    go into the Stacks corpus. See
-    [Planning with the Stacks MCP](../contributing/planning-with-stacks.md).
+    go into the Context Library. See
+    [Working with the Context Library](../contributing/planning-with-context-library.md).
 
 ---
 
@@ -106,8 +106,8 @@ not contradict these.
 
 > [!WARNING]
 > **Closed.** This section takes no new subsections and no new principles. Product judgement
-> calls now go into the Stacks corpus — see
-> [Planning with the Stacks MCP](../contributing/planning-with-stacks.md). The process below is
+> calls now go into the Context Library — see
+> [Working with the Context Library](../contributing/planning-with-context-library.md). The process below is
 > retained only to document how these pages were built.
 
 Follow the standard wiki [Ingestion Flow](../getting-started.md) plus these specifics:
@@ -140,7 +140,7 @@ nobody applies.
 ## 4. Backlog of subsections
 
 **Abandoned** — these were never written here and will not be. They are left as a record of the
-topics the team had identified as gaps; each is worth checking against Stacks when the question
+topics the team had identified as gaps; each is worth checking against the Context Library when the question
 next comes up.
 
 - Onboarding & first-run experience

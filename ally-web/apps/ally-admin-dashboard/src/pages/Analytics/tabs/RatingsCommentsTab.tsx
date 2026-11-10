@@ -134,12 +134,14 @@ const SummaryStrip = ({
               onClick={() => onPickStar(d.rating)}
               title={`${d.count} rated ${d.rating}, ${d.withComment} with a comment`}
               className={`flex flex-col gap-1 rounded border px-2 py-2 text-left text-xs transition-colors ${
-                active ? "border-[#0f62fe] bg-[#edf5ff]" : "border-border-light hover:bg-[#f4f4f4]"
+                active
+                  ? "border-blue-600 bg-blue-50"
+                  : "border-border-light hover:bg-background-secondary"
               }`}
             >
               <span className="font-medium text-typography-900">{d.rating} ★</span>
               <span
-                className="block h-1.5 rounded-sm bg-[#8d8d8d]"
+                className="block h-1.5 rounded-sm bg-neutral-400"
                 style={{ width: `${Math.max(4, (d.count / max) * 100)}%` }}
                 aria-hidden="true"
               />
@@ -170,7 +172,7 @@ const FeedRow = ({
         <Link
           to={ROUTES.ROLEPLAY_SESSION_LOG_DETAIL(item.sessionId)}
           title="Open this session in Roleplay Logs"
-          className="text-[#0f62fe] hover:underline"
+          className="text-blue-600 hover:underline"
         >
           {formatDate(item.sessionAt)}
         </Link>

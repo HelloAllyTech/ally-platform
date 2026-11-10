@@ -13,9 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.exceptions.custom_exceptions import (
-    EmbeddingFailedException,
     VectorDBDeleteFailedException,
-    VectorDBSearchFailedException,
     VectorDBUpdateFailedException,
 )
 from tests.api.v1.endpoints.base import BaseAPITest
@@ -137,75 +135,6 @@ class TestBulkUpsertEndpoint(_ResolvedKeyAPITest):
             json={"items": [chunk_payload(text="")]},
         )
         assert response.status_code == 422
-
-
-class TestSearchEndpoint(_ResolvedKeyAPITest):
-    def test_search_returns_passages(self, client: TestClient):
-        chunk_id = str(uuid4())
-
-        with patch(f"{SERVICE}.search") as mock_search:
-            mock_search.return_value = [
-                {
-                    "chunk_id": chunk_id,
-                    "document_id": str(uuid4()),
-                    "document_title": "WHO mhGAP Intervention Guide",
-                    "chunk_index": 3,
-                    "text": "Ask directly about intent.",
-                    "char_start": 10,
-                    "char_end": 36,
-                    "page_from": 44,
-                    "page_to": 44,
-                    "section_path": "Depression > Assessment",
-                    "source_url": "",
-                    "language": "en",
-                    "token_count": 9,
-                    "similarity": 0.5123,
-                }
-            ]
-
-            response = client.post(
-                "/api/v1/knowledge-chunks/search",
-                json={"query": "how do I ask about intent", "limit": 5},
-            )
-
-        assert response.status_code == 200
-        passages = response.json()["passages"]
-        assert passages[0]["chunk_id"] == chunk_id
-        # Page and section survive to the caller — they are what a citation is rendered
-        # from.
-        assert passages[0]["page_from"] == 44
-        assert passages[0]["section_path"] == "Depression > Assessment"
-        assert passages[0]["similarity"] == 0.5123
-
-    def test_search_embedding_failure_is_502(self, client: TestClient):
-        with patch(f"{SERVICE}.search") as mock_search:
-            mock_search.side_effect = EmbeddingFailedException("nope")
-            response = client.post(
-                "/api/v1/knowledge-chunks/search", json={"query": "q"}
-            )
-        assert response.status_code == 502
-
-    def test_search_vector_db_failure_is_503(self, client: TestClient):
-        with patch(f"{SERVICE}.search") as mock_search:
-            mock_search.side_effect = VectorDBSearchFailedException("down")
-            response = client.post(
-                "/api/v1/knowledge-chunks/search", json={"query": "q"}
-            )
-        assert response.status_code == 503
-
-    @pytest.mark.parametrize(
-        "body",
-        [
-            {"query": ""},  # min_length=1
-            {"query": "q", "limit": 0},  # ge=1
-            {"query": "q", "limit": 51},  # le=50
-            {"query": "q", "min_similarity": 1.5},  # le=1.0
-        ],
-    )
-    def test_search_validation(self, client: TestClient, body):
-        assert (
-            client.post("/api/v1/knowledge-chunks/search", json=body).status_code == 422
-        )
 
 
 class TestDeleteDocumentChunksEndpoint(_ResolvedKeyAPITest):
@@ -348,3 +277,67 @@ class TestGetChunkEndpoint(_ResolvedKeyAPITest):
 
     def test_get_chunk_rejects_non_uuid(self, client: TestClient):
         assert client.get("/api/v1/knowledge-chunks/not-a-uuid").status_code == 422
+
+
+class TestRetiredCollectionEndpoint(_ResolvedKeyAPITest):
+    """Dropping a retired corpus's collection: confirmed, and never a live corpus."""
+
+    DROP = "app.core.vector_db.weaviate.WeaviateDB.delete_collection"
+    URL = "/api/v1/knowledge-chunks/retired-collection"
+
+    @pytest.mark.parametrize("deleted", [True, False])
+    def test_drops_the_retired_collection(self, client: TestClient, deleted):
+        with patch(self.DROP) as mock_drop:
+            mock_drop.return_value = deleted
+            response = client.delete(
+                self.URL,
+                params={"collection": "CharacterChunk", "confirm": "CharacterChunk"},
+            )
+
+        assert response.status_code == 200
+        assert response.json() == {"deleted": deleted}
+        mock_drop.assert_called_once_with("CharacterChunk")
+
+    @pytest.mark.parametrize("name", ["GuideLibraryChunk", "DebriefKnowledgeChunk"])
+    def test_drops_the_corpora_retired_in_phase_6(self, client: TestClient, name):
+        with patch(self.DROP) as mock_drop:
+            mock_drop.return_value = True
+            response = client.delete(
+                self.URL, params={"collection": name, "confirm": name}
+            )
+
+        assert response.status_code == 200
+        mock_drop.assert_called_once_with(name)
+
+    @pytest.mark.parametrize(
+        "name", ["KnowledgeChunk", "AgentMemory", "CtxFirstPrinciples_v1"]
+    )
+    def test_refuses_any_collection_that_is_not_retired(self, client, name):
+        with patch(self.DROP) as mock_drop:
+            response = client.delete(
+                self.URL, params={"collection": name, "confirm": name}
+            )
+
+        assert response.status_code == 400
+        mock_drop.assert_not_called()
+
+    @pytest.mark.parametrize("confirm", [None, "", "characterchunk"])
+    def test_requires_exact_confirmation(self, client, confirm):
+        params = {"collection": "CharacterChunk"}
+        if confirm is not None:
+            params["confirm"] = confirm
+        with patch(self.DROP) as mock_drop:
+            response = client.delete(self.URL, params=params)
+
+        assert response.status_code == 400
+        mock_drop.assert_not_called()
+
+    def test_unreachable_index_is_503(self, client):
+        with patch(self.DROP) as mock_drop:
+            mock_drop.side_effect = VectorDBDeleteFailedException("down")
+            response = client.delete(
+                self.URL,
+                params={"collection": "CharacterChunk", "confirm": "CharacterChunk"},
+            )
+
+        assert response.status_code == 503

@@ -106,7 +106,11 @@ export interface DebriefSettings {
   deadlineMs: number;
   riskDeadlineMs: number;
   guidancePassagesPerMoment: number;
-  guidanceMinSimilarity: number;
+  /**
+   * Retired with the Knowledge Base's similarity floor: Debrief Guidance answers in relevance
+   * bands, not similarities. Releases made before it still carry the value; nothing reads it.
+   */
+  guidanceMinSimilarity?: number;
 }
 
 /** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */
@@ -172,7 +176,6 @@ export const IMPROVER_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
 export const IMPROVER_SETTINGS: Record<string, { min: number; max: number }> = {
   maxRevisionRounds: { min: 0, max: 3 },
   guidancePassagesPerMoment: { min: 0, max: 3 },
-  guidanceMinSimilarity: { min: 0.25, max: 0.6 },
   standardMinLearnerTurns: { min: 3, max: 10 },
 };
 
@@ -294,7 +297,6 @@ const SEED_RECIPES_BASE = {
     deadlineMs: 150_000,
     riskDeadlineMs: 180_000,
     guidancePassagesPerMoment: 2,
-    guidanceMinSimilarity: 0.35,
   },
   reply: DEBRIEF_REPLY_DEFAULT,
 };

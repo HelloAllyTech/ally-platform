@@ -300,7 +300,7 @@ interface UseCourseCopilotStreamOptions {
  * Token deltas are batched per animation frame: setState-per-delta re-renders the whole feed dozens
  * of times a second and the typing visibly stutters, which reads as the copilot struggling.
  *
- * Failure handling follows Stacks "Preserve State During Agent Failure in Multistep Tasks": a
+ * Failure handling follows "Preserve State During Agent Failure in Multistep Tasks": a
  * failed or stopped turn keeps everything already on screen, says why on the bubble, and offers
  * Retry — it never wipes the feed or restarts the interview. The one exception is a turn the
  * server REFUSED (`turn_in_progress`): nothing of it exists server-side, so its bubbles come back

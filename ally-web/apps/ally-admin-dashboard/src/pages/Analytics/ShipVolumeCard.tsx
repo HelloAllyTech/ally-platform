@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { StackedBarChart } from "@carbon/charts-react";
-
 import { useGetShipVolumeQuery } from "@api";
+import { StackedBarChart } from "@components/charts";
 
 import { GROUPING_LABEL, bucketTitle } from "./analyticsGrouping";
 import { defaultControlsFor, useChartControls } from "./chartControls";

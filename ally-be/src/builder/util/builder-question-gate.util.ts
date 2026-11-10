@@ -11,7 +11,7 @@
  * are what catch that.
  *
  * "Explain why clarification is needed" and "reference what was already said"
- * are Stacks, "Sequencing clarification questions to avoid user overwhelm".
+ * are "Sequencing clarification questions to avoid user overwhelm".
  */
 
 export const BUILDER_QUESTION_TYPES = [

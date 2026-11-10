@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 
 import { ScaleTypes } from "@carbon/charts";
-import { ComboChart } from "@carbon/charts-react";
 
 import { useGetCourseUnitsQuery } from "@api";
+import { ComboChart } from "@components/charts";
 
 import { bucketTitle, withoutInProgress } from "./analyticsGrouping";
 import { ChartDetailModal } from "./ChartDetailModal";

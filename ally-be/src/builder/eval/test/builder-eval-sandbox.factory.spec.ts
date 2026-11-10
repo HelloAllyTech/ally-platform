@@ -102,9 +102,12 @@ describe('BuilderEvalSandboxFactory', () => {
       agentLlmFactory as any,
       { resolve: jest.fn() } as any,
       { listAll: jest.fn().mockResolvedValue([]) } as any,
+      // The Context Library's agent chunks: Builder Lessons, read-only here.
       {
-        listActiveForRepos: jest.fn().mockResolvedValue([]),
-        listRecent: jest.fn().mockResolvedValue([]),
+        listActive: jest.fn().mockResolvedValue([]),
+        search: jest.fn().mockResolvedValue([]),
+        activeByCodes: jest.fn().mockResolvedValue([]),
+        card: jest.fn(),
       } as any,
       githubRead as any,
       {} as any,

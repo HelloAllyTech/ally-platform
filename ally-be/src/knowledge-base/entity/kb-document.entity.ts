@@ -1,7 +1,6 @@
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import {
-  KbCharacterTopic,
   KbCorpus,
   KbDocumentSourceType,
   KbDocumentStatus,
@@ -36,13 +35,8 @@ import {
  * so the warning is answered structurally instead: ally-ai's retrieval takes a REQUIRED
  * audience argument, and this platform refuses to answer a WhatsApp contact whose
  * organisation it could not resolve rather than falling back to something plausible.
- *
- * The Ally guide's library adds OWNERSHIP beside audience — `ownerTenantId`, see there —
- * because its organisation documents are an organisation's own, managed by that
- * organisation, rather than central material shared out.
  */
 @Entity('kb_documents')
-@Index('idx_kb_documents_corpus_owner', ['corpus', 'ownerTenantId'])
 @Index('idx_kb_documents_corpus_owner_chatbot', ['corpus', 'ownerChatbotId'])
 export class KbDocument extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -55,20 +49,6 @@ export class KbDocument extends BaseWithoutTenantEntity {
   @Index('idx_kb_documents_corpus')
   @Column({ type: 'varchar', length: 32, default: KbCorpus.WHATSAPP_QA })
   corpus!: KbCorpus;
-
-  /**
-   * Which parts of a character this document helps ground — a curator's hint that
-   * BOOSTS those topics in retrieval rather than restricting to them. Empty means
-   * "no hint", which is a perfectly good answer and the default. Only meaningful
-   * for the character-library corpus.
-   */
-  @Column({
-    name: 'character_topics',
-    type: 'text',
-    array: true,
-    default: () => "'{}'",
-  })
-  characterTopics!: KbCharacterTopic[];
 
   @Index('idx_kb_documents_title')
   @Column({ type: 'text' })
@@ -143,54 +123,14 @@ export class KbDocument extends BaseWithoutTenantEntity {
   isGlobal!: boolean;
 
   /**
-   * The organisation this document BELONGS to, for corpora whose documents have an owner
-   * (KB_OWNED_CORPORA — the Ally guide's library). Null means the platform's own.
-   *
-   * Ownership, not audience, and the two are kept apart on purpose. Audience is who may
-   * RETRIEVE a document (`isGlobal` + `kb_document_tenants`) and is what every search filters
-   * on; ownership is who may MANAGE it, and is what the organisation-scoped admin routes
-   * filter on — an organisation lists, adds and removes its own documents and can never reach
-   * another's or the platform's. For an owned corpus the audience is derived from this column
-   * at creation (null → global; an organisation → that organisation only) and cannot be
-   * retargeted afterwards, so the two never disagree.
-   *
-   * Always null on the other corpora, whose documents are curated centrally and targeted by
-   * hand. A uuid, like `kb_document_tenants.tenant_id`, so the two compare without a cast.
-   */
-  @Column({ type: 'uuid', name: 'owner_tenant_id', nullable: true })
-  ownerTenantId?: string | null;
-
-  /**
    * The chatbot this document belongs to, when it was uploaded on that chatbot's Knowledge tab
-   * (`whatsapp_qa` only, chunk 3d). Null is a shared library document. Like `ownerTenantId`, it
-   * says who may SEE and MANAGE the document: the library and every other bot's picker leave it
+   * (`whatsapp_qa` only, chunk 3d). Null is a shared library document. Ownership, not audience:
+   * it says who may SEE and MANAGE the document: the library and every other bot's picker leave it
    * out, and only its chatbot's editors change it. What a bot answers from is still
    * `chatbot_documents`, where an owned document is attached when it is created.
    */
   @Column({ type: 'uuid', name: 'owner_chatbot_id', nullable: true })
   ownerChatbotId?: string | null;
-
-  /**
-   * Clinical content (plan §8.5): served to the Debrief agent only once the
-   * clinical advisor has signed off this exact content. Set by the Ally team.
-   */
-  @Column({ type: 'boolean', name: 'needs_clinical_sign_off', default: false })
-  needsClinicalSignOff!: boolean;
-
-  @Column({ type: 'int', name: 'clinical_signed_off_by', nullable: true })
-  clinicalSignedOffBy?: number | null;
-
-  @Column({ type: 'timestamp', name: 'clinical_signed_off_at', nullable: true })
-  clinicalSignedOffAt?: Date | null;
-
-  /** The content hash that was signed off; an edit after it needs a new sign-off. */
-  @Column({
-    type: 'varchar',
-    length: 64,
-    name: 'clinical_signed_off_hash',
-    nullable: true,
-  })
-  clinicalSignedOffHash?: string | null;
 
   @Index('idx_kb_documents_status')
   @Column({

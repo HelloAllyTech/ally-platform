@@ -1,6 +1,14 @@
 # ADR: Where Bug Hunter's memory lives, and how it is searched
 
-Status: **Proposed, prototype built** (spike for roadmap item OPP-0739, 23 September 2026).
+Status: **Superseded** (2026-11-09) by the Context Library, phase 5 (`docs/context-library/PLAN.md`
+§6.3, §11 in the monorepo): Bug Hunter's notes and Builder's lessons are now two Context
+Library collections (Bug Hunter Notes, Builder Lessons) written by `writeAgentChunk` and curated
+by one agent curator. The `agent_memories` and `builder_lessons` tables, the `src/agent-memory/`
+module, both curators and ally-ai's `AgentMemory` collection are deleted. Kept as the record of
+why Bug Hunter's memory works the way it does; the paths below describe the code as it was.
+<!-- docs-path-lint: ignore -->
+
+Was: **Proposed, prototype built** (spike for roadmap item OPP-0739, 23 September 2026).
 Decision owner: Shubham Bhoite. Supersedes nothing; the memory items
 OPP-0714 (lessons notebook), OPP-0740 (memory as a tool), OPP-0715
 (exemplar bank) and OPP-0737 (retrieval-augmented verification) build on it.
@@ -182,6 +190,8 @@ then ally-be.
   https://vectorize.io/articles/best-ai-agent-memory-systems,
   https://atlan.com/know/best-ai-agent-memory-frameworks-2026/
 - In-repo precedents: `src/product-roadmap/service/roadmap-vector.service.ts`,
+  <!-- docs-path-lint: ignore -->
   `src/builder/service/builder-lesson-curator.service.ts`,
+  <!-- docs-path-lint: ignore -->
   `src/builder/entity/builder-lesson.entity.ts`, migration
   `1871000000000-CreateProductRoadmapTables.ts` (no pgvector note).

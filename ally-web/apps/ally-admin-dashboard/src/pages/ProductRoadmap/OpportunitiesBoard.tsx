@@ -300,7 +300,7 @@ export const OpportunitiesBoard: React.FC<OpportunitiesBoardProps> = ({
                         the height of EVERY row — the widest single cause of how few of 500+
                         opportunities fit on a screen. It is secondary context like the type and the
                         filer, it stays filterable and it is still on every row, so it belongs on
-                        this line (Stacks: "Visual Hierarchy: Controlling Perception Order" —
+                        this line ("Visual Hierarchy: Controlling Perception Order" —
                         visibility proportional to importance). */}
                     {/* Inline text flow, NOT a flex row. As flex items with `gap-2` these five
                         spans wrapped with an 8px row-gap and stood 40px tall — taller than the

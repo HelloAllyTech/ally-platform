@@ -2,7 +2,7 @@
 title: Contributing Guide
 tags: [contributing, sdlc, workflow, standards]
 summary: Branch naming, commit conventions, code standards, and the pull-request process shared across all Ally repositories.
-last_reconciled: 2026-07-28
+last_reconciled: 2026-11-09
 ---
 
 # Contributing Guide
@@ -56,7 +56,7 @@ Commitlint / Husky hooks enforce this in the TypeScript repos.
 
 ## Development Workflow
 
-0. **Get Stacks context — before you plan, and again whenever a product judgement comes up.** Search the library and incorporate relevant returned guidance, citing chunk titles — see [Working with the Stacks MCP](planning-with-stacks.md). An agent calls `search_chunks` on its own initiative, so you do not have to fetch context for it; `/stacks:planning_context` is there for when *you* want the context in front of you. Planning is the most important moment, not the only one: reach for it mid-implementation too, whenever you would otherwise invent an empty or failure state, a user-facing label, a threshold or a cadence. This is where product guidance now comes from; the in-wiki [Product Management Best Practices](../product/best-practices.md) section was deprecated on 2026-08-07. Trivial mechanical changes (rename, dependency bump, typo) skip this.
+0. **Search the Context Library — before you plan, and again whenever a product or engineering judgement comes up.** Incorporate relevant returned guidance and cite the codes you apply, such as `[FP-0142]` — see [Working with the Context Library](planning-with-context-library.md). An agent calls `search_context` on its own initiative, so you do not have to fetch context for it; the `planning_context` MCP prompt is there for when *you* want the context in front of you. Planning is the most important moment, not the only one: reach for it mid-implementation too, whenever you would otherwise invent an empty or failure state, a user-facing label, a threshold or a cadence. This is where product guidance now comes from: the Context Library replaced Stacks on 2026-11-09, and the in-wiki [Product Management Best Practices](../product/best-practices.md) section was deprecated on 2026-08-07. Trivial mechanical changes (rename, dependency bump, typo) skip this.
 1. **Create a feature branch** following the naming convention.
 2. **Make your changes** following the code standards for that repo.
 3. **Test thoroughly** — run tests (`npm test` / `poetry run pytest`) and linters (`npm run lint` / `poetry run flake8 app/`).
@@ -91,7 +91,7 @@ Same format as commit messages: `<type>: short summary`.
 ### PR Description
 Include: a **Summary**, a **Changes** list, **Testing** notes (unit/integration/manual), **Related Issues** (`Closes #123`), and screenshots for UI changes. Use a checklist (style, self-review, comments, docs updated, no new warnings, tests pass).
 
-For user-facing PRs, name the Stacks guidance the plan applied (by chunk title) so a reviewer can trace the product decisions — see [Planning with the Stacks MCP](planning-with-stacks.md).
+For user-facing PRs, cite the Context Library codes the plan applied (e.g. `[FP-0142]`) so a reviewer can trace the product decisions — see [Working with the Context Library](planning-with-context-library.md).
 
 ### Review
 1. Submit the PR with a clear title and description.

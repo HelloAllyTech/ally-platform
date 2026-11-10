@@ -18,10 +18,13 @@ rules:
     watch:
       - "app/core/vector_db/constants.py"
       - "app/migrations/**"
+      - "app/core/context_library/collection_schema.py"
     requires: wiki:repos/ally-ai.md
     why: >
       Weaviate collections are cross-repo state — ally-be's DATA_SCHEMA.md points at this
-      file as the source of truth for the vector side of the platform.
+      file as the source of truth for the vector side of the platform. The Context Library's
+      `Ctx<Collection>_v{N}` collections are created on demand from `collection_schema.py`
+      rather than by a migration, so that file is watched too.
 
   - id: repo-page-architecture
     watch:

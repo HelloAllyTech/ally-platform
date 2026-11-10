@@ -132,7 +132,6 @@ export class RetrievalLogProcessor extends BaseEventProcessor {
           // Absent means sensitive. See the class docstring.
           querySensitive: event.query_sensitive !== false,
           queryLanguage: event.query_language ?? null,
-          characterTopics: [],
           tags: Array.isArray(event.tags) ? event.tags.map(String) : [],
           minSimilarity: RetrievalLogProcessor.toFloat(event.min_similarity),
           declineSimilarity:

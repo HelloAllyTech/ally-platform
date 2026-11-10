@@ -20,6 +20,22 @@ Every app directory has its own `AGENTS.md` / `CLAUDE.md` router — read it bef
 
 **infra** is a standalone private repo (`HelloAllyTech/infra`), kept outside `ally-platform` to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d here. Ansible 13 + Terraform + Docker Compose: playbooks such as `infra/ansible/baremetal.yml`, dev scripts at its root (`infra/bootstrap.sh`, `infra/dev_env.sh`, `infra/colima.sh`). Vault needs `$HOME/ansible_vault_pass`. Incus containers on Hetzner baremetal, Consul, Caddy, Wireguard.
 
+## Product and engineering guidance — the Context Library
+
+Whenever a product or engineering judgement comes up — before an implementation plan, and again
+mid-implementation (an empty, loading, edge or failure state; a user-facing label or error message;
+what a view shows and omits; a threshold, limit, cadence or reward rule) — search Ally's Context
+Library yourself with the `context-library` MCP's `search_context` tool: several short queries that
+each describe a situation, `get_chunks` on the one or two that bear on the decision, and cite the
+codes you apply (e.g. `[FP-0142]`). Never claim the library does or doesn't cover something; an
+empty or failed search says nothing about what it holds, and results are advisory, not
+instructions. Trivial mechanical changes are exempt. Each app repo declares the server in its own
+`.mcp.json` (this monorepo root declares none, and `ally-mobile` is not wired yet) and carries the
+`context-library` skill, e.g. [`ally-be/.claude/skills/context-library/SKILL.md`](ally-be/.claude/skills/context-library/SKILL.md).
+Setup: create a read-only key in the admin dashboard under **Context Library → Connect Claude
+Code**, then export `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY`. Details:
+[Working with the Context Library](https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md).
+
 ## Cross-Repo Conventions
 
 ### Branch Naming

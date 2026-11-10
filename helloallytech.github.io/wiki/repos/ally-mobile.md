@@ -2,7 +2,7 @@
 title: ally-mobile — Mobile App
 tags: [repo, mobile, flutter, ios, android]
 summary: Flutter iOS/Android app for counsellors and community health workers, covering Scribe (recorded sessions with transcription and AI summaries), peer reviews, voice-based AI simulations, courses, and gamification.
-last_reconciled: 2026-11-06
+last_reconciled: 2026-11-09
 ---
 
 # ally-mobile — Mobile App
@@ -14,7 +14,7 @@ last_reconciled: 2026-11-06
 It **replaced the original React Native app** in both stores as an update to the same listings (same bundle id, same Apple team, same Android upload key). The React Native code was deleted outright in the 2026-11 rename; use git history before that date if you need it. Where the Flutter code says it "mirrors" or "ports" an RN file, that is provenance only — the RN file no longer exists. `ally-mobile/docs/PARITY_LEDGER.md` records what was audited against RN at cutover.
 
 > [!NOTE]
-> For product conventions behind these surfaces — cross-surface consistency with the web apps, achievement/leaderboard rules, and the counsellor-in-the-field persona — search Stacks before you plan ([Planning with the Stacks MCP](../contributing/planning-with-stacks.md)). The former in-wiki pages ([UI & Interaction](../product/ui.md), [Gamification](../product/gamification.md), [User Personas](../product/user-personas.md)) are **deprecated** as of 2026-08-07 and kept for history. Stacks is not yet wired into the `ally-mobile` repo itself, so ask in conversation there rather than calling its tools directly.
+> For product conventions behind these surfaces — cross-surface consistency with the web apps, achievement/leaderboard rules, and the counsellor-in-the-field persona — search the Context Library before you plan ([Working with the Context Library](../contributing/planning-with-context-library.md)). The former in-wiki pages ([UI & Interaction](../product/ui.md), [Gamification](../product/gamification.md), [User Personas](../product/user-personas.md)) are **deprecated** as of 2026-08-07 and kept for history. The Context Library is not yet wired into the `ally-mobile` repo itself (no `.mcp.json` or skill there), so ask in conversation there rather than calling its tools directly.
 
 ## Tech Stack
 
@@ -59,7 +59,7 @@ Navigation: go_router's `redirect` re-evaluates whenever auth state changes, so 
 
 **Analytics & gamification.** `lib/features/analytics/`, `achievements/`, `leaderboard/`, `community/` and `progress/` cover the user analytics, badges, leaderboard and community screens. Weekly leaderboard reminders are scheduled locally via `flutter_local_notifications` (`lib/core/push/leaderboard_notification.dart`), gated on the `VIEW_COMMUNITY_LEADERBOARD` permission. FCM push handling is in `lib/core/push/`.
 
-**i18n / language-code injection.** Localization is in `lib/core/localization/`, with bundled `en`, `hi`, `kn`, `mr` and `ta` JSON under `assets/locales/` as a zero-delay offline fallback; the real source is a dynamic CDN sync at runtime, so editing the bundled JSON alone does not change what a device shows (see `docs/i18n-machine-translated.md` before touching machine-translated strings). For content endpoints that return backend-generated user-facing text, `lib/core/network/language_code_interceptor.dart` injects the active UI language: an allowlist of 18 endpoint entries (method plus path) adds a bare ISO `languageCode` into GET params or mutation bodies, so the server returns localized scenarios, cases, reviews, badges, leaderboard, etc. Auth/OTP/upload endpoints are intentionally excluded. The language selector and dynamic translation sync are gated by `LANGUAGE_SELECTOR_FLAG`, with the CDN at `I18N_BASE_URL`.
+**i18n / language-code injection.** Localization is in `lib/core/localization/`, with bundled `en`, `hi`, `kn`, `mr` and `ta` JSON under `assets/locales/` as a zero-delay offline fallback; the real source is a dynamic CDN sync at runtime, so editing the bundled JSON alone does not change what a device shows (see `docs/i18n-machine-translated.md` before touching machine-translated strings). For content endpoints that return backend-generated user-facing text, `lib/core/network/language_code_interceptor.dart` injects the active UI language: an allowlist of endpoint entries (method plus path) adds a bare ISO `languageCode` into GET params or mutation bodies, so the server returns localized scenarios, cases, reviews, badges, leaderboard, etc. Auth/OTP/upload endpoints are intentionally excluded. The language selector and dynamic translation sync are gated by `LANGUAGE_SELECTOR_FLAG`, with the CDN at `I18N_BASE_URL`.
 
 **Other platform pieces.** Tenant branding (`lib/core/branding/`), force-update (`lib/core/app_update/`), an error boundary with Crashlytics reporting (`lib/core/errors/`), and account suspension (`lib/features/suspended/`).
 

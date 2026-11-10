@@ -14,7 +14,12 @@ import {
 } from '../type/builder-sse.type';
 import { BuilderPrdService } from './builder-prd.service';
 import { BuilderGithubReadService } from './builder-github-read.service';
-import { BuilderStacksService } from './builder-stacks.service';
+import {
+  ContextToolsService,
+  contextToolDefinitions,
+} from 'src/context-library/service/context-tools.service';
+import { ClUseCase } from 'src/context-library/enum/context-library.enum';
+import { BUILDER_PRINCIPLE_TOOLS } from '../constants/builder-principles.constants';
 import { BuilderEvidenceService } from './builder-evidence.service';
 import { BuilderCatalogService } from './builder-catalog.service';
 import { BuilderEvidenceLogService } from './builder-evidence-log.service';
@@ -28,7 +33,6 @@ import {
   BUILDER_WIKI_REPO,
   isBuilderReadableRepo,
 } from '../constants/builder-repos.constants';
-import { BUILDER_STACKS_DEFAULT_RESULTS } from '../constants/builder.constants';
 import {
   applyTolerantPrdPatch,
   PrdEdit,
@@ -155,7 +159,7 @@ export class BuilderInterviewToolsService {
   constructor(
     private readonly prdService: BuilderPrdService,
     private readonly githubRead: BuilderGithubReadService,
-    private readonly stacks: BuilderStacksService,
+    private readonly principles: ContextToolsService,
     private readonly evidence: BuilderEvidenceService,
     private readonly catalog: BuilderCatalogService,
     private readonly evidenceLog: BuilderEvidenceLogService,
@@ -417,39 +421,7 @@ export class BuilderInterviewToolsService {
           required: ['repo'],
         },
       },
-      {
-        name: 'stacks_search',
-        description:
-          "Search the team's curated product-guidance library. Call this " +
-          'whenever the interview reaches a product judgement — an empty, ' +
-          'loading, edge or failure state; a user-facing label; a threshold, ' +
-          'limit, cadence or reward rule; what a view shows and omits. Use ' +
-          'specific noun phrases, not ticket titles. An empty result is not ' +
-          'evidence the library lacks guidance — never claim coverage either way.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string', description: 'A specific noun phrase' },
-            maxResults: { type: 'number' },
-            tags: { type: 'array', items: { type: 'string' } },
-          },
-          required: ['query'],
-        },
-      },
-      {
-        name: 'stacks_get',
-        description:
-          'Fetch the full text of one or two Stacks chunks by id, after a ' +
-          'search. Cite the chunk title in the PRD wherever the guidance ' +
-          'actually changed a decision.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            ids: { type: 'array', items: { type: 'string' } },
-          },
-          required: ['ids'],
-        },
-      },
+      ...contextToolDefinitions(BUILDER_PRINCIPLE_TOOLS),
       {
         name: 'list_repo_commands',
         description:
@@ -737,23 +709,29 @@ export class BuilderInterviewToolsService {
               input?.path ? `/${input.path}` : ''
             }`,
         );
-      case 'stacks_search':
-        return this.wrapResearch(
-          await this.stacks.search(
-            String(input?.query ?? ''),
-            Number(input?.maxResults) || BUILDER_STACKS_DEFAULT_RESULTS,
-            Array.isArray(input?.tags) ? input.tags.map(String) : undefined,
-          ),
-          (result) =>
-            `Stacks: "${input?.query}" — ${result.results?.length ?? 0} hit(s)`,
+      case 'principles_search': {
+        const result = await this.principles.runSearch(
+          ClUseCase.BUILDER_INTERVIEW,
+          BUILDER_PRINCIPLE_TOOLS,
+          input ?? {},
+          {
+            sessionId: context.session?.id,
+            contextDescriptor:
+              (context.session?.metadata as any)?.principles?.descriptor ??
+              null,
+          },
         );
-      case 'stacks_get':
-        return this.wrapResearch(
-          await this.stacks.getChunks(
-            Array.isArray(input?.ids) ? input.ids.map(String) : [],
-          ),
-          (result) => `Read ${result.chunks?.length ?? 0} Stacks chunk(s)`,
+        return { modelResult: result.modelResult, summary: result.summary };
+      }
+      case 'principles_get': {
+        const result = await this.principles.runGet(
+          ClUseCase.BUILDER_INTERVIEW,
+          BUILDER_PRINCIPLE_TOOLS,
+          input ?? {},
+          { sessionId: context.session?.id },
         );
+        return { modelResult: result.modelResult, summary: result.summary };
+      }
       case 'list_repo_commands':
         return {
           modelResult: {

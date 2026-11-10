@@ -8,6 +8,14 @@ import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import axios, { AxiosError } from 'axios';
 import {
+  ContextChunkBulkUpsertResponse,
+  ContextChunkIdsResponse,
+  ContextChunkSearchRequest,
+  ContextChunkSearchResponse,
+  ContextChunkUpsertItem,
+  ContextEmbedResponse,
+} from '../dto/context-chunk.dto';
+import {
   aiFailureToHttpException,
   AiUpstreamError,
   classifyAiFailure,
@@ -46,9 +54,7 @@ import {
   KnowledgeChunkBulkUpsertRequest,
   KnowledgeChunkBulkUpsertResponse,
   KnowledgeChunkDeleteResponse,
-  KnowledgeChunkSearchRequest,
   KnowledgeCorpus,
-  KnowledgeChunkSearchResponse,
 } from '../dto/knowledge.dto';
 import {
   AddReferenceDocumentRequest,
@@ -71,8 +77,6 @@ import {
   TagPositivityRatingsRequest,
   TranscribeAudioRequest,
   UpdateReferenceDocumentRequest,
-  AgentMemoryUpsertRequest,
-  AgentMemorySearchRequest,
 } from '../dto/ai.request.dto';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import { SkillExperimentRouterService } from '../../skill-experiment/service/skill-experiment-router.service';
@@ -99,9 +103,6 @@ import {
   TagPositivityRatingsResponse,
   TranscribeAudioResponse,
   UpdateReferenceDocumentResponse,
-  AgentMemoryUpsertResponse,
-  AgentMemorySearchResponse,
-  AgentMemoryDeleteResponse,
 } from '../dto/ai.response.dto';
 import { ScribeSessionMode } from 'src/common/constants/chat.constants';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
@@ -466,64 +467,13 @@ export class AiService {
     );
   }
 
-  // ── Agent memory (Bug Hunter / Builder notebook) ─────────────────────────
-  // ally-ai owns the `AgentMemory` Weaviate collection; ally-be's `agent_memories`
-  // is the system of record. Same explicit-timeout rule as the roadmap block: a
-  // memory write is best-effort and a lookup happens mid-task on a CI runner, so
-  // neither may hang on an unhealthy ally-ai.
-
-  /** Idempotent: the Weaviate object uuid IS the memory id. 8s — a write nobody waits on. */
-  async upsertAgentMemory(request: AgentMemoryUpsertRequest) {
-    return this.makeRequest<
-      AgentMemoryUpsertResponse,
-      AgentMemoryUpsertRequest
-    >(
-      `${ENDPOINTS.AGENT_MEMORY_UPSERT}/${request.memory_id}`,
-      request,
-      true,
-      'put',
-      undefined,
-      false,
-      8_000,
-    );
-  }
-
-  /** Called when an entry is retired or merged away, so it stops surfacing in lookups. */
-  async deleteAgentMemory(memoryId: string) {
-    return this.makeRequest<AgentMemoryDeleteResponse, undefined>(
-      `${ENDPOINTS.AGENT_MEMORY_DELETE}/${memoryId}`,
-      undefined,
-      true,
-      'delete',
-      undefined,
-      false,
-      8_000,
-    );
-  }
-
-  /** 10s — the agent is waiting on this mid-task, and a slow answer is worse than none. */
-  async findSimilarAgentMemories(request: AgentMemorySearchRequest) {
-    return this.makeRequest<
-      AgentMemorySearchResponse,
-      AgentMemorySearchRequest
-    >(
-      ENDPOINTS.AGENT_MEMORY_SEARCH,
-      request,
-      true,
-      'post',
-      undefined,
-      false,
-      10_000,
-    );
-  }
-
   // ── WhatsApp Q&A knowledge corpus ──────────────────────────────────────────
   // ally-ai owns the chunk collections; ally-be's Postgres is the system of record.
   //
   // Every one of these takes a `corpus`, which ally-ai resolves to that corpus's own Weaviate
   // collection — one per corpus, not one collection with a scope argument. That is what makes the
-  // boundary structural: there is no filter to leave unset, so a character-library document can
-  // never be retrieved by the WhatsApp bot. See ally-ai migration 005 for why (a similarity
+  // boundary structural: there is no filter to leave unset, so one corpus's document can never be
+  // retrieved for another's consumer. See ally-ai migration 005 for why (a similarity
   // threshold only means something against one chunk-size distribution; filtered ANN search is
   // weaker than unfiltered; and re-chunking one corpus must not touch the other's live index).
   //
@@ -611,24 +561,132 @@ export class AiService {
     );
   }
 
-  /** Retrieval only, no LLM. Backs the admin retrieval console. */
-  async searchKnowledgeChunks(
-    request: KnowledgeChunkSearchRequest,
-    corpus: KnowledgeCorpus,
+  /**
+   * Drop the whole Weaviate collection of a retired corpus (the character corpus's
+   * `CharacterChunk`, the Ally guide's `GuideLibraryChunk`, Debrief's `DebriefKnowledgeChunk`).
+   * Called once, by the confirmed platform-admin retirement after the corpus
+   * has been distilled or copied into the Context Library. `deleted: false` means it was already gone.
+   */
+  async dropRetiredKnowledgeCollection(collection: string) {
+    const params = new URLSearchParams({ collection, confirm: collection });
+    return this.makeRequest<{ deleted: boolean }, undefined>(
+      `${ENDPOINTS.KNOWLEDGE_CHUNK_RETIRED_COLLECTION}?${params.toString()}`,
+      undefined,
+      true,
+      'delete',
+      undefined,
+      false,
+      60_000,
+    );
+  }
+
+  // ── Context Library index ─────────────────────────────────────────────────
+  // The derived Weaviate index for `cl_chunks`. Every call names one versioned collection
+  // (`Ctx<Collection>_v{N}`); ally-ai refuses any other name. Explicit timeouts, as above.
+
+  /** Index up to 100 chunks; per-item failures come back in `failed`, never thrown. */
+  async contextChunksBulkUpsert(
+    collection: string,
+    items: ContextChunkUpsertItem[],
   ) {
     return this.makeRequest<
-      KnowledgeChunkSearchResponse,
-      KnowledgeChunkSearchRequest
+      ContextChunkBulkUpsertResponse,
+      { items: ContextChunkUpsertItem[] }
     >(
-      withCorpus(ENDPOINTS.KNOWLEDGE_CHUNK_SEARCH, corpus),
-      request,
+      `${ENDPOINTS.CONTEXT_CHUNK_BULK_UPSERT}?collection=${encodeURIComponent(collection)}`,
+      { items },
+      true,
+      'post',
+      undefined,
+      false,
+      120_000,
+    );
+  }
+
+  async contextChunksDelete(collection: string, chunkIds: string[]) {
+    return this.makeRequest<{ deleted: number }, { chunk_ids: string[] }>(
+      `${ENDPOINTS.CONTEXT_CHUNK_DELETE}?collection=${encodeURIComponent(collection)}`,
+      { chunk_ids: chunkIds },
       true,
       'post',
       undefined,
       false,
       30_000,
-      // The query is a worker's question on the WhatsApp path.
+    );
+  }
+
+  /** One page of indexed ids with their text hashes, for reconciliation. */
+  async contextChunksIds(
+    collection: string,
+    after?: string | null,
+    limit = 200,
+  ) {
+    const params = new URLSearchParams({ collection, limit: String(limit) });
+    if (after) params.set('after', after);
+    return this.makeRequest<ContextChunkIdsResponse, undefined>(
+      `${ENDPOINTS.CONTEXT_CHUNK_IDS}?${params.toString()}`,
+      undefined,
       true,
+      'get',
+      undefined,
+      false,
+      30_000,
+    );
+  }
+
+  /**
+   * Run every query against every requested retriever and return each ranked list
+   * separately; fusion happens in ally-be so each signal can be logged and tuned.
+   * `sensitive` redacts the body from logs (a learner's or an admin's own words).
+   */
+  async contextChunksSearch(
+    collection: string,
+    request: ContextChunkSearchRequest,
+    sensitive = false,
+  ) {
+    return this.makeRequest<
+      ContextChunkSearchResponse,
+      ContextChunkSearchRequest
+    >(
+      `${ENDPOINTS.CONTEXT_CHUNK_SEARCH}?collection=${encodeURIComponent(collection)}`,
+      request,
+      true,
+      'post',
+      undefined,
+      false,
+      15_000,
+      sensitive,
+    );
+  }
+
+  /**
+   * Embeddings with the index's own model, for platitude and duplicate checks and gap
+   * clustering. `sensitive` keeps the texts out of request logs (a person's own words).
+   */
+  async contextEmbed(texts: string[], sensitive = false) {
+    return this.makeRequest<ContextEmbedResponse, { texts: string[] }>(
+      ENDPOINTS.CONTEXT_CHUNK_EMBED,
+      { texts },
+      true,
+      'post',
+      undefined,
+      false,
+      60_000,
+      sensitive,
+    );
+  }
+
+  /** Drop a whole index version after a blue/green switch. Refused unless named twice. */
+  async contextDeleteCollection(collection: string) {
+    const params = new URLSearchParams({ collection, confirm: collection });
+    return this.makeRequest<{ deleted: boolean }, undefined>(
+      `${ENDPOINTS.CONTEXT_CHUNK_COLLECTION}?${params.toString()}`,
+      undefined,
+      true,
+      'delete',
+      undefined,
+      false,
+      60_000,
     );
   }
 

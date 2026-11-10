@@ -49,7 +49,6 @@ vi.mock("../../useTrackMediaUpload", () => ({
 }));
 
 vi.mock("../TrackCompetenciesField", () => ({ TrackCompetenciesField: () => null }));
-vi.mock("../GenerateCoverImageModal", () => ({ GenerateCoverImageModal: () => null }));
 
 import { TrackSettingsEditor } from "../TrackSettingsEditor";
 

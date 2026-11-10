@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 
-import { LineChart } from "@carbon/charts-react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -16,6 +15,7 @@ import {
   Tag,
 } from "@ally-ui-mono/ui-shared";
 import { useGetBuilderScoreboardQuery } from "@api";
+import { LineChart } from "@components/charts";
 import { en, ROUTES } from "@constants";
 
 import { BUILDER_OUTCOME_TAG_TYPE } from "./builderMotion";

@@ -8,12 +8,12 @@ import { KnowledgeBaseService } from '../knowledge-base.service';
  * This is not a hypothetical branch. The ingest queue was never provisioned in production, so
  * for the knowledge base's entire life every upload 500'd — and, because the row is committed
  * before the message is sent, every attempt ALSO left a document behind at PENDING that no
- * consumer would ever collect. Two of them sat in the character corpus rendering as "Queued"
+ * consumer would ever collect. Two of them sat in a corpus rendering as "Queued"
  * forever, and the only way to notice was to read the table.
  */
 
 const dto = {
-  corpus: KbCorpus.CHARACTER_LIBRARY,
+  corpus: KbCorpus.WHATSAPP_QA,
   title: 'Designing clients',
   sourceType: KbDocumentSourceType.PASTE,
   text: 'A stance written into backstory can never be earned.',
@@ -34,13 +34,12 @@ describe('KnowledgeBaseService.create — when enqueueing fails', () => {
     };
     ingestProducer = { enqueue: jest.fn() };
     // Positional order matches the constructor: document, chunk, documentTenant, ingest,
-    // ai, s3, config, retrieval, tenant, tenantScope.
+    // ai, s3, config, tenant, tenantScope.
     service = new KnowledgeBaseService(
       documentRepository,
       {} as any,
       { replaceForDocument: jest.fn() } as any,
       ingestProducer as any,
-      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -82,6 +81,6 @@ describe('KnowledgeBaseService.create — when enqueueing fails', () => {
     const result = await service.create(dto);
 
     expect(documentRepository.update).not.toHaveBeenCalled();
-    expect(result.corpus).toBe(KbCorpus.CHARACTER_LIBRARY);
+    expect(result.corpus).toBe(KbCorpus.WHATSAPP_QA);
   });
 });

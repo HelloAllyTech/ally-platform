@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 
-import { SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
 // The stylesheets are imported HERE rather than by chartKit, because Analytics.tsx is what pulls them
 // in today — so a tab reusing ChartCard without them renders technically-correct but unstyled charts.
 // This file is the WhatsApp tab's only chart entry point, so this is the one place they belong.
@@ -14,6 +13,7 @@ import {
   useGetWaCorpusCoverageQuery,
 } from "@api";
 import { TooltipHint } from "@components/app-tooltip";
+import { SimpleBarChart, StackedBarChart } from "@components/charts";
 import { en, TooltipLocation } from "@constants";
 import { WaAnalyticsBucket, WaHandledBy } from "@types";
 

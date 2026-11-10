@@ -61,7 +61,7 @@ export const formatEventGap = (fromIso: string, toIso: string, minMs = 15_000): 
  * when most were a config error fixed in the next minute — and the one that
  * actually cost money gets no more attention than the rest.
  *
- * Stacks, "Dynamic visibility scaling tied to information urgency": visibility
+ * "Dynamic visibility scaling tied to information urgency": visibility
  * should be proportional to importance and should CHANGE with state rather
  * than stay constant. So the ones that spent nothing and ended almost
  * immediately are rendered quietly.

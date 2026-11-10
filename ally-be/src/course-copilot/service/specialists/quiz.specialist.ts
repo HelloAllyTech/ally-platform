@@ -61,7 +61,7 @@ const OPEN_ENDED_MAX_CRITERIA = 4;
 
 /**
  * Types whose wrong options are written to be tempting — each must explain
- * why the right answer is right. Stacks: "Forced-Choice Questions Provide Cues
+ * why the right answer is right. "Forced-Choice Questions Provide Cues
  * and Reveal Misconceptions".
  */
 const FORCED_CHOICE: ReadonlySet<QuizQuestionType> = new Set([
@@ -130,7 +130,7 @@ interface QuizNormaliseOptions {
 /**
  * Writes one QUIZ item.
  *
- * Stacks: "Forced-Choice Questions Provide Cues and Reveal Misconceptions" —
+ * "Forced-Choice Questions Provide Cues and Reveal Misconceptions" —
  * the default mix is mostly forced-choice with distractors drawn from this
  * audience's real misconceptions, every forced-choice question explained, plus
  * one or two open-ended scenario questions when the outcome is about doing.

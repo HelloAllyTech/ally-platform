@@ -175,6 +175,11 @@ const buildNavigationItems = (): NavigationItem[] => [
     path: ROUTES.ALLY_CONSOLE,
   },
   {
+    id: SIDEBAR_ITEMS.CONTEXT_LIBRARY,
+    label: en.contextLibrary.navLabel,
+    path: ROUTES.CONTEXT_LIBRARY,
+  },
+  {
     id: SIDEBAR_ITEMS.WHATSAPP_BOT,
     label: en.whatsappBot.navLabel,
     path: ROUTES.WHATSAPP_BOT,
@@ -286,6 +291,17 @@ export const deriveNavigationItems = ({
               permissions!.includes(Permissions.EDIT_COURSE_COPILOT) &&
               hasFeature(features, FeatureToggleKey.COURSE_COPILOT) &&
               hasFeature(features, FeatureToggleKey.CREATE_COURSES)
+            );
+          // The Context Library: its own toggle for platform admins (platform-only, so never an
+          // admin restricted to some organisations), OR an organisation's admin — the Ally
+          // organisation-settings toggle with the Ally guide's view grant, who sees only their
+          // organisation's entries there (docs/context-library/PLAN.md §10.2). Not in
+          // buildSidebarItemFeatureKeyMap, which allows one key and no grant.
+          case SIDEBAR_ITEMS.CONTEXT_LIBRARY:
+            return (
+              hasFeature(features, FeatureToggleKey.CONTEXT_LIBRARY) ||
+              (hasFeature(features, FeatureToggleKey.ALLY_GUIDE_ORG) &&
+                permissions!.includes(Permissions.VIEW_ALLY_GUIDE))
             );
           // The Ally Console: the ally_guide toggle AND the view grant, like Course Copilot, so
           // deliberately NOT in buildSidebarItemFeatureKeyMap (which would make it toggle-only and

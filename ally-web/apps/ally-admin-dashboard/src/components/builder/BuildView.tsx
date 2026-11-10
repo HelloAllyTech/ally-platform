@@ -600,7 +600,7 @@ export const BuildView: React.FC<BuildViewProps> = ({ sessionId, status, session
       )}
 
       {/* Pull requests, split by whether they still want something from you.
-          Stacks' "Unattended Execution: Risk-Based Action Gating" is the frame:
+          "Unattended Execution: Risk-Based Action Gating" is the frame:
           work an agent cannot finish alone becomes a pending item a person
           resolves out of band — so the one awaiting a merge is a decision, not
           a row in a list. "Dynamic visibility scaling tied to information

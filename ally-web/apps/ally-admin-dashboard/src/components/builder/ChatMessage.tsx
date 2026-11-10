@@ -19,6 +19,10 @@ const TOOL_LABELS: Record<string, string> = {
   github_search_code: "Searching the codebase",
   github_read_file: "Reading a file",
   github_repo_tree: "Looking through a repo",
+  principles_search: "Checking principles",
+  principles_get: "Reading principles",
+  // History: sessions from before 2026-11-09, when the Context Library replaced Stacks, stored
+  // these calls under their old names. Kept so those transcripts still read.
   stacks_search: "Checking product guidance",
   stacks_get: "Reading product guidance",
   list_repo_commands: "Checking repo commands",

@@ -34,6 +34,22 @@ describe('normaliseOpportunityBrief', () => {
     expect(brief.evidence[0].ref).toBeNull();
   });
 
+  /** Stacks was replaced by the Context Library's principles; old briefs keep the label, new ones never get it. */
+  it('files evidence a model still attributes to Stacks under principles', () => {
+    const brief = normaliseOpportunityBrief({
+      evidence: [
+        { source: 'stacks', claim: 'Design the empty state first.' },
+        { source: 'principles', claim: 'Ask before you assume.' },
+      ],
+      assessment: { rating: 'promising', summary: 'Worth it.' },
+    })!;
+
+    expect(brief.evidence.map((e) => e.source)).toEqual([
+      RoadmapBriefEvidenceSource.PRINCIPLES,
+      RoadmapBriefEvidenceSource.PRINCIPLES,
+    ]);
+  });
+
   it('survives agent-shaped lists: strings, nulls and half-filled items', () => {
     const brief = normaliseOpportunityBrief({
       strategicFit: [

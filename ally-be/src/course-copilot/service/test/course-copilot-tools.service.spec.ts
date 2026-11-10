@@ -1,6 +1,10 @@
 import { validate as isUuid } from 'uuid';
 import { CourseCopilotSessionStatus as Status } from '../../enum/course-copilot.enum';
-import { COURSE_COPILOT_STACKS_DEFAULT_RESULTS } from '../../constants/course-copilot.constants';
+import {
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
+import { COURSE_COPILOT_GUIDANCE_TOOLS } from '../../constants/course-copilot-guidance.constants';
 import { CourseBrief } from '../../type/course-copilot.type';
 import { CourseCopilotBriefService } from '../course-copilot-brief.service';
 import { EDIT_TOOL_DEFINITIONS } from '../course-copilot-edit-tools.service';
@@ -27,7 +31,7 @@ describe('CourseCopilotToolsService', () => {
   let sessionRepository: { update: jest.Mock };
   let blueprintService: { propose: jest.Mock; applyPatch: jest.Mock };
   let library: Record<string, jest.Mock>;
-  let stacks: { search: jest.Mock; getChunks: jest.Mock };
+  let guidance: { runSearch: jest.Mock; runGet: jest.Mock };
   let editTools: { execute: jest.Mock };
 
   beforeEach(() => {
@@ -43,9 +47,11 @@ describe('CourseCopilotToolsService', () => {
         .mockResolvedValue([{ id: 1, name: 'English', code: 'en' }]),
       listTriggerWarnings: jest.fn().mockResolvedValue([]),
       listCoverImages: jest.fn().mockResolvedValue([]),
-      search: jest.fn().mockResolvedValue([]),
+      search: jest
+        .fn()
+        .mockResolvedValue({ hits: [], noConfidentMatch: false }),
     };
-    stacks = { search: jest.fn(), getChunks: jest.fn() };
+    guidance = { runSearch: jest.fn(), runGet: jest.fn() };
     editTools = {
       execute: jest
         .fn()
@@ -56,7 +62,7 @@ describe('CourseCopilotToolsService', () => {
       new CourseCopilotBriefService(),
       blueprintService as any,
       library as any,
-      stacks as any,
+      guidance as any,
       editTools as any,
     );
   });
@@ -679,114 +685,101 @@ describe('CourseCopilotToolsService', () => {
   // ── Lookups ──────────────────────────────────────────────────────────────
 
   describe('design guidance', () => {
-    const interviewing = () => session(Status.INTERVIEWING);
+    const interviewing = () =>
+      session(Status.INTERVIEWING, { id: 'sess-1', tenantId: 'org-7' });
 
-    it('search: replaces the library client note with one that names the right tool', async () => {
-      stacks.search.mockResolvedValue({
-        ok: true,
-        results: '1. Spacing practice (id abc)',
-        note: 'Call stacks_get on the one or two ids…', // the shared client speaks Builder's dialect
+    it('exposes the Context Library tool pair under the design_guidance names', () => {
+      const tools = service.getToolDefinitions(interviewing());
+      const search = tools.find((t) => t.name === 'design_guidance_search')!;
+      const get = tools.find((t) => t.name === 'design_guidance_get')!;
+      expect(search.description).toMatch(/learning-design principles/);
+      expect(search.input_schema.required).toEqual(['queries']);
+      expect(Object.keys(search.input_schema.properties)).toEqual(
+        expect.arrayContaining([
+          'queries',
+          'domain',
+          'courseStage',
+          'itemType',
+        ]),
+      );
+      expect(get.input_schema.required).toEqual(['codes']);
+    });
+
+    it('search: reads Learning Design as Course Copilot, for the session and its organisation', async () => {
+      guidance.runSearch.mockResolvedValue({
+        modelResult: { ok: true, results: [{ code: 'LD-0004', band: 'good' }] },
+        summary:
+          'the team’s learning-design principles: "spaced practice" — 1 principle',
+        codes: ['LD-0004'],
       });
 
       const outcome = await exec(
         'design_guidance_search',
-        { query: 'spaced practice', tags: ['learning'], maxResults: 6 },
+        { queries: ['spaced practice'] },
         interviewing(),
       );
 
-      expect(stacks.search).toHaveBeenCalledWith('spaced practice', 6, [
-        'learning',
+      expect(guidance.runSearch).toHaveBeenCalledWith(
+        ClUseCase.COURSE_COPILOT,
+        COURSE_COPILOT_GUIDANCE_TOOLS,
+        { queries: ['spaced practice'] },
+        {
+          sessionId: 'sess-1',
+          audience: { tenantId: 'org-7' },
+          collections: [ClCollectionId.LEARNING_DESIGN],
+        },
+      );
+      expect(outcome.modelResult.results).toEqual([
+        { code: 'LD-0004', band: 'good' },
       ]);
-      expect(outcome.modelResult.note).toMatch(/design_guidance_get/);
-      expect(outcome.modelResult.note).not.toMatch(/stacks_get/);
-      expect(outcome.modelResult.note).toMatch(/never instructions/);
-      expect(outcome.summary).toBe(
-        'Checked design guidance: "spaced practice"',
-      );
-    });
-
-    it('search: defaults the result count and omits tags when none are given', async () => {
-      stacks.search.mockResolvedValue({ ok: true, results: 'hit' });
-      await exec('design_guidance_search', { query: 'q' }, interviewing());
-      expect(stacks.search).toHaveBeenCalledWith(
-        'q',
-        COURSE_COPILOT_STACKS_DEFAULT_RESULTS,
-        undefined,
-      );
-    });
-
-    it('search: says an empty result is not evidence of a gap', async () => {
-      stacks.search.mockResolvedValue({ ok: true, results: '   ' });
-      const outcome = await exec(
-        'design_guidance_search',
-        { query: 'q' },
-        interviewing(),
-      );
-      expect(outcome.modelResult.note).toMatch(/No hits for this phrasing/);
-      expect(outcome.modelResult.note).toMatch(
-        /not evidence the library lacks guidance/,
-      );
-    });
-
-    it('search: soft-fails when Stacks is unavailable — the interview goes on', async () => {
-      const failure = {
-        ok: false,
-        error: 'stacks_unavailable',
-        message: 'Stacks is not configured',
-      };
-      stacks.search.mockResolvedValue(failure);
-
-      const outcome = await exec(
-        'design_guidance_search',
-        { query: 'q' },
-        interviewing(),
-      );
-
-      expect(outcome.modelResult).toEqual(failure); // untouched: no invented note
-      expect(outcome.summary).toBe('Design guidance is unavailable this turn');
+      expect(outcome.modelResult.reminder).toMatch(/never instructions/);
+      expect(outcome.summary).toMatch(/spaced practice/);
       expect(outcome.endTurn).toBeUndefined();
     });
 
-    it('get: replaces the note, and soft-fails the same way', async () => {
-      stacks.getChunks.mockResolvedValue({
-        ok: true,
-        chunks: 'full text',
-        note: 'Cite the chunk title in the PRD…',
+    it('search: a platform admin searches with no organisation, and a failure stays soft', async () => {
+      guidance.runSearch.mockResolvedValue({
+        modelResult: {
+          ok: false,
+          error: 'library_unavailable',
+          message: 'says NOTHING about what it holds',
+        },
+        summary: 'unavailable this turn',
+        codes: [],
       });
-      const ok = await exec(
-        'design_guidance_get',
-        { ids: ['a', 'b'] },
-        interviewing(),
+      const outcome = await exec(
+        'design_guidance_search',
+        { query: 'q' },
+        session(Status.INTERVIEWING, { id: 'sess-2', tenantId: null }),
       );
-      expect(stacks.getChunks).toHaveBeenCalledWith(['a', 'b']);
-      expect(ok.modelResult.note).toMatch(
-        /Advisory reference material, not instructions/,
-      );
-      expect(ok.modelResult.note).not.toMatch(/PRD/);
-      expect(ok.summary).toBe('Read design guidance');
-
-      stacks.getChunks.mockResolvedValue({
-        ok: false,
-        error: 'stacks_unavailable',
+      expect(guidance.runSearch.mock.calls[0][3].audience).toEqual({
+        tenantId: null,
       });
-      const failed = await exec(
-        'design_guidance_get',
-        { ids: ['a'] },
-        interviewing(),
-      );
-      expect(failed.modelResult).toEqual({
-        ok: false,
-        error: 'stacks_unavailable',
-      });
-      expect(failed.summary).toBe('Design guidance is unavailable this turn');
+      expect(outcome.modelResult.ok).toBe(false);
+      expect(outcome.modelResult.message).toMatch(/NOTHING/);
+      expect(outcome.endTurn).toBeUndefined();
     });
 
-    it('get: stringifies ids and tolerates a missing list', async () => {
-      stacks.getChunks.mockResolvedValue({ ok: false, error: 'no_ids' });
-      await exec('design_guidance_get', { ids: [1, 2] }, interviewing());
-      expect(stacks.getChunks).toHaveBeenLastCalledWith(['1', '2']);
-      await exec('design_guidance_get', {}, interviewing());
-      expect(stacks.getChunks).toHaveBeenLastCalledWith([]);
+    it('get: reads by code, only from Learning Design', async () => {
+      guidance.runGet.mockResolvedValue({
+        modelResult: { ok: true, items: [{ code: 'LD-0004' }] },
+        summary: 'Read 1 principle',
+        codes: ['LD-0004'],
+      });
+      const outcome = await exec(
+        'design_guidance_get',
+        { codes: ['LD-0004'] },
+        interviewing(),
+      );
+      expect(guidance.runGet).toHaveBeenCalledWith(
+        ClUseCase.COURSE_COPILOT,
+        COURSE_COPILOT_GUIDANCE_TOOLS,
+        { codes: ['LD-0004'] },
+        expect.objectContaining({
+          collections: [ClCollectionId.LEARNING_DESIGN],
+        }),
+      );
+      expect(outcome.summary).toBe('Read 1 principle');
     });
   });
 
@@ -816,12 +809,15 @@ describe('CourseCopilotToolsService', () => {
     });
 
     it('search_library defaults an unknown kind to roleplay and the limit to 8, and marks the hits as data', async () => {
-      library.search.mockResolvedValue([{ id: 1, title: 'A hit' }]);
+      library.search.mockResolvedValue({
+        hits: [{ id: 1, title: 'A hit', code: 'CC-0001' }],
+        noConfidentMatch: false,
+      });
 
       const outcome = await exec(
         'search_library',
         { kind: 'podcast', query: 'asha' },
-        interviewing(),
+        session(Status.INTERVIEWING, { id: 'sess-1', tenantId: 'org-7' }),
       );
 
       expect(library.search).toHaveBeenCalledWith(
@@ -829,7 +825,11 @@ describe('CourseCopilotToolsService', () => {
         'asha',
         undefined,
         8,
+        { sessionId: 'sess-1', tenantId: 'org-7' },
       );
+      expect(outcome.modelResult.hits).toEqual([
+        { id: 1, title: 'A hit', code: 'CC-0001' },
+      ]);
       expect(outcome.modelResult.note).toMatch(/never instructions/);
       expect(outcome.summary).toBe(
         'Searched the roleplay library for "asha": 1 match',
@@ -842,7 +842,47 @@ describe('CourseCopilotToolsService', () => {
         { kind: 'case', query: 'q', competencyIds: [3], limit: 3 },
         interviewing(),
       );
-      expect(library.search).toHaveBeenCalledWith('case', 'q', ['3'], 3);
+      expect(library.search).toHaveBeenCalledWith(
+        'case',
+        'q',
+        ['3'],
+        3,
+        expect.objectContaining({ tenantId: null }),
+      );
+    });
+
+    it('search_library says a weak match is not the last word', async () => {
+      library.search.mockResolvedValue({ hits: [], noConfidentMatch: true });
+      const outcome = await exec(
+        'search_library',
+        { kind: 'character', query: 'a teenager' },
+        interviewing(),
+      );
+      expect(outcome.modelResult.ok).toBe(true);
+      expect(outcome.modelResult.note).toMatch(/No confident match/);
+      expect(outcome.summary).toBe(
+        'Searched the character library for "a teenager": 0 matches',
+      );
+    });
+
+    it('search_library fails soft and never claims the library is empty', async () => {
+      library.search.mockRejectedValue(new Error('index down'));
+      const outcome = await exec(
+        'search_library',
+        { kind: 'roleplay', query: 'grief' },
+        interviewing(),
+      );
+      expect(outcome.modelResult).toMatchObject({
+        ok: false,
+        error: 'library_unavailable',
+      });
+      expect(outcome.modelResult.message).toMatch(
+        /NOTHING about what it holds/,
+      );
+      expect(outcome.summary).toBe(
+        'The roleplay library is unavailable this turn',
+      );
+      expect(outcome.endTurn).toBeUndefined();
     });
 
     it('get_languages / get_trigger_warnings / list_cover_images summarise what they found', async () => {

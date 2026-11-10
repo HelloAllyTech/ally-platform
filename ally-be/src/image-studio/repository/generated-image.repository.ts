@@ -140,18 +140,18 @@ export class GeneratedImageRepository extends Repository<GeneratedImage> {
     });
   }
 
-  /** The latest accepted cast sheet per character, for one style. */
+  /** The latest accepted cast sheet per character — per style, or for one style when given. */
   async findCastSheets(
     tenantId: string | null,
     characterIds: string[],
-    styleId: string,
+    styleId?: string,
   ): Promise<GeneratedImage[]> {
     if (!characterIds.length) return [];
     const rows = await this.find({
       where: {
         tenantId: tenantId ?? IsNull(),
         characterId: In(characterIds),
-        styleId,
+        ...(styleId ? { styleId } : {}),
         slotKind: 'cast_sheet',
         status: GeneratedImageStatus.SUCCEEDED,
         acceptedAt: Not(IsNull()),
@@ -160,9 +160,8 @@ export class GeneratedImageRepository extends Repository<GeneratedImage> {
     });
     const latest = new Map<string, GeneratedImage>();
     for (const row of rows) {
-      if (row.characterId && !latest.has(row.characterId)) {
-        latest.set(row.characterId, row);
-      }
+      const key = `${row.characterId}:${row.styleId}`;
+      if (row.characterId && !latest.has(key)) latest.set(key, row);
     }
     return [...latest.values()];
   }

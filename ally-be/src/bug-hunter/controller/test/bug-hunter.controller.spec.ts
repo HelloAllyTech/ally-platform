@@ -103,8 +103,6 @@ describe('BugHunterController', () => {
       {} as never,
       // Eval service: no case here reads the eval set or stores a run.
       {} as never,
-      // Memory service: no case here reads or writes the notebook.
-      {} as never,
       // Replay service: no case here reads decisions/replay or owners.
       {} as never,
       // Verify-findings service: the locate-first gate on fix-session; no case here starts one on a report.

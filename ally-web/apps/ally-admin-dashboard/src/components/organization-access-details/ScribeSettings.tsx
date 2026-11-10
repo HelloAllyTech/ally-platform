@@ -471,7 +471,7 @@ export const ScribeSettings: FC<ScribeSettingsProps> = ({ tenantId, onUpdateTena
             type="checkbox"
             onChange={() => handleChildToggle(parentId, field.id, !field.visible)}
             checked={field.visible}
-            className="w-4 h-4 border border-[#D2D2D2] rounded cursor-pointer"
+            className="w-4 h-4 border border-gray-300 rounded cursor-pointer"
           />
           <span className="text-base leading-relaxed text-typography-900 font-normal">
             {field.label}

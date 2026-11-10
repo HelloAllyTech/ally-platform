@@ -8,7 +8,7 @@ import { asData } from './sentinel.prompt';
  * was, for the learner and for review; only what the model is given next is
  * condensed. Structured so nothing the next epoch needs is lost to prose:
  * goals, where things stand, what was agreed, what is still open
- * (Stacks: LLM-Generated Structured Summaries for Context Compaction).
+ * (LLM-Generated Structured Summaries for Context Compaction).
  * Frozen into each release bundle.
  */
 
