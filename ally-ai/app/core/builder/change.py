@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from app.core.builder.tasks import ungrounded
+from app.core.builder.grounding import ungrounded
 from app.core.llm.dispatch import generate_structured
 from app.core.llm_usage.tasks import LLMTask
 from app.exceptions.custom_exceptions import LLMInvocationFailedException

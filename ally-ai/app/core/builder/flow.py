@@ -13,7 +13,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
 
-from app.core.builder import catalogue, tasks
+from app.core.builder import catalogue, grounding, purposes, tasks
 from app.core.builder.schemas import ConverseOut, DraftOut, Tone
 from app.schemas.builder import (
     PURPOSE_OF_DESIGN,
@@ -177,7 +177,7 @@ def proposal_patches(out: ConverseOut, source: str) -> List[PatchOp]:
         tags = language_tags(", ".join(out.languages))
         if tags:
             patches.append(replace("/languages", tags))
-    decline = tasks.keep_grounded(out.decline_text.strip(), source)
+    decline = grounding.keep_grounded(out.decline_text.strip(), source)
     if decline:
         patches.append(replace("/declineText", decline[:600]))
     return patches
@@ -216,12 +216,14 @@ def draft_patches(
             replace("/branding/assistantName", name),
         ]
     introduction = catalogue.honest_about_booking(
-        tasks.keep_grounded(out.introduction, source)
+        grounding.keep_grounded(out.introduction, source)
     )[:600]
     if introduction:
         patches.append(replace("/introduction", introduction))
-    instructions = tasks.without_details(
-        catalogue.honest_about_booking(tasks.keep_grounded(out.instructions, source))
+    instructions = grounding.without_details(
+        catalogue.honest_about_booking(
+            grounding.keep_grounded(out.instructions, source)
+        )
     )[:4000]
     if instructions:
         patches.append(replace("/instructions", instructions))
@@ -232,13 +234,13 @@ def draft_patches(
     suggested = _unique(
         " ".join(q.split())[:120]
         for q in out.suggested_questions
-        if not tasks.ungrounded(q, source)
+        if not grounding.ungrounded(q, source)
     )[:4]
     patches.append(replace("/suggestedQuestions", suggested))
     patches.append(
         replace("/prechat", prechat(out) if purpose == PurposeId.ENQUIRIES else [])
     )
-    decline = tasks.keep_grounded(out.decline_text, source)[:600]
+    decline = grounding.keep_grounded(out.decline_text, source)[:600]
     if decline or not current_decline:
         patches.append(replace("/declineText", decline))
     return patches
@@ -478,7 +480,7 @@ async def _gaps(step: Step) -> BuilderStepResponse:
     step.status("designing")
     request.answers = answers
     designs = await tasks.propose_purposes(request, step.deadline.left())
-    message = catalogue.PURPOSE_MESSAGE
+    message = purposes.PURPOSE_MESSAGE
     if ack.strip():
         message = f"{ack.strip()}\n\n{message}"
     return step.respond(
@@ -520,11 +522,11 @@ async def _design(step: Step) -> BuilderStepResponse:
         step.status("designing")
         designs = await tasks.propose_purposes(request, step.deadline.left())
         return step.respond(
-            message=catalogue.PURPOSE_MESSAGE, next_step="design", designs=designs
+            message=purposes.PURPOSE_MESSAGE, next_step="design", designs=designs
         )
     tapped, chosen = _chosen_purpose(step)
     if tapped and chosen is None:
-        return step.respond(message=catalogue.PURPOSE_MESSAGE, next_step="design")
+        return step.respond(message=purposes.PURPOSE_MESSAGE, next_step="design")
     if chosen is None:
         note = " ".join(request.message.split())[:600]
         if request.draft.purpose == PurposeId.CUSTOM and note:
@@ -536,7 +538,7 @@ async def _design(step: Step) -> BuilderStepResponse:
         return step.respond(message=out.message, next_step="design")
     step.patches.append(replace("/purpose", chosen.value))
     if chosen == PurposeId.CUSTOM:
-        return step.respond(message=catalogue.CUSTOM_PROMPT, next_step="design")
+        return step.respond(message=purposes.CUSTOM_PROMPT, next_step="design")
     return await _build(step, chosen)
 
 

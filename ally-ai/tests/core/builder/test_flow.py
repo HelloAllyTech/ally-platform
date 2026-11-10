@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.core.builder import catalogue
+from app.core.builder import catalogue, purposes
 from app.core.builder.flow import BUILDER_PATHS, allowed, run_step
 from app.schemas.builder import BuilderStepRequest, PatchOp, PurposeId
 from tests.core.builder.fakes import TASKS, FakeLLM, request
@@ -189,7 +189,7 @@ class TestGaps:
             fake,
         )
         assert res.next_step == "design"
-        assert res.message == catalogue.PURPOSE_MESSAGE
+        assert res.message == purposes.PURPOSE_MESSAGE
         # The recommended purpose first, badged; Something else last.
         assert [d.id for d in res.designs] == [
             "enquiries",
@@ -222,19 +222,17 @@ class TestPurposes:
         res = await run(request("design", industry="saas"), fake)
         cards = {c.id: c for c in res.designs}
         assert list(cards) == ["answer", "guide", "enquiries", "training", "custom"]
-        for purpose in catalogue.TAILORED:
+        for purpose in purposes.TAILORED:
             card = cards[purpose.value]
-            assert card.title == catalogue.PURPOSES[purpose].name
-            assert card.will == list(catalogue.PURPOSES[purpose].will)
-            assert card.limit == catalogue.PURPOSES[purpose].limit
+            assert card.title == purposes.PURPOSES[purpose].name
+            assert card.will == list(purposes.PURPOSES[purpose].will)
+            assert card.limit == purposes.PURPOSES[purpose].limit
             assert not any("book" in w.lower() for w in card.will)
         enquiries = cards["enquiries"]
         assert enquiries.best_for == "New clients"
         # The overpromising sample is replaced by the catalogue's.
         assert all("booked" not in line["text"] for line in enquiries.sample)
-        assert (
-            cards["custom"].best_for == catalogue.PURPOSES[PurposeId.CUSTOM].one_liner
-        )
+        assert cards["custom"].best_for == purposes.PURPOSES[PurposeId.CUSTOM].one_liner
         assert not any(c.coming_soon for c in res.designs)
 
     @pytest.mark.asyncio
@@ -297,7 +295,7 @@ class TestPurposes:
         ]
         default = [
             {"from": who, "text": text}
-            for who, text in catalogue.PURPOSES[PurposeId.ANSWER].default_sample
+            for who, text in purposes.PURPOSES[PurposeId.ANSWER].default_sample
         ]
         for line in made_up:
             fake = FakeLLM(
@@ -431,7 +429,7 @@ class TestBuild:
             request("design", designs=PURPOSE_CARDS, chip="purpose:custom"), FakeLLM()
         )
         assert res.next_step == "design"
-        assert res.message == catalogue.CUSTOM_PROMPT
+        assert res.message == purposes.CUSTOM_PROMPT
         assert paths(res)["/purpose"] == "custom"
 
         fake = FakeLLM(DraftOut=[DRAFT])
@@ -607,7 +605,7 @@ class TestInstructionsCarryNoDetails:
     """Chunk 20a-2: facts stay in the pages, where they are cited."""
 
     def test_sentences_with_numbers_emails_or_links_are_dropped(self):
-        from app.core.builder.tasks import without_details
+        from app.core.builder.grounding import without_details
 
         text = (
             "Be warm and brief. Our phone is +91 20 0000 4400. "

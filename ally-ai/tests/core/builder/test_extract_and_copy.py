@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.core.builder import catalogue, tasks
+from app.core.builder import catalogue, purposes, tasks
 from app.prompts.contracts import PROMPT_CONTRACTS
 from app.schemas.builder import BotDraft, ExtractRequest
 from tests.core.builder.fakes import TASKS, FakeLLM
@@ -166,11 +166,11 @@ class TestContract:
 class TestPurposeCopy:
     def test_every_purpose_line_is_the_decks(self):
         lines = [
-            catalogue.PURPOSE_MESSAGE,
-            catalogue.CUSTOM_PROMPT,
-            catalogue.RECOMMENDED,
+            purposes.PURPOSE_MESSAGE,
+            purposes.CUSTOM_PROMPT,
+            purposes.RECOMMENDED,
         ]
-        for purpose in catalogue.PURPOSES.values():
+        for purpose in purposes.PURPOSES.values():
             lines += [purpose.name, purpose.one_liner, *purpose.will, *purpose.wont]
             lines += [text for _who, text in purpose.default_sample]
             if purpose.limit:
