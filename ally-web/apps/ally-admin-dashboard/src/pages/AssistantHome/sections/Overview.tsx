@@ -1,9 +1,13 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 
-import { useArchiveChatbotMutation, useSetChatbotStatusMutation } from "@api";
-import { Button } from "@components/v2";
+import {
+  useArchiveChatbotMutation,
+  useGetHomeNumbersQuery,
+  useSetChatbotStatusMutation,
+} from "@api";
+import { Button, Segmented } from "@components/v2";
 import { ROUTES } from "@constants";
 import { BotPageView, ChatbotStatus } from "@types";
 
@@ -19,7 +23,7 @@ const t = HOME.overview;
 
 /**
  * How the assistant is doing (chunk 20d): whether it's live, with the one switch; its link and QR
- * code; the last 30 days in four numbers (all of them under "All numbers"); and what needs the
+ * code; the last 7 or 30 days in four numbers (all of them under "All numbers"); and what needs the
  * owner. Owners can remove it here.
  */
 export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null }> = ({
@@ -31,6 +35,10 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
 }) => {
   const [setStatus, statusState] = useSetChatbotStatusMutation();
   const [archive, archiveState] = useArchiveChatbotMutation();
+  const [days, setDays] = useState<7 | 30>(30);
+  // The list already counted the last 30 days; 7 days is asked for when chosen.
+  const week = useGetHomeNumbersQuery({ id: bot.id, days: 7 }, { skip: days !== 7 });
+  const stats = days === 7 ? week.data : bot.stats;
   const navigate = useNavigate();
   const qr = useRef<HTMLDivElement>(null);
   const live = bot.status === ChatbotStatus.LIVE;
@@ -100,19 +108,29 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
         </Group>
       )}
 
-      <Group title={t.numbers} testId="overview-numbers">
-        <dl className="ally-home__stats">
+      <Group title={t.numbersTitle} testId="overview-numbers">
+        <Segmented
+          label={t.numbersPeriod}
+          options={[
+            { id: "7", label: t.last7 },
+            { id: "30", label: t.last30 },
+          ]}
+          value={String(days) as "7" | "30"}
+          onChange={id => setDays(id === "7" ? 7 : 30)}
+        />
+        <dl className="ally-home__stats" aria-busy={!stats || undefined}>
           {(
             [
-              [t.people, bot.stats.people],
-              [t.messages, bot.stats.messages],
-              [t.answered, bot.stats.answered],
-              [t.unanswered, bot.stats.declined],
+              [t.people, stats?.people],
+              [t.messages, stats?.messages],
+              [t.answered, stats?.answered],
+              [t.unanswered, stats?.declined],
             ] as const
           ).map(([label, value]) => (
             <div key={label} className="ally-home__stat">
               <dt className="ally-small">{label}</dt>
-              <dd>{value.toLocaleString("en-IN")}</dd>
+              {/* Held at its final size while the 7 days load. */}
+              <dd>{value === undefined ? "–" : value.toLocaleString("en-IN")}</dd>
             </div>
           ))}
         </dl>

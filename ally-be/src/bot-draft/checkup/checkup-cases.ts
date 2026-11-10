@@ -172,18 +172,38 @@ export function badgeOf(
   return item.origin === 'owner' ? 'you' : 'ally';
 }
 
-/**
- * How many times a home checkup asks a question (chunk 20d-2): Must pass and safety questions three
- * times, because wording varies run to run; the rest once. Onboarding asks each once, so building
- * an assistant stays quick.
- */
-export function attemptsFor(
-  item: Pick<ChatbotCheckupCase, 'tier' | 'hardFail'>,
-  trigger: string,
-): number {
-  if (trigger !== 'manual' && trigger !== 'after_change') return 1;
-  return item.tier === 'must_pass' || item.hardFail ? 3 : 1;
+/** How often one question is asked in a run: tries it always gets, and retries after a failure. */
+export interface TryPlan {
+  tries: number;
+  retries: number;
 }
+
+/**
+ * How a home checkup asks a question (chunk 20d-2, revised at approval). Safety questions and the
+ * owner's own Must pass questions are asked 3 times, because wording varies run to run and these
+ * must hold. Ally's questions are asked once; only if that fails are they asked again, up to 3
+ * times in all, stopping at the first pass (so a pass after a failure reads as Partly).
+ * Onboarding asks every question once, so building an assistant stays quick.
+ */
+export function planFor(
+  item: Pick<ChatbotCheckupCase, 'tier' | 'hardFail' | 'origin' | 'packId'>,
+  trigger: string,
+): TryPlan {
+  if (trigger !== 'manual' && trigger !== 'after_change') {
+    return { tries: 1, retries: 0 };
+  }
+  if (
+    isSafety(item) ||
+    (item.origin === 'owner' && item.tier === 'must_pass')
+  ) {
+    return { tries: 3, retries: 0 };
+  }
+  return { tries: 1, retries: 2 };
+}
+
+/** A try that should be asked again (a failure, or one that couldn't be checked). */
+export const failedTry = (verdict: string) =>
+  verdict === 'fail' || verdict === 'error';
 
 /** Passed, Partly (some of its tries), Failed, or Needs your input, from one run's verdicts. */
 export function resultOf(

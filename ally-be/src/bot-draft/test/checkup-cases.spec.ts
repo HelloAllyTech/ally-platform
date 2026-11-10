@@ -6,12 +6,12 @@ import {
 } from '@nestjs/common';
 import {
   applyEdit,
-  attemptsFor,
   badgeOf,
   caseVersion,
   gradedFacts,
   LOCKED,
   LOCKED_ADD_ONLY,
+  planFor,
   resultOf,
 } from '../checkup/checkup-cases';
 import {
@@ -116,11 +116,20 @@ describe('the owner’s questions, pure (chunk 20d-2)', () => {
     expect(badgeOf(item({ addedFrom: 'chat' }))).toBe('chat');
   });
 
-  it('asks Must pass and safety questions 3 times on the home, once in onboarding', () => {
-    expect(attemptsFor(item(), 'manual')).toBe(3);
-    expect(attemptsFor(safety(), 'after_change')).toBe(3);
-    expect(attemptsFor(item({ tier: 'nice_to_pass' }), 'manual')).toBe(1);
-    expect(attemptsFor(item(), 'onboarding')).toBe(1);
+  it('asks safety and the owner’s Must pass questions 3 times; Ally’s once, retried only after a failure', () => {
+    expect(planFor(safety(), 'manual')).toEqual({ tries: 3, retries: 0 });
+    expect(planFor(item(), 'after_change')).toEqual({ tries: 3, retries: 0 });
+    // Ally's own, Must pass or not: once, then up to 2 more only if it fails.
+    expect(planFor(item({ origin: 'generated' }), 'manual')).toEqual({
+      tries: 1,
+      retries: 2,
+    });
+    expect(planFor(item({ tier: 'nice_to_pass' }), 'manual')).toEqual({
+      tries: 1,
+      retries: 2,
+    });
+    // Onboarding: every question once.
+    expect(planFor(safety(), 'onboarding')).toEqual({ tries: 1, retries: 0 });
   });
 
   it('reads a run’s tries as Passed, Partly, Failed or Needs your input', () => {
@@ -219,6 +228,82 @@ describe('CheckupService.start, home runs (chunk 20d-2)', () => {
       execute.mock.calls[0] as unknown[]
     )[1] as ChatbotCheckupCase[];
     expect(asked.map((c) => c.id)).toEqual(['b']);
+  });
+});
+
+describe('CheckupService retries (chunk 20d-2)', () => {
+  const run = (verdicts: Record<string, string[]>) => {
+    const runs = {
+      increment: jest.fn(),
+      save: jest.fn(async (x) => x),
+      createQueryBuilder: jest.fn(),
+    };
+    const service = new CheckupService(
+      {} as never,
+      runs as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { getPromptOverrides: jest.fn(async () => ({})) } as never,
+    );
+    const asked: string[] = [];
+    jest
+      .spyOn(
+        service as unknown as { askGroup: () => Promise<string[]> },
+        'askGroup',
+      )
+      .mockImplementation((async (
+        _run: unknown,
+        group: { cases: ChatbotCheckupCase[] },
+        attempt: number,
+      ) => {
+        const id = group.cases[0].id;
+        asked.push(`${id}#${attempt}`);
+        return [verdicts[id][attempt - 1]];
+      }) as never);
+    jest.spyOn(service, 'totalsFor').mockResolvedValue({
+      questions: 0,
+      failed: 0,
+      hardFails: 0,
+    } as never);
+    return { service, asked, runs };
+  };
+
+  it('asks Ally’s question again only after a failure, and stops at the first pass', async () => {
+    const { service, asked, runs } = run({
+      kept: ['pass'],
+      flaky: ['fail', 'pass'],
+      broken: ['fail', 'fail', 'fail'],
+      mine: ['pass', 'fail', 'pass'],
+    });
+    const cases = [
+      item({ id: 'kept', origin: 'generated' }),
+      item({ id: 'flaky', origin: 'generated' }),
+      item({ id: 'broken', origin: 'generated' }),
+      item({ id: 'mine' }),
+    ];
+    await (
+      service as unknown as {
+        execute: (...a: unknown[]) => Promise<void>;
+      }
+    ).execute({ id: 'run-1', total: 6 }, cases, (c: ChatbotCheckupCase) =>
+      planFor(c, 'manual'),
+    );
+    expect(asked.sort()).toEqual(
+      [
+        'kept#1',
+        'flaky#1',
+        'flaky#2',
+        'broken#1',
+        'broken#2',
+        'broken#3',
+        'mine#1',
+        'mine#2',
+        'mine#3',
+      ].sort(),
+    );
+    // Each retry is added to the run's total as it's asked.
+    expect(runs.increment).toHaveBeenCalledTimes(3);
   });
 });
 

@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -319,6 +320,18 @@ export class AssistantHomeController {
     @Param('eventId', ParseUUIDPipe) eventId: string,
   ) {
     return this.changes.undo(id, eventId);
+  }
+
+  @Get(':id/home/numbers')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({
+    summary: "The Overview's numbers over the last 7 or 30 days (default 30)",
+  })
+  numbers(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('days') days?: string,
+  ) {
+    return this.home.numbers(id, days === '7' ? 7 : 30);
   }
 
   @Get(':id/how-it-works')

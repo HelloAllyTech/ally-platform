@@ -100,7 +100,16 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit }) =>
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const disclaimer = useHomeField(bot.id, "disclaimer", home.fields.disclaimer, HOME.saving.failed);
-  const crisis = useHomeField(bot.id, "crisisText", home.fields.crisisText, HOME.saving.failed);
+  const crisisField = useHomeField(
+    bot.id,
+    "crisisText",
+    home.fields.crisisText,
+    HOME.saving.failed,
+  );
+  // With nothing of the owner's, the box shows the reply people get today, to add to.
+  const atRiskReply = home.safety.atRiskReply ?? "";
+  const fromPack = !crisisField.value && Boolean(atRiskReply);
+  const crisis = fromPack ? { ...crisisField, value: atRiskReply } : crisisField;
   const avoid = useHomeField(bot.id, "avoidTopics", home.fields.avoidTopics, HOME.saving.failed);
   const addId = useId();
   const { pack, rules, version } = home.safety;
@@ -210,7 +219,7 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit }) =>
         />
         <TextField
           label={t.atRisk}
-          hint={t.atRiskHint}
+          hint={fromPack ? t.atRiskFromPack : t.atRiskHint}
           field={crisis}
           disabled={!canEdit}
           multiline

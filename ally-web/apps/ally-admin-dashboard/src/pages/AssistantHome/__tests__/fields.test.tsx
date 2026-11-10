@@ -189,3 +189,40 @@ describe("own safety rules", () => {
     });
   });
 });
+
+describe("when someone may be at risk", () => {
+  const withReply = (crisisText: string) =>
+    ({
+      ...props(),
+      home: {
+        ...HOME_VIEW,
+        fields: { ...HOME_VIEW.fields, crisisText: field(crisisText, "0000000000000008") },
+        safety: { ...HOME_VIEW.safety, atRiskReply: "Please call 14416 now." },
+      },
+    }) as never;
+
+  it("shows the reply from the safety rules until the owner writes their own, to add to", async () => {
+    save.mockReturnValue(resolves({ field: "crisisText", value: "x", version: "1".repeat(16) }));
+    render(<SafetySection {...withReply("")} />);
+    const box = screen.getByLabelText("When someone may be at risk") as HTMLTextAreaElement;
+    expect(box.value).toBe("Please call 14416 now.");
+    expect(screen.getByText(/^From your safety rules\./)).toBeTruthy();
+    // Looking at it saves nothing; adding to it saves the whole reply.
+    fireEvent.blur(box);
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.change(box, { target: { value: "Please call 14416 now. We're here." } });
+    await act(async () => {
+      vi.advanceTimersByTime(FIELD_SAVE_DEBOUNCE_MS);
+    });
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ field: "crisisText", value: "Please call 14416 now. We're here." }),
+    );
+  });
+
+  it("shows the owner's own reply when there is one", () => {
+    render(<SafetySection {...withReply("Call us on 98200 12345.")} />);
+    const box = screen.getByLabelText("When someone may be at risk") as HTMLTextAreaElement;
+    expect(box.value).toBe("Call us on 98200 12345.");
+    expect(screen.queryByText(/^From your safety rules\./)).toBeNull();
+  });
+});

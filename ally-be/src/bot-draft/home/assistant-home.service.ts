@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -10,6 +11,7 @@ import { createHash, randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { AiService } from '../../ai/service/ai.service';
 import { BotPageService } from '../../chatbot/bot-page/bot-page.service';
+import { ChatbotSettingsService } from '../../chatbot/service/chatbot-settings.service';
 import { ChatbotService } from '../../chatbot/service/chatbot.service';
 import { LoggerService } from '../../logger/logger.service';
 import { ChatbotPage } from '../../chatbot/entity/chatbot-page.entity';
@@ -46,6 +48,9 @@ export const SAFETY_CONFLICT_MESSAGE =
 /** Saved, but text that tries to override the rules can't (deck §25). */
 export const OVERRIDE_WARNING =
   'Saved. Your assistant still follows its safety and base rules first, so text that tries to override them has no effect.';
+/** "Your instructions" couldn't be checked, so they weren't saved (deck §25). */
+export const CHECK_UNAVAILABLE_MESSAGE =
+  "Couldn't check this right now. Try again in a minute.";
 /** How many changes the History shows. */
 const HISTORY_SHOWN = 50;
 
@@ -72,6 +77,7 @@ export class AssistantHomeService {
     // Chunk 20d-2 (optional, so the specs that build this service by hand needn't change).
     private readonly ai?: AiService,
     private readonly chatbots?: ChatbotService,
+    private readonly settings?: ChatbotSettingsService,
   ) {}
 
   private readonly logger = LoggerService.getInstance(
@@ -80,9 +86,10 @@ export class AssistantHomeService {
 
   async get(chatbotId: string) {
     const { chatbot, role } = await this.access.assert(chatbotId);
-    const [state, draft] = await Promise.all([
+    const [state, draft, atRiskReply] = await Promise.all([
       this.state(chatbot),
       this.drafts.findByChatbot(chatbotId),
+      this.atRiskReply(chatbot),
     ]);
     const facts = (draft?.learned.facts ?? []).map((fact) => ({
       ...fact,
@@ -91,7 +98,10 @@ export class AssistantHomeService {
     return {
       canEdit: role !== ChatbotMemberRole.VIEWER,
       fields: readAll(state),
-      safety: safetyView(chatbot.safetyPack, chatbot.rules?.never ?? []),
+      safety: {
+        ...safetyView(chatbot.safetyPack, chatbot.rules?.never ?? []),
+        atRiskReply,
+      },
       facts,
     };
   }
@@ -160,21 +170,46 @@ export class AssistantHomeService {
   /**
    * "Your instructions" go through the builder's safety check too (chunk 20d-2): text that
    * would weaken a safety rule is refused with the reason; text that tries to override the
-   * rules is saved with a note that it can't. Without ally-ai the save goes ahead: the text is
-   * fenced below the base and safety rules either way.
+   * rules is saved with a note that it can't. If the check can't be reached, nothing is saved.
    */
+  /**
+   * The reply someone who may be at risk gets when the owner hasn't written their own: the
+   * platform's text with this bot's helpline numbers, as the engine sends it (chunk 20d-2).
+   */
+  private async atRiskReply(chatbot: Chatbot): Promise<string | null> {
+    if (!this.settings) return null;
+    const [defaults, effective] = await Promise.all([
+      this.settings.get(),
+      this.settings.getForChatbot(chatbot),
+    ]);
+    return this.settings.renderPlaceholders(
+      defaults.crisisEscalationText,
+      effective,
+    );
+  }
+
   private async checkInstructions(value: unknown): Promise<string | null> {
     const text = typeof value === 'string' ? value.trim() : '';
-    if (!text || !this.ai) return null;
-    const check = await this.ai.checkOwnerText(text).catch(() => null);
-    if (check?.refused) {
+    if (!text) return null;
+    // Fail closed (chunk 20d-2, at approval): unchecked text is never saved.
+    const check = this.ai
+      ? await this.ai.checkOwnerText(text).catch(() => null)
+      : null;
+    if (!check) {
+      throw new ServiceUnavailableException({
+        errorCode: 'check_unavailable',
+        message: CHECK_UNAVAILABLE_MESSAGE,
+        details: { field: 'instructions' },
+      });
+    }
+    if (check.refused) {
       throw new UnprocessableEntityException({
         errorCode: 'safety_conflict',
         message: SAFETY_CONFLICT_MESSAGE,
         details: { field: 'instructions' },
       });
     }
-    return check?.warning ? OVERRIDE_WARNING : null;
+    return check.warning ? OVERRIDE_WARNING : null;
   }
 
   /** One edit by hand, for the History: who, when, the field, its before and after. */
@@ -278,6 +313,13 @@ export class AssistantHomeService {
    * "How it works" (chunk 20d-2): the instructions this assistant follows, built by ally-ai from
    * the very request a v2 answer would send (`ChatbotService.agentRequestFor`). Nothing is kept.
    */
+  /** The Overview's numbers over the last 7 or 30 days. */
+  async numbers(chatbotId: string, days: 7 | 30) {
+    await this.access.assert(chatbotId);
+    if (!this.chatbots) throw new NotFoundException();
+    return { days, ...(await this.chatbots.statsFor(chatbotId, days)) };
+  }
+
   async howItWorks(chatbotId: string) {
     const { chatbot } = await this.access.assert(chatbotId);
     if (!this.ai || !this.chatbots) throw new NotFoundException();

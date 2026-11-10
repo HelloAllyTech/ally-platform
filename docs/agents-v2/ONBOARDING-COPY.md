@@ -707,3 +707,6 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Why this answer:** Why this answer? · Hide · Where it looked · It didn't use any of your pages for this. · {s} s to answer · Topics to avoid: {topic} · It said it didn't know.
 - **Personality, the link to How it works:** See everything it follows
 - **How it works, in the section list (20d-2):** How it works · Everything your assistant follows, and the parts you can change.
+- **Your instructions, when the check can't run (20d-2, at approval):** Couldn't check this right now. Try again in a minute.
+- **When someone may be at risk, before the owner writes their own (20d-2, at approval):** From your safety rules. This is what it says now, and you can add to it.
+- **Overview numbers, with the 7 / 30 days switch (20d-2, at approval):** Your numbers · Show the last · 7 days · 30 days

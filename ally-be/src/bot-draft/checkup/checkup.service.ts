@@ -31,7 +31,13 @@ import {
   CheckupTrigger,
 } from '../entity/chatbot-checkup.entity';
 import { checkupTotals, StatInput } from './checkup-stats';
-import { attemptsFor, gradedFacts, resultOf } from './checkup-cases';
+import {
+  failedTry,
+  gradedFacts,
+  planFor,
+  resultOf,
+  TryPlan,
+} from './checkup-cases';
 import type { PlannedCase } from './checkup-generation';
 
 /** The plain-text sources list a channel without a sources view gets (reply-composer.ts). */
@@ -317,9 +323,11 @@ export class CheckupService {
     const chosen = failedOnly ? await this.notPassed(chatbotId, cases) : cases;
     const asked = chosen.slice(0, limit);
     if (!asked.length) throw new BadRequestException('no_checkup_questions');
-    // Evals ask every question `attempts` times; home runs ask Must pass ones 3 times.
-    const attemptsOf = (item: ChatbotCheckupCase) =>
-      options.attempts ? attempts : attemptsFor(item, options.trigger);
+    // Evals ask every question `attempts` times; home runs follow `planFor` (chunk 20d-2).
+    const planOf = (item: ChatbotCheckupCase): TryPlan =>
+      options.attempts
+        ? { tries: attempts, retries: 0 }
+        : planFor(item, options.trigger);
 
     const run = await this.runs.save(
       this.runs.create({
@@ -328,7 +336,8 @@ export class CheckupService {
         trigger: options.trigger,
         suite: options.suite ?? null,
         status: 'running',
-        total: asked.reduce((sum, item) => sum + attemptsOf(item), 0),
+        // Retries after a failure are added to the total as they're asked.
+        total: asked.reduce((sum, item) => sum + planOf(item).tries, 0),
         done: 0,
         asked: 0,
         phase: 'asking',
@@ -346,7 +355,7 @@ export class CheckupService {
     const about = [chatbot?.persona?.greeting, chatbot?.persona?.systemPrompt]
       .filter(Boolean)
       .join('\n');
-    void this.execute(run, asked, attemptsOf, { declineText, about }).catch(
+    void this.execute(run, asked, planOf, { declineText, about }).catch(
       async (error: unknown) => {
         this.logger.error(
           `Checkup run ${run.id} failed: ${error instanceof Error ? error.name : 'error'}`,
@@ -404,27 +413,53 @@ export class CheckupService {
   private async execute(
     run: ChatbotCheckupRun,
     cases: ChatbotCheckupCase[],
-    attempts: number | ((item: ChatbotCheckupCase) => number),
+    attempts: number | ((item: ChatbotCheckupCase) => TryPlan),
     context: GradeContext = {},
   ): Promise<void> {
     const prompts = await this.prompts();
-    const triesOf = (item: ChatbotCheckupCase) =>
-      typeof attempts === 'number' ? attempts : attempts(item);
+    const planOf = (item: ChatbotCheckupCase): TryPlan =>
+      typeof attempts === 'number'
+        ? { tries: attempts, retries: 0 }
+        : attempts(item);
+    // A thread is asked as often as its most-tried question.
+    const groupPlan = (group: Group): TryPlan => ({
+      tries: Math.max(...group.cases.map((c) => planOf(c).tries)),
+      retries: Math.max(...group.cases.map((c) => planOf(c).retries)),
+    });
     const work: { group: Group; attempt: number }[] = [];
-    const most = Math.max(1, ...cases.map(triesOf));
+    const groups = CheckupService.groups(cases);
+    const most = Math.max(1, ...groups.map((g) => groupPlan(g).tries));
     for (let attempt = 1; attempt <= most; attempt += 1) {
-      for (const group of CheckupService.groups(cases)) {
-        // A thread is asked as often as its most-tried question.
-        if (attempt <= Math.max(...group.cases.map(triesOf))) {
-          work.push({ group, attempt });
-        }
+      for (const group of groups) {
+        if (attempt <= groupPlan(group).tries) work.push({ group, attempt });
       }
     }
     let next = 0;
     const worker = async () => {
       while (next < work.length) {
         const { group, attempt } = work[next++];
-        await this.askGroup(run, group, attempt, prompts, context);
+        const verdicts = await this.askGroup(
+          run,
+          group,
+          attempt,
+          prompts,
+          context,
+        );
+        // Asked again only after a failed try, and only as far as its plan allows.
+        const plan = groupPlan(group);
+        if (
+          attempt >= plan.tries &&
+          attempt < plan.tries + plan.retries &&
+          verdicts.some(failedTry)
+        ) {
+          await this.runs.increment(
+            { id: run.id },
+            'total',
+            group.cases.length,
+          );
+          run.total += group.cases.length;
+          work.push({ group, attempt: attempt + 1 });
+        }
       }
     };
     await Promise.all(
@@ -454,7 +489,8 @@ export class CheckupService {
     attempt: number,
     prompts: Record<string, unknown> | undefined,
     context: GradeContext = {},
-  ): Promise<void> {
+  ): Promise<string[]> {
+    const verdicts: string[] = [];
     const conversationId = `checkup-${run.id.slice(0, 8)}-${group.cases[0].id.slice(0, 8)}-${attempt}`;
     const history: { role: 'user' | 'assistant'; content: string }[] = [];
     for (const item of group.cases) {
@@ -510,12 +546,14 @@ export class CheckupService {
         }),
       );
       if (!tested) await this.markAsked(run);
+      verdicts.push(grade?.verdict ?? 'error');
       await this.runs.increment({ id: run.id }, 'done', 1);
       history.push(
         { role: 'user', content: item.question },
         { role: 'assistant', content: tested?.reply ?? '' },
       );
     }
+    return verdicts;
   }
 
   /** One more question asked; once every one has been, the run is checking the last answers. */

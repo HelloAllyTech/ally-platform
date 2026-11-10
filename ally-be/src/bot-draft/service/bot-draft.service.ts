@@ -116,6 +116,9 @@ export class DraftPatchRefused extends BadRequestException {
  * proposes; this is the one writer. Later chunks extend it (pages in 4, templates in 18–20) rather
  * than fork it.
  */
+/** How many changes a bot's draft keeps; the oldest are dropped past this. */
+export const MAX_DRAFT_EVENTS = 200;
+
 @Injectable()
 export class BotDraftService {
   constructor(
@@ -639,7 +642,8 @@ export class BotDraftService {
   ): Promise<BotDraftEntity> {
     const next = {
       ...draft,
-      events: [...draft.events, ...newEvents],
+      // The newest MAX_DRAFT_EVENTS only (chunk 20d-2): every hand edit now adds one.
+      events: [...draft.events, ...newEvents].slice(-MAX_DRAFT_EVENTS),
       version: basedOn + 1,
     };
     const result = await this.drafts

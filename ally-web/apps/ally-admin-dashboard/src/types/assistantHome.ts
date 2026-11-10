@@ -94,6 +94,8 @@ export interface HomeSafety {
   } | null;
   rules: SafetyRule[];
   version: string;
+  /** What someone who may be at risk is sent when the owner hasn't written their own (20d-2). */
+  atRiskReply?: string | null;
 }
 
 export interface AssistantHomeView {

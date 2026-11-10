@@ -205,6 +205,15 @@ export class ChatbotService {
     return this.summarise(bots);
   }
 
+  /**
+   * One bot's numbers over the last 7 or 30 days, counted as the list counts its 30 (chunk 20d-2:
+   * the home's 7 days / 30 days switch). Access is checked by the caller.
+   */
+  async statsFor(id: string, days: 7 | 30): Promise<ChatbotStats> {
+    const stats = await this.stats([id], days);
+    return stats.get(id) ?? { ...EMPTY_STATS };
+  }
+
   async get(id: string): Promise<ChatbotSummary> {
     const { chatbot } = await this.access.assert(id);
     return (await this.summarise([chatbot]))[0];
@@ -313,7 +322,10 @@ export class ChatbotService {
    * the dashboard reads the shared store (chunk 12b), from `chatbot_*`: every channel, the bot page
    * included. The two have the same shape, so one query serves both.
    */
-  private async stats(ids: string[]): Promise<Map<string, ChatbotStats>> {
+  private async stats(
+    ids: string[],
+    days = STATS_DAYS,
+  ): Promise<Map<string, ChatbotStats>> {
     const shared = dashboardReadsShared(await this.settingsService.get());
     const messages = shared ? 'chatbot_messages' : 'wa_messages';
     const conversations = shared ? 'chatbot_conversations' : 'wa_conversations';
@@ -338,7 +350,7 @@ export class ChatbotService {
         WHERE c.chatbot_id = ANY($1::uuid[])
           AND m."createdAt" >= now() - ($2 || ' days')::interval
         GROUP BY c.chatbot_id`,
-      [ids, String(STATS_DAYS), WaHandledBy.RAG, WaHandledBy.DECLINED],
+      [ids, String(days), WaHandledBy.RAG, WaHandledBy.DECLINED],
     );
     const open = await this.chatbotRepository.manager.query<
       { chatbot_id: string; open: string }[]

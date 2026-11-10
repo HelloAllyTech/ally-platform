@@ -813,6 +813,7 @@ export const ApiEndpoints = {
     CHANGES: (id: string) => `/v1/chatbots/${id}/changes`,
     HISTORY: (id: string) => `/v1/chatbots/${id}/history`,
     HOW_IT_WORKS: (id: string) => `/v1/chatbots/${id}/how-it-works`,
+    HOME_NUMBERS: (id: string, days: 7 | 30) => `/v1/chatbots/${id}/home/numbers?days=${days}`,
     CHANGES_PROPOSE: (id: string) => `/v1/chatbots/${id}/changes/propose`,
     CHANGES_APPLY: (id: string) => `/v1/chatbots/${id}/changes/apply`,
     CHANGE_UNDO: (id: string, eventId: string) => `/v1/chatbots/${id}/changes/${eventId}/undo`,

@@ -8,7 +8,10 @@ import {
   SafetyPackId,
 } from '../enum/bot-draft.enum';
 import { SAFETY_PACKS } from '../safety-pack/safety-packs';
-import { BotDraftService } from '../service/bot-draft.service';
+import {
+  BotDraftService,
+  MAX_DRAFT_EVENTS,
+} from '../service/bot-draft.service';
 import type { BotDraftEntity } from '../entity/bot-draft.entity';
 
 jest.mock('src/common/execution/execution-manager', () => ({
@@ -133,6 +136,22 @@ describe('BotDraftService', () => {
         }),
       ),
     ).toBe('path_not_allowed');
+  });
+
+  it('keeps the newest 200 changes per bot, dropping the oldest', async () => {
+    const { service, draft, writes } = harness();
+    const edit = (n: number) =>
+      ({ id: `e${n}`, at: '2026-11-10T00:00:00Z', kind: 'edit' }) as never;
+    const full = {
+      ...draft(),
+      events: Array.from({ length: MAX_DRAFT_EVENTS }, (_, n) => edit(n)),
+    };
+    const saved = await service.update(full, {}, [edit(MAX_DRAFT_EVENTS)]);
+    expect(MAX_DRAFT_EVENTS).toBe(200);
+    expect(saved.events).toHaveLength(200);
+    expect(saved.events[0].id).toBe('e1');
+    expect(saved.events[saved.events.length - 1].id).toBe('e200');
+    expect((writes[writes.length - 1].events as unknown[]).length).toBe(200);
   });
 
   it('refuses a result that is not a valid draft', async () => {

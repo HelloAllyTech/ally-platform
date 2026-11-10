@@ -37,6 +37,7 @@ import {
   UpdateChatbotDocumentRequest,
   UpdateBotPageRequest,
   UpdateChatbotRequest,
+  ChatbotStats,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -255,6 +256,17 @@ export const chatbotsApi = baseAPI.injectEndpoints({
     getHowItWorks: builder.query<HowItWorks, string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.HOW_IT_WORKS(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:how` }],
+    }),
+
+    /** The Overview's numbers over the last 7 or 30 days (chunk 20d-2). */
+    getHomeNumbers: builder.query<ChatbotStats & { days: 7 | 30 }, { id: string; days: 7 | 30 }>({
+      query: ({ id, days }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME_NUMBERS(id, days),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_r, _e, { id, days }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:numbers:${days}` },
+      ],
     }),
 
     /** One of the home's lists with its version (chunk 20d-2). */
@@ -533,6 +545,7 @@ export const {
   useChangeOwnRuleMutation,
   useGetHomeListQuery,
   useGetHowItWorksQuery,
+  useGetHomeNumbersQuery,
   useChangeHomeListMutation,
   useCorrectFactMutation,
   useGetChatbotsQuery,

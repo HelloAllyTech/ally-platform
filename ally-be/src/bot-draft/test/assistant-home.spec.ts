@@ -20,6 +20,7 @@ import { SafetyPackId } from '../enum/bot-draft.enum';
 import { findSource, replaceSource } from '../home/correction';
 import {
   AssistantHomeService,
+  CHECK_UNAVAILABLE_MESSAGE,
   OVERRIDE_WARNING,
   SAFETY_CONFLICT_MESSAGE,
   STALE_MESSAGE,
@@ -318,6 +319,7 @@ function harness(
     safetyPack?: string | null;
     ai?: Record<string, jest.Mock>;
     chatbots?: Record<string, jest.Mock>;
+    settings?: Record<string, jest.Mock>;
   } = {},
 ) {
   const chatbot = {
@@ -410,6 +412,7 @@ function harness(
     knowledge as never,
     over.ai as never,
     over.chatbots as never,
+    over.settings as never,
   );
   return {
     service,
@@ -912,6 +915,62 @@ describe('Your instructions, checked like the builder checks (chunk 20d-2)', () 
       version: home.fields.instructions.version,
     });
     expect(saved).toMatchObject({ warning: OVERRIDE_WARNING });
+  });
+
+  it("gives the Overview's numbers for the last 7 or 30 days, counted the same way", async () => {
+    const chatbots = {
+      statsFor: jest.fn(async (_id: string, days: number) => ({
+        messages: days,
+        people: 1,
+        answered: 1,
+        declined: 0,
+        openUnanswered: 0,
+        lastMessageAt: null,
+      })),
+    };
+    const { service, access } = harness({ chatbots });
+    expect((await service.numbers('bot-1', 7)).messages).toBe(7);
+    expect((await service.numbers('bot-1', 30)).days).toBe(30);
+    expect(chatbots.statsFor).toHaveBeenCalledWith('bot-1', 7);
+    expect(access.assert).toHaveBeenCalledWith('bot-1');
+  });
+
+  it('shows the at-risk reply people get today when the owner has written none', async () => {
+    const settings = {
+      get: jest.fn(async () => ({
+        crisisEscalationText: 'Please call {helpline_numbers} now.',
+      })),
+      getForChatbot: jest.fn(async () => ({ helplineNumbers: '14416' })),
+      renderPlaceholders: jest.fn(
+        (text: string, s: { helplineNumbers: string }) =>
+          text.replace('{helpline_numbers}', s.helplineNumbers),
+      ),
+    };
+    const { service } = harness({ settings });
+    const home = await service.get('bot-1');
+    expect(home.safety.atRiskReply).toBe('Please call 14416 now.');
+    // Without the settings service the box just has no default.
+    const bare = await harness().service.get('bot-1');
+    expect(bare.safety.atRiskReply).toBeNull();
+  });
+
+  it("doesn't save when the check can't be reached, and says so", async () => {
+    const down = {
+      checkOwnerText: jest.fn(async () => {
+        throw new Error('ally-ai unreachable');
+      }),
+      agentInstructions: jest.fn(),
+    };
+    const { service, chatbot } = harness({ ai: down });
+    const home = await service.get('bot-1');
+    await expect(
+      service.saveField('bot-1', {
+        field: 'instructions',
+        value: 'Greet people by name.',
+        version: home.fields.instructions.version,
+      }),
+    ).rejects.toThrow(CHECK_UNAVAILABLE_MESSAGE);
+    expect(chatbot.persona?.systemPrompt).toBeUndefined();
   });
 
   it('saves a normal one as it always did', async () => {

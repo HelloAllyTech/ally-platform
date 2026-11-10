@@ -15,14 +15,16 @@
 | `f3d92bfd4` | B: the UX audit's fixes; every section explains itself |
 | `a9aaffd1c` | C: a Checkup the owner understands and controls |
 | `68f7ab26a` | D: Change your assistant explains itself; How it works; Why this answer |
-| this one | E: notes, screenshots, refreshed Playwright baselines |
+| `5db317889` | E: notes, screenshots, refreshed Playwright baselines |
+| this one | Fix-up round before CL1 (below) |
 
 **Suites (after D):**
 - ally-be: 14,830 passed, 70 skipped (the Postgres-only specs without a test database);
 - ally-ai: 2,157 passed, 46 skipped; flake8 clean;
 - ally-web: admin 9,494 passed, helpline and ui-shared green (the pre-commit hook ran all three on every commit); typecheck and lint clean on every changed file.
 - Playwright: baselines were refreshed once, at the end, as agreed (see "Browser tests" below).
-- **Not run:** the Sunrise checkup suite (`checkup_eval.py`) and the 3a conversation eval. Both call the live model through the local stack. The agent's prompt, `check.py`, the grader and the stats are unchanged, so no shift is expected, but that's not proof. They're the first thing to run before CL1 (commands under "How Shehbaz tests it").
+- **3a conversation eval: run, no regression** (`CHUNK-20D2-EVAL.md`, against `CHUNK-03R-EVAL.md`): 1 hard fail, the same count as 03R; judge mean 4.62 (03R 4.50), min 3; same documents as v1 100% of 12; p50 in scope -24% vs v1 (03R -22%; budget +25%); `turn_type` 92% (same). The one hard fail moved: 03R's `out-refund` now passes, and `ab-who` ("who are you?") was flagged for describing Ally without a citation. Rerun 3 times on its own, `ab-who` passed all 3, so it's model variance. Nothing on the agent's run path changed in 20d-2.
+- **Sunrise checkup suite (`checkup_eval.py`): not run yet.** It needs an admin's `ALLY_TOKEN` for the local ally-be, and signing one locally was refused by the permission mode. Run it with the command under "How Shehbaz tests it" (expect 0 hard fails, must_pass as at 20a-2 round 7). The grader, the stats and the questions' prompt are unchanged; only how many times a home checkup asks changed (fix-up item 2), and the eval sets its own attempts.
 
 ### What was built
 
@@ -96,16 +98,37 @@ Numbers are the audit's (plan §1).
 - `ally-web`: the chatbot entries of `constants/common.ts` (endpoints) and `constants/en.ts` (the `whatsappBot` strings the list page reads); the AI Chatbots API slices (`chatbots`, `checkup`, `changes`, `scorecard`, `botDrafts`) and types; `components/v2/Checkup.tsx` (an optional `empty` prop; only AI Chatbots screens use it).
 - `git diff --stat 9e9641617~1 HEAD`: 132 files, +11,140 −681 (before this notes commit).
 
+### Fix-up round before CL1 (10 Nov 2026)
+
+1. **Evals:** the conversation eval ran with no regression; the checkup suite still needs an admin token (see "Suites" above). The local ally-ai container was rebuilt first so it has `instructions.py` (local stack only).
+2. **Checkup attempts:** a home checkup asks **safety questions and the owner's own Must pass questions 3 times**. Every other question (the ones Ally wrote) is asked **once**, and only if that first try fails is it asked again, up to 3 tries in all. "Partly" = mixed results across a question's tries. Onboarding and suggestions still ask once. The rule is `planFor` in `bot-draft/checkup/checkup-cases.ts`; the runner adds the retries to the run's total as they're queued, so the progress count stays honest. Grader and stats unchanged.
+
+   **Cost per home checkup**, from the local Sunrise data (18.8 questions on average: 3 safety, 0.2 owner Must pass, 15.6 written by Ally; 38% of Ally questions fail their first try, 62 of 164):
+
+   | | Model asks per checkup | vs before 20d-2 |
+   |---|---|---|
+   | Before 20d-2 (each question once) | ≈ 19 | 1× |
+   | 20d-2 as first built (every Must pass ×3) | ≈ 53 | 2.8× |
+   | **Now** (safety and owner Must pass ×3; others once, retried only on a fail) | **≈ 31–37** | **1.7–2.0×** |
+
+   The range is how many retried questions pass on their second try (each pass stops the retries): ≈ 31 if most do, ≈ 37 if none do. Each ask is also graded once, so grading calls scale the same way.
+3. **Your instructions fail closed:** if the ally-ai check can't be reached (or isn't wired), nothing is saved and the owner sees "Couldn't check this right now. Try again in a minute." (503 `check_unavailable`; deck §25). Emptying the box needs no check. Spec: `assistant-home.spec.ts` "doesn't save when the check can't be reached".
+4. **#24, the at-risk reply:** the home view now carries `safety.atRiskReply`, the reply the engine sends someone who may be at risk when the owner hasn't written one: the platform's text with this bot's helpline numbers (`ChatbotSettingsService`, the same values and placeholder the engine uses). The Safety box shows it as its text with "From your safety rules. This is what it says now, and you can add to it." Looking at it saves nothing; changing it saves the whole reply as the owner's own. Specs on both sides.
+5. **#16, 7 days / 30 days:** the Overview's numbers card has the switch. 30 days is the list's numbers as before; 7 days comes from `GET v1/chatbots/:id/home/numbers?days=7`, the same query with a 7-day window (`ChatbotService.statsFor`; the counting is unchanged). `__tests__/Overview.test.tsx`.
+6. **History is capped:** a bot's draft keeps its newest 200 changes (`MAX_DRAFT_EVENTS` in `bot-draft.service.ts`); the oldest are dropped on the next write. `bot-draft.service.spec.ts` "keeps the newest 200 changes".
+
+Still follow-ups: #25 (one add pattern) and #7 (layout shift).
+
 ### Decisions made while building
 
-- **Must pass ×3 costs more than the plan said:** most generated questions are already `must_pass`, so a home checkup asks about 3× as many times as before, not 1.5–2×. Onboarding asks once, so building an assistant is as quick as before. If that's too costly, the runner rule is one line (`attemptsFor` in `checkup-cases.ts`).
+- **Must pass ×3 cost more than the plan said** (≈ 2.8×, since most generated questions are `must_pass`). Changed in the fix-up round: see item 2 above.
 - **"Partly"** is mixed results across a question's tries in one checkup.
 - **The four outcomes:** "politely decline" and "offer a person" are declines with one more fact the grader's judge already checks (`facts_missing` fails any case), so no grader change was needed.
 - **Team:** added by the email of someone in the caller's organisation (platform admins: anyone, as before by id); the three roles are today's.
 - **Undo for lists:** add ↔ remove for every list; removing an uploaded file can't be undone yet (it's archived; CL1 can add restore).
-- **History:** kept in the draft's `events` (jsonb), so no migration. It's not capped at 200 as planned (the drafts service appends; trimming needs its own change). Edits to the owner's own rules show in the History but are changed again from Safety, not undone there.
+- **History:** kept in the draft's `events` (jsonb), so no migration. Capped at the newest 200 (fix-up round). Edits to the owner's own rules show in the History but are changed again from Safety, not undone there.
 - **How it works when v2 is off:** the endpoint sits on the agent runtime's router, so it answers 404 when `AGENT_RUNTIME__ENABLED` is off; the section then says it couldn't load.
-- **The instructions check:** if ally-ai can't be reached, "Your instructions" still save (the text is fenced below the base and safety rules either way).
+- **The instructions check:** fails closed (fix-up round): if ally-ai can't be reached, nothing is saved.
 
 ### Changed tests (no behaviour test was weakened)
 
@@ -131,7 +154,7 @@ In AI Chatbots' new screens nothing imports these any more; they live on for `?v
 ### Follow-ups
 
 - **Prompt order** (approved as a follow-up): the owner's text is fenced *before* the base rules in the real prompt (`format_persona` is prepended). After the POC, test moving owner text after the base and safety layers, with the 3a conversation evals before and after. How it works shows the order the runtime really uses.
-- The 7/30-day switch on the Overview (#16), the at-risk placeholder (#24), one add pattern for topics (#25), and a Playwright layout-shift check (#7).
+- One add pattern for topics (#25), and a Playwright layout-shift check (#7).
 - Redraw the WhatsApp connect flow (Meta's steps) in v2.
 - The Overview's "Remove assistant" still uses a browser confirm.
 
