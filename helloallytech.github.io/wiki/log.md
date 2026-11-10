@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-10] update | `contributing/planning-with-context-library.md`, `platform/agent-guide.md`, `repos/ally-mobile.md`: `ally-mobile` wired to the Context Library; desktop-app and user-scope setup documented.
+
+`ally-mobile` now commits the `context-library` `.mcp.json`, skill and CLAUDE.md/AGENTS.md rule like every other app, so the "not wired yet — ask in conversation" notes are gone. The setup guide gains the Claude desktop app's missing-environment fix (`launchctl setenv`, the *"'url' is not a valid URL"* symptom) and an optional user-scope server for sessions outside the app directories. `platform/agent-guide.md` no longer claims every repo's `.mcp.json` declares the server — the monorepo root doesn't. No page added, moved or retitled.
+
 ## [2026-11-10] update | Pointers to the retired third-party guidance library removed from current pages; the Context Library is named alone.
 
 `contributing/planning-with-context-library.md` (History section), `contributing/dev-setup.md`, `contributing/guide.md`, `index.md`, `memory.md`, `overview.md`, `platform/agent-guide.md`, `platform/overview.md`, `repos/ally-be.md`, this repo's `CLAUDE.md` and the deprecation banners on every `product/` page no longer name the library the Context Library replaced on 2026-11-09. Older entries in this log keep their wording — it is append-only. No page added, moved or retitled; frontmatter unchanged.

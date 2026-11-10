@@ -2,7 +2,7 @@
 title: ally-mobile — Mobile App
 tags: [repo, mobile, flutter, ios, android]
 summary: Flutter iOS/Android app for counsellors and community health workers, covering Scribe (recorded sessions with transcription and AI summaries), peer reviews, voice-based AI simulations, courses, and gamification.
-last_reconciled: 2026-11-09
+last_reconciled: 2026-11-10
 ---
 
 # ally-mobile — Mobile App
@@ -14,7 +14,7 @@ last_reconciled: 2026-11-09
 It **replaced the original React Native app** in both stores as an update to the same listings (same bundle id, same Apple team, same Android upload key). The React Native code was deleted outright in the 2026-11 rename; use git history before that date if you need it. Where the Flutter code says it "mirrors" or "ports" an RN file, that is provenance only — the RN file no longer exists. `ally-mobile/docs/PARITY_LEDGER.md` records what was audited against RN at cutover.
 
 > [!NOTE]
-> For product conventions behind these surfaces — cross-surface consistency with the web apps, achievement/leaderboard rules, and the counsellor-in-the-field persona — search the Context Library before you plan ([Working with the Context Library](../contributing/planning-with-context-library.md)). The former in-wiki pages ([UI & Interaction](../product/ui.md), [Gamification](../product/gamification.md), [User Personas](../product/user-personas.md)) are **deprecated** as of 2026-08-07 and kept for history. The Context Library is not yet wired into the `ally-mobile` repo itself (no `.mcp.json` or skill there), so ask in conversation there rather than calling its tools directly.
+> For product conventions behind these surfaces — cross-surface consistency with the web apps, achievement/leaderboard rules, and the counsellor-in-the-field persona — search the Context Library before you plan ([Working with the Context Library](../contributing/planning-with-context-library.md)). The former in-wiki pages ([UI & Interaction](../product/ui.md), [Gamification](../product/gamification.md), [User Personas](../product/user-personas.md)) are **deprecated** as of 2026-08-07 and kept for history. `ally-mobile` commits the `context-library` server (`.mcp.json`) and skill like every other app, so a session there calls its tools directly.
 
 ## Tech Stack
 
