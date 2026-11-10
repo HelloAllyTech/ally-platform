@@ -26,6 +26,7 @@ import {
   ClIngestSegment,
   ClSegmentRun,
 } from './entity/cl-ingest-segment.entity';
+import { ClRolloutStep } from './entity/cl-rollout-step.entity';
 import { ClSource } from './entity/cl-source.entity';
 import { ClGapTopic, ClJudgment, ClLoopAction } from './entity/cl-loop.entity';
 import {
@@ -52,6 +53,7 @@ import { ContextWorkerService } from './service/context-worker.service';
 import { ContextGapsService } from './service/context-gaps.service';
 import { ContextKbCopyService } from './service/context-kb-copy.service';
 import { ContextKbImportService } from './service/context-kb-import.service';
+import { ContextLibraryRolloutService } from './service/context-library-rollout.service';
 import { ContextJudgeService } from './service/context-judge.service';
 import { ContextLearningService } from './service/context-learning.service';
 import { ContextLoopActionsService } from './service/context-loop-actions.service';
@@ -86,6 +88,7 @@ import { ContextTuningService } from './service/context-tuning.service';
       ClJudgment,
       ClLoopAction,
       ClGapTopic,
+      ClRolloutStep,
     ]),
     AiModule,
     // S3, for deleting a retired Knowledge Base corpus's stored files.
@@ -118,6 +121,8 @@ import { ContextTuningService } from './service/context-tuning.service';
     // word-for-word copies of the Ally guide's library and Debrief's guidance (phase 6).
     ContextKbImportService,
     ContextKbCopyService,
+    // Drives those steps after a release, with no one at a screen.
+    ContextLibraryRolloutService,
     // The learning loops (phase 3).
     ContextGapsService,
     ContextJudgeService,

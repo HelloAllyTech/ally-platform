@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-10] update | `repos/ally-be.md`, `repos/ally-ai.md`, `contributing/planning-with-context-library.md`: the Context Library's post-release steps run by themselves; Builder needs no Context Library setting.
+
+The manual steps after a release — the character import, enrichment of the copied Ally guide and Debrief passages, the smoke checks and retiring each old corpus — are now driven by a rollout service with progress in `cl_rollout_steps`, a 24-hour default grace period between a corpus's smoke check and its retirement, retries with backoff, and a kill switch; the admin routes remain for doing any step by hand. The Context Library's MCP endpoint also accepts the platform's service key, so Builder's design runs reach it with the key they already hold and its workflow needs no new setting.
+
 ## [2026-11-10] update | `repos/ally-be.md`, `repos/ally-ai.md`: the Context Library's dead-code sweep; the Knowledge Base now serves only the WhatsApp Q&A corpus.
 
 The last pieces the moved systems left behind are gone: the Knowledge Base columns only the retired corpora used (dropped by migration, after a check that every Ally guide passage has its copy), the admin retrieval preview (ally-be's `POST /v1/knowledge-base/search` and ally-ai's `POST /knowledge-chunks/search`) and the chunk-list route, none of which had a screen left, and the two curator prompts the agent-chunk curator replaced. The WhatsApp bot's Test tab remains the way to see what it retrieves. The docs maps now watch the Context Library's MCP controller and ally-ai's on-demand collection schema.

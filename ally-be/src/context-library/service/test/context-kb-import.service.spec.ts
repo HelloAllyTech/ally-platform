@@ -289,6 +289,22 @@ describe('ContextKbImportService', () => {
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
+    it('retires without the phrase only through retireConfirmed, which keeps every other guard', async () => {
+      const incomplete = build({ docs: [doc('doc-1')], sources: [] });
+      await expect(
+        incomplete.service.retireConfirmed(actor),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(
+        incomplete.ai.dropRetiredKnowledgeCollection,
+      ).not.toHaveBeenCalled();
+
+      const { service, ai } = build(finished);
+      await service.retireConfirmed(actor);
+      expect(ai.dropRetiredKnowledgeCollection).toHaveBeenCalledWith(
+        'CharacterChunk',
+      );
+    });
+
     it('deletes nothing until the import is complete', async () => {
       const { service, ai } = build({ docs: [doc('doc-1')], sources: [] });
       await expect(

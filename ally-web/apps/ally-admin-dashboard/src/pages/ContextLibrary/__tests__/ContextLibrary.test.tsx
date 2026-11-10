@@ -10,6 +10,7 @@ import type {
   ContextLoopChange,
   ContextLoopSettings,
   ContextReaderKey,
+  ContextRollout,
   ContextUseCase,
 } from "@types";
 
@@ -111,6 +112,8 @@ const mocks = vi.hoisted(() => ({
   tenants: [] as Array<{ id: string; name: string }>,
   collectionsArg: vi.fn(),
   chunksArg: vi.fn(),
+  rollout: undefined as unknown,
+  rolloutError: undefined as unknown,
 }));
 
 // Who is looking: the store is not mounted here, so the access hook is set per test.
@@ -170,6 +173,10 @@ vi.mock("@api", () => {
     useCreateContextReaderKeyMutation: mutation(mocks.createKey),
     useRevokeContextReaderKeyMutation: mutation(mocks.revokeKey),
     useRestoreContextReaderKeyMutation: mutation(mocks.restoreKey),
+    useGetContextRolloutQuery: () =>
+      mocks.rolloutError
+        ? { ...query(undefined), isError: true, isSuccess: false, error: mocks.rolloutError }
+        : query(mocks.rollout),
   };
 });
 
@@ -963,5 +970,135 @@ describe("Content Catalogue items (synced from Studio)", () => {
     expect(links[0]).toHaveAttribute("href", "/create-simulation/edit/42");
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Release steps (Settings)", () => {
+  const rollout = (over: Partial<ContextRollout> = {}): ContextRollout => ({
+    automatic: true,
+    retireAfterHours: 24,
+    maxAttempts: 8,
+    corpora: [
+      {
+        corpus: "character_library",
+        collectionId: "first_principles",
+        steps: [
+          {
+            step: "import",
+            status: "done",
+            attempts: 1,
+            startedAt: "2026-11-10T08:00:00Z",
+            finishedAt: "2026-11-10T09:00:00Z",
+            nextAttemptAt: null,
+            lastError: null,
+            detail: { importable: 12, complete: 12 },
+            waitingUntil: null,
+          },
+          {
+            step: "smoke_check",
+            status: "done",
+            attempts: 1,
+            startedAt: "2026-11-10T09:00:00Z",
+            finishedAt: "2026-11-10T09:05:00Z",
+            nextAttemptAt: null,
+            lastError: null,
+            detail: { replayed: 9, answered: 7, inGaps: 2, gapTopics: 1, failed: 0 },
+            waitingUntil: null,
+          },
+          {
+            step: "retire",
+            status: "pending",
+            attempts: 0,
+            startedAt: null,
+            finishedAt: null,
+            nextAttemptAt: null,
+            lastError: null,
+            detail: { activeChunks: 40 },
+            waitingUntil: "2026-11-11T09:05:00Z",
+          },
+        ],
+      },
+      {
+        corpus: "debrief_knowledge",
+        collectionId: "debrief_guidance",
+        steps: [
+          {
+            step: "enrich",
+            status: "failed",
+            attempts: 2,
+            startedAt: "2026-11-10T08:00:00Z",
+            finishedAt: null,
+            nextAttemptAt: "2026-11-10T10:00:00Z",
+            lastError: "Enrichment stopped with 3 passage(s) still waiting.",
+            detail: { pending: 3, passagesCopied: 80 },
+            waitingUntil: null,
+          },
+        ],
+      },
+    ],
+    ...over,
+  });
+
+  beforeEach(() => {
+    mocks.access = { mode: "platform", canEdit: true, orgIds: null };
+    mocks.collections = [firstPrinciples];
+    mocks.permissions = ["view:admin:context-library"];
+    mocks.rollout = rollout();
+    mocks.rolloutError = undefined;
+  });
+  afterEach(() => {
+    mocks.rollout = undefined;
+    mocks.rolloutError = undefined;
+  });
+
+  it("shows each corpus's steps with an icon and a word, counts and when", () => {
+    renderAt("?view=settings");
+    const section = screen.getByTestId("cl-release-steps");
+    expect(within(section).getByRole("heading", { name: "Release steps" })).toBeInTheDocument();
+    const corpora = within(section).getAllByTestId("cl-release-corpus");
+    expect(corpora).toHaveLength(2);
+    const character = corpora[0];
+    expect(character).toHaveTextContent("Character library");
+    expect(character).toHaveTextContent("into First Principles");
+    const steps = within(character).getAllByTestId("cl-release-step");
+    expect(steps[0]).toHaveTextContent("Done");
+    expect(steps[0]).toHaveTextContent("Character material imported");
+    expect(steps[0]).toHaveTextContent("12 of 12 documents imported");
+    expect(steps[0]).toHaveTextContent(/Finished 10 Nov/);
+    expect(steps[1]).toHaveTextContent(
+      "7 of 9 searches found a good answer · 2 in 1 missing topic",
+    );
+    expect(steps[2]).toHaveTextContent("Waiting");
+    expect(steps[2]).toHaveTextContent("Waiting 24 h before removing the old corpus");
+    expect(steps[2]).toHaveTextContent(/Due 11 Nov/);
+    // An unknown collection falls back to its id rather than vanishing.
+    expect(corpora[1]).toHaveTextContent("into debrief_guidance");
+    const enrich = within(corpora[1]).getByTestId("cl-release-step");
+    expect(enrich).toHaveTextContent("Failed");
+    expect(enrich).toHaveTextContent("3 passages still to enrich");
+    expect(enrich).toHaveTextContent("Enrichment stopped with 3 passage(s) still waiting.");
+    expect(enrich).toHaveTextContent(/Trying again 10 Nov/);
+    // Read-only: nothing to press.
+    expect(within(section).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("says so when the automatic steps are switched off", () => {
+    mocks.rollout = rollout({ automatic: false });
+    renderAt("?view=settings");
+    expect(screen.getByTestId("cl-release-steps")).toHaveTextContent(
+      "Automatic release steps are switched off on the server.",
+    );
+  });
+
+  it("is hidden from an admin the server does not treat as a platform admin", () => {
+    mocks.rolloutError = { status: 403, data: { message: "Only a platform admin can do this." } };
+    renderAt("?view=settings");
+    expect(screen.queryByTestId("cl-release-steps")).not.toBeInTheDocument();
+  });
+
+  it("is not part of an organisation admin's page", () => {
+    mocks.access = { mode: "organisation", canEdit: true, orgIds: null };
+    renderAt("?view=settings");
+    expect(screen.queryByTestId("cl-release-steps")).not.toBeInTheDocument();
   });
 });

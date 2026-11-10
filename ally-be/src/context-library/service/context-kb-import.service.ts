@@ -57,6 +57,8 @@ export const CHARACTER_CORPUS_MIGRATION: KbCorpusMigration = {
   retiredIndex: 'CharacterChunk',
   confirmation: 'retire character_library',
   mode: 'distil',
+  // The character interview's searches, replayed by `ContextKbCopyService.smokeCheckDistilled`.
+  useCase: ClUseCase.CHARACTER_INTERVIEW,
 };
 
 /** The Ally guide's library, copied by `1981000800000` into the Ally Guide Library. */
@@ -500,6 +502,19 @@ export class ContextKbImportService {
         `Nothing was deleted. To confirm, send "${migration.confirmation}".`,
       );
     }
+    return this.retireConfirmed(actor, migration);
+  }
+
+  /**
+   * `retire` without the confirmation phrase, which exists for a person at a screen. Every other
+   * guard stands: platform admins only, and refused until the import or copy reports complete.
+   * The automatic rollout (`ContextLibraryRolloutService`) calls this once its own gates hold.
+   */
+  async retireConfirmed(
+    actor: ClActor,
+    migration: KbCorpusMigration = CHARACTER_CORPUS_MIGRATION,
+  ): Promise<KbRetireResult> {
+    await this.assertPlatformAdmin(actor);
     const status = await this.status(migration);
     if (!status.importComplete) {
       throw new ConflictException(

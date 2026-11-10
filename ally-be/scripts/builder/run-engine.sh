@@ -86,13 +86,23 @@ INSTRUCTIONS_JSON="$(
 # Those AGENTS.md files are loaded into every phase (instructions, above), so
 # without the server each agent would be told to call a tool it does not have.
 # A remote MCP server: opencode substitutes {env:…} when it connects, so the
-# read-only key stays in the environment builder-session.yml sets and is never
-# written into this file.
+# key stays in the environment builder-session.yml sets and is never written
+# into this file.
+#
+# By default it is ally-be's own endpoint, authenticated with the service key
+# the job already has (ally-be accepts it there in place of a reader key, with
+# the same read-only grants), so no extra GitHub setting is needed. Setting
+# ALLY_CONTEXT_LIBRARY_URL and ALLY_CONTEXT_LIBRARY_KEY (a reader key) overrides
+# that, for a runner that should search another environment's library.
 CONTEXT_MCP='{}'
 if [ -n "${ALLY_CONTEXT_LIBRARY_URL:-}" ] && [ -n "${ALLY_CONTEXT_LIBRARY_KEY:-}" ]; then
   CONTEXT_MCP="$(jq -nc --arg url "$ALLY_CONTEXT_LIBRARY_URL" \
     '{"context-library": {type: "remote", url: $url, enabled: true,
       headers: {Authorization: "Bearer {env:ALLY_CONTEXT_LIBRARY_KEY}"}}}')"
+elif [ -n "${ALLY_BE_API_URL:-}" ] && [ -n "${ALLY_BE_API_KEY:-}" ]; then
+  CONTEXT_MCP="$(jq -nc --arg url "${ALLY_BE_API_URL%/}/api/v1/context-library/mcp" \
+    '{"context-library": {type: "remote", url: $url, enabled: true,
+      headers: {"x-api-key": "{env:ALLY_BE_API_KEY}"}}}')"
 fi
 
 # One agent, `reviewer`, whose read-only-ness is enforced by NOT OFFERING the

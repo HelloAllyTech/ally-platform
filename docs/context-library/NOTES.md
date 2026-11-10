@@ -19,21 +19,23 @@ why; this file says where it ended up, what changed on the way, and what is stil
 | Agent-written chunks | `service/context-agent-chunk.service.ts` (Builder, Bug Hunter) |
 | Content Catalogue sync | `service/context-catalogue-sync.service.ts`, `service/context-catalogue.subscriber.ts` |
 | Old-corpus import, copy, smoke check, retire | `service/context-kb-import.service.ts`, `service/context-kb-copy.service.ts` |
+| The automatic rollout after a release (drives the row above) | `service/context-library-rollout.service.ts`, `entity/cl-rollout-step.entity.ts` (`cl_rollout_steps`); admin view `ally-web/apps/ally-admin-dashboard/src/pages/ContextLibrary/ReleaseSteps.tsx` |
 | Engineers' MCP and read-only keys | `controller/context-library-mcp.controller.ts`, `service/context-reader-key.service.ts`; every repo's `.mcp.json` and `.claude/skills/context-library/SKILL.md` |
 | Admin and organisation routes | `controller/context-library.controller.ts` (`v1/context-library`), `controller/context-library-org.controller.ts` (`v1/context-library/org`) |
 | Prompts | `ally-be/src/prompts/context_library/*.txt`, contracts in `ally-be/src/prompt/contracts/prompt-contracts.ts`; AI task rows `context-library-*` in `ally-be/src/llm/constants/ai-task-registry.constants.ts` |
-| Migrations | `ally-be/src/database/migrations/1981000000000` to `1981001200000` |
+| Migrations | `ally-be/src/database/migrations/1981000000000` to `1981001300000` |
 | Admin UI | `ally-web/apps/ally-admin-dashboard/src/pages/ContextLibrary/`, API slice `ally-web/apps/ally-admin-dashboard/src/api/contextLibrary.ts`, citation chips and collection links under `ally-web/apps/ally-admin-dashboard/src/components/` (`context-citation`, `context-collection-link`) |
 | Callers | Builder (`ally-be/src/builder/`), Bug Hunter (`ally-be/src/bug-hunter/`), character interview, Course Copilot (`ally-be/src/course-copilot/`), Roadmap Copilot, the Ally guide (`ally-be/src/guide/knowledge/guide-library.service.ts`), Debrief |
 | Knowledge Base (stays, WhatsApp Q&A only) | `ally-be/src/knowledge-base/`, ally-ai `KnowledgeChunk` and `/knowledge-agent` |
 
 ## Decisions that differ from or add to the plan
 
-- **Retiring old data is a confirmed platform-admin action, never a migration.** Each old
-  corpus (character, Ally guide, Debrief) is retired by `POST v1/context-library/migrations/<corpus>/retire`
-  with an exact confirmation string, refused until its import or copy is complete. Migrations run
-  on deploy, before anyone has checked the result. ally-ai drops only collections it lists as
-  retired. Agent memory was different: its rows were copied and its tables dropped by migrations
+- **Retiring old data is never a migration.** Migrations run on deploy, before anyone has checked
+  the result. Each old corpus (character, Ally guide, Debrief) is retired by the rollout service
+  after a release (below), only once its smoke check is done and a grace period has passed, or by
+  hand with `POST v1/context-library/migrations/<corpus>/retire` and an exact confirmation string.
+  Both paths are refused until the corpus's import or copy is complete. ally-ai drops only
+  collections it lists as retired. Agent memory was different: its rows were copied and its tables dropped by migrations
   (`1981000500000`, then `1981000600000`, which refuses while any row lacks a copy).
 - **Character corpus:** distilled through the normal worker from its stored passages (text staged
   in Redis only, `kb_migration` sources); the topic-boost pass went with it.
@@ -49,6 +51,18 @@ why; this file says where it ended up, what changed on the way, and what is stil
   hand. `search_library` kept its name and parameters.
 - **Roadmap Copilot** moved in phase 2 with Builder, not phase 7. Briefs filed before that cite
   `stacks`; the enum value stays so they still read, filed under principles.
+- **Every step after a release is automatic** (the owner's decision, 2026-11-10).
+  `ContextLibraryRolloutService` replaces the manual after-deploy steps: progress in `cl_rollout_steps`, the
+  same service methods the admin routes call, retirement only through the import service's own
+  guards (the confirmation phrase is the one thing it skips — it exists for a person at a screen),
+  and a 24-hour default grace period so a release rolled back within a day still has the old
+  data. The character corpus gets a smoke check too (`smokeCheckDistilled`, replaying the
+  character interview's searches with no audience, as it searches live); its migration record
+  gained `useCase: character_interview` for it.
+- **Builder reaches the MCP with the service key.** The MCP endpoint accepts ally-be's
+  `API_KEY` in `x-api-key` (compared in constant time) in place of a reader key, as the `mcp_dev`
+  use case with session id `mcp:service`, so Builder's design workflow needs no Context Library
+  setting. A request carrying a bearer key is judged on that key alone. Engineers keep reader keys.
 - **The judge** (ally-ai's RAG-quality judge) takes a caller-supplied corpus purpose, so a new
   collection needs no ally-ai change.
 - **Phase 8 sweep** (this change): dropped `kb_documents.character_topics`,
@@ -76,27 +90,67 @@ MCP endpoint with it.
 
 ## After deploy, in order
 
-1. **Run migrations** (`npm run migration:run`). The drop migrations refuse, with a count, if a
+Nothing here needs a person. What happens by itself, in order:
+
+1. **Migrations** run on start-up (ally-be's `docker-entrypoint.sh` runs `npm run migration:run`;
+   ally-ai's image runs `scripts/migrate.py all`). The drop migrations refuse, with a count, if a
    copy is missing; re-run the named copy migration first.
-2. **Let reconciliation backfill the catalogue**: the nightly run does it, or start it with
-   `POST v1/context-library/migrations/content-catalogue/sync` and check
-   `GET v1/context-library/migrations/content-catalogue`.
-3. **Character library import:** `POST v1/context-library/migrations/character-library/import`,
-   then poll `GET v1/context-library/migrations/character-library` until it reports complete.
-4. **Guide and Debrief enrichment:** `POST v1/context-library/migrations/ally-guide-library/enrich`
-   and `POST v1/context-library/migrations/debrief-knowledge/enrich`.
-5. **Smoke checks:** `GET v1/context-library/migrations/ally-guide-library/smoke-check` and
-   `GET v1/context-library/migrations/debrief-knowledge/smoke-check` (counts and gap labels only,
-   never query text).
-6. **Retire, once each is confirmed:** `POST …/character-library/retire`,
-   `…/ally-guide-library/retire`, `…/debrief-knowledge/retire`, each with its
-   `{ "confirm": "retire <corpus>" }` body. This deletes the old documents, passages, stored
-   files, retrieval logs and Weaviate collection.
-7. **Builder workflow:** set the GitHub variable `ALLY_CONTEXT_LIBRARY_URL` and the secret
-   `ALLY_CONTEXT_LIBRARY_KEY` (a read-only key from Connect Claude Code) where Builder's
-   workflow runs; both `.github/workflows/builder-session.yml` and
-   `ally-be/.github/workflows/builder-session.yml` read them. Without them Builder phases run with no
-   principles.
+2. **The Content Catalogue backfills itself**: its reconciliation runs shortly after boot while
+   the collection is empty, then nightly.
+3. **The rollout** (`ContextLibraryRolloutService`) starts about two minutes after boot and then
+   ticks every five minutes, on one replica at a time. Per old corpus, each step starts only once
+   the one before it is done:
+   - **Character library** (`character_library` → Character Insights): start the import (it
+     skips documents already queued) → wait for the worker to report every document complete,
+     retrying failed parts once nothing else is moving → **smoke check** (the character
+     interview's last 30 days of searches replayed against Character Insights) → retire.
+   - **Ally guide's library** and **Debrief's guidance** (copied word for word by migration
+     `1981000800000`): start enrichment of the copied passages in the background, restarting it
+     whenever the pending count stops falling → wait until none is pending → **smoke check** →
+     retire.
+   - **Retire** runs only when all of these hold, otherwise it waits for a later tick: the import
+     or copy is complete (the import service's own guard), the corpus's smoke check in this
+     rollout is done (it must come first: retiring deletes the `kb_retrievals` it replays), the
+     new collection has at least one active chunk, and the **grace period** has passed since that
+     smoke check. It deletes the old documents, passages, stored files, retrieval logs and
+     Weaviate collection.
+   - A corpus with no old documents is marked **skipped**; one already retired by hand (an earlier
+     copy or import exists) is marked **done**.
+
+**Grace period:** `CONTEXT_LIBRARY_RETIRE_AFTER_HOURS`, default `24`, `0` allowed. It exists so a
+release rolled back within a day still finds the old data.
+
+**Failures:** a failed action is retried on later ticks with backoff (5 minutes, doubling, at most
+6 hours), up to 8 attempts, logged with its reason (counts and our own wording, never a search's
+text). After the eighth it waits for a person; every tick still reads the real state, so a step
+finished by hand is picked up as done.
+
+**Kill switch:** `CONTEXT_LIBRARY_AUTO_ROLLOUT=off` on ally-be stops the rollout entirely; every
+step stays manual through the routes below.
+
+**Watching progress:** the admin dashboard's **Context Library → Settings → Release steps**
+(platform admins), or `GET v1/context-library/rollout`. Each step shows its status, attempts,
+times and counts; the rows are `cl_rollout_steps`. ally-be's logs carry one line per step started,
+done or failed, prefixed `Context Library rollout:`.
+
+**Builder:** nothing to configure. Builder's design workflow reaches the Context Library's MCP
+endpoint on `ALLY_BE_API_URL` with the `ALLY_BE_API_KEY` it already has. Setting
+`ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` in its environment is only an override.
+
+### Doing a step by hand
+
+The admin routes stay, for when the rollout is switched off or a step has stopped trying (platform
+admins, `v1/context-library/…`):
+
+| Step | Route |
+|---|---|
+| Content Catalogue backfill | `POST migrations/content-catalogue/sync`; status `GET migrations/content-catalogue` |
+| Character import | `POST migrations/character-library/import`; status `GET migrations/character-library`; failed parts: `POST sources/:id/retry` |
+| Enrichment | `POST migrations/ally-guide-library/enrich`, `POST migrations/debrief-knowledge/enrich` (re-run to retry) |
+| Smoke check | `GET migrations/character-library/smoke-check`, `GET migrations/ally-guide-library/smoke-check`, `GET migrations/debrief-knowledge/smoke-check` (counts and gap labels only) |
+| Retire | `POST migrations/<corpus>/retire` with `{ "confirm": "retire <corpus>" }` — run the smoke check first |
+
+A corpus retired by hand is marked done by the next tick.
 
 ## Open questions and unverified items
 

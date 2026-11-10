@@ -12,6 +12,9 @@ const LANDING_ITEM_NOUNS: Record<string, [string, string]> = {
   GAME: ["game", "games"],
 };
 
+/** "24 h", "1.5 h": the Context Library's grace period before an old corpus is removed. */
+const formatHours = (hours: number): string => `${Number(hours.toFixed(2))} h`;
+
 export const en = {
   orgBranding: {
     tabLabel: "Branding",
@@ -10619,6 +10622,89 @@ export const en = {
           started: "Started — changes will appear under Insights → What changed?",
           failed: "Couldn't start. Try again.",
         },
+      },
+    },
+    // The automatic steps after a release, per old corpus (ally-be ContextLibraryRolloutService).
+    releaseSteps: {
+      title: "Release steps",
+      intro: (hours: number) =>
+        `After a release, each old corpus moves into the Context Library by itself: its material is imported or enriched, recent searches are replayed against the new collection, and ${hours === 0 ? "then" : `${formatHours(hours)} later`} the old corpus is removed. Nothing here needs you; each step can still be run by hand.`,
+      manual:
+        "Automatic release steps are switched off on the server. Each step stays manual until they are switched back on.",
+      loadFailed: "release steps",
+      corpora: {
+        character_library: "Character library",
+        ally_guide_library: "Ally guide's library",
+        debrief_knowledge: "Debrief's guidance",
+      } as Record<string, string>,
+      into: (collection: string) => `into ${collection}`,
+      statuses: {
+        pending: "Waiting",
+        running: "In progress",
+        done: "Done",
+        failed: "Failed",
+        skipped: "Skipped",
+      } as Record<string, string>,
+      steps: {
+        import: {
+          pending: "Importing character material: not started",
+          running: "Importing character material",
+          done: "Character material imported",
+          failed: "Importing character material stopped",
+          skipped: "No character material to import",
+        },
+        enrich: {
+          pending: "Enriching the copied passages: not started",
+          running: "Enriching the copied passages",
+          done: "Copied passages enriched",
+          failed: "Enriching the copied passages stopped",
+          skipped: "No copied passages to enrich",
+        },
+        smoke_check: {
+          pending: "Replaying recent searches: waits for the step above",
+          running: "Replaying recent searches",
+          done: "Recent searches replayed",
+          failed: "Replaying recent searches failed",
+          skipped: "No searches to replay",
+        },
+        retire: {
+          pending: "Removing the old corpus: waits for the steps above",
+          running: "Removing the old corpus",
+          done: "Old corpus removed",
+          failed: "Removing the old corpus failed",
+          skipped: "No old corpus to remove",
+        },
+      } as Record<string, Record<string, string>>,
+      waitingGrace: (hours: number) =>
+        `Waiting ${formatHours(hours)} before removing the old corpus`,
+      waitingImport: "Waiting for every document to finish importing",
+      waitingEntries: "Waiting for the new collection to have an active entry",
+      removedByHand: "Old corpus already removed by hand",
+      counts: {
+        imported: (complete: number, importable: number) =>
+          `${complete} of ${importable} ${importable === 1 ? "document" : "documents"} imported`,
+        failedParts: (n: number) => `${n} with failed parts`,
+        enrichPending: (pending: number) =>
+          `${pending} ${pending === 1 ? "passage" : "passages"} still to enrich`,
+        passages: (n: number) => `${n} ${n === 1 ? "passage" : "passages"}`,
+        replayed: (answered: number, replayed: number) =>
+          `${answered} of ${replayed} ${replayed === 1 ? "search" : "searches"} found a good answer`,
+        gaps: (queries: number, topics: number) =>
+          `${queries} in ${topics} missing ${topics === 1 ? "topic" : "topics"}`,
+        replayFailed: (n: number) => `${n} could not be replayed`,
+        activeEntries: (n: number) =>
+          `${n} active ${n === 1 ? "entry" : "entries"} in the new collection`,
+        removed: (documents: number, passages: number, files: number, logs: number) =>
+          `${documents} documents, ${passages} passages, ${files} files and ${logs} search logs removed`,
+        filesKept: (n: number) => `${n} ${n === 1 ? "file" : "files"} could not be deleted yet`,
+      },
+      when: {
+        finished: (at: string) => `Finished ${at}`,
+        started: (at: string) => `Started ${at}`,
+        due: (at: string) => `Due ${at}`,
+        retry: (at: string) => `Trying again ${at}`,
+        gaveUp: (attempts: number) =>
+          `Stopped after ${attempts} ${attempts === 1 ? "try" : "tries"}; run it by hand once the cause is fixed`,
       },
     },
     insights: {

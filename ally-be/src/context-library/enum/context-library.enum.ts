@@ -211,3 +211,34 @@ export enum ClGapKind {
   /** One organisation's own entries: "Add entries". */
   ORGANISATION = 'organisation',
 }
+
+// ── The automatic rollout after a release (ContextLibraryRolloutService) ─────
+
+/** A retired Knowledge Base corpus the rollout carries through (`kb_documents.corpus`). */
+export enum ClRolloutCorpus {
+  CHARACTER_LIBRARY = 'character_library',
+  ALLY_GUIDE_LIBRARY = 'ally_guide_library',
+  DEBRIEF_KNOWLEDGE = 'debrief_knowledge',
+}
+
+/** One step of a corpus's rollout. Which steps a corpus has, and their order, is in the service. */
+export enum ClRolloutStepKind {
+  /** Distil the old documents into the new collection (the character corpus). */
+  IMPORT = 'import',
+  /** Enrich the passages a migration copied word for word (the Ally guide's and Debrief's). */
+  ENRICH = 'enrich',
+  /** Replay the last 30 days of searches against the new collection. */
+  SMOKE_CHECK = 'smoke_check',
+  /** Delete the old corpus, after the grace period. */
+  RETIRE = 'retire',
+}
+
+export enum ClRolloutStatus {
+  PENDING = 'pending',
+  RUNNING = 'running',
+  DONE = 'done',
+  /** Retried on later ticks with backoff until the attempt cap; then it waits for a person. */
+  FAILED = 'failed',
+  /** Nothing to do: the corpus had no old documents. */
+  SKIPPED = 'skipped',
+}

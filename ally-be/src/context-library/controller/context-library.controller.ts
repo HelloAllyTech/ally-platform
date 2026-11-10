@@ -61,12 +61,14 @@ import { ContextGapsService } from '../service/context-gaps.service';
 import { ContextKbCopyService } from '../service/context-kb-copy.service';
 import {
   ALLY_GUIDE_CORPUS_MIGRATION,
+  CHARACTER_CORPUS_MIGRATION,
   ContextKbImportService,
   DEBRIEF_CORPUS_MIGRATION,
   KbCorpusMigration,
 } from '../service/context-kb-import.service';
 import { ContextLoopActionsService } from '../service/context-loop-actions.service';
 import { ContextLoopsService } from '../service/context-loops.service';
+import { ContextLibraryRolloutService } from '../service/context-library-rollout.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_CONTEXT_LIBRARY] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_CONTEXT_LIBRARY] };
@@ -141,6 +143,7 @@ export class ContextLibraryController {
     private readonly kbImport: ContextKbImportService,
     private readonly kbCopy: ContextKbCopyService,
     private readonly catalogue: ContextCatalogueSyncService,
+    private readonly rollout: ContextLibraryRolloutService,
   ) {}
 
   // ── Collections ────────────────────────────────────────────────────────────
@@ -563,6 +566,16 @@ export class ContextLibraryController {
     return this.kbImport.import(actorFor(user));
   }
 
+  @Get('migrations/character-library/smoke-check')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation(smokeDoc('character_interview', 'Character Insights'))
+  characterSmokeCheck(@CurrentUser() user: TokenUser) {
+    return this.kbCopy.smokeCheckDistilled(
+      CHARACTER_CORPUS_MIGRATION,
+      actorFor(user),
+    );
+  }
+
   @Post('migrations/character-library/retire')
   @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
   @ApiOperation({
@@ -662,6 +675,22 @@ export class ContextLibraryController {
       actorFor(user),
       DEBRIEF_CORPUS_MIGRATION,
     );
+  }
+
+  // ── The automatic rollout after a release ─────────────────────────────────────
+
+  @Get('rollout')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, VIEW)
+  @ApiOperation({
+    summary: 'Where the automatic post-release steps stand, per retired corpus',
+    description:
+      'Platform admins only, read-only. One entry per step (import or enrichment, smoke check, ' +
+      'retirement) with its status, attempts, times and counts. The steps run by themselves ' +
+      'unless CONTEXT_LIBRARY_AUTO_ROLLOUT=off; the migrations routes above still do each by hand.',
+  })
+  async rolloutStatus(@CurrentUser() user: TokenUser) {
+    await this.kbImport.assertPlatformAdmin(actorFor(user));
+    return this.rollout.view();
   }
 
   // ── Content Catalogue, synced from Studio (phase 7, §6.4) ─────────────────────

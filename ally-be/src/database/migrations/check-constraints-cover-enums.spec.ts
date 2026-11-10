@@ -25,6 +25,9 @@ import {
   ClLoop,
   ClLoopActionType,
   ClGapKind,
+  ClRolloutCorpus,
+  ClRolloutStatus,
+  ClRolloutStepKind,
 } from '../../context-library/enum/context-library.enum';
 import {
   BuilderEventType,
@@ -250,6 +253,9 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_cl_loop_actions_loop', Object.values(ClLoop)],
     ['CHK_cl_loop_actions_action', Object.values(ClLoopActionType)],
     ['CHK_cl_gap_topics_kind', Object.values(ClGapKind)],
+    ['CHK_cl_rollout_steps_corpus', Object.values(ClRolloutCorpus)],
+    ['CHK_cl_rollout_steps_step', Object.values(ClRolloutStepKind)],
+    ['CHK_cl_rollout_steps_status', Object.values(ClRolloutStatus)],
     ['CHK_builder_sessions_status', Object.values(BuilderSessionStatus)],
     ['CHK_builder_sessions_stage', Object.values(BuilderStage)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],

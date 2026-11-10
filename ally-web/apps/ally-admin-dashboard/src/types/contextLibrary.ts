@@ -467,3 +467,37 @@ export interface ContextReaderKey {
 export interface ContextReaderKeyCreated extends ContextReaderKey {
   key: string;
 }
+
+/* ── Release steps (the automatic rollout after a release) ───────────── */
+
+export type ContextRolloutCorpus = "character_library" | "ally_guide_library" | "debrief_knowledge";
+export type ContextRolloutStepKind = "import" | "enrich" | "smoke_check" | "retire";
+export type ContextRolloutStatus = "pending" | "running" | "done" | "failed" | "skipped";
+
+/** One step of one old corpus's move. `detail` holds counts only. */
+export interface ContextRolloutStep {
+  step: ContextRolloutStepKind;
+  status: ContextRolloutStatus;
+  attempts: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** Set while a failed step waits for its next try; null once it has stopped trying. */
+  nextAttemptAt: string | null;
+  lastError: string | null;
+  detail: Record<string, number>;
+  /** Retire only: when the grace period after the smoke check ends. */
+  waitingUntil: string | null;
+}
+
+/** `GET rollout`. */
+export interface ContextRollout {
+  /** False when the server has the automatic steps switched off. */
+  automatic: boolean;
+  retireAfterHours: number;
+  maxAttempts: number;
+  corpora: Array<{
+    corpus: ContextRolloutCorpus;
+    collectionId: string;
+    steps: ContextRolloutStep[];
+  }>;
+}

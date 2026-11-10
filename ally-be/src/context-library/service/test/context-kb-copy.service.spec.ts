@@ -160,6 +160,34 @@ describe('ContextKbCopyService.smokeCheck', () => {
       build().service.smokeCheck(CHARACTER_CORPUS_MIGRATION, actor),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it("replays the character interview's searches against Character Insights, with no audience", async () => {
+    const { service, retrieval } = build({
+      current: [{ queries: ['a widowed farmer'], audience: null }],
+      answers: { 'a widowed farmer': ['strong'] },
+    });
+    const report = await service.smokeCheckDistilled(
+      CHARACTER_CORPUS_MIGRATION,
+      actor,
+    );
+    expect(report).toMatchObject({
+      useCase: ClUseCase.CHARACTER_INTERVIEW,
+      replayed: 1,
+      answered: 1,
+      passed: true,
+    });
+    expect(retrieval.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        useCase: ClUseCase.CHARACTER_INTERVIEW,
+        audience: undefined,
+        collections: ['character_insights'],
+      }),
+      { replay: true },
+    );
+    await expect(
+      service.smokeCheckDistilled(ALLY_GUIDE_CORPUS_MIGRATION, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });
 
 describe('ContextKbCopyService.enrichOne', () => {

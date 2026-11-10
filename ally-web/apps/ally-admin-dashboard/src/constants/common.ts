@@ -702,6 +702,8 @@ export const ApiEndpoints = {
     READER_KEY_RESTORE: (id: string) =>
       `/v1/context-library/reader-keys/${encodeURIComponent(id)}/restore`,
     MCP: "/v1/context-library/mcp",
+    // The automatic steps after a release (import or enrichment, smoke check, retirement).
+    ROLLOUT: "/v1/context-library/rollout",
   },
   BUILDER: {
     SESSIONS: "/v1/builder/sessions",

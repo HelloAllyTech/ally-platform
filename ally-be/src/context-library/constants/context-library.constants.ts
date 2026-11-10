@@ -127,3 +127,23 @@ export const CL_CATALOGUE_LOCK_TTL_SECONDS = 30 * 60;
 /** Items enriched per run (one fast-model call each); the rest wait for the next night. */
 export const CL_CATALOGUE_ENRICH_PER_RUN = 300;
 export const CL_CATALOGUE_ENRICH_CONCURRENCY = 4;
+
+// ── The automatic rollout after a release (ContextLibraryRolloutService) ─────
+
+/** The first tick waits for the app to settle, and for the catalogue backfill to start first. */
+export const CL_ROLLOUT_BOOT_DELAY_MS = 2 * 60_000;
+/**
+ * One tick at a time across replicas. Longer than the slowest step (a smoke check replays at most
+ * 300 searches); a step left `running` for longer than this was interrupted and is started again.
+ */
+export const CL_ROLLOUT_LOCK_TTL_SECONDS = 60 * 60;
+/** A step's action is started at most this many times without progress before it waits for a person. */
+export const CL_ROLLOUT_MAX_ATTEMPTS = 8;
+/** Backoff between attempts: 5 min, doubling, at most 6 h. */
+export const CL_ROLLOUT_BACKOFF_BASE_MS = 5 * 60_000;
+export const CL_ROLLOUT_BACKOFF_MAX_MS = 6 * 60 * 60_000;
+/**
+ * Hours between a corpus's smoke check and its retirement, so a release rolled back within a
+ * day still finds the old data. `CONTEXT_LIBRARY_RETIRE_AFTER_HOURS` overrides it (0 allowed).
+ */
+export const CL_ROLLOUT_RETIRE_AFTER_HOURS_DEFAULT = 24;

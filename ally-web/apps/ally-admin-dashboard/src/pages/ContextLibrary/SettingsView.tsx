@@ -12,11 +12,13 @@ import { UNDO_MS } from "./ChunkSheet";
 import { errorReason } from "./contextLibraryFormat";
 import { InlineError, LoadingRows, StatusWord } from "./ContextLibraryUi";
 import { LoopSettings } from "./LoopSettings";
+import { ReleaseSteps } from "./ReleaseSteps";
 
 const cellKey = (useCase: string, collectionId: string) => `${useCase}::${collectionId}`;
 
 /**
- * Settings: who reads what, the selected collection's learning loops, and Connect Claude Code.
+ * Settings: who reads what, the selected collection's learning loops, Connect Claude Code, and
+ * the automatic steps after a release (platform admins only; read-only).
  */
 export const SettingsView: React.FC<{
   collections: ContextCollection[];
@@ -42,6 +44,7 @@ export const SettingsView: React.FC<{
         <PlugZap size={14} aria-hidden /> {en.contextLibrary.connect.button}
       </button>
     </section>
+    <ReleaseSteps collections={collections} />
   </div>
 );
 

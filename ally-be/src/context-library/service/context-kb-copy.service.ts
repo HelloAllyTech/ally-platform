@@ -230,6 +230,31 @@ export class ContextKbCopyService {
   ): Promise<SmokeCheckReport> {
     await this.kbImport.assertPlatformAdmin(actor);
     const useCase = this.assertCopied(migration);
+    return this.replaySearches(migration, useCase);
+  }
+
+  /**
+   * The same check for a corpus that was distilled rather than copied (the character corpus):
+   * its use case's searches replayed against the collection it was distilled into. Same report,
+   * same rules — counts and topic labels only.
+   */
+  async smokeCheckDistilled(
+    migration: KbCorpusMigration,
+    actor: ClActor,
+  ): Promise<SmokeCheckReport> {
+    await this.kbImport.assertPlatformAdmin(actor);
+    if (migration.mode !== 'distil' || !migration.useCase) {
+      throw new BadRequestException(
+        `${migration.corpus} was not distilled, or has no searches to replay.`,
+      );
+    }
+    return this.replaySearches(migration, migration.useCase);
+  }
+
+  private async replaySearches(
+    migration: KbCorpusMigration,
+    useCase: ClUseCase,
+  ): Promise<SmokeCheckReport> {
     const window = String(SMOKE_CHECK_WINDOW_DAYS);
 
     const old: Array<{ query: string; tenant_id: string | null }> =
@@ -281,7 +306,12 @@ export class ContextKbCopyService {
             const response = await this.retrieval.search(
               {
                 useCase,
-                audience: { tenantId: pair.tenantId },
+                // A platform use case (the character interview) searches with no audience, as
+                // it does live; the organisation ones as the original asker.
+                audience:
+                  useCase in SESSION_TENANT
+                    ? { tenantId: pair.tenantId }
+                    : undefined,
                 collections: [migration.collectionId],
                 queries: [pair.query],
               },

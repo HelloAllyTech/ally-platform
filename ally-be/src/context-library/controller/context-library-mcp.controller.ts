@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -16,12 +17,14 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { createHash, timingSafeEqual } from 'crypto';
 import { Response } from 'express';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { AppConfigService } from 'src/config/config.service';
 import { ClUseCase } from '../enum/context-library.enum';
 import { COLLECTION_PROFILES } from '../profiles';
 import { ContextAccessService } from '../service/context-access.service';
@@ -53,6 +56,22 @@ const ENGINEER_TOOLS: ContextToolNames = {
   ],
 };
 
+/** The session id a search made with the service key is logged under. */
+export const MCP_SERVICE_SESSION = 'mcp:service';
+
+/**
+ * The platform's service-to-service key, as `ApiAuthGuard` checks it, but compared in constant
+ * time (both sides hashed first, so their lengths never differ). False when no key is configured.
+ */
+export function isServiceKey(
+  presented: string | string[] | undefined,
+  configured: string,
+): boolean {
+  if (typeof presented !== 'string' || !presented || !configured) return false;
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  return timingSafeEqual(digest(presented), digest(configured));
+}
+
 interface JsonRpcRequest {
   jsonrpc?: string;
   id?: string | number | null;
@@ -67,6 +86,10 @@ interface JsonRpcRequest {
  * Authenticated by a read-only personal key (`Authorization: Bearer clr_…`), not an admin
  * session, and it can only ever read what the `mcp_dev` use case is granted — clinical,
  * learner-facing and organisation material is locked out in code.
+ *
+ * The platform's service key (`x-api-key`, the one Builder's workflow already holds) is accepted
+ * in place of a reader key, with exactly the same `mcp_dev` grants, so Builder's runner needs no
+ * setting of its own. A request that carries a bearer key is judged on that key alone.
  */
 @ApiTags('Context Library — MCP')
 @Controller('v1/context-library')
@@ -75,6 +98,7 @@ export class ContextLibraryMcpController {
     private readonly keys: ContextReaderKeyService,
     private readonly tools: ContextToolsService,
     private readonly access: ContextAccessService,
+    private readonly config: AppConfigService,
   ) {}
 
   // ── Keys (admin session) ───────────────────────────────────────────────────
@@ -132,12 +156,21 @@ export class ContextLibraryMcpController {
   @ApiExcludeEndpoint()
   async mcp(
     @Headers('authorization') authorization: string | undefined,
+    @Headers('x-api-key') apiKey: string | undefined,
     @Body() body: JsonRpcRequest | JsonRpcRequest[],
     @Res() res: Response,
   ) {
-    let key;
+    let sessionId: string;
     try {
-      key = await this.keys.verify(authorization);
+      if (!authorization?.trim() && apiKey !== undefined) {
+        if (!isServiceKey(apiKey, this.config.apiKey)) {
+          throw new UnauthorizedException('Invalid API key');
+        }
+        sessionId = MCP_SERVICE_SESSION;
+      } else {
+        const key = await this.keys.verify(authorization);
+        sessionId = `mcp:${key.id}`;
+      }
     } catch (error) {
       res.status(401).json({
         jsonrpc: '2.0',
@@ -149,7 +182,7 @@ export class ContextLibraryMcpController {
     const requests = Array.isArray(body) ? body : [body];
     const replies = [];
     for (const request of requests) {
-      const reply = await this.handle(request, `mcp:${key.id}`);
+      const reply = await this.handle(request, sessionId);
       if (reply) replies.push(reply);
     }
     if (!replies.length) {

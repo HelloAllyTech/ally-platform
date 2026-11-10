@@ -2,7 +2,7 @@
 title: Working with the Context Library
 tags: [contributing, agents, planning, mcp, workflow, context-library]
 summary: Search Ally's Context Library whenever a product or engineering judgement comes up — while planning and while coding — how an agent searches it itself, how to connect Claude Code, how to write queries, and how to cite the codes that come back.
-last_reconciled: 2026-11-09
+last_reconciled: 2026-11-10
 ---
 
 # Working with the Context Library
@@ -82,6 +82,13 @@ variable names.
 | `.claude/skills/context-library/SKILL.md` | A skill whose description names the trigger moments. Its one-line description stays in context every turn, so the rule keeps re-asserting itself deep into a long session |
 
 `ally-mobile` is not wired up yet: there, ask in conversation, or work from a repo that is.
+
+**Builder's design runs need no key of their own.** Builder's runner reaches the same MCP
+endpoint with the platform's service-to-service key (the `X-API-Key` it already uses for every
+other ally-be call), which the endpoint accepts in place of a reader key with exactly the same
+read-only grants. So the Builder workflow has no Context Library setting to configure; setting
+`ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` for it is only an override. Engineers'
+own sessions still use a reader key, as above.
 
 **Checking it works** — ask the session to list the `context-library` tools. `search_context`,
 `get_chunks` and `list_collections` should all be there, alongside the `planning_context` prompt.

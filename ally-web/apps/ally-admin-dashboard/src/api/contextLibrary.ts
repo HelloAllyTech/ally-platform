@@ -17,6 +17,7 @@ import {
   ContextQueueItem,
   ContextReaderKey,
   ContextReaderKeyCreated,
+  ContextRollout,
   ContextSearchRequest,
   ContextSearchResponse,
   ContextSource,
@@ -344,6 +345,11 @@ export const contextLibraryAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.CONTEXT_LIBRARY_READER_KEYS],
     }),
 
+    /** Where the automatic steps after a release stand. Platform admins only; read-only. */
+    getContextRollout: builder.query<ContextRollout, void>({
+      query: () => ({ url: ApiEndpoints.CONTEXT_LIBRARY.ROLLOUT, method: HttpMethod.GET }),
+    }),
+
     restoreContextReaderKey: builder.mutation<void, string>({
       query: id => ({
         url: ApiEndpoints.CONTEXT_LIBRARY.READER_KEY_RESTORE(id),
@@ -383,4 +389,5 @@ export const {
   useCreateContextReaderKeyMutation,
   useRevokeContextReaderKeyMutation,
   useRestoreContextReaderKeyMutation,
+  useGetContextRolloutQuery,
 } = contextLibraryAPI;

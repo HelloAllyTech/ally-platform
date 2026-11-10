@@ -24,6 +24,7 @@ run-name: "Builder ${{ inputs.mode }} · run ${{ inputs.run_id }}"
 #                        Exported under TWO names below; opencode's google
 #                        provider reads only GOOGLE_GENERATIVE_AI_API_KEY.
 #   ALLY_BE_API_KEY    — equals ally-be's API_KEY, for the pipeline callbacks
+#                        and the Context Library's MCP endpoint
 #   BUILDER_APP_PRIVATE_KEY (+ variable BUILDER_APP_ID) — the Ally Builder
 #                        GitHub App, whose token clones the target repos (the
 #                        default GITHUB_TOKEN cannot read the sibling repos).
@@ -96,11 +97,9 @@ jobs:
       # it looked like an answer and was not.
       GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       # BUILDER_GH_TOKEN and GH_TOKEN are exported by the first steps.
-      # The Context Library's MCP endpoint and a read-only key for it (create one under
-      # Context Library → Connect Claude Code). Without them every phase runs with no
-      # product guidance; run-engine.sh skips the server rather than failing.
-      ALLY_CONTEXT_LIBRARY_URL: ${{ vars.ALLY_CONTEXT_LIBRARY_URL }}
-      ALLY_CONTEXT_LIBRARY_KEY: ${{ secrets.ALLY_CONTEXT_LIBRARY_KEY }}
+      # The Context Library's MCP server needs nothing of its own: run-engine.sh
+      # reaches it on ALLY_BE_API_URL with ALLY_BE_API_KEY, which ally-be accepts
+      # there in place of a reader key.
       BUILDER_SESSION_ID: ${{ inputs.session_id }}
       BUILDER_RUN_ID: ${{ inputs.run_id }}
       BUILDER_MODE: ${{ inputs.mode }}
