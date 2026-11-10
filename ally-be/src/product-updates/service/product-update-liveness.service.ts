@@ -33,7 +33,7 @@ const HISTORY_LIMIT_MS = 90 * DAY_MS;
  */
 const HISTORY_WORKFLOWS: Record<
   ReleaseHistoryKey,
-  { repo: string; workflow: string }
+  { repo: string; workflow: string; inputs?: Readonly<Record<string, string>> }
 > = {
   'ally-be': RELEASE_TARGETS['ally-be'],
   'ally-ai': RELEASE_TARGETS['ally-ai'],
@@ -49,6 +49,18 @@ const HISTORY_WORKFLOWS: Record<
     workflow: 'promote-android-production.yml',
   },
 };
+
+/**
+ * Whether a run of the shared frontends workflow shipped `app`, read from the
+ * `[apps=...]` marker its `run-name` puts in the title. A run with no marker
+ * predates it (the first frontend-v1.0.0 release, which shipped both) and is
+ * counted for both apps.
+ */
+export function shippedApp(title: string, app: string | undefined): boolean {
+  if (!app) return true;
+  const marker = /\[apps=([a-z]+)\]/.exec(title)?.[1];
+  return !marker || marker === 'both' || marker === app;
+}
 
 export interface LivenessResult {
   sourcesLive: number;
@@ -224,7 +236,7 @@ export class ProductUpdateLivenessService {
     }
     await Promise.all(
       keys.map(async (key) => {
-        const { repo, workflow } = HISTORY_WORKFLOWS[key];
+        const { repo, workflow, inputs } = HISTORY_WORKFLOWS[key];
         const runs = await this.github.listSuccessfulRuns({
           repo,
           workflow,
@@ -234,10 +246,12 @@ export class ProductUpdateLivenessService {
           unreadable.push(key);
           return;
         }
-        history[key] = runs.map((run) => ({
-          startedAt: run.startedAt,
-          finishedAt: run.finishedAt,
-        }));
+        history[key] = runs
+          .filter((run) => shippedApp(run.title, inputs?.apps))
+          .map((run) => ({
+            startedAt: run.startedAt,
+            finishedAt: run.finishedAt,
+          }));
       }),
     );
     if (unreadable.length) {

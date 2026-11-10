@@ -33,6 +33,8 @@ export interface CompletedRun {
   htmlUrl: string;
   startedAt: Date;
   finishedAt: Date;
+  /** The run's title (`display_title`), which a workflow's `run-name` sets. */
+  title: string;
 }
 
 /**
@@ -1747,6 +1749,7 @@ export class GithubActionsService {
             htmlUrl: run.html_url,
             startedAt,
             finishedAt: new Date(run.updated_at ?? run.created_at),
+            title: String(run.display_title ?? run.name ?? ''),
           });
         }
         if (batch.length < 100) break;

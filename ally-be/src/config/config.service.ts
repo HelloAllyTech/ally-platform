@@ -248,7 +248,8 @@ export class AppConfigService {
   get builderHealthUrls(): Record<string, string> {
     const defaults: Record<string, string> = {
       'ally-be': `${this.publicApiBaseUrl}/api/health`,
-      'ally-web:admin': 'https://admin.helloally.ai',
+      'ally-web:admin': 'https://app.helloally.ai/admin/',
+      'ally-web:frontends': 'https://app.helloally.ai/admin/',
     };
     try {
       const raw = this.configService.get<string>('BUILDER_HEALTH_URLS', '');
