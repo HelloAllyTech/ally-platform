@@ -56,8 +56,8 @@ why; this file says where it ended up, what changed on the way, and what is stil
 - **Content Catalogue:** kept in step by a debounced TypeORM subscriber plus a nightly two-way
   reconciliation that also does the first backfill. Synced items cannot be edited or archived by
   hand. `search_library` kept its name and parameters.
-- **Roadmap Copilot** moved in phase 2 with Builder, not phase 7. Briefs filed before that cite
-  `stacks`; the enum value stays so they still read, filed under principles.
+- **Roadmap Copilot** moved in phase 2 with Builder, not phase 7. Briefs filed before that had their
+  old evidence source renamed to `principles` by migration `1981900500000`.
 - **Every step after a release is automatic** (the owner's decision, 2026-11-10).
   `ContextLibraryRolloutService` replaces the manual after-deploy steps: progress in `cl_rollout_steps`, the
   same service methods the admin routes call, retirement only through the import service's own
