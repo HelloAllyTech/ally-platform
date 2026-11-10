@@ -8,9 +8,13 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
-## [2026-11-10] update | Pages no longer name the product-guidance server the Context Library replaced.
-- Deprecation banners on `product/*.md`, `index.md`, `overview.md`, `memory.md`, `platform/agent-guide.md`, `platform/overview.md`, `repos/ally-be.md`, `contributing/guide.md`, `contributing/dev-setup.md` and `CLAUDE.md` now say only that the Context Library supersedes them. `contributing/planning-with-context-library.md` drops its History section; its two lessons stay, under **Lessons**.
-- Matching code cleanup in ally-be and ally-web: stored briefs, Builder transcripts and evidence rows are migrated to the `principles` names, and the read-side compatibility for the old names is gone.
+## [2026-11-10] update | Older log entries no longer name the retired guidance server; stored records renamed to `principles`.
+- Entries from August to November 2026 now call it "the guidance server/MCP"; file names that no longer exist are described rather than named.
+- ally-be migration `1981900500000-RenameRetiredGuidanceToolRecords` renames the old values still in stored roadmap briefs, Builder transcripts and Builder evidence to their `principles` equivalents, so nothing reads the old names any more.
+
+## [2026-11-10] update | Pointers to the retired third-party guidance library removed from current pages; the Context Library is named alone.
+
+`contributing/planning-with-context-library.md` (History section), `contributing/dev-setup.md`, `contributing/guide.md`, `index.md`, `memory.md`, `overview.md`, `platform/agent-guide.md`, `platform/overview.md`, `repos/ally-be.md`, this repo's `CLAUDE.md` and the deprecation banners on every `product/` page no longer name the library the Context Library replaced on 2026-11-09. Older entries in this log keep their wording — it is append-only. No page added, moved or retitled; frontmatter unchanged.
 
 ## [2026-11-10] update | `repos/ally-be.md`, `repos/ally-ai.md`, `contributing/planning-with-context-library.md`: the Context Library's post-release steps run by themselves; Builder needs no Context Library setting.
 

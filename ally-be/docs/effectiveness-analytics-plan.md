@@ -823,7 +823,8 @@ it. Opportunity coverage (EFF-30) reads `jsonb_array_elements(a.verdicts)` and g
 
 ## 10. Ask the Context Library before building
 
-The build session runs these as `search_context` queries first (up to six per
+The product-guidance library was not reachable from the session that
+wrote this plan. The build session runs these as `search_context` queries first (up to six per
 call, rephrased as short situations where that reads better), calls `get_chunks` on the one or
 two that bear on the decision, and cites chunk codes such as `[FP-0142]` in the PR body. Retrieved guidance is
 advisory; where it conflicts with §5, state the conflict rather than silently picking one.
@@ -904,7 +905,7 @@ the plan above — the plan text is left as written so the reasoning stays reada
 |---|---|---|
 | 1 | Skill growth sub-tab | **Option A, re-pointed to R1.** Response keys kept so the deployed admin keeps rendering between deploys; titles, DTO docs, provenance and registry notes now describe the learner ruler and say the series changed in 2026-10. |
 | 2 | Course → competency | **`tracks.competencyIds`** (optional author tag, shared competencies only, ≤ 15) plus a course-builder field. Course impact prefers it and falls back to the roleplay-derived set; `competencySource` says which. |
-| 3 | Self-efficacy instrument | **14 items, one per rubric skill, 0–10** (not 1–5: product guidance "Scaling Questions for Measuring Supervisee Development"), at onboarding, every 3 scored cuts and on course completion. Storage, learner API and charts built; **the learner-facing prompt is not.** |
+| 3 | Self-efficacy instrument | **14 items, one per rubric skill, 0–10** (not 1–5: "Scaling Questions for Measuring Supervisee Development"), at onboarding, every 3 scored cuts and on course completion. Storage, learner API and charts built; **the learner-facing prompt is not.** |
 | 4 | Human rating programme | **30 cuts per calendar quarter**, stratified by composite tercile × language, deterministic. Storage, sample + submit API and the κ chart built; **no rating UI** (as §6.J said). |
 | 5 | Learner-facing composite | **Flagged, not fixed.** The track progress dashboard already reads `scenario_sessions.score`; the one real leak is tenant-analytics `learner-usage` `avgScore` / roleplay points per minute (`tenant-analytics.repository.ts`), which still averages the actor composite for tenant admins. |
 | 6 | Curriculum floors | Withheld-with-counts kept as the intended state. |

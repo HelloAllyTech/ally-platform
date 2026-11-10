@@ -173,7 +173,7 @@ foreign-script filter, test-tenant exclusion, and rule-form annotation
 
 ## 6. Stage 3 — the verification gate
 
-Hermes will not let a task close without empirical proof; product guidance
+Hermes will not let a task close without empirical proof; the guidance
 ("Validate Automated Prompt Adjustments Before Deployment") requires offline validation
 plus a shadow deployment before rollout. v1 has neither. A candidate publishes only if:
 
@@ -256,7 +256,7 @@ the verification gate · Pareto selection + eviction · canary promotion
 
 ## 10. Rollout — strangler, not rewrite
 
-Product guidance ("Strangler Pattern for Legacy Architecture Replacement") is explicit: incremental,
+The guidance ("Strangler Pattern for Legacy Architecture Replacement") is explicit: incremental,
 reversible, one component at a time. Each step below is independently useful and
 independently revertible.
 

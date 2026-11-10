@@ -473,9 +473,9 @@ due dates are what tenant admins ask for first), and it is independently valuabl
 
 ---
 
-## 7. Product-guidance provenance
+## 7. Guidance provenance
 
-Six product-guidance queries were run across the task's distinct aspects — course structure and curriculum
+Six guidance-library queries were run across the task's distinct aspects — course structure and curriculum
 sequencing, assessment design and mastery criteria, certification and credential motivation, learner progress and
 completion rewards, gamification reward schedules, and instructional design scaffolding. Every hit returned from a
 single AI-agent-engineering book at weak scores (0.33–0.48); none bears on course or certification product design.

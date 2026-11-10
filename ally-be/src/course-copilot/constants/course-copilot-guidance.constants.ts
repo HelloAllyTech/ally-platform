@@ -9,7 +9,7 @@ import {
  * Course Copilot's view of the Context Library's Learning Design collection: the
  * `design_guidance_search` / `design_guidance_get` pair, on the same pipeline, card format,
  * honesty about failures and usage logging as Builder's and Roadmap Copilot's `principles_*`
- * (PLAN.md §9.5).
+ * (PLAN.md §9.5). Replaces the third-party guidance lookups these two tools made before.
  */
 export const COURSE_COPILOT_GUIDANCE_TOOLS: ContextToolNames = {
   search: 'design_guidance_search',

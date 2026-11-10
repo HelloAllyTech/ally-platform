@@ -174,9 +174,17 @@ it.** Anything there that is still true and still load-bearing belongs in the Co
 an entry, added through its page in the admin dashboard; putting it back into the wiki is not the
 path any more.
 
-## Lessons
+## History
 
-- **A tool's own description decides when an agent uses it.** While a guidance server described
+From 2026-08-07 product guidance came from a third-party MCP server reached through a committed
+bridge script and a skill in every repo. On **2026-11-09** it was replaced by the Context Library,
+as part of moving every retrieval-shaped system at Ally into one library: each repo's `.mcp.json`
+now declares `context-library`, and the bridge, the old skill and the old tools are gone. Older
+plans that cite guidance items by title are history; those titles are not Context Library codes.
+
+Two lessons from that period still apply:
+
+- **A tool's own description decides when an agent uses it.** While the earlier server described
   search as a *planning* tool, sessions stopped searching once implementation began, whatever the
   repo instructions said. The server's descriptions and the repo instructions have to say the same
   thing.

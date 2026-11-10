@@ -39,8 +39,9 @@ point — only an engineer can invoke it, with a whole task description. Setup a
 [Working with the Context Library](https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md).
 
 The Context Library **replaced** the wiki's Product Management Best Practices (deprecated
-2026-08-07): nothing there is a gate, and the Context Library wins on conflict. Those pages still record Ally-specific traps, so check them when a search turns
-up nothing for something Ally-specific.
+2026-08-07): nothing there is a gate, and the Context Library wins on conflict. Those pages still
+record Ally-specific traps, so check them when a search turns up nothing for something
+Ally-specific.
 
 ## What am I doing?
 

@@ -107,6 +107,7 @@ Plan approved 2026-11-06 at `~/.claude/plans/pasted-content-id-053d-we-re-starti
 8. **No read-receipt setting existed.** "Show typing" is the first, in Settings → General.
 9. **The widget is chunk 13 in `v2-chunks.md`,** not 21 as the brief says.
 10. **No parity path or `finalize` node anymore** (#223), so status codes are mapped for the agent loop only.
+11. Product guidance couldn't be searched: its MCP server wasn't connected in this session.
 
 ### Decisions at plan time (Shehbaz, 2026-11-06)
 

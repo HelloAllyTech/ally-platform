@@ -8,7 +8,8 @@ kept below as the rationale and the measurement contract; see
 `filler/predictive_filler` prompt, and the interim-reply chain that waits on the
 filler. Back-channel and comfort audio are touched only where they share code.
 
-> The product judgements (probability
+> The product-guidance library was not reachable from
+> the sessions that wrote and built this. The product judgements (probability
 > gate, cadence caps, continuation rule, early trigger, judge rubric) still need
 > a Context Library check; the thresholds below ship as
 > tunable settings precisely so that check can move them without a code change.

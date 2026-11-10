@@ -372,7 +372,7 @@ graph TD
     class STATIC,APPEND zone
 ```
 
-**Working memory goes last by default**, nearest the reply. Product guidance, *Rolling Context
+**Working memory goes last by default**, nearest the reply. *Rolling Context
 Window for Agent Memory*: *"place relevant context near the prompt end to increase
 likelihood of use."* Today the persona sits at the very top — furthest from generation —
 which is backwards, because persona failures are exactly what rise with conversation

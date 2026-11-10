@@ -63,7 +63,7 @@ the questions they answer.
 Memories and the director turn on together for a scenario, so the comparison that matters is the same
 scenario before and after its switch.
 
-Product guidance behind these: *Design APIs to do the right thing automatically* (selecting the prompt does the
+Guidance behind these: *Design APIs to do the right thing automatically* (selecting the prompt does the
 migration; nobody runs a separate step); *Information Reveals Trigger Emotion Like Direct Changes* (when a
 secret comes out is part of the exercise, so it is controlled through states rather than left to retrieval);
 *Validate Prompt and Tool Changes Through Multiple Testing Stages* (tested on a sample before the bulk switch,

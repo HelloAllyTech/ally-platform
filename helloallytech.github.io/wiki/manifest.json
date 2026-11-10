@@ -74,7 +74,7 @@
         "context-library"
       ],
       "last_reconciled": "2026-11-10",
-      "words": 1737,
+      "words": 1822,
       "url": "https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md",
       "skip_reason": ""
     },
@@ -127,7 +127,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 13589,
+      "words": 13655,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -141,7 +141,7 @@
         "learnings"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 3229,
+      "words": 3242,
       "url": "https://tech.helloally.ai/#/wiki/memory.md",
       "skip_reason": ""
     },
@@ -169,7 +169,7 @@
         "reference"
       ],
       "last_reconciled": "2026-11-09",
-      "words": 1347,
+      "words": 1351,
       "url": "https://tech.helloally.ai/#/wiki/platform/agent-guide.md",
       "skip_reason": ""
     },
@@ -579,7 +579,7 @@
         "api"
       ],
       "last_reconciled": "2026-11-10",
-      "words": 6205,
+      "words": 6217,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-be.md",
       "skip_reason": ""
     },
