@@ -367,6 +367,57 @@ export async function mockAssistantHome(
     }
     // Chunk Q2a: the live scorecard on the Overview.
     if (path === `${base}/scorecard`) return json(route, SCORECARD);
+    // Chunk 20d-2: How it works (the runtime's text, here a short stand-in) and the History.
+    if (path === `${base}/how-it-works`) {
+      const parts = [
+        { layer: "business", text: "# Who you are\nYou are Asha.\n", owner: true },
+        { layer: "tone", text: "Your tone: warm.\n", owner: true },
+        {
+          layer: "safety",
+          text: "# Safety rules\n- Never diagnose.\n- Never Talk about prices for other clinics\n\n",
+          owner: false,
+        },
+        {
+          layer: "base",
+          text: "Answer only from the passages, cite each one, and say plainly when you don't know.",
+          owner: false,
+        },
+      ];
+      return json(route, {
+        full: parts.map(p => p.text).join(""),
+        parts,
+        placeholders: { question: "(the visitor's message)", passages: "" },
+        search: { top_k: 8, max_passages: 5, min_similarity: 0.35, searches: 2, documents: 5 },
+        purpose: "answer",
+        safetyPack: "mental_health",
+      });
+    }
+    if (path === `${base}/history`) {
+      return json(route, {
+        entries: [
+          {
+            id: "00000000-0000-4000-8000-0000000000e2",
+            at: "2026-11-10T09:30:00.000Z",
+            kind: "edit",
+            origin: "hand",
+            who: "Shehbaz",
+            fields: [
+              { field: "introduction", before: "Hi.", after: "Hi, I'm Asha from Sunrise Mind." },
+            ],
+            undone: false,
+          },
+          {
+            id: "00000000-0000-4000-8000-0000000000e1",
+            at: "2026-11-10T09:00:00.000Z",
+            kind: "change",
+            origin: "panel",
+            who: "Shehbaz",
+            fields: [{ field: "tone", before: "formal", after: "warm" }],
+            undone: false,
+          },
+        ],
+      });
+    }
     // Chunk 20d-2: the checkup's questions, each made from the run's results.
     if (path === `${base}/checkup/cases`) {
       return json(route, {

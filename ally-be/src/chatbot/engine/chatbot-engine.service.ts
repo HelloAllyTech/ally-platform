@@ -2,6 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type {
+  AgentRunRequest,
   CrisisCheckResponse,
   KnowledgeAnswerRequest,
   KnowledgeAudienceRequest,
@@ -331,6 +332,22 @@ export class ChatbotEngineService {
         settings,
       ),
     };
+  }
+
+  /**
+   * The request a v2 answer for this turn would send to `/agent/run`, built by the same code as
+   * `answer` (the prompts, the knowledge, `buildKnowledgeRequest`, the runner's body), without
+   * answering (chunk 20d-2). The owner's "How it works" asks ally-ai to build the instructions
+   * from it, so nothing is copied that could drift.
+   */
+  async agentRequestFor(turn: ChatTurn): Promise<AgentRunRequest> {
+    const { prompts } = await this.loadPromptOverrides(turn, true);
+    const knowledge = await this.knowledgeFor(turn);
+    const request = buildKnowledgeRequest(turn, prompts, knowledge);
+    return this.agentRuntime.requestFor(turn, request, knowledge, {
+      conversationId: turn.conversationId ?? 'how-it-works',
+      runId: 'how-it-works',
+    });
   }
 
   private async answer(

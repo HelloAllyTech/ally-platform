@@ -32,6 +32,8 @@ export interface HomeField<T> {
   saving: boolean;
   /** Why the last save didn't go through: refused, or changed elsewhere (then `value` is theirs). */
   error: string | null;
+  /** Something the server said about a save that went through (chunk 20d-2: "Your instructions"). */
+  notice: string | null;
 }
 
 const errorOf = (error: unknown): { stale?: StaleField; message?: string } => {
@@ -62,6 +64,7 @@ export const useHomeField = <K extends HomeFieldName>(
   const [local, setLocal] = useState<{ value: T } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const queued = useRef<{ value: T } | null>(null);
   // The version the waiting edit is based on, and the value from before it (for Undo).
@@ -78,6 +81,7 @@ export const useHomeField = <K extends HomeFieldName>(
       try {
         const saved = await save({ id: botId, field, value, version }).unwrap();
         setError(null);
+        setNotice((saved as { warning?: string }).warning ?? null);
         saves.status("saved");
         if (undoable) {
           saves.changed(() => {
@@ -140,5 +144,5 @@ export const useHomeField = <K extends HomeFieldName>(
     [flush],
   );
 
-  return { value: local ? local.value : server.value, set, flush, saving, error };
+  return { value: local ? local.value : server.value, set, flush, saving, error, notice };
 };

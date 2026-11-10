@@ -3,11 +3,15 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
+import { AiService } from '../../ai/service/ai.service';
 import { BotPageService } from '../../chatbot/bot-page/bot-page.service';
+import { ChatbotService } from '../../chatbot/service/chatbot.service';
+import { LoggerService } from '../../logger/logger.service';
 import { ChatbotPage } from '../../chatbot/entity/chatbot-page.entity';
 import { Chatbot } from '../../chatbot/entity/chatbot.entity';
 import { BotPageAccess, BotPageStatus } from '../../chatbot/enum/bot-page.enum';
@@ -36,6 +40,15 @@ import {
 } from './home-fields';
 import { changeOwnRules, RuleChange, safetyView } from './own-rules';
 
+/** "Your instructions" refused because they'd weaken a safety rule (deck §25). */
+export const SAFETY_CONFLICT_MESSAGE =
+  "That would weaken a safety rule, so it can't be saved. Safety rules always come first.";
+/** Saved, but text that tries to override the rules can't (deck §25). */
+export const OVERRIDE_WARNING =
+  'Saved. Your assistant still follows its safety and base rules first, so text that tries to override them has no effect.';
+/** How many changes the History shows. */
+const HISTORY_SHOWN = 50;
+
 /** Shown when a save was based on a value that changed since (two tabs, or two people). */
 export const STALE_MESSAGE =
   'This changed while you were editing. Here is what it says now.';
@@ -56,7 +69,14 @@ export class AssistantHomeService {
     private readonly drafts: BotDraftService,
     private readonly publisher: BotDraftPublishService,
     private readonly knowledge: KnowledgeBaseService,
+    // Chunk 20d-2 (optional, so the specs that build this service by hand needn't change).
+    private readonly ai?: AiService,
+    private readonly chatbots?: ChatbotService,
   ) {}
+
+  private readonly logger = LoggerService.getInstance(
+    AssistantHomeService.name,
+  );
 
   async get(chatbotId: string) {
     const { chatbot, role } = await this.access.assert(chatbotId);
@@ -76,10 +96,14 @@ export class AssistantHomeService {
     };
   }
 
-  /** Save one field. `version` is the version of the value the edit started from. */
+  /**
+   * Save one field. `version` is the version of the value the edit started from. Each save is
+   * kept in the History (chunk 20d-2) unless the caller records it itself (change by chat).
+   */
   async saveField(
     chatbotId: string,
     dto: { field: string; value: unknown; version: string },
+    options: { record?: boolean } = {},
   ) {
     const field = homeField(dto.field);
     if (!field) {
@@ -90,8 +114,11 @@ export class AssistantHomeService {
     }
     await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
     const value = refusals(dto.field, () => field.parse(dto.value));
+    const warning =
+      dto.field === 'instructions' ? await this.checkInstructions(value) : null;
 
-    return this.dataSource.transaction(async (manager) => {
+    let before: unknown;
+    const saved = await this.dataSource.transaction(async (manager) => {
       const chatbot = await this.lock(manager, chatbotId);
       const view = await this.pages.view(chatbot);
       const state = stateOf(chatbot, view);
@@ -99,6 +126,7 @@ export class AssistantHomeService {
       if (versionOf(current) !== dto.version) {
         throw stale(dto.field, current);
       }
+      before = current;
       const write = refusals(dto.field, () => field.write(value, state));
       if (write.chatbot) {
         await manager
@@ -123,12 +151,155 @@ export class AssistantHomeService {
       const saved = field.read(next);
       return { field: dto.field, value: saved, version: versionOf(saved) };
     });
+    if (options.record !== false && versionOf(before) !== saved.version) {
+      await this.record(chatbotId, dto.field, before, saved.value);
+    }
+    return warning ? { ...saved, warning } : saved;
+  }
+
+  /**
+   * "Your instructions" go through the builder's safety check too (chunk 20d-2): text that
+   * would weaken a safety rule is refused with the reason; text that tries to override the
+   * rules is saved with a note that it can't. Without ally-ai the save goes ahead: the text is
+   * fenced below the base and safety rules either way.
+   */
+  private async checkInstructions(value: unknown): Promise<string | null> {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text || !this.ai) return null;
+    const check = await this.ai.checkOwnerText(text).catch(() => null);
+    if (check?.refused) {
+      throw new UnprocessableEntityException({
+        errorCode: 'safety_conflict',
+        message: SAFETY_CONFLICT_MESSAGE,
+        details: { field: 'instructions' },
+      });
+    }
+    return check?.warning ? OVERRIDE_WARNING : null;
+  }
+
+  /** One edit by hand, for the History: who, when, the field, its before and after. */
+  private async record(
+    chatbotId: string,
+    field: string,
+    before: unknown,
+    after: unknown,
+  ): Promise<void> {
+    try {
+      const draft = await this.drafts.findByChatbot(chatbotId);
+      if (!draft) return;
+      await this.drafts.update(draft, {}, [
+        {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          actor: BotDraftActor.OWNER,
+          kind: 'edit',
+          userId: userId(),
+          origin: 'hand',
+          field,
+          before,
+          after,
+          summary: field,
+        },
+      ]);
+    } catch (error) {
+      // The History misses one line; the save itself already happened.
+      this.logger.warn(
+        `Couldn't record an edit to ${field} for ${chatbotId}: ${error instanceof Error ? error.name : 'error'}`,
+      );
+    }
+  }
+
+  /**
+   * The History (chunk 20d-2): every change, newest first, what, who, when and where from (the
+   * Change panel or by hand), with the before and after of each field.
+   */
+  async history(chatbotId: string) {
+    await this.access.assert(chatbotId);
+    const draft = await this.drafts.findByChatbot(chatbotId);
+    const events = (draft?.events ?? [])
+      .filter((e) => e.kind === 'edit' || e.kind === 'change')
+      .slice(-HISTORY_SHOWN)
+      .reverse();
+    const ids = [
+      ...new Set(
+        events.map((e) => e.userId).filter((id): id is number => !!id),
+      ),
+    ];
+    const names = new Map<number, string>();
+    if (ids.length) {
+      const rows: { id: number; name: string | null }[] =
+        await this.dataSource.query(
+          `SELECT id, name FROM users WHERE id = ANY($1::int[])`,
+          [ids],
+        );
+      for (const row of rows) if (row.name) names.set(row.id, row.name);
+    }
+    return {
+      entries: events.map((e) => ({
+        id: e.id,
+        at: e.at,
+        kind: e.kind,
+        origin: e.origin ?? (e.kind === 'change' ? 'panel' : 'hand'),
+        who: e.userId ? (names.get(e.userId) ?? null) : null,
+        fields:
+          e.kind === 'edit'
+            ? [{ field: e.field ?? '', before: e.before, after: e.after }]
+            : (e.ops ?? []).map((op) => op.value as never),
+        undone: Boolean(e.undoneBy),
+      })),
+    };
+  }
+
+  /**
+   * Undo an edit by hand (its before comes back) or Restore one (its after comes back), as a
+   * new save with the field's current version, so it shows in the History too.
+   */
+  async revertEdit(chatbotId: string, eventId: string, to: 'before' | 'after') {
+    await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
+    const draft = await this.drafts.findByChatbot(chatbotId);
+    const event = draft?.events.find(
+      (e) => e.id === eventId && e.kind === 'edit',
+    );
+    if (!event?.field || !homeField(event.field)) {
+      throw new NotFoundException('That change was not found.');
+    }
+    const view = await this.get(chatbotId);
+    const current = (
+      view.fields as Record<string, { value: unknown; version: string }>
+    )[event.field];
+    return this.saveField(chatbotId, {
+      field: event.field,
+      value: to === 'before' ? event.before : event.after,
+      version: current.version,
+    });
+  }
+
+  /**
+   * "How it works" (chunk 20d-2): the instructions this assistant follows, built by ally-ai from
+   * the very request a v2 answer would send (`ChatbotService.agentRequestFor`). Nothing is kept.
+   */
+  async howItWorks(chatbotId: string) {
+    const { chatbot } = await this.access.assert(chatbotId);
+    if (!this.ai || !this.chatbots) throw new NotFoundException();
+    const request = await this.chatbots.agentRequestFor(chatbotId);
+    const instructions = await this.ai.agentInstructions(request);
+    return {
+      ...instructions,
+      purpose: chatbot.purpose ?? null,
+      safetyPack: chatbot.safetyPack ?? null,
+    };
   }
 
   /** Add, edit or remove one of the owner's own rules. Pack rules are fixed. */
-  async changeRule(chatbotId: string, dto: RuleChange & { version: string }) {
+  async changeRule(
+    chatbotId: string,
+    dto: RuleChange & { version: string },
+    options: { record?: boolean } = {},
+  ) {
     await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
-    return this.dataSource.transaction(async (manager) => {
+    let before: string[] = [];
+    let after: string[] = [];
+    const view = await this.dataSource.transaction(async (manager) => {
       const chatbot = await this.lock(manager, chatbotId);
       const own = chatbot.rules?.never ?? [];
       if (versionOf(own) !== dto.version) {
@@ -142,6 +313,8 @@ export class AssistantHomeService {
         });
       }
       const next = refusals('rules', () => changeOwnRules(own, dto));
+      before = own;
+      after = next;
       await manager.getRepository(Chatbot).update(
         { id: chatbotId },
         {
@@ -151,6 +324,11 @@ export class AssistantHomeService {
       );
       return safetyView(chatbot.safetyPack, next);
     });
+    // In the History as "Your own rules"; undone by editing the rule again, not from there.
+    if (options.record !== false) {
+      await this.record(chatbotId, 'rules', before, after);
+    }
+    return view;
   }
 
   /**

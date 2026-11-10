@@ -5,7 +5,7 @@ can fall back to that endpoint (v1) with almost no mapping. The contract grows
 toward the full v2 shape (contact, run_token, resume) in later chunks.
 """
 
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -145,3 +145,37 @@ class AgentRunResponse(KnowledgeAnswerResponse):
             "citations."
         ),
     )
+
+
+# ── "How it works" (chunk 20d-2) ─────────────────────────────────────────────
+
+
+class InstructionPart(BaseModel):
+    """One labelled stretch of the instructions, in the order it appears."""
+
+    layer: str
+    text: str
+    #: Written by the owner (business name, tone, their instructions, topics to avoid).
+    owner: bool = False
+
+
+class InstructionsResponse(BaseModel):
+    """The instructions a run for this bot starts from, as `/agent/run` would build
+    them: `full` is the text; `parts` joined are exactly `full`."""
+
+    full: str
+    parts: List[InstructionPart]
+    placeholders: Dict[str, str]
+    search: Dict[str, Any]
+
+
+class OwnerTextCheckRequest(BaseModel):
+    text: str = Field(..., max_length=8000)
+
+
+class OwnerTextCheckResponse(BaseModel):
+    #: `weakens_safety` when the text would weaken a safety rule (not saved).
+    refused: Optional[str] = None
+    #: `override_attempt` when it reads like "ignore previous instructions" (saved, with
+    #: a note that it can't outrank the rules).
+    warning: Optional[str] = None

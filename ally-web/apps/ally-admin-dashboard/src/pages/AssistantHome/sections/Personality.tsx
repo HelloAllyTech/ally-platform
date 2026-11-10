@@ -5,7 +5,7 @@ import type { BotPageLanguage } from "@types";
 
 import { TONES, toneOf } from "../../Onboarding/MakeItYours";
 import { HOME } from "../copy";
-import { Collapsed, Group, LinesField, SectionHead, TextField } from "../fields";
+import { Group, LinesField, SectionHead, TextField } from "../fields";
 import { useHomeField } from "../useHomeField";
 import { QuickReplies } from "./QuickReplies";
 
@@ -23,7 +23,7 @@ const LANGUAGES: { id: BotPageLanguage; label: string }[] = [
  * suggested questions, quick replies, what it says when it doesn't know, and — collapsed — the
  * owner's extra instructions, which the safety rules always come before.
  */
-export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
+export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit, go }) => {
   const f = home.fields;
   const failed = HOME.saving.failed;
   const name = useHomeField(bot.id, "assistantName", f.assistantName, failed);
@@ -32,7 +32,6 @@ export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit 
   const language = useHomeField(bot.id, "language", f.language, failed);
   const suggested = useHomeField(bot.id, "suggestedQuestions", f.suggestedQuestions, failed);
   const decline = useHomeField(bot.id, "declineText", f.declineText, failed);
-  const instructions = useHomeField(bot.id, "instructions", f.instructions, failed);
   const readOnly = !canEdit;
 
   return (
@@ -125,17 +124,12 @@ export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit 
           multiline
           maxLength={500}
         />
-        <Collapsed summary={t.instructions}>
-          <TextField
-            label={t.instructions}
-            hint={t.instructionsHint}
-            field={instructions}
-            disabled={readOnly}
-            multiline
-            rows={8}
-            maxLength={4000}
-          />
-        </Collapsed>
+        {/* "Your instructions" live in How it works now, with everything else it follows (20d-2). */}
+        <div>
+          <button type="button" className="ally-link" onClick={() => go("how")}>
+            {HOME.seeAll}
+          </button>
+        </div>
       </Group>
     </>
   );

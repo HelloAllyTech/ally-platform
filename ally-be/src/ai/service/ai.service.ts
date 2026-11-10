@@ -161,6 +161,14 @@ export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';
 
+/** ally-ai's `/agent/instructions` answer (chunk 20d-2). */
+export interface AgentInstructions {
+  full: string;
+  parts: { layer: string; text: string; owner: boolean }[];
+  placeholders: Record<string, string>;
+  search: Record<string, number>;
+}
+
 @Injectable()
 export class AiService {
   logger = LoggerService.getInstance(AiService.name);
@@ -735,6 +743,37 @@ export class AiService {
    *
    * redactBody=true: the payload is the person's question.
    */
+  /**
+   * The owner's "How it works" (chunk 20d-2): the instructions a run would start from, built by
+   * ally-ai's own prompt code from the same body `runAgent` sends. No model call. Additive.
+   */
+  async agentInstructions(
+    request: AgentRunRequest,
+  ): Promise<AgentInstructions> {
+    return this.postKnowledge<AgentInstructions, AgentRunRequest>(
+      ENDPOINTS.AGENT_INSTRUCTIONS,
+      request,
+      { timeoutMs: 10_000, alertOnFailure: false },
+    );
+  }
+
+  /** The builder's safety check on text an owner typed into their instructions (chunk 20d-2). */
+  async checkOwnerText(
+    text: string,
+  ): Promise<{ refused: string | null; warning: string | null }> {
+    return this.postKnowledge<
+      { refused: string | null; warning: string | null },
+      { text: string }
+    >(
+      ENDPOINTS.AGENT_INSTRUCTIONS_CHECK,
+      { text },
+      {
+        timeoutMs: 10_000,
+        alertOnFailure: false,
+      },
+    );
+  }
+
   async runAgent(request: AgentRunRequest) {
     return this.postKnowledge<AgentRunResponse, AgentRunRequest>(
       ENDPOINTS.AGENT_RUN,

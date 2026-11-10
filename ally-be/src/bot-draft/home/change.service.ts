@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { ExecutionManager } from '../../common/execution/execution-manager';
 import { AiService } from '../../ai/service/ai.service';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
@@ -146,20 +147,20 @@ export class ChangeService {
       const own = safety.rules.filter((r) => !r.fixed);
       const text = String(undoing ? from : to);
       if (!undoing) {
-        await this.home.changeRule(chatbotId, {
-          op: 'add',
-          text,
-          version: safety.version,
-        } as never);
+        await this.home.changeRule(
+          chatbotId,
+          { op: 'add', text, version: safety.version } as never,
+          { record: false },
+        );
         return;
       }
       const rule = own.find((r) => r.text === text);
       if (!rule) return; // already gone
-      await this.home.changeRule(chatbotId, {
-        op: 'remove',
-        id: rule.id,
-        version: safety.version,
-      } as never);
+      await this.home.changeRule(
+        chatbotId,
+        { op: 'remove', id: rule.id, version: safety.version } as never,
+        { record: false },
+      );
       return;
     }
     const view = await this.home.get(chatbotId);
@@ -173,11 +174,16 @@ export class ChangeService {
       const next = undoing
         ? current.filter((t) => t !== topic)
         : [...current, topic];
-      await this.home.saveField(chatbotId, {
-        field: 'avoidTopics',
-        value: next,
-        version: fields.avoidTopics.version,
-      });
+      await this.home.saveField(
+        chatbotId,
+        {
+          field: 'avoidTopics',
+          value: next,
+          version: fields.avoidTopics.version,
+        },
+        // Recorded once, as this change (below), not again as an edit by hand.
+        { record: false },
+      );
       return;
     }
     const name = FIELDS[field];
@@ -189,11 +195,11 @@ export class ChangeService {
           'This changed while you were editing. Here is what it says now.',
       });
     }
-    await this.home.saveField(chatbotId, {
-      field: name,
-      value: to,
-      version: fields[name].version,
-    });
+    await this.home.saveField(
+      chatbotId,
+      { field: name, value: to, version: fields[name].version },
+      { record: false },
+    );
   }
 
   private async record(chatbotId: string, changes: ProposedChange[]) {
@@ -203,6 +209,9 @@ export class ChangeService {
       at: new Date().toISOString(),
       actor: BotDraftActor.OWNER,
       kind: 'change',
+      // Who, and from where, for the History (chunk 20d-2).
+      userId: Number(ExecutionManager.getUserId() ?? 0) || null,
+      origin: 'panel',
       summary: changes.map((c) => c.field).join(', '),
       ops: changes.map((c) => ({
         op: 'replace',

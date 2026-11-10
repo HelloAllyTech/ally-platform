@@ -1125,3 +1125,108 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ── How it works, History, Why this answer (chunk 20d-2) ── */
+.ally-how {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-how__layer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+}
+.ally-how__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ally-how__head .ally-home__group-title {
+  margin: 0;
+  flex: 1;
+}
+.ally-how__n {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--ally-sunken);
+  font: 600 13px/1 var(--ally-font-ui);
+}
+.ally-how__locked {
+  color: var(--ally-faint);
+}
+.ally-how__counter {
+  margin: -6px 0 0;
+  text-align: right;
+  color: var(--ally-faint);
+}
+.ally-how__text {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+  border: 1px solid var(--ally-line);
+  font: 400 13px/1.55 var(--ally-font-label);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ally-how__full {
+  max-height: 560px;
+}
+.ally-how__mine {
+  background: var(--ally-accent-soft);
+  color: inherit;
+  border-radius: 4px;
+  box-shadow: inset 2px 0 0 var(--ally-accent);
+}
+.ally-how__edit {
+  margin-left: 6px;
+  border: 0;
+  background: var(--ally-accent);
+  color: var(--ally-on-accent, #fff);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font: 600 11px/1.6 var(--ally-font-ui);
+  cursor: pointer;
+}
+.ally-change__subtitle {
+  margin: -8px 0 12px;
+}
+.ally-change__limits {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0;
+}
+.ally-change__limits ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ally-history__diff {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.ally-history__before {
+  text-decoration: line-through;
+  color: var(--ally-faint);
+}
+.ally-why {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.ally-why ul {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}

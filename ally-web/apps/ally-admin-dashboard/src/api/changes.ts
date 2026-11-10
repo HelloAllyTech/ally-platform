@@ -32,6 +32,17 @@ export interface ChangeEntry {
   undone: boolean;
 }
 
+/** One line of the History (chunk 20d-2): a change by chat, or an edit by hand. */
+export interface HistoryEntry {
+  id: string;
+  at: string;
+  kind: "edit" | "change";
+  origin: "panel" | "hand";
+  who: string | null;
+  fields: { field: string; before?: unknown; after: unknown }[];
+  undone: boolean;
+}
+
 /** Change by chat on the assistant home (chunk 20a-2). */
 export const changesApi = baseAPI.injectEndpoints({
   endpoints: builder => ({
@@ -54,14 +65,37 @@ export const changesApi = baseAPI.injectEndpoints({
         method: HttpMethod.POST,
         body: { changes },
       }),
-      invalidatesTags: [TAG_TYPES.CHECKUP],
+      invalidatesTags: (_r, _e, { id }) => [
+        TAG_TYPES.CHECKUP,
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:history` },
+      ],
+    }),
+    /** Every change, newest first (chunk 20d-2). */
+    getHistory: builder.query<HistoryEntry[], string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.HISTORY(id), method: HttpMethod.GET }),
+      transformResponse: (response: { entries?: HistoryEntry[] }) => response.entries ?? [],
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:history` }],
+    }),
+    /** Undo an edit by hand (its before) or Restore one (its after). */
+    revertEdit: builder.mutation<unknown, { id: string; eventId: string; to: "undo" | "restore" }>({
+      query: ({ id, eventId, to }) => ({
+        url: `${ApiEndpoints.CHATBOTS.HISTORY(id)}/${eventId}/${to}`,
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:history` },
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:home` },
+      ],
     }),
     undoChange: builder.mutation<{ eventId: string }, { id: string; eventId: string }>({
       query: ({ id, eventId }) => ({
         url: ApiEndpoints.CHATBOTS.CHANGE_UNDO(id, eventId),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [TAG_TYPES.CHECKUP],
+      invalidatesTags: (_r, _e, { id }) => [
+        TAG_TYPES.CHECKUP,
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:history` },
+      ],
     }),
   }),
 });
@@ -71,4 +105,6 @@ export const {
   useProposeChangeMutation,
   useApplyChangeMutation,
   useUndoChangeMutation,
+  useGetHistoryQuery,
+  useRevertEditMutation,
 } = changesApi;

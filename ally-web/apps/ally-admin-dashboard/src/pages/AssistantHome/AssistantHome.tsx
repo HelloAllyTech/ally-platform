@@ -22,6 +22,7 @@ import { LoadError } from "../WhatsAppBot/shared";
 import { UnsavedChangesContext } from "../WhatsAppBot/unsavedChanges";
 import { CheckupSection } from "./sections/Checkup";
 import { ConversationsSection } from "./sections/Conversations";
+import { HowItWorksSection } from "./sections/HowItWorks";
 import { KnowsSection } from "./sections/Knows";
 import { OverviewSection } from "./sections/Overview";
 import { PageSection } from "./sections/Page";
@@ -206,6 +207,8 @@ export const AssistantHome: React.FC = () => {
         return <PersonalitySection {...props} />;
       case "safety":
         return <SafetySection {...props} />;
+      case "how":
+        return <HowItWorksSection {...props} />;
       case "page":
         return <PageSection {...props} />;
       case "checkup":

@@ -67,6 +67,9 @@ export const ENDPOINTS = {
   KNOWLEDGE_AGENT_CRISIS_CHECK: 'api/v1/knowledge-agent/crisis-check',
   /** Agents v2: the LangGraph runtime. 404 while ally-ai's AGENT_RUNTIME__ENABLED is off. */
   AGENT_RUN: 'api/v1/agent/run',
+  /** The instructions a run would start from, without running (chunk 20d-2). */
+  AGENT_INSTRUCTIONS: 'api/v1/agent/instructions',
+  AGENT_INSTRUCTIONS_CHECK: 'api/v1/agent/instructions/check',
   /** The same run as Server-Sent Events (Preview): status and steps live, then `final`. */
   AGENT_RUN_STREAM: 'api/v1/agent/run/stream',
   /** Onboarding builder (chunk 20a). 404 while ally-ai's BUILDER__ENABLED is off. */

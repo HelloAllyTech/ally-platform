@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 import {
   useAnswerGapMutation,
-  useGetChangesQuery,
+  useGetHistoryQuery,
   useGetCheckupQuery,
   useMarkNotOfferedMutation,
   useRunCheckupMutation,
@@ -70,7 +70,8 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
 }) => {
   const [polling, setPolling] = useState(false);
   const checkup = useGetCheckupQuery(bot.id, { pollingInterval: polling ? POLL_MS : 0 });
-  const { data: changes } = useGetChangesQuery(bot.id);
+  // Changes by chat and by hand alike (chunk 20d-2's History).
+  const { data: changes } = useGetHistoryQuery(bot.id);
   const [run, runState] = useRunCheckupMutation();
   const [answer, answerState] = useAnswerGapMutation();
   const [notOffered, notOfferedState] = useMarkNotOfferedMutation();

@@ -690,3 +690,20 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Inbox, adding to the checkup (20d-2):** Add to checkup · Added to your checkup. It's asked in the next one.
 - **Answer it and Correct this, the box (20d-2):** Also add to checkup
 - **Publishing, when an owner's own Must pass question failed (20d-2):** This question you marked Must pass failed. Go live anyway? · Go live anyway
+
+### Change your assistant, How it works and Why this answer *(added in 20d-2)*
+
+- **Change panel:** Describe a change in your own words. I'll show exactly what will change. Nothing changes until you approve it, and you can undo it. · What I can change · Welcome message · Tone · Languages · Business details · Your instructions · Topics to avoid · Quick replies · Pages it knows · What I can't change · Safety rules: these can only be added to. · Who can open your page: that's in Share. · Not this · Change · History · You changed your assistant. Run a checkup to see the effect. · Run checkup · Nothing has changed yet. · From the Change panel · Edited by hand · Undo · Restore · Undone · {who} · {when}
+- **Field names in the History:** Business name · Your assistant's name · The introduction · The tone · Your instructions · What it says when it doesn't know · The disclaimer · What it says when someone may be at risk · Suggested questions · Topics to avoid · Questions before the chat · Limits · Languages · Your page · Who can open your page · When someone asks for a person · The website bubble · Who can message it on WhatsApp · What it says when someone sends too many messages · What it says to a number it doesn't know · What it says when it can't read a message · Your own rules
+- **How it works:** Everything your assistant follows, in the order it applies. You can edit the parts marked as yours. · Set by Ally to keep answers accurate and safe. You can add to safety rules, not remove them. · Yours · Set by Ally · Show exact text · Hide exact text · Show the full instructions · Hide the full instructions · This is the whole text your assistant gets, with your parts highlighted. Where it says {question}, it gets the visitor's message; the parts of your pages it finds go in for each question. · Edit · Edit in {section} · {n} of {max} characters · Saved. Your assistant still follows its safety and base rules first, so text that tries to override them has no effect. · We couldn't load this. Try again in a moment. · Nothing here yet. · your kind of practice · answering questions · Anything else it should know or do
+- **How it works, Ally's base rules:** Ally's base rules · Answer from your pages, say where each answer came from, never make things up, and say plainly when it doesn't know.
+- **How it works, Safety rules:** Safety rules · Always on for {pack}. Your own rules are added after Ally's.
+- **How it works, What it's for:** What it's for · Set by the purpose you chose: {purpose}. Change it by choosing another purpose.
+- **How it works, Business details:** Business details · The name your assistant uses.
+- **How it works, Tone and style:** Tone and style · How it sounds.
+- **How it works, Your instructions:** Your instructions · Anything else it should know or do. Safety and base rules always come first.
+- **How it works, Topics to avoid:** Topics to avoid · Subjects it politely declines.
+- **How it works, How it finds answers:** How it finds answers · Searches your pages up to {searches} times a question and uses the best {passages} parts it finds, from {documents} documents.
+- **Why this answer:** Why this answer? · Hide · Where it looked · It didn't use any of your pages for this. · {s} s to answer · Topics to avoid: {topic} · It said it didn't know.
+- **Personality, the link to How it works:** See everything it follows
+- **How it works, in the section list (20d-2):** How it works · Everything your assistant follows, and the parts you can change.

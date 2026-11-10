@@ -143,7 +143,9 @@ export type DraftEventKind =
   /** A change by chat on the assistant home (chunk 20a-2): `ops` carry each before and after. */
   | 'change'
   /** Pages taken away (Choose pages, Sources): `ops[0].value` holds what each took, for Undo. */
-  | 'pages';
+  | 'pages'
+  /** A field saved by hand on the assistant home (chunk 20d-2), with its before and after. */
+  | 'edit';
 
 /** One entry of the append-only log; patches carry their inverse for undo. */
 export interface DraftEvent {
@@ -156,6 +158,12 @@ export interface DraftEvent {
   inverse?: PatchOp[];
   summary: string;
   undoneBy?: string;
+  /** Chunk 20d-2, for the History: who, where it came from, and the field's before and after. */
+  userId?: number | null;
+  origin?: 'panel' | 'hand';
+  field?: string;
+  before?: unknown;
+  after?: unknown;
 }
 
 export interface TranscriptEntry {

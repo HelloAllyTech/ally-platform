@@ -28,6 +28,7 @@ import {
   HomeFieldState,
   HomeList,
   HomeListChange,
+  HowItWorks,
   HomeListName,
   HomeSafety,
   RuleChange,
@@ -239,7 +240,21 @@ export const chatbotsApi = baseAPI.injectEndpoints({
         }
       },
       invalidatesTags: (r, _e, { id }) =>
-        r ? [...botTags(id), { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }] : [],
+        r
+          ? [
+              ...botTags(id),
+              { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` },
+              // The History and How it works show the change (chunk 20d-2).
+              { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:history` },
+              { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:how` },
+            ]
+          : [],
+    }),
+
+    /** "How it works": everything the assistant follows, from the runtime (chunk 20d-2). */
+    getHowItWorks: builder.query<HowItWorks, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.HOW_IT_WORKS(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:how` }],
     }),
 
     /** One of the home's lists with its version (chunk 20d-2). */
@@ -517,6 +532,7 @@ export const {
   useSaveHomeFieldMutation,
   useChangeOwnRuleMutation,
   useGetHomeListQuery,
+  useGetHowItWorksQuery,
   useChangeHomeListMutation,
   useCorrectFactMutation,
   useGetChatbotsQuery,

@@ -179,3 +179,31 @@ export interface HomeListChange {
   item?: Record<string, unknown>;
   ids?: string[];
 }
+
+/** "How it works" (chunk 20d-2): the instructions as ally-ai builds them for a run. */
+export interface HowItWorks {
+  /** The whole text, as the assistant receives it. */
+  full: string;
+  /** The text in order, each part labelled with its layer; joined, they are `full`. */
+  parts: { layer: HowLayer; text: string; owner: boolean }[];
+  placeholders: { question: string; passages: string };
+  search: {
+    top_k: number;
+    max_passages: number;
+    min_similarity: number;
+    searches: number;
+    documents: number;
+  };
+  purpose: string | null;
+  safetyPack: string | null;
+}
+
+export type HowLayer =
+  | "base"
+  | "safety"
+  | "purpose"
+  | "business"
+  | "tone"
+  | "instructions"
+  | "avoid"
+  | "search";

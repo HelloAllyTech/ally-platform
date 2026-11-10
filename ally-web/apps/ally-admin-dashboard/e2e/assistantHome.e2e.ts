@@ -10,6 +10,7 @@ const SECTIONS = [
   "knows",
   "personality",
   "safety",
+  "how",
   "page",
   "checkup",
   "conversations",

@@ -20,6 +20,10 @@ vi.mock("@api", async importOriginal => ({
   useGetChangesQuery: () => ({ data: h.history.current }),
   useProposeChangeMutation: () => [unwrapped(h.propose), { isLoading: false }],
   useApplyChangeMutation: () => [unwrapped(h.apply), { isLoading: false }],
+  // Chunk 20d-2: the History tab and the checkup run after Apply.
+  useGetHistoryQuery: () => ({ data: [], isLoading: false }),
+  useRevertEditMutation: () => [vi.fn(), { isLoading: false }],
+  useRunCheckupMutation: () => [vi.fn(), { isLoading: false }],
   useUndoChangeMutation: () => [
     (args: unknown) => Object.assign(Promise.resolve(h.undo(args)), { unwrap: () => null }),
     { isLoading: false },
@@ -30,6 +34,8 @@ vi.mock("@api", async importOriginal => ({
 import { COPY } from "../../Onboarding/copy";
 // eslint-disable-next-line import/first
 import { ChangePanel } from "../ChangePanel";
+// eslint-disable-next-line import/first
+import { HOME } from "../copy";
 
 const t = COPY.change;
 
@@ -91,7 +97,7 @@ describe("ChangePanel", () => {
     });
     fireEvent.click(screen.getByText(t.send));
     expect(await screen.findByText("English · Hindi")).toBeTruthy();
-    fireEvent.click(screen.getByText(t.notQuite));
+    fireEvent.click(screen.getByText(HOME.changeControls.notThis));
     expect(screen.queryByTestId("change-proposal")).toBeNull();
     expect(h.apply).not.toHaveBeenCalled();
   });

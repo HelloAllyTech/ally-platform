@@ -1,11 +1,11 @@
 import React, { useMemo, useRef, useState } from "react";
 
-import { useGetBotImagesQuery, useTestChatbotMutation } from "@api";
+import { useGetAssistantHomeQuery, useGetBotImagesQuery, useTestChatbotMutation } from "@api";
 import { Button, PhonePreview } from "@components/v2";
 import { ChatbotTestStreamUnavailable, useChatbotTestStream } from "@hooks/useChatbotTestStream";
 import type { BotPageView, Chatbot, TestChatbotResponse } from "@types";
 
-import { HOME } from "./copy";
+import { HOME, fill } from "./copy";
 import { pickCopy } from "../../botPage/copy";
 import { Chat, ChatItem, PendingReply } from "../../botPage/screens/Chat";
 import "../../botPage/page.css";
@@ -67,6 +67,76 @@ const usePreviewPage = (bot: Chatbot, view: BotPageView | null): PublicBotPage |
 const citationsOf = (result: TestChatbotResponse) =>
   result.citations.map(c => ({ title: c.document_title, url: null }));
 
+/** What "Why this answer?" shows for one reply (chunk 20d-2), from what the run already returns. */
+interface Why {
+  id: string;
+  question: string;
+  passages: { title: string; section: string | null }[];
+  ms: number | null;
+  declined: boolean;
+  /** A topic to avoid, shown only when the reply declined and the question touches it. */
+  topic: string | null;
+}
+
+/** The topic a declined question touches: its words (or their stems) appear in the question. */
+export const avoidedTopic = (question: string, topics: string[]): string | null => {
+  const words = question.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  // Plural or not: "prices" and "price", "therapies" and "therapy".
+  const stem = (w: string) => w.replace(/ies$/, "y").replace(/s$/, "");
+  const asked = new Set(words.map(stem));
+  return (
+    topics.find(topic => {
+      const parts = (topic.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).map(stem);
+      return parts.length > 0 && parts.every(p => asked.has(p));
+    }) ?? null
+  );
+};
+
+const whyOf = (question: string, result: TestChatbotResponse, topics: string[]): Why => {
+  const declined = String(result.handledBy) === "declined";
+  return {
+    id: `w${Date.now()}`,
+    question,
+    passages: result.citations.map(c => ({
+      title: c.document_title,
+      section: c.section_path || null,
+    })),
+    ms: typeof result.latencyMs === "number" ? result.latencyMs : null,
+    declined,
+    topic: declined ? avoidedTopic(question, topics) : null,
+  };
+};
+
+/** "Why this answer?" under the phone, one per reply, newest first (chunk 20d-2). */
+const WhyList: React.FC<{ whys: Why[] }> = ({ whys }) => (
+  <ol className="ally-why" data-testid="why-this-answer">
+    {[...whys].reverse().map(why => (
+      <li key={why.id}>
+        <details className="ally-home__details">
+          <summary>
+            {HOME.why.toggle} <span className="ally-small">“{why.question}”</span>
+          </summary>
+          <div className="ally-home__details-body ally-small">
+            {why.topic && <p>{fill(HOME.why.avoid, { topic: why.topic })}</p>}
+            {why.declined && !why.topic && <p>{HOME.why.declined}</p>}
+            <p className="ally-field__label">{HOME.why.passages}</p>
+            {why.passages.length ? (
+              <ul>
+                {why.passages.map((p, n) => (
+                  <li key={n}>{p.section ? `${p.title} · ${p.section}` : p.title}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>{HOME.why.none}</p>
+            )}
+            {why.ms !== null && <p>{fill(HOME.why.time, { s: (why.ms / 1000).toFixed(1) })}</p>}
+          </div>
+        </details>
+      </li>
+    ))}
+  </ol>
+);
+
 /**
  * Try it (chunk 20d): the real bot page chat, in the page's brand, inside a phone, answering
  * through the same test stream Preview used (so answers, sources and the crisis path match the
@@ -85,6 +155,9 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
   const [pending, setPending] = useState<PendingReply | null>(null);
   const [error, setError] = useState<string | null>(null);
   const conversation = useRef<string | undefined>();
+  const [whys, setWhys] = useState<Why[]>([]);
+  const { data: home } = useGetAssistantHomeQuery(bot.id);
+  const topics = (home?.fields.avoidTopics?.value as string[] | undefined) ?? [];
 
   const send = async (text: string) => {
     const history = messages
@@ -121,6 +194,7 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
         result = await test(request).unwrap();
       }
       conversation.current = result.conversationId;
+      setWhys(list => [...list, whyOf(text, result, topics)]);
       setMessages(list => [
         ...list,
         {
@@ -152,6 +226,7 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
               onClick={() => {
                 stream.cancel();
                 setMessages([]);
+                setWhys([]);
                 conversation.current = undefined;
               }}
             >
@@ -177,6 +252,7 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
               onSend={text => void send(text)}
               onNewChat={() => {
                 setMessages([]);
+                setWhys([]);
                 conversation.current = undefined;
               }}
               // Shown so the owner sees what visitors see; Preview stores no messages, so a
@@ -186,6 +262,7 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
           </div>
         </PhonePreview>
       )}
+      {whys.length > 0 && <WhyList whys={whys} />}
     </div>
   );
 };

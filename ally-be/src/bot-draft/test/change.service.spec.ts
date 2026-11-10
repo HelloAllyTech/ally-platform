@@ -115,6 +115,8 @@ describe('ChangeService (change by chat)', () => {
     expect(h.home.changeRule).toHaveBeenCalledWith(
       'bot',
       expect.objectContaining({ op: 'add', text: 'Give legal advice' }),
+      // Recorded once, as the change by chat, not again as an edit by hand (chunk 20d-2).
+      { record: false },
     );
     expect(h.draft.events.map((e) => e.id)).toContain(eventId);
     expect(h.checkup.scheduleAfterChange).toHaveBeenCalledWith('bot');

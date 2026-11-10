@@ -13,6 +13,7 @@ export const HOME = {
     knows: "What it knows",
     personality: "Personality",
     safety: "Safety",
+    how: "How it works",
     page: "Page",
     checkup: "Checkup",
     conversations: "Inbox",
@@ -23,6 +24,7 @@ export const HOME = {
     knows: "Everything your assistant answers from.",
     personality: "How it introduces itself and how it talks.",
     safety: "Rules your assistant always follows.",
+    how: "Everything your assistant follows, and the parts you can change.",
     page: "How your page looks, and what it asks before a chat.",
     checkup: "A check that your assistant answers well and stays safe.",
     conversations: "Chats from every channel. Take one over to reply yourself.",
@@ -541,6 +543,132 @@ export const HOME = {
       other: "It didn't do what it should.",
     },
   },
+  /** Chunk 20d-2, deck §25: the Change panel, How it works, Why this answer. */
+  changeControls: {
+    subtitle:
+      "Describe a change in your own words. I'll show exactly what will change. Nothing changes until you approve it, and you can undo it.",
+    canTitle: "What I can change",
+    can: [
+      "Welcome message",
+      "Tone",
+      "Languages",
+      "Business details",
+      "Your instructions",
+      "Topics to avoid",
+      "Quick replies",
+      "Pages it knows",
+    ],
+    cantTitle: "What I can't change",
+    cant: ["Safety rules: these can only be added to.", "Who can open your page: that's in Share."],
+    notThis: "Not this",
+    tabs: {
+      change: "Change",
+      history: "History",
+    },
+    afterApply: "You changed your assistant. Run a checkup to see the effect.",
+    runCheckup: "Run checkup",
+    historyEmpty: "Nothing has changed yet.",
+    fromPanel: "From the Change panel",
+    byHand: "Edited by hand",
+    undo: "Undo",
+    restore: "Restore",
+    undone: "Undone",
+    who: "{who} · {when}",
+    fields: {
+      name: "Business name",
+      assistantName: "Your assistant's name",
+      introduction: "The introduction",
+      tone: "The tone",
+      instructions: "Your instructions",
+      declineText: "What it says when it doesn't know",
+      disclaimer: "The disclaimer",
+      crisisText: "What it says when someone may be at risk",
+      suggestedQuestions: "Suggested questions",
+      avoidTopics: "Topics to avoid",
+      prechat: "Questions before the chat",
+      pageLimits: "Limits",
+      language: "Languages",
+      pageStatus: "Your page",
+      pageAccess: "Who can open your page",
+      handover: "When someone asks for a person",
+      widget: "The website bubble",
+      whatsappAccess: "Who can message it on WhatsApp",
+      busyText: "What it says when someone sends too many messages",
+      unknownNumberText: "What it says to a number it doesn't know",
+      unsupportedMediaText: "What it says when it can't read a message",
+      rules: "Your own rules",
+    },
+  },
+  how: {
+    intro:
+      "Everything your assistant follows, in the order it applies. You can edit the parts marked as yours.",
+    locked:
+      "Set by Ally to keep answers accurate and safe. You can add to safety rules, not remove them.",
+    yours: "Yours",
+    byAlly: "Set by Ally",
+    showText: "Show exact text",
+    hideText: "Hide exact text",
+    showFull: "Show the full instructions",
+    hideFull: "Hide the full instructions",
+    fullHint:
+      "This is the whole text your assistant gets, with your parts highlighted. Where it says {question}, it gets the visitor's message; the parts of your pages it finds go in for each question.",
+    editHere: "Edit",
+    editIn: "Edit in {section}",
+    counter: "{n} of {max} characters",
+    warning:
+      "Saved. Your assistant still follows its safety and base rules first, so text that tries to override them has no effect.",
+    unavailable: "We couldn't load this. Try again in a moment.",
+    none: "Nothing here yet.",
+    layers: {
+      base: {
+        title: "Ally's base rules",
+        summary:
+          "Answer from your pages, say where each answer came from, never make things up, and say plainly when it doesn't know.",
+      },
+      safety: {
+        title: "Safety rules",
+        summary: "Always on for {pack}. Your own rules are added after Ally's.",
+      },
+      purpose: {
+        title: "What it's for",
+        summary: "Set by the purpose you chose: {purpose}. Change it by choosing another purpose.",
+      },
+      business: {
+        title: "Business details",
+        summary: "The name your assistant uses.",
+      },
+      tone: {
+        title: "Tone and style",
+        summary: "How it sounds.",
+      },
+      instructions: {
+        title: "Your instructions",
+        summary: "Anything else it should know or do. Safety and base rules always come first.",
+      },
+      avoid: {
+        title: "Topics to avoid",
+        summary: "Subjects it politely declines.",
+      },
+      search: {
+        title: "How it finds answers",
+        summary:
+          "Searches your pages up to {searches} times a question and uses the best {passages} parts it finds, from {documents} documents.",
+      },
+    },
+    packAny: "your kind of practice",
+    purposeNone: "answering questions",
+    instructionsLabel: "Anything else it should know or do",
+  },
+  why: {
+    toggle: "Why this answer?",
+    hide: "Hide",
+    passages: "Where it looked",
+    none: "It didn't use any of your pages for this.",
+    time: "{s} s to answer",
+    avoid: "Topics to avoid: {topic}",
+    declined: "It said it didn't know.",
+  },
+  seeAll: "See everything it follows",
 } as const;
 
 /** "{n} questions…" with its values. */

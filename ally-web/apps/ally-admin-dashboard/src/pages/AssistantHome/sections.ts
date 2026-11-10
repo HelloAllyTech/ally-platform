@@ -4,6 +4,8 @@ export const SECTION_IDS = [
   "knows",
   "personality",
   "safety",
+  // Chunk 20d-2: everything it follows, in the order it applies.
+  "how",
   "page",
   "checkup",
   "conversations",

@@ -6,14 +6,18 @@ import {
   useGetChangesQuery,
   useProposeChangeMutation,
   useUndoChangeMutation,
+  useRunCheckupMutation,
 } from "@api";
 import type { ChangeProposal } from "@api";
-import { AssistantLine, Button, Chip, PrimaryButton } from "@components/v2";
+import { AssistantLine, Button, Chip, PrimaryButton, Segmented } from "@components/v2";
 
+import { ChangeHistory } from "./ChangeHistory";
 import { HOME } from "./copy";
+import { Collapsed } from "./fields";
 import { COPY, fill } from "../Onboarding/copy";
 
 const t = COPY.change;
+const c = HOME.changeControls;
 
 /** A recent change as the owner reads it: ally-be records the fields changed ("tone, language"). */
 export const changeLabel = (summary: string): string =>
@@ -67,6 +71,9 @@ export const ChangePanel: React.FC<{
   const [apply, applying] = useApplyChangeMutation();
   const [undo, undoing] = useUndoChangeMutation();
   const history = useGetChangesQuery(botId);
+  const [tab, setTab] = useState<"change" | "history">("change");
+  const [applied, setApplied] = useState(false);
+  const [runCheckup] = useRunCheckupMutation();
 
   const ask = async (text: string) => {
     if (!text.trim()) return;
@@ -87,6 +94,7 @@ export const ChangePanel: React.FC<{
       const { eventId } = await apply({ id: botId, changes: proposal.changes }).unwrap();
       setProposal(null);
       setAsked(null);
+      setApplied(true);
       onApplied(() => void undo({ id: botId, eventId }).then(onUndone));
     } catch (err) {
       // A stale apply (409) carries the deck's own message from ally-be.
@@ -103,125 +111,170 @@ export const ChangePanel: React.FC<{
         <h2 className="ally-home__panel-title">{t.title}</h2>
         <Button onClick={onClose}>{HOME.tryPanel.close}</Button>
       </header>
+      <p className="ally-small ally-change__subtitle">{c.subtitle}</p>
+      <Segmented<"change" | "history">
+        label={t.title}
+        value={tab}
+        onChange={setTab}
+        options={[
+          { id: "change", label: c.tabs.change },
+          { id: "history", label: c.tabs.history },
+        ]}
+      />
 
-      <div className="ally-change__thread" aria-live="polite">
-        {!asked && canEdit && <AssistantLine>{t.intro}</AssistantLine>}
-        {asked && <p className="ally-change__ask">{asked}</p>}
-        {proposing.isLoading && <AssistantLine working>{COPY.working.thinking}</AssistantLine>}
-        {proposal?.refused && <AssistantLine>{proposal.message}</AssistantLine>}
-        {proposal && !proposal.refused && (
-          <section className="ally-card ally-change__proposal" data-testid="change-proposal">
-            {proposal.message && <p className="ally-body">{proposal.message}</p>}
-            {proposal.changes.length > 0 && (
-              <>
-                <h3 className="ally-heading">{t.proposal}</h3>
-                {proposal.changes.map(change => (
-                  <ChangeCard key={`${change.field}-${show(change.after)}`} change={change} />
+      {tab === "history" ? (
+        <ChangeHistory botId={botId} canEdit={canEdit} onChanged={onUndone} />
+      ) : (
+        <>
+          <div className="ally-change__limits">
+            <Collapsed summary={c.canTitle}>
+              <ul className="ally-small">
+                {c.can.map(item => (
+                  <li key={item}>{item}</li>
                 ))}
-                <div className="ally-btn-row">
-                  <PrimaryButton onClick={() => void applyIt()} disabled={applying.isLoading}>
-                    {t.apply}
-                  </PrimaryButton>
-                  <Button
-                    onClick={() => {
-                      setProposal(null);
-                      setAsked(null);
-                    }}
-                  >
-                    {t.notQuite}
-                  </Button>
-                </div>
-              </>
-            )}
-          </section>
-        )}
-        {error && (
-          <p className="ally-error" role="alert">
-            {error}
-          </p>
-        )}
-      </div>
-
-      {entries.length > 0 && (
-        <section className="ally-change__history">
-          <h3 className="ally-label">{t.history}</h3>
-          <ul>
-            {entries.map(entry => (
-              <li key={entry.id} className="ally-change__entry">
-                <span>{changeLabel(entry.summary)}</span>
-                {canEdit && !entry.undone && (
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      setConfirming({ id: entry.id, summary: changeLabel(entry.summary) })
-                    }
-                  >
-                    {t.undo}
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-          {confirming && (
-            <div className="ally-card ally-change__confirm" role="group">
-              <p className="ally-body">{fill(t.undoConfirm, { change: confirming.summary })}</p>
-              <div className="ally-btn-row">
-                <PrimaryButton
-                  disabled={undoing.isLoading}
-                  onClick={async () => {
-                    await undo({ id: botId, eventId: confirming.id });
-                    setConfirming(null);
-                    onUndone();
-                  }}
-                >
-                  {t.undo}
-                </PrimaryButton>
-                <Button onClick={() => setConfirming(null)}>{t.cancel}</Button>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {canEdit && (
-        <footer className="ally-change__compose">
-          <div className="ally-change__chips">
-            {t.examples.map(example => (
-              <Chip key={example} onToggle={() => void ask(example)}>
-                {example}
-              </Chip>
-            ))}
+              </ul>
+            </Collapsed>
+            <Collapsed summary={c.cantTitle}>
+              <ul className="ally-small">
+                {c.cant.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </Collapsed>
           </div>
-          <form
-            onSubmit={event => {
-              event.preventDefault();
-              void ask(request);
-            }}
-          >
-            <label className="sr-only" htmlFor="change-request">
-              {t.title}
-            </label>
-            <textarea
-              id="change-request"
-              className="ally-input"
-              rows={2}
-              placeholder={t.placeholder}
-              value={request}
-              maxLength={1000}
-              onChange={event => setRequest(event.target.value)}
-              onKeyDown={event => {
-                // Enter sends; Shift+Enter starts a new line.
-                if (event.key === "Enter" && !event.shiftKey) {
+
+          <div className="ally-change__thread" aria-live="polite">
+            {!asked && canEdit && <AssistantLine>{t.intro}</AssistantLine>}
+            {asked && <p className="ally-change__ask">{asked}</p>}
+            {proposing.isLoading && <AssistantLine working>{COPY.working.thinking}</AssistantLine>}
+            {proposal?.refused && <AssistantLine>{proposal.message}</AssistantLine>}
+            {proposal && !proposal.refused && (
+              <section className="ally-card ally-change__proposal" data-testid="change-proposal">
+                {proposal.message && <p className="ally-body">{proposal.message}</p>}
+                {proposal.changes.length > 0 && (
+                  <>
+                    <h3 className="ally-heading">{t.proposal}</h3>
+                    {proposal.changes.map(change => (
+                      <ChangeCard key={`${change.field}-${show(change.after)}`} change={change} />
+                    ))}
+                    <div className="ally-btn-row">
+                      <PrimaryButton onClick={() => void applyIt()} disabled={applying.isLoading}>
+                        {t.apply}
+                      </PrimaryButton>
+                      <Button
+                        onClick={() => {
+                          setProposal(null);
+                          setAsked(null);
+                        }}
+                      >
+                        {c.notThis}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
+            {error && (
+              <p className="ally-error" role="alert">
+                {error}
+              </p>
+            )}
+            {applied && (
+              <div
+                className="ally-note ally-checkup__banner"
+                role="status"
+                data-testid="change-applied"
+              >
+                <span>{c.afterApply}</span>
+                <Button className="ally-btn--sm" onClick={() => void runCheckup(botId)}>
+                  {c.runCheckup}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {entries.length > 0 && (
+            <section className="ally-change__history">
+              <h3 className="ally-label">{t.history}</h3>
+              <ul>
+                {entries.map(entry => (
+                  <li key={entry.id} className="ally-change__entry">
+                    <span>{changeLabel(entry.summary)}</span>
+                    {canEdit && !entry.undone && (
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
+                          setConfirming({ id: entry.id, summary: changeLabel(entry.summary) })
+                        }
+                      >
+                        {t.undo}
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {confirming && (
+                <div className="ally-card ally-change__confirm" role="group">
+                  <p className="ally-body">{fill(t.undoConfirm, { change: confirming.summary })}</p>
+                  <div className="ally-btn-row">
+                    <PrimaryButton
+                      disabled={undoing.isLoading}
+                      onClick={async () => {
+                        await undo({ id: botId, eventId: confirming.id });
+                        setConfirming(null);
+                        onUndone();
+                      }}
+                    >
+                      {t.undo}
+                    </PrimaryButton>
+                    <Button onClick={() => setConfirming(null)}>{t.cancel}</Button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {canEdit && (
+            <footer className="ally-change__compose">
+              <div className="ally-change__chips">
+                {t.examples.map(example => (
+                  <Chip key={example} onToggle={() => void ask(example)}>
+                    {example}
+                  </Chip>
+                ))}
+              </div>
+              <form
+                onSubmit={event => {
                   event.preventDefault();
                   void ask(request);
-                }
-              }}
-            />
-            <Button type="submit" disabled={!request.trim() || proposing.isLoading}>
-              {t.send}
-            </Button>
-          </form>
-        </footer>
+                }}
+              >
+                <label className="sr-only" htmlFor="change-request">
+                  {t.title}
+                </label>
+                <textarea
+                  id="change-request"
+                  className="ally-input"
+                  rows={2}
+                  placeholder={t.placeholder}
+                  value={request}
+                  maxLength={1000}
+                  onChange={event => setRequest(event.target.value)}
+                  onKeyDown={event => {
+                    // Enter sends; Shift+Enter starts a new line.
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void ask(request);
+                    }
+                  }}
+                />
+                <Button type="submit" disabled={!request.trim() || proposing.isLoading}>
+                  {t.send}
+                </Button>
+              </form>
+            </footer>
+          )}
+        </>
       )}
     </div>
   );

@@ -321,6 +321,48 @@ export class AssistantHomeController {
     return this.changes.undo(id, eventId);
   }
 
+  @Get(':id/how-it-works')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({
+    summary:
+      'Everything the assistant follows, in order, built by ally-ai from the request a run sends',
+  })
+  howItWorks(@Param('id', ParseUUIDPipe) id: string) {
+    return this.home.howItWorks(id);
+  }
+
+  @Get(':id/history')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({
+    summary:
+      'Every change: what, who, when, and from where (the Change panel or by hand)',
+  })
+  history(@Param('id', ParseUUIDPipe) id: string) {
+    return this.home.history(id);
+  }
+
+  @Post(':id/history/:eventId/undo')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Undo an edit made by hand (its before comes back)',
+  })
+  undoEdit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('eventId', ParseUUIDPipe) eventId: string,
+  ) {
+    return this.home.revertEdit(id, eventId, 'before');
+  }
+
+  @Post(':id/history/:eventId/restore')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({ summary: 'Restore what a field said after an earlier edit' })
+  restoreEdit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('eventId', ParseUUIDPipe) eventId: string,
+  ) {
+    return this.home.revertEdit(id, eventId, 'after');
+  }
+
   @Get(':id/home')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({

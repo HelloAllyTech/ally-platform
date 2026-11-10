@@ -9,7 +9,11 @@ import { In, IsNull, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
-import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
+import type {
+  AgentRunRequest,
+  AgentTraceStep,
+  AgentTurnType,
+} from '../../ai/dto/knowledge.dto';
 import {
   CreateKbOwnedDocumentDto,
   CreateKbUploadUrlDto,
@@ -725,6 +729,33 @@ export class ChatbotService {
    * the run's status, steps and checked text are sent as they happen; the result is the same
    * either way, and it is what the streamed route sends as `final`.
    */
+  /**
+   * What a v2 answer from this assistant would send to `/agent/run`, for the owner's "How it
+   * works" (chunk 20d-2): the same Preview turn `test` builds, without a message, through the
+   * engine's own request builder. Nothing is answered, stored or sent.
+   */
+  async agentRequestFor(id: string): Promise<AgentRunRequest> {
+    const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
+    const bot: Chatbot = { ...chatbot, accessMode: ChatbotAccessMode.ANYONE };
+    const settings = await this.settingsService.getForChatbot(bot);
+    return this.engine.agentRequestFor({
+      chatbot: bot,
+      settings,
+      // ally-ai shows its own placeholder where the visitor's message goes.
+      text: "(the visitor's message)",
+      history: [],
+      isFirstMessage: false,
+      sender: {
+        externalId: `how-it-works:${currentUserId()}`,
+        label: 'how it works',
+        userId: currentUserId() || null,
+        email: null,
+        tenantId: null,
+      },
+      channel: PREVIEW_CHANNEL,
+    });
+  }
+
   async test(
     id: string,
     dto: TestChatbotDto,
