@@ -97,6 +97,15 @@ vi.mock("@components", () => ({
   UserModal: () => null,
 }));
 
+// The quick actions have their own suites (speech, drafts API, colour mode); here we only need to
+// know the primary nav carries them.
+vi.mock("@components/idea-capture/IdeaCapture", () => ({
+  IdeaCaptureLauncher: () => <button data-testid="idea-capture-button" />,
+}));
+vi.mock("@components/color-mode-toggle/ColorModeToggle", () => ({
+  ColorModeToggle: () => <button data-testid="color-mode-toggle" />,
+}));
+
 vi.mock("@constants", () => ({
   ReportGenerationStatus: {
     STARTED: "STARTED",
@@ -205,6 +214,20 @@ describe("Sidebar", () => {
     // After collapse, text should be hidden and only title remains
     expect(screen.queryByText("Simulation Studio")).not.toBeInTheDocument();
     expect(screen.getByTitle("Simulation Studio")).toBeInTheDocument();
+  });
+
+  it("carries the idea mic and light/dark switch in the primary nav, expanded or collapsed", () => {
+    renderWithProvider(<Sidebar />);
+    const sidebar = screen.getByTestId("admin-sidebar");
+    const actions = screen.getByTestId("sidebar-quick-actions");
+    expect(sidebar).toContainElement(actions);
+    expect(actions).toContainElement(screen.getByTestId("idea-capture-button"));
+    expect(actions).toContainElement(screen.getByTestId("color-mode-toggle"));
+    expect(actions).toHaveClass("flex-row");
+
+    fireEvent.click(screen.getByTitle("Collapse sidebar"));
+    expect(screen.getByTestId("sidebar-quick-actions")).toHaveClass("flex-col");
+    expect(screen.getByTestId("color-mode-toggle")).toBeInTheDocument();
   });
 
   it("opens user menu and logs out when expanded", () => {

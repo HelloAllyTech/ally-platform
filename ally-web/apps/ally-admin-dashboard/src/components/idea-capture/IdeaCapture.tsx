@@ -547,7 +547,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
 
   return (
     <>
-      <Tooltip label="Say an idea" align="bottom">
+      <Tooltip label="Say an idea" align="right">
         <button
           ref={buttonRef}
           type="button"
