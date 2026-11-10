@@ -5,6 +5,8 @@ export interface ScenarioDetailsCardProps {
   difficultyLevel?: string;
   isStarting: boolean;
   longDescription?: string;
+  /** Narration of the description; the listen button shows only when present. */
+  descriptionAudioUrl?: string | null;
   /** Time limit as "HH:MM:SS" (set only for timed scenarios); rendered as a duration chip. */
   maxTimeValue?: string;
   onStart: () => void;

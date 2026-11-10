@@ -2077,6 +2077,12 @@
     "learnIntro": "Use <blue>AI-voice based</blue> real-world practice <blue>situation</blue> to build mental health skills.",
     "scenariosCaps": "SCENARIOS",
     "scenarioLabel": "Situation",
+    "narration": {
+      "listen": "Listen to description",
+      "pause": "Pause",
+      "resume": "Resume",
+      "error": "Audio couldn't be played. You can still read the description."
+    },
     "start": "Start",
     "continue": "Continue",
     "simulation": "Role-play",

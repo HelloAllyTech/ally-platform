@@ -9,6 +9,7 @@ import { ShareIcon, TickGreenBackground, TimerIcon } from "@assets";
 import { AppTooltip, Button, Chip, ConfirmationDialog, ButtonVariant } from "@components";
 import { TooltipLocation } from "@constants";
 
+import { DescriptionNarrationButton } from "../description-narration";
 import { ScenarioDetailsCardProps } from "./types";
 
 /** Sentence-case labels for the backend ScenarioDifficultyLevel enum (EASY/MEDIUM/HARD). */
@@ -55,6 +56,7 @@ const ScenarioDetailsCard: FC<ScenarioDetailsCardProps> = ({
   difficultyLevel,
   isStarting,
   longDescription,
+  descriptionAudioUrl,
   maxTimeValue,
   onStart,
   title,
@@ -222,6 +224,11 @@ const ScenarioDetailsCard: FC<ScenarioDetailsCardProps> = ({
                 <div className="text-base font-semibold text-typography-900">
                   {t("learn.scenario.scenarioLabel")}
                 </div>
+                {descriptionAudioUrl && (
+                  <div className="my-2">
+                    <DescriptionNarrationButton audioUrl={descriptionAudioUrl} />
+                  </div>
+                )}
                 <RichTextRenderer content={longDescription} />
               </div>
             )}

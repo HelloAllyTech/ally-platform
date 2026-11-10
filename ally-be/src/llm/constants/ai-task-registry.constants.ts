@@ -1005,6 +1005,24 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'DEBRIEF_READ_ALOUD_VOICE in debrief-audio.service.ts',
   },
   {
+    id: 'scenario-description-narration',
+    task: LlmTask.SCENARIO_DESCRIPTION_NARRATION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'An author publishes a role-play, or edits the description of a published one; also the ' +
+      'backfill script and the retry sweep for a failed attempt',
+    detail:
+      'Speech of the role-play description, one standard narrator voice per language, made in ' +
+      'the background and stored in the assets bucket. Skipped when the text, voice and language ' +
+      'match the stored audio, so a re-save makes no TTS call. Failures retry up to 3 times ' +
+      'over about an hour and never block the save.',
+    kind: AiTaskKind.SPEECH,
+    provider: 'sarvam',
+    defaultModel: 'bulbul:v3',
+    configuredBy:
+      'SCENARIO_NARRATION_VOICE in scenario-description-audio.service.ts',
+  },
+  {
     id: 'debrief-reflection-check',
     task: LlmTask.DEBRIEF_REFLECTION_CHECK,
     runtime: LlmRuntime.ALLY_BE,
