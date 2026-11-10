@@ -13,6 +13,7 @@ import {
   usePatchBuilderPrdMutation,
   useDismissBuilderReviewFindingMutation,
   useStartBuilderBuildMutation,
+  useUpdateBuilderSessionMutation,
 } from "@api";
 import type { AgentAnswerPayload } from "@components/agent-chat";
 import {
@@ -184,6 +185,8 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
     }
   }, [sessionStatus, sessionId, refetchRuns, refetchMilestones]);
   const [startBuild, { isLoading: isContinuing }] = useStartBuilderBuildMutation();
+  const [updateSession] = useUpdateBuilderSessionMutation();
+  const [isDirectStarting, setIsDirectStarting] = useState(false);
   const [patchPrd] = usePatchBuilderPrdMutation();
   const [dismissReviewFinding] = useDismissBuilderReviewFindingMutation();
   const [cancelSession, { isLoading: isCancelling }] = useCancelBuilderSessionMutation();
@@ -447,6 +450,52 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
     locked: PRD_FROZEN.includes(effectiveStatus),
   };
   const designSection = <TechnicalDesignPanel {...designPanelProps} />;
+  // The PRD already names every repo its technical plan touches, so asking
+  // again is asking a question we answered during the interview — and the
+  // wrong answer is worse than a slow one: a build that cannot touch the repo
+  // it planned changes for fails late. The session's own repos win when set.
+  const plannedRepos = session.repos?.length
+    ? session.repos
+    : (prd.technicalPlan?.repos ?? [])
+        .map(plan => plan.repo)
+        .filter((repo): repo is string => Boolean(repo));
+
+  /**
+   * Start (or retry) straight away when there is nothing to ask: the repos are
+   * known, the PRD is ready and the design does not block. The dialog is kept
+   * for the cases that genuinely need a person — no repos to build, a PRD
+   * with open sections ("start anyway?"), or a design to approve first. A
+   * retry's failure is already pinned under the page header, so the dialog
+   * would only repeat it.
+   */
+  const requestStart = async () => {
+    if (plannedRepos.length === 0 || !readiness.ready || designBlock) {
+      setShowStartDialog(true);
+      return;
+    }
+    setIsDirectStarting(true);
+    try {
+      if (!session.repos?.length) {
+        try {
+          await updateSession({ id: sessionId, repos: plannedRepos }).unwrap();
+        } catch {
+          toast.error(en.builder.startBuildDialog.saveReposFailed);
+          return;
+        }
+      }
+      await startBuild({ id: sessionId }).unwrap();
+      setStatus("BUILDING");
+    } catch (error) {
+      // The backend refusals each name which control stopped the build — the
+      // kill switch, the concurrency ceiling, the budget.
+      const message =
+        (error as { data?: { message?: string } })?.data?.message ?? en.builder.build.startFailed;
+      toast.error(message);
+    } finally {
+      setIsDirectStarting(false);
+    }
+  };
+
   const handleReviewDesign = () => {
     setShowStartDialog(false);
     setFocusDesign(true);
@@ -460,8 +509,8 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
       className="w-full max-lg:!w-full max-lg:!max-w-none"
       // Terminal blocks a fresh start, except the states a person would
       // obviously want to build again from — see RESTARTABLE.
-      disabled={isTerminal && !canRestart}
-      onClick={() => setShowStartDialog(true)}
+      disabled={(isTerminal && !canRestart) || isDirectStarting}
+      onClick={() => void requestStart()}
     >
       {effectiveStatus === "FAILED"
         ? strings.retryBuild
@@ -510,7 +559,12 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
               {strings.continueChain(continueRepo)}
             </Button>
           ) : canRestart ? (
-            <Button kind="primary" size="sm" onClick={() => setShowStartDialog(true)}>
+            <Button
+              kind="primary"
+              size="sm"
+              disabled={isDirectStarting}
+              onClick={() => void requestStart()}
+            >
               {strings.retryBuild}
             </Button>
           ) : (
@@ -688,19 +742,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
         isOpen={showStartDialog}
         onClose={() => setShowStartDialog(false)}
         sessionId={sessionId}
-        // The PRD already names every repo its technical plan touches, so
-        // asking again is asking a question we answered during the interview —
-        // and the wrong answer is worse than a slow one: a build that cannot
-        // touch the repo it planned changes for fails late, after paying for a
-        // plan and a coding pass. Still a selection, not a lock: the session's
-        // own repos win when set, and the dialog remains editable.
-        currentRepos={
-          session.repos?.length
-            ? session.repos
-            : (prd?.technicalPlan?.repos ?? [])
-                .map(plan => plan.repo)
-                .filter((repo): repo is string => Boolean(repo))
-        }
+        currentRepos={plannedRepos}
         readiness={readiness}
         retryError={retryError}
         designBlock={designBlock}
