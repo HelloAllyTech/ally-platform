@@ -8,8 +8,8 @@ import * as path from 'path';
  * surfaces in the production deploy, after the new containers are already up.
  *
  * It has happened twice (the PARENT_COURSE seed on 2026-11-05, and the Context Library passage
- * copy in be-v1.180.0, which took the API down). Helpers belong in a file without a numeric
- * prefix, which the glob skips.
+ * copy in be-v1.180.0, which took the API down). Helpers belong outside `migrations/`, in
+ * `../migration-helpers/` or `../seed-data/`.
  */
 describe('migration exports', () => {
   const dir = __dirname;

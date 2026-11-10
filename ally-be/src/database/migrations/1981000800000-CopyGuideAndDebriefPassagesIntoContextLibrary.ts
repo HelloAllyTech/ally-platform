@@ -6,7 +6,7 @@ import {
   headingFor,
   tagOf,
   withoutByline,
-} from './context-library-passages.helpers';
+} from '../migration-helpers/context-library-passages.helpers';
 
 /**
  * Context Library, phase 6 (docs/context-library/PLAN.md §6.5): import the Ally guide's library
@@ -45,8 +45,9 @@ import {
  * and one Restore away, but not suddenly served to learners because the gate was retired.
  *
  * Self-contained SQL and string handling, no application imports, so it keeps meaning what it
- * meant when it ran. The string helpers live in `./context-library-passages.helpers`: TypeORM
- * calls `new` on every function a migration file exports, so an exported arrow function here
+ * meant when it ran. The string helpers live in
+ * `../migration-helpers/context-library-passages.helpers`: TypeORM calls `new` on every function a
+ * migration file exports, so an exported arrow function here
  * crashes `migration:run` before any migration loads.
  */
 interface CorpusCopy {

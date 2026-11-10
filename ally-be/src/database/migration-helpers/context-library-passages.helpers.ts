@@ -3,8 +3,8 @@
  *
  * Kept out of the migration file on purpose: TypeORM instantiates every function a migration file
  * exports, and an arrow function is not a constructor, so exporting these from the migration made
- * `migration:run` throw "someClass is not a constructor" before running anything. This file has no
- * numeric prefix, so the `[0-9]*.js` migrations glob never loads it.
+ * `migration:run` throw "someClass is not a constructor" before running anything. It sits outside
+ * `migrations/` because `migration-timestamps.spec.ts` requires every file there to be a migration.
  */
 export const PASSAGE_SYNC_PREFIX = 'kb_document_chunks:';
 

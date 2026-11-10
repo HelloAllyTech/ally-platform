@@ -1,7 +1,7 @@
 import { QueryRunner } from 'typeorm';
 import { AddAllyGuideAndDebriefCollections1981000700000 } from './1981000700000-AddAllyGuideAndDebriefCollections';
 import { CopyGuideAndDebriefPassagesIntoContextLibrary1981000800000 } from './1981000800000-CopyGuideAndDebriefPassagesIntoContextLibrary';
-import { headingFor, withoutByline } from './context-library-passages.helpers';
+import { headingFor, withoutByline } from '../migration-helpers/context-library-passages.helpers';
 import { DropKbDocumentClinicalSignOff1981000900000 } from './1981000900000-DropKbDocumentClinicalSignOff';
 
 const at = new Date('2026-10-01T00:00:00Z');
