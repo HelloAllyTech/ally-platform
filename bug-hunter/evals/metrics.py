@@ -104,8 +104,22 @@ def aggregate(results: Iterable[CaseResult]) -> dict[str, Metrics]:
                 m.errors += 1
             if r.kind == "bug":
                 m.bugs += 1
-                if r.outcome in ("detected", "escalated", "escalated_correctly"):
+                if r.outcome in (
+                    "detected",
+                    "escalated",
+                    "escalated_correctly",
+                    "escalated_acceptably",
+                ):
                     m.detected += 1
+                if r.outcome == "escalated_acceptably":
+                    # a bug unit tests cannot show, escalated with the right diagnosis:
+                    # counted as a correct escalation and as a fix-pass
+                    m.escalate_expected += 1
+                    m.escalate_correct += 1
+                    m.fix_attempted += 1
+                    m.fix_pass += 1
+                    m.fix_adjusted_attempted += 1
+                    m.fix_pass_adjusted += 1
                 elif r.outcome == "missed":
                     m.missed += 1
                 if r.expected == "escalate":

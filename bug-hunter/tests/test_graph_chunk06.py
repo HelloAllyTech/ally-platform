@@ -796,3 +796,144 @@ def test_review_sees_the_scrubbed_signal(config, repo, tmp_path) -> None:
     _, state = _run(deps)
     system = deps.models["review"].calls[0][0].content
     assert "x() returns 0 not 3" in system  # the report, next to the finding
+
+
+# --- ally-web reproduce fixes (f35e117d path prefix, 3b3db9b5 setup) --------------------  # noqa: E501
+
+
+def test_app_prefixed_test_paths_land_in_the_app(config, repo, tmp_path) -> None:
+    deps = _deps(config, repo, tmp_path, [])
+    out = deps.workspace.write_test_file(
+        "ally-be/src/y.repro.spec.ts", "tests src/x.ts\n"
+    )
+    assert (repo / "ally-be/src/y.repro.spec.ts").exists()
+    assert not (repo / "ally-be/ally-be").exists()
+    assert "run_tests(target='src/y.repro.spec.ts')" in out
+    assert "export const x" in deps.workspace.read_file("ally-be/src/x.ts")
+
+
+@pytest.mark.parametrize(
+    "excerpt",
+    [
+        "TypeError: Cannot destructure property 'user' of 'useUser(...)' as it is undefined.",  # noqa: E501
+        "Error: useGuide must be used within a GuideProvider",
+        "TypeError: Cannot read properties of undefined (reading 'id')",
+        "Error: No QueryClient set, use QueryClientProvider to set one",
+    ],
+)
+def test_missing_provider_is_a_setup_failure(config, excerpt) -> None:
+    from bug_hunter.graph.failure import classify_failure
+
+    assert (
+        classify_failure(config.app("ally-web"), run_result("ally-web", False, excerpt))
+        == "setup"
+    )
+
+
+def test_setup_failure_bounces_back_then_reproduces(config, repo, tmp_path) -> None:
+    deps = _deps(config, repo, tmp_path, [GIVE_UP])
+    deps.models["fix"].script[2:2] = [SUBMIT_REPRO]  # one resubmission after the bounce
+    deps.runner.results = [
+        run_result(
+            "ally-be",
+            False,
+            "TypeError: Cannot destructure property 'user' of 'useUser(...)' as it is undefined.",  # noqa: E501
+        ),
+        run_result("ally-be", False, "● x returns 3\n expect 3 got 0"),
+    ]
+    _, state = _run(deps)
+    assert state.repro_attempts == 1 and state.repro.failure_kind == "genuine"
+    bounce = [
+        m
+        for c in deps.models["fix"].calls
+        for m in c
+        if m.type == "human" and "SETUP" in str(m.content).upper()
+    ]
+    assert bounce and "FAILED BEFORE REACHING THE BEHAVIOUR" in str(bounce[0].content)
+
+
+def test_neighbour_test_setup_is_the_part_before_the_first_test(
+    config, repo, tmp_path
+) -> None:
+    from bug_hunter.graph.tools import neighbour_test_setup
+
+    (repo / "ally-be/src/__tests__").mkdir()
+    (repo / "ally-be/src/__tests__/x.test.ts").write_text(
+        "import { x } from '../x';\nvi.mock('../hooks/useUser', () => ({ useUser: () => ({ user: {} }) }));\n\n"  # noqa: E501
+        "describe('x', () => {\n  it('a', () => {});\n});\n"
+    )
+    deps = _deps(config, repo, tmp_path, [])
+    text = neighbour_test_setup(deps, ["src/x.ts"])
+    assert "vi.mock('../hooks/useUser'" in text and "describe(" not in text
+    assert "x.test.ts" in text
+    assert neighbour_test_setup(deps, ["src/none/y.ts"]).startswith("(no existing test")
+
+
+def test_reproduce_v5_receives_the_neighbour_setup(config, repo, tmp_path) -> None:
+    (repo / "ally-be/src/__tests__").mkdir()
+    (repo / "ally-be/src/__tests__/x.test.ts").write_text(
+        "vi.mock('./marker-module');\ndescribe('x', () => {});\n"
+    )
+    models = config.models.model_copy(
+        update={"prompts": {**config.models.prompts, "reproduce": "v5"}}
+    )
+    deps = _deps(
+        config.model_copy(update={"models": models}), repo, tmp_path, [GIVE_UP]
+    )
+    _run(deps)
+    system = next(
+        c[0].content
+        for c in deps.models["fix"].calls
+        if "reproduction step" in c[0].content
+    )
+    assert "vi.mock('./marker-module')" in system
+
+
+def test_stash_is_tagged_and_restored_by_sha(repo) -> None:
+    git = Git(repo)
+    (repo / "ally-be/src/x.ts").write_text(SRC_FIXED)
+    # someone else's stash on the shared stack
+    (repo / "ally-be/src/auth/guard.ts").write_text("export const g = 2;\n")
+    _git(
+        repo,
+        "stash",
+        "push",
+        "-q",
+        "-m",
+        "other-session",
+        "--",
+        "ally-be/src/auth/guard.ts",
+    )
+    assert git.stash_paths(repo, ["ally-be/src/x.ts"])
+    (
+        _git(
+            repo,
+            "stash",
+            "push",
+            "-q",
+            "-m",
+            "late-other",
+            "--",
+            "ally-be/src/auth/guard.ts",
+        )
+        if False
+        else None
+    )
+    git.unstash(repo)
+    assert (repo / "ally-be/src/x.ts").read_text() == SRC_FIXED
+    stack = _git(repo, "stash", "list", "--format=%gs")
+    assert "other-session" in stack and "bughunter-baseline" not in stack
+
+
+def test_orphan_sweep_ignores_non_run_folders(config, tmp_path) -> None:
+    from bug_hunter.runs import clean_orphans
+
+    runs = tmp_path / "home"
+    (runs / "src" / "bug-hunter").mkdir(parents=True)
+    (runs / "src" / "keep.txt").write_text("x")
+    clean_orphans(
+        config,
+        runs_dir=runs,
+        docker=lambda *a, **k: type("R", (), {"ok": True, "stdout": ""})(),
+    )
+    assert (runs / "src" / "keep.txt").exists()

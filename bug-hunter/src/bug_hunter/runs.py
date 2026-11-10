@@ -244,6 +244,9 @@ def clean_orphans(
         for entry in sorted(runs_dir.iterdir()):
             if not entry.is_dir() or entry.name in ("artefacts", "cache"):
                 continue
+            # only run folders: BUGHUNTER_HOME may hold other things, never sweep them
+            if not (entry / OWNER_FILE).exists() and not entry.name.startswith("run-"):
+                continue
             if _owner_alive(entry):
                 skipped_live.append(entry.name)
                 continue  # another process is still running this one

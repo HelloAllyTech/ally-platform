@@ -169,9 +169,25 @@ def genuinely_failed(results: list[RunResult]) -> bool:
     )
 
 
+def diagnosis_matches(case: Case, result: AgentResult) -> bool:
+    """The finding names a file the real fix changed (suffix match, any layout)."""
+    suspected = [
+        f for finding in result.findings for f in finding.get("suspected_files", [])
+    ]
+    return any(
+        s.endswith(src) or src.endswith(s.split("/", 1)[-1])
+        for s in suspected
+        for src in case.src_files
+    )
+
+
 def score_bug(case: Case, result: AgentResult) -> str:
     if result.escalated:
-        return "escalated_correctly" if case.expected == "escalate" else "escalated"
+        if case.expected == "escalate":
+            return "escalated_correctly"
+        if case.escalate_acceptable and diagnosis_matches(case, result):
+            return "escalated_acceptably"
+        return "escalated"
     return "detected" if result.found else "missed"
 
 

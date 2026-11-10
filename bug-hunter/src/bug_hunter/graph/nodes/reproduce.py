@@ -19,8 +19,9 @@ from bug_hunter.graph.loop import LoopState, ToolLoop, initial_messages, run_loo
 from bug_hunter.graph.nodes.common import charge_all, node_context, over_budget
 from bug_hunter.graph.prompts import load_prompt
 from bug_hunter.graph.state import BugState, Repro
-from bug_hunter.graph.tools import outline_first_read_tools
+from bug_hunter.graph.tools import neighbour_test_setup, outline_first_read_tools
 from bug_hunter.graph.verify import hashes_for
+from bug_hunter.safety.phi import scrub_code
 from bug_hunter.tools.lc import RunTestsArgs, WriteTestFileArgs
 from bug_hunter.tools.runner import RunResult, single_test_command
 
@@ -147,12 +148,17 @@ def make_reproduce_node(deps: GraphDeps):
             return stop
         assert state.finding is not None
         ctx = node_context(deps, "reproduce", state)
-        system = prompt.render(
+        values = dict(
             context=ctx.render(),
             app=state.app or deps.app,
             test_dirs=", ".join(app_config.test_dirs) or "(see app context)",
             test_command=app_config.test_one or app_config.test,
         )
+        if "neighbour_setup" in prompt.inputs:  # reproduce.v5+
+            values["neighbour_setup"] = scrub_code(
+                neighbour_test_setup(deps, state.finding.suspected_files)
+            )
+        system = prompt.render(**values)
         user = (
             "Write one minimal test that fails because of the finding above, run it "
             "with run_tests, then finish with submit_repro (or cannot_reproduce)."
@@ -184,7 +190,7 @@ def make_reproduce_node(deps: GraphDeps):
             deps.ensure_sandbox()
             run_result = deps.runner.run_tests(claim["test_path"], claim["test_name"])
             kind = classify_failure(app_config, run_result)
-            if kind not in ("passed", "no_tests") or attempts >= max_attempts:
+            if kind not in ("passed", "no_tests", "setup") or attempts >= max_attempts:
                 break
             # the claim did not hold: the test passed on the buggy code, or no test
             # ran. Send the agent back with the output; this is an attempt, not a
@@ -203,8 +209,15 @@ def make_reproduce_node(deps: GraphDeps):
                     "so it fails because of the hypothesised defect, run it, and "
                     "submit again; or finish with cannot_reproduce."
                     if kind == "passed"
-                    else "ran NO TEST (wrong path or name filter). Check the file path "
-                    "and the exact test name, run it again, and submit again."
+                    else (
+                        "FAILED BEFORE REACHING THE BEHAVIOUR: a setup problem "
+                        "(missing "
+                        "provider, context, mock or import). Compare with the existing "
+                        "tests' setup, fix the test, run it, and submit again."
+                        if kind == "setup"
+                        else "ran NO TEST (wrong path or name filter). Check the file "
+                        "path and the exact test name, run it again, and submit again."
+                    )
                 )
                 + f" (attempt {attempts} of {max_attempts})\n\nOutput:\n"
                 + (run_result.excerpt or "")[-EXCERPT_MAX:]

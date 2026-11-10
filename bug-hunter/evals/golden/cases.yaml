@@ -31,6 +31,7 @@ cases:
   introduced_by: 8821e5215782e44b07b664de41a450f4f5f60dc9
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -58,6 +59,7 @@ cases:
   introduced_by: 168f627a948f433b6054f8133e036738b40414ec
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -84,6 +86,7 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -112,6 +115,7 @@ cases:
   introduced_by: 099de82c1f76fd6f6fb4d8baa5f44f6098fa80ca
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -139,6 +143,7 @@ cases:
   introduced_by: a981059deb98b7f8bca10f0ab629e885116b3995
   status: active
   oracle_shape: true
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -165,6 +170,7 @@ cases:
   introduced_by: 2c2c378e8a99f1623e409d0667a601f89c2abc3a
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -192,6 +198,7 @@ cases:
   introduced_by: 88fd1da22fc0b732d3e4245d5edff4e735e48915
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -219,6 +226,7 @@ cases:
   introduced_by: bf5dcf9699ad683933b485454cc7935963098bcd
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -246,6 +254,7 @@ cases:
   introduced_by: f6ed605a08945f1cba2b09824b2bbbd0b99f75ec
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -275,6 +284,7 @@ cases:
   introduced_by: 2cff91d1026a17c5f4be4757c2c22e228fc61de7
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -303,9 +313,11 @@ cases:
   introduced_by: 5519e5891bad9218e07be097fd11d4bf547df61b
   status: active
   oracle_shape: false
+  escalate_acceptable: true
   human_fix_pass: {}
   dispute_note: ''
-  tags: []
+  tags:
+  - runtime-dependency-clash
 - id: ally-web-3b3db9b5
   kind: bug
   app: ally-web
@@ -335,6 +347,7 @@ cases:
   introduced_by: ec3e51c60e2f4ea8a92f66a3980971ac7f27ffe1
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -362,6 +375,7 @@ cases:
   introduced_by: 48363e1467d348a6a2bf5b706fdb484e1d9021f2
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -387,6 +401,7 @@ cases:
   introduced_by: cfda686b2dd052cc3e2464254b2bd0643ef5032a
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -414,6 +429,7 @@ cases:
   introduced_by: a3bc5e6939b582207484eba1f8d57a4e9d88dcf6
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -440,6 +456,7 @@ cases:
   introduced_by: 71ddf4d76520a6b90213d046c238b9ccefbdee3a
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -468,6 +485,7 @@ cases:
   introduced_by: 51ac5ac4d3a9307454188f123e87829405b4186b
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -500,6 +518,7 @@ cases:
   introduced_by: d4ae9ebdf5157a7119c5003c0778cc1d37d99dd0
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -526,6 +545,7 @@ cases:
   src_lines: 33
   status: disputed
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: '2026-11-09: labelled clean (feat: challenge_description field), but two sweep runs of
     graph v1/v2 produced concrete findings on it: (1) prompt text says ''Supportive engagement'' while
@@ -558,6 +578,7 @@ cases:
   src_lines: 75
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -580,6 +601,7 @@ cases:
   src_lines: 29
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -602,6 +624,7 @@ cases:
   src_lines: 10
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -625,6 +648,7 @@ cases:
   src_lines: 39
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -648,6 +672,7 @@ cases:
   src_lines: 91
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -670,6 +695,7 @@ cases:
   src_lines: 47
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -693,6 +719,7 @@ cases:
   src_lines: 30
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -715,6 +742,7 @@ cases:
   src_lines: 42
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -738,6 +766,7 @@ cases:
   src_lines: 33
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -761,6 +790,7 @@ cases:
   src_lines: 28
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -784,6 +814,7 @@ cases:
   src_lines: 37
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -808,6 +839,7 @@ cases:
   src_lines: 39
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -831,6 +863,7 @@ cases:
   src_lines: 39
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -853,6 +886,7 @@ cases:
   src_lines: 41
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -876,6 +910,7 @@ cases:
   src_lines: 41
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -898,6 +933,7 @@ cases:
   src_lines: 41
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -921,6 +957,7 @@ cases:
   src_lines: 40
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -944,6 +981,7 @@ cases:
   src_lines: 39
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -970,6 +1008,7 @@ cases:
   src_lines: 39
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -993,6 +1032,7 @@ cases:
   src_lines: 40
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1016,6 +1056,7 @@ cases:
   src_lines: 42
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1040,6 +1081,7 @@ cases:
   src_lines: 42
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1064,6 +1106,7 @@ cases:
   src_lines: 42
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1089,6 +1132,7 @@ cases:
   src_lines: 40
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1113,6 +1157,7 @@ cases:
   src_lines: 42
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1136,6 +1181,7 @@ cases:
   src_lines: 37
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1159,6 +1205,7 @@ cases:
   src_lines: 37
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1186,6 +1233,7 @@ cases:
   introduced_by: 06f1157e49daa64b25e1105fef256ecc3533739a
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1218,6 +1266,7 @@ cases:
   introduced_by: 122a80cbcae35f1abeaad6dac4d5f44f08c1892
   status: active
   oracle_shape: false
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []
@@ -1247,6 +1296,7 @@ cases:
   introduced_by: 25d665f80251fce1e5a798533a82d3c2f637b422
   status: active
   oracle_shape: true
+  escalate_acceptable: false
   human_fix_pass: {}
   dispute_note: ''
   tags: []

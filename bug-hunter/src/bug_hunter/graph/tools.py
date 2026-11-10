@@ -176,3 +176,54 @@ def lint_tool(deps: GraphDeps) -> StructuredTool:
         description="Run the app's lint in the sandbox (slow; once the repro passes).",
         args_schema=NoArgs,
     )
+
+
+_TEST_START = re.compile(
+    r"^\s*(?:describe|it|test|xit|xdescribe)(?:\.each)?\s*\("
+    r"|^\s*def test_|^\s*class Test"
+    r"|^\s*void main\s*\(|^\s*group\s*\(|^\s*testWidgets\s*\(",
+)
+TEMPLATE_MAX_LINES = 80
+
+
+def neighbour_test_setup(deps: GraphDeps, suspected: list[str]) -> str:
+    """The setup of the closest existing test for the suspected files: everything
+    before the first test (imports, ``vi.mock``/``jest.mock``, fixtures, helpers),
+    capped. A starting template for the repro; most failed repros were setup."""
+    candidates: list[str] = []
+    for file in suspected:
+        rel = str(file)
+        app_prefix = deps.config.app(deps.app).path + "/"
+        if rel.startswith(app_prefix):
+            rel = rel[len(app_prefix) :]
+        if deps.repo_map is not None:
+            candidates += deps.repo_map.tests_for(rel)
+        folder = (deps.app_root / rel).parent
+        for sub in (folder / "__tests__", folder / "test", folder):
+            if sub.is_dir():
+                for path in sorted(sub.iterdir()):
+                    name = path.name
+                    if (
+                        re.search(
+                            r"(\.spec|\.test)\.[jt]sx?$|^test_.*\.py$|_test\.dart$",
+                            name,
+                        )
+                        and "repro" not in name
+                    ):
+                        candidates.append(str(path.relative_to(deps.app_root)))
+    for rel in dict.fromkeys(candidates):
+        path = deps.app_root / rel
+        if not path.is_file():
+            continue
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        head: list[str] = []
+        for line in lines:
+            if _TEST_START.match(line):
+                break
+            head.append(line)
+        head = head[:TEMPLATE_MAX_LINES]
+        if any(line.strip() for line in head):
+            return f"From `{rel}` (everything before its first test):\n\n" + "\n".join(
+                head
+            )
+    return "(no existing test found next to the suspected files)"

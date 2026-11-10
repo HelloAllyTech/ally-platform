@@ -67,11 +67,24 @@ class Workspace:
 
     # --- helpers ---------------------------------------------------------------------
 
+    def _strip_app_prefix(self, raw: Path) -> Path:
+        """``ally-web/apps/x`` → ``apps/x``: agents often prefix the app's own folder.
+        Without this a new file landed at ``ally-web/ally-web/apps/x`` and no test
+        runner ever found it (ally-web-f35e117d)."""
+        app_rel = self.policy.app_path_of(self.app)
+        if not app_rel:
+            return raw
+        prefix = Path(app_rel).parts
+        if raw.parts[: len(prefix)] == prefix and not (self.app_dir / raw).exists():
+            return Path(*raw.parts[len(prefix) :])
+        return raw
+
     def _abs(self, path: str) -> Path:
         """Resolve an agent path: app-relative first, then worktree-relative."""
         raw = Path(path)
         if raw.is_absolute():
             return self.policy.resolve(raw)
+        raw = self._strip_app_prefix(raw)
         app_candidate = self.app_dir / raw
         if app_candidate.exists() or not (self.worktree / raw).exists():
             return self.policy.resolve(app_candidate)
@@ -245,6 +258,8 @@ class Workspace:
 
     def write_test_file(self, path: str, content: str) -> str:
         raw = Path(path)
+        if not raw.is_absolute():
+            raw = self._strip_app_prefix(raw)
         target = self.policy.resolve(raw if raw.is_absolute() else self.app_dir / raw)
         if target.exists():
             raise FsError(f"{path}: exists; write_test_file never overwrites")
@@ -256,4 +271,8 @@ class Workspace:
             )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
-        return f"wrote {self._display(target)} ({len(content.splitlines())} lines)"
+        shown = self._display(target)
+        return (
+            f"wrote {shown} ({len(content.splitlines())} lines); "
+            f"run it with run_tests(target={shown!r})"
+        )

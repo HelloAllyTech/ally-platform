@@ -18,7 +18,15 @@ _SETUP = {
         r"Cannot find module|Module not found|Test suite failed to run"
         r"|error TS\d+:|SyntaxError|ReferenceError: \w+ is not defined"
         r"|Failed to resolve import|Error: Cannot find package"
-        r"|Exceeded timeout of|Test timed out|ECONNREFUSED|ENOTFOUND",
+        r"|Exceeded timeout of|Test timed out|ECONNREFUSED|ENOTFOUND"
+        # a missing provider or unmocked hook: the test never reached the behaviour
+        # (ally-web-3b3db9b5 rendered a page without the user context)
+        r"|Cannot destructure property '?\w+'? of '?[\w.()]+'? "
+        r"as it is (?:undefined|null)"
+        r"|Cannot read propert(?:y|ies) of (?:undefined|null) \(reading"
+        r"|must be used within|must be wrapped in"
+        r"|outside (?:of )?(?:a|an|the) \w*Provider|could not find react-redux context"
+        r"|No QueryClient set|may be used only in the context of a <Router>",
         re.IGNORECASE,
     ),
     "python": re.compile(

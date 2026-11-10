@@ -195,3 +195,36 @@ def test_oracle_shape_cases_are_scored_by_human_review() -> None:
     assert (total.fix_pass, total.fix_attempted) == (1, 3)
     assert (total.fix_pass_adjusted, total.fix_adjusted_attempted) == (2, 2)
     assert total.fix_pending_human == 1
+
+
+def test_escalate_acceptable_scores_a_correct_diagnosis_as_a_pass() -> None:
+    from evals.agents import AgentResult
+    from evals.metrics import CaseResult, aggregate
+    from evals.run_evals import score_bug
+    from evals.schema import Case
+
+    case = Case(
+        id="ally-web-x",
+        kind="bug",
+        app="ally-web",
+        parent="a" * 40,
+        commit="b" * 40,
+        expected="fix",
+        description="page crashes on load in prod only",
+        src_files=["apps/a/src/analytics/Tracker.tsx"],
+        oracle_tests=["apps/a/t.test.tsx"],
+        escalate_acceptable=True,
+    )
+    right = AgentResult(
+        escalated=True,
+        findings=[{"suspected_files": ["apps/a/src/analytics/Tracker.tsx"]}],
+    )
+    wrong = AgentResult(
+        escalated=True, findings=[{"suspected_files": ["apps/a/src/Other.tsx"]}]
+    )
+    assert score_bug(case, right) == "escalated_acceptably"
+    assert score_bug(case, wrong) == "escalated"
+    total = aggregate(
+        [CaseResult("x", "ally-web", "bug", "fix", "escalated_acceptably")]
+    )["total"]
+    assert (total.detected, total.escalate_correct, total.fix_pass) == (1, 1, 1)

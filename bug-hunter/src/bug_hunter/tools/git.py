@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, Sequence
@@ -68,6 +69,7 @@ class Git:
     """Git commands against ``repo_root`` (the main checkout) or a worktree."""
 
     def __init__(self, repo_root: Path, runner: CommandRunner = subprocess_runner):
+        self._stashes: dict[str, list[tuple[str, str]]] = {}
         self.repo_root = Path(repo_root)
         self.runner = runner
 
@@ -188,14 +190,32 @@ class Git:
         paths = [p for p in paths if p in tracked]  # git refuses untracked pathspecs
         if not paths:
             return False
+        # the stash stack is shared by every worktree of the repo: tag the entry,
+        # remember its sha, and restore exactly that one (never a bare pop)
+        tag = f"bughunter-baseline-{uuid.uuid4().hex[:12]}"
         out = self._git(
-            ["stash", "push", "--quiet", "-m", "bughunter-baseline", "--", *paths],
-            cwd=worktree,
+            ["stash", "push", "--quiet", "-m", tag, "--", *paths], cwd=worktree
         )
-        return "No local changes" not in (out.stdout + out.stderr)
+        if "No local changes" in (out.stdout + out.stderr):
+            return False
+        listing = self._git(["stash", "list", "--format=%H %gs"], cwd=worktree)
+        for line in listing.stdout.splitlines():
+            sha, _, subject = line.partition(" ")
+            if subject.endswith(tag):
+                self._stashes.setdefault(str(worktree), []).append((sha, tag))
+                return True
+        raise GitError(f"stash {tag} not found after push")
 
     def unstash(self, worktree: Path) -> None:
-        self._git(["stash", "pop", "--quiet"], cwd=worktree)
+        """Restore the last stash this object made for ``worktree`` and drop it."""
+        sha, tag = self._stashes[str(worktree)].pop()
+        self._git(["stash", "apply", "--quiet", sha], cwd=worktree)
+        listing = self._git(["stash", "list", "--format=%gd %gs"], cwd=worktree)
+        for line in listing.stdout.splitlines():
+            ref, _, subject = line.partition(" ")
+            if subject.endswith(tag):
+                self._git(["stash", "drop", "--quiet", ref], cwd=worktree)
+                break
 
     # --- push: only open_pr may call this ------------------------------------------
 

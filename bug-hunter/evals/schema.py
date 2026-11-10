@@ -55,6 +55,10 @@ class Case(BaseModel):
     # argument), not only behaviour: an equivalent fix fails it. Fix pass for such a
     # case is scored by human review (`human_fix_pass`), and reported both ways.
     oracle_shape: bool = False
+    # A bug a unit test cannot show (e.g. a runtime dependency clash): escalating it
+    # with the right diagnosis is a pass. Diagnosis is right when the finding names a
+    # file the real fix changed.
+    escalate_acceptable: bool = False
     human_fix_pass: dict[str, bool] = Field(
         default_factory=dict, description="run_id -> human verdict on the agent's patch"
     )

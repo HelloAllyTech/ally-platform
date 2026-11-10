@@ -238,6 +238,11 @@ def test_setup_failure_is_not_a_reproduction_and_escalates(
                     }
                 ]
             ),
+            # setup failures bounce back (chunk 06); the agent resubmits until the
+            # attempts run out
+            ai(tool_calls=[REPRO_CALL]),
+            ai(tool_calls=[REPRO_CALL]),
+            ai(tool_calls=[REPRO_CALL]),
             ai(tool_calls=[REPRO_CALL]),
         ]
     )
@@ -265,8 +270,9 @@ def test_setup_failure_is_not_a_reproduction_and_escalates(
     assert state.repro and state.repro.failure_kind == "setup"
     assert not state.repro.fails_for_the_right_reason
     assert "could not reproduce" in (state.stop_reason or "")
-    # no model judgement was asked for a setup failure
-    assert state.budget_used.per_node["reproduce"].calls == 2
+    # no model judgement was asked for a setup failure; 3 bounces then escalate
+    assert state.repro_attempts == 3
+    assert state.budget_used.per_node["reproduce"].calls == 5
     escalation = (tmp_path / "artefacts/escalation.md").read_text()
     assert "## Why the agent stopped" in escalation and "import, compile" in escalation
 
