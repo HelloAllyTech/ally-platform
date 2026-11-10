@@ -510,7 +510,7 @@ describe('DebriefRunnerService', () => {
     it('records why each step ran, what it was given, its thinking and the budget left', async () => {
       const { svc, saved } = build({ steps: steps() });
       await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      const run = saved.at(-1);
+      const run = saved[saved.length - 1];
       const byStep = (name: string) =>
         run.steps.find((x: any) => x.step === name && x.status === 'done');
 
@@ -549,7 +549,7 @@ describe('DebriefRunnerService', () => {
     it('keeps every draft with the critique that produced it, and says why it published', async () => {
       const { svc, saved } = build({ steps: steps() });
       await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      const run = saved.at(-1);
+      const run = saved[saved.length - 1];
       expect(run.status).toBe(DebriefRunStatus.PUBLISHED);
       expect(run.workspace.drafts.map((d: any) => d.round)).toEqual([0, 1]);
       expect(run.workspace.drafts[1].cards.opening).toBe('A sharper opening.');
@@ -574,7 +574,7 @@ describe('DebriefRunnerService', () => {
         steps: { 'safety-reader': [new Error('down'), new Error('down')] },
       });
       await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      expect(saved.at(-1).workspace.decision.why).toMatch(
+      expect(saved[saved.length - 1].workspace.decision.why).toMatch(
         /safety reading failed/,
       );
     });
@@ -599,10 +599,10 @@ describe('DebriefRunnerService', () => {
       const { svc, ai, saved } = build({ steps: base(), live, cohort });
       await svc.run('s1', { mode: DebriefRunMode.SHADOW });
       const body = (path: string) =>
-        ai.step.mock.calls.find((c: any[]) => c[0] === path)![1] as any;
+        (ai.step.mock.calls as any[][]).find((c) => c[0] === path)![1];
       expect(body('analyst').live_detections).toEqual(live);
       expect(body('writer').cohort).toEqual(cohort);
-      expect(saved.at(-1).workspace).toEqual(
+      expect(saved[saved.length - 1].workspace).toEqual(
         expect.objectContaining({ liveDetections: live, cohort }),
       );
     });
@@ -612,10 +612,10 @@ describe('DebriefRunnerService', () => {
       context.liveDetections.mockRejectedValueOnce(new Error('db down'));
       context.cohortStats.mockRejectedValueOnce(new Error('db down'));
       await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      expect(saved.at(-1).status).toBe(DebriefRunStatus.PUBLISHED);
-      const writer = ai.step.mock.calls.find(
-        (c: any[]) => c[0] === 'writer',
-      )![1] as any;
+      expect(saved[saved.length - 1].status).toBe(DebriefRunStatus.PUBLISHED);
+      const writer = (ai.step.mock.calls as any[][]).find(
+        (c) => c[0] === 'writer',
+      )![1];
       expect(writer.cohort).toBeNull();
     });
   });

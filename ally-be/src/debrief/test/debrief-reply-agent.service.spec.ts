@@ -143,7 +143,9 @@ describe('DebriefReplyAgentService (Ask Ally tools, v9 FR-43)', () => {
       }),
     ]);
     // The second pass carries the tool result back to the model.
-    const second = fake.requests[1].messages.at(-1) as any;
+    const second = fake.requests[1].messages[
+      fake.requests[1].messages.length - 1
+    ] as any;
     expect(second.content[0]).toEqual(
       expect.objectContaining({ type: 'tool_result', tool_use_id: 'call-1-0' }),
     );
@@ -208,7 +210,9 @@ describe('DebriefReplyAgentService (Ask Ally tools, v9 FR-43)', () => {
       }),
     );
     expect(res.toolTexts).toEqual([]);
-    const result = (fake.requests[1].messages.at(-1) as any).content[0];
+    const result = (
+      fake.requests[1].messages[fake.requests[1].messages.length - 1] as any
+    ).content[0];
     expect(result.is_error).toBe(true);
   });
 

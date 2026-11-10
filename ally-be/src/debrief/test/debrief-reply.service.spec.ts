@@ -419,7 +419,7 @@ describe('DebriefReplyService (Ask Ally)', () => {
         guidance: true,
       });
       const events = await run(svc, 'How should I ask?');
-      expect(events.at(-1)).toMatchObject({
+      expect(events[events.length - 1]).toMatchObject({
         type: 'done',
         content: 'Ask it plainly.',
       });
@@ -455,7 +455,9 @@ describe('DebriefReplyService (Ask Ally)', () => {
         },
       });
       const events = await run(svc, 'What does the guidance say?');
-      expect(events.at(-1).content).toContain('Ask directly and calmly.');
+      expect(events[events.length - 1].content).toContain(
+        'Ask directly and calmly.',
+      );
     });
 
     it('answers the way it did before tools when the loop fails before any words', async () => {
@@ -470,7 +472,7 @@ describe('DebriefReplyService (Ask Ally)', () => {
       expect(call.systemPrompt).toContain(
         'Risk guide: Ask about safety plainly.',
       );
-      expect(events.at(-1)).toMatchObject({
+      expect(events[events.length - 1]).toMatchObject({
         type: 'done',
         content: 'A plain answer.',
       });
