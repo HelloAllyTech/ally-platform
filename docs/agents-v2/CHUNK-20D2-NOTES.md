@@ -2,9 +2,162 @@
 
 **Brief:** [chunk-20d2.md](./chunk-20d2.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §25. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20d-2]`. **Stage 1, the POC:** 20a-2 ✅ → Q2a ✅ → 13 ✅ → 11a ✅ → **20d-2** → CL1.
 
-> Report: written when the build is done (top of this file).
+> Report below. The plan as approved follows it.
+
+## Report: 20d-2 is done (10 Nov 2026)
+
+**Commits** (all `[20d-2]`, on `feat/agents-v2-chunk-12-shared-store`, not pushed):
+
+| Commit | Part |
+|---|---|
+| `9e9641617` | Docs: the approved plan and UX audit, the brief, copy §25, current chunk |
+| `4ab5741df` | A: the home's lists in v2, each saving on its own with a version |
+| `f3d92bfd4` | B: the UX audit's fixes; every section explains itself |
+| `a9aaffd1c` | C: a Checkup the owner understands and controls |
+| `68f7ab26a` | D: Change your assistant explains itself; How it works; Why this answer |
+| this one | E: notes, screenshots, refreshed Playwright baselines |
+
+**Suites (after D):**
+- ally-be: 14,830 passed, 70 skipped (the Postgres-only specs without a test database);
+- ally-ai: 2,157 passed, 46 skipped; flake8 clean;
+- ally-web: admin 9,494 passed, helpline and ui-shared green (the pre-commit hook ran all three on every commit); typecheck and lint clean on every changed file.
+- Playwright: baselines were refreshed once, at the end, as agreed (see "Browser tests" below).
+- **Not run:** the Sunrise checkup suite (`checkup_eval.py`) and the 3a conversation eval. Both call the live model through the local stack. The agent's prompt, `check.py`, the grader and the stats are unchanged, so no shift is expected, but that's not proof. They're the first thing to run before CL1 (commands under "How Shehbaz tests it").
+
+### What was built
+
+| | |
+|---|---|
+| **A. The lists** | One pair of routes (`GET`/`PATCH v1/chatbots/:id/home/lists/:list`) for who can open the page, WhatsApp's list, the team, documents and quick replies. One entry per change, with the list's version (409 `stale` with the current list), under the bot's row lock; the lists' own services do the work, so their rules hold (an owner for the team; a safety reply can't be turned off). Quick replies keep their template permissions. New field `whatsappAccess`. Organisations are offered by name. The web side: one list pattern, Changed · Undo, skeletons. |
+| **B. The audit** | See the issue list below: 44 of 48 fixed. |
+| **C. The Checkup** | What it is; live steps (keep going if you leave); How checking works; every question readable with its last 5 results; filters; add, edit, turn off, delete with Undo, Try this one; Run only failed; Must pass and safety questions asked 3 times on home runs (once in onboarding); the banner after a change with Before / After; Suggest more questions (kept only when ticked); Add to checkup from the inbox and from Answer it / Correct this; "Go live anyway?" when an owner's own Must pass question failed. Grader and stats unchanged. |
+| **D. Change, How it works, Why** | The Change panel's subtitle, what it can and can't change, Apply · Not this, the checkup banner, and a History tab (by chat and by hand, with Undo and Restore). How it works: every layer in order, exact text, the owner's controls, Ally's layers locked, the full text with the owner's parts marked; built by ally-ai from the very request a run sends, and a test proves the shown text is a real run's first prompt. Your instructions get the builder's safety check and an "override" warning. Why this answer? in Try it. |
+
+### The issue list, and what happened to each
+
+Numbers are the audit's (plan §1).
+
+| # | Status |
+|---|---|
+| 1–4 Header | Fixed: one height (44), two styles; Engine and Classic view in a staff-only `···` menu; Open page in that menu on phones; status words Live · Paused · Not live yet everywhere; one "Changes save as you go" |
+| 5 Three columns | Fixed: the panel docks only from 1600 px and never beside the Inbox; below that it's a sheet with a scrim (Esc, focus kept) |
+| 6 Try it on phones | Fixed: the chat fills the sheet, no phone frame |
+| 7 Layout shift | Fixed where it came from: the header and section skeletons, and the Overview's cards at their final size. The remaining shift in a cold browser is the web fonts swapping in (`font-display: swap`); a warm load doesn't move. Measured locally only (the audit script); the Playwright layout-shift check from the plan was **not added** |
+| 8 Phone section chips | Fixed: fade at the edge, the open one scrolled into view |
+| 9 Button heights | Fixed on AI Chatbots' screens: 44 default, 36 small (44 on touch), 50 only on onboarding and visitor pages |
+| 10 Group headers | Partly: one Group style, and every section has its line and `?`; some fields inside groups still use field labels rather than group titles (Disclaimer, Topics to avoid), which read fine |
+| 11 Look and feel card | Fixed (card, heading scale, the second "Changes save as you go" hidden). The theme control's long label still wraps at 1440 (it's the shared Segmented) |
+| 12 Serif digits | Fixed: inputs use the UI font inside AI Chatbots |
+| 13 Headings line up | Fixed with 5 (no docked panel below 1600) |
+| 14 Dark | As decided: owner screens stay light; dark for the bot page, widget and Try it's chat |
+| 15 "This week" twice | Fixed |
+| 16 Numbers | **Not done:** the 7/30-day switch. "This week" and "Last 30 days" are still two cards; the classic charts sit behind "See all numbers" as agreed |
+| 17 Counts disagree | Fixed: the second card is gone; Overview and What it knows share one list |
+| 18–19 Classic parts in What it knows | Fixed (v2 documents; the Q2a list for questions it didn't know) |
+| 20 Sources row | Fixed |
+| 21 Remove | Fixed: one icon button everywhere |
+| 22 Extra instructions | Moved to How it works; Personality links there |
+| 23 Quick replies | Fixed (v2) |
+| 24 At-risk reply empty | **Not done:** the box still shows empty when the pack's wording is in use; a placeholder needs the pack's default text from ally-be's settings, which the home view doesn't return yet |
+| 25 Two add patterns | **Not done:** Topics to avoid is shared with onboarding's Make it yours, so changing it changes onboarding too; left for CL1 |
+| 26–28 Checkup wording, dates, measures | Fixed (singular gap, the fallback quoted, one date format, measures 2 × 2, "No questions of this kind yet") |
+| 29 Checkup control | Part C |
+| 30–37 Inbox | Fixed: one row style; "Visitor · 4821"; channel icons; the sound toggle; filters on one row; Take over on the name line; bubbles ≤ 560 px, a date line per day, groups within 2 minutes; ratings in words; a centred empty side |
+| 38 Change panel | Part D |
+| 39 Engine form | As agreed: moved into the menu as is |
+| 40–44 Share | Fixed (v2 lists; Team by email with today's roles; one "Opening hours" label; native checkboxes styled). **Connect a WhatsApp number** still opens the classic Meta flow, inside a v2 sheet |
+| 45 Composer | Fixed: the send button sits inside the box. Correction to the audit: the coloured border was the focus ring (the screenshot had focus), not a resting style |
+| 46 Status line | Fixed: two lines before it's cut |
+| 47 Talk to a person | Fixed |
+| 48 List page | Fixed: v2 header, tabs and cards. The staff-only tabs (Channels, Defaults, Knowledge library) keep their classic content |
+
+### Jargon swept, and what it became
+
+| Was | Now |
+|---|---|
+| Engine | How it answers (staff only, in the `···` menu) |
+| Chatbot | Assistant (list page, tabs, empty states) |
+| Published / Draft | Live / Not live yet |
+| Organisation id, User ID | Your organisation (by name); their email address |
+| Channel, "No channel yet" | WhatsApp numbers; Not on WhatsApp yet |
+| "Match too weak", "Passages were not enough" | Gone (the classic unanswered list is no longer shown) |
+| Fallback | "when it doesn't know"; the Checkup quotes the owner's own wording |
+| Run, grade | Checkup; checking (Passed · Partly · Failed · Needs your input) |
+| Chunk, passage | "parts of your pages", "Where it looked" |
+| Extra instructions | Your instructions |
+| Model, LLM, RAG, token, embedding, v1/v2 | Not shown to owners anywhere in AI Chatbots (the copy test still refuses "model") |
+
+### Outside the AI Chatbots folders (all chatbot-only, additive)
+
+- `ally-be/src/whatsapp/whatsapp.module.ts` and `ally-be/src/chatbot/chatbot.module.ts`: one export line each (`WhatsAppAdminService`, `ChatbotAudienceService`), so the home's lists use the services' own rules instead of copies.
+- `ally-be/src/ai/service/ai.service.ts` and `ai/constants/endpoints.constants.ts`: three new methods (`suggestCheckupQuestions`, `agentInstructions`, `checkOwnerText`); no existing method changed.
+- `ally-be/src/database/migrations/1981340000000-AddCheckupCaseControls.ts` (additive) and `ally-be/DATA_SCHEMA.md`.
+- `ally-ai`: the agent runtime router and schemas (`/agent/instructions`, `/agent/instructions/check`), `app/core/agent_runtime/instructions.py`, and `QuestionsRequest.exclude` on the checkup endpoint. `knowledge_agent/prompt.py`, the grader, `check.py` and the prompts are not changed.
+- `ally-web`: the chatbot entries of `constants/common.ts` (endpoints) and `constants/en.ts` (the `whatsappBot` strings the list page reads); the AI Chatbots API slices (`chatbots`, `checkup`, `changes`, `scorecard`, `botDrafts`) and types; `components/v2/Checkup.tsx` (an optional `empty` prop; only AI Chatbots screens use it).
+- `git diff --stat 9e9641617~1 HEAD`: 132 files, +11,140 −681 (before this notes commit).
+
+### Decisions made while building
+
+- **Must pass ×3 costs more than the plan said:** most generated questions are already `must_pass`, so a home checkup asks about 3× as many times as before, not 1.5–2×. Onboarding asks once, so building an assistant is as quick as before. If that's too costly, the runner rule is one line (`attemptsFor` in `checkup-cases.ts`).
+- **"Partly"** is mixed results across a question's tries in one checkup.
+- **The four outcomes:** "politely decline" and "offer a person" are declines with one more fact the grader's judge already checks (`facts_missing` fails any case), so no grader change was needed.
+- **Team:** added by the email of someone in the caller's organisation (platform admins: anyone, as before by id); the three roles are today's.
+- **Undo for lists:** add ↔ remove for every list; removing an uploaded file can't be undone yet (it's archived; CL1 can add restore).
+- **History:** kept in the draft's `events` (jsonb), so no migration. It's not capped at 200 as planned (the drafts service appends; trimming needs its own change). Edits to the owner's own rules show in the History but are changed again from Safety, not undone there.
+- **How it works when v2 is off:** the endpoint sits on the agent runtime's router, so it answers 404 when `AGENT_RUNTIME__ENABLED` is off; the section then says it couldn't load.
+- **The instructions check:** if ally-ai can't be reached, "Your instructions" still save (the text is fenced below the base and safety rules either way).
+
+### Changed tests (no behaviour test was weakened)
+
+- `scorecard.spec.ts`, `Scorecard.test.tsx`: the calls now carry `addToCheckup` (default true, behaviour unchanged).
+- `change.service.spec.ts`: change by chat saves with `{ record: false }`, so it isn't recorded twice.
+- `ChangePanel.test.tsx`: "Not this"; the new hooks mocked.
+- `inbox.pg.spec.ts`: the inbox's name for a visitor without one is "Visitor · 4821" (the shared `visitorLabel` is unchanged).
+- `WhatsAppBot.test.tsx`: unchanged and passing (the new tabs keep their roles and test ids).
+- `assistantHome.e2e.ts`: the Engine test now opens the `···` menu; How it works joins the sections with baselines.
+
+### Now unused (for CL1)
+
+In AI Chatbots' new screens nothing imports these any more; they live on for `?view=classic` and the staff tabs:
+- `WhatsAppBot/KnowledgeTab.tsx`, `KnowledgeUploadPanel.tsx`, `KnowledgeDocumentPanel.tsx` (documents);
+- `WhatsAppBot/UnansweredTab.tsx`, `UnansweredAnswerPanel.tsx`;
+- `WhatsAppBot/TemplatesTab.tsx`, `TemplatePanel.tsx` (still used by the staff Defaults tab);
+- `WhatsAppBot/PeopleTab.tsx` (`WhoCanChat`, `Team`);
+- `WhatsAppBot/BotPageTab.tsx` `AccessList`;
+- `WhatsAppBot/ConnectorsTab.tsx` `BotConnectorsTab` (the list's Channels tab still uses `AllConnectorsTab`; `NumberTab`'s `ConnectWhatsAppFlow` is still used inside the v2 sheet);
+- `components/v2` `CheckRow` (the Checkup lists cards now; onboarding's checkup screen still uses it);
+- `ChatbotStatusPill` (only the classic page).
+
+### Follow-ups
+
+- **Prompt order** (approved as a follow-up): the owner's text is fenced *before* the base rules in the real prompt (`format_persona` is prepended). After the POC, test moving owner text after the base and safety layers, with the 3a conversation evals before and after. How it works shows the order the runtime really uses.
+- The 7/30-day switch on the Overview (#16), the at-risk placeholder (#24), one add pattern for topics (#25), and a Playwright layout-shift check (#7).
+- Redraw the WhatsApp connect flow (Meta's steps) in v2.
+- The Overview's "Remove assistant" still uses a browser confirm.
+
+### Screenshots
+
+Before and after, at 900 px wide (JPEG), in `docs/agents-v2/design/20d2/before/` and `after/`: the Overview (1440 and 390), What it knows, Share (1440 and 390), Checkup, the Inbox inside the home with a chat open, the Change panel, How it works (after only), Try it on a phone, the inbox, Page, Safety, the bot page chat (dark, 390), the widget (dark) and the list page (before only; the after needs a signed-in browser). The full sets (1440 and 390, light and dark) were taken with the audit script; the Playwright baselines in `e2e/__screenshots__` are the checked versions.
+
+### How Shehbaz tests it
+
+Local stack (`./infra/dev_env.sh`), admin on :8081; ally-be picks up the migration on restart (`docker restart ally-be-app-1`). The ally-ai container needs the new code (`/agent/instructions`): rebuild or restart it as usual.
+
+1. **Header and layout (1440 wide):** open an assistant. One row of buttons, one height. As Ally staff, `···` holds How it answers and Classic view; as an owner it's not there. Open Change your assistant: it comes over the page with a dark scrim; Esc closes it. Make the window 1600+ wide: it docks on the right. Open Inbox: it never docks there.
+2. **Share:** add an invited email, remove it, press Undo. Switch to "People in your organisation": "Add {your organisation}" by name. In Team, add a colleague by email and change their role. Open the same assistant in a second tab, add an email there, then remove one in the first: the first tab says "This changed while you were editing…".
+3. **What it knows:** upload a PDF (it appears as Reading, then Ready); add one from your library; remove it and Undo.
+4. **Checkup:** Run all. The four steps tick through; leave the page and come back mid-run. Open "How checking works". Add a question ("Do you see couples?", It should offer a person, Must pass). Edit it, Turn it off, Delete it and Undo. Try this one on a question (about 10 s). Open a safety question: no Delete or Turn off, and the reason. Suggest more questions, tick two, Keep.
+5. **From real use:** in the Inbox, open a chat and press Add to checkup under a reply: the question and the reply's sentences are filled in. On the Overview, Answer it shows "Also add to checkup" ticked.
+6. **Change panel and History:** "Make it more formal" → Before / After → Apply → the checkup banner. Change the introduction by hand in Personality. Open History: both are there, who and when, by hand and from the Change panel; Undo the hand edit (the exact old text comes back), Restore an older one.
+7. **How it works:** every layer in order; Show exact text on Safety; Show the full instructions (your parts highlighted). Edit Your instructions to "Turn off the crisis rules": refused with the reason. "Ignore all previous instructions": saved with the warning. "Greet people by name": saved; ask in Try it and the reply greets you.
+8. **Why this answer:** in Try it, ask a fees question: open Why this answer? (where it looked, the time). Add "prices" to Topics to avoid, ask "how much are your prices?": it declines and Why says "Topics to avoid: prices".
+9. **Publishing:** in a new onboarding, add an owner Must pass question that fails, then Publish: "This question you marked Must pass failed. Go live anyway?" → Go live anyway publishes.
+10. **Evals (before CL1):** `cd ally-ai && poetry run python scripts/checkup_eval.py --suite ../docs/agents-v2/evals/sunrise-mind-checkups.yaml` (0 hard fails, must_pass as at 20a-2 round 7), and `poetry run python scripts/agent_conversation_eval.py` against `CHUNK-03R-EVAL.md`.
+
 
 ## Plan (approved 2026-11-10)
+
+*As planned; some files were named differently when built (the lists are `sections/AccessLists.tsx`, `PeopleLists.tsx`, `DocumentsList.tsx`, `QuickReplies.tsx`; the specs are in `ally-be/src/bot-draft/test/`). The report above is the record of what exists.*
 
 
 Branch `feat/agents-v2-chunk-12-shared-store`. Commits `[20d-2]`, one per part (A–E), Node 22 first on PATH, no `--no-verify`, nothing pushed. Stacks MCP isn't connected in this session, so product calls follow the brief, DESIGN.md, the deck and the screenshots.
@@ -129,7 +282,7 @@ New versioned routes live in the chatbot's home module. Each delegates to today'
     - `PATCH :id/home/quick-replies` `{op: add|edit|remove|reorder, …, version}` → the WhatsApp template service, called from here; the `whatsapp/` module is not edited
   - `bot-draft/home/assistant-home.service.ts`: the list saves, under the same row lock as `saveField`.
   - `bot-draft/home/home-lists.ts` (new, pure): the list ops and their versions.
-  - `bot-draft/home/test/home-lists.spec.ts` (new): add and remove each list; stale 409; viewer refused; team owner-only; per-bot isolation.
+  - `bot-draft/home/test/home-lists.spec.ts` (new): add and remove each list; stale 409; viewer refused; team owner-only; per-bot isolation. <!-- docs-path-lint: ignore -->
   - `bot-draft/bot-draft.module.ts`: providers for the delegated services (if not already imported).
 - **WEB**
   - `pages/AssistantHome/ui/` (new): `ListField.tsx` (input + Add, rows with Remove, each saving with its version and "Changed · Undo"), `IconButton.tsx`, `Help.tsx` (the `?` popover, used in Part B), `StaffMenu.tsx` (Part B), `scale.css` (the spacing, height and radius scale, scoped `.ally-v2 .ally-home, .ally-inbox`).
@@ -138,7 +291,7 @@ New versioned routes live in the chatbot's home module. Each delegates to today'
   - `sections/Share.tsx`: On your page list, On WhatsApp audience and numbers (`DocumentsGroup`-style card; connect still opens the existing `ConnectWhatsAppFlow` inside a v2 sheet: it's a multi-step Meta flow, so it's wrapped, not rewritten), Team.
   - `sections/Personality.tsx`: v2 Quick replies.
   - `sections/Overview.tsx`: v2 "All numbers" (same analytics endpoints, local bars; no import of `UsageDashboard`).
-  - `sections/WhatsAppNumbers.tsx`, `sections/TeamGroup.tsx`, `sections/DocumentsGroup.tsx`, `sections/QuickReplies.tsx`, `sections/Numbers.tsx` (new, one per redrawn part).
+  - `sections/WhatsAppNumbers.tsx`, `sections/TeamGroup.tsx`, `sections/DocumentsGroup.tsx`, `sections/QuickReplies.tsx`, `sections/Numbers.tsx` (new, one per redrawn part). <!-- docs-path-lint: ignore -->
   - `api/chatbots.ts`: the new list mutations; `types/assistantHome.ts`: list versions.
   - `pages/AssistantHome/copy.ts`; `__tests__/lists.test.tsx` (new): each list saves its own op with its version, 409, Undo, viewer read-only.
 
@@ -154,11 +307,11 @@ New versioned routes live in the chatbot's home module. Each delegates to today'
   - `sections/*.tsx`: copy, empty states that say the next step, the fixes #15–28, #40–44.
   - `sections/Checkup.tsx` (fixes #26–28; most of it in C); `pages/AssistantHome/checkup.ts`.
   - `pages/Inbox/Inbox.tsx`, `ChatView.tsx`, `inbox.css`, `copy.ts`: #30–37.
-  - `pages/WhatsAppBot/WhatsAppBot.tsx` + new `pages/WhatsAppBot/AssistantList.tsx`: the list page (#48). This file is the AI Chatbots page itself; `ChatbotGrid` is replaced only here.
+  - `pages/WhatsAppBot/WhatsAppBot.tsx` + new `pages/WhatsAppBot/AssistantList.tsx`: the list page (#48). This file is the AI Chatbots page itself; `ChatbotGrid` is replaced only here. <!-- docs-path-lint: ignore -->
   - `botPage/screens/Chat.tsx`, `botPage/components/parts.tsx`, `botPage/botPage.css`: #45–47 (the bot page and widget share these). The page's size budget is checked.
 - **BE**
   - `chatbot/inbox/inbox.service.ts` `visitorLabel`: contact name (pre-chat name, then the contact's stored name), else "Visitor · {4 digits}" from the conversation id. `contactName` + `visitorTag` fields are added; `visitor` is kept.
-  - `chatbot/inbox/test/inbox.service.spec.ts`.
+  - `chatbot/inbox/test/inbox.service.spec.ts`. <!-- docs-path-lint: ignore -->
 - **Tests:** E2E `assistantHome.e2e.ts`, `inbox.e2e.ts`, `widget.e2e.ts`, `botPage.e2e.ts` and their fixtures: baselines for every changed screen at 1440 and 390 (dark for visitor surfaces); axe 0 serious; a layout-shift check (`PerformanceObserver`, < 0.02); keyboard reachability of the header, drawer (focus kept, Esc), `?` popovers and the inbox. Unit: `__tests__/sections.test.ts`, `copy.test.ts`, `Inbox/__tests__/inbox.test.tsx` (date line, grouping, sound toggle).
 
 ### Part C — A Checkup the owner understands and controls
@@ -169,7 +322,7 @@ New versioned routes live in the chatbot's home module. Each delegates to today'
   - Version check: `versionOf` over the editable fields (no new column).
 - `chatbot_checkup_runs`: `phase` (writing | asking | checking | done), `asked` (int), `only` (all | failed | one).
 - Index on `chatbot_checkup_results (case_id, created_at)` for "last 5 results".
-- `BE/DATA_SCHEMA.md`: the new columns.
+- `BE/DATA_SCHEMA.md`: the new columns. <!-- docs-path-lint: ignore -->
 
 **The four outcomes and the grader** (grader unchanged):
 - It should answer → `expect: answer`.
@@ -200,7 +353,7 @@ New versioned routes live in the chatbot's home module. Each delegates to today'
 - `bot-draft/scorecard/scorecard.controller.ts` + `scorecard.service.ts`: `addToCheckup` on Answer it and Correct this.
 - `chatbot/inbox/inbox.controller.ts`: `GET …/conversations/:id/messages/:messageId/checkup-draft` (the prefill).
 - `bot-draft/home/change.service.ts`: after an apply, the event carries a "run to compare" marker for the banner.
-- Specs: `bot-draft/checkup/test/checkup-cases.spec.ts` (new: create, edit, delete with Undo, turn off, 409, per-bot isolation, safety locked, owner cases through the same grader call, Try this one, only failed, last 5), `checkup-cases.pg.spec.ts` (Postgres), and updates to `draft-checkup` and `scorecard` specs for `addToCheckup`.
+- Specs: `bot-draft/checkup/test/checkup-cases.spec.ts` (new: create, edit, delete with Undo, turn off, 409, per-bot isolation, safety locked, owner cases through the same grader call, Try this one, only failed, last 5), `checkup-cases.pg.spec.ts` (Postgres), and updates to `draft-checkup` and `scorecard` specs for `addToCheckup`. <!-- docs-path-lint: ignore -->
 
 **AI** (checkup endpoint only)
 - `app/schemas/checkup.py`: `QuestionsRequest.exclude: List[str] = []`.

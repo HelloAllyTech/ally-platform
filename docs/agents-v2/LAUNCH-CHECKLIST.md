@@ -32,10 +32,12 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Website widget: `frame-ancestors` for `/b/*`** at CloudFront and Caddy (13). Per bot, from `GET /api/v1/public/widget/<slug>/frame-policy` (the allowed websites and their subdomains, plus the page's own origin). Until then the page and ally-be enforce the allowed websites themselves (`CHUNK-13-NOTES.md`, Security).
 - [ ] **Website widget: serve `/widget.js`** from the bot page's origin with short caching (`Cache-Control: max-age=300`), not the `immutable` the hashed assets get. It is built into the dashboard's dist by its build (13).
 - [ ] **`ALLOWED_ORIGINS` is unchanged by the widget:** the loader's settings route answers CORS itself, only to each bot's allowed websites (13).
+- [ ] **20d-2: deploy ally-ai before ally-be.** ally-be calls `POST /api/v1/agent/instructions` and `/instructions/check` (How it works, and the check on Your instructions); until ally-ai has them, How it works says it couldn't load and instructions save without the check. Migration `1981340000000-AddCheckupCaseControls` (additive) runs with ally-be. No new prompts: the Skills Store is unchanged for 20d-2.
 
 ## Checks
 
 - [ ] **Watch the v1 fallback rate in production; slow model steps (15–17 s) caused fallbacks in round 6** (`CHUNK-20A2-EVAL.md`, Round 6).
+- [ ] **Checkup cost (20d-2):** home checkups ask Must pass and safety questions 3 times, about 3× the model calls of a 20a-2 run. Watch it; the rule is `attemptsFor` in `bot-draft/checkup/checkup-cases.ts`.
 
 - [ ] A Lighthouse mobile LCP run for the bot page (20d).
 - [ ] Hindi bot page strings marked "needs review" in `botPage/copy/hi.ts` reviewed (20d).
