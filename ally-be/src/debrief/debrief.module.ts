@@ -18,6 +18,7 @@ import { LearnModule } from '../learn/learn.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { DebriefConsoleController } from './controller/debrief-console.controller';
 import { DebriefLearnerController } from './controller/debrief-learner.controller';
+import { DebriefGatewayController } from './controller/debrief-gateway.controller';
 import { DebriefFeedback } from './entity/debrief-feedback.entity';
 import { DebriefRun } from './entity/debrief-run.entity';
 import { DebriefAgentService } from './service/debrief-agent.service';
@@ -25,6 +26,9 @@ import { DebriefAiClient } from './service/debrief-ai.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
 import { DebriefContextRepository } from './service/debrief-context.repository';
 import { DebriefFeedbackService } from './service/debrief-feedback.service';
+import { DebriefGatewayService } from './service/debrief-gateway.service';
+import { DebriefGraphClient } from './service/debrief-graph.client';
+import { DebriefRunTokenService } from './service/debrief-run-token.service';
 import { DebriefPmAgentService } from './service/debrief-pm-agent.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
@@ -48,8 +52,11 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 
 /**
  * The Debrief agent and its PM agent (plan: ally-debriefs-plan.md). Runs on
- * the agent harness's releases and learning tables; its AI steps are
- * stateless calls into ally-ai.
+ * the agent harness's releases and learning tables. A debrief run is a graph
+ * in ally-ai (docs/debrief-harness/CONTRACT.md): `DebriefRunnerService`
+ * prepares and applies, and the graph calls back the gateway tools at
+ * `POST /api/v1/internal/debrief/tools/:name` (`DebriefGatewayController`),
+ * authenticated by a per-run token, never a user's JWT.
  */
 @Module({
   imports: [
@@ -84,10 +91,18 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     // "Practise this next" reads the learner's roleplays as their list does.
     LearnModule,
   ],
-  controllers: [DebriefConsoleController, DebriefLearnerController],
+  controllers: [
+    DebriefConsoleController,
+    DebriefLearnerController,
+    // The gateway tools ally-ai's debrief graph calls back (run token only).
+    DebriefGatewayController,
+  ],
   providers: [
     DebriefAiClient,
     DebriefContextRepository,
+    DebriefGraphClient,
+    DebriefRunTokenService,
+    DebriefGatewayService,
     DebriefRunnerService,
     DebriefRunJudgeService,
     DebriefAgentService,

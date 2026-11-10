@@ -1019,6 +1019,18 @@ export class AppConfigService {
   }
 
   /**
+   * Optional dedicated secret for the Debrief harness's run tokens (the
+   * bearer token ally-ai's debrief graph sends to the gateway tools). Empty
+   * when unset, and that is supported: `DebriefRunTokenService` then derives
+   * one as HMAC-SHA256(JWT_ACCESS_SECRET, 'debrief-gateway-v1'), so it is
+   * never the access secret itself and a user JWT can never pass as a run
+   * token (nor the reverse). Never leaves ally-be.
+   */
+  get debriefGatewaySecret(): string {
+    return this.configService.get<string>('DEBRIEF_GATEWAY_SECRET', '');
+  }
+
+  /**
    * User ids allowed to put a new version of a PINNED prompt live — the judge
    * rubrics, measuring instruments and guards in `PINNED_PROMPTS`.
    *

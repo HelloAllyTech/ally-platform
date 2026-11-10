@@ -1,8 +1,5 @@
 import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants';
-import {
-  DebriefSettings,
-  DebriefStep,
-} from '../constants/debrief-release.constants';
+import { DebriefSettings } from '../constants/debrief-release.constants';
 
 /**
  * The production budget (plan §10.1): every eligible session adds to the
@@ -41,41 +38,31 @@ export function effectiveRunCeiling(
   return Math.min(Math.max(ceiling, settings.runFloorUsd), capLeft);
 }
 
-/** Expected answer size per step, in tokens: the cost estimate's output half. */
-const OUTPUT_TOKENS: Record<DebriefStep, number> = {
-  [DebriefStep.SAFETY_READER]: 600,
-  [DebriefStep.ANALYST]: 3000,
-  [DebriefStep.PROGRESS_READER]: 600,
-  [DebriefStep.GUIDANCE_LOOKUP]: 0,
-  [DebriefStep.WRITER]: 2500,
-  [DebriefStep.CHECKS]: 0,
-  [DebriefStep.EVALUATOR]: 2000,
-  [DebriefStep.REVISER]: 2500,
-};
-
-/** Thinking models bill reasoning as output; allow for it rather than under-reserve. */
-const THINKING_ALLOWANCE = 2;
+/** A model's price per million tokens, as the debrief graph budgets with it. */
+export interface ModelPrice {
+  input_per_m: number;
+  output_per_m: number;
+}
 
 /**
- * Reserve-then-spend: the cost a step is expected to have, from the size of
- * what it will be sent. Over-estimates on purpose — a reservation that is too
- * small lets a run overspend its ceiling, one that is too large only takes the
- * cheaper path a little early. An unpriced model reserves Infinity, so it
- * never runs (plan §8.9).
+ * The price of every model a run may use, from the same pricing table the
+ * usage dashboards bill by. An unpriced model is left out, and the graph
+ * never runs a model it has no price for (plan §8.9).
  */
-export function estimateStepCostUsd(
-  step: DebriefStep,
-  model: string | null | undefined,
-  inputChars: number,
-): number {
-  if (!model || OUTPUT_TOKENS[step] === 0) return 0;
-  const promptTokens = Math.ceil(inputChars / 3);
-  const { costUsd, priced } = computeCostUsd(
-    model,
-    promptTokens,
-    OUTPUT_TOKENS[step] * THINKING_ALLOWANCE,
-  );
-  return priced ? costUsd : Number.POSITIVE_INFINITY;
+export function modelPrices(
+  models: Iterable<string | null | undefined>,
+): Record<string, ModelPrice> {
+  const out: Record<string, ModelPrice> = {};
+  for (const model of models) {
+    if (!model || out[model]) continue;
+    const input = computeCostUsd(model, 1_000_000, 0);
+    if (!input.priced) continue;
+    out[model] = {
+      input_per_m: input.costUsd,
+      output_per_m: computeCostUsd(model, 0, 1_000_000).costUsd,
+    };
+  }
+  return out;
 }
 
 /**

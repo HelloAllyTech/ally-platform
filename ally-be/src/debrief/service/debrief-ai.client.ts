@@ -3,20 +3,14 @@ import axios, { AxiosError } from 'axios';
 import { AppConfigService } from '../../config/config.service';
 
 /**
- * How long one call to a step may take before it is retried (on the backup
- * model when there is one). About one and a half times the slowest healthy
- * call in prod over 30 days (Oct–Nov 2026): a stuck call is cut while a slow
- * one still finishes. The Safety reader's longest was 42 s; a single hung
- * call used to hold a run for the full two minutes before its retry, which
- * then took 12 s.
+ * How long one call to a step may take. About one and a half times the
+ * slowest healthy call in prod over 30 days (Oct–Nov 2026): a stuck call is
+ * cut while a slow one still finishes. The Safety reader's longest was 42 s.
+ * Ask Ally's distress check is the one caller left; a debrief run's own steps
+ * run inside ally-ai's debrief graph (`DebriefGraphClient`).
  */
 export const STEP_TIMEOUT_MS: Record<string, number> = {
   'safety-reader': 60_000,
-  'progress-reader': 50_000,
-  analyst: 90_000,
-  writer: 75_000,
-  evaluator: 90_000,
-  reviser: 120_000,
 };
 /** Anything else (the PM agent's own calls): the run's own deadline is the real limit. */
 const DEFAULT_STEP_TIMEOUT_MS = 120_000;
@@ -32,9 +26,9 @@ export class DebriefStepError extends Error {
 }
 
 /**
- * HTTP client for ally-ai's stateless debrief steps (`/api/v1/debrief/*`) and
- * its knowledge search. ally-be decides what each step may see; this only
- * carries it.
+ * HTTP client for ally-ai's stateless debrief steps (`/api/v1/debrief/*`):
+ * Ask Ally's distress check and the PM agent's analysis. ally-be decides what
+ * each step may see; this only carries it.
  */
 @Injectable()
 export class DebriefAiClient {

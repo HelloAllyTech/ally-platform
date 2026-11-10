@@ -4,7 +4,6 @@ keeps only evidence anchored to the right speaker, and never coerces a missing
 answer into an empty one."""
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.core.debrief.pm_agent import PmAgentAnalysis, PmAgentIdea
 from app.core.debrief.safety_reader import TranscriptTurn
@@ -215,25 +214,22 @@ async def test_pm_agent_turns_an_unappliable_edit_into_a_question(dispatch_retur
     ]
 
 
-def test_endpoints_return_502_when_the_model_gives_nothing(monkeypatch):
-    from app.core.config import settings
+@pytest.mark.asyncio
+async def test_a_step_with_no_usable_answer_is_a_502_failure(monkeypatch):
+    """The graph treats it like any failed attempt: retry on the backup model."""
     from app.core.debrief import steps
-    from app.main import app
+    from app.core.debrief_graph.step_functions import InProcessSteps, StepError
 
     async def _none(*args, **kwargs):
         return None, "gemini-2.5-pro"
 
     monkeypatch.setattr(steps, "analyse", _none)
     monkeypatch.setattr(steps, "write", _none)
-    client = TestClient(app)
-    headers = {"x-api-key": settings.API.X_API_KEY}
-    for path, body in [
-        ("/api/v1/debrief/analyst", {"transcript": []}),
-        ("/api/v1/debrief/writer", {"evidence": {}}),
-    ]:
-        res = client.post(path, json=body, headers=headers)
-        assert res.status_code == 502, res.text
-        assert "no usable answer" in res.json()["detail"]
+    for path, body in [("analyst", {"transcript": []}), ("writer", {"evidence": {}})]:
+        with pytest.raises(StepError) as err:
+            await InProcessSteps().run(path, body, None, None)
+        assert err.value.status == 502
+        assert "no usable answer" in str(err.value)
 
 
 def test_judge_and_evaluator_see_the_history_the_writer_saw():
@@ -344,13 +340,13 @@ async def test_steps_ask_for_a_rationale_last_in_their_schema(dispatch_returns):
     assert list(DebriefCardsReasoned.model_fields)[-1] == "reasoning"
 
 
-def test_the_rationale_never_reaches_the_cards_or_the_evidence(monkeypatch):
-    """The response models keep their parent types, so the rationale travels
+@pytest.mark.asyncio
+async def test_the_rationale_never_reaches_the_cards_or_the_evidence(monkeypatch):
+    """The step functions serialise the parent types, so the rationale travels
     only in `reasoning`: nothing a learner reads can carry it."""
-    from app.core.config import settings
     from app.core.debrief import steps
     from app.core.debrief.schemas import DebriefCardsReasoned, EvidenceMapReasoned
-    from app.main import app
+    from app.core.debrief_graph.step_functions import InProcessSteps
 
     async def _analyse(*args, **kwargs):
         return EvidenceMapReasoned(reasoning="Why I read it so."), "gemini-2.5-pro"
@@ -363,18 +359,12 @@ def test_the_rationale_never_reaches_the_cards_or_the_evidence(monkeypatch):
 
     monkeypatch.setattr(steps, "analyse", _analyse)
     monkeypatch.setattr(steps, "write", _write)
-    client = TestClient(app)
-    headers = {"x-api-key": settings.API.X_API_KEY}
 
-    res = client.post(
-        "/api/v1/debrief/analyst", json={"transcript": []}, headers=headers
-    )
-    body = res.json()
+    body = await InProcessSteps().run("analyst", {"transcript": []}, None, None)
     assert body["reasoning"] == "Why I read it so."
     assert "reasoning" not in body["evidence"]
 
-    res = client.post("/api/v1/debrief/writer", json={"evidence": {}}, headers=headers)
-    body = res.json()
+    body = await InProcessSteps().run("writer", {"evidence": {}}, None, None)
     assert body["reasoning"] == "Why I wrote it so."
     assert "reasoning" not in body["cards"]
 

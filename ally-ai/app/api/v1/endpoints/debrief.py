@@ -7,11 +7,12 @@ workspace. This service only performs the step.
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.core.agent_runtime.checkpointer import checkpointer_available
 from app.core.config import settings
-from app.core.debrief import pm_agent, steps
+from app.core.debrief import pm_agent
 from app.core.debrief.pm_agent import PmAgentAnalysis
 from app.core.debrief.safety_reader import (
     LearnerDistress,
@@ -19,13 +20,12 @@ from app.core.debrief.safety_reader import (
     TranscriptTurn,
     read_safety,
 )
-from app.core.debrief.schemas import (
-    DebriefCards,
-    EvaluationOutput,
-    EvidenceMap,
-    ProgressReading,
-    reasoning_of,
-)
+from app.core.debrief_graph.context import DebriefRunContext
+from app.core.debrief_graph.gateway import HttpGateway
+from app.core.debrief_graph.graph import get_debrief_graph
+from app.core.debrief_graph.runner import run_debrief
+from app.core.debrief_graph.schemas import DebriefRunRequest, DebriefRunResponse
+from app.core.debrief_graph.step_functions import InProcessSteps
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -83,13 +83,6 @@ async def safety_reader(req: SafetyReaderRequest) -> SafetyReaderResponse:
     )
 
 
-# --- The remaining steps --------------------------------------------------------
-#
-# Same contract as the Safety reader: ally-be sends the live prompt text and the
-# model its recipe names; a model with no usable answer is a 502 so the runner
-# can retry on the step's backup model or step down its fallback ladder.
-
-
 def _unusable(step: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_502_BAD_GATEWAY,
@@ -103,202 +96,6 @@ def _failed(step: str, exc: Exception) -> HTTPException:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=f"{step} failed",
     )
-
-
-class StepRequest(BaseModel):
-    model: Optional[str] = None
-    system_prompt: Optional[str] = None
-    language: str = "en"
-    scenario_session_id: Optional[str] = None
-
-
-class AnalystRequest(StepRequest):
-    transcript: List[TranscriptTurn] = Field(default_factory=list)
-    scenario: Dict[str, Any] = Field(default_factory=dict)
-    expected_behaviours: List[str] = Field(default_factory=list)
-    learner_level: Optional[str] = None
-    # What the live detector recorded per expected behaviour (v9 FR-17
-    # get_live_detections); empty when the scenario has none.
-    live_detections: List[Dict[str, Any]] = Field(default_factory=list)
-    # A case session's memory so far; the Analyst returns the updated one.
-    case_memory: Optional[str] = None
-
-
-class AnalystResponse(BaseModel):
-    model: str
-    evidence: EvidenceMap
-    # The step's own rationale for the Console's run view; never in `evidence`.
-    reasoning: str = ""
-
-
-@router.post("/analyst", response_model=AnalystResponse)
-async def analyst(req: AnalystRequest) -> AnalystResponse:
-    model = req.model or settings.DEBRIEF.ANALYST_MODEL
-    try:
-        out, ran = await steps.analyse(
-            req.transcript,
-            req.language,
-            model,
-            scenario=req.scenario,
-            expected_behaviours=req.expected_behaviours,
-            learner_level=req.learner_level,
-            system=req.system_prompt,
-            scenario_session_id=req.scenario_session_id,
-            live_detections=req.live_detections,
-            case_memory=req.case_memory,
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise _failed("analyst", exc) from exc
-    if out is None:
-        raise _unusable("analyst")
-    return AnalystResponse(model=ran, evidence=out, reasoning=reasoning_of(out))
-
-
-class ProgressRequest(StepRequest):
-    evidence: Dict[str, Any]
-    past_points: List[Dict[str, Any]] = Field(default_factory=list)
-
-
-class ProgressResponse(BaseModel):
-    model: str
-    progress: ProgressReading
-    reasoning: str = ""
-
-
-@router.post("/progress-reader", response_model=ProgressResponse)
-async def progress_reader(req: ProgressRequest) -> ProgressResponse:
-    model = req.model or settings.DEBRIEF.PROGRESS_READER_MODEL
-    try:
-        out, ran = await steps.read_progress(
-            req.evidence,
-            req.past_points,
-            model,
-            system=req.system_prompt,
-            scenario_session_id=req.scenario_session_id,
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise _failed("progress-reader", exc) from exc
-    if out is None:
-        raise _unusable("progress-reader")
-    return ProgressResponse(model=ran, progress=out, reasoning=reasoning_of(out))
-
-
-class WriterRequest(StepRequest):
-    evidence: Dict[str, Any]
-    safety: Dict[str, Any] = Field(default_factory=dict)
-    transcript: List[TranscriptTurn] = Field(default_factory=list)
-    passages: List[Dict[str, Any]] = Field(default_factory=list)
-    progress: Optional[Dict[str, Any]] = None
-    learner_level: Optional[str] = None
-    tone: Optional[str] = None
-    short: bool = False
-    practice_options: List[Dict[str, Any]] = Field(default_factory=list)
-    case_memory: Optional[str] = None
-    assessment: bool = False
-    # How the organisation's other trainees did on this roleplay (v9 FR-17
-    # get_cohort_stats); ally-be sends it only for groups of 5 or more.
-    cohort: Optional[Dict[str, Any]] = None
-
-
-class CardsResponse(BaseModel):
-    model: str
-    cards: DebriefCards
-    reasoning: str = ""
-
-
-@router.post("/writer", response_model=CardsResponse)
-async def writer(req: WriterRequest) -> CardsResponse:
-    model = req.model or settings.DEBRIEF.WRITER_MODEL
-    try:
-        out, ran = await steps.write(
-            req.evidence,
-            req.safety,
-            req.language,
-            model,
-            req.transcript,
-            passages=req.passages,
-            progress=req.progress,
-            learner_level=req.learner_level,
-            tone=req.tone,
-            short=req.short,
-            system=req.system_prompt,
-            scenario_session_id=req.scenario_session_id,
-            practice_options=req.practice_options,
-            case_memory=req.case_memory,
-            assessment=req.assessment,
-            cohort=req.cohort,
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise _failed("writer", exc) from exc
-    if out is None:
-        raise _unusable("writer")
-    return CardsResponse(model=ran, cards=out, reasoning=reasoning_of(out))
-
-
-class EvaluatorRequest(StepRequest):
-    transcript: List[TranscriptTurn] = Field(default_factory=list)
-    debrief: str
-    # The pinned rubric from the Skills Store; None uses the judge's default.
-    rubric: Optional[str] = None
-    learner_level: Optional[str] = None
-    guidance: Optional[str] = None
-    history: Optional[str] = None
-
-
-class EvaluatorResponse(BaseModel):
-    model: str
-    evaluation: EvaluationOutput
-    reasoning: str = ""
-
-
-@router.post("/evaluator", response_model=EvaluatorResponse)
-async def evaluator(req: EvaluatorRequest) -> EvaluatorResponse:
-    model = req.model or settings.DEBRIEF.EVALUATOR_MODEL
-    try:
-        out, ran = await steps.evaluate(
-            req.transcript,
-            req.debrief,
-            req.language,
-            model,
-            rubric=req.rubric,
-            learner_level=req.learner_level,
-            guidance=req.guidance,
-            scenario_session_id=req.scenario_session_id,
-            history=req.history,
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise _failed("evaluator", exc) from exc
-    if out is None:
-        raise _unusable("evaluator")
-    return EvaluatorResponse(model=ran, evaluation=out, reasoning=reasoning_of(out))
-
-
-class ReviserRequest(StepRequest):
-    draft: Dict[str, Any]
-    critique: List[Dict[str, Any]] = Field(default_factory=list)
-    evidence: Dict[str, Any] = Field(default_factory=dict)
-    excerpts: List[TranscriptTurn] = Field(default_factory=list)
-
-
-@router.post("/reviser", response_model=CardsResponse)
-async def reviser(req: ReviserRequest) -> CardsResponse:
-    model = req.model or settings.DEBRIEF.REVISER_MODEL
-    try:
-        out, ran = await steps.revise(
-            req.draft,
-            req.critique,
-            req.evidence,
-            req.excerpts,
-            req.language,
-            model,
-            system=req.system_prompt,
-            scenario_session_id=req.scenario_session_id,
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise _failed("reviser", exc) from exc
-    if out is None:
-        raise _unusable("reviser")
-    return CardsResponse(model=ran, cards=out, reasoning=reasoning_of(out))
 
 
 class PmAgentRequest(BaseModel):
@@ -347,3 +144,44 @@ async def pm_agent_analyse(req: PmAgentRequest) -> PmAgentResponse:
     if out is None:
         raise _unusable("PM agent")
     return PmAgentResponse(model=ran, analysis=out)
+
+
+# --- The Debrief graph -------------------------------------------------------------
+#
+# The whole run in one call: ally-be prepares the inputs and applies the result;
+# the graph runs the recipe (CONTRACT.md in docs/debrief-harness). The graph calls
+# the step functions in-process; only the Safety reader keeps an endpoint (Ask Ally's
+# distress check calls it).
+
+
+def get_graph():
+    return get_debrief_graph()
+
+
+@router.post("/runs", response_model=DebriefRunResponse)
+async def debrief_run(
+    req: DebriefRunRequest, graph=Depends(get_graph)
+) -> DebriefRunResponse:
+    """Start, resume or read back one debrief run. Synchronous: returns the
+    decision. A run an unexpected error stopped answers `failed` (200) and can
+    be resumed with the same `run_id`."""
+    if not checkpointer_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="debrief checkpoints are unavailable",
+        )
+    ctx = DebriefRunContext(
+        run_id=req.run_id,
+        session_id=req.scenario_session_id,
+        bundle=req.bundle,
+        prompts={k: v for k, v in req.prompts.items() if v},
+        ceiling_usd=req.ceiling_usd,
+        prices=req.prices,
+        session=req.session,
+        transcript=req.transcript,
+        inputs=req.context,
+        steps=InProcessSteps(),
+        gateway=HttpGateway(req.gateway_url, req.run_token),
+    )
+    result = await run_debrief(graph, ctx, resume=req.resume)
+    return DebriefRunResponse(**result)
