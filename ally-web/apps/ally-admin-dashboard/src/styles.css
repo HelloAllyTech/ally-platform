@@ -315,6 +315,29 @@ html [data-sonner-toast][data-styled="true"] [data-button] {
   stroke-dashoffset: 40;
   animation: idea-draw 0.4s ease-out 0.35s forwards;
 }
+/* Transcribing: three dots after the last word, where the next phrase will land. */
+.idea-dots > span {
+  display: inline-block;
+  animation: idea-dot 1.2s ease-in-out infinite;
+}
+.idea-dots > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.idea-dots > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes idea-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-0.18em);
+  }
+}
 @keyframes idea-ripple {
   0% {
     transform: scale(0.7);
@@ -343,7 +366,8 @@ html [data-sonner-toast][data-styled="true"] [data-button] {
 @media (prefers-reduced-motion: reduce) {
   .idea-aurora,
   .idea-ripple,
-  .idea-breathe {
+  .idea-breathe,
+  .idea-dots > span {
     animation: none;
   }
   .idea-capture-surface {
