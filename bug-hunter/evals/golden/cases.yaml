@@ -30,6 +30,8 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 8821e5215782e44b07b664de41a450f4f5f60dc9
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-99584ee6
@@ -55,6 +57,8 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 168f627a948f433b6054f8133e036738b40414ec
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-d039e256
@@ -79,6 +83,8 @@ cases:
   src_lines: 3
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-89d8e055
@@ -105,6 +111,8 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 099de82c1f76fd6f6fb4d8baa5f44f6098fa80ca
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-adf36739
@@ -130,6 +138,8 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: a981059deb98b7f8bca10f0ab629e885116b3995
   status: active
+  oracle_shape: true
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-8c4f9caf
@@ -154,6 +164,8 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 2c2c378e8a99f1623e409d0667a601f89c2abc3a
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-9299e9aa
@@ -179,6 +191,8 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 88fd1da22fc0b732d3e4245d5edff4e735e48915
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-e5ad37b3
@@ -204,6 +218,8 @@ cases:
   lockfile_blob: ac36e034439c488c4e5182ba51ca425f7ea367ec
   introduced_by: bf5dcf9699ad683933b485454cc7935963098bcd
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-dd128ff8
@@ -229,6 +245,8 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: f6ed605a08945f1cba2b09824b2bbbd0b99f75ec
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-f35e117d
@@ -256,6 +274,8 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 2cff91d1026a17c5f4be4757c2c22e228fc61de7
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-eebbfd01
@@ -282,6 +302,8 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 5519e5891bad9218e07be097fd11d4bf547df61b
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-3b3db9b5
@@ -312,6 +334,8 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: ec3e51c60e2f4ea8a92f66a3980971ac7f27ffe1
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-b680c643
@@ -337,6 +361,8 @@ cases:
   lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
   introduced_by: 48363e1467d348a6a2bf5b706fdb484e1d9021f2
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-e9a0e1c3
@@ -360,6 +386,8 @@ cases:
   lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
   introduced_by: cfda686b2dd052cc3e2464254b2bd0643ef5032a
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-1065743a
@@ -385,6 +413,8 @@ cases:
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: a3bc5e6939b582207484eba1f8d57a4e9d88dcf6
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-7391ff7e
@@ -409,6 +439,8 @@ cases:
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: 71ddf4d76520a6b90213d046c238b9ccefbdee3a
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-995242d7
@@ -435,6 +467,8 @@ cases:
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: 51ac5ac4d3a9307454188f123e87829405b4186b
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-mobile-83bdf91e
@@ -465,6 +499,8 @@ cases:
   lockfile_blob: 4006dfa5966ef211c009513b41c55ba27aa83fff
   introduced_by: d4ae9ebdf5157a7119c5003c0778cc1d37d99dd0
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-6e81b510
@@ -489,6 +525,8 @@ cases:
   oracle_tests: []
   src_lines: 33
   status: disputed
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: '2026-11-09: labelled clean (feat: challenge_description field), but two sweep runs of
     graph v1/v2 produced concrete findings on it: (1) prompt text says ''Supportive engagement'' while
     the schema enum requires ''Supportive Engagement'' (structured-output validation risk); (2) challenge_description
@@ -519,6 +557,8 @@ cases:
   oracle_tests: []
   src_lines: 75
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-1ff07399
@@ -539,6 +579,8 @@ cases:
   oracle_tests: []
   src_lines: 29
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-6d1b48a8
@@ -559,6 +601,8 @@ cases:
   oracle_tests: []
   src_lines: 10
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-e6286217
@@ -580,6 +624,8 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-f06c8ed5
@@ -601,6 +647,8 @@ cases:
   oracle_tests: []
   src_lines: 91
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-b6c51894
@@ -621,6 +669,8 @@ cases:
   oracle_tests: []
   src_lines: 47
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-88592f67
@@ -642,6 +692,8 @@ cases:
   oracle_tests: []
   src_lines: 30
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-a645303c
@@ -662,6 +714,8 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-c77f929e
@@ -683,6 +737,8 @@ cases:
   oracle_tests: []
   src_lines: 33
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-b408b775
@@ -704,6 +760,8 @@ cases:
   oracle_tests: []
   src_lines: 28
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-66d9a037
@@ -725,6 +783,8 @@ cases:
   oracle_tests: []
   src_lines: 37
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-b29aa1be
@@ -747,6 +807,8 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-f3e78b7e
@@ -768,6 +830,8 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-a2ed4959
@@ -788,6 +852,8 @@ cases:
   oracle_tests: []
   src_lines: 41
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-d77c088a
@@ -809,6 +875,8 @@ cases:
   oracle_tests: []
   src_lines: 41
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-5017783f
@@ -829,6 +897,8 @@ cases:
   oracle_tests: []
   src_lines: 41
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-6b5647ff
@@ -850,6 +920,8 @@ cases:
   oracle_tests: []
   src_lines: 40
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-0f139f7a
@@ -871,6 +943,8 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-8c5367c1
@@ -895,6 +969,8 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-7b655598
@@ -916,6 +992,8 @@ cases:
   oracle_tests: []
   src_lines: 40
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-da6535f4
@@ -937,6 +1015,8 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-bbaeab31
@@ -959,6 +1039,8 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-ffa86627
@@ -981,6 +1063,8 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-2ae8d573
@@ -1004,6 +1088,8 @@ cases:
   oracle_tests: []
   src_lines: 40
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-1364881b
@@ -1026,6 +1112,8 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-382b51ea
@@ -1047,6 +1135,8 @@ cases:
   oracle_tests: []
   src_lines: 37
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-web-8890b80b
@@ -1068,6 +1158,8 @@ cases:
   oracle_tests: []
   src_lines: 37
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-819f6ccf
@@ -1093,6 +1185,8 @@ cases:
   lockfile_blob: baf594754c56a70cb476b9715f7679e5ebb33dd8
   introduced_by: 06f1157e49daa64b25e1105fef256ecc3533739a
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-6083b8d8
@@ -1123,6 +1217,8 @@ cases:
   lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
   introduced_by: 122a80cbcae35f1abeaad6dac4d5f44f08c1892
   status: active
+  oracle_shape: false
+  human_fix_pass: {}
   dispute_note: ''
   tags: []
 - id: ally-be-87c6ecb8
@@ -1150,5 +1246,7 @@ cases:
   lockfile_blob: 6f1c15c2ef3076fa643ce2862fa53c8ef6f8bcc4
   introduced_by: 25d665f80251fce1e5a798533a82d3c2f637b422
   status: active
+  oracle_shape: true
+  human_fix_pass: {}
   dispute_note: ''
   tags: []

@@ -37,6 +37,8 @@ class CaseResult:
     fix_attempts: int = 0
     final_outcome: str | None = None
     stop_reason: str | None = None
+    oracle_shape: bool = False  # the oracle asserts the real fix's shape
+    human_fix_pass: bool | None = None  # human verdict on this run's patch, if given
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -54,6 +56,9 @@ class Metrics:
     repro_valid: int = 0
     fix_attempted: int = 0
     fix_pass: int = 0
+    fix_pass_adjusted: int = 0  # oracle, except human review for oracle_shape
+    fix_adjusted_attempted: int = 0
+    fix_pending_human: int = 0
     escalate_expected: int = 0
     escalate_correct: int = 0
     errors: int = 0
@@ -71,6 +76,9 @@ class Metrics:
             "false_alarm": rate(self.false_alarms, self.clean),
             "reproduction": rate(self.repro_valid, self.repro_attempted),
             "fix_pass": rate(self.fix_pass, self.fix_attempted),
+            "fix_pass_adjusted": rate(
+                self.fix_pass_adjusted, self.fix_adjusted_attempted
+            ),
             "escalation_correct": rate(self.escalate_correct, self.escalate_expected),
             "error": rate(self.errors, self.cases),
         }
@@ -110,6 +118,15 @@ def aggregate(results: Iterable[CaseResult]) -> dict[str, Metrics]:
                 if r.oracle_pass is not None:
                     m.fix_attempted += 1
                     m.fix_pass += int(r.oracle_pass)
+                    if r.oracle_shape:
+                        if r.human_fix_pass is None:
+                            m.fix_pending_human += 1
+                        else:
+                            m.fix_adjusted_attempted += 1
+                            m.fix_pass_adjusted += int(r.human_fix_pass)
+                    else:
+                        m.fix_adjusted_attempted += 1
+                        m.fix_pass_adjusted += int(r.oracle_pass)
             else:
                 m.clean += 1
                 if r.outcome == "false_alarm":
@@ -187,6 +204,19 @@ def render_markdown(report: dict[str, Any]) -> str:
             + (
                 ", ".join(f"{k} {v}" for k, v in sorted(ending_totals.items()))
                 or "none"
+            ),
+        ]
+    total = metrics["total"]
+    if total["fix_attempted"]:
+        lines += [
+            "",
+            f"Fix pass: oracle {total['fix_pass']}/{total['fix_attempted']}; "
+            f"adjusted (human review for oracle_shape cases) "
+            f"{total['fix_pass_adjusted']}/{total['fix_adjusted_attempted']}"
+            + (
+                f", {total['fix_pending_human']} pending human review"
+                if total["fix_pending_human"]
+                else ""
             ),
         ]
     if meta.get("spend_today_usd") is not None:

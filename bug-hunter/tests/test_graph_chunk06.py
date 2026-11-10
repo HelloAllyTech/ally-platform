@@ -789,3 +789,10 @@ def test_topic_rule_ignores_lookalikes() -> None:
     assert topic_hits("translation token guard rejects placeholders") == []
     assert topic_hits("author name is truncated in the byline") == []
     assert topic_hits("x returns 0", "", "src/x.ts:2") == []
+
+
+def test_review_sees_the_scrubbed_signal(config, repo, tmp_path) -> None:
+    deps = _deps(config, repo, tmp_path, [EDIT_FIX, SUBMIT_FIX])
+    _, state = _run(deps)
+    system = deps.models["review"].calls[0][0].content
+    assert "x() returns 0 not 3" in system  # the report, next to the finding

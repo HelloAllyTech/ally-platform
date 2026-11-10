@@ -226,6 +226,7 @@ def test_patch_and_repro_are_scored_in_the_sandbox(repo_config, tmp_path: Path) 
         "false_alarm": 1.0,
         "reproduction": 1.0,
         "fix_pass": 1.0,
+        "fix_pass_adjusted": 1.0,
         "escalation_correct": None,
         "error": 0.0,
     }

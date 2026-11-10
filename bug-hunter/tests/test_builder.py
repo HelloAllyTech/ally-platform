@@ -50,10 +50,16 @@ def test_only_declared_fields_are_included(config: BugHunterConfig) -> None:
     ctx = build_context(
         config, "review", {**_state(), "repro": None}, counter=COUNT, budget=5000
     )
-    assert set(ctx.sections) == {"finding", "repro", "patch", "verification"}
+    assert set(ctx.sections) == {"signal", "finding", "repro", "patch", "verification"}
     assert ctx.sections["repro"] == "(none)"
     assert "secret_reasoning" not in ctx.render()
-    assert NODE_INPUTS["review"] == ("finding", "repro", "patch", "verification")
+    assert NODE_INPUTS["review"] == (
+        "signal",
+        "finding",
+        "repro",
+        "patch",
+        "verification",
+    )
 
 
 def test_review_never_sees_the_scratchpad(

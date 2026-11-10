@@ -283,6 +283,8 @@ def run_case(
                 result_row.seconds = round(agent_seconds, 1)
                 raise _AgentCrashed()
             result_row.review_verdicts = list(agent_result.review_verdicts)
+            result_row.oracle_shape = case.oracle_shape
+            result_row.human_fix_pass = case.human_fix_pass.get(run.run_id)
             result_row.fix_attempts = agent_result.fix_attempts
             result_row.final_outcome = agent_result.final_outcome
             result_row.stop_reason = agent_result.stop_reason

@@ -51,6 +51,13 @@ class Case(BaseModel):
     # "clean" commit, or a fix turned out not to be one). Disputed cases are kept but
     # never run or scored until resolved.
     status: Literal["active", "disputed"] = "active"
+    # The hidden oracle asserts the real fix's shape (a new symbol, an exact log
+    # argument), not only behaviour: an equivalent fix fails it. Fix pass for such a
+    # case is scored by human review (`human_fix_pass`), and reported both ways.
+    oracle_shape: bool = False
+    human_fix_pass: dict[str, bool] = Field(
+        default_factory=dict, description="run_id -> human verdict on the agent's patch"
+    )
     dispute_note: str = ""
     tags: list[str] = Field(default_factory=list)
 

@@ -38,7 +38,7 @@ NODE_INPUTS: dict[str, tuple[str, ...]] = {
     "investigate": ("signal", "finding"),
     "reproduce": ("finding", "root_cause"),
     "fix": ("finding", "repro", "root_cause"),
-    "review": ("finding", "repro", "patch", "verification"),
+    "review": ("signal", "finding", "repro", "patch", "verification"),
     "learn": ("signal", "finding", "root_cause", "patch", "review", "status"),
 }
 NODES_WITH_SCRATCHPAD = ("investigate", "reproduce", "fix", "learn")

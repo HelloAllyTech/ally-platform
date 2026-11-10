@@ -122,6 +122,7 @@ def test_metrics_aggregate_and_rates() -> None:
         "false_alarm": round(1 / 3, 3),
         "reproduction": 0.5,  # b1 valid, b4 not
         "fix_pass": 0.5,
+        "fix_pass_adjusted": 0.5,
         "escalation_correct": 0.5,  # b3 yes, b4 should have escalated
         "error": round(1 / 7, 3),
     }
@@ -163,3 +164,34 @@ def test_render_markdown() -> None:
         "| `b1` | bug | fix | detected | – | yes | – | 0 | – | 0 | $0.000 | 3 | – |"
         in text
     )
+
+
+def test_oracle_shape_cases_are_scored_by_human_review() -> None:
+    from evals.metrics import CaseResult, aggregate
+
+    rows = [
+        CaseResult("a", "ally-be", "bug", "fix", "detected", oracle_pass=True),
+        CaseResult(
+            "b",
+            "ally-be",
+            "bug",
+            "fix",
+            "detected",
+            oracle_pass=False,
+            oracle_shape=True,
+            human_fix_pass=True,
+        ),
+        CaseResult(
+            "c",
+            "ally-be",
+            "bug",
+            "fix",
+            "detected",
+            oracle_pass=False,
+            oracle_shape=True,
+        ),
+    ]
+    total = aggregate(rows)["total"]
+    assert (total.fix_pass, total.fix_attempted) == (1, 3)
+    assert (total.fix_pass_adjusted, total.fix_adjusted_attempted) == (2, 2)
+    assert total.fix_pending_human == 1
