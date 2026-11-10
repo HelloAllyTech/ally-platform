@@ -72,7 +72,8 @@ class LearnedSection(str, Enum):
 
 
 class DesignId(str, Enum):
-    """The designs that work today. Booking and orders are only ever "coming soon"."""
+    """The 20a-1 designs, which purposes replaced in 20a-2. Kept so a draft made
+    before purposes still loads; `PURPOSE_OF_DESIGN` maps it to a purpose."""
 
     GUIDE = "guide"
     ENQUIRIES = "enquiries"

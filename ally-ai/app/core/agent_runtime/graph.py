@@ -147,7 +147,7 @@ async def get_run_state(
 ) -> Optional[Dict[str, Any]]:
     """The final stored state of one run in a conversation, or None.
 
-    Internal for now; "Why?" (chunk 10) puts a route on it.
+    Only tests call it today; "Why?" (chunk 16b) will put a route on it.
     """
     config = {"configurable": {"thread_id": conversation_id}}
     # Newest first, so the first checkpoint of this run is its final state.
