@@ -17,7 +17,9 @@ const handleLogout = () => {
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED);
 
-  window.location.href = ROUTES.LOGIN;
+  // Raw window.location bypasses the router basename - prefix the Vite base
+  // (the app lives under /admin in production, / everywhere else).
+  window.location.href = import.meta.env.BASE_URL.replace(/\/$/, "") + ROUTES.LOGIN;
 };
 
 const baseQuery = fetchBaseQuery({
