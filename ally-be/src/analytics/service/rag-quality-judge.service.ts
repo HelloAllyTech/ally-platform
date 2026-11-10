@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { AppConfigService } from '../../config/config.service';
+import { KbRetrievalConsumer } from '../../knowledge-base/enum/knowledge-base.enum';
 import { LoggerService } from '../../logger/logger.service';
 import { RedisService } from '../../redis/service/redis.service';
 import {
@@ -130,18 +131,18 @@ export class RagQualityJudgeService {
   }
 
   /**
-   * Select a BALANCED batch across consumers rather than the newest rows outright.
+   * Select a batch from the consumers that still write retrievals, split evenly between them.
    *
-   * The admin retrieval preview and the agents' traffic are different populations, and the
-   * preview's is the one an operator can generate hundreds of on a single afternoon of
-   * threshold-probing. Taken newest-first, that afternoon becomes the entire measurement, and
-   * the number it produces describes the operator rather than the corpus. Splitting the chunk
-   * between consumers keeps the agent's traffic in every batch — sampling across the variation
-   * that exists is the cheapest guard against reading one population as another
-   * ("Mitigate false negatives by recruiting participant variation").
+   * Taken newest-first across every consumer, one noisy population can become the entire
+   * measurement — the admin retrieval preview once could, when an operator probed thresholds
+   * for an afternoon. Splitting the batch between live consumers keeps each one's traffic in
+   * every batch ("Mitigate false negatives by recruiting participant variation").
    *
-   * A consumer with nothing eligible simply contributes nothing; its share is not redistributed,
-   * because a batch that silently becomes single-consumer again is the thing being avoided.
+   * Only consumers still writing are listed. The admin preview stopped writing when its route
+   * was removed and the character interview moved to the Context Library (which has its own
+   * judge), so the WhatsApp bot is the only one left. Reserving half a batch for a consumer that
+   * no longer writes would leave that half unjudged on every run. A consumer added later goes
+   * in this list.
    */
   private async selectBalanced(
     sinceDays: number,
@@ -154,10 +155,7 @@ export class RagQualityJudgeService {
     if (!limit) {
       return this.repo.selectRetrievals({ sinceDays, unjudgedForVersion });
     }
-    // The agent side was the character interview until its corpus moved to the Context
-    // Library (which has its own judge); the WhatsApp bot is now the highest-volume agent
-    // traffic on a corpus this judge can read.
-    const consumers = ['whatsapp_bot', 'admin_preview'];
+    const consumers: string[] = [KbRetrievalConsumer.WHATSAPP_BOT];
     const share = Math.max(1, Math.floor(limit / consumers.length));
     const batches = await Promise.all(
       consumers.map((consumer) =>

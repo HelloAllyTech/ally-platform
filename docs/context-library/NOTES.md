@@ -106,7 +106,7 @@ MCP endpoint with it.
 - **Cost per real document** has been estimated, not measured on a full-size upload.
 - **No load test** of retrieval (three retrievers, fusion, re-rank) or of the worker under
   concurrent uploads.
-- The RAG-quality judge still splits its batch between `whatsapp_bot` and `admin_preview`
-  (`ally-be/src/analytics/service/rag-quality-judge.service.ts`); `admin_preview` gets no new
-  rows now, so half of each batch's budget goes unused. Left as is: changing it changes the
-  judge's sampling, which wants its own review.
+- The Knowledge Base's RAG-quality judge (`ally-be/src/analytics/service/rag-quality-judge.service.ts`)
+  now gives its whole batch to `whatsapp_bot`, the only consumer still writing retrievals. It
+  used to split the batch with `admin_preview`, which no longer writes, so half of every batch
+  went unjudged. If another consumer starts writing again, add it to that list.

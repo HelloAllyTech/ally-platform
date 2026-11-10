@@ -170,21 +170,17 @@ describe('RagQualityJudgeService', () => {
     expect(job.judged).toBe(1);
   });
 
-  it('samples across both consumers instead of taking the newest rows', async () => {
-    // An operator probing thresholds in the admin preview can generate hundreds of
-    // retrievals in an afternoon. Newest-first, that afternoon becomes the measurement, and
-    // the number describes the operator rather than the corpus.
+  it('gives the whole batch to the consumers that still write retrievals', async () => {
+    // The admin preview no longer writes rows; reserving half a batch for it would leave
+    // that half unjudged on every run.
     const { service, repo } = build();
     await run(service, 120);
 
-    const consumers = repo.selectRetrievals.mock.calls.map(
-      ([opts]: [{ consumer?: string; limit?: number }]) => opts.consumer,
+    const calls = repo.selectRetrievals.mock.calls.map(
+      ([opts]: [{ consumer?: string; limit?: number }]) => opts,
     );
-    expect(consumers).toEqual(
-      expect.arrayContaining(['whatsapp_bot', 'admin_preview']),
-    );
-    const [firstOpts] = repo.selectRetrievals.mock.calls[0];
-    expect(firstOpts.limit).toBe(60);
+    expect(calls.map((c) => c.consumer)).toEqual(['whatsapp_bot']);
+    expect(calls[0].limit).toBe(120);
   });
 
   it('sends the query, corpus and the floor that actually ran', async () => {
