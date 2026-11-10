@@ -11,7 +11,7 @@ import {
   useLazyGetTrackByIdQuery,
   useUpdateTrackByIdMutation,
   useUpdateTrackStructureMutation,
-  useUpdateLiveQuizSettingsMutation,
+  useUpdateLiveAttemptLimitMutation,
 } from "@api";
 import { WandStars, WarningAlt } from "@assets";
 import { ActionConfirmationPopup, Button, Header } from "@components";
@@ -46,7 +46,7 @@ import {
   createItemOfType,
   deserializeTrack,
   extractTrackMetadata,
-  getLiveQuizAttemptChanges,
+  getLiveAttemptLimitChanges,
   serializeTrackForm,
   validateTrackForPublish,
 } from "./trackFormUtils";
@@ -82,7 +82,7 @@ export const CreateTrack: FC = () => {
   const [createTrack] = useCreateTrackMutation();
   const [updateTrackMetadata] = useUpdateTrackByIdMutation();
   const [updateTrackStructure] = useUpdateTrackStructureMutation();
-  const [updateLiveQuizSettings] = useUpdateLiveQuizSettingsMutation();
+  const [updateLiveAttemptLimit] = useUpdateLiveAttemptLimitMutation();
   const { track } = useAnalytics();
 
   const formMethods = useForm<TrackFormValues>({
@@ -219,14 +219,19 @@ export const CreateTrack: FC = () => {
         setTrackId(created.id);
       }
 
-      // A raised attempt limit on a live course goes through its own endpoint: the
-      // structure PUT treats `maxAttempts` as structural and 409s once learners are
-      // enrolled. Sent first, so the PUT below then matches what is stored.
+      // A raised attempt limit (quiz or annotation) on a live course goes through
+      // its own endpoint: the structure PUT treats `maxAttempts` as structural and
+      // 409s once learners are enrolled. Sent first, so the PUT below then matches
+      // what is stored.
       if (trackId && trackDetail?.status === SimulationStatus.ACTIVE) {
-        for (const change of getLiveQuizAttemptChanges(trackDetail, values)) {
-          await updateLiveQuizSettings(change).unwrap();
+        for (const change of getLiveAttemptLimitChanges(trackDetail, values)) {
+          await updateLiveAttemptLimit({
+            trackItemId: change.trackItemId,
+            maxAttempts: change.maxAttempts,
+          }).unwrap();
           track(ANALYTICS_EVENTS.LIVE_QUIZ_ATTEMPTS_INCREASED, {
             trackItemId: change.trackItemId,
+            itemType: change.itemType,
             maxAttempts: change.maxAttempts,
           });
         }
