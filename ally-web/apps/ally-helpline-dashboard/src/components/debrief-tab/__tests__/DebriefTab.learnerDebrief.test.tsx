@@ -14,6 +14,7 @@ const mockLearnerDebriefQuery = vi.hoisted(() => vi.fn());
 const mockFetchAudio = vi.hoisted(() => vi.fn());
 const mockMarkRead = vi.hoisted(() => vi.fn());
 const mockMarkOpened = vi.hoisted(() => vi.fn());
+const mockReportEvent = vi.hoisted(() => vi.fn(() => ({ unwrap: () => Promise.resolve() })));
 const mockMutations = vi.hoisted(() => ({ helpful: vi.fn(), flag: vi.fn(), undo: vi.fn() }));
 
 vi.mock("react-i18next", () => ({
@@ -41,6 +42,7 @@ vi.mock("@api", () => ({
   useUndoDebriefFlagMutation: () => [mockMutations.undo, { isLoading: false }],
   useLazyGetDebriefCardAudioQuery: () => [mockFetchAudio],
   useMarkDebriefOpenedMutation: () => [mockMarkOpened],
+  useReportDebriefEventMutation: () => [mockReportEvent],
   useMarkDebriefReadMutation: () => [mockMarkRead],
   useGetSupervisorDebriefQuery: () => ({ data: undefined }),
   LEARNER_DEBRIEF_POLL_MS: 3000,
@@ -504,6 +506,39 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(screen.getAllByTestId("debrief-practise-this")).toHaveLength(1);
     });
 
+    it("reports a tap on Practise this next once, for the experience metrics (v9 §3.3)", () => {
+      mockReportEvent.mockReturnValue({ unwrap: () => Promise.resolve() });
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: withLinks,
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress" }],
+        },
+      });
+      renderTab();
+      fireEvent.click(screen.getByTestId("debrief-practise-next"));
+      fireEvent.click(screen.getByTestId("debrief-practise-next"));
+      const clicks = mockReportEvent.mock.calls.filter(([a]) => a.kind === "practise_next_click");
+      expect(clicks).toEqual([[{ sessionId: "s-1", kind: "practise_next_click" }]]);
+    });
+
+    it("a failed report never shows anything", async () => {
+      mockReportEvent.mockReturnValue({ unwrap: () => Promise.reject(new Error("404")) });
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: withLinks,
+          language: "en",
+          practice: [{ id: 41, title: "Exam stress" }],
+        },
+      });
+      renderTab();
+      fireEvent.click(screen.getByTestId("debrief-practise-next"));
+      await Promise.resolve();
+      expect(screen.getByTestId("debrief-practise-next")).toBeInTheDocument();
+    });
+
     it("shows no button when no linked roleplay is available", () => {
       mockLearnerDebriefQuery.mockReturnValue({
         data: { state: "ready", cards: withLinks, language: "en", practice: [] },
@@ -575,13 +610,16 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
   });
 
   describe("XP for reading to the end", () => {
-    let visible: (() => void) | null = null;
+    // Every observer the cards create (the XP marker and the first-card
+    // read-through marker) sees its element at once.
+    let seen: Array<() => void> = [];
+    const visible = () => seen.forEach(f => f());
     beforeEach(() => {
       vi.useFakeTimers();
-      visible = null;
+      seen = [];
       class FakeObserver {
         constructor(cb: (e: Array<{ isIntersecting: boolean }>) => void) {
-          visible = () => cb([{ isIntersecting: true }]);
+          seen.push(() => cb([{ isIntersecting: true }]));
         }
         observe() {}
         disconnect() {}
@@ -593,9 +631,16 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     });
     afterEach(() => vi.useRealTimers());
 
+    it("reports read-through once the end of the first Work-on-this card is seen (v9 §3.3)", () => {
+      renderTab();
+      expect(screen.getAllByTestId("debrief-first-work-end")).toHaveLength(1);
+      visible();
+      expect(mockReportEvent).toHaveBeenCalledWith({ sessionId: "s-1", kind: "read_through" });
+    });
+
     it("tells the server once the end was seen and the debrief open 30 seconds", () => {
       renderTab();
-      visible?.();
+      visible();
       vi.advanceTimersByTime(29_000);
       expect(mockMarkRead).not.toHaveBeenCalled();
       vi.advanceTimersByTime(1_000);
@@ -608,5 +653,33 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       vi.advanceTimersByTime(60_000);
       expect(mockMarkRead).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("DebriefTab — waiting on the debrief (v9 §3.3 abandoned before ready)", () => {
+  beforeEach(() => {
+    mockReportEvent.mockReset();
+    mockReportEvent.mockReturnValue({ unwrap: () => Promise.resolve() });
+  });
+
+  it("reports that the learner waited, and that they left while it was still working", () => {
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "working", steps: [] } });
+    const { unmount } = renderTab();
+    expect(mockReportEvent).toHaveBeenCalledWith({ sessionId: "s-1", kind: "waited" });
+    unmount();
+    expect(mockReportEvent).toHaveBeenCalledWith({ sessionId: "s-1", kind: "left_before_ready" });
+  });
+
+  it("does not report leaving once the debrief is ready", () => {
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "working", steps: [] } });
+    const { rerender, unmount } = renderTab();
+    mockLearnerDebriefQuery.mockReturnValue({
+      data: { state: "ready", cards: CARDS, language: "en", practice: [] },
+    });
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    unmount();
+    expect(mockReportEvent.mock.calls.filter(([a]) => a.kind === "left_before_ready")).toHaveLength(
+      0,
+    );
   });
 });

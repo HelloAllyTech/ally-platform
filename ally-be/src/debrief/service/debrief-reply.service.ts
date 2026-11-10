@@ -45,6 +45,7 @@ import { DebriefAgentService } from './debrief-agent.service';
 import { DebriefAiClient } from './debrief-ai.client';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefFeedbackService } from './debrief-feedback.service';
+import { DebriefLearnerEventsService } from './debrief-learner-events.service';
 import {
   DebriefReplyAgentService,
   ReplyTrace,
@@ -130,6 +131,8 @@ export class DebriefReplyService {
     @Optional() private readonly guidance?: ContextRetrievalService,
     /** Ask Ally's tool loop; absent, a reply is one call with context fetched first. */
     @Optional() private readonly replyAgent?: DebriefReplyAgentService,
+    /** v9 §3.3: replies and reflective answers, for the experience metrics. */
+    @Optional() private readonly learnerEvents?: DebriefLearnerEventsService,
   ) {}
 
   async stream(
@@ -160,6 +163,13 @@ export class DebriefReplyService {
       tenantId,
     });
     this.announceEngagement(prior, message, run, userId);
+    void this.learnerEvents?.record({
+      sessionId,
+      userId,
+      kind: 'replied',
+      tenantId,
+      runId: run.id,
+    });
 
     // Replayed: the crisis reply, and a fast model, can emit before the
     // controller has subscribed, and nothing the learner should see is lost.
@@ -453,6 +463,13 @@ export class DebriefReplyService {
               DebriefEngagementEvent.REFLECTION_QUALIFIED,
               params,
             );
+            void this.learnerEvents?.record({
+              sessionId: run.scenarioSessionId,
+              userId,
+              kind: 'reflection_answered',
+              tenantId: params.tenantId,
+              runId: (run as { id?: string }).id ?? null,
+            });
           }
         });
       }

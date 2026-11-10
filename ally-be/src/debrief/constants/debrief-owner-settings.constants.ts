@@ -14,7 +14,14 @@ export interface OwnerSettingSpec {
   max?: number;
   /** A budget head: only a person changes it, and the Console asks to confirm. */
   budget?: boolean;
-  group: 'quick' | 'gate' | 'sealed' | 'trials' | 'canary' | 'budget';
+  group:
+    | 'quick'
+    | 'gate'
+    | 'sealed'
+    | 'trials'
+    | 'canary'
+    | 'budget'
+    | 'metrics';
 }
 
 export const OWNER_SETTINGS_SPEC = {
@@ -108,6 +115,36 @@ export const OWNER_SETTINGS_SPEC = {
     max: 0.5,
     budget: true,
     group: 'budget',
+  },
+  // Metrics (v9 §3.3): the weekly steering proxy's weights, normalised by
+  // their sum, and how soon a learner's flag should be reviewed.
+  steeringWeightJudge: {
+    default: 0.5,
+    kind: 'share',
+    min: 0,
+    max: 1,
+    group: 'metrics',
+  },
+  steeringWeightPractise: {
+    default: 0.25,
+    kind: 'share',
+    min: 0,
+    max: 1,
+    group: 'metrics',
+  },
+  steeringWeightThumbs: {
+    default: 0.25,
+    kind: 'share',
+    min: 0,
+    max: 1,
+    group: 'metrics',
+  },
+  flagReviewSlaHours: {
+    default: 24,
+    kind: 'int',
+    min: 1,
+    max: 168,
+    group: 'metrics',
   },
 } as const satisfies Record<string, OwnerSettingSpec>;
 

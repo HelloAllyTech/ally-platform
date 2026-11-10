@@ -50,8 +50,8 @@ Runtime in CI is **Node.js 20** for both.
 - **A `libs/ui-shared` change ships in both.** Prefer `apps=both` when one is in the release.
 - **Users with an open tab during a deploy** get one automatic reload on their next screen
   (hashed chunk files are replaced on every deploy) — expected, not a bug.
-- The old per-app workflows (`production-release-admin-dashboard.yaml`,
-  `production-release-helpline-dashboard.yaml`, tags `admin-v*` / `helpline-v*`) are kept
-  briefly as a fallback and will be removed. Don't mix: once you release with
-  `frontend-v*`, keep using it.
+- The old per-app workflows and their `admin-v*` / `helpline-v*` tags are retired. The
+  old tags stay in git history; new releases are `frontend-v*` only.
+- Bug Hunter and Builder release through this same workflow (`apps=admin`, `apps=helpline`,
+  or `apps=both` when a change touches both apps).
 - CI and deployment workflow details: [`WORKFLOWS.md`](WORKFLOWS.md).

@@ -469,6 +469,7 @@ export const ApiEndpoints = {
     RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
     STEPS: "/v1/debriefs/console/steps",
     SETTINGS: "/v1/debriefs/console/settings",
+    METRICS: "/v1/debriefs/console/metrics",
     SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
     SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,

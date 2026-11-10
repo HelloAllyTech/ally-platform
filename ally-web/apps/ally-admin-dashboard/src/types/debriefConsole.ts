@@ -378,7 +378,7 @@ export interface DebriefOwnerSettingSpec {
   min?: number;
   max?: number;
   budget?: boolean;
-  group: "quick" | "gate" | "sealed" | "trials" | "canary" | "budget";
+  group: "quick" | "gate" | "sealed" | "trials" | "canary" | "budget" | "metrics";
 }
 
 export interface DebriefSettingsView {
@@ -401,4 +401,77 @@ export interface DebriefSettingsView {
   } | null;
   updatedAt: string;
   updatedBy: number | null;
+}
+
+/** A rate with its counts (v9 §3.3); `value` is null when nothing was counted. */
+export interface DebriefRate {
+  value: number | null;
+  n: number;
+  of: number;
+}
+
+export interface DebriefExperienceRates {
+  openedWithin24h: DebriefRate;
+  readThrough: DebriefRate;
+  practiseClickThrough: DebriefRate;
+  reflectionAnswered: DebriefRate;
+  abandonedBeforeReady: DebriefRate;
+  flagsWithinSla: DebriefRate;
+  listened: DebriefRate;
+  replied: DebriefRate;
+}
+
+export interface DebriefMetricsWeek {
+  week: string;
+  debriefs: number;
+  steering: {
+    value: number | null;
+    missing: Array<"practise" | "thumbs">;
+    components: { judge: number | null; practise: DebriefRate; thumbs: DebriefRate };
+  };
+  guardrails: {
+    judgeP50: number | null;
+    judgeMean: number | null;
+    judged: number;
+    hardFailRate: DebriefRate;
+    fabricatedQuotes: number;
+    thumbsDownRate: DebriefRate;
+    visibleSecondsP50: number | null;
+    visibleSecondsP90: number | null;
+    costP50: number | null;
+    costP90: number | null;
+    evaluatorJudgeGap: number | null;
+  };
+  efficiency: {
+    savedUsdMean: number | null;
+    revisionRoundsP50: number | null;
+    stepsP50: number | null;
+    within10Min: DebriefRate;
+  };
+  experience: DebriefExperienceRates;
+}
+
+export interface DebriefMetricsView {
+  weeks: number;
+  weights: { judge: number; practise: number; thumbs: number };
+  flagReviewSlaHours: number;
+  series: DebriefMetricsWeek[];
+  byLanguage: Array<{ key: string; debriefs: number; experience: DebriefExperienceRates }>;
+  byPlatform: Array<{ key: string; debriefs: number; experience: DebriefExperienceRates }>;
+  baselines: {
+    from: string;
+    until: string;
+    legacyHardFailRate: DebriefRate;
+    legacyThumbsDownRate: DebriefRate;
+  };
+  uptake: Array<{
+    month: string;
+    pairs: number;
+    lift: number | null;
+    lower: number | null;
+    upper: number | null;
+    insufficient: boolean;
+  }>;
+  safetyRecall: { recorded: false };
+  generatedAt: string;
 }
