@@ -1,4 +1,4 @@
-import { ApiEndpoints, HttpMethod } from "@constants";
+import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 
 import { baseAPI } from "./baseApi";
 
@@ -33,14 +33,12 @@ export interface Scorecard {
   checkup: { passed: number; total: number; at: string | null } | null;
 }
 
-const SCORECARD = "Scorecard" as const;
-
 /** The live scorecard on the Overview (chunk Q2a). */
-export const scorecardApi = baseAPI.enhanceEndpoints({ addTagTypes: [SCORECARD] }).injectEndpoints({
+export const scorecardApi = baseAPI.injectEndpoints({
   endpoints: builder => ({
     getScorecard: builder.query<Scorecard, string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.SCORECARD(id), method: HttpMethod.GET }),
-      providesTags: [SCORECARD],
+      providesTags: [TAG_TYPES.SCORECARD],
     }),
     answerUnanswered: builder.mutation<
       { ok: true },
@@ -51,7 +49,7 @@ export const scorecardApi = baseAPI.enhanceEndpoints({ addTagTypes: [SCORECARD] 
         method: HttpMethod.POST,
         body: { text },
       }),
-      invalidatesTags: [SCORECARD],
+      invalidatesTags: [TAG_TYPES.SCORECARD],
     }),
     correctFeedback: builder.mutation<
       { ok: true },
@@ -62,14 +60,14 @@ export const scorecardApi = baseAPI.enhanceEndpoints({ addTagTypes: [SCORECARD] 
         method: HttpMethod.POST,
         body: { text },
       }),
-      invalidatesTags: [SCORECARD],
+      invalidatesTags: [TAG_TYPES.SCORECARD],
     }),
     markFeedbackFine: builder.mutation<{ ok: true }, { id: string; feedbackId: string }>({
       query: ({ id, feedbackId }) => ({
         url: ApiEndpoints.CHATBOTS.SCORECARD_FINE(id, feedbackId),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [SCORECARD],
+      invalidatesTags: [TAG_TYPES.SCORECARD],
     }),
   }),
 });

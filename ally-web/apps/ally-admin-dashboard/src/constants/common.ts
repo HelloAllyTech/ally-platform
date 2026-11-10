@@ -1228,6 +1228,8 @@ export const TAG_TYPES = {
   CHATBOT_DETAIL: "chatbotDetail",
   BOT_DRAFT: "botDraft",
   CHECKUP: "checkup",
+  SOURCES: "sources",
+  SCORECARD: "scorecard",
   CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so

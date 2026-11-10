@@ -1,4 +1,4 @@
-import { ApiEndpoints, HttpMethod } from "@constants";
+import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 
 import { baseAPI } from "./baseApi";
 
@@ -28,14 +28,12 @@ export interface FoundPages {
   groups: { section: string; pages: FoundPage[] }[];
 }
 
-const SOURCES = "Sources" as const;
-
 /** Which pages it learns from (chunk 20a-2): Choose pages, and Sources on the home. */
-export const sourcesApi = baseAPI.enhanceEndpoints({ addTagTypes: [SOURCES] }).injectEndpoints({
+export const sourcesApi = baseAPI.injectEndpoints({
   endpoints: builder => ({
     getSources: builder.query<SourcePage[], string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.SOURCES(id), method: HttpMethod.GET }),
-      providesTags: [SOURCES],
+      providesTags: [TAG_TYPES.SOURCES],
     }),
     previewSource: builder.mutation<
       { url: string; title: string | null; details: number },
@@ -53,14 +51,14 @@ export const sourcesApi = baseAPI.enhanceEndpoints({ addTagTypes: [SOURCES] }).i
         method: HttpMethod.POST,
         body: { url },
       }),
-      invalidatesTags: [SOURCES],
+      invalidatesTags: [TAG_TYPES.SOURCES],
     }),
     restoreSource: builder.mutation<{ restored: number }, { id: string; eventId: string }>({
       query: ({ id, eventId }) => ({
         url: ApiEndpoints.CHATBOTS.SOURCE_RESTORE(id, eventId),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [SOURCES],
+      invalidatesTags: [TAG_TYPES.SOURCES],
     }),
     getFoundPages: builder.query<FoundPages, string>({
       query: id => ({ url: ApiEndpoints.BOT_DRAFTS.PAGES_FOUND(id), method: HttpMethod.GET }),
