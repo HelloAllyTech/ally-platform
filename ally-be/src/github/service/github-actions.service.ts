@@ -4,6 +4,7 @@ import axios, { AxiosError } from 'axios';
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { isMonorepoService } from 'src/github/constants/github-repos.constants';
+import { shippedApp } from '../../release/constants/release-targets.constants';
 
 // Relative on purpose: `nest build`'s path-alias hook rewrites a `src/…`
 // re-export into synthesized nodes, and in a file with a decorated class
@@ -33,6 +34,8 @@ export interface CompletedRun {
   htmlUrl: string;
   startedAt: Date;
   finishedAt: Date;
+  /** The run's title (`display_title`), which a workflow's `run-name` sets. */
+  title: string;
 }
 
 /**
@@ -400,6 +403,8 @@ export class GithubActionsService {
     repo: string;
     workflow: string;
     since: Date;
+    /** Only runs that shipped this app of the shared frontends workflow (see `shippedApp`). */
+    apps?: string;
   }): Promise<WorkflowRun | null> {
     this.requireConfigured();
     try {
@@ -415,7 +420,9 @@ export class GithubActionsService {
         .map((run: any) => this.toWorkflowRun(run))
         .filter(
           (run: WorkflowRun) =>
-            run.conclusion === 'success' && run.createdAt >= params.since,
+            run.conclusion === 'success' &&
+            run.createdAt >= params.since &&
+            shippedApp(run.displayTitle ?? '', params.apps),
         )
         .sort(
           (a: WorkflowRun, b: WorkflowRun) =>
@@ -1747,6 +1754,7 @@ export class GithubActionsService {
             htmlUrl: run.html_url,
             startedAt,
             finishedAt: new Date(run.updated_at ?? run.created_at),
+            title: String(run.display_title ?? run.name ?? ''),
           });
         }
         if (batch.length < 100) break;

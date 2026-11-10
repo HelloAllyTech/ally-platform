@@ -1908,6 +1908,7 @@ export class BugFixSessionService {
           repo: target.repo,
           workflow: target.workflow,
           since: pr.mergedAt,
+          apps: target.inputs?.apps,
         });
         if (!run) continue;
 

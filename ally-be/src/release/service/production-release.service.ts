@@ -55,7 +55,7 @@ export class ProductionReleaseService {
       repo: target.repo,
       workflow: target.workflow,
       ref,
-      inputs: { version_tag: tag },
+      inputs: { ...target.inputs, version_tag: tag },
     });
     this.logger.info(
       `Dispatched ${target.label} release ${tag} on ${target.repo}.`,

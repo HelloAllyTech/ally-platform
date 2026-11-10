@@ -2398,7 +2398,7 @@ describe('BuilderPullRequestService', () => {
       );
     });
 
-    it('releases both apps when one pull request spans two of them', async () => {
+    it('releases both apps in one run when one pull request spans two of them', async () => {
       github.listPullRequestFiles.mockResolvedValue({
         files: [
           'apps/ally-admin-dashboard/src/a.tsx',
@@ -2409,7 +2409,11 @@ describe('BuilderPullRequestService', () => {
 
       await merge(openPr({ repo: 'ally-web' }));
 
-      expect(releaseService.dispatch).toHaveBeenCalledTimes(2);
+      expect(releaseService.dispatch).toHaveBeenCalledTimes(1);
+      expect(releaseService.dispatch.mock.calls[0][0]).toMatchObject({
+        workflow: 'production-release-frontends.yaml',
+        inputs: { apps: 'both' },
+      });
     });
   });
 
@@ -2673,7 +2677,7 @@ describe('BuilderPullRequestService', () => {
         ),
       ).toEqual([
         'production-release-ally-be.yaml',
-        'production-release-admin-dashboard.yaml',
+        'production-release-frontends.yaml',
       ]);
     });
 

@@ -18,6 +18,9 @@
 # other's build. Nothing deploys unless every selected app's tests and build
 # pass; helpline deploys first, then admin.
 name: Production Release - Frontends
+# ally-be's product-update liveness reads "[apps=...]" from the run title to
+# tell an admin-only release from a helpline-only one. Keep that marker.
+run-name: Production Release - Frontends ${{ inputs.version_tag }} [apps=${{ inputs.apps }}]
 defaults:
   run:
     working-directory: ally-web
