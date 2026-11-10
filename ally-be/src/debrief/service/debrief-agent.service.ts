@@ -118,7 +118,9 @@ function practiceIds(cards?: Record<string, any> | null): number[] {
 
 /**
  * Owns when the Debrief agent runs: the 5-minute drain over ended sessions
- * (shadow everywhere, live for switched-on tenants), the release seed, the
+ * of switched-on tenants (live; while the agent is in development no other
+ * organisation's sessions are debriefed automatically — a shadow run is
+ * only ever asked for from the Console), the release seed, the
  * tenant switch, and the nightly reconciliation of estimated against actual
  * cost from `llm_usage`.
  */
@@ -317,14 +319,17 @@ export class DebriefAgentService implements OnModuleInit {
     return rows.map((r: { scopeId: string }) => r.scopeId);
   }
 
-  /** Ended sessions with messages and no production run yet. */
+  /** Ended sessions of the given tenants with messages and no production run yet. */
   async pendingSessions(
     limit: number,
+    tenantIds: string[],
   ): Promise<Array<{ id: string; tenant_id: string | null }>> {
+    if (tenantIds.length === 0) return [];
     return this.dataSource.query(
       `SELECT s.id, s.tenant_id
          FROM scenario_sessions s
         WHERE ${settledEndedSessionPredicate('s')}
+          AND s.tenant_id::text = ANY($3::text[])
           AND s."createdAt" >= now() - make_interval(hours => $1)
           AND s."roomId" NOT LIKE 'preview-%'
           AND s."roomId" NOT LIKE 'seed-room-%'
@@ -334,25 +339,25 @@ export class DebriefAgentService implements OnModuleInit {
                            WHERE r."scenarioSessionId" = s.id AND r.mode IN ('shadow','live'))
         ORDER BY s."endedAt" DESC NULLS LAST
         LIMIT $2`,
-      [DRAIN_WINDOW_HOURS, limit],
+      [DRAIN_WINDOW_HOURS, limit, tenantIds],
     );
   }
 
   async drain(): Promise<void> {
     if (this.config.debriefAgentMode === 'off') return;
     await this.ensureRelease();
-    const pending = await this.pendingSessions(DRAIN_BATCH);
+    // Only switched-on organisations: no automatic shadow runs elsewhere.
+    const pending = await this.pendingSessions(
+      DRAIN_BATCH,
+      await this.liveTenants(),
+    );
     if (pending.length === 0) {
       await this.judge.drain(5);
       return;
     }
-    const live = new Set(await this.liveTenants());
     let done = 0;
     await runWithConcurrency(pending, DRAIN_CONCURRENCY, async (s) => {
-      const mode =
-        s.tenant_id && live.has(s.tenant_id)
-          ? DebriefRunMode.LIVE
-          : DebriefRunMode.SHADOW;
+      const mode = DebriefRunMode.LIVE;
       const run = await this.runner.run(s.id, {
         mode,
         ...(await this.canaryOptions(s.id, mode)),

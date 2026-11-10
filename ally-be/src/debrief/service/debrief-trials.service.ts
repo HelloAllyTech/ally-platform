@@ -41,8 +41,9 @@ const CANARY_CACHE_MS = 60_000;
 /**
  * Rungs 3 to 5 of the PM agent's test ladder (v9 FR-52, FR-58, FR-59):
  *
- * 3. **Paired trials** on production sessions from every organisation: after
- *    a shadow or live debrief is published, a challenger debrief nobody sees
+ * 3. **Paired trials** on production sessions (switched-on organisations'
+ *    only, while no other organisation runs automatically): after a
+ *    production debrief is published, a challenger debrief nobody sees
  *    is written for the same session and both are judged blind; results in
  *    `debrief_probe_results`, paid from the learning budget, capped per
  *    session. The trial decides once it has enough pairs.
