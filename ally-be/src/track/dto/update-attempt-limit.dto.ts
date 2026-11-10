@@ -1,7 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, Min, ValidateIf } from 'class-validator';
 
-export class UpdateQuizSettingsDto {
+/**
+ * Raises the attempt limit of a component that has one (quiz, annotation) on
+ * a published course. The same body serves both; the item's type decides
+ * where the limit lives.
+ */
+export class UpdateAttemptLimitDto {
   @ApiProperty({
     type: Number,
     nullable: true,
@@ -14,7 +19,7 @@ export class UpdateQuizSettingsDto {
   maxAttempts!: number | null;
 }
 
-export class UpdateQuizSettingsResponseDto {
+export class UpdateAttemptLimitResponseDto {
   @ApiProperty()
   trackItemId!: string;
 
