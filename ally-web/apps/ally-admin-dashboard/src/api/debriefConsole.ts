@@ -1,8 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   DebriefCardCorrection,
-  DebriefKnowledgeDocument,
-  DebriefKnowledgeList,
   DebriefModels,
   DebriefOverview,
   DebriefReleaseRow,
@@ -170,37 +168,10 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    getDebriefKnowledge: builder.query<DebriefKnowledgeList, void>({
-      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.KNOWLEDGE, method: HttpMethod.GET }),
-      // Documents are added and edited through the knowledge base's own panel, which
-      // invalidates its document tag; refetch on that too.
-      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE, TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
-    }),
-    setDebriefKnowledgeClinical: builder.mutation<
-      DebriefKnowledgeDocument,
-      { id: string; needsSignOff: boolean }
-    >({
-      query: ({ id, needsSignOff }) => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.KNOWLEDGE_CLINICAL(id),
-        method: HttpMethod.PUT,
-        body: { needsSignOff },
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
-    signOffDebriefKnowledge: builder.mutation<DebriefKnowledgeDocument, string>({
-      query: id => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.KNOWLEDGE_SIGN_OFF(id),
-        method: HttpMethod.POST,
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
   }),
 });
 
 export const {
-  useGetDebriefKnowledgeQuery,
-  useSetDebriefKnowledgeClinicalMutation,
-  useSignOffDebriefKnowledgeMutation,
   useGetDebriefOverviewQuery,
   useGetDebriefRunsQuery,
   useGetDebriefRunQuery,

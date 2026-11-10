@@ -19,8 +19,8 @@
 // This runs on a fresh GitHub runner beside a checkout that is not installed.
 // The subset of MCP needed here — initialize, tools/list, tools/call over
 // newline-delimited JSON-RPC on stdio — is small enough to write out, and the
-// platform already speaks MCP by hand in BuilderStacksService for the same
-// reason.
+// platform already speaks MCP by hand in the Context Library's MCP endpoint
+// (context-library-mcp.controller.ts) for the same reason.
 
 import { readFileSync } from 'node:fs';
 import { writeFileSync } from 'node:fs';

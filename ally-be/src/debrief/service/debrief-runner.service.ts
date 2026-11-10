@@ -58,12 +58,8 @@ import {
   recordModelFailure,
   recordModelSuccess,
 } from '../util/model-circuit';
-import { isUUID } from 'class-validator';
-import {
-  KbCorpus,
-  KbRetrievalConsumer,
-} from '../../knowledge-base/enum/knowledge-base.enum';
-import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
+import { ContextRetrievalService } from '../../context-library/service/context-retrieval.service';
+import { guidancePassage, guidanceSearch } from '../util/debrief-guidance.util';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
@@ -144,7 +140,7 @@ export class DebriefRunnerService {
     private readonly ai: DebriefAiClient,
     private readonly releases: AgentReleaseService,
     private readonly practice: DebriefPracticeService,
-    private readonly knowledge: KnowledgeBaseService,
+    private readonly guidance: ContextRetrievalService,
     private readonly llmModels: LlmModelService,
   ) {}
 
@@ -547,35 +543,25 @@ export class DebriefRunnerService {
           }
           try {
             lookups++;
-            // The debrief knowledge base, as the learner's organisation may
-            // read it; clinical documents only as signed off. Logged to
-            // kb_retrievals like every other retrieval.
-            const { passages: hits } = await this.knowledge.searchForAudience(
-              {
-                corpus: KbCorpus.DEBRIEF_KNOWLEDGE,
-                query: m.summary,
-                limit: settings.guidancePassagesPerMoment,
-                minSimilarity: settings.guidanceMinSimilarity,
-              },
-              {
-                tenantId:
-                  session.tenantId && isUUID(session.tenantId)
-                    ? session.tenantId
-                    : null,
-              },
-              {
-                consumer: KbRetrievalConsumer.DEBRIEF,
-                sessionId: session.id,
-                userId: session.counselorId,
-              },
+            // Debrief Guidance, as the learner's organisation may read it
+            // (Context Library, `debrief` use case: logged, its query withheld
+            // from every read surface). "No confident match" is nothing, not a
+            // weak passage for the Writer to lean on.
+            const { results, noConfidentMatch } = await this.guidance.search(
+              guidanceSearch(
+                m.summary,
+                session.tenantId,
+                settings.guidancePassagesPerMoment,
+                session.id,
+              ),
             );
-            for (const h of hits) {
-              if (seen.has(h.chunk_id)) continue;
-              seen.add(h.chunk_id);
-              passages.push({ title: h.document_title, text: h.text });
+            for (const { chunk } of noConfidentMatch ? [] : results) {
+              if (seen.has(chunk.id)) continue;
+              seen.add(chunk.id);
+              passages.push(guidancePassage(chunk));
             }
           } catch {
-            // An empty or unreachable knowledge base never stops a debrief.
+            // Empty or unreachable guidance never stops a debrief.
             break;
           }
         }

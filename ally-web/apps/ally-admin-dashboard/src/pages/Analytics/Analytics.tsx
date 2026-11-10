@@ -187,9 +187,9 @@ const TABS: TabDef[] = [
     // Corpus retrieval quality: does what the agent retrieves actually answer what it asked?
     //
     // Sits beside the other judge-backed quality tabs rather than under the knowledge-base
-    // pages, because the question it answers is a quality question, not a curation one — and
-    // because the curator's own surface (the corpus panel's retrieval preview) already covers
-    // "is this one query working". This is the population view.
+    // pages, because the question it answers is a quality question, not a curation one. For "is
+    // this one query working", the WhatsApp bot's Test tab answers it end to end. This is the
+    // population view.
     //
     // Takes the range picker and no language: a corpus document is language-tagged but a
     // retrieval is not, and offering a language filter that narrowed nothing would be worse

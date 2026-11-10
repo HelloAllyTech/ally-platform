@@ -1,9 +1,6 @@
 """Knowledge agent endpoint — retrieve, then answer or decline.
 
 Stateless. History and every threshold arrive on the request; nothing is stored here.
-The raw retrieval half is a separate endpoint (/knowledge-chunks/search) so an admin can
-tune retrieval without spending generation tokens, and so a retrieval problem can be
-diagnosed without the prompt confounding it.
 """
 
 from contextlib import contextmanager

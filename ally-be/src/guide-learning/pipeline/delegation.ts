@@ -2,7 +2,7 @@ import { GuideLoopPolicy } from 'src/guide/release/guide-release.bundle';
 
 /**
  * Progressive delegation (plans/ally-guide/plan.md §7.13, Appendix A
- * "Autonomy preconditions"; Stacks: Progressive Delegation: Staged Autonomy
+ * "Autonomy preconditions"; Progressive Delegation: Staged Autonomy
  * Growth — start cautious and human-reviewed, widen autonomy as reliability
  * is proven). Pure.
  *

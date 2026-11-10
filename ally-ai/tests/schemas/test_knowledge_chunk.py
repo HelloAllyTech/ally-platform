@@ -13,7 +13,6 @@ from pydantic import ValidationError
 from app.schemas.knowledge_chunk import (
     AudienceSelector,
     KnowledgeChunkItem,
-    KnowledgeChunkSearchRequest,
 )
 
 
@@ -56,12 +55,3 @@ class TestKnowledgeChunkAudienceDefaults:
 
         assert item.is_global is False
         assert item.tenant_ids == []
-
-    def test_the_admin_search_defaults_to_unrestricted(self):
-        """
-        The deliberate asymmetry with the answering agent.
-
-        This endpoint backs the corpus browser and retrieval preview, which answer "what
-        is indexed", not "what may this worker see".
-        """
-        assert KnowledgeChunkSearchRequest(query="q").audience.unrestricted is True

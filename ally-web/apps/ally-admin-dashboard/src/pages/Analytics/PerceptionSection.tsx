@@ -87,7 +87,7 @@ const InternalTag = () => (
  *  - AAQ-230 Confidence start → now, per tier, and AAQ-231 Confidence against
  *    competence — the self-efficacy instrument, always beside the AI judge.
  *    Learners are poor, often over-confident self-assessors, so a self-rating
- *    is never shown as an outcome on its own (Stacks: "Include Self-Assessment
+ *    is never shown as an outcome on its own ("Include Self-Assessment
  *    Despite Known Accuracy Limitations" — collect it, but always triangulate).
  *
  * All three are all-time by construction and follow the page's org filter.

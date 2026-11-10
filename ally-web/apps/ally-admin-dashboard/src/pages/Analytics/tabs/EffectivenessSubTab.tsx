@@ -127,7 +127,7 @@ const InlinePicker = <T extends { id: string; label: string }>({
 
 /**
  * One group of the chain strip. The outcome group is the one framed: per
- * Stacks "Prioritize final outcomes over enabling metrics", the enablers come
+ * "Prioritize final outcomes over enabling metrics", the enablers come
  * first because the chain runs that way, but they are means, not the end.
  */
 const TileGroup = ({

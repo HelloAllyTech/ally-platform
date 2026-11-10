@@ -33,15 +33,6 @@ import { BugHunterService } from '../service/bug-hunter.service';
 import { BugHunterTelemetryService } from '../service/bug-hunter-telemetry.service';
 import { BugHunterEvalService } from '../service/bug-hunter-eval.service';
 import { ListBugHunterEvalRunsDto } from '../dto/bug-hunter-eval.dto';
-import { AgentMemoryService } from 'src/agent-memory/service/agent-memory.service';
-import { AgentMemoryAgent } from 'src/agent-memory/enum/agent-memory.enum';
-import { AGENT_MEMORY_RETIRED_WINDOW_DAYS } from 'src/agent-memory/constants/agent-memory.constants';
-import { AgentMemory } from 'src/agent-memory/entity/agent-memory.entity';
-import {
-  BugHunterMemoryEntryDto,
-  ListBugHunterMemoryResponseDto,
-  WriteBugHunterMemoryDto,
-} from '../dto/bug-hunter-memory.dto';
 import {
   BugHunterPipelineMetricsDto,
   BugHuntRunTelemetryDto,
@@ -175,114 +166,11 @@ export class BugHunterController {
     private readonly modelSettingsService: BugHunterModelSettingsService,
     private readonly telemetryService: BugHunterTelemetryService,
     private readonly evalService: BugHunterEvalService,
-    private readonly memoryService: AgentMemoryService,
     private readonly replayService: BugHunterDecisionReplayService,
     private readonly verifyFindingsService: BugVerifyFindingsService,
     private readonly wrongFixService: BugHunterWrongFixService,
     private readonly featureMapService: BugHunterFeatureMapService,
   ) {}
-
-  @Get('memory')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER)
-  @ApiOperation({
-    summary:
-      "Bug Hunter's notebook: the active entries in scope for a repo, strongest evidence first (super-duper-admin)",
-  })
-  @ApiResponse({ status: 200, type: ListBugHunterMemoryResponseDto })
-  async listMemory(
-    @Query('repo') repo?: string,
-    @Query('limit') limit?: string,
-  ): Promise<ListBugHunterMemoryResponseDto> {
-    const rows = await this.memoryService.listActive(
-      AgentMemoryAgent.BUG_HUNTER,
-      repo || undefined,
-      limit ? Math.min(Math.max(Number(limit) || 50, 1), 200) : 50,
-    );
-    return { items: rows.map(toMemoryEntryDto) };
-  }
-
-  @Post('memory')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER)
-  @ApiOperation({
-    summary:
-      "Add an entry to Bug Hunter's notebook by hand (super-duper-admin)",
-    description:
-      'The human half of the notebook: a lesson the team already knows and wants the ' +
-      'agent to start from. Pinned entries are never edited or retired by the curator.',
-  })
-  @ApiResponse({ status: 201, type: BugHunterMemoryEntryDto })
-  async addMemory(
-    @Body() body: WriteBugHunterMemoryDto,
-    @CurrentUser() user: TokenUser,
-  ): Promise<BugHunterMemoryEntryDto> {
-    const row = await this.memoryService.write({
-      agent: AgentMemoryAgent.BUG_HUNTER,
-      body: body.body,
-      repos: body.repos,
-      tags: body.tags,
-      createdBy: user.id,
-      pinned: body.pinned ?? false,
-      // A person's note is already curated; the agent's wait for the pass.
-      curated: true,
-    });
-    return toMemoryEntryDto(row);
-  }
-
-  @Post('memory/:id/retire')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER)
-  @ApiOperation({
-    summary:
-      'Retire a notebook entry so it stops being read or found (super-duper-admin)',
-  })
-  @ApiResponse({ status: 200, type: BugHunterMemoryEntryDto })
-  async retireMemory(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: TokenUser,
-  ): Promise<BugHunterMemoryEntryDto> {
-    return toMemoryEntryDto(await this.memoryService.retire(id, user.id));
-  }
-
-  @Get('memory/retired')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER)
-  @ApiOperation({
-    summary:
-      'What Bug Hunter retired from its own notebook recently, with its reason — undoable (super-duper-admin)',
-    description:
-      'Entries the nightly self-retirement pass took out of the active set in the last ' +
-      `${AGENT_MEMORY_RETIRED_WINDOW_DAYS} days (OPP-0752): each carries the rule that fired, in ` +
-      "the agent's words. Entries an admin retired by hand are not listed; those were a " +
-      'decision, not a guess to review.',
-  })
-  @ApiResponse({ status: 200, type: ListBugHunterMemoryResponseDto })
-  async listRetiredMemory(
-    @Query('repo') repo?: string,
-    @Query('limit') limit?: string,
-  ): Promise<ListBugHunterMemoryResponseDto> {
-    const rows = await this.memoryService.listRetiredByAgent(
-      AgentMemoryAgent.BUG_HUNTER,
-      repo || undefined,
-      AGENT_MEMORY_RETIRED_WINDOW_DAYS,
-      limit ? Math.min(Math.max(Number(limit) || 50, 1), 200) : 50,
-    );
-    return { items: rows.map(toMemoryEntryDto) };
-  }
-
-  @Post('memory/:id/restore')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER)
-  @ApiOperation({
-    summary:
-      'Put a retired notebook entry back into the active set (super-duper-admin)',
-    description:
-      "The undo for a retirement — the agent's or a person's. Counters are kept; the " +
-      'entry is re-embedded so search finds it again.',
-  })
-  @ApiResponse({ status: 200, type: BugHunterMemoryEntryDto })
-  async restoreMemory(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: TokenUser,
-  ): Promise<BugHunterMemoryEntryDto> {
-    return toMemoryEntryDto(await this.memoryService.restore(id, user.id));
-  }
 
   @Get('eval-runs')
   @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER)
@@ -1468,27 +1356,4 @@ export function toEventDto(row: BugHuntEvent): BugHuntEventDto {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export function toMemoryEntryDto(row: AgentMemory): BugHunterMemoryEntryDto {
-  return {
-    id: row.id,
-    body: row.body,
-    tags: row.tags ?? [],
-    repos: row.repos ?? null,
-    status: row.status,
-    pinned: row.pinned,
-    sourceCount: row.sourceCount,
-    timesApplied: row.timesApplied,
-    lastAppliedAt: row.lastAppliedAt ?? null,
-    retiredAt: row.retiredAt ?? null,
-    retiredBy: row.retiredBy ?? null,
-    retiredReason: row.retiredReason ?? null,
-    timesContradicted: row.timesContradicted,
-    runId: row.runId ?? null,
-    findingId: row.findingId ?? null,
-    createdBy: row.createdBy ?? null,
-    embeddingStatus: row.embeddingStatus,
-    createdAt: row.createdAt,
-  };
 }

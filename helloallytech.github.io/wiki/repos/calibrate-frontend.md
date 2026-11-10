@@ -2,7 +2,7 @@
 title: calibrate-frontend — Calibrate Web UI
 tags: [repo, calibrate, frontend, nextjs, evaluation]
 summary: Next.js UI for the hosted Calibrate product — datasets, personas, scenarios, simulations, and evaluation results.
-last_reconciled: 2026-08-14
+last_reconciled: 2026-11-09
 ---
 
 # calibrate-frontend — Calibrate Web UI
@@ -42,10 +42,10 @@ npm run build && npm start   # production build
 ## Gotchas that change what you write
 
 - **Externally-licensed (CC BY-SA 4.0), same as `calibrate`** — not on the internal
-  `.docs-map.yml`/Stacks/wiki-PR machinery the six core Ally repos use.
+  `.docs-map.yml`/Context Library/wiki-PR machinery the six core Ally repos use.
 - Building a chart or dashboard here should follow the same design discipline as any
   Ally chart work — check the `dataviz` guidance before adding a new chart type,
-  independent of whether Stacks itself has an entry for this repo.
+  whether or not a Context Library search turns anything up for it.
 
 ## Canonical docs
 

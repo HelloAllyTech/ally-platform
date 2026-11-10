@@ -492,4 +492,4 @@ topics:
 - `helloallytech.github.io/wiki/product/ai-product-patterns.md` — principles 1 (a model output is a proposal until a person accepts it),
   2 (provenance on the artefact), 5 (empty ≠ broken), 12 (meter every LLM call).
 
-These are deprecated, not gates; where future Stacks guidance conflicts, Stacks wins.
+These are deprecated, not gates; where Context Library guidance conflicts (it replaced Stacks on 2026-11-09), the Context Library wins.

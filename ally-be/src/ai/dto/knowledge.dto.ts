@@ -24,8 +24,8 @@ export interface KnowledgeAudienceRequest {
   /** Include documents available to every organisation. */
   include_global?: boolean;
   /**
-   * Ignore targeting entirely. ADMIN TOOLING ONLY — set from the permission-gated corpus
-   * console, never from the WhatsApp path.
+   * Ignore targeting entirely. Sent only for a chatbot that answers from documents an admin
+   * selected, whose scope is its `document_ids`; never on the organisation-targeted path.
    */
   unrestricted?: boolean;
 }
@@ -95,42 +95,7 @@ export interface KnowledgeChunkDeleteResponse {
  * transport layer and must not depend on a domain module. The values are
  * `KbCorpus`'s, which is assignable to this, so the compiler still couples them.
  */
-export type KnowledgeCorpus =
-  | 'whatsapp_qa'
-  | 'character_library'
-  | 'ally_guide_library'
-  | 'debrief_knowledge';
-
-export interface KnowledgeChunkSearchRequest {
-  query: string;
-  limit?: number;
-  min_similarity?: number;
-  document_ids?: string[];
-  language?: string;
-  /** Optional here, unlike on the answer request — ally-ai defaults this console to unrestricted. */
-  audience?: KnowledgeAudienceRequest;
-}
-
-export interface KnowledgeChunkPassage {
-  chunk_id: string;
-  document_id: string;
-  document_title: string;
-  chunk_index: number;
-  text: string;
-  char_start: number;
-  char_end: number;
-  page_from: number;
-  page_to: number;
-  section_path: string;
-  source_url: string;
-  language: string;
-  token_count: number;
-  similarity: number;
-}
-
-export interface KnowledgeChunkSearchResponse {
-  passages: KnowledgeChunkPassage[];
-}
+export type KnowledgeCorpus = 'whatsapp_qa';
 
 // ── Answering agent ─────────────────────────────────────────────────────────
 

@@ -223,7 +223,7 @@ export function isBuilderRepo(repo: string): boolean {
  * than `gh pr create` — the same reasoning that kept it out of the build's
  * clone list and into `.wiki-tmp` instead.
  *
- * It is here because the interview needs it. Stacks answers product judgement
+ * It is here because the interview needs it. The Context Library's principles answer product judgement
  * and the code answers what exists; platform architecture — how the services
  * fit together, which is exactly what a cross-repo PRD gets wrong — lives only
  * on the wiki.

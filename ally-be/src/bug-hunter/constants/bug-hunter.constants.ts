@@ -114,7 +114,7 @@ export const BUG_HUNT_KNOWN_NON_BUG_EXCERPT = 160;
  *
  * Verification now returns a self-assessed 0-1 certainty per verifier (see
  * `buildSweepPrompt` Phase 2), which is only worth collecting if something
- * acts on it. Stacks' "Escalate Low-Certainty Cases Using Confidence Scores"
+ * acts on it. "Escalate Low-Certainty Cases Using Confidence Scores"
  * suggests 0.7 as the routing default and that is what this is — a starting
  * point to calibrate against the accept-rate-by-confidence cut in
  * `BugHunterMetricsService`, not a tuned number. Deliberately a plain
@@ -291,3 +291,9 @@ export const escalationGuidance = (engine: string | undefined): string =>
  * the field for raw output.
  */
 export const BUG_FINDING_DESCRIPTION_MAX_LENGTH = 5000;
+
+/**
+ * Bug Hunter's notes (the Context Library's Bug Hunter Notes) rendered up front in
+ * a sweep prompt, strongest evidence first, for the repo in play plus platform-wide ones.
+ */
+export const BUG_HUNTER_NOTES_IN_CONTEXT = 12;

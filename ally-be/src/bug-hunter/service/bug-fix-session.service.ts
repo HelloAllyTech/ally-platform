@@ -91,7 +91,7 @@ import {
  * platform's release workflows are `workflow_dispatch`-only today precisely
  * because a person decides. So the split is the product: the agent goes as far
  * as master unattended, and one admin click — recorded in `released_by` —
- * promotes it. That is also the staged-autonomy shape Stacks describes in
+ * promotes it. That is also the staged-autonomy shape described in
  * "Progressive Delegation: Staged Autonomy Growth" and the human gate in
  * "Deployment Gates: Automated and Manual Quality Checks".
  */
@@ -613,7 +613,7 @@ export class BugFixSessionService {
    * Turns a fix agent's "this spans more than one repo" report into a plan Bug
    * Hunter drives itself.
    *
-   * The shape is planner-executor (Stacks: "Planner-Executor Agent
+   * The shape is planner-executor ("Planner-Executor Agent
    * Architecture"): the first session is the planner — it has already read the
    * bug and one codebase and is best placed to say what has to change where —
    * and each child is an executor with a single repo and a single job. Keeping

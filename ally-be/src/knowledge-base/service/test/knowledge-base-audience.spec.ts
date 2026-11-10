@@ -14,7 +14,6 @@ import { KbIngestProducer } from '../../producer/kb-ingest.producer';
 import { KbDocumentChunkRepository } from '../../repository/kb-document-chunk.repository';
 import { KbDocumentTenantRepository } from '../../repository/kb-document-tenant.repository';
 import { KbDocumentRepository } from '../../repository/kb-document.repository';
-import { KbRetrievalRepository } from '../../repository/kb-retrieval.repository';
 import { TenantScopeService } from '../../../authorization/service/tenant-scope.service';
 import { KnowledgeBaseService } from '../knowledge-base.service';
 
@@ -102,9 +101,6 @@ describe('KnowledgeBaseService audience', () => {
         { provide: AiService, useValue: aiService },
         { provide: S3Service, useValue: {} },
         { provide: AppConfigService, useValue: { s3: {} } },
-        // The retrieval log, which the audience paths never write — a retarget changes who may
-        // be answered, it does not retrieve.
-        { provide: KbRetrievalRepository, useValue: { record: jest.fn() } },
         { provide: getRepositoryToken(Tenant), useValue: tenantRepository },
         { provide: TenantScopeService, useValue: tenantScope },
       ],

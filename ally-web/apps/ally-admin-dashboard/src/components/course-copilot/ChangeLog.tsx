@@ -16,7 +16,7 @@ const VISIBLE_ENTRIES = 8;
 /**
  * What the copilot has changed, newest first, one line each. It is the trail behind the
  * highlight that fades after a couple of seconds: the trainer who looked away can still
- * find out what moved (Stacks, "Making Agent Trustworthiness Visible Through
+ * find out what moved ("Making Agent Trustworthiness Visible Through
  * Transparency": change logs so the agent's edits stay inspectable).
  *
  * Nothing renders for an empty log.

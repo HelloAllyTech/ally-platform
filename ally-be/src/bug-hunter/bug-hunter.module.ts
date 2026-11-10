@@ -13,7 +13,7 @@ import { User } from 'src/user/entity/user.entity';
 import { GlobalSettings } from 'src/settings/entity/global-settings.entity';
 import { GlobalSettingsRepository } from 'src/settings/repository/global-settings.repository';
 import { PosthogQueryService } from 'src/ux-signals/service/posthog-query.service';
-import { AgentMemoryModule } from 'src/agent-memory/agent-memory.module';
+import { ContextLibraryModule } from 'src/context-library/context-library.module';
 
 import { BugHunterController } from './controller/bug-hunter.controller';
 import { BugHunterPipelineController } from './controller/bug-hunter-pipeline.controller';
@@ -35,7 +35,6 @@ import { BugHunterEvalRunRepository } from './repository/bug-hunter-eval-run.rep
 import { BugHunterEvalService } from './service/bug-hunter-eval.service';
 import { BugHunterPolicyService } from './service/bug-hunter-policy.service';
 import { BugHunterDossierService } from './service/bug-hunter-dossier.service';
-import { BugHunterMemoryRetirementService } from './service/bug-hunter-memory-retirement.service';
 import { BugHuntEventRepository } from './repository/bug-hunt-event.repository';
 import { BugHunterSettingsRepository } from './repository/bug-hunter-settings.repository';
 import { BugFindingRepository } from './repository/bug-finding.repository';
@@ -137,10 +136,10 @@ import { BugHunterKnowledgeService } from './service/bug-hunter-knowledge.servic
     PromptModule,
     LlmUsageModule,
     LlmAgentModule,
-    // The notebook Bug Hunter reads before hunting and writes at close — see
-    // docs/bug-hunter-memory-adr.md. Exposed here on Bug Hunter's own two auth
-    // surfaces rather than by AgentMemoryModule itself.
-    AgentMemoryModule,
+    // The notes Bug Hunter reads before hunting and writes at close: the
+    // Context Library's Bug Hunter Notes collection (phase 5), searched with the
+    // `bug_hunter` use case and written as agent chunks the curator folds in.
+    ContextLibraryModule,
     // The image-generation probe calls the live image service the way the
     // product does — see BugHunterProbeService.imageGeneration.
     ImageGenerationModule,
@@ -176,7 +175,6 @@ import { BugHunterKnowledgeService } from './service/bug-hunter-knowledge.servic
     BugHunterPrReviewService,
     BugHunterTodayService,
     BugHunterDossierService,
-    BugHunterMemoryRetirementService,
     BugFindingService,
     // Provided directly rather than importing UxSignalsModule: it constructs
     // itself from the global AppConfigModule alone, so this costs nothing and

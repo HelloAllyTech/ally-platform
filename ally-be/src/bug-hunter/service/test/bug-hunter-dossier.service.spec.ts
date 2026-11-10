@@ -216,14 +216,19 @@ describe('BugHunterDossierService', () => {
         status: BugFindingStatus.NEW,
       }),
     ]);
+    // A Bug Hunter Notes chunk from the Context Library, found with a good band.
     memoryService.search.mockResolvedValue([
       {
-        id: 'm',
-        body: 'ally-be: scheduler tests need a live Redis.',
-        tags: ['fix-gotcha'],
-        repos: ['ally-be'],
-        pinned: false,
-        similarity: 0.71,
+        chunk: {
+          id: 'm',
+          code: 'BN-0007',
+          statement: 'ally-be: scheduler tests need a live Redis.',
+          body: null,
+          facets: { tags: ['fix-gotcha'], repos: ['ally-be'] },
+          pinned: false,
+        },
+        band: 'good',
+        card: '',
       },
     ]);
     eventRepository.listForFinding.mockResolvedValue([
@@ -272,9 +277,19 @@ describe('BugHunterDossierService', () => {
       { id: 'f-6', title: 'Queue metrics undercount', status: 'new' },
     ]);
     expect(dossier.notebook[0]).toMatchObject({
+      code: 'BN-0007',
+      body: 'ally-be: scheduler tests need a live Redis.',
       tags: ['fix-gotcha'],
-      similarity: 0.71,
+      similarity: 0.7,
     });
+    expect(memoryService.search).toHaveBeenCalledWith(
+      expect.objectContaining({
+        useCase: 'bug_hunter',
+        collection: 'bug_hunter_notes',
+        repos: ['ally-be'],
+        sessionId: 'run-now',
+      }),
+    );
 
     expect(findingRepository.listShippedSimilar).toHaveBeenCalledWith(
       'ally-be',

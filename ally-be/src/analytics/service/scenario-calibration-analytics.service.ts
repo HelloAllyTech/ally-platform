@@ -123,7 +123,7 @@ export interface ScenarioCalibrationBuilt {
  * sessions started at or after the config last changed — the bands are then
  * over those sessions only, so every banded score was earned under the config
  * the max describes (one constant standard across the sessions compared —
- * Stacks: "Monitoring Learner Progress with Consistent Standards"). Otherwise
+ * "Monitoring Learner Progress with Consistent Standards"). Otherwise
  * it is RAW: raw-point bands over all of the version's sessions, with the
  * reason.
  */

@@ -2,7 +2,7 @@
 title: Welcome
 tags: [homepage, general]
 summary: Welcome to the Ally Developer Wiki — the canonical knowledge base for the Ally platform.
-last_reconciled: 2026-07-28
+last_reconciled: 2026-11-09
 ---
 
 # Welcome to the Ally Developer Wiki
@@ -18,7 +18,7 @@ This is the canonical, sanitized documentation for **Ally** — a HIPAA-complian
 
 - **New here?** Start with the [Platform Overview](platform/overview.md).
 - **Understand the system:** [Architecture & Data Flow](platform/architecture.md) and [Tech Stack](platform/tech-stack.md).
-- **Build anything user-facing:** search the **Stacks** corpus before you plan, and again whenever a product judgement comes up mid-build — [Working with the Stacks MCP](contributing/planning-with-stacks.md). (The former in-wiki [Product Management Best Practices](product/best-practices.md) section is **deprecated** as of 2026-08-07 and kept only for history.)
+- **Build anything user-facing:** search Ally's **Context Library** before you plan, and again whenever a product or engineering judgement comes up mid-build — [Working with the Context Library](contributing/planning-with-context-library.md). (The former in-wiki [Product Management Best Practices](product/best-practices.md) section is **deprecated** as of 2026-08-07 and kept only for history.)
 - **Work on a repo:** the [Repositories](index.md#repositories) section — [ally-be](repos/ally-be.md), [ally-ai](repos/ally-ai.md), [ally-ai-learn](repos/ally-ai-learn.md), [ally-web](repos/ally-web.md), [ally-mobile](repos/ally-mobile.md), [infra](repos/infra.md).
 - **Contribute:** [Developer Setup](contributing/dev-setup.md) and the [Contributing Guide](contributing/guide.md).
 - **AI agents:** the [Cross-Repo Agent Guide](platform/agent-guide.md).
@@ -49,10 +49,11 @@ Read `agents.md` at the repo root, then follow its Ingestion, Query, and Lint fl
 3. Persist session progress in `wiki/context.md`.
 4. Catalog every new page in `wiki/index.md` and log changes in `wiki/log.md`.
 5. Keep pages cross-linked and consistent with the repos they describe.
-6. Whenever a product judgement comes up — before writing an implementation plan, and
-   again mid-implementation — search Stacks with the `search_chunks` tool and cite the
-   chunk titles you apply. An agent searches for itself; you do not have to fetch
-   context for it. (`wiki/product/` is deprecated — history only.)
+6. Whenever a product or engineering judgement comes up — before writing an
+   implementation plan, and again mid-implementation — search the Context Library with
+   the `search_context` tool and cite the codes you apply (e.g. `[FP-0142]`). An agent
+   searches for itself; you do not have to fetch context for it. (`wiki/product/` is
+   deprecated — history only.)
 ```
 
 ---

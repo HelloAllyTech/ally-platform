@@ -2,7 +2,7 @@
 title: Developer Setup
 tags: [contributing, setup, onboarding, environment]
 summary: How to clone all Ally repositories and start the full local development environment.
-last_reconciled: 2026-10-23
+last_reconciled: 2026-11-09
 ---
 
 # Developer Setup
@@ -76,29 +76,33 @@ The script also still prints a `:3000` "Search (Web)" line. That was the public 
 - **ally-mobile**: copy `env/.env.example` → `.env` at the repo root (read through `react-native-config`).
 - **Never commit `.env` files.** Required keys per service are listed in each [repo page](../index.md#repositories) and in the repo's env sample.
 
-## Agent Tooling — the Stacks MCP
+## Agent Tooling — the Context Library
 
-Every Ally repo commits a `.mcp.json` at its root declaring the `stacks` MCP server, which agents
-must search whenever a product judgement comes up — while planning and while coding. The file
-carries neither an endpoint nor a credential: it launches a small committed bridge,
-`.claude/stacks-bridge.mjs`, which finds a key for you. Alongside it each repo commits a `stacks`
-skill carrying the retrieval technique, so the corpus reaches a session without anyone adding or
-invoking anything. An agent calls `search_chunks` itself when a judgement comes up; the
-keyword-gated `UserPromptSubmit` hook that used to do this was retired on 2026-08-10 once
-searching became possible.
+Every Ally repo with agent wiring commits a `.mcp.json` at its root declaring the
+`context-library` MCP server — Ally's own retrieval library, which agents search on their own
+initiative whenever a product or engineering judgement comes up, while planning and while coding.
+The file carries neither an endpoint nor a credential: it reads both from two environment
+variables, `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY`. Alongside it each repo
+commits a `context-library` skill (`.claude/skills/context-library/SKILL.md`) carrying the
+retrieval technique.
 
-Setup is zero beyond one login. Once, per machine: run `gh auth login` as an account in the
-HelloAllyTech GitHub org, then approve the `stacks` server the first time an agent session
-prompts for it. The bridge exchanges your GitHub token for a key of your own on first use and
-caches it locally; every later session reads the cache. `STACKS_API_KEY` in the environment still
-wins if you set it, but an unset one is the normal state on a working machine — don't read it as a
-broken setup. Full rule and troubleshooting:
-[Working with the Stacks MCP](planning-with-stacks.md).
+Setup, once per engineer:
+
+1. In the admin dashboard, open **Context Library → Connect Claude Code** and create a read-only
+   key. The sheet shows both values; the key is shown once, so copy it then — and use
+   **Test connection** while it is on screen, which says whether the library answered, turned
+   the key away, or could not be reached.
+2. Export `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` in your shell profile, then
+   start a new agent session and approve the `context-library` server when it prompts.
+
+Never commit either value. Full rule, tools and troubleshooting:
+[Working with the Context Library](planning-with-context-library.md). This replaced the Stacks MCP
+and its `gh`-based bridge on 2026-11-09.
 
 ## General Requirements
 
 - Git and SSH access to the HelloAllyTech repositories.
-- The GitHub CLI (`gh`), logged in, for the Stacks bridge above.
+- The GitHub CLI (`gh`), logged in — `scripts/wiki-pr.sh` in the wiki repo uses it.
 - Docker and Docker Compose v2 — on macOS via **Colima** (the helper scripts target it, see below) or Docker Desktop.
 - Your preferred editor (VS Code recommended).
 

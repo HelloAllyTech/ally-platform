@@ -11,7 +11,7 @@ import { PolicySchema } from 'src/llm-agent/harness/config/policy-schema';
  * `pinned`: part of the safety core (§6.1) or the White Hat contract (§4.11),
  * which no organisation, course or learner can loosen. The overridable surface
  * is deliberately small: a setting nobody needs to tune is complexity handed
- * to admins (Stacks: Avoid configuration parameters; pull complexity
+ * to admins (Avoid configuration parameters; pull complexity
  * downward).
  */
 export const GUIDE_POLICY_SCHEMA: PolicySchema = {

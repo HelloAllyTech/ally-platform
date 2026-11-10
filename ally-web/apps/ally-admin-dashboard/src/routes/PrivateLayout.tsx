@@ -24,6 +24,7 @@ import {
   en,
   normalizeEmailForAllowlist,
 } from "@constants";
+import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 import { setUser, setPermissions, setFeatures } from "@reducer";
 import { hasPermissions, hasFeature } from "@utils";
 
@@ -315,6 +316,9 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
           </div>
         </main>
         <ReportUploadProgressDialog />
+        {/* Context Library's upload dock: draws nothing until documents are added, then keeps
+            following them on every admin page. */}
+        <UploadDockHost />
       </div>
     </ScenarioReportsSocketProvider>
   );

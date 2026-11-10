@@ -9,6 +9,7 @@ import type { CourseBlueprintItem, CourseItemType } from "@types";
 import { asAgentText } from "@utils";
 
 import { asArray, summarizeCompletion } from "./courseCopilotFormat";
+import { CitedText } from "../context-citation";
 import {
   INLINE_ITEM_TYPES,
   canChangeItemType,
@@ -192,7 +193,7 @@ export const BlueprintItemRow: React.FC<BlueprintItemRowProps> = ({
 
           {purpose && (
             <p className="truncate text-xs text-typography-700" title={purpose}>
-              {purpose}
+              <CitedText text={purpose} />
             </p>
           )}
 

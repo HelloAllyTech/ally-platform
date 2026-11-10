@@ -41,6 +41,10 @@ class RagQualityRequest(BaseModel):
     # barely-passing passages reads differently from one that cleared easily.
     min_similarity: float = 0.0
     rubric: Optional[str] = None
+    # What the corpus is for, when this service has no entry for it (the
+    # Context Library sends each collection's purpose from its profile).
+    # Capped: it is the caller's description, not a place for a second rubric.
+    corpus_purpose: Optional[str] = Field(default=None, max_length=2000)
 
 
 class RagQualityResponse(BaseModel):
@@ -73,6 +77,7 @@ async def judge(req: RagQualityRequest) -> RagQualityResponse:
             req.passages,  # type: ignore[arg-type]
             req.min_similarity,
             rubric=req.rubric,
+            corpus_purpose=req.corpus_purpose,
         )
     except Exception as exc:  # noqa: BLE001 - surface as 500, keep caller decoupled
         logger.exception("[rag_quality] judge failed")

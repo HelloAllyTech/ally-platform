@@ -71,7 +71,7 @@ export const SOURCE_LABEL: Record<string, string> = {
 
 /**
  * 'staff' is the default and every pre-existing row's value — badging it on every row would be
- * noise, not signal (Stacks: "Default to Common Case, Hide Alternatives"). Only 'consumer' gets
+ * noise, not signal ("Default to Common Case, Hide Alternatives"). Only 'consumer' gets
  * a badge, so a bug filed through the in-app "Report a problem" form is the thing that stands out.
  */
 export const isConsumerSourced = (source: RoadmapOpportunitySource | string): boolean =>

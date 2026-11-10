@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Brackets, DataSource, IsNull, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { resolveSort } from 'src/common/util/sort.util';
 import { KbDocument } from '../entity/kb-document.entity';
 import {
@@ -35,14 +35,6 @@ export interface ListKbDocumentsOptions {
    * outside their allowlist would change another customer's corpus.
    */
   ownedByTenantIds?: string[];
-  /**
-   * Only the documents this owner MANAGES (`owner_tenant_id`): an organisation's own, or with
-   * `tenantId: null` the platform's. An object rather than a bare `string | null` so that
-   * "no owner filter" (absent) and "the platform's documents" (`{ tenantId: null }`) cannot
-   * be confused — the null-means-unfiltered slip is the one that would list every
-   * organisation's documents on the platform screen.
-   */
-  owner?: { tenantId: string | null };
   includeArchived?: boolean;
   sortBy?: string;
   sortDir?: string;
@@ -82,7 +74,6 @@ export class KbDocumentRepository extends Repository<KbDocument> {
       tags,
       tenantId,
       excludeGlobal = false,
-      owner,
       ownedByTenantIds,
       includeArchived = false,
     } = options;
@@ -152,15 +143,6 @@ export class KbDocumentRepository extends Repository<KbDocument> {
         },
       );
     }
-    if (owner) {
-      if (owner.tenantId === null) {
-        query.andWhere('doc.ownerTenantId IS NULL');
-      } else {
-        query.andWhere('doc.ownerTenantId = :ownerTenantId', {
-          ownerTenantId: owner.tenantId,
-        });
-      }
-    }
     if (search?.trim()) {
       const term = `%${search.trim().toLowerCase()}%`;
       query.andWhere(
@@ -195,7 +177,6 @@ export class KbDocumentRepository extends Repository<KbDocument> {
         'doc.chunkCount',
         'doc.indexedChunkCount',
         'doc.isGlobal',
-        'doc.ownerTenantId',
         'doc.contentHash',
         'doc.chunkVersion',
         'doc.archivedAt',
@@ -218,13 +199,8 @@ export class KbDocumentRepository extends Repository<KbDocument> {
   }
 
   /**
-   * The retrievable documents of one corpus, split by whether a curator mapped them to
-   * the topic being asked about.
-   *
-   * This split IS the boost. Retrieval searches `preferred` first and tops up from
-   * `rest`, so a curator's hint wins ties without ever hiding the unmapped passage that
-   * turns out to matter. Archived documents appear in neither: their vectors are deleted,
-   * so returning their ids would only ask ally-ai about chunks it no longer holds.
+   * The retrievable documents of one corpus. Archived documents are excluded: their vectors
+   * are deleted, so returning their ids would only ask ally-ai about chunks it no longer holds.
    *
    * Returning ids rather than a filter flag is what keeps the corpus boundary honest —
    * ally-ai's search takes `document_ids`, so the scope becomes the query itself.
@@ -232,10 +208,9 @@ export class KbDocumentRepository extends Repository<KbDocument> {
   async retrievableIds(options: {
     corpus: KbCorpus;
     tags?: string[];
-    characterTopics?: string[];
-  }): Promise<{ preferred: string[]; rest: string[] }> {
+  }): Promise<string[]> {
     const query = this.createQueryBuilder('doc')
-      .select(['doc.id', 'doc.characterTopics'])
+      .select(['doc.id'])
       .where('doc.corpus = :corpus', { corpus: options.corpus })
       .andWhere('doc.archivedAt IS NULL')
       // Only an indexed document has vectors to match against; the others are still
@@ -249,81 +224,7 @@ export class KbDocumentRepository extends Repository<KbDocument> {
     }
 
     const rows = await query.getMany();
-    const wanted = new Set(options.characterTopics ?? []);
-    const preferred: string[] = [];
-    const rest: string[] = [];
-    for (const row of rows) {
-      const mapped =
-        wanted.size > 0 &&
-        (row.characterTopics ?? []).some((topic) => wanted.has(topic));
-      (mapped ? preferred : rest).push(row.id);
-    }
-    return { preferred, rest };
-  }
-
-  /**
-   * The retrievable documents of one corpus that ONE AUDIENCE may read, keyed by id, with
-   * whether each is global.
-   *
-   * The audience is a required argument with no "everyone" value. An organisation gets the
-   * global documents plus those targeted at it; `tenantId: null` — an anonymous visitor, or
-   * a learner with no organisation — gets the global documents only. It is the disjunction
-   * the corpus list's organisation filter applies and ally-ai applies inside the vector
-   * query, resolved here FIRST so that the ids travel as the search's `document_ids`: a
-   * document outside this set cannot come back, whatever the vector index believes about
-   * its audience.
-   *
-   * Indexed and unarchived only, as in `retrievableIds`.
-   */
-  async retrievableForAudience(options: {
-    corpus: KbCorpus;
-    tenantId: string | null;
-  }): Promise<Map<string, { isGlobal: boolean }>> {
-    const query = this.createQueryBuilder('doc')
-      .select(['doc.id', 'doc.isGlobal'])
-      .where('doc.corpus = :corpus', { corpus: options.corpus })
-      .andWhere('doc.archivedAt IS NULL')
-      .andWhere('doc.status = :status', { status: KbDocumentStatus.INDEXED })
-      // Clinical content is served only as signed off: its current text, by the advisor.
-      .andWhere(
-        `(doc."needs_clinical_sign_off" = false
-          OR doc."clinical_signed_off_hash" = doc."content_hash")`,
-      );
-
-    if (options.tenantId === null) {
-      query.andWhere('doc.isGlobal = true');
-    } else {
-      query.andWhere(
-        `(doc."is_global" = true OR EXISTS (
-            SELECT 1 FROM kb_document_tenants dt
-            WHERE dt.document_id = doc.id
-              AND dt.tenant_id = :tenantId
-              AND dt."deletedAt" IS NULL
-          ))`,
-        { tenantId: options.tenantId },
-      );
-    }
-
-    const rows = await query.getMany();
-    return new Map(rows.map((row) => [row.id, { isGlobal: row.isGlobal }]));
-  }
-
-  /**
-   * One document of an owned corpus, only if this owner owns it — the organisation's, or
-   * with `tenantId: null` the platform's. Null otherwise, which the caller reports as the
-   * same 404 as a missing id, so an organisation cannot probe for another's document ids.
-   */
-  async findOwned(
-    id: string,
-    owner: { corpus: KbCorpus; tenantId: string | null },
-  ): Promise<KbDocument | null> {
-    return this.findOne({
-      where: {
-        id,
-        corpus: owner.corpus,
-        ownerTenantId: owner.tenantId === null ? IsNull() : owner.tenantId,
-      },
-    });
+    return rows.map((row) => row.id);
   }
 
   /** Counts by status, for one corpus's stats strip. */

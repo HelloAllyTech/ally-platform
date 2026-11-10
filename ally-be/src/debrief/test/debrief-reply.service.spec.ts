@@ -86,15 +86,23 @@ function build(opts: {
     ),
   };
   const knowledge = {
-    searchForAudience: jest.fn(() =>
+    search: jest.fn(() =>
       opts.slowKnowledge
         ? new Promise(() => undefined)
         : Promise.resolve({
-            passages: opts.guidance
+            noConfidentMatch: !opts.guidance,
+            results: opts.guidance
               ? [
                   {
-                    document_title: 'Risk guide',
-                    text: 'Ask about safety plainly.',
+                    chunk: {
+                      id: 'c1',
+                      code: 'DG-0001',
+                      statement: 'Ask about safety',
+                      body: 'Ask about safety plainly.',
+                      citation: { title: 'Risk guide' },
+                      attributes: {},
+                    },
+                    band: 'good',
                   },
                 ]
               : [],
@@ -175,8 +183,12 @@ describe('DebriefReplyService (Ask Ally)', () => {
     expect(call.systemPrompt).toContain('Exploring risk: Ask directly');
     expect(call.systemPrompt).toContain('your team lead');
     // The query is the debrief's skills, never the learner's own words.
-    const [q] = knowledge.searchForAudience.mock.calls[0] as any[];
-    expect(q.query).not.toContain('Why that point?');
+    const [q] = knowledge.search.mock.calls[0] as any[];
+    expect(q).toMatchObject({
+      useCase: 'debrief',
+      collections: ['debrief_guidance'],
+    });
+    expect(q.queries.join(' ')).not.toContain('Why that point?');
   });
 
   it('answers without the guidance when the knowledge base is slow', async () => {

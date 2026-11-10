@@ -15,6 +15,7 @@ import pytest
 
 from app.core.knowledge_base.corpus import (
     CORPUS_COLLECTIONS,
+    RETIRED_CORPUS_COLLECTIONS,
     KbCorpus,
     collection_for,
 )
@@ -44,12 +45,23 @@ def test_the_whatsapp_corpus_keeps_the_collection_its_vectors_are_already_in():
 def test_wire_values_match_ally_be():
     # These are the strings stored in ally-be's kb_documents.corpus. A drift here means
     # ally-be asks for a corpus this service does not recognise.
-    assert {c.value for c in KbCorpus} == {
-        "whatsapp_qa",
-        "character_library",
-        "ally_guide_library",
-        "debrief_knowledge",
+    assert {c.value for c in KbCorpus} == {"whatsapp_qa"}
+
+
+def test_a_retired_corpus_resolves_to_nothing_and_its_collection_is_retired():
+    # The character corpus, the Ally guide's library and Debrief's guidance moved to
+    # ally-be's Context Library. Asking for one must fail loudly rather than read its
+    # old collection, and only their collections may be dropped through the
+    # retired-collection route — never a live corpus's.
+    live = {c.value for c in KbCorpus}
+    for retired in ("character_library", "ally_guide_library", "debrief_knowledge"):
+        assert retired not in live
+    assert RETIRED_CORPUS_COLLECTIONS == {
+        VectorDBCollectionNames.CHARACTER_CHUNKS,
+        VectorDBCollectionNames.GUIDE_LIBRARY_CHUNKS,
+        VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS,
     }
+    assert not RETIRED_CORPUS_COLLECTIONS & set(CORPUS_COLLECTIONS.values())
 
 
 def test_every_collection_has_a_migration_that_creates_it():
@@ -101,6 +113,6 @@ async def test_the_guide_library_collection_carries_the_audience_properties():
     await migration.up(client)
 
     kwargs = client.collections.create.call_args.kwargs
-    assert kwargs["name"] == collection_for(KbCorpus.ALLY_GUIDE_LIBRARY)
+    assert kwargs["name"] == VectorDBCollectionNames.GUIDE_LIBRARY_CHUNKS
     names = {prop.name for prop in kwargs["properties"]}
     assert {"is_global", "tenant_ids", "document_id"} <= names

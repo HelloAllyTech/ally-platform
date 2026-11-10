@@ -31,7 +31,7 @@ export interface BlueprintPlanOptions {
  * with its own narrow prompt, not a second manager LLM (plan §2.4).
  *
  * The sequencing rules live in `blueprint_planner.txt`:
- * - Stacks: "Write Assessments First, Then Derive Objectives" — the brief's
+ * - "Write Assessments First, Then Derive Objectives" — the brief's
  *   assessment is the capstone, placed last, and everything builds to it.
  * - "Organize Training via Task Classes from Simple to Complex" and "Define
  *   Task Classes via Simplifying Conditions Variation" — sections are whole

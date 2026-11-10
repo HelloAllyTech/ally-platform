@@ -31,9 +31,9 @@ describe('BuilderOutcomeService', () => {
   let service: BuilderOutcomeService;
   let exemplarService: any;
   let feedbackRepository: any;
-  let lessonRepository: any;
+  let lessons: any;
   let knowledgeService: any;
-  let curatorService: any;
+  let agentChunks: any;
   let reply: string;
 
   let llmCompletion: { complete: jest.Mock };
@@ -60,12 +60,9 @@ describe('BuilderOutcomeService', () => {
       listUnsettled: jest.fn().mockResolvedValue([]),
     };
     feedbackRepository = { listBySession: jest.fn().mockResolvedValue([]) };
-    lessonRepository = {
-      listActiveForRepos: jest.fn().mockResolvedValue([]),
-      recordContradicted: jest.fn(),
-    };
+    lessons = { inScope: jest.fn().mockResolvedValue([]) };
     knowledgeService = { recordLesson: jest.fn() };
-    curatorService = { consolidate: jest.fn().mockResolvedValue({}) };
+    agentChunks = { recordFeedback: jest.fn().mockResolvedValue({}) };
 
     service = new BuilderOutcomeService(
       {
@@ -75,10 +72,10 @@ describe('BuilderOutcomeService', () => {
       { findOne: jest.fn() } as any,
       { listBySession: jest.fn().mockResolvedValue([]) } as any,
       feedbackRepository,
-      lessonRepository,
+      lessons,
       exemplarService,
       knowledgeService,
-      curatorService,
+      agentChunks,
       llmCompletion as any,
       null as any,
     );
@@ -159,8 +156,8 @@ describe('BuilderOutcomeService', () => {
       exemplarService.findBySession.mockResolvedValue(
         exemplar({ outcome: BuilderExemplarOutcome.CLOSED_UNMERGED }),
       );
-      lessonRepository.listActiveForRepos.mockResolvedValue([
-        { id: 'l-9', lesson: 'Filter by tenantId.' },
+      lessons.inScope.mockResolvedValue([
+        { code: 'BL-0009', statement: 'Filter by tenantId.' },
       ]);
       withFeedback([
         { kind: BuilderPrFeedbackKind.REVIEW_COMMENT, body: 'leaks tenants' },
@@ -168,12 +165,21 @@ describe('BuilderOutcomeService', () => {
       reply = JSON.stringify({
         tags: ['review_correctness'],
         lessons: [],
-        contradictedLessonIds: ['l-9'],
+        contradictedLessonIds: ['BL-0009'],
       });
 
       await service.processSession('session-1');
 
-      expect(lessonRepository.recordContradicted).toHaveBeenCalledWith(['l-9']);
+      // An agent_contradicted usage event on the Builder Lessons chunk, without marking the
+      // rest of the session's lessons unused: this pass never saw what was applied.
+      expect(agentChunks.recordFeedback).toHaveBeenCalledWith({
+        useCase: 'builder_build',
+        collection: 'builder_lessons',
+        sessionId: 'session-1',
+        applied: [],
+        contradicted: ['BL-0009'],
+        markUnused: false,
+      });
     });
 
     it('ignores a contradicted id the model invented', async () => {
@@ -181,9 +187,7 @@ describe('BuilderOutcomeService', () => {
       exemplarService.findBySession.mockResolvedValue(
         exemplar({ outcome: BuilderExemplarOutcome.CLOSED_UNMERGED }),
       );
-      lessonRepository.listActiveForRepos.mockResolvedValue([
-        { id: 'l-real', lesson: 'x' },
-      ]);
+      lessons.inScope.mockResolvedValue([{ code: 'BL-0001', statement: 'x' }]);
       withFeedback([{ kind: BuilderPrFeedbackKind.REVIEW_COMMENT, body: 'y' }]);
       reply = JSON.stringify({
         tags: [],
@@ -193,7 +197,7 @@ describe('BuilderOutcomeService', () => {
 
       await service.processSession('session-1');
 
-      expect(lessonRepository.recordContradicted).not.toHaveBeenCalled();
+      expect(agentChunks.recordFeedback).not.toHaveBeenCalled();
     });
   });
 
@@ -213,10 +217,10 @@ describe('BuilderOutcomeService', () => {
       expect(exemplarService.refreshOutcome).toHaveBeenCalledTimes(2);
     });
 
-    it('curates whatever it harvested on the way out', async () => {
-      await service.sweep();
-
-      expect(curatorService.consolidate).toHaveBeenCalled();
+    it('leaves curation to the Context Library', async () => {
+      // Harvested lessons are candidates; the agent curator folds them in hourly.
+      await expect(service.sweep()).resolves.toEqual({ refreshed: 0 });
+      expect(agentChunks.recordFeedback).not.toHaveBeenCalled();
     });
   });
 });

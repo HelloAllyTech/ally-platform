@@ -22,7 +22,7 @@ import { activeFacetCount, AgeFilter, FindingsFilters } from "./findingsView";
  * So the *core* control stays permanently visible (search, plus the tabs
  * directly above this) and everything else is one click away, with a
  * count on the button so a reader can never be filtering without knowing it.
- * That is Stacks' *Progressive Disclosure and Contextual Relevance in Agent
+ * That is *Progressive Disclosure and Contextual Relevance in Agent
  * Interfaces* — show core capabilities first, reveal the rest progressively,
  * and use grouping rather than density to keep the surface navigable.
  *

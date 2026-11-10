@@ -95,6 +95,9 @@ vi.mock("@api", () => ({
   useGetBuilderRunsQuery: () => ({ data: runs }),
   useGetBuilderMilestonesQuery: () => ({ data: milestones }),
   useStartBuilderBuildMutation: () => [startBuild, { isLoading: false }],
+  // Principles in play: still loading, so the panel stays empty in these tests.
+  useGetBuilderPrinciplesQuery: () => ({ data: undefined, isLoading: true }),
+  useSetBuilderPrinciplesOffMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first

@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { CharacterInterviewToolsService } from '../character-interview-tools.service';
 import { CharacterInterviewSessionRepository } from '../../repository/character-interview-session.repository';
 import { LoggerService } from 'src/logger/logger.service';
-import { KnowledgeBaseService } from 'src/knowledge-base/service/knowledge-base.service';
+import { ContextRetrievalService } from 'src/context-library/service/context-retrieval.service';
 
 jest.mock('src/logger/logger.service');
 
@@ -102,7 +102,7 @@ describe('save_character_draft — per-language shapes', () => {
         },
         { provide: DataSource, useValue: dataSource },
         // Only search_corpus touches it; the draft path never calls it.
-        { provide: KnowledgeBaseService, useValue: { search: jest.fn() } },
+        { provide: ContextRetrievalService, useValue: { search: jest.fn() } },
       ],
     }).compile();
     service = module.get(CharacterInterviewToolsService);

@@ -2,7 +2,7 @@
  * Every way a turn or the session can fail, mapped to a designed state in
  * Ally's voice (plan §5.12; voice and tone §10). Never a red toast and never
  * an error code: each state says what happened and offers a way forward
- * (Stacks: "Apologetic Language and Resolution Paths in Agent Failures").
+ * ("Apologetic Language and Resolution Paths in Agent Failures").
  * Ally apologises only when the failure is Ally's.
  */
 import type { GuideFailureCode } from "../contract/wire";

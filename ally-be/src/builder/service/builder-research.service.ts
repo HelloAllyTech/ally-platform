@@ -18,6 +18,8 @@ import { AgentTurnResult } from 'src/llm-agent/type/agent-llm.type';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderPrdService } from './builder-prd.service';
 import { BuilderKnowledgeService } from './builder-knowledge.service';
+import { BuilderLessonsService } from './builder-lessons.service';
+import { ClUseCase } from 'src/context-library/enum/context-library.enum';
 import { BuilderPlatformContextService } from './builder-platform-context.service';
 import { BuilderInterviewToolsService } from './builder-interview-tools.service';
 import { BUILDER_MAX_TOKENS } from '../constants/builder.constants';
@@ -58,6 +60,9 @@ export class BuilderResearchService {
     private readonly prompts: PromptSharedService,
     @Optional()
     private readonly platformContext?: BuilderPlatformContextService,
+    /** The lessons block: pinned lessons, then the ones most relevant to this PRD. */
+    @Optional()
+    private readonly lessons?: BuilderLessonsService,
   ) {}
 
   /**
@@ -127,9 +132,28 @@ export class BuilderResearchService {
     );
     const { provider: providerName, model } = await this.resolveModel();
     const provider = this.agentLlmFactory.create(providerName, model);
+    // One pass, so nothing to freeze: search Builder Lessons for this session's title and PRD.
+    const lessons = this.lessons
+      ? await this.lessons
+          .block({
+            useCase: ClUseCase.BUILDER_RESEARCH,
+            sessionId: session.id,
+            repos: session.repos ?? undefined,
+            request: [session.title, JSON.stringify(doc.draft ?? {})]
+              .filter(Boolean)
+              .join('\n\n')
+              .slice(0, 2000),
+          })
+          .then((r) => r.block)
+          .catch(() => '')
+      : '';
     const [template, context, platformRules, platformMap] = await Promise.all([
       loadPromptTemplate(this.prompts, BUILDER_RESEARCH_SYSTEM.code),
-      this.knowledgeService.buildContextBlock(session.repos ?? undefined),
+      this.knowledgeService.buildContextBlock(
+        session.repos ?? undefined,
+        [],
+        lessons,
+      ),
       this.knowledgeService.platformRules(),
       this.platformContext?.render() ?? Promise.resolve(''),
     ]);
