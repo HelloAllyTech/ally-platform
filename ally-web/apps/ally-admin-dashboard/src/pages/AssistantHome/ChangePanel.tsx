@@ -15,6 +15,13 @@ import { COPY, fill } from "../Onboarding/copy";
 
 const t = COPY.change;
 
+/** A recent change as the owner reads it: ally-be records the fields changed ("tone, language"). */
+export const changeLabel = (summary: string): string =>
+  summary
+    .split(/,\s*/)
+    .map(field => (t.fields as Record<string, string>)[field] ?? field)
+    .join(", ");
+
 const show = (value: unknown): string => {
   if (value === undefined || value === null || value === "") return "—";
   if (Array.isArray(value)) return value.join(" · ") || "—";
@@ -140,11 +147,13 @@ export const ChangePanel: React.FC<{
           <ul>
             {entries.map(entry => (
               <li key={entry.id} className="ally-change__entry">
-                <span>{entry.summary}</span>
+                <span>{changeLabel(entry.summary)}</span>
                 {canEdit && !entry.undone && (
                   <Button
                     variant="ghost"
-                    onClick={() => setConfirming({ id: entry.id, summary: entry.summary })}
+                    onClick={() =>
+                      setConfirming({ id: entry.id, summary: changeLabel(entry.summary) })
+                    }
                   >
                     {t.undo}
                   </Button>

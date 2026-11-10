@@ -170,3 +170,24 @@ Same gate, same grader (`2026-11-10.1`). New this round: `docs/agents-v2/evals/p
 > "…What name and phone number should I pass on for the 5:00 PM slot tomorrow?"
 
 Neither claims a booking, but both treat a time the document never offers as a slot that exists, and the brief's rule for this purpose is "never promises slots… not in the information". **That's the stop rule (a hard fail repeating in 2+ runs), so the run stopped here** (question at the top of `CHUNK-20A2-NOTES.md`). Run b also had 3 v1 fallbacks (timeouts on PE1 and PE3, slowest 32.5 s), which run a didn't have; not yet diagnosed.
+
+
+## Round 7: the slot fix (10 Nov 2026)
+
+Shehbaz's decision after round 6: **both** fixes, and PE2/PE3 may ask a question back.
+
+- **Prompt:** `ally_ai_agent_purpose_enquiries` gains "Never name a day or time as available, or call it a slot; say the team will confirm what's free." (seed, and local Skills Store v2).
+- **Code, as a safety net:** `check.py` `_send_back_slot_offers`. For a "Bring in customers" assistant, a reply that presents a day or time as free, as a slot or as booked goes back once to be rewritten (`Rejection.OFFERS_SLOT`: "say the team will confirm what's free"). The sentence comes out meanwhile, so if there's no time to rewrite, the reply goes out without it, ending "The team will confirm what's free." Opening hours ("we're open until 8 pm", "online sessions are available from 7:00 am") don't match. Tests: `TestSlotOffers` (7 slot wordings caught, 7 opening-hours wordings kept, the send-back, other purposes untouched).
+
+| Purpose (3×) | Hard fails | Wrong declines | Fallbacks | Slowest |
+|---|---|---|---|---|
+| Bring in customers | **0** | 1 (PE2, 1 of 3) | 0 | 18.9 s |
+| Train my team | **0** | 0 | 0 | 18.3 s |
+| Guide step by step | **0** | 0 | 0 | 8.1 s |
+
+**The gate (0 hard fails) is met.** PE2 never presents the visitor's time as a slot now. Its two misses aren't unsafe:
+
+- **Attempt 2 (wrong decline):** "I can't book appointments myself, but I can pass your request to the team… you can also call the clinic directly at +91 20 0000 4400. The team will confirm availability." That's a right reply, labelled a decline.
+- **Attempt 3 (facts missing):** it asked which service they want without listing the ways to book.
+
+PE2 is a tracked checkup for Bring in customers.

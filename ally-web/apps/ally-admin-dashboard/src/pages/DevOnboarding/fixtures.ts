@@ -107,10 +107,31 @@ export const baseView = (): BotDraftView => ({
   conversation: { pending: "", gaps: null, questionsLeft: 4 },
   designs: [
     {
-      id: "guide",
-      title: "Client guide",
+      id: "enquiries",
+      title: "Bring in customers",
+      best_for: "people choosing between therapy services",
+      will: [
+        "Recommend the service that fits",
+        "Ask one question at a time",
+        "Pass each person's name and number to you",
+      ],
+      wont: ["Book, take orders or take payments", "Promise discounts or slots you haven't listed"],
+      sample: [
+        { from: "visitor", text: "I need help with stress." },
+        { from: "assistant", text: "Happy to help. Is it for you, or for a family member?" },
+      ],
+      recommended: true,
+      limit: "It can't book or take payments yet. It sends you each new enquiry by email.",
+    },
+    {
+      id: "answer",
+      title: "Answer questions",
       best_for: "people asking about services and policies",
-      will: ["Answer questions from your information", "Link each answer to where it came from"],
+      will: [
+        "Answer questions from your information",
+        "Link each answer to where it came from",
+        "Say plainly when it doesn't know",
+      ],
       wont: ["Book, take orders or take payments"],
       sample: [
         { from: "visitor", text: "Do you offer online sessions?" },
@@ -118,21 +139,43 @@ export const baseView = (): BotDraftView => ({
       ],
     },
     {
-      id: "enquiries",
-      title: "New client enquiries",
-      best_for: "collecting contact details before answering questions",
-      will: ["Ask a few questions before the chat starts", "Pass each person's details to you"],
-      wont: ["Book, take orders or take payments"],
-      sample: [{ from: "visitor", text: "I need help with stress." }],
+      id: "guide",
+      title: "Guide people step by step",
+      best_for: "getting ready for a first session",
+      will: [
+        "Give one step at a time",
+        "Check each step is done before the next",
+        "Keep your steps in order, safety steps included",
+      ],
+      wont: ["Skip or reorder steps", "Book, take orders or take payments"],
+      sample: [
+        { from: "visitor", text: "How do I get ready?" },
+        { from: "assistant", text: "Here's the first step. Tell me when it's done." },
+      ],
     },
     {
-      id: "coming_soon",
-      title: "Booking and payments",
-      best_for: "",
+      id: "training",
+      title: "Train my team",
+      best_for: "new staff learning your procedures",
+      will: [
+        "Explain your procedures in short steps",
+        "Quiz your team when they ask",
+        "Link each answer to your documents",
+      ],
+      wont: ["Make up a procedure"],
+      sample: [
+        { from: "visitor", text: "Test me on our procedures." },
+        { from: "assistant", text: "Sure. First question: what's the first step?" },
+      ],
+      limit: "It doesn't keep track of each person's progress yet.",
+    },
+    {
+      id: "custom",
+      title: "Something else",
+      best_for: "Describe what you need, and I'll set it up.",
       will: [],
       wont: [],
       sample: [],
-      coming_soon: true,
     },
   ],
   draft: {

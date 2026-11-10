@@ -34,6 +34,20 @@ test.describe("assistant home sections", () => {
   }
 });
 
+test("change your assistant: a proposal as before and after", async ({ page }) => {
+  await mockAssistantHome(page);
+  await open(page, "overview");
+  const panel = page.getByTestId("change-panel");
+  // Open by default on a wide screen for an editor; a header button on a phone.
+  if (!(await panel.isVisible())) {
+    await page.getByRole("button", { name: "Change your assistant" }).click();
+  }
+  await panel.getByRole("button", { name: "Make it more formal" }).click();
+  await expect(page.getByTestId("change-proposal")).toBeVisible();
+  await expect(page).toHaveScreenshot("home-change.png", { fullPage: true });
+  await expectNoSeriousA11yIssues(page);
+});
+
 test("Try it draws the bot page chat in the page's brand", async ({ page }) => {
   await mockAssistantHome(page);
   await open(page, "personality");

@@ -334,6 +334,7 @@ class Rejection(StrEnum):
     MENTIONS_SOURCES = "mentions_sources"
     USE_FOUND = "use_found"
     SEARCH_AGAIN = "search_again"
+    OFFERS_SLOT = "offers_slot"
 
 
 def rejection_feedback(
@@ -394,6 +395,11 @@ REJECTIONS: Dict[Rejection, str] = {
         "different words: the key words of the question, without the business's "
         "name. Then answer from the passages that answer it and cite them, or say "
         "plainly what you don't have."
+    ),
+    Rejection.OFFERS_SLOT: (
+        "It named a day or time as available, called it a slot, or said it was "
+        "booked. You can't see or hold appointments: say the team will confirm "
+        "what's free, and keep the rest."
     ),
 }
 
@@ -564,6 +570,8 @@ class CheckContext:
     decline_text: str = ""
     #: Topics the owner asked it not to talk about (chunk 20a-2).
     avoid_topics: Sequence[str] = ()
+    #: What the assistant is for (chunk 20a-2): answer, enquiries, training, guide.
+    purpose: Optional[str] = None
 
 
 @dataclass
@@ -603,6 +611,7 @@ def check_reply(
     can_search_again: bool = False,
     decline_text: Optional[str] = None,
     avoid_topics: Sequence[str] = (),
+    purpose: Optional[str] = None,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -628,6 +637,7 @@ def check_reply(
         can_search_again=can_search_again,
         decline_text=(decline_text or "").strip(),
         avoid_topics=tuple(avoid_topics),
+        purpose=purpose,
     )
     verdict = _read_draft(step, ctx)
     _ground(verdict, step, ctx)
@@ -832,6 +842,49 @@ def _trim_booking_offers(verdict: Verdict, ctx: CheckContext) -> None:
         )
 
 
+# A day or time presented as an opening ("the 5:00 PM slot", "book you for tomorrow
+# at 5", "3 pm is free", "you're booked"). Opening hours ("we're open until 8 pm",
+# "online sessions are available from 7 am") aren't: they say when the place is
+# open, not that a time is free (chunk 20a-2, Bring in customers).
+_TIME = r"\d{1,2}(?:[:.]\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)"
+_DAY = (
+    r"(?:today|tomorrow|tonight|this\s+(?:morning|afternoon|evening|week)|"
+    r"(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))"
+)
+_WHEN = rf"(?:{_TIME}|{_DAY})"
+_OFFERS_SLOT = re.compile(
+    rf"\bslots?\b[^.?!\n]{{0,25}}{_WHEN}|{_WHEN}[^.?!\n]{{0,15}}\bslots?\b"
+    rf"|\b(?:book|booked|booking|reserve|reserved|schedule|scheduled)\s+"
+    rf"(?:(?:you|it|that|this|them|one)\s+)?(?:in\s+)?(?:for|at|on)\s+{_WHEN}"
+    rf"|\bappointments?\s+(?:for|at|on)\s+{_WHEN}"
+    rf"|{_WHEN}\s+(?:is|are|looks|should\s+be)\s+(?:available|free)\b"
+    rf"|\b(?:available|free)\s+(?:at|on)\s+{_WHEN}"
+    r"|\b(?:you(?:'|’)re|you\s+are|you(?:'|’)ve\s+been|i(?:'|’)ve|i\s+have)\s+"
+    r"(?:booked|reserved)\b",
+    re.IGNORECASE,
+)
+
+#: What a Bring in customers reply says instead, if a rewrite can't be had.
+TEAM_WILL_CONFIRM = "The team will confirm what's free."
+
+
+def offers_slot(sentence: str) -> bool:
+    return bool(_OFFERS_SLOT.search(sentence or ""))
+
+
+def _send_back_slot_offers(verdict: Verdict, ctx: CheckContext) -> None:
+    """A Bring in customers assistant can't see or hold appointments, so it never
+    presents a time as free, as a slot or as booked (chunk 20a-2). Sent back once to
+    be rewritten; the sentence is taken out meanwhile, so a reply with no time left
+    for a rewrite goes out without it (and says the team will confirm)."""
+    if ctx.purpose != "enquiries" or not offers_slot(verdict.answer):
+        return
+    kept = without_sentences(verdict.answer, lambda s: not offers_slot(s))
+    verdict.answer = f"{kept} {TEAM_WILL_CONFIRM}".strip()
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.OFFERS_SLOT, True
+
+
 def _trim_repeated_crisis_wording(verdict: Verdict, ctx: CheckContext) -> None:
     """Trimmed, not sent back: a rewrite costs a model call for what a deterministic
     trim does. If trimming would leave nothing, the reply stays as is."""
@@ -882,6 +935,7 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,
     _trim_booking_offers,
+    _send_back_slot_offers,
     _cut_source_phrases,
     _flag_source_talk,
     _decline_if_nothing_left,

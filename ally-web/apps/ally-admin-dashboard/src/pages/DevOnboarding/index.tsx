@@ -24,6 +24,7 @@ const STAGES = [
   "building",
   "building-done",
   "make",
+  "checkup",
   "share",
   "live",
 ] as const;
@@ -48,7 +49,7 @@ function stageState(stage: Stage): {
     reading: index >= STAGES.indexOf("learned"),
     safety: index >= STAGES.indexOf("question-1"),
     built: index >= STAGES.indexOf("make"),
-    make: index >= STAGES.indexOf("share"),
+    make: index >= STAGES.indexOf("checkup"),
     checkup: index >= STAGES.indexOf("share"),
   };
   if (index >= STAGES.indexOf("reading-done")) {
@@ -76,14 +77,27 @@ function stageState(stage: Stage): {
       say(
         "b-design",
         "builder",
-        "Based on what I learned, here are a few ways your assistant could help. Pick one. You can change it later.",
+        "Based on what I learned, here's what I'd suggest. You can pick something else, and change it later.",
       ),
     );
     view.conversation = { ...view.conversation, questionsLeft: null };
   }
   if (index >= STAGES.indexOf("building-done")) {
     view.step = "share";
-    view.draft.design = "guide";
+    // The draft's assistant exists from here: Make it yours' topics and the checkup use it.
+    view.chatbotId = "dev-bot";
+    view.draft.purpose = "enquiries";
+    view.draft.prechat = [
+      { id: "q1", label: "Name", type: "text", required: true },
+      { id: "q2", label: "Phone", type: "phone", required: true },
+      {
+        id: "q3",
+        label: "What are you looking for",
+        type: "choice",
+        required: false,
+        options: ["Individual therapy", "Couples therapy"],
+      },
+    ];
   }
   if (stage === "live") {
     view.step = "published";

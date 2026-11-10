@@ -1,3 +1,5 @@
+import { CHECKUP_RUN } from "./onboarding.mocks";
+
 import type { Page, Route } from "@playwright/test";
 
 /** The assistant the home tests open (fictional Sunrise Mind, as the other fixtures). */
@@ -90,6 +92,7 @@ export const HOME = {
     unsupportedMediaText: { value: "", version: v(15) },
     pageStatus: { value: "on", version: v(16) },
     pageAccess: { value: "invite", version: v(17) },
+    avoidTopics: { value: ["Prices for other clinics"], version: v(18) },
   },
   safety: {
     pack: PACK,
@@ -242,6 +245,62 @@ export async function mockAssistantHome(
       const next = { value: body.value, version: v(1000 + saves.length) };
       (home.fields as Record<string, unknown>)[body.field] = next;
       return json(route, { field: body.field, ...next });
+    }
+    // Chunk 20a-2: the checkup, change by chat and the pages it learned from.
+    if (path === `${base}/checkup`) {
+      return json(route, {
+        latest: CHECKUP_RUN,
+        trend: [
+          { at: "2026-11-08T10:00:00.000Z", accuracy: 60 },
+          { at: "2026-11-09T10:00:00.000Z", accuracy: 75 },
+          { at: "2026-11-10T10:00:00.000Z", accuracy: 80 },
+        ],
+        fallback: "Please call us on 98200 12345.",
+        audience: "Clients",
+      });
+    }
+    if (path === `${base}/changes`) {
+      return json(route, [
+        {
+          id: "e-1",
+          at: "2026-11-10T09:00:00.000Z",
+          kind: "change",
+          summary: "tone",
+          undone: false,
+        },
+      ]);
+    }
+    if (path === `${base}/changes/propose` && method === "POST") {
+      return json(route, {
+        refused: false,
+        message: "",
+        changes: [{ field: "tone", before: "warm", after: "formal" }],
+      });
+    }
+    if (path === `${base}/sources`) {
+      return json(route, [
+        {
+          url: "https://sunrise.example/",
+          title: "Sunrise Mind",
+          details: 4,
+          removed: false,
+          eventId: null,
+        },
+        {
+          url: "https://sunrise.example/fees",
+          title: "Fees",
+          details: 3,
+          removed: false,
+          eventId: null,
+        },
+        {
+          url: "https://sunrise.example/blog/sleep",
+          title: "Sleep and stress",
+          details: 1,
+          removed: true,
+          eventId: "00000000-0000-4000-8000-000000000001",
+        },
+      ]);
     }
     if (path === `${base}/page`) return json(route, PAGE_VIEW);
     if (path === `${base}/page/access`) return json(route, { entries: [] });

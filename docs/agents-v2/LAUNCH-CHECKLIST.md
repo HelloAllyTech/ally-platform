@@ -12,6 +12,8 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
   - "When a question has more than one part, answer every part from the passages you found, not only the first."
 - [ ] **`ally_ai_checkup_judge`** is new in 20a-2: production creates it from the seed on first sync. Check that the live text matches `ally-ai/app/prompts/checkup/judge.txt` after deploy.
 
+- [ ] **New 20a-2 prompts, all created from their seeds on first sync:** `ally_ai_builder_purposes`, `ally_ai_builder_change`, `ally_ai_checkup_questions`, and the four purpose sections `ally_ai_agent_purpose_{answer,enquiries,training,guide}`. After deploy, check that each one's live text matches its file in `ally-ai/app/prompts/`. If `ally_ai_agent_purpose_enquiries` already existed before the slot line went in (local v2, approved 2026-11-10: "Never name a day or time as available, or call it a slot; say the team will confirm what's free."), push it with the prompts CLI.
+
 ## Data
 
 - [ ] **Re-ingest onboarded assistants' documents** (20a-2), after ally-be and ally-ai are deployed:
@@ -27,6 +29,8 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Public links stay off** (`botPagePublicAllowed`) until Stage 6.
 
 ## Checks
+
+- [ ] **Watch the v1 fallback rate in production; slow model steps (15–17 s) caused fallbacks in round 6** (`CHUNK-20A2-EVAL.md`, Round 6).
 
 - [ ] A Lighthouse mobile LCP run for the bot page (20d).
 - [ ] Hindi bot page strings marked "needs review" in `botPage/copy/hi.ts` reviewed (20d).

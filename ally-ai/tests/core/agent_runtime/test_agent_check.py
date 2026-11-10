@@ -4,11 +4,14 @@ import pytest
 
 from app.core.agent_runtime.check import (
     REJECTIONS,
+    TEAM_WILL_CONFIRM,
+    Rejection,
     check_reply,
     detail_kinds,
     fallback_contact,
     looks_factual,
     mentions_sources,
+    offers_slot,
     organisation_of,
     plain_text,
     rejection_feedback,
@@ -874,3 +877,64 @@ class TestAvoidTopics:
         assert touches_topic("Do you know other clinics nearby?", "other clinics")
         assert not touches_topic("Which clinic is closest?", "other clinics")
         assert not touches_topic("When do you open?", "prices")
+
+
+class TestSlotOffers:
+    """Bring in customers never presents a time as free, a slot or booked (chunk 20a-2,
+    round 6's PE2); opening hours from the documents are untouched."""
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "What name and phone should I pass on for the 5:00 PM slot tomorrow?",
+            "Shall I pass your details so they can book you for tomorrow at 5 pm?",
+            "There's a slot on Saturday if that suits you.",
+            "3 pm is free on Monday.",
+            "We have an appointment at 11:30 am.",
+            "You're booked for Friday.",
+            "The 10 am slot works.",
+        ],
+    )
+    def test_the_slot_wording_is_caught(self, sentence):
+        assert offers_slot(sentence), sentence
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "We're open until 8 pm.",
+            "Monday to Friday: 9:00 am to 8:00 pm; Saturday 9:00 am to 5:00 pm.",
+            "Online sessions are also available from 7:00 am on weekdays.",
+            "We are closed on Sunday.",
+            "You can book on WhatsApp at +91 20 0000 4411.",
+            "Book a first consultation on our website.",
+            "Our WhatsApp line is answered during opening hours only.",
+        ],
+    )
+    def test_the_opening_hours_wording_is_kept(self, sentence):
+        assert not offers_slot(sentence), sentence
+
+    def test_an_enquiries_reply_offering_a_slot_goes_back_to_be_rewritten(self):
+        text = (
+            "I can't book appointments directly. What name and phone number should "
+            "I pass on for the 5:00 PM slot tomorrow?"
+        )
+        result, rejection = review("clarify", text, purpose="enquiries")
+        assert rejection == Rejection.OFFERS_SLOT
+        # Without time to rewrite, it goes out without the slot.
+        assert "5:00 PM" not in result["answer"]
+        assert result["answer"] == (
+            "I can't book appointments directly. " + TEAM_WILL_CONFIRM
+        )
+        assert "the team will confirm" in REJECTIONS[Rejection.OFFERS_SLOT]
+
+    def test_opening_hours_go_through_for_enquiries(self):
+        text = "We're open until 8 pm on weekdays and 5 pm on Saturdays."
+        result, rejection = review("answer", text, citations=[1], purpose="enquiries")
+        assert rejection is None
+        assert result["answer"] == text
+
+    def test_only_bring_in_customers_is_checked(self):
+        text = "There's a slot on Saturday at 10 am."
+        for purpose in (None, "answer", "training", "guide"):
+            _, rejection = review("answer", text, citations=[1], purpose=purpose)
+            assert rejection != Rejection.OFFERS_SLOT, purpose

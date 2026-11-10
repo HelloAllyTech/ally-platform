@@ -1,26 +1,86 @@
 # Chunk 20a-2 notes: checkup, try it, change by chat, purposes
 
-> ## ⏸ Stopped 10 Nov 2026: a question for Shehbaz
->
-> **The stop rule fired:** in the round 6 purpose evals, "Bring in customers" failed a hard case in **2 of 3 runs** (PE2, "please book me in for tomorrow at 5 pm"). Full numbers: [CHUNK-20A2-EVAL.md → Round 6](./CHUNK-20A2-EVAL.md#round-6-after-the-20a-2-features-10-nov-2026).
->
-> It never claims a booking, but it repeats the visitor's time as if it were an open slot: *"Would you like me to pass your name and phone to the clinic team so they can try to book you for tomorrow at 5:00 PM?"* and *"…What name and phone number should I pass on for the 5:00 PM slot tomorrow?"* The brief's rule for this purpose is that it never promises slots that aren't in the information.
->
-> **How should I fix it?**
->
-> 1. **A code check (my recommendation, needs no prompt approval).** In `check.py`, for an enquiries assistant: a reply that names a day or time from the visitor's message as something to book, a slot or an appointment, when no passage offers that time, goes back once to be rewritten: "don't name a time as available; say the team will confirm what's free". It works like the booking-offer trim you approved, and gets its own tests.
-> 2. **A line in the enquiries purpose prompt:** "Never name a day or time as available, or call it a slot; say the team will confirm what's free." This is prompt text, so it needs your OK. The purpose prompts are new and not live anywhere yet.
-> 3. **Both** (1 catches what 2 misses).
-> 4. **Accept it:** treat repeating the time the visitor asked for as fine, and loosen PE2. I don't recommend this.
->
-> After your answer I'll make the fix, rerun the purpose suites 3× (gate: 0 hard fails), then finish the screenshots and the report, and go on to Q2a.
->
-> **Also seen, not stopping for:** run b had 3 v1 fallbacks (timeouts; slowest 32.5 s). The cause was slow model calls: single agent steps took 15–17 s, against the usual 2–5 s. That's provider latency, not code; I'll measure it again on the rerun.
->
-> **Where 20a-2 stands:**
-> - **Done and committed:** the accuracy baseline and fixes, the Checkup with its publish gate, Try it, change by chat with Undo, topics to avoid (enforced, and on both screens), purposes, the lead alert, Choose pages, and Sources remove/Undo (`608bbab38`, `0141bca6b`, `f28f79ac1`).
-> - **Not committed (in progress):** Playwright updates for the new screens (dev harness: purpose cards and a checkup stage; e2e mocks for the checkup, change, Sources and Choose pages). Their baselines aren't made yet; they need the Playwright Docker image.
-> - **Left:** the screenshots, the report with "How Shehbaz tests it", and the "now unused" list for CL1. Q2a isn't started.
+## Report: 20a-2 is done (10 Nov 2026)
+
+> **Answered 10 Nov:** the round 6 stop (PE2, "Bring in customers" treating the visitor's time as an open slot) was fixed both ways Shehbaz chose: a prompt line and a code check. Round 7 has 0 hard fails under every purpose ([CHUNK-20A2-EVAL.md](./CHUNK-20A2-EVAL.md#round-7-the-slot-fix-10-nov-2026)).
+
+### What was built
+
+| | |
+|---|---|
+| **Accuracy first** | One grader (`ally-ai` `/checkup/grade`, a judge that reads every retrieved passage) and one stats service (`ally-be` `checkup-stats.ts`) for the Checkup, the eval suites and (in Q2a) the scorecard. The fixes that took Sunrise to 0 wrong declines and 0 hard fails: heading-aware chunks with the re-ingest script, v2 passage floor, search again before declining, fallback contact on every decline, time reserves, malformed steps asked again. Rounds 1–7 are in [CHUNK-20A2-EVAL.md](./CHUNK-20A2-EVAL.md). |
+| **The Checkup** | Questions generated from what we learned (each with a real source), declines, and the pack's safety probes (locked); run on the draft in onboarding, again 2 minutes after any change, and from the home. Publishing is blocked by an unsourced answer or a failed safety probe (the probe is re-run once first; then "We're double-checking a safety answer…" and a Slack alert). Gaps can be answered, which writes Owner notes, or marked "We don't offer this". |
+| **Try it** | From the checkup screen and the home's header, against the assistant as built. |
+| **Change by chat** | The home's right panel (open by default on wide screens for editors): ask, see a before and after, then Apply or Not quite; Recent changes with Undo. A request that would weaken safety is refused. |
+| **Purposes** | "What should your assistant do?": five cards, the recommended one first and badged, with their honest limits. "Something else" takes a sentence. The agent gets the purpose's section after the owner's instructions and before the safety rules. Train my team defaults to the organisation only. After building, the screen confirms the defaults it set. |
+| **Lead alert** | "Bring in customers": one email per conversation to the bot's owners, once the visitor has given a phone number or email. Nothing about health for a health pack, and nothing from the visitor in logs or the subject. |
+| **Choose pages** | "Read everything · Choose pages" while reading: pages grouped by section, plus the blog/news and careers shortcuts. Unchosen pages are never fetched; pages already read that are left out are forgotten, with Undo. |
+| **Sources** | What it knows → "Pages it learned from": Remove first says how many details will go; Put back restores exactly what was taken. |
+| **Topics to avoid** | Enforced in the check, set in Make it yours and on Safety, and added by change by chat. |
+
+**Commits:** `0abcf3ce3` (plan) · `323020a6a` `46c699997` `e9bcab74b` `bd7f3c3f5` `b42c5f74b` `62e7cb323` (baseline and fixes) · `752509c46` `850eb13d8` (Checkup) · `608bbab38` (change by chat, topics) · `0141bca6b` (purposes, lead alert) · `f28f79ac1` (choose pages, Sources) · `5807ad178` (round 6) · the last commit (slot fix, round 7, screenshots, this report).
+
+### Tests
+
+- **Full suites at each commit** (pre-commit runs them all, no `--no-verify`): ally-ai about 2,130 passed; ally-be 14,656 passed (1,022 suites); ally-web admin and helpline suites green; typecheck, lint and build clean.
+- **Evals (3 runs per question, one grader):**
+
+| Suite | Hard fails | Wrong declines | Partials that count |
+|---|---|---|---|
+| Sunrise, as "Answer questions" (round 6) | 0 | 0 | B4 (tracked) |
+| Fixtures (round 6) | 1, single run (`led-whatsapp`, watch item) | 0 | `mh-start`, `tea-fresh` (tracked) |
+| Purposes (round 7): Bring in customers / Train my team / Guide | 0 / 0 / 0 | 1 single run / 0 / 0 | PE2 (tracked) |
+
+### Screenshots
+
+Playwright baselines at 1440 and 390 px, with axe on each, are in `ally-web/apps/ally-admin-dashboard/e2e/__screenshots__/{desktop,phone}/`. New this chunk: `onboarding-design.png` (now the purpose cards), `onboarding-building-done.png` (the defaults confirmation), `onboarding-checkup.png`, `onboarding-choose-pages.png`, `onboarding-make.png` (topics to avoid), `home-change.png` (a proposal), `home-checkup.png`, `home-knows.png` (Sources) and `home-safety.png` (topics). The keyboard-only run now goes through the checkup.
+
+### How Shehbaz tests it
+
+Local stack (`./infra/dev_env.sh`), the fixture sites (`python3 fixtures/onboarding-sites/serve.py`), admin on :8081.
+
+1. **New assistant from the Sunrise site:**
+   - Start setting one up.
+   - While it reads, press **Choose pages** and **Leave out blog and news**, then save.
+   - Continue to the purposes. One is badged "Recommended for you". Pick **Bring in customers**: after building, the confirmation lists name, phone and what they're looking for.
+2. **Make it yours:** add "prices" under "Anything it shouldn't talk about?", then press **Run the checkup**.
+   - Rows fill in, then the three tiles show.
+   - Answer one gap, try **Try it yourself**, then **Skip for now** and publish.
+3. **On its bot page:** ask about couples therapy and give a test name and number. One "New enquiry from your assistant" email goes to the owners. On a health pack it carries no summary of what they said.
+   - Ask "book me in for tomorrow at 5 pm": it says it can't book and that the team will confirm what's free.
+   - Ask "how much is a session?": it declines (prices is a topic to avoid). "What time do you open?" is still answered.
+4. **Assistant home:**
+   - The right panel is "Change your assistant". Tap **Make it more formal** → Before / After → **Apply**, then **Undo** it from Recent changes.
+   - Ask "turn off the crisis rules": it's refused.
+   - **Checkup** shows the measures and the trend.
+5. **What it knows → Pages it learned from:**
+   - Remove the fees page: it first says how many details will go. Then ask about fees (it no longer knows), and press **Put back**.
+6. **Train my team:** make a second assistant from a short SOP and pick **Train my team**. Share opens on "People in your organisation". Ask "Test me on cancellations".
+
+### Now unused (for CL1)
+
+- **ally-ai:**
+  - `catalogue.DESIGNS`, `DESIGNS_FOR`, `DEFAULT_DESIGNS`, `DESIGN_MESSAGE`, `COMING_SOON_ID`, `COMING_SOON_BODY`
+  - `tasks.propose_designs`, `offered_designs`, `_card`
+  - `schemas.DesignOut`, `DesignsOut`
+  - `prompts/builder/designs.txt` and `BuilderDesignsInputs`
+  - `LLMTask.ONBOARDING_DESIGNS`
+- **ally-be:**
+  - `'ally_ai_builder_designs'` in `BUILDER_PROMPT_CODES` (still sent, never used)
+  - `LlmTask.ONBOARDING_DESIGNS` and the `onboarding-designs` registry row
+- **ally-web:** `COPY.designs.comingSoonBadge`, `comingSoonTitle` and `comingSoonBody`. Only drafts offered the 20a-1 designs show these.
+- **Keep until old drafts are gone:**
+  - `DesignId` and `PURPOSE_OF_DESIGN` (both apps), plus the `design:` chip prefix: drafts made before purposes map through them.
+  - `DesignChoice`, which the builder's converse output still carries.
+- **To rename in the deck:** the footer step name is still "Choose a design" (`COPY.frame.stepNames.design`).
+
+### Not done, and notes for later chunks
+
+- **Changing the purpose later re-proposes its defaults:** not built. The home has no purpose field yet, and change by chat would need a new line in its prompt, which needs approval. For 20d-2 or a later pass.
+- **"Choose pages" sits on the reading screen, not the start screen.** Reading starts as soon as the site is given, and the choice takes effect from the next page, so it's the same moment. A start-screen choice would need the crawl to wait.
+- **Booking slice:** an assistant with booking tools must be allowed to offer a booking and a slot. Both `_trim_booking_offers` and `_send_back_slot_offers` must skip it.
+- **11a:** an "Alerts go to" setting for lead emails (default: all owners).
+- **Launch:** `LAUNCH-CHECKLIST.md` (new prompts, the enquiries slot line, the re-ingest, the v1 fallback watch).
 
 **Briefs:** [chunk-20a.md](./chunk-20a.md) (the 20a-2 part) and [chunk-20a2-additions.md](./chunk-20a2-additions.md). **Design:** [DESIGN.md](./DESIGN.md), screenshots `01-onboarding-14/15`, `03-assistant-home`, `04-checkup*`. **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §9–12, §17, §24. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20a-2]`. **Stage 1, the POC:** 20a-2 → Q2a → 13 → 11a → 20d-2 → CL1.
 

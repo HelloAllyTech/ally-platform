@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { expectNoSeriousA11yIssues } from "./a11y";
+import { mockOnboardingApi } from "./onboarding.mocks";
 
 /** Every onboarding screen, from the dev harness's fixtures (screenshots, axe). */
 const SCREENS = [
@@ -15,9 +16,14 @@ const SCREENS = [
   "design",
   "building-done",
   "make",
+  "checkup",
   "share",
   "live",
 ];
+
+test.beforeEach(async ({ page }) => {
+  await mockOnboardingApi(page);
+});
 
 test.describe("onboarding screens", () => {
   for (const screen of SCREENS) {
@@ -27,10 +33,21 @@ test.describe("onboarding screens", () => {
       await page.evaluate(() => document.fonts.ready);
       // The QR code is drawn after the screen appears.
       if (screen === "live") await expect(page.getByTestId("share-qr")).toBeVisible();
+      if (screen === "checkup") await expect(page.getByTestId("checkup-tiles")).toBeVisible();
       await expect(page).toHaveScreenshot(`onboarding-${screen}.png`, { fullPage: true });
       await expectNoSeriousA11yIssues(page);
     });
   }
+});
+
+test("choose pages: grouped by section, with the shortcuts", async ({ page }) => {
+  await page.goto("/dev/onboarding?screen=reading-done&hold=1");
+  await page.getByRole("button", { name: "Choose pages" }).click();
+  await expect(page.getByTestId("choose-pages")).toBeVisible();
+  await page.getByRole("button", { name: "Leave out blog and news" }).click();
+  await expect(page.getByLabel("All of blog")).not.toBeChecked();
+  await expect(page).toHaveScreenshot("onboarding-choose-pages.png", { fullPage: true });
+  await expectNoSeriousA11yIssues(page);
 });
 
 test("reduced motion: nothing animates", async ({ browser }) => {
@@ -79,7 +96,7 @@ test("keyboard only: start to published without a mouse", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: /where should it point people/ })).toBeVisible();
   await page.keyboard.press("a");
-  // Designs: Tab to "Choose this", Enter.
+  // Purposes: Tab to "Choose this", Enter.
   await expect(page.getByRole("button", { name: "Choose this" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Choose this" }).first().focus();
   await page.keyboard.press("Enter");
@@ -87,6 +104,10 @@ test("keyboard only: start to published without a mouse", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Make it yours" })).toBeVisible();
+  await page.keyboard.press("Enter");
+  // The checkup (20a-2): one question needs input; Skip for now goes on to Share.
+  await expect(page.getByTestId("checkup-tiles")).toBeVisible();
+  await page.getByRole("button", { name: "Skip for now" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Who can use it?" })).toBeVisible();
   await page.getByRole("textbox", { name: "Their emails" }).focus();

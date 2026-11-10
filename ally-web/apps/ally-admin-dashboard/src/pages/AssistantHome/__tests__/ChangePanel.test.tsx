@@ -121,6 +121,14 @@ describe("ChangePanel", () => {
     expect(h.undo).toHaveBeenCalledWith({ id: "bot-1", eventId: "e-1" });
   });
 
+  it("names a recent change by its field, as the deck does", () => {
+    h.history.current = [
+      { id: "e-1", at: "", kind: "change", summary: "tone, language", undone: false },
+    ];
+    renderPanel();
+    expect(screen.getByText(`${t.fields.tone}, ${t.fields.language}`)).toBeTruthy();
+  });
+
   it("lets a viewer read history but not ask or undo", () => {
     h.history.current = [
       { id: "e-1", at: "", kind: "change", summary: "Changed the tone", undone: false },
