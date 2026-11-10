@@ -97,7 +97,7 @@ All paths are under `ally-web/apps/ally-admin-dashboard/src`.
 ### Latest migration
 `1980920000000-AddChatbotLastTestedAt`. This chunk adds `1980960000000`.
 
-### Where the code differs from chunk-02.md (the code wins)
+### Where the code differs from archive/chunk-02.md (the code wins)
 1. `wa_messages` has no metadata jsonb, so this chunk adds `agent_run_id` and `agent_runtime` columns.
 2. `agentRuntimeAllowed` needs no data migration. Adding it to `DEFAULT_WHATSAPP_SETTINGS` is the existing mechanism, because `merge()` fills keys missing from the stored row.
 3. A bot must not be able to turn the kill switch on for itself. Because the per-bot settings DTO doesn't validate keys, `applyOverride` forces the platform value.

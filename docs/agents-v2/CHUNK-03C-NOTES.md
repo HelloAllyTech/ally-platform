@@ -1,6 +1,6 @@
 # Chunk 03c notes: live agent (streaming steps and replies, WhatsApp typing)
 
-**Brief:** [chunk-03c.md](./chunk-03c.md). **Branch:** `feat/agents-v2-chunk-03c-streaming`, from master after PR #223 (`chore/agents-v2-one-loop`: one agent loop, the parity path and Shadow removed) was merged. **Repos:** all three.
+**Brief:** [chunk-03c.md](./archive/chunk-03c.md). **Branch:** `feat/agents-v2-chunk-03c-streaming`, from master after PR #223 (`chore/agents-v2-one-loop`: one agent loop, the parity path and Shadow removed) was merged. **Repos:** all three.
 
 Plan approved 2026-11-06 at `~/.claude/plans/pasted-content-id-053d-we-re-starting-dynamic-turtle.md`.
 

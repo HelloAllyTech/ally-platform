@@ -37,12 +37,12 @@ Read `CONTEXT.md`, `BUILDING-BLOCKS.md` and `SLICE-1.md` first. Product spec: `a
 | 20a-1 Agent-first onboarding: start → publish | ✅ built on the slice 1 branch (see its notes) |
 | 20d Design pass and the assistant home | ✅ built on the slice 1 branch (see its notes) |
 | **Stage 1: the POC** (same branch) | 20a-2 → Q2a → 13 → 11a → 20d-2 → CL1 |
-| 20a-2 Checkup, try it, change by chat (+ `chunk-20a2-additions.md`) | ▶ next |
-| Q2a Live scorecard, light (`chunk-q2a.md`) | after 20a-2 |
-| 13 Website widget (`chunk-13.md`) | after Q2a |
-| 11a Inbox, light (`chunk-11a.md`) | after 13 |
-| 20d-2 Restyle the parts still in the old look (`chunk-20d2.md`) | after 11a |
-| CL1 Cleanup before launch, no behaviour change (`chunk-cl1.md`) | after 20d-2 |
+| 20a-2 Checkup, try it, change by chat (+ `archive/chunk-20a2-additions.md`) | ✅ built on the slice 1 branch (see its notes) |
+| Q2a Live scorecard, light (`archive/chunk-q2a.md`) | ✅ built on the slice 1 branch (see its notes) |
+| 13 Website widget (`archive/chunk-13.md`) | ✅ built on the slice 1 branch (see its notes) |
+| 11a Inbox, light (`archive/chunk-11a.md`) | ✅ built on the slice 1 branch (see its notes) |
+| 20d-2 Restyle the parts still in the old look (`archive/chunk-20d2.md`) | ✅ built on the slice 1 branch (see its notes) |
+| CL1 Cleanup before launch, no behaviour change (`chunk-cl1.md`) | ▶ built, waiting for review (`CHUNK-CL1-NOTES.md`) |
 | 15a Crisis classifier v2 | moved to Stage 6, with public links |
 | 20e Landing page | moved to Stage 6, with public links |
 | Stages 2–8 | Not started (see Stages below) |
@@ -61,7 +61,7 @@ The stages replace the earlier phases, "Moved to v3" and "Order and timing". The
 
 | Stage | Version | Chunks, in order | Result | Target | Gate |
 |---|---|---|---|---|---|
-| 1 The POC | v2.0 | 20a-1 ✅ → 20d ✅ → 20a-2 (+ `chunk-20a2-additions.md`) → Q2a → 13 → 11a → 20d-2 → CL1 | Website → tested, branded assistant → link for your organisation or invited people, a website bubble, live numbers and an inbox. Public links stay off | Late Nov 2026 | G1 |
+| 1 The POC | v2.0 | 20a-1 ✅ → 20d ✅ → 20a-2 ✅ (+ `archive/chunk-20a2-additions.md`) → Q2a ✅ → 13 ✅ → 11a ✅ → 20d-2 ✅ → CL1 ▶ | Website → tested, branded assistant → link for your organisation or invited people, a website bubble, live numbers and an inbox. Public links stay off | Late Nov 2026 | G1 |
 | 2 Agent core | v2.1 | 3b → 4 → 7 → 8 → 16a → 8L | Workspace (filesystem agent), profiles, managed memory, history search, owner-approved learning | Late Dec 2026 | G2a (new) |
 | 3 Quality | v2.2 | Q1 → Q2 | Checkups and the live scorecard | Mid Jan 2027 | — |
 | 4 Building blocks | v2.3 | 5 → 6 → 6F → 9 | Owner's own lists and tools, light follow-ups, media and voice | Early Feb 2027 | G2 |

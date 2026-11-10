@@ -6,7 +6,7 @@ Everything that has to happen outside the code before the POC (Stage 1) goes liv
 
 The Skills Store keeps a prompt's live text; a changed seed file never overwrites it. Push each with the `prompts` CLI (needs a Skills Store key), then publish it in the Skills Store.
 
-- [ ] **`ally_ai_builder_designs`**: one speaker per sample line, no ungrounded details (20d, `CHUNK-20D-NOTES.md` §5).
+- [ ] *(Optional)* **`ally_ai_builder_designs`**: no push needed any more. 20a-2 replaced designs with purposes and CL1 removed the code, so nothing sends or loads it; its Skills Store entry can be archived (`CHUNK-CL1-NOTES.md`).
 - [ ] **`ally_ai_agent_system`**: two lines added in 20a-2 (`CHUNK-20A2-NOTES.md` §3):
   - "When the answer is no, or not what they hoped, give the closest alternative the passages offer (another day, time or service) before any other tip."
   - "When a question has more than one part, answer every part from the passages you found, not only the first."

@@ -104,7 +104,7 @@ Build these once (in a `v2` folder of the admin app's components; the bot page a
 
 ## 5. Layout patterns
 
-- **Onboarding** (`/chatbots/new`): one screen at a time inside StepFrame (§6 of `chunk-20d.md` maps every step). No two-pane layout. The canvas pieces from 20a-1 become screens.
+- **Onboarding** (`/chatbots/new`): one screen at a time inside StepFrame (§6 of `archive/chunk-20d.md` maps every step). No two-pane layout. The canvas pieces from 20a-1 become screens.
 - **Assistant home** (an existing bot): a left section list (Overview, What it knows, Personality, Safety, Look and feel, Checkup, Conversations, Share), the content in the middle, and the **Change your assistant** panel on the right (20a-2). On narrow screens the list becomes a top menu and the panel a bottom sheet.
 - **Visitor surfaces:** mobile first. Bot page: cover → access → pre-chat questions (one per screen with progress) → chat. Landing page: nav, hero with an ask box, then sections.
 
@@ -127,4 +127,4 @@ One `brand` object on the bot page record (extend 12b's settings; don't add a se
 | `landingImages` | `hero` and up to 6 `gallery` image ids, each with alt text (used by 20e) |
 | `peoplePhotos` | Optional map from a team member's name to an image id; used by the landing page now, and by replies once People (chunk 7) lands |
 
-Image rules are in `chunk-20d.md` §4.
+Image rules are in `archive/chunk-20d.md` §4.

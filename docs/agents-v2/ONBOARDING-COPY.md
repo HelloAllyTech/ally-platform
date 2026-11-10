@@ -560,7 +560,7 @@ says when a save can't be made. More lines for the home's sections are added her
 
 ## 24. Purposes, choosing pages and topics to avoid (20a-2)
 
-*(From `chunk-20a2-additions.md` §4, plus the checkup lines 20a-2's screens need. §20 is the assistant's home, so these are §24.)*
+*(From `archive/chunk-20a2-additions.md` §4, plus the checkup lines 20a-2's screens need. §20 is the assistant's home, so these are §24.)*
 
 - **Screen title:** What should your assistant do?
 - **Builder message:** Based on what I learned, here's what I'd suggest. You can pick something else, and change it later.

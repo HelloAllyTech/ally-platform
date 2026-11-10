@@ -437,7 +437,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 - **Ratings:** value low · effort S · risk low · **should**
 
 **60. `CLAUDE.md` still names chunk 03a as current**
-- **Where:** `CLAUDE.md:235`. `docs/agents-v2/chunk-03r.md` is also untracked.
+- **Where:** `CLAUDE.md:235`. `docs/agents-v2/archive/chunk-03r.md` is also untracked.
 - **Proposed change:** point the line at `chunk-03r.md` and commit the brief. Pass 1 commits only this review, as instructed.
 - **Ratings:** value med · effort S · risk low · **should**
 
@@ -516,7 +516,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 | ally-be: chatbot, whatsapp, ai, llm, common and config specs; `typecheck`; `lint` on the touched folders | **97 suites, 1,238 tests pass**; typecheck and lint clean. The full suite and `build` weren't re-run, to save time; every commit up to #47 ran them through the hooks. |
 | ally-web: admin `vitest`; the CI typecheck; `lint` on the touched folders | **539 files, 8,345 tests pass** (540 files before: two Preview test files were merged); typecheck clean; lint has 0 errors (3 warnings in the untouched `UsageDashboard.tsx`) |
 | Parity: `agent_parity.py` against the master baseline | **0 must-match failures**, 0 baseline failures. p50: v1 5,854 ms, v2 6,252 ms |
-| Conversation eval ([CHUNK-03R-EVAL.md](./CHUNK-03R-EVAL.md)), run **once** to save time (the brief asks for two) | 42 turns, 0 automatic check fails. Judge mean **4.50** (baseline 4.45, inside ±0.3). Agent p50 **6,878 ms** (baseline 7,274 ms, −5%, inside +10%). 1 hard fail: see below |
+| Conversation eval ([CHUNK-03R-EVAL.md](../CHUNK-03R-EVAL.md)), run **once** to save time (the brief asks for two) | 42 turns, 0 automatic check fails. Judge mean **4.50** (baseline 4.45, inside ±0.3). Agent p50 **6,878 ms** (baseline 7,274 ms, −5%, inside +10%). 1 hard fail: see below |
 
 **About the hard fail:**
 - `out-refund` was judged "out-of-scope answered". The reply itself is a decline (intent `decline`, "I don't have any information about a refund policy…").

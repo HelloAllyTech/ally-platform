@@ -1,6 +1,6 @@
 # Slice 1 — From website to a shareable bot, agent-first
 
-> Read with `CONTEXT.md`, `BUILDING-BLOCKS.md` and `v2-chunks.md`. This slice is Stage 1 of the plan (`v2-chunks.md`, Stages): **12 → 12b → 20a-1 → 20d → 20a-2 → 15a → 20e**, one Claude Code loop each. Each has its own brief (`chunk-12.md` first; the others are written once the previous one is merged, so they match what was actually built).
+> Read with `CONTEXT.md`, `BUILDING-BLOCKS.md` and `v2-chunks.md`. This slice became Stage 1, the POC: its chunks, their order and their status are in `v2-chunks.md` (Progress and Stages), which is the one source for them. 15a and 20e moved to Stage 6. Finished briefs are in `archive/`.
 
 ## The goal
 
@@ -89,7 +89,7 @@ The safety packs live in code and pages, versioned, and are applied by industry.
 | **12b** | **Bot page.** A branded, shareable link with streaming, access modes (public, organisation, invite with a one-time code), pre-chat questions, suggested questions, rate limits, a bot check and a daily cap | The link the owner shares | Chat from a phone browser by link; invite-only asks for a code; pre-chat answers are saved on the conversation |
 | **20a** | **Agent-first onboarding (quick-start).** The builder agent, the live canvas, website reading, safety packs, design proposals, the readiness check, publish and share, change-by-chat with undo | The 10x experience | Every fixture above: website to shared link in under 5 minutes; a readiness check with 0 unsourced answers; safety packs applied |
 | **20d** | **Design pass.** One screen at a time with motion, the owner's brand on everything their clients see, logo and image uploads, Look and feel | The first thing a customer sees must feel like the best product they've used | Every onboarding screen and the bot page in the new style; uploads validated and served; screenshots, keyboard and accessibility checks pass |
-| **20a-2** | **Checkup, try it, change by chat**, plus purposes and choosing pages (`chunk-20a2-additions.md`) | Owners see proof it works before they share | The checkup gates publishing; change by chat with Confirm and Undo; safety can't be weakened |
+| **20a-2** | **Checkup, try it, change by chat**, plus purposes and choosing pages (`archive/chunk-20a2-additions.md`) | Owners see proof it works before they share | The checkup gates publishing; change by chat with Confirm and Undo; safety can't be weakened |
 | **15a** | **Crisis classifier v2.** Recent turns as context, benign look-alikes in the prompt, a crisis eval set with zero missed crises, and fewer false alarms | Required before any public health bot link (gate G1b) | Crisis eval: 0 misses, false alarms down; the Sunrise Mind and Ally FAQ tests still pass |
 | **20e** | **Landing page.** A one-page site built from what the assistant knows, with the assistant built in | Many small businesses have a weak website or none | Public by nature, so after 15a (gate G1b) |
 

@@ -1,6 +1,6 @@
 # Chunk 12b notes: bot page (a shareable chat link)
 
-**Brief:** [chunk-12b.md](./chunk-12b.md). **Branch:** `feat/agents-v2-chunk-12-shared-store`. All of slice 1 (12, 12b, 20a, 15a) is built on this one branch, and every 12b commit is tagged `[12b]`. Master (#232) was merged first: it was already the base, so there were no conflicts. **Repos:** ally-be and ally-web. ally-ai is untouched: the stream contract already covers the page.
+**Brief:** [chunk-12b.md](./archive/chunk-12b.md). **Branch:** `feat/agents-v2-chunk-12-shared-store`. All of slice 1 (12, 12b, 20a, 15a) is built on this one branch, and every 12b commit is tagged `[12b]`. Master (#232) was merged first: it was already the base, so there were no conflicts. **Repos:** ally-be and ally-web. ally-ai is untouched: the stream contract already covers the page.
 
 Plan approved 2026-11-07 at `~/.claude/plans/pasted-content-id-f834-we-re-continuing-sharded-raven.md`.
 

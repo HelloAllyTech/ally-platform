@@ -1,6 +1,6 @@
 # Chunk 20d notes: design pass, brand and images
 
-**Brief:** [chunk-20d.md](./chunk-20d.md). **Design:** [DESIGN.md](./DESIGN.md) and the screenshots in `design/`. **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §15–19. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20d]`. **Order in slice 1:** 12 → 12b → 20a-1 → **20d** → 20a-2 → 15a → 20e.
+**Brief:** [chunk-20d.md](./archive/chunk-20d.md). **Design:** [DESIGN.md](./DESIGN.md) and the screenshots in `design/`. **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §15–19. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20d]`. **Order in slice 1:** 12 → 12b → 20a-1 → **20d** → 20a-2 → 15a → 20e.
 
 ## 1. Code map: what exists today (read before building)
 

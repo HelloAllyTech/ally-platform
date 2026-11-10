@@ -1,6 +1,6 @@
 # Chunk 20d-2 notes: polish and control pass
 
-**Brief:** [chunk-20d2.md](./chunk-20d2.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §25. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20d-2]`. **Stage 1, the POC:** 20a-2 ✅ → Q2a ✅ → 13 ✅ → 11a ✅ → **20d-2** → CL1.
+**Brief:** [chunk-20d2.md](./archive/chunk-20d2.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §25. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20d-2]`. **Stage 1, the POC:** 20a-2 ✅ → Q2a ✅ → 13 ✅ → 11a ✅ → **20d-2** → CL1.
 
 > Report below. The plan as approved follows it.
 
@@ -316,7 +316,7 @@ New versioned routes live in the chatbot's home module. Each delegates to today'
   - `sections/Overview.tsx`: v2 "All numbers" (same analytics endpoints, local bars; no import of `UsageDashboard`).
   - `sections/WhatsAppNumbers.tsx`, `sections/TeamGroup.tsx`, `sections/DocumentsGroup.tsx`, `sections/QuickReplies.tsx`, `sections/Numbers.tsx` (new, one per redrawn part). <!-- docs-path-lint: ignore -->
   - `api/chatbots.ts`: the new list mutations; `types/assistantHome.ts`: list versions.
-  - `pages/AssistantHome/copy.ts`; `__tests__/lists.test.tsx` (new): each list saves its own op with its version, 409, Undo, viewer read-only.
+  - `pages/AssistantHome/copy/index.ts` (one file until CL1); `__tests__/lists.test.tsx` (new): each list saves its own op with its version, 409, Undo, viewer read-only.
 
 ### Part B — UX audit fixes, explain every section
 

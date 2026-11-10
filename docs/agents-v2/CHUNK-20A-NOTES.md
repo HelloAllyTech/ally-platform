@@ -1,6 +1,6 @@
 # Chunk 20a notes: agent-first onboarding
 
-**Brief:** [chunk-20a.md](./chunk-20a.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md), used exactly. **Branch:** `feat/agents-v2-chunk-12-shared-store`. All of slice 1 is on this branch, and every 20a commit is tagged `[20a]`.
+**Brief:** [chunk-20a.md](./archive/chunk-20a.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md), used exactly. **Branch:** `feat/agents-v2-chunk-12-shared-store`. All of slice 1 is on this branch, and every 20a commit is tagged `[20a]`.
 - Master was merged first: no new commits, so no conflicts.
 - **Repos:** all three.
 - **Two loops.**
@@ -173,7 +173,7 @@ Elsewhere in ally-be: the engine sends the pack as `persona.safety_rules` and `p
 - Six structured sub-tasks, each with its own prompt (`app/prompts/builder/*.txt`) and task label: the conversation step, fact extraction, classify (business type and care topics), gaps, designs, draft.
 - Code decides what the deck fixes: question order and quick replies, gap checklists per business type, what each design will and won't do, the coming-soon card, and every fixed message. The model writes only what the deck leaves open, and proposes values that code turns into patches on the builder's own paths.
 - Checks in code: facts must cite a page in their batch; sentences stating a number we were never given are dropped; the assistant never claims to book; unknown labels fall back rather than fail a batch.
-- The agent check (`agent_runtime/check.py`) enforces a health pack in code: no diagnosis, result reading, dosing or medication changes, whatever the instructions say.
+- The agent check (`agent_runtime/check/safety.py` since CL1) enforces a health pack in code: no diagnosis, result reading, dosing or medication changes, whatever the instructions say.
 
 ### Admin dashboard (`apps/ally-admin-dashboard/src/pages/Onboarding/`)
 

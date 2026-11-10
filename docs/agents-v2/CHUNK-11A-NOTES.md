@@ -1,6 +1,6 @@
 # Chunk 11a notes: Inbox (light), with a person stepping in
 
-**Brief:** [chunk-11a.md](./chunk-11a.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §23. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[11a]`. **Stage 1, the POC:** 20a-2 ✅ → Q2a ✅ → **11a** (13, the widget, is being built in another session; 20d-2 and CL1 next week).
+**Brief:** [chunk-11a.md](./archive/chunk-11a.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §23. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[11a]`. **Stage 1, the POC:** 20a-2 ✅ → Q2a ✅ → **11a** (13, the widget, is being built in another session; 20d-2 and CL1 next week).
 
 ## Report: 11a is done (10 Nov 2026)
 

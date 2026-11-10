@@ -1,6 +1,6 @@
 # Chunk 03d notes: v2 only, and a chatbot's own documents
 
-Brief: [chunk-03d.md](./chunk-03d.md). Built 2026-11-06 on `feat/agents-v2-chunk-01-langgraph-runtime`.
+Brief: [chunk-03d.md](./archive/chunk-03d.md). Built 2026-11-06 on `feat/agents-v2-chunk-01-langgraph-runtime`.
 
 ## Decisions
 
@@ -99,7 +99,7 @@ Not run: the full ally-be suite, `build`'s e2e, ally-ai (unchanged).
 
 ## How Shehbaz tests it
 
-Follow [chunk-03d.md](./chunk-03d.md), "How Shehbaz tests it". Refresh the dashboard first: the Engine card is gone.
+Follow [chunk-03d.md](./archive/chunk-03d.md), "How Shehbaz tests it". Refresh the dashboard first: the Engine card is gone.
 
 ## Open items
 

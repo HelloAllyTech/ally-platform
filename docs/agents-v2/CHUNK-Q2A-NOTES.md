@@ -50,7 +50,7 @@ As planned in §2, plus:
 - **The weekly CSV export** isn't built (the brief allowed it; not needed for the POC).
 - **The "Needs your input" group** under the 30-day numbers now overlaps "Questions it didn't know": a CL1 cleanup candidate.
 
-**Brief:** [chunk-q2a.md](./chunk-q2a.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §21. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[Q2a]`. **Stage 1, the POC:** 20a-2 ✅ → **Q2a** → 11a (13 in another session; 20d-2 and CL1 next week).
+**Brief:** [chunk-q2a.md](./archive/chunk-q2a.md). **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §21. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[Q2a]`. **Stage 1, the POC:** 20a-2 ✅ → **Q2a** → 11a (13 in another session; 20d-2 and CL1 next week).
 
 ## 1. Code map: what exists
 

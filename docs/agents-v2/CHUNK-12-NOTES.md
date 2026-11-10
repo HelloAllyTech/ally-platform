@@ -1,6 +1,6 @@
 # Chunk 12 notes: shared conversation store and contact identity
 
-**Brief:** [chunk-12.md](./chunk-12.md). **Branch:** `feat/agents-v2-chunk-12-shared-store`, from master after #232 (chunk 3c) was merged. **Repos:** ally-be only.
+**Brief:** [chunk-12.md](./archive/chunk-12.md). **Branch:** `feat/agents-v2-chunk-12-shared-store`, from master after #232 (chunk 3c) was merged. **Repos:** ally-be only.
 
 Plan approved 2026-11-07 at `~/.claude/plans/pasted-content-id-bd8d-we-re-starting-tingly-bee.md`.
 

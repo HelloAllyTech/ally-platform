@@ -70,7 +70,7 @@ List the files in scope with `git diff --stat master...HEAD` and review every on
 - Timeouts and error mapping are consistent.
 - Settings have sensible defaults and are documented in `env_sample`.
 
-**Output:** `docs/agents-v2/REVIEW-1-3A.md`, containing:
+**Output:** `docs/agents-v2/archive/REVIEW-1-3A.md`, containing:
 
 - **A scorecard:** each rubric area rated 1–5, with one line of why.
 - **Findings, numbered,** each with: area, file:line, what's wrong, the proposed change, **value** (high/med/low), **effort** (S/M/L), **risk** of behaviour change (low/med/high), and whether it's **must** (fix before merge), **should** (fix now if cheap) or **later** (note for a future chunk).

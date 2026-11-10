@@ -63,7 +63,8 @@ Local stack (`./infra/dev_env.sh`), the fixture sites (`python3 fixtures/onboard
   - `catalogue.DESIGNS`, `DESIGNS_FOR`, `DEFAULT_DESIGNS`, `DESIGN_MESSAGE`, `COMING_SOON_ID`, `COMING_SOON_BODY`
   - `tasks.propose_designs`, `offered_designs`, `_card`
   - `schemas.DesignOut`, `DesignsOut`
-  - `prompts/builder/designs.txt` and `BuilderDesignsInputs`
+  <!-- docs-path-lint: ignore -->
+  - `prompts/builder/designs.txt` and `BuilderDesignsInputs` (removed in CL1)
   - `LLMTask.ONBOARDING_DESIGNS`
 - **ally-be:**
   - `'ally_ai_builder_designs'` in `BUILDER_PROMPT_CODES` (still sent, never used)
@@ -82,7 +83,7 @@ Local stack (`./infra/dev_env.sh`), the fixture sites (`python3 fixtures/onboard
 - **11a:** an "Alerts go to" setting for lead emails (default: all owners).
 - **Launch:** `LAUNCH-CHECKLIST.md` (new prompts, the enquiries slot line, the re-ingest, the v1 fallback watch).
 
-**Briefs:** [chunk-20a.md](./chunk-20a.md) (the 20a-2 part) and [chunk-20a2-additions.md](./chunk-20a2-additions.md). **Design:** [DESIGN.md](./DESIGN.md), screenshots `01-onboarding-14/15`, `03-assistant-home`, `04-checkup*`. **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §9–12, §17, §24. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20a-2]`. **Stage 1, the POC:** 20a-2 → Q2a → 13 → 11a → 20d-2 → CL1.
+**Briefs:** [chunk-20a.md](./archive/chunk-20a.md) (the 20a-2 part) and [chunk-20a2-additions.md](./archive/chunk-20a2-additions.md). **Design:** [DESIGN.md](./DESIGN.md), screenshots `01-onboarding-14/15`, `03-assistant-home`, `04-checkup*`. **Copy:** [ONBOARDING-COPY.md](./ONBOARDING-COPY.md) §9–12, §17, §24. **Branch:** `feat/agents-v2-chunk-12-shared-store`; commits tagged `[20a-2]`. **Stage 1, the POC:** 20a-2 → Q2a → 13 → 11a → 20d-2 → CL1.
 
 - Master merged first (`8e575913e`, 14 commits, no conflicts, no migrations of its own).
 - Plan approved 2026-11-09 (with the additions in §10a below). Stacks was tried but isn't connected in this session; product calls follow the briefs, the deck and the screenshots.
@@ -94,7 +95,7 @@ Paths are relative to each app.
 ### ally-ai
 
 - **Passage selection:** `app/core/knowledge_agent/agent.py` `_select_passages(hits, *, band, max_passages, max_context_tokens)` (l.384) keeps hits within `band` of the best. Defaults (`app/core/config.py:109-117`): top_k 8, min 0.35, decline 0.42, band 0.08, 5 passages, 3000 tokens. Called by v1 `answer()` and by v2 `agent_runtime/tools/search_knowledge.py` (retrieve → gate → select).
-- **The check:** `app/core/agent_runtime/check.py`. `Rejection` (l.306): CLINICAL_ADVICE, UNCITED, UNSOURCED_DETAIL, EMPTY, SEARCH_FIRST, MENTIONS_SOURCES, USE_FOUND. `check_reply` (l.512): read draft → ground (`_require_sources` l.638) → `_enforce_safety_pack` (l.442, health packs) → wording fixes. `MAX_REVISIONS = 1` (`budget.py:18`); a rejection loops back through `nodes/agent_check.py:66-80`. `organisation_of` (l.238) takes the left side of "X — Y" titles.
+- **The check:** `app/core/agent_runtime/check/__init__.py` (one file until CL1; the line numbers are from then). `Rejection` (l.306): CLINICAL_ADVICE, UNCITED, UNSOURCED_DETAIL, EMPTY, SEARCH_FIRST, MENTIONS_SOURCES, USE_FOUND. `check_reply` (l.512): read draft → ground (`_require_sources` l.638) → `_enforce_safety_pack` (l.442, health packs) → wording fixes. `MAX_REVISIONS = 1` (`budget.py:18`); a rejection loops back through `nodes/agent_check.py:66-80`. `organisation_of` (l.238) takes the left side of "X — Y" titles.
 - **Prompt assembly:** `format_persona` (`app/core/knowledge_agent/prompt.py:115`): who you are, name, tone, the owner's instructions in a fence, then `safety_rules`. A purpose section goes between the fence (l.153) and the rules (l.154).
 - **`/agent/run`:** `AgentRunResponse` (`app/schemas/agent_runtime.py:116`): intent answer|decline|clarify (no crisis: ally-be decides crisis), citations (document_id, source_url, similarity…), `retrieval` (`hit_chunk_ids` etc., **first search only**), `trace` timings, `turn_type`. Passage text isn't returned.
 - **Evals:** `scripts/agent_conversation_eval.py` (its own case format, automatic checks, a gpt-5-mini judge, hard fails) and `scripts/onboarding_eval.py` (fixture sites end to end, no judge). **Nothing reads `evals/sunrise-mind-checkups.yaml` yet.** Judge modules elsewhere in `app/core/*/judge.py` all use `generate_structured(..., never_fallback=True)`.
@@ -271,7 +272,7 @@ Q2a extends this same service for live numbers. **The eval script runs suites th
 
 ### 7. Purposes, lead alerts, choosing pages, topics to avoid
 
-- **Purposes** (`chunk-20a2-additions.md`).
+- **Purposes** (`archive/chunk-20a2-additions.md`).
   - **Builder:** the five cards come from code (`catalogue.PURPOSES`). The model only tailors "Best for" and the sample, with the existing grounding checks. One card is recommended and shown first.
   - **The screen:** "Choose a design" becomes "What should your assistant do?". `DesignCard` gets a `recommended` badge, and a defaults confirmation follows.
   - **Defaults:** pre-chat questions and access are set as patches. Changing the purpose later re-proposes them as a before/after and never overwrites the owner's edits.
@@ -297,7 +298,7 @@ Q2a extends this same service for live numbers. **The eval script runs suites th
 
 ### 8. Screens (copy from the deck only)
 
-The purpose, choose pages and avoid copy from `chunk-20a2-additions.md` §4 goes into the deck as **§24**, because §20 is now the home. Any other new line (for example the header chip "{pct}% accurate · {n} to fix" from screenshot 03) goes into the deck in the same commit.
+The purpose, choose pages and avoid copy from `archive/chunk-20a2-additions.md` §4 goes into the deck as **§24**, because §20 is now the home. Any other new line (for example the header chip "{pct}% accurate · {n} to fix" from screenshot 03) goes into the deck in the same commit.
 
 | Screen | Built from |
 |---|---|
