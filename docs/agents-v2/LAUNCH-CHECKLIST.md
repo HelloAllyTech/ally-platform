@@ -29,6 +29,9 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **v2 in production:** confirm `global_settings` `whatsapp_bot` → `agentRuntimeAllowed` and ally-ai `AGENT_RUNTIME__ENABLED` (`CHUNK-20A2-NOTES.md` §3).
 - [ ] **A private bucket of its own for bot images** (20d).
 - [ ] **Public links stay off** (`botPagePublicAllowed`) until Stage 6.
+- [ ] **Website widget: `frame-ancestors` for `/b/*`** at CloudFront and Caddy (13). Per bot, from `GET /api/v1/public/widget/<slug>/frame-policy` (the allowed websites and their subdomains, plus the page's own origin). Until then the page and ally-be enforce the allowed websites themselves (`CHUNK-13-NOTES.md`, Security).
+- [ ] **Website widget: serve `/widget.js`** from the bot page's origin with short caching (`Cache-Control: max-age=300`), not the `immutable` the hashed assets get. It is built into the dashboard's dist by its build (13).
+- [ ] **`ALLOWED_ORIGINS` is unchanged by the widget:** the loader's settings route answers CORS itself, only to each bot's allowed websites (13).
 
 ## Checks
 
