@@ -25,12 +25,6 @@ vi.mock("@components", async importOriginal => {
 });
 
 // Mock ReportUploadProgressDialog to avoid API dependency
-// The global idea-capture button has its own concerns (speech, drafts API); the shell test only
-// needs to know a slot exists for it.
-vi.mock("@components/idea-capture/IdeaCapture", () => ({
-  IdeaCaptureLauncher: () => <div data-testid="idea-capture-slot" />,
-}));
-
 vi.mock("@components/report-upload-progress-dialog/ReportUploadProgressDialog", () => ({
   default: () => null,
 }));
