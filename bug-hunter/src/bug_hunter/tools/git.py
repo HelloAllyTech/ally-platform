@@ -10,10 +10,10 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, Sequence
+from typing import Iterator, Protocol, Sequence
 
 from bug_hunter.safety.phi import scrub_code
 
@@ -69,7 +69,6 @@ class Git:
     """Git commands against ``repo_root`` (the main checkout) or a worktree."""
 
     def __init__(self, repo_root: Path, runner: CommandRunner = subprocess_runner):
-        self._stashes: dict[str, list[tuple[str, str]]] = {}
         self.repo_root = Path(repo_root)
         self.runner = runner
 
@@ -182,40 +181,20 @@ class Git:
         )
         return self.head(worktree)
 
-    def stash_paths(self, worktree: Path, paths: Sequence[str]) -> bool:
-        """Set aside the tracked changes to ``paths`` (the fix) so the baseline can run
-        on the untouched code; untracked files (the repro test) stay. Returns whether
-        anything was stashed."""
-        tracked = set(self.modified_tracked_files(worktree))
-        paths = [p for p in paths if p in tracked]  # git refuses untracked pathspecs
-        if not paths:
-            return False
-        # the stash stack is shared by every worktree of the repo: tag the entry,
-        # remember its sha, and restore exactly that one (never a bare pop)
-        tag = f"bughunter-baseline-{uuid.uuid4().hex[:12]}"
-        out = self._git(
-            ["stash", "push", "--quiet", "-m", tag, "--", *paths], cwd=worktree
-        )
-        if "No local changes" in (out.stdout + out.stderr):
-            return False
-        listing = self._git(["stash", "list", "--format=%H %gs"], cwd=worktree)
-        for line in listing.stdout.splitlines():
-            sha, _, subject = line.partition(" ")
-            if subject.endswith(tag):
-                self._stashes.setdefault(str(worktree), []).append((sha, tag))
-                return True
-        raise GitError(f"stash {tag} not found after push")
-
-    def unstash(self, worktree: Path) -> None:
-        """Restore the last stash this object made for ``worktree`` and drop it."""
-        sha, tag = self._stashes[str(worktree)].pop()
-        self._git(["stash", "apply", "--quiet", sha], cwd=worktree)
-        listing = self._git(["stash", "list", "--format=%gd %gs"], cwd=worktree)
-        for line in listing.stdout.splitlines():
-            ref, _, subject = line.partition(" ")
-            if subject.endswith(tag):
-                self._git(["stash", "drop", "--quiet", ref], cwd=worktree)
-                break
+    @contextmanager
+    def clean_checkout(self, parent: Path, name: str, ref: str) -> Iterator[Path]:
+        """A throwaway detached worktree of ``ref`` at ``parent/name/worktree``,
+        removed afterwards whatever happens. Used to run commands on untouched code
+        without touching the caller's worktree or the stash stack (which every
+        worktree of the repo shares)."""
+        path = self.create_worktree(parent, name, ref)
+        try:
+            yield path
+        finally:
+            try:
+                self.remove_worktree(path)
+            finally:
+                shutil.rmtree(Path(parent) / name, ignore_errors=True)
 
     # --- push: only open_pr may call this ------------------------------------------
 

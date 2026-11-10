@@ -48,6 +48,27 @@ class GraphDeps:
     github: Any = None  # GitHubClient; None -> dry-run client built on first use
     approvals: Any = None  # ApprovalStore; None -> in memory (tests) or Postgres (CLI)
     push: bool = False  # real pushes need --push and the GitHub App
+    # builds a runner for a clean checkout (baseline on untouched code); tests fake it
+    baseline_runner: Callable[[Path, Path], Any] | None = None
+
+    def make_baseline_runner(self, worktree: Path, app_root: Path):
+        if self.baseline_runner is not None:
+            return self.baseline_runner(worktree, app_root)
+        from bug_hunter.tools.sandbox import Sandbox
+
+        main = getattr(self.runner, "sandbox", None)
+        sandbox = Sandbox(
+            self.config,
+            worktree,
+            self.app,
+            f"{self.run_id}-base",
+            docker=main.docker,
+            app_root=app_root,
+        )
+        sandbox.ensure_image()
+        sandbox.install()  # same lockfile hash: the dependency volume is reused
+        return Runner(self.config, sandbox)
+
     resume_decision: dict[str, Any] | None = None  # set by `bug-hunter resume`
 
     def github_client(self):

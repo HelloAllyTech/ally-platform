@@ -183,7 +183,29 @@ _TEST_START = re.compile(
     r"|^\s*def test_|^\s*class Test"
     r"|^\s*void main\s*\(|^\s*group\s*\(|^\s*testWidgets\s*\(",
 )
-TEMPLATE_MAX_LINES = 80
+TEMPLATE_MAX_LINES = 120
+TEMPLATE_MAX_TOKENS = 3000
+# a line that does not end a statement: an open bracket, a trailing comma, an operator
+_OPEN_END = re.compile(r"[,(\[{\\]\s*$|=>\s*$|=\s*$|\b(?:and|or|from)\s*$")
+
+
+def cap_setup(lines: list[str], counter) -> list[str]:
+    """At most ``TEMPLATE_MAX_LINES`` lines and ``TEMPLATE_MAX_TOKENS`` tokens, cut at
+    the end of a statement so the template never stops mid-import or mid-mock."""
+    head = lines[:TEMPLATE_MAX_LINES]
+    while head and counter("\n".join(head)) > TEMPLATE_MAX_TOKENS:
+        head = head[:-1]
+    depth = 0
+    last_ok = 0
+    for i, line in enumerate(head, 1):
+        depth += line.count("(") + line.count("[") + line.count("{")
+        depth -= line.count(")") + line.count("]") + line.count("}")
+        if depth <= 0 and not _OPEN_END.search(line):
+            last_ok = i
+    cut = head[:last_ok]
+    if len(cut) < len(lines):
+        cut.append("// … (rest of the setup omitted; read the file for more)")
+    return cut
 
 
 def neighbour_test_setup(deps: GraphDeps, suspected: list[str]) -> str:
@@ -221,8 +243,9 @@ def neighbour_test_setup(deps: GraphDeps, suspected: list[str]) -> str:
             if _TEST_START.match(line):
                 break
             head.append(line)
-        head = head[:TEMPLATE_MAX_LINES]
-        if any(line.strip() for line in head):
+        counter = deps.counter or (lambda text: len(text) // 3 + 1)
+        head = cap_setup(head, counter)
+        if any(line.strip() and not line.startswith("// … (rest") for line in head):
             return f"From `{rel}` (everything before its first test):\n\n" + "\n".join(
                 head
             )

@@ -39,6 +39,7 @@ class CaseResult:
     stop_reason: str | None = None
     oracle_shape: bool = False  # the oracle asserts the real fix's shape
     human_fix_pass: bool | None = None  # human verdict on this run's patch, if given
+    note: str = ""  # the case's report_note and any human note for this run
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -206,6 +207,9 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {c['tokens']} | ${c['cost_usd']:.3f} | {c['seconds']:.0f} | {trace} "
             f"| {(note or '')[:80]} |"
         )
+    notes = [(c["id"], c.get("note")) for c in report["cases"] if c.get("note")]
+    if notes:
+        lines += ["", "Notes:"] + [f"- `{cid}`: {note}" for cid, note in notes]
     if verdict_totals or ending_totals:
         lines += [
             "",

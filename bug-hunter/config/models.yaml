@@ -14,7 +14,7 @@ fallbacks:
 prompts:
   triage: v3
   investigate: v3
-  reproduce: v4
+  reproduce: v5
   fix: v2
   review: v3
 # USD per 1M tokens, from the providers' price pages (checked 2026-11-09; see

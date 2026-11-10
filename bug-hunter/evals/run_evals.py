@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import shutil
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -141,17 +140,29 @@ class _AgentCrashed(Exception):
     """The agent returned an error result; the row is already filled in."""
 
 
-@contextmanager
-def _fix_set_aside(run: Run):
-    """Stash the tracked changes in the run's worktree (an agent's applied fix) for
-    the duration of the block; untracked files (the repro test) stay."""
-    files = run.git.modified_tracked_files(run.worktree) if run.git else []
-    stashed = bool(files) and run.git.stash_paths(run.worktree, files)
-    try:
-        yield
-    finally:
-        if stashed:
-            run.git.unstash(run.worktree)
+def _repro_on_untouched_code(
+    config, run: Run, case: Case, options, app_rel: Path, path: str, content: str
+):
+    """Run the agent's repro test in a clean checkout of the case's parent commit (the
+    graph has already applied its fix in the run's own worktree)."""
+    with run.git.clean_checkout(run.dir, "repro-base", worktree_ref(case)) as clean:
+        target = clean / app_rel / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        sandbox = (options.sandbox_factory or Sandbox)(
+            config,
+            clean,
+            case.app,
+            f"{run.run_id}-repro",
+            docker=options.docker,
+            app_root=clean / app_rel,
+        )
+        try:
+            sandbox.ensure_image()
+            sandbox.install()
+            return _run_tests(Runner(config, sandbox), [path])
+        finally:
+            sandbox.cleanup()
 
 
 def _run_tests(runner: Runner, tests: list[str]) -> tuple[bool, float, list[RunResult]]:
@@ -301,6 +312,9 @@ def run_case(
             result_row.review_verdicts = list(agent_result.review_verdicts)
             result_row.oracle_shape = case.oracle_shape
             result_row.human_fix_pass = case.human_fix_pass.get(run.run_id)
+            result_row.note = "; ".join(
+                n for n in (case.report_note, case.human_fix_notes.get(run.run_id)) if n
+            )
             result_row.fix_attempts = agent_result.fix_attempts
             result_row.final_outcome = agent_result.final_outcome
             result_row.stop_reason = agent_result.stop_reason
@@ -332,10 +346,17 @@ def run_case(
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_text(content, encoding="utf-8")
                     if agent_result.patch_applied:
-                        # the graph already applied its fix in this worktree: set the
-                        # fix aside so "fails on the buggy code" is measured on it
-                        with _fix_set_aside(run):
-                            _passed, secs, runs = _run_tests(runner, [path])
+                        # the graph already applied its fix in this worktree: measure
+                        # "fails on the buggy code" in a clean checkout of the parent
+                        _passed, secs, runs = _repro_on_untouched_code(
+                            config,
+                            run,
+                            case,
+                            options,
+                            app_root.relative_to(run.worktree),
+                            path,
+                            content,
+                        )
                     else:
                         _passed, secs, runs = _run_tests(runner, [path])
                     sandbox_seconds += secs

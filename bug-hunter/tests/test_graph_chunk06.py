@@ -160,7 +160,7 @@ def _deps(
             or [structured(Review(verdict="approve"), model="gemini-2.5-pro")]
         ),
     }
-    return GraphDeps(
+    deps = GraphDeps(
         config=cfg,
         run_id="run-c06",
         app="ally-be",
@@ -175,7 +175,12 @@ def _deps(
         runner=runner,
         ref="HEAD",
         checkpointer=saver,
+        # the baseline runs in a clean checkout; scripted to pass unless a test says so
+        baseline_runner=lambda wt, root: ScriptedRunner(
+            "ally-be", [run_result("ally-be", True)]
+        ),
     )
+    return deps
 
 
 @pytest.fixture(autouse=True)
@@ -638,18 +643,6 @@ def test_bounced_repro_files_are_not_part_of_the_fix_and_stash_works(
     assert state.patch.files_changed == ["ally-be/src/x.ts"]
 
 
-def test_stash_paths_ignores_untracked_paths(repo) -> None:
-    git = Git(repo)
-    (repo / "ally-be/src/x.ts").write_text(SRC_FIXED)
-    (repo / "ally-be/src/new.spec.ts").write_text("x\n")
-    assert git.modified_tracked_files(repo) == ["ally-be/src/x.ts"]
-    assert git.stash_paths(repo, ["ally-be/src/x.ts", "ally-be/src/new.spec.ts"])
-    assert (repo / "ally-be/src/x.ts").read_text() == SRC_BUGGY
-    assert (repo / "ally-be/src/new.spec.ts").exists()
-    git.unstash(repo)
-    assert (repo / "ally-be/src/x.ts").read_text() == SRC_FIXED
-
-
 # --- risk rules (a) topic and (b) risk-path dependents ---
 
 TIER_CONSTANTS = (
@@ -889,42 +882,6 @@ def test_reproduce_v5_receives_the_neighbour_setup(config, repo, tmp_path) -> No
     assert "vi.mock('./marker-module')" in system
 
 
-def test_stash_is_tagged_and_restored_by_sha(repo) -> None:
-    git = Git(repo)
-    (repo / "ally-be/src/x.ts").write_text(SRC_FIXED)
-    # someone else's stash on the shared stack
-    (repo / "ally-be/src/auth/guard.ts").write_text("export const g = 2;\n")
-    _git(
-        repo,
-        "stash",
-        "push",
-        "-q",
-        "-m",
-        "other-session",
-        "--",
-        "ally-be/src/auth/guard.ts",
-    )
-    assert git.stash_paths(repo, ["ally-be/src/x.ts"])
-    (
-        _git(
-            repo,
-            "stash",
-            "push",
-            "-q",
-            "-m",
-            "late-other",
-            "--",
-            "ally-be/src/auth/guard.ts",
-        )
-        if False
-        else None
-    )
-    git.unstash(repo)
-    assert (repo / "ally-be/src/x.ts").read_text() == SRC_FIXED
-    stack = _git(repo, "stash", "list", "--format=%gs")
-    assert "other-session" in stack and "bughunter-baseline" not in stack
-
-
 def test_orphan_sweep_ignores_non_run_folders(config, tmp_path) -> None:
     from bug_hunter.runs import clean_orphans
 
@@ -937,3 +894,33 @@ def test_orphan_sweep_ignores_non_run_folders(config, tmp_path) -> None:
         docker=lambda *a, **k: type("R", (), {"ok": True, "stdout": ""})(),
     )
     assert (runs / "src" / "keep.txt").exists()
+
+
+def test_clean_checkout_is_separate_and_removed(repo) -> None:
+    git = Git(repo)
+    (repo / "ally-be/src/x.ts").write_text(SRC_FIXED)  # the fix, uncommitted
+    parent = repo.parent / "scratch"
+    with git.clean_checkout(parent, "baseline", "HEAD") as clean:
+        assert (clean / "ally-be/src/x.ts").read_text() == SRC_BUGGY
+        assert (repo / "ally-be/src/x.ts").read_text() == SRC_FIXED
+    assert not (parent / "baseline").exists()
+    assert "scratch" not in _git(repo, "worktree", "list")
+    assert _git(repo, "stash", "list") == ""  # the shared stash stack is untouched
+
+
+def test_neighbour_setup_is_capped_at_a_statement_end() -> None:
+    from bug_hunter.graph.tools import TEMPLATE_MAX_LINES, cap_setup
+
+    lines = ["import { a } from 'a';"] * (TEMPLATE_MAX_LINES - 2) + [
+        "vi.mock('../hooks/useUser', () => ({",
+        "  useUser: () => ({ user: {} }),",
+        "}));",
+    ]
+    out = cap_setup(lines, lambda text: len(text) // 3)
+    assert out[-1].startswith("// … (rest")
+    assert "vi.mock('../hooks/useUser', () => ({" not in out  # never cut mid-mock
+    assert len(out) <= TEMPLATE_MAX_LINES + 1
+    small = ["import x from 'x';", "vi.mock('y');"]
+    assert cap_setup(small, lambda t: 1) == small
+    tokens = cap_setup(["const a = 1;"] * 50, lambda text: len(text.splitlines()) * 100)
+    assert len(tokens) == 31 and tokens[-1].startswith("// …")  # 30 lines = 3000 tokens

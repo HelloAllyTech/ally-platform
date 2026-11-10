@@ -8,8 +8,7 @@ the stash is restored, so the baseline never sees the patch.
 from __future__ import annotations
 
 import shlex
-from contextlib import contextmanager
-from typing import Any, Callable, Iterator
+from typing import Any, Callable
 
 from bug_hunter.graph.baseline import Baseline, baseline_for
 from bug_hunter.graph.budget import with_clock
@@ -30,17 +29,6 @@ def web_projects(files: list[str]) -> list[str]:
         if project not in seen:
             seen.append(project)
     return seen
-
-
-@contextmanager
-def patch_removed(deps: GraphDeps, files: list[str]) -> Iterator[None]:
-    """The worktree without the fix (tracked edits stashed), restored afterwards."""
-    stashed = bool(deps.git and deps.git.stash_paths(deps.worktree, files))
-    try:
-        yield
-    finally:
-        if stashed and deps.git:
-            deps.git.unstash(deps.worktree)
 
 
 def format_changed_files(deps: GraphDeps, app_rel_files: list[str]) -> RunResult | None:
@@ -84,11 +72,26 @@ def make_verify_node(deps: GraphDeps):
         commands: list[str] = []
         ignore = {state.repro.test_name, state.repro.test_path}
 
-        def baseline(command: str, kind_run: Callable[[], RunResult]) -> Baseline:
+        app_rel = deps.app_root.relative_to(deps.worktree)
+
+        def baseline(command: str, run_on: Callable[[Any], RunResult]) -> Baseline:
             def on_untouched_code() -> RunResult:
-                files = state.patch.files_changed  # type: ignore[union-attr]
-                with patch_removed(deps, files):
-                    return kind_run()
+                # a separate clean checkout of the base commit: the fix's worktree and
+                # the shared stash stack are never touched
+                if deps.git is None:
+                    raise RuntimeError("verify: no git to make a clean checkout")
+                with deps.git.clean_checkout(
+                    deps.worktree.parent, "baseline", commit
+                ) as clean:
+                    base_runner = deps.make_baseline_runner(clean, clean / app_rel)
+                    try:
+                        return run_on(base_runner)
+                    finally:
+                        cleanup = getattr(
+                            getattr(base_runner, "sandbox", None), "cleanup", None
+                        )
+                        if cleanup:
+                            cleanup()
 
             base, _cached = baseline_for(commit, deps.app, command, on_untouched_code)
             return base
@@ -141,7 +144,7 @@ def make_verify_node(deps: GraphDeps):
         for command in suite_commands:
             after = runner.run_tests_command(command)
             commands.append(after.command)
-            base = baseline(command, lambda c=command: runner.run_tests_command(c))
+            base = baseline(command, lambda r, c=command: r.run_tests_command(c))
             suite_baseline += base.failing_tests
             fresh = new_failures(after, base, ignore)
             if fresh:
@@ -152,11 +155,11 @@ def make_verify_node(deps: GraphDeps):
         lint = runner.run_lint()
         lint_base = None
         if not lint.skipped and not lint.passed:
-            lint_base = baseline(lint.command, runner.run_lint)
+            lint_base = baseline(lint.command, lambda r: r.run_lint())
         types = runner.run_typecheck()
         types_base = None
         if not types.skipped and not types.passed:
-            types_base = baseline(types.command, runner.run_typecheck)
+            types_base = baseline(types.command, lambda r: r.run_typecheck())
         commands += [c for c in (lint.command, types.command) if c]
 
         lint_ok = check_passes(lint, lint_base)

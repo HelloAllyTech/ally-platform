@@ -62,6 +62,11 @@ class Case(BaseModel):
     human_fix_pass: dict[str, bool] = Field(
         default_factory=dict, description="run_id -> human verdict on the agent's patch"
     )
+    human_fix_notes: dict[str, str] = Field(
+        default_factory=dict, description="run_id -> why the human gave that verdict"
+    )
+    # shown next to the case in every report (a scoring decision a reader needs)
+    report_note: str = ""
     dispute_note: str = ""
     tags: list[str] = Field(default_factory=list)
 

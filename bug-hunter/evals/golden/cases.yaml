@@ -33,6 +33,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-99584ee6
@@ -61,6 +63,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-d039e256
@@ -88,6 +92,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-89d8e055
@@ -117,6 +123,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-adf36739
@@ -144,7 +152,12 @@ cases:
   status: active
   oracle_shape: true
   escalate_acceptable: false
-  human_fix_pass: {}
+  human_fix_pass:
+    run-20261110-071133-afc456: false
+  human_fix_notes:
+    run-20261110-071133-afc456: doesn't fix the reported log detail; rethrowing QueryFailedError changes
+      the client response and may expose query details.
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-8c4f9caf
@@ -172,6 +185,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-9299e9aa
@@ -200,6 +215,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-e5ad37b3
@@ -228,6 +245,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-dd128ff8
@@ -256,6 +275,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-f35e117d
@@ -286,6 +307,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-eebbfd01
@@ -315,6 +338,9 @@ cases:
   oracle_shape: false
   escalate_acceptable: true
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: 'escalate_acceptable, strict file rule: 2026-11-10 run had the mechanism right, wrong file
+    (ui-shared vs helpline PageviewTracker); scored fail'
   dispute_note: ''
   tags:
   - runtime-dependency-clash
@@ -349,6 +375,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-b680c643
@@ -377,6 +405,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-e9a0e1c3
@@ -403,6 +433,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-1065743a
@@ -431,6 +463,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-7391ff7e
@@ -458,6 +492,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-995242d7
@@ -487,6 +523,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-mobile-83bdf91e
@@ -520,6 +558,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-6e81b510
@@ -547,6 +587,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: '2026-11-09: labelled clean (feat: challenge_description field), but two sweep runs of
     graph v1/v2 produced concrete findings on it: (1) prompt text says ''Supportive engagement'' while
     the schema enum requires ''Supportive Engagement'' (structured-output validation risk); (2) challenge_description
@@ -580,6 +622,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-1ff07399
@@ -603,6 +647,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-6d1b48a8
@@ -626,6 +672,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-e6286217
@@ -650,6 +698,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-f06c8ed5
@@ -674,6 +724,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-b6c51894
@@ -697,6 +749,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-88592f67
@@ -721,6 +775,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-a645303c
@@ -744,6 +800,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-c77f929e
@@ -768,6 +826,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-b408b775
@@ -792,6 +852,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-ai-learn-66d9a037
@@ -816,6 +878,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-b29aa1be
@@ -841,6 +905,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-f3e78b7e
@@ -865,6 +931,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-a2ed4959
@@ -888,6 +956,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-d77c088a
@@ -912,6 +982,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-5017783f
@@ -935,6 +1007,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-6b5647ff
@@ -959,6 +1033,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-0f139f7a
@@ -983,6 +1059,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-8c5367c1
@@ -1010,6 +1088,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-7b655598
@@ -1034,6 +1114,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-da6535f4
@@ -1058,6 +1140,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-bbaeab31
@@ -1083,6 +1167,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-ffa86627
@@ -1108,6 +1194,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-2ae8d573
@@ -1134,6 +1222,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-1364881b
@@ -1159,6 +1249,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-382b51ea
@@ -1183,6 +1275,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-web-8890b80b
@@ -1207,6 +1301,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-819f6ccf
@@ -1235,6 +1331,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-6083b8d8
@@ -1268,6 +1366,8 @@ cases:
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []
 - id: ally-be-87c6ecb8
@@ -1298,5 +1398,7 @@ cases:
   oracle_shape: true
   escalate_acceptable: false
   human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
   dispute_note: ''
   tags: []

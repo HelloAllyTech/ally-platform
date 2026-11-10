@@ -152,7 +152,8 @@ def test_repro_hashes_detect_edits(repo) -> None:
 
 
 class VerifyRunner:
-    """Scripted per command; records what ran so the baseline stash is observable."""
+    """Scripted per command; records what the code under test looked like at each
+    call, so it is observable that the baseline ran on untouched code."""
 
     def __init__(self, repo: Path, results: dict[str, list]):
         self.app = "ally-be"
@@ -241,15 +242,21 @@ def test_verify_runs_baseline_on_untouched_code_and_blames_only_new_failures(
         },
     )
     deps = _deps(config, repo, tmp_path, runner)
+    base_runners: list[VerifyRunner] = []
+    deps.baseline_runner = (
+        lambda wt, root: base_runners.append(VerifyRunner(wt, runner.results))
+        or base_runners[-1]
+    )
     out = make_verify_node(deps)(state)
     v = out["verification"]
     assert v.passed and out["status"] == "verified", v.summary
     assert v.baseline_failures == ["old › flaky"] and v.new_failures == []
     # the baseline (second suite call) saw the untouched code; then the fix came back
     # calls: repro, format, suite (after), suite baseline (patch stashed), lint, types
-    # x_at_call is recorded by the test-side calls only (format is not one of them)
-    assert runner.x_at_call[1] == "export const x = () => 3;"  # after
-    assert runner.x_at_call[2] == "export const x = () => 0;"  # baseline: patch stashed
+    assert runner.x_at_call[1] == "export const x = () => 3;"  # after, with the fix
+    # the baseline ran in a separate clean checkout of the base commit
+    assert base_runners and base_runners[0].x_at_call[0] == "export const x = () => 0;"
+    assert base_runners[0].repo != repo
     assert (repo / "ally-be/src/x.ts").read_text() == "export const x = () => 3;\n"
     # second verify: the baseline comes from the cache, no extra suite run
     runner.results[("suite", "npm test -- --forceExit --detectOpenHandles")] = [
@@ -284,7 +291,9 @@ def test_verify_fails_on_new_failure_or_edited_repro(
             ("typecheck",): [run_result("ally-be", True)],
         },
     )
-    out = make_verify_node(_deps(config, repo, tmp_path, runner))(state)
+    deps = _deps(config, repo, tmp_path, runner)
+    deps.baseline_runner = lambda wt, root: VerifyRunner(wt, runner.results)
+    out = make_verify_node(deps)(state)
     assert out["status"] == "fixing" and out["verification"].new_failures == [
         "other › now broken"
     ]
@@ -301,7 +310,9 @@ def test_verify_fails_on_new_failure_or_edited_repro(
             ("typecheck",): [run_result("ally-be", True)],
         },
     )
-    out = make_verify_node(_deps(config, repo, tmp_path, runner))(state)
+    deps = _deps(config, repo, tmp_path, runner)
+    deps.baseline_runner = lambda wt, root: VerifyRunner(wt, runner.results)
+    out = make_verify_node(deps)(state)
     assert out["status"] == "fixing" and not out["verification"].repro_files_unchanged
 
 
