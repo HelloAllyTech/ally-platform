@@ -276,6 +276,26 @@ describe("Building", () => {
 });
 
 describe("Share", () => {
+  it("asks before going live when an owner's Must pass question failed (chunk 20d-2)", () => {
+    const onConfirm = vi.fn();
+    render(
+      <ShareScreen
+        view={view({ step: "share" })}
+        publicAllowed={false}
+        publishing={false}
+        onPublish={vi.fn()}
+        mustPass={{
+          message: "This question you marked Must pass failed. Go live anyway?",
+          questions: ["Do you see couples?"],
+          onConfirm,
+        }}
+      />,
+    );
+    expect(screen.getByRole("alert").textContent).toContain("Do you see couples?");
+    fireEvent.click(screen.getByText(COPY.share.goLiveAnyway));
+    expect(onConfirm).toHaveBeenCalled();
+  });
+
   it("keeps public off with the deck's note while the platform has it off", () => {
     const onPublish = vi.fn();
     render(

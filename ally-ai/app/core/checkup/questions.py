@@ -7,6 +7,7 @@ detail it wasn't given, or none, is dropped and counted.
 
 from __future__ import annotations
 
+import re
 from typing import List
 
 from app.core.llm.dispatch import generate_structured
@@ -31,12 +32,18 @@ def _format_facts(request: QuestionsRequest) -> str:
     )
 
 
+def _key(question: str) -> str:
+    """A question as two questions compare: case, spacing and punctuation ignored."""
+    return " ".join(re.sub(r"[^\w\s]", " ", question.lower()).split())
+
+
 def keep_grounded(
     request: QuestionsRequest, written: List[WrittenQuestion]
 ) -> QuestionsResponse:
     known = {fact.id for fact in request.facts}
     kept: List[WrittenQuestion] = []
-    seen: set[str] = set()
+    # Questions already asked count as seen, so a suggestion is always new.
+    seen: set[str] = {_key(q) for q in request.exclude}
     dropped = 0
     for item in written:
         question = " ".join(item.question.split())[:MAX_QUESTION_CHARS]
@@ -44,7 +51,7 @@ def keep_grounded(
         if not question or not ids or any(i not in known for i in ids):
             dropped += 1
             continue
-        key = question.lower()
+        key = _key(question)
         if key in seen:
             dropped += 1
             continue
@@ -62,7 +69,8 @@ async def write_questions(request: QuestionsRequest) -> QuestionsResponse:
         audience=request.audience or "clients",
         business=request.business,
         facts=_format_facts(request),
-        count=str(request.count),
+        # With questions to leave out, ask for more so `count` new ones survive.
+        count=str(min(20, request.count + len(request.exclude))),
         language=request.language or "en",
     )
     if not prompt:

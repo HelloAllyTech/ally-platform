@@ -101,6 +101,8 @@ describe("Scorecard", () => {
         id: "b1",
         questionId: "q1",
         text: "We give a receipt to claim.",
+        // "Also add to checkup" is ticked by default (chunk 20d-2).
+        addToCheckup: true,
       }),
     );
     expect(await screen.findByText(t.saved)).toBeTruthy();
@@ -124,6 +126,7 @@ describe("Scorecard", () => {
         id: "b1",
         feedbackId: "f1",
         text: "A session is Rs. 2,000.",
+        addToCheckup: true,
       }),
     );
   });

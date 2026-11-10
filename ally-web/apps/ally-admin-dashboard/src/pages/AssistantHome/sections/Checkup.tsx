@@ -2,43 +2,67 @@ import React, { useState } from "react";
 
 import {
   useAnswerGapMutation,
+  useGetChangesQuery,
   useGetCheckupQuery,
   useMarkNotOfferedMutation,
   useRunCheckupMutation,
 } from "@api";
-import { Button, CheckRow, GapCard, MeasureCard, Segmented } from "@components/v2";
+import { Button, GapCard, MeasureCard } from "@components/v2";
 
 import { Sparkline } from "../../Analytics/chartKit";
 import { COPY, fill } from "../../Onboarding/copy";
-import {
-  CheckupFilter,
-  accuracyPct,
-  filtered,
-  gapsOf,
-  hasTotals,
-  sourceLabel,
-  statusOf,
-} from "../checkup";
+import { accuracyPct, gapsOf, hasTotals } from "../checkup";
+import { stepOf } from "../checkupCases";
 import { HOME } from "../copy";
-import { Group, SectionHead } from "../fields";
+import { dateTime } from "../dates";
+import { Collapsed, Group, SectionHead } from "../fields";
+import { CheckupCases } from "./CheckupCases";
 
 import type { SectionProps } from "./props";
 
 const t = COPY.checkup;
+const c = HOME.checkupControls;
 const POLL_MS = 2000;
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+/** The decline wording, as a quote inside a sentence: no full stop of its own. */
+const quoted = (fallback: string) =>
+  fallback ? `“${fallback.trim().replace(/[.\s]+$/, "")}”` : "";
+
+/** The four live steps (chunk 20d-2): which is done, which is running, which waits. */
+const Steps: React.FC<{ step: 1 | 2 | 3 | 4; asked: number; total: number }> = ({
+  step,
+  asked,
+  total,
+}) => {
+  const items = [
+    c.steps.writing,
+    fill(c.steps.asking, { n: Math.min(asked, total), total }),
+    c.steps.checking,
+    c.steps.result,
+  ];
+  return (
+    <ol className="ally-checkup__steps" aria-live="polite" data-testid="checkup-steps">
+      {items.map((label, index) => {
+        const n = index + 1;
+        const state = n < step ? "done" : n === step ? "now" : "next";
+        return (
+          <li key={n} className={`ally-checkup__step ally-checkup__step--${state}`}>
+            <span className="ally-checkup__step-mark" aria-hidden="true">
+              {state === "done" ? "✓" : n}
+            </span>
+            <span>{label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+};
 
 /**
- * The checkup (chunk 20a-2, screenshot 04): how the assistant did on its test questions, in the
- * deck's four measures, the questions it couldn't answer one at a time, and every question with
- * how it went. Run again starts a new run; while one runs, the rows fill in.
+ * The checkup (chunk 20a-2, screenshot 04; chunk 20d-2 gives the owner control): what a checkup is,
+ * live steps while it runs (it keeps going if the owner leaves), how checking works, the four
+ * measures, the questions it couldn't answer one at a time, and every question with its result,
+ * which the owner can add to, edit, turn off, delete and try on its own.
  */
 export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = ({
   bot,
@@ -46,40 +70,82 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
 }) => {
   const [polling, setPolling] = useState(false);
   const checkup = useGetCheckupQuery(bot.id, { pollingInterval: polling ? POLL_MS : 0 });
+  const { data: changes } = useGetChangesQuery(bot.id);
   const [run, runState] = useRunCheckupMutation();
   const [answer, answerState] = useAnswerGapMutation();
   const [notOffered, notOfferedState] = useMarkNotOfferedMutation();
   const [explain, setExplain] = useState(false);
-  const [filter, setFilter] = useState<CheckupFilter>("all");
   const [gapIndex, setGapIndex] = useState(0);
   const [note, setNote] = useState<string | null>(null);
+  const [compared, setCompared] = useState(false);
 
   const view = checkup.data?.latest ?? null;
   const running = view?.run.status === "running";
   if (running !== polling) setPolling(running);
 
-  const start = async () => {
+  const start = async (only?: "failed") => {
     setNote(null);
-    const result = await run(bot.id);
+    const result = await run(only ? { id: bot.id, only } : bot.id);
     if ("error" in result) {
       const status = (result.error as { status?: number }).status;
       setNote(status === 429 ? t.blocked.limit : t.blocked.start);
+    } else {
+      setCompared(true);
     }
   };
 
+  // A change made since the last checkup: offer to run one and show the effect.
+  const lastChange = (changes ?? []).find(entry => !entry.undone)?.at;
+  const changedSince =
+    !!lastChange && !!view && !running && Date.parse(lastChange) > Date.parse(view.run.startedAt);
+  const compare = checkup.data?.compare;
+
   const head = (
-    <div className="ally-home__row">
-      <SectionHead
-        title={HOME.sections.checkup}
-        subtitle={HOME.subtitles.checkup}
-        help={HOME.help.checkup}
-      />
-      {canEdit && (
-        <Button onClick={() => void start()} disabled={running || runState.isLoading}>
-          {t.runAgain}
-        </Button>
-      )}
-    </div>
+    <SectionHead
+      title={HOME.sections.checkup}
+      subtitle={c.intro}
+      help={HOME.subtitles.checkup}
+      action={
+        canEdit && (
+          <div className="ally-btn-row">
+            <Button
+              className="ally-btn--sm"
+              onClick={() => void start("failed")}
+              disabled={running || runState.isLoading || !view}
+            >
+              {c.runs.failed}
+            </Button>
+            <Button
+              variant="primary"
+              className="ally-btn--sm"
+              onClick={() => void start()}
+              disabled={running || runState.isLoading}
+            >
+              {c.runs.all}
+            </Button>
+          </div>
+        )
+      }
+    />
+  );
+
+  const howItWorks = (
+    <Collapsed summary={c.how.title}>
+      <ul className="ally-checkup__how">
+        {[
+          c.how.passed,
+          c.how.partly,
+          c.how.failed,
+          c.how.needsInput,
+          c.how.mustPass,
+          c.how.blocks,
+        ].map(line => (
+          <li key={line} className="ally-small">
+            {line}
+          </li>
+        ))}
+      </ul>
+    </Collapsed>
   );
 
   if (!view) {
@@ -88,16 +154,17 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
         {head}
         <Group testId="checkup-empty">
           <p className="ally-empty">{note ?? HOME.checkup.empty}</p>
+          {howItWorks}
         </Group>
+        <CheckupCases botId={bot.id} canEdit={canEdit} run={null} />
       </>
     );
   }
 
-  const fallback = checkup.data?.fallback || "";
-  const clients = checkup.data?.audience || "clients";
+  const fallback = quoted(checkup.data?.fallback || "");
+  const clients = (checkup.data?.audience || "clients").toLowerCase();
   const gaps = gapsOf(view);
   const gap = gaps[Math.min(gapIndex, Math.max(gaps.length - 1, 0))];
-  const results = filtered(view.results, filter);
 
   return (
     <>
@@ -108,22 +175,38 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
         </p>
       )}
 
+      {changedSince && canEdit && (
+        <div className="ally-note ally-checkup__banner" role="status" data-testid="checkup-banner">
+          <span>{c.banner}</span>
+          <Button className="ally-btn--sm" onClick={() => void start()}>
+            {c.bannerRun}
+          </Button>
+        </div>
+      )}
+
       {running || !hasTotals(view) ? (
         <Group testId="checkup-running">
-          <p className="ally-body" role="status" aria-live="polite">
-            {fill(t.running, {
-              n: Math.min(view.run.done + 1, view.run.total),
-              total: view.run.total,
-            })}
-          </p>
+          <Steps
+            step={stepOf(view.run)}
+            asked={view.run.asked ?? view.run.done}
+            total={view.run.total}
+          />
+          <p className="ally-small">{c.leave}</p>
+          {howItWorks}
         </Group>
       ) : (
         <>
+          {compared && compare?.before && compare.after && (
+            <p className="ally-note" role="status" data-testid="checkup-compare">
+              {fill(c.before, { a: compare.before.passed, n: compare.before.total })} ·{" "}
+              {fill(c.after, { b: compare.after.passed, n: compare.after.total })}
+            </p>
+          )}
           <p className="ally-small">
             {fill(t.subtitle, {
               total: view.totals.questions,
               clients,
-              when: when(view.run.finishedAt ?? view.run.startedAt),
+              when: dateTime(view.run.finishedAt ?? view.run.startedAt),
             })}
           </p>
           <section className="ally-card ally-checkup__summary" data-testid="checkup-summary">
@@ -133,9 +216,11 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
             </div>
             <div>
               <h3 className="ally-heading">
-                {view.totals.gaps
-                  ? fill(t.summaryGaps, { clients, gaps: view.totals.gaps })
-                  : fill(t.summaryClear, { clients })}
+                {view.totals.gaps === 1
+                  ? fill(c.summaryGap, { clients })
+                  : view.totals.gaps
+                    ? fill(t.summaryGaps, { clients, gaps: view.totals.gaps })
+                    : fill(t.summaryClear, { clients })}
               </h3>
               {view.totals.gaps > 0 && (
                 <p className="ally-body">
@@ -160,6 +245,7 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
               </div>
             )}
           </section>
+          {howItWorks}
 
           <div className="ally-home__row">
             <h3 className="ally-heading">{t.sections.checked}</h3>
@@ -183,6 +269,7 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
                   explanation={fill(m.explanation, { gaps: view.totals.gaps })}
                   explain={explain}
                   tone={key === "safety" ? "good" : "accent"}
+                  empty={c.measureEmpty}
                 />
               );
             })}
@@ -212,43 +299,21 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
               const result = await answer({ id: bot.id, caseId: gap.caseId, text });
               if ("error" in result) return false;
               setNote(t.added);
-              setGapIndex(i => i);
+              // The next gap (the answered one leaves the list when the checkup refreshes).
+              setGapIndex(i => Math.min(i + 1, Math.max(gaps.length - 1, 0)));
               return true;
             }}
             onNotOffered={async () => {
               const result = await notOffered({ id: bot.id, caseId: gap.caseId });
-              return !("error" in result);
+              if ("error" in result) return false;
+              setGapIndex(i => Math.min(i + 1, Math.max(gaps.length - 1, 0)));
+              return true;
             }}
           />
         </>
       )}
 
-      <div className="ally-home__row">
-        <h3 className="ally-heading">{t.sections.asked}</h3>
-        <Segmented<CheckupFilter>
-          label={t.sections.asked}
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { id: "all", label: fill(t.filters.all, { total: view.results.length }) },
-            { id: "answered", label: t.filters.answered },
-            { id: "safety", label: t.filters.safety },
-            { id: "input", label: t.filters.input },
-          ]}
-        />
-      </div>
-      <ul className="ally-checks" data-testid="checkup-rows">
-        {results.map((result, index) => (
-          <CheckRow
-            key={result.caseId}
-            index={index}
-            question={result.question}
-            status={statusOf(result)}
-            source={sourceLabel(result, t.safetyRule)}
-            labels={t.rows}
-          />
-        ))}
-      </ul>
+      <CheckupCases botId={bot.id} canEdit={canEdit} run={view} />
     </>
   );
 };

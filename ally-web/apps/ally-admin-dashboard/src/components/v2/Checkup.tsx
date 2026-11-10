@@ -51,8 +51,32 @@ export const MeasureCard: React.FC<{
   explanation: string;
   explain: boolean;
   tone?: "accent" | "good";
-}> = ({ title, word, passed, total, unit, meaning, explanation, explain, tone = "accent" }) => {
+  /** Shown instead of "0 of 0" and an empty bar when nothing was asked (chunk 20d-2). */
+  empty?: string;
+}> = ({
+  title,
+  word,
+  passed,
+  total,
+  unit,
+  meaning,
+  explanation,
+  explain,
+  tone = "accent",
+  empty,
+}) => {
   const share = total ? Math.round((passed / total) * 100) : 0;
+  if (!total && empty) {
+    return (
+      <article className="ally-card ally-measure" data-testid="measure-card">
+        <header className="ally-measure__head">
+          <h3 className="ally-measure__title">{title}</h3>
+          <span className="ally-measure__word">{word}</span>
+        </header>
+        <p className="ally-measure__meaning">{empty}</p>
+      </article>
+    );
+  }
   return (
     <article className="ally-card ally-measure" data-testid="measure-card">
       <header className="ally-measure__head">

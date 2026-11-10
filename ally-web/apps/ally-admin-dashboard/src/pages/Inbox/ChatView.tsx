@@ -5,14 +5,30 @@ import {
   useHandBackMutation,
   useReplyInInboxMutation,
   useTakeOverMutation,
+  useAddCheckupCaseMutation,
 } from "@api";
 import type { InboxThread } from "@api";
 import { Button, PrimaryButton } from "@components/v2";
 
 import { channelLabel, fill, INBOX } from "./copy";
+import { CheckupCaseEditor } from "../AssistantHome/sections/CheckupCaseEditor";
 
 const errorText = (error: unknown): string =>
   (error as { data?: { message?: string } })?.data?.message ?? "Something went wrong. Try again.";
+
+/**
+ * "Add to checkup" from a reply (chunk 20d-2): the visitor's question before it, and the reply's
+ * sentences as what a good answer includes. The owner edits either before saving.
+ */
+const prefill = (messages: InboxThread["messages"], index: number) => {
+  const asked = [...messages.slice(0, index)].reverse().find(m => m.role === "user");
+  const facts = (messages[index]?.text ?? "")
+    .split(/(?<=[.!?])\s+/)
+    .map(line => line.trim())
+    .filter(line => line.length > 3)
+    .slice(0, 4);
+  return { question: asked?.text.slice(0, 500) ?? "", outcome: "answer" as const, facts };
+};
 
 /** Messages from one sender this close together are one group. */
 const GROUP_MS = 2 * 60 * 1000;
@@ -54,11 +70,13 @@ const authorOf = (m: InboxThread["messages"][number], thread: InboxThread): stri
  * While you have it, the assistant is paused in this chat only and your replies go out on its
  * channel; Hand back lets the assistant answer the next message.
  */
-export const ChatView: React.FC<{ chatbotId: string; id: string; me: number | null }> = ({
-  chatbotId,
-  id,
-  me,
-}) => {
+export const ChatView: React.FC<{
+  chatbotId: string;
+  id: string;
+  me: number | null;
+  /** Editors can turn a real reply into a checkup question (chunk 20d-2). */
+  canAddToCheckup?: boolean;
+}> = ({ chatbotId, id, me, canAddToCheckup = false }) => {
   const { data: thread, isLoading } = useGetInboxThreadQuery({ chatbotId, id });
   const [takeOver, taking] = useTakeOverMutation();
   const [handBack, handing] = useHandBackMutation();
@@ -66,6 +84,10 @@ export const ChatView: React.FC<{ chatbotId: string; id: string; me: number | nu
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [add, addCase] = useAddCheckupCaseMutation();
 
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: "end" });
@@ -174,6 +196,42 @@ export const ChatView: React.FC<{ chatbotId: string; id: string; me: number | nu
                       .map(c => c.title)
                       .filter(Boolean)
                       .join(" · ")}
+                  </p>
+                )}
+                {m.role === "assistant" && canAddToCheckup && adding !== m.id && (
+                  <button
+                    type="button"
+                    className="ally-link ally-small ally-inbox__add-checkup"
+                    onClick={() => setAdding(m.id)}
+                  >
+                    {INBOX.addToCheckup}
+                  </button>
+                )}
+                {adding === m.id && (
+                  <CheckupCaseEditor
+                    title={INBOX.addToCheckup}
+                    initial={prefill(thread.messages, index)}
+                    busy={addCase.isLoading}
+                    error={addError}
+                    onSave={async input => {
+                      setAddError(null);
+                      try {
+                        await add({
+                          id: chatbotId,
+                          input: { ...input, addedFrom: "chat" },
+                        }).unwrap();
+                        setAdding(null);
+                        setAdded(m.id);
+                      } catch (failure) {
+                        setAddError(errorText(failure));
+                      }
+                    }}
+                    onCancel={() => setAdding(null)}
+                  />
+                )}
+                {added === m.id && (
+                  <p className="ally-small" role="status">
+                    {INBOX.addedToCheckup}
                   </p>
                 )}
                 {m.rating && (

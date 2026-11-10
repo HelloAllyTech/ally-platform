@@ -145,6 +145,9 @@ class QuestionsRequest(BaseModel):
     facts: List[LearnedDetail]
     count: int = Field(12, ge=1, le=20)
     prompts: Optional[Dict[str, Any]] = None
+    #: Questions the checkup already asks ("Suggest more questions", chunk 20d-2):
+    #: none of these come back. Dropped in code; the prompt is unchanged.
+    exclude: List[str] = Field(default_factory=list, max_length=100)
 
 
 class WrittenQuestion(BaseModel):

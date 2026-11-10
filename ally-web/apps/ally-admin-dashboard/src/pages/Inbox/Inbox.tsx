@@ -253,7 +253,15 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
             >
               {INBOX.back}
             </button>
-            <ChatView chatbotId={currentBot} id={selected} me={user?.id ?? null} />
+            <ChatView
+              chatbotId={currentBot}
+              id={selected}
+              me={user?.id ?? null}
+              canAddToCheckup={
+                (bots?.chatbots ?? []).find(b => b.id === currentBot)?.myRole !== undefined &&
+                (bots?.chatbots ?? []).find(b => b.id === currentBot)?.myRole !== "viewer"
+              }
+            />
           </>
         ) : (
           <div className="ally-inbox__nothing">

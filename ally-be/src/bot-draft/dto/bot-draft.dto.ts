@@ -239,6 +239,14 @@ export class PublishBotDraftDto {
   @ArrayMaxSize(50)
   @IsUUID('4', { each: true })
   organisationIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'The owner confirmed going live although a question they marked Must pass failed (chunk 20d-2)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  confirmMustPass?: boolean;
 }
 
 /** "Choose pages" (chunk 20a-2): path patterns; no includes means every page. */

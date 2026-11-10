@@ -41,6 +41,8 @@ export const INBOX = {
   soundTipOff: "Sound for new chats: off",
   today: "Today",
   yesterday: "Yesterday",
+  addToCheckup: "Add to checkup",
+  addedToCheckup: "Added to your checkup. It's asked in the next one.",
   helpful: "Helpful",
   notHelpful: "Not helpful",
   turnOnNotifications: "Turn on notifications",

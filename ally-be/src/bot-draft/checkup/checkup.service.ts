@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import type {
   CheckupGradeRequest,
   CheckupGradeResponse,
@@ -31,6 +31,7 @@ import {
   CheckupTrigger,
 } from '../entity/chatbot-checkup.entity';
 import { checkupTotals, StatInput } from './checkup-stats';
+import { attemptsFor, gradedFacts, resultOf } from './checkup-cases';
 import type { PlannedCase } from './checkup-generation';
 
 /** The plain-text sources list a channel without a sources view gets (reply-composer.ts). */
@@ -70,8 +71,11 @@ export interface SuiteCase {
 export interface StartRun {
   trigger: CheckupTrigger;
   suite?: string | null;
+  /** Every question this many times (evals). Without it, home runs ask Must pass ones 3 times. */
   attempts?: number;
   draftId?: string | null;
+  /** Only the questions that didn't pass last time (chunk 20d-2). */
+  only?: 'all' | 'failed';
 }
 
 /** One graded question as the Checkup screens show it. */
@@ -87,12 +91,27 @@ export interface CheckupResultView {
   safety: boolean;
   source: ChatbotCheckupCase['source'];
   reply: string;
+  /** Which try this was (Must pass questions are asked 3 times on the home). */
+  attempt: number;
+  tier: ChatbotCheckupCase['tier'];
+  origin: ChatbotCheckupCase['origin'];
+  citations: ChatbotCheckupResult['citations'];
+  ms: number;
 }
 
 export interface CheckupRunView {
   run: Pick<
     ChatbotCheckupRun,
-    'id' | 'status' | 'total' | 'done' | 'startedAt' | 'finishedAt'
+    | 'id'
+    | 'status'
+    | 'total'
+    | 'done'
+    | 'startedAt'
+    | 'finishedAt'
+    | 'phase'
+    | 'asked'
+    | 'only'
+    | 'trigger'
   >;
   totals: Record<string, unknown>;
   results: CheckupResultView[];
@@ -261,7 +280,7 @@ export class CheckupService {
       Math.max(options.attempts ?? 1, 1),
       CHECKUP_LIMITS.maxAttempts,
     );
-    if (options.trigger === 'eval' || attempts > 1) {
+    if (options.trigger === 'eval' || (options.attempts ?? 1) > 1) {
       await this.access.assertPlatformAdmin();
     } else {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -284,6 +303,7 @@ export class CheckupService {
       where: {
         chatbotId,
         status: 'active',
+        deletedAt: IsNull(),
         // A run asks the assistant's own questions; an eval asks one suite's.
         ...(options.suite ? { suite: options.suite } : { suite: IsNull() }),
       },
@@ -293,8 +313,13 @@ export class CheckupService {
       options.trigger === 'eval'
         ? cases.length
         : CHECKUP_LIMITS.questionsPerRun;
-    const asked = cases.slice(0, limit);
+    const failedOnly = options.only === 'failed';
+    const chosen = failedOnly ? await this.notPassed(chatbotId, cases) : cases;
+    const asked = chosen.slice(0, limit);
     if (!asked.length) throw new BadRequestException('no_checkup_questions');
+    // Evals ask every question `attempts` times; home runs ask Must pass ones 3 times.
+    const attemptsOf = (item: ChatbotCheckupCase) =>
+      options.attempts ? attempts : attemptsFor(item, options.trigger);
 
     const run = await this.runs.save(
       this.runs.create({
@@ -303,8 +328,11 @@ export class CheckupService {
         trigger: options.trigger,
         suite: options.suite ?? null,
         status: 'running',
-        total: asked.length * attempts,
+        total: asked.reduce((sum, item) => sum + attemptsOf(item), 0),
         done: 0,
+        asked: 0,
+        phase: 'asking',
+        only: failedOnly ? 'failed' : 'all',
         startedBy: Number(ExecutionManager.getUserId() ?? 0) || null,
       }),
     );
@@ -318,7 +346,7 @@ export class CheckupService {
     const about = [chatbot?.persona?.greeting, chatbot?.persona?.systemPrompt]
       .filter(Boolean)
       .join('\n');
-    void this.execute(run, asked, attempts, { declineText, about }).catch(
+    void this.execute(run, asked, attemptsOf, { declineText, about }).catch(
       async (error: unknown) => {
         this.logger.error(
           `Checkup run ${run.id} failed: ${error instanceof Error ? error.name : 'error'}`,
@@ -376,14 +404,21 @@ export class CheckupService {
   private async execute(
     run: ChatbotCheckupRun,
     cases: ChatbotCheckupCase[],
-    attempts: number,
+    attempts: number | ((item: ChatbotCheckupCase) => number),
     context: GradeContext = {},
   ): Promise<void> {
     const prompts = await this.prompts();
+    const triesOf = (item: ChatbotCheckupCase) =>
+      typeof attempts === 'number' ? attempts : attempts(item);
     const work: { group: Group; attempt: number }[] = [];
-    for (let attempt = 1; attempt <= attempts; attempt += 1) {
-      for (const group of CheckupService.groups(cases))
-        work.push({ group, attempt });
+    const most = Math.max(1, ...cases.map(triesOf));
+    for (let attempt = 1; attempt <= most; attempt += 1) {
+      for (const group of CheckupService.groups(cases)) {
+        // A thread is asked as often as its most-tried question.
+        if (attempt <= Math.max(...group.cases.map(triesOf))) {
+          work.push({ group, attempt });
+        }
+      }
     }
     let next = 0;
     const worker = async () => {
@@ -402,6 +437,8 @@ export class CheckupService {
     await this.runs.save({
       ...run,
       status: 'done' as const,
+      phase: 'done' as const,
+      asked: run.total,
       done: run.total,
       totals: totals as unknown as Record<string, unknown>,
       finishedAt: new Date(),
@@ -430,6 +467,7 @@ export class CheckupService {
           history: [...history],
           conversationId,
         });
+        await this.markAsked(run);
         grade = await this.ai.gradeCheckup(
           CheckupService.gradeRequest(item, tested, history, prompts, context),
         );
@@ -471,12 +509,49 @@ export class CheckupService {
           ms: tested?.latencyMs ?? Date.now() - startedAt,
         }),
       );
+      if (!tested) await this.markAsked(run);
       await this.runs.increment({ id: run.id }, 'done', 1);
       history.push(
         { role: 'user', content: item.question },
         { role: 'assistant', content: tested?.reply ?? '' },
       );
     }
+  }
+
+  /** One more question asked; once every one has been, the run is checking the last answers. */
+  private async markAsked(run: ChatbotCheckupRun): Promise<void> {
+    await this.runs.increment({ id: run.id }, 'asked', 1);
+    await this.runs
+      .createQueryBuilder()
+      .update()
+      .set({ phase: 'checking' })
+      .where('id = :id AND asked >= total AND phase = :asking', {
+        id: run.id,
+        asking: 'asking',
+      })
+      .execute();
+  }
+
+  /**
+   * The questions that didn't pass in the latest checkup (chunk 20d-2, "Run only failed"): any
+   * that failed, partly passed, needed input or couldn't be checked, and any never asked.
+   */
+  async notPassed(
+    chatbotId: string,
+    cases: ChatbotCheckupCase[],
+  ): Promise<ChatbotCheckupCase[]> {
+    const latest = await this.latestFor(chatbotId);
+    if (!latest) return cases;
+    const verdicts = new Map<string, string[]>();
+    for (const row of latest.results) {
+      verdicts.set(row.caseId, [
+        ...(verdicts.get(row.caseId) ?? []),
+        row.verdict,
+      ]);
+    }
+    return cases.filter(
+      (item) => resultOf(verdicts.get(item.id) ?? []) !== 'passed',
+    );
   }
 
   static gradeRequest(
@@ -492,7 +567,8 @@ export class CheckupService {
         id: item.id,
         question: item.question,
         expect: item.expect,
-        facts: item.facts,
+        // The owner's facts, plus what their choice of outcome implies (chunk 20d-2).
+        facts: gradedFacts(item),
         must_not: item.mustNot,
         also_ok: item.alsoOk,
         hard_fail: item.hardFail,
@@ -536,8 +612,41 @@ export class CheckupService {
     }
   }
 
+  /**
+   * A run's results. "Run only failed" asks some questions again: the others keep their results
+   * from the checkup before it, so the run still reads as the whole checkup (same stats).
+   */
+  private async rowsOf(runId: string): Promise<ChatbotCheckupResult[]> {
+    const run = await this.runs.findOne({ where: { id: runId } });
+    const rows = await this.results.find({
+      where: { runId },
+      order: { createdAt: 'ASC' },
+    });
+    if (!run || run.only !== 'failed') return rows;
+    const base = await this.runs.findOne({
+      where: {
+        chatbotId: run.chatbotId,
+        suite: IsNull(),
+        status: 'done',
+        only: 'all',
+        trigger: In(['onboarding', 'manual', 'after_change']),
+        startedAt: LessThan(run.startedAt),
+      },
+      order: { startedAt: 'DESC' },
+    });
+    if (!base) return rows;
+    const asked = new Set(rows.map((r) => r.caseId));
+    const kept = (
+      await this.results.find({
+        where: { runId: base.id },
+        order: { createdAt: 'ASC' },
+      })
+    ).filter((r) => !asked.has(r.caseId));
+    return [...kept, ...rows];
+  }
+
   async totalsFor(runId: string) {
-    const rows = await this.results.find({ where: { runId } });
+    const rows = await this.rowsOf(runId);
     const cases = await this.cases.find({
       where: { id: In([...new Set(rows.map((r) => r.caseId))]) },
     });
@@ -572,18 +681,22 @@ export class CheckupService {
     chatbotId: string,
     caseIds: string[],
     draftId: string | null,
+    trigger: 'onboarding' | 'try' = 'onboarding',
   ): Promise<CheckupResultView[]> {
     const cases = await this.cases.find({
-      where: { chatbotId, id: In(caseIds) },
+      where: { chatbotId, id: In(caseIds), deletedAt: IsNull() },
     });
     const run = await this.runs.save(
       this.runs.create({
         chatbotId,
         draftId,
-        trigger: 'onboarding',
+        trigger,
         status: 'running',
         total: cases.length,
         done: 0,
+        asked: 0,
+        phase: 'asking',
+        only: trigger === 'try' ? 'one' : 'all',
         startedBy: Number(ExecutionManager.getUserId() ?? 0) || null,
       }),
     );
@@ -633,15 +746,26 @@ export class CheckupService {
           : 0,
       };
     });
-    return { latest, trend, fallback, audience };
+    // Before and after (chunk 20d-2): the finished checkup before the latest, by the same measure.
+    const accuracyOf = (run?: ChatbotCheckupRun) =>
+      (
+        run?.totals as
+          | { accuracy?: { passed: number; total: number } }
+          | undefined
+      )?.accuracy ?? null;
+    const compare =
+      done.length >= 2 && latest?.run.status === 'done'
+        ? {
+            before: accuracyOf(done[done.length - 2]),
+            after: accuracyOf(done[done.length - 1]),
+          }
+        : null;
+    return { latest, trend, fallback, audience, compare };
   }
 
   private async viewOf(runId: string): Promise<CheckupRunView> {
     const run = await this.runs.findOneOrFail({ where: { id: runId } });
-    const results = await this.results.find({
-      where: { runId },
-      order: { createdAt: 'ASC' },
-    });
+    const results = await this.rowsOf(runId);
     const cases = await this.cases.find({
       where: { id: In([...new Set(results.map((r) => r.caseId))]) },
     });
@@ -654,6 +778,10 @@ export class CheckupService {
         done: run.done,
         startedAt: run.startedAt,
         finishedAt: run.finishedAt ?? null,
+        phase: run.phase,
+        asked: run.asked,
+        only: run.only,
+        trigger: run.trigger,
       },
       totals:
         run.status === 'done'
@@ -679,6 +807,11 @@ export class CheckupService {
             safety: item.origin === 'platform' && Boolean(item.packId),
             source: item.source,
             reply: row.reply,
+            attempt: row.attempt,
+            tier: item.tier,
+            origin: item.origin,
+            citations: row.citations,
+            ms: row.ms,
           },
         ];
       }),

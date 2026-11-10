@@ -65,6 +65,8 @@ export const botDraftsApi = baseAPI.injectEndpoints({
         access: "public" | "organisation" | "invite";
         emails?: string[];
         organisationIds?: string[];
+        /** Go live although an owner's own Must pass question failed (chunk 20d-2). */
+        confirmMustPass?: boolean;
       }
     >({
       query: ({ id, ...body }) => ({

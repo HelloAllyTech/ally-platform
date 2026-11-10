@@ -490,9 +490,11 @@ export const ShareScreen: React.FC<{
   view: BotDraftView;
   publicAllowed: boolean;
   publishing: boolean;
+  /** An owner's Must pass question failed (chunk 20d-2): asked before going live. */
+  mustPass?: { message: string; questions: string[]; onConfirm: () => void } | null;
   line?: string;
   onPublish: (access: Access, emails: string[]) => void;
-}> = ({ view, publicAllowed, publishing, line, onPublish }) => {
+}> = ({ view, publicAllowed, publishing, line, onPublish, mustPass }) => {
   const [access, setAccess] = useState<Access>(view.draft.access.mode ?? "invite");
   const [emails, setEmails] = useState(view.draft.access.emails.join(", "));
   const options: { id: Access; label: string; help: string; disabled?: boolean }[] = [
@@ -547,6 +549,21 @@ export const ShareScreen: React.FC<{
               onChange={event => setEmails(event.target.value)}
             />
             <span className="ally-field__hint">{COPY.share.emailsHelp}</span>
+          </div>
+        )}
+        {mustPass && (
+          <div className="ally-card ally-must-pass" role="alert" data-testid="must-pass">
+            <p className="ally-body">{mustPass.message}</p>
+            {mustPass.questions.length > 0 && (
+              <ul className="ally-small">
+                {mustPass.questions.map(q => (
+                  <li key={q}>“{q}”</li>
+                ))}
+              </ul>
+            )}
+            <Button disabled={publishing} onClick={mustPass.onConfirm}>
+              {COPY.share.goLiveAnyway}
+            </Button>
           </div>
         )}
         <PrimaryButton enterHint={COPY.frame.enterHint} disabled={!ready} onClick={publish}>

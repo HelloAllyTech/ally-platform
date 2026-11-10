@@ -190,6 +190,7 @@ const DevOnboarding: React.FC = () => {
       publicAllowed: false,
       published: stage === "live" ? PUBLISHED : null,
       publishing: false,
+      mustPass: null,
       canvasVersion: 0,
       say: advance,
       chooseChip: advance,

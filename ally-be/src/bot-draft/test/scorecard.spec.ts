@@ -221,6 +221,8 @@ describe('ScorecardService', () => {
       'bot-1',
       'Do you take insurance?',
       'We give a receipt to claim.',
+      // "Also add to checkup", ticked by default (chunk 20d-2).
+      { addToCheckup: true, addedFrom: 'unanswered' },
     );
     const update = h.query.mock.calls.find(([sql]) =>
       String(sql).startsWith('UPDATE wa_unanswered_questions'),
@@ -244,6 +246,7 @@ describe('ScorecardService', () => {
       'bot-1',
       'How much is a session?',
       'A session is Rs. 2,000.',
+      { addToCheckup: true, addedFrom: 'thumbs_down' },
     );
     expect(h.feedback.update).toHaveBeenLastCalledWith(
       { id: 'f-1' },

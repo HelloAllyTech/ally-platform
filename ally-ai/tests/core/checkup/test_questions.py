@@ -74,3 +74,23 @@ def test_contract_matches_the_default_prompt():
     )
     for f in fields:
         assert f"<{f}>" in rendered
+
+
+@pytest.mark.asyncio
+async def test_suggestions_never_repeat_a_question_the_checkup_asks(monkeypatch):
+    """Suggest more questions (chunk 20d-2): excluded in code, whatever the wording."""
+    fake = FakeLLM(
+        {
+            "questions": [
+                {"question": "How much is a first session?", "fact_ids": ["f1"]},
+                {"question": "Are you open on Sunday?", "fact_ids": ["f2"]},
+            ]
+        }
+    )
+    monkeypatch.setattr(questions, "generate_structured", fake)
+    request = REQUEST.model_copy(
+        update={"exclude": ["how much is a first session"], "count": 2}
+    )
+    result = await questions.write_questions(request)
+    assert [q.question for q in result.questions] == ["Are you open on Sunday?"]
+    assert result.dropped == 1

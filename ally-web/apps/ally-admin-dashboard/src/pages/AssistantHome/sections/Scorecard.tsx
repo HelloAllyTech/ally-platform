@@ -36,17 +36,19 @@ const MEASURES: Measure[] = [
 /** The owner's answer, written in place: "Answer it" and "Correct this" both use it. */
 const AnswerBox: React.FC<{
   busy: boolean;
-  onSave: (text: string) => Promise<boolean>;
+  onSave: (text: string, addToCheckup: boolean) => Promise<boolean>;
   onCancel: () => void;
 }> = ({ busy, onSave, onCancel }) => {
   const [text, setText] = useState("");
+  // "Also add to checkup" (chunk 20d-2), ticked by default.
+  const [addToCheckup, setAddToCheckup] = useState(true);
   const id = React.useId();
   return (
     <form
       className="ally-field ally-score__answer"
       onSubmit={async event => {
         event.preventDefault();
-        if (text.trim() && (await onSave(text.trim()))) setText("");
+        if (text.trim() && (await onSave(text.trim(), addToCheckup))) setText("");
       }}
     >
       <label className="ally-field__label" htmlFor={id}>
@@ -61,6 +63,14 @@ const AnswerBox: React.FC<{
         value={text}
         onChange={event => setText(event.target.value)}
       />
+      <label className="ally-home__check">
+        <input
+          type="checkbox"
+          checked={addToCheckup}
+          onChange={event => setAddToCheckup(event.target.checked)}
+        />
+        <span>{HOME.checkupControls.alsoAdd}</span>
+      </label>
       <div className="ally-btn-row">
         <Button type="submit" variant="primary" disabled={busy || !text.trim()}>
           {t.save}
@@ -114,10 +124,10 @@ export const UnansweredList: React.FC<{ botId: string; canEdit: boolean; testId?
                 <AnswerBox
                   busy={answering.isLoading}
                   onCancel={() => setOpen(null)}
-                  onSave={async text => {
+                  onSave={async (text, addToCheckup) => {
                     setError(null);
                     try {
-                      await answer({ id: botId, questionId: q.id, text }).unwrap();
+                      await answer({ id: botId, questionId: q.id, text, addToCheckup }).unwrap();
                       setOpen(null);
                       setNote(t.saved);
                       return true;
@@ -279,8 +289,10 @@ export const Scorecard: React.FC<{
                   <AnswerBox
                     busy={correcting.isLoading}
                     onCancel={() => setOpen(null)}
-                    onSave={text =>
-                      save(() => correct({ id: botId, feedbackId: f.id, text }).unwrap())
+                    onSave={(text, addToCheckup) =>
+                      save(() =>
+                        correct({ id: botId, feedbackId: f.id, text, addToCheckup }).unwrap(),
+                      )
                     }
                   />
                 )}

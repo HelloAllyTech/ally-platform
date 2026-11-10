@@ -42,23 +42,23 @@ export const scorecardApi = baseAPI.injectEndpoints({
     }),
     answerUnanswered: builder.mutation<
       { ok: true },
-      { id: string; questionId: string; text: string }
+      { id: string; questionId: string; text: string; addToCheckup?: boolean }
     >({
-      query: ({ id, questionId, text }) => ({
+      query: ({ id, questionId, text, addToCheckup }) => ({
         url: ApiEndpoints.CHATBOTS.SCORECARD_ANSWER(id, questionId),
         method: HttpMethod.POST,
-        body: { text },
+        body: { text, ...(addToCheckup === false ? { addToCheckup } : {}) },
       }),
       invalidatesTags: [TAG_TYPES.SCORECARD],
     }),
     correctFeedback: builder.mutation<
       { ok: true },
-      { id: string; feedbackId: string; text: string }
+      { id: string; feedbackId: string; text: string; addToCheckup?: boolean }
     >({
-      query: ({ id, feedbackId, text }) => ({
+      query: ({ id, feedbackId, text, addToCheckup }) => ({
         url: ApiEndpoints.CHATBOTS.SCORECARD_CORRECT(id, feedbackId),
         method: HttpMethod.POST,
-        body: { text },
+        body: { text, ...(addToCheckup === false ? { addToCheckup } : {}) },
       }),
       invalidatesTags: [TAG_TYPES.SCORECARD],
     }),

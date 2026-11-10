@@ -115,7 +115,18 @@ export interface OnboardingSession {
   back: () => Promise<void>;
   /** An edit on the canvas. Resolves false (and says why) if it was refused. */
   edit: (target: "draft" | "learned", ops: PatchOp[]) => Promise<boolean>;
-  publish: (access: PublishResult["access"], emails: string[]) => Promise<void>;
+  publish: (
+    access: PublishResult["access"],
+    emails: string[],
+    confirmMustPass?: boolean,
+  ) => Promise<void>;
+  /** Asked before going live: an owner's own Must pass question failed (chunk 20d-2). */
+  mustPass: {
+    message: string;
+    questions: string[];
+    access: PublishResult["access"];
+    emails: string[];
+  } | null;
 
   /** The one-screen flow (chunk 20d). Null while the draft loads. */
   flow: OnboardingScreenState | null;
@@ -138,6 +149,12 @@ export const useOnboardingSession = (
   const session: BotDraftSession = useBotDraftSession(draftId);
   const { view, sending, working, send, setView } = session;
   const [publishedNow, setPublished] = useState<PublishResult | null>(null);
+  const [mustPass, setMustPass] = useState<{
+    message: string;
+    questions: string[];
+    access: PublishResult["access"];
+    emails: string[];
+  } | null>(null);
   const [patchDraft] = usePatchBotDraftMutation();
   const [goBack] = useBackBotDraftMutation();
   const [publishDraft, { isLoading: publishing }] = usePublishBotDraftMutation();
@@ -253,6 +270,7 @@ export const useOnboardingSession = (
     publicAllowed: Boolean(page?.publicAllowed),
     published,
     publishing,
+    mustPass,
     canvasVersion: session.canvasVersion,
 
     say: text => void send({ text }),
@@ -285,12 +303,33 @@ export const useOnboardingSession = (
         onError(errorText(err));
       }
     },
-    publish: async (access, emails) => {
+    publish: async (access, emails, confirmMustPass = false) => {
       if (!view) return;
       try {
-        setPublished(await publishDraft({ id: view.id, access, emails }).unwrap());
+        setPublished(
+          await publishDraft({
+            id: view.id,
+            access,
+            emails,
+            ...(confirmMustPass ? { confirmMustPass: true } : {}),
+          }).unwrap(),
+        );
+        setMustPass(null);
         void session.reload();
       } catch (err) {
+        // An owner's own Must pass question failed (chunk 20d-2): ask, then go live if they say so.
+        const data = (err as { data?: { errorCode?: string; message?: string; details?: unknown } })
+          ?.data;
+        if (data?.errorCode === "must_pass_failed") {
+          const details = data.details as { questions?: { question: string }[] } | undefined;
+          setMustPass({
+            message: data.message ?? "",
+            questions: (details?.questions ?? []).map(q => q.question),
+            access,
+            emails,
+          });
+          return;
+        }
         onError(errorText(err));
       }
     },

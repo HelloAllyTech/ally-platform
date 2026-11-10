@@ -40,6 +40,12 @@ export interface CheckupResult {
   safety: boolean;
   source: CheckupSource;
   reply: string;
+  /** Chunk 20d-2: which try (Must pass questions are asked 3 times on the home). */
+  attempt?: number;
+  tier?: "must_pass" | "nice_to_pass";
+  origin?: "generated" | "owner" | "platform" | "suite";
+  citations?: { documentId: string; title: string; url: string }[];
+  ms?: number;
 }
 
 export interface CheckupRun {
@@ -49,6 +55,11 @@ export interface CheckupRun {
   done: number;
   startedAt: string;
   finishedAt: string | null;
+  /** Chunk 20d-2: the live step, and how many questions have been asked so far. */
+  phase?: "writing" | "asking" | "checking" | "done";
+  asked?: number;
+  only?: "all" | "failed" | "one";
+  trigger?: string;
 }
 
 export interface CheckupRunView {
@@ -63,4 +74,46 @@ export interface CheckupView {
   trend: { at: string; accuracy: number }[];
   fallback: string;
   audience: string;
+  /** The finished checkup before the latest, and the latest, by accuracy (chunk 20d-2). */
+  compare?: { before: Measure | null; after: Measure | null } | null;
+}
+
+/** What should happen, as the owner says it (chunk 20d-2). */
+export type CheckupOutcomeChoice = "answer" | "dont_know" | "decline" | "person";
+export type CheckupCaseResult = "passed" | "partly" | "failed" | "needs_input" | "error";
+
+/** One of the checkup's questions, as the owner's list shows it (chunk 20d-2). */
+export interface CheckupCase {
+  id: string;
+  question: string;
+  outcome: CheckupOutcomeChoice | null;
+  expect: CheckupExpect;
+  facts: string[];
+  mustNot: string[];
+  mustPass: boolean;
+  language: string | null;
+  active: boolean;
+  safety: boolean;
+  badge: "ally" | "you" | "chat";
+  addedFrom: "chat" | "unanswered" | "thumbs_down" | null;
+  source: CheckupSource;
+  version: string;
+  history: { runId: string; at: string; result: CheckupCaseResult }[];
+}
+
+export interface CheckupCaseInput {
+  question?: string;
+  outcome?: CheckupOutcomeChoice;
+  facts?: string[];
+  mustNot?: string[];
+  mustPass?: boolean;
+  language?: string;
+  active?: boolean;
+  addedFrom?: "chat" | "unanswered" | "thumbs_down";
+}
+
+export interface CheckupSuggestion {
+  question: string;
+  facts: string[];
+  source?: CheckupSource;
 }

@@ -10,10 +10,17 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiProperty,
+  ApiPropertyOptional,
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { CallerScopedRoute } from '../../auth/decorators/caller-scoped-route.decorator';
 import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
@@ -28,6 +35,13 @@ export class OwnerAnswerDto {
   @MinLength(1)
   @MaxLength(1000)
   text!: string;
+
+  @ApiPropertyOptional({
+    description: '"Also add to checkup" (chunk 20d-2); ticked unless false',
+  })
+  @IsOptional()
+  @IsBoolean()
+  addToCheckup?: boolean;
 }
 
 /**
@@ -61,7 +75,12 @@ export class ScorecardController {
     @Param('questionId', ParseUUIDPipe) questionId: string,
     @Body() dto: OwnerAnswerDto,
   ) {
-    return this.scorecard.answerUnanswered(id, questionId, dto.text);
+    return this.scorecard.answerUnanswered(
+      id,
+      questionId,
+      dto.text,
+      dto.addToCheckup !== false,
+    );
   }
 
   @Post(':id/scorecard/feedback/:feedbackId/correct')
@@ -75,7 +94,12 @@ export class ScorecardController {
     @Param('feedbackId', ParseUUIDPipe) feedbackId: string,
     @Body() dto: OwnerAnswerDto,
   ) {
-    return this.scorecard.correctFeedback(id, feedbackId, dto.text);
+    return this.scorecard.correctFeedback(
+      id,
+      feedbackId,
+      dto.text,
+      dto.addToCheckup !== false,
+    );
   }
 
   @Post(':id/scorecard/feedback/:feedbackId/fine')

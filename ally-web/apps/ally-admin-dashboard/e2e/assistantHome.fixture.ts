@@ -367,6 +367,30 @@ export async function mockAssistantHome(
     }
     // Chunk Q2a: the live scorecard on the Overview.
     if (path === `${base}/scorecard`) return json(route, SCORECARD);
+    // Chunk 20d-2: the checkup's questions, each made from the run's results.
+    if (path === `${base}/checkup/cases`) {
+      return json(route, {
+        cases: (
+          CHECKUP_RUN.results as { caseId: string; question: string; safety?: boolean }[]
+        ).map((r, n) => ({
+          id: r.caseId,
+          question: r.question,
+          outcome: r.safety ? null : "answer",
+          expect: "answer",
+          facts: [],
+          mustNot: [],
+          mustPass: true,
+          language: null,
+          active: true,
+          safety: Boolean(r.safety),
+          badge: n === 0 ? "you" : "ally",
+          addedFrom: null,
+          source: { kind: "page" },
+          version: v(3000 + n),
+          history: [],
+        })),
+      });
+    }
     // Chunk 20a-2: the checkup, change by chat and the pages it learned from.
     if (path === `${base}/checkup`) {
       return json(route, {

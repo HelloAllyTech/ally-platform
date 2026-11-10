@@ -329,7 +329,12 @@ export class ScorecardService implements OnModuleInit {
   }
 
   /** "Answer it": the owner's answer to a question it didn't know. */
-  async answerUnanswered(chatbotId: string, id: string, text: string) {
+  async answerUnanswered(
+    chatbotId: string,
+    id: string,
+    text: string,
+    addToCheckup = true,
+  ) {
     await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
     const [row] = (await this.dataSource.query(
       `SELECT q.id, q.question_text AS question FROM wa_unanswered_questions q
@@ -339,7 +344,10 @@ export class ScorecardService implements OnModuleInit {
     )) as { id: string; question: string }[];
     if (!row)
       throw new NotFoundException('That question isn’t one it was asked.');
-    await this.draftCheckup.addOwnerAnswer(chatbotId, row.question, text);
+    await this.draftCheckup.addOwnerAnswer(chatbotId, row.question, text, {
+      addToCheckup,
+      addedFrom: 'unanswered',
+    });
     await this.dataSource.query(
       `UPDATE wa_unanswered_questions
           SET status = $2, resolution_note = 'Answered from the Overview',
@@ -351,7 +359,12 @@ export class ScorecardService implements OnModuleInit {
   }
 
   /** "Correct this" on a thumbs-down: the right answer to what they asked. */
-  async correctFeedback(chatbotId: string, id: string, text: string) {
+  async correctFeedback(
+    chatbotId: string,
+    id: string,
+    text: string,
+    addToCheckup = true,
+  ) {
     await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
     const item = await this.openFeedback(chatbotId, id);
     const [question] = (await this.dataSource.query(
@@ -365,7 +378,10 @@ export class ScorecardService implements OnModuleInit {
         'We couldn’t find the question this answered.',
       );
     }
-    await this.draftCheckup.addOwnerAnswer(chatbotId, question.text, text);
+    await this.draftCheckup.addOwnerAnswer(chatbotId, question.text, text, {
+      addToCheckup,
+      addedFrom: 'thumbs_down',
+    });
     await this.close(item, 'corrected');
     return { ok: true as const };
   }

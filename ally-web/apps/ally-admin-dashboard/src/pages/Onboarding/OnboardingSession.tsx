@@ -163,6 +163,13 @@ export const OnboardingView: React.FC<{
             publicAllowed={s.publicAllowed}
             publishing={s.publishing}
             onPublish={(access, emails) => void s.publish(access, emails)}
+            mustPass={
+              s.mustPass && {
+                message: s.mustPass.message,
+                questions: s.mustPass.questions,
+                onConfirm: () => void s.publish(s.mustPass!.access, s.mustPass!.emails, true),
+              }
+            }
           />
         );
       case "live":

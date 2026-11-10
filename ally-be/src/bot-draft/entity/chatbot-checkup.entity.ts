@@ -7,7 +7,22 @@ import type {
 } from '../../ai/dto/checkup.dto';
 
 export type CheckupOrigin = 'generated' | 'owner' | 'platform' | 'suite';
-export type CheckupTrigger = 'onboarding' | 'manual' | 'after_change' | 'eval';
+export type CheckupTrigger =
+  | 'onboarding'
+  | 'manual'
+  | 'after_change'
+  | 'eval'
+  /** "Try this one" (chunk 20d-2): one question, never the latest checkup. */
+  | 'try';
+/** What should happen, in the owner's words (chunk 20d-2); each maps onto the grader's `expect`. */
+export type CheckupOutcomeChoice =
+  | 'answer'
+  | 'dont_know'
+  | 'decline'
+  | 'person';
+/** Where an owner's question came from (chunk 20d-2). */
+export type CheckupAddedFrom = 'chat' | 'unanswered' | 'thumbs_down';
+export type CheckupPhase = 'writing' | 'asking' | 'checking' | 'done';
 export type CheckupResultVerdict = 'pass' | 'fail' | 'needs_input' | 'error';
 
 /**
@@ -84,6 +99,20 @@ export class ChatbotCheckupCase extends BaseWithoutTenantEntity {
 
   @Column({ name: 'created_by', type: 'int', nullable: true })
   createdBy?: number | null;
+
+  /** What should happen, as the owner chose it (chunk 20d-2); null for questions from before. */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  outcome?: CheckupOutcomeChoice | null;
+
+  @Column({ type: 'varchar', length: 8, nullable: true })
+  language?: string | null;
+
+  @Column({ name: 'added_from', type: 'varchar', length: 16, nullable: true })
+  addedFrom?: CheckupAddedFrom | null;
+
+  /** Deleted (with Undo): kept until then, never asked. */
+  @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deletedAt?: Date | null;
 }
 
 /** One run of an assistant's checkup questions through its own engine. */
@@ -127,6 +156,18 @@ export class ChatbotCheckupRun extends BaseWithoutTenantEntity {
 
   @Column({ name: 'finished_at', type: 'timestamptz', nullable: true })
   finishedAt?: Date | null;
+
+  /** Which step the run is on, for the live steps (chunk 20d-2). */
+  @Column({ type: 'varchar', length: 16, default: 'asking' })
+  phase!: CheckupPhase;
+
+  /** Questions asked so far (`done` counts the ones checked). */
+  @Column({ type: 'int', default: 0 })
+  asked!: number;
+
+  /** Everything, only the ones that failed last time, or one ("Try this one"). */
+  @Column({ type: 'varchar', length: 8, default: 'all' })
+  only!: 'all' | 'failed' | 'one';
 }
 
 /** One question's graded result in a run (an eval asks each question more than once). */

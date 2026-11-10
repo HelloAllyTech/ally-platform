@@ -839,6 +839,22 @@ export class AiService {
   }
 
   /**
+   * "Suggest more questions" (chunk 20d-2): the same writer, told which questions the checkup
+   * already asks so it offers new ones. Additive: `writeCheckupQuestions` is unchanged.
+   */
+  async suggestCheckupQuestions(
+    request: CheckupQuestionsRequest & { exclude: string[] },
+  ): Promise<CheckupQuestionsResponse> {
+    return this.postKnowledge<
+      CheckupQuestionsResponse,
+      CheckupQuestionsRequest & { exclude: string[] }
+    >(ENDPOINTS.CHECKUP_QUESTIONS, request, {
+      timeoutMs: CHECKUP_GRADE_TIMEOUT_MS * 2,
+      alertOnFailure: false,
+    });
+  }
+
+  /**
    * Facts for "What we learned" from a batch of crawled pages. redactBody=true: the payload is
    * a business's site text, which can carry staff names, phones and emails.
    */

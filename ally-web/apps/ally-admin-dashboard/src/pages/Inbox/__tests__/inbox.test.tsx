@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   takeOver: vi.fn(),
   handBack: vi.fn(),
   reply: vi.fn(),
+  addCase: vi.fn(),
 }));
 
 const unwrapped = (fn: (args: unknown) => unknown) => (args: unknown) => ({
@@ -24,11 +25,14 @@ const unwrapped = (fn: (args: unknown) => unknown) => (args: unknown) => ({
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGetInboxQuery: () => ({ data: h.items.current, isLoading: false }),
-  useGetChatbotsQuery: () => ({ data: { chatbots: [{ id: "b1", name: "Sunrise Mind" }] } }),
+  useGetChatbotsQuery: () => ({
+    data: { chatbots: [{ id: "b1", name: "Sunrise Mind", myRole: "editor" }] },
+  }),
   useGetInboxThreadQuery: () => ({ data: h.thread.current, isLoading: false }),
   useTakeOverMutation: () => [unwrapped(h.takeOver), { isLoading: false }],
   useHandBackMutation: () => [unwrapped(h.handBack), { isLoading: false }],
   useReplyInInboxMutation: () => [unwrapped(h.reply), { isLoading: false }],
+  useAddCheckupCaseMutation: () => [unwrapped(h.addCase), { isLoading: false }],
 }));
 vi.mock("@hooks", () => ({ useUser: () => ({ user: { id: 7 } }) }));
 vi.mock("../useInboxStream", () => ({ useInboxStream: () => undefined }));
@@ -253,6 +257,40 @@ describe("Inbox", () => {
       </MemoryRouter>,
     );
     expect(screen.queryByRole("heading", { level: 1, name: INBOX.nav })).toBeNull();
+  });
+
+  it("Add to checkup on a reply is filled in with what they asked and what it said (20d-2)", async () => {
+    h.thread.current = thread({
+      messages: [
+        { ...thread().messages[0], text: "Do you see couples?" },
+        {
+          ...thread().messages[1],
+          text: "Yes. Couples sessions are 75 minutes with Sara.",
+          rating: null,
+        },
+      ],
+    });
+    h.addCase.mockReturnValue({});
+    render(
+      <MemoryRouter initialEntries={["/inbox?conversation=c1&bot=b1"]}>
+        <Inbox />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: INBOX.addToCheckup }));
+    const editor = screen.getByTestId("checkup-editor");
+    expect((editor.querySelector("input") as HTMLInputElement).value).toBe("Do you see couples?");
+    expect(editor.textContent).toContain("Couples sessions are 75 minutes with Sara.");
+    fireEvent.submit(editor);
+    await waitFor(() =>
+      expect(h.addCase).toHaveBeenCalledWith({
+        id: "b1",
+        input: expect.objectContaining({
+          question: "Do you see couples?",
+          facts: ["Yes.", "Couples sessions are 75 minutes with Sara."],
+          addedFrom: "chat",
+        }),
+      }),
+    );
   });
 
   it("an empty inbox says so", () => {

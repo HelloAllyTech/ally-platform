@@ -43,6 +43,7 @@ import { changes, draftView } from '../service/bot-draft-view';
 import { BotDraftEventsService } from '../service/bot-draft-events.service';
 import { BotDraftService } from '../service/bot-draft.service';
 import { DraftCheckupService } from '../checkup/draft-checkup.service';
+import { CheckupCasesService } from '../checkup/checkup-cases.service';
 import { SourcesService } from '../home/sources.service';
 import { SseWriter } from './sse';
 
@@ -68,6 +69,8 @@ export class BotDraftController {
     private readonly events: BotDraftEventsService,
     private readonly checkup: DraftCheckupService,
     private readonly sources: SourcesService,
+    // Optional so the specs that build this controller by hand needn't change.
+    private readonly checkupCases?: CheckupCasesService,
   ) {}
 
   @Post()
@@ -288,6 +291,12 @@ export class BotDraftController {
     // The checkup gates the first publish (chunk 20a-2); changing who can use a published
     // assistant doesn't run it again.
     if (draft.status !== BotDraftStatus.PUBLISHED) {
+      // An owner's own Must pass question that failed asks first (chunk 20d-2); the gate itself
+      // (unsourced answers, safety questions) is unchanged and runs after.
+      await this.checkupCases?.assertMustPassConfirmed(
+        draft,
+        Boolean(dto.confirmMustPass),
+      );
       await this.checkup.assertCanPublish(draft);
     }
     return this.publisher.publish(draft, dto);

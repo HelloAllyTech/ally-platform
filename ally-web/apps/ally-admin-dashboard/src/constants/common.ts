@@ -827,6 +827,9 @@ export const ApiEndpoints = {
     SOURCE_RESTORE: (id: string, eventId: string) =>
       `/v1/chatbots/${id}/sources/${eventId}/restore`,
     CHECKUP_RUNS: (id: string) => `/v1/chatbots/${id}/checkup/runs`,
+    CHECKUP_CASES: (id: string) => `/v1/chatbots/${id}/checkup/cases`,
+    CHECKUP_CASE: (id: string, caseId: string) => `/v1/chatbots/${id}/checkup/cases/${caseId}`,
+    CHECKUP_SUGGESTIONS: (id: string) => `/v1/chatbots/${id}/checkup/suggestions`,
     CHECKUP_RUN: (id: string, runId: string) => `/v1/chatbots/${id}/checkup/runs/${runId}`,
     CHECKUP_ANSWER: (id: string, caseId: string) =>
       `/v1/chatbots/${id}/checkup/cases/${caseId}/answer`,

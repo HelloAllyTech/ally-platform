@@ -343,6 +343,7 @@ export const COPY = {
     writing: "Writing the reply",
   } as Record<string, string>,
   share: {
+    goLiveAnyway: "Go live anyway",
     title: "Who can use it?",
     public: "Anyone with the link",
     publicHelp: "Best for your website, Instagram or WhatsApp status.",
