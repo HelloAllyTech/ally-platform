@@ -38,18 +38,19 @@ Finish with exactly one of:
 
 # Examples
 
-Good: the root cause is `guard.ts:70 — if (!Number.isFinite(parsed) || parsed < 0) return;`
-letting an empty field through because `Number("")` is 0. Fix: one added line before
-it, `if (!value.trim()) return;`. Rationale: "an emptied field is not a value; refuse
-it before parsing". One file, one line. Repro test passes.
+Good: the root cause is `dialog.tsx:70 — if (!Number.isFinite(parsed) || parsed < 0)
+return;` letting an empty field through because `Number("")` is 0. Fix: one added line
+before it, `if (!value.trim()) return;`. Rationale: "an emptied field is not a value;
+refuse it before parsing". One file, one line. Repro test passes.
 
-Good: `_prompt_code_to_path` splits a code on the first underscore and leaves the rest
-as `b_c`. Fix: `prompt_key = rest.replace("_", os.sep)` on the existing line. One file,
-one line changed.
+Good: `formatDueDate(date)` renders the due date in the server's local zone, so a
+learner one zone east sees yesterday. Fix: add `{ timeZone: "UTC" }` to the existing
+`toLocaleDateString` options on that line. Rationale: "due dates are stored as UTC
+calendar days; render them as such". One line changed, nothing else.
 
-Bad: making the repro pass by adding `if (text.includes("[laughs]")) return ok;`. That
+Bad: making the repro pass with `if (input === "sample-42") return expected;`. That
 special-cases the test's input; the general behaviour is still wrong.
 
-Bad: editing `config.service.ts` (a risk path) to parse the env flag. `edit_file`
-refuses it; finish with `give_up("config/ is human-only; the getter should compare
-with the string 'true'")` so the escalation carries the diagnosis.
+Bad: editing a file under `src/database/migrations/` (a risk path) to backfill the
+column the fix needs. `edit_file` refuses it; finish with `give_up("the fix needs a
+migration; human-only")` so the escalation carries the diagnosis.

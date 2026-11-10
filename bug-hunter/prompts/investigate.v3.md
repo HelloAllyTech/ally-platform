@@ -88,7 +88,7 @@ Bad: `submit_finding` with evidence like "the service probably does not handle n
 and no file:line, or a hypothesis copied from the signal. That is a low-confidence
 suspicion; use report_no_bug or keep reading until you can point at the line.
 
-Bad (sweep): `report_no_bug("the refactor cleanly resolves nested prompts; tests
-cover it")` after reading only the diff and its tests. Trace a nested code such as
-`ally_ai_a_b_c` through the new function first; if it yields `b_c` where the caller
-needs `b/c`, that is the finding.
+Bad (sweep): `report_no_bug("the refactor only renames the helper; tests cover
+it")` after reading only the diff and its tests. Trace one call through the renamed
+helper with an empty list first; if it now throws where the caller expects an empty
+result, that is the finding.

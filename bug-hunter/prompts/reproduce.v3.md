@@ -67,8 +67,8 @@ step'". Test adds one row to the existing claims table style:
 asserts `claimsPrdEdit(text)` returns true. It fails with `expected false to be true`
 on the buggy regex.
 
-Bad: a test that imports `PLATFORM_TIER_ROLES` from a module that does not export it
-yet. It fails with a compile error (`TS2305`), which proves nothing about the
+Bad: a test that imports `NotificationScheduler` from a module that does not export
+it yet. It fails with a compile error (`TS2305`), which proves nothing about the
 behaviour; that is a setup failure and must not be submitted.
 
 Bad: a test that mocks the function under test and asserts the mock was called. It

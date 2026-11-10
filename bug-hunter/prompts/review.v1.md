@@ -46,11 +46,11 @@ dialog's submit handler; the repro asserts the API is not called for an emptied
 field; the suite is green. Issues: none. Regression risks: "whitespace-only input is
 now a no-op instead of submitting 0, which is the intended behaviour".
 
-Request changes: a fix that converts underscores to `os.sep` in a prompt-code path
-but only when the code has exactly one underscore. Issue: "resolver.py:41 — nested
-codes with two or more segments still resolve to a flat name — the repro covers one
-nesting level only". Regression risk: none beyond the symptom.
+Request changes: a pagination fix that clamps `page` to at least 1 but leaves
+`pageSize` untouched. Issue: "list.service.ts:58 — a pageSize of 0 still divides by
+zero two lines below; the repro covers page only". Regression risk: none beyond the
+symptom.
 
-Reject: a fix that wraps the failing call in `try/except` and returns the English text
-when the token guard throws. The symptom disappears, the root cause (an over-strict
-regex) stays, and translations are silently dropped. A human should decide.
+Reject: a fix that wraps the failing date parse in `try/catch` and returns today's
+date on error. The symptom disappears, the root cause (an input format the parser does
+not accept) stays, and bad input is now silently accepted. A human should decide.
