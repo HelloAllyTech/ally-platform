@@ -1,5 +1,5 @@
 /**
- * The admin console's Carbon charts, themed to the top-bar light/dark switch.
+ * The admin console's Carbon charts, themed to the sidebar light/dark switch.
  *
  * Import charts from here, not from `@carbon/charts-react` directly: Carbon charts paint their
  * own colour tokens on the chart holder from `options.theme` (default "white"), so a chart that

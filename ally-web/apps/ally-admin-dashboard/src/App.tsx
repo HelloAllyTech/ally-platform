@@ -16,7 +16,7 @@ export function App() {
   return (
     // Single centralised Carbon design-system boundary (serif), shared by every
     // app via @ally-ui-mono/ui-shared. "White" by default; "Gray 100" while the
-    // top-bar switch has dark mode on (see hooks/useColorMode).
+    // sidebar switch has dark mode on (see hooks/useColorMode).
     <AllyThemeProvider theme={isDark ? "g100" : "white"}>
       <RouteLayout />
       {import.meta.env.VITE_SHOW_LOG_TERMINAL === "true" && <LogViewer />}
