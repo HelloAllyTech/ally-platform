@@ -148,7 +148,7 @@ const ScorecardTable = ({
           <TableHeader>
             <span className="inline-flex items-center gap-1">
               Self-harm follow-up
-              <span className="rounded border border-[#a2191f] px-1 text-xs font-semibold tracking-wide text-[#a2191f]">
+              <span className="rounded border border-red-700 px-1 text-xs font-semibold tracking-wide text-red-700">
                 Internal
               </span>
             </span>

@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 
-import { LineChart, SimpleBarChart } from "@carbon/charts-react";
-
 import { useGetBugAgentPerformanceQuery } from "@api";
+import { LineChart, SimpleBarChart } from "@components/charts";
 
 import { AnalyticsTabFilters, asOf, windowLabel } from "./analyticsFilters";
 import {
