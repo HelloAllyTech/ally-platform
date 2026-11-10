@@ -348,11 +348,18 @@ detectors:
 
 ### Admin & Organization
 
-| Constant               | Event Name             | Description                                                 |
-| ---------------------- | ---------------------- | ----------------------------------------------------------- | -------------------------------------------------------------- |
-| `UPGRADE_PROMPT_SHOWN` | `upgrade.prompt_shown` | An upgrade prompt or paywall is shown to a learner or admin | —                                                              |
-| `UPGRADE_CLICKED`      | `upgrade.clicked`      | Learner or admin clicks an upgrade call-to-action           | —                                                              |
-| `SIDEBAR_INTERACTION`  | `sidebar_interaction`  | Admin pins or unpins the sidebar                            | `apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx` |
+| Constant                         | Event Name                       | Description                                                                                                                       |
+| -------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `UPGRADE_PROMPT_SHOWN`           | `upgrade.prompt_shown`           | An upgrade prompt or paywall is shown to a learner or admin                                                                       | —                                                                       |
+| `UPGRADE_CLICKED`                | `upgrade.clicked`                | Learner or admin clicks an upgrade call-to-action                                                                                 | —                                                                       |
+| `SIDEBAR_INTERACTION`            | `sidebar_interaction`            | Admin pins or unpins the sidebar                                                                                                  | `apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx`          |
+| `IDEA_CAPTURE_SESSION_STARTED`   | `idea_capture_session_started`   | Admin opened the Idea Capture overlay from the header mic-and-bulb button (the mic starts with it)                                | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+| `IDEA_CAPTURE_DRAFT_SAVED`       | `idea_capture_draft_saved`       | An idea was saved to My drafts, after the save succeeds. Carries `capture_mode` (`voice` if any of it was dictated, else `typed`) | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+| `IDEA_CAPTURE_SESSION_ABANDONED` | `idea_capture_session_abandoned` | The overlay was closed with words in it and nothing saved (Discard on the leave prompt). Carries `capture_mode`                   | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+
+The three `idea_capture_*` events measure the save rate of voice-initiated idea captures:
+`idea_capture_draft_saved` over `idea_capture_session_started`, filtered to
+`capture_mode = voice`. They never carry the idea's text.
 
 `upgrade.prompt_shown` sends `org_id`, `trigger_source`, `current_plan`; `upgrade.clicked` sends
 `org_id`, `current_plan`, `target_plan`. Both are **registered but not yet emitted** — this app has
