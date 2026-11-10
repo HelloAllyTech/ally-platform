@@ -69,12 +69,18 @@ ChatModel = BaseChatModel | ChatModelWithFallbacks
 
 def _build_chat_model(spec: ModelSpec, config: BugHunterConfig) -> BaseChatModel:
     defaults = config.models.defaults
+    extra: dict = {}
+    if spec.provider == "google_genai":
+        # system messages ("developer instructions") need the v1beta Gemini API;
+        # with google-genai 3.x the default resolved to v1 and the review call failed
+        extra["api_version"] = "v1beta"
     return init_chat_model(
         spec.model,
         model_provider=spec.provider,
         temperature=defaults.temperature,
         timeout=defaults.timeout_s,
         max_retries=defaults.max_retries,
+        **extra,
     )
 
 

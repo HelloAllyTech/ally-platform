@@ -8,7 +8,7 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from bug_hunter.graph.deps import GraphDeps
-from bug_hunter.graph.llm import StructuredOutputError, call_structured
+from bug_hunter.graph.llm import call_structured
 from bug_hunter.graph.nodes.common import charge_all, node_context, over_budget
 from bug_hunter.graph.prompts import load_prompt
 from bug_hunter.graph.state import BugState, Review
@@ -46,9 +46,12 @@ def make_review_node(deps: GraphDeps):
                     ),
                 ],
             )
-        except StructuredOutputError as exc:
-            deps.scratchpad.append_note(f"review failed: {exc}")
-            return {"status": "escalated", "stop_reason": f"review: {exc}"[:300]}
+        except Exception as exc:  # noqa: BLE001 - provider errors must not kill the run
+            deps.scratchpad.append_note(f"review failed: {type(exc).__name__}: {exc}")
+            return {
+                "status": "escalated",
+                "stop_reason": f"review failed ({type(exc).__name__}): {exc}"[:400],
+            }
         budget = charge_all(deps, state.budget_used, "review", "review", raws, secs)
         deps.scratchpad.append_note(
             f"review: {verdict.verdict}; issues: {'; '.join(verdict.issues)[:200]}"

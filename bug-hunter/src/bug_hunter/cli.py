@@ -783,7 +783,29 @@ def run_cmd(
                     + ("" if push else " (PR dry-run)")
                 )
                 graph = build_graph(deps, saver)
-                state = run_graph(graph, deps, signal)
+                try:
+                    state = run_graph(graph, deps, signal)
+                except Exception:
+                    # the run is lost but its spend is not: read the last checkpoint
+                    try:
+                        snap = graph.get_state(
+                            {"configurable": {"thread_id": run.run_id}}
+                        )
+                        budget = (
+                            snap.values.get("budget_used")
+                            if snap and snap.values
+                            else None
+                        )
+                        cost = getattr(budget, "cost_usd", None) or (budget or {}).get(
+                            "cost_usd", 0
+                        )
+                        if cost:
+                            spend.record(
+                                cost, "local-run", f"{run.run_id} {app_name} (crashed)"
+                            )
+                    except Exception:  # noqa: BLE001 - best effort
+                        pass
+                    raise
                 state.trace_url = trace_url(run.run_id)
                 if state.budget_used.cost_usd:
                     spend.record(

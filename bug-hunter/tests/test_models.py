@@ -47,6 +47,7 @@ def test_review_is_gemini_with_config_params(config: BugHunterConfig) -> None:
     assert model.temperature == 0
     assert model.timeout == 120
     assert model.max_retries == 2
+    assert model.api_version == "v1beta"
 
 
 def test_triage_is_openai_mini(config: BugHunterConfig) -> None:
@@ -77,6 +78,7 @@ def test_factory_passes_config_values_to_init_chat_model(
             "temperature": 0,
             "timeout": 120,
             "max_retries": 2,
+            "api_version": "v1beta",  # system messages need the beta Gemini API
         },
     ]
 
