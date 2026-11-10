@@ -23,6 +23,8 @@ export const validationSchema = Joi.object({
   DB_USERNAME: Joi.string().required(),
   DB_PASSWORD: Joi.string().required(),
   DB_DATABASE: Joi.string().required(),
+  // false in production, where the deploy migrates before the swap (see migration-runner.ts)
+  DB_MIGRATIONS_ON_BOOT: Joi.boolean().default(true),
 
   // AI
   AI_SERVICE_API_URL: Joi.string().required(),

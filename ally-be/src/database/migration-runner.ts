@@ -6,6 +6,22 @@ import { DataSource, DataSourceOptions } from 'typeorm';
  */
 export const MIGRATION_LOCK_KEY = 4_918_201;
 
+/**
+ * Whether the app runs pending migrations itself on boot. On unless `DB_MIGRATIONS_ON_BOOT` is
+ * exactly `false` (any case), so local development and tests keep migrating without setting it.
+ *
+ * Production turns it off: the deploy runs `npm run migration:run` in a one-shot container of
+ * the new image before the old containers stop, so a failed migration leaves the old version
+ * serving. A second runner at boot would only ever find nothing pending. Read from
+ * `process.env` (validated in env.validation.ts) because the TypeORM dataSourceFactory, which
+ * keeps the module's connection retry around the run, receives the options and nothing else.
+ */
+export function migrationsOnBootEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.DB_MIGRATIONS_ON_BOOT?.trim().toLowerCase() !== 'false';
+}
+
 export interface MigrationRunLog {
   log: (message: string) => void;
 }
