@@ -24,6 +24,7 @@ from app.core.debrief.schemas import (
     EvaluationOutput,
     EvidenceMap,
     ProgressReading,
+    reasoning_of,
 )
 from app.utils.logger import get_logger
 
@@ -116,11 +117,16 @@ class AnalystRequest(StepRequest):
     scenario: Dict[str, Any] = Field(default_factory=dict)
     expected_behaviours: List[str] = Field(default_factory=list)
     learner_level: Optional[str] = None
+    # What the live detector recorded per expected behaviour (v9 FR-17
+    # get_live_detections); empty when the scenario has none.
+    live_detections: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class AnalystResponse(BaseModel):
     model: str
     evidence: EvidenceMap
+    # The step's own rationale for the Console's run view; never in `evidence`.
+    reasoning: str = ""
 
 
 @router.post("/analyst", response_model=AnalystResponse)
@@ -136,12 +142,13 @@ async def analyst(req: AnalystRequest) -> AnalystResponse:
             learner_level=req.learner_level,
             system=req.system_prompt,
             scenario_session_id=req.scenario_session_id,
+            live_detections=req.live_detections,
         )
     except Exception as exc:  # noqa: BLE001
         raise _failed("analyst", exc) from exc
     if out is None:
         raise _unusable("analyst")
-    return AnalystResponse(model=ran, evidence=out)
+    return AnalystResponse(model=ran, evidence=out, reasoning=reasoning_of(out))
 
 
 class ProgressRequest(StepRequest):
@@ -152,6 +159,7 @@ class ProgressRequest(StepRequest):
 class ProgressResponse(BaseModel):
     model: str
     progress: ProgressReading
+    reasoning: str = ""
 
 
 @router.post("/progress-reader", response_model=ProgressResponse)
@@ -169,7 +177,7 @@ async def progress_reader(req: ProgressRequest) -> ProgressResponse:
         raise _failed("progress-reader", exc) from exc
     if out is None:
         raise _unusable("progress-reader")
-    return ProgressResponse(model=ran, progress=out)
+    return ProgressResponse(model=ran, progress=out, reasoning=reasoning_of(out))
 
 
 class WriterRequest(StepRequest):
@@ -184,11 +192,15 @@ class WriterRequest(StepRequest):
     practice_options: List[Dict[str, Any]] = Field(default_factory=list)
     case_memory: Optional[str] = None
     assessment: bool = False
+    # How the organisation's other trainees did on this roleplay (v9 FR-17
+    # get_cohort_stats); ally-be sends it only for groups of 5 or more.
+    cohort: Optional[Dict[str, Any]] = None
 
 
 class CardsResponse(BaseModel):
     model: str
     cards: DebriefCards
+    reasoning: str = ""
 
 
 @router.post("/writer", response_model=CardsResponse)
@@ -211,12 +223,13 @@ async def writer(req: WriterRequest) -> CardsResponse:
             practice_options=req.practice_options,
             case_memory=req.case_memory,
             assessment=req.assessment,
+            cohort=req.cohort,
         )
     except Exception as exc:  # noqa: BLE001
         raise _failed("writer", exc) from exc
     if out is None:
         raise _unusable("writer")
-    return CardsResponse(model=ran, cards=out)
+    return CardsResponse(model=ran, cards=out, reasoning=reasoning_of(out))
 
 
 class EvaluatorRequest(StepRequest):
@@ -232,6 +245,7 @@ class EvaluatorRequest(StepRequest):
 class EvaluatorResponse(BaseModel):
     model: str
     evaluation: EvaluationOutput
+    reasoning: str = ""
 
 
 @router.post("/evaluator", response_model=EvaluatorResponse)
@@ -253,7 +267,7 @@ async def evaluator(req: EvaluatorRequest) -> EvaluatorResponse:
         raise _failed("evaluator", exc) from exc
     if out is None:
         raise _unusable("evaluator")
-    return EvaluatorResponse(model=ran, evaluation=out)
+    return EvaluatorResponse(model=ran, evaluation=out, reasoning=reasoning_of(out))
 
 
 class ReviserRequest(StepRequest):
@@ -281,7 +295,7 @@ async def reviser(req: ReviserRequest) -> CardsResponse:
         raise _failed("reviser", exc) from exc
     if out is None:
         raise _unusable("reviser")
-    return CardsResponse(model=ran, cards=out)
+    return CardsResponse(model=ran, cards=out, reasoning=reasoning_of(out))
 
 
 class ImproverRequest(BaseModel):

@@ -17,6 +17,20 @@ export interface DebriefRunStepRecord {
   estimatedUsd?: number;
   round?: number;
   note?: string | null;
+  /**
+   * Reasoning out loud (v9 FR-7, FR-38), read by the Console's run view.
+   * `why`: the runner's own reason this step ran or was skipped — the real
+   * cause, since the recipe and its rules decide. `inputs`: what the step was
+   * given. `reasoning`: the model's rationale for its answer, or for a step
+   * with no model (or a pinned one, the Safety reader) what code found.
+   * `output`: one line on what it produced. `budgetLeftUsd`: the run's
+   * ceiling minus everything reserved once this step was.
+   */
+  why?: string | null;
+  inputs?: string[];
+  reasoning?: string | null;
+  output?: string | null;
+  budgetLeftUsd?: number;
 }
 
 /**

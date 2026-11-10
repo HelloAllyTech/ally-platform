@@ -43,6 +43,13 @@ class BehaviourEvidence(BaseModel):
         default=None, description="Exact words from that turn, as written."
     )
     note: str = Field(description="One sentence: what happened and why it mattered.")
+    detector_agreement: Optional[Literal["agrees", "disagrees"]] = Field(
+        default=None,
+        description=(
+            "Only when LIVE DETECTIONS lists this skill: whether your reading "
+            "agrees with what the live detector recorded. Null otherwise."
+        ),
+    )
 
 
 class PivotalMoment(BaseModel):
@@ -188,3 +195,42 @@ class EvaluationOutput(BaseModel):
     dimensions: List[DimensionScore]
     hard_fails: List[HardFailFinding] = Field(default_factory=list)
     fixes: List[FixNote] = Field(default_factory=list)
+
+
+# --- Reasoning out loud --------------------------------------------------------
+#
+# Each step also says, in a few sentences, why it decided as it did, for the
+# Debrief Console's run view (v9 FR-7 "the agent's per-turn rationale", FR-38).
+# The field comes last in each schema so it explains the answer rather than
+# steering it. The response models in the endpoints keep their parent types, so
+# pydantic serialises only the parent's fields there and the rationale travels
+# in its own `reasoning` field: it never reaches the cards, the evidence map or
+# anything a learner reads.
+
+REASONING_DESCRIPTION = (
+    "For the Ally team, never shown to the learner: two to four plain sentences "
+    "on what you weighed and why you decided as you did. Refer to moments by "
+    "turn number rather than copying long quotes."
+)
+
+
+class EvidenceMapReasoned(EvidenceMap):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class ProgressReadingReasoned(ProgressReading):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class DebriefCardsReasoned(DebriefCards):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class EvaluationOutputReasoned(EvaluationOutput):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+def reasoning_of(output: object) -> str:
+    """The step's rationale, or '' for an output without one."""
+    value = getattr(output, "reasoning", "")
+    return value.strip()[:2000] if isinstance(value, str) else ""

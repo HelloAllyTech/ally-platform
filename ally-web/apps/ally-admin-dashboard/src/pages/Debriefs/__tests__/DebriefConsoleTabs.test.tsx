@@ -348,7 +348,7 @@ describe("Debrief Console tabs", () => {
     expect(row).toHaveTextContent("Important moment");
     fireEvent.click(within(row).getByRole("button", { name: "Open" }));
     expect(h.run).toHaveBeenCalledWith(RUN_ROW.id);
-    expect(screen.getByTestId("run-steps")).toHaveTextContent("safety_reader");
+    expect(screen.getByTestId("run-how-made")).toHaveTextContent("Safety reader");
     expect(screen.getByTestId("run-body")).toHaveTextContent("quote_mismatch");
   });
 

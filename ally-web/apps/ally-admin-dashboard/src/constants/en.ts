@@ -9837,6 +9837,61 @@ export const en = {
       cost: (est: string, actual: string) => `Estimated ${est} · actual ${actual}`,
       skipped: "Skipped",
       failed: "Failed",
+      // Reasoning out loud (v9 FR-38): how the debrief was made, step by step.
+      howMade: "How this debrief was made",
+      howMadeHelp:
+        "Each step in the order it ran: why it ran, what it was given, what it was thinking and what it produced. The recipe decides the order; the thinking is the step's own account, for the Ally team only.",
+      decision: "Outcome",
+      noReasoning:
+        "This run was made before steps recorded their reasoning, so only timings and notes are shown.",
+      why: "Why",
+      given: "Given",
+      thinking: "Thinking",
+      result: "Result",
+      budgetLeft: (usd: string) => `${usd} left`,
+      stepCost: (usd: string) => `~${usd}`,
+      showOutput: "Show what it produced",
+      outputs: {
+        safety: "Safety reading",
+        evidence: "Evidence map",
+        liveDetections: "Live detector's record",
+        progress: "Progress reading",
+        cohort: "How other trainees did",
+      },
+      draftChanges: "What changed between drafts",
+      draftChangesNone: "The first draft was not revised.",
+      critique: "What it was asked to fix",
+      revisionChanged: (round: number, count: number) =>
+        `Revision ${round}: ${count === 0 ? "no section changed" : count === 1 ? "1 section changed" : `${count} sections changed`}`,
+      before: "Before",
+      after: "After",
+      removed: "(removed)",
+      added: "(new)",
+      replies: "Ask Ally replies",
+      repliesHelp:
+        "How each reply to the learner was reached: the lookups it made and what they found. The learner's messages are not shown here.",
+      replyLine: (at: string, passes: number, cost: string) =>
+        `${at} · ${passes === 1 ? "1 pass" : `${passes} passes`} · ${cost}`,
+      noTools: "Answered from the debrief and the session, without lookups.",
+      stoppedBy: {
+        budget: "Stopped looking things up: the reply's budget was nearly spent.",
+        max_turns: "Stopped looking things up: it reached its limit of passes.",
+      },
+      stepNames: {
+        safety_reader: "Safety reader",
+        analyst: "Analyst",
+        progress_reader: "Progress reader",
+        guidance_lookup: "Guidance lookup",
+        writer: "Writer",
+        checks: "Rule checks",
+        evaluator: "Evaluator",
+        reviser: "Reviser",
+      } as Record<string, string>,
+      toolNames: {
+        search_guidance: "Searched guidance",
+        get_learner_history: "Read the learner's earlier points",
+        get_live_detections: "Read the live detector's record",
+      } as Record<string, string>,
     },
     review: {
       heading: "Review",

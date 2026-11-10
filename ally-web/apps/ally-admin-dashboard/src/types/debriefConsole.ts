@@ -88,6 +88,22 @@ export interface DebriefRunStep {
   estimatedUsd?: number;
   round?: number;
   note?: string | null;
+  /** Reasoning out loud (v9 FR-38). Absent on runs made before they were recorded. */
+  why?: string | null;
+  inputs?: string[];
+  reasoning?: string | null;
+  output?: string | null;
+  budgetLeftUsd?: number;
+}
+
+/** One Ask Ally reply: how it was reached. Never the learner's message. */
+export interface DebriefReplyTrace {
+  at: string;
+  model: string;
+  turns: number;
+  costUsd: number;
+  tools: Array<{ name: string; topic?: string; ok: boolean; ms: number; found: string }>;
+  stoppedBy?: "max_turns" | "budget";
 }
 
 export interface DebriefRunDetail {
@@ -116,6 +132,13 @@ export interface DebriefRunDetail {
       hardFails: string[];
       checks: string[];
     }>;
+    decision?: { status: DebriefRunStatus; round: number | null; why: string };
+    drafts?: Array<{
+      round: number;
+      cards: DebriefCardsData;
+      critique: Array<{ section: string; note: string }>;
+    }>;
+    replyTraces?: DebriefReplyTrace[];
     [k: string]: unknown;
   };
   cards: DebriefCardsData | null;

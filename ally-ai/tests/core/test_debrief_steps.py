@@ -323,3 +323,108 @@ async def test_each_step_runs_on_the_provider_its_model_names(monkeypatch):
     for model in ("claude-sonnet-5-5", "gpt-5-mini", "gemini-2.5-flash"):
         await write({}, {}, "en", model, TRANSCRIPT)
     assert seen == ["anthropic", "openai", "gemini"]
+
+
+# --- Reasoning out loud, live detections, cohort (v9 FR-7, FR-17, FR-38) -------
+
+
+@pytest.mark.asyncio
+async def test_steps_ask_for_a_rationale_last_in_their_schema(dispatch_returns):
+    from app.core.debrief.schemas import DebriefCardsReasoned, EvidenceMapReasoned
+    from app.core.debrief.steps import analyse, write
+
+    calls = dispatch_returns(EvidenceMapReasoned(reasoning="Turn 3 changed topic."))
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert calls["schema"] is EvidenceMapReasoned
+    assert list(EvidenceMapReasoned.model_fields)[-1] == "reasoning"
+
+    calls = dispatch_returns(DebriefCardsReasoned(opening="Hi", reasoning="x"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert calls["schema"] is DebriefCardsReasoned
+    assert list(DebriefCardsReasoned.model_fields)[-1] == "reasoning"
+
+
+def test_the_rationale_never_reaches_the_cards_or_the_evidence(monkeypatch):
+    """The response models keep their parent types, so the rationale travels
+    only in `reasoning`: nothing a learner reads can carry it."""
+    from app.core.config import settings
+    from app.core.debrief import steps
+    from app.core.debrief.schemas import DebriefCardsReasoned, EvidenceMapReasoned
+    from app.main import app
+
+    async def _analyse(*args, **kwargs):
+        return EvidenceMapReasoned(reasoning="Why I read it so."), "gemini-2.5-pro"
+
+    async def _write(*args, **kwargs):
+        return (
+            DebriefCardsReasoned(opening="Hi", reasoning="Why I wrote it so."),
+            "gemini-3-flash-preview",
+        )
+
+    monkeypatch.setattr(steps, "analyse", _analyse)
+    monkeypatch.setattr(steps, "write", _write)
+    client = TestClient(app)
+    headers = {"x-api-key": settings.API.X_API_KEY}
+
+    res = client.post(
+        "/api/v1/debrief/analyst", json={"transcript": []}, headers=headers
+    )
+    body = res.json()
+    assert body["reasoning"] == "Why I read it so."
+    assert "reasoning" not in body["evidence"]
+
+    res = client.post("/api/v1/debrief/writer", json={"evidence": {}}, headers=headers)
+    body = res.json()
+    assert body["reasoning"] == "Why I wrote it so."
+    assert "reasoning" not in body["cards"]
+
+
+@pytest.mark.asyncio
+async def test_analyst_reads_the_live_detector_as_a_second_opinion(dispatch_returns):
+    from app.core.debrief.steps import analyse
+
+    calls = dispatch_returns(EvidenceMap())
+    await analyse(
+        TRANSCRIPT,
+        "en",
+        "gemini-2.5-pro",
+        live_detections=[{"behaviour": "Explores risk", "detected": False, "times": 0}],
+    )
+    prompt = calls["prompt"]
+    assert "LIVE DETECTIONS" in prompt and "It can be wrong" in prompt
+    assert '"behaviour": "Explores risk"' in prompt
+
+    calls = dispatch_returns(EvidenceMap())
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert "LIVE DETECTIONS" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_may_use_the_cohort_only_to_normalise(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    cohort = {
+        "trainees": "five or more",
+        "skills": [{"skill": "Explores risk", "how_often": "few trainees show this"}],
+    }
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, cohort=cohort)
+    prompt = calls["prompt"]
+    assert "COHORT:" in prompt and "Never compare this trainee" in prompt
+    assert "few trainees show this" in prompt
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "COHORT" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_never_states_mixed_evidence_as_fact(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    evidence = {
+        "behaviours": [{"skill": "Reflections", "detector_agreement": "disagrees"}]
+    }
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(evidence, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "MIXED EVIDENCE" in calls["prompt"]
