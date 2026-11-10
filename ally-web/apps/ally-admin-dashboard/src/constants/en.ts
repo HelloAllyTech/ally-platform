@@ -10418,6 +10418,41 @@ export const en = {
       pick: "Choose an organisation",
       filterHelp:
         "Global entries reach every learner. An organisation's reach only its own learners.",
+      pickerLabel: "Who can read this",
+      pickerHelp:
+        "Every organisation, or only the ones you tick. Learners in other organisations never see a targeted entry in the Ally guide, Debrief or Course Copilot. Builder and Bug Hunter read everything either way.",
+      documentHelp:
+        "Every entry drawn from these documents reaches the organisations you choose here. You can change it later from the document.",
+      bulkNote:
+        "For new rows that leave is_global and tenant_ids blank. A row's own columns win, and rows that update an entry keep its audience unless they set one.",
+      everyOrganisation: "Every organisation (global)",
+      onlyThese: "Only these organisations",
+      filterOrganisations: "Filter organisations",
+      noOrganisationMatches: "No organisation matches.",
+      noOrganisations: "No organisations to choose from.",
+      unknownOrganisation: "Unknown organisation",
+      selectedCount: (count: number) =>
+        count === 1 ? "1 organisation selected" : `${count} organisations selected`,
+      chooseOne: "Choose at least one organisation.",
+      change: "Change",
+      save: "Save",
+      saving: "Saving…",
+      cancel: "Cancel",
+      saved: "Audience updated.",
+      saveFailed: "Couldn't change who can read this.",
+      ownedByOrganisation: "Belongs to an organisation, so it reaches that organisation only.",
+      followsStudio: "Follows its owner in Studio.",
+      documentSaved: (updated: number, shared: number) =>
+        [
+          updated === 1 ? "1 entry updated." : `${updated} entries updated.`,
+          shared
+            ? shared === 1
+              ? "1 entry also comes from another document and kept its audience."
+              : `${shared} entries also come from other documents and kept their audience.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
     },
     /** For "All": no single collection noun applies. */
     allNoun: "item",

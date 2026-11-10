@@ -22,13 +22,7 @@ import {
 import { BulkUpload } from "./BulkUpload";
 import { ChunkSheet } from "./ChunkSheet";
 import { ConnectSheet } from "./ConnectSheet";
-import {
-  capitalise,
-  errorReason,
-  nounsFor,
-  splitDocuments,
-  takesEntries,
-} from "./contextLibraryFormat";
+import { capitalise, errorReason, nounsFor, takesEntries } from "./contextLibraryFormat";
 import { ContextLibraryScopeContext, useContextLibraryAccess } from "./contextLibraryScope";
 import { InlineError, LoadingRows, Segmented } from "./ContextLibraryUi";
 import { DocumentSheet, DocumentsView } from "./DocumentsView";
@@ -168,24 +162,15 @@ export const ContextLibrary: React.FC = () => {
       collections: choice.collections,
       docVersion: choice.docVersion,
       year: choice.year,
+      audience: choice.audience,
     });
   }, []);
 
   /**
-   * With one collection in view and nothing to skip, a drop goes straight in — the overlay
-   * already said where. Otherwise the dialog names what is skipped and asks where to.
+   * Every drop goes through the dialog: it names what is skipped and asks where the documents go
+   * and which organisations their entries reach. Add is focused, so Enter confirms the defaults.
    */
-  const receiveFiles = useCallback(
-    (files: File[]) => {
-      const { accepted, skipped } = splitDocuments(files);
-      if (current?.takesDocuments && accepted.length && !skipped.length) {
-        startUpload({ files: accepted, collections: [current.id] });
-        return;
-      }
-      setStaged(files);
-    },
-    [current, startUpload],
-  );
+  const receiveFiles = useCallback((files: File[]) => setStaged(files), []);
 
   const dropEnabled = canEdit && documentCollections.length > 0 && !sheet && !staged;
   const { dragging, dragCount } = useDocumentDrop(dropEnabled, receiveFiles);
@@ -227,9 +212,8 @@ export const ContextLibrary: React.FC = () => {
           initialTargets={targets}
           canEdit={canEdit}
           onFiles={(files, chosen) => {
-            const { accepted, skipped } = splitDocuments(files);
-            if (skipped.length || !accepted.length) setStaged(files);
-            else startUpload({ files: accepted, collections: chosen });
+            rememberTargets(chosen);
+            setStaged(files);
           }}
           onWrite={() => pushOverlay({ sheet: "new" })}
         />
@@ -437,6 +421,7 @@ export const ContextLibrary: React.FC = () => {
           <DocumentSheet
             id={documentId}
             collections={collections}
+            canEdit={canEdit && !orgMode}
             onClose={() => closeOverlay("document")}
           />
         )}

@@ -45,6 +45,12 @@ export const buildUploadForm = (files: File[], options: ContextUploadOptions): F
   if (options.addAnyway) form.append("addAnyway", "true");
   if (options.costCapUsd) form.append("costCapUsd", String(options.costCapUsd));
   if (options.batchId) form.append("batchId", options.batchId);
+  if (options.audience) {
+    form.append("isGlobal", String(options.audience.isGlobal));
+    if (!options.audience.isGlobal) {
+      form.append("tenantIds", JSON.stringify(options.audience.tenantIds));
+    }
+  }
   return form;
 };
 

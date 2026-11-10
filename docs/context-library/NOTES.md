@@ -43,6 +43,13 @@ why; this file says where it ended up, what changed on the way, and what is stil
   `sync_key`; unsigned clinical Debrief documents arrive archived; enrichment is a separate admin
   action that never touches the body. Organisation admins get a scoped Library under the guide
   library's existing gate (`ally_guide_org` toggle); the platform Library is platform-only.
+- **Audience is a platform admin's choice on every write path** (2026-11-10): written entries,
+  bulk files (per row, or the upload's default for new rows) and documents (`cl_sources.is_global`
+  / `tenant_ids`, copied onto what is distilled). Any platform-owned chunk, or a whole document,
+  can be re-targeted later. Organisation-owned and synced chunks follow their owner. Dedupe and
+  the curator's merges respect audience, so a document for one organisation never disappears into
+  a chunk only another can read. Organisation admins now also see, read-only, entries Ally targeted
+  at them. Every upload goes through the Add documents dialog, so a drop is never silently global.
 - **Agent lessons:** agents write candidates that are never retrieved until the hourly curator
   (fast tier, at most 10 changes a pass, never touching pinned or person-written chunks) accepts
   them. Builder's lessons block is frozen per session so the prompt cache holds.

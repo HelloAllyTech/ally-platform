@@ -691,10 +691,13 @@ export const ApiEndpoints = {
     QUEUE: "/v1/context-library/queue",
     SOURCES: "/v1/context-library/sources",
     SOURCE_BY_ID: (id: string) => `/v1/context-library/sources/${id}`,
+    SOURCE_AUDIENCE: (id: string) => `/v1/context-library/sources/${id}/audience`,
     SOURCE_ACTION: (id: string, action: "pause" | "resume" | "cancel" | "front" | "retry") =>
       `/v1/context-library/sources/${id}/${action}`,
     CHUNKS: "/v1/context-library/chunks",
     CHUNK_BY_CODE: (code: string) => `/v1/context-library/chunks/${encodeURIComponent(code)}`,
+    CHUNK_AUDIENCE: (code: string) =>
+      `/v1/context-library/chunks/${encodeURIComponent(code)}/audience`,
     CHUNK_ACTION: (code: string, action: "archive" | "restore" | "pin" | "unpin") =>
       `/v1/context-library/chunks/${encodeURIComponent(code)}/${action}`,
     COLLECTION_CHUNKS: (collectionId: string) =>
