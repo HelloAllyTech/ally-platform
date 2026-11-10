@@ -123,7 +123,7 @@ same change. No runtime flag stays behind.
 Recorded by the ally-be build (2026-11-10).
 
 1. **No flag, no legacy path.** The user dropped `DEBRIEF_HARNESS` and `runLegacy`: `run()` always does
-   prepare → graph → apply, and the in-process steps are deleted from ally-be now (with `util/model-circuit.ts`,
+   prepare → graph → apply, and the in-process steps are deleted from ally-be now (with the model circuit breaker,
    `estimateStepCostUsd`, and the runner's narration helpers). Check 7 in §4 (legacy vs graph side by side)
    can only be done against a build from before this change (e.g. master at `e9c1e7123`).
 2. **`session` keys** are the snake_case of `DebriefSessionContext`: `id, tenant_id, counselor_id, status,
