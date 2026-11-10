@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -126,6 +127,33 @@ export class DraftCheckupService {
         tier: 'must_pass',
       },
     );
+    return { ok: true as const };
+  }
+
+  /**
+   * The owner's answer to a real question (chunk Q2a, the Overview's "Answer it" and "Correct
+   * this"): written to Owner notes, kept as a confirmed checkup question with the answer as its
+   * fact, and checked in the next checkup. The caller has checked the owner may edit.
+   */
+  async addOwnerAnswer(chatbotId: string, question: string, text: string) {
+    const answer = text.trim();
+    if (!answer) throw new BadRequestException('Write the answer first.');
+    const draft = await this.drafts.findByChatbot(chatbotId);
+    if (!draft) throw new NotFoundException('That assistant has no setup.');
+    await this.addNote(draft, `${question.trim()} ${answer}`);
+    await this.cases.save(
+      this.cases.create({
+        chatbotId,
+        question: question.trim().slice(0, 500),
+        expect: 'answer',
+        facts: [answer],
+        source: { kind: 'owner', title: 'From you' },
+        origin: 'owner',
+        confirmed: true,
+        tier: 'must_pass',
+      }),
+    );
+    this.checkup.scheduleAfterChange(chatbotId);
     return { ok: true as const };
   }
 

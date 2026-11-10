@@ -294,3 +294,23 @@ export class BotPageMessageDto {
   @MaxLength(BOT_PAGE_BOUNDS.maxMessageChars)
   message!: string;
 }
+
+/** "Was this helpful?" on one answer (chunk Q2a). A reason and note only with a thumbs down. */
+export class BotPageFeedbackDto {
+  @ApiProperty({ enum: ['up', 'down'] })
+  @IsIn(['up', 'down'])
+  rating!: 'up' | 'down';
+
+  @ApiPropertyOptional({ enum: ['wrong_info', 'not_answered', 'other'] })
+  @IsOptional()
+  @IsIn(['wrong_info', 'not_answered', 'other'])
+  reason?: 'wrong_info' | 'not_answered' | 'other';
+
+  @ApiPropertyOptional({
+    description: 'Tell us more (optional), at most 300 characters',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  note?: string;
+}

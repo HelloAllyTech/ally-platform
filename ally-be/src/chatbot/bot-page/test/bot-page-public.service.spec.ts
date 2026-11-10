@@ -167,7 +167,10 @@ function harness(
   const engine = { respond: jest.fn().mockResolvedValue(DECISION) };
   const leads = { afterTurn: jest.fn().mockResolvedValue(false) };
   const unansweredValues = jest.fn().mockReturnThis();
+  /** Raw queries the feedback route runs (chunk Q2a): the message lookup, then the upsert. */
+  const db = { query: jest.fn() };
   const unanswered = {
+    manager: db,
     createQueryBuilder: () => ({
       insert: () => ({
         into: () => ({
@@ -209,6 +212,7 @@ function harness(
     emit,
     stored,
     unansweredValues,
+    db,
     issued,
     req,
     res,
@@ -494,6 +498,7 @@ describe('BotPagePublicService', () => {
         citations: [{ title: 'Fees', url: 'https://sunrise.example/fees' }],
         messageId: 'msg-2',
         conversationId: 'conv-1',
+        rateable: true,
       });
     });
 
@@ -632,6 +637,7 @@ describe('BotPagePublicService', () => {
           citations: DECISION.citations,
           retrievalMeta: { x: 1 },
           agentRunId: 'run-1',
+          handledBy: 'rag',
           createdAt: new Date('2026-11-07T10:00:05Z'),
         },
         {
@@ -649,6 +655,7 @@ describe('BotPagePublicService', () => {
         text: 'Sessions cost 1500.',
         citations: [{ title: 'Fees', url: 'https://sunrise.example/fees' }],
         createdAt: '2026-11-07T10:00:05.000Z',
+        rateable: true,
       });
     });
 
@@ -672,5 +679,86 @@ describe('BotPagePublicService', () => {
       { title: 'A', url: null },
       { title: 'B', url: 'https://b' },
     ]);
+  });
+
+  describe('feedback on an answer (chunk Q2a)', () => {
+    const answer = (handledBy: string) => [
+      {
+        id: 'msg-2',
+        conversation_id: 'conv-1',
+        direction: 'outbound',
+        handled_by: handledBy,
+      },
+    ];
+
+    it('stores a thumbs down with its reason and note, once per answer', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.setVisitor({});
+      h.db.query.mockResolvedValueOnce(answer('rag')).mockResolvedValueOnce([]);
+      await expect(
+        h.service.feedback(
+          'sunrise',
+          'msg-2',
+          { rating: 'down', reason: 'wrong_info', note: ' The fee is wrong ' },
+          h.req,
+        ),
+      ).resolves.toEqual({ rating: 'down' });
+      const [sql, params] = h.db.query.mock.calls[1];
+      expect(sql).toContain('ON CONFLICT (message_id) DO UPDATE');
+      expect(params).toEqual([
+        'msg-2',
+        BOT_ID,
+        'conv-1',
+        'down',
+        'wrong_info',
+        'The fee is wrong',
+      ]);
+    });
+
+    it('a thumbs up keeps no reason or note', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.setVisitor({});
+      h.db.query
+        .mockResolvedValueOnce(answer('declined'))
+        .mockResolvedValueOnce([]);
+      await h.service.feedback(
+        'sunrise',
+        'msg-2',
+        { rating: 'up', reason: 'other', note: 'x' },
+        h.req,
+      );
+      expect(h.db.query.mock.calls[1][1].slice(3)).toEqual(['up', null, null]);
+    });
+
+    it('never on a crisis reply or a template', async () => {
+      for (const kind of ['crisis', 'template', 'consent']) {
+        const h = harness(BotPageAccess.PUBLIC);
+        h.setVisitor({});
+        h.db.query.mockResolvedValueOnce(answer(kind));
+        expect(
+          await errorCodeOf(
+            h.service.feedback('sunrise', 'msg-2', { rating: 'up' }, h.req),
+          ),
+        ).toBe('BOT_PAGE_NOT_RATEABLE');
+        expect(h.db.query).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it("refuses an answer from someone else's conversation", async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.setVisitor({});
+      h.db.query.mockResolvedValueOnce([]);
+      expect(
+        await errorCodeOf(
+          h.service.feedback('sunrise', 'msg-9', { rating: 'down' }, h.req),
+        ),
+      ).toBe('BOT_PAGE_NOT_FOUND');
+      // The lookup is scoped to this visitor's contact on this bot.
+      expect(h.db.query.mock.calls[0][1]).toEqual([
+        'msg-9',
+        BOT_ID,
+        'contact-1',
+      ]);
+    });
   });
 });

@@ -192,6 +192,7 @@ export const COPY = {
   /** Change your assistant (copy §12), on the assistant home's right (chunk 20a-2). */
   change: {
     title: "Change your assistant",
+    intro: "Tell me what you'd like to change. I'll show you the change before anything happens.",
     placeholder: 'Tell me what to change, for example "make it more formal"',
     examples: ["Make it more formal", "Add Hindi", "Don't discuss prices", "Add our new branch"],
     proposal: "Here's the change",

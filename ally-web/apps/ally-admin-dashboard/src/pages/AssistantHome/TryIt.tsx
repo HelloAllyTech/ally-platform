@@ -125,6 +125,8 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
           role: "assistant",
           text: result.reply,
           citations: citationsOf(result),
+          // As on the page: the thumbs show under the assistant's own answers (chunk Q2a).
+          rateable: ["rag", "declined", "clarified"].includes(String(result.handledBy)),
         },
       ]);
     } catch {
@@ -174,6 +176,9 @@ export const TryIt: React.FC<{ bot: Chatbot; page: BotPageView | null; onClose: 
                 setMessages([]);
                 conversation.current = undefined;
               }}
+              // Shown so the owner sees what visitors see; Preview stores no messages, so a
+              // rating here isn't counted (chunk Q2a).
+              onRate={() => undefined}
             />
           </div>
         </PhonePreview>

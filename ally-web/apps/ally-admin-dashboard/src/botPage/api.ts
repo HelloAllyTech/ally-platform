@@ -1,6 +1,7 @@
 import { readSse } from "../hooks/chatStream/sse";
 
 import type {
+  AnswerFeedback,
   BotPageErrorCode,
   PublicBotPage,
   PublicFinal,
@@ -85,6 +86,13 @@ export const botPageApi = {
 
   conversation: (slug: string) =>
     call<{ conversationId: string | null; messages: PublicMessage[] }>(url(slug, "/conversation")),
+
+  /** "Was this helpful?" on one answer; rating again changes it (chunk Q2a). */
+  feedback: (slug: string, messageId: string, body: AnswerFeedback) =>
+    call<{ rating: "up" | "down" }>(url(slug, `/messages/${messageId}/feedback`), {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   newConversation: (slug: string) =>
     call<{ ok: true }>(url(slug, "/conversation/new"), { method: "POST", body: "{}" }),

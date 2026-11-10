@@ -44,6 +44,18 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page).toHaveScreenshot(`bot-chat-${theme}.png`);
       await expectNoSeriousA11yIssues(page);
     });
+
+    test("was this helpful? a thumbs down asks what was wrong", async ({ page }) => {
+      await mockBotPage(page, { theme }, "ready");
+      await page.goto("/b/sunrise-mind");
+      await page.getByRole("button", { name: "Start" }).click();
+      await page.getByRole("button", { name: "What are your fees?" }).click();
+      await page.getByRole("button", { name: "Not helpful" }).click();
+      await expect(page.getByText("What was wrong?")).toBeVisible();
+      await page.getByRole("button", { name: "Wrong information" }).click();
+      await expect(page).toHaveScreenshot(`bot-feedback-${theme}.png`);
+      await expectNoSeriousA11yIssues(page);
+    });
   });
 }
 

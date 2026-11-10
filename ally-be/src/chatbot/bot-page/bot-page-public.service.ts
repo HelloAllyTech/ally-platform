@@ -9,10 +9,12 @@ import { ErrorCode } from '../../exception/error-code.enum';
 import { LoggerService } from '../../logger/logger.service';
 import { WaUnansweredQuestion } from '../../whatsapp/entity/wa-unanswered-question.entity';
 import {
+  WaHandledBy,
   WaMessageDirection,
   WaMessageStatus,
 } from '../../whatsapp/enum/whatsapp.enum';
 import {
+  BotPageFeedbackDto,
   BotPageIntakeDto,
   BotPageSessionDto,
   BotPageVerifyDto,
@@ -108,6 +110,8 @@ export interface PublicMessage {
   text: string;
   citations: PublicCitation[];
   createdAt: string;
+  /** Whether "Was this helpful?" shows under it (chunk Q2a): never on a crisis reply. */
+  rateable: boolean;
 }
 
 /** The stream's `final`: the reply as stored, never the run behind it. */
@@ -116,6 +120,8 @@ export interface PublicFinal {
   citations: PublicCitation[];
   messageId: string;
   conversationId: string;
+  /** Whether "Was this helpful?" shows under it (chunk Q2a). */
+  rateable: boolean;
 }
 
 /** The bot page's refusals, mapped onto the repo's `ErrorCode` contract (see error-code.enum.ts). */
@@ -133,6 +139,7 @@ const PUBLIC_ERRORS = {
   too_long: ErrorCode.BOT_PAGE_MESSAGE_TOO_LONG,
   intake_required: ErrorCode.BOT_PAGE_INTAKE_REQUIRED,
   intake_invalid: ErrorCode.BOT_PAGE_INTAKE_INVALID,
+  not_rateable: ErrorCode.BOT_PAGE_NOT_RATEABLE,
 } as const;
 
 export type PublicErrorCode = keyof typeof PUBLIC_ERRORS;
@@ -182,6 +189,13 @@ interface ReadyVisitor {
   email: string | null;
   eligibility: BotPageEligibility;
 }
+
+/** Answers a visitor can rate (chunk Q2a): the assistant's own, never a crisis reply or template. */
+const RATEABLE = new Set<string>([
+  WaHandledBy.RAG,
+  WaHandledBy.DECLINED,
+  WaHandledBy.CLARIFIED,
+]);
 
 /**
  * The bot page's public side (chunk 12b): sessions, codes, pre-chat answers and messages.
@@ -429,6 +443,9 @@ export class BotPagePublicService {
           text: row.text,
           citations: publicCitations(row.citations),
           createdAt: row.createdAt.toISOString(),
+          rateable:
+            row.role !== ConversationMessageRole.USER &&
+            RATEABLE.has(row.handledBy ?? ''),
         })),
     };
   }
@@ -616,7 +633,64 @@ export class BotPagePublicService {
       citations: publicCitations(decision.citations),
       messageId: outbound.id,
       conversationId: conversation.id,
+      rateable: RATEABLE.has(decision.handledBy),
     };
+  }
+
+  /**
+   * "Was this helpful?" (chunk Q2a): the visitor's thumbs up or down on one of the answers in
+   * their own conversation. Rating again changes it. Crisis replies, templates and the consent
+   * gate can't be rated. Nothing they wrote is logged.
+   */
+  async feedback(
+    slug: string,
+    messageId: string,
+    dto: BotPageFeedbackDto,
+    req: Request,
+  ): Promise<{ rating: 'up' | 'down' }> {
+    const available = await this.page(slug);
+    const ready = await this.requireReady(available, req);
+    await this.ipLimit(req, 'feedback', BOT_PAGE_IP_LIMITS.feedback.perHour);
+    const contact = await this.contactOf(available, ready, false);
+    const db = this.unansweredRepository.manager;
+    const [message] = contact
+      ? ((await db.query(
+          `SELECT m.id, m.conversation_id, m.direction, m.handled_by
+             FROM chatbot_messages m
+             JOIN chatbot_conversations c ON c.id = m.conversation_id
+            WHERE m.id = $1 AND c.chatbot_id = $2 AND c.contact_id = $3`,
+          [messageId, available.chatbot.id, contact.id],
+        )) as {
+          id: string;
+          conversation_id: string;
+          direction: string;
+          handled_by: string | null;
+        }[])
+      : [];
+    if (!message || message.direction !== WaMessageDirection.OUTBOUND) {
+      throw publicError(HttpStatus.NOT_FOUND, 'not_found');
+    }
+    if (!RATEABLE.has(message.handled_by ?? '')) {
+      throw publicError(HttpStatus.CONFLICT, 'not_rateable');
+    }
+    const down = dto.rating === 'down';
+    await db.query(
+      `INSERT INTO chatbot_message_feedback
+         (message_id, chatbot_id, conversation_id, rating, reason, note, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'open')
+       ON CONFLICT (message_id) DO UPDATE SET
+         rating = EXCLUDED.rating, reason = EXCLUDED.reason, note = EXCLUDED.note,
+         status = 'open', handled_by = NULL, handled_at = NULL, "updatedAt" = now()`,
+      [
+        message.id,
+        available.chatbot.id,
+        message.conversation_id,
+        dto.rating,
+        down ? (dto.reason ?? null) : null,
+        down ? dto.note?.trim().slice(0, 300) || null : null,
+      ],
+    );
+    return { rating: dto.rating };
   }
 
   // ── plumbing ──────────────────────────────────────────────────────────

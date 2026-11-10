@@ -101,3 +101,85 @@ export function checkupTotals(rows: StatInput[]): CheckupTotals {
     },
   };
 }
+
+// ── Live numbers (chunk Q2a): the same plain words, from real conversations ──
+
+/**
+ * One assistant's day, as `chatbot_daily_stats` holds it and the Overview reads it. Each count's
+ * definition is in `ScorecardService.ROLLUP_SQL`, the one place it is worked out.
+ */
+export interface DayStats {
+  day: string;
+  conversations: number;
+  answers: number;
+  answeredWithSource: number;
+  declined: number;
+  /** Declines where the search did find something: flagged for review (Q1), never "wrong". */
+  wrongDeclineSuspected: number;
+  handedOver: number;
+  crisis: number;
+  thumbsUp: number;
+  thumbsDown: number;
+  replyMsP50: number | null;
+  replyMsP90: number | null;
+}
+
+export type WeekStats = Omit<DayStats, 'day' | 'replyMsP50' | 'replyMsP90'> & {
+  /** Answers with a source, of all answers, rounded (0 with no answers). */
+  answeredPct: number;
+  /** Thumbs up, of all thumbs, rounded; null with none. */
+  thumbsUpPct: number | null;
+};
+
+const COUNTS = [
+  'conversations',
+  'answers',
+  'answeredWithSource',
+  'declined',
+  'wrongDeclineSuspected',
+  'handedOver',
+  'crisis',
+  'thumbsUp',
+  'thumbsDown',
+] as const;
+
+/** A week (or any run of days) summed, with the two rates the Overview shows. */
+export function sumDays(days: DayStats[]): WeekStats {
+  const sum = Object.fromEntries(
+    COUNTS.map((key) => [key, days.reduce((n, d) => n + (d[key] ?? 0), 0)]),
+  ) as Record<(typeof COUNTS)[number], number>;
+  const thumbs = sum.thumbsUp + sum.thumbsDown;
+  return {
+    ...sum,
+    answeredPct: sum.answers
+      ? Math.round((sum.answeredWithSource / sum.answers) * 100)
+      : 0,
+    thumbsUpPct: thumbs ? Math.round((sum.thumbsUp / thumbs) * 100) : null,
+  };
+}
+
+/** Days are India's (the business's) days; weeks start on Monday. */
+export const SCORECARD_TIME_ZONE = 'Asia/Kolkata';
+
+/** `YYYY-MM-DD` in India for an instant. */
+export function dayOf(at: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: SCORECARD_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(at);
+}
+
+/** `YYYY-MM-DD` plus `n` days. */
+export function addDays(day: string, n: number): string {
+  const at = new Date(`${day}T00:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + n);
+  return at.toISOString().slice(0, 10);
+}
+
+/** The Monday that starts the week holding `day`. */
+export function weekStart(day: string): string {
+  const weekday = new Date(`${day}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+  return addDays(day, -((weekday + 6) % 7));
+}

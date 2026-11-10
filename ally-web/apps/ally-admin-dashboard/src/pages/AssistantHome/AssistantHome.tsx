@@ -188,13 +188,9 @@ export const AssistantHome: React.FC = () => {
                       {HOME.admin.engine}
                     </Button>
                   )}
-                  {canEdit && (
-                    <Button
-                      aria-pressed={panel === "change"}
-                      onClick={() => setPanel(p => (p === "change" ? null : "change"))}
-                    >
-                      {COPY.change.title}
-                    </Button>
+                  {/* While the panel is open its own Close is right there, so the button steps aside. */}
+                  {canEdit && panel !== "change" && (
+                    <Button onClick={() => setPanel("change")}>{COPY.change.title}</Button>
                   )}
                   {page?.saved && (
                     <a

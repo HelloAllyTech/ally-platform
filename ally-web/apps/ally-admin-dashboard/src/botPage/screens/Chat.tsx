@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 
-import { ErrorText, PageHeader, Sources, TypingDots } from "../components/parts";
+import { ErrorText, Feedback, PageHeader, Sources, TypingDots } from "../components/parts";
 import { fill, type BotPageCopy } from "../copy";
 
-import type { PublicBotPage, PublicCitation, StatusCode } from "../types";
+import type { AnswerFeedback, PublicBotPage, PublicCitation, StatusCode } from "../types";
 
 export interface ChatItem {
   id: string;
   role: "user" | "assistant";
   text: string;
   citations: PublicCitation[];
+  /** "Was this helpful?" shows under it (chunk Q2a). */
+  rateable?: boolean;
 }
 
 /** The reply being written: what the agent is doing, and the checked text revealed so far. */
@@ -30,6 +32,7 @@ export function Chat({
   signedInAs,
   returnedDraft,
   statusLine,
+  onRate,
 }: {
   page: PublicBotPage;
   copy: BotPageCopy;
@@ -44,6 +47,8 @@ export function Chat({
   returnedDraft?: { text: string } | null;
   /** Under the name in the header: what the assistant is doing, or how fast it replies. */
   statusLine?: string;
+  /** A visitor's rating of one answer (chunk Q2a); without it, no thumbs. */
+  onRate?(messageId: string, feedback: AnswerFeedback): void;
 }) {
   const { branding } = page;
   const [draft, setDraft] = useState("");
@@ -114,6 +119,9 @@ export function Chat({
                   {m.text}
                 </div>
                 <Sources citations={m.citations} copy={copy} />
+                {m.rateable && onRate && (
+                  <Feedback copy={copy} onRate={feedback => onRate(m.id, feedback)} />
+                )}
               </li>
             ),
           )}

@@ -12,6 +12,7 @@ import { copyToClipboard } from "../../WhatsAppBot/shared";
 import { UsageTab } from "../../WhatsAppBot/UsageTab";
 import { fill, HOME } from "../copy";
 import { Group, SectionHead } from "../fields";
+import { Scorecard } from "./Scorecard";
 
 import type { SectionProps } from "./props";
 
@@ -71,6 +72,8 @@ export const OverviewSection: React.FC<SectionProps & { page: BotPageView | null
           )}
         </div>
       </Group>
+
+      <Scorecard botId={bot.id} canEdit={canEdit} go={go} />
 
       {page?.saved && (
         <Group title={t.link} testId="overview-link">

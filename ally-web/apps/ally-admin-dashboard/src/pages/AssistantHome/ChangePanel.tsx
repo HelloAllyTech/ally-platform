@@ -105,6 +105,7 @@ export const ChangePanel: React.FC<{
       </header>
 
       <div className="ally-change__thread" aria-live="polite">
+        {!asked && canEdit && <AssistantLine>{t.intro}</AssistantLine>}
         {asked && <p className="ally-change__ask">{asked}</p>}
         {proposing.isLoading && <AssistantLine working>{COPY.working.thinking}</AssistantLine>}
         {proposal?.refused && <AssistantLine>{proposal.message}</AssistantLine>}
@@ -200,13 +201,21 @@ export const ChangePanel: React.FC<{
             <label className="sr-only" htmlFor="change-request">
               {t.title}
             </label>
-            <input
+            <textarea
               id="change-request"
               className="ally-input"
+              rows={2}
               placeholder={t.placeholder}
               value={request}
               maxLength={1000}
               onChange={event => setRequest(event.target.value)}
+              onKeyDown={event => {
+                // Enter sends; Shift+Enter starts a new line.
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void ask(request);
+                }
+              }}
             />
             <Button type="submit" disabled={!request.trim() || proposing.isLoading}>
               {t.send}

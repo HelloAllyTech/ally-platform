@@ -5,6 +5,7 @@ import {
   Header,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Post,
   Req,
   Res,
@@ -13,6 +14,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Public } from '../../auth/decorators/auth.metadata';
 import {
+  BotPageFeedbackDto,
   BotPageIntakeDto,
   BotPageMessageDto,
   BotPageSessionDto,
@@ -104,6 +106,21 @@ export class BotPagePublicController {
   }
 
   @Public()
+  @Post(':slug/messages/:messageId/feedback')
+  @ApiOperation({
+    summary: 'Was this helpful? A thumbs up or down on one answer (changeable)',
+    description:
+      'Only the visitor whose conversation it is may rate it. Crisis replies, templates and the consent gate cannot be rated (409 not_rateable).',
+  })
+  feedback(
+    @Param('slug') slug: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Body() dto: BotPageFeedbackDto,
+    @Req() req: Request,
+  ) {
+    return this.service.feedback(slug, messageId, dto, req);
+  }
+
   @Post(':slug/messages/stream')
   @ApiOperation({
     summary: 'Send a message and stream the reply (SSE)',

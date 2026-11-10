@@ -814,6 +814,13 @@ export const ApiEndpoints = {
     CHANGES_APPLY: (id: string) => `/v1/chatbots/${id}/changes/apply`,
     CHANGE_UNDO: (id: string, eventId: string) => `/v1/chatbots/${id}/changes/${eventId}/undo`,
     SOURCES: (id: string) => `/v1/chatbots/${id}/sources`,
+    SCORECARD: (id: string) => `/v1/chatbots/${id}/scorecard`,
+    SCORECARD_ANSWER: (id: string, questionId: string) =>
+      `/v1/chatbots/${id}/scorecard/unanswered/${questionId}/answer`,
+    SCORECARD_CORRECT: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/correct`,
+    SCORECARD_FINE: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/fine`,
     SOURCE_PREVIEW: (id: string) => `/v1/chatbots/${id}/sources/preview`,
     SOURCE_REMOVE: (id: string) => `/v1/chatbots/${id}/sources/remove`,
     SOURCE_RESTORE: (id: string, eventId: string) =>

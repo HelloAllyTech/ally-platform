@@ -37,6 +37,8 @@ export const changesApi = baseAPI.injectEndpoints({
   endpoints: builder => ({
     getChanges: builder.query<ChangeEntry[], string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.CHANGES(id), method: HttpMethod.GET }),
+      // ally-be answers `{ changes: [...] }` (ChatbotChangesController).
+      transformResponse: (response: { changes?: ChangeEntry[] }) => response.changes ?? [],
       providesTags: [TAG_TYPES.CHECKUP],
     }),
     proposeChange: builder.mutation<ChangeProposal, { id: string; request: string }>({

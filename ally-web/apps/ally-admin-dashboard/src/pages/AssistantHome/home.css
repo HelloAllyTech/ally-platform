@@ -539,9 +539,63 @@
 }
 .ally-change__compose form {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
 }
 .ally-change__compose .ally-input {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
+  resize: vertical;
+}
+
+/* The live scorecard on the Overview (chunk Q2a). */
+.ally-score__headline {
+  font-size: 18px;
+}
+.ally-score__headline .ally-link {
+  font: inherit;
+  padding: 0;
+}
+.ally-score__stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.ally-score__last {
+  color: var(--ally-faint);
+}
+.ally-score__trend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ally-score__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-score__list > li {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ally-line);
+}
+.ally-score__list > li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.ally-score__unhappy p {
+  margin: 0 0 4px;
+}
+.ally-score__answer {
+  margin-top: 8px;
+}
+@media (max-width: 959px) {
+  .ally-score__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.ally-score__last {
+  display: block;
+  font-family: var(--ally-font-ui);
 }

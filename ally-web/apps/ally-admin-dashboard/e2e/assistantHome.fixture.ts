@@ -201,6 +201,52 @@ const DOCUMENTS = [
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
+const week = (over: Record<string, number | null> = {}) => ({
+  conversations: 142,
+  answers: 120,
+  answeredWithSource: 109,
+  declined: 12,
+  wrongDeclineSuspected: 2,
+  handedOver: 0,
+  crisis: 1,
+  thumbsUp: 18,
+  thumbsDown: 2,
+  answeredPct: 91,
+  thumbsUpPct: 90,
+  ...over,
+});
+
+/** The Overview's scorecard (chunk Q2a): a week against the one before. */
+const SCORECARD = {
+  thisWeek: week(),
+  lastWeek: week({
+    conversations: 118,
+    answeredPct: 86,
+    declined: 15,
+    thumbsUpPct: 84,
+    crisis: 0,
+  }),
+  trend: [82, 85, 88, 87, 90, 92, 91].map((answeredPct, i) => ({
+    day: `2026-11-0${i + 3}`,
+    answeredPct,
+  })),
+  unanswered: [
+    { id: "00000000-0000-4000-8000-0000000000a1", question: "Do you take insurance?", at: "" },
+    { id: "00000000-0000-4000-8000-0000000000a2", question: "Is there parking?", at: "" },
+  ],
+  thumbsDown: [
+    {
+      id: "00000000-0000-4000-8000-0000000000b1",
+      reason: "wrong_info",
+      note: "The fee went up last month",
+      at: "",
+      reply: "Individual sessions are ₹2,000 for 50 minutes.",
+      question: "How much is a session?",
+    },
+  ],
+  checkup: { passed: 18, total: 20, at: "2026-11-10T10:00:00.000Z" },
+};
+
 /**
  * Answers every API call the home makes, from the fixtures above. Field saves check the version
  * they were based on, as ally-be does, so a stale save gets a 409 with the current value.
@@ -246,6 +292,8 @@ export async function mockAssistantHome(
       (home.fields as Record<string, unknown>)[body.field] = next;
       return json(route, { field: body.field, ...next });
     }
+    // Chunk Q2a: the live scorecard on the Overview.
+    if (path === `${base}/scorecard`) return json(route, SCORECARD);
     // Chunk 20a-2: the checkup, change by chat and the pages it learned from.
     if (path === `${base}/checkup`) {
       return json(route, {
@@ -260,15 +308,17 @@ export async function mockAssistantHome(
       });
     }
     if (path === `${base}/changes`) {
-      return json(route, [
-        {
-          id: "e-1",
-          at: "2026-11-10T09:00:00.000Z",
-          kind: "change",
-          summary: "tone",
-          undone: false,
-        },
-      ]);
+      return json(route, {
+        changes: [
+          {
+            id: "e-1",
+            at: "2026-11-10T09:00:00.000Z",
+            kind: "change",
+            summary: "tone",
+            undone: false,
+          },
+        ],
+      });
     }
     if (path === `${base}/changes/propose` && method === "POST") {
       return json(route, {

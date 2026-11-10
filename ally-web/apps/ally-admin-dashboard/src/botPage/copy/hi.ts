@@ -52,6 +52,22 @@ export const hi: BotPageCopy = {
     headerIdle: "{name} की अपनी जानकारी से जवाब",
     // needs review: drafted in chunk 20d, not yet checked by a Hindi speaker.
     typing: "लिख रहे हैं…",
+    // needs review: drafted in chunk Q2a, not yet checked by a Hindi speaker.
+    feedback: {
+      question: "क्या यह मददगार था?",
+      up: "मददगार",
+      down: "मददगार नहीं",
+      whatWrong: "क्या गलत था?",
+      reasons: {
+        wrong_info: "गलत जानकारी",
+        not_answered: "मेरे सवाल का जवाब नहीं दिया",
+        other: "कुछ और",
+      },
+      notePlaceholder: "और बताएँ (वैकल्पिक)",
+      send: "भेजें",
+      skip: "छोड़ें",
+      thanks: "धन्यवाद, इससे टीम को इसे बेहतर बनाने में मदद मिलती है।",
+    },
     status: {
       thinking: "सोच रहा है…",
       searching: "जानकारी खोज रहा है…",

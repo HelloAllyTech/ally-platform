@@ -46,6 +46,22 @@ export const en = {
     tooLong: "{count} of {max} characters",
     headerIdle: "Answers from {name}'s own information",
     typing: "Typing…",
+    /** "Was this helpful?" under an answer (copy §21, chunk Q2a). */
+    feedback: {
+      question: "Was this helpful?",
+      up: "Helpful",
+      down: "Not helpful",
+      whatWrong: "What was wrong?",
+      reasons: {
+        wrong_info: "Wrong information",
+        not_answered: "Didn't answer my question",
+        other: "Something else",
+      },
+      notePlaceholder: "Tell us more (optional)",
+      send: "Send",
+      skip: "Skip",
+      thanks: "Thanks, this helps the team improve it.",
+    },
     status: {
       thinking: "Thinking…",
       searching: "Looking it up…",

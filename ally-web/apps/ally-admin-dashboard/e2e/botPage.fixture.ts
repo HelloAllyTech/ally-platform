@@ -64,12 +64,15 @@ export async function mockBotPage(page: Page, look: Look = {}, state: "new" | "r
     if (path === "/intake") return json(route, { intakeDone: true });
     if (path.startsWith("/conversation"))
       return json(route, { conversationId: null, messages: [] });
+    if (path === "/messages/m2/feedback") return json(route, { rating: "down" });
     if (path === "/messages/stream") {
       const final = {
         reply: "Individual sessions are ₹2,000 for 50 minutes, in person or online.",
         citations: [{ title: "Services and fees", url: "https://sunrisemind.example/services" }],
         messageId: "m2",
         conversationId: "c1",
+        // "Was this helpful?" shows under it (chunk Q2a).
+        rateable: true,
       };
       return route.fulfill({
         status: 200,

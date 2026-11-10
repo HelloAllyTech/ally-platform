@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { BotPageApiError, type botPageApi } from "../api";
@@ -172,12 +172,10 @@ describe("BotPageApp", () => {
   ])("explains a limit and puts the message back in the box", async (refusal, text) => {
     const user = userEvent.setup();
     const api = fakeApi({
-      conversation: vi
-        .fn()
-        .mockResolvedValue({
-          conversationId: "c1",
-          messages: [{ id: "m1", role: "user", text: "Hi", citations: [], createdAt: "" }],
-        }),
+      conversation: vi.fn().mockResolvedValue({
+        conversationId: "c1",
+        messages: [{ id: "m1", role: "user", text: "Hi", citations: [], createdAt: "" }],
+      }),
       session: vi.fn().mockResolvedValue({ ...READY, intakeDone: true }),
       send: vi.fn().mockRejectedValue(refusal),
     });
@@ -221,12 +219,10 @@ describe("BotPageApp", () => {
   it("refuses a message over the page's limit before sending it", async () => {
     const user = userEvent.setup();
     const api = fakeApi({
-      conversation: vi
-        .fn()
-        .mockResolvedValue({
-          conversationId: "c1",
-          messages: [{ id: "m1", role: "user", text: "Hi", citations: [], createdAt: "" }],
-        }),
+      conversation: vi.fn().mockResolvedValue({
+        conversationId: "c1",
+        messages: [{ id: "m1", role: "user", text: "Hi", citations: [], createdAt: "" }],
+      }),
       session: vi.fn().mockResolvedValue({ ...READY, intakeDone: true }),
     });
     render(<BotPageApp slug="sunrise-mind" api={api} />);
@@ -246,5 +242,67 @@ describe("parseSse", () => {
     expect(first.events).toEqual([{ type: "status", data: { code: "thinking" } }]);
     const second = parseSse(`${first.rest}en\ndata: {"text":"Hi"}\n\n`);
     expect(second.events).toEqual([{ type: "token", data: { text: "Hi" } }]);
+  });
+
+  describe("Was this helpful? (chunk Q2a)", () => {
+    const resumed = (rateable: boolean) =>
+      fakeApi({
+        conversation: vi.fn().mockResolvedValue({
+          conversationId: "c1",
+          messages: [
+            { id: "m1", role: "user", text: "Fees?", citations: [], createdAt: "" },
+            {
+              id: "m2",
+              role: "assistant",
+              text: "Sessions cost 1500.",
+              citations: [],
+              createdAt: "",
+              rateable,
+            },
+          ],
+        }),
+        session: vi.fn().mockResolvedValue({ ...READY, intakeDone: true }),
+        feedback: vi.fn().mockResolvedValue({ rating: "down" }),
+      });
+
+    it("a thumbs down asks what was wrong, sends the reason and note, then thanks them", async () => {
+      const user = userEvent.setup();
+      const api = resumed(true);
+      render(<BotPageApp slug="sunrise-mind" api={api} />);
+      expect(await screen.findByText("Was this helpful?")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Not helpful" }));
+      expect(api.feedback).toHaveBeenLastCalledWith("sunrise-mind", "m2", { rating: "down" });
+      expect(screen.getByText("What was wrong?")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Wrong information" }));
+      await user.type(screen.getByLabelText("Tell us more (optional)"), "It's 2000");
+      const form = screen.getByRole("group", { name: "What was wrong?" });
+      await user.click(within(form).getByRole("button", { name: "Send" }));
+      expect(api.feedback).toHaveBeenLastCalledWith("sunrise-mind", "m2", {
+        rating: "down",
+        reason: "wrong_info",
+        note: "It's 2000",
+      });
+      expect(screen.getByText("Thanks, this helps the team improve it.")).toBeInTheDocument();
+    });
+
+    it("a rating can be changed to a thumbs up", async () => {
+      const user = userEvent.setup();
+      const api = resumed(true);
+      render(<BotPageApp slug="sunrise-mind" api={api} />);
+      await user.click(await screen.findByRole("button", { name: "Not helpful" }));
+      await user.click(screen.getByRole("button", { name: "Helpful" }));
+      expect(api.feedback).toHaveBeenLastCalledWith("sunrise-mind", "m2", { rating: "up" });
+      expect(screen.getByRole("button", { name: "Helpful" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.queryByText("What was wrong?")).not.toBeInTheDocument();
+    });
+
+    it("isn't shown under a reply that can't be rated, like a crisis reply", async () => {
+      render(<BotPageApp slug="sunrise-mind" api={resumed(false)} />);
+      expect(await screen.findByText("Sessions cost 1500.")).toBeInTheDocument();
+      expect(screen.queryByText("Was this helpful?")).not.toBeInTheDocument();
+    });
   });
 });

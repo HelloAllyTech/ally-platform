@@ -76,6 +76,8 @@ export interface PublicMessage {
   text: string;
   citations: PublicCitation[];
   createdAt: string;
+  /** "Was this helpful?" shows under it (chunk Q2a); never on a crisis reply. */
+  rateable?: boolean;
 }
 
 export interface PublicFinal {
@@ -83,6 +85,14 @@ export interface PublicFinal {
   citations: PublicCitation[];
   messageId: string;
   conversationId: string;
+  rateable?: boolean;
+}
+
+/** A visitor's rating of one answer (chunk Q2a). */
+export interface AnswerFeedback {
+  rating: "up" | "down";
+  reason?: "wrong_info" | "not_answered" | "other";
+  note?: string;
 }
 
 /** What the agent is doing, as a code the page words itself (3c's status codes). */

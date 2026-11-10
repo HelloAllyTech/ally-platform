@@ -198,6 +198,8 @@ export enum ErrorCode {
   BOT_PAGE_INTAKE_REQUIRED = 'BOT_PAGE_INTAKE_REQUIRED',
   /** 400. A pre-chat answer was refused; `details.field` names the question. */
   BOT_PAGE_INTAKE_INVALID = 'BOT_PAGE_INTAKE_INVALID',
+  /** A crisis reply, template or consent message: no thumbs (chunk Q2a). */
+  BOT_PAGE_NOT_RATEABLE = 'BOT_PAGE_NOT_RATEABLE',
 }
 
 /**

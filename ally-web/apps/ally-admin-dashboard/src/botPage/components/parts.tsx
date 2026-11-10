@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 // By path: the bot page imports only self-contained modules (see eslint.config.mjs).
 import { Orb } from "../../components/v2/core/Orb";
 import { initials } from "../theme";
 
 import type { BotPageCopy } from "../copy";
-import type { BotPageBranding, PublicCitation } from "../types";
+import type { AnswerFeedback, BotPageBranding, PublicCitation } from "../types";
 
 /**
  * Whether a screen's heading takes focus when it appears. Off in the dashboard's live preview, so
@@ -149,6 +149,113 @@ export function Sources({ citations, copy }: { citations: PublicCitation[]; copy
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+const REASONS = ["wrong_info", "not_answered", "other"] as const;
+
+/**
+ * "Was this helpful?" under one answer (chunk Q2a): thumbs up or down, changeable. A thumbs down
+ * asks "What was wrong?" (three reasons and an optional note, or Skip), then thanks them.
+ */
+export function Feedback({
+  copy,
+  onRate,
+}: {
+  copy: BotPageCopy;
+  onRate(feedback: AnswerFeedback): void;
+}) {
+  const t = copy.chat.feedback;
+  const [rating, setRating] = useState<"up" | "down" | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState<AnswerFeedback["reason"]>();
+  const [note, setNote] = useState("");
+  const [thanked, setThanked] = useState(false);
+
+  const rate = (next: "up" | "down") => {
+    setRating(next);
+    setThanked(false);
+    if (next === "up") {
+      setAsking(false);
+      onRate({ rating: "up" });
+      setThanked(true);
+    } else {
+      onRate({ rating: "down" });
+      setAsking(true);
+    }
+  };
+
+  const finish = (send: boolean) => {
+    if (send && (reason || note.trim())) {
+      onRate({ rating: "down", reason, note: note.trim() || undefined });
+    }
+    setAsking(false);
+    setThanked(true);
+  };
+
+  return (
+    <div className="bp-feedback" data-testid="answer-feedback">
+      <div className="bp-feedback__row">
+        <span className="bp-feedback__question">{t.question}</span>
+        <button
+          type="button"
+          className="bp-feedback__thumb"
+          aria-label={t.up}
+          aria-pressed={rating === "up"}
+          onClick={() => rate("up")}
+        >
+          <span aria-hidden="true">👍</span>
+        </button>
+        <button
+          type="button"
+          className="bp-feedback__thumb"
+          aria-label={t.down}
+          aria-pressed={rating === "down"}
+          onClick={() => rate("down")}
+        >
+          <span aria-hidden="true">👎</span>
+        </button>
+      </div>
+      {asking && (
+        <div className="bp-feedback__form" role="group" aria-label={t.whatWrong}>
+          <p className="bp-feedback__question">{t.whatWrong}</p>
+          <div className="bp-feedback__reasons">
+            {REASONS.map(id => (
+              <button
+                key={id}
+                type="button"
+                className="bp-pill"
+                aria-pressed={reason === id}
+                onClick={() => setReason(id)}
+              >
+                {t.reasons[id]}
+              </button>
+            ))}
+          </div>
+          <input
+            className="bp-feedback__note"
+            aria-label={t.notePlaceholder}
+            placeholder={t.notePlaceholder}
+            maxLength={300}
+            value={note}
+            onChange={event => setNote(event.target.value)}
+          />
+          <div className="bp-feedback__actions">
+            <button type="button" className="bp-pill" onClick={() => finish(true)}>
+              {t.send}
+            </button>
+            <button type="button" className="bp-feedback__skip" onClick={() => finish(false)}>
+              {t.skip}
+            </button>
+          </div>
+        </div>
+      )}
+      {thanked && (
+        <p className="bp-feedback__thanks" role="status">
+          {t.thanks}
+        </p>
+      )}
     </div>
   );
 }

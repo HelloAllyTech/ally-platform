@@ -42,6 +42,7 @@ const toItem = (m: PublicMessage): ChatItem => ({
   role: m.role,
   text: m.text,
   citations: m.citations,
+  rateable: m.rateable,
 });
 
 /** A refusal or failure in the visitor's language. */
@@ -298,7 +299,13 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
         setPending(null);
         setMessages(m => [
           ...m,
-          { id: final.messageId, role: "assistant", text: final.reply, citations: final.citations },
+          {
+            id: final.messageId,
+            role: "assistant",
+            text: final.reply,
+            citations: final.citations,
+            rateable: final.rateable,
+          },
         ]);
       } catch (err) {
         clearInterval(timer);
@@ -404,6 +411,10 @@ export function BotPageApp({ slug, api = botPageApi }: { slug: string; api?: typ
           error={error}
           signedInAs={signedInAs}
           returnedDraft={returnedDraft}
+          onRate={(messageId, feedback) =>
+            // A rating that doesn't reach us isn't worth an error on the visitor's screen.
+            void api.feedback(slug, messageId, feedback).catch(() => undefined)
+          }
         />
       );
   }

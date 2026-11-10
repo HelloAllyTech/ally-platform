@@ -181,6 +181,7 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 ## 12. Changing it later (builder on the assistant's page)
 
 - **Panel title:** Change your assistant
+- **Intro line, before anything is asked** *(added in 20a-2)*: Tell me what you'd like to change. I'll show you the change before anything happens.
 - **Placeholder:** Tell me what to change, for example "make it more formal"
 - **Examples (chips):**
   - Make it more formal
@@ -475,6 +476,16 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Thumbs-down actions:** Correct this · It was fine
 - **Checkup card:** Last checkup: {passed} of {total} answered well · View checkup
 - **Empty state:** No conversations yet this week. Share your link to get started.
+- **The rest of the screen** *(added in Q2a)*:
+  - Section titles: This week · Answered with a source, last 7 days
+  - Thumbs, for screen readers: Helpful · Not helpful
+  - After choosing a reason: Send · Skip
+  - Answer it box: Your answer · Write the answer in a sentence or two. · Save answer · Cancel
+  - After Answer it or Correct this: Saved to your notes. The next checkup will ask this.
+  - Under a thumbs-down: They asked · It said · Why
+  - Reasons as the owner reads them: Wrong information · Didn't answer the question · Something else
+  - Nothing to show: Nothing it didn't know this week. · No one has marked an answer unhelpful.
+  - Suspected wrong declines, under Didn't know: {n} may have been in your information
 
 ## 22. Website widget (13)
 
