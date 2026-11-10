@@ -102,6 +102,9 @@ class Verification(BaseModel):
     repro_files_unchanged: bool = True  # hashes from reproduce still match
     commands_run: list[str] = Field(default_factory=list)
     summary: str = ""
+    lint_excerpt: str = ""  # scrubbed tail, only when lint failed
+    typecheck_excerpt: str = ""
+    repro_excerpt: str = ""
 
     @property
     def passed(self) -> bool:

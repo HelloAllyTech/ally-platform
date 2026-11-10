@@ -154,3 +154,25 @@ def repro_only_run_tests(
         ),
         args_schema=NoArgs,
     )
+
+
+def lint_tool(deps: GraphDeps) -> StructuredTool:
+    """``run_lint`` for the fix loop: the app's lint in the sandbox, tail only."""
+    from bug_hunter.tools.lc import NoArgs
+
+    def run_lint() -> str:
+        if deps.runner is None:
+            return "error: no sandbox available in this run"
+        deps.ensure_sandbox()
+        result = deps.runner.run_lint()
+        text = result.summary()
+        if result.excerpt and not result.passed:
+            text += "\n" + result.excerpt[-3000:]
+        return text
+
+    return StructuredTool.from_function(
+        func=run_lint,
+        name="run_lint",
+        description="Run the app's lint in the sandbox (slow; once the repro passes).",
+        args_schema=NoArgs,
+    )

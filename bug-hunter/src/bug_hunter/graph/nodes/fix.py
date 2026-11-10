@@ -18,6 +18,7 @@ from bug_hunter.graph.prompts import load_prompt
 from bug_hunter.graph.state import BugState, Patch
 from bug_hunter.graph.tools import (
     fix_edit_tool,
+    lint_tool,
     outline_first_read_tools,
     repro_only_run_tests,
 )
@@ -109,6 +110,7 @@ def make_fix_node(deps: GraphDeps):
         ] + [
             fix_edit_tool(deps, protected),
             repro_only_run_tests(deps, repro.test_path, repro.test_name),
+            lint_tool(deps),
         ]
         loop = ToolLoop(
             config=deps.config,
@@ -145,16 +147,19 @@ def make_fix_node(deps: GraphDeps):
             "(or give_up)."
         )
         if state.verification is not None and attempt > 1:
-            user += (
-                "\n\nThe previous attempt failed verification:\n"
-                + state.verification.summary
-                + "\n"
-                + (
-                    "New failures: " + "; ".join(state.verification.new_failures)
-                    if state.verification.new_failures
-                    else ""
+            ver = state.verification
+            user += "\n\nThe previous attempt failed verification:\n" + ver.summary
+            if ver.new_failures:
+                user += "\nNew failures: " + "; ".join(ver.new_failures)
+            if ver.repro_excerpt:
+                user += "\n\nRepro test output:\n" + ver.repro_excerpt
+            if ver.lint_excerpt:
+                user += (
+                    "\n\nLint output (the untouched code lints clean; fix the lines "
+                    "you changed, never the lint configuration):\n" + ver.lint_excerpt
                 )
-            )
+            if ver.typecheck_excerpt:
+                user += "\n\nTypecheck output:\n" + ver.typecheck_excerpt
         if (
             state.review is not None
             and state.review.verdict == "request_changes"

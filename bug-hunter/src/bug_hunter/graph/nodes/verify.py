@@ -120,6 +120,11 @@ def make_verify_node(deps: GraphDeps):
             baseline_failures=sorted(set(suite_baseline))[:50],
             repro_files_unchanged=unchanged,
             commands_run=commands,
+            lint_excerpt="" if lint_ok else (lint.excerpt or "")[-2500:],
+            typecheck_excerpt="" if types_ok else (types.excerpt or "")[-2500:],
+            repro_excerpt=(
+                "" if repro_result.passed else (repro_result.excerpt or "")[-2000:]
+            ),
             summary=(
                 f"repro {'passes' if repro_result.passed else 'still fails'}; "
                 f"{len(suite_new)} new failure(s); lint {'ok' if lint_ok else 'FAIL'}; "
@@ -131,20 +136,32 @@ def make_verify_node(deps: GraphDeps):
             f"verify (attempt {state.attempts}): {verification.summary}"
         )
         detail = ""
-        if not repro_result.passed:
-            detail += f"--- repro ---\n{(repro_result.excerpt or '')[-2000:]}\n"
+        if verification.repro_excerpt:
+            detail += f"--- repro ---\n{verification.repro_excerpt}\n"
         if suite_new:
             detail += "--- new failures ---\n" + "\n".join(suite_new[:20]) + "\n"
+        if verification.lint_excerpt:
+            detail += f"--- lint ---\n{verification.lint_excerpt}\n"
+        if verification.typecheck_excerpt:
+            detail += f"--- typecheck ---\n{verification.typecheck_excerpt}\n"
         if not unchanged:
             detail += "--- the reproduction test file was modified ---\n"
         deps.write_artefact(
             f"verify-attempt-{state.attempts}.md",
             verification.summary + "\n\n" + detail,
         )
-        return {
+        update: dict[str, Any] = {
             "verification": verification,
             "status": "verified" if verification.passed else "fixing",
             "budget_used": budget,
         }
+        max_attempts = deps.config.limits.run.max_fix_attempts
+        if not verification.passed and state.attempts >= max_attempts:
+            update["status"] = "escalated"
+            update["stop_reason"] = (
+                f"verification failed after {state.attempts} attempts: "
+                f"{verification.summary}"
+            )[:400]
+        return update
 
     return verify

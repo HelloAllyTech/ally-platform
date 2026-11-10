@@ -47,13 +47,14 @@ class Baseline:
         )
 
 
-def cache_path(commit: str, app: str, command: str, root: Path = BASELINE_DIR) -> Path:
+def cache_path(commit: str, app: str, command: str, root: Path | None = None) -> Path:
+    root = root or BASELINE_DIR  # resolved at call time, so tests can redirect it
     digest = hashlib.sha256(command.encode("utf-8")).hexdigest()[:12]
     return root / app / f"{commit[:12]}-{digest}.json"
 
 
 def load(
-    commit: str, app: str, command: str, root: Path = BASELINE_DIR
+    commit: str, app: str, command: str, root: Path | None = None
 ) -> Baseline | None:
     path = cache_path(commit, app, command, root)
     if not path.exists():
@@ -64,7 +65,7 @@ def load(
         return None
 
 
-def save(baseline: Baseline, root: Path = BASELINE_DIR) -> Path:
+def save(baseline: Baseline, root: Path | None = None) -> Path:
     path = cache_path(baseline.commit, baseline.app, baseline.command, root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(asdict(baseline), indent=1), encoding="utf-8")
@@ -76,7 +77,7 @@ def baseline_for(
     app: str,
     command: str,
     run,  # Callable[[], RunResult]
-    root: Path = BASELINE_DIR,
+    root: Path | None = None,
 ) -> tuple[Baseline, bool]:
     """``(baseline, from_cache)``; runs ``run()`` on the untouched code on a miss."""
     cached = load(commit, app, command, root)

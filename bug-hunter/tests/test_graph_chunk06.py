@@ -493,3 +493,29 @@ def test_push_requires_the_github_app(tmp_path) -> None:
     dry = DryRunGitHub(lambda n, c: (tmp_path / n).write_text(c) or tmp_path / n)
     pr = dry.open_draft_pr("bughunter/ally-be/x", "fix(ally-be): x", "body")
     assert pr.draft and pr.url == "dry-run" and (tmp_path / "pr-body.md").exists()
+
+
+def test_lint_failure_reaches_the_next_fix_attempt_and_exhaustion_has_a_reason(
+    config, repo, tmp_path
+) -> None:
+    deps = _deps(config, repo, tmp_path, [EDIT_FIX, SUBMIT_FIX, SUBMIT_FIX, SUBMIT_FIX])
+    lint_fail = run_result(
+        "ally-be",
+        False,
+        "src/x.ts:2:3 error Replace `return 3;` with ... prettier/prettier",
+    )
+    x_ts = repo / "ally-be/src/x.ts"
+    # lint fails only with the fix applied; the baseline (patch stashed) is clean
+    deps.runner.run_lint = lambda: (
+        lint_fail if "return 3" in x_ts.read_text() else run_result("ally-be", True)
+    )
+    _, state = _run(deps)
+    assert state.status == "escalated" and state.attempts == 3
+    assert state.stop_reason.startswith("verification failed after 3 attempts")
+    assert "lint FAIL" in state.stop_reason
+    prompts = [c[1].content for c in deps.models["fix"].calls if len(c) > 1]
+    second = next(p for p in prompts if "Attempt 2 of 3" in p)
+    assert "Lint output" in second and "prettier/prettier" in second
+    assert "run_lint" in deps.models["fix"].bound_tools[-1]
+    verify_md = (tmp_path / "artefacts" / "verify-attempt-1.md").read_text()
+    assert "--- lint ---" in verify_md and "prettier/prettier" in verify_md
