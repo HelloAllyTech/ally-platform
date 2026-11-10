@@ -10,10 +10,10 @@ import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
 /**
  * The three test sets, built from real sessions (plan §9.5).
  *
- * - **open**: the Improver screens ideas on it and sees the results.
- * - **gate**: decides whether a change may reach learners; the Improver sees
+ * - **open**: the PM agent screens ideas on it and sees the results.
+ * - **gate**: decides whether a change may reach learners; the PM agent sees
  *   only pass or fail, never per-case results.
- * - **sealed**: never shown to the Improver; drills and the launch check only,
+ * - **sealed**: never shown to the PM agent; drills and the launch check only,
  *   so it stays a fair measure of whether improvements generalise.
  *
  * Stored in the agent harness's `agent_eval_suites` / `agent_eval_cases`
@@ -28,7 +28,7 @@ export enum DebriefTestSet {
 }
 
 const SUITE_NAMES: Record<DebriefTestSet, string> = {
-  [DebriefTestSet.OPEN]: 'Debrief: open set (Improver screens)',
+  [DebriefTestSet.OPEN]: 'Debrief: open set (PM agent screens)',
   [DebriefTestSet.GATE]: 'Debrief: gate set (release decisions)',
   [DebriefTestSet.SEALED]: 'Debrief: sealed set (drills, launch)',
 };
@@ -169,6 +169,42 @@ export class DebriefTestSetsService {
       `[debrief] test sets built: added ${JSON.stringify(added)}, totals ${JSON.stringify(total)}`,
     );
     return { added, total };
+  }
+
+  /**
+   * Monthly rotation (v9: "25% replaced monthly"): add the newest eligible
+   * sessions, then retire the oldest `share` of the set's active cases, but
+   * never below `target` active cases — a set that cannot be refilled is not
+   * thinned. Retired cases stay for the record.
+   */
+  async rotate(
+    set: DebriefTestSet,
+    target: number,
+    share: number,
+  ): Promise<{ retired: number; active: number }> {
+    await this.build({ sinceDays: 45 });
+    const suites = await this.ensureSuites();
+    const [{ n }] = await this.dataSource.query(
+      `SELECT count(*)::int AS n FROM agent_eval_cases WHERE "suiteId" = $1 AND status = 'active'`,
+      [suites[set]],
+    );
+    const retire = Math.max(
+      0,
+      Math.min(Math.floor(Number(n) * share), Number(n) - target),
+    );
+    if (retire > 0) {
+      await this.dataSource.query(
+        `UPDATE agent_eval_cases SET status = 'retired', "updatedAt" = now()
+          WHERE id IN (SELECT id FROM agent_eval_cases
+                        WHERE "suiteId" = $1 AND status = 'active'
+                        ORDER BY "createdAt" ASC LIMIT $2)`,
+        [suites[set], retire],
+      );
+    }
+    this.logger.info(
+      `[debrief] ${set} rotated: retired ${retire} of ${n} (target ${target})`,
+    );
+    return { retired: retire, active: Number(n) - retire };
   }
 
   async counts(): Promise<Record<DebriefTestSet, number>> {

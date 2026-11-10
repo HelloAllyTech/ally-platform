@@ -1,6 +1,7 @@
 import { LlmModule } from '../llm/llm.module';
 import { Module } from '@nestjs/common';
 import { AiChatModule } from '../ai-chat/ai-chat.module';
+import { AuditModule } from '../audit/audit.module';
 import { LlmUsageModule } from '../analytics/llm-usage.module';
 import { AwsModule } from '../aws/aws.module';
 import { ContextLibraryModule } from '../context-library/context-library.module';
@@ -12,6 +13,7 @@ import { ScenarioSessionChat } from '../learn/entity/scenario-session-chat.entit
 import { ScenarioSessionChatMessage } from '../learn/entity/scenario-session-chat-message.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentHarnessModule } from '../llm-agent/harness/agent-harness.module';
+import { LlmAgentModule } from '../llm-agent/llm-agent.module';
 import { LearnModule } from '../learn/learn.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { DebriefConsoleController } from './controller/debrief-console.controller';
@@ -23,17 +25,26 @@ import { DebriefAiClient } from './service/debrief-ai.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
 import { DebriefContextRepository } from './service/debrief-context.repository';
 import { DebriefFeedbackService } from './service/debrief-feedback.service';
-import { DebriefImproverService } from './service/debrief-improver.service';
+import { DebriefPmAgentService } from './service/debrief-pm-agent.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
+import { DebriefReplyAgentService } from './service/debrief-reply-agent.service';
+import { DebriefPublishService } from './service/debrief-publish.service';
+import { DebriefSettingsService } from './service/debrief-settings.service';
+import { DebriefBaselineService } from './service/debrief-baseline.service';
+import { DebriefReportingService } from './service/debrief-reporting.service';
+import { DebriefTrialsService } from './service/debrief-trials.service';
+import { DebriefOwnerSettings } from './entity/debrief-owner-settings.entity';
+import { DebriefProbeResult } from './entity/debrief-probe-result.entity';
+import { DebriefConsoleAuditInterceptor } from './interceptor/debrief-console-audit.interceptor';
 import { DebriefRunJudgeService } from './service/debrief-run-judge.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
 import { DebriefTestSetsService } from './service/debrief-test-sets.service';
 
 /**
- * The Debrief agent and its Improver (plan: ally-debriefs-plan.md). Runs on
+ * The Debrief agent and its PM agent (plan: ally-debriefs-plan.md). Runs on
  * the agent harness's releases and learning tables; its AI steps are
  * stateless calls into ally-ai.
  */
@@ -42,6 +53,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     TypeOrmModule.forFeature([
       DebriefRun,
       DebriefFeedback,
+      DebriefOwnerSettings,
+      DebriefProbeResult,
       // Ask Ally writes to the same thread today's debrief chat uses.
       ScenarioSessionChat,
       ScenarioSessionChatMessage,
@@ -50,6 +63,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
       GuideSignal,
     ]),
     AiChatModule,
+    // v9 FR-38: every Debrief Console view writes an audit event.
+    AuditModule,
     AwsModule,
     // The LLM catalog: a release's models must be active there.
     LlmModule,
@@ -59,6 +74,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     // The bell and phone pushes: "your debrief is ready", "Ally updated it".
     NotificationModule,
     AgentHarnessModule,
+    // Ask Ally's tool loop: the same tool-capable providers the Guide uses.
+    LlmAgentModule,
     PromptModule,
     // "Practise this next" reads the learner's roleplays as their list does.
     LearnModule,
@@ -71,11 +88,18 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefRunJudgeService,
     DebriefAgentService,
     DebriefTestSetsService,
-    DebriefImproverService,
+    DebriefPmAgentService,
     DebriefConsoleService,
     DebriefFeedbackService,
     DebriefPracticeService,
     DebriefReplyService,
+    DebriefReplyAgentService,
+    DebriefPublishService,
+    DebriefSettingsService,
+    DebriefBaselineService,
+    DebriefReportingService,
+    DebriefTrialsService,
+    DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,
     GuideCrisisService,

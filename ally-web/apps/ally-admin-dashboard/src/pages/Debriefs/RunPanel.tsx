@@ -2,13 +2,14 @@ import React from "react";
 
 import { SidePanel } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefRunQuery } from "@api";
-import { formatMs, formatUsd, shortId } from "@components/ally-guide/allyGuideFormat";
+import { formatUsd, shortId } from "@components/ally-guide/allyGuideFormat";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
 import { en, ROUTES } from "@constants";
 import { DebriefCardsData, DebriefRunDetail } from "@types";
 
 import { score } from "./consoleTable";
+import { DraftChanges, HowItWasMade, ReplyTraces } from "./RunReasoning";
 
 /**
  * The roleplay itself — transcript, audio and scored events — in a new tab, so
@@ -119,34 +120,8 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
       </div>
       {run.error && <p className="text-sm text-typography-700">{run.error}</p>}
 
-      <Section title={s.timeline}>
-        <ol className="flex flex-col gap-1 text-sm" data-testid="run-steps">
-          {run.steps.map((step, i) => (
-            <li key={i} className="flex flex-wrap gap-2">
-              <span className="w-36 font-mono text-xs">
-                {step.step}
-                {step.round ? ` · ${step.round}` : ""}
-              </span>
-              <Pill
-                tone={
-                  step.status === "done"
-                    ? "success"
-                    : step.status === "failed"
-                      ? "warning"
-                      : "neutral"
-                }
-              >
-                {step.status === "done"
-                  ? formatMs(step.ms)
-                  : step.status === "failed"
-                    ? s.failed
-                    : s.skipped}
-              </Pill>
-              {step.model && <span className="font-mono text-xs">{step.model}</span>}
-              {step.note && <span className="text-typography-700">{step.note}</span>}
-            </li>
-          ))}
-        </ol>
+      <Section title={s.howMade}>
+        <HowItWasMade run={run} />
       </Section>
 
       <Section title={s.checks}>
@@ -175,6 +150,10 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
         </ul>
       </Section>
 
+      <Section title={s.draftChanges}>
+        <DraftChanges run={run} />
+      </Section>
+
       <Section title={s.judge}>
         {judge ? (
           <p className="text-sm">
@@ -186,6 +165,12 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
           <p className="text-sm">{s.notJudged}</p>
         )}
       </Section>
+
+      {(run.workspace?.replyTraces?.length ?? 0) > 0 && (
+        <Section title={s.replies}>
+          <ReplyTraces run={run} />
+        </Section>
+      )}
 
       <Section title={s.cards}>
         {run.cards ? <Cards cards={run.cards} /> : <p className="text-sm">{s.noCards}</p>}

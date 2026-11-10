@@ -18,7 +18,7 @@ export const STEP_TIMEOUT_MS: Record<string, number> = {
   evaluator: 90_000,
   reviser: 120_000,
 };
-/** Anything else (the Improver's own calls): the run's own deadline is the real limit. */
+/** Anything else (the PM agent's own calls): the run's own deadline is the real limit. */
 const DEFAULT_STEP_TIMEOUT_MS = 120_000;
 
 export class DebriefStepError extends Error {

@@ -156,7 +156,7 @@ export const ModelsPanel: React.FC = () => {
       <ConfirmDialog
         isOpen={confirming}
         title={s.confirmTitle}
-        cancelLabel={en.debriefs.improver.cancel}
+        cancelLabel={en.debriefs.pmAgent.cancel}
         confirmLabel={s.confirm}
         isWorking={isLoading}
         onConfirm={() => void submit()}

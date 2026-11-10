@@ -1,9 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { AppConfigService } from '../config/config.service';
 import { dataSourceOptions } from './data-source';
-import { runMigrationsExclusively } from './migration-runner';
+import {
+  migrationsOnBootEnabled,
+  runMigrationsExclusively,
+} from './migration-runner';
 
 @Module({
   imports: [
@@ -23,7 +26,13 @@ import { runMigrationsExclusively } from './migration-runner';
       },
       dataSourceFactory: async (options?: DataSourceOptions) => {
         if (!options) throw new Error('No database options');
-        await runMigrationsExclusively(options);
+        if (migrationsOnBootEnabled()) {
+          await runMigrationsExclusively(options);
+        } else {
+          new Logger('DatabaseModule').log(
+            'Skipping migrations on boot (DB_MIGRATIONS_ON_BOOT=false); the deploy runs them.',
+          );
+        }
         return new DataSource(options).initialize();
       },
     }),

@@ -22,8 +22,8 @@ import {
   DEBRIEF_PROMPT_CODES,
   DebriefBundle,
   DebriefRecipeKey,
-  IMPROVER_EDITABLE_PROMPTS,
-  IMPROVER_SETTINGS,
+  PM_AGENT_EDITABLE_PROMPTS,
+  PM_AGENT_SETTINGS,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
 import { DebriefRunArm, DebriefRunMode } from '../enum/debrief-run.enum';
@@ -31,38 +31,32 @@ import { DebriefAiClient } from './debrief-ai.client';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefFeedbackService } from './debrief-feedback.service';
 import {
-  DebriefRunJudgeService,
-  RunJudgment,
-} from './debrief-run-judge.service';
+  GateResult,
+  gateResult,
+  LadderPair,
+  quickTestResult,
+} from '../util/debrief-ladder.util';
+import { DebriefReportingService } from './debrief-reporting.service';
+import { DebriefSettingsService } from './debrief-settings.service';
+import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefRunnerService, RunOptions } from './debrief-runner.service';
 import {
   DebriefTestSet,
   DebriefTestSetsService,
 } from './debrief-test-sets.service';
 
-/**
- * The learning skim (v9 FR-8/FR-58): this share of every production run's
- * ceiling funds the learning pool, which pays for the Improver's analysis,
- * screens and replays. Learner-facing work never draws on it; there is no
- * monthly cap — the pool grows with usage and is bounded only by the skim.
- */
-export const LEARNING_SKIM_PCT = 0.2;
-/** A screen: this many open-set sessions, each run as baseline and challenger. */
-export const SCREEN_CASES = 6;
-/** A screen passes when the challenger's mean judge score is at least this much higher, with no new hard fail. */
-export const SCREEN_MIN_LIFT = 0.2;
 /** Sessions screened at once; each runs both arms side by side. */
 const SCREEN_CONCURRENCY = 3;
 
-export type ImproverIdeaKind =
+export type PmAgentIdeaKind =
   | 'prompt_edit'
   | 'setting'
   | 'needs_code'
   | 'defect'
   | 'needs_person';
 
-export interface ImproverIdea {
-  kind: ImproverIdeaKind;
+export interface PmAgentIdea {
+  kind: PmAgentIdeaKind;
   title: string;
   hypothesis: string;
   evidence: string;
@@ -74,32 +68,8 @@ export interface ImproverIdea {
   expected_effect: string;
 }
 
-export interface ScreenResult {
-  status: 'done';
-  cases: number;
-  /** Sessions where both arms produced a judged debrief; the means are over these. */
-  pairs: number;
-  baselineMean: number | null;
-  challengerMean: number | null;
-  lift: number | null;
-  baselineHardFails: number;
-  challengerHardFails: number;
-  /** Runs with nothing to judge: needs a person, failed, or the judge gave no answer. */
-  baselineFailures: number;
-  challengerFailures: number;
-  challengerCheckFailures: number;
-  costUsd: number;
-  passed: boolean;
-  ranAt: string;
-}
-
-const mean = (xs: number[]) =>
-  xs.length
-    ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 100) / 100
-    : null;
-
-/** What the Improver reads each run: aggregates only, never a transcript. */
-export interface ImproverSignals {
+/** What the PM agent reads each run: aggregates only, never a transcript. */
+export interface PmAgentSignals {
   windowDays: number;
   runs: number;
   byStatus: Record<string, number>;
@@ -133,7 +103,7 @@ export interface ImproverSignals {
 }
 
 /**
- * The Improver (plan §11), v0: once a day it reads aggregate signals from
+ * The PM agent (plan §11), v0: once a day it reads aggregate signals from
  * the Debrief agent's runs, writes a short report for people and proposes
  * ideas; ideas it can try itself (a prompt edit or a setting) are screened on
  * the open test set straight away, paired against the current release. A
@@ -147,9 +117,9 @@ export interface ImproverSignals {
  * report, and spend is read from `llm_usage` and the replay runs.
  */
 @Injectable()
-export class DebriefImproverService implements OnModuleInit {
+export class DebriefPmAgentService implements OnModuleInit {
   private readonly logger = LoggerService.getInstance(
-    DebriefImproverService.name,
+    DebriefPmAgentService.name,
   );
 
   constructor(
@@ -162,26 +132,41 @@ export class DebriefImproverService implements OnModuleInit {
     private readonly releases: AgentReleaseService,
     private readonly prompts: PromptVersioningService,
     private readonly learnerFeedback: DebriefFeedbackService,
+    private readonly reporting: DebriefReportingService,
+    private readonly ownerSettings: DebriefSettingsService,
   ) {}
 
   onModuleInit(): void {
-    scheduledTaskRegistry.register('daily', 'debrief-improver', async () => {
+    // v9 FR-50: a weekly analysis, and a deeper review once a month.
+    scheduledTaskRegistry.register('weekly', 'debrief-pm-agent', async () => {
       await this.testSets.build();
-      await this.analyse();
+      await this.analyse({ review: 'weekly' });
     });
+    scheduledTaskRegistry.register(
+      'monthly',
+      'debrief-pm-agent-review',
+      async () => {
+        await this.analyse({ review: 'monthly' });
+      },
+    );
   }
 
   // --- Learning budget ----------------------------------------------------------
 
-  /** The learning pool this month: the skim of every production run's ceiling. */
+  /**
+   * The learning budget this month (v9 FR-58, owner settings FR-60): the
+   * fixed monthly amount plus the skim of every production run's ceiling.
+   */
   async learningBudgetThisMonth(): Promise<number> {
+    const { learningBudgetUsd, learningSkimPct } =
+      await this.ownerSettings.get();
     const [r] = await this.dataSource.query(
       `SELECT COALESCE(sum(COALESCE("ceilingUsd", 0)::float), 0) AS ceilings
          FROM debrief_runs
         WHERE mode IN ('shadow','live') AND status <> 'skipped'
           AND "createdAt" >= date_trunc('month', now())`,
     );
-    return Number(r?.ceilings ?? 0) * LEARNING_SKIM_PCT;
+    return learningBudgetUsd + Number(r?.ceilings ?? 0) * learningSkimPct;
   }
 
   async learningSpentThisMonth(): Promise<number> {
@@ -197,7 +182,7 @@ export class DebriefImproverService implements OnModuleInit {
           WHERE task = 'debrief_improver' AND "occurredAt" >= date_trunc('month', now())
           GROUP BY model`,
       );
-    const improver = usage.reduce(
+    const pmAgent = usage.reduce(
       (n, u) => n + computeCostUsd(u.model, Number(u.p), Number(u.c)).costUsd,
       0,
     );
@@ -207,12 +192,12 @@ export class DebriefImproverService implements OnModuleInit {
         WHERE mode = 'replay' AND workspace ? 'judge'
           AND "createdAt" >= date_trunc('month', now())`,
     );
-    return Number(replay[0].usd) + improver + Number(judged[0].n) * 0.04;
+    return Number(replay[0].usd) + pmAgent + Number(judged[0].n) * 0.04;
   }
 
   // --- Signals -------------------------------------------------------------------
 
-  async signals(windowDays = 7): Promise<ImproverSignals> {
+  async signals(windowDays = 7): Promise<PmAgentSignals> {
     const q = (sql: string) =>
       this.dataSource.query(sql, [windowDays]) as Promise<
         Array<Record<string, any>>
@@ -320,7 +305,7 @@ export class DebriefImproverService implements OnModuleInit {
     return { id: release?.id ?? null, bundle };
   }
 
-  /** Ideas the Improver has had, newest first, with what happened to each. */
+  /** Ideas the PM agent has had, newest first, with what happened to each. */
   async history(limit = 30): Promise<Array<Record<string, any>>> {
     return this.dataSource.query(
       `SELECT l.id, l.status, l.text AS title, l.change, l.evidence, l."createdAt",
@@ -338,11 +323,18 @@ export class DebriefImproverService implements OnModuleInit {
    * One analysis: signals → report + ideas → screens. Skips (and says why)
    * when the learning budget is spent or there is nothing to read yet.
    */
-  async analyse(opts: { actorUserId?: number | null } = {}): Promise<{
+  async analyse(
+    opts: {
+      actorUserId?: number | null;
+      review?: 'weekly' | 'monthly';
+    } = {},
+  ): Promise<{
     report: string | null;
     ideas: string[];
     skipped?: string;
+    queries?: number;
   }> {
+    const review = opts.review ?? 'weekly';
     const spent = await this.learningSpentThisMonth();
     if (spent >= (await this.learningBudgetThisMonth())) {
       await this.audit('curator_run', null, opts.actorUserId ?? null, {
@@ -351,13 +343,14 @@ export class DebriefImproverService implements OnModuleInit {
       });
       return { report: null, ideas: [], skipped: 'learning budget spent' };
     }
-    const signals = await this.signals();
+    const windowDays = review === 'monthly' ? 30 : 7;
+    const signals = await this.signals(windowDays);
     if (signals.runs === 0) {
       return { report: null, ideas: [], skipped: 'no runs to read yet' };
     }
     const { id: gaId, bundle } = await this.gaBundle();
     const promptTexts: Record<string, string> = {};
-    for (const code of IMPROVER_EDITABLE_PROMPTS) {
+    for (const code of PM_AGENT_EDITABLE_PROMPTS) {
       const text = await this.context.promptText(
         code,
         bundle.prompts[code] ?? null,
@@ -368,14 +361,14 @@ export class DebriefImproverService implements OnModuleInit {
       maxRevisionRounds:
         bundle.recipes[DebriefRecipeKey.STANDARD].maxRevisionRounds,
       ...Object.fromEntries(
-        Object.keys(IMPROVER_SETTINGS)
+        Object.keys(PM_AGENT_SETTINGS)
           .filter((k) => k !== 'maxRevisionRounds')
           .map((k) => [
             k,
             (bundle.settings as unknown as Record<string, unknown>)[k],
           ]),
       ),
-      allowedRanges: IMPROVER_SETTINGS,
+      allowedRanges: PM_AGENT_SETTINGS,
     };
     const history = (await this.history()).map((h) => ({
       title: h.title,
@@ -386,19 +379,42 @@ export class DebriefImproverService implements OnModuleInit {
         : null,
     }));
     const system = await this.context.promptText(
-      DEBRIEF_PROMPT_CODES.improver,
+      DEBRIEF_PROMPT_CODES.pmAgent,
       null,
     );
-    const res = await this.ai.step<{
+    // v9 FR-61: the reporting library every time, then read-only SQL the
+    // model asks for (one round weekly, two monthly), all through the guard.
+    const reporting = await this.reporting.library(windowDays);
+    const catalog = this.reporting.catalog();
+    const rounds = review === 'monthly' ? 2 : 1;
+    const queryResults: Array<Record<string, unknown>> = [];
+    let res!: {
       model: string;
-      analysis: { report: string; ideas: ImproverIdea[] };
-    }>('improver/analyse', {
-      signals,
-      prompts: promptTexts,
-      settings,
-      history,
-      system_prompt: system,
-    });
+      analysis: {
+        report: string;
+        ideas: PmAgentIdea[];
+        follow_up_queries?: string[];
+      };
+    };
+    for (let pass = 0; pass <= rounds; pass++) {
+      res = await this.ai.step<typeof res>('pm-agent/analyse', {
+        signals: { ...signals, reporting },
+        prompts: promptTexts,
+        settings,
+        history,
+        system_prompt: system,
+        catalog,
+        query_results: queryResults,
+        rounds_left: rounds - pass,
+        review,
+      });
+      const asked = (res.analysis.follow_up_queries ?? []).slice(0, 3);
+      if (pass === rounds || asked.length === 0) break;
+      for (const sql of asked) {
+        const r = await this.reporting.query(sql);
+        queryResults.push(r as unknown as Record<string, unknown>);
+      }
+    }
 
     const ideaIds: string[] = [];
     for (const idea of res.analysis.ideas) {
@@ -406,9 +422,16 @@ export class DebriefImproverService implements OnModuleInit {
       if (id) ideaIds.push(id);
     }
     await this.audit('curator_run', null, opts.actorUserId ?? null, {
+      review,
       report: res.analysis.report,
       model: res.model,
       signals,
+      queries: queryResults.map((q) => ({
+        sql: q.sql,
+        ok: q.ok,
+        refused: q.refused ?? null,
+        rows: Array.isArray(q.rows) ? q.rows.length : 0,
+      })),
       ideaIds,
       learningSpentUsd: Math.round(spent * 100) / 100,
     });
@@ -423,31 +446,35 @@ export class DebriefImproverService implements OnModuleInit {
       if (['prompt_edit', 'setting'].includes(idea.change?.ideaKind)) {
         await this.screen(id).catch((e: Error) =>
           this.logger.warn(
-            `[improver] screen ${id} failed: ${(e as Error).message}`,
+            `[pm-agent] screen ${id} failed: ${(e as Error).message}`,
           ),
         );
       }
     }
-    return { report: res.analysis.report, ideas: ideaIds };
+    return {
+      report: res.analysis.report,
+      ideas: ideaIds,
+      queries: queryResults.length,
+    };
   }
 
-  /** Refuses (blocks) anything the Improver may not change, before it costs anything. */
-  blockReason(idea: ImproverIdea): string | null {
+  /** Refuses (blocks) anything the PM agent may not change, before it costs anything. */
+  blockReason(idea: PmAgentIdea): string | null {
     if (idea.kind === 'prompt_edit') {
       if (
         !idea.prompt_code ||
-        !IMPROVER_EDITABLE_PROMPTS.has(idea.prompt_code)
+        !PM_AGENT_EDITABLE_PROMPTS.has(idea.prompt_code)
       ) {
-        return 'that prompt is pinned or not the Improver’s to edit';
+        return 'that prompt is pinned or not the PM agent’s to edit';
       }
       if (!idea.find || idea.replace == null) return 'the edit is incomplete';
     }
     if (idea.kind === 'setting') {
       const range = idea.setting_key
-        ? IMPROVER_SETTINGS[idea.setting_key]
+        ? PM_AGENT_SETTINGS[idea.setting_key]
         : null;
       const v = Number(idea.setting_value);
-      if (!range) return 'that setting is not the Improver’s to change';
+      if (!range) return 'that setting is not the PM agent’s to change';
       if (!Number.isFinite(v) || v < range.min || v > range.max) {
         return `the value is outside ${range.min}–${range.max}`;
       }
@@ -456,8 +483,8 @@ export class DebriefImproverService implements OnModuleInit {
   }
 
   private async saveIdea(
-    idea: ImproverIdea,
-    signals: ImproverSignals,
+    idea: PmAgentIdea,
+    signals: PmAgentSignals,
     gaId: string | null,
   ): Promise<string | null> {
     const lessonKind =
@@ -555,33 +582,13 @@ export class DebriefImproverService implements OnModuleInit {
   }
 
   /**
-   * The screen (rung one of the experiment ladder): run the current release
-   * and the challenger on the same open-set sessions, judge both blind with
-   * the independent judge, and compare. Paid from the learning budget.
-   *
-   * Checks everything that can be checked up front, marks the idea's screen
-   * as running and returns; the runs take minutes, so they finish in the
-   * background and write the result onto the idea.
+   * How the challenger runs for an idea: the prompt or setting override, or a
+   * whole bundle when the change is a recipe setting. Checked against the
+   * catalog before anything is paid for. Used by every rung of the ladder.
    */
-  async screen(
-    ideaId: string,
-  ): Promise<{ status: 'running'; startedAt: string }> {
-    const idea = await this.getIdea(ideaId);
-    const running = idea.evidence?.screen;
-    if (
-      running?.status === 'running' &&
-      Date.now() - new Date(running.startedAt).getTime() < 60 * 60 * 1000
-    ) {
-      throw new ConflictException('this idea is already being tried');
-    }
-    if (
-      (await this.learningSpentThisMonth()) >=
-      (await this.learningBudgetThisMonth())
-    ) {
-      throw new ConflictException(
-        'the learning budget for this month is spent',
-      );
-    }
+  async challengerOptions(
+    idea: Record<string, any>,
+  ): Promise<Partial<RunOptions>> {
     const { bundle } = await this.gaBundle();
     const code = idea.change?.promptCode;
     const promptTexts: Record<string, string> = {};
@@ -606,18 +613,61 @@ export class DebriefImproverService implements OnModuleInit {
             },
           }
         : null;
-    const challengerProblems = challengerBundle
-      ? validateDebriefBundle(
-          challengerBundle,
-          await this.runner.modelCatalog(),
-        )
-      : [];
-    if (challengerProblems.length) {
-      throw new BadRequestException(challengerProblems.join('; '));
+    if (challengerBundle) {
+      const problems = validateDebriefBundle(
+        challengerBundle,
+        await this.runner.modelCatalog(),
+      );
+      if (problems.length) throw new BadRequestException(problems.join('; '));
     }
+    return {
+      promptOverrides: challenger.promptOverrides,
+      settingOverrides: challenger.settingOverrides,
+      release: challengerBundle
+        ? ({ id: null, version: null, bundle: challengerBundle } as any)
+        : undefined,
+    };
+  }
+
+  /** Throws when this month's learning budget is spent. */
+  private async requireLearningBudget(): Promise<void> {
+    if (
+      (await this.learningSpentThisMonth()) >=
+      (await this.learningBudgetThisMonth())
+    ) {
+      throw new ConflictException(
+        'the learning budget for this month is spent',
+      );
+    }
+  }
+
+  /**
+   * Rung 1, the quick test (v9 FR-52): the current release and the challenger
+   * on the same open-set sessions (owner setting `quickTestCases`), judged
+   * blind by the independent judge. Passing starts rung 2, the full gate test,
+   * on its own. Paid from the learning budget.
+   *
+   * Checks everything that can be checked up front, marks the idea's quick
+   * test as running and returns; the runs take minutes, so they finish in the
+   * background and write the result onto the idea.
+   */
+  async screen(
+    ideaId: string,
+  ): Promise<{ status: 'running'; startedAt: string }> {
+    const idea = await this.getIdea(ideaId);
+    const running = idea.evidence?.screen;
+    if (
+      running?.status === 'running' &&
+      Date.now() - new Date(running.startedAt).getTime() < 60 * 60 * 1000
+    ) {
+      throw new ConflictException('this idea is already being tried');
+    }
+    await this.requireLearningBudget();
+    const challenger = await this.challengerOptions(idea);
+    const settings = await this.ownerSettings.get();
     const sessions = await this.testSets.sessions(
       DebriefTestSet.OPEN,
-      SCREEN_CASES,
+      settings.quickTestCases,
     );
     if (sessions.length === 0) {
       throw new ConflictException(
@@ -625,18 +675,24 @@ export class DebriefImproverService implements OnModuleInit {
       );
     }
     const startedAt = new Date().toISOString();
-    await this.writeScreen(ideaId, { status: 'running', startedAt });
-    void this.runScreen(ideaId, sessions, {
-      promptOverrides: challenger.promptOverrides,
-      settingOverrides: challenger.settingOverrides,
-      release: challengerBundle
-        ? ({ id: null, version: null, bundle: challengerBundle } as any)
-        : undefined,
-    }).catch(async (e) => {
+    await this.writeEvidence(ideaId, 'screen', {
+      status: 'running',
+      startedAt,
+    });
+    void (async () => {
+      const pairs = await this.runPairs(ideaId, sessions, challenger);
+      const result = quickTestResult(pairs, sessions.length, settings);
+      await this.writeEvidence(ideaId, 'screen', result);
+      await this.audit('pipeline_step', ideaId, null, {
+        step: 'quick_test',
+        ...result,
+      });
+      if (result.passed) await this.gate(ideaId);
+    })().catch(async (e) => {
       this.logger.error(
-        `[improver] screen ${ideaId} failed: ${(e as Error).message}`,
+        `[pm-agent] quick test ${ideaId} failed: ${(e as Error).message}`,
       );
-      await this.writeScreen(ideaId, {
+      await this.writeEvidence(ideaId, 'screen', {
         status: 'failed',
         startedAt,
         error: (e as Error).message.slice(0, 300),
@@ -645,17 +701,68 @@ export class DebriefImproverService implements OnModuleInit {
     return { status: 'running', startedAt };
   }
 
-  private async runScreen(
+  /**
+   * Rung 2, the full gate test (v9 FR-52): the gate set (owner setting
+   * `gateCases`, rotated monthly), and the owner's gate rules — no new hard
+   * fails, the judge's median not lower, cost within the allowed increase.
+   * Passing starts rung 3, the paired trial on production sessions.
+   */
+  async gate(ideaId: string): Promise<GateResult | null> {
+    const idea = await this.getIdea(ideaId);
+    const settings = await this.ownerSettings.get();
+    const startedAt = new Date().toISOString();
+    try {
+      await this.requireLearningBudget();
+      const sessions = await this.testSets.sessions(
+        DebriefTestSet.GATE,
+        settings.gateCases,
+      );
+      if (sessions.length === 0) {
+        throw new ConflictException('the gate test set is empty');
+      }
+      await this.writeEvidence(ideaId, 'gate', {
+        status: 'running',
+        startedAt,
+      });
+      const pairs = await this.runPairs(
+        ideaId,
+        sessions,
+        await this.challengerOptions(idea),
+      );
+      const result = gateResult(pairs, sessions.length, settings);
+      await this.writeEvidence(ideaId, 'gate', result);
+      await this.audit('pipeline_step', ideaId, null, {
+        step: 'gate',
+        ...result,
+      });
+      if (result.passed) {
+        await this.writeEvidence(ideaId, 'trial', {
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          comparisons: 0,
+        });
+      }
+      return result;
+    } catch (e) {
+      this.logger.error(
+        `[pm-agent] gate ${ideaId} failed: ${(e as Error).message}`,
+      );
+      await this.writeEvidence(ideaId, 'gate', {
+        status: 'failed',
+        startedAt,
+        error: (e as Error).message.slice(0, 300),
+      }).catch(() => undefined);
+      return null;
+    }
+  }
+
+  /** Baseline and challenger on each session, judged blind; a failed arm is "no score", never zero. */
+  private async runPairs(
     ideaId: string,
     sessions: string[],
     challengerOpts: Partial<RunOptions>,
-  ): Promise<ScreenResult> {
-    const pairs: Array<{
-      base: RunJudgment | null;
-      chal: RunJudgment | null;
-      chalChecks: number;
-      cost: number;
-    }> = [];
+  ): Promise<LadderPair[]> {
+    const pairs: LadderPair[] = [];
     const runArm = async (
       sessionId: string,
       arm: DebriefRunArm,
@@ -667,9 +774,6 @@ export class DebriefImproverService implements OnModuleInit {
         arm,
         ...opts,
       });
-      // A run with nothing publishable, or a judge that gave no answer, is
-      // recorded as "no score" — never as a zero, which would hand the other
-      // arm a lift it did not earn.
       const judged = run.cards
         ? await this.judge.judge(run).catch(() => null)
         : null;
@@ -689,67 +793,25 @@ export class DebriefImproverService implements OnModuleInit {
           chalChecks: c.run.checkFailures.filter(
             (f) => !ADVISORY_CHECKS.has(f.code as DebriefCheckCode),
           ).length,
-          cost: Number(b.run.estimatedCostUsd) + Number(c.run.estimatedCostUsd),
+          baseCost: Number(b.run.estimatedCostUsd),
+          chalCost: Number(c.run.estimatedCostUsd),
         });
       },
     );
-
-    const scored = pairs.filter(
-      (p) => p.base?.overall != null && p.chal?.overall != null,
-    );
-    const bm = mean(scored.map((p) => p.base!.overall as number));
-    const cm = mean(scored.map((p) => p.chal!.overall as number));
-    const lift =
-      bm != null && cm != null ? Math.round((cm - bm) * 100) / 100 : null;
-    const baselineFailures = pairs.filter((p) => !p.base).length;
-    const challengerFailures = pairs.filter((p) => !p.chal).length;
-    const baselineHardFails = pairs.filter(
-      (p) => p.base?.hardFails.length,
-    ).length;
-    const challengerHardFails = pairs.filter(
-      (p) => p.chal?.hardFails.length,
-    ).length;
-    const result: ScreenResult = {
-      status: 'done',
-      cases: sessions.length,
-      pairs: scored.length,
-      baselineMean: bm,
-      challengerMean: cm,
-      lift,
-      baselineHardFails,
-      challengerHardFails,
-      baselineFailures,
-      challengerFailures,
-      challengerCheckFailures: pairs.reduce((n, p) => n + p.chalChecks, 0),
-      costUsd: Math.round(pairs.reduce((n, p) => n + p.cost, 0) * 100) / 100,
-      passed:
-        lift != null &&
-        scored.length >= Math.ceil(sessions.length / 2) &&
-        lift >= SCREEN_MIN_LIFT &&
-        challengerHardFails <= baselineHardFails &&
-        challengerFailures <= baselineFailures,
-      ranAt: new Date().toISOString(),
-    };
-    await this.writeScreen(
-      ideaId,
-      result as unknown as Record<string, unknown>,
-    );
-    await this.audit('pipeline_step', ideaId, null, {
-      step: 'screen',
-      ...result,
-    });
-    return result;
+    return pairs;
   }
 
-  private async writeScreen(
+  /** Merge one rung's result into the idea's evidence. */
+  async writeEvidence(
     ideaId: string,
-    screen: Record<string, unknown>,
+    key: 'screen' | 'gate' | 'trial' | 'canary',
+    value: Record<string, unknown>,
   ): Promise<void> {
     await this.dataSource.query(
-      `UPDATE agent_lessons SET evidence = evidence || jsonb_build_object('screen', $2::jsonb),
+      `UPDATE agent_lessons SET evidence = evidence || jsonb_build_object($2::text, $3::jsonb),
               "updatedAt" = now()
         WHERE id = $1::uuid`,
-      [ideaId, JSON.stringify(screen)],
+      [ideaId, key, JSON.stringify(value)],
     );
   }
 
@@ -763,7 +825,11 @@ export class DebriefImproverService implements OnModuleInit {
     ideaId: string,
     userId: number,
     note?: string,
-  ): Promise<{ releaseId: string; version: number }> {
+  ): Promise<{
+    releaseId: string;
+    version: number;
+    stage: 'canary' | 'promoted';
+  }> {
     const idea = await this.getIdea(ideaId);
     if (!['proposed', 'approved'].includes(idea.status)) {
       throw new ConflictException(`this idea is ${idea.status}`);
@@ -774,12 +840,41 @@ export class DebriefImproverService implements OnModuleInit {
         'only prompt edits and settings become releases; this one needs a person to act on it',
       );
     }
-    // The ladder holds: only a change that did better on the open set, with
-    // no new hard fails, may be put live.
-    const screen = idea.evidence?.screen;
-    if (screen?.status !== 'done' || !screen.passed) {
+    // The ladder holds (v9 FR-52): a canary that passed is promoted; a paired
+    // trial that passed starts a canary; nothing else may reach learners.
+    const canary = idea.evidence?.canary;
+    if (canary?.status === 'passed' && canary.releaseId) {
+      const released = await this.releases.makeGa(
+        canary.releaseId,
+        userId,
+        AgentReleaseAuditAction.PROMOTED,
+        note,
+      );
+      await this.dataSource.query(
+        `UPDATE agent_lessons SET status = 'active', "releaseId" = $2, "updatedAt" = now() WHERE id = $1`,
+        [ideaId, canary.releaseId],
+      );
+      await this.writeEvidence(ideaId, 'canary', {
+        ...canary,
+        status: 'promoted',
+        promotedAt: new Date().toISOString(),
+      });
+      await this.audit('activated', ideaId, userId, {
+        releaseId: canary.releaseId,
+        note: note ?? null,
+      });
+      return {
+        releaseId: canary.releaseId,
+        version: (released as { version?: number })?.version ?? canary.version,
+        stage: 'promoted',
+      };
+    }
+    if (canary?.status === 'running') {
+      throw new ConflictException('the canary is still running');
+    }
+    if (idea.evidence?.trial?.status !== 'passed') {
       throw new ConflictException(
-        'only a change that did better when tried can go live; try it first',
+        'only a change that passed its paired trial on real sessions can start a canary',
       );
     }
     const { bundle } = await this.gaBundle();
@@ -810,7 +905,7 @@ export class DebriefImproverService implements OnModuleInit {
           body: current.replace(idea.change.find, idea.change.replace),
           baseVersion: latest,
           source: PromptVersionSource.EXPERIMENT,
-          note: `Debrief Improver idea ${ideaId}: ${idea.text}`.slice(0, 500),
+          note: `Debrief PM agent idea ${ideaId}: ${idea.text}`.slice(0, 500),
           evalSummary: idea.evidence?.screen ?? null,
           createdBy: userId,
         },
@@ -831,28 +926,39 @@ export class DebriefImproverService implements OnModuleInit {
       await this.runner.modelCatalog(),
     );
     if (problems.length) throw new BadRequestException(problems.join('; '));
+    // Rung 4 (v9 FR-52): the candidate release reaches a share of real
+    // learners in switched-on organisations first; DebriefTrialsService
+    // reverts it on its own when it does worse, or marks it ready to promote.
     const draft = await this.releases.createDraft(
       DEBRIEF_AGENT_KEY,
       next as unknown as Record<string, unknown>,
       userId,
-      `Improver idea: ${idea.text}`,
+      `PM agent idea (canary): ${idea.text}`,
     );
-    await this.releases.makeGa(
+    const { canaryShare } = await this.ownerSettings.get();
+    // The harness's canary (one per agent, audited, at most 30%).
+    await this.releases.startCanary(
       draft.id,
+      Math.max(1, Math.round(canaryShare * 100)),
       userId,
-      AgentReleaseAuditAction.PROMOTED,
-      note,
+      `PM agent idea ${ideaId}: ${idea.text}`.slice(0, 300),
     );
-    await this.dataSource.query(
-      `UPDATE agent_lessons SET status = 'active', "releaseId" = $2, "updatedAt" = now() WHERE id = $1`,
-      [ideaId, draft.id],
-    );
-    await this.audit('activated', ideaId, userId, {
+    await this.writeEvidence(ideaId, 'canary', {
+      status: 'running',
       releaseId: draft.id,
       version: draft.version,
+      share: canaryShare,
+      startedAt: new Date().toISOString(),
+      startedBy: userId,
+    });
+    await this.audit('pipeline_step', ideaId, userId, {
+      step: 'canary_started',
+      releaseId: draft.id,
+      version: draft.version,
+      share: canaryShare,
       note: note ?? null,
     });
-    return { releaseId: draft.id, version: draft.version };
+    return { releaseId: draft.id, version: draft.version, stage: 'canary' };
   }
 
   async reject(ideaId: string, userId: number, reason?: string): Promise<void> {
@@ -887,6 +993,11 @@ export class DebriefImproverService implements OnModuleInit {
       signals: r?.detail?.signals ?? null,
       learningSpentUsd: r?.detail?.learningSpentUsd ?? null,
     };
+  }
+
+  /** A ladder event with no single idea (the monthly sealed run), for the Console's series. */
+  async recordLadderEvent(detail: Record<string, unknown>): Promise<void> {
+    await this.audit('pipeline_step', null, null, detail);
   }
 
   private async audit(

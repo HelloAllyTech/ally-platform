@@ -45,6 +45,10 @@ import { DebriefAgentService } from './debrief-agent.service';
 import { DebriefAiClient } from './debrief-ai.client';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefFeedbackService } from './debrief-feedback.service';
+import {
+  DebriefReplyAgentService,
+  ReplyTrace,
+} from './debrief-reply-agent.service';
 import { DebriefRunnerService } from './debrief-runner.service';
 
 /** The chat's assistant sender, as today's debrief chat stores it. */
@@ -124,6 +128,8 @@ export class DebriefReplyService {
     private readonly llm: LlmProviderFactory,
     private readonly usage: LlmUsageService,
     @Optional() private readonly guidance?: ContextRetrievalService,
+    /** Ask Ally's tool loop; absent, a reply is one call with context fetched first. */
+    @Optional() private readonly replyAgent?: DebriefReplyAgentService,
   ) {}
 
   async stream(
@@ -178,11 +184,15 @@ export class DebriefReplyService {
       return subject.pipe(startWith(event({ type: 'start' })));
     }
 
+    // With the tool loop, guidance and history are tools the model calls when
+    // a question needs them; only the organisation's short wording is sent
+    // up front. Without it, all three are fetched first, as before.
+    const agent = this.replyAgent;
     const [transcript, system, { bundle }, extra] = await Promise.all([
       this.context.transcript(sessionId),
       this.systemPrompt(),
       this.runner.resolveRelease(),
-      this.extraContext(run, sessionId, userId),
+      this.extraContext(run, sessionId, userId, agent ? 'org' : 'all'),
     ]);
     // The release names Ask Ally's model, as it names every step's.
     const model = bundle.reply ?? DEBRIEF_REPLY_DEFAULT;
@@ -202,87 +212,171 @@ export class DebriefReplyService {
       ...CARD_SECTION_NAMES,
     ];
 
-    let full = '';
-    this.aiChat
-      .streamResponse({
-        systemPrompt: [
-          system,
-          '',
-          `SESSION LANGUAGE: ${language}`,
-          'DEBRIEF:',
-          JSON.stringify(run.cards),
-          'TRANSCRIPT:',
-          ...transcript.map((t) => `${t.role}: ${t.text}`),
-          ...extra,
-          '',
-          REPLY_LENGTH_REMINDER,
-        ].join('\n'),
-        chatHistory: this.history(prior),
-        userMessage: message,
-        providerType: model.provider,
-        // No thinking: it would spend the reply's tokens (a Gemini 2.5 reply
-        // was cut mid-sentence) and delay the first words.
-        llmConfig: {
-          model: model.model,
-          maxTokens: model.maxTokens,
-          thinkingBudget: 0,
-        },
-        usage: {
-          task: LlmTask.DEBRIEF_REPLY,
-          scenarioSessionId: sessionId,
-          tenantId,
-          metadata: { chatId: chat.id, runId: run.id, model: model.model },
-        },
-      })
-      .subscribe({
-        next: (e) => {
-          const data = JSON.parse(e.data);
-          if (data.type === 'token') {
-            full += data.content ?? '';
-            // Both names: the web reads `text`, the phones read `content`.
+    const promptWith = (context: string[]) =>
+      [
+        system,
+        '',
+        `SESSION LANGUAGE: ${language}`,
+        'DEBRIEF:',
+        JSON.stringify(run.cards),
+        'TRANSCRIPT:',
+        ...transcript.map((t) => `${t.role}: ${t.text}`),
+        ...context,
+        '',
+        REPLY_LENGTH_REMINDER,
+      ].join('\n');
+    const systemPrompt = promptWith(extra);
+    // Both names: the web reads `text`, the phones read `content`.
+    const token = (text: string) =>
+      subject.next(event({ type: 'token', content: text, text }));
+
+    /** The finished reply: checked, distress-screened, then sent and saved. */
+    const settle = async (full: string) => {
+      const fails = replyCheckFailures(full, sources);
+      let content = fails.length ? CHECK_FALLBACK : full;
+      if (fails.length) {
+        this.logger.warn(
+          `[debrief] Ask Ally reply replaced for run ${run.id}: ${fails.join(', ')}`,
+        );
+        void this.keepReplaced(run.id, {
+          at: new Date().toISOString(),
+          fails,
+          unmatched: unmatchedQuotes(full, sources),
+          reply: full,
+        });
+      }
+      if (await distress) {
+        void this.feedback.raiseChatDistress(run, userId, 'safety reader');
+        content += `\n\n${await this.supportReply(tenantId, language, false)}`;
+      }
+      await finish(content);
+    };
+
+    /** One streamed call with everything fetched up front (no tools). */
+    const singleCall = (prompt: string = systemPrompt) => {
+      let full = '';
+      this.aiChat
+        .streamResponse({
+          systemPrompt: prompt,
+          chatHistory: this.history(prior),
+          userMessage: message,
+          providerType: model.provider,
+          // No thinking: it would spend the reply's tokens (a Gemini 2.5 reply
+          // was cut mid-sentence) and delay the first words.
+          llmConfig: {
+            model: model.model,
+            maxTokens: model.maxTokens,
+            thinkingBudget: 0,
+          },
+          usage: {
+            task: LlmTask.DEBRIEF_REPLY,
+            scenarioSessionId: sessionId,
+            tenantId,
+            metadata: { chatId: chat.id, runId: run.id, model: model.model },
+          },
+        })
+        .subscribe({
+          next: (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'token') {
+              full += data.content ?? '';
+              token(data.content);
+            } else if (data.type === 'done') {
+              void settle(full);
+            } else if (data.type === 'error') {
+              subject.next(e);
+              subject.complete();
+            }
+          },
+          error: (err) => {
             subject.next(
-              event({
-                type: 'token',
-                content: data.content,
-                text: data.content,
-              }),
+              event({ type: 'error', error: (err as Error).message }),
             );
-          } else if (data.type === 'done') {
-            void (async () => {
-              const fails = replyCheckFailures(full, sources);
-              let content = fails.length ? CHECK_FALLBACK : full;
-              if (fails.length) {
-                this.logger.warn(
-                  `[debrief] Ask Ally reply replaced for run ${run.id}: ${fails.join(', ')}`,
-                );
-                void this.keepReplaced(run.id, {
-                  at: new Date().toISOString(),
-                  fails,
-                  unmatched: unmatchedQuotes(full, sources),
-                  reply: full,
-                });
-              }
-              if (await distress) {
-                void this.feedback.raiseChatDistress(
-                  run,
-                  userId,
-                  'safety reader',
-                );
-                content += `\n\n${await this.supportReply(tenantId, language, false)}`;
-              }
-              await finish(content);
-            })();
-          } else if (data.type === 'error') {
-            subject.next(e);
             subject.complete();
-          }
-        },
-        error: (err) => {
-          subject.next(event({ type: 'error', error: (err as Error).message }));
-          subject.complete();
-        },
-      });
+          },
+        });
+    };
+
+    if (!agent) {
+      singleCall();
+      return subject.pipe(startWith(event({ type: 'start' })));
+    }
+
+    // v9 FR-43: the reply as a small agent that looks up what a question
+    // needs (guidance, the learner's history, the live detector's record)
+    // within its turn and dollar limits.
+    void (async () => {
+      let streamed = '';
+      try {
+        const res = await agent.reply({
+          model,
+          system: systemPrompt,
+          history: this.history(prior),
+          message,
+          sessionId,
+          tenantId,
+          userId,
+          chatId: chat.id,
+          runId: run.id,
+          onText: (text) => {
+            streamed += text;
+            token(text);
+          },
+        });
+        // A quote from what a tool returned is not a misquote.
+        sources.push(...res.toolTexts);
+        void this.keepReplyTrace(run.id, res.trace);
+        await settle(res.text);
+      } catch (e) {
+        this.logger.warn(
+          `[debrief] Ask Ally tool loop failed for run ${run.id}: ${(e as Error).message}`,
+        );
+        if (streamed) {
+          // Words already reached the learner: finish with what they saw.
+          await settle(streamed);
+        } else {
+          // Nothing shown yet: answer the way Ask Ally did before tools.
+          const fallback = await this.extraContext(
+            run,
+            sessionId,
+            userId,
+            'all',
+          );
+          sources.push(...fallback);
+          singleCall(promptWith(fallback));
+        }
+      }
+    })();
     return subject.pipe(startWith(event({ type: 'start' })));
+  }
+
+  /**
+   * How a reply was reached — the tools it called (a guidance topic, never
+   * the learner's message), its passes and cost — kept on the run (the last
+   * 20) for the Console's run view. Never throws.
+   */
+  private async keepReplyTrace(
+    runId: string,
+    trace: ReplyTrace,
+  ): Promise<void> {
+    try {
+      await this.chats.manager.query(
+        `UPDATE debrief_runs
+            SET workspace = jsonb_set(
+              coalesce(workspace, '{}'::jsonb), '{replyTraces}',
+              (SELECT coalesce(jsonb_agg(x.e ORDER BY x.n), '[]'::jsonb)
+                 FROM jsonb_array_elements(
+                        coalesce(workspace->'replyTraces', '[]'::jsonb) || jsonb_build_array($2::jsonb)
+                      ) WITH ORDINALITY AS x(e, n)
+                WHERE x.n > jsonb_array_length(coalesce(workspace->'replyTraces', '[]'::jsonb)) + 1 - 20))
+          WHERE id = $1`,
+        [runId, JSON.stringify(trace)],
+      );
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] could not keep a reply trace for run ${runId}: ${(e as Error).message}`,
+      );
+    }
   }
 
   /**
@@ -432,6 +526,7 @@ export class DebriefReplyService {
     run: { tenantId?: string | null; cards?: unknown },
     sessionId: string,
     userId: number,
+    parts: 'all' | 'org' = 'all',
   ): Promise<string[]> {
     const within = async <T>(f: () => Promise<T>, fallback: T): Promise<T> => {
       try {
@@ -455,8 +550,9 @@ export class DebriefReplyService {
       .filter((x): x is string => typeof x === 'string' && !!x.trim())
       .slice(0, 6)
       .join('; ');
+    const all = parts === 'all';
     const [guidance, history, org] = await Promise.all([
-      query && this.guidance
+      all && query && this.guidance
         ? within(
             () =>
               this.guidance!.search(
@@ -470,10 +566,12 @@ export class DebriefReplyService {
             [] as Array<{ title: string; text: string }>,
           )
         : Promise.resolve([] as Array<{ title: string; text: string }>),
-      within(
-        () => this.context.pastWorkOnThis(userId, tenantId, sessionId, 5),
-        [],
-      ),
+      all
+        ? within(
+            () => this.context.pastWorkOnThis(userId, tenantId, sessionId, 5),
+            [],
+          )
+        : Promise.resolve([]),
       tenantId
         ? within(() => this.context.orgWording(tenantId), null)
         : Promise.resolve(null),

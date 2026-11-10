@@ -29,6 +29,10 @@ function build(opts: {
   history?: boolean;
   org?: boolean;
   slowKnowledge?: boolean;
+  /** Ask Ally's tool loop: what it returns, or the error it throws. */
+  replyAgent?:
+    | { text: string; toolTexts?: string[]; streamed?: string }
+    | Error;
 }) {
   const saved: any[] = [];
   const messages = {
@@ -132,6 +136,33 @@ function build(opts: {
     JSON.stringify({ on_topic: opts.onTopic ?? false }),
   );
   const llm = { getProvider: jest.fn(() => ({ getCompletion })) };
+  const replyAgent = {
+    reply: jest.fn(async (input: any) => {
+      const r = opts.replyAgent;
+      if (r instanceof Error) throw r;
+      if (r?.streamed) input.onText(r.streamed);
+      else if (r?.text) input.onText(r.text);
+      return {
+        text: r?.text ?? '',
+        toolTexts: r?.toolTexts ?? [],
+        trace: {
+          at: '2026-11-10T00:00:00.000Z',
+          model: 'gemini-2.5-flash',
+          turns: 2,
+          costUsd: 0.001,
+          tools: [
+            {
+              name: 'search_guidance',
+              topic: 'asking about suicide',
+              ok: true,
+              ms: 5,
+              found: '1 passage(s)',
+            },
+          ],
+        },
+      };
+    }),
+  };
   const svc = new DebriefReplyService(
     chats as any,
     messages as any,
@@ -147,6 +178,7 @@ function build(opts: {
     llm as any,
     { record: jest.fn() } as any,
     knowledge as any,
+    opts.replyAgent ? (replyAgent as any) : undefined,
   );
   return {
     svc,
@@ -157,6 +189,8 @@ function build(opts: {
     getCompletion,
     knowledge,
     kept,
+    replyAgent,
+    context,
   };
 }
 
@@ -373,6 +407,75 @@ describe('DebriefReplyService (Ask Ally)', () => {
       await run(svc, 'thanks, makes sense');
       await flush();
       expect(getCompletion).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('with the tool loop (FR-43)', () => {
+    it('sends only the organisation’s wording up front and lets the model look up the rest', async () => {
+      const { svc, replyAgent, knowledge, context, aiChat } = build({
+        replyAgent: { text: 'Ask it plainly.' },
+        org: true,
+        history: true,
+        guidance: true,
+      });
+      const events = await run(svc, 'How should I ask?');
+      expect(events[events.length - 1]).toMatchObject({
+        type: 'done',
+        content: 'Ask it plainly.',
+      });
+      const input = (replyAgent.reply.mock.calls[0] as any[])[0];
+      expect(input.system).toContain('your team lead');
+      expect(input.system).not.toContain('Risk guide');
+      expect(input.message).toBe('How should I ask?');
+      expect(knowledge.search).not.toHaveBeenCalled();
+      expect(context.pastWorkOnThis).not.toHaveBeenCalled();
+      expect(aiChat.streamResponse).not.toHaveBeenCalled();
+    });
+
+    it('keeps how the reply was reached on the run, without the learner’s message', async () => {
+      const { svc, kept } = build({ replyAgent: { text: 'Ask it plainly.' } });
+      await run(svc, 'My private worry about this');
+      const traceWrite = kept.mock.calls.find((c: any[]) =>
+        String(c[0]).includes('replyTraces'),
+      ) as any[];
+      expect(traceWrite).toBeDefined();
+      const trace = JSON.parse(traceWrite[1][1]);
+      expect(trace.tools[0]).toMatchObject({
+        name: 'search_guidance',
+        topic: 'asking about suicide',
+      });
+      expect(traceWrite[1][1]).not.toContain('My private worry');
+    });
+
+    it('accepts a quote from what a tool returned', async () => {
+      const { svc } = build({
+        replyAgent: {
+          text: 'The guidance says "Ask directly and calmly."',
+          toolTexts: ['Asking about suicide: Ask directly and calmly.'],
+        },
+      });
+      const events = await run(svc, 'What does the guidance say?');
+      expect(events[events.length - 1].content).toContain(
+        'Ask directly and calmly.',
+      );
+    });
+
+    it('answers the way it did before tools when the loop fails before any words', async () => {
+      const { svc, aiChat } = build({
+        replyAgent: new Error('provider down'),
+        reply: 'A plain answer.',
+        guidance: true,
+      });
+      const events = await run(svc, 'Why that point?');
+      expect(aiChat.streamResponse).toHaveBeenCalledTimes(1);
+      const call = (aiChat.streamResponse.mock.calls[0] as any[])[0];
+      expect(call.systemPrompt).toContain(
+        'Risk guide: Ask about safety plainly.',
+      );
+      expect(events[events.length - 1]).toMatchObject({
+        type: 'done',
+        content: 'A plain answer.',
+      });
     });
   });
 });

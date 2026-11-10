@@ -350,6 +350,9 @@ import { SettingsModule } from 'src/settings/settings.module';
     // Exported for CourseCopilotModule: the interview grounds outcomes and
     // annotation labels in each competency's helpful/unhelpful behaviours.
     CompetencyService,
+    // Exported for DebriefModule: a published live debrief writes the
+    // learner's supervisor memory in place of today's debrief (v9 FR-20).
+    LearnerSupervisorMemoryService,
   ],
 })
 export class LearnModule {}

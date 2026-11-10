@@ -7,8 +7,8 @@ import {
   useBuildDebriefTestSetsMutation,
   useDecideIdeaMutation,
   useGetDebriefOverviewQuery,
-  useGetImproverStateQuery,
-  useRunImproverMutation,
+  useGetPmAgentStateQuery,
+  useRunPmAgentMutation,
   useScreenIdeaMutation,
 } from "@api";
 import { formatUsd } from "@components/ally-guide/allyGuideFormat";
@@ -17,18 +17,118 @@ import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/Con
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
-import { ImproverIdeaRow } from "@types";
+import { PmAgentIdeaRow } from "@types";
 import { getErrorMessage } from "@utils";
 
 import { formatWhen } from "./consoleTable";
 
 const SCREENABLE = new Set(["prompt_edit", "setting"]);
 
+/** What approving does next: start the canary after a passed trial, promote after a passed canary. */
+export const stage = (idea: PmAgentIdeaRow): "canary" | "promote" | null => {
+  if (idea.evidence.canary?.status === "passed") return "promote";
+  if (idea.evidence.canary?.status === "running") return null;
+  return idea.evidence.trial?.status === "passed" ? "canary" : null;
+};
+
+const signed = (x: number | null | undefined) =>
+  x == null ? "—" : `${x > 0 ? "+" : ""}${x.toFixed(2)}`;
+const score = (x: number | null | undefined) => (x == null ? "—" : x.toFixed(1));
+
+/** The idea's climb through the test ladder (v9 FR-52): one line per rung. */
+const Ladder: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
+  const s = en.debriefs.pmAgent;
+  const { screen: q, gate: g, trial: t, canary: c } = idea.evidence;
+  const state = (x?: { status: string; passed?: boolean }) =>
+    !x ? (
+      <Pill tone="neutral">{s.rungWaiting}</Pill>
+    ) : x.status === "running" ? (
+      <Pill tone="info">{s.rungRunning}</Pill>
+    ) : x.status === "failed" && x.passed === undefined ? (
+      <Pill tone="warning">{s.rungFailed}</Pill>
+    ) : x.passed || x.status === "passed" ? (
+      <Pill tone="success">{s.rungPassed}</Pill>
+    ) : (
+      <Pill tone="neutral">{s.rungNotPassed}</Pill>
+    );
+  return (
+    <ol className="flex flex-col gap-1 text-sm" data-testid="idea-ladder">
+      <li className="flex flex-wrap items-center gap-2" data-testid="idea-screen">
+        <span className="w-28 font-semibold">{s.ladder.quick}</span>
+        {!q ? s.notScreened : state(q)}
+        {q?.status === "done" && (
+          <span>
+            {s.screened(signed(q.lift), q.pairs)} · {formatUsd(q.costUsd)}
+            {q.challengerFailures > 0 && ` · ${s.unfinished(q.challengerFailures)}`}
+          </span>
+        )}
+      </li>
+      <li className="flex flex-wrap items-center gap-2" data-testid="idea-gate">
+        <span className="w-28 font-semibold">{s.ladder.gate}</span>
+        {state(g)}
+        {g?.status === "done" && (
+          <span>
+            {s.gateLine(score(g.baselineMedian), score(g.challengerMedian), g.pairs)}
+            {!g.passed &&
+              ` · ${Object.entries(g.rules)
+                .filter(([, ok]) => !ok)
+                .map(([k]) => s.gateRules[k])
+                .join(", ")}`}
+          </span>
+        )}
+      </li>
+      <li className="flex flex-wrap items-center gap-2" data-testid="idea-trial">
+        <span className="w-28 font-semibold">{s.ladder.trial}</span>
+        {state(
+          t && {
+            status: t.status === "running" ? "running" : "done",
+            passed: t.status === "passed",
+          },
+        )}
+        {t && (
+          <span>
+            {s.trialLine(t.comparisons, signed(t.meanDifference), signed(t.lower), signed(t.upper))}
+          </span>
+        )}
+      </li>
+      <li className="flex flex-wrap items-center gap-2" data-testid="idea-canary">
+        <span className="w-28 font-semibold">{s.ladder.canary}</span>
+        {!c ? (
+          <Pill tone="neutral">{s.rungWaiting}</Pill>
+        ) : (
+          <Pill
+            tone={
+              c.status === "passed" || c.status === "promoted"
+                ? "success"
+                : c.status === "reverted"
+                  ? "warning"
+                  : "info"
+            }
+          >
+            {s.canaryStatus[c.status] ?? c.status}
+          </Pill>
+        )}
+        {c && (
+          <span>
+            {s.canaryLine(
+              Math.round(c.share * 100),
+              c.canaryRuns ?? 0,
+              score(c.canaryMedian),
+              score(c.controlMedian),
+            )}
+            {c.reason && c.status === "reverted" && ` · ${c.reason}`}
+          </span>
+        )}
+      </li>
+    </ol>
+  );
+};
+
 const IdeaCard: React.FC<{
-  idea: ImproverIdeaRow;
+  idea: PmAgentIdeaRow;
   onDecide: (d: "approve" | "reject") => void;
 }> = ({ idea, onDecide }) => {
-  const s = en.debriefs.improver;
+  const s = en.debriefs.pmAgent;
   const [screen, { isLoading: screening }] = useScreenIdeaMutation();
   const r = idea.evidence.screen;
   const open = idea.status === "proposed";
@@ -77,29 +177,7 @@ const IdeaCard: React.FC<{
           {idea.change.settingKey} → {idea.change.settingValue}
         </p>
       )}
-      {SCREENABLE.has(idea.change.ideaKind) && (
-        <p className="text-sm" data-testid="idea-screen">
-          {!r ? (
-            s.notScreened
-          ) : r.status === "running" ? (
-            s.screening
-          ) : r.status === "failed" ? (
-            s.screenError
-          ) : (
-            <>
-              <Pill tone={r.passed ? "success" : "neutral"}>
-                {r.passed ? s.screenPassed : s.screenFailed}
-              </Pill>{" "}
-              {s.screened(
-                r.lift == null ? "—" : `${r.lift > 0 ? "+" : ""}${r.lift.toFixed(2)}`,
-                r.pairs,
-              )}{" "}
-              · {formatUsd(r.costUsd)}
-              {r.challengerFailures > 0 && ` · ${s.unfinished(r.challengerFailures)}`}
-            </>
-          )}
-        </p>
-      )}
+      {SCREENABLE.has(idea.change.ideaKind) && <Ladder idea={idea} />}
       {open && (
         <div className="flex flex-wrap gap-2">
           {SCREENABLE.has(idea.change.ideaKind) && (
@@ -120,11 +198,11 @@ const IdeaCard: React.FC<{
             <Button
               kind="primary"
               size="sm"
-              disabled={r?.status !== "done" || !r.passed}
-              title={r?.status === "done" && r.passed ? undefined : s.approveNeedsScreen}
+              disabled={stage(idea) === null}
+              title={stage(idea) === null ? s.canaryNeedsTrial : undefined}
               onClick={() => onDecide("approve")}
             >
-              {s.approve}
+              {stage(idea) === "promote" ? s.promote : s.startCanary}
             </Button>
           )}
           <Button kind="tertiary" size="sm" onClick={() => onDecide("reject")}>
@@ -136,17 +214,21 @@ const IdeaCard: React.FC<{
   );
 };
 
-/** The Improver: its report, its test sets, and its ideas with the approval layer. */
-export const ImproverTab: React.FC = () => {
-  const s = en.debriefs.improver;
-  const state = useGetImproverStateQuery();
+/** The PM agent: its report, its test sets, and its ideas with the approval layer. */
+export const PmAgentTab: React.FC = () => {
+  const s = en.debriefs.pmAgent;
+  const state = useGetPmAgentStateQuery();
   const overview = useGetDebriefOverviewQuery();
-  const [run, { isLoading: running }] = useRunImproverMutation();
+  const [run, { isLoading: running }] = useRunPmAgentMutation();
   const [build, { isLoading: building }] = useBuildDebriefTestSetsMutation();
   const [decide, { isLoading: deciding }] = useDecideIdeaMutation();
   const [pending, setPending] = useState<{ id: string; decision: "approve" | "reject" } | null>(
     null,
   );
+
+  const ideas = state.data?.ideas ?? [];
+  const pendingIdea = pending ? ideas.find(i => i.id === pending.id) : undefined;
+  const pendingStage = pendingIdea ? stage(pendingIdea) : null;
 
   const runNow = async () => {
     try {
@@ -161,7 +243,13 @@ export const ImproverTab: React.FC = () => {
     if (!pending) return;
     try {
       await decide(pending).unwrap();
-      toast.success(pending.decision === "approve" ? s.approved : s.rejected);
+      toast.success(
+        pending.decision === "approve"
+          ? pendingStage === "promote"
+            ? s.promoted
+            : s.canaryStarted
+          : s.rejected,
+      );
       setPending(null);
     } catch (e) {
       toast.error(getErrorMessage(e, s.actionFailed));
@@ -170,7 +258,7 @@ export const ImproverTab: React.FC = () => {
 
   const o = overview.data;
   return (
-    <div className="flex flex-col gap-8" data-testid="improver-tab">
+    <div className="flex flex-col gap-8" data-testid="pm-agent-tab">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-normal text-typography-900">{s.heading}</h2>
@@ -195,7 +283,7 @@ export const ImproverTab: React.FC = () => {
         <LoadingBlock lines={6} />
       ) : (
         <>
-          <section className="flex flex-col gap-2" data-testid="improver-report">
+          <section className="flex flex-col gap-2" data-testid="pm-agent-report">
             <h3 className="text-xl font-normal text-typography-900">{s.report}</h3>
             {state.data.report ? (
               <>
@@ -248,14 +336,32 @@ export const ImproverTab: React.FC = () => {
 
       <ConfirmDialog
         isOpen={pending !== null}
-        title={pending?.decision === "approve" ? s.approveTitle : s.rejectTitle}
+        title={
+          pending?.decision === "approve"
+            ? pendingStage === "promote"
+              ? s.promoteTitle
+              : s.canaryTitle
+            : s.rejectTitle
+        }
         cancelLabel={s.cancel}
-        confirmLabel={pending?.decision === "approve" ? s.approveConfirm : s.rejectConfirm}
+        confirmLabel={
+          pending?.decision === "approve"
+            ? pendingStage === "promote"
+              ? s.promoteConfirm
+              : s.canaryConfirm
+            : s.rejectConfirm
+        }
         isWorking={deciding}
         onConfirm={() => void confirm()}
         onClose={() => setPending(null)}
       >
-        <p>{pending?.decision === "approve" ? s.approveBody : s.rejectBody}</p>
+        <p>
+          {pending?.decision === "approve"
+            ? pendingStage === "promote"
+              ? s.promoteBody
+              : s.canaryBody
+            : s.rejectBody}
+        </p>
       </ConfirmDialog>
     </div>
   );

@@ -89,6 +89,10 @@ export const AUDIT_EVENTS = {
   HELPLINE_TRANSCRIPT_ACCESSED: 'HELPLINE_TRANSCRIPT_ACCESSED',
   HELPLINE_ERASURE_REQUESTED: 'HELPLINE_ERASURE_REQUESTED',
   HELPLINE_TALKER_BLOCKED: 'HELPLINE_TALKER_BLOCKED',
+  /** v9 FR-38: someone opened a Debrief Console view (which view and ids, never content). */
+  DEBRIEF_CONSOLE_VIEWED: 'DEBRIEF_CONSOLE_VIEWED',
+  /** v9 FR-60: a person changed or accepted a debrief owner setting (before and after). */
+  DEBRIEF_SETTINGS_CHANGED: 'DEBRIEF_SETTINGS_CHANGED',
 } as const;
 
 export const AUDIT_ACTIONS = {

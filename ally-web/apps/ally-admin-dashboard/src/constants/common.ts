@@ -187,8 +187,8 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
-    // Raise a live quiz's attempt limit; the structure PUT is locked once learners enrol.
-    QUIZ_SETTINGS: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/quiz/settings`,
+    // Raise a live quiz's or annotation's attempt limit; the structure PUT is locked once learners enrol.
+    ATTEMPT_LIMIT: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/attempt-limit`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
@@ -467,11 +467,15 @@ export const ApiEndpoints = {
     OVERVIEW: "/v1/debriefs/console/overview",
     RUNS: "/v1/debriefs/console/runs",
     RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
+    STEPS: "/v1/debriefs/console/steps",
+    SETTINGS: "/v1/debriefs/console/settings",
+    SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
+    SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
-    IMPROVER: "/v1/debriefs/console/improver",
-    IMPROVER_ANALYSE: "/v1/debriefs/console/improver/analyse",
+    PM_AGENT: "/v1/debriefs/console/pm-agent",
+    PM_AGENT_ANALYSE: "/v1/debriefs/console/improver/analyse",
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
-      `/v1/debriefs/console/improver/ideas/${id}/${action}`,
+      `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
     RELEASES: "/v1/debriefs/console/releases",
     MODELS: "/v1/debriefs/console/models",
     ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
@@ -687,10 +691,13 @@ export const ApiEndpoints = {
     QUEUE: "/v1/context-library/queue",
     SOURCES: "/v1/context-library/sources",
     SOURCE_BY_ID: (id: string) => `/v1/context-library/sources/${id}`,
+    SOURCE_AUDIENCE: (id: string) => `/v1/context-library/sources/${id}/audience`,
     SOURCE_ACTION: (id: string, action: "pause" | "resume" | "cancel" | "front" | "retry") =>
       `/v1/context-library/sources/${id}/${action}`,
     CHUNKS: "/v1/context-library/chunks",
     CHUNK_BY_CODE: (code: string) => `/v1/context-library/chunks/${encodeURIComponent(code)}`,
+    CHUNK_AUDIENCE: (code: string) =>
+      `/v1/context-library/chunks/${encodeURIComponent(code)}/audience`,
     CHUNK_ACTION: (code: string, action: "archive" | "restore" | "pin" | "unpin") =>
       `/v1/context-library/chunks/${encodeURIComponent(code)}/${action}`,
     COLLECTION_CHUNKS: (collectionId: string) =>

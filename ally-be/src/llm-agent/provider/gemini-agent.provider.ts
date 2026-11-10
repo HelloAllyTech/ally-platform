@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
-import { GoogleGenAI } from '@google/genai';
-import { modelSupportsTemperature } from 'src/common/util/llm-model.util';
+import { FunctionCallingConfigMode, GoogleGenAI } from '@google/genai';
+import {
+  isGemini3OrLater,
+  modelSupportsTemperature,
+} from 'src/common/util/llm-model.util';
 import {
   AgentContentBlock,
   AgentStopReason,
@@ -81,6 +84,20 @@ export class GeminiAgentProvider implements IAgentLlmProvider {
                 },
               ],
             }
+          : {}),
+        // 'none' keeps the declarations (the request's prefix) but forbids a
+        // call on this pass, as the interface promises and the other adapters
+        // already do.
+        ...(request.tools?.length && request.toolChoice === 'none'
+          ? {
+              toolConfig: {
+                functionCallingConfig: { mode: FunctionCallingConfigMode.NONE },
+              },
+            }
+          : {}),
+        ...(request.thinkingBudget !== undefined &&
+        !isGemini3OrLater(request.model)
+          ? { thinkingConfig: { thinkingBudget: request.thinkingBudget } }
           : {}),
         ...(request.temperature !== undefined &&
         modelSupportsTemperature(request.model)

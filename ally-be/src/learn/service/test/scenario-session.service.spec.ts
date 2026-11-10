@@ -1,3 +1,4 @@
+import { SCENARIO_SESSION_DEBRIEF_READY_EVENT } from '../../constants/scenario-session-events.constants';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import { ScenarioInteractionMode } from '../../enum/scenario-interaction-mode.enum';
@@ -4856,6 +4857,56 @@ describe('ScenarioSessionService', () => {
 
     const persistedSummary = () =>
       upsert.mock.calls.map(([row]) => row.summary).find(Boolean);
+
+    // v9 FR-4: in an organisation switched on for the Debrief agent, the
+    // learner reads the agent's debrief, so the "debrief ready" event (and the
+    // supervisor memory) come from it; today's debrief only hands back.
+    describe('when the organisation is switched on for the Debrief agent', () => {
+      const liveFor = (live: boolean) =>
+        (dataSource.query as jest.Mock).mockImplementation(
+          async (sql: string) =>
+            String(sql).includes('agent_config_overrides') && live
+              ? [{ x: 1 }]
+              : [],
+        );
+      const emitted = () =>
+        ((service as any).eventEmitter.emit as jest.Mock).mock.calls.map(
+          (c: any[]) => c[0],
+        );
+
+      it('announces the debrief as before when the organisation is not switched on', async () => {
+        liveFor(false);
+        await service.endScenarioSession(
+          mockScenarioSessionId,
+          mockCounselorId,
+        );
+        await flush();
+        expect(emitted()).toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
+      });
+
+      it('does not run today’s debrief, and only records the call duration', async () => {
+        liveFor(true);
+        const detailsUpsert =
+          scenarioSessionDetailsRepository.upsert as jest.Mock;
+        detailsUpsert.mockResolvedValue(undefined);
+        await service.endScenarioSession(
+          mockScenarioSessionId,
+          mockCounselorId,
+        );
+        await flush();
+        expect(aiService.getScenarioSessionEvaluation).not.toHaveBeenCalled();
+        expect(scenarioSessionMessagesRepository.find).not.toHaveBeenCalled();
+        expect(persistedSummary()).toBeUndefined();
+        expect(detailsUpsert).toHaveBeenCalledWith(
+          expect.not.objectContaining({ summary: expect.anything() }),
+          { conflictPaths: ['scenarioSessionId'] },
+        );
+        expect(emitted()).not.toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
+        expect(
+          (service as any).learnerSupervisorMemoryService.recordFromEvaluation,
+        ).not.toHaveBeenCalled();
+      });
+    });
 
     it('a second end while the first evaluation is in flight pays for nothing', async () => {
       let finish!: (value: any) => void;

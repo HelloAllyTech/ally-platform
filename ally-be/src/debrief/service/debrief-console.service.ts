@@ -27,7 +27,7 @@ import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefAgentService, DebriefRegion } from './debrief-agent.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefTestSetsService } from './debrief-test-sets.service';
-import { DebriefImproverService } from './debrief-improver.service';
+import { DebriefPmAgentService } from './debrief-pm-agent.service';
 
 const num = (v: unknown, d = 2) =>
   v == null ? null : Math.round(Number(v) * 10 ** d) / 10 ** d;
@@ -60,7 +60,7 @@ export class DebriefConsoleService {
     private readonly agent: DebriefAgentService,
     private readonly context: DebriefContextRepository,
     private readonly testSets: DebriefTestSetsService,
-    private readonly improver: DebriefImproverService,
+    private readonly pmAgent: DebriefPmAgentService,
     private readonly releases: AgentReleaseService,
     private readonly config: AppConfigService,
     private readonly llmModels: LlmModelService,
@@ -247,8 +247,8 @@ export class DebriefConsoleService {
         monthSpentUsd: num(mtd.spentUsd),
         monthlyCapUsd: settings.monthlyCapUsd,
         runCeilingUsd: settings.runCeilingUsd,
-        learningSpentUsd: num(await this.improver.learningSpentThisMonth()),
-        learningBudgetUsd: num(await this.improver.learningBudgetThisMonth()),
+        learningSpentUsd: num(await this.pmAgent.learningSpentThisMonth()),
+        learningBudgetUsd: num(await this.pmAgent.learningBudgetThisMonth()),
       },
       testSets: await this.testSets.counts(),
       liveTenants: await this.liveTenants(),
@@ -298,7 +298,7 @@ export class DebriefConsoleService {
       params.push(v);
       return `$${params.length}`;
     };
-    // Production by default: the Improver's replays are its experiments and
+    // Production by default: the PM agent's replays are its experiments and
     // are read from its ideas, not mixed into what learners could see.
     let where = opts.mode
       ? `r.mode = ${p(opts.mode)}`
@@ -325,6 +325,85 @@ export class DebriefConsoleService {
       evaluatorOverall: num(x.evaluatorOverall),
       costUsd: num(x.costUsd, 4),
     }));
+  }
+
+  /**
+   * v9 FR-38 "Registry": the recipe's steps as capabilities — for each step,
+   * the model the GA release names, and over the last `days` of production
+   * runs how often it ran, failed or was skipped, its typical time and its
+   * estimated spend. Read from the runs' step timelines, so it shows what ran,
+   * not what the recipe says.
+   */
+  async stepUsage(days = 30): Promise<
+    Array<{
+      step: string;
+      model: string | null;
+      backupModel: string | null;
+      inRecipes: string[];
+      done: number;
+      failed: number;
+      skipped: number;
+      medianMs: number | null;
+      estimatedUsd: number;
+      models: string[];
+    }>
+  > {
+    const { bundle } = await this.runner.resolveRelease();
+    const rows: Array<{
+      step: string;
+      done: number;
+      failed: number;
+      skipped: number;
+      median_ms: number | null;
+      usd: number;
+      models: string[] | null;
+    }> = await this.dataSource.query(
+      `SELECT s->>'step' AS step,
+              count(*) FILTER (WHERE s->>'status' = 'done')::int AS done,
+              count(*) FILTER (WHERE s->>'status' = 'failed')::int AS failed,
+              count(*) FILTER (WHERE s->>'status' = 'skipped')::int AS skipped,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY (s->>'ms')::float)
+                FILTER (WHERE s->>'status' = 'done') AS median_ms,
+              COALESCE(sum((s->>'estimatedUsd')::float), 0)::float AS usd,
+              array_remove(array_agg(DISTINCT s->>'model'), NULL) AS models
+         FROM debrief_runs r, jsonb_array_elements(COALESCE(r.steps, '[]'::jsonb)) s
+        WHERE r.mode IN ('shadow','live')
+          AND r."createdAt" >= now() - make_interval(days => $1)
+        GROUP BY 1`,
+      [days],
+    );
+    const byStep = new Map(rows.map((r) => [r.step, r]));
+    const steps = new Map<
+      string,
+      { model: string | null; backupModel: string | null; recipes: string[] }
+    >();
+    for (const recipe of Object.values(bundle.recipes)) {
+      for (const st of recipe.steps) {
+        const seen = steps.get(st.step);
+        if (seen) seen.recipes.push(recipe.key);
+        else
+          steps.set(st.step, {
+            model: st.model ?? null,
+            backupModel: st.backupModel ?? null,
+            recipes: [recipe.key],
+          });
+      }
+    }
+    return [...steps.entries()].map(([step, st]) => {
+      const u = byStep.get(step);
+      return {
+        step,
+        model: st.model,
+        backupModel: st.backupModel,
+        inRecipes: st.recipes,
+        done: u?.done ?? 0,
+        failed: u?.failed ?? 0,
+        skipped: u?.skipped ?? 0,
+        medianMs: u?.median_ms != null ? Math.round(u.median_ms) : null,
+        estimatedUsd: Number((u?.usd ?? 0).toFixed(4)),
+        models: u?.models ?? [],
+      };
+    });
   }
 
   async getRun(id: string) {
@@ -377,11 +456,29 @@ export class DebriefConsoleService {
       isTest: boolean;
       region: DebriefRegion;
       hasSupportContact: boolean;
+      /** v9 FR-8: this calendar month's production spend (shadow + live), actual where reconciled. */
+      monthSpentUsd: number;
+      monthRuns: number;
     }>
   > {
-    const [live, regions] = await Promise.all([
+    const [live, regions, spend] = await Promise.all([
       this.agent.liveTenants().then((ids) => new Set(ids)),
       this.agent.regions(),
+      this.dataSource
+        .query(
+          `SELECT tenant_id AS id,
+                  COALESCE(sum(COALESCE("actualCostUsd", "estimatedCostUsd")), 0)::float AS spent,
+                  count(*) FILTER (WHERE status <> 'skipped')::int AS runs
+             FROM debrief_runs
+            WHERE mode IN ('shadow','live')
+              AND "createdAt" >= date_trunc('month', now())
+              AND tenant_id IS NOT NULL
+            GROUP BY tenant_id`,
+        )
+        .then(
+          (rows: Array<{ id: string; spent: number; runs: number }>) =>
+            new Map(rows.map((r) => [String(r.id), r])),
+        ),
     ]);
     const rows = await this.dataSource.query(
       `SELECT t.id::text AS id, t.name, COALESCE(t."isTestOrganization", false) AS "isTest",
@@ -400,6 +497,8 @@ export class DebriefConsoleService {
         ...t,
         live: live.has(t.id),
         region: regions.get(t.id) ?? 'india',
+        monthSpentUsd: Number((spend.get(t.id)?.spent ?? 0).toFixed(4)),
+        monthRuns: Number(spend.get(t.id)?.runs ?? 0),
       }),
     );
   }

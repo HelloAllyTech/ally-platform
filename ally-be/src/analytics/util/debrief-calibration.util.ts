@@ -1,13 +1,13 @@
 /**
  * The debrief calibration set's rules: how human and judge scores are compared,
- * and the standing gate on the Improver's autonomy.
+ * and the standing gate on the PM agent's autonomy.
  *
  * People (the clinical advisor and one other rater) score a stratified sample
  * of debriefs on the same rubric as the independent judge. Agreement is
  * Cohen's κ: quadratic-weighted on each 0-10 dimension (a 7-vs-8 disagreement
  * costs far less than 2-vs-8), unweighted on each hard fail.
  *
- * The gate: the Improver may put changes live on its own only while κ ≥ 0.6
+ * The gate: the PM agent may put changes live on its own only while κ ≥ 0.6
  * on accuracy, evidence and specificity, and the missed-risk-cue hard fail.
  * Below the reporting floor κ is null, and a null κ never passes the gate.
  */

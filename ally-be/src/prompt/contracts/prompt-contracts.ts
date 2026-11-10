@@ -1405,13 +1405,13 @@ export const DEBRIEF_REFLECTION_CHECK_SYSTEM = definePrompt(
 );
 
 /** src/prompts/debrief/improver_system.txt */
-export const DEBRIEF_IMPROVER_SYSTEM = definePrompt(
+export const DEBRIEF_PM_AGENT_SYSTEM = definePrompt(
   'debrief_improver_system',
   {},
   {
-    name: 'Debrief Improver',
+    name: 'Debrief PM agent',
     description:
-      "The Improver's instructions: reads aggregate signals from debrief runs, writes the weekly report and proposes ideas. Its own skill; changes go through a person.",
+      "The PM agent's instructions: reads aggregate signals from debrief runs, writes the weekly report and proposes ideas. Its own skill; changes go through a person.",
     category: 'evaluation',
     output: 'structured',
   },

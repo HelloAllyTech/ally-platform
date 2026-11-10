@@ -39,7 +39,7 @@ export interface DebriefRatingInput {
 /**
  * The debrief calibration set: a stratified sample of scored debriefs that
  * people rate blind on the judge's rubric, and the agreement that gates the
- * debrief Improver's autonomy.
+ * debrief PM agent's autonomy.
  *
  * Same shape as the foundational-skills human rating programme (its sampler is
  * reused): a seeded, stratified sample nobody can steer by choosing what to
@@ -206,7 +206,7 @@ export class DebriefCalibrationService {
   /**
    * Judge vs human (one pair per rating) and human vs human (every pair of
    * raters of the same debrief), per dimension and per hard fail, plus the
-   * standing gate on the Improver's autonomy.
+   * standing gate on the PM agent's autonomy.
    */
   async getAgreement() {
     const cols = DEBRIEF_QUALITY_DIMENSIONS.map(

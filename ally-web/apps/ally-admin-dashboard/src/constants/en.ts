@@ -9725,15 +9725,78 @@ export const en = {
   debriefs: {
     title: "Debriefs",
     intro:
-      "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the Improver is changing, and which organisations have it.",
+      "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the PM agent is changing, and which organisations have it.",
     tabs: {
       runs: "Runs",
       review: "Review",
-      improver: "Improver",
+      pmAgent: "PM agent",
       releases: "Releases",
       organisations: "Organisations",
       calibration: "Calibration",
       knowledge: "Knowledge",
+      settings: "Settings",
+    },
+    // v9 FR-60: every threshold of the PM agent's test ladder, and the budgets.
+    settings: {
+      heading: "Settings",
+      help: "Every threshold the PM agent's tests use, and its learning budget. Each change is recorded with who made it, and takes effect on the next run. The baseline job reads this month's debriefs and proposes values with its reasons; nothing changes until you accept.",
+      loadFailed: "the settings",
+      groups: {
+        quick: "1. Quick test (open set)",
+        gate: "2. Full test (gate set)",
+        trials: "3. Paired trials on real sessions",
+        canary: "4. Canary to real learners",
+        sealed: "5. Sealed set (monthly)",
+        budget: "Learning budget",
+      } as Record<string, string>,
+      names: {
+        quickTestCases: "Sessions in the quick test",
+        quickTestMinLift: "Lift needed to pass (points)",
+        gateCases: "Sessions in the gate set",
+        gateRotationShare: "Share of the gate set replaced each month",
+        gateNoNewHardFails: "No new hard fails",
+        gateJudgeMedianNotLower: "Judge's median not lower",
+        gateMaxCostIncreasePct: "Most extra cost allowed (%)",
+        sealedCases: "Sessions in the sealed set",
+        pairedMinComparisons: "Pairs needed before deciding",
+        pairedConfidence: "Confidence",
+        probeCapPerSessionUsd: "Most a trial may spend on one session ($)",
+        canaryShare: "Share of live debriefs on the canary",
+        canaryMinRuns: "Canary debriefs needed",
+        canaryMinDays: "Days the canary must run",
+        learningBudgetUsd: "Fixed learning budget a month ($)",
+        learningSkimPct: "Share of every debrief's budget added",
+      } as Record<string, string>,
+      columns: {
+        setting: "Setting",
+        value: "In force",
+        proposed: "Proposed",
+        why: "Why",
+      },
+      default: (v: string) => `Default ${v}`,
+      budgetTag: "Budget",
+      misfit: "No longer fits",
+      noProposal: "—",
+      accept: "Accept",
+      acceptAll: "Accept every proposed value that isn't a budget",
+      save: "Save changes",
+      saved: "Settings saved",
+      saveFailed: "Couldn't save the settings",
+      reset: "Back to default",
+      runBaseline: "Propose values from this month's data",
+      baselineRunning: "Reading this month's debriefs…",
+      baselineDone: "New values proposed",
+      baselineFailed: "Couldn't propose values",
+      baselineNever: "No proposal yet. It runs monthly, or now with the button.",
+      baselineFacts: (when: string, perDay: string, median: string, noise: string, cost: string) =>
+        `Proposed ${when} from ${perDay} debriefs a day; judge median ${median}, re-judging moves scores by ${noise}; typical cost ${cost}.`,
+      budgetTitle: "Change the learning budget?",
+      budgetBody:
+        "Budget settings decide how much the PM agent may spend on tests each month. The change is recorded with your name.",
+      budgetConfirm: "Change the budget",
+      cancel: "Cancel",
+      yes: "Yes",
+      no: "No",
     },
     // The guidance moved into the Context Library's Debrief Guidance (PLAN.md §9.7).
     guidance: {
@@ -9780,7 +9843,7 @@ export const en = {
         costHelp: "Typical (p50) and expensive (p90) runs. The ceiling is shown underneath.",
         ceiling: (v: string) => `Ceiling ${v}`,
         month: "Spent this month",
-        monthHelp: "Production debriefs only. The Improver's learning budget is separate.",
+        monthHelp: "Production debriefs only. The PM agent's learning budget is separate.",
         cap: (v: string) => `Monthly cap: ${v}.`,
       },
       filterLabel: "Show runs",
@@ -9837,6 +9900,76 @@ export const en = {
       cost: (est: string, actual: string) => `Estimated ${est} · actual ${actual}`,
       skipped: "Skipped",
       failed: "Failed",
+      // Reasoning out loud (v9 FR-38): how the debrief was made, step by step.
+      howMade: "How this debrief was made",
+      howMadeHelp:
+        "Each step in the order it ran: why it ran, what it was given, what it was thinking and what it produced. The recipe decides the order; the thinking is the step's own account, for the Ally team only.",
+      decision: "Outcome",
+      noReasoning:
+        "This run was made before steps recorded their reasoning, so only timings and notes are shown.",
+      why: "Why",
+      given: "Given",
+      thinking: "Thinking",
+      result: "Result",
+      budgetLeft: (usd: string) => `${usd} left`,
+      stepCost: (usd: string) => `~${usd}`,
+      showOutput: "Show what it produced",
+      outputs: {
+        safety: "Safety reading",
+        evidence: "Evidence map",
+        liveDetections: "Live detector's record",
+        progress: "Progress reading",
+        cohort: "How other trainees did",
+      },
+      draftChanges: "What changed between drafts",
+      draftChangesNone: "The first draft was not revised.",
+      critique: "What it was asked to fix",
+      revisionChanged: (round: number, count: number) =>
+        `Revision ${round}: ${count === 0 ? "no section changed" : count === 1 ? "1 section changed" : `${count} sections changed`}`,
+      before: "Before",
+      after: "After",
+      removed: "(removed)",
+      added: "(new)",
+      replies: "Ask Ally replies",
+      repliesHelp:
+        "How each reply to the learner was reached: the lookups it made and what they found. The learner's messages are not shown here.",
+      replyLine: (at: string, passes: number, cost: string) =>
+        `${at} · ${passes === 1 ? "1 pass" : `${passes} passes`} · ${cost}`,
+      noTools: "Answered from the debrief and the session, without lookups.",
+      stoppedBy: {
+        budget: "Stopped looking things up: the reply's budget was nearly spent.",
+        max_turns: "Stopped looking things up: it reached its limit of passes.",
+      },
+      registry: "Steps",
+      registryHelp:
+        "Each step the recipes run, the model the live release names for it, and how it did over the last 30 days of debriefs. Change a step's model under Models above; the order of steps is the recipe's.",
+      registryColumns: {
+        step: "Step",
+        model: "Model (backup)",
+        recipes: "In recipes",
+        ran: "Ran",
+        failed: "Failed",
+        skipped: "Skipped",
+        time: "Typical time",
+        spend: "Estimated spend",
+      },
+      registryEmpty: "No debriefs in the last 30 days.",
+      registryLoadFailed: "the steps",
+      stepNames: {
+        safety_reader: "Safety reader",
+        analyst: "Analyst",
+        progress_reader: "Progress reader",
+        guidance_lookup: "Guidance lookup",
+        writer: "Writer",
+        checks: "Rule checks",
+        evaluator: "Evaluator",
+        reviser: "Reviser",
+      } as Record<string, string>,
+      toolNames: {
+        search_guidance: "Searched guidance",
+        get_learner_history: "Read the learner's earlier points",
+        get_live_detections: "Read the live detector's record",
+      } as Record<string, string>,
     },
     review: {
       heading: "Review",
@@ -9846,6 +9979,8 @@ export const en = {
       emptyMessage: "Live debriefs that need a person, and learners' flags, appear here.",
       runsHeading: "Debriefs waiting for a person",
       flagsHeading: "Learners' flags",
+      keyboardHint:
+        "Keyboard: j and k move through the queue, Enter opens the debrief, e escalates to the clinical advisor.",
       distress: "Learner distress",
       judgeBelow: "Judge below the bar",
       judgeHelp:
@@ -9913,24 +10048,24 @@ export const en = {
         reviewed: "It stays as the learner has it and leaves this queue.",
       } as Record<string, string>,
     },
-    improver: {
-      heading: "The Improver",
-      help: "Each day the Improver reads how debriefs are doing, writes a short report and proposes changes. It tries prompt and setting changes on the open test set on its own; nothing reaches learners until a person approves it here.",
-      loadFailed: "the Improver",
+    pmAgent: {
+      heading: "The PM agent",
+      help: "Each week the PM agent reads how debriefs are doing, writes a short report and proposes changes, and once a month it takes a longer look. Each change climbs a ladder of tests on its own — a quick test, the full gate test, then paired trials on real sessions — and reaches learners only after a person starts a canary and promotes it here.",
+      loadFailed: "the PM agent",
       report: "Latest report",
       noReport:
-        "The Improver has not written a report yet. It runs once there are debrief runs to read.",
+        "The PM agent has not written a report yet. It runs once there are debrief runs to read.",
       ranAt: (when: string) => `Written ${when}`,
-      runNow: "Run the Improver now",
+      runNow: "Run the PM agent now",
       running: "Running…",
-      ran: "The Improver has finished",
-      skipped: (why: string) => `The Improver did not run: ${why}`,
-      runFailed: "The Improver could not run",
+      ran: "The PM agent has finished",
+      skipped: (why: string) => `The PM agent did not run: ${why}`,
+      runFailed: "The PM agent could not run",
       budget: (spent: string, of: string) =>
-        `Learning budget: ${spent} spent of ${of} set aside this month (20% of every debrief's budget)`,
+        `Learning budget: ${spent} spent of ${of} set aside this month (see Settings)`,
       testSets: "Test sets",
       testSetsHelp:
-        "Real sessions, split three ways. The Improver screens ideas on the open set; the gate set decides releases; the sealed set is never shown to it.",
+        "Real sessions, split three ways. The PM agent screens ideas on the open set; the gate set decides releases; the sealed set is never shown to it.",
       sets: { debrief_open: "Open", debrief_gate: "Gate", debrief_sealed: "Sealed" } as Record<
         string,
         string
@@ -9962,6 +10097,48 @@ export const en = {
       notScreened: "Not tried yet",
       screenPassed: "Better",
       screenFailed: "Not better",
+      ladder: {
+        quick: "Quick test",
+        gate: "Gate test",
+        trial: "Paired trial",
+        canary: "Canary",
+      },
+      rungRunning: "Running…",
+      rungFailed: "Did not finish",
+      rungPassed: "Passed",
+      rungNotPassed: "Did not pass",
+      rungWaiting: "Waiting",
+      gateLine: (base: string, chal: string, pairs: number) =>
+        `median ${base} → ${chal} on ${pairs} sessions`,
+      gateRules: {
+        hardFails: "new hard fails",
+        median: "judge's median lower",
+        cost: "cost above the limit",
+        scored: "too few sessions scored",
+      } as Record<string, string>,
+      trialLine: (n: number, diff: string, lo: string, hi: string) =>
+        `${n} pairs · ${diff} (${lo} to ${hi})`,
+      canaryLine: (share: number, runs: number, canary: string, control: string) =>
+        `${share}% of live debriefs · ${runs} so far · median ${canary} against ${control}`,
+      canaryStatus: {
+        running: "Running",
+        passed: "Ready to promote",
+        reverted: "Reverted",
+        promoted: "Promoted",
+      } as Record<string, string>,
+      startCanary: "Start canary",
+      promote: "Promote to everyone",
+      canaryNeedsTrial: "Only a change that passed its paired trial can start a canary.",
+      canaryTitle: "Start a canary?",
+      canaryBody:
+        "A share of live debriefs in switched-on organisations will use this change (set in Settings). It is reverted on its own if it does worse.",
+      canaryConfirm: "Start the canary",
+      promoteTitle: "Promote this change to everyone?",
+      promoteBody:
+        "The canary did not do worse than the release in force. Promoting makes it the release every learner gets. You can roll it back from Releases.",
+      promoteConfirm: "Promote",
+      promoted: "Promoted. Every learner now gets this change.",
+      canaryStarted: "Canary started.",
       approve: "Approve",
       reject: "Reject",
       approveNeedsScreen: "Only a change that did better when tried can go live.",
@@ -9972,7 +10149,7 @@ export const en = {
       approveConfirm: "Put it live",
       rejectTitle: "Reject this idea?",
       rejectBody:
-        "The Improver will see it was rejected and will not propose it again unless the numbers change.",
+        "The PM agent will see it was rejected and will not propose it again unless the numbers change.",
       rejectConfirm: "Reject",
       cancel: "Cancel",
       approved: "The change is live",
@@ -10024,7 +10201,7 @@ export const en = {
         notes: "What changed",
         when: "Made",
       },
-      authors: { seed: "Code", human: "A person", curator: "Improver", system: "System" } as Record<
+      authors: { seed: "Code", human: "A person", curator: "PM agent", system: "System" } as Record<
         string,
         string
       >,
@@ -10039,7 +10216,14 @@ export const en = {
       heading: "Organisations",
       help: "Switch an organisation on and its learners read the Debrief agent's debrief instead of today's. Switching off is the emergency stop for that organisation.",
       loadFailed: "the organisations",
-      columns: { name: "Organisation", state: "Learners read", region: "Works in" },
+      columns: {
+        name: "Organisation",
+        state: "Learners read",
+        region: "Works in",
+        spend: "Spent this month",
+      },
+      spendLine: (usd: string, runs: number) =>
+        `${usd} · ${runs === 1 ? "1 debrief" : `${runs} debriefs`}`,
       india: "India",
       outsideIndia: "Outside India",
       markOutside: "Mark as outside India",
@@ -10064,7 +10248,7 @@ export const en = {
     },
     calibration: {
       heading: "Score debriefs by hand",
-      help: "People score a fixed sample of debriefs on the same rubric the quality judge uses, without seeing its scores. How closely the judge agrees with people decides whether the Improver may put changes live without asking.",
+      help: "People score a fixed sample of debriefs on the same rubric the quality judge uses, without seeing its scores. How closely the judge agrees with people decides whether the PM agent may put changes live without asking.",
       loadFailed: "the calibration sample",
       agreementFailed: "agreement",
       kpis: {
@@ -10074,14 +10258,14 @@ export const en = {
         ratersHelp: "Two or more lets us measure how much people agree with each other.",
         mine: "Rated by you",
         mineHelp: "Your scores count wherever the sample moves.",
-        gate: "Improver autonomy",
+        gate: "PM agent autonomy",
         gateHelp:
           "Met only while the judge agrees with people well enough on accuracy, evidence and missed risk.",
         met: "Allowed",
         notMet: "Needs approval",
       },
       ofTarget: (n: number, target: number) => `${n} of ${target}`,
-      gateHeading: "What the Improver's autonomy depends on",
+      gateHeading: "What the PM agent's autonomy depends on",
       gateHelp:
         "Agreement is Cohen's kappa: 1 is perfect, 0 is chance. Each check needs 0.6 or more, measured on at least 20 rated debriefs.",
       gateColumns: { measure: "Check", agreement: "Judge vs people", status: "Status" },
@@ -10234,6 +10418,41 @@ export const en = {
       pick: "Choose an organisation",
       filterHelp:
         "Global entries reach every learner. An organisation's reach only its own learners.",
+      pickerLabel: "Who can read this",
+      pickerHelp:
+        "Every organisation, or only the ones you tick. Learners in other organisations never see a targeted entry in the Ally guide, Debrief or Course Copilot. Builder and Bug Hunter read everything either way.",
+      documentHelp:
+        "Every entry drawn from these documents reaches the organisations you choose here. You can change it later from the document.",
+      bulkNote:
+        "For new rows that leave is_global and tenant_ids blank. A row's own columns win, and rows that update an entry keep its audience unless they set one.",
+      everyOrganisation: "Every organisation (global)",
+      onlyThese: "Only these organisations",
+      filterOrganisations: "Filter organisations",
+      noOrganisationMatches: "No organisation matches.",
+      noOrganisations: "No organisations to choose from.",
+      unknownOrganisation: "Unknown organisation",
+      selectedCount: (count: number) =>
+        count === 1 ? "1 organisation selected" : `${count} organisations selected`,
+      chooseOne: "Choose at least one organisation.",
+      change: "Change",
+      save: "Save",
+      saving: "Saving…",
+      cancel: "Cancel",
+      saved: "Audience updated.",
+      saveFailed: "Couldn't change who can read this.",
+      ownedByOrganisation: "Belongs to an organisation, so it reaches that organisation only.",
+      followsStudio: "Follows its owner in Studio.",
+      documentSaved: (updated: number, shared: number) =>
+        [
+          updated === 1 ? "1 entry updated." : `${updated} entries updated.`,
+          shared
+            ? shared === 1
+              ? "1 entry also comes from another document and kept its audience."
+              : `${shared} entries also come from other documents and kept their audience.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
     },
     /** For "All": no single collection noun applies. */
     allNoun: "item",

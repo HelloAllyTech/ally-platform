@@ -153,6 +153,7 @@ export const addDocuments = (incoming: File[], options: ContextUploadOptions): v
         fileName: file.name,
         title: titleFromFileName(file.name),
         collections: options.collections,
+        audience: options.audience,
         phase: "uploading",
         uploadFraction: 0,
       };
@@ -190,7 +191,12 @@ export const resendRow = (
     message: undefined,
     final: undefined,
   });
-  sendBatch([id], [file], { collections: row.collections, ...extra, batchId: row.batchId });
+  sendBatch([id], [file], {
+    collections: row.collections,
+    audience: row.audience,
+    ...extra,
+    batchId: row.batchId,
+  });
   return true;
 };
 

@@ -48,7 +48,15 @@ export class DebriefRunJudgeService {
     private readonly config: AppConfigService,
   ) {}
 
-  async judge(run: DebriefRun): Promise<RunJudgment | null> {
+  /**
+   * Score a run. `store: false` scores without writing it back — the baseline
+   * job re-judges a sample to measure how much scores move on re-judging,
+   * and must not replace the score the KPI reads.
+   */
+  async judge(
+    run: DebriefRun,
+    opts: { store?: boolean } = {},
+  ): Promise<RunJudgment | null> {
     if (!run.cards) return null;
     const transcript = await this.context.transcript(run.scenarioSessionId);
     if (!transcript.length) return null;
@@ -96,6 +104,7 @@ export class DebriefRunJudgeService {
       hardFails: d.hard_fails,
       judgedAt: new Date().toISOString(),
     };
+    if (opts.store === false) return judgment;
     await this.runs.query(
       `UPDATE debrief_runs SET workspace = workspace || jsonb_build_object('judge', $2::jsonb)
         WHERE id = $1`,

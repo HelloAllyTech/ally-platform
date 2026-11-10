@@ -23,7 +23,7 @@ describe('DebriefAiClient', () => {
 
   it('gives each step its own limit, and anything else the run-length default', async () => {
     await client.step('reviser', {});
-    await client.step('improver', {});
+    await client.step('pm-agent', {});
     expect(post.mock.calls.map((c) => c[2].timeout)).toEqual([
       120_000, 120_000,
     ]);

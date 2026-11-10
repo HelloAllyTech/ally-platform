@@ -77,6 +77,11 @@ export interface RunOptions {
   settingOverrides?: Partial<DebriefBundle['settings']>;
   experimentId?: string | null;
   arm?: DebriefRunArm | null;
+  /**
+   * v9 FR-3: carry on this run (its worker died) instead of claiming a new
+   * one. Steps whose results were checkpointed are replayed, not paid again.
+   */
+  resume?: DebriefRun | null;
   /** For tests: the clock. */
   now?: () => number;
 }
@@ -93,6 +98,144 @@ interface Draft {
   checks: DebriefCheckFailure[];
   evaluation: Evaluation | null;
   round: number;
+}
+
+/**
+ * How a step is explained in the Console's run view (reasoning out loud):
+ * why the runner ran it, what it was given, how to say in one line what it
+ * produced, and, for a step whose model gives no rationale, what to say
+ * instead.
+ */
+interface StepExplain<T> {
+  why?: string;
+  inputs?: string[];
+  summarise?: (res: T) => string;
+  reasoning?: (res: T) => string | null;
+}
+
+/** An optional read that can never fail the run: any error gives the fallback. */
+async function orFallback<T>(read: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await read();
+  } catch {
+    return fallback;
+  }
+}
+
+/** A summary that cannot fail the run: an odd answer shape gives no line. */
+function safeSummary<T>(
+  summarise: ((res: T) => string) | undefined,
+  res: T,
+): string | null {
+  if (!summarise) return null;
+  try {
+    return summarise(res).slice(0, 300) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The runner's reason for a skipped step, by the note it records. */
+const SKIP_WHY: Record<string, string> = {
+  budget: 'Skipped: not enough of the run budget was left for it.',
+  deadline: 'Skipped: too little time was left before the deadline.',
+  'no history': 'Skipped: this learner has no earlier debriefs to follow up.',
+};
+
+/** "1 thing" / "3 things": counts read as words in the run view. */
+const n = (count: number, one: string, many = `${one}s`) =>
+  `${count} ${count === 1 ? one : many}`;
+
+/** The Analyst's evidence map, in one line. */
+export function evidenceSummary(evidence: Record<string, any>): string {
+  const b: Array<{ observation?: string; opportunity?: boolean }> =
+    Array.isArray(evidence?.behaviours) ? evidence.behaviours : [];
+  const seen = (o: string) =>
+    b.filter((x) => x?.opportunity !== false && x?.observation === o).length;
+  const moments = Array.isArray(evidence?.pivotal_moments)
+    ? evidence.pivotal_moments.length
+    : 0;
+  return (
+    `${n(b.length, 'skill')} read: ${seen('observed')} observed, ` +
+    `${seen('partial')} partial, ${seen('missed')} missed; ` +
+    `${n(moments, 'pivotal moment')}`
+  );
+}
+
+/** A draft's cards, in one line. */
+export function cardsSummary(cards: Partial<DebriefCards> | undefined): string {
+  const worked = cards?.what_worked?.length ?? 0;
+  const work = cards?.work_on_this?.length ?? 0;
+  return [
+    cards?.important_moment ? 'an important moment' : 'no important moment',
+    n(worked, 'strength'),
+    n(work, 'point to work on', 'points to work on'),
+    cards?.practise_next ? 'Practise next' : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+/** What code found in the Safety reader's reading (its model is pinned and gives no rationale). */
+export function safetyNarration(safety: SafetyReading): string {
+  const cues = safety.risk_cues;
+  if (cues.length === 0 && safety.learner_distress.length === 0) {
+    return 'No client risk cues and no sign of the learner’s own distress.';
+  }
+  const parts: string[] = [];
+  if (cues.length) {
+    parts.push(
+      `${n(cues.length, 'client risk cue')}: ` +
+        cues
+          .map(
+            (c) =>
+              `turn ${c.turn_index} (${String(c.category).replace(/_/g, ' ')}; ` +
+              `learner ${String(c.learner_response).replace(/_/g, ' ')})`,
+          )
+          .join(', ') +
+        '. The debrief must cover every one.',
+    );
+  }
+  if (safety.learner_distress.length) {
+    parts.push(
+      `The learner’s own distress at turn ` +
+        safety.learner_distress.map((d) => d.turn_index).join(', ') +
+        ': the debrief opens with support first.',
+    );
+  }
+  return parts.join(' ');
+}
+
+/** Why a run ended before a draft was judged, by its skip reason. */
+const END_WHY: Record<string, string> = {
+  no_session: 'Stopped: the session could not be found.',
+  too_short: 'No debrief: the learner said nothing in the session.',
+  no_transcript: 'No debrief: the session has no transcript.',
+  monthly_cap:
+    'Held for a person: this month’s debrief budget is spent, so no run could start.',
+  budget_below_minimum:
+    'Held for a person: the run budget could not cover the minimum steps.',
+  safety_reader_failed:
+    'Held for a person: the safety reading failed, and nothing is published without one.',
+  writer_failed: 'Held for a person: the Writer failed on both of its models.',
+};
+
+/** Why the Reviser ran: what kept the best draft below the bar. */
+function revisionWhy(best: Draft, passScore: number): string {
+  const blocking = best.checks.filter((c) => !ADVISORY_CHECKS.has(c.code));
+  const reasons = [
+    blocking.length
+      ? `it failed ${blocking.map((c) => c.code).join(', ')}`
+      : null,
+    best.evaluation?.hardFails.length
+      ? `the Evaluator found ${best.evaluation.hardFails.map((h) => h.code).join(', ')}`
+      : null,
+    best.evaluation?.overall != null && best.evaluation.overall < passScore
+      ? `it scored ${best.evaluation.overall.toFixed(1)} (the bar is ${passScore})`
+      : null,
+    !best.evaluation ? 'it could not be scored' : null,
+  ].filter(Boolean);
+  return `Revising round ${best.round} because ${reasons.join(', and ') || 'it is below the bar'}.`;
 }
 
 /** A draft is publishable when it passes every check. */
@@ -121,7 +264,7 @@ export function betterDraft(a: Draft | null, b: Draft): Draft {
  * checks, then the recipe's steps in order, the check → evaluate ⇄ revise
  * loop, the budget and the deadline, and the fallback ladder when either runs
  * out. Every step is recorded on the run as it happens, so the Console can
- * draw the timeline and the Improver can read what went wrong.
+ * draw the timeline and the PM agent can read what went wrong.
  *
  * The guarantees hold whatever the recipe says: the safety reader always runs
  * and its failure stops the run; nothing is published without passing the
@@ -188,7 +331,7 @@ export class DebriefRunnerService {
     const { release, bundle } = await this.resolveRelease(opts.release);
     const settings = { ...bundle.settings, ...(opts.settingOverrides ?? {}) };
 
-    const created = await this.claim(sessionId, opts, release);
+    const created = opts.resume ?? (await this.claim(sessionId, opts, release));
     if (!created) {
       return (await this.runs.findOne({
         where: { scenarioSessionId: sessionId, mode: opts.mode },
@@ -197,6 +340,14 @@ export class DebriefRunnerService {
     const run = created;
     const startedAt = now();
     const steps: DebriefRunStepRecord[] = [];
+    // v9 FR-3: each paid step's answer, checkpointed on the run as it lands,
+    // so a run whose worker dies resumes without paying for them again. Kept
+    // out of the in-memory workspace: the finished run does not store them.
+    const { stepResults: checkpoint = {}, ...workspaceNow } = (run.workspace ??
+      {}) as Record<string, any>;
+    const stepResults = checkpoint as Record<string, { res: any; est: number }>;
+    run.workspace = workspaceNow;
+    const resumed = !!opts.resume;
     let estimated = 0;
     let rung = FallbackRung.NONE;
 
@@ -204,6 +355,25 @@ export class DebriefRunnerService {
       status: DebriefRunStatus,
       patch: Partial<DebriefRun> = {},
     ): Promise<DebriefRun> => {
+      // A run that ended early still says why, in the same place as one that
+      // reached a decision about a draft.
+      const ended =
+        patch.skipReason ??
+        (status === DebriefRunStatus.FAILED ? 'failed' : null);
+      if (ended && !run.workspace?.decision) {
+        run.workspace = {
+          ...run.workspace,
+          decision: {
+            status,
+            round: null,
+            why:
+              END_WHY[ended] ??
+              (status === DebriefRunStatus.FAILED
+                ? 'Failed: an unexpected error stopped the run (see the error).'
+                : ended),
+          },
+        };
+      }
       Object.assign(run, patch, {
         status,
         steps,
@@ -262,7 +432,13 @@ export class DebriefRunnerService {
         languageSource = detected.source;
         run.language = detected.language;
       }
-      run.workspace = { ...run.workspace, languageSource };
+      run.workspace = {
+        ...run.workspace,
+        languageSource,
+        ...(resumed
+          ? { resumes: Number(run.workspace?.resumes ?? 0) || 1 }
+          : {}),
+      };
 
       const recipe: DebriefRecipe =
         session.learnerTurns < settings.standardMinLearnerTurns
@@ -341,21 +517,58 @@ export class DebriefRunnerService {
         }
       };
 
-      /** One AI step, retried once (on the backup model when there is one). */
+      /** What is left of the ceiling once everything reserved so far is spent. */
+      const budgetLeft = () =>
+        Number(Math.max(0, ceiling - estimated).toFixed(4));
+
+      /**
+       * One AI step, retried once (on the backup model when there is one).
+       * `explain` is the reasoning-out-loud record: why the runner ran it,
+       * what it was given, and how to say in one line what came back.
+       */
       const call = async <T>(
         s: RecipeStep,
         path: string,
         body: Record<string, unknown>,
         est: number,
         round?: number,
+        explain: StepExplain<T> = {},
       ): Promise<T | null> => {
         announce({ step: s.step, ...(round ? { round } : {}) });
+        const key = `${path}#${round ?? 0}`;
+        const saved = stepResults[key];
+        if (saved) {
+          // Already paid for before the worker died: replay the answer.
+          steps.push({
+            step: s.step,
+            label: s.label,
+            status: 'done',
+            startedAt: new Date(now()).toISOString(),
+            ms: 0,
+            model: saved.res?.model ?? s.model,
+            estimatedUsd: Number(saved.est.toFixed(4)),
+            round,
+            note: 'resumed from checkpoint',
+            why: explain.why ?? null,
+            inputs: explain.inputs ?? [],
+            reasoning:
+              explain.reasoning?.(saved.res) ??
+              (typeof saved.res?.reasoning === 'string'
+                ? saved.res.reasoning
+                : null),
+            output: safeSummary(explain.summarise, saved.res),
+            budgetLeftUsd: budgetLeft(),
+          });
+          return saved.res as T;
+        }
         // A model whose breaker is open goes after its backup, not before.
         const models = modelsToTry(s.model, s.backupModel);
         for (let attempt = 0; attempt < 2; attempt++) {
           const t0 = now();
           try {
-            const res = await this.ai.step<T & { model?: string }>(path, {
+            const res = await this.ai.step<
+              T & { model?: string; reasoning?: string }
+            >(path, {
               ...body,
               model: models[attempt],
               scenario_session_id: sessionId,
@@ -371,7 +584,18 @@ export class DebriefRunnerService {
               estimatedUsd: Number(est.toFixed(4)),
               round,
               note: attempt > 0 ? 'retried' : null,
+              why: explain.why ?? null,
+              inputs: explain.inputs ?? [],
+              reasoning:
+                explain.reasoning?.(res) ??
+                (typeof res.reasoning === 'string' && res.reasoning.trim()
+                  ? res.reasoning.trim().slice(0, 2000)
+                  : null),
+              output: safeSummary(explain.summarise, res),
+              budgetLeftUsd: budgetLeft(),
             });
+            stepResults[key] = { res, est };
+            await this.checkpoint(run.id, key, { res, est });
             return res;
           } catch (e) {
             const err = e as DebriefStepError;
@@ -386,12 +610,22 @@ export class DebriefRunnerService {
               estimatedUsd: Number(est.toFixed(4)),
               round,
               note: `${err.status ?? 'network'}: ${err.message}`.slice(0, 300),
+              why:
+                attempt === 0
+                  ? (explain.why ?? null)
+                  : 'Retried once after the first attempt failed.',
+              inputs: explain.inputs ?? [],
+              budgetLeftUsd: budgetLeft(),
             });
           }
         }
         return null;
       };
-      const skipped = (s: RecipeStep | DebriefStep, note: string) => {
+      const skipped = (
+        s: RecipeStep | DebriefStep,
+        note: string,
+        why?: string,
+      ) => {
         const step = typeof s === 'string' ? s : s.step;
         steps.push({
           step,
@@ -400,6 +634,8 @@ export class DebriefRunnerService {
           startedAt: new Date(now()).toISOString(),
           ms: 0,
           note,
+          why: why ?? SKIP_WHY[note] ?? null,
+          budgetLeftUsd: budgetLeft(),
         });
       };
 
@@ -413,9 +649,28 @@ export class DebriefRunnerService {
           skipReason: 'budget_below_minimum',
         });
       }
+      // The live detector's record is a second opinion for the Analyst (v9
+      // FR-17). It never blocks a debrief: unreadable means none.
+      const liveDetections = analystStep
+        ? await orFallback(
+            () => this.context.liveDetections(sessionId, session.scenarioId),
+            [],
+          )
+        : [];
+      if (liveDetections.length) {
+        run.workspace = { ...run.workspace, liveDetections };
+      }
+      // A case's memory so far: the Analyst returns it updated (v9 FR-4, the
+      // memory the next session of the case reads), the Writer keeps to it.
+      const caseMemory =
+        recipe.key === DebriefRecipeKey.CASE
+          ? await orFallback(() => this.context.caseMemory(session.id), null)
+          : null;
+      if (caseMemory) run.workspace = { ...run.workspace, caseMemory };
       const analystEst = analystStep
         ? reserve(analystStep, transcriptChars)
         : null;
+      const turnsLine = `the transcript (${n(transcript.length, 'turn')})`;
       const [safetyRes, analystRes] = await Promise.all([
         call<{
           risk_cues: SafetyReading['risk_cues'];
@@ -429,6 +684,19 @@ export class DebriefRunnerService {
             system_prompt: await prompt(DEBRIEF_PROMPT_CODES.safetyReader),
           },
           safetyEst,
+          undefined,
+          {
+            why: 'Always runs first: nothing is published without a safety reading.',
+            inputs: [turnsLine],
+            reasoning: (r) =>
+              safetyNarration({
+                risk_cues: r.risk_cues ?? [],
+                learner_distress: r.learner_distress ?? [],
+              }),
+            summarise: (r) =>
+              `${n(r.risk_cues?.length ?? 0, 'risk cue')}, ` +
+              `${n(r.learner_distress?.length ?? 0, 'sign', 'signs')} of the learner’s own distress`,
+          },
         ),
         analystStep && analystEst !== null
           ? call<{ evidence: Record<string, any> }>(
@@ -440,9 +708,27 @@ export class DebriefRunnerService {
                 scenario: session.scenario,
                 expected_behaviours: session.expectedBehaviours,
                 learner_level: session.learnerLevel,
+                live_detections: liveDetections,
+                case_memory: caseMemory,
                 system_prompt: await prompt(DEBRIEF_PROMPT_CODES.analyst),
               },
               analystEst,
+              undefined,
+              {
+                why: 'Builds the evidence map the Writer writes from.',
+                inputs: [
+                  turnsLine,
+                  'the scenario',
+                  n(session.expectedBehaviours.length, 'expected behaviour'),
+                  ...(caseMemory ? ['the case memory'] : []),
+                  ...(liveDetections.length
+                    ? [
+                        `the live detector’s record (${liveDetections.filter((d) => d.detected).length} of ${liveDetections.length} detected)`,
+                      ]
+                    : []),
+                ],
+                summarise: (r) => evidenceSummary(r.evidence),
+              },
             )
           : Promise.resolve(null),
       ]);
@@ -500,6 +786,25 @@ export class DebriefRunnerService {
                 ),
               },
               est,
+              undefined,
+              {
+                why: `This learner has ${n(past.length, 'earlier Work-on-this point')} to follow up.`,
+                inputs: ['the evidence map', n(past.length, 'past point')],
+                summarise: (r) =>
+                  r.progress?.items?.length
+                    ? (
+                        r.progress.items as Array<{
+                          skill?: string;
+                          trend?: string;
+                        }>
+                      )
+                        .map(
+                          (i) =>
+                            `${i.skill}: ${String(i.trend ?? '').replace(/_/g, ' ')}`,
+                        )
+                        .join('; ')
+                    : 'nothing to follow up this time',
+              },
             );
             progress = res?.progress?.items?.length ? res.progress : null;
             if (!res) rung = Math.max(rung, FallbackRung.SKIP_PROGRESS);
@@ -535,10 +840,12 @@ export class DebriefRunnerService {
         });
         const seen = new Set<string>();
         let lookups = 0;
+        let stopped: string | null = null;
         for (const m of moments) {
           if (!m?.summary) continue;
           if (timeLeft() < settings.deadlineMs / 2) {
             rung = Math.max(rung, FallbackRung.ONE_GUIDANCE_LOOKUP);
+            stopped = 'Stopped early to keep time for writing.';
             break;
           }
           try {
@@ -562,6 +869,7 @@ export class DebriefRunnerService {
             }
           } catch {
             // Empty or unreachable guidance never stops a debrief.
+            stopped = 'Guidance could not be reached; writing without it.';
             break;
           }
         }
@@ -572,6 +880,33 @@ export class DebriefRunnerService {
           startedAt: new Date(t0).toISOString(),
           ms: now() - t0,
           note: `${lookups} lookup(s), ${passages.length} passage(s)`,
+          why: moments.length
+            ? `Looks up practice guidance for the session’s ${n(Math.min(moments.length, 3), 'pivotal moment')}.`
+            : 'No pivotal moments to look guidance up for.',
+          inputs: [
+            'each moment’s summary in the Analyst’s words (never the learner’s)',
+          ],
+          reasoning:
+            [
+              typeof topic === 'string' && topic.trim()
+                ? `Led by the skill that mattered most: ${topic.trim().slice(0, 60)}.`
+                : null,
+              lookups && !passages.length
+                ? 'Nothing matched confidently, so the Writer gets no guidance rather than a weak match.'
+                : null,
+              stopped,
+            ]
+              .filter(Boolean)
+              .join(' ') || null,
+          output: `${n(lookups, 'lookup')}, ${n(passages.length, 'passage')} kept${
+            passages.length
+              ? `: ${passages
+                  .map((p) => p.title)
+                  .slice(0, 3)
+                  .join('; ')}`
+              : ''
+          }`,
+          budgetLeftUsd: budgetLeft(),
         });
         run.workspace = { ...run.workspace, passages: [...seen] };
       }
@@ -584,14 +919,17 @@ export class DebriefRunnerService {
       );
       const offered = new Set(practiceOptions.map((o) => o.id));
       const writerStep = stepOf(DebriefStep.WRITER)!;
-      const caseMemory =
-        recipe.key === DebriefRecipeKey.CASE
-          ? await this.context.caseMemory(session.id)
-          : null;
-      if (caseMemory) run.workspace = { ...run.workspace, caseMemory };
+      // How the organisation's other trainees did on this roleplay (v9 FR-17):
+      // only for 5 or more of them, in words, and never a reason to fail.
+      const cohort = await orFallback(
+        () => this.context.cohortStats(session),
+        null,
+      );
+      if (cohort) run.workspace = { ...run.workspace, cohort };
       const writerInput = {
         practice_options: practiceOptions,
         case_memory: caseMemory,
+        cohort,
         assessment: recipe.key === DebriefRecipeKey.ASSESSMENT,
         evidence,
         safety,
@@ -615,6 +953,30 @@ export class DebriefRunnerService {
         'writer',
         writerInput,
         writerEst,
+        undefined,
+        {
+          why: recipe.shortForm
+            ? 'Writes a short debrief: the session had few learner turns.'
+            : `Writes the cards from the evidence (${recipe.key} recipe).`,
+          inputs: [
+            analystRes
+              ? 'the evidence map'
+              : 'no evidence map (the Analyst did not run)',
+            'the safety reading',
+            turnsLine,
+            ...(passages.length
+              ? [n(passages.length, 'guidance passage')]
+              : []),
+            ...(progress ? ['the progress reading'] : []),
+            ...(caseMemory ? ['the case memory'] : []),
+            ...(cohort
+              ? ['how other trainees did on this roleplay (5 or more)']
+              : []),
+            n(practiceOptions.length, 'roleplay', 'roleplays') +
+              ' Practise next may point to',
+          ],
+          summarise: (r) => cardsSummary(r.cards),
+        },
       );
       if (!written) {
         rung = FallbackRung.PERSON_FINISHES;
@@ -647,6 +1009,21 @@ export class DebriefRunnerService {
           note: fails.length
             ? fails.map((f) => f.code).join(', ')
             : 'all passed',
+          why: 'The rule checks run on every draft: quotes, risk cues, length, language, no scores.',
+          reasoning: fails.length
+            ? fails
+                .slice(0, 6)
+                .map((f) => `${f.section}: ${f.detail}`)
+                .join(' · ')
+            : null,
+          output: fails.length
+            ? `${n(fails.length, 'check')} failed${
+                fails.every((f) => ADVISORY_CHECKS.has(f.code))
+                  ? ' (advisory only; still publishable)'
+                  : ''
+              }`
+            : 'every check passed',
+          budgetLeftUsd: budgetLeft(),
         });
         return fails;
       };
@@ -682,6 +1059,35 @@ export class DebriefRunnerService {
           },
           est,
           round,
+          {
+            why:
+              round === 0
+                ? 'Scores the first draft against the rubric before anything is published.'
+                : `Scores revision ${round} against the rubric.`,
+            inputs: [
+              round === 0 ? 'the draft' : `revision ${round}`,
+              turnsLine,
+              'the rubric',
+              ...(history ? ['the learner’s past points'] : []),
+            ],
+            summarise: (r) => {
+              const overall = computeDebriefOverall(
+                Object.fromEntries(
+                  r.evaluation.dimensions.map((d) => [d.dimension, d.score]),
+                ) as Partial<Record<DebriefQualityDimension, number>>,
+                r.evaluation.hard_fails.length,
+              );
+              return [
+                overall != null
+                  ? `${overall.toFixed(1)} overall`
+                  : 'no overall score',
+                r.evaluation.hard_fails.length
+                  ? `hard fails: ${r.evaluation.hard_fails.map((h) => h.code).join(', ')}`
+                  : 'no hard fail',
+                n(r.evaluation.fixes?.length ?? 0, 'fix note'),
+              ].join('; ');
+            },
+          },
         );
         if (!res) return null;
         const scores = Object.fromEntries(
@@ -710,6 +1116,13 @@ export class DebriefRunnerService {
         round: 0,
       };
       current.evaluation = await evaluate(current.cards, 0);
+      // Every round's cards and the critique that produced it, so the run
+      // view can show what changed between drafts and why.
+      const drafts: Array<{
+        round: number;
+        cards: DebriefCards;
+        critique: Array<{ section: string; note: string }>;
+      }> = [{ round: 0, cards: written.cards, critique: [] }];
       let best = betterDraft(null, current);
       const evaluations: Array<{
         round: number;
@@ -789,8 +1202,19 @@ export class DebriefRunnerService {
           input,
           est,
           round,
+          {
+            why: revisionWhy(best, settings.passScore),
+            inputs: [
+              `the best draft so far (round ${best.round})`,
+              n(critique.length, 'critique note'),
+              'the evidence map',
+              n(excerpts.length, 'transcript excerpt'),
+            ],
+            summarise: (r) => cardsSummary(r.cards),
+          },
         );
         if (!revised) break;
+        drafts.push({ round, cards: revised.cards, critique });
         current = {
           cards: revised.cards,
           checks: check(revised.cards, round),
@@ -807,7 +1231,12 @@ export class DebriefRunnerService {
         best = betterDraft(best, current);
       }
 
-      run.workspace = { ...run.workspace, evaluations, bestRound: best.round };
+      run.workspace = {
+        ...run.workspace,
+        evaluations,
+        bestRound: best.round,
+        drafts,
+      };
       const patch: Partial<DebriefRun> = {
         cards: withPointIds(
           keepOfferedPractice(best.cards, offered),
@@ -820,16 +1249,52 @@ export class DebriefRunnerService {
             : null,
         evaluatorHardFails: best.evaluation?.hardFails ?? [],
       };
-      if (meetsBar(best))
+      const decide = (status: DebriefRunStatus, why: string) => {
+        run.workspace = {
+          ...run.workspace,
+          decision: { status, round: best.round, why },
+        };
+      };
+      const scored =
+        best.evaluation?.overall != null
+          ? `scored ${best.evaluation.overall.toFixed(1)}`
+          : 'was not scored';
+      if (meetsBar(best)) {
+        decide(
+          DebriefRunStatus.PUBLISHED,
+          `Published round ${best.round}: it passed every check and ${scored} with no hard fail (the bar is ${settings.passScore}).`,
+        );
         return await finish(DebriefRunStatus.PUBLISHED, patch);
+      }
       if (
         passesChecks(best) &&
         best.evaluation &&
         !best.evaluation.hardFails.some((h) => h.code === 'missed_risk_cue')
       ) {
+        decide(
+          DebriefRunStatus.BELOW_BAR,
+          `Published round ${best.round} below the bar and sent it to review: it passed every check but ${scored}` +
+            (best.evaluation.hardFails.length
+              ? ` with ${best.evaluation.hardFails.map((h) => h.code).join(', ')}`
+              : '') +
+            (round >= maxRounds
+              ? ', and no revision rounds were left.'
+              : ', and there was no budget or time for another revision.'),
+        );
         return await finish(DebriefRunStatus.BELOW_BAR, patch);
       }
       rung = FallbackRung.PERSON_FINISHES;
+      decide(
+        DebriefRunStatus.NEEDS_PERSON,
+        passesChecks(best)
+          ? best.evaluation
+            ? 'Held for a person: the Evaluator found a missed risk cue, which is never published automatically.'
+            : 'Held for a person: no draft could be scored, so nothing was published automatically.'
+          : `Held for a person: the best draft still failed ${best.checks
+              .filter((c) => !ADVISORY_CHECKS.has(c.code))
+              .map((c) => c.code)
+              .join(', ')}.`,
+      );
       return await finish(DebriefRunStatus.NEEDS_PERSON, {
         ...patch,
         skipReason: passesChecks(best)
@@ -844,6 +1309,47 @@ export class DebriefRunnerService {
       return finish(DebriefRunStatus.FAILED, {
         error: (e as Error).message.slice(0, 1000),
       });
+    }
+  }
+
+  /**
+   * v9 FR-3: carry on a run whose worker died, on the GA release, with a
+   * fresh deadline. Checkpointed steps are replayed; the rest run as usual.
+   */
+  async resume(run: DebriefRun): Promise<DebriefRun> {
+    return this.run(run.scenarioSessionId, {
+      mode: run.mode,
+      resume: run,
+      experimentId: run.experimentId ?? null,
+      arm: run.arm ?? null,
+    });
+  }
+
+  /**
+   * Save one step's answer on the run as soon as it lands, key by key (the
+   * Safety reader and the Analyst land side by side). A failed save only
+   * means a resume would pay for that step again; it never fails the run.
+   */
+  private async checkpoint(
+    runId: string,
+    key: string,
+    value: { res: unknown; est: number },
+  ): Promise<void> {
+    try {
+      await this.runs.query(
+        `UPDATE debrief_runs
+            SET workspace = jsonb_set(
+                  coalesce(workspace, '{}'::jsonb)
+                    || jsonb_build_object('stepResults', coalesce(workspace->'stepResults', '{}'::jsonb)),
+                  ARRAY['stepResults', $2::text],
+                  $3::jsonb)
+          WHERE id = $1 AND status = 'running'`,
+        [runId, key, JSON.stringify(value)],
+      );
+    } catch (e) {
+      this.logger.warn(
+        `debrief run ${runId}: checkpoint of ${key} not saved: ${(e as Error).message}`,
+      );
     }
   }
 

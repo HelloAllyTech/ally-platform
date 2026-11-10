@@ -11,8 +11,8 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.core.debrief import improver, steps
-from app.core.debrief.improver import ImproverAnalysis
+from app.core.debrief import pm_agent, steps
+from app.core.debrief.pm_agent import PmAgentAnalysis
 from app.core.debrief.safety_reader import (
     LearnerDistress,
     RiskCue,
@@ -24,6 +24,7 @@ from app.core.debrief.schemas import (
     EvaluationOutput,
     EvidenceMap,
     ProgressReading,
+    reasoning_of,
 )
 from app.utils.logger import get_logger
 
@@ -116,11 +117,18 @@ class AnalystRequest(StepRequest):
     scenario: Dict[str, Any] = Field(default_factory=dict)
     expected_behaviours: List[str] = Field(default_factory=list)
     learner_level: Optional[str] = None
+    # What the live detector recorded per expected behaviour (v9 FR-17
+    # get_live_detections); empty when the scenario has none.
+    live_detections: List[Dict[str, Any]] = Field(default_factory=list)
+    # A case session's memory so far; the Analyst returns the updated one.
+    case_memory: Optional[str] = None
 
 
 class AnalystResponse(BaseModel):
     model: str
     evidence: EvidenceMap
+    # The step's own rationale for the Console's run view; never in `evidence`.
+    reasoning: str = ""
 
 
 @router.post("/analyst", response_model=AnalystResponse)
@@ -136,12 +144,14 @@ async def analyst(req: AnalystRequest) -> AnalystResponse:
             learner_level=req.learner_level,
             system=req.system_prompt,
             scenario_session_id=req.scenario_session_id,
+            live_detections=req.live_detections,
+            case_memory=req.case_memory,
         )
     except Exception as exc:  # noqa: BLE001
         raise _failed("analyst", exc) from exc
     if out is None:
         raise _unusable("analyst")
-    return AnalystResponse(model=ran, evidence=out)
+    return AnalystResponse(model=ran, evidence=out, reasoning=reasoning_of(out))
 
 
 class ProgressRequest(StepRequest):
@@ -152,6 +162,7 @@ class ProgressRequest(StepRequest):
 class ProgressResponse(BaseModel):
     model: str
     progress: ProgressReading
+    reasoning: str = ""
 
 
 @router.post("/progress-reader", response_model=ProgressResponse)
@@ -169,7 +180,7 @@ async def progress_reader(req: ProgressRequest) -> ProgressResponse:
         raise _failed("progress-reader", exc) from exc
     if out is None:
         raise _unusable("progress-reader")
-    return ProgressResponse(model=ran, progress=out)
+    return ProgressResponse(model=ran, progress=out, reasoning=reasoning_of(out))
 
 
 class WriterRequest(StepRequest):
@@ -184,11 +195,15 @@ class WriterRequest(StepRequest):
     practice_options: List[Dict[str, Any]] = Field(default_factory=list)
     case_memory: Optional[str] = None
     assessment: bool = False
+    # How the organisation's other trainees did on this roleplay (v9 FR-17
+    # get_cohort_stats); ally-be sends it only for groups of 5 or more.
+    cohort: Optional[Dict[str, Any]] = None
 
 
 class CardsResponse(BaseModel):
     model: str
     cards: DebriefCards
+    reasoning: str = ""
 
 
 @router.post("/writer", response_model=CardsResponse)
@@ -211,12 +226,13 @@ async def writer(req: WriterRequest) -> CardsResponse:
             practice_options=req.practice_options,
             case_memory=req.case_memory,
             assessment=req.assessment,
+            cohort=req.cohort,
         )
     except Exception as exc:  # noqa: BLE001
         raise _failed("writer", exc) from exc
     if out is None:
         raise _unusable("writer")
-    return CardsResponse(model=ran, cards=out)
+    return CardsResponse(model=ran, cards=out, reasoning=reasoning_of(out))
 
 
 class EvaluatorRequest(StepRequest):
@@ -232,6 +248,7 @@ class EvaluatorRequest(StepRequest):
 class EvaluatorResponse(BaseModel):
     model: str
     evaluation: EvaluationOutput
+    reasoning: str = ""
 
 
 @router.post("/evaluator", response_model=EvaluatorResponse)
@@ -253,7 +270,7 @@ async def evaluator(req: EvaluatorRequest) -> EvaluatorResponse:
         raise _failed("evaluator", exc) from exc
     if out is None:
         raise _unusable("evaluator")
-    return EvaluatorResponse(model=ran, evaluation=out)
+    return EvaluatorResponse(model=ran, evaluation=out, reasoning=reasoning_of(out))
 
 
 class ReviserRequest(StepRequest):
@@ -281,37 +298,52 @@ async def reviser(req: ReviserRequest) -> CardsResponse:
         raise _failed("reviser", exc) from exc
     if out is None:
         raise _unusable("reviser")
-    return CardsResponse(model=ran, cards=out)
+    return CardsResponse(model=ran, cards=out, reasoning=reasoning_of(out))
 
 
-class ImproverRequest(BaseModel):
+class PmAgentRequest(BaseModel):
     signals: Dict[str, Any]
     prompts: Dict[str, str] = Field(default_factory=dict)
     settings: Dict[str, Any] = Field(default_factory=dict)
     history: List[Dict[str, Any]] = Field(default_factory=list)
     model: Optional[str] = None
     system_prompt: Optional[str] = None
+    # v9 FR-61: the redacted views it may query, the rows of the queries it
+    # asked for last pass, how many more passes may ask, and which review.
+    catalog: Optional[str] = None
+    query_results: List[Dict[str, Any]] = Field(default_factory=list)
+    rounds_left: int = 0
+    review: str = "weekly"
 
 
-class ImproverResponse(BaseModel):
+class PmAgentResponse(BaseModel):
     model: str
-    analysis: ImproverAnalysis
+    analysis: PmAgentAnalysis
 
 
-@router.post("/improver/analyse", response_model=ImproverResponse)
-async def improver_analyse(req: ImproverRequest) -> ImproverResponse:
-    model = req.model or settings.DEBRIEF.IMPROVER_MODEL
+# `/improver/analyse` is the PM agent's old name, kept while an ally-be
+# release from before the rename may still call it.
+@router.post("/pm-agent/analyse", response_model=PmAgentResponse)
+@router.post(
+    "/improver/analyse", response_model=PmAgentResponse, include_in_schema=False
+)
+async def pm_agent_analyse(req: PmAgentRequest) -> PmAgentResponse:
+    model = req.model or settings.DEBRIEF.PM_AGENT_MODEL
     try:
-        out, ran = await improver.analyse_signals(
+        out, ran = await pm_agent.analyse_signals(
             req.signals,
             req.prompts,
             req.settings,
             req.history,
             model,
             system=req.system_prompt,
+            catalog=req.catalog,
+            query_results=req.query_results,
+            rounds_left=req.rounds_left,
+            review=req.review,
         )
     except Exception as exc:  # noqa: BLE001
-        raise _failed("improver", exc) from exc
+        raise _failed("PM agent", exc) from exc
     if out is None:
-        raise _unusable("improver")
-    return ImproverResponse(model=ran, analysis=out)
+        raise _unusable("PM agent")
+    return PmAgentResponse(model=ran, analysis=out)

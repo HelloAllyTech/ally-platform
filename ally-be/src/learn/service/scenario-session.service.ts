@@ -2,6 +2,10 @@ import {
   SCENARIO_SESSION_DEBRIEF_READY_EVENT,
   ScenarioSessionDebriefReadyEvent,
 } from '../constants/scenario-session-events.constants';
+import {
+  hasLegacyFeedback,
+  isDebriefAgentLiveForSession,
+} from '../../debrief/util/debrief-live.util';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { CohortContentType } from 'src/cohort/constants/cohort.constants';
 import {
@@ -2055,10 +2059,42 @@ export class ScenarioSessionService {
         select: { id: true, summary: true },
       },
     );
-    if (existingDetails?.summary?.feedback) {
+    // Feedback holding only the Debrief agent's fields (it can publish before
+    // this finishes) still needs today's debrief for the parts only it
+    // writes: emotional movement, the transcript's tags, a case's memory.
+    if (hasLegacyFeedback(existingDetails?.summary?.feedback)) {
       this.logger.info(
         `Skipping summary generation for ${scenarioSessionId}: feedback already generated.`,
       );
+      return;
+    }
+
+    // v9 FR-4: for an organisation switched on for the Debrief agent, the
+    // learner reads the agent's debrief, so the supervisor memory update and
+    // the "debrief ready" event come from it (DebriefPublishService), not
+    // from this note.
+    const debriefAgentLive = await isDebriefAgentLiveForSession(
+      this.dataSource,
+      scenarioSessionId,
+    );
+    if (debriefAgentLive) {
+      // v9 FR-4: the Debrief agent writes this session's whole debrief —
+      // note, skill coverage, emotional movement, case memory, the learner's
+      // memory and the ready event (DebriefPublishService) — so today's
+      // evaluation is not run. The call duration is still recorded here.
+      this.logger.info(
+        `Skipping today's debrief for ${scenarioSessionId}: the organisation reads the Debrief agent's.`,
+      );
+      try {
+        await this.scenarioSessionDetailsRepository.upsert(
+          { scenarioSessionId, callDuration, tenantId },
+          { conflictPaths: ['scenarioSessionId'] },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to record the call duration for ${scenarioSessionId}: ${JSON.stringify((error as Error).message)}`,
+        );
+      }
       return;
     }
 
@@ -2292,7 +2328,10 @@ export class ScenarioSessionService {
 
     let feedbackToServe = summary.feedback;
 
+    // A note the Debrief agent published is already in the session's language
+    // and is not today's debrief's to re-write in another (v9 FR-4).
     const needsOtherLanguage =
+      !summary.feedback?.debriefGenerator &&
       !!requestedLanguage &&
       requestedLanguage !== baseLanguage &&
       !!summary.feedback &&

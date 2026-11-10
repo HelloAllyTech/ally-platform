@@ -979,8 +979,11 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'A learner replies under the reflective question of a published Debrief-agent debrief',
     detail:
       'Ask Ally: answers from the published debrief and the transcript, streamed, one short reply ' +
-      'per message (≤ $0.05). A first-person risk statement gets the fixed support reply instead, ' +
-      'and the Safety reader reads each message alongside. Replaces coaching-chat for switched-on organisations.',
+      'per message (≤ $0.05). Up to 4 passes, calling tools when a question needs them: ' +
+      'search_guidance (Context Library, Debrief Guidance), get_learner_history and ' +
+      'get_live_detections (v9 FR-43); the last pass never calls a tool. A first-person risk ' +
+      'statement gets the fixed support reply instead, and the Safety reader reads each message ' +
+      'alongside. Replaces coaching-chat for switched-on organisations.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
@@ -1019,15 +1022,15 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
   },
   {
     id: 'debrief-improver',
-    task: LlmTask.DEBRIEF_IMPROVER,
+    task: LlmTask.DEBRIEF_PM_AGENT,
     runtime: LlmRuntime.ALLY_AI,
     trigger: 'Daily, and on demand from the Debrief Console',
     detail:
-      'The Improver: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
+      'The PM agent: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
-    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.improver)',
+    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.pmAgent)',
   },
   {
     id: 'rag-quality-judge',
