@@ -61,8 +61,8 @@ interface JsonRpcRequest {
 }
 
 /**
- * The Context Library as an MCP server for engineers' Claude Code — replacing
- * `stacks-bridge.mjs`. Streamable HTTP, JSON responses only: one POST, one JSON-RPC reply.
+ * The Context Library as an MCP server for engineers' Claude Code (it replaced the Stacks bridge
+ * script on 2026-11-09). Streamable HTTP, JSON responses only: one POST, one JSON-RPC reply.
  *
  * Authenticated by a read-only personal key (`Authorization: Bearer clr_…`), not an admin
  * session, and it can only ever read what the `mcp_dev` use case is granted — clinical,

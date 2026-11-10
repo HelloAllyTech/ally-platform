@@ -158,7 +158,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
      * imports ProductRoadmapModule.
      */
     BuilderModule,
-    // The opportunity copilot's principles_search/principles_get (replaced the Stacks client).
+    // The opportunity copilot's principles_search/principles_get, on First Principles.
     ContextLibraryModule,
     /**
      * S3Service — presigned PUTs for opportunity reference images, and the URL parsing that

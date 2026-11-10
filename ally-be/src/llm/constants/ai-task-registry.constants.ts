@@ -1831,7 +1831,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     detail:
       'A tool loop per turn: up to 8 research passes (the board, user-interview notes, the ' +
       'Analytics Agent, UX signals, Bug Hunter findings, repo docs, GitHub code and wiki, ' +
-      'Stacks), then a structured turn — question, readiness verdicts, draft and brief. One ' +
+      'First Principles from the Context Library), then a structured turn — question, readiness verdicts, draft and brief. One ' +
       'llm_usage row per pass. Two cached system blocks: a product map (repos, admin ' +
       'surfaces, the head of each Builder knowledge pack, the wiki and repo-docs index — ' +
       '~10k tokens, re-rendered at most every 30 min) and the Vision & strategy page, goals ' +
@@ -2448,7 +2448,10 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
       'take a pass or two more (at most two rejections). Off, the prior loop runs, plus one ' +
       'tool-less wrap-up call when the cap is hit. ' +
       'The system prompt and a per-session library context block are cached; the ' +
-      'brief, blueprint or course outline rides on the newest user turn. Runs on ' +
+      'brief, blueprint or course outline rides on the newest user turn. ' +
+      'design_guidance_search / _get read the Context Library’s Learning Design and ' +
+      'search_library its Content Catalogue — their re-rank and the blueprint’s citation check ' +
+      'are the context-library rows, not this one. Runs on ' +
       'any of the three providers through AgentLlmProviderFactory — the prompt ' +
       'row wins, so set the model there (Claude Sonnet recommended for tool-use ' +
       'reliability in production).',
@@ -2989,8 +2992,9 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
       '`context_library_extract_first_principles_system` for First Principles, ' +
       '`context_library_extract_character_insights_system` for Character Insights (including ' +
       'the one-off distillation of the retired character corpus), ' +
-      '`context_library_extract_ally_guide_library_system` for the Ally Guide Library and ' +
-      '`context_library_extract_debrief_guidance_system` for Debrief Guidance — and each prompt’s own model ' +
+      '`context_library_extract_ally_guide_library_system` for the Ally Guide Library, ' +
+      '`context_library_extract_debrief_guidance_system` for Debrief Guidance and ' +
+      '`context_library_extract_learning_design_system` for Learning Design — and each prompt’s own model ' +
       'is read first. The overview and vocabularies are an identical prefix across a document, ' +
       'so prompt caching applies.',
     kind: AiTaskKind.COMPLETION,
@@ -3053,11 +3057,13 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.FAST,
     trigger:
-      'An admin writes or bulk-uploads an entry, an agent writes a lesson, or a platform admin enriches the Ally guide and Debrief passages imported from the Knowledge Base',
+      'An admin writes or bulk-uploads an entry, an agent writes a lesson, a platform admin enriches the Ally guide and Debrief passages imported from the Knowledge Base, or a Studio item is synced into the Content Catalogue',
     detail:
       'Adds situations, example searches, keywords and missing facets without touching the ' +
       'entry text (an imported passage also gets a one-line statement in place of its citation). ' +
-      'One call per entry; bulk uploads and the import enrichment run them in small parallel batches.',
+      'One call per entry; bulk uploads and the import enrichment run them in small parallel batches. ' +
+      'A synced Content Catalogue item gets example searches only — its text and facets are its ' +
+      'Studio row’s — once after it is created or renamed, at most 300 a night (ContextCatalogueSyncService).',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-4o-mini',
@@ -3088,8 +3094,9 @@ const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
     tier: LlmModelTier.FAST,
     trigger: 'A PRD, blueprint or answer cites Context Library codes',
     detail:
-      'One call per saved version that adds citations, over the new ones only. Codes never ' +
-      'surfaced in the session are stripped in code before this runs.',
+      'One call per saved version that adds citations, over the new ones only: Builder’s PRD ' +
+      '(`[FP-…]`) and Course Copilot’s blueprint (`[LD-…]`, `[CC-…]`). Codes never surfaced in ' +
+      'the session are stripped in code before this runs.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-4o-mini',

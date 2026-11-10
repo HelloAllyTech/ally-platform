@@ -151,6 +151,59 @@ export const mcpEndpoint = (apiBase: string | undefined, origin: string, path: s
   }
 };
 
+/** What "Test connection" found: the endpoint answered, refused the key, or could not be reached. */
+export type ConnectionOutcome = "reachable" | "refused" | "unreachable";
+
+/** How long a connection test waits before calling the endpoint unreachable. */
+export const CONNECTION_TEST_TIMEOUT_MS = 10_000;
+
+/**
+ * Read a ping's answer. A JSON-RPC result means the key works; 401 or 403 means the endpoint
+ * answered and turned the key away; anything else (a 5xx, an HTML error page, a JSON-RPC error)
+ * means Claude Code would not get a working connection from here either.
+ */
+export const connectionOutcome = (status: number, body: unknown): ConnectionOutcome => {
+  if (status === 401 || status === 403) return "refused";
+  if (status >= 200 && status < 300 && body && typeof body === "object" && "result" in body) {
+    return "reachable";
+  }
+  return "unreachable";
+};
+
+/**
+ * Send the MCP endpoint one JSON-RPC `ping` with the new key, as Claude Code would (§9.2). A
+ * plain `fetch`, not an RTK Query endpoint: the app's API slice signs every call with the admin's
+ * own session, and this must carry the reader key and nothing else. Never throws.
+ */
+export const testConnection = async (
+  url: string,
+  key: string,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs = CONNECTION_TEST_TIMEOUT_MS,
+): Promise<ConnectionOutcome> => {
+  const controller = typeof AbortController === "undefined" ? null : new AbortController();
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const response = await fetchImpl(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+      credentials: "omit",
+      signal: controller?.signal,
+    });
+    const body = await response.json().catch(() => null);
+    return connectionOutcome(response.status, body);
+  } catch {
+    return "unreachable";
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
 /** The two lines an engineer pastes into their shell. */
 export const shellLines = (url: string, key: string): string =>
   [`export ALLY_CONTEXT_LIBRARY_URL=${url}`, `export ALLY_CONTEXT_LIBRARY_KEY=${key}`].join("\n");

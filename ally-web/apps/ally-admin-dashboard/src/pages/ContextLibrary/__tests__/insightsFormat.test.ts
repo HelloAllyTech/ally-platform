@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ContextCollection } from "@types";
 
 import {
   changeHeadline,
+  connectionOutcome,
   formatPercent,
   formatScore,
   gapAction,
@@ -16,6 +17,7 @@ import {
   sampleRatePercent,
   setupRows,
   shellLines,
+  testConnection,
   weeklyLines,
   weeklySpark,
   withLoop,
@@ -172,5 +174,44 @@ describe("Connect Claude Code", () => {
       "export ALLY_CONTEXT_LIBRARY_URL=https://x.test/api/v1/context-library/mcp\nexport ALLY_CONTEXT_LIBRARY_KEY=clr_abc",
     );
     expect(keyHint("clr_AbCdEf")).toBe("clr_AbCdEf…");
+  });
+});
+
+describe("Test connection", () => {
+  it("reads a ping's answer as reachable, refused or unreachable", () => {
+    expect(connectionOutcome(200, { jsonrpc: "2.0", id: 1, result: {} })).toBe("reachable");
+    expect(connectionOutcome(401, { error: { code: -32001 } })).toBe("refused");
+    expect(connectionOutcome(403, null)).toBe("refused");
+    expect(connectionOutcome(200, { jsonrpc: "2.0", error: { code: -32601 } })).toBe("unreachable");
+    expect(connectionOutcome(502, null)).toBe("unreachable");
+    expect(connectionOutcome(200, null)).toBe("unreachable");
+  });
+
+  it("sends one JSON-RPC ping with the key and nothing of the admin's session", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      status: 200,
+      json: async () => ({ result: {} }),
+    })) as unknown as typeof fetch;
+    expect(
+      await testConnection("https://x.test/api/v1/context-library/mcp", "clr_k", fetchImpl),
+    ).toBe("reachable");
+    const [, init] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.headers.Authorization).toBe("Bearer clr_k");
+    expect(init.credentials).toBe("omit");
+    expect(JSON.parse(init.body)).toEqual({ jsonrpc: "2.0", id: 1, method: "ping" });
+  });
+
+  it("never throws: a network failure or a page that isn't JSON is unreachable", async () => {
+    const down = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    expect(await testConnection("https://x.test/mcp", "clr_k", down)).toBe("unreachable");
+    const html = vi.fn(async () => ({
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("Unexpected token <");
+      },
+    })) as unknown as typeof fetch;
+    expect(await testConnection("https://x.test/mcp", "clr_k", html)).toBe("unreachable");
   });
 });

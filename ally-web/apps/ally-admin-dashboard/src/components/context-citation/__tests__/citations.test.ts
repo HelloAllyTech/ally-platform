@@ -6,7 +6,7 @@ import {
   isCitationCode,
   linkCitations,
   splitCitations,
-} from "../prdCitations";
+} from "../citations";
 
 describe("citationHref / citationCodeFromHref", () => {
   it("round-trips a code through the Context Library link", () => {

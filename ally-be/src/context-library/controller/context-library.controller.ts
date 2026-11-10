@@ -53,6 +53,7 @@ import { ClChunkStatus, ClUseCase } from '../enum/context-library.enum';
 import { COLLECTION_PROFILES, requireProfile } from '../profiles';
 import { templateCsv } from '../util/bulk.util';
 import { ContextAccessService } from '../service/context-access.service';
+import { ContextCatalogueSyncService } from '../service/context-catalogue-sync.service';
 import { ClActor, ContextChunkService } from '../service/context-chunk.service';
 import { ContextRetrievalService } from '../service/context-retrieval.service';
 import { ContextUploadService } from '../service/context-upload.service';
@@ -139,6 +140,7 @@ export class ContextLibraryController {
     private readonly gaps: ContextGapsService,
     private readonly kbImport: ContextKbImportService,
     private readonly kbCopy: ContextKbCopyService,
+    private readonly catalogue: ContextCatalogueSyncService,
   ) {}
 
   // ── Collections ────────────────────────────────────────────────────────────
@@ -660,6 +662,36 @@ export class ContextLibraryController {
       actorFor(user),
       DEBRIEF_CORPUS_MIGRATION,
     );
+  }
+
+  // ── Content Catalogue, synced from Studio (phase 7, §6.4) ─────────────────────
+
+  @Get('migrations/content-catalogue')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary:
+      'Per kind: active Studio rows, synced items, and items waiting for enrichment',
+  })
+  async catalogueStatus(@CurrentUser() user: TokenUser) {
+    await this.kbImport.assertPlatformAdmin(actorFor(user));
+    return this.catalogue.status();
+  }
+
+  @Post('migrations/content-catalogue/sync')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary:
+      'Reconcile the Content Catalogue with Studio now, in the background',
+    description:
+      'Platform admins only. The same run as the nightly one: every active roleplay, case, ' +
+      'character and component template gets its item, items whose row is gone or no longer ' +
+      'active are archived, and items still waiting are enriched with example searches. Studio ' +
+      'text is copied, never rewritten. A run already in progress on any server is not repeated.',
+  })
+  async syncCatalogue(@CurrentUser() user: TokenUser) {
+    await this.kbImport.assertPlatformAdmin(actorFor(user));
+    void this.catalogue.reconcile({ enrich: true }).catch(() => undefined);
+    return { started: true };
   }
 }
 

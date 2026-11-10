@@ -112,6 +112,8 @@ export interface ContextChunk {
   supersededById?: string | null;
   sourceCount: number;
   agent?: string | null;
+  /** A synced item's source row, `<table>:<row id>` (e.g. `scenarios:42`). */
+  syncKey?: string | null;
   version: number;
   createdAt?: string;
   updatedAt?: string;

@@ -13,7 +13,8 @@ over MCP as the `context-library` server declared in this repo's `.mcp.json`. Pl
 ## Setup (once)
 
 Create a read-only key in the admin dashboard: **Context Library → Connect Claude Code**. Then set two
-environment variables in your shell profile (the sheet shows both; the key is shown only once):
+environment variables in your shell profile (the sheet shows both; the key is shown only once, and
+**Test connection** checks it against the library while it is still on screen):
 
 ```bash
 export ALLY_CONTEXT_LIBRARY_URL="<the URL shown in the sheet>"

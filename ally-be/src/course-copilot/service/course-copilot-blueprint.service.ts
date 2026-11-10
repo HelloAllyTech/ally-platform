@@ -2,9 +2,12 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import { applyJsonPatch, JsonPatchOp } from 'src/common/util/json-patch.util';
 import { AppConfigService } from 'src/config/config.service';
+import { ClUseCase } from 'src/context-library/enum/context-library.enum';
+import { ContextCitationService } from 'src/context-library/service/context-citation.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { TrackService } from 'src/track/service/track.service';
 import { TrackStatus } from 'src/track/type/track.type';
@@ -30,7 +33,7 @@ import { CourseCopilotStructureService } from './course-copilot-structure.servic
  * The blueprint: the plan the trainer approves before anything is generated.
  *
  * The planner runs once, as a one-shot specialist — not as a second managing
- * agent (Stacks: "Hierarchical Agent Managers Double Costs Without Quality
+ * agent ("Hierarchical Agent Managers Double Costs Without Quality
  * Gains"). Every change after that — a chat edit through `update_blueprint`,
  * an inline edit in the tree — goes through the same normalise → estimate →
  * validate path, so the tree, the estimate and the approve button can never
@@ -51,6 +54,7 @@ export class CourseCopilotBlueprintService {
     private readonly library: CourseCopilotLibraryService,
     private readonly structureService: CourseCopilotStructureService,
     private readonly trackService: TrackService,
+    @Optional() private readonly citations?: ContextCitationService,
   ) {}
 
   /** Run the planner and store blueprint v(n+1). Caller has checked readiness. */
@@ -260,7 +264,9 @@ export class CourseCopilotBlueprintService {
     raw: unknown,
     extra: { status?: CourseCopilotSessionStatus } = {},
   ): Promise<CourseCopilotBlueprintResponse> {
-    const { blueprint, problems } = await this.evaluate(session, raw);
+    const evaluated = await this.evaluate(session, raw);
+    const { problems } = evaluated;
+    const blueprint = await this.checkCitations(session, evaluated.blueprint);
     const rows: { blueprintVersion: number }[] =
       await this.sessionRepository.manager
         .query(
@@ -295,6 +301,54 @@ export class CourseCopilotBlueprintService {
       budget: await this.costService.budget(session),
       problems,
     };
+  }
+
+  /**
+   * Citation integrity, as Builder's PRD has it: `[LD-…]` principles and `[CC-…]` catalogue items
+   * cited in the blueprint that this session was never shown (or that do not exist) are stripped
+   * before it is stored, and the rest are checked by a small model in the background — only a
+   * pass counts as a verified use of the principle. Never fails or slows the save beyond one
+   * query: the model call is off the save path, and any failure keeps the blueprint as written.
+   */
+  private async checkCitations(
+    session: CourseCopilotSession,
+    blueprint: CourseBlueprint,
+  ): Promise<CourseBlueprint> {
+    if (!this.citations) return blueprint;
+    try {
+      const checked = await this.citations.validate({
+        useCase: ClUseCase.COURSE_COPILOT,
+        sessionId: session.id,
+        text: JSON.stringify(blueprint),
+        previousText: JSON.stringify(session.blueprint ?? {}),
+      });
+      const kept = checked.rejected.length
+        ? (JSON.parse(checked.text) as CourseBlueprint)
+        : blueprint;
+      if (checked.rejected.length) {
+        this.logger.info(
+          `Course Copilot ${session.id}: removed citations not shown in this session: ${checked.rejected.join(', ')}`,
+        );
+      }
+      if (checked.valid.length) {
+        void this.citations
+          .verify({
+            useCase: ClUseCase.COURSE_COPILOT,
+            sessionId: session.id,
+            text: checked.text,
+            codes: checked.valid,
+          })
+          .catch(() => undefined);
+      }
+      return kept;
+    } catch (error) {
+      this.logger.warn(
+        `Course Copilot ${session.id}: citation check skipped: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return blueprint;
+    }
   }
 
   private assertEditable(session: CourseCopilotSession): void {

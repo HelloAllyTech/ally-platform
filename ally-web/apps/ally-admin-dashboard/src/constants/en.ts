@@ -4781,7 +4781,6 @@ export const en = {
       failed: "That didn't go through. Nothing changed.",
       loadFailed: "Couldn't load the principles.",
       retry: "Retry",
-      open: (code: string) => `Open ${code} in the Context Library`,
     },
     // The Builder tab: Now · Rules · History. One name per thing, in copy and in code:
     // Decision, Waiting on you, In progress, Up next, Start, Put back, Ask, Tell, Rule,
@@ -6258,7 +6257,7 @@ export const en = {
       raiseFailed: "Couldn't raise the ceiling.",
       archiveFailed: "Couldn't archive that session.",
       // Placeholder says what this state accepts, so the composer teaches the capability
-      // (Stacks: "Communicate Agent Capabilities via Visual Affordances").
+      // ("Communicate Agent Capabilities via Visual Affordances").
       composerPlaceholder: {
         INTERVIEWING: "Answer, or tell me something I haven't asked about…",
         AWAITING_BLUEPRINT: "Ask for a change — “drop the game, make section 3 two roleplays”…",
@@ -10202,6 +10201,8 @@ export const en = {
   // "extract", never "distil"; "part", never "segment"; "document", never "source". Status
   // and origin words always sit next to an icon, never colour alone.
   contextLibrary: {
+    /** A citation chip's accessible name, wherever an agent cites a code (PRD, Course Copilot). */
+    citationOpen: (code: string) => `Open ${code} in the Context Library`,
     navLabel: "Context Library",
     title: "Context Library",
     subtitle: "What Ally's agents look up before they answer.",
@@ -10343,7 +10344,9 @@ export const en = {
       pinHelp: "Pinned entries are never edited or retired by the system.",
       archive: "Archive",
       restore: "Restore",
-      syncedNote: "Synced from Studio. Edit the item there.",
+      syncedNote: "Synced from Studio — edit the item there.",
+      openInStudio: "Open in Studio",
+      openInStudioLabel: (code: string) => `Open ${code} in Studio to edit it`,
       readOnly: "You can read the library but not change it.",
       toasts: {
         archived: (code: string) => `${code} archived`,
@@ -10468,7 +10471,7 @@ export const en = {
       newTitle: (noun: string) => `New ${noun}`,
       editTitle: (code: string) => `Edit ${code}`,
       collection: "Collection",
-      syncedOnly: (name: string) => `${name} is synced from Studio. Edit the item there.`,
+      syncedOnly: (name: string) => `${name} is synced from Studio — edit the item there.`,
       statement: "Statement",
       statementHelp:
         "One sentence that makes sense on its own. This is what search matches and what agents read first.",
@@ -10729,6 +10732,15 @@ export const en = {
       copied: "Copied",
       copyFailed: "Couldn't copy. Select the text and copy it yourself.",
       done: "I've copied it",
+      testConnection: "Test connection",
+      testing: "Testing…",
+      testHelp: "Checks this key against the library the way Claude Code will.",
+      testResult: {
+        reachable: "Connected. Claude Code can reach the library with this key.",
+        refused: "The library turned this key away. Revoke it, create a new one and test again.",
+        unreachable:
+          "Couldn't reach the library from here. Check the address in the first line, then test again.",
+      } as Record<"reachable" | "refused" | "unreachable", string>,
       shellHeading: "Set these in your shell",
       shellHelp:
         "Add both lines to your shell profile, then restart Claude Code. Never commit either.",

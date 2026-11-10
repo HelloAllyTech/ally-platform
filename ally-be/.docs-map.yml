@@ -91,6 +91,30 @@ rules:
       reads a different one) that skips it leaves "where does X live?" answering with a
       collection that no longer matches the code.
 
+  - id: content-catalogue-sync
+    watch:
+      - "src/context-library/service/context-catalogue-sync.service.ts"
+      - "src/context-library/service/context-catalogue.subscriber.ts"
+    requires: DATA_SCHEMA.md
+    why: >
+      The Content Catalogue mirrors four Studio tables into `cl_chunks`. DATA_SCHEMA.md §3.22
+      says which tables, what makes a row "active", the `sync_key` format and whose audience an
+      item takes. A change to any of those that skips it leaves the next person reading a
+      different mirror from the one that runs.
+
+  - id: course-copilot-context-library
+    watch:
+      - "src/course-copilot/service/course-copilot-tools.service.ts"
+      - "src/course-copilot/service/course-copilot-library.service.ts"
+      - "src/course-copilot/constants/course-copilot-guidance.constants.ts"
+    requires: docs/course-copilot.md
+    why: >
+      Course Copilot's design guidance and library search read the Context Library (Learning
+      Design and the Content Catalogue), scoped to the trainer's organisation and rechecked
+      against content access. docs/course-copilot.md is where that is written down for the next
+      person to change the tools, and an out-of-date description there sends the next change to
+      the wrong place.
+
   - id: agent-entrypoints-in-sync
     watch:
       - "AGENTS.md"

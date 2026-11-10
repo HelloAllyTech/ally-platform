@@ -1054,18 +1054,6 @@ export class AppConfigService {
     );
   }
 
-  /**
-   * Stacks — the team's curated product-guidance library, reached over HTTP
-   * (ally-be is not an MCP client). Optional: unset simply means the
-   * interview runs without product guidance.
-   */
-  get stacks() {
-    return {
-      apiUrl: this.configService.get<string>('STACKS_API_URL'),
-      apiKey: this.configService.get<string>('STACKS_API_KEY'),
-    };
-  }
-
   get courseCopilot() {
     return {
       // Interview/edit-loop model. The `course_copilot_interviewer_system`

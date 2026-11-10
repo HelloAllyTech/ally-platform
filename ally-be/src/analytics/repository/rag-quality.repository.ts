@@ -84,7 +84,7 @@ export class RagQualityRepository {
    * sample. An afternoon of an operator probing thresholds in the admin preview can outnumber
    * the agents' real queries several times over; pooled and taken newest-first, that
    * afternoon becomes the whole measurement. Sampling across the variation that exists is the
-   * cheapest guard against a false read (Stacks: "Mitigate false negatives by recruiting
+   * cheapest guard against a false read ("Mitigate false negatives by recruiting
    * participant variation").
    */
   async selectRetrievals(opts: {

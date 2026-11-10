@@ -19,6 +19,7 @@ import {
   originLabel,
   sourceCountLine,
   splitDocuments,
+  studioHref,
   textHints,
   yieldSentence,
 } from "../contextLibraryFormat";
@@ -245,5 +246,20 @@ describe("small helpers", () => {
     expect(matchesFacets(chunk, { domain: ["ux_ui", "data"] })).toBe(true);
     expect(matchesFacets(chunk, { domain: ["ux_ui"], prdSections: ["api"] })).toBe(false);
     expect(matchesFacets(chunk, { domain: [] })).toBe(true);
+  });
+});
+
+describe("studioHref", () => {
+  it("opens each synced kind where Studio edits it", () => {
+    expect(studioHref("scenarios:42")).toBe("/create-simulation/edit/42");
+    expect(studioHref("cases:6f1c")).toBe("/create-case/edit/6f1c");
+    expect(studioHref("scenario_characters:c-1")).toBe("/character-library");
+    expect(studioHref("track_component_templates:t-1")).toBe("/component-library");
+  });
+
+  it("has nowhere to send anything else", () => {
+    expect(studioHref("kb_document_chunks:1")).toBeNull();
+    expect(studioHref("scenarios:")).toBeNull();
+    expect(studioHref(null)).toBeNull();
   });
 });

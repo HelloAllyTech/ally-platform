@@ -17,8 +17,7 @@ import { en } from "@constants";
 import { BuilderChatMessage, BuilderPrdDocument, BuilderPrdReadiness } from "@types";
 import { asAgentText, asAgentTextList } from "@utils";
 
-import { CitedText, prdMarkdownComponents } from "./CitationChip";
-import { linkCitations } from "./prdCitations";
+import { CitedText, citationMarkdownComponents, linkCitations } from "../context-citation";
 import { downloadPrdMarkdown, downloadPrdPdf, PrdExportMeta } from "./prdExport";
 import { PrdReviewFindings } from "./PrdReviewFindings";
 import { ReadinessRing } from "./ReadinessRing";
@@ -260,7 +259,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
     const value = asAgentText(raw);
     return value.trim() ? (
       <div className="prose prose-sm mt-1 max-w-none text-sm text-typography-800">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={prdMarkdownComponents}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={citationMarkdownComponents}>
           {linkCitations(value)}
         </ReactMarkdown>
       </div>

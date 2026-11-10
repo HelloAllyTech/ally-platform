@@ -64,6 +64,14 @@ export interface ContextSearchRequest {
    * backend sweep, and is never counted as shown there.
    */
   facetScope?: { key: string; values: string[] };
+  /**
+   * Who may open what, beyond audience (PLAN.md §7.2 step 5): called once at hydration with the
+   * active chunks the index returned, it answers with the ids the asker may open. Anything else
+   * is dropped (`access`) before it is picked, logged as shown or counted as used, so a person
+   * never sees an item they could not open. Course Copilot rechecks catalogue items against
+   * content access this way. A failure fails the search, never open.
+   */
+  canOpen?: (chunks: ClChunk[]) => Promise<Set<string>>;
   /** Include per-candidate diagnostics ("How was this found?"). */
   explain?: boolean;
   /** Skip the re-rank (Library search box: no reshuffling under the cursor). */
@@ -251,8 +259,12 @@ export class ContextRetrievalService {
             where: { id: In(ids.map((i) => i.id)) },
           });
           const byId = new Map(rows.map((r) => [r.id, r]));
+          const live = rows.filter((r) => r.status === ClChunkStatus.ACTIVE);
+          // Access can change inside the cache window; it is rechecked on every read.
+          const openable = req.canOpen ? await req.canOpen(live) : null;
           const results = ids
             .filter((i) => byId.get(i.id)?.status === ClChunkStatus.ACTIVE)
+            .filter((i) => !openable || openable.has(i.id))
             .map((i) => this.result(byId.get(i.id)!, i.band, i.score));
           return {
             retrievalId: null,
@@ -398,6 +410,32 @@ export class ContextRetrievalService {
         })
       : [];
     const byId = new Map(rows.map((r) => [r.id, r]));
+    let openable: Set<string> | null = null;
+    if (req.canOpen) {
+      try {
+        openable = await req.canOpen(
+          rows.filter((r) => r.status === ClChunkStatus.ACTIVE),
+        );
+      } catch (error) {
+        if (replay) throw error;
+        void this.log({
+          req,
+          queries,
+          collections: grants.map((g) => g.collectionId),
+          denied: [],
+          audience,
+          failed: true,
+          started,
+          latency,
+        });
+        this.logger.warn(
+          `Context search access check failed for ${req.useCase}: ${(error as Error).message}`,
+        );
+        throw new Error(
+          'Retrieval failed — this says nothing about what the library holds. Continue without it.',
+        );
+      }
+    }
     type Scored = {
       candidate: FusedCandidate;
       chunk: ClChunk;
@@ -434,6 +472,16 @@ export class ContextRetrievalService {
           grade: null,
           band: 'low',
           dropped: 'audience',
+        });
+        continue;
+      }
+      if (openable && !openable.has(chunk.id)) {
+        scored.push({
+          candidate,
+          chunk,
+          grade: null,
+          band: 'low',
+          dropped: 'access',
         });
         continue;
       }

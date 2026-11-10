@@ -9,7 +9,7 @@ import type { SpineChapter } from "../state/spineModel";
 
 /**
  * Opens a scene (card grammar §5.1): chapter number, title, the stakes in one
- * line, and what's in it. Skippable (Stacks: "Cutscene Pacing Controls Game
+ * line, and what's in it. Skippable ("Cutscene Pacing Controls Game
  * Rhythm and Emphasis"). A chapter with trigger warnings gets a content note
  * that can't be dismissed while the warning exists.
  */

@@ -36,6 +36,8 @@ import { ContextAccessService } from './service/context-access.service';
 import { ContextAgentChunkService } from './service/context-agent-chunk.service';
 import { ContextAgentCuratorService } from './service/context-agent-curator.service';
 import { ContextBriefService } from './service/context-brief.service';
+import { ContextCatalogueSubscriber } from './service/context-catalogue.subscriber';
+import { ContextCatalogueSyncService } from './service/context-catalogue-sync.service';
 import { ContextCitationService } from './service/context-citation.service';
 import { ContextReaderKeyService } from './service/context-reader-key.service';
 import { ContextRetrievalService } from './service/context-retrieval.service';
@@ -126,6 +128,9 @@ import { ContextTuningService } from './service/context-tuning.service';
     // Agent-written chunks and their curator (phase 5).
     ContextAgentChunkService,
     ContextAgentCuratorService,
+    // Course Copilot's catalogue, synced from Studio (phase 7).
+    ContextCatalogueSyncService,
+    ContextCatalogueSubscriber,
   ],
   exports: [
     ContextAccessService,

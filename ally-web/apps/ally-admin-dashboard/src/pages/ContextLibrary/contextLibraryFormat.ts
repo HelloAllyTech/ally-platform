@@ -1,4 +1,4 @@
-import { en } from "@constants";
+import { en, ROUTES } from "@constants";
 import {
   ContextBulkResult,
   ContextChunk,
@@ -23,6 +23,31 @@ export const ORIGINS: ContextChunkOrigin[] = [
   "agent",
   "synced",
 ];
+
+/**
+ * Where a Content Catalogue item is edited in Studio, from its `syncKey` (`<table>:<row id>`):
+ * the roleplay or case editor, or the character or component library. Null for anything else.
+ * Routes are read here rather than at module load (tests mock `@constants` wholesale).
+ */
+export const studioHref = (syncKey: string | null | undefined): string | null => {
+  const at = (syncKey ?? "").indexOf(":");
+  if (at <= 0) return null;
+  const table = syncKey!.slice(0, at);
+  const id = syncKey!.slice(at + 1);
+  if (!id) return null;
+  switch (table) {
+    case "scenarios":
+      return ROUTES.EDIT_SIMULATION(id);
+    case "cases":
+      return ROUTES.EDIT_CASE(id);
+    case "scenario_characters":
+      return ROUTES.CHARACTER_LIBRARY;
+    case "track_component_templates":
+      return ROUTES.COMPONENT_LIBRARY;
+    default:
+      return null;
+  }
+};
 
 /** The origin badge on a row and in the sheet. */
 export const originLabel = (origin: string): string =>

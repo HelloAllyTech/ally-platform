@@ -1,8 +1,9 @@
 import { ROUTES } from "@constants";
 
 /**
- * Citation codes in PRD text, such as `[FP-0142]` or `[FP-0142, FP-0007]`, turned into links to
- * the Context Library entry they cite (`/context-library?chunk=FP-0142`).
+ * Context Library citation codes in agent-written text — `[FP-0142]` in Builder's PRD, `[LD-0004]`
+ * or `[CC-0042]` in Course Copilot's chat and blueprint, or several in one bracket — turned into
+ * links to the entry they cite (`/context-library?chunk=FP-0142`). Any collection's code works.
  *
  * The pattern mirrors ally-be's citation check (`context-citation.service.ts`): two capital
  * letters, a hyphen and at least four digits, one or more to a bracket.

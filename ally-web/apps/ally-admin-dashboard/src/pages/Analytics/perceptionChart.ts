@@ -250,7 +250,7 @@ export interface SelfEfficacyResponse {
 /**
  * Read on both cards. Learners are poor, often over-confident self-assessors,
  * and the weakest self-assess least well; a self-rating is worth collecting
- * only when it is triangulated with an outside measure (Stacks: "Include
+ * only when it is triangulated with an outside measure ("Include
  * Self-Assessment Despite Known Accuracy Limitations").
  */
 export const SELF_RATING_CAVEAT =

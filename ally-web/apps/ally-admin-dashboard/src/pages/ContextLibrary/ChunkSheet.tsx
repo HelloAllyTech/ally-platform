@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 import { useContextChunkActionMutation, useGetContextChunkQuery } from "@api";
 import { en } from "@constants";
 import { ContextChunkDetail, ContextCollection, ContextChunkSourceLink } from "@types";
 
-import { errorReason, humanise, nounsFor } from "./contextLibraryFormat";
+import { errorReason, humanise, nounsFor, studioHref } from "./contextLibraryFormat";
 import { useContextLibraryScope } from "./contextLibraryScope";
 import {
   AudienceBadge,
@@ -131,7 +132,21 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({
 
   const title = chunk ? `${chunk.code}` : code;
   const synced = chunk?.origin === "synced";
+  const studio = synced ? studioHref(chunk?.syncKey) : null;
   const showsText = chunk && (chunk.origin === "authored" || chunk.origin === "imported");
+  // A synced item's Studio row decides its text and whether it is live, so there is no Edit,
+  // Archive or Restore here — only a way to the row (PLAN.md §10.4).
+  const studioLink = studio ? (
+    <Link
+      to={studio}
+      aria-label={strings.openInStudioLabel(chunk?.code ?? code)}
+      data-testid="cl-open-in-studio"
+      className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 max-md:min-h-10"
+    >
+      {strings.openInStudio}
+      <span aria-hidden>→</span>
+    </Link>
+  ) : null;
 
   const footer =
     chunk && canEdit && !editing ? (
@@ -153,7 +168,9 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({
         >
           {chunk.pinned ? strings.unpin : strings.pin}
         </button>
-        {chunk.status === "archived" ? (
+        {synced ? (
+          studioLink
+        ) : chunk.status === "archived" ? (
           <button
             type="button"
             onClick={() => void run("restore", true)}
@@ -267,8 +284,12 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-typography-600">
+              <p
+                className="text-sm text-typography-600"
+                data-testid={synced ? "cl-synced-note" : undefined}
+              >
                 {synced ? strings.syncedNote : strings.whereFromNone}
+                {synced && studioLink && <> {studioLink}</>}
               </p>
             )}
           </section>
@@ -286,7 +307,6 @@ export const ChunkSheet: React.FC<ChunkSheetProps> = ({
             </p>
           )}
           {!canEditLibrary && <p className="text-xs text-typography-600">{strings.readOnly}</p>}
-          {canEdit && synced && <p className="text-xs text-typography-600">{strings.syncedNote}</p>}
         </div>
       )}
     </Sheet>

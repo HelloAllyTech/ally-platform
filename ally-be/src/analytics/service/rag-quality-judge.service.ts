@@ -137,8 +137,8 @@ export class RagQualityJudgeService {
    * threshold-probing. Taken newest-first, that afternoon becomes the entire measurement, and
    * the number it produces describes the operator rather than the corpus. Splitting the chunk
    * between consumers keeps the agent's traffic in every batch — sampling across the variation
-   * that exists is the cheapest guard against reading one population as another (Stacks:
-   * "Mitigate false negatives by recruiting participant variation").
+   * that exists is the cheapest guard against reading one population as another
+   * ("Mitigate false negatives by recruiting participant variation").
    *
    * A consumer with nothing eligible simply contributes nothing; its share is not redistributed,
    * because a batch that silently becomes single-consumer again is the thing being avoided.

@@ -331,7 +331,7 @@ export interface BuilderDoneEvent {
  * `BuilderTurnReceipt`. Agent-adjacent JSON: read every field through an `Array.isArray` guard.
  */
 export interface BuilderTurnReceipt {
-  /** Files and pages read: `ally-be/src/builder/x.ts`, `Stacks: 2 chunks`. */
+  /** Files and pages read: `ally-be/src/builder/x.ts`, `Principles search "empty state"`. */
   read: string[];
   /** Searches and lookups with what came back: `Code search "debrief rating" — 4 matches`. */
   searched: string[];

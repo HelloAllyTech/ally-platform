@@ -42,7 +42,11 @@ import { ClChunkSource } from '../entity/cl-chunk-links.entity';
 import { ClChunk } from '../entity/cl-chunk.entity';
 import { ClCollection } from '../entity/cl-collection.entity';
 import { ClSource } from '../entity/cl-source.entity';
-import { ClChunkStatus, ClUseCase } from '../enum/context-library.enum';
+import {
+  ClChunkOrigin,
+  ClChunkStatus,
+  ClUseCase,
+} from '../enum/context-library.enum';
 import {
   COLLECTION_PROFILES,
   CollectionProfile,
@@ -60,11 +64,21 @@ import { chunkDetail, toAuthoredInput } from './context-library.controller';
 const VIEW = { permissions: [PERMISSIONS.VIEW_ALLY_GUIDE] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_ALLY_GUIDE] };
 
+/**
+ * Whether an organisation's admins write entries here: a collection that holds organisation
+ * chunks AND takes written ones. The Content Catalogue holds organisations' own items too, but
+ * only as Studio syncs them, so it is not one.
+ */
+export const takesOrgEntries = (
+  p: CollectionProfile | undefined | null,
+): p is CollectionProfile =>
+  Boolean(
+    p?.allowsOrgChunks && p.allowedOrigins.includes(ClChunkOrigin.AUTHORED),
+  );
+
 /** The collections an organisation writes to: today, the Ally Guide Library. */
 export const ORG_COLLECTIONS = (): CollectionProfile[] =>
-  Object.values(COLLECTION_PROFILES).filter((p): p is CollectionProfile =>
-    Boolean(p?.allowsOrgChunks),
-  );
+  Object.values(COLLECTION_PROFILES).filter(takesOrgEntries);
 
 /**
  * One organisation's view of the Context Library (PLAN.md §10.2), for its admins.
@@ -112,7 +126,7 @@ export class ContextLibraryOrgController {
 
   private orgCollection(collectionId: string): CollectionProfile {
     const profile = getProfile(collectionId);
-    if (!profile?.allowsOrgChunks) {
+    if (!takesOrgEntries(profile)) {
       throw new NotFoundException(
         'That collection does not take organisation entries.',
       );
@@ -129,7 +143,7 @@ export class ContextLibraryOrgController {
     const chunk = await this.chunkService.findByCode(code);
     const profile = getProfile(chunk.collectionId);
     if (
-      !profile?.allowsOrgChunks ||
+      !takesOrgEntries(profile) ||
       (!chunk.isGlobal && chunk.ownerTenantId !== tenantId)
     ) {
       throw new NotFoundException(`No chunk ${code}`);

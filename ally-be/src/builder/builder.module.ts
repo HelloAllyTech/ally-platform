@@ -178,7 +178,7 @@ import {
     // SlackService: the inbox is a pull surface, so a paused build needs a push.
     NotificationModule,
     // The interview's principles (search, guiding brief, citation checks) and, later, its
-    // lessons — the Context Library replaced the Stacks client.
+    // lessons.
     ContextLibraryModule,
   ],
   controllers: [

@@ -2233,7 +2233,7 @@ export class BuilderInterviewOrchestratorService {
    * session rating, and the rating's shape, were both in the copilot's brief it was never
    * shown.
    *
-   * "Reference what was said rather than asking from scratch" is Stacks, "Sequencing
+   * "Reference what was said rather than asking from scratch" is "Sequencing
    * clarification questions to avoid user overwhelm".
    */
   private renderHandoff(handoffContext: string): string {

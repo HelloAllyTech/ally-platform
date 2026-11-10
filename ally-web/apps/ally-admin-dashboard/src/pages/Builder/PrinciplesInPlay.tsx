@@ -7,7 +7,7 @@ import { useGetBuilderPrinciplesQuery, useSetBuilderPrinciplesOffMutation } from
 import { en } from "@constants";
 import { BuilderPrincipleStatus } from "@types";
 
-import { CitationChip } from "../../components/builder/CitationChip";
+import { CitationChip } from "../../components/context-citation";
 import { StatusWord } from "../ContextLibrary/ContextLibraryUi";
 
 /** Polled while the brief is being built: it lands in the background, seconds after start. */

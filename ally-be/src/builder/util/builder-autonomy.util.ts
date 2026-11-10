@@ -1,7 +1,7 @@
 /**
  * How much Builder does on its own, as one level rather than five switches.
  *
- * Stacks, "Design autonomy sliders to build user trust": expose autonomy as a
+ * "Design autonomy sliders to build user trust": expose autonomy as a
  * few clearly labelled levels with predictable behaviour at each, and make
  * moving between them one step. The switches stay underneath (and stay
  * settable on their own, which reads back as `custom`).

@@ -46,7 +46,7 @@ export const BUG_HUNTER_NOTES_COLLECTION = "bug_hunter_notes";
  *   weight as the work. `?section=about` still opens it.
  *
  * So the Work tab is the bugs table and nothing else, and the strip reads
- * Work | Notebook. Stacks' *Eliminate distractions that don't drive desired
+ * Work | Notebook. *Eliminate distractions that don't drive desired
  * actions* is the general form: every element on the reviewer's surface has
  * to move them toward a decision, or it goes somewhere else.
  *

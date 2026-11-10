@@ -696,7 +696,7 @@ export class BuilderController {
     const trackRecord = await this.pullRequestService.trackRecord();
     // The next level is suggested only once it has been earned: a full window
     // of clean reviews that people then merged exactly as reviewed, with no
-    // release that failed its health check (Stacks, "Progressive Delegation").
+    // release that failed its health check ("Progressive Delegation").
     const earned =
       trackRecord.mergedAsReviewed >= trackRecord.window &&
       trackRecord.unhealthyReleases === 0;

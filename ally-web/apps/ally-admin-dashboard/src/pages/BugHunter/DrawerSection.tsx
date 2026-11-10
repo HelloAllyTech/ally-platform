@@ -10,7 +10,7 @@ import { ArrowDown } from "@icons";
  * how sure Bug Hunter was, how it planned the fix, how it decided, what it did
  * — which a reader needs when a decision looks wrong, not every time the drawer
  * opens. The drawer leads with the decision instead, and keeps the rest one
- * click away (Stacks: *Progressive Disclosure and Contextual Relevance in Agent
+ * click away (*Progressive Disclosure and Contextual Relevance in Agent
  * Interfaces*).
  *
  * The body is not rendered until it is opened, so a closed section costs

@@ -236,6 +236,11 @@ export class ContextToolsService {
       (c) =>
         c.status === ClChunkStatus.ACTIVE &&
         granted.has(c.collectionId) &&
+        // A product's tool pair reads only its own collections, even when its use case is granted
+        // more: Course Copilot's guidance tools never open a catalogue item, which is shown only
+        // through its own access-checked search.
+        (!ctx.collections?.length ||
+          ctx.collections.includes(c.collectionId)) &&
         (!ctx.audience ||
           c.isGlobal ||
           (ctx.audience.tenantId &&

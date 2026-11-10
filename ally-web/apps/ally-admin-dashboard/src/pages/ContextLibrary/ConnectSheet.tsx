@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 
-import { Copy, KeyRound, Trash2 } from "lucide-react";
+import { Copy, KeyRound, PlugZap, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -15,7 +15,14 @@ import { ContextReaderKey, ContextReaderKeyCreated } from "@types";
 import { UNDO_MS } from "./ChunkSheet";
 import { errorReason } from "./contextLibraryFormat";
 import { InlineError, LoadingRows } from "./ContextLibraryUi";
-import { formatDay, keyHint, mcpEndpoint, shellLines } from "./insightsFormat";
+import {
+  ConnectionOutcome,
+  formatDay,
+  keyHint,
+  mcpEndpoint,
+  shellLines,
+  testConnection,
+} from "./insightsFormat";
 import { Sheet } from "../Builder/room/Sheet";
 
 const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500";
@@ -40,7 +47,8 @@ const copyText = async (text: string, done: string) => {
 
 /**
  * Connect Claude Code (`?sheet=connect`): what it gives, your read-only keys, and the two shell
- * lines to set. A new key is shown once, here, and never again: the server keeps only its hash.
+ * lines to set. A new key is shown once, here, and never again: the server keeps only its hash —
+ * which is also why Test connection is offered only then, while this page still holds the key.
  * Revoking happens at once with an undo.
  */
 export const ConnectSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -53,6 +61,8 @@ export const ConnectSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => 
 
   const [label, setLabel] = useState("");
   const [fresh, setFresh] = useState<ContextReaderKeyCreated | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [outcome, setOutcome] = useState<ConnectionOutcome | null>(null);
   // Revoked here ahead of the server; back in the list if it refuses or the revoke is undone.
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
   const listRef = useRef<HTMLHeadingElement>(null);
@@ -70,11 +80,28 @@ export const ConnectSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     try {
       const created = await createKey({ label: label.trim() }).unwrap();
       setFresh(created);
+      setOutcome(null);
       setLabel("");
     } catch (error) {
       const reason = errorReason(error);
       toast.error(reason ? `${strings.createFailed} ${reason}` : strings.createFailed);
     }
+  };
+
+  const test = async () => {
+    if (!fresh) return;
+    setTesting(true);
+    setOutcome(null);
+    try {
+      setOutcome(await testConnection(url, fresh.key));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const forget = () => {
+    setFresh(null);
+    setOutcome(null);
   };
 
   const revoke = useCallback(
@@ -83,7 +110,10 @@ export const ConnectSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       listRef.current?.focus();
       try {
         await revokeKey(key.id).unwrap();
-        if (fresh?.id === key.id) setFresh(null);
+        if (fresh?.id === key.id) {
+          setFresh(null);
+          setOutcome(null);
+        }
         toast(strings.revoked(key.label), {
           duration: UNDO_MS,
           action: {
@@ -147,9 +177,32 @@ export const ConnectSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                   <Copy size={14} aria-hidden /> {strings.copyKey}
                 </button>
               </div>
-              <button type="button" className={quietButton} onClick={() => setFresh(null)}>
-                {strings.done}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={quietButton}
+                  disabled={testing}
+                  title={strings.testHelp}
+                  onClick={() => void test()}
+                  data-testid="cl-connect-test"
+                >
+                  <PlugZap size={14} aria-hidden />{" "}
+                  {testing ? strings.testing : strings.testConnection}
+                </button>
+                <button type="button" className={quietButton} onClick={forget}>
+                  {strings.done}
+                </button>
+              </div>
+              <p
+                aria-live="polite"
+                data-testid="cl-connect-test-result"
+                data-outcome={outcome ?? undefined}
+                className={
+                  outcome === "reachable" ? "text-green-700" : outcome ? "text-red-700" : "sr-only"
+                }
+              >
+                {outcome ? strings.testResult[outcome] : ""}
+              </p>
             </div>
           ) : (
             <form className="flex flex-wrap items-end gap-2" onSubmit={event => void create(event)}>

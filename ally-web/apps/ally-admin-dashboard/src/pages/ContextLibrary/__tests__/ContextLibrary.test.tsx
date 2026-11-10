@@ -716,6 +716,58 @@ describe("Connect Claude Code", () => {
     expect(screen.queryByText("clr_secret123", { exact: false })).not.toBeInTheDocument();
   });
 
+  it("tests a new key against the MCP endpoint and says what it found, in plain words", async () => {
+    mocks.createKey.mockReturnValue({ ...key, id: "k-2", label: "Desk", key: "clr_secret123" });
+    const fetchMock = vi.fn(async () => ({
+      status: 200,
+      json: async () => ({ jsonrpc: "2.0", id: 1, result: {} }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      renderAt("?sheet=connect");
+      // No key in hand, nothing to test: the button arrives with the key.
+      expect(screen.queryByTestId("cl-connect-test")).not.toBeInTheDocument();
+      fireEvent.change(screen.getByTestId("cl-connect-label"), { target: { value: "Desk" } });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("cl-connect-create"));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("cl-connect-test"));
+      });
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toMatch(/\/api\/v1\/context-library\/mcp$/);
+      expect(init.method).toBe("POST");
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer clr_secret123");
+      expect(JSON.parse(String(init.body))).toMatchObject({ jsonrpc: "2.0", method: "ping" });
+      expect(screen.getByTestId("cl-connect-test-result")).toHaveTextContent(
+        "Connected. Claude Code can reach the library with this key.",
+      );
+
+      fetchMock.mockImplementation(async () => ({
+        status: 401,
+        json: async () => ({ jsonrpc: "2.0", id: null, error: { code: -32001 } }),
+      }));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("cl-connect-test"));
+      });
+      expect(screen.getByTestId("cl-connect-test-result")).toHaveTextContent(
+        "The library turned this key away.",
+      );
+
+      fetchMock.mockImplementation(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("cl-connect-test"));
+      });
+      expect(screen.getByTestId("cl-connect-test-result")).toHaveTextContent(
+        "Couldn't reach the library from here.",
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("revokes at once, with a six-second undo that restores the key", async () => {
     renderAt("?sheet=connect");
     await act(async () => {
@@ -869,5 +921,47 @@ describe("ContextLibrary for an organisation's admin (§10.2)", () => {
       expect.objectContaining({ audience: OTHER, tenantId: undefined }),
     );
     expect(mocks.collectionsArg).toHaveBeenCalledWith(undefined);
+  });
+});
+
+describe("Content Catalogue items (synced from Studio)", () => {
+  const catalogue: ContextCollection = {
+    ...firstPrinciples,
+    id: "content_catalogue",
+    name: "Content Catalogue",
+    noun: "item",
+    nounPlural: "items",
+    codePrefix: "CC",
+    allowedOrigins: ["synced"],
+    allowsOrgChunks: true,
+    takesDocuments: false,
+    facets: { itemKind: { label: "Kind", values: ["roleplay"], multi: false } },
+    attributes: {},
+  };
+
+  beforeEach(() => {
+    mocks.access = { mode: "platform", canEdit: true, orgIds: null };
+    mocks.permissions = ["view:admin:context-library", "edit:admin:context-library"];
+    mocks.collections = [catalogue];
+    mocks.chunks = [
+      chunk("CC-0001", "Grief at work — a colleague asks for help", {
+        collectionId: "content_catalogue",
+        origin: "synced",
+        syncKey: "scenarios:42",
+        facets: { itemKind: "roleplay" },
+        attributes: {},
+      }),
+    ];
+  });
+
+  it("links to the item in Studio instead of offering Edit or Archive", () => {
+    renderAt("?collection=content_catalogue&chunk=CC-0001");
+    expect(screen.getByTestId("cl-synced-note")).toHaveTextContent(
+      "Synced from Studio — edit the item there.",
+    );
+    const links = screen.getAllByTestId("cl-open-in-studio");
+    expect(links[0]).toHaveAttribute("href", "/create-simulation/edit/42");
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
   });
 });

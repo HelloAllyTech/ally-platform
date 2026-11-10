@@ -68,7 +68,7 @@ const sourceLabel = (source?: HelplineRiskSource | null) =>
 
 /**
  * Plain, specific alert copy: what happened, why it was raised, and the one
- * thing to do next — open the monitor (the Stacks chunk "Escalation Design:
+ * thing to do next — open the monitor (the guidance "Escalation Design:
  * Thresholds for Human Intervention": the human receiving an escalation needs
  * what happened, why, and what is needed to proceed). Built ONLY from the
  * org name, the listener's alias and the flag's source — never a message

@@ -19,7 +19,6 @@ export const COURSE_COPILOT_MAX_TRUNCATION_RETRIES = 2;
 export const COURSE_COPILOT_SUMMARY_AFTER_MESSAGES = 40;
 export const COURSE_COPILOT_SUMMARY_KEEP_RECENT = 16;
 export const COURSE_COPILOT_DEFAULT_MAX_TOOL_ITERATIONS = 10;
-export const COURSE_COPILOT_STACKS_DEFAULT_RESULTS = 4;
 
 // ── Build runner ────────────────────────────────────────────────────────────
 

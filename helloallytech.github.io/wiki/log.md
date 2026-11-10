@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-web.md`, `contributing/dev-setup.md`, `contributing/planning-with-context-library.md`: Course Copilot moved onto the Context Library; Stacks removed; Test connection added.
+
+Course Copilot's design guidance reads the new Learning Design collection and `search_library` the new Content Catalogue, which mirrors active Studio roleplays, cases, characters and component templates (a subscriber on those tables plus a nightly reconciliation) and rechecks every hit against who may open it. Roadmap Copilot stays on First Principles. The third-party Stacks client and its config keys are deleted. The Connect Claude Code sheet now has **Test connection** for a newly created key, and both contributing pages (and every repo's `context-library` skill) say so again. Agent-cited codes render as chips in Course Copilot as they do in Builder.
+
 ## [2026-11-09] update | `repos/ally-be.md`, `repos/ally-ai.md`, `repos/ally-web.md`: the Ally guide's library and Debrief's guidance moved into the Context Library; organisation admins get a scoped Library.
 
 They are now the Ally Guide Library and Debrief Guidance collections, their passages copied word for word with citations, audiences and owners; the guide and Debrief search them as the learner's organisation. Clinical sign-off is dropped (`clinical` is information only). An organisation's admins open the Context Library scoped to their organisation and manage their own entries there, which replaces the guide library panel and the Debrief knowledge tab. ally-ai lists `GuideLibraryChunk` and `DebriefKnowledgeChunk` as retired; each is dropped only by ally-be's confirmed retire action after a smoke check, never by a migration.

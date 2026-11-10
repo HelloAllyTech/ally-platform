@@ -487,6 +487,8 @@ export type RoadmapBriefEvidenceSource =
   | "roadmap"
   | "codebase"
   | "wiki"
+  | "principles"
+  /** Only on briefs filed before 2026-11-09; the server writes `principles` for new ones. */
   | "stacks"
   | "strategy";
 

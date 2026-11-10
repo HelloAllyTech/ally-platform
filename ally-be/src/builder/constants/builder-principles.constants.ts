@@ -5,9 +5,9 @@ import {
 } from 'src/context-library/profiles/first-principles.profile';
 
 /**
- * The Builder interview's view of the Context Library: First Principles (and, once they move
- * in, Builder Lessons), under tool names and wording that fit a PRD interview. Replaces the
- * Stacks tools; the shared pipeline lives in `src/context-library/`.
+ * The Builder interview's view of the Context Library: First Principles and Builder Lessons,
+ * under tool names and wording that fit a PRD interview. Roadmap Copilot reads First Principles
+ * through the same pair. The shared pipeline lives in `src/context-library/`.
  */
 export const BUILDER_PRINCIPLE_TOOLS: ContextToolNames = {
   search: 'principles_search',

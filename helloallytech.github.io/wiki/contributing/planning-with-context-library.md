@@ -58,7 +58,8 @@ slash commands for the `context-library` server.
 
 1. In Ally's admin dashboard, open **Context Library → Connect Claude Code** and create a
    **read-only key**. The sheet shows the two values you need; the key is shown once, so copy
-   it then.
+   it then. While it is on screen, **Test connection** sends the library a ping with it and says
+   whether it answered, turned the key away, or could not be reached.
 2. Export both in your shell profile, using the values the sheet shows:
 
    ```bash
@@ -91,7 +92,7 @@ variable names.
 |---|---|
 | No `context-library` server in the session | One of the two variables was unset in the shell that launched the session, or the server was never approved. Export both and start a new session — `.mcp.json` is read at startup |
 | Every call is refused as unauthorised | The key was revoked or mistyped — create a new one in the Connect Claude Code sheet |
-| Calls cannot connect | The URL is wrong, or the network or server is down. Check the URL against the one the sheet shows, then ask whoever runs the platform whether the server is up |
+| Calls cannot connect | The URL is wrong, or the network or server is down. Check the URL against the one the sheet shows; **Test connection** on a newly created key tells a refused key from an unreachable library (the sheet can only test a key while it is showing it) |
 
 None of these says anything about what the library holds. Do not work around a broken connection
 by skipping the library silently: fix it, or say in the plan that the Context Library was

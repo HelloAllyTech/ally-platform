@@ -328,7 +328,7 @@ export class ContextChunkService {
     const profile = requireProfile(chunk.collectionId);
     if (chunk.origin === ClChunkOrigin.SYNCED) {
       throw new BadRequestException(
-        'This item is synced from its source; edit it there.',
+        'This item is synced from Studio; edit it there.',
       );
     }
     const findings = runAuthoredGate(profile, input, {
@@ -368,6 +368,12 @@ export class ContextChunkService {
   ) {
     const chunk = await this.findByCode(code);
     this.assertCanEdit(chunk, actor);
+    if (chunk.origin === ClChunkOrigin.SYNCED) {
+      // The sync would undo it: an item is archived or restored by its row, in Studio.
+      throw new BadRequestException(
+        'This item is synced from Studio; archive or restore it there.',
+      );
+    }
     if (chunk.status === status) return chunk;
     await this.snapshot(
       chunk,

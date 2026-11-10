@@ -15,7 +15,7 @@ export interface ShapingDecision {
  * (KB_CHUNK_OVERLAP_TOKENS — overlap exists so a thought that straddles a boundary survives in
  * both neighbours), so two adjacent chunks are near-guaranteed to score alike and to repeat each
  * other's best sentences. Left alone, a top-8 routinely spends half its budget re-reading one
- * page of one document. Stacks, "When to apply memory and knowledge compression": repetitive or
+ * page of one document. "When to apply memory and knowledge compression": repetitive or
  * duplicate items in a store reduce retrieval efficiency — the same is true of a result set, and
  * a result set can be de-duplicated at no indexing cost.
  *

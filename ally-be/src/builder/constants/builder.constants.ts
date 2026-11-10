@@ -134,9 +134,6 @@ export const BUILDER_CORRECTIONS_TASK = 'builder-corrections-scan';
 export const BUILDER_EVAL_RESUME_INTERVAL = '5min';
 export const BUILDER_EVAL_RESUME_TASK = 'builder-eval-resume';
 
-/** Stacks retrieval defaults — small on purpose; hits are compact. */
-export const BUILDER_STACKS_DEFAULT_RESULTS = 4;
-
 /**
  * Per-tenant session caps, mirroring the character-interview rationale: bound
  * LLM spend for org admins (a platform admin is not capped). Concurrency

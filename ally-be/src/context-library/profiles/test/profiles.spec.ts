@@ -278,13 +278,27 @@ describe('Ally Guide Library and Debrief Guidance (phase 6)', () => {
   });
 
   it('lets organisations write to the guide library only', () => {
+    const {
+      ORG_COLLECTIONS,
+    } = require('../../controller/context-library-org.controller');
     expect(ALLY_GUIDE_LIBRARY_PROFILE.allowsOrgChunks).toBe(true);
     expect(DEBRIEF_GUIDANCE_PROFILE.allowsOrgChunks).toBe(false);
+    // The Content Catalogue holds organisations' own items too (phase 7), but only as Studio
+    // syncs them: it takes no written entries, so it is not an organisation's to write to.
     expect(
       Object.values(COLLECTION_PROFILES)
         .filter((p) => p?.allowsOrgChunks)
-        .map((p) => p!.id),
-    ).toEqual([ClCollectionId.ALLY_GUIDE_LIBRARY]);
+        .map((p) => p!.id)
+        .sort(),
+    ).toEqual(
+      [
+        ClCollectionId.ALLY_GUIDE_LIBRARY,
+        ClCollectionId.CONTENT_CATALOGUE,
+      ].sort(),
+    );
+    expect(ORG_COLLECTIONS().map((p: { id: string }) => p.id)).toEqual([
+      ClCollectionId.ALLY_GUIDE_LIBRARY,
+    ]);
   });
 
   it('is never granted to engineers, and reaches the guide and Debrief only', () => {
@@ -372,5 +386,134 @@ describe('Ally Guide Library and Debrief Guidance (phase 6)', () => {
       'early_professional',
       'experienced_professional',
     ]);
+  });
+});
+
+describe('Learning Design and the Content Catalogue (phase 7)', () => {
+  const { LEARNING_DESIGN_PROFILE } = require('../learning-design.profile');
+  const {
+    CONTENT_CATALOGUE_PROFILE,
+    catalogueSyncKey,
+    parseCatalogueSyncKey,
+  } = require('../content-catalogue.profile');
+
+  it('registers both with their codes, nouns and origins', () => {
+    expect(requireProfile(ClCollectionId.LEARNING_DESIGN)).toBe(
+      LEARNING_DESIGN_PROFILE,
+    );
+    expect(LEARNING_DESIGN_PROFILE.codePrefix).toBe('LD');
+    expect(LEARNING_DESIGN_PROFILE.noun).toBe('principle');
+    expect([...LEARNING_DESIGN_PROFILE.allowedOrigins].sort()).toEqual([
+      'authored',
+      'distilled',
+    ]);
+    expect(LEARNING_DESIGN_PROFILE.extraction.promptCode).toBe(
+      'context_library_extract_learning_design_system',
+    );
+    expect(LEARNING_DESIGN_PROFILE.purpose.length).toBeGreaterThan(80);
+
+    expect(requireProfile(ClCollectionId.CONTENT_CATALOGUE)).toBe(
+      CONTENT_CATALOGUE_PROFILE,
+    );
+    expect(CONTENT_CATALOGUE_PROFILE.codePrefix).toBe('CC');
+    expect(CONTENT_CATALOGUE_PROFILE.noun).toBe('item');
+    expect(CONTENT_CATALOGUE_PROFILE.allowedOrigins).toEqual(['synced']);
+    expect(CONTENT_CATALOGUE_PROFILE.allowsOrgChunks).toBe(true);
+    expect(CONTENT_CATALOGUE_PROFILE.extraction).toBeUndefined();
+    expect([...CONTENT_CATALOGUE_PROFILE.facets.itemKind.values]).toEqual([
+      'roleplay',
+      'case',
+      'character',
+      'template',
+    ]);
+  });
+
+  it('grants Learning Design to Course Copilot and engineers only', () => {
+    const readers = Object.values(ClUseCase).filter(
+      (useCase) =>
+        !LEARNING_DESIGN_PROFILE.neverGrantTo.includes(useCase) &&
+        useCase !== ClUseCase.ADMIN_PREVIEW &&
+        useCase !== ClUseCase.EVAL,
+    );
+    expect(readers.sort()).toEqual(
+      [ClUseCase.COURSE_COPILOT, ClUseCase.MCP_DEV].sort(),
+    );
+    for (const useCase of readers) {
+      expect(CONTEXT_USE_CASES[useCase].defaultCollections).toContain(
+        ClCollectionId.LEARNING_DESIGN,
+      );
+    }
+  });
+
+  it('grants the Content Catalogue to Course Copilot only, never to engineers', () => {
+    expect(CONTENT_CATALOGUE_PROFILE.neverGrantTo).toContain(ClUseCase.MCP_DEV);
+    const readers = Object.values(ClUseCase).filter(
+      (useCase) =>
+        !CONTENT_CATALOGUE_PROFILE.neverGrantTo.includes(useCase) &&
+        useCase !== ClUseCase.ADMIN_PREVIEW &&
+        useCase !== ClUseCase.EVAL,
+    );
+    expect(readers).toEqual([ClUseCase.COURSE_COPILOT]);
+    expect(
+      CONTEXT_USE_CASES[ClUseCase.COURSE_COPILOT].defaultCollections,
+    ).toEqual([
+      ClCollectionId.LEARNING_DESIGN,
+      ClCollectionId.CONTENT_CATALOGUE,
+    ]);
+    expect(
+      CONTEXT_USE_CASES[ClUseCase.MCP_DEV].defaultCollections,
+    ).not.toContain(ClCollectionId.CONTENT_CATALOGUE);
+  });
+
+  it('keys a synced item by its table and row, and reads the key back', () => {
+    expect(catalogueSyncKey('roleplay', 42)).toBe('scenarios:42');
+    expect(catalogueSyncKey('template', 'abc')).toBe(
+      'track_component_templates:abc',
+    );
+    expect(parseCatalogueSyncKey('scenario_characters:c-1')).toEqual({
+      table: 'scenario_characters',
+      id: 'c-1',
+      kind: 'character',
+    });
+    expect(parseCatalogueSyncKey('kb_document_chunks:1')).toBeNull();
+    expect(parseCatalogueSyncKey(null)).toBeNull();
+  });
+
+  it('renders compact cards for both', () => {
+    const principle = LEARNING_DESIGN_PROFILE.card(
+      {
+        code: 'LD-0004',
+        statement:
+          'Let learners practise a skill before they are assessed on it',
+        situations: ['placing a roleplay assessment'],
+        exampleQueries: [],
+        keywords: [],
+        topics: [],
+        facets: { domain: 'assessment', itemTypes: ['roleplay'] },
+        attributes: { strength: 'should' },
+      },
+      'good',
+    );
+    expect(principle).toBe(
+      '[LD-0004 · should · assessment · good] Let learners practise a skill before they are assessed on it\n  When: placing a roleplay assessment',
+    );
+    const item = CONTENT_CATALOGUE_PROFILE.card({
+      code: 'CC-0012',
+      statement: 'Grief at work — a colleague asks for help',
+      situations: [],
+      exampleQueries: [],
+      keywords: [],
+      topics: [],
+      facets: {
+        itemKind: 'roleplay',
+        competencies: ['Active listening'],
+        difficulty: 'MEDIUM',
+        languages: ['en'],
+      },
+      attributes: {},
+    });
+    expect(item).toBe(
+      '[CC-0012 · roleplay] Grief at work — a colleague asks for help\n  Active listening · MEDIUM · en',
+    );
   });
 });

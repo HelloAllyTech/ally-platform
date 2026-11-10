@@ -47,7 +47,7 @@ export interface BlueprintFooterProps {
  * it — a disabled button with no stated reason makes the trainer hunt for one.
  *
  * The cost is labelled and explained as an estimate that can differ from the real
- * spend: Stacks, "Making Agent Trustworthiness Visible Through Transparency" — surface
+ * spend: "Making Agent Trustworthiness Visible Through Transparency" — surface
  * uncertainty rather than hide it, and keep override (raise the budget, trim the
  * course) one click from the number that blocks you.
  */

@@ -8,6 +8,7 @@ import { en } from "@constants";
 import { AgentChatMessage, CourseCopilotSuggestedAction, CourseReviewFinding } from "@types";
 
 import { AgentAnswerPayload, QuestionCard } from "./QuestionCard";
+import { citationMarkdownComponents, linkCitations } from "../context-citation";
 import { sharedMarkdownComponents } from "../markdown/markdownComponents";
 
 export type AgentChatStrings = typeof en.agentChat.chat;
@@ -27,6 +28,11 @@ export interface ChatMessageProps {
    * rather than the sentence to show.
    */
   formatToolNote?: (note: string) => string;
+  /**
+   * Draw Context Library codes in the reply (`[LD-0004]`, `[CC-0042]`) as chips that open the
+   * entry, for an agent that cites them (Course Copilot).
+   */
+  citations?: boolean;
 }
 
 /**
@@ -48,6 +54,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   disabled = false,
   strings: stringOverrides,
   formatToolNote,
+  citations = false,
 }) => {
   const strings: AgentChatStrings = { ...en.agentChat.chat, ...stringOverrides };
 
@@ -118,8 +125,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         <Tile className="w-full max-w-[92%]">
           {hasBody ? (
             <div className="prose prose-sm max-w-none break-words text-sm text-typography-900">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={sharedMarkdownComponents}>
-                {content}
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={citations ? citationMarkdownComponents : sharedMarkdownComponents}
+              >
+                {citations ? linkCitations(content) : content}
               </ReactMarkdown>
             </div>
           ) : message.isStreaming ? (

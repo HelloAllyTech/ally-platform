@@ -105,7 +105,7 @@ const TYPE_TENSION: Record<string, GuideTension> = {
 /**
  * Minutes a newcomer typically needs, by type, when the item itself says
  * nothing better. Deliberately generous: an author's own timing undercounts
- * a novice by half or more (Stacks: Estimating Activity Duration for Novice
+ * a novice by half or more (Estimating Activity Duration for Novice
  * Learners), and a dock that promises 3 minutes for a 7-minute task spends
  * trust it cannot earn back. Replace with observed medians once there is
  * completion data per item.

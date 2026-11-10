@@ -115,34 +115,26 @@ describe('ContextAccessService', () => {
       ...collections,
       { id: ClCollectionId.LEARNING_DESIGN, status: 'active' },
     ];
-    // Pretend Learning Design has a profile, as it will once it ships.
-    (COLLECTION_PROFILES as any)[ClCollectionId.LEARNING_DESIGN] = {
-      ...COLLECTION_PROFILES[ClCollectionId.FIRST_PRINCIPLES],
-      id: ClCollectionId.LEARNING_DESIGN,
-      neverGrantTo: [],
-    };
-    try {
-      const service = new ContextAccessService(
-        grants as any,
-        log as any,
-        repo(live) as any,
-      );
-      await service.setGrant(
-        ClUseCase.MCP_DEV,
-        ClCollectionId.FIRST_PRINCIPLES,
-        false,
-        undefined,
-        7,
-      );
-      service.invalidate();
-      expect(
-        (await service.grantedCollections(ClUseCase.MCP_DEV)).map(
-          (g) => g.collectionId,
-        ),
-      ).toEqual([ClCollectionId.LEARNING_DESIGN]);
-      expect(log.save).toHaveBeenCalled();
-    } finally {
-      delete (COLLECTION_PROFILES as any)[ClCollectionId.LEARNING_DESIGN];
-    }
+    // Learning Design is live since phase 7; engineers read it by default.
+    expect(COLLECTION_PROFILES[ClCollectionId.LEARNING_DESIGN]).toBeDefined();
+    const service = new ContextAccessService(
+      grants as any,
+      log as any,
+      repo(live) as any,
+    );
+    await service.setGrant(
+      ClUseCase.MCP_DEV,
+      ClCollectionId.FIRST_PRINCIPLES,
+      false,
+      undefined,
+      7,
+    );
+    service.invalidate();
+    expect(
+      (await service.grantedCollections(ClUseCase.MCP_DEV)).map(
+        (g) => g.collectionId,
+      ),
+    ).toEqual([ClCollectionId.LEARNING_DESIGN]);
+    expect(log.save).toHaveBeenCalled();
   });
 });

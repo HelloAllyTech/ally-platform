@@ -148,7 +148,7 @@ const railVariantForStatus = (
  *
  * It replaces the queued/releasing/released/failed banners and the meta-row
  * spinner, which each stated a piece of the same fact in a different place
- * (Stacks: *Balance Transparency with Cognitive Load in Agent UX*). Returns
+ * (*Balance Transparency with Cognitive Load in Agent UX*). Returns
  * null only for an open question, where the question itself is the sentence.
  */
 const statusSentence = (
@@ -253,7 +253,7 @@ const foundAgo = (finding: BugFindingDetail): string | null => {
  *
  * The order is the reader's: someone opening a bug wants to know what it needs
  * from them, and the evidence for that decision is a click away rather than
- * between them and the button (Stacks: *Desert Oasis: Isolating the Primary
+ * between them and the button (*Desert Oasis: Isolating the Primary
  * Call-to-Action*; *Progressive Disclosure and Contextual Relevance in Agent
  * Interfaces*).
  *

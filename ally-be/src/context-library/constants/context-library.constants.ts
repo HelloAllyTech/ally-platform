@@ -115,3 +115,15 @@ export const CL_AGENT_CURATOR_MAX_TOKENS = 4096;
  * report nothing do not count, so the rule cannot empty a collection whose agent never reports.
  */
 export const CL_AGENT_UNUSED_AFTER_REPORTS = 30;
+
+// ── Content Catalogue sync (§6.4, phase 7) ──────────────────────────────────
+
+/** Writes to a Studio row are synced this long after the last one, once they have committed. */
+export const CL_CATALOGUE_DEBOUNCE_MS = 3_000;
+/** The backfill waits for the app to settle before its first reconciliation. */
+export const CL_CATALOGUE_BOOT_DELAY_MS = 90_000;
+/** A reconciliation that dies mid-run cannot hold the next one off past this. */
+export const CL_CATALOGUE_LOCK_TTL_SECONDS = 30 * 60;
+/** Items enriched per run (one fast-model call each); the rest wait for the next night. */
+export const CL_CATALOGUE_ENRICH_PER_RUN = 300;
+export const CL_CATALOGUE_ENRICH_CONCURRENCY = 4;

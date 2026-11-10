@@ -65,7 +65,7 @@ export interface BuilderEvalSandbox {
  * What is real, and why: the model calls (that is what is being tested), the
  * repo knowledge packs, lessons, catalog and platform map (read-only, and the
  * interview's context), and the research tools — GitHub reads, docs search,
- * Stacks, production analytics — which only read. File reads are pinned to the
+ * production analytics — which only read. File reads are pinned to the
  * fixture's commits when it has them.
  *
  * What is swapped:

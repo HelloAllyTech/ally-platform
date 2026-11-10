@@ -213,7 +213,7 @@ export const BUILDER_INTERVIEWER_SYSTEM = definePrompt(
   {
     name: 'Builder Interviewer — System',
     description:
-      'System prompt for the Builder PRD-interview agent: interviews an Ally admin one option-card question at a time, grounding each question in the codebase (GitHub tools + repo knowledge packs) and the product library (Stacks), resolving contradictions between answers, and keeping a living PRD patched to build-readiness for the coding agent to implement.',
+      'System prompt for the Builder PRD-interview agent: interviews an Ally admin one option-card question at a time, grounding each question in the codebase (GitHub tools + repo knowledge packs) and the team’s principles (the Context Library’s First Principles), resolving contradictions between answers, and keeping a living PRD patched to build-readiness for the coding agent to implement.',
     category: 'Builder',
     runtimes: ['ally-be'],
   },
@@ -1534,6 +1534,20 @@ export const CONTEXT_LIBRARY_EXTRACT_DEBRIEF_GUIDANCE_SYSTEM = definePrompt(
     name: 'Context Library — Extract Debrief Guidance',
     description:
       'Distils one part of a practice guideline, style guide, level guide or protocol into short guidelines the Debrief agent reads beside a pivotal moment: statement, what good practice looks like, the moments it applies to, kind, learner levels, skills and an information-only clinical flag. Own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_learning_design_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_LEARNING_DESIGN_SYSTEM = definePrompt(
+  'context_library_extract_learning_design_system',
+  {},
+  {
+    name: 'Context Library — Extract Learning Design',
+    description:
+      'Distils one part of a learning-design or training document into short, standalone principles Course Copilot reads while it plans a course for mental-health helpers: statement, rationale, situations, example searches, domain, course stage, item types, probe and anti-pattern. Never clinical treatment guidance; own words only; no names.',
     category: 'Context Library',
     runtimes: ['ally-be'],
     output: 'json',

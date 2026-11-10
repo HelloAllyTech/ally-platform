@@ -45,6 +45,8 @@ import { CharacterInterviewMessageRepository } from './repository/character-inte
     CharacterInterviewSessionRepository,
     CharacterInterviewMessageRepository,
   ],
-  exports: [ScenarioCharacterService],
+  // CharacterLibraryAccessService: Course Copilot's catalogue search rechecks every character it
+  // shows against the asker's slice of the library.
+  exports: [ScenarioCharacterService, CharacterLibraryAccessService],
 })
 export class ScenarioCharacterModule {}

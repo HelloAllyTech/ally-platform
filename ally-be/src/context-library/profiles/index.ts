@@ -3,8 +3,10 @@ import { ALLY_GUIDE_LIBRARY_PROFILE } from './ally-guide-library.profile';
 import { BUG_HUNTER_NOTES_PROFILE } from './bug-hunter-notes.profile';
 import { BUILDER_LESSONS_PROFILE } from './builder-lessons.profile';
 import { CHARACTER_INSIGHTS_PROFILE } from './character-insights.profile';
+import { CONTENT_CATALOGUE_PROFILE } from './content-catalogue.profile';
 import { DEBRIEF_GUIDANCE_PROFILE } from './debrief-guidance.profile';
 import { FIRST_PRINCIPLES_PROFILE } from './first-principles.profile';
+import { LEARNING_DESIGN_PROFILE } from './learning-design.profile';
 import { CollectionProfile } from './profile.types';
 
 export * from './critic-checks';
@@ -24,6 +26,8 @@ export const COLLECTION_PROFILES: Partial<
   [ClCollectionId.BUG_HUNTER_NOTES]: BUG_HUNTER_NOTES_PROFILE,
   [ClCollectionId.ALLY_GUIDE_LIBRARY]: ALLY_GUIDE_LIBRARY_PROFILE,
   [ClCollectionId.DEBRIEF_GUIDANCE]: DEBRIEF_GUIDANCE_PROFILE,
+  [ClCollectionId.LEARNING_DESIGN]: LEARNING_DESIGN_PROFILE,
+  [ClCollectionId.CONTENT_CATALOGUE]: CONTENT_CATALOGUE_PROFILE,
 };
 
 export function getProfile(
