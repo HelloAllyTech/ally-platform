@@ -108,6 +108,11 @@ export const HeroBlock: FC<LandingBlockProps> = ({ page, update }) => {
         />
         <PersonaImageField
           imageUrl={persona.imageUrl}
+          persona={{
+            name: persona.name ?? undefined,
+            descriptor: persona.descriptor,
+            characterId: persona.characterId,
+          }}
           onChange={imageUrl =>
             update(draft => {
               draft.persona.imageUrl = imageUrl;

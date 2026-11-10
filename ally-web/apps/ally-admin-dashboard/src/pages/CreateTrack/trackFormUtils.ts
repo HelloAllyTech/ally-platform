@@ -1277,6 +1277,12 @@ export const extractTrackMetadata = (values: TrackFormValues): TrackMetadataInpu
   competencyIds: values.competencyIds ?? [],
   // Always sent (null clears it) so emptying the page in the builder empties the stored one.
   landingPage: serializeLandingPage(values.landingPage, values.sections ?? []),
+  // Sent only once the form holds them (loaded from a backend that has the
+  // columns, or set in this session), so an older backend never sees them.
+  ...(values.imageStyleId !== undefined ? { imageStyleId: values.imageStyleId } : {}),
+  ...(values.imageStyleAnchorId !== undefined
+    ? { imageStyleAnchorId: values.imageStyleAnchorId }
+    : {}),
 });
 
 /** GET /tracks/:id response -> builder form values (fresh client localIds). */
@@ -1290,6 +1296,10 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
   competencyIds: detail.competencyIds ?? [],
   // Always a full page, so the Landing page editor never meets a null.
   landingPage: detail.landingPage ? withLandingDefaults(detail.landingPage) : emptyLandingPage(),
+  ...(detail.imageStyleId !== undefined ? { imageStyleId: detail.imageStyleId } : {}),
+  ...(detail.imageStyleAnchorId !== undefined
+    ? { imageStyleAnchorId: detail.imageStyleAnchorId }
+    : {}),
   sections: [...(detail.sections ?? [])]
     .sort((a, b) => a.order - b.order)
     .map(section => ({

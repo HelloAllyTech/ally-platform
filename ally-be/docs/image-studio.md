@@ -115,6 +115,7 @@ GenerateImageRequest {
   castCharacterIds?: string[];          // scenario_characters ids: their appearance text is added; their
                                         // accepted cast sheet for this style is added as a reference
   refine?: { imageId: string; instruction: string };  // "make her look more worried": edits that image
+                                        // (it becomes reference 1; sending it again in `references` is deduplicated)
   context?: ImageContext;
 }
 ImageReferenceInput {
@@ -130,7 +131,7 @@ when the request is blocked, `429` when the author already has too many images i
 
 ```ts
 GeneratedImage {
-  id; batchId; slotKind; styleId; description; altText;
+  id; batchId; slotKind; slotKey?; styleId; description; altText;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
   imageUrl?: string;  width?: number; height?: number;
   error?: string;                         // author-facing
@@ -146,26 +147,26 @@ GeneratedImage {
 `{ images: number, perImageUsd: number, totalUsd: number }` — show it before a batch starts.
 
 ### `GET /jobs?ids=a,b,c`
-Poll. Only images in the caller's tenant.
+Poll; returns a bare `GeneratedImage[]`. Only images in the caller's tenant.
 
 ### `GET /history?slotKey=…&limit=12`
-Earlier tries for this slot (caller's tenant, newest first, succeeded only).
+Earlier tries for this slot as a bare `GeneratedImage[]` (caller's tenant, newest first, succeeded only).
 
 ### `POST /images/:id/accept`
 Marks the image used (protects it from cleanup; the first accepted image in a course with no
 style example becomes it when the editor sends `trackId` — see tracks below). `{ trackId? }` →
 `GeneratedImage`.
 
-### `GET /cast-sheets?characterIds=a,b&styleId=x`
+### `GET /cast-sheets?characterIds=a,b[&styleId=x]`
 `[{ characterId, styleId, image: GeneratedImage }]` — the latest accepted `cast_sheet` per
-character for that style. Generate one with `POST /jobs` `{ slotKind: 'cast_sheet', castCharacterIds: [id], styleId }`;
+character and style (only that style when `styleId` is given). Generate one with `POST /jobs` `{ slotKind: 'cast_sheet', castCharacterIds: [id], styleId }`;
 accept it to make it the sheet.
 
 ## Related fields
 
 - `tracks.imageStyleId` (nullable): the course's visual style; every generator in the course
   starts on it. `tracks.imageStyleAnchorId` (nullable `generated_images.id`): the course's style
-  example, sent as a `style` reference. Both are on the track DTOs (`PATCH /v1/learn/admin/tracks/:id`).
+  example, sent as a `style` reference. Both are on the track DTOs (the editor's existing track update, `PUT /v1/learn/admin/tracks/:id`).
 - `scenario_characters.appearance` (nullable, ≤ 500): a fixed one-line look ("early 30s, short
   beard, blue kurta") added to every image the character is in. On the character DTOs.
 

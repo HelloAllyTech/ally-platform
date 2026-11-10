@@ -54,6 +54,7 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
     tooltipLocation,
     tooltip,
     aiGenerate,
+    imageSlotKind,
     onValueChange,
   } = config;
   const {
@@ -198,6 +199,7 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
               header={en.simulation.coverImage}
               fileType={FILE_TYPE.IMAGE}
               enableAiGeneration={aiGenerate}
+              imageSlotKind={imageSlotKind}
             />
           </div>
         );

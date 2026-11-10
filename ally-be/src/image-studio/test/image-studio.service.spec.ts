@@ -356,6 +356,45 @@ describe('ImageStudioService.generateBatch', () => {
   });
 });
 
+describe('ImageStudioService batch matching and cast sheets', () => {
+  it('echoes each image’s slotKey so the editor can match a batch to its scenes', async () => {
+    const { service } = build();
+    const result = await service.generateBatch(user, [
+      request({ slotKey: 'node:a' }),
+      request({ slotKey: 'node:b' }),
+    ] as any);
+    expect(result.images.map((image) => image.slotKey)).toEqual([
+      'node:a',
+      'node:b',
+    ]);
+  });
+
+  it('lists cast sheets for every style when no style is named', async () => {
+    const { service, repository } = build({
+      castSheets: [
+        {
+          id: 's1',
+          characterId: 'c1',
+          styleId: 'graphic_novel',
+          status: GeneratedImageStatus.SUCCEEDED,
+          references: [],
+          createdAt: new Date(),
+        },
+      ],
+    });
+    const sheets = await service.castSheets(user, ['c1']);
+    expect(repository.findCastSheets).toHaveBeenCalledWith(
+      'tenant-a',
+      ['c1'],
+      undefined,
+    );
+    expect(sheets[0]).toMatchObject({
+      characterId: 'c1',
+      styleId: 'graphic_novel',
+    });
+  });
+});
+
 describe('ImageStudioService.estimate', () => {
   it('prices a batch at one image per item, with references on the reference model', () => {
     const { service } = build();

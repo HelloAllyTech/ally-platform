@@ -1,4 +1,4 @@
-export { RichTextEditor } from "./RichTextEditor";
+export { RichTextEditor, textNearSelection, type GenerateImageAtCursor } from "./RichTextEditor";
 export { RichTextToolbar } from "./RichTextToolbar";
 export {
   ARTICLE_QUESTION_MARKER_ATTR,

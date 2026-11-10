@@ -15,6 +15,7 @@ export * from "./userBages";
 export * from "./guardrails";
 export * from "./glossary";
 export * from "./imageGeneration";
+export * from "./imageStudio";
 export * from "./customFields";
 export * from "./dynamicI18n";
 export * from "./tooltip";

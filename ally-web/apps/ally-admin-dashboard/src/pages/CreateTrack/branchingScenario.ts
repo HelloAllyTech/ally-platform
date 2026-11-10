@@ -244,6 +244,15 @@ export const serializeBranching = (content: BranchingScenarioContent): Branching
     ...(trimmed(content.intro) ? { intro: content.intro } : {}),
     // Classic is the default, so it is never written: classic content stays byte-identical.
     ...(isStoryExperience(content) ? { experience: BranchingExperience.STORY } : {}),
+    // Optional and new: written only when someone is cast, so other content stays byte-identical.
+    ...(content.imageCast?.length
+      ? {
+          imageCast: content.imageCast.map(member => ({
+            characterId: member.characterId,
+            name: member.name,
+          })),
+        }
+      : {}),
     settings: {
       passScore: passScore ?? 0,
       maxAttempts: content.settings?.maxAttempts ?? null,

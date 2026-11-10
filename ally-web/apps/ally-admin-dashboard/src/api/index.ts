@@ -26,6 +26,7 @@ export * from "./awsLogs";
 export * from "./mobileReleases";
 export * from "./appVersion";
 export * from "./tracks";
+export * from "./imageStudio";
 export * from "./componentTemplates";
 export * from "./courseDiscussion";
 export * from "./blog";
