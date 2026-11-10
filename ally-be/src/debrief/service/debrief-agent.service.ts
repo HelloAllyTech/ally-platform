@@ -30,10 +30,15 @@ import {
   ScenarioSessionLeaderboardEndedEventParams,
   ScenarioSessionLeaderboardEvent,
 } from '../../learn/type/scenario-session-leaderboard-event.type';
-import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
+import {
+  DebriefRunArm,
+  DebriefRunMode,
+  DebriefRunStatus,
+} from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefPublishService } from './debrief-publish.service';
+import { DebriefTrialsService } from './debrief-trials.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import {
   DebriefProgress,
@@ -171,6 +176,8 @@ export class DebriefAgentService implements OnModuleInit {
     private readonly notifier: DebriefNotifier,
     /** v9 FR-20: a readable live debrief is written where today's was. */
     @Optional() private readonly publisher?: DebriefPublishService,
+    /** The PM agent's paired trials and canary (v9 FR-52). */
+    @Optional() private readonly trials?: DebriefTrialsService,
   ) {}
 
   /**
@@ -346,7 +353,10 @@ export class DebriefAgentService implements OnModuleInit {
         s.tenant_id && live.has(s.tenant_id)
           ? DebriefRunMode.LIVE
           : DebriefRunMode.SHADOW;
-      const run = await this.runner.run(s.id, { mode });
+      const run = await this.runner.run(s.id, {
+        mode,
+        ...(await this.canaryOptions(s.id, mode)),
+      });
       await this.announceReady(run);
       // The independent judge scores every debrief, published or not, blind.
       if (run.cards) {
@@ -357,6 +367,7 @@ export class DebriefAgentService implements OnModuleInit {
               `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
             ),
           );
+        void this.trials?.onPublished(run);
       }
       done++;
       this.logger.info(
@@ -395,6 +406,7 @@ export class DebriefAgentService implements OnModuleInit {
       await this.ensureRelease();
       const run = await this.runner.run(sessionId, {
         mode: DebriefRunMode.LIVE,
+        ...(await this.canaryOptions(sessionId, DebriefRunMode.LIVE)),
       });
       await this.announceReady(run);
       this.logger.info(
@@ -408,6 +420,7 @@ export class DebriefAgentService implements OnModuleInit {
               `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
             ),
           );
+        void this.trials?.onPublished(run);
       }
     } catch (e) {
       this.logger.error(
@@ -423,6 +436,27 @@ export class DebriefAgentService implements OnModuleInit {
    * a shadow or replay one is marked failed. Runs are resumed once first
    * (resumeStuckRuns); this catches the ones that died again, and replays.
    */
+  /**
+   * v9 FR-52 rung 4: a live debrief in a switched-on organisation runs on the
+   * canary release when one is running and the session falls in its share,
+   * marked as the canary's challenger arm. Never for shadow runs: the canary
+   * is about what learners read. A failed read means no canary.
+   */
+  private async canaryOptions(
+    sessionId: string,
+    mode: DebriefRunMode,
+  ): Promise<Record<string, unknown>> {
+    if (mode !== DebriefRunMode.LIVE || !this.trials) return {};
+    const canary = await this.trials.canaryFor(sessionId).catch(() => null);
+    return canary
+      ? {
+          release: canary.release,
+          experimentId: canary.ideaId,
+          arm: DebriefRunArm.CHALLENGER,
+        }
+      : {};
+  }
+
   /**
    * v9 FR-3 durable runs: a production run whose worker died mid-run (a
    * deploy, a crash) is resumed once from its checkpoint — the paid steps that

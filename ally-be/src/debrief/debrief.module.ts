@@ -32,6 +32,12 @@ import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
 import { DebriefReplyAgentService } from './service/debrief-reply-agent.service';
 import { DebriefPublishService } from './service/debrief-publish.service';
+import { DebriefSettingsService } from './service/debrief-settings.service';
+import { DebriefBaselineService } from './service/debrief-baseline.service';
+import { DebriefReportingService } from './service/debrief-reporting.service';
+import { DebriefTrialsService } from './service/debrief-trials.service';
+import { DebriefOwnerSettings } from './entity/debrief-owner-settings.entity';
+import { DebriefProbeResult } from './entity/debrief-probe-result.entity';
 import { DebriefConsoleAuditInterceptor } from './interceptor/debrief-console-audit.interceptor';
 import { DebriefRunJudgeService } from './service/debrief-run-judge.service';
 import { DebriefRunnerService } from './service/debrief-runner.service';
@@ -47,6 +53,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     TypeOrmModule.forFeature([
       DebriefRun,
       DebriefFeedback,
+      DebriefOwnerSettings,
+      DebriefProbeResult,
       // Ask Ally writes to the same thread today's debrief chat uses.
       ScenarioSessionChat,
       ScenarioSessionChatMessage,
@@ -87,6 +95,10 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefReplyService,
     DebriefReplyAgentService,
     DebriefPublishService,
+    DebriefSettingsService,
+    DebriefBaselineService,
+    DebriefReportingService,
+    DebriefTrialsService,
     DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,

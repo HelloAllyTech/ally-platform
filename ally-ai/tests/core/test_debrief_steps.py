@@ -478,3 +478,40 @@ async def test_analyst_rates_client_turns_and_updates_case_memory(dispatch_retur
     out, _ = await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
     assert out.case_memory_update is None
     assert "CASE MEMORY" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_pm_agent_asks_for_queries_only_with_rounds_left(dispatch_returns):
+    """v9 FR-61: follow-up SQL over the reporting views, at most three, and
+    only while a pass may still ask."""
+    from app.core.debrief.pm_agent import PmAgentAnalysis, analyse_signals
+
+    asked = [f"SELECT {i} FROM debrief_reporting.runs" for i in range(5)]
+    calls = dispatch_returns(PmAgentAnalysis(report="r", follow_up_queries=asked))
+    out, _ = await analyse_signals(
+        {},
+        {},
+        {},
+        [],
+        "gemini-2.5-pro",
+        catalog="debrief_reporting.runs: one row per run",
+        rounds_left=1,
+        review="monthly",
+    )
+    assert len(out.follow_up_queries) == 3
+    prompt = calls["prompt"]
+    assert "REPORTING VIEWS" in prompt and "QUERY ROUNDS LEFT: 1" in prompt
+    assert "REVIEW: monthly" in prompt
+
+    dispatch_returns(PmAgentAnalysis(report="r", follow_up_queries=asked))
+    out, _ = await analyse_signals(
+        {},
+        {},
+        {},
+        [],
+        "gemini-2.5-pro",
+        catalog="x",
+        rounds_left=0,
+        query_results=[{"sql": "SELECT 1", "rows": [{"n": 1}]}],
+    )
+    assert out.follow_up_queries == []

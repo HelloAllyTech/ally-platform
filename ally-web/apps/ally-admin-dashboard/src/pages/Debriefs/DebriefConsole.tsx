@@ -12,6 +12,7 @@ import { PmAgentTab } from "./PmAgentTab";
 import { ReleasesTab } from "./ReleasesTab";
 import { ReviewTab } from "./ReviewTab";
 import { RunsTab } from "./RunsTab";
+import { SettingsTab } from "./SettingsTab";
 
 export enum DebriefConsoleTab {
   RUNS = "runs",
@@ -22,6 +23,7 @@ export enum DebriefConsoleTab {
   CALIBRATION = "calibration",
   // Kept as `knowledge` so links to the old Knowledge tab still open here.
   GUIDANCE = "knowledge",
+  SETTINGS = "settings",
 }
 
 const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
@@ -32,6 +34,7 @@ const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.ORGANISATIONS]: OrganisationsTab,
   [DebriefConsoleTab.CALIBRATION]: CalibrationTab,
   [DebriefConsoleTab.GUIDANCE]: GuidanceTab,
+  [DebriefConsoleTab.SETTINGS]: SettingsTab,
 };
 
 const VALID_TABS = new Set<string>(Object.values(DebriefConsoleTab));

@@ -59,6 +59,20 @@ class PmAgentAnalysis(BaseModel):
         description="The weekly report for people: plain words, at most 300 words."
     )
     ideas: List[PmAgentIdea] = Field(default_factory=list)
+    # v9 FR-61: read-only SQL on the redacted debrief_reporting views. Asked
+    # for on a pass that still has rounds left; ally-be runs them through its
+    # guard and returns the rows on the next pass.
+    follow_up_queries: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Only when QUERY ROUNDS LEFT is above 0: up to 3 read-only SELECT "
+            "queries over the REPORTING VIEWS that would settle a question the "
+            "signals leave open. Empty when the signals are enough."
+        ),
+    )
+
+
+MAX_FOLLOW_UP_QUERIES = 3
 
 
 DEFAULT_PM_AGENT_SYSTEM = """\
@@ -95,19 +109,37 @@ def build_prompt(
     settings_: Dict[str, Any],
     history: List[Dict[str, Any]],
     system: Optional[str] = None,
+    catalog: Optional[str] = None,
+    query_results: Optional[List[Dict[str, Any]]] = None,
+    rounds_left: int = 0,
+    review: str = "weekly",
 ) -> str:
     def block(tag: str, value: Any) -> str:
         return f"<{tag}>\n{json.dumps(value, ensure_ascii=False, indent=1)}\n</{tag}>"
 
-    return "\n\n".join(
-        [
-            system or DEFAULT_PM_AGENT_SYSTEM,
-            block("signals", signals),
-            block("current_prompts", prompts),
-            block("settings", settings_),
-            block("idea_history", history),
-        ]
+    parts = [system or DEFAULT_PM_AGENT_SYSTEM]
+    # Code-owned (v9 FR-50): the weekly analysis, or the deeper monthly review.
+    parts.append(
+        "REVIEW: monthly — look across the whole month, trends against the "
+        "previous month, and which kinds of ideas have worked."
+        if review == "monthly"
+        else "REVIEW: weekly."
     )
+    if catalog:
+        parts.append(
+            "REPORTING VIEWS (read-only, redacted; no transcripts or learner "
+            "text):\n" + catalog
+        )
+        parts.append(f"QUERY ROUNDS LEFT: {max(0, rounds_left)}")
+    parts += [
+        block("signals", signals),
+        block("current_prompts", prompts),
+        block("settings", settings_),
+        block("idea_history", history),
+    ]
+    if query_results:
+        parts.append(block("query_results", query_results))
+    return "\n\n".join(parts)
 
 
 async def analyse_signals(
@@ -117,6 +149,10 @@ async def analyse_signals(
     history: List[Dict[str, Any]],
     model: str,
     system: Optional[str] = None,
+    catalog: Optional[str] = None,
+    query_results: Optional[List[Dict[str, Any]]] = None,
+    rounds_left: int = 0,
+    review: str = "weekly",
 ) -> Tuple[Optional[PmAgentAnalysis], str]:
     from app.core.llm.dispatch import (
         PROVIDER_GEMINI,
@@ -127,7 +163,17 @@ async def analyse_signals(
 
     output, meta = await generate_structured(
         schema=PmAgentAnalysis,
-        prompt=build_prompt(signals, prompts, settings_, history, system),
+        prompt=build_prompt(
+            signals,
+            prompts,
+            settings_,
+            history,
+            system,
+            catalog=catalog,
+            query_results=query_results,
+            rounds_left=rounds_left,
+            review=review,
+        ),
         task=LLMTask.DEBRIEF_PM_AGENT.value,
         provider=infer_provider_from_model(model) or PROVIDER_GEMINI,
         never_fallback=True,
@@ -149,4 +195,11 @@ async def analyse_signals(
         ):
             idea.kind = "needs_person"
     output.ideas = output.ideas[:5]
+    output.follow_up_queries = (
+        [q.strip() for q in output.follow_up_queries if q and q.strip()][
+            :MAX_FOLLOW_UP_QUERIES
+        ]
+        if catalog and rounds_left > 0
+        else []
+    )
     return output, meta["model"]

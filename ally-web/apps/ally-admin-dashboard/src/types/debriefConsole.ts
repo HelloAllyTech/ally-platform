@@ -216,6 +216,33 @@ export interface PmAgentIdeaRow {
     evidence?: string;
     expectedEffect?: string;
     screen?: PmAgentScreen;
+    /** Rung 2, the full gate test. */
+    gate?:
+      | { status: "running" | "failed"; startedAt: string; error?: string }
+      | (PmAgentLadderResult & {
+          rules: { hardFails: boolean; median: boolean; cost: boolean; scored: boolean };
+        });
+    /** Rung 3, paired trials on real sessions. */
+    trial?: {
+      status: "running" | "passed" | "failed";
+      startedAt: string;
+      comparisons: number;
+      meanDifference?: number | null;
+      lower?: number | null;
+      upper?: number | null;
+    };
+    /** Rung 4, the canary to real learners. */
+    canary?: {
+      status: "running" | "passed" | "reverted" | "promoted";
+      releaseId: string;
+      version: number;
+      share: number;
+      startedAt: string;
+      canaryRuns?: number;
+      canaryMedian?: number | null;
+      controlMedian?: number | null;
+      reason?: string;
+    };
   };
   createdAt: string;
   releaseVersion: number | null;
@@ -329,4 +356,49 @@ export interface DebriefStepUsage {
   medianMs: number | null;
   estimatedUsd: number;
   models: string[];
+}
+
+export interface PmAgentLadderResult {
+  status: "done";
+  cases: number;
+  pairs: number;
+  baselineMedian: number | null;
+  challengerMedian: number | null;
+  baselineHardFails: number;
+  challengerHardFails: number;
+  baselineCostUsd: number;
+  challengerCostUsd: number;
+  passed: boolean;
+}
+
+/** v9 FR-60: one owner setting's spec, as ally-be sends it. */
+export interface DebriefOwnerSettingSpec {
+  default: number | boolean;
+  kind: "int" | "number" | "share" | "bool";
+  min?: number;
+  max?: number;
+  budget?: boolean;
+  group: "quick" | "gate" | "sealed" | "trials" | "canary" | "budget";
+}
+
+export interface DebriefSettingsView {
+  values: Record<string, number | boolean>;
+  defaults: Record<string, number | boolean>;
+  spec: Record<string, DebriefOwnerSettingSpec>;
+  changed: string[];
+  baseline: {
+    ranAt: string;
+    facts: {
+      runsPerDay?: number;
+      liveRunsPerDay?: number;
+      eligibleSessionsPerMonth?: number;
+      judge?: { scored: number; median: number | null; sd: number | null };
+      rejudge?: { pairs: number; sdOfDifference: number | null };
+      hardFailRate?: number | null;
+      costPerRunUsd?: { p50: number | null; p90: number | null };
+    };
+    proposals: Record<string, { value: number | boolean; reason: string; misfit: boolean }>;
+  } | null;
+  updatedAt: string;
+  updatedBy: number | null;
 }

@@ -308,6 +308,12 @@ class PmAgentRequest(BaseModel):
     history: List[Dict[str, Any]] = Field(default_factory=list)
     model: Optional[str] = None
     system_prompt: Optional[str] = None
+    # v9 FR-61: the redacted views it may query, the rows of the queries it
+    # asked for last pass, how many more passes may ask, and which review.
+    catalog: Optional[str] = None
+    query_results: List[Dict[str, Any]] = Field(default_factory=list)
+    rounds_left: int = 0
+    review: str = "weekly"
 
 
 class PmAgentResponse(BaseModel):
@@ -331,6 +337,10 @@ async def pm_agent_analyse(req: PmAgentRequest) -> PmAgentResponse:
             req.history,
             model,
             system=req.system_prompt,
+            catalog=req.catalog,
+            query_results=req.query_results,
+            rounds_left=req.rounds_left,
+            review=req.review,
         )
     except Exception as exc:  # noqa: BLE001
         raise _failed("PM agent", exc) from exc

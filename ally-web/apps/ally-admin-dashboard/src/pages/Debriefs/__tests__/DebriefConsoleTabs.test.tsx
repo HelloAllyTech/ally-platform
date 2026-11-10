@@ -378,21 +378,127 @@ describe("Debrief Console tabs", () => {
     expect(h.runs).toHaveBeenLastCalledWith({ status: "needs_person" });
   });
 
-  it("PM agent shows its report and an idea with its screen, and approval asks first", async () => {
+  it("PM agent shows its report and each rung; a change cannot start a canary before its paired trial passes", () => {
     render(<PmAgentTab />);
     expect(screen.getByTestId("pm-agent-report")).toHaveTextContent("Scores are up.");
     expect(screen.getByTestId("idea-screen")).toHaveTextContent("+0.50 on 6 sessions");
+    expect(screen.getByTestId("idea-gate")).toHaveTextContent("Waiting");
     expect(screen.getByTestId("test-sets")).toHaveTextContent("Sealed: 11");
-    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(screen.getByRole("button", { name: "Start canary" })).toBeDisabled();
+  });
+
+  it("after a passed paired trial, starting the canary asks first", async () => {
+    h.pmAgent.mockReturnValue(
+      ok({
+        report: null,
+        at: null,
+        learningSpentUsd: 0,
+        ideas: [
+          {
+            ...IDEA,
+            evidence: {
+              ...IDEA.evidence,
+              trial: {
+                status: "passed",
+                startedAt: "2026-11-01T00:00:00Z",
+                comparisons: 34,
+                meanDifference: 0.4,
+                lower: 0.1,
+                upper: 0.7,
+              },
+            },
+          },
+        ],
+      }),
+    );
+    render(<PmAgentTab />);
+    expect(screen.getByTestId("idea-trial")).toHaveTextContent("34 pairs · +0.40 (+0.10 to +0.70)");
+    fireEvent.click(screen.getByRole("button", { name: "Start canary" }));
     expect(h.decide).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Put it live" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start the canary" }));
     await waitFor(() =>
       expect(h.decide).toHaveBeenCalledWith({ id: IDEA.id, decision: "approve" }),
     );
-    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith("The change is live"));
+    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith("Canary started."));
   });
 
-  it("an idea that did not do better cannot be approved", () => {
+  it("a canary that passed is promoted by a person, after confirming", async () => {
+    h.pmAgent.mockReturnValue(
+      ok({
+        report: null,
+        at: null,
+        learningSpentUsd: 0,
+        ideas: [
+          {
+            ...IDEA,
+            evidence: {
+              ...IDEA.evidence,
+              trial: { status: "passed", startedAt: "2026-11-01T00:00:00Z", comparisons: 34 },
+              canary: {
+                status: "passed",
+                releaseId: "r3",
+                version: 3,
+                share: 0.1,
+                startedAt: "2026-11-05T00:00:00Z",
+                canaryRuns: 31,
+                canaryMedian: 8.7,
+                controlMedian: 8.5,
+              },
+            },
+          },
+        ],
+      }),
+    );
+    render(<PmAgentTab />);
+    expect(screen.getByTestId("idea-canary")).toHaveTextContent("Ready to promote");
+    expect(screen.getByTestId("idea-canary")).toHaveTextContent("10% of live debriefs · 31 so far");
+    fireEvent.click(screen.getByRole("button", { name: "Promote to everyone" }));
+    fireEvent.click(screen.getByRole("button", { name: "Promote" }));
+    await waitFor(() =>
+      expect(h.toastSuccess).toHaveBeenCalledWith("Promoted. Every learner now gets this change."),
+    );
+  });
+
+  it("a running canary cannot be promoted, and a failed trial reads as not passed", () => {
+    h.pmAgent.mockReturnValue(
+      ok({
+        report: null,
+        at: null,
+        learningSpentUsd: 0,
+        ideas: [
+          {
+            ...IDEA,
+            id: "a",
+            evidence: {
+              ...IDEA.evidence,
+              trial: { status: "passed", startedAt: "2026-11-01T00:00:00Z", comparisons: 34 },
+              canary: {
+                status: "running",
+                releaseId: "r3",
+                version: 3,
+                share: 0.1,
+                startedAt: "2026-11-05T00:00:00Z",
+              },
+            },
+          },
+          {
+            ...IDEA,
+            id: "b",
+            evidence: {
+              ...IDEA.evidence,
+              trial: { status: "failed", startedAt: "2026-11-01T00:00:00Z", comparisons: 40 },
+            },
+          },
+        ],
+      }),
+    );
+    render(<PmAgentTab />);
+    for (const b of screen.getAllByRole("button", { name: "Start canary" }))
+      expect(b).toBeDisabled();
+    expect(screen.getAllByTestId("idea-trial")[1]).toHaveTextContent("Did not pass");
+  });
+
+  it("a quick test that did not do better reads as not passed", () => {
     h.pmAgent.mockReturnValue(
       ok({
         report: null,
@@ -404,8 +510,8 @@ describe("Debrief Console tabs", () => {
       }),
     );
     render(<PmAgentTab />);
-    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
-    expect(screen.getByTestId("idea-screen")).toHaveTextContent("Not better");
+    expect(screen.getByRole("button", { name: "Start canary" })).toBeDisabled();
+    expect(screen.getByTestId("idea-screen")).toHaveTextContent("Did not pass");
   });
 
   it("an approved idea reads live only while its release is", () => {
@@ -436,7 +542,7 @@ describe("Debrief Console tabs", () => {
       }),
     );
     render(<PmAgentTab />);
-    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Start canary" })).toBeNull();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
   });
 

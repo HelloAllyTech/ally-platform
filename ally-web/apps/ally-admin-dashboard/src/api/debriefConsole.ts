@@ -1,6 +1,7 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   DebriefStepUsage,
+  DebriefSettingsView,
   DebriefCardCorrection,
   DebriefModels,
   DebriefOverview,
@@ -33,6 +34,32 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
         params: status ? { status } : undefined,
       }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefSettings: builder.query<DebriefSettingsView, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SETTINGS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    updateDebriefSettings: builder.mutation<
+      unknown,
+      { changes: Record<string, number | boolean | null> }
+    >({
+      query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SETTINGS, method: HttpMethod.PUT, body }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    acceptDebriefBaseline: builder.mutation<unknown, { keys: string[] }>({
+      query: body => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.SETTINGS_ACCEPT,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    runDebriefBaseline: builder.mutation<unknown, void>({
+      query: () => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.SETTINGS_BASELINE,
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     getDebriefSteps: builder.query<DebriefStepUsage[], void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.STEPS, method: HttpMethod.GET }),
@@ -181,6 +208,10 @@ export const {
   useGetDebriefRunsQuery,
   useGetDebriefRunQuery,
   useGetDebriefStepsQuery,
+  useGetDebriefSettingsQuery,
+  useUpdateDebriefSettingsMutation,
+  useAcceptDebriefBaselineMutation,
+  useRunDebriefBaselineMutation,
   useGetPmAgentStateQuery,
   useRunPmAgentMutation,
   useScreenIdeaMutation,

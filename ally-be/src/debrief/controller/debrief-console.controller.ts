@@ -18,6 +18,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsOptional,
@@ -38,6 +40,8 @@ import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
+import { DebriefSettingsService } from '../service/debrief-settings.service';
+import { DebriefBaselineService } from '../service/debrief-baseline.service';
 
 class ReasonDto {
   @ApiProperty({ required: false })
@@ -128,6 +132,23 @@ class ModelChangeDto {
   note?: string;
 }
 
+class SettingsChangeDto {
+  @ApiProperty({
+    description:
+      'Settings to change, by key; null returns a key to its default (v9 FR-60)',
+  })
+  @IsObject()
+  changes!: Record<string, number | boolean | null>;
+}
+
+class AcceptBaselineDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  keys!: string[];
+}
+
 class TenantRegionDto {
   @ApiProperty({ enum: ['india', 'outside_india'] })
   @IsIn(['india', 'outside_india'])
@@ -166,6 +187,8 @@ export class DebriefConsoleController {
     private readonly pmAgent: DebriefPmAgentService,
     private readonly testSets: DebriefTestSetsService,
     private readonly feedback: DebriefFeedbackService,
+    private readonly settings: DebriefSettingsService,
+    private readonly baseline: DebriefBaselineService,
   ) {}
 
   @Get('review')
@@ -278,6 +301,42 @@ export class DebriefConsoleController {
   @ApiOperation({ summary: 'Recent runs, newest first' })
   runs(@Query() q: RunsQueryDto) {
     return this.console.listRuns({ mode: q.mode, status: q.status });
+  }
+
+  @Get('settings')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Owner settings (v9 FR-60): every test-ladder threshold and budget, with the baseline proposal',
+  })
+  settingsView() {
+    return this.settings.view();
+  }
+
+  @Put('settings')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({ summary: 'Change owner settings (audited)' })
+  updateSettings(@Req() req: AuthedRequest, @Body() body: SettingsChangeDto) {
+    return this.settings.update(body.changes, req.user.id);
+  }
+
+  @Post('settings/accept')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: "Accept some of the baseline job's proposed values",
+  })
+  acceptBaseline(@Req() req: AuthedRequest, @Body() body: AcceptBaselineDto) {
+    return this.settings.acceptBaseline(body.keys, req.user.id);
+  }
+
+  @Post('settings/baseline')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Run the baseline job now: propose starting values from production data (it also runs monthly)',
+  })
+  runBaseline() {
+    return this.baseline.run();
   }
 
   @Get('steps')
