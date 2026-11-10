@@ -15,6 +15,7 @@ import { KnowledgeTab } from "../../WhatsAppBot/KnowledgeTab";
 import { UnansweredTab } from "../../WhatsAppBot/UnansweredTab";
 import { HOME } from "../copy";
 import { Collapsed, Group, SectionHead } from "../fields";
+import { SourcesList } from "./Sources";
 
 import type { SectionProps } from "./props";
 
@@ -266,6 +267,10 @@ export const KnowsSection: React.FC<SectionProps> = ({ bot, home, canEdit }) => 
             </section>
           ))
         )}
+      </Group>
+
+      <Group title={HOME.sources.title} hint={HOME.sources.hint}>
+        <SourcesList botId={bot.id} canEdit={canEdit} />
       </Group>
 
       <Group title={t.notes} hint={t.notesHint} testId="knows-notes">

@@ -3,6 +3,9 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+// `@constants` first: the admin app's barrel does module-load-time work.
+import "@constants";
+
 import { COPY } from "../copy";
 import type { BotDraftView } from "../types";
 import { withFinding } from "../findings";

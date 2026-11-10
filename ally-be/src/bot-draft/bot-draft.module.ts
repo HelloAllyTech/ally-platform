@@ -14,6 +14,7 @@ import {
 import { AssistantHomeController } from './home/assistant-home.controller';
 import { AssistantHomeService } from './home/assistant-home.service';
 import { ChangeService } from './home/change.service';
+import { SourcesService } from './home/sources.service';
 import { CRAWL_LEARNER } from './crawl/site-crawl.service';
 import { BotDraftPublishService } from './service/bot-draft-publish.service';
 import { BotDraftSessionService } from './service/bot-draft-session.service';
@@ -65,6 +66,7 @@ import { BotDraftService } from './service/bot-draft.service';
     BotDraftPublishService,
     AssistantHomeService,
     ChangeService,
+    SourcesService,
     CheckupService,
     DraftCheckupService,
     // The crawl hands each batch of pages to the builder's fact extraction.

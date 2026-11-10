@@ -76,6 +76,7 @@ function harness(allowHosts: string[] = ['127.0.0.1'], crawlsPerDay = 5) {
     step: BotDraftStep;
     brand?: unknown;
     docs: string[];
+    choice?: { include: string[]; exclude: string[]; removed: string[] };
   } = {
     step: BotDraftStep.READING,
     docs: [],
@@ -115,6 +116,9 @@ function harness(allowHosts: string[] = ['127.0.0.1'], crawlsPerDay = 5) {
       state.step = step;
     }),
     findStalledCrawls: jest.fn(async () => []),
+    pageChoice: jest.fn(
+      async () => state.choice ?? { include: [], exclude: [], removed: [] },
+    ),
   };
   const events = { publish: jest.fn() };
   let docCount = 0;
@@ -187,6 +191,34 @@ describe('SiteCrawlService', () => {
     servers.push(s.server);
     return s;
   };
+
+  it('never fetches a page the owner left out or removed (chunk 20a-2)', async () => {
+    const s = await serve({
+      '/': {
+        body: page('Sunrise Mind', LONG, [
+          '/fees',
+          '/blog/one',
+          '/careers',
+          '/team',
+        ]),
+      },
+      '/fees': { body: page('Fees', LONG, []) },
+      '/blog/one': { body: page('Post', LONG, []) },
+      '/careers': { body: page('Careers', LONG, []) },
+      '/team': { body: page('Team', LONG, []) },
+    });
+    const h = harness();
+    h.state.choice = {
+      include: [],
+      exclude: ['/blog', '/careers'],
+      removed: [`${s.url}team`],
+    };
+    const crawl = await h.crawl(s.url);
+    expect(read(crawl).sort()).toEqual(['/', '/fees']);
+    expect(s.hits).not.toContain('/blog/one');
+    expect(s.hits).not.toContain('/careers');
+    expect(s.hits).not.toContain('/team');
+  });
 
   it('reads the site into library documents, follows links, skips junk and honours robots.txt', async () => {
     const s = await serve({

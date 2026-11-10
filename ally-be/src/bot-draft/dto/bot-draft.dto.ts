@@ -240,3 +240,20 @@ export class PublishBotDraftDto {
   @IsUUID('4', { each: true })
   organisationIds?: string[];
 }
+
+/** "Choose pages" (chunk 20a-2): path patterns; no includes means every page. */
+export class PageChoiceDto {
+  @ApiProperty({ type: [String], example: ['/services'] })
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  @MaxLength(200, { each: true })
+  include!: string[];
+
+  @ApiProperty({ type: [String], example: ['/blog'] })
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  @MaxLength(200, { each: true })
+  exclude!: string[];
+}

@@ -33,6 +33,7 @@ import { FeatureToggleKey } from '../../authorization/constants/admin-feature-to
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { AssistantHomeService } from './assistant-home.service';
 import { ChangeService } from './change.service';
+import { SourcesService } from './sources.service';
 import { HOME_FIELDS } from './home-fields';
 import type { RuleChange } from './own-rules';
 
@@ -113,6 +114,10 @@ export class ApplyChangeDto {
   changes!: ProposedChangeDto[];
 }
 
+export class SourceUrlDto {
+  @ApiProperty() @IsString() @MaxLength(2000) url!: string;
+}
+
 export class CorrectFactDto {
   @ApiProperty()
   @IsString()
@@ -139,7 +144,52 @@ export class AssistantHomeController {
   constructor(
     private readonly home: AssistantHomeService,
     private readonly changes: ChangeService,
+    private readonly sources: SourcesService,
   ) {}
+
+  @Get(':id/sources')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
+  @ApiOperation({
+    summary: 'The pages it learned from, with how many details each gave',
+  })
+  listSources(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sources.list(id);
+  }
+
+  @Post(':id/sources/preview')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'How many details removing a page would take (nothing is removed)',
+  })
+  previewSource(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SourceUrlDto,
+  ) {
+    return this.sources.preview(id, dto.url);
+  }
+
+  @Post(':id/sources/remove')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      'Stop learning from a page: its document is detached and its details removed (Undo puts them back)',
+  })
+  removeSource(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SourceUrlDto,
+  ) {
+    return this.sources.remove(id, dto.url);
+  }
+
+  @Post(':id/sources/:eventId/restore')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({ summary: 'Undo removing a page' })
+  restoreSource(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('eventId', ParseUUIDPipe) eventId: string,
+  ) {
+    return this.sources.restore(id, eventId);
+  }
 
   @Post(':id/changes/propose')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)

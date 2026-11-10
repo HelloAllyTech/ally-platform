@@ -546,6 +546,17 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Topics to avoid placeholder:** For example, prices or other clinics
 - **Topics to avoid errors:** Up to 10 topics. · A topic can be at most 80 characters.
 - **Removing a source:** Remove {page}? Your assistant will forget {n} details that came only from this page.
+- **Choose pages and Sources, the rest of the screen** *(added in 20a-2)*:
+  - Choose pages buttons: Save these pages · Read everything
+  - The home page's section: Home page (always read)
+  - A page not read yet: Not read yet
+  - Section checkbox: All of {section}
+  - After saving: Saved. It reads only the pages you chose. · Saved. It forgot {n} pages you left out. Undo
+  - Sources group title and hint: Pages it learned from · Remove a page and your assistant stops using it.
+  - A page's count: {n} details
+  - A removed page: Removed · Put back
+  - Buttons: Remove · Keep it
+- **Topics to avoid, the add button** *(added in 20a-2)*: Add a topic
 
 ### The checkup in onboarding and on the home *(added in 20a-2)*
 

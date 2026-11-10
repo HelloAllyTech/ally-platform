@@ -6,7 +6,7 @@ import type { RuleChange, SafetyRule } from "@types";
 
 import { COPY, fill } from "../../Onboarding/copy";
 import { HOME } from "../copy";
-import { Group, SectionHead, TextField } from "../fields";
+import { Group, LinesField, SectionHead, TextField } from "../fields";
 import { useHomeField } from "../useHomeField";
 
 import type { SectionProps } from "./props";
@@ -101,6 +101,7 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit }) =>
   const [error, setError] = useState<string | null>(null);
   const disclaimer = useHomeField(bot.id, "disclaimer", home.fields.disclaimer, HOME.saving.failed);
   const crisis = useHomeField(bot.id, "crisisText", home.fields.crisisText, HOME.saving.failed);
+  const avoid = useHomeField(bot.id, "avoidTopics", home.fields.avoidTopics, HOME.saving.failed);
   const addId = useId();
   const { pack, rules, version } = home.safety;
   const own = rules.filter(rule => !rule.fixed);
@@ -179,6 +180,19 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit }) =>
             {error}
           </p>
         )}
+      </Group>
+
+      <Group testId="safety-avoid">
+        <LinesField
+          label={HOME.avoid.label}
+          hint={HOME.avoid.hint}
+          addLabel={HOME.avoid.add}
+          removeLabel={t.remove}
+          field={avoid}
+          max={10}
+          maxLength={80}
+          disabled={!canEdit}
+        />
       </Group>
 
       <Group testId="safety-messages">

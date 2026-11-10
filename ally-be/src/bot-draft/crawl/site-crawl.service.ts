@@ -31,6 +31,7 @@ import { CRAWLER_USER_AGENT, parseRobots, Robots } from './robots';
 import { parseSitemap } from './sitemap';
 import {
   displayDomain,
+  chosen,
   isArticle,
   isJunk,
   MAX_ARTICLES,
@@ -277,10 +278,20 @@ export class SiteCrawlService implements OnModuleInit {
 
     const readCount = () =>
       crawl.pages.filter((p) => p.status === 'read').length;
+    // The owner's choice of pages (chunk 20a-2), read again before each page: an unchosen or
+    // removed page is never fetched. The start page is always read: it decides reachability and
+    // the brand.
+    let choice = await this.drafts.pageChoice(draft.id);
+    const allowed = (url: string) =>
+      url === startUrl ||
+      (chosen(url, choice) && !choice.removed.includes(url));
+
     // The business's own pages first; blog and news pages only once those run out, and at most
     // MAX_ARTICLES of them (counted from what was taken, so it holds across a resume).
     const take = (): string | undefined => {
-      crawl.queue = crawl.queue.filter((url) => !crawl.seen.includes(url));
+      crawl.queue = crawl.queue.filter(
+        (url) => !crawl.seen.includes(url) && allowed(url),
+      );
       const core = crawl.queue.findIndex((url) => !isArticle(url));
       if (core >= 0) return crawl.queue.splice(core, 1)[0];
       const articles = crawl.seen.filter((url) => isArticle(url)).length;
@@ -301,6 +312,7 @@ export class SiteCrawlService implements OnModuleInit {
         readCount() + reading >= CRAWL_LIMITS.maxPages
       )
         return false;
+      choice = await this.drafts.pageChoice(draft.id).catch(() => choice);
       const url = take();
       if (!url) return false;
       crawl.seen.push(url);
@@ -484,6 +496,64 @@ export class SiteCrawlService implements OnModuleInit {
       snippet: parsed.text.slice(0, 600),
       text: parsed.text.slice(0, 12_000),
     } as CrawlPage;
+  }
+
+  /**
+   * The site's pages found so far, without reading any (chunk 20a-2, "Choose pages"): what the
+   * crawl already saw, its sitemap and the start page's links. Same site, no sign-in or files,
+   * nothing robots.txt asks us to leave alone.
+   */
+  async discover(
+    draft: BotDraftEntity,
+  ): Promise<{ url: string; title: string | null; read: boolean }[]> {
+    const startUrl = startUrlFrom(
+      draft.crawl.website ?? draft.source.website ?? '',
+    );
+    if (!startUrl) return [];
+    const fetchOptions = {
+      timeoutMs: CRAWL_LIMITS.pageTimeoutMs,
+      maxBytes: CRAWL_LIMITS.pageMaxBytes,
+      userAgent: `Mozilla/5.0 (compatible; ${CRAWLER_USER_AGENT}/1.0)`,
+      allowHosts: this.config.botDraft.crawlAllowHosts,
+    };
+    const found = new Map<string, { title: string | null; read: boolean }>();
+    for (const page of draft.crawl.pages) {
+      if (page.status === 'read') {
+        found.set(page.url, { title: page.title, read: true });
+      }
+    }
+    const robots = await this.robots(startUrl, fetchOptions);
+    const add = (url: string | null) => {
+      if (
+        url &&
+        sameSite(url, startUrl) &&
+        !isJunk(url) &&
+        robots.allows(pathOf(url)) &&
+        !found.has(url) &&
+        found.size < CRAWL_LIMITS.queueCap
+      ) {
+        found.set(url, { title: null, read: false });
+      }
+    };
+    add(startUrl);
+    for (const url of draft.crawl.queue) add(url);
+    for (const url of await this.sitemapUrls(startUrl, robots, fetchOptions)) {
+      add(url);
+    }
+    if (found.size < 10) {
+      try {
+        const fetched = await guardedFetchText(startUrl, {
+          ...fetchOptions,
+          contentTypes: ['text/html', 'application/xhtml+xml'],
+        });
+        for (const href of parsePage(fetched.body).links) {
+          add(normaliseUrl(href, fetched.url));
+        }
+      } catch {
+        // Nothing more to list; the owner can still choose from what we have.
+      }
+    }
+    return [...found.entries()].map(([url, page]) => ({ url, ...page }));
   }
 
   private async robots(

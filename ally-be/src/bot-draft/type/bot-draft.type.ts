@@ -141,7 +141,9 @@ export type DraftEventKind =
   | 'source'
   | 'safety'
   /** A change by chat on the assistant home (chunk 20a-2): `ops` carry each before and after. */
-  | 'change';
+  | 'change'
+  /** Pages taken away (Choose pages, Sources): `ops[0].value` holds what each took, for Undo. */
+  | 'pages';
 
 /** One entry of the append-only log; patches carry their inverse for undo. */
 export interface DraftEvent {

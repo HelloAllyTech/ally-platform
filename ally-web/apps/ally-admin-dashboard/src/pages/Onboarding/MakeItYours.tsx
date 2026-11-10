@@ -14,6 +14,7 @@ import {
 import { BrandPreview } from "./BrandPreview";
 import { COPY } from "./copy";
 import { colourSwatches } from "../../utils/colourPicks";
+import { AvoidTopics } from "../AssistantHome/AvoidTopics";
 
 import type { BotDraftView, PatchOp } from "./types";
 import type { BrandEditor } from "../../hooks/brand/useBrandEditor";
@@ -215,6 +216,7 @@ export const MakeItYoursScreen: React.FC<{
             onBlur={() => save("/introduction", opening, draft.introduction)}
           />
         </div>
+        <AvoidTopics botId={view.chatbotId ?? null} />
         <PrimaryButton enterHint={COPY.frame.enterHint} onClick={onContinue}>
           {COPY.make.checkup}
         </PrimaryButton>

@@ -19,6 +19,8 @@ export interface HomeFieldValues {
   pageAccess: BotPageAccess;
   unknownNumberText: string;
   unsupportedMediaText: string;
+  /** Topics the owner asked it not to talk about (chunk 20a-2), up to 10. */
+  avoidTopics: string[];
 }
 
 export type HomeFieldName = keyof HomeFieldValues;

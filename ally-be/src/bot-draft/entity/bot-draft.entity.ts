@@ -47,6 +47,10 @@ export class BotDraftEntity extends BaseWithoutTenantEntity {
     ownerNotesDocumentId?: string | null;
     /** The placeholder name the draft started with, until the site or the owner names it. */
     autoName?: string | null;
+    /** The pages the owner chose to read (chunk 20a-2); reused when the site is read again. */
+    pages?: { include: string[]; exclude: string[] };
+    /** Pages the owner removed from what it knows (Sources), never read again until restored. */
+    removed?: string[];
   };
 
   @Column({

@@ -34,6 +34,7 @@ import {
   PatchBotDraftDto,
   PublishBotDraftDto,
   UndoBotDraftDto,
+  PageChoiceDto,
 } from '../dto/bot-draft.dto';
 import { BotDraftActor, BotDraftStatus } from '../enum/bot-draft.enum';
 import { BotDraftPublishService } from '../service/bot-draft-publish.service';
@@ -42,6 +43,7 @@ import { changes, draftView } from '../service/bot-draft-view';
 import { BotDraftEventsService } from '../service/bot-draft-events.service';
 import { BotDraftService } from '../service/bot-draft.service';
 import { DraftCheckupService } from '../checkup/draft-checkup.service';
+import { SourcesService } from '../home/sources.service';
 import { SseWriter } from './sse';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -65,6 +67,7 @@ export class BotDraftController {
     private readonly publisher: BotDraftPublishService,
     private readonly events: BotDraftEventsService,
     private readonly checkup: DraftCheckupService,
+    private readonly sources: SourcesService,
   ) {}
 
   @Post()
@@ -288,6 +291,40 @@ export class BotDraftController {
       await this.checkup.assertCanPublish(draft);
     }
     return this.publisher.publish(draft, dto);
+  }
+
+  @Get(':id/pages/found')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      'The site’s pages found so far, grouped by section (none are read)',
+  })
+  foundPages(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sources.found(id);
+  }
+
+  @Post(':id/pages')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Choose which pages it reads',
+    description:
+      'Saved on the draft and reused when the site is read again. Pages already read that the choice leaves out are taken away, with the details that came only from them; the result names the event that undoes it.',
+  })
+  choosePages(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PageChoiceDto,
+  ) {
+    return this.sources.choose(id, dto);
+  }
+
+  @Post(':id/pages/:eventId/undo')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({ summary: 'Put back the pages a choice took away' })
+  undoPages(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('eventId', ParseUUIDPipe) eventId: string,
+  ) {
+    return this.sources.restoreForDraft(id, eventId);
   }
 
   @Post(':id/checkup')

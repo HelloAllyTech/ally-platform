@@ -21,6 +21,7 @@ import {
   useEnterToSubmit,
 } from "@components/v2";
 
+import { ChoosePages } from "./ChoosePages";
 import { COPY, fill } from "./copy";
 import { parseEmails } from "./flow";
 
@@ -54,6 +55,8 @@ export const ReadingScreen: React.FC<{
   onDone: () => void;
 }> = ({ view, reading, onDone }) => {
   const [slow, setSlow] = useState(false);
+  // "Read everything · Choose pages" (chunk 20a-2): a website's draft can choose while it reads.
+  const [choosing, setChoosing] = useState(false);
   const running = view.crawl.status === "running" && !reading.done;
   useEffect(() => {
     if (!running) return undefined;
@@ -99,6 +102,17 @@ export const ReadingScreen: React.FC<{
         />
         {slow && !done && <p className="ally-small">{COPY.reading.takingLong}</p>}
       </div>
+      {view.source.website &&
+        (choosing ? (
+          <ChoosePages draftId={view.id} onClose={() => setChoosing(false)} />
+        ) : (
+          <div className="ally-btn-row" role="group" aria-label={COPY.pages.title}>
+            <Chip selected onToggle={() => setChoosing(false)}>
+              {COPY.pages.readEverything}
+            </Chip>
+            <Chip onToggle={() => setChoosing(true)}>{COPY.pages.choosePages}</Chip>
+          </div>
+        ))}
       {reading.findings.length > 0 && (
         <ul className="ally-findings" aria-live="polite">
           {reading.findings.map((line, i) => (

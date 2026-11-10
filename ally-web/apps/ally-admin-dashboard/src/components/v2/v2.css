@@ -804,3 +804,38 @@ a.ally-source:hover {
   font-size: 13px;
   color: var(--ally-muted);
 }
+
+/* ── Choose pages (chunk 20a-2) ── */
+.ally-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ally-pages__shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ally-pages__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 50vh;
+  overflow: auto;
+}
+.ally-pages__group {
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  padding: 10px 14px;
+}
+.ally-pages__group ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ally-pages__group label {
+  overflow-wrap: anywhere;
+}

@@ -218,6 +218,22 @@ export const COPY = {
       avoid_topic: "Anything it shouldn't talk about?",
     },
   },
+  /** Which pages should it read? (copy §24, chunk 20a-2). */
+  pages: {
+    readEverything: "Read everything",
+    choosePages: "Choose pages",
+    title: "Which pages should it read?",
+    note: "It only learns from the pages you choose. You can change this later.",
+    leaveOutBlog: "Leave out blog and news",
+    leaveOutCareers: "Leave out careers",
+    save: "Save these pages",
+    home: "Home page (always read)",
+    notRead: "Not read yet",
+    all: "All of {section}",
+    saved: "Saved. It reads only the pages you chose.",
+    forgot: "Saved. It forgot {n} pages you left out.",
+    undo: "Undo",
+  },
   /** What should your assistant do? (copy §24, chunk 20a-2). */
   purposes: {
     title: "What should your assistant do?",

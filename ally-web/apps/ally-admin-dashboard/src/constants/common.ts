@@ -813,6 +813,11 @@ export const ApiEndpoints = {
     CHANGES_PROPOSE: (id: string) => `/v1/chatbots/${id}/changes/propose`,
     CHANGES_APPLY: (id: string) => `/v1/chatbots/${id}/changes/apply`,
     CHANGE_UNDO: (id: string, eventId: string) => `/v1/chatbots/${id}/changes/${eventId}/undo`,
+    SOURCES: (id: string) => `/v1/chatbots/${id}/sources`,
+    SOURCE_PREVIEW: (id: string) => `/v1/chatbots/${id}/sources/preview`,
+    SOURCE_REMOVE: (id: string) => `/v1/chatbots/${id}/sources/remove`,
+    SOURCE_RESTORE: (id: string, eventId: string) =>
+      `/v1/chatbots/${id}/sources/${eventId}/restore`,
     CHECKUP_RUNS: (id: string) => `/v1/chatbots/${id}/checkup/runs`,
     CHECKUP_RUN: (id: string, runId: string) => `/v1/chatbots/${id}/checkup/runs/${runId}`,
     CHECKUP_ANSWER: (id: string, caseId: string) =>
@@ -825,6 +830,9 @@ export const ApiEndpoints = {
     CURRENT: "/v1/bot-drafts/current",
     BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
     EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,
+    PAGES_FOUND: (id: string) => `/v1/bot-drafts/${id}/pages/found`,
+    PAGES: (id: string) => `/v1/bot-drafts/${id}/pages`,
+    PAGES_UNDO: (id: string, eventId: string) => `/v1/bot-drafts/${id}/pages/${eventId}/undo`,
     MESSAGES_STREAM: (id: string) => `/v1/bot-drafts/${id}/messages/stream`,
     UNDO: (id: string) => `/v1/bot-drafts/${id}/undo`,
     BACK: (id: string) => `/v1/bot-drafts/${id}/back`,

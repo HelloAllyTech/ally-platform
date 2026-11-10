@@ -102,6 +102,21 @@ export const HOME = {
     instructions: "Extra instructions",
     instructionsHint: "Your own guidance for how it answers. Safety rules always come first.",
   },
+  sources: {
+    title: "Pages it learned from",
+    hint: "Remove a page and your assistant stops using it.",
+    details: "{n} details",
+    remove: "Remove",
+    keep: "Keep it",
+    removed: "Removed",
+    putBack: "Put back",
+    confirm: "Remove {page}? Your assistant will forget {n} details that came only from this page.",
+  },
+  avoid: {
+    label: "Anything it shouldn't talk about?",
+    hint: "For example, prices or other clinics",
+    add: "Add a topic",
+  },
   safety: {
     ownRules: "Your own rules",
     ownRulesHint: "Things your assistant must never do, on top of the rules above.",

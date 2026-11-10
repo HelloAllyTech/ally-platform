@@ -37,6 +37,7 @@ const HOME_VIEW = {
     declineText: field("", "0000000000000006"),
     disclaimer: field("Not a crisis service.", "0000000000000007"),
     crisisText: field("", "0000000000000008"),
+    avoidTopics: field([] as string[], "0000000000000009"),
     suggestedQuestions: field(["What are your fees?"], "0000000000000009"),
     prechat: field([], "000000000000000a"),
     pageLimits: field(

@@ -123,3 +123,73 @@ export function isArticle(url: string): boolean {
 
 /** How many blog and news pages one crawl reads, at most. */
 export const MAX_ARTICLES = 10;
+
+/**
+ * Which pages the owner chose (chunk 20a-2, "Choose pages"): path patterns, each a path prefix
+ * on segment boundaries ("/blog" is /blog and /blog/…, not /blogroll). No includes means every
+ * page; an exclude always wins. Saved on the draft and reused when the site is read again.
+ */
+export interface PageChoice {
+  include: string[];
+  exclude: string[];
+}
+
+export const NO_CHOICE: PageChoice = { include: [], exclude: [] };
+/** The most patterns one choice holds, and the longest one. */
+export const PAGE_CHOICE_LIMITS = { patterns: 100, chars: 200 };
+
+/** A pattern as stored: a path starting with "/", no query, no trailing "/". */
+export function normalisePattern(raw: string): string | null {
+  const path = (raw ?? '').trim().split(/[?#]/)[0];
+  if (!path.startsWith('/') || path.length > PAGE_CHOICE_LIMITS.chars) {
+    return null;
+  }
+  const clean = path.replace(/\/+$/, '') || '/';
+  return clean.toLowerCase();
+}
+
+const matches = (path: string, pattern: string): boolean =>
+  pattern === '/'
+    ? path === '/'
+    : path === pattern || path.startsWith(`${pattern}/`);
+
+/** Whether the owner's choice lets the crawl read `url`. */
+export function chosen(url: string, choice: PageChoice | undefined): boolean {
+  if (!choice) return true;
+  const path = (new URL(url).pathname.replace(/\/+$/, '') || '/').toLowerCase();
+  if (choice.exclude.some((p) => matches(path, p))) return false;
+  return !choice.include.length || choice.include.some((p) => matches(path, p));
+}
+
+/** The section a page sits in, for grouping: its first path segment ("" for the home page). */
+export function sectionOf(url: string): string {
+  return (
+    new URL(url).pathname.split('/').filter(Boolean)[0]?.toLowerCase() ?? ''
+  );
+}
+
+/** The sections "Leave out blog and news" and "Leave out careers" leave out. */
+export const SHORTCUT_SECTIONS = {
+  blog: [
+    'blog',
+    'blogs',
+    'news',
+    'newsroom',
+    'articles',
+    'article',
+    'stories',
+    'press',
+    'press-releases',
+    'insights',
+    'posts',
+    'updates',
+  ],
+  careers: [
+    'careers',
+    'career',
+    'jobs',
+    'join-us',
+    'work-with-us',
+    'vacancies',
+  ],
+} as const;

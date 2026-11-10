@@ -504,6 +504,24 @@ export class BotDraftService {
     );
   }
 
+  /**
+   * The owner's page choice and removed pages, read fresh: the crawl checks them before each page,
+   * so a choice made while it reads takes effect at once.
+   */
+  async pageChoice(
+    draftId: string,
+  ): Promise<{ include: string[]; exclude: string[]; removed: string[] }> {
+    const [row] = (await this.dataSource.query(
+      `SELECT source FROM bot_drafts WHERE id = $1`,
+      [draftId],
+    )) as { source: BotDraftEntity['source'] | null }[];
+    return {
+      include: row?.source?.pages?.include ?? [],
+      exclude: row?.source?.pages?.exclude ?? [],
+      removed: row?.source?.removed ?? [],
+    };
+  }
+
   /** Record a document the crawl or an upload added (server-maintained; patches can't touch it). */
   async addKnowledgeDocument(
     draftId: string,
