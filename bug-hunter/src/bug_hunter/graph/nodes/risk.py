@@ -28,11 +28,10 @@ def make_risk_precheck_node(deps: GraphDeps):
         files = [
             deps.worktree / _app_abs(deps, f) for f in state.finding.suspected_files
         ]
-        text = " ".join(
-            [state.finding.title, state.finding.hypothesis, state.root_cause or ""]
-            + state.finding.evidence
-        )
-        reasons = risk_hits(deps.workspace.policy, deps.app, files, "+" + text)
+        # paths and category only: the safety-keyword check runs on *changed code* in
+        # risk_gate. Scanning the finding's prose matched a quoted code comment
+        # ("… ＳＵＩＣＩＤＥ → suicide …") and escalated a plain regex fix.
+        reasons = list(deps.workspace.policy.touches_risk(files, deps.app))
         if state.finding.category == "security":
             reasons.append("finding category: security")
         if reasons:

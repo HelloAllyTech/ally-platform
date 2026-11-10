@@ -597,3 +597,29 @@ def test_ally_mobile_is_never_formatted(config, tmp_path) -> None:
     (cfg_dir / "apps.yaml").write_text(yaml.safe_dump(apps))
     with pytest.raises(ConfigError):
         load_config(config_dir=cfg_dir, repo_root=config.repo_root, env={})
+
+
+def test_safety_words_in_the_findings_prose_do_not_escalate_precheck(
+    config, repo, tmp_path
+) -> None:
+    """Keywords are checked on changed code (risk_gate), not on quoted evidence."""
+    prose = {
+        **FINDING,
+        "args": {
+            **FINDING["args"],
+            "evidence": [
+                "src/x.ts:2 — comment: fold ＳＵＩＣＩＤＥ to suicide for NFKC"
+            ],
+            "hypothesis": "the crisis of the regex is that it misses fullwidth braces",
+        },
+    }
+    deps = _deps(
+        config,
+        repo,
+        tmp_path,
+        [EDIT_FIX, SUBMIT_FIX],
+        investigate=ScriptedChatModel(script=[ai(tool_calls=[prose])]),
+    )
+    _, state = _run(deps)
+    assert state.status == "awaiting_human", state.stop_reason
+    assert state.risk_level == "low"
