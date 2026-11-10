@@ -14,7 +14,6 @@ packages = [
 python = "^3.12"
 fastapi = "^0.115.8"
 pydantic-settings = "^2.7.1"
-contextvars = "^2.4"
 uvicorn = "^0.34.0"
 weaviate-client = "^4.11.0"
 langchain-openai = "^1.1.12"
