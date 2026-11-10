@@ -150,4 +150,11 @@ export interface ChatbotDecision {
    * the reply and, for a fallback, raises the throttled "agent runtime degraded" alert.
    */
   agent?: AgentRunRef;
+  /**
+   * A team member has this chat (chunk 11a): the assistant didn't answer, and the channel sends
+   * and stores no reply. Never set on a crisis reply, which always goes out.
+   */
+  held?: boolean;
+  /** The visitor asked for a person (chunk 11a): the body tells them the team has been asked. */
+  handover?: 'asked';
 }

@@ -102,4 +102,8 @@ export class ChatbotMessage extends BaseWithoutTenantEntity {
   /** For an outbound message, the inbound message it answers. */
   @Column({ type: 'uuid', name: 'in_reply_to_id', nullable: true })
   inReplyToId?: string | null;
+
+  /** The team member who wrote an `agent_human` message (chunk 11a). */
+  @Column({ type: 'int', name: 'sent_by_user_id', nullable: true })
+  sentByUserId?: number | null;
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type {
@@ -18,9 +18,15 @@ import {
 import { composeReply } from '../../whatsapp/util/reply-composer';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import { ChatbotKnowledgeSource, ChatbotRuntime } from '../enum/chatbot.enum';
+import {
+  asksForPerson,
+  handoverMessage,
+  handoverOf,
+} from '../handover/handover';
 import { ChatbotAudienceService } from '../service/chatbot-audience.service';
 import { ChatbotReplyService } from '../service/chatbot-reply.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
+import { ConversationService } from '../service/conversation.service';
 import { effectiveRuntime } from './agent-runtime';
 import {
   AgentFallbackFailedError,
@@ -121,6 +127,8 @@ export class ChatbotEngineService {
     private readonly aiService: AiService,
     private readonly promptSharedService: PromptSharedService,
     private readonly agentRuntime: AgentRuntimeRunner,
+    // Optional so the engine's own specs build it without the store: then no chat is ever held.
+    @Optional() private readonly conversations?: ConversationService,
   ) {}
 
   /**
@@ -128,6 +136,110 @@ export class ChatbotEngineService {
    * steps and text while it happens; the decision returned is the same either way.
    */
   async respond(turn: ChatTurn, live?: LiveReply): Promise<ChatbotDecision> {
+    // ── 0. The single switch (chunk 11a) ─────────────────────────────────
+    // A team member has this chat: the assistant never answers here, on any channel (they all
+    // reach the engine through this method). Crisis is still checked first, and its reply always
+    // goes out.
+    const holder = await this.holderOf(turn);
+    if (holder !== null) {
+      return (
+        (await this.crisisOnly(turn)) ?? {
+          handledBy: WaHandledBy.HELD,
+          body: '',
+          held: true,
+        }
+      );
+    }
+    // "Talk to a person" (English, Hindi, Hinglish): after crisis, never instead of it.
+    if (asksForPerson(turn.text)) {
+      return (
+        (await this.crisisOnly(turn)) ?? {
+          handledBy: WaHandledBy.HANDOVER,
+          body: handoverMessage(handoverOf(turn.settings), new Date()),
+          handover: 'asked',
+        }
+      );
+    }
+    return this.decide(turn, live);
+  }
+
+  /** Who holds this chat: a team member's id, or null (the assistant). A lookup failure is null. */
+  private async holderOf(turn: ChatTurn): Promise<number | null> {
+    if (!this.conversations) return null;
+    try {
+      return await this.conversations.holderOf(turn.conversationId);
+    } catch (error) {
+      this.logger.warn(
+        `Could not read who holds conversation ${turn.conversationId}; the assistant answers: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Crisis alone (chunk 11a): the keyword templates, then the classifier. The crisis decision, or
+   * null when it isn't one. Used while a person holds a chat and before a hand-over, so a crisis
+   * reply never waits for anyone.
+   */
+  private async crisisOnly(turn: ChatTurn): Promise<ChatbotDecision | null> {
+    const match = await this.replyService.match(
+      turn.text,
+      turn.language,
+      turn.chatbot.id,
+    );
+    if (match && match.template.kind === WaTemplateKind.CRISIS) {
+      return this.keywordCrisis(turn, match.template);
+    }
+    if (!turn.settings.crisisClassifierEnabled) return null;
+    try {
+      const { prompts, ran } = await this.loadPromptOverrides(turn);
+      const crisis = await this.aiService.checkWhatsAppCrisis({
+        message: turn.text,
+        prompts,
+      });
+      return crisis?.is_crisis
+        ? this.crisisDecision(turn, crisis, ran, { notOnList: false })
+        : null;
+    } catch (error) {
+      // As in `answer()`: a classifier outage doesn't stop the message; the keyword layer ran.
+      this.logger.warn(
+        `Crisis classifier did not run (${turn.sender.label}): ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /** The fixed safety reply for a crisis keyword, with its Slack alert. */
+  private keywordCrisis(
+    turn: ChatTurn,
+    template: { id: string; responseText?: string | null },
+  ): ChatbotDecision {
+    const { chatbot, settings, sender } = turn;
+    return {
+      handledBy: WaHandledBy.CRISIS,
+      body: this.settingsService.renderPlaceholders(
+        template.responseText || settings.crisisEscalationText,
+        settings,
+      ),
+      templateId: template.id,
+      alert: this.alert(
+        200,
+        'crisis',
+        `A crisis keyword matched on chatbot "${chatbot.name}" (${turn.channel.type}, ` +
+          `sender ${sender.label}). The fixed safety reply was sent.`,
+        'Chatbot Crisis Keyword',
+      ),
+    };
+  }
+
+  private async decide(
+    turn: ChatTurn,
+    live?: LiveReply,
+  ): Promise<ChatbotDecision> {
     const { chatbot, settings, sender } = turn;
     const allowed = await this.audienceService.canChat(chatbot, sender);
     // v2 (the conversational agent) unless the platform's emergency switch is off.
@@ -158,27 +270,17 @@ export class ChatbotEngineService {
           isWelcome: true,
         };
       }
+      // A crisis reply carries its Slack alert, so a human learns about it in near real time. A
+      // crisis reply that only lands in a table nobody is watching is a log entry, not an
+      // escalation.
+      if (isCrisis) return this.keywordCrisis(turn, match.template);
       return {
-        handledBy: isCrisis ? WaHandledBy.CRISIS : WaHandledBy.TEMPLATE,
+        handledBy: WaHandledBy.TEMPLATE,
         body: this.settingsService.renderPlaceholders(
-          isCrisis
-            ? match.template.responseText || settings.crisisEscalationText
-            : match.template.responseText,
+          match.template.responseText,
           settings,
         ),
         templateId: match.template.id,
-        // Routed to the existing Slack exception path so a human learns about it in near real
-        // time. A crisis reply that only lands in a table nobody is watching is a log entry, not an
-        // escalation.
-        alert: isCrisis
-          ? this.alert(
-              200,
-              'crisis',
-              `A crisis keyword matched on chatbot "${chatbot.name}" (${turn.channel.type}, ` +
-                `sender ${sender.label}). The fixed safety reply was sent.`,
-              'Chatbot Crisis Keyword',
-            )
-          : undefined,
       };
     }
 

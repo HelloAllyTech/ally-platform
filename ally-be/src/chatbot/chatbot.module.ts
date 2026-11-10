@@ -29,6 +29,11 @@ import { ChatbotService } from './service/chatbot.service';
 import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
 import { ConnectorService } from './service/connector.service';
 import { ConversationService } from './service/conversation.service';
+import { HandoverService } from './handover/handover.service';
+import { InboxEventsService } from './inbox/inbox-events.service';
+import { InboxController } from './inbox/inbox.controller';
+import { InboxService } from './inbox/inbox.service';
+import { NotificationModule } from '../notification/notification.module';
 
 /**
  * Chatbots: configurable bots reached through connectors.
@@ -60,8 +65,10 @@ import { ConversationService } from './service/conversation.service';
     PromptModule,
     LlmModule,
     KnowledgeBaseModule,
+    // The inbox's "nobody opened it" email (chunk 11a).
+    NotificationModule,
   ],
-  controllers: [ChatbotController, ConnectorController],
+  controllers: [ChatbotController, ConnectorController, InboxController],
   providers: [
     GlobalSettingsRepository,
     ConnectorRegistry,
@@ -75,6 +82,9 @@ import { ConversationService } from './service/conversation.service';
     ChatbotService,
     AgentRuntimeAlertThrottle,
     ConversationService,
+    InboxEventsService,
+    InboxService,
+    HandoverService,
   ],
   exports: [
     // The Checkup (chunk 20a-2) asks questions through Preview's path.
@@ -87,6 +97,9 @@ import { ConversationService } from './service/conversation.service';
     ChatbotEngineService,
     AgentRuntimeAlertThrottle,
     ConversationService,
+    // Channels report each decision and deliver the team's replies (chunk 11a).
+    HandoverService,
+    InboxEventsService,
   ],
 })
 export class ChatbotModule {}

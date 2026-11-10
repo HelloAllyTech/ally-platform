@@ -6,7 +6,7 @@ import {
 } from 'src/chatbot/enum/conversation.enum';
 import type { WaContact } from '../entity/wa-contact.entity';
 import type { WaMessage } from '../entity/wa-message.entity';
-import { WaMessageDirection } from '../enum/whatsapp.enum';
+import { WaHandledBy, WaMessageDirection } from '../enum/whatsapp.enum';
 
 /**
  * How WhatsApp's rows become shared-store rows (Agents v2, chunk 12). The dual-write, the backfill
@@ -66,7 +66,10 @@ export function sharedMessageOf(row: WaMessage): AppendMessageInput {
     role:
       row.direction === WaMessageDirection.INBOUND
         ? ConversationMessageRole.USER
-        : ConversationMessageRole.ASSISTANT,
+        : row.handledBy === WaHandledBy.HUMAN
+          ? ConversationMessageRole.AGENT_HUMAN
+          : ConversationMessageRole.ASSISTANT,
+    sentByUserId: row.sentByUserId ?? null,
     text: row.body,
     handledBy: row.handledBy ?? null,
     citations: row.citations ?? null,

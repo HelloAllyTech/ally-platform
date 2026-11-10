@@ -20,4 +20,6 @@ export enum ConversationStatus {
 export enum ConversationMessageRole {
   USER = 'user',
   ASSISTANT = 'assistant',
+  /** A team member replying from the inbox (chunk 11a). The model reads it as an assistant turn. */
+  AGENT_HUMAN = 'agent_human',
 }

@@ -23,6 +23,8 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 
 ## Settings and infrastructure
 
+- [ ] **Turn on `sharedStoreWrites` in production (and backfill).** The inbox (11a) reads only the shared store, so WhatsApp chats can be taken over only once their messages are written there. Backfill recent WhatsApp threads first, so the inbox shows their history.
+
 - [ ] **Gate G1 (ops):** checkpoint database, retention, `AGENT_RUNTIME__AGENT_REASONING_EFFORT=low`, agent prompt published (`v2-chunks.md`, Release gates).
 - [ ] **v2 in production:** confirm `global_settings` `whatsapp_bot` → `agentRuntimeAllowed` and ally-ai `AGENT_RUNTIME__ENABLED` (`CHUNK-20A2-NOTES.md` §3).
 - [ ] **A private bucket of its own for bot images** (20d).

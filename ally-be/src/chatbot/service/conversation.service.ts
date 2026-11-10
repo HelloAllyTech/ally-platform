@@ -39,6 +39,7 @@ export type AppendMessageInput = Pick<
       | 'latencyMs'
       | 'errorMessage'
       | 'inReplyToId'
+      | 'sentByUserId'
     >
   >;
 
@@ -67,6 +68,8 @@ const BLANK_BATCH_SIZE = 500;
  * idle window); messages are deduped on (channel, provider id). WhatsApp writes here through
  * WaSharedStoreWriter while `wa_*` stays its source of truth; the bot page (12b) writes here only.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class ConversationService {
   constructor(
@@ -417,6 +420,19 @@ export class ConversationService {
         content: row.text,
       }))
       .filter((turn) => turn.content?.trim());
+  }
+
+  /**
+   * Who is handling a chat (chunk 11a): the team member's id, or null for the assistant. A
+   * Preview turn's made-up id (not a uuid) is never stored, so it's never held.
+   */
+  async holderOf(conversationId: string | undefined): Promise<number | null> {
+    if (!conversationId || !UUID.test(conversationId)) return null;
+    const [row] = (await this.dataSource.query(
+      `SELECT handled_by_user_id FROM chatbot_conversations WHERE id = $1`,
+      [conversationId],
+    )) as { handled_by_user_id: number | null }[];
+    return row?.handled_by_user_id ?? null;
   }
 
   /** Merge keys into a thread's metadata (the bot page's pre-chat answers, chunk 12b). */

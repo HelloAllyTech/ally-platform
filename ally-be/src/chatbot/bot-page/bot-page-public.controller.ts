@@ -106,6 +106,31 @@ export class BotPagePublicController {
   }
 
   @Public()
+  @Post(':slug/handover')
+  @ApiOperation({
+    summary: 'Talk to a person: ask the team to join this chat (chunk 11a)',
+    description:
+      'The same hand-over as asking in words. Returns the message the visitor is shown.',
+  })
+  askForPerson(@Param('slug') slug: string, @Req() req: Request) {
+    return this.service.askForPerson(slug, req);
+  }
+
+  @Get(':slug/conversation/events')
+  @ApiOperation({
+    summary:
+      "The visitor's live stream (SSE): a team member's replies and changes of hands",
+    description:
+      'Starts with `hello` {conversationId, by: assistant|person}, so a reconnect knows who has the chat; then `message` {id, role, text, sender, createdAt} and `state` {by}. Ends at once when there is no chat yet. A comment line every 10 s.',
+  })
+  visitorStream(
+    @Param('slug') slug: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    return this.service.visitorStream(slug, req, res);
+  }
+
   @Post(':slug/messages/:messageId/feedback')
   @ApiOperation({
     summary: 'Was this helpful? A thumbs up or down on one answer (changeable)',

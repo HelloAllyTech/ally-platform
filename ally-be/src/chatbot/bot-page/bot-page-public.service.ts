@@ -60,6 +60,10 @@ import {
   BotPageVisitor,
   BotPageVisitorService,
 } from './bot-page-visitor.service';
+import { SseWriter } from '../../common/sse/sse-writer';
+import { handoverMessage, handoverOf } from '../handover/handover';
+import { HandoverService } from '../handover/handover.service';
+import { InboxEventsService } from '../inbox/inbox-events.service';
 import { LeadAlertService } from './lead-alert.service';
 import { TurnstileService } from './turnstile.service';
 
@@ -106,7 +110,10 @@ export interface PublicCitation {
 
 export interface PublicMessage {
   id: string;
-  role: 'user' | 'assistant';
+  /** `agent_human`: a team member replying from the inbox (chunk 11a). */
+  role: 'user' | 'assistant' | 'agent_human';
+  /** For a team member's reply: "{first name} from {business}", or the business. */
+  sender?: string;
   text: string;
   citations: PublicCitation[];
   createdAt: string;
@@ -122,6 +129,8 @@ export interface PublicFinal {
   conversationId: string;
   /** Whether "Was this helpful?" shows under it (chunk Q2a). */
   rateable: boolean;
+  /** A team member has this chat (chunk 11a): no reply now; theirs comes on the visitor stream. */
+  held?: boolean;
 }
 
 /** The bot page's refusals, mapped onto the repo's `ErrorCode` contract (see error-code.enum.ts). */
@@ -223,6 +232,8 @@ export class BotPagePublicService {
     private readonly eventEmitter: EventEmitter2,
     private readonly config: AppConfigService,
     private readonly leads: LeadAlertService,
+    private readonly handover: HandoverService,
+    private readonly inboxEvents: InboxEventsService,
     @InjectRepository(WaUnansweredQuestion)
     private readonly unansweredRepository: Repository<WaUnansweredQuestion>,
   ) {}
@@ -439,7 +450,14 @@ export class BotPagePublicService {
         .map((row) => ({
           id: row.id,
           role:
-            row.role === ConversationMessageRole.USER ? 'user' : 'assistant',
+            row.role === ConversationMessageRole.USER
+              ? 'user'
+              : row.role === ConversationMessageRole.AGENT_HUMAN
+                ? 'agent_human'
+                : 'assistant',
+          ...(row.role === ConversationMessageRole.AGENT_HUMAN
+            ? { sender: String(row.retrievalMeta?.sender_label ?? '') }
+            : {}),
           text: row.text,
           citations: publicCitations(row.citations),
           createdAt: row.createdAt.toISOString(),
@@ -593,6 +611,30 @@ export class BotPagePublicService {
       throw error;
     }
 
+    // A team member has this chat (chunk 11a): the engine didn't answer and nothing is stored as a
+    // reply. The visitor's message stays for the team; their reply comes on the visitor stream.
+    if (decision.held) {
+      await this.conversations.updateMessage(inbound.id, {
+        status: WaMessageStatus.SENT,
+        handledBy: WaHandledBy.HELD,
+      });
+      await this.handover.afterDecision(chatbot, conversation.id, decision);
+      return {
+        reply: '',
+        citations: [],
+        messageId: inbound.id,
+        conversationId: conversation.id,
+        rateable: false,
+        held: true,
+      };
+    }
+    // Safety, Needs a person, and a second "I don't know" becoming the hand-over message.
+    decision = await this.handover.afterDecision(
+      chatbot,
+      conversation.id,
+      decision,
+    );
+
     const outbound = await this.conversations.appendMessage(conversation.id, {
       channel: ConversationChannel.WEB,
       direction: WaMessageDirection.OUTBOUND,
@@ -691,6 +733,80 @@ export class BotPagePublicService {
       ],
     );
     return { rating: dto.rating };
+  }
+
+  // ── a person (chunk 11a) ──────────────────────────────────────────────
+
+  /**
+   * "Talk to a person": the same hand-over as asking in words. The visitor is told the team has been
+   * asked; a chat a team member already has just says so again.
+   */
+  async askForPerson(
+    slug: string,
+    req: Request,
+  ): Promise<{ reply: string; messageId: string; conversationId: string }> {
+    const available = await this.page(slug);
+    const ready = await this.requireReady(available, req);
+    const contact = (await this.contactOf(available, ready, true))!;
+    const conversation = await this.openWithIntake(available, contact);
+    const reply = handoverMessage(
+      handoverOf(available.botSettings),
+      new Date(),
+    );
+    const stored = await this.conversations.appendMessage(conversation.id, {
+      channel: ConversationChannel.WEB,
+      direction: WaMessageDirection.OUTBOUND,
+      role: ConversationMessageRole.ASSISTANT,
+      text: reply,
+      status: WaMessageStatus.SENT,
+      handledBy: WaHandledBy.HANDOVER,
+    });
+    await this.handover.markNeedsPerson(
+      available.chatbot.id,
+      conversation.id,
+      'asked',
+    );
+    return { reply, messageId: stored.id, conversationId: conversation.id };
+  }
+
+  /**
+   * The visitor's live stream (chunk 11a): who has the chat now (`hello`), then a team member's
+   * replies and changes of hands as they happen. Their current chat only; none yet ends it at once.
+   */
+  async visitorStream(
+    slug: string,
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const available = await this.page(slug);
+    const ready = await this.requireReady(available, req);
+    const contact = await this.contactOf(available, ready, false);
+    const current = contact
+      ? await this.conversations.currentConversation(
+          available.chatbot.id,
+          contact.id,
+          ConversationChannel.WEB,
+          available.botSettings.conversationIdleMinutes,
+        )
+      : null;
+    const sse = new SseWriter(res);
+    const holder = current
+      ? await this.conversations.holderOf(current.id)
+      : null;
+    sse.send('hello', {
+      conversationId: current?.id ?? null,
+      by: holder === null ? 'assistant' : 'person',
+    });
+    if (!current) return sse.end();
+    const stop = await this.inboxEvents.listenVisitor(current.id, (event) => {
+      const { type, ...data } = event;
+      sse.send(type, data);
+    });
+    await new Promise<void>((resolve) =>
+      sse.closed.signal.addEventListener('abort', () => resolve()),
+    );
+    stop();
+    sse.end();
   }
 
   // ── plumbing ──────────────────────────────────────────────────────────

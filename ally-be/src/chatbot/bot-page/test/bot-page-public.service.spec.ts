@@ -166,6 +166,12 @@ function harness(
   };
   const engine = { respond: jest.fn().mockResolvedValue(DECISION) };
   const leads = { afterTurn: jest.fn().mockResolvedValue(false) };
+  // The inbox (chunk 11a): decisions pass through unchanged unless a test says otherwise.
+  const handover = {
+    afterDecision: jest.fn(async (_c: unknown, _id: string, d: unknown) => d),
+    markNeedsPerson: jest.fn(),
+  };
+  const inboxEvents = { listenVisitor: jest.fn(async () => () => undefined) };
   const unansweredValues = jest.fn().mockReturnThis();
   /** Raw queries the feedback route runs (chunk Q2a): the message lookup, then the upsert. */
   const db = { query: jest.fn() };
@@ -195,6 +201,8 @@ function harness(
     { emit } as never,
     { jwt: { accessToken: { secret: 's' } } } as never,
     leads as never,
+    handover as never,
+    inboxEvents as never,
     unanswered as never,
   );
   const req = { ip: '203.0.113.9', headers: {} } as never;
@@ -213,6 +221,7 @@ function harness(
     stored,
     unansweredValues,
     db,
+    handover,
     issued,
     req,
     res,
@@ -470,6 +479,41 @@ describe('BotPagePublicService', () => {
       );
       return h.service.respond(admitted, live);
     }
+
+    it('stores no reply while a team member holds the chat (chunk 11a)', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.engine.respond.mockResolvedValueOnce({
+        handledBy: WaHandledBy.HELD,
+        body: '',
+        held: true,
+      });
+      const final = await answer(h);
+      // Only the visitor's message: no assistant reply is stored or returned.
+      expect(h.stored).toHaveLength(1);
+      expect(h.stored[0]).toMatchObject({ direction: 'inbound', role: 'user' });
+      expect(final).toMatchObject({ reply: '', held: true, rateable: false });
+      expect(h.conversations.updateMessage).toHaveBeenCalledWith(
+        h.stored[0].id,
+        expect.objectContaining({ handledBy: WaHandledBy.HELD }),
+      );
+      expect(h.handover.afterDecision).toHaveBeenCalled();
+    });
+
+    it('still sends the crisis reply while a team member holds the chat (chunk 11a)', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.engine.respond.mockResolvedValueOnce({
+        handledBy: WaHandledBy.CRISIS,
+        body: 'Please call 14416 now.',
+      });
+      const final = await answer(h);
+      expect(h.stored[1]).toMatchObject({
+        direction: 'outbound',
+        handledBy: WaHandledBy.CRISIS,
+        text: 'Please call 14416 now.',
+      });
+      expect(final.reply).toBe('Please call 14416 now.');
+      expect(final.held).toBeUndefined();
+    });
 
     it('stores the message and the reply on the web channel, with the run behind it', async () => {
       const h = harness(BotPageAccess.PUBLIC);
@@ -759,6 +803,27 @@ describe('BotPagePublicService', () => {
         BOT_ID,
         'contact-1',
       ]);
+    });
+  });
+
+  describe('Talk to a person (chunk 11a)', () => {
+    it('tells the visitor the team has been asked, and marks the chat', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.setVisitor({});
+      const result = await h.service.askForPerson('sunrise', h.req);
+      expect(result.reply).toBe(
+        "I've asked the team to join. They usually reply within a few hours.",
+      );
+      expect(h.stored[0]).toMatchObject({
+        direction: 'outbound',
+        role: 'assistant',
+        handledBy: WaHandledBy.HANDOVER,
+      });
+      expect(h.handover.markNeedsPerson).toHaveBeenCalledWith(
+        BOT_ID,
+        'conv-1',
+        'asked',
+      );
     });
   });
 });

@@ -1,3 +1,5 @@
+import { HandoverService } from '../../../chatbot/handover/handover.service';
+import { ConversationService } from '../../../chatbot/service/conversation.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -97,6 +99,8 @@ export interface InboundHarness {
   /** Every message row saved, inbound and outbound. */
   savedMessages: Record<string, unknown>[];
   messageUpdates: jest.Mock;
+  /** The inbox's after-decision hook (chunk 11a); a pass-through. */
+  handover: { afterDecision: jest.Mock };
 }
 
 /**
@@ -110,6 +114,7 @@ export async function buildInboundHarness({
   settings: settingsOverride = {},
   documents = { find: async () => [{ documentId: 'doc-1' }] },
   replies = {},
+  holder,
 }: {
   chatbot: () => Chatbot;
   /** What `/agent/run` answers. */
@@ -120,6 +125,11 @@ export async function buildInboundHarness({
   documents?: Record<string, unknown>;
   /** ChatbotReplyService methods to replace (no keyword matches by default). */
   replies?: Record<string, jest.Mock>;
+  /**
+   * The inbox (chunk 11a): the team member holding the chat (null for the assistant). Unset, the
+   * inbox isn't wired, as before it existed.
+   */
+  holder?: number | null;
 }): Promise<InboundHarness> {
   const savedMessages: Record<string, unknown>[] = [];
   const provider = {
@@ -181,6 +191,9 @@ export async function buildInboundHarness({
 
   const emitter = new EventEmitter2();
   jest.spyOn(emitter, 'emit');
+  const handover = {
+    afterDecision: jest.fn(async (_c: unknown, _id: string, d: unknown) => d),
+  };
 
   const module: TestingModule = await Test.createTestingModule({
     providers: [
@@ -275,6 +288,15 @@ export async function buildInboundHarness({
         useValue: { getPromptsByOptions: jest.fn().mockResolvedValue([]) },
       },
       { provide: EventEmitter2, useValue: emitter },
+      ...(holder === undefined
+        ? []
+        : [
+            {
+              provide: ConversationService,
+              useValue: { holderOf: jest.fn().mockResolvedValue(holder) },
+            },
+            { provide: HandoverService, useValue: handover },
+          ]),
     ],
   }).compile();
 
@@ -289,5 +311,6 @@ export async function buildInboundHarness({
     aiService,
     savedMessages,
     messageUpdates,
+    handover,
   };
 }

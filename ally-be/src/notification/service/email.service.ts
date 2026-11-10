@@ -147,6 +147,26 @@ ${magicLink ? `Or click the link below to login instantly:\n${magicLink}\n` : ''
     });
   }
 
+  /**
+   * "A conversation needs you" to an assistant's owner (Agents v2, chunk 11a): no message text, only
+   * the assistant's name and a link. Recipient masked in logs.
+   */
+  async sendHandoverAlert(params: {
+    to: string;
+    subject: string;
+    body: string;
+  }): Promise<boolean> {
+    return this.sesService.sendEmail({
+      from: this.config.email.sourceEmail,
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      isHtml: false,
+      purpose: 'handover alert',
+      maskRecipientsInLog: true,
+    });
+  }
+
   async sendSummaryNotification(params: {
     to: string;
     chatId: number;

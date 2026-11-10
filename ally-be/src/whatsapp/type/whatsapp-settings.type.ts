@@ -129,6 +129,15 @@ export interface WhatsAppBotSettings {
   showTyping?: boolean;
 
   /**
+   * A person stepping in (chunk 11a): the reply time and opening hours the visitor is told, the
+   * auto hand-back and the owner's email. Per bot; unset fields take `HANDOVER_DEFAULTS`
+   * (read through `handoverOf`).
+   */
+  handover?: Partial<
+    import('../../chatbot/handover/handover').HandoverSettings
+  >;
+
+  /**
    * Agents v2, chunk 12: also write every WhatsApp message to the shared conversation store
    * (`chatbot_*`). `wa_*` stays the source of truth; a failed shared write is logged and counted,
    * never felt by the person waiting for a reply. Platform-wide only.

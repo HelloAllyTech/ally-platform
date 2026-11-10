@@ -52,6 +52,35 @@ export class ChatbotConversation extends BaseWithoutTenantEntity {
   @Column({ type: 'jsonb', default: () => "'{}'" })
   metadata!: Record<string, unknown>;
 
+  /**
+   * The single switch (chunk 11a): the team member handling this chat, or null when the assistant
+   * is. While it is set the engine never answers here; a crisis message still gets the crisis reply.
+   */
+  @Column({ name: 'handled_by_user_id', type: 'int', nullable: true })
+  handledByUserId?: number | null;
+
+  @Column({ name: 'handled_since', type: 'timestamp', nullable: true })
+  handledSince?: Date | null;
+
+  /** When the chat started needing a person, and why ("asked" or "declined_twice"). */
+  @Column({ name: 'needs_person_since', type: 'timestamp', nullable: true })
+  needsPersonSince?: Date | null;
+
+  @Column({
+    name: 'needs_person_reason',
+    type: 'varchar',
+    length: 16,
+    nullable: true,
+  })
+  needsPersonReason?: string | null;
+
+  /** The last crisis reply here: the inbox lists it as Safety, at the top. */
+  @Column({ name: 'safety_at', type: 'timestamp', nullable: true })
+  safetyAt?: Date | null;
+
+  @Column({ name: 'last_human_reply_at', type: 'timestamp', nullable: true })
+  lastHumanReplyAt?: Date | null;
+
   /** A summary of the thread (chunk 16). */
   @Column({ type: 'text', nullable: true })
   summary?: string | null;

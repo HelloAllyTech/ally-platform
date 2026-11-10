@@ -34,6 +34,7 @@ import { WhatsAppCredentialCipherService } from './service/whatsapp-credential-c
 import { WhatsAppConversationService } from './service/whatsapp-conversation.service';
 import { WhatsAppIdentityService } from './service/whatsapp-identity.service';
 import { WhatsAppPhoneMappingService } from './service/whatsapp-phone-mapping.service';
+import { WhatsAppInboxSender } from './service/whatsapp-inbox-sender.service';
 import { WhatsAppInboundService } from './service/whatsapp-inbound.service';
 import { WhatsAppRateLimitService } from './service/whatsapp-rate-limit.service';
 import { WhatsAppRetentionService } from './service/whatsapp-retention.service';
@@ -101,6 +102,8 @@ import { Connector } from '../chatbot/entity/connector.entity';
     WhatsAppConnectorType,
     WhatsAppInboundProducer,
     WhatsAppInboundService,
+    // Sends the inbox's messages (chunk 11a).
+    WhatsAppInboxSender,
     WaSharedStoreWriter,
     WhatsAppAdminService,
     WaAnalyticsRepository,

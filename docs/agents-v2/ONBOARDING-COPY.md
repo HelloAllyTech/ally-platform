@@ -516,6 +516,24 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Notification:** {business}: someone needs a person
 - **Email subject:** A conversation needs you
 - **Settings:** Hand back to the assistant after {hours} hours without a reply · Email me if nobody opens it within {minutes} minutes
+- **The rest, added in 11a:**
+  - Visitor link in the chat: Talk to a person
+  - Email body (no message text): Someone talking to {assistant} would like a person. Nobody has opened the conversation yet. Open it: {link}
+  - WhatsApp after 24 hours: WhatsApp only lets you reply within 24 hours of their last message. You can reply again when they next write.
+  - WhatsApp window, while open: You can reply on WhatsApp until {time}.
+  - Reply box placeholder: Write a reply
+  - Buttons: Send · Take over · Hand back to assistant
+  - Settings section title: When someone asks for a person
+  - Settings labels: They usually reply within · Opening hours (optional) · Days · From · To · Show the team member's first name · Hours before it hands back · Minutes before the email
+  - Settings hint for opening hours: Without opening hours, visitors are always told when you usually reply.
+  - List labels: Needs a person · Safety · {name} is replying · Your assistant
+  - Reasons: Asked for a person · Couldn't help twice
+  - Empty inbox: No conversations yet. They'll appear here as people chat.
+  - Nothing needs a person: Nobody is waiting for a person.
+  - Notifications: Sound on · Sound off · Turn on notifications
+  - Notification for Safety: {business}: a safety message
+  - Visitor page, team joined: {sender} has joined the chat.
+  - Visitor page, handed back: You're chatting with the assistant again.
 
 ## 24. Purposes, choosing pages and topics to avoid (20a-2)
 

@@ -56,6 +56,13 @@ export interface HomeWrite {
 }
 
 /** A value that can't be saved; the message is shown under the field. */
+import {
+  HANDOVER_LIMITS,
+  handoverOf,
+  type HandoverSettings,
+  type OpeningHours,
+} from '../../chatbot/handover/handover';
+
 export class HomeFieldInvalid extends Error {}
 
 interface HomeField<T> {
@@ -353,6 +360,20 @@ export const HOME_FIELDS = {
     },
   } as HomeField<BotPageAccess>,
 
+  /** A person stepping in (chunk 11a): what visitors are told, the auto hand-back, the email. */
+  handover: {
+    read: (s) => handoverOf(s.chatbot.settings ?? {}),
+    parse: (value) => parseHandover(value),
+    write: (value, s) => ({
+      chatbot: {
+        settings: {
+          ...(s.chatbot.settings ?? {}),
+          handover: value,
+        } as ChatbotSettingsOverride,
+      },
+    }),
+  } as HomeField<HandoverSettings>,
+
   busyText: overrideText(
     'rateLimitText',
     500,
@@ -413,4 +434,66 @@ export function readAll(
     out[name] = { value, version: versionOf(value) };
   }
   return out;
+}
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** The hand-over settings as the owner sent them, checked (chunk 11a). */
+export function parseHandover(value: unknown): HandoverSettings {
+  const v = (value ?? {}) as Partial<HandoverSettings>;
+  const replyWithin = String(v.replyWithin ?? '').trim();
+  if (!replyWithin || replyWithin.length > HANDOVER_LIMITS.replyWithinChars) {
+    throw new HomeFieldInvalid(
+      `Say how soon the team usually replies, in up to ${HANDOVER_LIMITS.replyWithinChars} characters.`,
+    );
+  }
+  const whole = (
+    n: unknown,
+    { min, max }: { min: number; max: number },
+    what: string,
+  ) => {
+    const x = Number(n);
+    if (!Number.isInteger(x) || x < min || x > max) {
+      throw new HomeFieldInvalid(`${what} must be between ${min} and ${max}.`);
+    }
+    return x;
+  };
+  let hours: OpeningHours | null = null;
+  if (v.hours) {
+    const h = v.hours;
+    const days = [...new Set((h.days ?? []).map(Number))].filter(
+      (d) => Number.isInteger(d) && d >= 0 && d <= 6,
+    );
+    if (
+      !days.length ||
+      !HHMM.test(h.from) ||
+      !HHMM.test(h.to) ||
+      h.from >= h.to
+    ) {
+      throw new HomeFieldInvalid(
+        'Opening hours need days, and a start before the end.',
+      );
+    }
+    hours = {
+      timeZone: h.timeZone || 'Asia/Kolkata',
+      days: days.sort(),
+      from: h.from,
+      to: h.to,
+    };
+  }
+  return {
+    replyWithin,
+    hours,
+    autoHandBackHours: whole(
+      v.autoHandBackHours,
+      HANDOVER_LIMITS.autoHandBackHours,
+      'Hours before it hands back',
+    ),
+    emailAfterMinutes: whole(
+      v.emailAfterMinutes,
+      HANDOVER_LIMITS.emailAfterMinutes,
+      'Minutes before the email',
+    ),
+    showFirstName: v.showFirstName !== false,
+  };
 }
