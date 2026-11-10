@@ -133,6 +133,8 @@ describe("Inbox", () => {
     expect(screen.getByText("Needs a person · Asked for a person")).toBeTruthy();
     expect(screen.getByText(INBOX.safety)).toBeTruthy();
     expect(screen.getByLabelText("2 unread")).toBeTruthy();
+    // No chat open yet: the other side says what to do.
+    expect(screen.getByText(INBOX.pickChat)).toBeTruthy();
   });
 
   it("takes a chat over, replies, and hands it back", async () => {

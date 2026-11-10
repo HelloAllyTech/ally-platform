@@ -217,7 +217,7 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
             <ChatView chatbotId={currentBot} id={selected} me={user?.id ?? null} />
           </>
         ) : (
-          <p className="ally-empty">{items.length ? "" : INBOX.empty}</p>
+          <p className="ally-empty">{items.length ? INBOX.pickChat : INBOX.empty}</p>
         )}
       </main>
     </div>

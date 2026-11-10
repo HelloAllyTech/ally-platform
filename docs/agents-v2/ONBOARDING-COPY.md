@@ -533,6 +533,7 @@ says when a save can't be made. More lines for the home's sections are added her
   - List labels: Needs a person · Safety · {name} is replying · Your assistant
   - Reasons: Asked for a person · Couldn't help twice
   - Empty inbox: No conversations yet. They'll appear here as people chat.
+  - No chat open: Pick a chat to read it.
   - Nothing needs a person: Nobody is waiting for a person.
   - Notifications: Sound on · Sound off · Turn on notifications
   - Notification for Safety: {business}: a safety message

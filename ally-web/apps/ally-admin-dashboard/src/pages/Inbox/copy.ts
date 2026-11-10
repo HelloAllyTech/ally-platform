@@ -32,6 +32,7 @@ export const INBOX = {
   windowClosed:
     "WhatsApp only lets you reply within 24 hours of their last message. You can reply again when they next write.",
   empty: "No conversations yet. They'll appear here as people chat.",
+  pickChat: "Pick a chat to read it.",
   nobodyWaiting: "Nobody is waiting for a person.",
   soundOn: "Sound on",
   soundOff: "Sound off",
