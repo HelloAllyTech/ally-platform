@@ -173,6 +173,10 @@ class VerifyRunner:
     def run_tests_command(self, command):
         return self._take(("suite", command))
 
+    def run_format(self, command):
+        self.calls.append(("format", command))
+        return run_result("ally-be", True)
+
     def run_lint(self):
         return self._take(("lint",))
 
@@ -242,6 +246,8 @@ def test_verify_runs_baseline_on_untouched_code_and_blames_only_new_failures(
     assert v.passed and out["status"] == "verified", v.summary
     assert v.baseline_failures == ["old › flaky"] and v.new_failures == []
     # the baseline (second suite call) saw the untouched code; then the fix came back
+    # calls: repro, format, suite (after), suite baseline (patch stashed), lint, types
+    # x_at_call is recorded by the test-side calls only (format is not one of them)
     assert runner.x_at_call[1] == "export const x = () => 3;"  # after
     assert runner.x_at_call[2] == "export const x = () => 0;"  # baseline: patch stashed
     assert (repo / "ally-be/src/x.ts").read_text() == "export const x = () => 3;\n"
@@ -251,9 +257,8 @@ def test_verify_runs_baseline_on_untouched_code_and_blames_only_new_failures(
     ]
     calls_before = len(runner.calls)
     make_verify_node(deps)(state)
-    assert (
-        len(runner.calls) == calls_before + 4
-    )  # repro, suite, lint, typecheck; no baseline
+    # repro, format, suite, lint, typecheck; no baseline this time
+    assert len(runner.calls) == calls_before + 5
 
 
 def test_verify_fails_on_new_failure_or_edited_repro(

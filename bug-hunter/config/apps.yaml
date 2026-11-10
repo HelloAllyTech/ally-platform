@@ -15,6 +15,8 @@ apps:
     lang: typescript
     test: "npm test -- --forceExit --detectOpenHandles"
     test_one: "npx jest {file} -t {name} --forceExit"
+    # verify (chunk 06) formats only the files a fix changed before lint; {files} = app-relative paths
+    format_files: "npx prettier --write {files}"
     lint: "npm run lint"
     typecheck: "npm run typecheck"
     # Jest rootDir is src with testRegex .*\.spec\.ts$; there is no top-level test/.
@@ -46,6 +48,7 @@ apps:
     test_one: "npx nx test {project} -- {project_file} --testNamePattern={name}"
     # verify (chunk 06) runs only the Nx projects a fix touches; the full suite runs in the PR's CI
     test_project: "npx nx test {project}"
+    format_files: "npx prettier --write {files}"
     lint: "npm run lint && npm run format:check && npm run lint:colors"
     typecheck: >-
       npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json
@@ -74,6 +77,7 @@ apps:
     lang: python
     test: "poetry run pytest tests/ -v"
     test_one: "poetry run pytest {file} -k {name} -v"
+    format_files: "poetry run black {files} && poetry run isort {files}"
     lint: "poetry run flake8"
     test_dirs: ["tests/"]
     image: python312
@@ -94,6 +98,7 @@ apps:
     lang: python
     test: "poetry run python -m pytest tests/ -v"
     test_one: "poetry run python -m pytest {file} -k {name} -v"
+    format_files: "poetry run black {files} && poetry run isort {files}"
     lint: "poetry run flake8"
     test_dirs: ["tests/"]
     image: python312

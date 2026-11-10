@@ -519,3 +519,81 @@ def test_lint_failure_reaches_the_next_fix_attempt_and_exhaustion_has_a_reason(
     assert "run_lint" in deps.models["fix"].bound_tools[-1]
     verify_md = (tmp_path / "artefacts" / "verify-attempt-1.md").read_text()
     assert "--- lint ---" in verify_md and "prettier/prettier" in verify_md
+
+
+def test_verify_formats_only_the_changed_files_then_lints(
+    config, repo, tmp_path
+) -> None:
+    deps = _deps(config, repo, tmp_path, [EDIT_FIX, SUBMIT_FIX])
+    seen = []
+
+    def formatter(command):
+        seen.append(command)
+        x = repo / "ally-be/src/x.ts"
+        x.write_text(
+            x.read_text().replace("return 3; // bug", "return 3; // bug (formatted)")
+        )
+
+    deps.runner.format_hook = formatter
+    _, state = _run(deps)
+    assert state.status == "awaiting_human", state.stop_reason
+    assert deps.runner.format_calls == ["npx prettier --write src/x.ts"]
+    # the diff was re-measured after formatting and the formatted patch is the one kept
+    assert state.patch.lines_changed == 2 and state.patch.diff_path.endswith(
+        "formatted.patch"
+    )
+    assert "(formatted)" in (tmp_path / "artefacts" / "fix.patch").read_text()
+    # lint ran after formatting, on the formatted tree
+    assert any("prettier --write" in c for c in deps.runner.format_calls)
+
+
+def test_formatting_that_blows_the_line_cap_escalates(config, repo, tmp_path) -> None:
+    deps = _deps(config, repo, tmp_path, [EDIT_FIX, SUBMIT_FIX])
+
+    def formatter(command):
+        x = repo / "ally-be/src/x.ts"
+        x.write_text(
+            x.read_text() + "\n".join(f"// line {i}" for i in range(100)) + "\n"
+        )
+
+    deps.runner.format_hook = formatter
+    _, state = _run(deps)
+    assert (
+        state.status == "escalated"
+        and "fix too large after formatting" in state.stop_reason
+    )
+
+
+def test_ally_mobile_is_never_formatted(config, tmp_path) -> None:
+    from bug_hunter.config import ConfigError, load_config
+    from bug_hunter.graph.nodes.verify import format_changed_files
+
+    mobile = config.app("ally-mobile")
+    assert mobile.format_files is None and mobile.lang == "dart"
+    deps = GraphDeps(
+        config=config,
+        run_id="r",
+        app="ally-mobile",
+        mode="issue",
+        worktree=tmp_path,
+        app_root=tmp_path,
+        workspace=None,
+        models={},
+        scratchpad=Scratchpad(tmp_path / "pad.md"),
+        write_artefact=lambda n, c: tmp_path / n,
+        runner=ScriptedRunner("ally-mobile", [run_result("ally-mobile", True)]),
+    )
+    assert format_changed_files(deps, ["lib/a.dart"]) is None
+    assert deps.runner.format_calls == []
+    # and the config refuses a formatter for a dart app at load time
+    import yaml
+
+    cfg_dir = tmp_path / "config"
+    import shutil
+
+    shutil.copytree(config.config_dir, cfg_dir)
+    apps = yaml.safe_load((cfg_dir / "apps.yaml").read_text())
+    apps["apps"]["ally-mobile"]["format_files"] = "dart format {files}"
+    (cfg_dir / "apps.yaml").write_text(yaml.safe_dump(apps))
+    with pytest.raises(ConfigError):
+        load_config(config_dir=cfg_dir, repo_root=config.repo_root, env={})

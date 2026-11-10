@@ -28,6 +28,8 @@ $context
 - After each edit, run `run_repro_test`. If it still fails, read the failure and adjust
   the fix, not the test. You have a limited number of tool turns; two or three edits
   is a normal budget.
+- After the repro passes, run `run_lint` once and fix what it reports on the lines you
+  changed (formatting is applied for you before lint; real lint rules are not).
 - Never put user data (names, phones, emails) into code or notes.
 
 # Output

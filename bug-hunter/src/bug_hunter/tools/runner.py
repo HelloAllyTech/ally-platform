@@ -248,6 +248,10 @@ class Runner:
         """A test command already rendered (e.g. one Nx project's suite)."""
         return self._run("test", command)
 
+    def run_format(self, command: str) -> RunResult:
+        """The app's formatter on specific files (already rendered)."""
+        return self._run("format", command)
+
     def run_lint(self) -> RunResult:
         return self._run("lint", self.app_config.lint)
 

@@ -7,12 +7,14 @@ the stash is restored, so the baseline never sees the patch.
 
 from __future__ import annotations
 
+import shlex
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator
 
 from bug_hunter.graph.baseline import Baseline, baseline_for
 from bug_hunter.graph.budget import with_clock
 from bug_hunter.graph.deps import GraphDeps
+from bug_hunter.graph.nodes.fix import count_changed_lines
 from bug_hunter.graph.state import BugState, Verification
 from bug_hunter.graph.verify import check_passes, hashes_match, new_failures
 from bug_hunter.tools.runner import RunResult, nx_project
@@ -39,6 +41,25 @@ def patch_removed(deps: GraphDeps, files: list[str]) -> Iterator[None]:
     finally:
         if stashed and deps.git:
             deps.git.unstash(deps.worktree)
+
+
+def format_changed_files(deps: GraphDeps, app_rel_files: list[str]) -> RunResult | None:
+    """Run the app's formatter on exactly the files the fix changed. None when the app
+    has no formatter configured (ally-mobile: never dart format) or nothing changed."""
+    app_config = deps.config.app(deps.app)
+    if not app_config.format_files or app_config.lang == "dart" or not app_rel_files:
+        return None
+    if deps.runner is None:
+        return None
+    command = app_config.format_files.format(
+        files=" ".join(shlex.quote(f) for f in app_rel_files)
+    )
+    result = deps.runner.run_format(command)
+    deps.scratchpad.append_note(
+        f"verify: formatted {len(app_rel_files)} file(s) "
+        f"({'ok' if result.passed else 'formatter failed, continuing'})"
+    )
+    return result
 
 
 def make_verify_node(deps: GraphDeps):
@@ -76,6 +97,35 @@ def make_verify_node(deps: GraphDeps):
         repro_result = runner.run_tests(state.repro.test_path, state.repro.test_name)
         commands.append(repro_result.command)
         unchanged = hashes_match(deps.app_root, state.repro.file_hashes)
+
+        # 1b. the app's own formatter on the changed files only (never for dart,
+        # enforced in config), then re-measure the diff against the line cap
+        patch = state.patch
+        formatted = format_changed_files(deps, patch_files)
+        if formatted is not None:
+            commands.append(formatted.command)
+            diff = deps.git.diff(deps.worktree) if deps.git else ""
+            lines = count_changed_lines(diff)
+            diff_path = deps.write_artefact(
+                f"fix-attempt-{state.attempts}.formatted.patch", diff
+            )
+            patch = patch.model_copy(
+                update={"lines_changed": lines, "diff_path": str(diff_path)}
+            )
+            cap = deps.config.limits.run.max_fix_lines_changed
+            if lines > cap:
+                deps.scratchpad.append_note(
+                    f"verify: {lines} changed lines after formatting > {cap}"
+                )
+                return {
+                    "patch": patch,
+                    "status": "escalated",
+                    "stop_reason": (
+                        f"fix too large after formatting: {lines} changed lines "
+                        f"(limit {cap})"
+                    ),
+                    "budget_used": budget,
+                }
 
         # 2. app tests: touched Nx projects for ally-web, the whole suite elsewhere
         suite_new: list[str] = []
@@ -152,6 +202,7 @@ def make_verify_node(deps: GraphDeps):
         )
         update: dict[str, Any] = {
             "verification": verification,
+            "patch": patch,
             "status": "verified" if verification.passed else "fixing",
             "budget_used": budget,
         }

@@ -63,11 +63,26 @@ class AppConfig(_Strict):
     test: str
     test_one: str | None = None
     test_project: str | None = None  # ally-web: one Nx project's suite ({project})
+    format_files: str | None = (
+        None  # formatter for changed files only ({files}); never for dart
+    )
     lint: str | None = None
     typecheck: str | None = None
     test_dirs: list[str] = Field(default_factory=list)
     risk_paths: list[str] = Field(default_factory=list)
     notes: str | None = None
+
+    @model_validator(mode="after")
+    def _formatter_rules(self) -> "AppConfig":
+        if self.format_files is not None:
+            if self.lang == "dart":
+                raise ValueError(
+                    "format_files is not allowed for a dart app: never run dart format"
+                )
+            if "{files}" not in self.format_files:
+                raise ValueError("format_files must contain {files}")
+        return self
+
     # Sandbox (chunk 02)
     image: str = Field(min_length=1)
     install: str = Field(min_length=1)

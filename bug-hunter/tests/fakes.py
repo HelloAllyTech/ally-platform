@@ -111,6 +111,13 @@ class ScriptedRunner:
         self.app = app
         self.results = list(results)
         self.calls: list[tuple[str | None, str | None]] = []
+        # per instance (class-level lists leaked between tests)
+        self.suite: list[RunResult] = []
+        self.suite_calls: list[str] = []
+        self.format_calls: list[str] = []
+        self.format_hook = None
+        self.lint_result: RunResult | None = None
+        self.typecheck_result: RunResult | None = None
 
     def run_tests(
         self, target: str | None = None, name: str | None = None
@@ -119,16 +126,16 @@ class ScriptedRunner:
         index = min(len(self.calls) - 1, len(self.results) - 1)
         return self.results[index]
 
-    # verify-side commands: scripted separately so the repro script is untouched
-    suite: list[RunResult] = []
-    lint_result: RunResult | None = None
-    typecheck_result: RunResult | None = None
-    suite_calls: list[str] = []
-
     def run_tests_command(self, command: str) -> RunResult:
         self.suite_calls.append(command)
         if self.suite:
             return self.suite.pop(0) if len(self.suite) > 1 else self.suite[0]
+        return run_result(self.app, True)
+
+    def run_format(self, command: str) -> RunResult:
+        self.format_calls.append(command)
+        if self.format_hook:
+            self.format_hook(command)
         return run_result(self.app, True)
 
     def run_lint(self) -> RunResult:
