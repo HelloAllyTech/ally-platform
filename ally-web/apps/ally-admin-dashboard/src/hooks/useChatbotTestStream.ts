@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS } from "@constants";
-import {
-  AgentTraceStep,
-  ChatbotTestStatus,
-  RefreshResponse,
-  TestChatbotRequest,
-  TestChatbotResponse,
-} from "@types";
+import { ApiEndpoints } from "@constants";
+import { AgentTraceStep, ChatbotTestStatus, TestChatbotRequest, TestChatbotResponse } from "@types";
 
-import { parseCopilotSse } from "./useRoadmapCopilotStream";
+import { fetchWithReauth } from "./chatStream/fetchWithReauth";
+import { readSse } from "./chatStream/sse";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -39,41 +34,6 @@ type StreamEvent =
   | { type: "token"; data: { text: string } }
   | { type: "final"; data: TestChatbotResponse }
   | { type: "error"; data: { code: string } };
-
-/** Same bearer and one-shot 401 refresh-and-retry as the other admin SSE hooks. */
-const fetchWithReauth = async (
-  url: string,
-  body: unknown,
-  signal: AbortSignal,
-): Promise<Response> => {
-  const request = (token: string | null) =>
-    fetch(url, {
-      method: HttpMethod.POST,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(body),
-      signal,
-    });
-
-  const response = await request(localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN));
-  if (response.status !== 401) return response;
-  const refreshToken = localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN);
-  if (!refreshToken) return response;
-  const refreshed = await fetch(`${API_BASE_URL}/api${ApiEndpoints.AUTH.REFRESH}`, {
-    method: HttpMethod.POST,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
-    signal,
-  });
-  if (!refreshed.ok) return response;
-  const tokens = (await refreshed.json()) as RefreshResponse;
-  localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN, tokens.accessToken);
-  localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN, tokens.refreshToken);
-  return request(tokens.accessToken);
-};
 
 /**
  * One Preview message over SSE (POST /v1/chatbots/:id/test/stream). `run` resolves with the same
@@ -114,30 +74,27 @@ export const useChatbotTestStream = () => {
         throw new ChatbotTestStreamUnavailable(response.status);
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
       let started = false;
+      let final: TestChatbotResponse | undefined;
       try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const parsed = parseCopilotSse(buffer);
-          buffer = parsed.rest;
-          for (const event of parsed.events as unknown as StreamEvent[]) {
-            started = true;
-            if (event.type === "final") return event.data;
-            if (event.type === "error") throw new Error(event.data.code);
-            if (event.type === "status") handlers.onStatus(event.data);
-            else if (event.type === "step") handlers.onStep(event.data);
-            else if (event.type === "token") handlers.onToken(event.data.text);
+        ({ started } = await readSse(response.body, raw => {
+          started = true;
+          const event = raw as StreamEvent;
+          if (event.type === "final") {
+            final = event.data;
+            return true;
           }
-        }
+          if (event.type === "error") throw new Error(event.data.code);
+          if (event.type === "status") handlers.onStatus(event.data);
+          else if (event.type === "step") handlers.onStep(event.data);
+          else if (event.type === "token") handlers.onToken(event.data.text);
+          return false;
+        }));
       } catch (error) {
         if (!started && !controller.signal.aborted) throw new ChatbotTestStreamUnavailable();
         throw error;
       }
+      if (final) return final;
       if (!started) throw new ChatbotTestStreamUnavailable();
       throw new Error("The test ended without a reply");
     },

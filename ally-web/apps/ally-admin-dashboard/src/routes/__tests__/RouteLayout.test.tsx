@@ -76,7 +76,6 @@ vi.mock("@pages", () => ({
   Logs: () => <div>LogsPage</div>,
   MobileReleases: () => <div>MobileReleasesPage</div>,
   WhatsAppBot: () => <div>WhatsAppBotPage</div>,
-  ChatbotPage: () => <div>ChatbotPage</div>,
   Terms: () => <div>TermsPage</div>,
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,
@@ -99,9 +98,26 @@ vi.mock("@pages", () => ({
   CourseCopilotSession: () => <div>CourseCopilotSessionPage</div>,
 }));
 
+// The assistant home (chunk 20d) stands in for its real page, which needs the store.
+vi.mock("../../pages/AssistantHome", () => ({
+  AssistantHome: () => <div>AssistantHomePage</div>,
+}));
 describe("RouteLayout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("opens an assistant on its home, and an old ?view=classic link on the home too", () => {
+    for (const path of [
+      "/chatbots/bot-1",
+      "/chatbots/bot-1?view=classic",
+      "/chatbots/bot-1?view=classic&tab=usage",
+    ]) {
+      window.history.pushState({}, "", path);
+      const { unmount } = render(<RouteLayout />);
+      expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("renders Login route", () => {

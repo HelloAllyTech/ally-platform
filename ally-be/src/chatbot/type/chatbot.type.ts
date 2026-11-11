@@ -48,6 +48,7 @@ export type ChatbotSettingsOverride = Partial<
     | 'crisisClassifierEnabled'
     | 'consentRequired'
     | 'showTyping'
+    | 'handover'
   >
 > & {
   rateLimit?: Partial<WhatsAppBotSettings['rateLimit']>;

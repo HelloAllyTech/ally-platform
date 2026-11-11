@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Not, Repository } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
@@ -7,6 +7,7 @@ import { WaConversation } from '../entity/wa-conversation.entity';
 import { WaMessage } from '../entity/wa-message.entity';
 import { WaUnansweredQuestion } from '../entity/wa-unanswered-question.entity';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
+import { ConversationService } from 'src/chatbot/service/conversation.service';
 
 /** Rows blanked per pass. Bounds one run's transaction size on a large backlog. */
 const BATCH_SIZE = 500;
@@ -41,6 +42,11 @@ export class WhatsAppRetentionService {
     @InjectRepository(WaUnansweredQuestion)
     private readonly unansweredRepository: Repository<WaUnansweredQuestion>,
     private readonly settingsService: ChatbotSettingsService,
+    /**
+     * The shared conversation store (chunk 12), swept after `wa_*`. Optional so a module built
+     * without it behaves exactly as before.
+     */
+    @Optional() private readonly conversations?: ConversationService,
   ) {}
 
   /** Entry point for the daily scheduled task. */
@@ -59,6 +65,11 @@ export class WhatsAppRetentionService {
 
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    await this.sweepWhatsApp(cutoff);
+    await this.sweepSharedStore(cutoff);
+  }
+
+  private async sweepWhatsApp(cutoff: Date): Promise<void> {
     const messages = await this.messageRepository.count({
       where: { createdAt: LessThan(cutoff), body: Not(ERASED) },
     });
@@ -77,6 +88,33 @@ export class WhatsAppRetentionService {
       `WhatsApp retention sweep past ${cutoff.toISOString()}: ` +
         `${blanked} message(s), ${questions} question(s), ${contacts} contact(s)`,
     );
+  }
+
+  /**
+   * The same rules over the shared conversation store, after `wa_*`. It selects its own rows past
+   * the cutoff rather than the ones just blanked above, so a pass that fails here is logged and the
+   * next hourly run finishes it; `wa_*`, the source of truth, has already been swept.
+   */
+  private async sweepSharedStore(cutoff: Date): Promise<void> {
+    if (!this.conversations) return;
+    try {
+      const { messages, identities } = await this.conversations.blankBefore(
+        cutoff,
+        { text: ERASED, erasedPrefix: ERASED_PHONE_PREFIX },
+      );
+      if (messages || identities) {
+        this.logger.info(
+          `Shared store retention sweep past ${cutoff.toISOString()}: ` +
+            `${messages} message(s), ${identities} identity(ies)`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Shared store retention sweep failed; the next run retries: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
   }
 
   private async blankMessages(cutoff: Date): Promise<number> {

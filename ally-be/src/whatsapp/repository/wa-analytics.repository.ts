@@ -258,4 +258,4 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
  * Matches the admin analytics kit's existing MIN_N_FOR_SCORE floor, for the same reason: a ratio over
  * a handful of samples reads as signal and is noise.
  */
-export const MIN_SAMPLE_FOR_RATE = 20;
+const MIN_SAMPLE_FOR_RATE = 20;

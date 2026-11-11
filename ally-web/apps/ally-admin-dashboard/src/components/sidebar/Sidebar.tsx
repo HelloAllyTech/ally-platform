@@ -40,6 +40,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { CustomImage } from "@ally-ui-mono/ui-shared";
 import { useAnalytics, ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@ally-ui-mono/ui-shared";
+import { useGetInboxCountsQuery } from "@api";
 import {
   ArrowDown,
   Book,
@@ -89,6 +90,23 @@ const defaultProfileUploadValues: {
   profileImageUrl: string;
 } = {
   profileImageUrl: "",
+};
+
+/** Unread chats in the inbox (chunk 11a), refreshed every minute and on every inbox event. */
+const InboxNavBadge: React.FC = () => {
+  const { data } = useGetInboxCountsQuery(undefined, {
+    pollingInterval: 60_000,
+    skipPollingIfUnfocused: true,
+  });
+  if (!data?.unread) return null;
+  return (
+    <span
+      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white"
+      title={`${data.unread} unread`}
+    >
+      {data.unread}
+    </span>
+  );
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobileClose }) => {
@@ -176,7 +194,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
   useEffect(() => {
     const isCreateRoute =
       location.pathname.includes(ROUTES.CREATE_SIMULATION) ||
-      location.pathname.includes(ROUTES.CREATE_PATH);
+      location.pathname.includes(ROUTES.CREATE_PATH) ||
+      // Onboarding's chat and canvas need the width (chunk 20a).
+      location.pathname.startsWith(ROUTES.CHATBOT_NEW);
 
     setIsRouteForceCollapsed(isCreateRoute);
 
@@ -352,6 +372,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     switch (id) {
       case SIDEBAR_ITEMS.BUILDER:
         return <BuilderNavBadge />;
+      // The inbox lives in AI Chatbots (chunk 11a): its unread chats show on that tab.
+      case SIDEBAR_ITEMS.WHATSAPP_BOT:
+        return <InboxNavBadge />;
       default:
         return undefined;
     }

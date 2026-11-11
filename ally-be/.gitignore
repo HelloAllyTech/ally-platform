@@ -77,3 +77,6 @@ scan_report.*
 # Bug Hunter eval replays: per-run detail stays local, the score is recorded in ally-be (see evals/bug-hunter/README.md)
 evals/bug-hunter/results/
 .eval-worktrees/
+
+# chunk 12 shared-store backfill progress
+.backfill-chatbot-shared-store.cursor.json

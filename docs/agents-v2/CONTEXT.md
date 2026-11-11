@@ -14,11 +14,11 @@ What makes it different: **everything the agent knows, does and learns is visibl
 
 ## Stages
 
-| Stage | Status | What's in it |
+| Version | Status | What's in it |
 |---|---|---|
-| Stage 1 | **Live** | Chatbots, WhatsApp connector, channel-agnostic engine in ally-be, knowledge answers in ally-ai, admin page at `/chatbots`. See `stage1-build.md`. |
-| **v2 (Stage 2)** | **Building now** | The agent engine, plus **seven generic building blocks** (Pages, Collections, People, Memory and history, Abilities, Channels and messages, Rules) that any bot is assembled from, and **templates** made of those blocks that anyone can install, customise, export and share. Also: memory you can read (profiles, the agent's notebook), conversation history and "Why?", rich and interactive messages, voice notes in and voice replies, team inbox, website widget, approvals, Never check and learning mode, owner manager mode on WhatsApp, onboarding, privacy controls. See `BUILDING-BLOCKS.md`. |
-| v3 (Stage 3) | Later | **Scheduler and outbound** (reminders, follow-ups, digests, broadcasts), **flows and workflows**, **the self-learning loop**; connectors (calendars, payments, stores, CRMs, ticketing), MCP, any API as a tool, the public template gallery and skills store, forms and WhatsApp Flows, Slack and Teams. **Don't build any of this in v2.** |
+| AI Chatbots (v1) | **Live** | Chatbots, WhatsApp connector, channel-agnostic engine in ally-be, knowledge answers in ally-ai, admin page at `/chatbots`. See `stage1-build.md`. |
+| **v2** | **Building now**, in Stages 1–8 (`v2-chunks.md`). Stage 1, the POC, is built |  The agent engine, plus **seven generic building blocks** (Pages, Collections, People, Memory and history, Abilities, Channels and messages, Rules) that any bot is assembled from, and **templates** made of those blocks that anyone can install, customise, export and share. Also: memory you can read (profiles, the agent's notebook), conversation history and "Why?", rich and interactive messages, voice notes in and voice replies, team inbox, website widget, approvals, Never check and learning mode, owner manager mode on WhatsApp, onboarding, privacy controls. See `BUILDING-BLOCKS.md`. |
+| v3 | Later | **Campaigns and routines** (broadcasts, announcements, the daily digest, campaign templates), **the visual flow builder**, **fully automatic learning**; connectors (calendars, payments, stores, CRMs, ticketing), MCP, any API as a tool, the public template gallery and skills store, forms and WhatsApp Flows, Slack and Teams. **Don't build any of this in v2.** |
 
 ## Documents in this folder, and which one wins
 
@@ -26,9 +26,10 @@ What makes it different: **everything the agent knows, does and learns is visibl
 |---|---|---|
 | `CONTEXT.md` | This file | Background, decisions, glossary |
 | `agents-v2-spec.md` | Product and experience spec for v2 | **The source of truth for scope and user experience.** What the owner sees and how it behaves |
-| `BUILDING-BLOCKS.md` | The six blocks every bot is made of, generated tools, and the template format | **The architecture every chunk from 4 on must fit.** If a feature doesn't fit a block, raise it; don't build industry-specific code |
-| `v2-chunks.md` | v2 split into chunks, with rules for every chunk, release gates and what moved to v3 | Build order, and what "done" means per chunk |
-| `chunk-NN.md` | The brief for the current chunk | **The current task.** Do only this |
+| `BUILDING-BLOCKS.md` | The seven blocks every bot is made of, generated tools, and the template format | **The architecture every chunk from 4 on must fit.** If a feature doesn't fit a block, raise it; don't build industry-specific code |
+| `SLICE-1.md` | The first end-to-end slice: website → agent-built, tested bot → shareable link; the onboarding experience and the four chunks | What's being built right now, and the experience bar for onboarding |
+| `v2-chunks.md` | v2 split into chunks and stages, with rules for every chunk, release gates and what stays in v3 | Build order, and what "done" means per chunk |
+| `chunk-NN.md` | The brief for the current chunk (finished briefs are in `archive/`) | **The current task.** Do only this |
 | `three-stage-plan.md` | Earlier research and three-stage engineering plan | Engineering detail: graph nodes, state, `/agent/run` contract, gateway, data model, rollout, risks |
 | `stage1-build.md` | How Stage 1 is built today | Real module names, tables, message flow, engine order |
 | `CHUNK-NN-NOTES.md` | Written by you at the end of each chunk | What was built, how to test, open questions |
@@ -40,6 +41,8 @@ What makes it different: **everything the agent knows, does and learns is visibl
 3. `three-stage-plan.md` wins on engineering detail only where the spec is silent.
 4. The code wins over every document on facts about the existing system. Write down every mismatch in the notes file.
 
+**v2 was split into stages on 8 Nov 2026** (v2.0 to v2.7; see Stages in `v2-chunks.md`). Light follow-ups (6F) and owner-approved learning (8L) moved into v2; campaigns, the visual flow builder and fully automatic learning stay in v3.
+
 **v2 scope was revised on 6 Nov 2026:** only the scheduler, flows and the self-learning loop moved to v3; Collections, People relations, Memory as its own block, media and voice, rich messages, the team inbox and templates moved in. Where `agents-v2-spec.md` describes the moved features as v2, `v2-chunks.md` wins.
 
 **Known differences in `three-stage-plan.md`:** its Stage 2 includes a form creator and an 8-step order. Both are superseded. **Forms are v3**, and the order is `v2-chunks.md`. Its `/agent/run` request shape is the **target** contract. Chunk 1 starts smaller (today's request plus `conversation_id`), and the contract grows toward the target in chunks 2–3.
@@ -47,8 +50,8 @@ What makes it different: **everything the agent knows, does and learns is visibl
 ## Architecture decisions (settled; don't revisit without asking)
 
 - **ally-be goes first, unchanged.** Quick replies, access, kill switches, consent, STOP/START and crisis keywords run in ally-be before any AI call. The AI crisis check keeps running in parallel as a separate call.
-- **Switchable runtime.** Per bot, `runtime: v1 | v2` plus `features` flags (`context_files`, `tools`, `memory`, `schedules`, `flows`, …). Rollback is a settings change, not a deploy.
-- **One LangGraph graph serves every bot.** Flags switch nodes on, so parity mode is the same graph with everything new off.
+- **Switchable runtime.** One platform switch, `whatsapp_bot` → `agentRuntimeAllowed`: on, every bot answers with the v2 agent; off, every bot uses v1. v1 is also v2's fallback when a run fails. Rollback is a settings change, not a deploy. (Chunk 3d replaced the per-bot `runtime` and `features` settings and removed shadow mode; v1 and the fallback go in CL2.)
+- **One LangGraph graph serves every bot.** What differs per bot is its settings (purpose, safety pack, documents, the owner's instructions), never the graph.
 - **Thread id = conversation id.** The LangGraph Postgres checkpointer stores each run's state. That state feeds "Why?", approvals (`interrupt`) and resume.
 - **Graph decides, ally-be executes.** ally-ai never writes to ally-be's database, never sends messages and never holds channel or third-party credentials. Tools call the ally-be gateway (`/internal/agent/context`, `/internal/agent/tools/:name`, `/internal/agent/contacts/:id/memory`) with a service secret plus a short-lived per-run `run_token` naming the bot, contact, conversation and allowed tools.
 - **Idempotency everywhere.** Each tool call is keyed by run id plus step, and each send and scheduled job has a key. A retry never books or messages twice. ally-be's existing rule holds: throw only before sending, and after a send record failures and return.
@@ -78,6 +81,8 @@ What makes it different: **everything the agent knows, does and learns is visibl
 | Needs you | The owner's to-do list: approvals, handovers, failed sends, flow problems |
 | Sandbox number | An Ally-owned WhatsApp number; join codes let anyone try a draft bot |
 | Parity | v2 answers the way v1 does on the same questions before anything new is switched on |
+| Checkup | A test question a bot must pass, with what a good answer must do (cite, decline, clarify, crisis only, must not say). Generated from documents, safety packs and real conversations; owners can edit them. The product name for evals |
+| Scorecard | A bot's live performance with real people: answered with sources, declined, unanswered topics, thumbs up or down, response time, checkup pass rate |
 
 ## Always
 

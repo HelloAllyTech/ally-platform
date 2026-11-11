@@ -80,10 +80,13 @@ export class WhatsAppConversationController {
     @Query('sortDir') sortDir?: string,
     @Query('chatbotId', new ParseUUIDPipe({ optional: true }))
     chatbotId?: string,
+    @Query('channel') channel?: string,
   ) {
     await this.bot(chatbotId);
     return this.conversationService.listConversations({
       chatbotId,
+      // Chunk 12b: WhatsApp or the bot page. Anything else is ignored rather than refused.
+      ...(channel === 'whatsapp' || channel === 'web' ? { channel } : {}),
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined,
       from: from ? new Date(from) : undefined,
@@ -195,6 +198,19 @@ export class WhatsAppConversationController {
   })
   erase(@Param('id', ParseUUIDPipe) id: string) {
     return this.conversationService.eraseContact(id);
+  }
+
+  @Post('web-contacts/:id/erase')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
+    permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_CONVERSATIONS],
+  })
+  @ApiOperation({
+    summary: 'Erase a bot page visitor',
+    description:
+      'Chunk 12b. Blanks the messages, the pre-chat answers, the visitor’s email and their unanswered questions. The id is the shared store contact id from the conversation detail.',
+  })
+  eraseWebContact(@Param('id', ParseUUIDPipe) id: string) {
+    return this.conversationService.eraseWebContact(id);
   }
 
   // ── unanswered queue ──────────────────────────────────────────────────

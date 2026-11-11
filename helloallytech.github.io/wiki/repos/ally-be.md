@@ -87,6 +87,10 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
 
   The identity gate sits BELOW opt-out and the keyword templates and runs the LLM crisis classifier itself before refusing. Someone in danger is not less in danger for being unrecognised, and that ordering is what keeps both safety layers reachable for the people we know least about.
 
+**AI Chatbots (Agents v2)**
+- `chatbot/` — channel-agnostic chatbots: the engine that decides every reply (quick replies, access, consent, crisis and kill switches first, then ally-ai's `/agent/run` with `/knowledge-agent/answer` as the fallback), a shared conversation store every channel writes to, the inbox (live chats, take over and hand back), and `bot-page/`: the public chat page at `/b/<slug>` and the website widget that embeds it. The page and widget have their own public routes, rate limits and access (organisation, invited people, or — behind a platform switch — anyone).
+- `bot-draft/` — setting a chatbot up and running it afterwards: onboarding sessions with ally-ai's builder (crawl, facts with sources, purposes, publish), the checkups (questions, runs, results), the assistant's home (each field saved on its own with a version), change-by-chat with history and undo, and the live scorecard.
+
 **Agents that build**
 - `builder/` — the **Builder** agent: interviews a platform admin into a PRD, then builds it. Two halves that share one set of tables. The interview runs in-process (Anthropic SDK, SSE to the browser) and writes a versioned PRD document. The build cannot: ally-be can neither check out a repo, run a test suite, nor open a pull request from inside its container, so it dispatches a GitHub Actions run and *owns the protocol that run follows* — the runner fetches its instructions from `GET /v1/builder/pipeline/runs/:id/prompt` at run time, which is why a change to how builds work takes effect on the next dispatch instead of after a PR merges. Everything asymmetric about the module (a second controller authenticated by `X-API-Key`, a reconcile tick, prompt-over-HTTP) follows from that split. A run that needs a human commits its work in progress, posts its questions and exits 0; the answer dispatches a fresh run that continues from those branches. Off by default behind both `FeatureToggleKey.BUILDER` and a separate `builder_settings.enabled` kill switch — the toggle decides who sees the tab, the switch decides whether anything will dispatch. Human review and merge always; Builder never merges.
 
@@ -151,7 +155,7 @@ Role and permission lookups are cached in Redis (`user:roles:<id>`, `user:groups
   - `sqs-learn-message-and-event-queue` — learning messages and events from ally-ai-learn.
   - `whatsapp-inbound` (+ `-dlq`) — one message per inbound WhatsApp message. A standard queue, not FIFO: dedupe lives in Postgres (unique `provider_message_id`), and FIFO's 5-minute dedupe window is far shorter than Meta's retry window.
   - `kb-ingest` (+ `-dlq`) — corpus extraction, chunking and indexing.
-- **ally-web / ally-mobile** — consume the versioned REST API plus the Socket.IO gateways above. CORS origins are configured via `ALLOWED_ORIGINS` (defaults include the landing page :3000, helpline dashboard :8080, admin dashboard :8081).
+- **ally-web / ally-mobile** — consume the versioned REST API plus the Socket.IO gateways above. CORS origins are configured via `ALLOWED_ORIGINS` (defaults include the landing page :3000, helpline dashboard :8080, admin dashboard :8081). The website widget's two public routes are the exception: owners' own sites call them, so they answer CORS themselves, only for each chatbot's allowed websites.
 - **Redis message broker** — pub/sub for inter-service event delivery (`message-broker/`).
 - **Metabase** — analytics dashboards via `METABASE_URL` / `METABASE_API_KEY`.
 - **AWS SES** — transactional email.

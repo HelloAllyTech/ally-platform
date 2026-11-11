@@ -1,0 +1,62 @@
+# Fixture checkups (chunk 20a-2): the accuracy baseline on the onboarding fixture sites.
+#
+# Per site: the three suggested questions the 20a eval asked each published assistant, which
+# include the five it wrongly declined (yoga styles, beginners' series, batch timings,
+# possession date, amenities) and two more that declined in the same run with a source shown
+# (weekday hours at the GP clinic, opening hours at the lab). Facts are copied from the page
+# named in `page`, so every question has a real source.
+#
+# Same case format as docs/agents-v2/evals/sunrise-mind-checkups.yaml, plus `page` (the path
+# on the fixture site; the eval turns it into the page's URL and ally-be finds its document).
+
+sites:
+  mental-health:
+    cases:
+      - { id: mh-start, send: "How do I start a first session?", expect: answer, facts: ["call or email the clinic", "they arrange a first session with the therapist who fits best"], page: /faq }
+      - { id: mh-video, send: "Do you offer online video sessions?", expect: answer, facts: ["yes, online by video", "also in person at the Baner clinic"], page: / }
+      - { id: mh-languages, send: "What languages do you offer sessions in?", expect: answer, facts: ["English, Hindi, Marathi and Tamil"], page: / }
+  gp-clinic:
+    cases:
+      - { id: gp-fee, send: "How much is a general consultation?", expect: answer, facts: ["₹700"], page: /services }
+      - { id: gp-vaccines, send: "Do you offer child vaccinations?", expect: answer, facts: ["yes, child vaccinations"], page: /services }
+      - { id: gp-hours, send: "When are you open on weekdays?", expect: answer, facts: ["8 am to 8 pm on weekdays"], page: /visit }
+  diagnostic-lab:
+    cases:
+      - { id: lab-hours, send: "What are your opening hours?", expect: answer, facts: ["every day, 7 am to 9 pm"], page: /contact }
+      - { id: lab-where, send: "Where are you located?", expect: answer, facts: ["Andheri West, Mumbai"], page: /contact }
+      - { id: lab-fbc, send: "How much is the full body check-up?", expect: answer, facts: ["₹2,999"], page: /tests }
+  pharmacy:
+    cases:
+      - { id: ph-hours, send: "What are your opening hours?", expect: answer, facts: ["Monday to Sunday, 8 am to 11 pm"], page: /store }
+      - { id: ph-where, send: "Where is GoodHealth Pharmacy located?", expect: answer, facts: ["Salt Lake, Kolkata"], page: /store }
+      - { id: ph-devices, send: "Do you sell glucometers and BP monitors?", expect: answer, facts: ["yes, both"], page: /products }
+  wellness:
+    cases:
+      - { id: yoga-styles, send: "What yoga styles do you teach?", expect: answer, facts: ["Hatha, Vinyasa and Yin"], page: / }
+      - { id: yoga-beginners, send: "When is the beginners' series?", expect: answer, facts: ["four Sundays each month", "8 am"], page: /classes }
+      - { id: yoga-hatha, send: "What are the morning Hatha class times?", expect: answer, facts: ["Monday, Wednesday and Friday", "6:30 to 7:30 am"], page: /classes }
+  d2c:
+    cases:
+      - { id: tea-range, send: "What teas do you sell and in what sizes?", expect: answer, facts: ["Assam Breakfast, 250 g", "Darjeeling First Flush, 100 g", "Masala Chai blend, 250 g"], page: /shop }
+      - { id: tea-fresh, send: "How fresh are your teas and how are they packed?", expect: answer, facts: ["packed within a month of plucking", "a resealable foil pouch"], page: /shop }
+      - { id: tea-store, send: "How should I store my tea and how long does it stay fresh?", expect: answer, facts: ["sealed, away from light and strong smells", "about 12 months"], page: /help }
+  coaching:
+    cases:
+      - { id: bm-courses, send: "What courses do you offer for Class 11 and 12?", expect: answer, facts: ["JEE", "NEET"], page: /courses }
+      - { id: bm-batches, send: "What are the morning and evening batch timings?", expect: answer, facts: ["morning batch 7 to 10 am", "evening batch 5 to 8 pm"], page: /batches }
+      - { id: bm-weekend, send: "When is the weekend doubt-clearing session?", expect: answer, facts: ["Sunday, 10 am to 1 pm"], page: /batches }
+  real-estate:
+    cases:
+      - { id: gf-sizes, send: "What apartment sizes are available?", expect: answer, facts: ["2 BHK of 1,150 sq ft", "3 BHK of 1,540 sq ft"], page: /project }
+      - { id: gf-possession, send: "When is possession for Greenfield Meadows?", expect: answer, facts: ["from June 2027"], page: / }
+      - { id: gf-amenities, send: "What amenities does the project have?", expect: answer, facts: ["clubhouse", "pool", "children's play area", "1 km walking track"], page: /project }
+  saas:
+    cases:
+      - { id: led-invoice, send: "How do I create a new invoice?", expect: answer, facts: ["Invoices, then New invoice", "add the customer, items and tax rates"], page: /help/invoices }
+      - { id: led-whatsapp, send: "How do I send an invoice by WhatsApp?", expect: answer, facts: ["an invoice can be sent by WhatsApp"], page: /help/invoices }
+      - { id: led-gst, send: "How does Ledgerly calculate CGST or IGST?", expect: answer, facts: ["from the customer's state"], page: /help/invoices }
+  restaurant:
+    cases:
+      - { id: csk-hours, send: "What are your opening hours?", expect: answer, facts: ["Tuesday to Sunday", "12 to 3:30 pm and 7 to 11:30 pm", "closed on Mondays"], page: /visit }
+      - { id: csk-where, send: "Where is Coastal Spice Kitchen located?", expect: answer, facts: ["Bandra West, Mumbai"], page: /visit }
+      - { id: csk-seafood, send: "Do you serve Mangalorean and Goan seafood?", expect: answer, facts: ["yes"], page: / }

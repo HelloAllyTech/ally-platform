@@ -18,3 +18,14 @@ export const KNOWLEDGE_ANSWER_LIMITS = {
   attempts: 2,
   delayMs: 500,
 } as const;
+
+/** ally-ai's onboarding builder (chunk 20a). */
+export const BUILDER_LIMITS = {
+  /**
+   * One streamed builder step. ally-ai caps a step at 45s (`BUILDER__STEP_TIMEOUT_SECONDS`), so
+   * its own `error: timeout` arrives first.
+   */
+  stepMs: 60_000,
+  /** One batch of pages read for facts; ally-ai caps the model call at 40s. */
+  extractMs: 50_000,
+} as const;

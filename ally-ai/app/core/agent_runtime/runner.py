@@ -55,6 +55,21 @@ def build_response(state: AgentState, run_id: str) -> AgentRunResponse:
     retrieval = {
         **result["retrieval"],
         "hit_chunk_ids": [str(hit.get("chunk_id")) for hit in state.get("hits") or []],
+        "passage_document_ids": list(
+            dict.fromkeys(
+                str(p["document_id"])
+                for p in state.get("passages") or []
+                if p.get("document_id")
+            )
+        ),
+        "passage_chunk_ids": [
+            str(p["chunk_id"]) for p in state.get("passages") or [] if p.get("chunk_id")
+        ],
+        "searches": sum(
+            1
+            for call in state.get("tool_calls") or []
+            if call.get("tool") == "search_knowledge"
+        ),
     }
     return AgentRunResponse(
         **{**result, "retrieval": retrieval},

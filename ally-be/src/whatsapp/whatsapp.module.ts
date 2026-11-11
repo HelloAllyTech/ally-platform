@@ -34,12 +34,14 @@ import { WhatsAppCredentialCipherService } from './service/whatsapp-credential-c
 import { WhatsAppConversationService } from './service/whatsapp-conversation.service';
 import { WhatsAppIdentityService } from './service/whatsapp-identity.service';
 import { WhatsAppPhoneMappingService } from './service/whatsapp-phone-mapping.service';
+import { WhatsAppInboxSender } from './service/whatsapp-inbox-sender.service';
 import { WhatsAppInboundService } from './service/whatsapp-inbound.service';
 import { WhatsAppRateLimitService } from './service/whatsapp-rate-limit.service';
 import { WhatsAppRetentionService } from './service/whatsapp-retention.service';
 import { WhatsAppSchedulerRegistrationService } from './service/whatsapp-scheduler-registration.service';
 import { WHATSAPP_PROVIDER } from './type/whatsapp-provider.interface';
 import { WhatsAppConnectorType } from './service/whatsapp-connector-type.service';
+import { WaSharedStoreWriter } from './shared-store/wa-shared-store.writer';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { Chatbot } from '../chatbot/entity/chatbot.entity';
 import { Connector } from '../chatbot/entity/connector.entity';
@@ -100,6 +102,9 @@ import { Connector } from '../chatbot/entity/connector.entity';
     WhatsAppConnectorType,
     WhatsAppInboundProducer,
     WhatsAppInboundService,
+    // Sends the inbox's messages (chunk 11a).
+    WhatsAppInboxSender,
+    WaSharedStoreWriter,
     WhatsAppAdminService,
     WaAnalyticsRepository,
     WhatsAppConversationService,
@@ -121,5 +126,7 @@ import { Connector } from '../chatbot/entity/connector.entity';
       inject: [AppConfigService, MetaWhatsAppProvider],
     },
   ],
+  // The assistant home's quick replies (chunk 20d-2) go through the same service.
+  exports: [WhatsAppAdminService],
 })
 export class WhatsAppModule {}

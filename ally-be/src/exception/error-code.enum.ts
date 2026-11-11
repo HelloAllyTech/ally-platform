@@ -168,6 +168,40 @@ export enum ErrorCode {
    * `message` names each answer and its item. Nothing was saved.
    */
   GUIDE_NOTES_ANSWER_LEAK = 'GUIDE_NOTES_ANSWER_LEAK',
+
+  // ── Bot page (Agents v2, chunk 12b) ───────────────────────────────────────
+  // The public chat page turns each into its own words (English and Hindi), so
+  // the `message` is for logs and developers only.
+  /** 404. No page answers at this link now: unknown, off, draft bot, or public links blocked. */
+  BOT_PAGE_NOT_FOUND = 'BOT_PAGE_NOT_FOUND',
+  /** 403. The Turnstile bot check failed on a public page. Try again. */
+  BOT_PAGE_BOT_CHECK_FAILED = 'BOT_PAGE_BOT_CHECK_FAILED',
+  /** 401. No usable visitor session (none, expired, or not verified): start again. */
+  BOT_PAGE_START_AGAIN = 'BOT_PAGE_START_AGAIN',
+  /** 403. The verified email may no longer use this page. */
+  BOT_PAGE_NOT_ALLOWED = 'BOT_PAGE_NOT_ALLOWED',
+  /** 400. The code doesn't match; tries remain. */
+  BOT_PAGE_CODE_WRONG = 'BOT_PAGE_CODE_WRONG',
+  /** 400. No live code for this address (expired, used, or never sent). */
+  BOT_PAGE_CODE_EXPIRED = 'BOT_PAGE_CODE_EXPIRED',
+  /** 400. Five wrong tries; the code is gone. Ask for a new one. */
+  BOT_PAGE_CODE_TOO_MANY = 'BOT_PAGE_CODE_TOO_MANY',
+  /** 503. The code email could not be sent. Transient. */
+  BOT_PAGE_EMAIL_UNAVAILABLE = 'BOT_PAGE_EMAIL_UNAVAILABLE',
+  /** 429. Too many messages or attempts; `retryAfterSeconds` says how long. */
+  BOT_PAGE_THROTTLED = 'BOT_PAGE_THROTTLED',
+  /** 503. The bot's daily message cap is reached: "busy, try later". */
+  BOT_PAGE_BUSY_UNAVAILABLE = 'BOT_PAGE_BUSY_UNAVAILABLE',
+  /** 400. The message is empty or longer than `details.max`. */
+  BOT_PAGE_MESSAGE_TOO_LONG = 'BOT_PAGE_MESSAGE_TOO_LONG',
+  /** 409. The pre-chat questions must be answered before the first message. */
+  BOT_PAGE_INTAKE_REQUIRED = 'BOT_PAGE_INTAKE_REQUIRED',
+  /** 400. A pre-chat answer was refused; `details.field` names the question. */
+  BOT_PAGE_INTAKE_INVALID = 'BOT_PAGE_INTAKE_INVALID',
+  /** A crisis reply, template or consent message: no thumbs (chunk Q2a). */
+  BOT_PAGE_NOT_RATEABLE = 'BOT_PAGE_NOT_RATEABLE',
+  /** The website widget is on a site that isn't one of the bot's allowed websites (chunk 13). */
+  BOT_PAGE_HOST_NOT_ALLOWED = 'BOT_PAGE_HOST_NOT_ALLOWED',
 }
 
 /**

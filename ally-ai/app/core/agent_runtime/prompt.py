@@ -131,4 +131,4 @@ def build_agent_prompt(
         return body
     # The persona goes first, fenced and ranked below the rules that follow, as in
     # v1's answer prompt.
-    return format_persona(persona) + body
+    return format_persona(persona, prompts) + body

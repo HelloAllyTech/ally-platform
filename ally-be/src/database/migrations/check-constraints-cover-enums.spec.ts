@@ -15,6 +15,21 @@ import {
 } from '../../debrief/enum/debrief-review.enum';
 import { join } from 'path';
 import {
+  ConversationChannel,
+  ConversationMessageRole,
+  ConversationStatus,
+} from '../../chatbot/enum/conversation.enum';
+import {
+  BotPageAccess,
+  BotPageAccessKind,
+  BotPageStatus,
+} from '../../chatbot/enum/bot-page.enum';
+import {
+  BotDraftStatus,
+  BotDraftStep,
+  SafetyPackId,
+} from '../../bot-draft/enum/bot-draft.enum';
+import {
   ClBulkUploadStatus,
   ClChunkConfidence,
   ClChunkOrigin,
@@ -446,6 +461,24 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_guide_appointments_purpose', Object.values(GuideAppointmentPurpose)],
     ['CHK_guide_crisis_responses_scope', Object.values(GuideCrisisScope)],
     ['CHK_track_enrollments_entry_source', Object.values(TrackEntrySource)],
+    // The shared conversation store (Agents v2, chunk 12).
+    [
+      'CHK_chatbot_contact_identities_channel',
+      Object.values(ConversationChannel),
+    ],
+    ['CHK_chatbot_conversations_channel', Object.values(ConversationChannel)],
+    ['CHK_chatbot_conversations_status', Object.values(ConversationStatus)],
+    ['CHK_chatbot_messages_channel', Object.values(ConversationChannel)],
+    ['CHK_chatbot_messages_role', Object.values(ConversationMessageRole)],
+    // The bot page (Agents v2, chunk 12b).
+    ['CHK_chatbot_pages_status', Object.values(BotPageStatus)],
+    ['CHK_chatbot_pages_access', Object.values(BotPageAccess)],
+    ['CHK_chatbot_page_access_kind', Object.values(BotPageAccessKind)],
+    // Agent-first onboarding (Agents v2, chunk 20a).
+    ['CHK_bot_drafts_status', Object.values(BotDraftStatus)],
+    ['CHK_bot_drafts_step', Object.values(BotDraftStep)],
+    ['CHK_bot_drafts_safety_pack', Object.values(SafetyPackId)],
+    ['CHK_chatbots_safety_pack', Object.values(SafetyPackId)],
   ])('%s accepts every enum value', (constraint, values) => {
     const allowed = allowedValues(constraint as string);
     const missing = (values as string[]).filter((v) => !allowed.includes(v));

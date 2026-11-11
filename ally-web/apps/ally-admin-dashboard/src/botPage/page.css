@@ -1,0 +1,611 @@
+/*
+ * The public bot page's own styles (chunk 20d, screenshots 02-bot-page-*). Plain CSS on the v2
+ * tokens (`.brand-surface`), not the app's Tailwind, so a visitor downloads only what the page
+ * draws. Mobile first; the page column is at most 640 px wide.
+ */
+@import "../components/v2/core/styles.css";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  -webkit-text-size-adjust: 100%;
+}
+
+.bp-root {
+  height: 100%;
+  overflow-y: auto;
+}
+.bp-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.bp-pad {
+  padding: 24px 24px 20px;
+}
+.bp-grow {
+  flex: 1;
+}
+.bp-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.bp-muted {
+  color: var(--ally-muted);
+}
+.bp-small {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ally-muted);
+}
+.bp-center {
+  text-align: center;
+}
+.bp-error {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--ally-danger);
+}
+.bp-heading:focus {
+  outline: none;
+}
+
+/* ── Cover ── */
+.bp-cover-image {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  max-height: 46vh;
+  width: 100%;
+  border-radius: var(--ally-radius-xl);
+  background: color-mix(in srgb, var(--brand-accent) 26%, var(--brand-bg));
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+.bp-cover-image img.bp-cover-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.bp-logo-tile {
+  position: absolute;
+  left: 22px;
+  bottom: -22px;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  /* White in every theme: logos are drawn for white, and the accent reads on it at 4.5:1. */
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(23, 23, 28, 0.12);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.bp-logo-tile img {
+  max-width: 70%;
+  max-height: 70%;
+  object-fit: contain;
+}
+.bp-initials {
+  font: 600 22px/1 var(--ally-font-ui);
+  color: var(--brand-accent);
+}
+.bp-cover-title {
+  margin-top: 40px;
+}
+.bp-cta {
+  width: 100%;
+}
+.bp-cta .ally-btn {
+  width: 100%;
+  min-height: 56px;
+  font-size: 17px;
+  border-radius: 16px;
+}
+
+/* ── Header (access, pre-chat, chat) ── */
+.bp-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--brand-bg);
+  border-bottom: 1px solid var(--brand-line);
+}
+.bp-header__text {
+  flex: 1;
+  min-width: 0;
+}
+.bp-header__name {
+  margin: 0;
+  font: 600 17px/1.25 var(--ally-font-ui);
+  color: var(--brand-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bp-header__status {
+  /* #46 (20d-2): two lines before it's cut, so "Answers from …" reads whole. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 1px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--brand-muted);
+}
+.bp-header__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: contain;
+  background: var(--brand-surface);
+  flex: none;
+}
+.bp-pill {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--brand-line);
+  background: var(--brand-surface);
+  color: var(--brand-ink);
+  font: 500 14px/1 var(--ally-font-ui);
+  cursor: pointer;
+  flex: none;
+}
+.bp-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Forms (email, code, pre-chat) ── */
+.bp-label {
+  font: 500 14px/1.3 var(--ally-font-ui);
+  color: var(--brand-ink);
+}
+.bp-code {
+  text-align: center;
+  font: 500 26px/1 var(--ally-font-label);
+  letter-spacing: 0.45em;
+}
+.bp-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bp-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bp-progress-row .ally-progress {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+}
+.bp-progress-row .ally-progress__bar {
+  background: var(--brand-accent);
+}
+.bp-choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-radius: var(--ally-radius-sm);
+  border: 1px solid var(--ally-line-strong);
+  background: var(--brand-surface);
+  color: var(--brand-ink);
+  cursor: pointer;
+  font: 400 16px/1.4 var(--ally-font-ui);
+}
+.bp-choice:has(input:checked) {
+  border-color: var(--brand-accent);
+  background: var(--brand-accent-soft);
+}
+.bp-choice input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.bp-choice:has(input:focus-visible) {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+.bp-choice:has(input:checked) .ally-kbd {
+  background: var(--brand-accent);
+  border-color: var(--brand-accent);
+  color: var(--brand-on-accent);
+}
+.bp-choice .ally-kbd {
+  background: var(--brand-surface);
+  border: 1px solid var(--ally-line-strong);
+}
+.bp-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.bp-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand-accent);
+}
+.bp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 24px;
+  margin-top: auto;
+}
+
+/* ── Chat ── */
+.bp-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.bp-signed-in {
+  margin: 0;
+  padding: 6px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--brand-muted);
+  background: var(--ally-sunken);
+}
+.bp-thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 18px;
+}
+.bp-messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.bp-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.bp-msg--user {
+  align-items: flex-end;
+}
+.bp-bubble {
+  max-width: 88%;
+  margin: 0;
+  padding: 14px 18px;
+  border-radius: 24px;
+  font: 400 16px/1.55 var(--ally-font-ui);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.bp-bubble--assistant {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-line);
+  color: var(--brand-ink);
+}
+.bp-bubble--user {
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+  border-bottom-right-radius: 8px;
+}
+.bp-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bp-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--brand-line);
+  background: var(--brand-surface);
+  color: var(--brand-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+.bp-dots {
+  display: inline-flex;
+  gap: 5px;
+  padding: 4px 0;
+}
+.bp-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--brand-muted);
+  animation: bp-dot 1.2s ease-in-out infinite;
+}
+.bp-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.bp-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes bp-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+.bp-suggested {
+  padding: 0 18px 10px;
+}
+.bp-suggested .ally-chip {
+  border-color: var(--brand-accent);
+  color: var(--brand-accent);
+  background: transparent;
+  text-align: left;
+  min-height: 40px;
+  height: auto;
+  padding: 8px 14px;
+  line-height: 1.3;
+}
+.bp-composer {
+  padding: 8px 14px 6px;
+}
+.bp-composer__box {
+  display: flex;
+  /* #45 (20d-2): the send button sits inside the box, centred, never over its rounded corner. */
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 20px;
+  border-radius: 32px;
+  border: 1px solid var(--brand-line);
+  background: var(--brand-surface);
+}
+.bp-composer__box:focus-within {
+  border-color: var(--brand-accent);
+  box-shadow: 0 0 0 4px var(--brand-accent-soft);
+}
+.bp-composer textarea {
+  flex: 1;
+  min-height: 44px;
+  max-height: 140px;
+  padding: 11px 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--brand-ink);
+  font: 400 16px/1.4 var(--ally-font-ui);
+}
+/* The box shows focus (its ring, above); the page-wide focus outline would draw a second one inside. */
+.bp-composer textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.bp-send {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 999px;
+  border: 0;
+  background: var(--brand-accent);
+  color: var(--brand-on-accent);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.bp-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.bp-count {
+  min-height: 16px;
+  margin: 2px 8px 0;
+  text-align: right;
+  font-size: 12px;
+  color: var(--brand-muted);
+}
+.bp-count[data-over="true"] {
+  color: var(--ally-danger);
+}
+.bp-status {
+  min-height: 18px;
+  margin: 0;
+  padding: 0 18px;
+  font-size: 12px;
+  color: var(--brand-muted);
+  text-align: center;
+}
+
+/* ── Footer ── */
+.bp-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  padding: 10px 16px 14px;
+  font-size: 12px;
+  color: var(--brand-muted);
+}
+.bp-footer a {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-dots span {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* "Was this helpful?" under an answer (chunk Q2a). */
+.bp-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.bp-feedback__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bp-feedback__question {
+  margin: 0;
+  font: 400 13px/1.4 var(--ally-font-ui);
+  color: var(--brand-muted);
+}
+.bp-feedback__thumb {
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--brand-line);
+  background: var(--brand-surface);
+  cursor: pointer;
+  font-size: 15px;
+}
+.bp-feedback__thumb[aria-pressed="true"] {
+  border-color: var(--brand-accent);
+  box-shadow: inset 0 0 0 1px var(--brand-accent);
+}
+.bp-feedback__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+.bp-feedback__reasons,
+.bp-feedback__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.bp-feedback__reasons .bp-pill[aria-pressed="true"] {
+  border-color: var(--brand-accent);
+}
+.bp-feedback__note {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--brand-line);
+  background: var(--brand-surface);
+  color: var(--brand-ink);
+  font: 400 14px/1.4 var(--ally-font-ui);
+}
+.bp-feedback__skip {
+  border: 0;
+  background: none;
+  color: var(--brand-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font: 400 14px/1 var(--ally-font-ui);
+  min-height: 40px;
+}
+.bp-feedback__thanks {
+  margin: 0;
+  font: 400 13px/1.4 var(--ally-font-ui);
+  color: var(--brand-muted);
+}
+
+/* A person stepping in (chunk 11a). */
+.bp-sender {
+  margin: 0 0 4px;
+  font: 500 12px/1.3 var(--ally-font-ui);
+  color: var(--brand-muted);
+}
+.bp-bubble--person {
+  box-shadow: inset 3px 0 0 var(--brand-accent);
+}
+.bp-notice {
+  align-self: center;
+  margin: 4px auto;
+  font: 400 12px/1.4 var(--ally-font-ui);
+  color: var(--brand-muted);
+  text-align: center;
+  list-style: none;
+}
+.bp-ask-person {
+  display: block;
+  /* #47 (20d-2): readable, and right under the box. */
+  margin: 0 auto;
+  border: 0;
+  background: none;
+  color: var(--brand-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  font: 500 14px/1 var(--ally-font-ui);
+  min-height: 36px;
+  padding: 0 8px;
+}
+
+/* ── The website widget (chunk 13): the page inside the panel on the owner's site ─────────────── */
+.bp-root--embed {
+  position: relative;
+}
+.bp-root--embed .bp-screen,
+.bp-root--embed .bp-chat {
+  max-width: none;
+}
+.bp-root--embed .bp-header {
+  padding: 10px 12px;
+  gap: 10px;
+}
+.bp-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid var(--brand-line);
+  background: var(--brand-surface);
+  color: var(--brand-ink);
+  font: 400 22px/1 var(--ally-font-ui);
+  cursor: pointer;
+}
+.bp-close:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+.bp-close--float {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+}

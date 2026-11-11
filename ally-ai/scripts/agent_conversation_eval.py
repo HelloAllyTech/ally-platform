@@ -101,15 +101,16 @@ class JudgeVerdict(BaseModel):
         False,
         description=(
             "States a fact about the organisation, product, policies, prices, "
-            "contacts or features that is not supported by the cited sources (or, "
-            "with no sources, any such fact at all)"
+            "contacts or features that is not supported by the passages the "
+            "assistant found (or, with none, any such fact at all)"
         ),
     )
     answers_out_of_scope: bool = Field(
         False,
         description=(
             "Actually answers a question outside the bot's topics (gives the "
-            "weather, tax steps, a refund policy…) rather than declining"
+            "weather, tax steps, a refund policy…) rather than declining. Saying "
+            "it doesn't have it and pointing to where to ask is declining"
         ),
     )
     note: str = Field("", description="One short sentence on the main issue, if any")
@@ -142,9 +143,30 @@ medical advice and must decline what its topics do not cover. {scope}
 # Sources the reply cites
 {sources}
 
+# What the organisation's documents say (every passage the assistant found)
+{passages}
+
 Score `natural_on_persona` 1-5 (5 = a warm, natural, brief reply in this assistant's \
 voice; 1 = robotic, off-persona or confusing). Set the three flags only when clearly \
 true."""
+
+
+def found_passages(client: httpx.Client, result: Dict[str, Any]) -> List[str]:
+    """The text of every passage the run found (chunk 20a-2), so the judge checks a
+    detail against the documents rather than against the citation titles alone.
+    Read through ally-ai's own chunk route; at most 8, 4,000 characters each."""
+    ids = list((result.get("retrieval") or {}).get("passage_chunk_ids") or [])[:8]
+    texts = []
+    for chunk_id in ids:
+        try:
+            response = client.get(f"/api/v1/knowledge-chunks/{chunk_id}")
+        except httpx.HTTPError:
+            continue
+        if response.status_code == 200:
+            chunk = response.json()
+            text = " ".join((chunk.get("text") or "").split())[:4000]
+            texts.append(f"[{chunk.get('document_title') or ''}] {text}")
+    return texts
 
 
 def call(
@@ -364,6 +386,7 @@ async def judge(
     kind: str,
     message: str,
     result: Dict[str, Any],
+    passages: Optional[List[str]] = None,
 ) -> JudgeVerdict:
     from app.core.llm.dispatch import generate_structured
 
@@ -393,6 +416,7 @@ async def judge(
         reply=result.get("answer")
         or "(empty: the bot's fixed decline wording is sent)",
         sources=sources or "(none)",
+        passages="\n\n".join(passages or []) or "(none)",
     )
     verdict, _meta = await generate_structured(
         schema=JudgeVerdict, prompt=prompt, model=model, never_fallback=True
@@ -461,6 +485,7 @@ def run(
                 status, problems = "fail", problems + extra
             verdict = None
             if judge_model:
+                passages = found_passages(client, result)
                 try:
                     with JUDGE_LOCK:  # the provider client is shared
                         verdict = asyncio.run(
@@ -471,6 +496,7 @@ def run(
                                 kind=kind,
                                 message=turn["say"],
                                 result=result,
+                                passages=passages,
                             )
                         )
                 except Exception as e:  # noqa: BLE001 — a judge failure is reported

@@ -14,11 +14,19 @@ from langgraph.graph.state import CompiledStateGraph
 from app.api.v1.endpoints.knowledge_agent import knowledge_errors
 from app.core.agent_runtime.checkpointer import checkpointer_available
 from app.core.agent_runtime.graph import get_agent_graph
+from app.core.agent_runtime.instructions import check_owner_text
+from app.core.agent_runtime.instructions import describe as describe_instructions
 from app.core.agent_runtime.runner import execute, stream
 from app.core.config import settings
 from app.core.dependencies import get_knowledge_agent_service
 from app.core.knowledge_agent.agent import KnowledgeAgentService
-from app.schemas.agent_runtime import AgentRunRequest, AgentRunResponse
+from app.schemas.agent_runtime import (
+    AgentRunRequest,
+    AgentRunResponse,
+    InstructionsResponse,
+    OwnerTextCheckRequest,
+    OwnerTextCheckResponse,
+)
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -74,6 +82,32 @@ async def run(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="The agent run timed out",
         )
+
+
+@router.post(
+    "/instructions",
+    response_model=InstructionsResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def instructions(payload: AgentRunRequest):
+    """
+    The instructions a run for this bot starts from, without running it (chunk 20d-2,
+    the owner's "How it works"). Built by the same code `/agent/run` uses, from the
+    same request, so what the owner reads is what the assistant follows. No model call.
+    """
+    return describe_instructions(payload.to_bot())
+
+
+@router.post(
+    "/instructions/check",
+    response_model=OwnerTextCheckResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def check_instructions(payload: OwnerTextCheckRequest):
+    """The builder's safety check on text an owner typed into their instructions."""
+    return check_owner_text(payload.text)
 
 
 @router.post("/run/stream", tags=["agent_runtime"])

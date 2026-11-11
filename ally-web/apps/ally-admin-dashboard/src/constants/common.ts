@@ -852,12 +852,78 @@ export const ApiEndpoints = {
     PRIVATE_DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents/private`,
     DOCUMENT_BY_ID: (id: string, documentId: string) =>
       `/v1/chatbots/${id}/documents/${documentId}`,
-    MEMBERS: (id: string) => `/v1/chatbots/${id}/members`,
-    AUDIENCE: (id: string) => `/v1/chatbots/${id}/audience`,
-    AUDIENCE_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/audience/${entryId}`,
     TEST: (id: string) => `/v1/chatbots/${id}/test`,
     TEST_STREAM: (id: string) => `/v1/chatbots/${id}/test/stream`,
+    PAGE: (id: string) => `/v1/chatbots/${id}/page`,
+    PAGE_BRAND: (id: string) => `/v1/chatbots/${id}/page/brand`,
+    TEAM_NAMES: (id: string) => `/v1/chatbots/${id}/team-names`,
+    HOME: (id: string) => `/v1/chatbots/${id}/home`,
+    HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
+    RULES: (id: string) => `/v1/chatbots/${id}/rules`,
+    FACT_CORRECTION: (id: string, factId: string) =>
+      `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
+    IMAGES: (id: string) => `/v1/chatbots/${id}/images`,
+    IMAGE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}`,
+    IMAGE_RESTORE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}/restore`,
     CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
+    CHECKUP: (id: string) => `/v1/chatbots/${id}/checkup`,
+    CHANGES: (id: string) => `/v1/chatbots/${id}/changes`,
+    HISTORY: (id: string) => `/v1/chatbots/${id}/history`,
+    HOW_IT_WORKS: (id: string) => `/v1/chatbots/${id}/how-it-works`,
+    HOME_NUMBERS: (id: string, days: 7 | 30) => `/v1/chatbots/${id}/home/numbers?days=${days}`,
+    CHANGES_PROPOSE: (id: string) => `/v1/chatbots/${id}/changes/propose`,
+    CHANGES_APPLY: (id: string) => `/v1/chatbots/${id}/changes/apply`,
+    CHANGE_UNDO: (id: string, eventId: string) => `/v1/chatbots/${id}/changes/${eventId}/undo`,
+    SOURCES: (id: string) => `/v1/chatbots/${id}/sources`,
+    SCORECARD: (id: string) => `/v1/chatbots/${id}/scorecard`,
+    SCORECARD_ANSWER: (id: string, questionId: string) =>
+      `/v1/chatbots/${id}/scorecard/unanswered/${questionId}/answer`,
+    SCORECARD_CORRECT: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/correct`,
+    SCORECARD_FINE: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/fine`,
+    SOURCE_PREVIEW: (id: string) => `/v1/chatbots/${id}/sources/preview`,
+    SOURCE_REMOVE: (id: string) => `/v1/chatbots/${id}/sources/remove`,
+    SOURCE_RESTORE: (id: string, eventId: string) =>
+      `/v1/chatbots/${id}/sources/${eventId}/restore`,
+    CHECKUP_RUNS: (id: string) => `/v1/chatbots/${id}/checkup/runs`,
+    CHECKUP_CASES: (id: string) => `/v1/chatbots/${id}/checkup/cases`,
+    CHECKUP_CASE: (id: string, caseId: string) => `/v1/chatbots/${id}/checkup/cases/${caseId}`,
+    CHECKUP_SUGGESTIONS: (id: string) => `/v1/chatbots/${id}/checkup/suggestions`,
+    CHECKUP_RUN: (id: string, runId: string) => `/v1/chatbots/${id}/checkup/runs/${runId}`,
+    CHECKUP_ANSWER: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/answer`,
+    CHECKUP_NOT_OFFERED: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/not-offered`,
+  },
+  INBOX: {
+    CONVERSATIONS: "/v1/inbox/conversations",
+    COUNTS: "/v1/inbox/counts",
+    EVENTS: "/v1/inbox/events",
+    THREAD: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}`,
+    TAKE_OVER: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/take-over`,
+    HAND_BACK: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
+    REPLY: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+  },
+  BOT_DRAFTS: {
+    LIST: "/v1/bot-drafts",
+    CURRENT: "/v1/bot-drafts/current",
+    BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
+    EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,
+    PAGES_FOUND: (id: string) => `/v1/bot-drafts/${id}/pages/found`,
+    PAGES: (id: string) => `/v1/bot-drafts/${id}/pages`,
+    PAGES_UNDO: (id: string, eventId: string) => `/v1/bot-drafts/${id}/pages/${eventId}/undo`,
+    MESSAGES_STREAM: (id: string) => `/v1/bot-drafts/${id}/messages/stream`,
+    UNDO: (id: string) => `/v1/bot-drafts/${id}/undo`,
+    BACK: (id: string) => `/v1/bot-drafts/${id}/back`,
+    DOCUMENTS: (id: string) => `/v1/bot-drafts/${id}/documents`,
+    PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,
+    ABANDON: (id: string) => `/v1/bot-drafts/${id}/abandon`,
+    CHECKUP: (id: string) => `/v1/bot-drafts/${id}/checkup`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
@@ -869,7 +935,6 @@ export const ApiEndpoints = {
     DOCUMENT_REINDEX: (id: string) => `/v1/knowledge-base/documents/${id}/reindex`,
     DOCUMENT_ARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/archive`,
     DOCUMENT_UNARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/unarchive`,
-    CHUNK_BY_ID: (chunkId: string) => `/v1/knowledge-base/chunks/${chunkId}`,
     STATS: "/v1/knowledge-base/stats",
     // Bot (ally-be src/whatsapp)
     // Phone → organisation mappings. Surfaced under User Management, but owned by the bot:
@@ -890,17 +955,7 @@ export const ApiEndpoints = {
     NUMBER_CHECK: (id: string) => `/v1/whatsapp/numbers/${id}/check`,
     NUMBER_SUBSCRIBE: (id: string) => `/v1/whatsapp/numbers/${id}/subscribe`,
     NUMBER_BY_ID: (id: string) => `/v1/whatsapp/numbers/${id}`,
-    // Conversations, unanswered queue and usage dashboard
-    CONVERSATIONS: "/v1/whatsapp/conversations",
-    CONVERSATION_BY_ID: (id: string) => `/v1/whatsapp/conversations/${id}`,
-    CONVERSATION_LANGUAGES: "/v1/whatsapp/conversations/languages",
-    CITATION_BY_CHUNK: (chunkId: string) => `/v1/whatsapp/citations/${chunkId}`,
-    CONTACT_REVEAL: (id: string) => `/v1/whatsapp/contacts/${id}/reveal`,
-    CONTACT_BLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/block`,
-    CONTACT_UNBLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/unblock`,
-    UNANSWERED: "/v1/whatsapp/unanswered",
-    UNANSWERED_BY_ID: (id: string) => `/v1/whatsapp/unanswered/${id}`,
-    UNANSWERED_CREATE_DOCUMENT: (id: string) => `/v1/whatsapp/unanswered/${id}/create-document`,
+    // All numbers on the assistant home's Overview
     ANALYTICS_OVERVIEW: "/v1/whatsapp/analytics/overview",
     ANALYTICS_TIMESERIES: "/v1/whatsapp/analytics/timeseries",
     ANALYTICS_LANGUAGES: "/v1/whatsapp/analytics/languages",
@@ -1073,6 +1128,10 @@ export const ROUTES = {
   /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
   WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
   CHATBOT_DETAIL: "/chatbots/:botId",
+  /** Onboarding (chunk 20a). Static, so it outranks `:botId`. */
+  CHATBOT_NEW: "/chatbots/new",
+  INBOX: "/inbox",
+  CHATBOT_NEW_SESSION: (draftId: string) => `/chatbots/new/${draftId}`,
   TERMS: "/terms",
   PRIVACY: "/privacy",
   // Fully public, no-login gallery of the centralised design-system components.
@@ -1228,6 +1287,11 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_NUMBERS: "whatsAppBotNumbers",
   CHATBOTS: "chatbots",
   CHATBOT_DETAIL: "chatbotDetail",
+  BOT_DRAFT: "botDraft",
+  CHECKUP: "checkup",
+  SOURCES: "sources",
+  SCORECARD: "scorecard",
+  INBOX: "inbox",
   CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so

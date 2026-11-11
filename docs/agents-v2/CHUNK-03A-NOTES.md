@@ -92,7 +92,7 @@ Also decided at plan time:
 | `app/core/agent_runtime/conversation.py` | The model call, through `generate_structured`: `agent_step()`. |
 | `app/core/agent_runtime/schemas.py` | `AgentIntent`, and `step_schema(tools)`, which builds `AgentStep` from the registry. `action` is a str **Enum** (not a Literal, so a one-value schema renders `enum`, not `const`), plus one input field per tool, plus `turn_type` and the reply fields. |
 | `app/core/agent_runtime/tools/` | The registry: `base.py` (`Tool`, `ToolContext`, `ToolResult`), `search_knowledge.py`, and `__init__.py` (`REGISTRY`, `allowed_tools(bot)`). |
-| `app/core/agent_runtime/check.py` | `check_reply()`, the rules in section 1 / plan, as a pure function, returning the result and a rejection reason; `looks_factual()`; `REJECTIONS`. |
+| `app/core/agent_runtime/check/__init__.py` (a package since CL1) | `check_reply()`, the rules in section 1 / plan, as a pure function, returning the result and a rejection reason; `looks_factual()`; `REJECTIONS`. |
 | `app/core/agent_runtime/prompt.py` | Renders topics, searches, tools and the rewrite feedback; prepends the persona with the existing `format_persona`. |
 | `app/core/agent_runtime/nodes/{agent,tools,agent_check}.py` | The new nodes. Every node, and each tool call, adds a trace step with counts only. A tool step is `{node: "tool", summary: "search_knowledge: 2 hits, 1 new passages, best 0.61"}`. |
 | `app/core/agent_runtime/state.py` | New run-scoped keys (reset on every run). |
@@ -328,7 +328,7 @@ Latency outliers (18–76 s) in runs B and C were OpenAI retrying requests (`Ret
 - Ally FAQ was on **documents_and_general** in `ally_local` (last updated 05:39:16, two seconds after the run; the run used it too). Now set back to **documents_only**.
 - Stored run `3c94618a` (05:39:14): it **did** search. The first search found passage [1] (About Ally); three more searches with longer queries found nothing new; it then replied `decline`, no citations. A decline the model chose was sent as written, so its uncited facts, markdown link and "documents don't cover it" went out.
 
-**Check rules added** (`app/core/agent_runtime/check.py`), whatever the answer mode:
+**Check rules added** (`app/core/agent_runtime/check/__init__.py`, a package since CL1), whatever the answer mode:
 - **The organisation's names** come from the bot: its display name and the name its documents share ("Ally FAQ – …"), plus their distinctive words ("Ally"; generic words like FAQ, Bot, Help are skipped). The bot's own name is masked first, so "I'm Ally FAQ" is not about the organisation. A message naming it, or an answer to a question that names it, is about the organisation. A bot with no display name and no titled documents has no names; only citations apply.
 - **General knowledge** (documents_and_general) is allowed uncited only when the subject isn't the organisation **and** a search this run found nothing relevant. Otherwise an uncited answer is sent back ("search first" when nothing was searched), then declined.
 - **Small talk answering a question that names the organisation** ("What is Ally?" labelled about_bot) needs a citation like any answer.
