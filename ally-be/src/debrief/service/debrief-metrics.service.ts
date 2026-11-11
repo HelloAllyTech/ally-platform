@@ -450,15 +450,18 @@ export class DebriefMetricsService {
         askAllyReplyOutcome({ checkFailures: [] }),
       ),
     ];
-    const scored = outcomes.filter((o) => o.pass !== null);
+    // Only replaced replies get a verdict today, and they all fail, so a rate over the scored
+    // ones alone reads 0%. Report it only when every reply has a verdict.
+    const unscored = outcomes.some((o) => o.pass === null);
     return {
       replies,
       questions: num(r?.questions),
       checkPassRate: rate(replies - replaced, replies),
-      /** Null until an Ask Ally judge exists: only the checks can be read today. */
-      passRate: scored.length
-        ? rate(scored.filter((o) => o.pass).length, scored.length)
-        : null,
+      /** Null until every reply has a verdict (needs the Ask Ally judge): only the checks can be read today. */
+      passRate:
+        outcomes.length && !unscored
+          ? rate(outcomes.filter((o) => o.pass).length, outcomes.length)
+          : null,
       distressFlags: num(r?.distress_flags),
       modelCalls: num(r?.calls),
       ...(await this.askAllyCost(weeks, fsql, replies)),
