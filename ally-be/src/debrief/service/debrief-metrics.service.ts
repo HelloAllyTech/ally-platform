@@ -17,7 +17,7 @@ import {
   RolledRun,
 } from '../util/debrief-outcome.util';
 import { stageMetrics, StageRun } from '../util/debrief-stage-metrics.util';
-import { CHECK_FALLBACK } from './debrief-reply.service';
+import { CHECK_FALLBACK } from '../constants/debrief-reply.constants';
 import {
   MetricsFilter,
   metricsFilterSql,
