@@ -72,7 +72,7 @@ All paths are relative to each app.
   - `BotPageModule` imports `ChatbotModule` and exports only `BotPageService`, so it must also export `BotPageAccessService`.
   - A publish service has to live in a module that imports both; inside `ChatbotModule` it would be circular.
   - `ChatbotService` isn't exported from `ChatbotModule`.
-- **The dashboard:** Settings → Bot page (`ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/BotPageTab.tsx`) has the phone frame (`:489`), the link and the `QrCode` component (not exported).
+- **The dashboard:** Settings → Bot page (`ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/BotPageTab.tsx`) has the phone frame (`:489`), the link and the `QrCode` component (not exported). <!-- docs-path-lint: ignore -->
 
 ### 3a's structured step, and registering a prompt
 

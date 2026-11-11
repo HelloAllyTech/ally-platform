@@ -12,8 +12,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Also an index for the dashboard's channel filter over the shared store.
  */
-export class CreateChatbotPages1981000000000 implements MigrationInterface {
-  name = 'CreateChatbotPages1981000000000';
+export class CreateChatbotPages1981000000001 implements MigrationInterface {
+  name = 'CreateChatbotPages1981000000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

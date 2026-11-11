@@ -103,7 +103,7 @@ Findings marked **⚠ approval** change behaviour, prompt text or test strength.
 ### Should: ally-ai runtime
 
 **8. `check_reply` is a 201-line function, not an ordered list of checks** (1 Structure / 5 Check)
-- **Where:** `ally-ai/app/core/agent_runtime/check.py:375-575`.
+- **Where:** `ally-ai/app/core/agent_runtime/check.py:375-575`. <!-- docs-path-lint: ignore -->
 - **What's wrong:** six interacting flags (`intent`, `rejection`, `keeps_text`, `model_declined`, `unsupported`, `answer_text`), and the order matters (`:496`, `:527`, `:530`).
 - **Proposed change:** split it into four named phases:
   1. `normalise(step)`: `plain_text`, then "says it has nothing" becomes a decline.

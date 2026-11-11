@@ -18,8 +18,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Named `chatbot_*` because `messages` already belongs to the chat module.
  */
-export class CreateChatbotSharedStore1980990000000 implements MigrationInterface {
-  name = 'CreateChatbotSharedStore1980990000000';
+export class CreateChatbotSharedStore1980990000001 implements MigrationInterface {
+  name = 'CreateChatbotSharedStore1980990000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

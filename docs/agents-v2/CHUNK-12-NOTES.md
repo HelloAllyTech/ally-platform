@@ -107,7 +107,7 @@ So the message being answered appears twice in the request: as the last history 
 
 ## 2. What was built (ally-be only)
 
-**Tables** (migration `1980990000000-CreateChatbotSharedStore`, entities in `src/chatbot/entity/chatbot-*.entity.ts`, enums in `src/chatbot/enum/conversation.enum.ts`):
+**Tables** (migration `1980990000001-CreateChatbotSharedStore` (`…0000` until CL1; renumbered when merging master, whose `CreateImageStudio` has that timestamp), entities in `src/chatbot/entity/chatbot-*.entity.ts`, enums in `src/chatbot/enum/conversation.enum.ts`):
 
 | Table | Holds | Keys and indexes |
 |---|---|---|
