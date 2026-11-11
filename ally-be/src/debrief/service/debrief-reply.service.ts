@@ -58,7 +58,7 @@ const ALLY_SENDER = -1;
 const HISTORY_TURNS = 10;
 
 /** Shown in place of a reply that failed a check: honest, never the failed text. */
-const CHECK_FALLBACK =
+export const CHECK_FALLBACK =
   "I'd rather not answer that the way I first wrote it. Could you ask me " +
   'about one card, or tell me more about what you meant?';
 

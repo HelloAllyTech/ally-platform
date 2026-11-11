@@ -197,4 +197,105 @@ describe("Debrief metrics (v9 §3.3)", () => {
       "No live debrief in this window.",
     );
   });
+
+  it("shows each agent's live numbers, including the Evaluator's agreement with the judge", () => {
+    const rt = (n: number, of: number) => ({
+      n,
+      of,
+      value: of ? n / of : null,
+      low: 0.1,
+      high: 0.9,
+    });
+    const health = {
+      ran: 10,
+      failRate: rt(1, 10),
+      retryRate: rt(2, 10),
+      msP50: 9500,
+      msP90: 22000,
+    };
+    h.metrics.mockReturnValue({
+      data: {
+        ...VIEW,
+        agents: {
+          stages: {
+            runs: 10,
+            safetyReader: { ...health, riskCueRate: rt(4, 10), judgeMissDespiteCoverage: rt(1, 4) },
+            analyst: health,
+            progressReader: { ...health, unsupportedProgressRate: rt(0, 3) },
+            guidanceLookup: {
+              ran: 9,
+              foundRate: rt(8, 9),
+              passagesPerRunMean: 2.4,
+              clinicalOnNoRiskRate: rt(2, 5),
+              wrongLevelRate: rt(0, 4),
+            },
+            writer: {
+              ...health,
+              firstDraftPassRate: rt(6, 10),
+              firstDraftFailures: [{ code: "quote_mismatch", runs: 3 }],
+            },
+            reviser: {
+              ...health,
+              fixRate: rt(3, 4),
+              regressionRate: rt(1, 5),
+              deadlineSkipRate: rt(1, 6),
+            },
+            evaluator: {
+              ...health,
+              missedRiskCue: {
+                n: 116,
+                both: 1,
+                referenceOnly: 6,
+                candidateOnly: 5,
+                neither: 104,
+                kappa: 0.104,
+                recall: rt(1, 7),
+                falseFlagRate: rt(5, 109),
+              },
+              heldOnItsOwnRate: rt(3, 100),
+            },
+            judge: { judgedRate: rt(9, 9), versions: ["gemini-2.5-pro/v3+g1"] },
+          },
+          askAlly: {
+            replies: 27,
+            questions: 27,
+            checkPassRate: rt(20, 27),
+            passRate: null,
+            distressFlags: 0,
+            modelCalls: 27,
+          },
+          pmAgent: {
+            ideas: 13,
+            screened: 4,
+            gated: 1,
+            promoted: 0,
+            reverted: 0,
+            rejected: 2,
+            pending: 11,
+            holdRate: rt(0, 0),
+          },
+        },
+      },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<MetricsTab />);
+    const t = screen.getByTestId("metrics-agents-table");
+    const row = (measure: string) => within(t).getByText(measure).closest("tr")!;
+    const times = within(t).getAllByText("Time, median / slowest 10%");
+    expect(times).toHaveLength(2);
+    expect(times[0].closest("tr")!).toHaveTextContent("9.5s / 22s");
+    expect(
+      row("Agreement with the judge on missed risk cues, beyond chance (0–1)"),
+    ).toHaveTextContent("0.10");
+    expect(row("First drafts that passed every check")).toHaveTextContent(
+      "60% (95% range 10%–90%, 6 of 10)",
+    );
+    expect(row("Most common first-draft failures")).toHaveTextContent("quote_mismatch (3)");
+    expect(row("Pass rate (needs the Ask Ally judge)")).toHaveTextContent("Not measured yet");
+    expect(
+      row("Replies that passed the checks (others were replaced by a fallback)"),
+    ).toHaveTextContent("20 of 27");
+    expect(row("Promoted / reverted / rejected / waiting")).toHaveTextContent("0 / 0 / 2 / 11");
+  });
 });

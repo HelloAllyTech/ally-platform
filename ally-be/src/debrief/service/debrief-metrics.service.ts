@@ -10,7 +10,14 @@ import {
   UptakeRun,
 } from '../util/debrief-metrics.util';
 import { DebriefSettingsService } from './debrief-settings.service';
-import { passRollup, RolledRun } from '../util/debrief-outcome.util';
+import {
+  askAllyReplyOutcome,
+  passRollup,
+  pmIdeaOutcome,
+  RolledRun,
+} from '../util/debrief-outcome.util';
+import { stageMetrics, StageRun } from '../util/debrief-stage-metrics.util';
+import { CHECK_FALLBACK } from './debrief-reply.service';
 
 /** Live debriefs a learner can read. */
 const READABLE = `r.mode = 'live' AND r.status IN ('published','below_bar')`;
@@ -115,15 +122,27 @@ export class DebriefMetricsService {
         experience: experience(r),
       };
     });
-    const [byLanguage, byPlatform, baselines, uptake, safety, quality] =
-      await Promise.all([
-        this.breakdown(w, s.flagReviewSlaHours, 'language'),
-        this.breakdown(w, s.flagReviewSlaHours, 'platform'),
-        this.baselines(),
-        this.uptakeByMonth(6),
-        this.latestSafetyRecall(),
-        this.quality(w),
-      ]);
+    const [
+      byLanguage,
+      byPlatform,
+      baselines,
+      uptake,
+      safety,
+      quality,
+      stages,
+      askAlly,
+      pmAgent,
+    ] = await Promise.all([
+      this.breakdown(w, s.flagReviewSlaHours, 'language'),
+      this.breakdown(w, s.flagReviewSlaHours, 'platform'),
+      this.baselines(),
+      this.uptakeByMonth(6),
+      this.latestSafetyRecall(),
+      this.quality(w),
+      this.stages(w),
+      this.askAlly(w),
+      this.pmAgent(),
+    ]);
     return {
       weeks: w,
       weights,
@@ -135,6 +154,7 @@ export class DebriefMetricsService {
       uptake,
       safetyRecall: safety,
       quality,
+      agents: { stages, askAlly, pmAgent },
       generatedAt: new Date().toISOString(),
     };
   }
@@ -282,6 +302,138 @@ export class DebriefMetricsService {
       workspace: r.judge ? { judge: r.judge } : {},
     }));
     return passRollup(runs);
+  }
+
+  /** Each agent inside a live debrief run, from its step trail (see debrief-stage-metrics.util). */
+  private async stages(weeks: number) {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(`
+      SELECT r.status, r."hasRiskCue" AS risk, r."skipReason" AS skip_reason,
+             (r.cards IS NOT NULL) AS has_cards, r."checkFailures" AS check_failures,
+             r."evaluatorHardFails" AS evaluator_hard_fails, r.steps,
+             r.workspace->'judge' AS judge,
+             lower(u.metadata->>'workerType') AS learner_level,
+             (SELECT jsonb_agg(jsonb_build_object(
+                       'kind', c.facets->>'kind', 'level', c.facets->'level',
+                       'clinical', COALESCE((c.attributes->>'clinical')::boolean, false)))
+                FROM jsonb_array_elements_text(COALESCE(r.workspace->'passages', '[]'::jsonb)) pid
+                JOIN cl_chunks c ON c.id::text = pid) AS passages
+        FROM debrief_runs r
+        JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+        LEFT JOIN users u ON u.id = s."counselorId"
+       WHERE r.mode = 'live'
+         AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})`);
+    const runs: StageRun[] = rows.map((r) => ({
+      status: r.status,
+      cards: r.has_cards ? {} : null,
+      hasRiskCue: !!r.risk,
+      skipReason: r.skip_reason,
+      checkFailures: Array.isArray(r.check_failures) ? r.check_failures : [],
+      evaluatorHardFails: Array.isArray(r.evaluator_hard_fails)
+        ? r.evaluator_hard_fails
+        : [],
+      steps: Array.isArray(r.steps) ? r.steps : [],
+      workspace: r.judge ? { judge: r.judge } : {},
+      passages: Array.isArray(r.passages)
+        ? r.passages.map((p: any) => ({
+            kind: p.kind,
+            level: Array.isArray(p.level) ? p.level : null,
+            clinical: !!p.clinical,
+          }))
+        : [],
+      learnerLevel: r.learner_level ?? null,
+    }));
+    return stageMetrics(runs);
+  }
+
+  /**
+   * Ask Ally: replies to learners on live debriefs. A reply a code check
+   * replaced reached the learner as the fallback, so it fails; a clean reply
+   * has no verdict until an Ask Ally judge exists (askAllyReplyOutcome).
+   */
+  private async askAlly(weeks: number) {
+    const [r] = await this.dataSource.query(
+      `WITH chats AS (
+         SELECT c.id FROM scenario_session_chats c
+          WHERE EXISTS (SELECT 1 FROM debrief_runs r
+                         WHERE r."scenarioSessionId" = c."scenarioSessionId" AND r.mode = 'live')
+       ),
+       msgs AS (
+         SELECT m."senderId" AS sender, m.content
+           FROM scenario_session_chat_messages m JOIN chats ON chats.id = m."chatId"
+          WHERE m."createdAt" >= date_trunc('week', now()) - make_interval(weeks => $2)
+       )
+       SELECT count(*) FILTER (WHERE sender = -1)::int AS replies,
+              count(*) FILTER (WHERE sender = -1 AND left(content, length($1)) = $1)::int AS replaced,
+              count(*) FILTER (WHERE sender <> -1)::int AS questions,
+              (SELECT count(*)::int FROM debrief_run_feedback f
+                WHERE f.section = 'ask_ally' AND f.kind = 'flag'
+                  AND f."createdAt" >= date_trunc('week', now()) - make_interval(weeks => $2)) AS distress_flags,
+              (SELECT count(*)::int FROM llm_usage u WHERE u.task = 'debrief_reply'
+                  AND u."createdAt" >= date_trunc('week', now()) - make_interval(weeks => $2)) AS calls
+         FROM msgs`,
+      [CHECK_FALLBACK, weeks - 1],
+    );
+    const replies = num(r?.replies);
+    const replaced = num(r?.replaced);
+    const outcomes = [
+      ...Array.from({ length: replaced }, () =>
+        askAllyReplyOutcome({ checkFailures: ['replaced'] }),
+      ),
+      ...Array.from({ length: replies - replaced }, () =>
+        askAllyReplyOutcome({ checkFailures: [] }),
+      ),
+    ];
+    const scored = outcomes.filter((o) => o.pass !== null);
+    return {
+      replies,
+      questions: num(r?.questions),
+      checkPassRate: rate(replies - replaced, replies),
+      /** Null until an Ask Ally judge exists: only the checks can be read today. */
+      passRate: scored.length
+        ? rate(scored.filter((o) => o.pass).length, scored.length)
+        : null,
+      distressFlags: num(r?.distress_flags),
+      modelCalls: num(r?.calls),
+    };
+  }
+
+  /**
+   * The PM agent's ideas and where they ended (pmIdeaOutcome): live, "right"
+   * is a promotion that still stands 14 days on without a revert.
+   */
+  private async pmAgent() {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT l.status, l.evidence->'canary'->>'status' AS canary_status,
+              rel."promotedAt" AS promoted_at,
+              EXISTS (SELECT 1 FROM agent_release_audit a
+                       WHERE a."releaseId" = l."releaseId"
+                         AND a.action IN ('rolled_back','emergency_rollback','canary_reverted')) AS rolled_back,
+              (l.evidence ? 'screen') AS screened, (l.evidence ? 'gate') AS gated
+         FROM agent_lessons l
+         LEFT JOIN agent_releases rel ON rel.id = l."releaseId"
+        WHERE l."agentKey" = 'debrief'`,
+    );
+    const outcomes = rows.map((r) =>
+      pmIdeaOutcome({
+        status: r.status,
+        canaryStatus: r.canary_status,
+        rolledBack: !!r.rolled_back,
+        promotedAt: r.promoted_at,
+      }),
+    );
+    const scored = outcomes.filter((o) => o.pass !== null);
+    const count = (d: string) =>
+      outcomes.filter((o) => o.decision === d).length;
+    return {
+      ideas: rows.length,
+      screened: rows.filter((r) => r.screened).length,
+      gated: rows.filter((r) => r.gated).length,
+      promoted: count('promoted'),
+      reverted: count('reverted'),
+      rejected: count('rejected'),
+      pending: count('pending'),
+      holdRate: rate(scored.filter((o) => o.pass).length, scored.length),
+    };
   }
 
   /** Experience over the whole window, per language or per device (v9 §3.3). */

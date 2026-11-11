@@ -497,5 +497,77 @@ export interface DebriefMetricsView {
       } & DebriefPassGroup
     >;
   };
+  agents?: DebriefAgentMetrics;
   generatedAt: string;
+}
+
+export interface DebriefStepHealth {
+  ran: number;
+  failRate: DebriefRate;
+  retryRate: DebriefRate;
+  msP50: number | null;
+  msP90: number | null;
+}
+
+export interface DebriefAgreement {
+  n: number;
+  both: number;
+  referenceOnly: number;
+  candidateOnly: number;
+  neither: number;
+  kappa: number | null;
+  recall: DebriefRate;
+  falseFlagRate: DebriefRate;
+}
+
+/** Live numbers per agent in the debrief family (ally-be debrief-stage-metrics.util). */
+export interface DebriefAgentMetrics {
+  stages: {
+    runs: number;
+    safetyReader: DebriefStepHealth & {
+      riskCueRate: DebriefRate;
+      judgeMissDespiteCoverage: DebriefRate;
+    };
+    analyst: DebriefStepHealth;
+    progressReader: DebriefStepHealth & { unsupportedProgressRate: DebriefRate };
+    guidanceLookup: {
+      ran: number;
+      foundRate: DebriefRate;
+      passagesPerRunMean: number | null;
+      clinicalOnNoRiskRate: DebriefRate;
+      wrongLevelRate: DebriefRate;
+    };
+    writer: DebriefStepHealth & {
+      firstDraftPassRate: DebriefRate;
+      firstDraftFailures: Array<{ code: string; runs: number }>;
+    };
+    reviser: DebriefStepHealth & {
+      fixRate: DebriefRate;
+      regressionRate: DebriefRate;
+      deadlineSkipRate: DebriefRate;
+    };
+    evaluator: DebriefStepHealth & {
+      missedRiskCue: DebriefAgreement;
+      heldOnItsOwnRate: DebriefRate;
+    };
+    judge: { judgedRate: DebriefRate; versions: string[] };
+  };
+  askAlly: {
+    replies: number;
+    questions: number;
+    checkPassRate: DebriefRate;
+    passRate: DebriefRate | null;
+    distressFlags: number;
+    modelCalls: number;
+  };
+  pmAgent: {
+    ideas: number;
+    screened: number;
+    gated: number;
+    promoted: number;
+    reverted: number;
+    rejected: number;
+    pending: number;
+    holdRate: DebriefRate;
+  };
 }

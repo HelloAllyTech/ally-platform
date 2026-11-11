@@ -185,6 +185,7 @@ const MetricsBody: React.FC<{
       </div>
 
       <QualitySection quality={view.quality} />
+      <AgentsSection agents={view.agents} />
 
       <section className="flex flex-col gap-2" data-testid="metrics-steering">
         <ChartCard
@@ -540,6 +541,90 @@ const QualitySection: React.FC<{ quality: DebriefMetricsView["quality"] }> = ({ 
   );
 };
 
+/** Live numbers for every agent in the debrief family, one row per measure. */
+const AgentsSection: React.FC<{ agents: DebriefMetricsView["agents"] }> = ({ agents }) => {
+  const s = en.debriefs.metrics.agents;
+  if (!agents) return null;
+  const { stages: st, askAlly, pmAgent } = agents;
+  const r = rateWithRange;
+  const time = (h: { msP50: number | null; msP90: number | null }) =>
+    h.msP50 == null || h.msP90 == null
+      ? en.debriefs.metrics.none
+      : s.time(s.seconds(h.msP50), s.seconds(h.msP90));
+  const rows: string[][] = [
+    [s.safetyReader.name, s.safetyReader.fail, r(st.safetyReader.failRate)],
+    [s.safetyReader.name, s.safetyReader.retry, r(st.safetyReader.retryRate)],
+    [s.safetyReader.name, s.safetyReader.time, time(st.safetyReader)],
+    [s.safetyReader.name, s.safetyReader.riskCue, r(st.safetyReader.riskCueRate)],
+    [
+      s.safetyReader.name,
+      s.safetyReader.missDespiteCoverage,
+      r(st.safetyReader.judgeMissDespiteCoverage),
+    ],
+    [s.analyst.name, s.analyst.fail, r(st.analyst.failRate)],
+    [s.analyst.name, s.analyst.time, time(st.analyst)],
+    [s.progressReader.name, s.progressReader.fail, r(st.progressReader.failRate)],
+    [
+      s.progressReader.name,
+      s.progressReader.unsupported,
+      r(st.progressReader.unsupportedProgressRate),
+    ],
+    [s.guidance.name, s.guidance.found, r(st.guidanceLookup.foundRate)],
+    [s.guidance.name, s.guidance.perRun, fixed(st.guidanceLookup.passagesPerRunMean)],
+    [s.guidance.name, s.guidance.clinicalNoRisk, r(st.guidanceLookup.clinicalOnNoRiskRate)],
+    [s.guidance.name, s.guidance.wrongLevel, r(st.guidanceLookup.wrongLevelRate)],
+    [s.writer.name, s.writer.firstDraft, r(st.writer.firstDraftPassRate)],
+    [
+      s.writer.name,
+      s.writer.failures,
+      st.writer.firstDraftFailures.length
+        ? st.writer.firstDraftFailures
+            .slice(0, 4)
+            .map(f => `${f.code} (${f.runs})`)
+            .join(", ")
+        : en.debriefs.metrics.none,
+    ],
+    [s.writer.name, s.writer.fail, r(st.writer.failRate)],
+    [s.reviser.name, s.reviser.fix, r(st.reviser.fixRate)],
+    [s.reviser.name, s.reviser.regression, r(st.reviser.regressionRate)],
+    [s.reviser.name, s.reviser.deadline, r(st.reviser.deadlineSkipRate)],
+    [s.evaluator.name, s.evaluator.kappa, fixed(st.evaluator.missedRiskCue.kappa, 2)],
+    [s.evaluator.name, s.evaluator.recall, r(st.evaluator.missedRiskCue.recall)],
+    [s.evaluator.name, s.evaluator.falseFlag, r(st.evaluator.missedRiskCue.falseFlagRate)],
+    [s.evaluator.name, s.evaluator.held, r(st.evaluator.heldOnItsOwnRate)],
+    [s.judge.name, s.judge.judged, r(st.judge.judgedRate)],
+    [s.judge.name, s.judge.versions, st.judge.versions.join(", ") || en.debriefs.metrics.none],
+    [s.askAlly.name, s.askAlly.replies, String(askAlly.replies)],
+    [s.askAlly.name, s.askAlly.checks, r(askAlly.checkPassRate)],
+    [s.askAlly.name, s.askAlly.pass, askAlly.passRate ? r(askAlly.passRate) : s.notMeasured],
+    [s.askAlly.name, s.askAlly.distress, String(askAlly.distressFlags)],
+    [s.pmAgent.name, s.pmAgent.ideas, String(pmAgent.ideas)],
+    [s.pmAgent.name, s.pmAgent.tested, `${pmAgent.screened} / ${pmAgent.gated}`],
+    [
+      s.pmAgent.name,
+      s.pmAgent.outcome,
+      `${pmAgent.promoted} / ${pmAgent.reverted} / ${pmAgent.rejected} / ${pmAgent.pending}`,
+    ],
+    [s.pmAgent.name, s.pmAgent.held, r(pmAgent.holdRate)],
+  ];
+  return (
+    <section className="flex flex-col gap-2" data-testid="metrics-agents">
+      <h3 className="flex items-center gap-1 text-xl font-normal text-typography-900">
+        {s.heading}
+        <InfoTip label={s.help} ariaLabel={`About ${s.heading}`} />
+      </h3>
+      <QualityTable
+        title=""
+        testId="metrics-agents-table"
+        head={[s.cols.agent, s.cols.measure, s.cols.value]}
+        rows={rows}
+        th="py-1 pr-2 font-normal"
+        td="py-1 pr-2 align-top"
+      />
+    </section>
+  );
+};
+
 const QualityTable: React.FC<{
   title: string;
   help?: string;
@@ -550,10 +635,12 @@ const QualityTable: React.FC<{
   td: string;
 }> = ({ title, help, testId, head, rows, th, td }) => (
   <div className="flex flex-col gap-1" data-testid={testId}>
-    <h4 className="flex items-center gap-1 text-base font-semibold text-typography-900">
-      {title}
-      {help && <InfoTip label={help} ariaLabel={`About ${title}`} />}
-    </h4>
+    {title && (
+      <h4 className="flex items-center gap-1 text-base font-semibold text-typography-900">
+        {title}
+        {help && <InfoTip label={help} ariaLabel={`About ${title}`} />}
+      </h4>
+    )}
     <table className="w-full text-left text-sm">
       <thead className="text-typography-700">
         <tr>
