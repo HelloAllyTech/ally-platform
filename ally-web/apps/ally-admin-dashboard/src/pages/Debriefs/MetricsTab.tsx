@@ -17,6 +17,7 @@ import {
   DebriefMetricsView,
   DebriefPassBreakdownRow,
   DebriefPassGroup,
+  DebriefPassRateSegment,
   DebriefRate,
 } from "@types";
 
@@ -61,7 +62,10 @@ export const MetricsTab: React.FC<{ range?: AnalyticsRange }> = ({ range = "90d"
   const s = en.debriefs.metrics;
   const weeks = WEEKS_FOR_RANGE[range];
   const [filter, setFilter] = useState<DebriefMetricsFilter>({});
-  const q = useGetDebriefMetricsQuery({ weeks, ...filter });
+  // Pass-rate segments live under the Pass rate heading and narrow only that section (the backend
+  // applies them to the pass rate alone).
+  const [segment, setSegment] = useState<DebriefPassRateSegment>({});
+  const q = useGetDebriefMetricsQuery({ weeks, ...filter, ...segment });
 
   if (q.isError && !q.data) {
     return (
@@ -83,7 +87,13 @@ export const MetricsTab: React.FC<{ range?: AnalyticsRange }> = ({ range = "90d"
       className={q.isFetching ? "opacity-60 transition-opacity" : "transition-opacity"}
       aria-busy={q.isFetching || undefined}
     >
-      <MetricsBody view={q.data} filter={filter} onFilter={setFilter} />
+      <MetricsBody
+        view={q.data}
+        filter={filter}
+        onFilter={setFilter}
+        segment={segment}
+        onSegment={setSegment}
+      />
     </div>
   );
 };
@@ -121,7 +131,9 @@ const MetricsBody: React.FC<{
   view: DebriefMetricsView;
   filter: DebriefMetricsFilter;
   onFilter: (f: DebriefMetricsFilter) => void;
-}> = ({ view, filter, onFilter }) => {
+  segment: DebriefPassRateSegment;
+  onSegment: (s: DebriefPassRateSegment) => void;
+}> = ({ view, filter, onFilter, segment, onSegment }) => {
   const s = en.debriefs.metrics;
   const live = hasLiveDebriefs(view);
   const filtered = Object.values(filter).some(v => v !== undefined && v !== "");
@@ -155,7 +167,12 @@ const MetricsBody: React.FC<{
         </div>
       ) : (
         <>
-          <QualitySection quality={view.quality} />
+          <QualitySection
+            quality={view.quality}
+            options={view.filterOptions}
+            segment={segment}
+            onSegment={onSegment}
+          />
           <SteeringCard view={view} />
           <GuardrailsCard view={view} />
           <ExperienceSection view={view} />
@@ -295,7 +312,12 @@ const groupTable = (list: DebriefPassBreakdownRow[]): string[][] =>
  * The pass rate (same definition as the test-set evals): by week as a line with
  * its 95% band, then every breakdown as dot-and-whisker rows.
  */
-const QualitySection: React.FC<{ quality: DebriefMetricsView["quality"] }> = ({ quality }) => {
+const QualitySection: React.FC<{
+  quality: DebriefMetricsView["quality"];
+  options: DebriefFilterOptions | undefined;
+  segment: DebriefPassRateSegment;
+  onSegment: (s: DebriefPassRateSegment) => void;
+}> = ({ quality, options, segment, onSegment }) => {
   const s = en.debriefs.metrics.quality;
   const sec = en.debriefs.metrics.sections;
   const c = s.cols;
@@ -326,38 +348,16 @@ const QualitySection: React.FC<{ quality: DebriefMetricsView["quality"] }> = ({ 
     ...l,
     key: l.language,
   }));
-  const segmentRows: RateRow[] = quality.bySegment.map(g => ({
-    key: `${g.language}|${g.writerModel}|${g.judgeVersion}`,
-    label: g.language,
-    sublabel: `${g.writerModel} · ${g.judgeVersion}`,
-    rate: g.passRate,
-  }));
-  const b = quality.breakdowns;
-  const k = s.breakdowns;
-  const breakdowns: Array<{
-    id: string;
-    title: string;
-    help?: string;
-    list: DebriefPassBreakdownRow[];
-    sort?: boolean;
-    top?: number;
-  }> = b
-    ? [
-        { id: "skill", title: k.skill, help: k.skillHelp, list: b.skill, top: 8 },
-        { id: "scenario", title: k.scenario, list: b.scenario, top: 8 },
-        { id: "course", title: k.course, help: k.courseHelp, list: b.course },
-        { id: "session-length", title: k.sessionLength, list: b.sessionLength, sort: false },
-        { id: "step-model", title: k.stepModel, help: k.stepModelHelp, list: b.stepModel },
-        { id: "risk", title: k.risk, list: b.risk, sort: false },
-      ]
-    : [];
-  const head = [k.key, c.debriefs, c.passRate, c.hardFailRate, c.judgeMean];
+  const segmented = Object.values(segment).some(v => v !== undefined && v !== "");
 
   return (
     <section className="flex flex-col gap-4" data-testid="metrics-quality">
       <SectionHeading title={s.heading} help={s.help} />
+      <SegmentBar options={options} segment={segment} onSegment={onSegment} />
       {weeks.length === 0 ? (
-        <p className="text-sm text-typography-700">{s.empty}</p>
+        <p className="text-sm text-typography-700" data-testid="metrics-quality-empty">
+          {segmented ? s.segments.noMatch : s.empty}
+        </p>
       ) : (
         <>
           <p className="sr-only" data-testid="metrics-quality-headline">
@@ -420,60 +420,7 @@ const QualitySection: React.FC<{ quality: DebriefMetricsView["quality"] }> = ({ 
                 />
               </ChartCard>
             )}
-            {segmentRows.length > 0 && (
-              <ChartCard
-                title={s.bySegment}
-                titleHelp={<InfoTip label={s.segmentHelp} ariaLabel={`About ${s.bySegment}`} />}
-                caption={sec.breakdownsCaption}
-              >
-                <RateDots rows={segmentRows} max={1} testId="metrics-by-segment-dots" />
-                <NumbersTable
-                  testId="metrics-quality-segments"
-                  head={[c.language, c.writerModel, c.judgeVersion, c.debriefs, c.passRate]}
-                  rows={quality.bySegment.map(g => [
-                    g.language,
-                    g.writerModel,
-                    g.judgeVersion,
-                    String(g.debriefs),
-                    rateWithRange(g.passRate),
-                  ])}
-                />
-              </ChartCard>
-            )}
           </div>
-
-          {breakdowns.some(t => t.list.length > 0) && (
-            <div className="flex flex-col gap-3" data-testid="metrics-quality-breakdowns">
-              <h4 className="text-base font-semibold text-typography-900">{k.heading}</h4>
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                {breakdowns
-                  .filter(t => t.list.length > 0)
-                  .map(t => (
-                    <ChartCard
-                      key={t.id}
-                      title={t.title}
-                      titleHelp={
-                        t.help ? (
-                          <InfoTip label={t.help} ariaLabel={`About ${t.title}`} />
-                        ) : undefined
-                      }
-                      caption={t.sort === false ? undefined : sec.breakdownsCaption}
-                    >
-                      <div data-testid={`metrics-breakdown-${t.id}`}>
-                        <RateDots
-                          rows={groupRows(t.list)}
-                          sort={t.sort}
-                          top={t.top}
-                          max={1}
-                          testId={`metrics-breakdown-${t.id}-dots`}
-                        />
-                        <NumbersTable head={head} rows={groupTable(t.list)} />
-                      </div>
-                    </ChartCard>
-                  ))}
-              </div>
-            </div>
-          )}
         </>
       )}
     </section>
@@ -1009,6 +956,115 @@ const UptakeCard: React.FC<{ uptake: DebriefMetricsView["uptake"] }> = ({ uptake
 /* -------------------------------------------------------------------------- */
 /* Filters                                                                    */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * The pass rate's own filters, under its heading: the segments it used to list as breakdowns.
+ * They narrow only the pass rate (the backend applies them to it alone), so they sit with it
+ * rather than in the page's row. Same Carbon dropdowns as the page's filters; each offers only
+ * values seen in the window, and a filter with nothing to offer is left out.
+ */
+const SegmentBar: React.FC<{
+  options: DebriefFilterOptions | undefined;
+  segment: DebriefPassRateSegment;
+  onSegment: (s: DebriefPassRateSegment) => void;
+}> = ({ options, segment, onSegment }) => {
+  const g = en.debriefs.metrics.quality.segments;
+  if (!options) return null;
+  type Item = { id: string; label: string };
+  const set = (patch: Partial<DebriefPassRateSegment>) => onSegment({ ...segment, ...patch });
+  const pick = (
+    id: keyof DebriefPassRateSegment,
+    label: string,
+    choices: Item[],
+    onChange: (v: string) => void,
+    width = "sm:w-48",
+  ) => {
+    const value = segment[id];
+    // Keep a set filter visible even if its value left the window, so it can be cleared.
+    if (choices.length === 0 && value === undefined) return null;
+    const items: Item[] = [{ id: "", label: g.allOf[id] }, ...choices];
+    return (
+      <div className={`w-full ${width}`} key={id} data-testid={`metrics-segment-${id}`}>
+        <Dropdown
+          id={`debrief-pass-rate-${id}`}
+          size="md"
+          titleText={label}
+          hideLabel
+          label={label}
+          items={items}
+          selectedItem={
+            items.find(i => i.id === (value === undefined ? "" : String(value))) ?? items[0]
+          }
+          itemToString={(item: Item | null) => item?.label ?? ""}
+          onChange={({ selectedItem }: { selectedItem: Item | null }) =>
+            onChange(selectedItem?.id ?? "")
+          }
+        />
+      </div>
+    );
+  };
+  const active = Object.values(segment).some(v => v !== undefined && v !== "");
+  return (
+    <div className="flex flex-col gap-2" data-testid="metrics-segments">
+      <div className="flex flex-wrap items-end gap-3">
+        {pick(
+          "skill",
+          g.skill,
+          (options.skills ?? []).map(x => ({ id: x, label: x })),
+          v => set({ skill: v || undefined }),
+          "sm:w-56",
+        )}
+        {pick(
+          "scenarioId",
+          g.scenario,
+          (options.scenarios ?? []).map(x => ({ id: String(x.id), label: x.name })),
+          v => set({ scenarioId: v ? Number(v) : undefined }),
+          "sm:w-56",
+        )}
+        {pick(
+          "courseId",
+          g.course,
+          (options.courses ?? []).map(x => ({ id: String(x.id), label: x.name })),
+          v => set({ courseId: v ? Number(v) : undefined }),
+          "sm:w-56",
+        )}
+        {pick(
+          "sessionLength",
+          g.sessionLength,
+          (options.sessionLengths ?? []).map(x => ({ id: x, label: g.length(x) })),
+          v => set({ sessionLength: v || undefined }),
+        )}
+        {pick(
+          "stepModel",
+          g.stepModel,
+          (options.stepModels ?? []).map(x => ({ id: x, label: groupLabel(x) })),
+          v => set({ stepModel: v || undefined }),
+          "sm:w-64",
+        )}
+        {pick(
+          "risk",
+          g.risk,
+          (options.risks ?? []).map(x => ({ id: x, label: g.risks[x] ?? x })),
+          v => set({ risk: (v || undefined) as DebriefPassRateSegment["risk"] }),
+          "sm:w-64",
+        )}
+        {active && (
+          <div className="flex items-center">
+            <Button
+              kind="ghost"
+              size="md"
+              data-testid="metrics-segment-clear"
+              onClick={() => onSegment({})}
+            >
+              {g.clear}
+            </Button>
+          </div>
+        )}
+      </div>
+      {active && <p className="text-xs text-typography-700">{g.note}</p>}
+    </div>
+  );
+};
 
 /**
  * The six filters, applied to every live metric on the page. They render into the Analytics page's

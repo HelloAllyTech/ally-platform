@@ -9814,9 +9814,6 @@ export const en = {
         unjudged: "Not scored yet",
         byWeek: "By week",
         byLanguage: "By language",
-        bySegment: "By language, writing model and judge version",
-        segmentHelp:
-          "Read a trend within one judge version only: a new judge version scores differently.",
         cols: {
           week: "Week",
           language: "Language",
@@ -9828,20 +9825,26 @@ export const en = {
           judgeMean: "Judge score, mean",
         },
         empty: "No live debrief in this window.",
-        breakdowns: {
-          heading: "Pass rate broken down",
-          skill: "By skill the debrief worked on",
-          skillHelp:
-            "A debrief counts under every skill it named, so these rows add up to more than the total.",
-          scenario: "By scenario",
-          course: "By course",
-          courseHelp: "A scenario used in more than one course counts under each.",
-          sessionLength: "By session length (learner turns)",
-          stepModel: "By the model each step ran on",
-          stepModelHelp:
-            "A debrief counts once for each step's model. A backup model shows as its own row.",
-          risk: "Sessions with and without a client risk cue",
-          key: "Group",
+        segments: {
+          note: "These narrow only the pass rate. The tiles and every other section follow the filters at the top.",
+          skill: "Skill",
+          scenario: "Scenario",
+          course: "Course",
+          sessionLength: "Session length",
+          stepModel: "Step model",
+          risk: "Client risk cue",
+          allOf: {
+            skill: "All skills",
+            scenarioId: "All scenarios",
+            courseId: "All courses",
+            sessionLength: "Any session length",
+            stepModel: "Any step model",
+            risk: "With or without a risk cue",
+          } as Record<string, string>,
+          length: (band: string) => `${band} learner turns`,
+          risks: { risk: "With a risk cue", no_risk: "No risk cue" } as Record<string, string>,
+          clear: "Clear",
+          noMatch: "No scored debriefs match these pass-rate filters.",
         },
       },
       guardrails: {

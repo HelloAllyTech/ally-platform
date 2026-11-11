@@ -461,6 +461,17 @@ export interface DebriefMetricsFilter {
   judgeVersion?: string;
 }
 
+/** Filters that narrow only the pass rate; they sit under its heading (they were its breakdowns). */
+export interface DebriefPassRateSegment {
+  skill?: string;
+  scenarioId?: number;
+  courseId?: number;
+  sessionLength?: string;
+  /** "<step>: <model>". */
+  stepModel?: string;
+  risk?: "risk" | "no_risk";
+}
+
 export interface DebriefFilterOptions {
   organisations: Array<{ id: string; name: string }>;
   languages: string[];
@@ -468,6 +479,13 @@ export interface DebriefFilterOptions {
   recipes: string[];
   releaseVersions: number[];
   judgeVersions: string[];
+  /** The pass-rate segments' values in the window (absent from an older backend). */
+  skills?: string[];
+  scenarios?: Array<{ id: number; name: string }>;
+  courses?: Array<{ id: number; name: string }>;
+  sessionLengths?: string[];
+  stepModels?: string[];
+  risks?: Array<"risk" | "no_risk">;
 }
 
 export type DebriefPassBreakdownRow = { key: string; debriefs: number } & DebriefPassGroup;
@@ -564,6 +582,8 @@ export interface DebriefMetricsView {
       risk: DebriefPassBreakdownRow[];
     };
   };
+  /** The pass rate without the segment filters; sent only when one is set (the headline tiles read it). */
+  qualityAll?: DebriefMetricsView["quality"];
   agents?: DebriefAgentMetrics;
   filter?: DebriefMetricsFilter;
   /** Sections read across all organisations and versions whatever the filter says. */

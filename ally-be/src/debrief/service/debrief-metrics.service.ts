@@ -20,7 +20,10 @@ import { stageMetrics, StageRun } from '../util/debrief-stage-metrics.util';
 import { CHECK_FALLBACK } from '../constants/debrief-reply.constants';
 import {
   MetricsFilter,
+  cardSkillsSql,
   metricsFilterSql,
+  pageFilter,
+  SESSION_LENGTH_BANDS,
 } from '../util/debrief-metrics-filter.util';
 import { lengthBand } from '../util/debrief-metrics.util';
 import { cardSkills, DebriefCards } from '../util/debrief-cards.util';
@@ -82,7 +85,10 @@ export class DebriefMetricsService {
   ) {}
 
   async view(weeks = 12, filter: MetricsFilter = {}) {
-    const fsql = metricsFilterSql(filter);
+    // Page-wide filters narrow every live metric; the pass-rate segments (skill, scenario, course,
+    // session length, step model, risk) narrow only the pass rate, where the Analytics tab puts them.
+    const fsql = metricsFilterSql(pageFilter(filter));
+    const qsql = metricsFilterSql(filter);
     const w = Math.max(4, Math.min(52, Math.round(weeks)));
     const s = await this.settings.get();
     const weights = {
@@ -136,6 +142,7 @@ export class DebriefMetricsService {
       uptake,
       safety,
       quality,
+      qualityAll,
       stages,
       askAlly,
       pmAgent,
@@ -145,7 +152,9 @@ export class DebriefMetricsService {
       this.baselines(),
       this.uptakeByMonth(6),
       this.latestSafetyRecall(),
-      this.quality(w, fsql),
+      this.quality(w, qsql),
+      // With a pass-rate segment set, the headline tiles still read the whole (page-filtered) pass rate.
+      qsql === fsql ? Promise.resolve(null) : this.quality(w, fsql),
       this.stages(w, fsql),
       this.askAlly(w, fsql),
       this.pmAgent(),
@@ -161,6 +170,8 @@ export class DebriefMetricsService {
       uptake,
       safetyRecall: safety,
       quality,
+      /** The pass rate without the segment filters; present only when one is set. */
+      ...(qualityAll ? { qualityAll } : {}),
       agents: { stages, askAlly, pmAgent },
       filter,
       /** Read across all organisations and versions whatever the filter says. */
@@ -495,26 +506,63 @@ export class DebriefMetricsService {
   private async filterOptions(weeks: number) {
     const since = `date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})`;
     const q = (sql: string) => this.dataSource.query(sql) as Promise<any[]>;
-    const [orgs, languages, levels, recipes, releases, judges] =
-      await Promise.all([
-        q(`SELECT r.tenant_id AS id, COALESCE(t.name, r.tenant_id) AS name, count(*)::int AS n
+    const live = `r.mode = 'live' AND r."createdAt" >= ${since}`;
+    const [
+      orgs,
+      languages,
+      levels,
+      recipes,
+      releases,
+      judges,
+      skills,
+      scenarios,
+      courses,
+      stepModels,
+      bands,
+      risks,
+    ] = await Promise.all([
+      q(`SELECT r.tenant_id AS id, COALESCE(t.name, r.tenant_id) AS name, count(*)::int AS n
            FROM debrief_runs r LEFT JOIN tenants t ON t.id::text = r.tenant_id
           WHERE r.mode = 'live' AND r.tenant_id IS NOT NULL AND r."createdAt" >= ${since}
           GROUP BY 1, 2 ORDER BY n DESC`),
-        q(`SELECT DISTINCT r.language AS v FROM debrief_runs r
+      q(`SELECT DISTINCT r.language AS v FROM debrief_runs r
           WHERE r.mode = 'live' AND r.language IS NOT NULL AND r."createdAt" >= ${since} ORDER BY 1`),
-        q(`SELECT DISTINCT lower(COALESCE(u.metadata->>'workerType', 'LAY')) AS v
+      q(`SELECT DISTINCT lower(COALESCE(u.metadata->>'workerType', 'LAY')) AS v
            FROM debrief_runs r JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
            LEFT JOIN users u ON u.id = s."counselorId"
           WHERE r.mode = 'live' AND r."createdAt" >= ${since} ORDER BY 1`),
-        q(`SELECT DISTINCT r."recipeKey" AS v FROM debrief_runs r
+      q(`SELECT DISTINCT r."recipeKey" AS v FROM debrief_runs r
           WHERE r.mode = 'live' AND r."recipeKey" IS NOT NULL AND r."createdAt" >= ${since} ORDER BY 1`),
-        q(`SELECT DISTINCT r."releaseVersion" AS v FROM debrief_runs r
+      q(`SELECT DISTINCT r."releaseVersion" AS v FROM debrief_runs r
           WHERE r.mode = 'live' AND r."releaseVersion" IS NOT NULL AND r."createdAt" >= ${since} ORDER BY 1 DESC`),
-        q(`SELECT DISTINCT (r.workspace->'judge'->>'model') || '/' || COALESCE(r.workspace->'judge'->>'promptVersion', '?') AS v
+      q(`SELECT DISTINCT (r.workspace->'judge'->>'model') || '/' || COALESCE(r.workspace->'judge'->>'promptVersion', '?') AS v
            FROM debrief_runs r
           WHERE r.mode = 'live' AND r.workspace ? 'judge' AND r."createdAt" >= ${since} ORDER BY 1`),
-      ]);
+      q(`SELECT k.sk AS v, count(DISTINCT r.id)::int AS n
+             FROM debrief_runs r, LATERAL ${cardSkillsSql('r')} k
+            WHERE ${live} AND k.sk IS NOT NULL AND btrim(k.sk) <> ''
+            GROUP BY 1 ORDER BY n DESC, 1`),
+      q(`SELECT sc.id, sc.title AS name, count(*)::int AS n
+             FROM debrief_runs r JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+             JOIN scenarios sc ON sc.id = s."scenarioId"
+            WHERE ${live} GROUP BY 1, 2 ORDER BY n DESC, 2`),
+      q(`SELECT t.id, t.title AS name, count(DISTINCT r.id)::int AS n
+             FROM debrief_runs r JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+             JOIN track_items ti ON ti."scenarioId" = s."scenarioId" JOIN tracks t ON t.id = ti."trackId"
+            WHERE ${live} GROUP BY 1, 2 ORDER BY n DESC, 2`),
+      q(`SELECT (st->>'step') || ': ' || (st->>'model') AS v, count(DISTINCT r.id)::int AS n
+             FROM debrief_runs r,
+                  jsonb_array_elements(CASE WHEN jsonb_typeof(r.steps) = 'array' THEN r.steps ELSE '[]'::jsonb END) st
+            WHERE ${live} AND st->>'status' = 'done' AND st->>'step' IS NOT NULL AND st->>'model' IS NOT NULL
+            GROUP BY 1 ORDER BY 1`),
+      q(`SELECT DISTINCT r."learnerTurns"::int AS v FROM debrief_runs r
+            WHERE ${live} AND r."learnerTurns" IS NOT NULL`),
+      q(`SELECT DISTINCT r."hasRiskCue" AS v FROM debrief_runs r
+            WHERE ${live} AND r."hasRiskCue" IS NOT NULL`),
+    ]);
+    const bandsSeen = new Set(
+      bands.map((b) => lengthBand(Math.max(1, Number(b.v)))),
+    );
     const vals = (rows: any[]) => rows.map((r) => r.v).filter((v) => v != null);
     return {
       organisations: orgs.map((o) => ({
@@ -526,6 +574,20 @@ export class DebriefMetricsService {
       recipes: vals(recipes).map(String),
       releaseVersions: vals(releases).map(Number),
       judgeVersions: vals(judges).map(String),
+      skills: vals(skills).map(String),
+      scenarios: scenarios.map((x) => ({
+        id: Number(x.id),
+        name: String(x.name),
+      })),
+      courses: courses.map((x) => ({ id: Number(x.id), name: String(x.name) })),
+      sessionLengths: SESSION_LENGTH_BANDS.map((b) => b.band).filter((b) =>
+        bandsSeen.has(b),
+      ),
+      stepModels: vals(stepModels).map(String),
+      risks: [
+        ...(risks.some((x) => x.v === true) ? ['risk'] : []),
+        ...(risks.some((x) => x.v === false) ? ['no_risk'] : []),
+      ],
     };
   }
 

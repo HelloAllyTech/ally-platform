@@ -83,7 +83,8 @@ export interface HeadlineNumbers {
 
 /** The six headline numbers over the window, each with its weekly trend. */
 export const headlineNumbers = (view: DebriefMetricsView): HeadlineNumbers => {
-  const weeks = view.quality?.byWeek ?? [];
+  // The tiles read the whole pass rate: a segment set under the Pass rate heading must not move them.
+  const weeks = (view.qualityAll ?? view.quality)?.byWeek ?? [];
   const series = view.series;
   const pick = (f: (g: DebriefPassGroup) => DebriefRate) => sumRates(weeks.map(f));
   const judged = series.reduce((a, w) => a + w.guardrails.judged, 0);

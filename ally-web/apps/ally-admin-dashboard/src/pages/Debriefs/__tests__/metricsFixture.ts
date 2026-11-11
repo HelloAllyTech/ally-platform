@@ -399,6 +399,12 @@ export const fullView = (): DebriefMetricsView => {
       recipes: ["standard", "short"],
       releaseVersions: [5, 4],
       judgeVersions: ["gemini-2.5-pro/v3+g1"],
+      skills: ["Open questions", "Reflecting feelings"],
+      scenarios: [{ id: 42, name: "Low mood after a job loss" }],
+      courses: [{ id: 7, name: "Foundations" }],
+      sessionLengths: ["6-15", "16-30"],
+      stepModels: ["safety_reader: gemini-3-flash-preview", "writer: gemini-3-flash-preview"],
+      risks: ["risk", "no_risk"],
     },
     generatedAt: "2026-11-10T00:00:00Z",
   };

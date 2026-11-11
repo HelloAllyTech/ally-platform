@@ -120,12 +120,9 @@ describe("Debriefs tab: pass rate", () => {
       "95% range 62.7%–90.5%. 24 of 30 scored debriefs passed.",
     );
     expect(screen.getByTestId("metrics-quality-weeks")).toHaveTextContent("95% range 62%–90%");
-    expect(screen.getByTestId("metrics-quality-segments")).toHaveTextContent(
-      "gemini-2.5-pro/v3+g1",
-    );
   });
 
-  it("draws every breakdown as sorted dots with whiskers, thin groups hollow and labelled", () => {
+  it("draws pass rate by language as sorted dots with whiskers, thin groups hollow and labelled", () => {
     render(<MetricsTab />);
     const lang = screen.getAllByTestId("metrics-by-language-dots-row");
     expect(lang.map(r => r.textContent?.slice(0, 5))).toEqual(["en-IN", "hi-IN", "ta-IN", "kn-IN"]);
@@ -134,33 +131,58 @@ describe("Debriefs tab: pass rate", () => {
     expect(lang[3]).toHaveTextContent("too few to read");
     expect(lang[0]).not.toHaveAttribute("data-thin");
     expect(lang[0]).toHaveTextContent("Hard fail");
-    // Ordered groups keep their order.
-    const lengths = screen.getAllByTestId("metrics-breakdown-session-length-dots-row");
-    expect(lengths.map(r => r.querySelector("span span")?.textContent)).toEqual([
-      "6-15",
-      "16-30",
-      "31-60",
-      "61+",
-    ]);
-    expect(screen.getByTestId("metrics-breakdown-step-model")).toHaveTextContent(
-      "Safety reader: gpt-5-mini (backup)",
+    // The other segments are filters now, not lists.
+    expect(screen.queryByTestId("metrics-quality-breakdowns")).toBeNull();
+  });
+
+  it("narrows only the pass rate with its own filters, under its heading", async () => {
+    const user = userEvent.setup();
+    h.metrics.mockReturnValue(answer(fullView()));
+    render(<MetricsTab />);
+    const bar = within(screen.getByTestId("metrics-quality")).getByTestId("metrics-segments");
+    expect(within(bar).getByRole("combobox", { name: /skill/i })).toHaveTextContent("All skills");
+    await user.click(within(bar).getByRole("combobox", { name: /skill/i }));
+    await user.click(await screen.findByRole("option", { name: "Open questions" }));
+    await user.click(within(bar).getByRole("combobox", { name: /step model/i }));
+    await user.click(
+      await screen.findByRole("option", { name: "Safety reader: gemini-3-flash-preview" }),
     );
-    expect(screen.getByTestId("metrics-breakdown-risk")).toHaveTextContent("38 of 58");
+    await waitFor(() =>
+      expect(h.metrics.mock.calls[h.metrics.mock.calls.length - 1][0]).toEqual({
+        weeks: 13,
+        skill: "Open questions",
+        stepModel: "safety_reader: gemini-3-flash-preview",
+      }),
+    );
+    expect(bar.parentElement).toHaveTextContent("These narrow only the pass rate.");
+    await user.click(within(bar).getByTestId("metrics-segment-clear"));
+    await waitFor(() =>
+      expect(h.metrics.mock.calls[h.metrics.mock.calls.length - 1][0]).toEqual({ weeks: 13 }),
+    );
   });
 
-  it("shows the eight largest skills until the reader asks for all", () => {
-    render(<MetricsTab />);
-    expect(screen.getAllByTestId("metrics-breakdown-skill-dots-row")).toHaveLength(8);
-    fireEvent.click(within(screen.getByTestId("metrics-breakdown-skill")).getByText("Show all 12"));
-    expect(screen.getAllByTestId("metrics-breakdown-skill-dots-row")).toHaveLength(12);
-  });
-
-  it("leaves an empty breakdown out", () => {
+  it("keeps the headline tiles on the whole pass rate while a segment is set", () => {
     const v = fullView();
-    v.quality!.breakdowns!.course = [];
-    h.metrics.mockReturnValue(answer(v));
+    const whole = {
+      ...v.quality!,
+      byWeek: v.quality!.byWeek.map(w => ({
+        ...w,
+        passRate: { n: 9, of: 10, value: 0.9, low: 0.6, high: 0.98 },
+      })),
+    };
+    h.metrics.mockReturnValue(answer({ ...v, qualityAll: whole }));
     render(<MetricsTab />);
-    expect(screen.queryByTestId("metrics-breakdown-course")).toBeNull();
+    const totalOf = whole.byWeek.length * 10;
+    expect(screen.getByTestId("metrics-tiles")).toHaveTextContent(`of ${totalOf} scored`);
+  });
+
+  it("leaves out a pass-rate filter with nothing to offer", () => {
+    const v = fullView();
+    v.filterOptions = { ...v.filterOptions!, courses: [] };
+    h.metrics.mockReturnValue(answer({ ...v, quality: { ...v.quality!, byWeek: [] } }));
+    render(<MetricsTab />);
+    expect(screen.queryByTestId("metrics-segment-courseId")).toBeNull();
+    expect(screen.getByTestId("metrics-segment-skill")).toBeInTheDocument();
   });
 });
 

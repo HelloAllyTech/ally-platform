@@ -7,8 +7,6 @@ import { Tabs } from "@ally-ui-mono/ui-shared";
 import { en, Permissions, ROUTES } from "@constants";
 import { RootState } from "@store";
 
-import { ANALYTICS_DEBRIEFS_TAB_ID } from "../Analytics/Analytics";
-
 import { CalibrationTab } from "./CalibrationTab";
 import { ExpertReviewTab } from "./ExpertReviewTab";
 import { GuidanceTab } from "./GuidanceTab";
@@ -18,6 +16,7 @@ import { ReleasesTab } from "./ReleasesTab";
 import { ReviewTab } from "./ReviewTab";
 import { RunsTab } from "./RunsTab";
 import { SettingsTab } from "./SettingsTab";
+import { ANALYTICS_DEBRIEFS_TAB_ID } from "../Analytics/Analytics";
 
 export enum DebriefConsoleTab {
   RUNS = "runs",
