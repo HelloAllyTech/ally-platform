@@ -4,8 +4,10 @@
 //
 // Source: docs/debrief-harness/guidance/debrief-guides.json (reviewed in git).
 // Usage, from a built ally-be (`npm run build`), local or inside the prod container:
-//   node scripts/load-debrief-guides.js <path to debrief-guides.json> [--apply]
-// Without --apply it prints what it would do and writes nothing.
+//   node scripts/load-debrief-guides.js <path to debrief-guides.json> [--apply | --archive]
+// Without a flag it prints what it would do and writes nothing. --archive takes the file's
+// entries out of retrieval (archived, history kept). An entry may carry `tenantIds` to target
+// organisations; without it the entry is platform-wide.
 const fs = require('fs');
 const path = require('path');
 
@@ -16,6 +18,7 @@ const req = (p) => require(path.join(ROOT, p));
   const [file, flag] = process.argv.slice(2);
   if (!file) throw new Error('usage: load-debrief-guides.js <json> [--apply]');
   const apply = flag === '--apply';
+  const archive = flag === '--archive';
   const { entries } = JSON.parse(fs.readFileSync(file, 'utf8'));
 
   const { NestFactory } = req('node_modules/@nestjs/core');
@@ -38,6 +41,22 @@ const req = (p) => require(path.join(ROOT, p));
     ).map((r) => [r.statement, r.code]),
   );
   const actor = { userId: null, tenantId: null };
+  if (archive) {
+    const { ClChunkStatus } = req(
+      'dist/context-library/enum/context-library.enum',
+    );
+    for (const e of entries) {
+      const code = existing.get(e.statement);
+      if (!code) {
+        console.log(`not active  ${e.key}`);
+        continue;
+      }
+      await chunks.setStatus(code, ClChunkStatus.ARCHIVED, actor);
+      console.log(`archived ${code}  ${e.key}`);
+    }
+    await app.close();
+    process.exit(0);
+  }
   let created = 0;
   let updated = 0;
   for (const e of entries) {
@@ -50,8 +69,8 @@ const req = (p) => require(path.join(ROOT, p));
       topics: [],
       facets: e.facets ?? {},
       attributes: { detail: e.detail, clinical: !!e.clinical },
-      isGlobal: true,
-      tenantIds: [],
+      isGlobal: !e.tenantIds?.length,
+      tenantIds: e.tenantIds ?? [],
       pinned: true,
     };
     const code = existing.get(e.statement);

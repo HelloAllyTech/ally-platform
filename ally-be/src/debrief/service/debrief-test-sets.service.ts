@@ -3,7 +3,10 @@ import { createHash } from 'crypto';
 import { DataSource } from 'typeorm';
 import { LoggerService } from '../../logger/logger.service';
 import { excludeTestTenants } from '../../analytics/util/test-tenant.util';
-import { settledEndedSessionPredicate } from '../../analytics/util/session-eligibility.util';
+import {
+  notV2vTestPredicate,
+  settledEndedSessionPredicate,
+} from '../../analytics/util/session-eligibility.util';
 import { debriefOverallSql } from '../../analytics/constants/debrief-quality.constants';
 import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
 
@@ -114,6 +117,7 @@ export class DebriefTestSetsService {
             AND s."createdAt" >= now() - make_interval(days => $1)
             AND s."roomId" NOT LIKE 'preview-%'
             AND s."roomId" NOT LIKE 'seed-room-%'
+            AND ${notV2vTestPredicate('s')}
             AND ${excludeTestTenants('s."tenant_id"')}
        )
        SELECT * FROM (
@@ -234,6 +238,7 @@ export class DebriefTestSetsService {
          JOIN agent_eval_suites su ON su.id = c."suiteId"
          JOIN scenario_sessions s ON s.id = (c.input->>'scenarioSessionId')::uuid
         WHERE su."agentKey" = $1 AND su.key = $2 AND c.status = 'active'
+          AND ${notV2vTestPredicate('s')}
         ORDER BY c."contentHash"
         LIMIT $3`,
       [DEBRIEF_AGENT_KEY, set, limit],
