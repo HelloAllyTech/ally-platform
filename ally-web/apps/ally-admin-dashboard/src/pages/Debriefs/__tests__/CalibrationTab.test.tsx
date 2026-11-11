@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
@@ -24,6 +25,12 @@ vi.mock("sonner", () => ({
 vi.mock("../../Analytics/chartKit", () => ({
   KpiTile: ({ label, value }: { label: string; value: string }) => (
     <div data-testid={`kpi-${label}`}>{value}</div>
+  ),
+  ChartCard: ({ title, caption, children }: any) => (
+    <div data-testid={`chart-${title}`}>
+      <p>{caption}</p>
+      {children}
+    </div>
   ),
 }));
 vi.mock("@api", async importOriginal => ({
@@ -142,11 +149,32 @@ describe("CalibrationTab", () => {
     expect(screen.getByTestId("kpi-Debriefs rated")).toHaveTextContent("1 of 150");
     expect(screen.getByTestId("kpi-Rated by you")).toHaveTextContent("1");
     expect(screen.getByTestId("kpi-PM agent autonomy")).toHaveTextContent("Needs approval");
-    expect(within(screen.getByTestId("gate-accuracy")).getByText("Passes")).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("gate-missed_risk_cue")).getByText("Needs 20 rated debriefs"),
-    ).toBeInTheDocument();
+    // The gate is a chart: each check's kappa against the 0.6 it needs, glossed in words.
+    const accuracy = screen.getByTestId("gate-chart-accuracy");
+    expect(accuracy).toHaveTextContent("0.72, substantial");
+    expect(accuracy).toHaveTextContent("Target: ≥ 0.6");
+    expect(accuracy).toHaveTextContent("On target");
+    expect(screen.getByTestId("gate-chart-evidence_specificity")).toHaveTextContent("Off target");
+    expect(screen.getByTestId("gate-chart-missed_risk_cue")).toHaveTextContent(
+      "Needs 20 rated debriefs",
+    );
+    expect(screen.getByTestId("calibration-gate")).toHaveTextContent("0 is chance, 1 is always");
+    // The exact numbers stay in a collapsed table.
+    const numbers = screen.getByTestId("gate-numbers");
+    expect(numbers.tagName).toBe("DETAILS");
+    expect(within(numbers).getAllByText("Passes")).toHaveLength(1);
     expect(screen.getAllByTestId("calibration-row")).toHaveLength(1);
+    expect(screen.getAllByTestId("calibration-row")[0]).toHaveTextContent("Hindi");
+  });
+
+  it("shows agreement per part of the rubric as a chart, with the table behind it", () => {
+    render(<CalibrationTab />);
+    const accuracy = screen.getByTestId("agreement-chart-accuracy");
+    expect(accuracy).toHaveTextContent("Accuracy");
+    expect(accuracy).toHaveTextContent("0.72, substantial");
+    expect(accuracy).toHaveTextContent("People with each other: Needs 20 rated debriefs");
+    expect(screen.getByTestId("agreement-chart-tone")).toHaveTextContent("0.50, moderate");
+    expect(screen.getByTestId("agreement-numbers")).toHaveTextContent("0.6 higher");
   });
 
   it("never shows the judge's scores or quality band in the sample", () => {

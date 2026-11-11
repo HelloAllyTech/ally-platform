@@ -274,14 +274,24 @@ export interface BulletRow {
  * coloured by whether it is on target, its target as a dark rule, and a range
  * (p50–p90, or a 95% range) drawn as a thin whisker. A thin sample is grey.
  */
-export const BulletRows: React.FC<{ rows: BulletRow[]; testId?: string }> = ({ rows, testId }) => {
+export const BulletRows: React.FC<{
+  rows: BulletRow[];
+  testId?: string;
+  /** Column heads (label, axis, value) when the metrics page's own do not fit. */
+  head?: [string, string, string];
+}> = ({ rows, testId, head }) => {
   const c = en.debriefs.metrics.columns;
+  const [hLabel, hAxis, hValue] = head ?? [
+    c.metric,
+    en.debriefs.metrics.charts.bulletAxis,
+    c.window,
+  ];
   return (
     <div className="flex flex-col" data-testid={testId}>
       <div className={`${GRID} mb-1 text-xs text-typography-500`}>
-        <span className="hidden sm:block">{c.metric}</span>
-        <span className="hidden sm:block">{en.debriefs.metrics.charts.bulletAxis}</span>
-        <span className="hidden sm:block">{c.window}</span>
+        <span className="hidden sm:block">{hLabel}</span>
+        <span className="hidden sm:block">{hAxis}</span>
+        <span className="hidden sm:block">{hValue}</span>
       </div>
       {rows.map(r => {
         const lo = r.min ?? 0;
