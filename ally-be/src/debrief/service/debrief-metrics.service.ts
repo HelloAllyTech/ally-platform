@@ -341,7 +341,17 @@ export class DebriefMetricsService {
                        'kind', c.facets->>'kind', 'level', c.facets->'level',
                        'clinical', COALESCE((c.attributes->>'clinical')::boolean, false)))
                 FROM jsonb_array_elements_text(COALESCE(r.workspace->'passages', '[]'::jsonb)) pid
-                JOIN cl_chunks c ON c.id::text = pid) AS passages
+                JOIN cl_chunks c ON c.id::text = pid) AS passages,
+             -- The orchestrator's records, only for runs that planned.
+             r.workspace->'plans' AS plans,
+             CASE WHEN r.workspace ? 'plans' THEN r.workspace->'findings' END AS findings,
+             CASE WHEN r.workspace ? 'plans' THEN r.cards END AS plan_cards,
+             EXISTS (SELECT 1 FROM debrief_reviews v WHERE v."runId" = r.id) AS reviewed,
+             (SELECT jsonb_agg(h) FROM debrief_reviews v,
+                     jsonb_array_elements_text(COALESCE(v."hardFails", '[]'::jsonb)) h
+               WHERE v."runId" = r.id) AS review_hard_fails,
+             (SELECT jsonb_agg(c.tag) FROM debrief_review_comments c
+               WHERE c."runId" = r.id AND c."parentId" IS NULL AND c.tag IS NOT NULL) AS review_tags
         FROM debrief_runs r
         JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
         LEFT JOIN users u ON u.id = s."counselorId"
@@ -349,7 +359,7 @@ export class DebriefMetricsService {
          AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})${fsql}`);
     const runs: StageRun[] = rows.map((r) => ({
       status: r.status,
-      cards: r.has_cards ? {} : null,
+      cards: r.plan_cards ?? (r.has_cards ? {} : null),
       hasRiskCue: !!r.risk,
       skipReason: r.skip_reason,
       checkFailures: Array.isArray(r.check_failures) ? r.check_failures : [],
@@ -357,7 +367,16 @@ export class DebriefMetricsService {
         ? r.evaluator_hard_fails
         : [],
       steps: Array.isArray(r.steps) ? r.steps : [],
-      workspace: r.judge ? { judge: r.judge } : {},
+      workspace: {
+        ...(r.judge ? { judge: r.judge } : {}),
+        ...(Array.isArray(r.plans) ? { plans: r.plans } : {}),
+        ...(r.findings ? { findings: r.findings } : {}),
+      },
+      reviewed: !!r.reviewed,
+      reviewHardFails: Array.isArray(r.review_hard_fails)
+        ? r.review_hard_fails
+        : [],
+      reviewTags: Array.isArray(r.review_tags) ? r.review_tags : [],
       passages: Array.isArray(r.passages)
         ? r.passages.map((p: any) => ({
             kind: p.kind,

@@ -553,6 +553,60 @@ export interface DebriefAgreement {
   falseFlagRate: DebriefRate;
 }
 
+type CodeCount = Array<{ code: string; runs: number }>;
+
+/** One registry agent's live numbers (ally-be `RegistryAgentMetrics`). */
+export interface DebriefRegistryAgentMetrics extends DebriefStepHealth {
+  agent: string;
+  floor: boolean;
+  offered: number;
+  chosenRate: DebriefRate;
+  findingsPerRunMean: number | null;
+  droppedQuoteRate: DebriefRate;
+  usedByWriterRate: DebriefRate;
+  judgedHardFailRate: DebriefRate;
+  topHardFails: CodeCount;
+}
+
+/** The planner, the top-up and every registry agent (ally-be `OrchestratorMetrics`). */
+export interface DebriefOrchestratorMetrics {
+  runs: number;
+  planner: DebriefStepHealth & {
+    fallbackRate: DebriefRate;
+    timeoutRate: DebriefRate;
+    fallbackReasons: CodeCount;
+    agentsChosenMean: number | null;
+    agentsChosenP50: number | null;
+    droppedForBudgetRate: DebriefRate;
+    droppedForTimeRate: DebriefRate;
+    droppedUnavailableRate: DebriefRate;
+    chosen: CodeCount;
+  };
+  topUp: { reachedRate: DebriefRate; addedRate: DebriefRate; passAfterTopUpRate: DebriefRate };
+  skippedThenMissed: {
+    overall: DebriefRate;
+    byAgent: Array<{ agent: string; whenSkipped: DebriefRate; whenChosen: DebriefRate }>;
+  };
+  agents: DebriefRegistryAgentMetrics[];
+  protocolCheck: {
+    contradictsProtocolRate: DebriefRate;
+    contradictsProtocolWithoutRate: DebriefRate;
+    appliedRate: DebriefRate;
+    protocolNamedRate: DebriefRate;
+  };
+  languageSpecialist: { sessions: number; missWithRate: DebriefRate; missWithoutRate: DebriefRate };
+  historyDeep: {
+    unsupportedProgressWithRate: DebriefRate;
+    unsupportedProgressWithoutRate: DebriefRate;
+  };
+  aggregates: Array<{
+    agent: string;
+    ran: number;
+    noQuoteRate: DebriefRate;
+    smallGroupRefusedRate: DebriefRate;
+  }>;
+}
+
 /** Live numbers per agent in the debrief family (ally-be debrief-stage-metrics.util). */
 export interface DebriefAgentMetrics {
   stages: {
@@ -584,6 +638,8 @@ export interface DebriefAgentMetrics {
       heldOnItsOwnRate: DebriefRate;
     };
     judge: { judgedRate: DebriefRate; versions: string[] };
+    /** Absent from an ally-be older than the orchestrator metrics. */
+    orchestrator?: DebriefOrchestratorMetrics;
   };
   askAlly: {
     replies: number;
