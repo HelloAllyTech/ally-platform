@@ -127,6 +127,61 @@ export interface WhatsAppBotSettings {
    * platform admin can change it.
    */
   showTyping?: boolean;
+
+  /**
+   * A person stepping in (chunk 11a): the reply time and opening hours the visitor is told, the
+   * auto hand-back and the owner's email. Per bot; unset fields take `HANDOVER_DEFAULTS`
+   * (read through `handoverOf`).
+   */
+  handover?: Partial<
+    import('../../chatbot/handover/handover').HandoverSettings
+  >;
+
+  /**
+   * Agents v2, chunk 12: also write every WhatsApp message to the shared conversation store
+   * (`chatbot_*`). `wa_*` stays the source of truth; a failed shared write is logged and counted,
+   * never felt by the person waiting for a reply. Platform-wide only.
+   */
+  sharedStoreWrites: boolean;
+
+  /**
+   * Where WhatsApp reads a thread's history for the engine: `wa` (`wa_messages`, as always) or
+   * `shared` (`chatbot_messages`). `shared` takes effect only while `sharedStoreWrites` is on, so it
+   * never reads a store nobody is writing to. Platform-wide only.
+   */
+  readHistoryFrom: HistorySource;
+
+  /**
+   * Agents v2, chunk 12b: whether a bot page may be opened by anyone with its link. Off, pages can
+   * be organisation-only or invite-only, and a page already set to public stops answering. It stays
+   * off until the crisis classifier is reviewed end to end (chunk 15a, gate G1b). Platform-wide
+   * only, and only a platform admin can change it.
+   */
+  botPagePublicAllowed: boolean;
+
+  /**
+   * Where the dashboard's Conversations, Unanswered and bot stats read from: `wa` (`wa_*`, as
+   * always) or `shared` (`chatbot_*`, every channel, with the bot page's chats). `shared` takes
+   * effect only while `sharedStoreWrites` is on, so the dashboard never reads a store nobody is
+   * writing to. Platform-wide only, and only a platform admin can change it.
+   */
+  dashboardReadsFrom: HistorySource;
+}
+
+/** Which store WhatsApp reads a thread's history from. */
+export type HistorySource = 'wa' | 'shared';
+
+/** Whether the dashboard reads the shared store: asked for, and only while it is being written. */
+export function dashboardReadsShared(
+  settings: Pick<
+    WhatsAppBotSettings,
+    'sharedStoreWrites' | 'dashboardReadsFrom'
+  >,
+): boolean {
+  return (
+    settings.sharedStoreWrites === true &&
+    settings.dashboardReadsFrom === 'shared'
+  );
 }
 
 export const WHATSAPP_SETTINGS_NAME = 'whatsapp_bot';
@@ -181,4 +236,8 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
   crisisClassifierEnabled: true,
   helplineNumbers: '',
   agentRuntimeAllowed: false,
+  sharedStoreWrites: false,
+  readHistoryFrom: 'wa',
+  botPagePublicAllowed: false,
+  dashboardReadsFrom: 'wa',
 };

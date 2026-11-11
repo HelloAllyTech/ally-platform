@@ -649,6 +649,29 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     ],
   },
   {
+    id: 'assistant-onboarding',
+    name: 'New assistant setup (onboarding)',
+    whatItIs:
+      'A guided setup that reads a business website or documents, shows what it learned with ' +
+      'sources, turns on a safety pack, asks only about gaps, offers designs, builds the assistant ' +
+      'and publishes its bot page. A builder in ally-ai proposes changes; the draft service applies them.',
+    reuseWhen:
+      'A request wants to create an assistant from a website, or a guided, step-by-step way for a ' +
+      'business owner to set one up.',
+    extendVia:
+      'The draft step machine and BotDraftService (later steps are added, not forked).',
+    modules: ['ally-be:src/bot-draft', 'ally-ai:app/core/builder'],
+    adminRoute: '/chatbots/new',
+    keywords: [
+      'onboarding',
+      'new assistant',
+      'setup',
+      'website',
+      'crawl',
+      'safety pack',
+    ],
+  },
+  {
     id: 'file-storage',
     name: 'File uploads (S3)',
     whatItIs: 'S3 access for uploads and generated files.',

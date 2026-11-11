@@ -1463,9 +1463,8 @@ export const DEBRIEF_PM_AGENT_SYSTEM = definePrompt(
   {
     name: 'Debrief PM agent',
     description:
-      "The PM agent's instructions: reads aggregate signals from debrief runs, writes the weekly report and proposes ideas. Its own skill; changes go through a person.",
+      "The PM agent's instructions (one Deep Agent in ally-ai): how it plans, investigates, proposes ideas through ally-be's gateway tools, routes them (itself, Builder, Bug Hunter, a person), keeps its memory and writes the report. The run's inputs arrive as its first message, not as variables. On the never-list itself: changes go through a person.",
     category: 'evaluation',
-    output: 'structured',
   },
 );
 

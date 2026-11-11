@@ -60,6 +60,12 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+#: The v2 agent's passage selection (chunk 20a-2). A hit under this many tokens is a
+#: heading on its own and never sets the similarity band.
+AGENT_MIN_BEST_TOKENS = 10
+#: The v2 agent always sees up to this many hits above the decline threshold.
+AGENT_FLOOR_PASSAGES = 4
+
 # Answer length the reply is composed to. ally-be renders the source lines on top of
 # this and hard-caps the whole message at 1600 characters (Twilio's ceiling, below
 # Meta's 4096 — composing to the portable one is what keeps the provider seam honest).
@@ -387,9 +393,21 @@ class KnowledgeAgentService:
         band: float,
         max_passages: int,
         max_context_tokens: int,
+        min_best_tokens: int = 0,
+        floor_passages: int = 0,
+        floor_similarity: float = 0.0,
     ) -> List[Dict[str, Any]]:
         """
         Narrow raw hits to the passages actually worth putting in the prompt.
+
+        The last three arguments are off by default, which is v1 exactly. The v2
+        agent turns them on (chunk 20a-2), because on short web pages a chunk that
+        holds only a heading ("Greenfield Meadows") matches any question that names
+        the business, sets the band, and pushes the passage with the answer out:
+
+        - ``min_best_tokens``: a hit shorter than this can't set the band;
+        - ``floor_passages`` / ``floor_similarity``: keep at least this many hits
+          that clear ``floor_similarity`` (the decline threshold), band or not.
 
         Three filters, in order:
 
@@ -406,17 +424,29 @@ class KnowledgeAgentService:
         if not hits:
             return []
 
-        best = float(hits[0].get("similarity") or 0.0)
-        banded = [h for h in hits if float(h.get("similarity") or 0.0) >= best - band]
+        def similarity(hit: Dict[str, Any]) -> float:
+            return float(hit.get("similarity") or 0.0)
+
+        def token_count(hit: Dict[str, Any]) -> int:
+            # Fall back to a rough character estimate only when ally-be sent no
+            # count, so a missing field cannot silently disable the budget.
+            return int(hit.get("token_count") or 0) or max(
+                1, len(hit.get("text") or "") // 4
+            )
+
+        setter = next((h for h in hits if token_count(h) >= min_best_tokens), hits[0])
+        best = similarity(setter)
+        banded = [h for h in hits if similarity(h) >= best - band]
+        if floor_passages and len(banded) < floor_passages:
+            extra = [
+                h for h in hits if h not in banded and similarity(h) >= floor_similarity
+            ][: floor_passages - len(banded)]
+            banded = sorted(banded + extra, key=similarity, reverse=True)
 
         selected: List[Dict[str, Any]] = []
         budget = max_context_tokens
         for hit in banded[:max_passages]:
-            # Fall back to a rough character estimate only when ally-be sent no
-            # count, so a missing field cannot silently disable the budget.
-            tokens = int(hit.get("token_count") or 0) or max(
-                1, len(hit.get("text") or "") // 4
-            )
+            tokens = token_count(hit)
             if selected and tokens > budget:
                 break
             selected.append(hit)
@@ -620,6 +650,7 @@ class KnowledgeAgentService:
         language: str,
         retrieval: Dict[str, Any],
         log_retrieval: bool = True,
+        agent_selection: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         Pick the passages for the prompt, set ``retrieval["passages_used"]`` and
@@ -636,6 +667,16 @@ class KnowledgeAgentService:
             band=limits["similarity_band"],
             max_passages=limits["max_passages"],
             max_context_tokens=limits["max_context_tokens"],
+            # The v2 agent's search (chunk 20a-2); v1 keeps the plain band.
+            **(
+                {
+                    "min_best_tokens": AGENT_MIN_BEST_TOKENS,
+                    "floor_passages": AGENT_FLOOR_PASSAGES,
+                    "floor_similarity": limits["decline_similarity"],
+                }
+                if agent_selection
+                else {}
+            ),
         )
         retrieval["passages_used"] = len(passages)
         if log_retrieval:

@@ -116,6 +116,17 @@ export const validationSchema = Joi.object({
   // Incoming-webhook URL for the Ally team's alert channel (plan §7.12, Q8).
   ALLY_GUIDE_ALERT_WEBHOOK_URL: Joi.string().uri().optional().allow(''),
   LIVEKIT_GUIDE_AGENT_NAME: Joi.string().optional(),
+  // Agents v2 bot page (chunk 12b). The base URL defaults to ADMIN_APP_BASE_URL, which hosts the
+  // page; Turnstile is off while its secret is empty; the visitor-token secret is derived from the
+  // access secret when unset.
+  BOT_PAGE_BASE_URL: Joi.string().uri().optional().allow(''),
+  TURNSTILE_SITE_KEY: Joi.string().optional().allow(''),
+  TURNSTILE_SECRET_KEY: Joi.string().optional().allow(''),
+  BOT_PAGE_VISITOR_SECRET: Joi.string().optional().allow(''),
+  // Agent-first onboarding (chunk 20a). Allow-list for the local fixture sites (ignored outside
+  // local and development), and the per-owner daily crawl cap.
+  BOT_DRAFT_CRAWL_ALLOW_HOSTS: Joi.string().optional().allow(''),
+  BOT_DRAFT_CRAWLS_PER_DAY: Joi.number().integer().min(1).optional(),
 
   SCENARIO_PATH_ITEM_MIN_DURATION_FOR_COMPLETION: Joi.string().optional(),
 

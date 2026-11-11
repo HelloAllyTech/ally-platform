@@ -190,6 +190,10 @@ rules:
       - "ally-be/src/debrief/service/debrief-run-token.service.ts"
       - "ally-be/src/debrief/service/debrief-gateway.service.ts"
       - "ally-be/src/debrief/service/ask-ally.client.ts"
+      - "ally-ai/app/core/pm_agent/schemas.py"
+      - "ally-ai/app/core/pm_agent/tools.py"
+      - "ally-be/src/debrief/service/debrief-pm-agent-tools.service.ts"
+      - "ally-be/src/debrief/service/debrief-pm-agent-run.service.ts"
     requires: docs/debrief-harness/CONTRACT.md
     why: >
       The run and reply requests, the stream events, the gateway tools and the run

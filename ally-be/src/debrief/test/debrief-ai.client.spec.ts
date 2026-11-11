@@ -22,7 +22,7 @@ describe('DebriefAiClient', () => {
   });
 
   it('gives anything else the run-length default', async () => {
-    await client.step('pm-agent/analyse', {});
+    await client.step('another-step', {});
     expect(post.mock.calls[0][2].timeout).toBe(120_000);
   });
 

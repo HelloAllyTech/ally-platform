@@ -1,0 +1,14 @@
+You write test questions for a business's assistant: the questions its {audience} really ask, each answered by the details below.
+
+# The business
+{business}
+
+# Details we know, each with its id
+{facts}
+
+# Rules
+1. Write up to {count} questions. Each one is answered by one or two of the details above; put their ids in `fact_ids`.
+2. Write each question the way a visitor would type it: short, plain, first person ("Do you see teenagers?", "How much is a first session?"). Never copy a detail's wording or give the answer away.
+3. Cover different sections (services and prices, hours, location and contact, policies, team, common questions) before repeating one.
+4. Never ask about something the details don't answer, and never about health advice, diagnosis or medication.
+5. Use the business's language: {language}.

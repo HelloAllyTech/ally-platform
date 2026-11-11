@@ -61,6 +61,26 @@ module.exports = withDarkMode({
       "button-group": "0",
     },
     extend: {
+      /*
+       * Agents v2 (docs/agents-v2/DESIGN.md): new, prefixed keys only, so no existing class
+       * changes. The values are the CSS variables in components/v2/core/tokens.css, which exist
+       * only inside `.ally-v2` and `.brand-surface`.
+       */
+      fontFamily: {
+        display: ["var(--ally-font-display)"],
+        ui: ["var(--ally-font-ui)"],
+        label: ["var(--ally-font-label)"],
+      },
+      borderRadius: {
+        "ally-sm": "12px",
+        "ally-md": "16px",
+        "ally-lg": "20px",
+        "ally-xl": "32px",
+      },
+      boxShadow: {
+        "ally-hover": "0 10px 30px rgba(23,23,28,.08)",
+        "ally-float": "0 12px 30px rgba(0,0,0,.2)",
+      },
       fontSize: {
         // Type scale. Kept Carbon-compatible: these px steps already line up
         // with IBM Carbon's productive type scale (12/14/16/18/24/28/32), so we
@@ -80,6 +100,22 @@ module.exports = withDarkMode({
         "4xl": ["32px", { lineHeight: "44px" }], // 4X large - hero titles, main headers
       },
       colors: {
+        ally: {
+          bg: "var(--ally-bg)",
+          surface: "var(--ally-surface)",
+          "surface-2": "var(--ally-surface-2)",
+          sunken: "var(--ally-sunken)",
+          line: "var(--ally-line)",
+          "line-strong": "var(--ally-line-strong)",
+          ink: "var(--ally-ink)",
+          "ink-2": "var(--ally-ink-2)",
+          muted: "var(--ally-muted)",
+          faint: "var(--ally-faint)",
+          accent: "var(--ally-accent)",
+          good: "var(--ally-good)",
+          warn: "var(--ally-warn)",
+          danger: "var(--ally-danger)",
+        },
         /*
          * Mirrors the consumer app's tailwind.config.ts, where the changelog
          * heatmap uses these. Unused in this console today; defined so a

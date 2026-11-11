@@ -8,13 +8,19 @@ import time
 from typing import Any, Dict, Literal, Tuple, Union
 
 from app.core.agent_runtime import conversation
-from app.core.agent_runtime.budget import MUST_SEARCH_AFTER, recent, tool_budget
+from app.core.agent_runtime.budget import (
+    MUST_SEARCH_AFTER,
+    REWRITE_RESERVE_SECONDS,
+    recent,
+    tool_budget,
+)
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import allowed_tools
 from app.core.agent_runtime.trace import Node, StatusCode, traced
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.exceptions.custom_exceptions import LLMInvocationFailedException
 
 
 def _summary(_: AgentState, update: Dict[str, Any]) -> str:
@@ -50,23 +56,39 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         tools = allowed_tools(bot) if budget > 0 else []
         # Sent back for not searching, and still nothing searched: this step can
         # only search. Asking alone was not enough in the eval.
+        # A step sent back to search again (SEARCH_AGAIN) is asked to, not forced:
+        # forcing the schema made a step that replied anyway fail validation, and
+        # the failed run fell back to v1 (chunk 20a-2).
         must_search = bool(
             tools
             and state.get("feedback") in MUST_SEARCH_AFTER
             and not state.get("tool_calls")
         )
-        step, meta = await conversation.agent_step(
-            state["question"],
-            passages=state.get("passages") or [],
-            tools=tools,
-            tool_budget=budget,
-            bot=bot,
-            history=recent(state.get("history")),
-            searches=state.get("tool_calls") or [],
-            feedback=state.get("feedback_text"),
-            must_search=must_search,
-            timeout=_time_left(state.get("started_at") or start["started_at"]),
-        )
+        started_at = state.get("started_at") or start["started_at"]
+
+        async def step_once(force: bool):
+            return await conversation.agent_step(
+                state["question"],
+                passages=state.get("passages") or [],
+                tools=tools,
+                tool_budget=budget,
+                bot=bot,
+                history=recent(state.get("history")),
+                searches=state.get("tool_calls") or [],
+                feedback=state.get("feedback_text"),
+                must_search=force,
+                timeout=_time_left(started_at),
+            )
+
+        try:
+            step, meta = await step_once(must_search)
+        except LLMInvocationFailedException:
+            # A step that doesn't fit the schema (forced to search but replied, or
+            # a search with no query) would fail the run, and v1 would answer.
+            # Asked once more, unforced, while there's time for it (chunk 20a-2).
+            if _time_left(started_at) < REWRITE_RESERVE_SECONDS:
+                raise
+            step, meta = await step_once(False)
         return {
             **start,
             "agent_step": json_safe(step),

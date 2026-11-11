@@ -21,7 +21,8 @@ export interface OwnerSettingSpec {
     | 'trials'
     | 'canary'
     | 'budget'
-    | 'metrics';
+    | 'metrics'
+    | 'agent';
 }
 
 export const OWNER_SETTINGS_SPEC = {
@@ -146,6 +147,22 @@ export const OWNER_SETTINGS_SPEC = {
     max: 168,
     group: 'metrics',
   },
+  // The PM agent's autonomy (v9 FR-55), as two switches: off runs nothing;
+  // on without quick tests is propose-only (a person starts every quick
+  // test); both on is auto. Builder hand-offs, bug reports, canaries and
+  // promotions always wait for a person (approve-everything stage).
+  pmAgentEnabled: { default: true, kind: 'bool', group: 'agent' },
+  pmAgentStartsQuickTests: { default: true, kind: 'bool', group: 'agent' },
+  // What one PM agent run may spend on its own model calls, inside the
+  // learning budget.
+  pmAgentRunCapUsd: {
+    default: 5,
+    kind: 'number',
+    min: 0.5,
+    max: 50,
+    budget: true,
+    group: 'agent',
+  },
 } as const satisfies Record<string, OwnerSettingSpec>;
 
 export type OwnerSettingKey = keyof typeof OWNER_SETTINGS_SPEC;
@@ -158,6 +175,17 @@ export type OwnerSettings = {
 export const OWNER_SETTING_KEYS = Object.keys(
   OWNER_SETTINGS_SPEC,
 ) as OwnerSettingKey[];
+
+/** v9 FR-55's three modes, from the two switches. */
+export type PmAgentAutonomy = 'auto' | 'propose_only' | 'off';
+
+export function pmAgentAutonomy(s: {
+  pmAgentEnabled: boolean;
+  pmAgentStartsQuickTests: boolean;
+}): PmAgentAutonomy {
+  if (!s.pmAgentEnabled) return 'off';
+  return s.pmAgentStartsQuickTests ? 'auto' : 'propose_only';
+}
 
 export function defaultOwnerSettings(): OwnerSettings {
   return Object.fromEntries(

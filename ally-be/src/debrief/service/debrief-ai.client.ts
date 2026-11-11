@@ -12,7 +12,7 @@ import { AppConfigService } from '../../config/config.service';
 export const STEP_TIMEOUT_MS: Record<string, number> = {
   'safety-reader': 60_000,
 };
-/** Anything else (the PM agent's own calls): the run's own deadline is the real limit. */
+/** Any other step: generous; the caller's own deadline is the real limit. */
 const DEFAULT_STEP_TIMEOUT_MS = 120_000;
 
 export class DebriefStepError extends Error {
@@ -27,7 +27,7 @@ export class DebriefStepError extends Error {
 
 /**
  * HTTP client for ally-ai's stateless debrief steps (`/api/v1/debrief/*`):
- * Ask Ally's distress check and the PM agent's analysis. ally-be decides what
+ * Ask Ally's distress check. ally-be decides what
  * each step may see; this only carries it.
  */
 @Injectable()

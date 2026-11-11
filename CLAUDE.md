@@ -18,7 +18,7 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 | `ally-be` | NestJS + TypeScript + PostgreSQL + Redis | Core backend API, auth, multi-tenant, RBAC, WebSocket gateways | 8001 |
 | `ally-ai` | FastAPI + Python + Weaviate | AI service: conversation analysis, nudges, summaries, transcription, chatbot knowledge answers | 8000 in the container; 3001 on the host in the local Docker stack (`docker-compose.local.yml`) |
 | `ally-ai-learn` | FastAPI + LiveKit + LangGraph + Python | Voice-based training agent: simulated client conversations with real-time event detection | 8000 (API) + LiveKit worker |
-| `ally-web` | Nx monorepo: Next.js + 2x Vite+React apps | Landing page (3000), Helpline dashboard (8080), Admin dashboard (8081) | 3000/8080/8081 |
+| `ally-web` | Nx monorepo: 2x Vite+React apps | Helpline dashboard (8080), Admin dashboard (8081, also hosts the public bot page at `/b/<slug>`) | 8080/8081 |
 | `ally-mobile` | Flutter + Dart | iOS/Android app for counselors: live sessions, reviews, simulations | N/A |
 | `infra` *(standalone repo)* | Ansible + Terraform + Docker | Infrastructure: Hetzner baremetal, AWS (ECR/SQS/S3/CloudWatch), Incus containers (`HelloAllyTech/infra`, kept outside `ally-platform` monorepo to isolate Ansible Vault secrets; `/infra/` is `.gitignore`d) | N/A |
 | `helloallytech.github.io` | Jekyll | Developer hub / docs site on GitHub Pages | 4000 |
@@ -143,7 +143,6 @@ poetry run uvicorn app.main:app --reload --port 8000  # API (Terminal 2)
 npm install
 npx nx serve ally-helpline-dashboard  # Helpline at :8080
 npx nx serve ally-admin-dashboard     # Admin at :8081
-npx nx serve ally-web                 # Landing at :3000
 npm run build:prod                    # Build all
 ```
 
@@ -255,7 +254,7 @@ npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json   # CI typecheck
 
 Agents v2 turns Stage 1 chatbots into a LangGraph agent workspace, built in chunks. Before any Agents v2 work, **always read `docs/agents-v2/CONTEXT.md` and the current chunk brief first.**
 
-**Current chunk: 03c — `docs/agents-v2/chunk-03c.md`**
+**Current chunk: CL1 — `docs/agents-v2/chunk-cl1.md`** (Stage 1, the POC: 20a-2 → Q2a → 13 → 11a → 20d-2 → CL1). Index of the Agents v2 docs: `docs/agents-v2/README.md`.
 
 Always (from `CONTEXT.md`):
 

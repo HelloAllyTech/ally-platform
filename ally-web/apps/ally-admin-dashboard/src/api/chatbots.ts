@@ -1,25 +1,35 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AssistantHomeView,
+  BotImageKind,
+  BotImageView,
+  BotPageBrand,
+  BotPageView,
   Chatbot,
-  ChatbotAudienceEntry,
-  ChatbotAudienceKind,
   ChatbotDocumentDetail,
   ChatbotDocumentRow,
-  ChatbotMember,
-  ChatbotMemberRole,
   ChatbotSettingsOverride,
   ChatbotSettingsView,
   ChatbotStatus,
   Connector,
-  CreateChatbotRequest,
   CreateChatbotUploadUrlRequest,
   CreateKbUploadUrlResponse,
   CreatePrivateChatbotDocumentRequest,
   GetChatbotsResponse,
+  HomeFact,
+  HomeFieldName,
+  HomeFieldState,
+  HomeList,
+  HomeListChange,
+  HowItWorks,
+  HomeListName,
+  HomeSafety,
+  RuleChange,
   TestChatbotRequest,
   TestChatbotResponse,
   UpdateChatbotDocumentRequest,
   UpdateChatbotRequest,
+  ChatbotStats,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -44,11 +54,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
     getChatbot: builder.query<Chatbot, string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.BY_ID(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
-    }),
-
-    createChatbot: builder.mutation<Chatbot, CreateChatbotRequest>({
-      query: body => ({ url: ApiEndpoints.CHATBOTS.LIST, method: HttpMethod.POST, body }),
-      invalidatesTags: [TAG_TYPES.CHATBOTS],
     }),
 
     updateChatbot: builder.mutation<Chatbot, UpdateChatbotRequest>({
@@ -96,18 +101,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
     }),
 
-    setChatbotDocuments: builder.mutation<
-      ChatbotDocumentRow[],
-      { id: string; documentIds: string[] }
-    >({
-      query: ({ id, documentIds }) => ({
-        url: ApiEndpoints.CHATBOTS.DOCUMENTS(id),
-        method: HttpMethod.PUT,
-        body: { documentIds },
-      }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
-    }),
-
     /** Presign a file for one of the chatbot's own documents; the browser PUTs it there. */
     createChatbotDocumentUploadUrl: builder.mutation<
       CreateKbUploadUrlResponse,
@@ -129,18 +122,6 @@ export const chatbotsApi = baseAPI.injectEndpoints({
         url: ApiEndpoints.CHATBOTS.PRIVATE_DOCUMENTS(id),
         method: HttpMethod.POST,
         body,
-      }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
-    }),
-
-    /** Archives a private document; takes a shared one off this chatbot only. Returns its list. */
-    removeChatbotDocument: builder.mutation<
-      ChatbotDocumentRow[],
-      { id: string; documentId: string }
-    >({
-      query: ({ id, documentId }) => ({
-        url: ApiEndpoints.CHATBOTS.DOCUMENT_BY_ID(id, documentId),
-        method: HttpMethod.DELETE,
       }),
       invalidatesTags: (_r, _e, { id }) => botTags(id),
     }),
@@ -169,49 +150,216 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       ],
     }),
 
-    getChatbotMembers: builder.query<ChatbotMember[], string>({
-      query: id => ({ url: ApiEndpoints.CHATBOTS.MEMBERS(id), method: HttpMethod.GET }),
-      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
+    // ── assistant home (chunk 20d) ───────────────────────────────────────
+
+    getAssistantHome: builder.query<AssistantHomeView, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.HOME(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:home` }],
     }),
 
-    setChatbotMembers: builder.mutation<
-      ChatbotMember[],
-      { id: string; members: { userId: number; role: ChatbotMemberRole }[] }
+    /**
+     * Save one field. A save based on a value that changed since is refused (409, with what it
+     * says now). A saved value goes straight into the cached home, so other fields being edited
+     * keep their versions; the bot and its page are refetched for the screens that show them.
+     */
+    saveHomeField: builder.mutation<
+      { field: HomeFieldName } & HomeFieldState<unknown>,
+      { id: string; field: HomeFieldName; value: unknown; version: string }
     >({
-      query: ({ id, members }) => ({
-        url: ApiEndpoints.CHATBOTS.MEMBERS(id),
-        method: HttpMethod.PUT,
-        body: { members },
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME(id),
+        method: HttpMethod.PATCH,
+        body,
       }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getAssistantHome", id, home => {
+              (home.fields as Record<string, HomeFieldState<unknown>>)[data.field] = {
+                value: data.value,
+                version: data.version,
+              };
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+      invalidatesTags: (r, _e, { id }) =>
+        r
+          ? [
+              ...botTags(id),
+              { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` },
+              // The History and How it works show the change (chunk 20d-2).
+              { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:history` },
+              { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:how` },
+            ]
+          : [],
     }),
 
-    getChatbotAudience: builder.query<ChatbotAudienceEntry[], string>({
-      query: id => ({ url: ApiEndpoints.CHATBOTS.AUDIENCE(id), method: HttpMethod.GET }),
-      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
+    /** "How it works": everything the assistant follows, from the runtime (chunk 20d-2). */
+    getHowItWorks: builder.query<HowItWorks, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.HOW_IT_WORKS(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:how` }],
     }),
 
-    addChatbotAudience: builder.mutation<
-      { added: number; skipped: number },
-      {
-        id: string;
-        entries: { kind: ChatbotAudienceKind; value: string; label?: string }[];
-      }
+    /** The Overview's numbers over the last 7 or 30 days (chunk 20d-2). */
+    getHomeNumbers: builder.query<ChatbotStats & { days: 7 | 30 }, { id: string; days: 7 | 30 }>({
+      query: ({ id, days }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME_NUMBERS(id, days),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_r, _e, { id, days }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:numbers:${days}` },
+      ],
+    }),
+
+    /** One of the home's lists with its version (chunk 20d-2). */
+    getHomeList: builder.query<HomeList<HomeListName>, { id: string; list: HomeListName }>({
+      query: ({ id, list }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME_LIST(id, list),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_r, _e, { id, list }) => [
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:list:${list}` },
+      ],
+    }),
+
+    /**
+     * One add, edit or remove on a home list, with the version it was based on. A change based on
+     * a list that changed since is refused (409, with the list as it is now). The new list goes
+     * straight into the cache.
+     */
+    changeHomeList: builder.mutation<
+      HomeList<HomeListName>,
+      { id: string; list: HomeListName; version: string; change: HomeListChange }
     >({
-      query: ({ id, entries }) => ({
-        url: ApiEndpoints.CHATBOTS.AUDIENCE(id),
+      query: ({ id, list, version, change }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME_LIST(id, list),
+        method: HttpMethod.PATCH,
+        body: { ...change, version },
+      }),
+      async onQueryStarted({ id, list }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getHomeList", { id, list }, current => {
+              current.items = data.items;
+              current.version = data.version;
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+      // The bot (its team, documents) shows elsewhere too.
+      invalidatesTags: (r, _e, { id }) => (r ? botTags(id) : []),
+    }),
+
+    changeOwnRule: builder.mutation<HomeSafety, { id: string; version: string } & RuleChange>({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.RULES(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getAssistantHome", id, home => {
+              home.safety = data;
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+    }),
+
+    correctFact: builder.mutation<
+      { fact: HomeFact; appliedTo: "page" | "notes" },
+      { id: string; factId: string; text: string; version: string }
+    >({
+      query: ({ id, factId, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.FACT_CORRECTION(id, factId),
         method: HttpMethod.POST,
-        body: { entries },
+        body,
       }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getAssistantHome", id, home => {
+              home.facts = home.facts.map(f => (f.id === data.fact.id ? data.fact : f));
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+      // The page document changed, and the notes may be new.
+      invalidatesTags: (r, _e, { id }) => (r ? botTags(id) : []),
     }),
 
-    removeChatbotAudience: builder.mutation<void, { id: string; entryId: string }>({
-      query: ({ id, entryId }) => ({
-        url: ApiEndpoints.CHATBOTS.AUDIENCE_ENTRY(id, entryId),
+    // ── bot page (chunk 12b) ─────────────────────────────────────────────
+
+    getBotPage: builder.query<BotPageView, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.PAGE(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }],
+    }),
+
+    // ── bot page look and images (chunk 20d) ─────────────────────────────
+
+    updateBotPageBrand: builder.mutation<
+      BotPageView,
+      { id: string } & Partial<Omit<BotPageBrand, "accentContrast">>
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.PAGE_BRAND(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` }],
+    }),
+
+    getChatbotTeamNames: builder.query<{ names: string[] }, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.TEAM_NAMES(id), method: HttpMethod.GET }),
+    }),
+
+    getBotImages: builder.query<BotImageView[], string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.IMAGES(id), method: HttpMethod.GET }),
+      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
+    }),
+
+    uploadBotImage: builder.mutation<
+      BotImageView,
+      { id: string; kind: BotImageKind; file: File; alt?: string }
+    >({
+      query: ({ id, kind, file, alt }) => {
+        const body = new FormData();
+        body.append("file", file);
+        body.append("kind", kind);
+        if (alt) body.append("alt", alt);
+        return { url: ApiEndpoints.CHATBOTS.IMAGES(id), method: HttpMethod.POST, body };
+      },
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
+    }),
+
+    removeBotImage: builder.mutation<void, { id: string; imageId: string }>({
+      query: ({ id, imageId }) => ({
+        url: ApiEndpoints.CHATBOTS.IMAGE(id, imageId),
         method: HttpMethod.DELETE,
       }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
+    }),
+
+    restoreBotImage: builder.mutation<BotImageView, { id: string; imageId: string }>({
+      query: ({ id, imageId }) => ({
+        url: ApiEndpoints.CHATBOTS.IMAGE_RESTORE(id, imageId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:images` }],
     }),
 
     testChatbot: builder.mutation<TestChatbotResponse, TestChatbotRequest>({
@@ -241,26 +389,33 @@ export const chatbotsApi = baseAPI.injectEndpoints({
 });
 
 export const {
+  useGetAssistantHomeQuery,
+  useSaveHomeFieldMutation,
+  useChangeOwnRuleMutation,
+  useGetHomeListQuery,
+  useGetHowItWorksQuery,
+  useGetHomeNumbersQuery,
+  useChangeHomeListMutation,
+  useCorrectFactMutation,
   useGetChatbotsQuery,
   useGetChatbotQuery,
-  useCreateChatbotMutation,
   useUpdateChatbotMutation,
   useSetChatbotStatusMutation,
   useArchiveChatbotMutation,
   useGetChatbotSettingsQuery,
   useUpdateChatbotSettingsMutation,
   useGetChatbotDocumentsQuery,
-  useSetChatbotDocumentsMutation,
   useCreateChatbotDocumentUploadUrlMutation,
   useCreatePrivateChatbotDocumentMutation,
-  useRemoveChatbotDocumentMutation,
   useGetChatbotDocumentQuery,
   useUpdateChatbotDocumentMutation,
-  useGetChatbotMembersQuery,
-  useSetChatbotMembersMutation,
-  useGetChatbotAudienceQuery,
-  useAddChatbotAudienceMutation,
-  useRemoveChatbotAudienceMutation,
   useTestChatbotMutation,
   useBindConnectorMutation,
+  useGetBotPageQuery,
+  useUpdateBotPageBrandMutation,
+  useGetBotImagesQuery,
+  useGetChatbotTeamNamesQuery,
+  useUploadBotImageMutation,
+  useRemoveBotImageMutation,
+  useRestoreBotImageMutation,
 } = chatbotsApi;

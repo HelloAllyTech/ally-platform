@@ -33,8 +33,27 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
 import { ENDPOINTS } from '../constants/endpoints.constants';
-import { KNOWLEDGE_ANSWER_LIMITS } from '../constants/knowledge-answer.constants';
+import type {
+  BuilderChangeRequest,
+  BuilderChangeResponse,
+  BuilderExtractRequest,
+  BuilderExtractResponse,
+  BuilderStepRequest,
+  BuilderStepResponse,
+  BuilderStreamEvent,
+} from '../dto/builder.dto';
+import {
+  BUILDER_LIMITS,
+  KNOWLEDGE_ANSWER_LIMITS,
+} from '../constants/knowledge-answer.constants';
 import { SseParser } from '../util/sse-parser';
+import {
+  CHECKUP_GRADE_TIMEOUT_MS,
+  type CheckupGradeRequest,
+  type CheckupGradeResponse,
+  type CheckupQuestionsRequest,
+  type CheckupQuestionsResponse,
+} from '../dto/checkup.dto';
 import {
   HelplineRiskRequest,
   HelplineRiskResponse,
@@ -142,6 +161,14 @@ export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
 ] as const;
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';
+
+/** ally-ai's `/agent/instructions` answer (chunk 20d-2). */
+export interface AgentInstructions {
+  full: string;
+  parts: { layer: string; text: string; owner: boolean }[];
+  placeholders: Record<string, string>;
+  search: Record<string, number>;
+}
 
 @Injectable()
 export class AiService {
@@ -774,6 +801,37 @@ export class AiService {
    *
    * redactBody=true: the payload is the person's question.
    */
+  /**
+   * The owner's "How it works" (chunk 20d-2): the instructions a run would start from, built by
+   * ally-ai's own prompt code from the same body `runAgent` sends. No model call. Additive.
+   */
+  async agentInstructions(
+    request: AgentRunRequest,
+  ): Promise<AgentInstructions> {
+    return this.postKnowledge<AgentInstructions, AgentRunRequest>(
+      ENDPOINTS.AGENT_INSTRUCTIONS,
+      request,
+      { timeoutMs: 10_000, alertOnFailure: false },
+    );
+  }
+
+  /** The builder's safety check on text an owner typed into their instructions (chunk 20d-2). */
+  async checkOwnerText(
+    text: string,
+  ): Promise<{ refused: string | null; warning: string | null }> {
+    return this.postKnowledge<
+      { refused: string | null; warning: string | null },
+      { text: string }
+    >(
+      ENDPOINTS.AGENT_INSTRUCTIONS_CHECK,
+      { text },
+      {
+        timeoutMs: 10_000,
+        alertOnFailure: false,
+      },
+    );
+  }
+
   async runAgent(request: AgentRunRequest) {
     return this.postKnowledge<AgentRunResponse, AgentRunRequest>(
       ENDPOINTS.AGENT_RUN,
@@ -802,9 +860,126 @@ export class AiService {
     onEvent: (event: AgentStreamEvent) => void,
     signal?: AbortSignal,
   ): Promise<AgentRunResponse> {
-    const deadline = AbortSignal.timeout(KNOWLEDGE_ANSWER_LIMITS.streamMs);
+    return this.streamSse<AgentRunResponse, AgentStreamEvent>(
+      ENDPOINTS.AGENT_RUN_STREAM,
+      request,
+      { deadlineMs: KNOWLEDGE_ANSWER_LIMITS.streamMs, what: 'agent run' },
+      onEvent,
+      signal,
+    );
+  }
+
+  /**
+   * One onboarding builder step (chunk 20a), streamed: `status` and `token` events, then the
+   * proposal. ally-ai caps a step at 45s (`BUILDER__STEP_TIMEOUT_SECONDS`), so its own
+   * `error: timeout` arrives before this deadline does.
+   */
+  async runBuilderStepStreaming(
+    request: BuilderStepRequest,
+    onEvent: (event: BuilderStreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<BuilderStepResponse> {
+    return this.streamSse<BuilderStepResponse, BuilderStreamEvent>(
+      ENDPOINTS.BUILDER_STEP_STREAM,
+      request,
+      { deadlineMs: BUILDER_LIMITS.stepMs, what: 'builder step' },
+      onEvent,
+      signal,
+    );
+  }
+
+  /**
+   * Grade one checkup question (chunk 20a-2): the case and what the engine did go in, one verdict
+   * comes back. The same grader serves the Checkup, the eval suites and the scorecard.
+   *
+   * redactBody=true: the payload holds the question and the reply. No Slack alert: a failed grade
+   * is recorded on the result and the run carries on.
+   */
+  async gradeCheckup(
+    request: CheckupGradeRequest,
+  ): Promise<CheckupGradeResponse> {
+    return this.postKnowledge<CheckupGradeResponse, CheckupGradeRequest>(
+      ENDPOINTS.CHECKUP_GRADE,
+      request,
+      { timeoutMs: CHECKUP_GRADE_TIMEOUT_MS, alertOnFailure: false },
+    );
+  }
+
+  /**
+   * Change by chat (chunk 20a-2): the owner's request as a proposed before and after. Nothing is
+   * applied here. redactBody=true: the payload is the assistant's settings and the owner's words.
+   */
+  async proposeChange(
+    request: BuilderChangeRequest,
+  ): Promise<BuilderChangeResponse> {
+    return this.postKnowledge<BuilderChangeResponse, BuilderChangeRequest>(
+      ENDPOINTS.BUILDER_CHANGE,
+      request,
+      { timeoutMs: BUILDER_LIMITS.stepMs, alertOnFailure: false },
+    );
+  }
+
+  /**
+   * Checkup questions from what we learned (chunk 20a-2): each keeps the ids of the facts that
+   * answer it. redactBody=true: the payload is the business's own details.
+   */
+  async writeCheckupQuestions(
+    request: CheckupQuestionsRequest,
+  ): Promise<CheckupQuestionsResponse> {
+    return this.postKnowledge<
+      CheckupQuestionsResponse,
+      CheckupQuestionsRequest
+    >(ENDPOINTS.CHECKUP_QUESTIONS, request, {
+      timeoutMs: CHECKUP_GRADE_TIMEOUT_MS * 2,
+      alertOnFailure: false,
+    });
+  }
+
+  /**
+   * "Suggest more questions" (chunk 20d-2): the same writer, told which questions the checkup
+   * already asks so it offers new ones. Additive: `writeCheckupQuestions` is unchanged.
+   */
+  async suggestCheckupQuestions(
+    request: CheckupQuestionsRequest & { exclude: string[] },
+  ): Promise<CheckupQuestionsResponse> {
+    return this.postKnowledge<
+      CheckupQuestionsResponse,
+      CheckupQuestionsRequest & { exclude: string[] }
+    >(ENDPOINTS.CHECKUP_QUESTIONS, request, {
+      timeoutMs: CHECKUP_GRADE_TIMEOUT_MS * 2,
+      alertOnFailure: false,
+    });
+  }
+
+  /**
+   * Facts for "What we learned" from a batch of crawled pages. redactBody=true: the payload is
+   * a business's site text, which can carry staff names, phones and emails.
+   */
+  async extractOnboardingFacts(
+    request: BuilderExtractRequest,
+  ): Promise<BuilderExtractResponse> {
+    return this.makeRequest<BuilderExtractResponse, BuilderExtractRequest>(
+      ENDPOINTS.BUILDER_EXTRACT,
+      request,
+      true,
+      'post',
+      undefined,
+      false,
+      BUILDER_LIMITS.extractMs,
+      true,
+    );
+  }
+
+  /** An ally-ai SSE endpoint: live events to `onEvent`, resolving with `final`. */
+  private async streamSse<R, E>(
+    endpoint: string,
+    request: unknown,
+    { deadlineMs, what }: { deadlineMs: number; what: string },
+    onEvent: (event: E) => void,
+    signal?: AbortSignal,
+  ): Promise<R> {
+    const deadline = AbortSignal.timeout(deadlineMs);
     const startedAt = Date.now();
-    const endpoint = ENDPOINTS.AGENT_RUN_STREAM;
     try {
       const response = await axios({
         method: 'post',
@@ -826,27 +1001,27 @@ export class AiService {
             this.logger.info(
               `AI stream DONE | endpoint=${endpoint} | elapsedMs=${Date.now() - startedAt}`,
             );
-            return data as AgentRunResponse;
+            return data as R;
           }
           if (message.event === 'error') {
             const code = String(data?.code ?? 'internal');
             throw code === 'timeout'
               ? new AiUpstreamError(
-                  'The agent run timed out',
+                  `The ${what} timed out`,
                   ErrorCode.AI_SERVICE_TIMEOUT,
                   504,
                 )
               : new AiUpstreamError(
-                  `The agent run failed (${code})`,
+                  `The ${what} failed (${code})`,
                   ErrorCode.AI_SERVICE_UNAVAILABLE,
                   502,
                 );
           }
-          onEvent({ event: message.event, data } as AgentStreamEvent);
+          onEvent({ event: message.event, data } as E);
         }
       }
       throw new AiUpstreamError(
-        'The agent stream ended without a final event',
+        `The ${what.split(' ')[0]} stream ended without a final event`,
         ErrorCode.AI_SERVICE_UNAVAILABLE,
         502,
       );
@@ -854,7 +1029,7 @@ export class AiService {
       const failure =
         deadline.aborted && !(error instanceof AiUpstreamError)
           ? new AiUpstreamError(
-              'The agent stream timed out',
+              `The ${what.split(' ')[0]} stream timed out`,
               ErrorCode.AI_SERVICE_TIMEOUT,
             )
           : classifyAiFailure(error);

@@ -5,7 +5,7 @@ can fall back to that endpoint (v1) with almost no mapping. The contract grows
 toward the full v2 shape (contact, run_token, resume) in later chunks.
 """
 
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -105,6 +105,25 @@ class AgentRetrievalMeta(RetrievalMeta):
             "Not part of the /knowledge-agent/answer contract."
         ),
     )
+    passage_document_ids: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Every document the agent was shown a passage from, across all of the "
+            "run's searches (the fields above cover the first search only). The "
+            "checkup uses it to tell a wrong decline from an honest one."
+        ),
+    )
+    passage_chunk_ids: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Every passage the agent was shown, across all of the run's searches. "
+            "The checkup's judge reads them, so a detail a decline took from them "
+            "isn't taken for an invented one."
+        ),
+    )
+    searches: int = Field(
+        0, description="How many times the agent searched in this run."
+    )
 
 
 class TraceStep(BaseModel):
@@ -126,3 +145,37 @@ class AgentRunResponse(KnowledgeAnswerResponse):
             "citations."
         ),
     )
+
+
+# ── "How it works" (chunk 20d-2) ─────────────────────────────────────────────
+
+
+class InstructionPart(BaseModel):
+    """One labelled stretch of the instructions, in the order it appears."""
+
+    layer: str
+    text: str
+    #: Written by the owner (business name, tone, their instructions, topics to avoid).
+    owner: bool = False
+
+
+class InstructionsResponse(BaseModel):
+    """The instructions a run for this bot starts from, as `/agent/run` would build
+    them: `full` is the text; `parts` joined are exactly `full`."""
+
+    full: str
+    parts: List[InstructionPart]
+    placeholders: Dict[str, str]
+    search: Dict[str, Any]
+
+
+class OwnerTextCheckRequest(BaseModel):
+    text: str = Field(..., max_length=8000)
+
+
+class OwnerTextCheckResponse(BaseModel):
+    #: `weakens_safety` when the text would weaken a safety rule (not saved).
+    refused: Optional[str] = None
+    #: `override_attempt` when it reads like "ignore previous instructions" (saved, with
+    #: a note that it can't outrank the rules).
+    warning: Optional[str] = None

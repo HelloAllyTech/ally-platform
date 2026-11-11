@@ -103,6 +103,19 @@ above. Builder and Bug Hunter are never given a token, so they never receive com
 | Tool | Body | Returns |
 |---|---|---|
 | `comments_read` | `{ "since"?: ISO date (exclusive, on `created_at`), "status"?: "open" \| "resolved" (default both), "ids"?: [uuid, ...], "limit"?: 1–200 (default 100) }` | `{ "comments": [ { "id", "run_id", "session_type", "language", "anchor": { "kind": "transcript" \| "card" \| "debrief", "turn_index", "section", "span_start", "span_end" }, "quoted_text", "body", "tag", "status", "idea": { "id", "status" } \| null, "repeat_of_id", "created_at", "replies": [ { "id", "body", "tag", "created_at" } ] } ], "next_since": ISO \| null }` — expert comment threads, oldest first (spec D8). Never the transcript, the cards or who wrote a comment. `next_since` is set when the page was full; pass it back as `since` |
+| `reporting_query` | `{ "sql": "SELECT …" }` | `ReportingQueryResult` `{ sql, ok, rows?, truncated?, refused? }` — the existing Analytics Agent guard and read-only executor over the redacted `debrief_reporting.*` views only. A refused query answers `refused` (the agent reads it as a tool error) |
+| `metrics_view` | `{ "weeks"?: 4–52 (default 8), "language"?, "recipe"?, …metric filters }` | `{ weeks, failure_points: [ { kind, name, segment, value, n, target, why } ], metrics: { <name>: value }, metric_names }` — spec C2 failure points from `DebriefMetricsService.view()` (`debrief-metric-failures.util.ts`): experience rates off the v9 targets (all, per language, per device), guardrails (hard-fail and thumbs-down above pre-launch, fabricated quotes, judge median below 8), efficiency drift (cost, revision rounds, visible seconds), steering falling, stages failing. Thin samples (n < 20) are left out |
+| `idea_propose` | `{ "problem": { title, summary, comment_ids[], metrics: [ { name, value, segment? } ] }, "route": "A"\|"B"\|"C"\|"D", "title", "hypothesis", "expected_effect": { metric, direction: "up"\|"down", by?, note? } }` | `{ idea_id, route, linked_comments, unknown_comment_ids, baseline: { metric, value }, next }` — writes an `agent_lessons` idea (`change.route`, `change.ideaKind` = `route_a` / `needs_code` / `defect` / `needs_person`; `evidence.problem`, `commentIds`, `metrics`, `forecast` with the named metric's value now), links the cited comments (`DebriefReviewService.linkIdea`). Refused: no evidence (no existing comment id and no metric), a metric not in `PM_AGENT_METRICS`, more than 5 ideas in one run, a duplicate, autonomy off |
+| `release_draft` | `{ "idea_id", "kind": "prompt_edit"\|"setting"\|"registry_agent", prompt_code/find/replace \| setting_key/setting_value \| agent: { id, description, use_when, skip_when, prompt, tools[], scopes[], eval_cases, model? } }` | `{ ok, idea_id, kind, next }` — route A only; draft only (nothing reaches learners). Refused: the never-list (C4: the rubric and judge prompts, the Safety reader, the PM agent's own instructions, budgets, `passScore`, every owner setting), prompts outside `PM_AGENT_EDITABLE_PROMPTS` (orchestrator prompts only while GA runs the orchestrator), a `find` not exactly once in the live text, a change to `{variables}`, settings outside `PM_AGENT_SETTINGS` ranges, a change that does not apply to GA or fails bundle validation; FR-53 for registry agents (registered tools and A2 scopes only, ≥ 10 eval cases, ≤ 10 experimental, approved model). Registry agents are stored as drafts: the build defines the agents a release can enable, so they are not tested yet |
+| `ladder_start_quick_test` | `{ "idea_id" }` | `{ status: "running", startedAt, note }` — requests `DebriefPmAgentService.screen` (the deterministic ladder: quick test → gate → paired trials → canary watch; a person starts the canary and promotes). Refused: autonomy `propose_only` (a person starts it in the Console) or `off`, no drafted change, a registry agent, the learning budget spent, a quick test already running |
+| `builder_handoff` | `{ "idea_id", "problem", "evidence_summary", "expected_effect", "acceptance_checks": [ … ] }` | `{ ok, idea_id, waiting_for, quotes_removed }` — route B. Quotes and the cited comments' text (bodies, quoted spans, replies) are stripped here as well as in ally-ai; a brief that asks to change something on the never-list is refused (route D). Stored as `evidence.handoff` (`status: "waiting"`); a person's Approve in the Console opens the Builder session with it as `handoffContext` |
+| `bug_hunter_report` | `{ "idea_id", "summary", "run_ids": [uuid], "repo"? }` | `{ ok, idea_id, waiting_for, quotes_removed }` — route C, same stripping and never-list check; Approve files it through `RoadmapOpportunityService.createBugReport` (a Bug Hunter reported bug) with the summary and the run ids that exist |
+| `person_ask` | `{ "idea_id", "topic": "rubric"\|"safety"\|"budget"\|"data_access"\|"clinical"\|"product"\|"other", "question", "context"? }` | `{ ok, idea_id, waiting_for }` — route D: a Console item for the owner (or the clinical advisor for clinical and safety); Approve marks it answered |
+
+Every refusal answers **200** `{ "refused": "<readable reason>" }` and is audited (`agent_lesson_audit`, action
+`blocked`, `detail.agentRunId`, `detail.tool`, `detail.neverList` for C4) so the offline eval can read a clean path;
+every accepted action is audited as `proposed` or `pipeline_step` with `detail.agentRunId`. A 4xx/5xx still means the
+token or the request was wrong.
 
 ## 3. Rollout (decided 2026-11-10)
 
@@ -325,3 +338,59 @@ considered: [{agent, whyNot}], dropped: [{agent, why}], estimatedUsd }`), `works
 `planner` record (the model call), a `plan` record (`step: "plan"`, with the plan above in `plan`), and one record
 per agent under its id (`protocol_check`, …) in the usual record shape. Every existing step name, field and
 decision rule is unchanged, so `debrief-stage-metrics` and the Console read them as before.
+
+
+## 7. The PM agent — `POST /api/v1/pm-agent/runs` (ally-ai)
+
+Spec Part C. One Deep Agent (`app/core/pm_agent`, `create_deep_agent`): planning (`write_todos`), one read-only
+investigator subagent per problem (`task`; it replaces the default general-purpose subagent so no subagent can
+act), memory under `/memories/` in LangGraph's Postgres store (namespace `("debrief_pm_agent", "memories")`, same
+database, schema and pool as the checkpoints; in memory without `AGENT_RUNTIME__CHECKPOINT_DB_URL`), skills under
+`/skills/` (read-only: prompt change, registry agent, Builder brief), scratch files for drafts. No outer graph
+(D7). Auth: the service `X-API-Key`. Synchronous; ally-be waits up to 45 minutes. Thread id `pm-agent:<agent_run_id>`
+on the shared checkpointer: a call with the same id after a crash continues from the last checkpoint. LangSmith
+tracing is off for the run; the trace is the returned `steps`.
+
+```jsonc
+{
+  "agent_run_id": "uuid",                 // ally-be's id; also in every audit row the run's tools write
+  "review": "weekly | monthly",
+  "model": "gemini-2.5-pro", "backup_model": "gemini-2.5-flash",
+  "prices": { "<model>": { "input_per_m": 1.25, "output_per_m": 10 } },   // an unpriced model never runs
+  "budget_usd": 2.4,                      // min(owner setting pmAgentRunCapUsd, learning budget left)
+  "system_prompt": "<live debrief_improver_system> | null",
+  "inputs": {                             // packed by DebriefPmAgentRunService.packInputs (spec C1)
+    "counts": {...}, "window_days": 7,
+    "comments_since_last_run": [ comments_read rows ], "comments_still_open": [ ... ],
+    "metric_failure_points": [ ... ], "metrics": { ... }, "metric_names": [ ... ],
+    "judge_and_evaluator": { reporting library }, "learner_flags": { helpful, flags },
+    "reporting_catalog": "...", "editable_prompts": { code: live text }, "settings": { current, allowed_ranges },
+    "idea_outcomes": [ { id, title, status, route, kind, quick_test, gate, trial, canary, handoff, forecast } ],
+    "last_run": { at, status, ideas, refusals } | null, "autonomy": { mode, meaning }
+  },
+  "tools": [ "comments_read", ... ],      // what the agent token lists; the agent is given only these
+  "agent_token": "<signAgent JWT>",
+  "gateway_url": "https://<ally-be>/api/v1/internal/debrief"
+}
+```
+
+Response: `{ "status": "finished" | "budget_spent" | "failed", "report", "idea_ids", "steps": [ { step ("model" or
+the tool name), agent ("main" | "investigator"), status ("done" | "failed" | "refused"), startedAt, ms, model?,
+estimatedUsd?, inputs, reasoning?, output?, budgetLeftUsd } ], "todos", "estimated_cost_usd", "model", "refusals":
+[ { tool, reason } ], "error" }`. `503` when the checkpoint database was configured but could not be opened. Model
+calls go primary → backup with the debrief graph's circuit breaker (`models_to_try`); each is priced with
+`cost_usd` and recorded to `llm_usage` as `debrief_improver` (the learning budget's PM agent line). When another call
+like the last one would go over the budget, the next model call ends the loop instead of calling the model
+(`budget_spent`). An empty answer (no text, no tool call) is tried once more on the other model. Step records never
+carry comment text or quotes: a tool's record keeps only its outcome fields (ids, status, counts, a refusal).
+
+ally-be stores the result as the run's `curator_run` row in `agent_lesson_audit` (`detail`: agentRunId, review,
+status, report, steps, todos, ideaIds, refusals, costUsd, budgetUsd, inputs counts, learningSpentUsd); the Console's
+PM agent tab reads the latest. Schedules: weekly (after the test sets are topped up) and monthly; the Console's
+"Run now" starts one in the background. Autonomy (FR-55) is two owner settings: `pmAgentEnabled` (off: no run, every
+action tool refused) and `pmAgentStartsQuickTests` (off: propose only). Closing the loop (C5): a daily job records,
+for each promoted idea that has stood 14 days, the named metric now against the baseline `idea_propose` stored
+(`evidence.forecast.after`, `moved`), and the next run reads it in `idea_outcomes`.
+
+Planted-idea fixtures for the offline "right final state" eval (METRICS.md): `ally-ai/tests/fixtures/pm_agent_planted_ideas.json`
+(good, bad, neutral; no runner yet).

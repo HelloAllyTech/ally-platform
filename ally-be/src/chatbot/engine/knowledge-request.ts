@@ -1,3 +1,4 @@
+import { packRulesBlock } from '../../bot-draft/safety-pack/safety-packs';
 import type {
   AgentRunRequest,
   KnowledgeAnswerRequest,
@@ -84,6 +85,25 @@ function personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
     display_name: persona.displayName?.trim() || undefined,
     system_prompt: persona.systemPrompt?.trim() || undefined,
     tone: persona.tone?.trim() || undefined,
+    // The bot's safety pack and its owner's Never rules (chunk 20a), on every run, in their own
+    // field: an editor's instructions can't remove them.
+    safety_rules:
+      packRulesBlock(turn.chatbot.safetyPack, [
+        ...(turn.chatbot.rules?.never ?? []),
+        // Topics the owner asked it not to talk about (chunk 20a-2).
+        ...(turn.chatbot.rules?.avoid ?? []).map(
+          (topic) => `Talk about ${topic}`,
+        ),
+      ]) ?? undefined,
+    // The id too: for a health pack, ally-ai's check refuses diagnosis and dosing in code.
+    safety_pack: turn.chatbot.safetyPack || undefined,
+    // And for the check, which declines a reply touching one.
+    avoid_topics: turn.chatbot.rules?.avoid?.length
+      ? turn.chatbot.rules.avoid
+      : undefined,
+    // What it's for (chunk 20a-2): a section after the instructions, before the safety rules.
+    purpose: turn.chatbot.purpose || undefined,
+    purpose_note: turn.chatbot.purposeNote?.trim() || undefined,
   };
   return Object.values(out).some(Boolean) ? out : undefined;
 }

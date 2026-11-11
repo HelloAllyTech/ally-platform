@@ -3,6 +3,7 @@ import * as jwt from 'jsonwebtoken';
 import { DebriefGatewayController } from '../controller/debrief-gateway.controller';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefGatewayService } from '../service/debrief-gateway.service';
+import { DebriefPmAgentToolsService } from '../service/debrief-pm-agent-tools.service';
 import {
   ASK_ALLY_GATEWAY_TOOLS,
   DEBRIEF_GATEWAY_TOOLS,
@@ -122,11 +123,17 @@ function build(
       next_since: null,
     })),
   };
-  const controller = new DebriefGatewayController(
-    tokens,
-    gateway,
+  const pmTools = new DebriefPmAgentToolsService(
+    {} as any,
     reviews as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
   );
+  const controller = new DebriefGatewayController(tokens, gateway, pmTools);
   const bearer = (t = tokens.sign('run-1', 's1')) => `Bearer ${t}`;
   return {
     tokens,

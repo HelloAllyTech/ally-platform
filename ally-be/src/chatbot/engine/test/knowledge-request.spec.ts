@@ -8,6 +8,7 @@ import {
   MAX_DECLINE_TEXT_CHARS,
   MAX_HISTORY_MESSAGES,
 } from '../knowledge-request';
+import { purposePromptCodes } from '../chatbot-engine.service';
 import { chatbotFixture } from './engine.fixtures';
 
 const turn = (over: Partial<ChatTurn> = {}): ChatTurn => ({
@@ -46,6 +47,32 @@ describe('buildKnowledgeRequest', () => {
       system_prompt: undefined,
       tone: 'warm',
     });
+  });
+
+  it('sends the purpose, and the note only as written (chunk 20a-2)', () => {
+    const chatbot = chatbotFixture({
+      purpose: 'custom',
+      purposeNote: ' Help parents choose a class ',
+    } as Partial<Chatbot>);
+    const body = buildKnowledgeRequest(turn({ chatbot }), {}, KNOWLEDGE);
+    expect(body.persona).toMatchObject({
+      purpose: 'custom',
+      purpose_note: 'Help parents choose a class',
+    });
+  });
+
+  it('sends no purpose for a bot made before purposes', () => {
+    const body = buildKnowledgeRequest(turn(), {}, KNOWLEDGE);
+    expect(body.persona?.purpose).toBeUndefined();
+  });
+
+  it('loads a purpose section only for a bot that has one', () => {
+    expect(purposePromptCodes('enquiries')).toEqual([
+      'ally_ai_agent_purpose_enquiries',
+    ]);
+    expect(purposePromptCodes('custom')).toEqual([]);
+    expect(purposePromptCodes(null)).toEqual([]);
+    expect(purposePromptCodes('anything')).toEqual([]);
   });
 
   it('sends no persona at all when every part is blank', () => {

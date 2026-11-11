@@ -2,23 +2,26 @@ import React, { useCallback, useMemo, useState } from "react";
 
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { SkeletonText, Tabs } from "@ally-ui-mono/ui-shared";
 import { useGetChatbotsQuery } from "@api";
-import { Button, EmptyState } from "@components";
-import { ButtonVariant } from "@components/types";
+import { EmptyState } from "@components";
+import { Button as V2Button } from "@components/v2";
 import { en, ROUTES } from "@constants";
 import { Chatbot, ChatbotStatus } from "@types";
 
 import { BotSettingsTab } from "./BotSettingsTab";
 import { AllConnectorsTab } from "./ConnectorsTab";
 import { CorpusTab } from "./CorpusTab";
-import { CreateChatbotPanel } from "./CreateChatbotPanel";
-import { fill, LoadError, StatusPill } from "./shared";
+import { fill, LoadError } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
+import { Inbox } from "../Inbox";
+import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
+
+import "../AssistantHome/ui/scale.css";
+import "./list-page.css";
 
 const t = en.whatsappBot.bots;
 
-type HomeTab = "bots" | "connectors" | "defaults" | "library";
+type HomeTab = "bots" | "inbox" | "connectors" | "defaults" | "library";
 
 /**
  * Chatbots home.
@@ -35,19 +38,24 @@ type HomeTab = "bots" | "connectors" | "defaults" | "library";
 export const WhatsAppBot: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, isLoading, isError, refetch } = useGetChatbotsQuery();
-  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
   const canCreate = Boolean(data?.canCreate);
 
+  // The inbox (chunk 11a) is for everyone who can see an assistant: its chats, every channel.
   const tabItems = useMemo(
     () =>
       canCreate
         ? [
             { id: "bots", label: t.homeTabs.bots },
+            { id: "inbox", label: t.homeTabs.inbox },
             { id: "connectors", label: t.homeTabs.connectors },
             { id: "defaults", label: t.homeTabs.defaults },
             { id: "library", label: t.homeTabs.library },
           ]
-        : [{ id: "bots", label: t.homeTabs.bots }],
+        : [
+            { id: "bots", label: t.homeTabs.bots },
+            { id: "inbox", label: t.homeTabs.inbox },
+          ],
     [canCreate],
   );
   const requested = searchParams.get("tab") ?? "bots";
@@ -57,42 +65,71 @@ export const WhatsAppBot: React.FC = () => {
     [setSearchParams],
   );
 
+  // Chunk 20d-2: the page in the v2 look (DESIGN.md), like the assistant's own home.
   return (
-    <div className="py-[2px] font-primary relative">
-      <div className="flex flex-wrap items-end justify-between gap-4 pb-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl text-typography-900 font-secondary">{en.whatsappBot.title}</h1>
-          <p className="text-sm text-typography-600">{en.whatsappBot.subtitle}</p>
+    <div className="ally-v2 ally-list-page">
+      <header className="ally-list-page__head">
+        <div className="ally-list-page__title">
+          <h1 className="ally-display">{en.whatsappBot.title}</h1>
+          <p className="ally-small">{en.whatsappBot.subtitle}</p>
         </div>
-        {canCreate && (
-          <Button variant={ButtonVariant.PRIMARY} onClick={() => setCreating(true)}>
-            {t.create}
-          </Button>
-        )}
-      </div>
+        {/* Onboarding is the only way to make an assistant (chunk 20d). */}
+        <V2Button variant="primary" onClick={() => navigate(ROUTES.CHATBOT_NEW)}>
+          {ONBOARDING_COPY.newAssistant}
+        </V2Button>
+      </header>
       {tabItems.length > 1 && (
-        <Tabs items={tabItems} activeId={activeTab} onChange={goToTab} showCount={false} />
+        <div className="ally-list-page__tabs" role="tablist" data-testid="tabs">
+          {tabItems.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              data-testid={`tab-${tab.id}`}
+              aria-selected={tab.id === activeTab}
+              className="ally-list-page__tab"
+              onClick={() => goToTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       )}
-      <div className="pt-6">
+      <div className="ally-list-page__body">
         {activeTab === "bots" &&
           (isLoading ? (
-            <SkeletonText paragraph lineCount={6} />
+            <div className="ally-list-page__grid" aria-busy="true">
+              {[0, 1, 2].map(n => (
+                <span
+                  key={n}
+                  className="ally-card ally-list-page__card ally-list-page__card--skeleton"
+                />
+              ))}
+            </div>
           ) : isError ? (
             <LoadError title={t.loadFailed} onRetry={() => void refetch()} />
           ) : (
             <ChatbotGrid
               bots={data?.chatbots ?? []}
               canCreate={canCreate}
-              onCreate={() => setCreating(true)}
+              onCreate={() => navigate(ROUTES.CHATBOT_NEW)}
             />
           ))}
         {activeTab === "connectors" && (
-          <AllConnectorsTab bots={data?.chatbots ?? []} onCreateAgent={() => setCreating(true)} />
+          <AllConnectorsTab
+            bots={data?.chatbots ?? []}
+            onCreateAgent={() => navigate(ROUTES.CHATBOT_NEW)}
+          />
+        )}
+        {activeTab === "inbox" && (
+          // Everything above the panel (the app bar, this title and the tabs) is about 240px.
+          <div style={{ ["--ally-inbox-top" as string]: "240px" }}>
+            <Inbox />
+          </div>
         )}
         {activeTab === "defaults" && <DefaultsTab />}
         {activeTab === "library" && <CorpusTab />}
       </div>
-      <CreateChatbotPanel isOpen={creating} onClose={() => setCreating(false)} />
     </div>
   );
 };
@@ -136,16 +173,6 @@ const DefaultsTab: React.FC = () => {
   );
 };
 
-const STATUS_TONE: Record<ChatbotStatus, "success" | "warning" | "neutral"> = {
-  [ChatbotStatus.LIVE]: "success",
-  [ChatbotStatus.DRAFT]: "neutral",
-  [ChatbotStatus.PAUSED]: "warning",
-};
-
-export const ChatbotStatusPill: React.FC<{ status: ChatbotStatus }> = ({ status }) => (
-  <StatusPill tone={STATUS_TONE[status]}>{t.status[status]}</StatusPill>
-);
-
 const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () => void }> = ({
   bots,
   canCreate,
@@ -164,50 +191,56 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
     );
   }
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="ally-list-page__grid">
       {bots.map(bot => (
         <button
           key={bot.id}
           type="button"
-          onClick={() => navigate(ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id))}
-          className="flex flex-col gap-3 text-left border border-border-light rounded-md p-5 hover:bg-neutral-50 min-w-0"
+          onClick={() =>
+            // An unfinished setup opens where it left off (chunk 20a), not the bot's page.
+            navigate(
+              bot.status === ChatbotStatus.DRAFT && bot.setupDraftId
+                ? ROUTES.CHATBOT_NEW_SESSION(bot.setupDraftId)
+                : ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id),
+            )
+          }
+          className="ally-card ally-list-page__card"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-base text-typography-900 font-secondary truncate">
-                {bot.name}
-              </span>
+          <span className="ally-list-page__card-top">
+            <span className="ally-list-page__name">
+              <span className="ally-list-page__bot">{bot.name}</span>
               {bot.persona.displayName && bot.persona.displayName !== bot.name && (
-                <span className="text-xs text-typography-500 truncate">
-                  {bot.persona.displayName}
-                </span>
+                <span className="ally-small">{bot.persona.displayName}</span>
               )}
-            </div>
-            <ChatbotStatusPill status={bot.status} />
-          </div>
+            </span>
+            <span
+              className={`ally-badge ally-list-page__status ally-list-page__status--${bot.status}`}
+            >
+              {t.status[bot.status]}
+            </span>
+          </span>
           {bot.description && (
-            <p className="text-sm text-typography-600 line-clamp-2">{bot.description}</p>
+            <span className="ally-small ally-list-page__desc">{bot.description}</span>
           )}
-          <div className="flex flex-wrap gap-2">
+          <span className="ally-list-page__channels">
             {bot.connectors.length ? (
               bot.connectors.map(connector => (
-                <span
-                  key={connector.id}
-                  className="text-xs px-2 py-[2px] rounded-full bg-background-100 text-typography-800"
-                >
+                <span key={connector.id} className="ally-badge ally-badge--muted">
                   {connector.typeLabel} {connector.summary?.address ?? ""}
                 </span>
               ))
             ) : (
-              <span className="text-xs text-typography-500">{t.noConnector}</span>
+              <span className="ally-small">{t.noConnector}</span>
             )}
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-typography-600">
+          </span>
+          <span className="ally-list-page__stats ally-small">
             <span>{fill(t.cardMessages, { count: bot.stats.messages })}</span>
             <span>{fill(t.cardPeople, { count: bot.stats.people })}</span>
-            <span>{fill(t.cardDocs, { count: bot.documentCount })}</span>
-            <span className="ml-auto text-typography-500">{t.role[bot.myRole]}</span>
-          </div>
+            {bot.status === ChatbotStatus.DRAFT && bot.setupDraftId && (
+              <span className="ally-list-page__continue">{ONBOARDING_COPY.continueSetup}</span>
+            )}
+            <span className="ally-list-page__role">{t.role[bot.myRole]}</span>
+          </span>
         </button>
       ))}
     </div>

@@ -58,8 +58,21 @@ export const GATEWAY_TOOLS: readonly DebriefGatewayTool[] = [
  * The gateway tools the PM agent may call (spec C1, B4). Never in a debrief
  * run's token: a debrief run cannot read expert comments, and an agent token
  * cannot call a debrief run's tools. Builder and Bug Hunter get no token.
+ * The first three only read; the rest propose or request an action, each
+ * enforced by DebriefPmAgentToolsService (never-list, FR-53, learning budget,
+ * autonomy mode). CONTRACT.md §2a.
  */
-export const PM_AGENT_GATEWAY_TOOLS = ['comments_read'] as const;
+export const PM_AGENT_GATEWAY_TOOLS = [
+  'comments_read',
+  'reporting_query',
+  'metrics_view',
+  'idea_propose',
+  'release_draft',
+  'ladder_start_quick_test',
+  'builder_handoff',
+  'bug_hunter_report',
+  'person_ask',
+] as const;
 export type PmAgentGatewayTool = (typeof PM_AGENT_GATEWAY_TOOLS)[number];
 
 /** An agent token lives at most this long: a PM agent run is minutes, not hours. */

@@ -175,7 +175,41 @@ export interface DebriefCardsData {
   progress_note?: string | null;
 }
 
-export type PmAgentIdeaKind = "prompt_edit" | "setting" | "needs_code" | "defect" | "needs_person";
+/** By route (spec C3): A is route_a until drafted, then prompt_edit / setting / registry_agent; B, C, D. */
+export type PmAgentIdeaKind =
+  | "route_a"
+  | "prompt_edit"
+  | "setting"
+  | "registry_agent"
+  | "needs_code"
+  | "defect"
+  | "needs_person";
+
+/** What the PM agent wrote for a person to act on (routes B, C, D). Never learner quotes. */
+export type PmAgentHandoff = {
+  status: "waiting" | "filed" | "answered";
+  filedId?: string | null;
+} & (
+  | {
+      kind: "builder";
+      problem: string;
+      evidenceSummary: string;
+      expectedEffect: string;
+      acceptanceChecks: string[];
+    }
+  | { kind: "bug_hunter"; summary: string; runIds: string[]; repo: string | null }
+  | { kind: "person"; topic: string; question: string; context: string; for: string }
+);
+
+/** Closing the loop (spec C5): the metric the idea named, before and after it went live. */
+export interface PmAgentForecast {
+  metric: string;
+  direction: "up" | "down";
+  baseline: number | null;
+  after?: number | null;
+  moved?: boolean | null;
+  checkedAt?: string;
+}
 
 export type PmAgentScreen =
   | { status: "running"; startedAt: string }
@@ -205,6 +239,7 @@ export interface PmAgentIdeaRow {
   title: string;
   change: {
     ideaKind: PmAgentIdeaKind;
+    route?: "A" | "B" | "C" | "D";
     promptCode: string | null;
     find: string | null;
     replace: string | null;
@@ -215,6 +250,9 @@ export interface PmAgentIdeaRow {
     hypothesis?: string;
     evidence?: string;
     expectedEffect?: string;
+    commentIds?: string[];
+    handoff?: PmAgentHandoff;
+    forecast?: PmAgentForecast;
     screen?: PmAgentScreen;
     /** Rung 2, the full gate test. */
     gate?:
@@ -378,7 +416,7 @@ export interface DebriefOwnerSettingSpec {
   min?: number;
   max?: number;
   budget?: boolean;
-  group: "quick" | "gate" | "sealed" | "trials" | "canary" | "budget" | "metrics";
+  group: "quick" | "gate" | "sealed" | "trials" | "canary" | "budget" | "metrics" | "agent";
 }
 
 export interface DebriefSettingsView {
