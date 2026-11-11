@@ -15,9 +15,12 @@ import {
 } from '../util/debrief-cards.util';
 import { guidancePassage, guidanceSearch } from '../util/debrief-guidance.util';
 import { DebriefContextRepository } from './debrief-context.repository';
+import { DebriefRunClaims } from './debrief-run-token.service';
 
 /** At most this many moments are looked up per call, as the in-process runner did. */
 const MAX_TOPICS = 3;
+/** Ask Ally's history tool: at most this many earlier points. */
+const MAX_HISTORY_POINTS = 10;
 
 export interface GuidanceTopic {
   skill?: string;
@@ -170,5 +173,37 @@ export class DebriefGatewayService {
       [run.id, JSON.stringify(p), !!body.has_risk_cue],
     );
     return { ok: true };
+  }
+
+  /**
+   * Ask Ally: the learner's earlier "Work on this" points, newest first. The
+   * learner is the one the reply token names, never one the agent asks for.
+   */
+  async learnerHistory(
+    run: DebriefRun,
+    claims: DebriefRunClaims,
+    body: { limit?: number },
+  ) {
+    const limit = Math.max(
+      1,
+      Math.min(Number(body.limit ?? MAX_HISTORY_POINTS), MAX_HISTORY_POINTS),
+    );
+    const points = await this.context.pastWorkOnThis(
+      claims.userId as number,
+      run.tenantId ?? null,
+      run.scenarioSessionId,
+      limit,
+    );
+    return { points };
+  }
+
+  /** Ask Ally: what the live detector recorded for each behaviour the scenario watches. */
+  async liveDetections(run: DebriefRun) {
+    const session = await this.context.loadSession(run.scenarioSessionId);
+    const detections = await this.context.liveDetections(
+      run.scenarioSessionId,
+      session?.scenarioId ?? null,
+    );
+    return { detections };
   }
 }

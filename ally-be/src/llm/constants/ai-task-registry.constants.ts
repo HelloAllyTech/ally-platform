@@ -974,16 +974,18 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
   {
     id: 'debrief-reply',
     task: LlmTask.DEBRIEF_REPLY,
-    runtime: LlmRuntime.ALLY_BE,
+    runtime: LlmRuntime.ALLY_AI,
     trigger:
       'A learner replies under the reflective question of a published Debrief-agent debrief',
     detail:
       'Ask Ally: answers from the published debrief and the transcript, streamed, one short reply ' +
-      'per message (≤ $0.05). Up to 4 passes, calling tools when a question needs them: ' +
+      'per message (≤ $0.05). A LangChain create_agent loop in ally-ai (app/core/ask_ally), up to ' +
+      '4 passes, calling tools through the ally-be Debrief gateway when a question needs them: ' +
       'search_guidance (Context Library, Debrief Guidance), get_learner_history and ' +
-      'get_live_detections (v9 FR-43); the last pass never calls a tool. A first-person risk ' +
-      'statement gets the fixed support reply instead, and the Safety reader reads each message ' +
-      'alongside. Replaces coaching-chat for switched-on organisations.',
+      'get_live_detections (v9 FR-43); the last pass never calls a tool. ally-be screens first: a ' +
+      'first-person risk statement gets the fixed support reply instead, and the Safety reader ' +
+      'reads each message alongside; ally-be also runs the reply checks, keeps the thread and ' +
+      'relays the stream. Replaces coaching-chat for switched-on organisations.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',

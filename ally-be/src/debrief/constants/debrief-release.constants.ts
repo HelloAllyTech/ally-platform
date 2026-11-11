@@ -115,7 +115,7 @@ export interface DebriefSettings {
 
 /** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */
 export interface DebriefReplyConfig {
-  /** A provider the in-process chat can run. */
+  /** A provider Ask Ally's agent in ally-ai can run. */
   provider: 'gemini' | 'openai' | 'anthropic';
   model: string;
   /** Room for a 120-word reply in an Indic script, which costs far more tokens than English. */
@@ -353,7 +353,7 @@ export const MANDATORY_STEPS: readonly DebriefStep[] = [
 /**
  * The platform's LLM catalog (Admin → Model Catalog), as the debrief reads it:
  * the active model ids each place a debrief model runs can call. The steps
- * run in ally-ai; Ask Ally and the reflection check run in ally-be.
+ * and Ask Ally run in ally-ai (both read its list).
  */
 export interface DebriefModelCatalog {
   steps: ReadonlySet<string>;
@@ -394,7 +394,7 @@ export function validateDebriefBundle(
     if (problem) problems.push(problem);
     else if (catalog && !catalog.reply.has(b.reply.model)) {
       problems.push(
-        `${b.reply.model} is not an active model in the LLM catalog for ally-be`,
+        `${b.reply.model} is not an active model in the LLM catalog for ally-ai`,
       );
     }
   }
