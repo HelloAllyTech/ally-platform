@@ -9503,6 +9503,7 @@ export const en = {
         sealed: "5. Sealed set (monthly)",
         budget: "Learning budget",
         metrics: "Metrics",
+        agent: "The PM agent",
       } as Record<string, string>,
       names: {
         quickTestCases: "Sessions in the quick test",
@@ -9525,6 +9526,9 @@ export const en = {
         steeringWeightPractise: "Steering score: weight of Practise-next click-through",
         steeringWeightThumbs: "Steering score: weight of thumbs-up",
         flagReviewSlaHours: "Hours to review a learner's flag",
+        pmAgentEnabled: "PM agent runs",
+        pmAgentStartsQuickTests: "PM agent starts quick tests itself (off: propose only)",
+        pmAgentRunCapUsd: "Most one PM agent run may spend ($)",
       } as Record<string, string>,
       columns: {
         setting: "Setting",
@@ -10034,7 +10038,7 @@ export const en = {
       ranAt: (when: string) => `Written ${when}`,
       runNow: "Run the PM agent now",
       running: "Running…",
-      ran: "The PM agent has finished",
+      ran: "The PM agent has started. Its report appears here when it finishes.",
       skipped: (why: string) => `The PM agent did not run: ${why}`,
       runFailed: "The PM agent could not run",
       budget: (spent: string, of: string) =>
@@ -10050,12 +10054,61 @@ export const en = {
       ideas: "Ideas",
       noIdeas: "No ideas yet.",
       kinds: {
+        route_a: "Change not drafted yet",
         prompt_edit: "Prompt change",
         setting: "Setting",
-        needs_code: "Needs a code change",
-        defect: "Looks broken",
+        registry_agent: "New analysis agent",
+        needs_code: "For Builder",
+        defect: "For Bug Hunter",
         needs_person: "Question for a person",
       } as Record<string, string>,
+      problem: "Problem",
+      evidenceComments: (n: number) => `${n} expert comment${n === 1 ? "" : "s"}`,
+      handoff: {
+        builder: "Brief for Builder",
+        bug_hunter: "Report for Bug Hunter",
+        person: "Question",
+        checks: "Acceptance checks",
+        runs: "Debrief runs",
+        forWhom: { owner: "For the owner", clinical_advisor: "For the clinical advisor" } as Record<
+          string,
+          string
+        >,
+        status: {
+          waiting: "Waiting for you",
+          filed: "Filed",
+          answered: "Answered",
+        } as Record<string, string>,
+        approve: {
+          builder: "Open a Builder session",
+          bug_hunter: "Send to Bug Hunter",
+          person: "Mark answered",
+        } as Record<string, string>,
+        title: {
+          builder: "Open a Builder session for this?",
+          bug_hunter: "Send this to Bug Hunter?",
+          person: "Mark this question answered?",
+        } as Record<string, string>,
+        body: {
+          builder:
+            "Builder gets a new session with this brief as its starting context. You are its author; a person still reviews and merges whatever it builds.",
+          bug_hunter:
+            "This files a bug report with this summary and the debrief run ids. Bug Hunter triages it like any other report.",
+          person: "The PM agent will see the question as answered on its next run.",
+        } as Record<string, string>,
+        done: {
+          builder: "Builder session opened",
+          bug_hunter: "Sent to Bug Hunter",
+          person: "Marked answered",
+        } as Record<string, string>,
+      },
+      forecast: (metric: string, before: string, after: string, moved: string) =>
+        `${metric}: ${before} before, ${after} after — ${moved}`,
+      forecastMoved: {
+        yes: "moved as expected",
+        no: "did not move as expected",
+        unknown: "not enough data",
+      },
       ideaStatus: {
         proposed: "Waiting for a decision",
         active: "Live",

@@ -23,9 +23,67 @@ import { getErrorMessage } from "@utils";
 import { formatWhen } from "./consoleTable";
 
 const SCREENABLE = new Set(["prompt_edit", "setting"]);
+const HANDOFF_KINDS = new Set(["needs_code", "defect", "needs_person"]);
 
-/** What approving does next: start the canary after a passed trial, promote after a passed canary. */
-export const stage = (idea: PmAgentIdeaRow): "canary" | "promote" | null => {
+/** The brief, report or question the PM agent wrote for a person (no learner quotes). */
+const Handoff: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
+  const s = en.debriefs.pmAgent.handoff;
+  const h = idea.evidence.handoff;
+  if (!h) return null;
+  return (
+    <div className="flex flex-col gap-1 bg-neutral-50 p-2 text-sm" data-testid="idea-handoff">
+      <p className="flex flex-wrap items-center gap-2 font-semibold">
+        {s[h.kind]}
+        <Pill tone={h.status === "waiting" ? "info" : "success"}>
+          {s.status[h.status] ?? h.status}
+        </Pill>
+        {h.kind === "person" && <span className="font-normal">{s.forWhom[h.for] ?? h.for}</span>}
+      </p>
+      {h.kind === "builder" && (
+        <>
+          <p className="whitespace-pre-wrap">{h.problem}</p>
+          <p className="whitespace-pre-wrap">{h.evidenceSummary}</p>
+          <p className="whitespace-pre-wrap">{h.expectedEffect}</p>
+          <p className="font-semibold">{s.checks}</p>
+          <ul className="list-disc pl-5">
+            {h.acceptanceChecks.map(c => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {h.kind === "bug_hunter" && (
+        <>
+          <p className="whitespace-pre-wrap">{h.summary}</p>
+          {h.runIds.length > 0 && (
+            <p className="font-mono text-xs">
+              {s.runs}: {h.runIds.join(", ")}
+            </p>
+          )}
+        </>
+      )}
+      {h.kind === "person" && (
+        <>
+          <p className="whitespace-pre-wrap">{h.question}</p>
+          {h.context && <p className="whitespace-pre-wrap text-typography-700">{h.context}</p>}
+        </>
+      )}
+    </div>
+  );
+};
+
+const num = (x: number | null | undefined) =>
+  x == null ? "—" : String(Math.round(x * 1000) / 1000);
+
+/**
+ * What approving does next: for a change, start the canary after a passed trial or promote
+ * after a passed canary; for Builder, Bug Hunter or a person, act on the hand-off once the PM
+ * agent has written it.
+ */
+export const stage = (idea: PmAgentIdeaRow): "canary" | "promote" | "handoff" | null => {
+  if (HANDOFF_KINDS.has(idea.change.ideaKind)) {
+    return idea.evidence.handoff?.status === "waiting" ? "handoff" : null;
+  }
   if (idea.evidence.canary?.status === "passed") return "promote";
   if (idea.evidence.canary?.status === "running") return null;
   return idea.evidence.trial?.status === "passed" ? "canary" : null;
@@ -162,6 +220,26 @@ const IdeaCard: React.FC<{
           <span className="font-semibold">{s.expected}:</span> {idea.evidence.expectedEffect}
         </p>
       )}
+      {(idea.evidence.commentIds?.length ?? 0) > 0 && (
+        <p className="text-xs text-typography-700">
+          {s.evidenceComments(idea.evidence.commentIds?.length ?? 0)}
+        </p>
+      )}
+      {idea.evidence.forecast?.checkedAt && (
+        <p className="text-sm" data-testid="idea-forecast">
+          {s.forecast(
+            idea.evidence.forecast.metric,
+            num(idea.evidence.forecast.baseline),
+            num(idea.evidence.forecast.after),
+            idea.evidence.forecast.moved == null
+              ? s.forecastMoved.unknown
+              : idea.evidence.forecast.moved
+                ? s.forecastMoved.yes
+                : s.forecastMoved.no,
+          )}
+        </p>
+      )}
+      <Handoff idea={idea} />
       {idea.change.ideaKind === "prompt_edit" && idea.change.find && (
         <div className="text-sm">
           <p className="font-semibold">
@@ -205,6 +283,16 @@ const IdeaCard: React.FC<{
               {stage(idea) === "promote" ? s.promote : s.startCanary}
             </Button>
           )}
+          {HANDOFF_KINDS.has(idea.change.ideaKind) && idea.evidence.handoff && (
+            <Button
+              kind="primary"
+              size="sm"
+              disabled={stage(idea) !== "handoff"}
+              onClick={() => onDecide("approve")}
+            >
+              {s.handoff.approve[idea.evidence.handoff.kind]}
+            </Button>
+          )}
           <Button kind="tertiary" size="sm" onClick={() => onDecide("reject")}>
             {s.reject}
           </Button>
@@ -229,6 +317,17 @@ export const PmAgentTab: React.FC = () => {
   const ideas = state.data?.ideas ?? [];
   const pendingIdea = pending ? ideas.find(i => i.id === pending.id) : undefined;
   const pendingStage = pendingIdea ? stage(pendingIdea) : null;
+  const handoffKind = pendingIdea?.evidence.handoff?.kind;
+  const approveText = (k: "title" | "body") =>
+    pendingStage === "handoff" && handoffKind
+      ? s.handoff[k][handoffKind]
+      : pendingStage === "promote"
+        ? k === "title"
+          ? s.promoteTitle
+          : s.promoteBody
+        : k === "title"
+          ? s.canaryTitle
+          : s.canaryBody;
 
   const runNow = async () => {
     try {
@@ -245,9 +344,11 @@ export const PmAgentTab: React.FC = () => {
       await decide(pending).unwrap();
       toast.success(
         pending.decision === "approve"
-          ? pendingStage === "promote"
-            ? s.promoted
-            : s.canaryStarted
+          ? pendingStage === "handoff" && handoffKind
+            ? s.handoff.done[handoffKind]
+            : pendingStage === "promote"
+              ? s.promoted
+              : s.canaryStarted
           : s.rejected,
       );
       setPending(null);
@@ -336,32 +437,22 @@ export const PmAgentTab: React.FC = () => {
 
       <ConfirmDialog
         isOpen={pending !== null}
-        title={
-          pending?.decision === "approve"
-            ? pendingStage === "promote"
-              ? s.promoteTitle
-              : s.canaryTitle
-            : s.rejectTitle
-        }
+        title={pending?.decision === "approve" ? approveText("title") : s.rejectTitle}
         cancelLabel={s.cancel}
         confirmLabel={
           pending?.decision === "approve"
-            ? pendingStage === "promote"
-              ? s.promoteConfirm
-              : s.canaryConfirm
+            ? pendingStage === "handoff" && handoffKind
+              ? s.handoff.approve[handoffKind]
+              : pendingStage === "promote"
+                ? s.promoteConfirm
+                : s.canaryConfirm
             : s.rejectConfirm
         }
         isWorking={deciding}
         onConfirm={() => void confirm()}
         onClose={() => setPending(null)}
       >
-        <p>
-          {pending?.decision === "approve"
-            ? pendingStage === "promote"
-              ? s.promoteBody
-              : s.canaryBody
-            : s.rejectBody}
-        </p>
+        <p>{pending?.decision === "approve" ? approveText("body") : s.rejectBody}</p>
       </ConfirmDialog>
     </div>
   );

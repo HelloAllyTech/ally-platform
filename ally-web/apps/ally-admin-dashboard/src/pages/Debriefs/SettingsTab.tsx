@@ -19,7 +19,16 @@ import { getErrorMessage } from "@utils";
 
 import { formatWhen } from "./consoleTable";
 
-const GROUPS = ["quick", "gate", "trials", "canary", "sealed", "budget", "metrics"] as const;
+const GROUPS = [
+  "quick",
+  "gate",
+  "trials",
+  "canary",
+  "sealed",
+  "budget",
+  "metrics",
+  "agent",
+] as const;
 
 type Value = number | boolean;
 

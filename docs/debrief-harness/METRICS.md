@@ -127,7 +127,7 @@ tuned on). **Gate** = a script that exits 1 on a miss.
 | | Number | Where | Status |
 |---|---|---|---|
 | Plan (kept) | Ideas through the ladder: screen → gate → trial → canary; learning budget spent | Console (PM agent tab) | Live |
-| Excerpt | **Share of tasks that end in the right database state, plus a clean path.** Offline: on planted good, bad and neutral ideas, the decision matches the known right one, within budget and with no forbidden action | Eval | Definition built; **planted ideas to build** |
+| Excerpt | **Share of tasks that end in the right database state, plus a clean path.** Offline: on planted good, bad and neutral ideas, the decision matches the known right one, within budget and with no forbidden action | Eval | Definition built; planted good/bad/neutral fixtures in `ally-ai/tests/fixtures/pm_agent_planted_ideas.json` (with the expected decision, forbidden actions and spend limit); **runner to build**. The clean path is read from `agent_lesson_audit` (`blocked` rows with `detail.neverList` for the run's `agentRunId`) |
 | Evals skill | Live: promotions that still stood 14 days later without a revert (the plan's late-revert read); ideas screened, gate-tested, promoted, reverted, rejected, waiting | Console | Live |
 | Evals skill | pass^3 and cost per correct decision | Eval | **To build** |
 

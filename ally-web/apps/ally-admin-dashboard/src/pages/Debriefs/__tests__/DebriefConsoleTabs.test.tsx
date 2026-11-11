@@ -546,6 +546,46 @@ describe("Debrief Console tabs", () => {
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
   });
 
+  it("a Builder brief from the PM agent opens a Builder session only after a person confirms", async () => {
+    h.decide.mockReturnValue(resolves({ stage: "builder", id: "b1" }));
+    h.pmAgent.mockReturnValue(
+      ok({
+        report: null,
+        at: null,
+        learningSpentUsd: 0,
+        ideas: [
+          {
+            ...IDEA,
+            change: { ...IDEA.change, ideaKind: "needs_code", route: "B" },
+            evidence: {
+              commentIds: ["c1", "c2"],
+              handoff: {
+                kind: "builder",
+                status: "waiting",
+                problem: "Learners never see the Practise-next card on Android.",
+                evidenceSummary: "practise_click_through 0.08 on android (n=60)",
+                expectedEffect: "practise_click_through up",
+                acceptanceChecks: ["The card shows first on Android"],
+              },
+            },
+          },
+        ],
+      }),
+    );
+    render(<PmAgentTab />);
+    expect(screen.getByTestId("idea-handoff")).toHaveTextContent("Brief for Builder");
+    expect(screen.getByTestId("idea-handoff")).toHaveTextContent("The card shows first on Android");
+    expect(screen.getByText("2 expert comments")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open a Builder session" }));
+    expect(h.decide).not.toHaveBeenCalled();
+    expect(screen.getByText("Open a Builder session for this?")).toBeInTheDocument();
+    const buttons = screen.getAllByRole("button", { name: "Open a Builder session" });
+    fireEvent.click(buttons[buttons.length - 1]);
+    await waitFor(() =>
+      expect(h.decide).toHaveBeenCalledWith({ id: IDEA.id, decision: "approve" }),
+    );
+  });
+
   it("Releases: picking a model makes a release with only the changed models, after confirming", async () => {
     render(<ReleasesTab />);
     const panel = screen.getByTestId("models-panel");
