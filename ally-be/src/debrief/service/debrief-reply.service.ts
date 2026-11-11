@@ -535,17 +535,14 @@ export class DebriefReplyService {
     sessionId: string,
   ): Promise<boolean> {
     try {
-      const res = await this.ai.step<{ learner_distress?: unknown[] }>(
-        'safety-reader',
-        {
-          transcript: [{ turn_index: 1, role: 'counselor', text: message }],
-          language,
-          scenario_session_id: sessionId,
-          system_prompt: await this.systemPrompt(
-            DEBRIEF_PROMPT_CODES.safetyReader,
-          ),
-        },
-      );
+      const res = await this.ai.safetyReader({
+        transcript: [{ turn_index: 1, role: 'counselor', text: message }],
+        language,
+        scenario_session_id: sessionId,
+        system_prompt: await this.systemPrompt(
+          DEBRIEF_PROMPT_CODES.safetyReader,
+        ),
+      });
       return (res.learner_distress?.length ?? 0) > 0;
     } catch {
       // The keyword screen already ran; a failed read adds nothing.

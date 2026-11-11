@@ -1,8 +1,8 @@
-"""Shapes the debrief agent's AI steps exchange with ally-be's recipe runner.
+"""Shapes the debrief agent's AI steps exchange inside the Debrief graph.
 
-ally-be owns the run and stores every one of these in the run's workspace; the
-steps here are stateless. Field names are the wire names ally-be reads, so a
-rename here is a contract change on both sides.
+The graph keeps them in its state and step records and ally-be stores the
+result on the run; the steps here are stateless. Field names are the wire
+names ally-be reads, so a rename here is a contract change on both sides.
 """
 
 from __future__ import annotations

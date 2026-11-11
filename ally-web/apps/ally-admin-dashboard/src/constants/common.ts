@@ -474,7 +474,7 @@ export const ApiEndpoints = {
     SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
     PM_AGENT: "/v1/debriefs/console/pm-agent",
-    PM_AGENT_ANALYSE: "/v1/debriefs/console/improver/analyse",
+    PM_AGENT_ANALYSE: "/v1/debriefs/console/pm-agent/analyse",
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
       `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
     RELEASES: "/v1/debriefs/console/releases",

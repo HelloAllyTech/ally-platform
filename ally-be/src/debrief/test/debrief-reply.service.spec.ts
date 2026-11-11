@@ -64,7 +64,7 @@ function build(opts: {
     manager: { query: kept },
   };
   const ai = {
-    step: jest.fn(async () => {
+    safetyReader: jest.fn(async () => {
       if (opts.safetyFails) throw new Error('down');
       return { learner_distress: opts.distress ? [{ turn_index: 1 }] : [] };
     }),

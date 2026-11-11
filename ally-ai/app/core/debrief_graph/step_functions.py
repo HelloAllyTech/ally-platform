@@ -1,11 +1,9 @@
-"""The debrief's model steps, called in-process with exactly what ally-be sent
-their HTTP endpoints, answering in the endpoints' wire shape.
+"""The debrief's model steps, called in-process by the graph's nodes.
 
-`app/api/v1/endpoints/debrief.py` maps a request body onto `steps.py` /
-`safety_reader.py` and serialises the answer through its response model; this
-does the same without HTTP, so the graph sees what ally-be's runner saw: the
-same dicts, the same `model` and `reasoning`, and the same failures (a step
-with no usable answer is a 502, one that raised is a 500).
+Each maps a step body onto `steps.py` / `safety_reader.py` and answers in the
+wire shape the former per-step endpoints used (the step records and ally-be
+read it): the same dicts, the same `model` and `reasoning`, and the same
+failures (a step with no usable answer is a 502, one that raised is a 500).
 """
 
 from __future__ import annotations

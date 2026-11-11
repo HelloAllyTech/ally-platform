@@ -205,11 +205,6 @@ export class DebriefRunnerService {
       })) as DebriefRun;
     }
     const run = created;
-    // The in-process runner's step checkpoints: the graph keeps its own now,
-    // and the finished run never stores them.
-    const workspaceNow = { ...((run.workspace ?? {}) as Record<string, any>) };
-    delete workspaceNow.stepResults;
-    run.workspace = workspaceNow;
 
     try {
       const prepared = await this.prepare(run, sessionId, opts, release, {
