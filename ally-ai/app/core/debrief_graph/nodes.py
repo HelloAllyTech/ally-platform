@@ -34,7 +34,15 @@ from app.core.debrief_graph.drafts import (
 )
 from app.core.debrief_graph.narration import n
 from app.core.debrief_graph.records import iso, js_len, progress_event, skipped
-from app.core.debrief_graph.registry.manifest import agent_config, is_orchestrated
+from app.core.debrief_graph.registry import (  # noqa: F401 - registers them
+    agents as _agents,
+)
+from app.core.debrief_graph.registry.agents._common import code_record
+from app.core.debrief_graph.registry.manifest import (
+    REGISTRY,
+    agent_config,
+    is_orchestrated,
+)
 from app.core.debrief_graph.result import build_result
 from app.core.debrief_graph.state import DebriefState as State
 
@@ -120,9 +128,20 @@ async def plan(
     }
     reserved = {"safety-reader#0": safety_est}
     goto: List[str] = ["safety_reader"]
-    # Orchestrated: the Analyst is the planner's choice, made after the safety
-    # reading (spec A1, A5).
-    if analyst_step and not orchestrated:
+    floor: Dict[str, Any] = {}
+    if orchestrated:
+        # The orchestrated floor (decided 2026-11-11): the Analyst runs beside
+        # the safety reader, on the release's model for it, and the planner
+        # reads a summary of its evidence map; the case memory it must read
+        # is applied first, in code.
+        if analyst_step:
+            analyst_step = {
+                **analyst_step,
+                **agent_config(probe, ctx, "analyst", Step.ANALYST),
+            }
+        if memory:
+            floor = floor_data_agent({**base, **probe}, ctx, "case_memory")
+    if analyst_step:
         analyst_est = _reserve(ctx, estimated, analyst_step, ctx.transcript_chars)
         if analyst_est is not None:
             estimated += analyst_est
@@ -131,12 +150,25 @@ async def plan(
     return Command(
         update={
             **base,
-            "workspace": workspace,
+            **floor,
+            "workspace": {**workspace, **floor.get("workspace", {})},
             "estimated": estimated,
             "reserved": reserved,
         },
         goto=goto,
     )
+
+
+def floor_data_agent(state: State, ctx: Ctx, agent: str) -> Dict[str, Any]:
+    """A data agent the orchestrated floor applies in code (no model, no
+    cost), recorded as the dispatcher records one: its update, answered, a step."""
+    m = REGISTRY[agent]
+    t0 = ctx.clock()
+    applied = m.apply(state, ctx)
+    record = code_record(
+        ctx, state, agent, t0, why=m.description, inputs=[], output="applied"
+    ) | {"why": "In the floor: " + m.description}
+    return {**applied, "agent_ok": {agent: True}, "steps": [record]}
 
 
 async def after_reading(
@@ -153,20 +185,6 @@ async def after_reading(
         "risk_cues": safety_res.get("risk_cues") or [],
         "learner_distress": safety_res.get("learner_distress") or [],
     }
-    if state.get("orchestrated"):
-        # The safety reading is in: the planner decides what runs next.
-        return Command(
-            update={
-                "safety": safety,
-                "evidence": {},
-                "has_risk_cue": len(safety["risk_cues"]) > 0,
-                "learner_distress": len(safety["learner_distress"]) > 0,
-                "workspace": {"safety": safety, "evidence": {}},
-                "progress": None,
-                "history": None,
-            },
-            goto="profile",
-        )
     analyst_step = ctx.step_of(state["recipe_key"], Step.ANALYST)
     analyst_res = results.get("analyst#0")
     evidence = (analyst_res or {}).get("evidence") or {}
@@ -186,6 +204,13 @@ async def after_reading(
         "progress": None,
         "history": None,
     }
+    if state.get("orchestrated"):
+        # The safety reading and the evidence map are in: the planner decides
+        # what runs next. An agent that requires the Analyst is satisfied by
+        # the floor's answer, and never offered without one.
+        if analyst_step:
+            update["agent_ok"] = {"analyst": bool(analyst_res)}
+        return Command(update={**update, "steps": steps, "rung": rung}, goto="profile")
 
     # 2. Progress reader, when the learner has history.
     progress_step = ctx.step_of(state["recipe_key"], Step.PROGRESS_READER)

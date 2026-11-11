@@ -27,7 +27,7 @@ vi.mock("@api", async importOriginal => ({
 }));
 
 // eslint-disable-next-line import/first
-import { MetricsTab, targetState } from "../MetricsTab";
+import { MetricsTab, orchestratorRows, targetState } from "../MetricsTab";
 
 const r = (n: number, of: number) => ({ n, of, value: of ? n / of : null });
 const exp = (scale = 1) => ({
@@ -369,5 +369,100 @@ describe("Debrief metrics (v9 §3.3)", () => {
     expect(screen.getByTestId("metrics-breakdown-risk")).toHaveTextContent("0 of 1");
     // An empty breakdown is left out rather than shown as an empty table.
     expect(screen.queryByTestId("metrics-breakdown-course")).toBeNull();
+  });
+});
+
+describe("the orchestrator's rows in Each agent", () => {
+  const rt = (n: number, of: number) => ({
+    n,
+    of,
+    value: of ? n / of : null,
+    low: of ? 0.1 : null,
+    high: of ? 0.9 : null,
+  });
+  const health = { ran: 7, failRate: rt(1, 8), retryRate: rt(0, 8), msP50: 1200, msP90: 3000 };
+  const agentRow = (agent: string, floor = false) => ({
+    agent,
+    floor,
+    ...health,
+    offered: 3,
+    chosenRate: floor ? rt(0, 0) : rt(1, 3),
+    findingsPerRunMean: 1,
+    droppedQuoteRate: rt(1, 2),
+    usedByWriterRate: rt(1, 1),
+    judgedHardFailRate: rt(0, 1),
+    topHardFails: [],
+  });
+  const o = {
+    runs: 7,
+    planner: {
+      ...health,
+      fallbackRate: rt(1, 7),
+      timeoutRate: rt(1, 7),
+      fallbackReasons: [{ code: "planner_failed", runs: 1 }],
+      agentsChosenMean: 1.3,
+      agentsChosenP50: 1,
+      droppedForBudgetRate: rt(1, 7),
+      droppedForTimeRate: rt(0, 7),
+      droppedUnavailableRate: rt(0, 7),
+      chosen: [{ code: "guidance_lookup", runs: 4 }],
+    },
+    topUp: { reachedRate: rt(1, 7), addedRate: rt(1, 1), passAfterTopUpRate: rt(1, 1) },
+    skippedThenMissed: {
+      overall: rt(2, 3),
+      byAgent: [{ agent: "protocol_check", whenSkipped: rt(1, 2), whenChosen: rt(0, 1) }],
+    },
+    agents: [agentRow("analyst", true), agentRow("protocol_check"), agentRow("course_patterns")],
+    protocolCheck: {
+      contradictsProtocolRate: rt(0, 1),
+      contradictsProtocolWithoutRate: rt(1, 2),
+      appliedRate: rt(1, 1),
+      protocolNamedRate: rt(1, 1),
+    },
+    languageSpecialist: { sessions: 1, missWithRate: rt(1, 1), missWithoutRate: rt(0, 0) },
+    historyDeep: {
+      unsupportedProgressWithRate: rt(0, 0),
+      unsupportedProgressWithoutRate: rt(1, 1),
+    },
+    aggregates: [
+      { agent: "course_patterns", ran: 1, noQuoteRate: rt(1, 1), smallGroupRefusedRate: rt(1, 1) },
+    ],
+  };
+  const rows = orchestratorRows(o, x => `${x.msP50} / ${x.msP90}`);
+  const find = (agent: string, measure: string) =>
+    rows.find(r => r[0] === agent && r[1] === measure)?.[2];
+
+  it("shows the planner's fallbacks, time, choices and skipped-then-missed with ranges", () => {
+    expect(
+      find(
+        "Planner",
+        "Fell back to the standard plan (planner failed, timed out or could not run)",
+      ),
+    ).toBe("14.3% (95% range 10%–90%, 1 of 7)");
+    expect(find("Planner", "Why it fell back")).toBe("planner_failed (1)");
+    expect(find("Planner", "Time, median / slowest 10%")).toBe("1200 / 3000");
+    expect(find("Planner", "Agents chosen per debrief, mean / median")).toBe("1.3 / 1");
+    expect(find("Planner", "Skipped Protocol check, then its miss showed up")).toContain("1 of 2");
+    expect(find("Top-up", "Debriefs that passed after a top-up added agents")).toContain("1 of 1");
+  });
+
+  it("gives every registry agent its rows in plain words, plus the agent-specific ones", () => {
+    expect(find("Analyst (agent)", "Chosen when available")).toBe(
+      "Always runs (not chosen by the planner)",
+    );
+    expect(find("Protocol check", "Chosen when available")).toContain("1 of 3");
+    expect(find("Protocol check", "Findings that name the protocol")).toContain("1 of 1");
+    expect(
+      find(
+        "Protocol check",
+        "Judged debriefs that contradicted a protocol, when offered but not run",
+      ),
+    ).toContain("1 of 2");
+    expect(find("Course patterns", "Refused: fewer than 5 learners in the group")).toContain(
+      "1 of 1",
+    );
+    expect(find("Protocol check", "Most common hard fails")).toBe(
+      find("Analyst (agent)", "Most common hard fails"),
+    );
   });
 });

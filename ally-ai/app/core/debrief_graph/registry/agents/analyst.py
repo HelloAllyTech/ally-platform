@@ -1,6 +1,9 @@
-"""`analyst`: today's Analyst step as a registry agent, nearly always chosen
-(spec Q1). Its evidence map stays the Writer's and the checks' input and is
-also summarised into findings."""
+"""`analyst`: today's Analyst step as a registry agent. In the floor whenever
+the orchestrator is on (decided 2026-11-11): it runs beside the safety reader
+for every session long enough to map (the Short recipe has no Analyst), the
+planner reads a summary of its evidence map, and it is never offered to the
+planner. Its evidence map stays the Writer's and the checks' input and is also
+summarised into findings."""
 
 from app.core.debrief_graph import model_steps
 from app.core.debrief_graph.constants import Step
@@ -24,7 +27,7 @@ MANIFEST = register(
             "opportunity, observed / partial / missed with the exact quote, the "
             "pivotal moments and the AI client's faults."
         ),
-        use_when="Almost always: the Writer writes from its evidence map.",
+        use_when=("Always (in the floor): the Writer writes from its evidence map."),
         skip_when=(
             "Only when the session is so short there is nothing to map; the "
             "debrief is then written from the transcript alone."
@@ -41,6 +44,7 @@ MANIFEST = register(
         eval_suite_id="debrief-analyst",
         ai_task_id="debrief-analyst",
         writer_has_own_block=True,
+        floor=True,
         step=registry_step(
             "analyst",
             model_steps.ANALYST,

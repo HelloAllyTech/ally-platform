@@ -56,6 +56,9 @@ tuned on). **Gate** = a script that exits 1 on a miss.
 
 ## Analyst
 
+In the orchestrated floor since 2026-11-11 (runs beside the safety reader; the planner reads a summary of its
+evidence map), so with the orchestrator on it also has a registry-agent row (findings used by the Writer).
+
 | | Number | Where | Status |
 |---|---|---|---|
 | Evals skill | Gave no evidence map; time p50/p90 | Console | Live |
@@ -130,6 +133,45 @@ tuned on). **Gate** = a script that exits 1 on a miss.
 | Excerpt | **Share of tasks that end in the right database state, plus a clean path.** Offline: on planted good, bad and neutral ideas, the decision matches the known right one, within budget and with no forbidden action | Eval | Definition built; planted good/bad/neutral fixtures in `ally-ai/tests/fixtures/pm_agent_planted_ideas.json` (with the expected decision, forbidden actions and spend limit); **runner to build**. The clean path is read from `agent_lesson_audit` (`blocked` rows with `detail.neverList` for the run's `agentRunId`) |
 | Evals skill | Live: promotions that still stood 14 days later without a revert (the plan's late-revert read); ideas screened, gate-tested, promoted, reverted, rejected, waiting | Console | Live |
 | Evals skill | pass^3 and cost per correct decision | Eval | **To build** |
+
+## Planner (orchestrated runs only)
+
+Definitions: `orchestratorMetrics` in `ally-be/src/debrief/util/debrief-stage-metrics.util.ts`, read from each run's
+Plan records (`workspace.plans`), its `planner` step records, findings and the judge, honouring the six filters.
+Shown on the Console under Each agent → Planner. Wired with synthetic runs (`debrief-orchestrator-metrics.spec.ts`);
+live numbers fill in once a challenger release runs. Synthetic planner cases for the offline eval:
+`docs/debrief-harness/fixtures/orchestrator/planner_cases.json`.
+
+| | Number | Where | Status |
+|---|---|---|---|
+| Spec Part E | Fallback to the default plan (planner failed, timed out, or could not run), and why (`fallbackCode`); fallbacks from a timeout alone | Console | Live, no data yet |
+| Spec Part E | Planner time p50/p90 (successful calls; a timed-out call counts as a failure, not a time) and failure rate | Console | Live, no data yet |
+| Spec Part E | Agents chosen per debrief (mean, median); most chosen agents | Console | Live, no data yet |
+| Spec A5 | Plans that lost a chosen agent for budget, for time; plans that named an agent not available | Console | Live, no data yet |
+| Decided 11-11 | **Skipped-then-missed:** of runs with a verdict (judged or expert-reviewed) where the planner considered an agent and skipped it, the share where that agent's miss showed up — protocol_check: `contradicts_protocol` or a `protocol` comment tag; history_deep and progress_reader: `unsupported_progress_claim` / check `unsupported_progress`; language_specialist: `wrong_language` (judge or check), `quote_mismatch`, or a `language` tag. Beside it, the same miss when the agent ran | Console | Live, no data yet |
+| Evals skill | Choice accuracy on planted cases (choose / never lists), pass^3 | Eval | **To build** (fixtures ready) |
+
+## Top-up (D3)
+
+| | Number | Where | Status |
+|---|---|---|---|
+| Spec Part E | Runs whose first draft fell below the bar and reached the top-up; top-ups that added an agent | Console | Live, no data yet |
+| Decided 11-11 | Debriefs that passed (the one pass definition) after a top-up added agents | Console | Live, no data yet |
+
+## Registry agents (every agent in the release)
+
+One row set per agent in `DEBRIEF_REGISTRY_AGENTS`; the Analyst and case memory run in the floor, so they have no
+chosen rate.
+
+| | Number | Where | Status |
+|---|---|---|---|
+| Decided 11-11 | Chosen when offered (kept, or chosen then dropped for budget or time); gave no answer; time p50/p90 | Console | Live, no data yet |
+| Decided 11-11 | Findings per run; quotes dropped because no turn held them; findings the Writer used (a finding whose turn or quote is in a published card, over findings with a turn or quote) | Console | Live, no data yet |
+| Decided 11-11 | Judged debriefs it worked on that still had a hard fail; the most common hard fails (how case_memory and assessment_anchoring are read) | Console | Live, no data yet |
+| protocol_check | `contradicts_protocol` rate when it ran vs when it was offered and not run; runs where a protocol applied; findings naming the protocol (`source: protocol:<code>`) | Console | Live, no data yet. Offline: expected findings on the planted protocol cases (fixtures) **to build** |
+| language_specialist | On Indic or code-mixed sessions (the plan's profile): `wrong_language` or `quote_mismatch`, with and without it | Console | Live, no data yet |
+| history_deep | On sessions with 3+ past debriefs: `unsupported_progress_claim`, with and without it | Console | Live, no data yet |
+| cohort_comparison, course_patterns | Findings with no learner's words (should be all); queries refused for a group under 5 | Console | Live, no data yet |
 
 ## Not decided yet
 

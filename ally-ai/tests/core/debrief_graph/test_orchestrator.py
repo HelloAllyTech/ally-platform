@@ -5,6 +5,7 @@ With the challenger flag off the fixed recipe runs unchanged
 (test_debrief_graph.py covers that path)."""
 
 import asyncio
+import json
 from dataclasses import replace
 
 import pytest
@@ -15,7 +16,9 @@ from app.core.debrief_graph.registry.manifest import REGISTRY, SCOPES
 from tests.core.debrief_graph.fakes import (
     ALL_AGENTS,
     CONTEXT,
+    EVIDENCE,
     SESSION,
+    TRANSCRIPT,
     FakeGateway,
     FakeSteps,
     bundle,
@@ -122,7 +125,6 @@ class TestFlagOff:
 class TestPlan:
     async def test_planned_agents_run_and_the_plan_is_recorded(self, steps, gateway):
         steps.answers["planner"] = planned(
-            "analyst",
             "guidance_lookup",
             "language_specialist",
             considered=["progress_reader"],
@@ -131,37 +133,36 @@ class TestPlan:
 
         assert result["status"] == "published"
         assert steps.count("planner") == 1
+        assert steps.count("analyst") == 1
         assert steps.count("agent-language-specialist") == 1
         assert steps.count("progress-reader") == 0
         plan = plan_of(result)
-        assert plan["source"] == "planner"
+        assert plan["source"] == "planner" and plan["fallbackCode"] is None
         assert [c["agent"] for c in plan["chosen"]] == [
-            "analyst",
             "guidance_lookup",
             "language_specialist",
         ]
         assert {"agent": "progress_reader", "whyNot": "not here"} in plan["considered"]
         assert plan["profile"]["session_type"] == "standard"
+        assert plan["evidenceSummary"]["skills"]["missed"] == ["exploring risk"]
+        assert plan["dropped"] == []
         record = next(s for s in result["steps"] if s["step"] == "plan")
-        assert record["output"].startswith("Chose analyst, guidance_lookup")
-        # Safety first, then the plan, then the agents, then the floor.
+        assert record["output"].startswith("Chose guidance_lookup, language_specialist")
+        # The floor (safety reader and Analyst) first, then the plan, then the
+        # agents, then the Writer.
         order = ran(result)
-        assert (
-            order.index("safety_reader")
-            < order.index("planner")
-            < order.index("analyst")
-        )
+        assert order.index("safety_reader") < order.index("planner")
+        assert order.index("analyst") < order.index("planner")
+        assert order.index("planner") < order.index("language_specialist")
         assert order.index("guidance_lookup") < order.index("writer")
-        # The planner never sees the transcript.
+        # The planner never sees the transcript, and is never offered the Analyst.
         planner_body = next(c["body"] for c in steps.calls if c["path"] == "planner")
         assert "transcript" not in planner_body
-        assert {a["id"] for a in planner_body["agents"]} >= {
-            "analyst",
-            "language_specialist",
-        }
+        offered = {a["id"] for a in planner_body["agents"]}
+        assert "language_specialist" in offered and "analyst" not in offered
 
     async def test_the_writer_gets_one_findings_section_by_kind(self, steps, gateway):
-        steps.answers["planner"] = planned("analyst", "language_specialist")
+        steps.answers["planner"] = planned("language_specialist")
         result = await orun(steps, gateway, bundle=orchestrated_bundle())
         writer = next(c["body"] for c in steps.calls if c["path"] == "writer")
         # The Analyst has its own block (the evidence map); the new agent's
@@ -197,13 +198,19 @@ class TestPlan:
         assert result["status"] == "published"
         plan = plan_of(result)
         assert plan["source"] == "default"
-        assert "planner failed or took longer than 8 s" in plan["fallback"]
-        # Today's Standard recipe, as data.
+        assert plan["fallbackCode"] == "planner_failed"
+        assert (
+            f"planner failed or took longer than {orchestrator.PLANNER_TIMEOUT_S:g} s"
+            in plan["fallback"]
+        )
+        # Today's Standard recipe, as data, less the Analyst that already ran
+        # in the floor.
         assert [c["agent"] for c in plan["chosen"]] == [
-            "analyst",
             "progress_reader",
             "guidance_lookup",
         ]
+        assert plan["dropped"] == []
+        assert steps.count("analyst") == 1
         failed = next(s for s in result["steps"] if s["step"] == "planner")
         assert failed["status"] == "failed" and "timeout" in failed["note"]
 
@@ -214,7 +221,35 @@ class TestPlan:
         assert plan_of(result)["source"] == "default"
         assert result["status"] == "published"
 
-    async def test_case_session_default_plan_includes_case_memory(self, steps, gateway):
+    async def test_case_memory_is_in_the_floor_with_the_analyst(self, steps, gateway):
+        """The Analyst runs before the planner, so the case memory it reads
+        is applied in code for a Case session, never left to the planner."""
+        b = orchestrated_bundle()
+        b["recipes"]["case"] = {**b["recipes"]["standard"], "key": "case"}
+        steps.answers["planner"] = planned("case_memory", "guidance_lookup")
+        result = await orun(
+            steps,
+            gateway,
+            bundle=b,
+            session={"in_case": True},
+            inputs={**CONTEXT, "case_memory": "The client lost her job."},
+        )
+        analyst = next(c["body"] for c in steps.calls if c["path"] == "analyst")
+        assert analyst["case_memory"] == "The client lost her job."
+        order = [s["step"] for s in result["steps"]]
+        assert order.index("case_memory") < order.index("analyst")
+        planner_body = next(c["body"] for c in steps.calls if c["path"] == "planner")
+        assert "case_memory" not in {a["id"] for a in planner_body["agents"]}
+        plan = plan_of(result)
+        assert [c["agent"] for c in plan["chosen"]] == ["guidance_lookup"]
+        assert {
+            "agent": "case_memory",
+            "code": "already_ran",
+            "why": "It already ran in this debrief.",
+        } in plan["dropped"]
+        assert result["workspace"]["caseMemory"] == "The client lost her job."
+
+    async def test_case_default_plan_leaves_out_the_floor(self, steps, gateway):
         b = orchestrated_bundle()
         b["recipes"]["case"] = {**b["recipes"]["standard"], "key": "case"}
         steps.fail["planner"] = "always"
@@ -226,9 +261,11 @@ class TestPlan:
             inputs={**CONTEXT, "case_memory": "The client lost her job."},
         )
         plan = plan_of(result)
-        assert [c["agent"] for c in plan["chosen"]][0] == "case_memory"
-        analyst = next(c["body"] for c in steps.calls if c["path"] == "analyst")
-        assert analyst["case_memory"] == "The client lost her job."
+        assert [c["agent"] for c in plan["chosen"]] == [
+            "progress_reader",
+            "guidance_lookup",
+        ]
+        assert plan["dropped"] == []
 
     async def test_profile_reads_risk_cues_and_language(self, steps, gateway):
         steps.answers["safety-reader"] = {
@@ -242,7 +279,7 @@ class TestPlan:
             ],
             "learner_distress": [],
         }
-        steps.answers["planner"] = planned("analyst")
+        steps.answers["planner"] = planned()
         result = await orun(steps, gateway, bundle=orchestrated_bundle())
         prof = plan_of(result)["profile"]
         assert prof["risk_cues"] == 1 and prof["risk_cue_turns"] == [2]
@@ -254,11 +291,12 @@ class TestPlan:
 class TestRefusalsAndLimits:
     async def test_agents_outside_the_release_are_refused(self, steps, gateway):
         agents = [a for a in ALL_AGENTS if a != "language_specialist"]
-        steps.answers["planner"] = planned("analyst", "language_specialist")
+        steps.answers["planner"] = planned("language_specialist")
         result = await orun(steps, gateway, bundle=orchestrated_bundle(agents))
         assert steps.count("agent-language-specialist") == 0
         assert {
             "agent": "language_specialist",
+            "code": "refused",
             "why": "Refused: this release does not enable it.",
         } in plan_of(result)["dropped"]
         # Never offered to the planner either.
@@ -270,7 +308,7 @@ class TestRefusalsAndLimits:
         for e in b["orchestrator"]["agents"]:
             if e["id"] == "language_specialist":
                 e["version"] = 2
-        steps.answers["planner"] = planned("analyst", "language_specialist")
+        steps.answers["planner"] = planned("language_specialist")
         result = await orun(steps, gateway, bundle=b)
         assert steps.count("agent-language-specialist") == 0
         dropped = {d["agent"]: d["why"] for d in plan_of(result)["dropped"]}
@@ -278,14 +316,23 @@ class TestRefusalsAndLimits:
             "Refused: the release enables version 2"
         )
 
-    async def test_unavailable_and_unmet_requires_are_dropped(self, steps, gateway):
-        # protocol_check: the org has no protocols; guidance_lookup: needs the Analyst.
-        steps.answers["planner"] = planned("protocol_check", "guidance_lookup")
+    async def test_unavailable_agents_are_dropped(self, steps, gateway):
+        # protocol_check: the org has no protocols; the Analyst: in the floor.
+        steps.answers["planner"] = planned(
+            "protocol_check", "analyst", "guidance_lookup"
+        )
         result = await orun(steps, gateway, bundle=orchestrated_bundle())
-        dropped = {d["agent"]: d["why"] for d in plan_of(result)["dropped"]}
-        assert dropped["protocol_check"] == "Not available for this session."
-        assert dropped["guidance_lookup"] == "Needs analyst, which is not in the plan."
-        assert result["status"] in ("published", "below_bar", "needs_person")
+        plan = plan_of(result)
+        dropped = {d["agent"]: (d["code"], d["why"]) for d in plan["dropped"]}
+        assert dropped["protocol_check"] == (
+            "unavailable",
+            "Not available for this session.",
+        )
+        assert dropped["analyst"] == ("already_ran", "It already ran in this debrief.")
+        # The floor's Analyst satisfies guidance_lookup's `requires`.
+        assert [c["agent"] for c in plan["chosen"]] == ["guidance_lookup"]
+        assert steps.count("analyst") == 1
+        assert result["status"] == "published"
 
     async def test_budget_drops_what_does_not_fit_after_the_floor(self, steps, gateway):
         prices = {
@@ -297,7 +344,7 @@ class TestRefusalsAndLimits:
         for e in b["orchestrator"]["agents"]:
             if e["id"] == "analyst":
                 e["model"] = None  # the recipe's analyst model
-        steps.answers["planner"] = planned("analyst", "language_specialist")
+        steps.answers["planner"] = planned("language_specialist")
         result = await orun(steps, gateway, bundle=b, prices=prices)
         dropped = {d["agent"]: d["why"] for d in plan_of(result)["dropped"]}
         assert dropped["language_specialist"].startswith("Not enough of the run budget")
@@ -307,52 +354,153 @@ class TestRefusalsAndLimits:
 
     async def test_max_agents_per_plan(self, steps, gateway):
         steps.answers["planner"] = planned(
-            "analyst", "language_specialist", "guidance_lookup"
+            "language_specialist", "guidance_lookup", "progress_reader"
         )
         result = await orun(
             steps, gateway, bundle=orchestrated_bundle(maxAgentsPerPlan=2)
         )
-        dropped = {d["agent"]: d["why"] for d in plan_of(result)["dropped"]}
-        assert dropped["guidance_lookup"] == "The plan already has 2 agents."
+        dropped = {
+            d["agent"]: (d["code"], d["why"]) for d in plan_of(result)["dropped"]
+        }
+        assert dropped["progress_reader"] == ("limit", "The plan already has 2 agents.")
 
-    async def test_a_dependant_is_skipped_when_its_requirement_fails(
+    async def test_no_evidence_map_means_its_dependants_are_never_offered(
         self, steps, gateway
     ):
-        steps.answers["planner"] = planned("analyst", "progress_reader")
+        steps.answers["planner"] = planned("progress_reader", "language_specialist")
         steps.fail["analyst"] = "always"
         result = await orun(steps, gateway, bundle=orchestrated_bundle())
         assert steps.count("progress-reader") == 0
-        skipped = next(s for s in result["steps"] if s["step"] == "progress_reader")
-        assert skipped["status"] == "skipped"
-        assert "needs analyst" in skipped["why"]
+        planner_body = next(c["body"] for c in steps.calls if c["path"] == "planner")
+        offered = {a["id"] for a in planner_body["agents"]}
+        assert offered.isdisjoint(
+            {"progress_reader", "guidance_lookup", "history_deep", "analyst"}
+        )
+        assert "language_specialist" in offered
+        dropped = {d["agent"]: d["code"] for d in plan_of(result)["dropped"]}
+        assert dropped == {"progress_reader": "unavailable"}
+        assert steps.count("agent-language-specialist") == 1
         assert result["fallback_rung"] >= 5  # writer and checks only, as today
+
+    async def test_no_budget_for_the_analyst_is_recorded_as_today(self, steps, gateway):
+        prices = {
+            **make_ctx(steps, gateway).prices,
+            "analyst-m": {"input_per_m": 10_000.0, "output_per_m": 10_000.0},
+        }
+        b = orchestrated_bundle()
+        for e in b["orchestrator"]["agents"]:
+            if e["id"] == "analyst":
+                e["model"] = None  # the recipe's (priced-out) analyst model
+        steps.answers["planner"] = planned("guidance_lookup")
+        result = await orun(steps, gateway, bundle=b, prices=prices)
+        assert steps.count("analyst") == 0
+        skipped = next(s for s in result["steps"] if s["step"] == "analyst")
+        assert skipped["status"] == "skipped" and skipped["note"] == "budget"
+        assert result["fallback_rung"] >= 5
 
 
 class TestFanOut:
-    async def test_chosen_agents_run_in_parallel(self, gateway):
+    @staticmethod
+    def barrier(paths):
+        """FakeSteps whose calls on `paths` wait until all of them started:
+        sequential runs would never see them all start."""
         started = {}
         both = asyncio.Event()
 
         class Barrier(FakeSteps):
             async def run(self, path, body, model, session_id):
-                if path in ("analyst", "agent-language-specialist"):
+                if path in paths:
                     started[path] = True
-                    if len(started) == 2:
+                    if len(started) == len(paths):
                         both.set()
-                    # Sequential runs would never see both started.
                     await asyncio.wait_for(both.wait(), timeout=2)
                 return await super().run(path, body, model, session_id)
 
-        steps = Barrier()
-        steps.answers["planner"] = planned("analyst", "language_specialist")
+        return Barrier(), both
+
+    async def test_chosen_agents_run_in_parallel(self, gateway):
+        steps, both = self.barrier(
+            ("agent-protocol-check", "agent-language-specialist")
+        )
+        steps.answers["planner"] = planned("protocol_check", "language_specialist")
+        result = await orun(
+            steps,
+            gateway,
+            bundle=orchestrated_bundle(),
+            inputs={**CONTEXT, "availability": {"org_protocols": 2}},
+        )
+        assert both.is_set()
+        assert result["status"] == "published"
+
+    async def test_the_analyst_runs_beside_the_safety_reader(self, gateway):
+        steps, both = self.barrier(("safety-reader", "analyst"))
+        steps.answers["planner"] = planned()
         result = await orun(steps, gateway, bundle=orchestrated_bundle())
         assert both.is_set()
         assert result["status"] == "published"
+        # On the release's model for it (the orchestrator block's entry).
+        assert steps.models("analyst") == ["agent-m"]
+        # Its evidence map is summarised into findings, as before.
+        assert result["workspace"]["findings"]["analyst"]["findings"]
+
+
+class TestPlannerInput:
+    async def test_planner_reads_the_evidence_summary_never_quotes(
+        self, steps, gateway
+    ):
+        evidence = {
+            **EVIDENCE,
+            "ai_faults": [
+                {
+                    "turn_index": 4,
+                    "note": 'The client repeated "Everything feels heavy." oddly.',
+                }
+            ],
+        }
+        steps.answers["analyst"] = {"evidence": evidence, "reasoning": ""}
+        steps.answers["planner"] = planned()
+        await orun(steps, gateway, bundle=orchestrated_bundle())
+        body = next(c["body"] for c in steps.calls if c["path"] == "planner")
+        assert body["evidence_summary"] == {
+            "pivotal_moments": [
+                {"turn": 2, "summary": "client signals hopelessness"},
+                {"turn": 4, "summary": "client describes heaviness"},
+            ],
+            "skills": {
+                "observed": ["open questions"],
+                "partial": [],
+                "missed": ["exploring risk"],
+            },
+            "ai_client_faults": [{"turn": 4, "note": "The client repeated … oddly."}],
+        }
+        # Nothing the learner or the client said reaches the planner.
+        sent = json.dumps(body, ensure_ascii=False)
+        for turn in TRANSCRIPT:
+            assert turn["text"] not in sent
+        assert "transcript" not in body and "evidence" not in body
+
+    async def test_short_sessions_have_no_analyst_and_offer_none_that_need_it(
+        self, steps, gateway
+    ):
+        steps.answers["planner"] = planned()
+        result = await orun(
+            steps,
+            gateway,
+            bundle=orchestrated_bundle(),
+            session={"learner_turns": 2},
+        )
+        assert steps.count("analyst") == 0
+        body = next(c["body"] for c in steps.calls if c["path"] == "planner")
+        offered = {a["id"] for a in body["agents"]}
+        needs_analyst = {a for a, m in REGISTRY.items() if "analyst" in m.requires}
+        assert offered and offered.isdisjoint(needs_analyst | {"analyst"})
+        assert body["evidence_summary"]["pivotal_moments"] == []
+        assert result["status"] in ("published", "below_bar")
 
 
 class TestFindingsQuotes:
     async def test_quotes_are_checked_against_the_transcript(self, steps, gateway):
-        steps.answers["planner"] = planned("analyst", "language_specialist")
+        steps.answers["planner"] = planned("language_specialist")
         steps.answers["agent-language-specialist"] = {
             "findings": [
                 {
@@ -385,7 +533,7 @@ class TestFindingsQuotes:
         gateway.answers["query_aggregates"] = {
             "rows": [{"skill": "exploring risk", "learners": 7, "observed_share": 0.2}]
         }
-        steps.answers["planner"] = planned("analyst", "cohort_comparison")
+        steps.answers["planner"] = planned("cohort_comparison")
         result = await orun(
             steps,
             gateway,
@@ -434,7 +582,7 @@ class TestFindingsQuotes:
         gateway.raise_on["query_aggregates"] = lambda: GatewayError(
             "query_aggregates", 500, "down"
         )
-        steps.answers["planner"] = planned("analyst", "course_patterns")
+        steps.answers["planner"] = planned("course_patterns")
         result = await orun(
             steps,
             gateway,
@@ -487,7 +635,7 @@ class TestTopUp:
     async def test_one_top_up_before_the_reviser(self, steps, gateway):
         plans = iter(
             [
-                planned("analyst"),
+                planned(),
                 planned("language_specialist"),
                 planned("guidance_lookup"),
             ]
@@ -515,7 +663,7 @@ class TestTopUp:
         assert result["status"] == "below_bar"
 
     async def test_no_top_up_when_switched_off(self, steps, gateway):
-        steps.answers["planner"] = planned("analyst")
+        steps.answers["planner"] = planned()
         steps.answers["evaluator"] = {"evaluation": evaluation(6), "reasoning": ""}
         await orun(steps, gateway, bundle=orchestrated_bundle(topUp=False))
         assert steps.count("planner") == 1
@@ -530,7 +678,7 @@ class TestTopUp:
             calls["n"] += 1
             if calls["n"] == 2:
                 raise RuntimeError("planner down")
-            return planned("analyst")
+            return planned()
 
         steps.answers["planner"] = plan
         steps.answers["evaluator"] = {"evaluation": evaluation(6), "reasoning": ""}
@@ -566,7 +714,7 @@ class TestFloor:
 async def test_resume_reuses_the_plan(steps, gateway):
     """A resumed run continues from its checkpoint: the plan is state."""
     graph = new_graph()
-    steps.answers["planner"] = planned("analyst", "language_specialist")
+    steps.answers["planner"] = planned("language_specialist")
     steps.fail["writer"] = "always"
     first = await orun(steps, gateway, graph=graph, bundle=orchestrated_bundle())
     assert first["status"] == "needs_person"

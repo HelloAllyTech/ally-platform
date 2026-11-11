@@ -524,9 +524,18 @@ async def revise(
 
 DEFAULT_PLANNER_SYSTEM = """\
 You plan the analysis behind one debrief of a mental-health training roleplay. \
-You do not see the transcript. From the SESSION PROFILE and the AVAILABLE \
+You do not see the transcript. The safety reader and the Analyst have already \
+read it. From the SESSION PROFILE, the EVIDENCE SUMMARY and the AVAILABLE \
 AGENTS, choose the agents whose findings would make THIS debrief better, and \
 say for every other available agent why it is not worth running here.
+
+The EVIDENCE SUMMARY is the Analyst's own account of the session: its pivotal \
+moments (what happened, at which turn), the skills the trainee showed, partly \
+showed or missed, and the AI client's faults. Use it to judge what a closer \
+look would add: a pivotal moment an organisation protocol covers, a missed \
+skill that keeps coming up in the learner's history, a moment whose meaning \
+depends on the language. The Writer already gets the Analyst's evidence map, \
+so never choose an agent only to repeat it.
 
 Choose few: each agent costs time and money, and the learner is waiting. Read \
 each agent's use_when and skip_when. Choose only from AVAILABLE AGENTS, by id.\
@@ -588,11 +597,13 @@ async def plan_agents(
     system: Optional[str] = None,
     critique: Optional[List[Dict[str, Any]]] = None,
     already: Optional[List[str]] = None,
+    evidence_summary: Optional[Dict[str, Any]] = None,
     scenario_session_id: Optional[str] = None,
 ):
-    """The planner (spec A5): the session profile and the manifests in, actions
-    and considered-not-chosen out. Never the transcript. A top-up call (D3)
-    also gets the Evaluator's critique and the agents that already ran."""
+    """The planner (spec A5): the session profile, a summary of the Analyst's
+    evidence map (its words, no quotes) and the manifests in, actions and
+    considered-not-chosen out. Never the transcript. A top-up call (D3) also
+    gets the Evaluator's critique and the agents that already ran."""
     from app.core.debrief.schemas import PlannerOutputReasoned
     from app.core.llm_usage.tasks import LLMTask
 
@@ -609,6 +620,7 @@ async def plan_agents(
         )
     lines.append("")
     lines += _json_block("session_profile", profile)
+    lines += _json_block("evidence_summary", evidence_summary or {})
     lines += _json_block("available_agents", agents)
     if critique is not None:
         lines += _json_block("critique", critique)

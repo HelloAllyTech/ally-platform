@@ -12,6 +12,7 @@ import {
   DebriefFilterOptions,
   DebriefMetricsFilter,
   DebriefMetricsView,
+  DebriefOrchestratorMetrics,
   DebriefPassBreakdownRow,
   DebriefPassGroup,
   DebriefRate,
@@ -562,6 +563,94 @@ const QualitySection: React.FC<{ quality: DebriefMetricsView["quality"] }> = ({ 
   );
 };
 
+const codes = (list: Array<{ code: string; runs: number }>) =>
+  list.length
+    ? list
+        .slice(0, 4)
+        .map(f => `${f.code} (${f.runs})`)
+        .join(", ")
+    : en.debriefs.metrics.none;
+
+/**
+ * The orchestrator's rows: the planner, the top-up, then every registry agent
+ * and the agent-specific measures (ally-be `orchestratorMetrics`). Nothing
+ * until a release with the orchestrator on has run.
+ */
+export const orchestratorRows = (
+  o: DebriefOrchestratorMetrics,
+  time: (h: { msP50: number | null; msP90: number | null }) => string,
+): string[][] => {
+  const a = en.debriefs.metrics.agents;
+  const p = a.planner;
+  const t = a.topUp;
+  const g = a.registry;
+  const r = rateWithRange;
+  const name = (id: string) => g.names[id] ?? id;
+  const mean = `${fixed(o.planner.agentsChosenMean)} / ${fixed(o.planner.agentsChosenP50, 0)}`;
+  const rows: string[][] = [
+    [p.name, p.runs, String(o.runs)],
+    [p.name, p.fallback, r(o.planner.fallbackRate)],
+    [p.name, p.timeout, r(o.planner.timeoutRate)],
+    [p.name, p.reasons, codes(o.planner.fallbackReasons)],
+    [p.name, p.time, time(o.planner)],
+    [p.name, p.chosen, mean],
+    [p.name, p.budget, r(o.planner.droppedForBudgetRate)],
+    [p.name, p.deadline, r(o.planner.droppedForTimeRate)],
+    [p.name, p.unavailable, r(o.planner.droppedUnavailableRate)],
+    [p.name, p.mostChosen, codes(o.planner.chosen)],
+    [p.name, p.skippedMissed, r(o.skippedThenMissed.overall)],
+    ...o.skippedThenMissed.byAgent.flatMap(b => [
+      [p.name, p.skippedMissedAgent(name(b.agent)), r(b.whenSkipped)],
+      [p.name, p.chosenMissedAgent(name(b.agent)), r(b.whenChosen)],
+    ]),
+    [t.name, t.reached, r(o.topUp.reachedRate)],
+    [t.name, t.added, r(o.topUp.addedRate)],
+    [t.name, t.passAfter, r(o.topUp.passAfterTopUpRate)],
+  ];
+  for (const ag of o.agents) {
+    const n = name(ag.agent);
+    rows.push(
+      [n, g.chosen, ag.floor ? g.floor : r(ag.chosenRate)],
+      [n, g.fail, r(ag.failRate)],
+      [n, g.time, time(ag)],
+      [n, g.findings, fixed(ag.findingsPerRunMean)],
+      [n, g.droppedQuotes, r(ag.droppedQuoteRate)],
+      [n, g.used, r(ag.usedByWriterRate)],
+      [n, g.hardFail, r(ag.judgedHardFailRate)],
+      [n, g.topHardFails, codes(ag.topHardFails)],
+    );
+    if (ag.agent === "protocol_check") {
+      rows.push(
+        [n, g.contradicts, r(o.protocolCheck.contradictsProtocolRate)],
+        [n, g.contradictsWithout, r(o.protocolCheck.contradictsProtocolWithoutRate)],
+        [n, g.applied, r(o.protocolCheck.appliedRate)],
+        [n, g.named, r(o.protocolCheck.protocolNamedRate)],
+      );
+    }
+    if (ag.agent === "language_specialist") {
+      rows.push(
+        [n, g.languageSessions, String(o.languageSpecialist.sessions)],
+        [n, g.languageWith, r(o.languageSpecialist.missWithRate)],
+        [n, g.languageWithout, r(o.languageSpecialist.missWithoutRate)],
+      );
+    }
+    if (ag.agent === "history_deep") {
+      rows.push(
+        [n, g.historyWith, r(o.historyDeep.unsupportedProgressWithRate)],
+        [n, g.historyWithout, r(o.historyDeep.unsupportedProgressWithoutRate)],
+      );
+    }
+    const agg = o.aggregates.find(x => x.agent === ag.agent);
+    if (agg) {
+      rows.push(
+        [n, g.noQuote, r(agg.noQuoteRate)],
+        [n, g.smallGroup, r(agg.smallGroupRefusedRate)],
+      );
+    }
+  }
+  return rows;
+};
+
 /** Live numbers for every agent in the debrief family, one row per measure. */
 const AgentsSection: React.FC<{ agents: DebriefMetricsView["agents"] }> = ({ agents }) => {
   const s = en.debriefs.metrics.agents;
@@ -627,6 +716,7 @@ const AgentsSection: React.FC<{ agents: DebriefMetricsView["agents"] }> = ({ age
       `${pmAgent.promoted} / ${pmAgent.reverted} / ${pmAgent.rejected} / ${pmAgent.pending}`,
     ],
     [s.pmAgent.name, s.pmAgent.held, r(pmAgent.holdRate)],
+    ...(st.orchestrator ? orchestratorRows(st.orchestrator, time) : []),
   ];
   return (
     <section className="flex flex-col gap-2" data-testid="metrics-agents">

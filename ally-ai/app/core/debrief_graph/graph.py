@@ -20,9 +20,11 @@ round, and `score_draft` stops at the recipe's `maxRevisionRounds`.
 
 With the release's challenger flag on (`bundle.orchestrator.enabled`), the same
 graph runs the orchestrated middle instead of the recipe's readers (see
-`orchestrator.py`): after_reading → profile → planner → dispatch ─Send→
-agent_<id> … → dispatch → prepare_writer, and one top-up after the first failed
-evaluation. With it off, none of those nodes is ever reached.
+`orchestrator.py`): the safety reader and the Analyst still start together
+(the Analyst is in the floor, decided 2026-11-11), then after_reading → profile
+→ planner (reads the profile and a summary of the evidence map) → dispatch
+─Send→ agent_<id> … → dispatch → prepare_writer, and one top-up after the first
+failed evaluation. With it off, none of those nodes is ever reached.
 """
 
 from __future__ import annotations
@@ -68,6 +70,8 @@ def build_graph(checkpointer: Optional[BaseCheckpointSaver]) -> CompiledStateGra
     g.add_node("dispatch", orchestrator.dispatch)
     g.add_node("top_up", orchestrator.top_up)
     for m in REGISTRY.values():
+        if m.floor:
+            continue  # run by the floor's own nodes, never dispatched
         if m.step is not None:
             g.add_node(m.node, **make_model_step(m.step))
         elif m.run is not None:

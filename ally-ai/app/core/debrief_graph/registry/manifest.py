@@ -116,6 +116,12 @@ class AgentManifest:
     #: memory), so its findings are kept for the run view but left out of
     #: the Writer's generic findings section.
     writer_has_own_block: bool = False
+    #: Runs in the floor whenever the orchestrator is on, before the planner,
+    #: and is never offered to it (decided 2026-11-11): the Analyst, whose
+    #: evidence map the Writer writes from and the planner reads a summary of,
+    #: and the case memory the Analyst must read. Agents that `require` one
+    #: are satisfied by the floor.
+    floor: bool = False
 
     @property
     def node(self) -> str:
@@ -161,6 +167,7 @@ class AgentManifest:
             "origin": self.origin,
             "evalSuiteId": self.eval_suite_id,
             "aiTaskId": self.ai_task_id,
+            "floor": self.floor,
         }
 
 

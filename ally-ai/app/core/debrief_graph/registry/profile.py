@@ -1,10 +1,11 @@
 """The session profile (spec A5): cheap facts computed in code, no model. The
-planner decides from this and the safety reading's flagged turns, never from
-the transcript itself.
+planner decides from this, the safety reading's flagged turns and a summary of
+the Analyst's evidence map (decided 2026-11-11), never from the transcript.
 """
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
 
 from app.core.debrief_graph import inputs as body
@@ -122,3 +123,45 @@ def build_profile(state: Dict[str, Any], ctx: Ctx) -> Dict[str, Any]:
         "budget_left_usd": budget_left(ctx.ceiling_usd, state.get("estimated", 0.0)),
         "time_left_ms": max(0, round(ctx.time_left_ms(bool(safety.get("risk_cues"))))),
     }
+
+
+#: The most of each list the planner reads: enough to plan from, small enough
+#: that the planner stays fast.
+_SUMMARY_MOMENTS = 6
+_SUMMARY_SKILLS = 12
+_SUMMARY_FAULTS = 5
+_SUMMARY_CHARS = 200
+#: Anything between quotation marks: the summary is the Analyst's own words,
+#: never the transcript's.
+_QUOTED = re.compile(r"[\"“”„«»][^\"“”„«»]{0,400}[\"“”„«»]|‘[^‘’]{0,400}’")
+
+
+def _own_words(text: Any) -> str:
+    return _QUOTED.sub("…", str(text or "")).strip()[:_SUMMARY_CHARS]
+
+
+def evidence_summary(evidence: Dict[str, Any]) -> Dict[str, Any]:
+    """What the planner reads of the Analyst's evidence map (decided
+    2026-11-11): the pivotal moments (summary and turn), the skills observed,
+    partial and missed, and the AI client's faults — the Analyst's words, with
+    no quote, no note on a skill, and nothing of the transcript."""
+    evidence = evidence or {}
+    moments = [
+        {"turn": m.get("turn_index"), "summary": _own_words(m.get("summary"))}
+        for m in evidence.get("pivotal_moments") or []
+        if isinstance(m, dict) and m.get("summary")
+    ][:_SUMMARY_MOMENTS]
+    skills: Dict[str, List[str]] = {"observed": [], "partial": [], "missed": []}
+    for b in evidence.get("behaviours") or []:
+        if not isinstance(b, dict) or b.get("opportunity") is False:
+            continue
+        bucket = skills.get(str(b.get("observation") or ""))
+        name = _own_words(b.get("skill"))[:60]
+        if bucket is not None and name and len(bucket) < _SUMMARY_SKILLS:
+            bucket.append(name)
+    faults = [
+        {"turn": f.get("turn_index"), "note": _own_words(f.get("note"))}
+        for f in evidence.get("ai_faults") or []
+        if isinstance(f, dict) and f.get("note")
+    ][:_SUMMARY_FAULTS]
+    return {"pivotal_moments": moments, "skills": skills, "ai_client_faults": faults}
