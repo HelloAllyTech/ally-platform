@@ -37,6 +37,9 @@ anthropic = "^0.121.0"
 # Agents v2 runtime (app/core/agent_runtime): the graph and its Postgres checkpointer.
 langgraph = "^1.2.0"
 langgraph-checkpoint-postgres = "^3.2.0"
+# The Debrief PM agent (app/core/pm_agent): one Deep Agent (planning, subagents, skills,
+# store-backed memory). 0.7.13 is the newest that keeps anthropic on ^0.121.
+deepagents = "~0.7.13"
 psycopg = {version = "^3.3.0", extras = ["binary", "pool"]}
 # Transitive (langsmith, langgraph-checkpoint-postgres), pinned here only to hold it at
 # a patch bump: the checkpointer needs >=3.11.5 and the lock was on 3.11.2.

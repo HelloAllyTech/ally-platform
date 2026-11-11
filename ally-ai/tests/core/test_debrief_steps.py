@@ -1,11 +1,9 @@
-"""The debrief agent's steps after the Safety reader, and the PM agent's
-analysis: each runs on the model the recipe names with no silent substitute,
-keeps only evidence anchored to the right speaker, and never coerces a missing
-answer into an empty one."""
+"""The debrief agent's steps after the Safety reader: each runs on the model the
+recipe names with no silent substitute, keeps only evidence anchored to the right
+speaker, and never coerces a missing answer into an empty one."""
 
 import pytest
 
-from app.core.debrief.pm_agent import PmAgentAnalysis, PmAgentIdea
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import (
     BehaviourEvidence,
@@ -172,46 +170,6 @@ async def test_evaluator_with_partial_scores_is_no_answer(dispatch_returns):
     )
     out, _ = await evaluate(TRANSCRIPT, "A debrief.", "en", "gemini-2.5-flash")
     assert out is None
-
-
-@pytest.mark.asyncio
-async def test_pm_agent_turns_an_unappliable_edit_into_a_question(dispatch_returns):
-    from app.core.debrief.pm_agent import analyse_signals
-
-    def idea(**kw):
-        base = dict(
-            kind="prompt_edit",
-            title="t",
-            hypothesis="h",
-            evidence="e",
-            expected_effect="x",
-            prompt_code="debrief_writer_system",
-        )
-        base.update(kw)
-        return PmAgentIdea(**base)
-
-    dispatch_returns(
-        PmAgentAnalysis(
-            report="r",
-            ideas=[
-                idea(find="Warm, direct", replace="Warm and direct"),
-                idea(find="not in the prompt", replace="x"),
-                idea(prompt_code="debrief_quality_rubric", find="a", replace="b"),
-            ],
-        )
-    )
-    out, _ = await analyse_signals(
-        {"runs": 10},
-        {"debrief_writer_system": "Warm, direct and specific."},
-        {},
-        [],
-        "gemini-2.5-pro",
-    )
-    assert [i.kind for i in out.ideas] == [
-        "prompt_edit",
-        "needs_person",
-        "needs_person",
-    ]
 
 
 @pytest.mark.asyncio
@@ -468,40 +426,3 @@ async def test_analyst_rates_client_turns_and_updates_case_memory(dispatch_retur
     out, _ = await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
     assert out.case_memory_update is None
     assert "CASE MEMORY" not in calls["prompt"]
-
-
-@pytest.mark.asyncio
-async def test_pm_agent_asks_for_queries_only_with_rounds_left(dispatch_returns):
-    """v9 FR-61: follow-up SQL over the reporting views, at most three, and
-    only while a pass may still ask."""
-    from app.core.debrief.pm_agent import PmAgentAnalysis, analyse_signals
-
-    asked = [f"SELECT {i} FROM debrief_reporting.runs" for i in range(5)]
-    calls = dispatch_returns(PmAgentAnalysis(report="r", follow_up_queries=asked))
-    out, _ = await analyse_signals(
-        {},
-        {},
-        {},
-        [],
-        "gemini-2.5-pro",
-        catalog="debrief_reporting.runs: one row per run",
-        rounds_left=1,
-        review="monthly",
-    )
-    assert len(out.follow_up_queries) == 3
-    prompt = calls["prompt"]
-    assert "REPORTING VIEWS" in prompt and "QUERY ROUNDS LEFT: 1" in prompt
-    assert "REVIEW: monthly" in prompt
-
-    dispatch_returns(PmAgentAnalysis(report="r", follow_up_queries=asked))
-    out, _ = await analyse_signals(
-        {},
-        {},
-        {},
-        [],
-        "gemini-2.5-pro",
-        catalog="x",
-        rounds_left=0,
-        query_results=[{"sql": "SELECT 1", "rows": [{"n": 1}]}],
-    )
-    assert out.follow_up_queries == []
