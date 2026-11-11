@@ -38,7 +38,6 @@ import {
 } from '../util/debrief-cards.util';
 import { AskAllyClient, AskAllyError, ReplyTrace } from './ask-ally.client';
 import { DebriefAgentService } from './debrief-agent.service';
-import { DebriefAiClient } from './debrief-ai.client';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { CHECK_FALLBACK } from '../constants/debrief-reply.constants';
 import { DebriefFeedbackService } from './debrief-feedback.service';
@@ -74,9 +73,10 @@ const event = (data: Record<string, unknown>): SseMessageEvent => ({
  * Every learner message is screened first by the shared first-person risk
  * matcher; a match gets the organisation's approved crisis copy and support
  * lines instead of a model reply, and an urgent review item. The debrief's
- * Safety reader reads each message alongside the reply for distress the
- * keywords miss, and adds the support lines and the review item when it
- * finds some. A reply that fails the code checks is replaced, not shown.
+ * Safety reader reads each message alongside the reply, inside Ask Ally's
+ * request to ally-ai, for distress the keywords miss; its verdict comes back
+ * on the reply's last event, and this service adds the support lines and the
+ * review item when it finds some. A reply that fails the code checks is replaced, not shown.
  *
  * The reply itself is Ask Ally's agent in ally-ai (CONTRACT.md §5): a
  * LangGraph tool loop that looks up guidance, the learner's history and the
@@ -117,7 +117,6 @@ export class DebriefReplyService {
     private readonly chats: Repository<ScenarioSessionChat>,
     @InjectRepository(ScenarioSessionChatMessage)
     private readonly messages: Repository<ScenarioSessionChatMessage>,
-    private readonly ai: DebriefAiClient,
     private readonly context: DebriefContextRepository,
     private readonly runner: DebriefRunnerService,
     private readonly agent: DebriefAgentService,
@@ -195,16 +194,16 @@ export class DebriefReplyService {
     // Guidance, the learner's history and the live detector's record are
     // tools Ask Ally calls when a question needs them; only the
     // organisation's short wording is sent up front.
-    const [transcript, system, { bundle }, org] = await Promise.all([
-      this.context.transcript(sessionId),
-      this.systemPrompt(),
-      this.runner.resolveRelease(),
-      this.orgContext(tenantId),
-    ]);
+    const [transcript, system, safetySystem, { bundle }, org] =
+      await Promise.all([
+        this.context.transcript(sessionId),
+        this.systemPrompt(),
+        this.systemPrompt(DEBRIEF_PROMPT_CODES.safetyReader),
+        this.runner.resolveRelease(),
+        this.orgContext(tenantId),
+      ]);
     // The release names Ask Ally's model, as it names every step's.
     const model = bundle.reply ?? DEBRIEF_REPLY_DEFAULT;
-    // Read alongside the reply, never in front of it: first words stay fast.
-    const distress = this.readDistress(message, language, sessionId);
     const sources = [
       ...speakerRuns(transcript),
       ...org,
@@ -236,7 +235,7 @@ export class DebriefReplyService {
       subject.next(event({ type: 'token', content: text, text }));
 
     /** The finished reply: checked, distress-screened, then sent and saved. */
-    const settle = async (full: string) => {
+    const settle = async (full: string, distress: boolean) => {
       const fails = replyCheckFailures(full, sources);
       let content = fails.length ? CHECK_FALLBACK : full;
       if (fails.length) {
@@ -250,7 +249,7 @@ export class DebriefReplyService {
           reply: full,
         });
       }
-      if (await distress) {
+      if (distress) {
         void this.feedback.raiseChatDistress(run, userId, 'safety reader');
         content += `\n\n${await this.supportReply(tenantId, language, false)}`;
       }
@@ -275,6 +274,10 @@ export class DebriefReplyService {
             message,
             run_token: this.tokens.signReply(run.id, sessionId, userId),
             gateway_url: this.tokens.gatewayUrl(),
+            // The Safety reader reads the message alongside the reply, in
+            // ally-ai; first words never wait for it.
+            language,
+            safety_system: safetySystem || null,
           },
           (text) => {
             streamed += text;
@@ -284,7 +287,7 @@ export class DebriefReplyService {
         // A quote from what a tool returned is not a misquote.
         sources.push(...res.toolTexts);
         if (res.trace) void this.keepReplyTrace(run.id, res.trace);
-        await settle(res.text);
+        await settle(res.text, res.distress);
       } catch (e) {
         this.logger.warn(
           `[debrief] Ask Ally failed for run ${run.id}: ${(e as Error).message}`,
@@ -292,10 +295,13 @@ export class DebriefReplyService {
         if (e instanceof AskAllyError && e.trace) {
           void this.keepReplyTrace(run.id, e.trace);
         }
+        // A reply that failed before its last event carries no verdict: the
+        // keyword screen already ran, and a failed read adds nothing.
+        const distress = e instanceof AskAllyError && e.distress;
         if (streamed) {
           // Words already reached the learner: finish with what they saw.
-          await settle(streamed);
-        } else if (await distress) {
+          await settle(streamed, distress);
+        } else if (distress) {
           // No reply, but the Safety reader heard distress: the support
           // lines still reach them.
           void this.feedback.raiseChatDistress(run, userId, 'safety reader');
@@ -526,28 +532,6 @@ export class DebriefReplyService {
         m.senderId === ALLY_SENDER ? ('assistant' as const) : ('user' as const),
       content: m.content,
     }));
-  }
-
-  /** True when the Safety reader finds the learner's own distress in the message. */
-  private async readDistress(
-    message: string,
-    language: string,
-    sessionId: string,
-  ): Promise<boolean> {
-    try {
-      const res = await this.ai.safetyReader({
-        transcript: [{ turn_index: 1, role: 'counselor', text: message }],
-        language,
-        scenario_session_id: sessionId,
-        system_prompt: await this.systemPrompt(
-          DEBRIEF_PROMPT_CODES.safetyReader,
-        ),
-      });
-      return (res.learner_distress?.length ?? 0) > 0;
-    } catch {
-      // The keyword screen already ran; a failed read adds nothing.
-      return false;
-    }
   }
 
   /** The organisation's approved crisis or support copy, with its lines. */

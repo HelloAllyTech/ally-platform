@@ -49,6 +49,8 @@ export interface DebriefGraphResponse {
   evaluator_hard_fails?: Array<{ code: string; evidence: string }>;
   check_failures?: Array<DebriefCheckFailure | string>;
   resumed?: boolean;
+  /** The debrief's language: recorded, or read from the learner's turns (v9 FR-39). */
+  language?: string | null;
   /** Set with status `failed`: what stopped the graph. */
   error?: string | null;
 }

@@ -51,3 +51,9 @@ class AskAllyRequest(BaseModel):
     message: str
     run_token: str
     gateway_url: str
+    #: The session's language, as the Safety reader reads the message in it.
+    language: str = "en"
+    #: The live `debrief_safety_reader_system` text the release pins; None
+    #: uses the default. The Safety reader reads the learner's message for
+    #: their own distress alongside the reply (CONTRACT.md §5).
+    safety_system: Optional[str] = None

@@ -358,11 +358,28 @@ describe('DebriefRunnerService', () => {
       expect(graph.run).not.toHaveBeenCalled();
     });
 
-    it('reads the language from the transcript when the session recorded none', async () => {
-      const { svc, request } = build({ languageRecorded: false });
+    it('leaves an unrecorded language to the graph, and keeps what it read', async () => {
+      const { svc, request } = build({
+        languageRecorded: false,
+        graph: {
+          ...graphAnswer(),
+          language: 'ta',
+          workspace: {
+            ...graphAnswer().workspace,
+            languageSource: 'detected',
+          },
+        },
+      });
       const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
-      expect(run.workspace?.languageSource).toMatch(/^detected/);
-      expect(request().session.language_source).toMatch(/^detected/);
+      // ally-be sends what it knows: the default, flagged as not recorded.
+      expect(request().session).toMatchObject({
+        language: 'en',
+        language_source: null,
+        language_recorded: false,
+      });
+      // The graph's answer fills the run record as detection here did.
+      expect(run.language).toBe('ta');
+      expect(run.workspace?.languageSource).toBe('detected');
     });
 
     it('reads the case memory for a case session, and debriefs on when an optional read fails', async () => {

@@ -33,6 +33,7 @@ describe('AskAllyClient', () => {
           text: 'Ask it plainly — शांति से.',
           tool_texts: ['Risk guide: Ask plainly.'],
           trace: { turns: 2, tools: [] },
+          distress: true,
         },
       ]),
     });
@@ -45,6 +46,7 @@ describe('AskAllyClient', () => {
       text: 'Ask it plainly — शांति से.',
       toolTexts: ['Risk guide: Ask plainly.'],
       trace: { turns: 2, tools: [] },
+      distress: true,
     });
     const [url, body, config] = post.mock.calls[0];
     expect(url).toBe('http://ai/api/v1/ask-ally/replies');
@@ -57,12 +59,28 @@ describe('AskAllyClient', () => {
     post.mockResolvedValue({
       data: ndjson([
         { type: 'token', text: 'Let me check.' },
-        { type: 'error', error: 'down', text: 'Let me check.', trace: null },
+        {
+          type: 'error',
+          error: 'down',
+          text: 'Let me check.',
+          trace: null,
+          distress: true,
+        },
       ]),
     });
     const err = await client.reply({} as any, () => undefined).catch((e) => e);
     expect(err).toBeInstanceOf(AskAllyError);
     expect(err.streamed).toBe('Let me check.');
+    // The Safety reader's verdict rides on the error too.
+    expect(err.distress).toBe(true);
+  });
+
+  it('reads a last event without a verdict as no distress', async () => {
+    post.mockResolvedValue({
+      data: ndjson([{ type: 'done', text: 'Hi', tool_texts: [], trace: null }]),
+    });
+    const res = await client.reply({} as any, () => undefined);
+    expect(res.distress).toBe(false);
   });
 
   it('throws when ally-ai cannot be reached, or the stream stops early', async () => {
@@ -76,5 +94,7 @@ describe('AskAllyClient', () => {
     const err = await client.reply({} as any, () => undefined).catch((e) => e);
     expect(err.message).toBe('ask-ally stream ended early');
     expect(err.streamed).toBe('Half');
+    // No last event, no verdict: the keyword screen already ran.
+    expect(err.distress).toBe(false);
   });
 });

@@ -3,16 +3,25 @@
 Events, one JSON object per line (CONTRACT.md §5):
 
 - `{"type": "token", "text": ...}` — reply text as it arrives, every pass;
-- `{"type": "done", "text", "tool_texts", "trace"}` — the reply finished;
-- `{"type": "error", "error", "text", "trace"}` — it stopped; `text` is what
-  the learner already saw (ally-be finishes with it, or reports the error).
+- `{"type": "done", "text", "tool_texts", "trace", "distress"}` — the reply
+  finished;
+- `{"type": "error", "error", "text", "trace", "distress"}` — it stopped;
+  `text` is what the learner already saw (ally-be finishes with it, or reports
+  the error).
+
+`distress` (both last events): the Safety reader, run in-process alongside the
+reply from the first moment, found the learner's own distress in the message.
+False when it found none, and when the reading failed or took longer than
+`DISTRESS_TIMEOUT_S` — ally-be's keyword screen already ran before the call.
+The reply's words never wait for it; only the last event does.
 
 Never traced to LangSmith: the reply carries the learner's words.
 """
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Callable, Dict, Optional
+import asyncio
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, Optional
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
@@ -29,6 +38,7 @@ from app.core.ask_ally.middleware import ReplyLimits, ToolTrace, tool_unavailabl
 from app.core.ask_ally.models import build_reply_model
 from app.core.ask_ally.schemas import AskAllyRequest
 from app.core.ask_ally.tools import ASK_ALLY_TOOLS
+from app.core.debrief.safety_reader import TranscriptTurn, read_safety
 from app.core.debrief_graph.gateway import Gateway, HttpGateway
 from app.utils.logger import get_logger
 
@@ -38,6 +48,39 @@ logger = get_logger(__name__)
 TOOL_TIMEOUT_S = 1.5
 #: One retry for a pass that failed before any of its words reached the learner.
 MODEL_RETRIES = 1
+#: How long the Safety reader may take: about one and a half times the slowest
+#: healthy call in prod over 30 days (Oct–Nov 2026, longest 42 s), so a stuck
+#: call is cut while a slow one still finishes. Was ally-be's
+#: SAFETY_READER_TIMEOUT_MS on the old HTTP hop.
+DISTRESS_TIMEOUT_S = 60.0
+
+DistressReader = Callable[[AskAllyRequest], Awaitable[bool]]
+
+
+async def read_distress(req: AskAllyRequest) -> bool:
+    """True when the Safety reader finds the learner's own distress in the
+    message: the message read as one counsellor turn, on the default safety
+    model, as ally-be's old `readDistress` sent it."""
+    reading, _ = await read_safety(
+        [TranscriptTurn(turn_index=1, role="counselor", text=req.message)],
+        req.language,
+        system=req.safety_system,
+        scenario_session_id=req.scenario_session_id,
+    )
+    if reading is None:
+        # No usable answer: the old endpoint's 502, which ally-be read as false.
+        raise ValueError("safety reader returned no usable answer")
+    return len(reading.learner_distress) > 0
+
+
+async def _settle_distress(task: "asyncio.Task[bool]", run_id: str) -> bool:
+    try:
+        return bool(await asyncio.wait_for(task, DISTRESS_TIMEOUT_S))
+    except Exception as e:  # noqa: BLE001 - a failed read adds nothing
+        logger.warning(
+            "Ask Ally distress read for run %s failed: %s", run_id, type(e).__name__
+        )
+        return False
 
 
 def build_agent(run: ReplyRun, model: BaseChatModel, system: str):
@@ -82,7 +125,10 @@ async def stream_reply(
     *,
     gateway: Optional[Gateway] = None,
     model_factory: Callable[..., BaseChatModel] = build_reply_model,
+    distress_reader: DistressReader = read_distress,
 ) -> AsyncIterator[Dict[str, Any]]:
+    # Read alongside the reply, never in front of it: first words stay fast.
+    distress = asyncio.ensure_future(distress_reader(req))
     gw = gateway or HttpGateway(req.gateway_url, req.run_token, TOOL_TIMEOUT_S)
     run = ReplyRun(
         run_id=req.run_id,
@@ -120,9 +166,11 @@ async def stream_reply(
                 if text:
                     run.streamed.append(text)
                     yield _event("token", text=text)
-        yield _event(
+        done = _event(
             "done", text=run.text, tool_texts=run.tool_texts, trace=run.trace()
         )
+        done["distress"] = await _settle_distress(distress, req.run_id)
+        yield done
     except Exception as e:  # noqa: BLE001 - reported to ally-be, which decides
         logger.warning(
             "Ask Ally reply for run %s failed: %s", req.run_id, type(e).__name__
@@ -132,8 +180,11 @@ async def stream_reply(
             error=(str(e) or type(e).__name__)[:300],
             text=run.text,
             trace=run.trace(),
+            distress=await _settle_distress(distress, req.run_id),
         )
     finally:
+        if not distress.done():
+            distress.cancel()
         try:
             await gw.aclose()
         except Exception:  # noqa: BLE001

@@ -1,24 +1,16 @@
-"""The Debrief agent's endpoints.
+"""The Debrief agent's endpoint.
 
 - `POST /debrief/runs`: one whole debrief on the Debrief graph (CONTRACT.md §1).
   ally-be prepares the inputs and applies the result; the graph runs every step
   in-process.
-- `POST /debrief/safety-reader`: the Safety reader on its own, for ally-be's Ask
-  Ally distress screen (its one caller).
+
+The Safety reader has no endpoint of its own: the graph runs it in-process, and
+Ask Ally's distress check runs it inside `POST /ask-ally/replies` (CONTRACT.md §5).
 """
 
-from typing import List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
 
 from app.core.agent_runtime.checkpointer import checkpointer_available
-from app.core.debrief.safety_reader import (
-    LearnerDistress,
-    RiskCue,
-    TranscriptTurn,
-    read_safety,
-)
 from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import HttpGateway
 from app.core.debrief_graph.graph import get_debrief_graph
@@ -32,62 +24,11 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-class SafetyReaderRequest(BaseModel):
-    # Every turn, both speakers, numbered from 1.
-    transcript: List[TranscriptTurn] = Field(default_factory=list)
-    language: str = "en"
-    # The live `debrief_safety_reader_system` text; None uses the default.
-    system_prompt: Optional[str] = None
-    scenario_session_id: Optional[str] = None
-    # The release's model for this step; None uses DEBRIEF.SAFETY_READER_MODEL.
-    model: Optional[str] = None
-
-
-class SafetyReaderResponse(BaseModel):
-    model: str
-    risk_cues: List[RiskCue]
-    learner_distress: List[LearnerDistress]
-
-
-@router.post("/safety-reader", response_model=SafetyReaderResponse)
-async def safety_reader(req: SafetyReaderRequest) -> SafetyReaderResponse:
-    """Read one session for client risk cues and the learner's own distress.
-
-    A model that returns nothing usable is a 502, never an empty reading: the
-    step is mandatory, and an empty answer would read as a safe session.
-    """
-    try:
-        reading, model = await read_safety(
-            req.transcript,
-            req.language,
-            system=req.system_prompt,
-            scenario_session_id=req.scenario_session_id,
-            model=req.model,
-        )
-    except Exception as exc:  # noqa: BLE001 - surface as 500, keep caller decoupled
-        logger.exception("[debrief-safety] reader failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="safety reader failed",
-        ) from exc
-    if reading is None:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="safety reader returned no usable answer",
-        )
-    return SafetyReaderResponse(
-        model=model,
-        risk_cues=reading.risk_cues,
-        learner_distress=reading.learner_distress,
-    )
-
-
 # --- The Debrief graph -------------------------------------------------------------
 #
 # The whole run in one call: ally-be prepares the inputs and applies the result;
 # the graph runs the recipe (CONTRACT.md in docs/debrief-harness). The graph calls
-# the step functions in-process; only the Safety reader keeps an endpoint (Ask Ally's
-# distress check calls it).
+# the step functions in-process.
 
 
 def get_graph():

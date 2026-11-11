@@ -43,4 +43,6 @@ class DebriefRunResponse(BaseModel):
     evaluator_hard_fails: List[Dict[str, Any]] = Field(default_factory=list)
     check_failures: List[Dict[str, Any]] = Field(default_factory=list)
     resumed: bool = False
+    #: The debrief's language (recorded, or read from the learner's turns).
+    language: Optional[str] = None
     error: Optional[str] = None

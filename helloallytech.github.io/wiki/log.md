@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-11] update | `repos/ally-ai.md`: `/debrief/safety-reader` is gone; Ask Ally's distress check and language detection moved into ally-ai.
+
+- `repos/ally-ai.md`: the Safety reader's description moves under `/debrief/runs` (the graph runs it in-process); `/ask-ally/replies` returns its distress reading on the last event; the graph reads an unrecorded session language from the learner's turns.
+
 ## [2026-11-11] update | `repos/ally-ai.md`, `repos/ally-be.md`: the Debrief PM agent is `/pm-agent/runs`; the old `/debrief/pm-agent/analyse` is gone.
 
 - `repos/ally-ai.md`: `/pm-agent/runs` (the PM agent Deep Agent) replaces the stale `/debrief/pm-agent/analyse` entry.

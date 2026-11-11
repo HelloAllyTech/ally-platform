@@ -26,7 +26,6 @@ import { DebriefFeedback } from './entity/debrief-feedback.entity';
 import { DebriefRun } from './entity/debrief-run.entity';
 import { DebriefAgentService } from './service/debrief-agent.service';
 import { AskAllyClient } from './service/ask-ally.client';
-import { DebriefAiClient } from './service/debrief-ai.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
 import { DebriefContextRepository } from './service/debrief-context.repository';
 import { DebriefFeedbackService } from './service/debrief-feedback.service';
@@ -109,7 +108,6 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
   providers: [
     // Ask Ally's agent in ally-ai (CONTRACT.md §5).
     AskAllyClient,
-    DebriefAiClient,
     DebriefContextRepository,
     DebriefGraphClient,
     DebriefRunTokenService,
