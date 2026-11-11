@@ -2,7 +2,7 @@ import axios from 'axios';
 import {
   DebriefAiClient,
   DebriefStepError,
-  STEP_TIMEOUT_MS,
+  SAFETY_READER_TIMEOUT_MS,
 } from '../service/debrief-ai.client';
 
 jest.mock('axios');
@@ -15,24 +15,22 @@ describe('DebriefAiClient', () => {
 
   beforeEach(() => post.mockReset().mockResolvedValue({ data: { ok: true } }));
 
-  it('cuts a stuck Safety reader call at one minute, not two', async () => {
-    await client.step('safety-reader', {});
+  it('calls the Safety reader endpoint and cuts a stuck call at one minute', async () => {
+    await client.safetyReader({});
+    expect(post.mock.calls[0][0]).toBe(
+      'http://ai/api/v1/debrief/safety-reader',
+    );
     expect(post.mock.calls[0][2].timeout).toBe(60_000);
-    expect(STEP_TIMEOUT_MS['safety-reader']).toBeLessThan(120_000);
+    expect(SAFETY_READER_TIMEOUT_MS).toBe(60_000);
   });
 
-  it('gives anything else the run-length default', async () => {
-    await client.step('another-step', {});
-    expect(post.mock.calls[0][2].timeout).toBe(120_000);
-  });
-
-  it('turns a timeout into a step error the runner retries', async () => {
+  it('turns a timeout into a step error', async () => {
     post.mockRejectedValue(
       Object.assign(new Error('timeout of 60000ms exceeded'), {
         code: 'ECONNABORTED',
       }),
     );
-    await expect(client.step('safety-reader', {})).rejects.toBeInstanceOf(
+    await expect(client.safetyReader({})).rejects.toBeInstanceOf(
       DebriefStepError,
     );
   });

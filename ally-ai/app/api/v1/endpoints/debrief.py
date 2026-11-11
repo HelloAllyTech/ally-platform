@@ -1,8 +1,10 @@
-"""The debrief agent's steps — stateless transforms ally-be's recipe runner calls.
+"""The Debrief agent's endpoints.
 
-ally-be owns the run: it picks the recipe, gathers the inputs, sends the live
-prompt text from the Skills Store, and stores every result in the run's
-workspace. This service only performs the step.
+- `POST /debrief/runs`: one whole debrief on the Debrief graph (CONTRACT.md §1).
+  ally-be prepares the inputs and applies the result; the graph runs every step
+  in-process.
+- `POST /debrief/safety-reader`: the Safety reader on its own, for ally-be's Ask
+  Ally distress screen (its one caller).
 """
 
 from typing import List, Optional

@@ -8,6 +8,11 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-11-11] update | `repos/ally-ai.md`, `repos/ally-be.md`: the Debrief PM agent is `/pm-agent/runs`; the old `/debrief/pm-agent/analyse` is gone.
+
+- `repos/ally-ai.md`: `/pm-agent/runs` (the PM agent Deep Agent) replaces the stale `/debrief/pm-agent/analyse` entry.
+- `repos/ally-be.md`: debrief runs are checkpointed in ally-ai's graph, not on the run row; the PM agent works through the gateway tools.
+
 ## [2026-11-10] update | `contributing/planning-with-context-library.md`, `platform/agent-guide.md`, `repos/ally-mobile.md`: `ally-mobile` wired to the Context Library; desktop-app and user-scope setup documented.
 
 `ally-mobile` now commits the `context-library` `.mcp.json`, skill and CLAUDE.md/AGENTS.md rule like every other app, so the "not wired yet — ask in conversation" notes are gone. The setup guide gains the Claude desktop app's missing-environment fix (`launchctl setenv`, the *"'url' is not a valid URL"* symptom) and an optional user-scope server for sessions outside the app directories. `platform/agent-guide.md` no longer claims every repo's `.mcp.json` declares the server — the monorepo root doesn't. No page added, moved or retitled.

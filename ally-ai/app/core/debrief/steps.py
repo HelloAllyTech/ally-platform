@@ -2,12 +2,12 @@
 reader, Writer, Evaluator and Reviser.
 
 Each is one structured call through the model gateway (`generate_structured`),
-on the model ally-be's recipe names for it, with the live prompt text ally-be
-sends from the Skills Store (the defaults below are the fallback). ally-be runs
-the recipe, enforces budgets and deadlines, runs the rule checks and stores
-everything; these functions only perform the step.
+on the model the release's recipe names for it, with the live prompt text ally-be
+sends from the Skills Store (the defaults below are the fallback). The Debrief
+graph (`app/core/debrief_graph/`) runs the recipe, budgets and deadlines and
+calls ally-be's rule checks; these functions only perform the step.
 
-What each step may see is enforced by what ally-be sends — the Writer is never
+What each step may see is enforced by the body the graph builds — the Writer is never
 sent the rubric, the Evaluator never the Writer's reasoning, the Progress reader
 never the full transcript.
 """

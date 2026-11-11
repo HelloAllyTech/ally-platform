@@ -396,7 +396,7 @@ export class DebriefConsoleController {
     return run;
   }
 
-  @Get(['pm-agent', 'improver'])
+  @Get('pm-agent')
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({ summary: "The PM agent's latest report and its ideas" })
   async pmAgentState() {
@@ -406,6 +406,8 @@ export class DebriefConsoleController {
     };
   }
 
+  // `improver/analyse`: the path the released admin still calls; remove it
+  // once an admin build that calls `pm-agent/analyse` is live.
   @Post(['pm-agent/analyse', 'improver/analyse'])
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({
@@ -416,7 +418,7 @@ export class DebriefConsoleController {
     return this.pmRuns.start(req.user.id);
   }
 
-  @Post(['pm-agent/ideas/:id/screen', 'improver/ideas/:id/screen'])
+  @Post('pm-agent/ideas/:id/screen')
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({
     summary: 'Screen an idea on the open test set against the current release',
@@ -425,7 +427,7 @@ export class DebriefConsoleController {
     return this.pmAgent.screen(id);
   }
 
-  @Post(['pm-agent/ideas/:id/approve', 'improver/ideas/:id/approve'])
+  @Post('pm-agent/ideas/:id/approve')
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({
     summary:
@@ -439,7 +441,7 @@ export class DebriefConsoleController {
     return this.pmAgent.approve(id, req.user.id, body?.reason);
   }
 
-  @Post(['pm-agent/ideas/:id/reject', 'improver/ideas/:id/reject'])
+  @Post('pm-agent/ideas/:id/reject')
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({ summary: 'Reject an idea' })
   reject(

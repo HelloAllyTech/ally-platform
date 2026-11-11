@@ -490,13 +490,12 @@ describe('DebriefRunnerService', () => {
         mode: DebriefRunMode.SHADOW,
         status: DebriefRunStatus.RUNNING,
         fallbackRung: 0,
-        workspace: { resumes: 1, stepResults: { 'writer#0': {} } },
+        workspace: { resumes: 1 },
       } as any;
       const done = await svc.resume(stuck);
       expect(request()).toMatchObject({ run_id: 'run-9', resume: true });
       expect(done.status).toBe(DebriefRunStatus.PUBLISHED);
       expect(done.workspace.resumes).toBe(1);
-      expect(done.workspace.stepResults).toBeUndefined();
     });
   });
 });

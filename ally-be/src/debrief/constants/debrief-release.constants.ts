@@ -49,9 +49,6 @@ export function modelProblem(model: string): string | null {
   if (!computeCostUsd(model, 1, 1).priced) return `${model} has no known price`;
   return null;
 }
-/** Learning-loop calls (PM agent, screens) are ledgered apart from production. */
-export const DEBRIEF_LEARNING_AGENT_KEY = 'debrief_learning';
-
 export enum DebriefStep {
   SAFETY_READER = 'safety_reader',
   ANALYST = 'analyst',

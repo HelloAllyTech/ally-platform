@@ -47,16 +47,6 @@ import {
 /** Sessions screened at once; each runs both arms side by side. */
 const SCREEN_CONCURRENCY = 3;
 
-/** What an idea is, by route (spec C3): A's three kinds, then B, C and D. */
-export type PmAgentIdeaKind =
-  | 'route_a'
-  | 'prompt_edit'
-  | 'setting'
-  | 'registry_agent'
-  | 'needs_code'
-  | 'defect'
-  | 'needs_person';
-
 /**
  * The PM agent's ladder and approvals (v9 FR-52, D11): ally-be's
  * deterministic half. The thinking is the PM agent Deep Agent in ally-ai
