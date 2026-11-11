@@ -112,6 +112,14 @@ export function pairedDifference(
   };
 }
 
+/** Session length by learner turns: the bands the test sets are stratified by, and the Console cuts by. */
+export function lengthBand(learnerTurns: number): string {
+  if (learnerTurns < 6) return '1-5';
+  if (learnerTurns <= 15) return '6-15';
+  if (learnerTurns <= 30) return '16-30';
+  return '31+';
+}
+
 /** Below this many in the denominator a rate is shown but marked thin. */
 export const MIN_RATE_SAMPLE = 20;
 

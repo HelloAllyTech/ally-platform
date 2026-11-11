@@ -1,6 +1,7 @@
 import {
   askAllyReplyOutcome,
   debriefOutcome,
+  passBreakdown,
   passRollup,
   pmIdeaOutcome,
   judgeVersionOf,
@@ -246,5 +247,86 @@ describe('pmIdeaOutcome: the right final state, and a clean path', () => {
       pmIdeaOutcome({ status: 'active', canaryStatus: 'reverted' }, { now }),
     ).toMatchObject({ decision: 'reverted', pass: false });
     expect(pmIdeaOutcome({ status: 'rejected' }, { now }).pass).toBeNull();
+  });
+});
+
+describe('passBreakdown and the rollup breakdowns', () => {
+  const run = (over: Record<string, unknown>) => ({
+    week: '2026-11-09',
+    language: 'en',
+    status: 'published',
+    cards: {},
+    checkFailures: [],
+    steps: [
+      { step: 'safety_reader', status: 'done', model: 'gemini-2.5-flash' },
+      { step: 'writer', status: 'done', model: 'gemini-3-flash-preview' },
+    ],
+    workspace: {
+      judge: { model: 'm', promptVersion: 'v', overall: 9, hardFails: [] },
+    },
+    ...over,
+  });
+
+  it('counts a run under every key it has, and under none when it has none', () => {
+    const rows = passBreakdown(
+      [
+        run({ skills: ['empathy', 'open questions'] }),
+        run({ skills: ['empathy'] }),
+        run({}),
+      ] as any,
+      (r) => r.skills ?? [],
+    );
+    expect(rows.map((r) => [r.key, r.debriefs])).toEqual([
+      ['empathy', 2],
+      ['open questions', 1],
+    ]);
+  });
+
+  it('breaks the pass rate down by skill, scenario, course, session length, step model and risk', () => {
+    const r = passRollup(
+      [
+        run({
+          skills: ['empathy'],
+          scenario: 'Exam stress',
+          courses: ['Basics'],
+          learnerTurns: 4,
+          hasRiskCue: false,
+        }),
+        run({
+          skills: ['empathy'],
+          scenario: 'Exam stress',
+          courses: ['Basics', 'Advanced'],
+          learnerTurns: 22,
+          hasRiskCue: true,
+          workspace: {
+            judge: {
+              model: 'm',
+              promptVersion: 'v',
+              overall: 3,
+              hardFails: [{ code: 'missed_risk_cue' }],
+            },
+          },
+        }),
+      ] as any,
+      (n) => (n < 6 ? '1-5' : n <= 30 ? '16-30' : '31+'),
+    );
+    expect(r.breakdowns.skill[0]).toMatchObject({
+      key: 'empathy',
+      debriefs: 2,
+    });
+    expect(r.breakdowns.skill[0].passRate).toMatchObject({ n: 1, of: 2 });
+    expect(r.breakdowns.course.map((c) => c.key).sort()).toEqual([
+      'Advanced',
+      'Basics',
+    ]);
+    expect(r.breakdowns.sessionLength.map((c) => c.key).sort()).toEqual([
+      '1-5',
+      '16-30',
+    ]);
+    expect(r.breakdowns.stepModel.map((c) => c.key)).toContain(
+      'safety_reader: gemini-2.5-flash',
+    );
+    const risk = r.breakdowns.risk.find((x) => x.key === 'risk cue')!;
+    expect(risk.passRate).toMatchObject({ n: 0, of: 1 });
   });
 });

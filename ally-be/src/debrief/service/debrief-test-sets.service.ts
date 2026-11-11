@@ -9,6 +9,9 @@ import {
 } from '../../analytics/util/session-eligibility.util';
 import { debriefOverallSql } from '../../analytics/constants/debrief-quality.constants';
 import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { lengthBand } from '../util/debrief-metrics.util';
+
+export { lengthBand };
 
 /**
  * The three test sets, built from real sessions (plan §9.5).
@@ -46,13 +49,6 @@ export function setForSession(sessionId: string): DebriefTestSet {
   if (n < 60) return DebriefTestSet.OPEN;
   if (n < 85) return DebriefTestSet.GATE;
   return DebriefTestSet.SEALED;
-}
-
-export function lengthBand(learnerTurns: number): string {
-  if (learnerTurns < 6) return '1-5';
-  if (learnerTurns <= 15) return '6-15';
-  if (learnerTurns <= 30) return '16-30';
-  return '31+';
 }
 
 /** Per stratum (language × length × today's quality band), at most this many sessions. */

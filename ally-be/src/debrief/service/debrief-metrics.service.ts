@@ -18,6 +18,12 @@ import {
 } from '../util/debrief-outcome.util';
 import { stageMetrics, StageRun } from '../util/debrief-stage-metrics.util';
 import { CHECK_FALLBACK } from './debrief-reply.service';
+import {
+  MetricsFilter,
+  metricsFilterSql,
+} from '../util/debrief-metrics-filter.util';
+import { lengthBand } from '../util/debrief-metrics.util';
+import { cardSkills, DebriefCards } from '../util/debrief-cards.util';
 
 /** Live debriefs a learner can read. */
 const READABLE = `r.mode = 'live' AND r.status IN ('published','below_bar')`;
@@ -75,7 +81,8 @@ export class DebriefMetricsService {
     private readonly settings: DebriefSettingsService,
   ) {}
 
-  async view(weeks = 12) {
+  async view(weeks = 12, filter: MetricsFilter = {}) {
+    const fsql = metricsFilterSql(filter);
     const w = Math.max(4, Math.min(52, Math.round(weeks)));
     const s = await this.settings.get();
     const weights = {
@@ -83,7 +90,7 @@ export class DebriefMetricsService {
       practise: s.steeringWeightPractise,
       thumbs: s.steeringWeightThumbs,
     };
-    const rows = await this.weekly(w, s.flagReviewSlaHours);
+    const rows = await this.weekly(w, s.flagReviewSlaHours, fsql);
     const series: DebriefMetricsWeek[] = rows.map((r) => {
       const practise = rate(
         num(r.practise_clicks),
@@ -133,14 +140,14 @@ export class DebriefMetricsService {
       askAlly,
       pmAgent,
     ] = await Promise.all([
-      this.breakdown(w, s.flagReviewSlaHours, 'language'),
-      this.breakdown(w, s.flagReviewSlaHours, 'platform'),
+      this.breakdown(w, s.flagReviewSlaHours, 'language', fsql),
+      this.breakdown(w, s.flagReviewSlaHours, 'platform', fsql),
       this.baselines(),
       this.uptakeByMonth(6),
       this.latestSafetyRecall(),
-      this.quality(w),
-      this.stages(w),
-      this.askAlly(w),
+      this.quality(w, fsql),
+      this.stages(w, fsql),
+      this.askAlly(w, fsql),
       this.pmAgent(),
     ]);
     return {
@@ -155,12 +162,16 @@ export class DebriefMetricsService {
       safetyRecall: safety,
       quality,
       agents: { stages, askAlly, pmAgent },
+      filter,
+      /** Read across all organisations and versions whatever the filter says. */
+      unfiltered: ['baselines', 'uptake', 'pmAgent'],
+      filterOptions: await this.filterOptions(w),
       generatedAt: new Date().toISOString(),
     };
   }
 
   /** Every per-run fact the weekly series and breakdowns are built from. */
-  private runFacts(weeks: number, slaHours: number) {
+  private runFacts(weeks: number, slaHours: number, fsql = '') {
     return `
       WITH runs AS (
         SELECT r.id, r."scenarioSessionId" AS session_id, r."createdAt",
@@ -178,7 +189,8 @@ export class DebriefMetricsService {
                ${READABLE} AS readable
           FROM debrief_runs r
           JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
-         WHERE r.mode = 'live' AND r.status <> 'skipped'
+          LEFT JOIN users u ON u.id = s."counselorId"
+         WHERE r.mode = 'live' AND r.status <> 'skipped'${fsql}
            AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})
       ),
       ev AS (
@@ -267,9 +279,9 @@ export class DebriefMetricsService {
       sum(flags_due)::int AS flags_due,
       sum(flags_on_time)::int AS flags_on_time`;
 
-  private weekly(weeks: number, slaHours: number): Promise<any[]> {
+  private weekly(weeks: number, slaHours: number, fsql = ''): Promise<any[]> {
     return this.dataSource.query(`
-      ${this.runFacts(weeks, slaHours)},
+      ${this.runFacts(weeks, slaHours, fsql)},
       wk AS (SELECT generate_series(
                date_trunc('week', now()) - make_interval(weeks => ${weeks - 1}),
                date_trunc('week', now()), interval '1 week') AS week)
@@ -284,28 +296,41 @@ export class DebriefMetricsService {
    * model × judge version, beside the PRD metrics above. Computed in code from
    * each live run so the eval and the Console can never define it twice.
    */
-  private async quality(weeks: number) {
+  private async quality(weeks: number, fsql = '') {
     const rows: Array<Record<string, any>> = await this.dataSource.query(`
       SELECT date_trunc('week', r."createdAt") AS week, r.status, r.language,
-             (r.cards IS NOT NULL) AS has_cards, r."checkFailures" AS check_failures,
-             r.steps, r.workspace->'judge' AS judge
+             r.cards, r."checkFailures" AS check_failures,
+             r.steps, r.workspace->'judge' AS judge,
+             r."learnerTurns" AS learner_turns, r."hasRiskCue" AS risk,
+             sc.title AS scenario,
+             (SELECT array_agg(DISTINCT t.title) FROM track_items ti JOIN tracks t ON t.id = ti."trackId"
+               WHERE ti."scenarioId" = s."scenarioId") AS courses
         FROM debrief_runs r
+        JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+        LEFT JOIN users u ON u.id = s."counselorId"
+        LEFT JOIN scenarios sc ON sc.id = s."scenarioId"
        WHERE r.mode = 'live'
-         AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})`);
+         AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})${fsql}`);
     const runs: RolledRun[] = rows.map((r) => ({
       week: new Date(r.week).toISOString().slice(0, 10),
       language: r.language ?? null,
       status: r.status,
-      cards: r.has_cards ? {} : null,
+      cards: r.cards ?? null,
       checkFailures: Array.isArray(r.check_failures) ? r.check_failures : [],
       steps: Array.isArray(r.steps) ? r.steps : [],
       workspace: r.judge ? { judge: r.judge } : {},
+      skills: [...new Set(cardSkills(r.cards as DebriefCards | null))],
+      scenario: r.scenario ?? null,
+      courses: Array.isArray(r.courses) ? r.courses.filter(Boolean) : [],
+      learnerTurns:
+        r.learner_turns == null ? undefined : Number(r.learner_turns),
+      hasRiskCue: r.risk == null ? undefined : !!r.risk,
     }));
-    return passRollup(runs);
+    return passRollup(runs, lengthBand);
   }
 
   /** Each agent inside a live debrief run, from its step trail (see debrief-stage-metrics.util). */
-  private async stages(weeks: number) {
+  private async stages(weeks: number, fsql = '') {
     const rows: Array<Record<string, any>> = await this.dataSource.query(`
       SELECT r.status, r."hasRiskCue" AS risk, r."skipReason" AS skip_reason,
              (r.cards IS NOT NULL) AS has_cards, r."checkFailures" AS check_failures,
@@ -321,7 +346,7 @@ export class DebriefMetricsService {
         JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
         LEFT JOIN users u ON u.id = s."counselorId"
        WHERE r.mode = 'live'
-         AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})`);
+         AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})${fsql}`);
     const runs: StageRun[] = rows.map((r) => ({
       status: r.status,
       cards: r.has_cards ? {} : null,
@@ -350,12 +375,18 @@ export class DebriefMetricsService {
    * replaced reached the learner as the fallback, so it fails; a clean reply
    * has no verdict until an Ask Ally judge exists (askAllyReplyOutcome).
    */
-  private async askAlly(weeks: number) {
+  private async askAlly(weeks: number, fsql = '') {
     const [r] = await this.dataSource.query(
-      `WITH chats AS (
+      `WITH runs AS (
+         SELECT r.id, r."scenarioSessionId" AS session_id
+           FROM debrief_runs r
+           JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+           LEFT JOIN users u ON u.id = s."counselorId"
+          WHERE r.mode = 'live'${fsql}
+       ),
+       chats AS (
          SELECT c.id FROM scenario_session_chats c
-          WHERE EXISTS (SELECT 1 FROM debrief_runs r
-                         WHERE r."scenarioSessionId" = c."scenarioSessionId" AND r.mode = 'live')
+          WHERE c."scenarioSessionId" IN (SELECT session_id FROM runs)
        ),
        msgs AS (
          SELECT m."senderId" AS sender, m.content
@@ -367,8 +398,10 @@ export class DebriefMetricsService {
               count(*) FILTER (WHERE sender <> -1)::int AS questions,
               (SELECT count(*)::int FROM debrief_run_feedback f
                 WHERE f.section = 'ask_ally' AND f.kind = 'flag'
+                  AND f."runId" IN (SELECT id FROM runs)
                   AND f."createdAt" >= date_trunc('week', now()) - make_interval(weeks => $2)) AS distress_flags,
               (SELECT count(*)::int FROM llm_usage u WHERE u.task = 'debrief_reply'
+                  AND u."scenarioSessionId" IN (SELECT session_id FROM runs)
                   AND u."createdAt" >= date_trunc('week', now()) - make_interval(weeks => $2)) AS calls
          FROM msgs`,
       [CHECK_FALLBACK, weeks - 1],
@@ -436,18 +469,60 @@ export class DebriefMetricsService {
     };
   }
 
+  /**
+   * The values each filter can take in this window (live runs), so the
+   * Console offers only filters that would match something.
+   */
+  private async filterOptions(weeks: number) {
+    const since = `date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})`;
+    const q = (sql: string) => this.dataSource.query(sql) as Promise<any[]>;
+    const [orgs, languages, levels, recipes, releases, judges] =
+      await Promise.all([
+        q(`SELECT r.tenant_id AS id, COALESCE(t.name, r.tenant_id) AS name, count(*)::int AS n
+           FROM debrief_runs r LEFT JOIN tenants t ON t.id::text = r.tenant_id
+          WHERE r.mode = 'live' AND r.tenant_id IS NOT NULL AND r."createdAt" >= ${since}
+          GROUP BY 1, 2 ORDER BY n DESC`),
+        q(`SELECT DISTINCT r.language AS v FROM debrief_runs r
+          WHERE r.mode = 'live' AND r.language IS NOT NULL AND r."createdAt" >= ${since} ORDER BY 1`),
+        q(`SELECT DISTINCT lower(COALESCE(u.metadata->>'workerType', 'LAY')) AS v
+           FROM debrief_runs r JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+           LEFT JOIN users u ON u.id = s."counselorId"
+          WHERE r.mode = 'live' AND r."createdAt" >= ${since} ORDER BY 1`),
+        q(`SELECT DISTINCT r."recipeKey" AS v FROM debrief_runs r
+          WHERE r.mode = 'live' AND r."recipeKey" IS NOT NULL AND r."createdAt" >= ${since} ORDER BY 1`),
+        q(`SELECT DISTINCT r."releaseVersion" AS v FROM debrief_runs r
+          WHERE r.mode = 'live' AND r."releaseVersion" IS NOT NULL AND r."createdAt" >= ${since} ORDER BY 1 DESC`),
+        q(`SELECT DISTINCT (r.workspace->'judge'->>'model') || '/' || COALESCE(r.workspace->'judge'->>'promptVersion', '?') AS v
+           FROM debrief_runs r
+          WHERE r.mode = 'live' AND r.workspace ? 'judge' AND r."createdAt" >= ${since} ORDER BY 1`),
+      ]);
+    const vals = (rows: any[]) => rows.map((r) => r.v).filter((v) => v != null);
+    return {
+      organisations: orgs.map((o) => ({
+        id: String(o.id),
+        name: String(o.name),
+      })),
+      languages: vals(languages).map(String),
+      learnerLevels: vals(levels).map(String),
+      recipes: vals(recipes).map(String),
+      releaseVersions: vals(releases).map(Number),
+      judgeVersions: vals(judges).map(String),
+    };
+  }
+
   /** Experience over the whole window, per language or per device (v9 §3.3). */
   private async breakdown(
     weeks: number,
     slaHours: number,
     by: 'language' | 'platform',
+    fsql = '',
   ): Promise<
     Array<{ key: string; debriefs: number; experience: ExperienceRates }>
   > {
     const col =
       by === 'language' ? `COALESCE(language, 'unknown')` : 'platform';
     const rows: any[] = await this.dataSource.query(`
-      ${this.runFacts(weeks, slaHours)}
+      ${this.runFacts(weeks, slaHours, fsql)}
       SELECT ${col} AS key, ${DebriefMetricsService.AGGREGATES}
         FROM facts GROUP BY 1 ORDER BY count(*) DESC LIMIT 20`);
     return rows.map((r) => ({
