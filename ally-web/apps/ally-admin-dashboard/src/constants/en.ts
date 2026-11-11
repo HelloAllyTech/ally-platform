@@ -9322,7 +9322,6 @@ export const en = {
       calibration: "Calibration",
       knowledge: "Knowledge",
       settings: "Settings",
-      metrics: "Metrics",
     },
     // Expert review (debrief orchestrator spec Part B): clinical experts comment on exact lines.
     expertReview: {

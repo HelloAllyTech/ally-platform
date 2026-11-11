@@ -1,16 +1,17 @@
 import React, { useMemo } from "react";
 
 import { useSelector } from "react-redux";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 
 import { Tabs } from "@ally-ui-mono/ui-shared";
-import { en, Permissions } from "@constants";
+import { en, Permissions, ROUTES } from "@constants";
 import { RootState } from "@store";
+
+import { ANALYTICS_DEBRIEFS_TAB_ID } from "../Analytics/Analytics";
 
 import { CalibrationTab } from "./CalibrationTab";
 import { ExpertReviewTab } from "./ExpertReviewTab";
 import { GuidanceTab } from "./GuidanceTab";
-import { MetricsTab } from "./MetricsTab";
 import { OrganisationsTab } from "./OrganisationsTab";
 import { PmAgentTab } from "./PmAgentTab";
 import { ReleasesTab } from "./ReleasesTab";
@@ -20,7 +21,6 @@ import { SettingsTab } from "./SettingsTab";
 
 export enum DebriefConsoleTab {
   RUNS = "runs",
-  METRICS = "metrics",
   REVIEW = "review",
   EXPERT_REVIEW = "expert-review",
   PM_AGENT = "pm-agent",
@@ -34,7 +34,6 @@ export enum DebriefConsoleTab {
 
 const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.RUNS]: RunsTab,
-  [DebriefConsoleTab.METRICS]: MetricsTab,
   [DebriefConsoleTab.REVIEW]: ReviewTab,
   [DebriefConsoleTab.EXPERT_REVIEW]: ExpertReviewTab,
   [DebriefConsoleTab.PM_AGENT]: PmAgentTab,
@@ -44,6 +43,9 @@ const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.GUIDANCE]: GuidanceTab,
   [DebriefConsoleTab.SETTINGS]: SettingsTab,
 };
+
+/** The Console's former Metrics tab id: links to it now open Analytics → Debriefs. */
+const MOVED_METRICS_TAB = "metrics";
 
 /** Tabs shown only to holders of a permission beyond the Console's toggle. */
 const TAB_PERMISSION: Partial<Record<DebriefConsoleTab, Permissions>> = {
@@ -73,6 +75,10 @@ export const DebriefConsole: React.FC = () => {
   );
 
   const requested = searchParams.get("tab");
+  // Debrief metrics moved to Analytics → Debriefs (2026-11-11); old links follow them there.
+  if (requested === MOVED_METRICS_TAB) {
+    return <Navigate to={`${ROUTES.ANALYTICS}?tab=${ANALYTICS_DEBRIEFS_TAB_ID}`} replace />;
+  }
   const activeTab =
     requested && (visible as string[]).includes(requested)
       ? (requested as DebriefConsoleTab)

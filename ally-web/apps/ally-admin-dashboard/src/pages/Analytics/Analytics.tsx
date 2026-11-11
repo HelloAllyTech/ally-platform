@@ -29,6 +29,8 @@ import { BugAgentPerformance } from "./BugAgentPerformance";
 import { CodingAgentCost } from "./CodingAgentCost";
 import { FixSessionEngineCost } from "./FixSessionEngineCost";
 import { TabControlsSlotProvider } from "./tabControlsSlot";
+import { MetricsTab as DebriefMetricsTab } from "../Debriefs/MetricsTab";
+
 import { AllyGuideTab } from "./tabs/AllyGuideTab";
 import { AnalyticsAgentTab } from "./tabs/AnalyticsAgentTab";
 import { GlossaryAdherenceTab } from "./tabs/GlossaryAdherenceTab";
@@ -87,6 +89,8 @@ interface TabDef {
 
 /** Query-string key that selects an Analytics tab by its `TabDef.id`. */
 export const ANALYTICS_TAB_PARAM = "tab";
+/** The Debriefs tab's id, exported so the Debrief Console can send its old Metrics links here. */
+export const ANALYTICS_DEBRIEFS_TAB_ID = "debriefs";
 /** The Bug Agent tab's id, exported so the Bug Hunter page can link to it. */
 export const ANALYTICS_BUG_AGENT_TAB_ID = "bug-agent-performance";
 
@@ -152,6 +156,17 @@ const TABS: TabDef[] = [
     uses: { language: false, range: true },
     orgScoped: true,
     render: f => <AllyGuideTab {...f} />,
+  },
+  {
+    // The Debrief agent's metrics: the PRD's success metrics, the pass rate (the same definition the
+    // evals use) with its breakdowns, and each agent in the debrief family. Moved here from the
+    // Debrief Console on 2026-11-11 so every agent's analytics sit together; the Console keeps the
+    // operator work. It brings its own window and six filters (organisation, language, learner
+    // level, debrief type, release, judge version), so the page's pickers are hidden for it.
+    id: ANALYTICS_DEBRIEFS_TAB_ID,
+    label: "Debriefs",
+    uses: { language: false, range: false },
+    render: () => <DebriefMetricsTab />,
   },
   {
     id: "latency",
