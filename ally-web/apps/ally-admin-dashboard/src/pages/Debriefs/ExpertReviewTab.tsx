@@ -2,13 +2,14 @@ import React, { useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
 
-import { Button, Checkbox, Select, SelectItem } from "@ally-ui-mono/ui-shared";
+import { Button, CarbonDropdown as Dropdown, CarbonToggle } from "@ally-ui-mono/ui-shared";
 import { useGetExpertReviewQueueQuery } from "@api";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
 import { ExpertQueueFilters, ExpertReviewReason } from "@types";
 
+import { codeWords, languageLabel } from "./consoleLabels";
 import { ConsoleTable, formatWhen, score } from "./consoleTable";
 import { ExpertReviewScreen, MyComments } from "./ExpertReviewScreen";
 
@@ -23,25 +24,37 @@ const REASONS: ExpertReviewReason[] = [
 /** The open debrief lives in `?review=` beside `?tab=`, so a link opens exactly there. */
 const OPEN_PARAM = "review";
 
-const FilterSelect: React.FC<{
+type Item = { id: string; label: string };
+
+/** One house filter: a Carbon dropdown with no visible label, its first item "All …". */
+const FilterDropdown: React.FC<{
   id: string;
   label: string;
+  allLabel: string;
   value: string;
-  options: Array<{ value: string; text: string }>;
+  options: Item[];
   onChange: (v: string) => void;
-}> = ({ id, label, value, options, onChange }) => (
-  <Select
-    id={id}
-    labelText={label}
-    value={value}
-    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
-  >
-    <SelectItem value="" text={en.debriefs.expertReview.filters.any} />
-    {options.map(o => (
-      <SelectItem key={o.value} value={o.value} text={o.text} />
-    ))}
-  </Select>
-);
+  width?: string;
+}> = ({ id, label, allLabel, value, options, onChange, width = "sm:w-48" }) => {
+  const items: Item[] = [{ id: "", label: allLabel }, ...options];
+  return (
+    <div className={`w-full ${width}`} data-testid={id}>
+      <Dropdown
+        id={id}
+        size="md"
+        titleText={label}
+        hideLabel
+        label={label}
+        items={items}
+        selectedItem={items.find(i => i.id === value) ?? items[0]}
+        itemToString={(item: Item | null) => item?.label ?? ""}
+        onChange={({ selectedItem }: { selectedItem: Item | null }) =>
+          onChange(selectedItem?.id ?? "")
+        }
+      />
+    </div>
+  );
+};
 
 const Queue: React.FC<{ onOpen: (runId: string) => void }> = ({ onOpen }) => {
   const s = en.debriefs.expertReview;
@@ -49,48 +62,70 @@ const Queue: React.FC<{ onOpen: (runId: string) => void }> = ({ onOpen }) => {
   const queue = useGetExpertReviewQueueQuery(filters, { refetchOnMountOrArgChange: true });
   const set = (patch: Partial<ExpertQueueFilters>) => setFilters(f => ({ ...f, ...patch }));
   const options = queue.data?.filters;
-  const typeLabel = (t: string | null) => (t ? (s.sessionTypes[t] ?? t) : "—");
+  const typeLabel = (t: string | null) => (t ? (s.sessionTypes[t] ?? codeWords(t)) : "—");
+  const f = s.filters;
+  const active = Object.values(filters).some(v => v !== undefined && v !== "");
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <FilterSelect
+      <div className="flex flex-wrap items-end gap-3" data-testid="expert-filters">
+        <FilterDropdown
           id="expert-filter-org"
-          label={s.filters.organisation}
+          label={f.organisation}
+          allLabel={f.allOf.organisation}
           value={filters.tenantId ?? ""}
-          options={(options?.tenants ?? []).map(t => ({ value: t.id, text: t.name }))}
+          options={(options?.tenants ?? []).map(t => ({ id: t.id, label: t.name }))}
           onChange={v => set({ tenantId: v || undefined })}
+          width="sm:w-56"
         />
-        <FilterSelect
+        <FilterDropdown
           id="expert-filter-language"
-          label={s.filters.language}
+          label={f.language}
+          allLabel={f.allOf.language}
           value={filters.language ?? ""}
-          options={(options?.languages ?? []).map(l => ({ value: l, text: l }))}
+          options={(options?.languages ?? []).map(l => ({ id: l, label: languageLabel(l) }))}
           onChange={v => set({ language: v || undefined })}
         />
-        <FilterSelect
+        <FilterDropdown
           id="expert-filter-type"
-          label={s.filters.sessionType}
+          label={f.sessionType}
+          allLabel={f.allOf.sessionType}
           value={filters.sessionType ?? ""}
-          options={(options?.sessionTypes ?? []).map(t => ({ value: t, text: typeLabel(t) }))}
+          options={(options?.sessionTypes ?? []).map(t => ({ id: t, label: typeLabel(t) }))}
           onChange={v => set({ sessionType: v || undefined })}
         />
-        <FilterSelect
+        <FilterDropdown
           id="expert-filter-reason"
-          label={s.filters.reason}
+          label={f.reason}
+          allLabel={f.allOf.reason}
           value={filters.source ?? ""}
-          options={REASONS.map(r => ({ value: r, text: s.reasons[r] }))}
+          options={REASONS.map(r => ({ id: r, label: s.reasons[r] }))}
           onChange={v => set({ source: (v || undefined) as ExpertReviewReason | undefined })}
         />
+        <div className="flex items-center">
+          <CarbonToggle
+            id="expert-include-reviewed"
+            size="sm"
+            // With hideLabel, Carbon shows labelText as the side label in both states.
+            labelText={f.includeReviewed}
+            hideLabel
+            toggled={!!filters.includeReviewed}
+            onToggle={(on: boolean) => set({ includeReviewed: on || undefined })}
+          />
+        </div>
+        {active && (
+          <div className="flex items-center">
+            <Button
+              kind="ghost"
+              size="md"
+              data-testid="expert-filter-clear"
+              onClick={() => setFilters({})}
+            >
+              {f.clear}
+            </Button>
+          </div>
+        )}
       </div>
-      <Checkbox
-        id="expert-include-reviewed"
-        labelText={s.filters.includeReviewed}
-        checked={!!filters.includeReviewed}
-        onChange={(_e: unknown, { checked }: { checked: boolean }) =>
-          set({ includeReviewed: checked || undefined })
-        }
-      />
 
       {queue.isError ? (
         <ErrorPanel what={s.loadFailed} error={queue.error} onRetry={() => void queue.refetch()} />
@@ -120,7 +155,7 @@ const Queue: React.FC<{ onOpen: (runId: string) => void }> = ({ onOpen }) => {
             cells: [
               formatWhen(item.createdAt),
               item.tenantName ?? "—",
-              item.language ?? "—",
+              languageLabel(item.language),
               typeLabel(item.sessionType),
               <span key="r" className="flex flex-wrap gap-1">
                 {item.reasons.map(r => (

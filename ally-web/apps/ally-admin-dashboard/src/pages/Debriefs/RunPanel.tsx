@@ -1,13 +1,21 @@
 import React from "react";
 
 import { SidePanel } from "@ally-ui-mono/ui-shared";
-import { useGetDebriefRunQuery } from "@api";
+import { useGetDebriefModelsQuery, useGetDebriefRunQuery } from "@api";
 import { formatUsd, shortId } from "@components/ally-guide/allyGuideFormat";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
 import { en, ROUTES } from "@constants";
 import { DebriefCardsData, DebriefRunDetail } from "@types";
 
+import {
+  checkLabel,
+  hardFailLabel,
+  modelLabels,
+  recipeLabel,
+  sectionLabel,
+  skipReasonLabel,
+} from "./consoleLabels";
 import { score } from "./consoleTable";
 import { DraftChanges, HowItWasMade, ReplyTraces } from "./RunReasoning";
 
@@ -43,12 +51,12 @@ const Cards: React.FC<{ cards: DebriefCardsData }> = ({ cards }) => {
           <p className="font-semibold">{s.importantMoment}</p>
           <p>{cards.important_moment.lead}</p>
           <p className="italic">
-            “{cards.important_moment.quote}” (turn {cards.important_moment.turn_index})
+            “{cards.important_moment.quote}” {s.turn(cards.important_moment.turn_index)}
           </p>
           <p>{cards.important_moment.body}</p>
           {(cards.important_moment.others ?? []).map(o => (
             <p key={o.turn_index} className="pl-3">
-              <span className="italic">“{o.quote}”</span> (turn {o.turn_index}) {o.note}
+              <span className="italic">“{o.quote}”</span> {s.turn(o.turn_index)} {o.note}
             </p>
           ))}
         </div>
@@ -59,7 +67,7 @@ const Cards: React.FC<{ cards: DebriefCardsData }> = ({ cards }) => {
           <ul className="list-disc pl-5">
             {cards.what_worked.map((c, i) => (
               <li key={i}>
-                {c.lead} <span className="italic">“{c.quote}”</span> (turn {c.turn_index}) {c.body}
+                {c.lead} <span className="italic">“{c.quote}”</span> {s.turn(c.turn_index)} {c.body}
               </li>
             ))}
           </ul>
@@ -71,7 +79,7 @@ const Cards: React.FC<{ cards: DebriefCardsData }> = ({ cards }) => {
           <ul className="list-disc pl-5">
             {cards.work_on_this.map((c, i) => (
               <li key={i}>
-                {c.lead} <span className="italic">“{c.quote}”</span> (turn {c.turn_index}) {c.why}{" "}
+                {c.lead} <span className="italic">“{c.quote}”</span> {s.turn(c.turn_index)} {c.why}{" "}
                 <span className="font-semibold">{s.trySaying}:</span> “{c.try_saying}”
               </li>
             ))}
@@ -97,6 +105,9 @@ const Cards: React.FC<{ cards: DebriefCardsData }> = ({ cards }) => {
 const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
   const s = en.debriefs.run;
   const judge = run.workspace?.judge;
+  const evaluations = run.workspace?.evaluations ?? [];
+  const models = useGetDebriefModelsQuery();
+  const modelLabel = modelLabels(models.data);
   return (
     <div className="flex flex-col gap-8" data-testid="run-body">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -112,16 +123,16 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
         >
           {en.debriefs.status[run.status]}
         </Pill>
-        <span>{run.recipeKey ?? "—"}</span>
+        <span>{recipeLabel(run.recipeKey)}</span>
         <span>· {s.fallback(run.fallbackRung)}</span>
         <SessionLogLink sessionId={run.scenarioSessionId} />
         <span>· {s.cost(formatUsd(run.estimatedCostUsd), formatUsd(run.actualCostUsd))}</span>
-        {run.skipReason && <span>· {run.skipReason}</span>}
+        {run.skipReason && <span>· {skipReasonLabel(run.skipReason)}</span>}
       </div>
       {run.error && <p className="text-sm text-typography-700">{run.error}</p>}
 
       <Section title={s.howMade}>
-        <HowItWasMade run={run} />
+        <HowItWasMade run={run} modelLabel={modelLabel} />
       </Section>
 
       <Section title={s.checks}>
@@ -131,7 +142,8 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
           <ul className="list-disc pl-5 text-sm">
             {run.checkFailures.map((f, i) => (
               <li key={i}>
-                <span className="font-mono text-xs">{f.code}</span> · {f.section}: {f.detail}
+                <span className="font-semibold">{checkLabel(f.code)}</span> ·{" "}
+                {sectionLabel(f.section)}: {f.detail}
               </li>
             ))}
           </ul>
@@ -139,15 +151,22 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
       </Section>
 
       <Section title={s.verdicts}>
-        <ul className="text-sm">
-          {(run.workspace?.evaluations ?? []).map(e => (
-            <li key={e.round}>
-              {s.round(e.round)}: {score(e.overall)}
-              {e.hardFails.length > 0 && ` · ${s.hardFails}: ${e.hardFails.join(", ")}`}
-              {e.checks.length > 0 && ` · ${s.checks}: ${e.checks.join(", ")}`}
-            </li>
-          ))}
-        </ul>
+        {evaluations.length === 0 ? (
+          <p className="text-sm" data-testid="run-not-evaluated">
+            {s.notEvaluated}
+          </p>
+        ) : (
+          <ul className="text-sm">
+            {evaluations.map(e => (
+              <li key={e.round}>
+                {s.round(e.round)}: {score(e.overall)}
+                {e.hardFails.length > 0 &&
+                  ` · ${s.hardFails}: ${e.hardFails.map(hardFailLabel).join(", ")}`}
+                {e.checks.length > 0 && ` · ${s.checks}: ${e.checks.map(checkLabel).join(", ")}`}
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
 
       <Section title={s.draftChanges}>
@@ -159,7 +178,7 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
           <p className="text-sm">
             {score(judge.overall)}
             {judge.hardFails.length > 0 &&
-              ` · ${s.hardFails}: ${judge.hardFails.map(h => h.code).join(", ")}`}
+              ` · ${s.hardFails}: ${judge.hardFails.map(h => hardFailLabel(h.code)).join(", ")}`}
           </p>
         ) : (
           <p className="text-sm">{s.notJudged}</p>
@@ -168,7 +187,7 @@ const RunBody: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
 
       {(run.workspace?.replyTraces?.length ?? 0) > 0 && (
         <Section title={s.replies}>
-          <ReplyTraces run={run} />
+          <ReplyTraces run={run} modelLabel={modelLabel} />
         </Section>
       )}
 

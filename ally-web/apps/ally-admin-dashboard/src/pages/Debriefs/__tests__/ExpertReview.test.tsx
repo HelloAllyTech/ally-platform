@@ -249,8 +249,31 @@ describe("ExpertReviewTab", () => {
         <ExpertReviewTab />
       </MemoryRouter>,
     );
-    fireEvent.change(screen.getByLabelText("Organisation"), { target: { value: "t1" } });
+    fireEvent.change(screen.getByLabelText("Organisation"), { target: { value: "Sangath" } });
     expect(h.queue).toHaveBeenLastCalledWith({ tenantId: "t1" });
+  });
+
+  it("filters in one row of house dropdowns, languages by name, with a toggle and Clear filters", () => {
+    render(
+      <MemoryRouter>
+        <ExpertReviewTab />
+      </MemoryRouter>,
+    );
+    const row = screen.getByTestId("expert-filters");
+    const language = within(row).getByLabelText("Language");
+    expect(
+      within(language)
+        .getAllByRole("option")
+        .map(o => o.textContent),
+    ).toEqual(["All languages", "Hindi"]);
+    expect(within(row).getByLabelText("Why it's here")).toHaveDisplayValue("All reasons");
+    expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    fireEvent.change(language, { target: { value: "Hindi" } });
+    fireEvent.click(within(row).getByRole("switch", { name: "Show debriefs I've reviewed" }));
+    expect(h.queue).toHaveBeenLastCalledWith({ language: "hi", includeReviewed: true });
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(h.queue).toHaveBeenLastCalledWith({});
+    expect(screen.getByTestId("expert-queue-row")).toHaveTextContent("Hindi");
   });
 
   it("says so when nothing matches", () => {
@@ -290,6 +313,30 @@ describe("ExpertReviewScreen", () => {
     expect(screen.getByText("Your opening let them lead.")).toBeTruthy();
     expect(screen.getAllByTestId("comment-highlight")[0].textContent).toBe("cannot sleep");
     expect(screen.getByTestId("comment-idea").textContent).toContain("Being tried");
+  });
+
+  it("names the language and a learner flag's card section in words", () => {
+    h.review.mockReturnValue(
+      ok(
+        detail({
+          flags: [
+            {
+              id: "f1",
+              section: "work_on_this[1]",
+              reason: "wrong",
+              note: null,
+              status: "published",
+              resolutionNote: null,
+              createdAt: "2026-11-10T10:00:00Z",
+            },
+          ],
+        }),
+      ),
+    );
+    renderScreen();
+    expect(screen.getByTestId("expert-review-screen")).toHaveTextContent("· Hindi");
+    expect(screen.getByTestId("expert-flags")).toHaveTextContent("Work on this, point 2");
+    expect(screen.getByTestId("expert-flags")).not.toHaveTextContent("work_on_this");
   });
 
   it("keeps the scores hidden until a verdict, and a hard fail forces Needs work", async () => {

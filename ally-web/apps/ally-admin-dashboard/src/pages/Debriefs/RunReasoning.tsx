@@ -5,7 +5,12 @@ import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
 import { DebriefRunDetail, DebriefRunStep } from "@types";
 
+import { sectionLabel } from "./consoleLabels";
 import { draftChanges } from "./draftChanges";
+
+/** A model id in words: the catalog's label, from the run panel's models query. */
+type ModelLabel = (id: string) => string;
+const asIs: ModelLabel = id => id;
 
 /** What each step produced, by the workspace key that holds it. */
 const STEP_OUTPUTS: Record<string, Array<keyof typeof en.debriefs.run.outputs>> = {
@@ -37,7 +42,8 @@ const StepCard: React.FC<{
   step: DebriefRunStep;
   workspace: DebriefRunDetail["workspace"];
   showOutputs: boolean;
-}> = ({ step, workspace, showOutputs }) => {
+  modelLabel: ModelLabel;
+}> = ({ step, workspace, showOutputs, modelLabel }) => {
   const s = en.debriefs.run;
   const outputs = showOutputs
     ? (STEP_OUTPUTS[step.step] ?? []).filter(k => workspace?.[WORKSPACE_KEY[k]] != null)
@@ -56,7 +62,11 @@ const StepCard: React.FC<{
               ? s.failed
               : s.skipped}
         </Pill>
-        {step.model && <span className="font-mono text-xs">{step.model}</span>}
+        {step.model && (
+          <span className="text-xs" title={step.model} data-testid="run-step-model">
+            {modelLabel(step.model)}
+          </span>
+        )}
         {step.estimatedUsd != null && step.estimatedUsd > 0 && (
           <span className="text-xs text-typography-700">
             {s.stepCost(formatUsd(step.estimatedUsd))}
@@ -104,7 +114,10 @@ const StepCard: React.FC<{
  * lines are each step's rationale. A run from before these were recorded
  * still shows its timings and notes.
  */
-export const HowItWasMade: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
+export const HowItWasMade: React.FC<{ run: DebriefRunDetail; modelLabel?: ModelLabel }> = ({
+  run,
+  modelLabel = asIs,
+}) => {
   const s = en.debriefs.run;
   const decision = run.workspace?.decision;
   const narrated = run.steps.some(st => st.why || st.reasoning || st.output);
@@ -120,7 +133,15 @@ export const HowItWasMade: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
         {run.steps.map((step, i) => {
           const first = step.status === "done" && !seen.has(step.step);
           if (first) seen.add(step.step);
-          return <StepCard key={i} step={step} workspace={run.workspace} showOutputs={first} />;
+          return (
+            <StepCard
+              key={i}
+              step={step}
+              workspace={run.workspace}
+              showOutputs={first}
+              modelLabel={modelLabel}
+            />
+          );
         })}
       </ol>
       {decision && (
@@ -152,7 +173,7 @@ export const DraftChanges: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
                 <ul className="list-disc pl-5">
                   {d.critique.map((c, j) => (
                     <li key={j}>
-                      <span className="font-mono text-xs">{c.section}</span> · {c.note}
+                      <span className="font-semibold">{sectionLabel(c.section)}</span> · {c.note}
                     </li>
                   ))}
                 </ul>
@@ -160,7 +181,7 @@ export const DraftChanges: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
             )}
             {changes.map(c => (
               <div key={c.section} className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-                <p className="font-mono text-xs md:col-span-2">{c.section}</p>
+                <p className="text-xs font-semibold md:col-span-2">{sectionLabel(c.section)}</p>
                 <div className="bg-neutral-50 p-2">
                   <p className="text-xs font-semibold">{s.before}</p>
                   <p>{c.before ?? s.added}</p>
@@ -179,7 +200,10 @@ export const DraftChanges: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
 };
 
 /** How each Ask Ally reply was reached: its lookups, passes and cost. */
-export const ReplyTraces: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
+export const ReplyTraces: React.FC<{ run: DebriefRunDetail; modelLabel?: ModelLabel }> = ({
+  run,
+  modelLabel = asIs,
+}) => {
   const s = en.debriefs.run;
   const traces = run.workspace?.replyTraces ?? [];
   if (traces.length === 0) return null;
@@ -192,7 +216,7 @@ export const ReplyTraces: React.FC<{ run: DebriefRunDetail }> = ({ run }) => {
             <span className="text-xs text-typography-700">
               {s.replyLine(new Date(t.at).toLocaleString(), t.turns, formatUsd(t.costUsd))}
               {" · "}
-              <span className="font-mono">{t.model}</span>
+              <span title={t.model}>{modelLabel(t.model)}</span>
             </span>
             {t.tools.length === 0 ? (
               <span>{s.noTools}</span>

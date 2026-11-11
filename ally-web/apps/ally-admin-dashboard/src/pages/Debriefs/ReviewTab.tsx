@@ -17,6 +17,7 @@ import { en } from "@constants";
 import { DebriefCardCorrection, DebriefReviewFlag, DebriefReviewRun } from "@types";
 import { getErrorMessage } from "@utils";
 
+import { hardFailLabel, languageLabel, sectionLabel } from "./consoleLabels";
 import { formatWhen, score } from "./consoleTable";
 import { RunPanel, SessionLogLink } from "./RunPanel";
 
@@ -73,7 +74,7 @@ const RunItem: React.FC<{
         <span className="font-mono text-xs">{shortId(run.scenarioSessionId)}</span>
         <SessionLogLink sessionId={run.scenarioSessionId} />
         <span>{run.tenantName ?? "—"}</span>
-        <span>· {run.language ?? "—"}</span>
+        <span>· {languageLabel(run.language)}</span>
         <span>· {formatWhen(run.createdAt)}</span>
       </div>
       <p className="text-sm text-typography-800">
@@ -98,17 +99,17 @@ const RunItem: React.FC<{
         <ul className="list-disc pl-5 text-sm">
           {run.checkFailures.map((f, i) => (
             <li key={`c${i}`}>
-              {f.section}: {f.detail}
+              {sectionLabel(f.section)}: {f.detail}
             </li>
           ))}
           {run.evaluatorHardFails.map((h, i) => (
             <li key={`h${i}`}>
-              {h.code}: {h.evidence}
+              {hardFailLabel(h.code)}: {h.evidence}
             </li>
           ))}
           {(run.judgeHardFails ?? []).map((h, i) => (
             <li key={`j${i}`}>
-              {h.code}: {h.evidence}
+              {hardFailLabel(h.code)}: {h.evidence}
             </li>
           ))}
         </ul>
@@ -176,7 +177,7 @@ const FlagItem: React.FC<{
         {flag.urgent && <Pill tone="warning">{s.urgent}</Pill>}
         {flag.status === "escalated" && <Pill tone="info">{s.escalated}</Pill>}
         <Pill tone="neutral">{s.reasons[flag.reason]}</Pill>
-        <span className="font-mono text-xs">{flag.section}</span>
+        <span>{sectionLabel(flag.section)}</span>
         <SessionLogLink sessionId={flag.scenarioSessionId} />
         <span>{flag.tenantName ?? "—"}</span>
         <span>· {formatWhen(flag.createdAt)}</span>
@@ -305,9 +306,11 @@ export const ReviewTab: React.FC = () => {
   );
   const [selected, setSelected] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (selected >= items.length) setSelected(Math.max(0, items.length - 1));
-  }, [items.length, selected]);
+  // An item that left the queue moves the selection back onto the last one (adjusted while
+  // rendering, as React recommends, rather than in an effect).
+  if (selected >= items.length && selected !== Math.max(0, items.length - 1)) {
+    setSelected(Math.max(0, items.length - 1));
+  }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;

@@ -186,6 +186,55 @@ describe("DraftChanges", () => {
     );
     expect(screen.getByText("The first draft was not revised.")).toBeTruthy();
   });
+
+  it("names the sections it changed and critiqued, not their keys", () => {
+    const { container } = render(
+      <DraftChanges
+        run={run({
+          workspace: {
+            drafts: [
+              { round: 0, cards: cards(), critique: [] },
+              {
+                round: 1,
+                cards: cards({
+                  what_worked: [{ ...cards().what_worked[0], lead: "A better lead." }],
+                }),
+                critique: [{ section: "what_worked[0]", note: "Say why." }],
+              },
+            ],
+          },
+        })}
+      />,
+    );
+    expect(container.textContent).toContain("What worked, point 1");
+    expect(container.textContent).not.toContain("what_worked");
+  });
+});
+
+describe("model names", () => {
+  it("shows each step's and reply's model by the label it is given, the id on hover", () => {
+    const label = (id: string) => (id === "gemini-2.5-flash" ? "Gemini 2.5 Flash" : id);
+    render(
+      <HowItWasMade
+        modelLabel={label}
+        run={run({
+          steps: [
+            {
+              step: "writer",
+              label: "",
+              status: "done",
+              startedAt: "",
+              ms: 1000,
+              model: "gemini-2.5-flash",
+            },
+          ],
+        })}
+      />,
+    );
+    const model = screen.getByTestId("run-step-model");
+    expect(model.textContent).toBe("Gemini 2.5 Flash");
+    expect(model.getAttribute("title")).toBe("gemini-2.5-flash");
+  });
 });
 
 describe("ReplyTraces", () => {

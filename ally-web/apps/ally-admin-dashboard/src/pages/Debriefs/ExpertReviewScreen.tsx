@@ -26,6 +26,7 @@ import {
 } from "@types";
 import { getErrorMessage } from "@utils";
 
+import { languageLabel, sectionLabel } from "./consoleLabels";
 import { formatWhen, score } from "./consoleTable";
 import {
   ANCHOR_ATTR,
@@ -611,7 +612,8 @@ const FlagsPanel: React.FC<{ detail: ExpertReviewDetail }> = ({ detail }) => {
               <p className="font-medium">{f.reasons[flag.reason ?? ""] ?? flag.reason}</p>
               {flag.note && <p className="italic">“{flag.note}”</p>}
               <p className="text-xs text-typography-700">
-                {flag.section} · {f.outcome(en.debriefs.status[flag.status] ?? flag.status)}
+                {sectionLabel(flag.section)} ·{" "}
+                {f.outcome(en.debriefs.status[flag.status] ?? flag.status)}
                 {flag.resolutionNote ? ` — ${flag.resolutionNote}` : ""}
               </p>
             </li>
@@ -751,7 +753,7 @@ export const ExpertReviewScreen: React.FC<{ runId: string; onBack: () => void }>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {header}
         <span>{d.run.tenantName ?? "—"}</span>
-        <span>· {d.run.language ?? "—"}</span>
+        <span>· {languageLabel(d.run.language)}</span>
         <span>· {s().sessionTypes[d.run.sessionType ?? ""] ?? d.run.sessionType ?? "—"}</span>
         <span>· {formatWhen(d.run.createdAt)}</span>
         <Pill tone={d.run.mode === "live" ? "info" : "neutral"}>

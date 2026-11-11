@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 import { Button, ContentSwitcher, InlineNotification, Switch } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefOverviewQuery, useGetDebriefRunsQuery } from "@api";
@@ -8,6 +8,7 @@ import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
 import { DebriefRunStatus } from "@types";
 
+import { languageLabel } from "./consoleLabels";
 import { ConsoleTable, formatWhen, score } from "./consoleTable";
 import { RunPanel } from "./RunPanel";
 import { KpiTile } from "../Analytics/chartKit";
@@ -29,7 +30,8 @@ export const RunsTab: React.FC = () => {
     { refetchOnMountOrArgChange: true, pollingInterval: polling ? 15_000 : 0 },
   );
   const anyRunning = !!runs.data?.some(r => r.status === "running" || r.status === "queued");
-  useEffect(() => setPolling(anyRunning), [anyRunning]);
+  // Polling follows whether a run is in flight; adjusted while rendering rather than in an effect.
+  if (anyRunning !== polling) setPolling(anyRunning);
   const o = overview.data;
   const tile = {
     loading: overview.isLoading,
@@ -101,7 +103,8 @@ export const RunsTab: React.FC = () => {
         />
       </div>
 
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-4" data-testid="runs-list">
+        <h3 className="text-xl font-normal text-typography-900">{s.listHeading}</h3>
         <ContentSwitcher
           size="md"
           selectedIndex={FILTERS.indexOf(filter)}
@@ -142,8 +145,9 @@ export const RunsTab: React.FC = () => {
               testId: "run-row",
               cells: [
                 formatWhen(r.createdAt),
-                <span key="s" className="font-mono text-xs">
-                  {shortId(r.scenarioSessionId)} · {r.language ?? "—"}
+                <span key="s" className="text-xs">
+                  <span className="font-mono">{shortId(r.scenarioSessionId)}</span> ·{" "}
+                  {languageLabel(r.language)}
                 </span>,
                 r.tenantName ?? "—",
                 en.debriefs.mode[r.mode],
