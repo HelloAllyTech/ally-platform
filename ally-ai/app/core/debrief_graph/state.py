@@ -51,6 +51,25 @@ class DebriefState(TypedDict, total=False):
     evaluations: Annotated[List[Dict[str, Any]], operator.add]
     advisory: List[str]  # advisory check codes, as `run_checks` names them
 
+    # The orchestrated middle (spec A1–A5; only when the release's challenger
+    # flag is on): the profile, the plan(s), the agents the planner chose and
+    # what each found.
+    orchestrated: bool
+    profile: Dict[str, Any]
+    offered: List[str]  # agents the release enables and the session allows
+    plans: Annotated[List[Dict[str, Any]], operator.add]  # the plan, then the top-up
+    phase: str  # "plan" | "top_up": where the dispatcher goes when the agents are done
+    pending: List[str]  # chosen agents not started yet, in plan order
+    actions: Annotated[Dict[str, Any], merge]  # the planner's action per agent
+    agent_ok: Annotated[Dict[str, bool], merge]  # agent → it answered
+    findings: Annotated[Dict[str, Any], merge]  # agent → its findings (A3)
+    data_agents: Annotated[List[str], operator.add]  # data agents applied
+    anchor_quotes: bool  # assessment anchoring: only quoted findings reach the Writer
+    floor_reserve: float  # USD held back for the floor before any agent
+    top_up_used: bool
+    top_up_agents: Annotated[List[str], operator.add]
+    action: Dict[str, Any]  # a Send payload's own action (never written)
+
     # The ending.
     outcome: Dict[str, Any]  # {status, skip_reason}
     patch: Dict[str, Any]  # the decided draft's run fields

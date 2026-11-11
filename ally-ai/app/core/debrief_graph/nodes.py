@@ -34,6 +34,7 @@ from app.core.debrief_graph.drafts import (
 )
 from app.core.debrief_graph.narration import n
 from app.core.debrief_graph.records import iso, js_len, progress_event, skipped
+from app.core.debrief_graph.registry.manifest import agent_config, is_orchestrated
 from app.core.debrief_graph.result import build_result
 from app.core.debrief_graph.state import DebriefState as State
 
@@ -90,7 +91,9 @@ async def plan(
 ) -> Command[Literal["safety_reader", "analyst", "finish"]]:
     ctx = runtime.context
     recipe_key = choose_recipe(ctx)["key"]
+    orchestrated = is_orchestrated(ctx)
     base: Dict[str, Any] = {
+        "orchestrated": orchestrated,
         "recipe_key": recipe_key,
         "workspace": {"languageSource": ctx.sess("language_source") or "recorded"},
         "estimated": 0.0,
@@ -117,7 +120,9 @@ async def plan(
     }
     reserved = {"safety-reader#0": safety_est}
     goto: List[str] = ["safety_reader"]
-    if analyst_step:
+    # Orchestrated: the Analyst is the planner's choice, made after the safety
+    # reading (spec A1, A5).
+    if analyst_step and not orchestrated:
         analyst_est = _reserve(ctx, estimated, analyst_step, ctx.transcript_chars)
         if analyst_est is not None:
             estimated += analyst_est
@@ -136,7 +141,7 @@ async def plan(
 
 async def after_reading(
     state: State, runtime: Runtime[Ctx]
-) -> Command[Literal["progress_reader", "guidance_lookup", "finish"]]:
+) -> Command[Literal["progress_reader", "guidance_lookup", "profile", "finish"]]:
     ctx = runtime.context
     results = state.get("results") or {}
     safety_res = results.get("safety-reader#0")
@@ -148,6 +153,20 @@ async def after_reading(
         "risk_cues": safety_res.get("risk_cues") or [],
         "learner_distress": safety_res.get("learner_distress") or [],
     }
+    if state.get("orchestrated"):
+        # The safety reading is in: the planner decides what runs next.
+        return Command(
+            update={
+                "safety": safety,
+                "evidence": {},
+                "has_risk_cue": len(safety["risk_cues"]) > 0,
+                "learner_distress": len(safety["learner_distress"]) > 0,
+                "workspace": {"safety": safety, "evidence": {}},
+                "progress": None,
+                "history": None,
+            },
+            goto="profile",
+        )
     analyst_step = ctx.step_of(state["recipe_key"], Step.ANALYST)
     analyst_res = results.get("analyst#0")
     evidence = (analyst_res or {}).get("evidence") or {}
@@ -218,7 +237,11 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
     """Up to N passages per pivotal moment, no learner words in the query."""
     ctx = runtime.context
     update: Dict[str, Any] = {"passages": []}
-    guidance_step = ctx.step_of(state["recipe_key"], Step.GUIDANCE_LOOKUP)
+    guidance_step = (
+        agent_config(state, ctx, "guidance_lookup", Step.GUIDANCE_LOOKUP)
+        if state.get("orchestrated")
+        else ctx.step_of(state["recipe_key"], Step.GUIDANCE_LOOKUP)
+    )
     per_moment = ctx.setting("guidancePassagesPerMoment", 0)
     if guidance_step and per_moment > 0:
         evidence = state.get("evidence") or {}
@@ -228,7 +251,10 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
         _emit(
             runtime,
             progress_event(
-                Step.GUIDANCE_LOOKUP, state.get("has_risk_cue"), topic=topic
+                Step.GUIDANCE_LOOKUP,
+                state.get("has_risk_cue"),
+                topic=topic,
+                label_key=guidance_step.get("labelKey"),
             ),
         )
         seen: List[str] = []
@@ -446,7 +472,7 @@ def _max_rounds(state: State, ctx: Ctx) -> int:
 
 async def score_draft(
     state: State, runtime: Runtime[Ctx]
-) -> Command[Literal["revise_gate", "decide"]]:
+) -> Command[Literal["revise_gate", "top_up", "decide"]]:
     ctx = runtime.context
     cur = state["current"]
     rnd = cur["round"]
@@ -481,9 +507,18 @@ async def score_draft(
     again = not meets_bar(best, advisory, ctx.setting("passScore", 8)) and state.get(
         "round", 0
     ) < _max_rounds(state, ctx)
+    goto = "revise_gate" if again else "decide"
+    if (
+        again
+        and evaluation is not None
+        and state.get("orchestrated")
+        and not state.get("top_up_used")
+    ):
+        # D3: the first failed evaluation gets one evidence top-up first.
+        goto = "top_up"
     return Command(
         update={"current": draft, "best": best, "evaluations": [record]},
-        goto="revise_gate" if again else "decide",
+        goto=goto,
     )
 
 

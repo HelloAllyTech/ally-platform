@@ -23,9 +23,11 @@ from app.core.debrief.safety_reader import (
     read_safety,
 )
 from app.core.debrief.schemas import (
+    AgentFindings,
     DebriefCards,
     EvaluationOutput,
     EvidenceMap,
+    PlannerOutput,
     ProgressReading,
     reasoning_of,
 )
@@ -74,7 +76,10 @@ class InProcessSteps:
         model: Optional[str],
         session_id: Optional[str],
     ) -> Dict[str, Any]:
-        handler = getattr(self, "_" + path.replace("-", "_"))
+        handler = getattr(self, "_" + path.replace("-", "_"), None)
+        if handler is None and path.startswith("agent-"):
+            # A prompt-only registry agent (`agent-<id>`): one generic call.
+            handler = self._findings
         label = "safety reader" if path == "safety-reader" else path
         try:
             answer = await handler(body, model, session_id)
@@ -158,6 +163,7 @@ class InProcessSteps:
             case_memory=body.get("case_memory"),
             assessment=bool(body.get("assessment")),
             cohort=body.get("cohort"),
+            findings=body.get("findings"),
         )
         if out is None:
             return None
@@ -197,11 +203,55 @@ class InProcessSteps:
             model or settings.DEBRIEF.REVISER_MODEL,
             system=body.get("system_prompt"),
             scenario_session_id=session_id,
+            findings=body.get("findings"),
         )
         if out is None:
             return None
         return {
             "model": ran,
             "cards": _dump(DebriefCards, out),
+            "reasoning": reasoning_of(out),
+        }
+
+    # --- the orchestrator (spec A5, A9) ---------------------------------------
+
+    async def _planner(self, body, model, session_id):
+        out, ran = await steps.plan_agents(
+            body.get("profile") or {},
+            body.get("agents") or [],
+            model,
+            max_agents=int(body.get("max_agents") or 0),
+            system=body.get("system_prompt"),
+            critique=body.get("critique"),
+            already=body.get("already"),
+            scenario_session_id=session_id,
+        )
+        if out is None:
+            return None
+        return {
+            "model": ran,
+            "plan": _dump(PlannerOutput, out),
+            "reasoning": reasoning_of(out),
+        }
+
+    async def _findings(self, body, model, session_id):
+        """A prompt-only registry agent: `body` is what its scopes allow."""
+        transcript = body.get("transcript")
+        out, ran = await steps.find(
+            body["task"],
+            body["default_system"],
+            body.get("blocks") or {},
+            _turns(transcript) if transcript is not None else None,
+            body.get("language") or "en",
+            model,
+            system=body.get("system_prompt"),
+            focus_turns=body.get("focus_turns") or [],
+            scenario_session_id=session_id,
+        )
+        if out is None:
+            return None
+        return {
+            "model": ran,
+            "findings": _dump(AgentFindings, out)["findings"],
             "reasoning": reasoning_of(out),
         }

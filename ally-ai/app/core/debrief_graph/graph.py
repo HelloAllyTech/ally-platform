@@ -17,6 +17,12 @@
 
 The loop ends: every pass through `revise_gate` that reaches the reviser adds a
 round, and `score_draft` stops at the recipe's `maxRevisionRounds`.
+
+With the release's challenger flag on (`bundle.orchestrator.enabled`), the same
+graph runs the orchestrated middle instead of the recipe's readers (see
+`orchestrator.py`): after_reading → profile → planner → dispatch ─Send→
+agent_<id> … → dispatch → prepare_writer, and one top-up after the first failed
+evaluation. With it off, none of those nodes is ever reached.
 """
 
 from __future__ import annotations
@@ -26,17 +32,16 @@ from typing import Optional, Tuple
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.types import RetryPolicy
 
 from app.core.agent_runtime import checkpointer as runtime_checkpointer
-from app.core.debrief_graph import model_steps, nodes
+from app.core.debrief_graph import model_steps, nodes, orchestrator
 from app.core.debrief_graph.context import DebriefRunContext
-from app.core.debrief_graph.gateway import is_transient
+from app.core.debrief_graph.gateway import GATEWAY_RETRY
 from app.core.debrief_graph.model_step import make_model_step
+from app.core.debrief_graph.registry.manifest import REGISTRY
 from app.core.debrief_graph.state import DebriefState
 
-#: Gateway tools (checks, render, finalise) that did not answer are retried.
-GATEWAY_RETRY = RetryPolicy(max_attempts=3, initial_interval=0.5, retry_on=is_transient)
+__all__ = ["GATEWAY_RETRY", "build_graph", "get_debrief_graph"]
 
 
 def build_graph(checkpointer: Optional[BaseCheckpointSaver]) -> CompiledStateGraph:
@@ -56,6 +61,20 @@ def build_graph(checkpointer: Optional[BaseCheckpointSaver]) -> CompiledStateGra
     g.add_node("reviser", **make_model_step(model_steps.REVISER))
     g.add_node("decide", nodes.decide, retry_policy=GATEWAY_RETRY)
     g.add_node("finish", nodes.finish)
+
+    # The orchestrated middle (challenger releases only).
+    g.add_node("profile", orchestrator.profile)
+    g.add_node("planner", **make_model_step(orchestrator.PLANNER))
+    g.add_node("dispatch", orchestrator.dispatch)
+    g.add_node("top_up", orchestrator.top_up)
+    for m in REGISTRY.values():
+        if m.step is not None:
+            g.add_node(m.node, **make_model_step(m.step))
+        elif m.run is not None:
+            g.add_node(m.node, **orchestrator.code_agent_node(m))
+        else:
+            continue  # data agents are applied by the dispatcher in place
+        g.add_edge(m.node, "dispatch")
 
     g.add_edge(START, "plan")
     g.add_edge("safety_reader", "after_reading")

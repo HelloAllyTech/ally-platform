@@ -69,6 +69,11 @@ STEP_TIMEOUT_S: Dict[str, float] = {
     "writer": 75.0,
     "evaluator": 90.0,
     "reviser": 120.0,
+    # The orchestrator (spec A5): the planner gives way to the default plan.
+    "planner": 8.0,
+    "agent-protocol-check": 60.0,
+    "agent-history-deep": 60.0,
+    "agent-language-specialist": 60.0,
 }
 
 #: Shown in place of a failed check list when `run_checks` names no advisory codes.

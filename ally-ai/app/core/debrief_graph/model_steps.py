@@ -45,7 +45,10 @@ SAFETY_READER = ModelStep(
     ),
     summarise=safety_summary,
     on_success=_stay,
-    on_failure=_stay,
+    # An error handler's update follows no static edge: without this, a failed
+    # safety reading with no Analyst beside it would end the run unanswered.
+    on_failure=lambda s, c: ({}, "after_reading"),
+    destinations=("after_reading",),
 )
 
 

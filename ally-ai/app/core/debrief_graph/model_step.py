@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from langgraph.errors import NodeError, NodeTimeoutError
 from langgraph.runtime import Runtime
@@ -34,6 +34,7 @@ from app.core.debrief_graph.circuit import (
 )
 from app.core.debrief_graph.constants import STEP_TIMEOUT_S
 from app.core.debrief_graph.context import DebriefRunContext
+from app.core.debrief_graph.findings import agent_findings
 from app.core.debrief_graph.records import iso, progress_event, safe_summary
 from app.core.debrief_graph.state import DebriefState
 from app.core.debrief_graph.step_functions import StepError
@@ -62,9 +63,34 @@ class ModelStep:
     reasoning: Optional[Callable[[Dict[str, Any]], Optional[str]]] = None
     round_of: Callable[[State], Optional[int]] = lambda state: None
     destinations: Tuple[str, ...] = ()
+    #: `{model, backupModel, label, labelKey?}` for this step; default: the
+    #: recipe's step of the same name (registry agents and the planner have
+    #: their own, from the release's orchestrator block).
+    config: Optional[Callable[[State, Ctx], Dict[str, Any]]] = None
+    #: Data the step reads from a gateway tool before its model call, handed
+    #: to `body` as `state["fetched"]`. None = nothing to read: the model is
+    #: not called and the step answers with no findings.
+    fetch: Optional[Callable[[State, Ctx], Awaitable[Optional[Dict[str, Any]]]]] = None
+    #: The answer as findings (spec A3), checked against the transcript and
+    #: kept on `state["findings"][step]`; orchestrated runs only.
+    findings: Optional[Callable[[State, Ctx, Dict[str, Any]], List[Dict[str, Any]]]] = (
+        None
+    )
+    #: Attempts before the error handler routes the failure (2 = the backup model).
+    max_attempts: int = 2
+    #: Seconds per attempt; default STEP_TIMEOUT_S[path].
+    timeout_s: Optional[float] = None
 
     def key(self, state: State) -> str:
         return f"{self.path}#{self.round_of(state) or 0}"
+
+    def step_config(self, state: State, ctx: Ctx) -> Dict[str, Any]:
+        if self.config is not None:
+            return self.config(state, ctx) or {}
+        return ctx.step_of(state["recipe_key"], self.step) or {}
+
+    def timeout(self) -> float:
+        return self.timeout_s or STEP_TIMEOUT_S.get(self.path, 120.0)
 
 
 def _route(update: Dict[str, Any], nxt: Next):
@@ -91,7 +117,7 @@ def make_model_step(spec: ModelStep):
         key = spec.key(state)
         rnd = spec.round_of(state)
         attempt = runtime.execution_info.node_attempt
-        recipe_step = ctx.step_of(state["recipe_key"], spec.step) or {}
+        recipe_step = spec.step_config(state, ctx)
         scratch = ctx.attempts.get(key)
         if attempt == 1 or scratch is None:
             # A model whose breaker is open goes after its backup, not before;
@@ -104,7 +130,12 @@ def make_model_step(spec: ModelStep):
             }
             if runtime.stream_writer:
                 runtime.stream_writer(
-                    progress_event(spec.step, state.get("has_risk_cue", False), rnd)
+                    progress_event(
+                        spec.step,
+                        state.get("has_risk_cue", False),
+                        rnd,
+                        label_key=recipe_step.get("labelKey"),
+                    )
                 )
         model = scratch["models"][min(attempt, 2) - 1]
         est = (state.get("reserved") or {}).get(key, 0.0)
@@ -138,13 +169,46 @@ def make_model_step(spec: ModelStep):
             scratch["failed"].append(record)
             return record
 
+        sent: State = state
+        if spec.fetch is not None:
+            try:
+                fetched = await spec.fetch(state, ctx)
+            except (
+                Exception
+            ) as e:  # noqa: BLE001 - a tool that failed fails the attempt
+                failed(f"tool: {e}")
+                raise StepAttemptFailed(spec.step) from e
+            if fetched is None:
+                # Nothing for it to read (no protocols, no history): no model
+                # call, no cost, and no findings.
+                ctx.attempts.pop(key, None)
+                res = {"findings": []}
+                update = {
+                    "steps": [
+                        {
+                            **base,
+                            "status": "done",
+                            "startedAt": iso(t0),
+                            "ms": round(ctx.clock() - t0),
+                            "estimatedUsd": 0.0,
+                            "note": "nothing to read",
+                            "why": spec.why(state, ctx),
+                            "inputs": spec.inputs(state, ctx),
+                            "output": "nothing to read, so no model call",
+                            "budgetLeftUsd": left,
+                        }
+                    ],
+                    "results": {key: res},
+                }
+                return _route(update, spec.on_success(state, ctx, res))
+            sent = {**state, "fetched": fetched}
         try:
             res = await ctx.steps.run(
-                spec.path, spec.body(state, ctx), model, ctx.session_id
+                spec.path, spec.body(sent, ctx), model, ctx.session_id
             )
         except asyncio.CancelledError:
             # The node timeout cancelled this attempt (axios' wording, as before).
-            ms = int(STEP_TIMEOUT_S.get(spec.path, 120.0) * 1000)
+            ms = int(spec.timeout() * 1000)
             failed(f"network: timeout of {ms}ms exceeded")
             raise
         except StepError as e:
@@ -172,7 +236,16 @@ def make_model_step(spec: ModelStep):
             "budgetLeftUsd": left,
         }
         ctx.attempts.pop(key, None)
-        update = {"steps": scratch["failed"] + [done], "results": {key: res}}
+        update: Dict[str, Any] = {
+            "steps": scratch["failed"] + [done],
+            "results": {key: res},
+        }
+        if spec.findings is not None and state.get("orchestrated"):
+            update["findings"] = {
+                spec.step: agent_findings(
+                    spec.step, spec.findings(state, ctx, res), ctx, res
+                )
+            }
         return _route(update, spec.on_success(state, ctx, res))
 
     async def on_error(state: State, error: NodeError, runtime: Runtime[Ctx]):
@@ -189,11 +262,11 @@ def make_model_step(spec: ModelStep):
         "action": node,
         "error_handler": on_error,
         "retry_policy": RetryPolicy(
-            max_attempts=2,
+            max_attempts=spec.max_attempts,
             initial_interval=0.0,
             jitter=False,
             retry_on=lambda e: isinstance(e, (StepAttemptFailed, NodeTimeoutError)),
         ),
-        "timeout": STEP_TIMEOUT_S.get(spec.path, 120.0),
+        "timeout": spec.timeout(),
         "destinations": spec.destinations or None,
     }
