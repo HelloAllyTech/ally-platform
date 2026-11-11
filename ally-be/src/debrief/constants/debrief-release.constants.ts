@@ -120,16 +120,17 @@ export interface DebriefReplyConfig {
   model: string;
   /** Room for a 120-word reply in an Indic script, which costs far more tokens than English. */
   maxTokens: number;
-  /** v9 FR-43: dollars one reply may spend across its tool turns; default DEBRIEF_REPLY_BUDGET_USD. */
+  /**
+   * v9 FR-43: dollars one reply may spend across its passes. ally-ai enforces
+   * it and never allows more than $0.05 (`REPLY_BUDGET_USD`, app/core/ask_ally).
+   */
   budgetUsd?: number;
-  /** v9 FR-43: model passes per reply, tool turns included; default DEBRIEF_REPLY_MAX_TURNS. */
+  /**
+   * v9 FR-43: model passes per reply, tool passes included, the last never
+   * calling a tool. ally-ai's default and ceiling is 4 (`REPLY_MAX_TURNS`).
+   */
   maxTurns?: number;
 }
-
-/** v9 FR-43 / NFR-2: an Ask Ally reply costs at most this. */
-export const DEBRIEF_REPLY_BUDGET_USD = 0.05;
-/** v9 FR-43: at most this many model passes per reply, the last never calling a tool. */
-export const DEBRIEF_REPLY_MAX_TURNS = 4;
 
 export interface DebriefBundle {
   /** Standard and Short always; Case and Assessment from the release that added them. */

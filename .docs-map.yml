@@ -180,6 +180,23 @@ rules:
     requires: helloallytech.github.io/wiki/repos/ally-ai.md
     why: The HTTP surface is what ally-be integrates against; the repo page documents it.
 
+  - id: debrief-harness-contract
+    watch:
+      - "ally-ai/app/core/debrief_graph/schemas.py"
+      - "ally-ai/app/core/debrief_graph/gateway.py"
+      - "ally-ai/app/core/ask_ally/schemas.py"
+      - "ally-ai/app/core/ask_ally/agent.py"
+      - "ally-ai/app/core/ask_ally/tools.py"
+      - "ally-be/src/debrief/service/debrief-run-token.service.ts"
+      - "ally-be/src/debrief/service/debrief-gateway.service.ts"
+      - "ally-be/src/debrief/service/ask-ally.client.ts"
+    requires: docs/debrief-harness/CONTRACT.md
+    why: >
+      The run and reply requests, the stream events, the gateway tools and the run
+      tokens are a contract between ally-be and ally-ai; each side is built and
+      deployed separately, so a change on one side without the contract moving
+      leaves the other guessing.
+
   - id: ally-ai-filler-eval-schema
     watch:
       - "ally-ai/app/core/filler_quality/**"

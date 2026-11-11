@@ -13,7 +13,6 @@ import { ScenarioSessionChat } from '../learn/entity/scenario-session-chat.entit
 import { ScenarioSessionChatMessage } from '../learn/entity/scenario-session-chat-message.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentHarnessModule } from '../llm-agent/harness/agent-harness.module';
-import { LlmAgentModule } from '../llm-agent/llm-agent.module';
 import { LearnModule } from '../learn/learn.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { DebriefConsoleController } from './controller/debrief-console.controller';
@@ -35,7 +34,6 @@ import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
-import { DebriefReplyAgentService } from './service/debrief-reply-agent.service';
 import { DebriefPublishService } from './service/debrief-publish.service';
 import { DebriefSettingsService } from './service/debrief-settings.service';
 import { DebriefBaselineService } from './service/debrief-baseline.service';
@@ -86,8 +84,6 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     // The bell and phone pushes: "your debrief is ready", "Ally updated it".
     NotificationModule,
     AgentHarnessModule,
-    // Ask Ally's tool loop: the same tool-capable providers the Guide uses.
-    LlmAgentModule,
     PromptModule,
     // "Practise this next" reads the learner's roleplays as their list does.
     LearnModule,
@@ -115,7 +111,6 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefFeedbackService,
     DebriefPracticeService,
     DebriefReplyService,
-    DebriefReplyAgentService,
     DebriefPublishService,
     DebriefSettingsService,
     DebriefBaselineService,
