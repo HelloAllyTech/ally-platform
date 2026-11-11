@@ -146,6 +146,50 @@ export const uiSharedFakes = {
     </div>
   ),
   SelectItem: ({ value, text }: any) => <option value={value}>{text}</option>,
+  // A Carbon Dropdown as a native select: each option's value is its label, so a test picks an
+  // item by the words a person sees.
+  CarbonDropdown: ({
+    id,
+    titleText,
+    items,
+    selectedItem,
+    itemToString,
+    onChange,
+    disabled,
+    ...rest
+  }: any) => {
+    const text = (item: any) => (itemToString ? itemToString(item) : String(item ?? ""));
+    return (
+      <div data-testid={rest["data-testid"]}>
+        <label htmlFor={id}>{titleText}</label>
+        <select
+          id={id}
+          value={selectedItem ? text(selectedItem) : ""}
+          disabled={disabled}
+          onChange={event =>
+            onChange?.({ selectedItem: items.find((i: any) => text(i) === event.target.value) })
+          }
+        >
+          {items.map((item: any, i: number) => (
+            <option key={i} value={text(item)}>
+              {text(item)}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  },
+  NumberInput: ({ id, value, min, max, disabled, onChange }: any) => (
+    <input
+      id={id}
+      type="number"
+      value={value}
+      min={min}
+      max={max}
+      disabled={disabled}
+      onChange={event => onChange?.(event, { value: event.target.value, direction: "" })}
+    />
+  ),
   ContentSwitcher: ({ children, selectedIndex, onChange, ...rest }: any) => (
     <div role="group" aria-label={rest["aria-label"]}>
       {React.Children.map(children, (child: any, index: number) =>

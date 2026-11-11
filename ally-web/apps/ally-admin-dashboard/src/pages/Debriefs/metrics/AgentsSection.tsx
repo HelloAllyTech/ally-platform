@@ -18,20 +18,12 @@ import {
 import { MIN_RATE_SAMPLE, rateWithRange } from "./metricsData";
 import { ChartCard } from "../../Analytics/chartKit";
 import { CONTEXT, PALETTE } from "../../Analytics/chartScales";
+import { agentName, checkLabel, hardFailLabel, plannerFallbackLabel } from "../consoleLabels";
 
 const fixed = (x: number | null | undefined, d = 1) =>
   x == null ? en.debriefs.metrics.none : x.toFixed(d);
 
-/** A code's plain name; an unlisted code reads as words rather than as an id. */
-const words = (code: string) => {
-  const t = code.replace(/_/g, " ");
-  return t.charAt(0).toUpperCase() + t.slice(1);
-};
-const checkLabel = (code: string) => en.debriefs.metrics.codeLabels.checks[code] ?? words(code);
-const fallbackLabel = (code: string) =>
-  en.debriefs.metrics.codeLabels.plannerFallback[code] ?? words(code);
-const hardFailLabel = (code: string) =>
-  (en.debriefs.hardFails as Record<string, string>)[code] ?? words(code);
+const fallbackLabel = plannerFallbackLabel;
 
 const codes = (list: Array<{ code: string; runs: number }>, label: (code: string) => string) =>
   list.length
@@ -40,8 +32,6 @@ const codes = (list: Array<{ code: string; runs: number }>, label: (code: string
         .map(f => `${label(f.code)} (${f.runs})`)
         .join(", ")
     : en.debriefs.metrics.none;
-
-const agentName = (id: string) => en.debriefs.metrics.agents.registry.names[id] ?? id;
 
 /**
  * The orchestrator's rows for the numbers table: the planner, the top-up, then
