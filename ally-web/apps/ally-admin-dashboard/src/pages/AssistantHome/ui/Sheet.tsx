@@ -12,7 +12,8 @@ export const Sheet: React.FC<{
   label: string;
   onClose: () => void;
   children: React.ReactNode;
-  side?: "right" | "bottom";
+  /** `center` is a small dialog over the page, for a confirmation. */
+  side?: "right" | "bottom" | "center";
   testId?: string;
 }> = ({ label, onClose, children, side = "right", testId }) => {
   const panel = useRef<HTMLDivElement>(null);

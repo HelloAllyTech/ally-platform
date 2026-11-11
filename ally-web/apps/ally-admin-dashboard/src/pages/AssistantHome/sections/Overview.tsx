@@ -2,21 +2,18 @@ import React, { useRef, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 
-import {
-  useArchiveChatbotMutation,
-  useGetHomeNumbersQuery,
-  useSetChatbotStatusMutation,
-} from "@api";
+import { useGetHomeNumbersQuery, useSetChatbotStatusMutation } from "@api";
 import { Button, Segmented } from "@components/v2";
 import { ROUTES } from "@constants";
 import { BotPageView, ChatbotStatus } from "@types";
 
 import { Qr } from "../../Onboarding/Screens";
 import { copyToClipboard } from "../../WhatsAppBot/shared";
-import { fill, HOME } from "../copy";
+import { HOME } from "../copy";
 import { Group, SectionHead } from "../fields";
 import { AllNumbers } from "./AllNumbers";
 import { Scorecard } from "./Scorecard";
+import { RemoveDialog } from "../ui/RemoveDialog";
 
 import type { SectionProps } from "./props";
 
@@ -35,7 +32,7 @@ export const OverviewSection: React.FC<
   }
 > = ({ bot, page, openAllNumbers = false, canEdit, canManage, go }) => {
   const [setStatus, statusState] = useSetChatbotStatusMutation();
-  const [archive, archiveState] = useArchiveChatbotMutation();
+  const [removing, setRemoving] = useState(false);
   const [days, setDays] = useState<7 | 30>(30);
   const [allNumbers, setAllNumbers] = useState(openAllNumbers);
   // The list already counted the last 30 days; 7 days is asked for when chosen.
@@ -154,15 +151,17 @@ export const OverviewSection: React.FC<
           <button
             type="button"
             className="ally-link ally-home__danger"
-            disabled={archiveState.isLoading}
-            onClick={async () => {
-              if (!window.confirm(fill(t.removeConfirm, { name: bot.name }))) return;
-              await archive(bot.id).unwrap();
-              navigate(ROUTES.WHATSAPP_BOT);
-            }}
+            onClick={() => setRemoving(true)}
           >
             {t.remove}
           </button>
+          {removing && (
+            <RemoveDialog
+              bot={bot}
+              onClose={() => setRemoving(false)}
+              onRemoved={() => navigate(ROUTES.WHATSAPP_BOT)}
+            />
+          )}
         </div>
       )}
     </>

@@ -51,6 +51,18 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       providesTags: [TAG_TYPES.CHATBOTS],
     }),
 
+    /** Removed assistants, most recent first: read-only. */
+    getArchivedChatbots: builder.query<{ chatbots: Chatbot[] }, void>({
+      query: () => ({ url: ApiEndpoints.CHATBOTS.ARCHIVED, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.CHATBOTS],
+    }),
+
+    /** A removed assistant back, paused; its channels are reconnected by hand. */
+    restoreChatbot: builder.mutation<Chatbot, string>({
+      query: id => ({ url: ApiEndpoints.CHATBOTS.RESTORE(id), method: HttpMethod.POST }),
+      invalidatesTags: (_r, _e, id) => botTags(id),
+    }),
+
     getChatbot: builder.query<Chatbot, string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.BY_ID(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.CHATBOT_DETAIL, id }],
@@ -71,7 +83,12 @@ export const chatbotsApi = baseAPI.injectEndpoints({
         method: HttpMethod.PATCH,
         body: { status },
       }),
-      invalidatesTags: (_r, _e, { id }) => botTags(id),
+      // Going live turns its page on too (one switch), so the page and the home refresh.
+      invalidatesTags: (_r, _e, { id }) => [
+        ...botTags(id),
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:page` },
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:home` },
+      ],
     }),
 
     archiveChatbot: builder.mutation<void, string>({
@@ -398,6 +415,8 @@ export const {
   useChangeHomeListMutation,
   useCorrectFactMutation,
   useGetChatbotsQuery,
+  useGetArchivedChatbotsQuery,
+  useRestoreChatbotMutation,
   useGetChatbotQuery,
   useUpdateChatbotMutation,
   useSetChatbotStatusMutation,

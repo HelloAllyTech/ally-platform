@@ -28,6 +28,7 @@ import {
   AddBotDraftDocumentDto,
   BotDraftMessageDto,
   CreateBotDraftDto,
+  DescribeBotDraftDto,
   PatchBotDraftDto,
   PublishBotDraftDto,
   UndoBotDraftDto,
@@ -138,6 +139,28 @@ export class BotDraftController {
       .catch((error) =>
         this.logger.warn(
           `Reading document ${dto.documentId} for draft ${id} failed: ${error instanceof Error ? error.message : 'unknown'}`,
+        ),
+      );
+    return draftView(draft);
+  }
+
+  @Post(':id/description')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'Read a description into "What we learned"',
+    description:
+      'For a setup whose website gave too little: the description is read in the background, each detail sourced to the owner, as when a setup starts from one. Progress on /events.',
+  })
+  async describe(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DescribeBotDraftDto,
+  ) {
+    const draft = await this.drafts.get(id);
+    void this.session
+      .learnFromDescription(draft.id, dto.description.trim())
+      .catch((error) =>
+        this.logger.warn(
+          `Reading the description for draft ${id} failed: ${error instanceof Error ? error.message : 'unknown'}`,
         ),
       );
     return draftView(draft);

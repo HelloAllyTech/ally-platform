@@ -720,7 +720,8 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.WHATSAPP_BOT}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT}>
+            // Full bleed, as the assistant home: the page draws its own background to the edges.
+            <PrivateLayout requiredFeature={FeatureToggleKey.WHATSAPP_BOT} fullBleed>
               <WhatsAppBot />
             </PrivateLayout>
           }

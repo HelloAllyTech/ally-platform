@@ -1,10 +1,16 @@
 /* The AI Chatbots page (chunk 20d-2): its title, tabs and assistant cards in the v2 look. */
 .ally-list-page {
   min-height: 100%;
-  padding: 4px 0 48px;
+  /* The route is full bleed (no shell padding), so the page pads itself: the shell's p-4 / lg:p-6. */
+  padding: 20px 16px 48px;
   background: var(--ally-bg);
   color: var(--ally-ink);
   font-family: var(--ally-font-ui);
+}
+@media (min-width: 1024px) {
+  .ally-list-page {
+    padding: 28px 24px 48px;
+  }
 }
 .ally-list-page__head {
   display: flex;
@@ -83,6 +89,42 @@
   border-color: var(--ally-accent);
   box-shadow: 0 0 0 4px var(--ally-accent-soft);
 }
+/* A card plus, for its owners, the `···` menu in its top-right corner. */
+.ally-list-page__card-wrap {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.ally-list-page__card-wrap > .ally-list-page__card {
+  flex: 1;
+}
+/* Room for the menu beside the status badge. */
+.ally-list-page__card-wrap--menu .ally-list-page__card-top {
+  padding-right: 40px;
+}
+.ally-list-page__menu {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.ally-list-page__menu .ally-more__button {
+  width: 34px;
+  min-height: 34px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ally-muted);
+}
+.ally-list-page__menu .ally-more__button:is(:hover, :focus-visible, [aria-expanded="true"]) {
+  background: var(--ally-sunken);
+  color: var(--ally-ink);
+}
+/* A removed assistant: quieter, still opens (read-only). */
+.ally-list-page__card--archived {
+  background: var(--ally-surface-2);
+}
+.ally-list-page__card--archived .ally-list-page__bot {
+  color: var(--ally-ink-2);
+}
 .ally-list-page__card--skeleton {
   height: 156px;
   background: var(--ally-surface-2);
@@ -112,6 +154,11 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
   color: var(--ally-muted);
+}
+/* The status pill never wraps or shrinks; the name gives way (it truncates with "…"). */
+.ally-list-page__status {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .ally-list-page__status--live {
   background: var(--ally-good-bg);

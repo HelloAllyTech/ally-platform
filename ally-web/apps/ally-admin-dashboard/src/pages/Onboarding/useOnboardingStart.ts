@@ -1,34 +1,11 @@
 import { useCallback, useState } from "react";
 
-import axios from "axios";
-
-import {
-  useAddBotDraftDocumentMutation,
-  useCreateBotDraftMutation,
-  useCreateChatbotDocumentUploadUrlMutation,
-  useCreatePrivateChatbotDocumentMutation,
-  useGetCurrentBotDraftQuery,
-} from "@api";
+import { useCreateBotDraftMutation, useGetCurrentBotDraftQuery } from "@api";
 
 import { COPY } from "./copy";
+import { filesProblem, useDraftUpload } from "./useDraftUpload";
 
 import type { BotDraftView } from "./types";
-
-/** Copy §13: up to 10 files at a time, 20 MB each. */
-const MAX_FILES = 10;
-const MAX_BYTES = 20 * 1024 * 1024;
-const FORMATS: Record<string, { sourceType: string; mime: string }> = {
-  pdf: { sourceType: "pdf", mime: "application/pdf" },
-  docx: {
-    sourceType: "docx",
-    mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  },
-  txt: { sourceType: "paste", mime: "text/plain" },
-};
-export const ACCEPTED_FILES = ".pdf,.docx,.txt";
-
-const extension = (name: string) => name.toLowerCase().split(".").pop() ?? "";
-const withoutExtension = (name: string) => name.replace(/\.[^.]+$/, "");
 
 export const errorText = (error: unknown): string => {
   const data = (error as { data?: { message?: unknown } })?.data;
@@ -56,9 +33,7 @@ export const useOnboardingStart = (): OnboardingStart => {
   const [uploading, setUploading] = useState(false);
   const { data: current } = useGetCurrentBotDraftQuery();
   const [createDraft, { isLoading: creating }] = useCreateBotDraftMutation();
-  const [createUploadUrl] = useCreateChatbotDocumentUploadUrlMutation();
-  const [createDocument] = useCreatePrivateChatbotDocumentMutation();
-  const [addDocument] = useAddBotDraftDocumentMutation();
+  const upload = useDraftUpload();
 
   const start = useCallback(
     async (body: { website?: string; description?: string }) => {
@@ -76,50 +51,15 @@ export const useOnboardingStart = (): OnboardingStart => {
   const startWithFiles = useCallback(
     async (files: File[]) => {
       setError(null);
-      if (
-        !files.length ||
-        files.length > MAX_FILES ||
-        files.some(f => f.size > MAX_BYTES || !FORMATS[extension(f.name)])
-      ) {
-        setError(COPY.start.uploadLimits);
+      const problem = filesProblem(files);
+      if (problem) {
+        setError(problem);
         return null;
       }
       setUploading(true);
       try {
         const draft = await createDraft({ upload: true }).unwrap();
-        const botId = draft.chatbotId!;
-        for (const file of files) {
-          const format = FORMATS[extension(file.name)];
-          const title = withoutExtension(file.name);
-          let rows;
-          if (format.sourceType === "paste") {
-            rows = await createDocument({
-              id: botId,
-              title,
-              sourceType: "paste",
-              text: await file.text(),
-            } as never).unwrap();
-          } else {
-            const { presignedUrl, fileUrl } = await createUploadUrl({
-              id: botId,
-              fileName: file.name,
-              fileSize: file.size,
-              contentType: format.mime,
-            }).unwrap();
-            await axios.put(presignedUrl, file, { headers: { "Content-Type": format.mime } });
-            rows = await createDocument({
-              id: botId,
-              title,
-              sourceType: format.sourceType,
-              fileUrl,
-              fileName: file.name,
-              contentType: format.mime,
-              sizeBytes: file.size,
-            } as never).unwrap();
-          }
-          const added = (rows as { id: string; title: string }[]).find(r => r.title === title);
-          if (added) await addDocument({ id: draft.id, documentId: added.id }).unwrap();
-        }
+        await upload({ id: draft.id, chatbotId: draft.chatbotId! }, files);
         return draft.id;
       } catch (err) {
         setError(errorText(err));
@@ -128,7 +68,7 @@ export const useOnboardingStart = (): OnboardingStart => {
         setUploading(false);
       }
     },
-    [addDocument, createDocument, createDraft, createUploadUrl],
+    [createDraft, upload],
   );
 
   return {

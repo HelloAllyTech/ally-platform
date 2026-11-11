@@ -1461,6 +1461,14 @@ export const en = {
         connectors: "Channels",
         defaults: "Defaults",
         library: "Knowledge library",
+        archived: "Archived",
+      },
+      /** Removed assistants: read-only, kept so their conversations can still be read. */
+      archived: {
+        empty: "Nothing archived",
+        emptyHint: "Assistants you remove appear here, with their conversations.",
+        removed: "Removed {date}",
+        loadFailed: "Could not load the archived assistants.",
       },
       status: { draft: "Not live yet", live: "Live", paused: "Paused" },
       role: { viewer: "Viewer", editor: "Editor", owner: "Owner" },

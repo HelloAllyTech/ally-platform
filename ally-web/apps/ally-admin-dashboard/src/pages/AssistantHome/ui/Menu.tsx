@@ -8,6 +8,8 @@ export interface MenuItem {
   onSelect?: () => void;
   /** Shown only below 960 px (where the header has no room for it). */
   phoneOnly?: boolean;
+  /** A destructive action, such as Remove assistant: shown in the danger colour. */
+  danger?: boolean;
 }
 
 /**
@@ -105,6 +107,7 @@ export const MoreMenu: React.FC<{ label: string; items: MenuItem[] }> = ({ label
                   type="button"
                   role="menuitem"
                   tabIndex={-1}
+                  className={item.danger ? "ally-more__danger" : undefined}
                   onClick={() => {
                     setOpen(false);
                     item.onSelect?.();

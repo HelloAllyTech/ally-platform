@@ -13,7 +13,8 @@ import { ROUTES } from "@constants";
 import { Chatbot, ChatbotMemberRole, ChatbotStatus } from "@types";
 
 import { ChangePanel } from "./ChangePanel";
-import { HOME } from "./copy";
+import { fill, HOME } from "./copy";
+import { day } from "./dates";
 import { EnginePanel } from "./EnginePanel";
 import { SECTION_IDS, SectionId, sectionFromUrl } from "./sections";
 import { SettingsPanel } from "./SettingsPanel";
@@ -33,6 +34,7 @@ import { ShareSection } from "./sections/Share";
 import { TryIt } from "./TryIt";
 import { MoreMenu } from "./ui/Menu";
 import { Sheet } from "./ui/Sheet";
+import { useRestoreAssistant } from "./ui/useRestoreAssistant";
 import { HomeSaves, HomeSavesContext, SaveState } from "./useHomeField";
 import "./home.css";
 import "./ui/scale.css";
@@ -87,6 +89,7 @@ export const AssistantHome: React.FC = () => {
   const { data: page } = useGetBotPageQuery(botId, { skip: !botId });
   const { data: list } = useGetChatbotsQuery();
   const isPlatformAdmin = Boolean(list?.canCreate);
+  const { restore, restoring } = useRestoreAssistant();
 
   const fromUrl = sectionFromUrl(params);
   const section = fromUrl.section;
@@ -167,8 +170,11 @@ export const AssistantHome: React.FC = () => {
     );
   }
 
-  const canEdit = RANK[bot.myRole] >= RANK[ChatbotMemberRole.EDITOR] && home.data.canEdit;
-  const canManage = RANK[bot.myRole] >= RANK[ChatbotMemberRole.OWNER];
+  // A removed assistant, opened from the Archived list, is read-only.
+  const archived = Boolean(bot.archivedAt);
+  const canEdit =
+    !archived && RANK[bot.myRole] >= RANK[ChatbotMemberRole.EDITOR] && home.data.canEdit;
+  const canManage = !archived && RANK[bot.myRole] >= RANK[ChatbotMemberRole.OWNER];
   const props = { bot, home: home.data, canEdit, canManage, go };
 
   const panelLabel =
@@ -242,8 +248,11 @@ export const AssistantHome: React.FC = () => {
           <div className="ally-v2 ally-home" data-testid="assistant-home" data-section={section}>
             <header className="ally-home__top">
               <nav className="ally-home__crumb ally-small" aria-label="Breadcrumb">
-                <Link to={ROUTES.WHATSAPP_BOT} className="ally-link">
-                  {HOME.breadcrumb}
+                <Link
+                  to={archived ? `${ROUTES.WHATSAPP_BOT}?tab=archived` : ROUTES.WHATSAPP_BOT}
+                  className="ally-link"
+                >
+                  {archived ? HOME.archived.back : HOME.breadcrumb}
                 </Link>
                 <span aria-hidden="true"> / </span>
                 <span aria-current="page">{bot.name}</span>
@@ -262,56 +271,78 @@ export const AssistantHome: React.FC = () => {
                           ? HOME.saving.asYouGo
                           : ""}
                 </span>
-                <div className="ally-home__actions">
-                  {canEdit && (
+                {!archived && (
+                  <div className="ally-home__actions">
+                    {canEdit && (
+                      <Button
+                        aria-pressed={panel === "change"}
+                        onClick={() => setPanel(p => (p === "change" ? null : "change"))}
+                      >
+                        {COPY.change.title}
+                      </Button>
+                    )}
+                    {page?.saved && (
+                      <a
+                        className="ally-btn ally-btn--secondary ally-home__open-page"
+                        href={page.link}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {HOME.openPage}
+                      </a>
+                    )}
                     <Button
-                      aria-pressed={panel === "change"}
-                      onClick={() => setPanel(p => (p === "change" ? null : "change"))}
+                      variant="primary"
+                      aria-pressed={panel === "try"}
+                      onClick={() => setPanel(p => (p === "try" ? null : "try"))}
                     >
-                      {COPY.change.title}
+                      {HOME.tryIt}
+                    </Button>
+                    <MoreMenu
+                      label={HOME.more.more}
+                      items={[
+                        ...(page?.saved
+                          ? [
+                              {
+                                label: HOME.openPage,
+                                href: page.link,
+                                external: true,
+                                phoneOnly: true,
+                              },
+                            ]
+                          : []),
+                        // Ally staff only: how it answers, and this assistant's own settings.
+                        ...(isPlatformAdmin
+                          ? [
+                              { label: HOME.more.engine, onSelect: () => setPanel("engine") },
+                              { label: HOME.more.settings, onSelect: () => setPanel("settings") },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  </div>
+                )}
+              </div>
+              {archived && (
+                <div className="ally-home__archived" role="status">
+                  <p className="ally-small">
+                    {fill(HOME.archived.banner, { date: day(bot.archivedAt!) })}
+                  </p>
+                  {bot.myRole === ChatbotMemberRole.OWNER && (
+                    <Button
+                      disabled={restoring}
+                      onClick={async () => {
+                        if (await restore(bot)) {
+                          void refetch();
+                          void home.refetch();
+                        }
+                      }}
+                    >
+                      {HOME.archived.restore}
                     </Button>
                   )}
-                  {page?.saved && (
-                    <a
-                      className="ally-btn ally-btn--secondary ally-home__open-page"
-                      href={page.link}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {HOME.openPage}
-                    </a>
-                  )}
-                  <Button
-                    variant="primary"
-                    aria-pressed={panel === "try"}
-                    onClick={() => setPanel(p => (p === "try" ? null : "try"))}
-                  >
-                    {HOME.tryIt}
-                  </Button>
-                  <MoreMenu
-                    label={HOME.more.more}
-                    items={[
-                      ...(page?.saved
-                        ? [
-                            {
-                              label: HOME.openPage,
-                              href: page.link,
-                              external: true,
-                              phoneOnly: true,
-                            },
-                          ]
-                        : []),
-                      // Ally staff only: how it answers, and this assistant's own settings.
-                      ...(isPlatformAdmin
-                        ? [
-                            { label: HOME.more.engine, onSelect: () => setPanel("engine") },
-                            { label: HOME.more.settings, onSelect: () => setPanel("settings") },
-                          ]
-                        : []),
-                    ]}
-                  />
                 </div>
-              </div>
+              )}
             </header>
 
             <div className={`ally-home__body${panel ? " ally-home__body--panel" : ""}`}>
@@ -375,8 +406,11 @@ export const AssistantHome: React.FC = () => {
 
 const noop = () => undefined;
 
-const StatusPill: React.FC<{ bot: Chatbot }> = ({ bot }) => (
-  <span className={`ally-badge ally-home__status ally-home__status--${bot.status}`}>
-    {STATUS_LABEL[bot.status]}
-  </span>
-);
+const StatusPill: React.FC<{ bot: Chatbot }> = ({ bot }) =>
+  bot.archivedAt ? (
+    <span className="ally-badge ally-badge--muted ally-home__status">{HOME.archived.badge}</span>
+  ) : (
+    <span className={`ally-badge ally-home__status ally-home__status--${bot.status}`}>
+      {STATUS_LABEL[bot.status]}
+    </span>
+  );

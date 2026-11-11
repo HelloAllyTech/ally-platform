@@ -11,6 +11,17 @@ import { ALL_NUMBERS } from "./numbers";
  */
 export const HOME = {
   breadcrumb: "Assistants",
+  /** A removed assistant, opened from the Archived list: read-only. */
+  archived: {
+    badge: "Removed",
+    back: "Archived assistants",
+    restore: "Restore assistant",
+    restored:
+      "{name} is back, paused. Turn it on from its Overview, and reconnect WhatsApp under Share if it used a number.",
+    restoreFailed: "Couldn't restore it. Try again.",
+    banner:
+      "Removed on {date}. You can still read what it knew and its conversations, but it can't be changed or chatted with.",
+  },
   tryIt: "Try it",
   openPage: "Open page",
   status: { live: "Live", paused: "Paused", draft: "Not live yet" },
@@ -43,7 +54,7 @@ export const HOME = {
     failed: "Couldn't save. Try again.",
   },
   overview: {
-    live: "Your assistant is live",
+    live: "Your assistant is live. People can chat with it on its page, your website and WhatsApp.",
     paused: "Your assistant is paused. People see a note that it's away.",
     draft: "Your assistant isn't live yet",
     pause: "Pause",
@@ -63,8 +74,14 @@ export const HOME = {
     allNumbers: "All numbers",
     seeAllNumbers: "See all numbers",
     remove: "Remove assistant",
-    removeConfirm:
-      "Remove {name}? Its page stops working and nobody can chat with it. Conversations are kept.",
+    removeTitle: "Remove {name}?",
+    removeBody:
+      "Its page stops working and nobody can chat with it. Any WhatsApp number it uses is freed for another assistant. Its conversations are kept.",
+    removeConfirm: "Remove",
+    removeKeep: "Keep it",
+    removeFailed: "Couldn't remove it. Try again.",
+    /** The `···` button on an assistant's card. */
+    moreFor: "More for {name}",
   },
   knows: {
     website: "From your website",
@@ -236,6 +253,10 @@ export const HOME = {
     off: "Your page is off",
     turnOn: "Turn on",
     turnOff: "Turn off",
+    /** One switch: the page follows the assistant's own, in Overview. */
+    followsLive: "It's on whenever your assistant is live. Turn it on or pause it from Overview.",
+    pausedNote: "Your assistant is paused, so people who open it see a note that it's away.",
+    toOverview: "Go to Overview",
     prechat: "Questions before the chat",
     prechatHint: "Asked one at a time before the chat starts. Up to 8.",
     question: "Question {n}",

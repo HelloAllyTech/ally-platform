@@ -1,6 +1,7 @@
 import React, { useId } from "react";
 
 import { Button } from "@components/v2";
+import { ChatbotStatus } from "@types";
 import type { BotPageLimits, PrechatField } from "@types";
 
 import { LookAndFeelSection } from "../../WhatsAppBot/LookAndFeel";
@@ -246,15 +247,14 @@ const LimitsEditor: React.FC<{ field: HomeField<BotPageLimits>; disabled: boolea
  * The assistant's page (chunk 20d): its name at the top, how it looks (Look and feel, with the live
  * phone), the questions it asks before a chat, and its limits.
  */
-export const PageSection: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
+export const PageSection: React.FC<SectionProps> = ({ bot, home, canEdit, go }) => {
   const f = home.fields;
   const failed = HOME.saving.failed;
   const name = useHomeField(bot.id, "name", f.name, failed);
   const prechat = useHomeField(bot.id, "prechat", f.prechat, failed);
   const limits = useHomeField(bot.id, "pageLimits", f.pageLimits, failed);
   const busy = useHomeField(bot.id, "busyText", f.busyText, failed);
-  const status = useHomeField(bot.id, "pageStatus", f.pageStatus, failed);
-  const on = status.value === "on";
+  const on = f.pageStatus.value === "on";
   return (
     <>
       <SectionHead
@@ -263,24 +263,17 @@ export const PageSection: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
         help={HOME.help.page}
       />
 
+      {/* One switch (the assistant's, in Overview): this says where the page stands and why. */}
       <Group testId="page-status">
         <div className="ally-home__row">
-          <p className="ally-body ally-home__strong">{on ? t.on : t.off}</p>
-          {canEdit && (
-            <Button
-              variant={on ? "secondary" : "primary"}
-              disabled={status.saving}
-              onClick={() => status.set(on ? "off" : "on", { now: true })}
-            >
-              {on ? t.turnOff : t.turnOn}
-            </Button>
-          )}
+          <div>
+            <p className="ally-body ally-home__strong">{on ? t.on : t.off}</p>
+            <p className="ally-small">
+              {on && bot.status === ChatbotStatus.PAUSED ? t.pausedNote : t.followsLive}
+            </p>
+          </div>
+          {canEdit && <Button onClick={() => go("overview")}>{t.toOverview}</Button>}
         </div>
-        {status.error && (
-          <p className="ally-error" role="alert">
-            {status.error}
-          </p>
-        )}
       </Group>
 
       <Group testId="page-name">

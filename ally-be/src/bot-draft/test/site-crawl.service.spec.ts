@@ -83,6 +83,7 @@ function harness(allowHosts: string[] = ['127.0.0.1'], crawlsPerDay = 5) {
   };
   const draft = (website: string) => ({
     id: 'draft-1',
+    status: 'active',
     ownerUserId: 7,
     tenantId: 't1',
     chatbotId: 'bot-1',
@@ -307,7 +308,7 @@ describe('SiteCrawlService', () => {
     expect(read(crawl).sort()).toEqual(['/', '/fees']);
   });
 
-  it('reads the sitemap first, stops at 50 pages and never runs more than 4 at once', async () => {
+  it('reads the sitemap, stops at 50 pages and never runs more than 4 at once', async () => {
     const routes: Routes = { '/': { body: page('Home', LONG) } };
     const locs: string[] = [];
     for (let i = 0; i < 70; i++) {
@@ -326,6 +327,29 @@ describe('SiteCrawlService', () => {
     // The builder learns in batches as pages arrive.
     expect(h.learned.reduce((a, b) => a + b, 0)).toBe(50);
     expect(Math.max(...h.learned)).toBeLessThanOrEqual(CRAWL_LIMITS.learnBatch);
+  });
+
+  it("reads the owner's own pages before a big sitemap catalogue", async () => {
+    // A lab's site: the owner typed /mumbai, whose links are the Mumbai packages and the contact
+    // page, while the sitemap lists 300 test pages.
+    const own = ['/mumbai/package/a', '/mumbai/package/b', '/contact'];
+    const routes: Routes = { '/mumbai': { body: page('Mumbai', LONG, own) } };
+    for (const path of own) routes[path] = { body: page(path, LONG) };
+    const locs: string[] = [];
+    for (let i = 0; i < 300; i++) {
+      routes[`/calc/p${i}`] = { body: page(`Range ${i}`, LONG) };
+      locs.push(`<url><loc>PLACEHOLDER/calc/p${i}</loc></url>`);
+    }
+    const s = await serve(routes);
+    routes['/sitemap.xml'] = {
+      type: 'application/xml',
+      body: `<urlset>${locs.join('').replace(/PLACEHOLDER/g, s.url.slice(0, -1))}</urlset>`,
+    };
+    const crawl = await harness().crawl(`${s.url}mumbai`);
+    const taken = crawl.seen.map((url) => new URL(url).pathname);
+    expect(taken.slice(0, 4)).toEqual(['/mumbai', ...own]);
+    expect(read(crawl)).toEqual(expect.arrayContaining(own));
+    expect(read(crawl)).toHaveLength(CRAWL_LIMITS.maxPages);
   });
 
   it('follows a short home page’s links instead of giving up', async () => {

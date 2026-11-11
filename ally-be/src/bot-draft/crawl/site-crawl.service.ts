@@ -17,7 +17,11 @@ import { LoggerService } from '../../logger/logger.service';
 import { RedisService } from '../../redis/service/redis.service';
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
 import { BotDraftEntity } from '../entity/bot-draft.entity';
-import { BotDraftActor, BotDraftStep } from '../enum/bot-draft.enum';
+import {
+  BotDraftActor,
+  BotDraftStatus,
+  BotDraftStep,
+} from '../enum/bot-draft.enum';
 import { BotDraftEventsService } from '../service/bot-draft-events.service';
 import { BotDraftService } from '../service/bot-draft.service';
 import type {
@@ -35,6 +39,7 @@ import {
   isArticle,
   isJunk,
   MAX_ARTICLES,
+  nextToRead,
   normaliseUrl,
   sameSite,
   startUrlFrom,
@@ -56,6 +61,11 @@ export const CRAWL_LIMITS = {
   /** A crawl left "running" this long (an instance restarted) is picked up by the sweep. */
   stalledSeconds: 60,
   queueCap: 400,
+  /**
+   * The most of the queue the sitemap may fill, so links the pages themselves offer always have
+   * room. A large catalogue's sitemap once filled the whole queue and crowded them out.
+   */
+  sitemapCap: 200,
 };
 
 /** Hands each batch of pages to the builder to learn from (BotDraftLearningService). */
@@ -222,7 +232,13 @@ export class SiteCrawlService implements OnModuleInit {
     if (!(await this.redis.acquireLock(lockKey, 180).catch(() => true))) return;
     try {
       const draft = await this.drafts.findById(draftId);
-      if (!draft || draft.crawl.status !== 'running' || !draft.crawl.website)
+      // A setup closed since (its bot was removed) is never read again.
+      if (
+        !draft ||
+        draft.status !== BotDraftStatus.ACTIVE ||
+        draft.crawl.status !== 'running' ||
+        !draft.crawl.website
+      )
         return;
       await this.crawl(draft);
     } finally {
@@ -249,13 +265,17 @@ export class SiteCrawlService implements OnModuleInit {
       return this.finish(draft.id, crawl, 'failed', 'blocked');
     }
     if (!crawl.seen.length) {
+      crawl.sitemapOnly = [];
       for (const url of await this.sitemapUrls(
         startUrl,
         robots,
         fetchOptions,
       )) {
-        if (crawl.queue.length >= CRAWL_LIMITS.queueCap) break;
-        if (!crawl.queue.includes(url)) crawl.queue.push(url);
+        if (crawl.sitemapOnly.length >= CRAWL_LIMITS.sitemapCap) break;
+        if (!crawl.queue.includes(url)) {
+          crawl.queue.push(url);
+          crawl.sitemapOnly.push(url);
+        }
       }
     }
 
@@ -292,14 +312,18 @@ export class SiteCrawlService implements OnModuleInit {
       crawl.queue = crawl.queue.filter(
         (url) => !crawl.seen.includes(url) && allowed(url),
       );
-      const core = crawl.queue.findIndex((url) => !isArticle(url));
-      if (core >= 0) return crawl.queue.splice(core, 1)[0];
       const articles = crawl.seen.filter((url) => isArticle(url)).length;
       if (articles >= MAX_ARTICLES) {
-        crawl.queue = [];
-        return undefined;
+        crawl.queue = crawl.queue.filter((url) => !isArticle(url));
       }
-      return crawl.queue.shift();
+      const next = nextToRead(
+        crawl.queue,
+        crawl.seen,
+        startUrl,
+        new Set(crawl.sitemapOnly ?? []),
+      );
+      if (next < 0) return undefined;
+      return crawl.queue.splice(next, 1)[0];
     };
 
     let startFailed: GuardedFetchError | null = null;
@@ -432,6 +456,10 @@ export class SiteCrawlService implements OnModuleInit {
 
     for (const href of parsed.links) {
       const link = normaliseUrl(href, fetched.url);
+      // A page the site links to is no longer "only in the sitemap".
+      if (link && crawl.sitemapOnly?.includes(link)) {
+        crawl.sitemapOnly = crawl.sitemapOnly.filter((url) => url !== link);
+      }
       if (
         link &&
         sameSite(link, startUrl) &&

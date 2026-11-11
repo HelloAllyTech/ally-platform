@@ -10,7 +10,10 @@ import {
   BotPageStatus,
   PrechatFieldType,
 } from '../../chatbot/enum/bot-page.enum';
-import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
+import {
+  ChatbotMemberRole,
+  ChatbotStatus,
+} from '../../chatbot/enum/chatbot.enum';
 import {
   BotPageSettings,
   defaultBotPageSettings,
@@ -137,12 +140,19 @@ describe('Assistant home fields', () => {
     ]);
   });
 
-  it('turns the page on or off, and refuses public while the platform does', () => {
+  it('turns the page on or off with the assistant (one switch), and refuses public while the platform does', () => {
     expect(
       HOME_FIELDS.pageStatus.write(BotPageStatus.OFF, stateWith()),
     ).toEqual({
       pageRow: { status: BotPageStatus.OFF },
+      chatbot: { status: ChatbotStatus.PAUSED },
     });
+    expect(HOME_FIELDS.pageStatus.write(BotPageStatus.ON, stateWith())).toEqual(
+      {
+        pageRow: { status: BotPageStatus.ON },
+        chatbot: { status: ChatbotStatus.LIVE },
+      },
+    );
     expect(() =>
       HOME_FIELDS.pageAccess.write(BotPageAccess.PUBLIC, stateWith()),
     ).toThrow('Public links are turned off for now.');

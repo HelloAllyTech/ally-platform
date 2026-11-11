@@ -53,6 +53,32 @@ export const COPY = {
     save: "Save",
     cancel: "Cancel",
     fromYou: "From you",
+    /** When the website gave nothing (chunk 20a-2): why, and the ways on. */
+    nothing: {
+      title: "We couldn't find much on {domain}",
+      titleNoSite: "We couldn't find much yet",
+      why: {
+        unreachable:
+          "We couldn't reach the site. The address may be wrong, or the site may be down.",
+        blocked: "The site asks automated readers not to visit, so we've respected that.",
+        script_heavy: "The site loads its content with scripts, so we couldn't read it.",
+        little_found: "The pages we read didn't say much about your business.",
+      },
+      choose: "How would you like to fill this in?",
+      describe: "Describe your business",
+      describeHint: "A few sentences is plenty",
+      upload: "Upload documents",
+      uploadHint: "A brochure, price list or FAQ",
+      otherSite: "Try a different website",
+      otherSiteHint: "Start again with another address",
+      skip: "Skip, I'll answer questions",
+      skipHint: "We'll ask a few quick questions instead",
+      read: "Read this",
+      backToChoices: "Choose another way",
+      reading: "Reading what you sent…",
+      stillNothing:
+        "We still couldn't find any details in that. Try another way, or skip and answer a few questions.",
+    },
   },
   safety: {
     title: "{Pack name} is on",

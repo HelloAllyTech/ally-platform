@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { TenantScopeService } from '../../authorization/service/tenant-scope.service';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { Chatbot } from '../entity/chatbot.entity';
@@ -74,7 +74,7 @@ export class ChatbotAccessService {
   }
 
   /**
-   * Load a live (not archived) bot the caller holds at least `minRole` on.
+   * Load a bot the caller holds at least `minRole` on. An archived bot loads only for viewing.
    */
   async assert(
     chatbotId: string,
@@ -82,9 +82,16 @@ export class ChatbotAccessService {
     userId = currentUserId(),
   ): Promise<{ chatbot: Chatbot; role: ChatbotMemberRole }> {
     const chatbot = await this.chatbotRepository.findOne({
-      where: { id: chatbotId, archivedAt: IsNull() },
+      where: { id: chatbotId },
     });
-    if (!chatbot) throw new NotFoundException('Chatbot not found');
+    // A removed (archived) bot stays readable, for the Archived list's "what happened", and is
+    // never changed: anything above viewing treats it as gone.
+    if (
+      !chatbot ||
+      (chatbot.archivedAt && minRole !== ChatbotMemberRole.VIEWER)
+    ) {
+      throw new NotFoundException('Chatbot not found');
+    }
 
     let role: ChatbotMemberRole | undefined;
     if (await this.isPlatformAdmin(userId)) {

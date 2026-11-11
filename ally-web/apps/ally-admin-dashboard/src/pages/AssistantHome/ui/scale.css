@@ -253,6 +253,17 @@
   max-height: 92vh;
   border-radius: 20px 20px 0 0;
 }
+.ally-sheet--center {
+  align-items: center;
+  justify-content: center;
+  padding: var(--ally-space-4);
+}
+.ally-sheet--center .ally-sheet__panel {
+  width: min(420px, 100%);
+  height: auto;
+  border-radius: var(--ally-radius-lg);
+  background: var(--ally-surface);
+}
 .ally-sheet__head {
   display: flex;
   align-items: center;
@@ -279,4 +290,86 @@
       opacity: 0;
     }
   }
+  .ally-sheet--center .ally-sheet__panel {
+    animation: ally-sheet-pop 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes ally-sheet-pop {
+    from {
+      transform: scale(0.97);
+      opacity: 0;
+    }
+  }
+}
+
+/* The `···` menu (ui/Menu.tsx): the assistant header, and each card on the assistants list. */
+.ally-more {
+  position: relative;
+}
+.ally-more__button {
+  width: 44px;
+  padding: 0;
+}
+.ally-more__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  box-shadow: 0 12px 30px rgba(23, 23, 28, 0.12);
+}
+.ally-more__menu :is(a, button) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--ally-radius-sm);
+  background: none;
+  color: var(--ally-ink);
+  font: 400 15px/1.3 var(--ally-font-ui);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ally-more__menu :is(a, button):is(:hover, :focus-visible) {
+  background: var(--ally-sunken);
+  outline: none;
+}
+/* A destructive entry, such as Remove assistant. */
+.ally-more__menu button.ally-more__danger {
+  color: var(--ally-danger);
+}
+
+/* Remove assistant (ui/RemoveDialog.tsx). */
+.ally-remove {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ally-space-3);
+}
+.ally-remove .ally-heading {
+  margin: 0;
+}
+.ally-remove .ally-small {
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-remove .ally-remove__error {
+  color: var(--ally-danger);
+}
+.ally-remove__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ally-space-2);
+  margin-top: var(--ally-space-2);
+}
+.ally-btn--primary.ally-remove__confirm {
+  min-height: 44px;
+  background: var(--ally-danger);
 }

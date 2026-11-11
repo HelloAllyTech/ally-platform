@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  useArchiveChatbotMutation,
   useBackBotDraftMutation,
+  useDescribeBotDraftMutation,
   useGetBotPageQuery,
   usePatchBotDraftMutation,
   usePublishBotDraftMutation,
@@ -17,6 +19,7 @@ import {
 } from "./flow";
 import { reached } from "./steps";
 import { BotDraftSession, ReadingProgress, useBotDraftSession } from "./useBotDraftSession";
+import { filesProblem, useDraftUpload } from "./useDraftUpload";
 import { errorText } from "./useOnboardingStart";
 
 import type {
@@ -130,6 +133,14 @@ export interface OnboardingSession {
   pass: (screen: keyof PassedScreens) => void;
   /** Back from the current screen: a browser-only screen, else the server's step back. */
   backScreen: () => Promise<void>;
+  /**
+   * When the website gave nothing (chunk 20a-2): read a description or documents into "What we
+   * learned" instead. Each resolves false, having said why, if it was refused.
+   */
+  describe: (text: string) => Promise<boolean>;
+  upload: (files: File[]) => Promise<boolean>;
+  /** Remove this unfinished assistant, to start again with another website. */
+  discard: () => Promise<boolean>;
 }
 
 /**
@@ -154,6 +165,22 @@ export const useOnboardingSession = (
   const [patchDraft] = usePatchBotDraftMutation();
   const [goBack] = useBackBotDraftMutation();
   const [publishDraft, { isLoading: publishing }] = usePublishBotDraftMutation();
+  const [describeDraft] = useDescribeBotDraftMutation();
+  const [archiveChatbot] = useArchiveChatbotMutation();
+  const uploadToDraft = useDraftUpload();
+  /** Runs an action, saying why it failed: false when it did. */
+  const attempt = useCallback(
+    async (action: () => Promise<unknown>) => {
+      try {
+        await action();
+        return true;
+      } catch (err) {
+        onError(errorText(err));
+        return false;
+      }
+    },
+    [onError],
+  );
   const { data: page } = useGetBotPageQuery(view?.chatbotId ?? "", { skip: !view?.chatbotId });
   const [stored, setStored] = useState<Partial<PassedScreens>>(() => readPassed(draftId));
   const pass = useCallback(
@@ -299,6 +326,21 @@ export const useOnboardingSession = (
         onError(errorText(err));
       }
     },
+    describe: text =>
+      view
+        ? attempt(() => describeDraft({ id: view.id, description: text.trim() }).unwrap())
+        : Promise.resolve(false),
+    upload: files => {
+      const problem = filesProblem(files);
+      if (problem) onError(problem);
+      if (problem || !view?.chatbotId) return Promise.resolve(false);
+      const chatbotId = view.chatbotId;
+      return attempt(() => uploadToDraft({ id: view.id, chatbotId }, files));
+    },
+    discard: () =>
+      view?.chatbotId
+        ? attempt(() => archiveChatbot(view.chatbotId!).unwrap())
+        : Promise.resolve(false),
     publish: async (access, emails, confirmMustPass = false) => {
       if (!view) return;
       try {
