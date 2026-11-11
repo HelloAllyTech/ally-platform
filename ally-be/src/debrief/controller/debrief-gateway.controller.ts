@@ -14,7 +14,9 @@ import {
   DEBRIEF_GATEWAY_TOOLS,
   DebriefGatewayTool,
   DebriefRunTokenService,
+  PM_AGENT_GATEWAY_TOOLS,
 } from '../service/debrief-run-token.service';
+import { DebriefReviewService } from '../service/debrief-review.service';
 
 /**
  * The Debrief gateway (docs/debrief-harness/CONTRACT.md §2): the tools
@@ -22,6 +24,9 @@ import {
  * user-auth guard and no user JWT is ever read here; the only credential is
  * the run token ally-be signed for this run (`Authorization: Bearer`), checked
  * for signature, expiry, the tool, and a run that is still running.
+ *
+ * The PM agent's tools (`PM_AGENT_GATEWAY_TOOLS`: `comments_read`) share the
+ * route but take an agent token (`DebriefRunTokenService.signAgent`) instead.
  */
 @ApiExcludeController()
 @Controller('v1/internal/debrief')
@@ -29,6 +34,7 @@ export class DebriefGatewayController {
   constructor(
     private readonly tokens: DebriefRunTokenService,
     private readonly gateway: DebriefGatewayService,
+    private readonly reviews: DebriefReviewService,
   ) {}
 
   @Public()
@@ -39,6 +45,11 @@ export class DebriefGatewayController {
     @Headers('authorization') authorization: string | undefined,
     @Body() body: Record<string, any>,
   ): Promise<Record<string, unknown>> {
+    if ((PM_AGENT_GATEWAY_TOOLS as readonly string[]).includes(name)) {
+      // The PM agent's tools take an agent token, never a debrief run's.
+      this.tokens.authoriseAgent(authorization, name);
+      return this.reviews.commentsForAgent(body ?? {});
+    }
     if (!DEBRIEF_GATEWAY_TOOLS.includes(name as DebriefGatewayTool)) {
       throw new NotFoundException(`No debrief tool ${name}`);
     }

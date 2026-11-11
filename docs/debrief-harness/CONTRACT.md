@@ -91,6 +91,17 @@ ally-ai never holds the secret.
 | `finalise_cards` | `{ "cards": {...}, "offered": [41, 7] }` | `{ "cards": {...} }` — `keepOfferedPractice` + `withPointIds` |
 | `progress` | `{ "step": "writer", "round": 1, "topic": "...", "has_risk_cue": bool }` | `{ "ok": true }` — writes `workspace.liveProgress` (FR-27); fire-and-forget on the ally-ai side |
 
+### 2a. PM agent tools (same route, agent token)
+
+Auth: `Authorization: Bearer <agent_token>` from `DebriefRunTokenService.signAgent(agentRunId)`: HS256 with the
+same secret, claims `{ kind: "agent", agent: "pm_agent", agentRunId, tools: [...], exp }` (exp ≤ now + 2 h). A
+debrief run token is refused here (401) even if it lists the tool, and an agent token is refused on every tool
+above. Builder and Bug Hunter are never given a token, so they never receive comment text (spec B4).
+
+| Tool | Body | Returns |
+|---|---|---|
+| `comments_read` | `{ "since"?: ISO date (exclusive, on `created_at`), "status"?: "open" \| "resolved" (default both), "ids"?: [uuid, ...], "limit"?: 1–200 (default 100) }` | `{ "comments": [ { "id", "run_id", "session_type", "language", "anchor": { "kind": "transcript" \| "card" \| "debrief", "turn_index", "section", "span_start", "span_end" }, "quoted_text", "body", "tag", "status", "idea": { "id", "status" } \| null, "repeat_of_id", "created_at", "replies": [ { "id", "body", "tag", "created_at" } ] } ], "next_since": ISO \| null }` — expert comment threads, oldest first (spec D8). Never the transcript, the cards or who wrote a comment. `next_since` is set when the page was full; pass it back as `since` |
+
 ## 3. Rollout (decided 2026-11-10)
 
 No shadow period: the Debrief agent is not in learners' hands at scale yet, so the graph **replaces** the

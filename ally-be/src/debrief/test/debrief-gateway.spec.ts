@@ -80,9 +80,19 @@ function build(
     context as any,
     retrieval as any,
   );
-  const controller = new DebriefGatewayController(tokens, gateway);
+  const reviews = {
+    commentsForAgent: jest.fn(async () => ({
+      comments: [],
+      next_since: null,
+    })),
+  };
+  const controller = new DebriefGatewayController(
+    tokens,
+    gateway,
+    reviews as any,
+  );
   const bearer = (t = tokens.sign('run-1', 's1')) => `Bearer ${t}`;
-  return { tokens, controller, runs, context, retrieval, bearer };
+  return { tokens, controller, runs, context, retrieval, bearer, reviews };
 }
 
 describe('DebriefRunTokenService', () => {
@@ -292,5 +302,57 @@ describe('DebriefGatewayController', () => {
       topic: 'exploring risk',
     });
     expect(params[2]).toBe(true);
+  });
+});
+
+describe('comments_read (the PM agent reads expert comments)', () => {
+  it('answers an agent token that lists it, passing the filters through', async () => {
+    const { controller, tokens, reviews, runs } = build();
+    const token = tokens.signAgent('pm-run-1');
+    const out = await controller.tool('comments_read', `Bearer ${token}`, {
+      since: '2026-11-01T00:00:00Z',
+      status: 'open',
+    });
+    expect(out).toEqual({ comments: [], next_since: null });
+    expect(reviews.commentsForAgent).toHaveBeenCalledWith({
+      since: '2026-11-01T00:00:00Z',
+      status: 'open',
+    });
+    // No debrief run is involved: the agent token is not a run token.
+    expect(runs.findOne).not.toHaveBeenCalled();
+  });
+
+  it('refuses a debrief run token, even one that claims the tool', async () => {
+    const { controller, tokens, reviews } = build();
+    const runToken = tokens.sign('run-1', 's1', ['comments_read']);
+    await expect(
+      controller.tool('comments_read', `Bearer ${runToken}`, {}),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(reviews.commentsForAgent).not.toHaveBeenCalled();
+  });
+
+  it('never lets an agent token call a debrief run tool', async () => {
+    const { controller, tokens } = build();
+    const token = tokens.signAgent('pm-run-1');
+    await expect(
+      controller.tool('render_cards', `Bearer ${token}`, { cards }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('refuses an agent token without the tool, and a missing token', async () => {
+    const { controller, tokens } = build();
+    const none = tokens.signAgent('pm-run-1', []);
+    await expect(
+      controller.tool('comments_read', `Bearer ${none}`, {}),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      controller.tool('comments_read', undefined, {}),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('is not among the tools a debrief run is signed for by default', () => {
+    expect(DEBRIEF_GATEWAY_TOOLS as readonly string[]).not.toContain(
+      'comments_read',
+    );
   });
 });

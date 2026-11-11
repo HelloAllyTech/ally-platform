@@ -19,6 +19,10 @@ import { PromptModule } from '../prompt/prompt.module';
 import { DebriefConsoleController } from './controller/debrief-console.controller';
 import { DebriefLearnerController } from './controller/debrief-learner.controller';
 import { DebriefGatewayController } from './controller/debrief-gateway.controller';
+import { DebriefReviewController } from './controller/debrief-review.controller';
+import { DebriefReview } from './entity/debrief-review.entity';
+import { DebriefReviewComment } from './entity/debrief-review-comment.entity';
+import { DebriefReviewService } from './service/debrief-review.service';
 import { DebriefFeedback } from './entity/debrief-feedback.entity';
 import { DebriefRun } from './entity/debrief-run.entity';
 import { DebriefAgentService } from './service/debrief-agent.service';
@@ -66,6 +70,9 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
       DebriefOwnerSettings,
       DebriefProbeResult,
       DebriefLearnerEvent,
+      // Expert review (spec Part B): verdicts and comments.
+      DebriefReview,
+      DebriefReviewComment,
       // Ask Ally writes to the same thread today's debrief chat uses.
       ScenarioSessionChat,
       ScenarioSessionChatMessage,
@@ -96,6 +103,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefLearnerController,
     // The gateway tools ally-ai's debrief graph calls back (run token only).
     DebriefGatewayController,
+    // Expert review: the queue, the review screen, comments and verdicts.
+    DebriefReviewController,
   ],
   providers: [
     DebriefAiClient,
@@ -123,8 +132,10 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,
+    DebriefReviewService,
     GuideCrisisService,
   ],
-  exports: [DebriefAgentService],
+  // DebriefReviewService: `linkIdea` for the PM agent's idea.propose.
+  exports: [DebriefAgentService, DebriefReviewService],
 })
 export class DebriefModule {}

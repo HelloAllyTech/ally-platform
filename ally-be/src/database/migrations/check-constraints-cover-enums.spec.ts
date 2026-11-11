@@ -7,6 +7,12 @@ import {
   DebriefRunMode,
   DebriefRunStatus,
 } from '../../debrief/enum/debrief-run.enum';
+import {
+  DebriefCommentAnchor,
+  DebriefCommentStatus,
+  DebriefCommentTag,
+  DebriefReviewVerdict,
+} from '../../debrief/enum/debrief-review.enum';
 import { join } from 'path';
 import {
   ClBulkUploadStatus,
@@ -385,6 +391,13 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_debrief_run_feedback_kind', Object.values(DebriefFeedbackKind)],
     ['CHK_debrief_run_feedback_reason', Object.values(DebriefFlagReason)],
     ['CHK_debrief_run_feedback_status', Object.values(DebriefFeedbackStatus)],
+    ['CHK_debrief_reviews_verdict', Object.values(DebriefReviewVerdict)],
+    [
+      'CHK_debrief_review_comments_anchor_kind',
+      Object.values(DebriefCommentAnchor),
+    ],
+    ['CHK_debrief_review_comments_tag', Object.values(DebriefCommentTag)],
+    ['CHK_debrief_review_comments_status', Object.values(DebriefCommentStatus)],
     ['CHK_agent_release_audit_action', Object.values(AgentReleaseAuditAction)],
     [
       'CHK_agent_release_audit_actor_kind',

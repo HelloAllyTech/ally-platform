@@ -8,7 +8,17 @@ import { Observable, tap } from 'rxjs';
 import { AuditLogService } from '../../audit/service/audit-log.service';
 
 /** Query keys worth keeping: filters, never free text a person typed. */
-const KEPT_QUERY = new Set(['mode', 'status', 'days', 'kind']);
+const KEPT_QUERY = new Set([
+  'mode',
+  'status',
+  'days',
+  'kind',
+  // Expert review's queue filters.
+  'tenantId',
+  'language',
+  'sessionType',
+  'source',
+]);
 
 /**
  * v9 FR-38 "Audit: every view writes an audit event". Each successful GET on
