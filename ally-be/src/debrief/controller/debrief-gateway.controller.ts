@@ -67,9 +67,17 @@ export class DebriefGatewayController {
       case 'progress':
         return this.gateway.progress(run, b as any);
       case 'get_learner_history':
-        return this.gateway.learnerHistory(run, claims, b);
+        // Ask Ally's reply token reads the learner's points; a debrief run's
+        // token (orchestrated releases only) reads their past debriefs.
+        return claims.scope === 'reply'
+          ? this.gateway.learnerHistory(run, claims, b)
+          : this.gateway.runLearnerHistory(run, b);
       case 'get_live_detections':
         return this.gateway.liveDetections(run);
+      case 'get_org_protocols':
+        return this.gateway.orgProtocols(run);
+      case 'query_aggregates':
+        return this.gateway.queryAggregates(run, b);
     }
   }
 }

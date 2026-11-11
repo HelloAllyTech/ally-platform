@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import { DebriefQualityRepository } from '../../analytics/repository/debrief-quality.repository';
 import { resolveWorkerType } from '../../user/enum/user.enum';
 import { TranscriptTurn } from '../util/debrief-cards.util';
+import { guidancePassage } from '../util/debrief-guidance.util';
+import { ClChunk } from '../../context-library/entity/cl-chunk.entity';
 
 export interface DebriefSessionContext {
   id: string;
@@ -269,6 +271,145 @@ export class DebriefContextRepository {
         : null,
     ].filter(Boolean) as string[];
     return lines.length ? lines.join('\n').slice(0, 1500) : null;
+  }
+
+  /**
+   * What the orchestrator's planner may build on (spec A5), as cheap counts:
+   * the organisation's protocols in Debrief Guidance, the learner's past
+   * debriefs, whether five or more other trainees in the organisation have
+   * debriefs (cohort data), and whether the session belongs to a course.
+   * Never a learner's words.
+   */
+  async availability(
+    session: Pick<DebriefSessionContext, 'id' | 'tenantId' | 'counselorId'>,
+  ): Promise<{
+    org_protocols: number;
+    past_debriefs: number;
+    cohort: boolean;
+    course: boolean;
+  }> {
+    const [r] = await this.dataSource.query(
+      `SELECT
+         (SELECT count(*)::int FROM cl_chunks c
+           WHERE c.collection_id = 'debrief_guidance' AND c.status = 'active'
+             AND c.facets->>'kind' = 'protocol'
+             AND $1::text IS NOT NULL
+             AND (c.owner_tenant_id::text = $1::text OR $1::text = ANY(c.tenant_ids))) AS org_protocols,
+         (SELECT count(*)::int FROM debrief_runs r
+            JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+           WHERE s."counselorId" = $2 AND s.tenant_id IS NOT DISTINCT FROM $1::text
+             AND r."scenarioSessionId" <> $3
+             AND r.mode IN ('shadow','live') AND r.status IN ('published','below_bar')) AS past_debriefs,
+         (SELECT count(DISTINCT s."counselorId")::int FROM debrief_runs r
+            JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+           WHERE s.tenant_id = $1::text AND s."counselorId" IS DISTINCT FROM $2
+             AND r.mode IN ('shadow','live') AND r.status IN ('published','below_bar')
+             AND r."createdAt" > now() - interval '90 days') AS peers,
+         (SELECT ti."trackId" IS NOT NULL FROM scenario_sessions s
+            LEFT JOIN track_item_progress tip ON tip.id = s."trackItemProgressId"
+            LEFT JOIN track_items ti ON ti.id = tip."trackItemId"
+           WHERE s.id = $3) AS course`,
+      [session.tenantId, session.counselorId ?? -1, session.id],
+    );
+    return {
+      org_protocols: Number(r?.org_protocols ?? 0),
+      past_debriefs: session.counselorId ? Number(r?.past_debriefs ?? 0) : 0,
+      cohort: Number(r?.peers ?? 0) >= COHORT_MIN_LEARNERS,
+      course: r?.course === true,
+    };
+  }
+
+  /**
+   * The organisation's own protocols (spec A4 `get_org_protocols`): its
+   * Debrief Guidance entries with facet kind `protocol`, read the way every
+   * Debrief prompt reads a passage, plus the procedures in its Guide profile.
+   * Organisation-scoped: global guidance is never a protocol here.
+   */
+  async orgProtocols(tenantId: string | null): Promise<{
+    protocols: Array<{ code: string; title: string; text: string }>;
+    procedures: string | null;
+  }> {
+    if (!tenantId) return { protocols: [], procedures: null };
+    const rows: ClChunk[] = await this.dataSource.query(
+      `SELECT code, statement, body, citation, attributes, facets
+         FROM cl_chunks
+        WHERE collection_id = 'debrief_guidance' AND status = 'active'
+          AND facets->>'kind' = 'protocol'
+          AND (owner_tenant_id::text = $1 OR $1 = ANY(tenant_ids))
+        ORDER BY pinned DESC, code
+        LIMIT 20`,
+      [tenantId],
+    );
+    const [profile] = await this.dataSource.query(
+      `SELECT profile->>'protocols' AS protocols FROM guide_org_profiles WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    const procedures = String(profile?.protocols ?? '').trim();
+    return {
+      protocols: (rows ?? []).map((c) => {
+        const { title, text } = guidancePassage(c);
+        return { code: c.code, title, text: text.slice(0, 1500) };
+      }),
+      procedures: procedures ? procedures.slice(0, 1500) : null,
+    };
+  }
+
+  /**
+   * The learner's last debriefs (spec A4 `get_learner_history`), newest first:
+   * Work-on-this points, strengths and skill words per session. No quotes and
+   * no transcript; only this learner, in this organisation.
+   */
+  async learnerHistory(
+    counselorId: number,
+    tenantId: string | null,
+    beforeSessionId: string,
+    limit = 8,
+  ): Promise<
+    Array<{
+      date: string;
+      recipe: string | null;
+      work_on_this: Array<{ skill: string; point: string }>;
+      strengths: string[];
+      skills: Array<{ skill: string; word: string }>;
+    }>
+  > {
+    const rows: Array<{
+      createdAt: Date;
+      recipeKey: string | null;
+      cards: Record<string, any> | null;
+    }> = await this.dataSource.query(
+      `SELECT r."createdAt", r."recipeKey", r.cards
+         FROM debrief_runs r
+         JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+        WHERE s."counselorId" = $1
+          AND s.tenant_id IS NOT DISTINCT FROM $2
+          AND r."scenarioSessionId" <> $3
+          AND r.mode IN ('shadow','live')
+          AND r.status IN ('published','below_bar')
+        ORDER BY r."createdAt" DESC
+        LIMIT $4`,
+      [
+        counselorId,
+        tenantId,
+        beforeSessionId,
+        Math.max(1, Math.min(limit, 12)),
+      ],
+    );
+    const list = (v: unknown): Array<Record<string, any>> =>
+      Array.isArray(v) ? v : [];
+    return (rows ?? []).map((r) => ({
+      date: new Date(r.createdAt).toISOString().slice(0, 10),
+      recipe: r.recipeKey ?? null,
+      work_on_this: list(r.cards?.work_on_this)
+        .filter((c) => c?.lead)
+        .map((c) => ({ skill: String(c.skill ?? ''), point: String(c.lead) })),
+      strengths: list(r.cards?.what_worked)
+        .map((c) => String(c?.skill ?? ''))
+        .filter(Boolean),
+      skills: list(r.cards?.skill_words)
+        .filter((c) => c?.skill && c?.word)
+        .map((c) => ({ skill: String(c.skill), word: String(c.word) })),
+    }));
   }
 
   /** The learner's last few Work-on-this points, newest first, for the Progress reader. */

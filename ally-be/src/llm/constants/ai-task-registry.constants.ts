@@ -972,6 +972,65 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'debrief release bundle (recipes.standard.steps[reviser].model)',
   },
   {
+    id: 'debrief-planner',
+    task: LlmTask.DEBRIEF_PLANNER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Every run on a challenger release with the orchestrator on, after the safety reading; once more after a failed evaluation (the top-up)',
+    detail:
+      'Chooses which registry agents run from the session profile and their manifests (never the transcript). Structured, temperature 0; past 8 s, or on any failure, the run takes the default plan (the recipe) and records it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'debrief release bundle (orchestrator.plannerModel)',
+    promptOverride: 'debrief_planner_system',
+  },
+  {
+    id: 'debrief-protocol-check',
+    task: LlmTask.DEBRIEF_PROTOCOL_CHECK,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: the organisation has protocols the session touches, or a risk cue',
+    detail:
+      "Registry agent: the session against the organisation's own protocols (get_org_protocols), as findings for the Writer.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[protocol_check].model); default the registry manifest',
+    promptOverride: 'debrief_protocol_check_system',
+  },
+  {
+    id: 'debrief-history-deep',
+    task: LlmTask.DEBRIEF_HISTORY_DEEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: three or more past debriefs and a pattern worth naming',
+    detail:
+      "Registry agent: the learner's last debriefs (get_learner_history) against this session's evidence map, as findings.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[history_deep].model); default the registry manifest',
+    promptOverride: 'debrief_history_deep_system',
+  },
+  {
+    id: 'debrief-language-specialist',
+    task: LlmTask.DEBRIEF_LANGUAGE_SPECIALIST,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: a code-mixed or Indian-language session, or quotes in another script',
+    detail:
+      'Registry agent: what a Writer in the session language could get wrong, as findings.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[language_specialist].model); default the registry manifest',
+    promptOverride: 'debrief_language_specialist_system',
+  },
+  {
     id: 'debrief-reply',
     task: LlmTask.DEBRIEF_REPLY,
     runtime: LlmRuntime.ALLY_AI,

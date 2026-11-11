@@ -6,6 +6,7 @@ import { DebriefGatewayService } from '../service/debrief-gateway.service';
 import {
   ASK_ALLY_GATEWAY_TOOLS,
   DEBRIEF_GATEWAY_TOOLS,
+  DEBRIEF_ORCHESTRATOR_TOOLS,
   DebriefRunTokenService,
 } from '../service/debrief-run-token.service';
 import {
@@ -70,6 +71,7 @@ function build(
     loadSession: jest.fn(async () => ({
       tenantId: 't-from-session',
       scenarioId: 41,
+      counselorId: 7,
     })),
     pastWorkOnThis: jest.fn(async () => [
       { date: '2026-10-20', skill: 'Exploring risk', point: 'Ask directly' },
@@ -77,6 +79,28 @@ function build(
     liveDetections: jest.fn(async () => [
       { behaviour: 'Asks about safety', detected: true, times: 2 },
     ]),
+    orgProtocols: jest.fn(async () => ({
+      protocols: [
+        { code: 'DG-9', title: 'Refer', text: 'Refer on self-harm.' },
+      ],
+      procedures: null,
+    })),
+    learnerHistory: jest.fn(async () => [
+      {
+        date: '2026-11-01',
+        recipe: 'standard',
+        work_on_this: [{ skill: 'pacing', point: 'Slow down.' }],
+        strengths: [],
+        skills: [],
+      },
+    ]),
+  };
+  const aggregates = {
+    run: jest.fn(async (_run: unknown, query: string) => ({
+      query,
+      rows: [],
+      min_group: 5,
+    })),
   };
   const retrieval = {
     search: jest.fn(async () => {
@@ -90,6 +114,7 @@ function build(
     runs as any,
     context as any,
     retrieval as any,
+    aggregates as any,
   );
   const reviews = {
     commentsForAgent: jest.fn(async () => ({
@@ -103,7 +128,16 @@ function build(
     reviews as any,
   );
   const bearer = (t = tokens.sign('run-1', 's1')) => `Bearer ${t}`;
-  return { tokens, controller, runs, context, retrieval, bearer, reviews };
+  return {
+    tokens,
+    controller,
+    runs,
+    context,
+    retrieval,
+    aggregates,
+    bearer,
+    reviews,
+  };
 }
 
 describe('DebriefRunTokenService', () => {
@@ -313,6 +347,87 @@ describe('DebriefGatewayController', () => {
       topic: 'exploring risk',
     });
     expect(params[2]).toBe(true);
+  });
+
+  it('progress: keeps a registry agent’s keyed label, and drops anything else', async () => {
+    const { controller, bearer, runs } = build();
+    await controller.tool('progress', bearer(), {
+      step: 'protocol_check',
+      label_key: 'debrief.progress.protocol_check',
+    });
+    await controller.tool('progress', bearer(), {
+      step: 'protocol_check',
+      label_key: '<script>',
+    });
+    const calls = runs.query.mock.calls as any[][];
+    expect(JSON.parse(calls[0][1][1])).toEqual({
+      step: 'protocol_check',
+      labelKey: 'debrief.progress.protocol_check',
+    });
+    expect(JSON.parse(calls[1][1][1])).toEqual({ step: 'protocol_check' });
+  });
+});
+
+describe('The orchestrator’s gateway tools (spec A4)', () => {
+  const orchestrated = (tokens: DebriefRunTokenService) =>
+    `Bearer ${tokens.sign('run-1', 's1', [...DEBRIEF_GATEWAY_TOOLS, ...DEBRIEF_ORCHESTRATOR_TOOLS])}`;
+
+  it('are refused to a run whose release does not turn the orchestrator on', async () => {
+    const { controller, bearer } = build();
+    for (const tool of DEBRIEF_ORCHESTRATOR_TOOLS) {
+      await expect(controller.tool(tool, bearer(), {})).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    }
+  });
+
+  it('get_org_protocols: the run’s organisation, never one from the body', async () => {
+    const { controller, tokens, context } = build();
+    const res = await controller.tool(
+      'get_org_protocols',
+      orchestrated(tokens),
+      {
+        tenantId: 'someone-else',
+      },
+    );
+    expect(context.orgProtocols).toHaveBeenCalledWith(
+      '6b0d6a3e-4b8f-4a43-9a5a-1f2b3c4d5e6f',
+    );
+    expect(res).toEqual({
+      protocols: [
+        { code: 'DG-9', title: 'Refer', text: 'Refer on self-harm.' },
+      ],
+      procedures: null,
+    });
+  });
+
+  it('get_learner_history: the session’s learner, at most 12 debriefs', async () => {
+    const { controller, tokens, context } = build();
+    const res = await controller.tool(
+      'get_learner_history',
+      orchestrated(tokens),
+      { limit: 500 },
+    );
+    expect(context.learnerHistory).toHaveBeenCalledWith(
+      7,
+      't-from-session',
+      's1',
+      12,
+    );
+    expect((res as any).sessions).toHaveLength(1);
+  });
+
+  it('query_aggregates: hands the named query to the aggregates service', async () => {
+    const { controller, tokens, aggregates } = build();
+    await controller.tool('query_aggregates', orchestrated(tokens), {
+      query: 'cohort_skill_rates',
+      params: { skills: ['pacing'] },
+    });
+    expect(aggregates.run).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'run-1' }),
+      'cohort_skill_rates',
+      { skills: ['pacing'] },
+    );
   });
 });
 

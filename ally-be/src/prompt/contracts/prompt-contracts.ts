@@ -1379,6 +1379,58 @@ export const DEBRIEF_REVISER_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/debrief/planner_system.txt */
+export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
+  'debrief_planner_system',
+  {},
+  {
+    name: 'Debrief planner',
+    description:
+      "The orchestrated debrief's planner (challenger releases only): from the session profile and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the manifests and the limits around this text. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/protocol_check_system.txt */
+export const DEBRIEF_PROTOCOL_CHECK_SYSTEM = definePrompt(
+  'debrief_protocol_check_system',
+  {},
+  {
+    name: 'Debrief protocol check',
+    description:
+      "Registry agent: checks the session against the learner's organisation's own protocols and says which the learner followed or missed, as findings. The step composes the protocols, the risk cues, the transcript and the findings contract around this text. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/history_deep_system.txt */
+export const DEBRIEF_HISTORY_DEEP_SYSTEM = definePrompt(
+  'debrief_history_deep_system',
+  {},
+  {
+    name: 'Debrief history (deep)',
+    description:
+      "Registry agent: reads the learner's last debriefs with this session's evidence map and names a pattern only when three or more sessions support it, as findings. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/language_specialist_system.txt */
+export const DEBRIEF_LANGUAGE_SPECIALIST_SYSTEM = definePrompt(
+  'debrief_language_specialist_system',
+  {},
+  {
+    name: 'Debrief language specialist',
+    description:
+      'Registry agent: reads code-mixed and Indian-language sessions for what a Writer could get wrong (meaning that depends on the language, deliberate code-mixing, quotes that must keep their script), as findings. Release-only.',
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/debrief/reply_system.txt */
 export const DEBRIEF_REPLY_SYSTEM = definePrompt(
   'debrief_reply_system',

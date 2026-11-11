@@ -30,6 +30,7 @@ import { DebriefAiClient } from './service/debrief-ai.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
 import { DebriefContextRepository } from './service/debrief-context.repository';
 import { DebriefFeedbackService } from './service/debrief-feedback.service';
+import { DebriefAggregatesService } from './service/debrief-aggregates.service';
 import { DebriefGatewayService } from './service/debrief-gateway.service';
 import { DebriefGraphClient } from './service/debrief-graph.client';
 import { DebriefRunTokenService } from './service/debrief-run-token.service';
@@ -111,6 +112,7 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefGraphClient,
     DebriefRunTokenService,
     DebriefGatewayService,
+    DebriefAggregatesService,
     DebriefRunnerService,
     DebriefRunJudgeService,
     DebriefAgentService,

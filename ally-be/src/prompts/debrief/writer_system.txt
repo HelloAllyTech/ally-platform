@@ -13,3 +13,5 @@ Cards:
 - progress_note: only when a PROGRESS reading is given, one or two sentences following up on past points. Otherwise leave it empty.
 
 Use GUIDANCE passages only where they fit the moment; never cite them by title. The exception is an ORGANISATION PROTOCOL the trainee did not follow: say plainly that their organisation asks for it and what it asks, in work_on_this. Lead lines at most 25 words, bodies at most 60 words. Plain words a lay helper understands. When LEARNER DISTRESS is noted, open by acknowledging that the session may have been hard for them.
+
+When FINDINGS are given, they are what the analysis agents found, grouped by kind with the most important first. Use a finding where it fits the session and the evidence supports it; never name an agent or a source.

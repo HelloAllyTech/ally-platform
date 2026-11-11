@@ -140,7 +140,57 @@ export interface DebriefBundle {
   settings: DebriefSettings;
   /** Absent in releases made before Ask Ally: the code default then applies. */
   reply?: DebriefReplyConfig;
+  /**
+   * The orchestrator (spec A1–A5, A11). Absent, or `enabled: false`, runs
+   * today's fixed recipes: every release made before it, and the seed, which
+   * never carries it (a changed seed auto-promotes to GA). A challenger
+   * release turns it on; a person promotes it through the ladder.
+   */
+  orchestrator?: DebriefOrchestratorConfig;
 }
+
+/**
+ * The registry agents ally-ai's build defines (one module per agent,
+ * `app/core/debrief_graph/registry/agents/`), at the version it has. A release
+ * may enable an agent only at a version the build has; ally-ai refuses any
+ * other (spec A2: calling an agent outside the release is refused).
+ */
+export const DEBRIEF_REGISTRY_AGENTS = {
+  analyst: { version: 1 },
+  progress_reader: { version: 1 },
+  guidance_lookup: { version: 1 },
+  case_memory: { version: 1 },
+  assessment_anchoring: { version: 1 },
+  protocol_check: { version: 1 },
+  history_deep: { version: 1 },
+  language_specialist: { version: 1 },
+  cohort_comparison: { version: 1 },
+  course_patterns: { version: 1 },
+} as const;
+export type DebriefRegistryAgentId = keyof typeof DEBRIEF_REGISTRY_AGENTS;
+
+/** One registry agent a release enables. No model: the build's default (or the recipe's step). */
+export interface DebriefReleaseAgent {
+  id: DebriefRegistryAgentId;
+  version: number;
+  model?: string | null;
+  backupModel?: string | null;
+}
+
+export interface DebriefOrchestratorConfig {
+  /** The challenger flag: on, the planner chooses the analysis agents. */
+  enabled: boolean;
+  /** Fast class, structured, temperature 0 (spec A5). */
+  plannerModel: string;
+  plannerBackupModel?: string | null;
+  /** D3: one evidence top-up after the first failed evaluation. */
+  topUp: boolean;
+  maxAgentsPerPlan: number;
+  agents: DebriefReleaseAgent[];
+}
+
+/** Planner limits a release may set (spec Part E: owner settings come later). */
+export const DEBRIEF_MAX_AGENTS_PER_PLAN = 10;
 
 export const DEBRIEF_PROMPT_CODES = {
   safetyReader: 'debrief_safety_reader_system',
@@ -151,7 +201,19 @@ export const DEBRIEF_PROMPT_CODES = {
   rubric: 'debrief_quality_rubric',
   pmAgent: 'debrief_improver_system',
   reply: 'debrief_reply_system',
+  planner: 'debrief_planner_system',
+  protocolCheck: 'debrief_protocol_check_system',
+  historyDeep: 'debrief_history_deep_system',
+  languageSpecialist: 'debrief_language_specialist_system',
 } as const;
+
+/** The orchestrator's prompts, sent to ally-ai only when a release turns it on. */
+export const DEBRIEF_ORCHESTRATOR_PROMPT_CODES: readonly string[] = [
+  DEBRIEF_PROMPT_CODES.planner,
+  DEBRIEF_PROMPT_CODES.protocolCheck,
+  DEBRIEF_PROMPT_CODES.historyDeep,
+  DEBRIEF_PROMPT_CODES.languageSpecialist,
+];
 
 /** The on-topic check for reflection XP: a yes or no, cheap and fast. */
 export const DEBRIEF_REFLECTION_CHECK_MODEL = {
@@ -207,6 +269,11 @@ export const DEBRIEF_MODELS = {
   reviser: 'gemini-3-flash-preview',
   pmAgent: 'gemini-2.5-pro',
   judge: 'gemini-2.5-pro',
+  /** The orchestrator's planner: fast, the learner is waiting (spec A5). */
+  planner: 'gemini-2.5-flash',
+  /** The prompt-only registry agents (ally-ai manifests name the same). */
+  registryAgent: 'gemini-2.5-flash',
+  registryAgentBackup: 'gemini-3-flash-preview',
 } as const;
 
 const step = (
@@ -343,6 +410,138 @@ export const DEBRIEF_SEED_BUNDLE: DebriefBundle = {
   },
 };
 
+/**
+ * The orchestrator as a challenger release enables it: every registry agent
+ * at the build's version, today's recipe models for the agents that were
+ * recipe steps, the build's defaults for the rest.
+ */
+export const DEBRIEF_ORCHESTRATOR_DEFAULT: DebriefOrchestratorConfig = {
+  enabled: true,
+  plannerModel: DEBRIEF_MODELS.planner,
+  plannerBackupModel: null,
+  topUp: true,
+  maxAgentsPerPlan: 6,
+  agents: (
+    Object.entries(DEBRIEF_REGISTRY_AGENTS) as Array<
+      [DebriefRegistryAgentId, { version: number }]
+    >
+  ).map(([id, { version }]) => ({ id, version })),
+};
+
+/**
+ * A challenger bundle (spec A11): `base` (normally the live GA bundle) with
+ * the orchestrator on. Made a DRAFT release by the Console action; never the
+ * seed, because a changed seed is promoted to GA at boot.
+ */
+export function debriefChallengerBundle(
+  base: DebriefBundle,
+  orchestrator: Partial<DebriefOrchestratorConfig> = {},
+): DebriefBundle {
+  return {
+    ...base,
+    prompts: {
+      ...base.prompts,
+      ...Object.fromEntries(
+        DEBRIEF_ORCHESTRATOR_PROMPT_CODES.filter(
+          (c) => !(c in (base.prompts ?? {})),
+        ).map((c) => [c, null]),
+      ),
+    },
+    orchestrator: {
+      ...DEBRIEF_ORCHESTRATOR_DEFAULT,
+      ...(base.orchestrator ?? {}),
+      ...orchestrator,
+      enabled: orchestrator.enabled ?? true,
+    },
+  };
+}
+
+/** True when a bundle runs the orchestrator rather than the fixed recipes. */
+export function isOrchestrated(bundle: Partial<DebriefBundle>): boolean {
+  return bundle.orchestrator?.enabled === true;
+}
+
+/** Every model the orchestrator block names (for prices and validation). */
+export function orchestratorModels(bundle: Partial<DebriefBundle>): string[] {
+  const o = bundle.orchestrator;
+  if (!o) return [];
+  return [
+    o.plannerModel,
+    o.plannerBackupModel,
+    ...(o.agents ?? []).flatMap((a) => [a.model, a.backupModel]),
+    // The prompt-only agents' build defaults run when the release names none.
+    ...(o.enabled
+      ? [DEBRIEF_MODELS.registryAgent, DEBRIEF_MODELS.registryAgentBackup]
+      : []),
+  ].filter((m): m is string => typeof m === 'string' && m.length > 0);
+}
+
+/** Every problem with an orchestrator block (none when it may be used). */
+export function orchestratorProblems(
+  o: unknown,
+  catalog?: DebriefModelCatalog,
+): string[] {
+  if (o === undefined || o === null) return [];
+  const c = o as Partial<DebriefOrchestratorConfig>;
+  if (typeof c !== 'object') return ['orchestrator is not an object'];
+  const problems: string[] = [];
+  if (typeof c.enabled !== 'boolean') {
+    problems.push('orchestrator: enabled must be true or false');
+  }
+  if (typeof c.topUp !== 'boolean') {
+    problems.push('orchestrator: topUp must be true or false');
+  }
+  if (
+    !Number.isInteger(c.maxAgentsPerPlan) ||
+    (c.maxAgentsPerPlan as number) < 1 ||
+    (c.maxAgentsPerPlan as number) > DEBRIEF_MAX_AGENTS_PER_PLAN
+  ) {
+    problems.push(
+      `orchestrator: maxAgentsPerPlan must be 1–${DEBRIEF_MAX_AGENTS_PER_PLAN}`,
+    );
+  }
+  if (!c.plannerModel) problems.push('orchestrator: no planner model');
+  if (!Array.isArray(c.agents)) {
+    problems.push('orchestrator: agents must be a list');
+  } else {
+    const seen = new Set<string>();
+    for (const a of c.agents) {
+      const known =
+        DEBRIEF_REGISTRY_AGENTS[a?.id as DebriefRegistryAgentId] ?? null;
+      if (!known) {
+        problems.push(`orchestrator: no registry agent ${String(a?.id)}`);
+        continue;
+      }
+      if (seen.has(a.id))
+        problems.push(`orchestrator: ${a.id} is listed twice`);
+      seen.add(a.id);
+      if (a.version !== known.version) {
+        problems.push(
+          `orchestrator: ${a.id} v${String(a.version)} is not in this build (v${known.version})`,
+        );
+      }
+    }
+  }
+  const models = [
+    c.plannerModel,
+    c.plannerBackupModel,
+    ...(Array.isArray(c.agents) ? c.agents : []).flatMap((a) => [
+      a?.model,
+      a?.backupModel,
+    ]),
+  ].filter((m): m is string => typeof m === 'string' && m.length > 0);
+  for (const m of new Set(models)) {
+    const problem = modelProblem(m);
+    if (problem) problems.push(`orchestrator: ${problem}`);
+    else if (catalog && !catalog.steps.has(m)) {
+      problems.push(
+        `orchestrator: ${m} is not an active model in the LLM catalog for ally-ai`,
+      );
+    }
+  }
+  return problems;
+}
+
 /** Steps no recipe may drop (plan §8.2): safety, writing, the checks and the evaluation. */
 export const MANDATORY_STEPS: readonly DebriefStep[] = [
   DebriefStep.SAFETY_READER,
@@ -453,6 +652,7 @@ export function validateDebriefBundle(
       problems.push(`recipe ${key}: maxRevisionRounds must be 0–3`);
     }
   }
+  problems.push(...orchestratorProblems(b.orchestrator, catalog));
   const s = b.settings;
   if (!s) problems.push('settings are missing');
   else {
