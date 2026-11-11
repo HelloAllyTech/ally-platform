@@ -1103,13 +1103,20 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'debrief-improver',
     task: LlmTask.DEBRIEF_PM_AGENT,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Daily, and on demand from the Debrief Console',
+    trigger:
+      'Weekly, a deeper review monthly, and on demand from the Debrief Console',
     detail:
-      'The PM agent: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
+      'The PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
+      'and redacted reporting views (never transcripts), plans, investigates with read-only subagents, and proposes ' +
+      'ideas routed to itself, Builder, Bug Hunter or a person through ally-be gateway tools that refuse the ' +
+      'never-list. Every model call (main agent and subagents) is one row. Falls back to ' +
+      'DEBRIEF_MODELS.pmAgentBackup. Paid from the learning budget, capped per run (pmAgentRunCapUsd).',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
-    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.pmAgent)',
+    configuredBy:
+      'DEBRIEF_MODELS.pmAgent / pmAgentBackup in debrief-release.constants.ts',
+    promptOverride: 'debrief_improver_system',
   },
   {
     id: 'rag-quality-judge',

@@ -35,6 +35,8 @@ import { DebriefGatewayService } from './service/debrief-gateway.service';
 import { DebriefGraphClient } from './service/debrief-graph.client';
 import { DebriefRunTokenService } from './service/debrief-run-token.service';
 import { DebriefPmAgentService } from './service/debrief-pm-agent.service';
+import { DebriefPmAgentRunService } from './service/debrief-pm-agent-run.service';
+import { DebriefPmAgentToolsService } from './service/debrief-pm-agent-tools.service';
 import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
@@ -118,6 +120,9 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefAgentService,
     DebriefTestSetsService,
     DebriefPmAgentService,
+    // The PM agent Deep Agent's runs (ally-ai) and its gateway tools.
+    DebriefPmAgentRunService,
+    DebriefPmAgentToolsService,
     DebriefConsoleService,
     DebriefFeedbackService,
     DebriefPracticeService,

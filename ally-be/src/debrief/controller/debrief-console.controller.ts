@@ -38,6 +38,7 @@ import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
 import { DebriefConsoleService } from '../service/debrief-console.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
+import { DebriefPmAgentRunService } from '../service/debrief-pm-agent-run.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
@@ -187,6 +188,7 @@ export class DebriefConsoleController {
     private readonly runner: DebriefRunnerService,
     private readonly judge: DebriefRunJudgeService,
     private readonly pmAgent: DebriefPmAgentService,
+    private readonly pmRuns: DebriefPmAgentRunService,
     private readonly testSets: DebriefTestSetsService,
     private readonly feedback: DebriefFeedbackService,
     private readonly settings: DebriefSettingsService,
@@ -406,9 +408,12 @@ export class DebriefConsoleController {
 
   @Post(['pm-agent/analyse', 'improver/analyse'])
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({ summary: 'Run the PM agent now (it also runs daily)' })
+  @ApiOperation({
+    summary:
+      'Start a PM agent run now (it also runs weekly, and monthly in depth); the report lands when it finishes',
+  })
   analyse(@Req() req: AuthedRequest) {
-    return this.pmAgent.analyse({ actorUserId: req.user.id });
+    return this.pmRuns.start(req.user.id);
   }
 
   @Post(['pm-agent/ideas/:id/screen', 'improver/ideas/:id/screen'])
@@ -423,7 +428,8 @@ export class DebriefConsoleController {
   @Post(['pm-agent/ideas/:id/approve', 'improver/ideas/:id/approve'])
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({
-    summary: 'Approve an idea: it becomes a new release and goes live',
+    summary:
+      'Approve an idea: route A starts its canary or promotes it; B opens a Builder session; C files a bug for Bug Hunter; D marks the question answered',
   })
   approve(
     @Param('id', ParseUUIDPipe) id: string,

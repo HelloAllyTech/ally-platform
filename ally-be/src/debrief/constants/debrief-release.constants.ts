@@ -231,13 +231,17 @@ export const DEBRIEF_REPLY_DEFAULT: DebriefReplyConfig = {
 /**
  * Prompts the PM agent may propose edits to. The rubric and the Safety
  * reader are pinned (named people only), and the PM agent's own instructions
- * change only through a person.
+ * change only through a person. The orchestrator's planner and its
+ * prompt-only registry agents are route A too (spec C3: default plans and
+ * changed manifests), but only while the GA release runs the orchestrator:
+ * otherwise a change to them could not be tested (DebriefPmAgentToolsService).
  */
 export const PM_AGENT_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.writer,
   DEBRIEF_PROMPT_CODES.reviser,
+  ...DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
 ]);
 
 /**
@@ -268,6 +272,8 @@ export const DEBRIEF_MODELS = {
   evaluator: 'gemini-2.5-flash',
   reviser: 'gemini-3-flash-preview',
   pmAgent: 'gemini-2.5-pro',
+  // The PM agent's backup when its model fails or its breaker is open.
+  pmAgentBackup: 'gemini-2.5-flash',
   judge: 'gemini-2.5-pro',
   /** The orchestrator's planner: fast, the learner is waiting (spec A5). */
   planner: 'gemini-2.5-flash',
