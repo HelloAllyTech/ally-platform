@@ -9,7 +9,7 @@ decides, ally-be executes**: ally-ai never writes ally-be's database.
 
 | ally-be (system of record) | ally-ai (the debrief graph) |
 |---|---|
-| Claims the run (one per session), early skips (`no_session`, `too_short`, `no_transcript`), language detection, loads all context, resolves the release bundle, prompt texts (with run overrides) and the effective run ceiling; the `monthly_cap` skip | Recipe choice from the bundle and session flags; every model step (safety reader, analyst, progress reader, writer, evaluator, reviser); budget reservations; model order with circuit breaker and backup model; the check → evaluate ⇄ revise loop; deadlines; fallback rungs; the decision (published / below_bar / needs_person + reason); step records |
+| Claims the run (one per session), early skips (`no_session`, `too_short`, `no_transcript`), loads all context, resolves the release bundle, prompt texts (with run overrides) and the effective run ceiling; the `monthly_cap` skip | The language of a session that recorded none (read from the learner's turns, see §1); recipe choice from the bundle and session flags; every model step (safety reader, analyst, progress reader, writer, evaluator, reviser); budget reservations; model order with circuit breaker and backup model; the check → evaluate ⇄ revise loop; deadlines; fallback rungs; the decision (published / below_bar / needs_person + reason); step records |
 | Gateway tools the graph calls: guidance search, rule checks, live progress | Checkpoints every step (LangGraph Postgres checkpointer, thread id = run id) so a resumed run never pays twice |
 | Applies the result to `debrief_runs` (same fields as today) and does everything after: publish, judge, trials, metrics | — |
 
@@ -35,7 +35,7 @@ stored result.
   "ceiling_usd": 0.5,
   "prices": { "<model>": { "input_per_m": 0.3, "output_per_m": 2.5 } },      // for every model the bundle names; unpriced = cannot run
   "session": {                                                              // DebriefSessionContext as ally-be loads it today
-    "tenant_id": "...", "language": "en-IN", "language_source": "recorded",
+    "tenant_id": "...", "language": "en-IN", "language_source": "recorded | null", "language_recorded": true,
     "learner_turns": 12, "assessment": false, "in_case": false, "scenario_id": 41, "...": "..."
   },
   "transcript": [ { "turn_index": 0, "role": "counselor | client", "text": "...", "message_id": "..." } ],
@@ -69,9 +69,22 @@ Response:
   "evaluator_overall": 9.2,
   "evaluator_hard_fails": [],
   "check_failures": [ "C-4" ],
-  "resumed": false
+  "resumed": false,
+  "language": "hi"                         // the debrief's language: the recorded one, or the one read from the learner's turns
 }
 ```
+
+**Language (v9 FR-39; moved into the graph 2026-11-11, spec §D1).** ally-be sends what it knows: the session's
+configured language (its default `en` when none is recorded), `language_recorded`, and `language_source:
+"recorded"` (null when not recorded). Before any step, the graph settles the language
+(`registry/profile.py` `resolve_language`): a recorded one is kept; for `language_recorded: false` it is read
+from the learner's (`counselor`) turns — Tamil, Kannada and English by script, Devanagari as Hindi or Marathi by
+their most common words — with `language_source` `detected`, or `detected_low_confidence` when the script's share
+is under 60%, the text under 20 letters, or Hindi and Marathi within one word of each other. Every step reads that
+language; the response's `language` and `workspace.languageSource` carry it, and ally-be writes them to
+`debrief_runs.language` and `workspace.languageSource` as its own detection did (a port of the deleted
+`detect-language.ts`, identical on 425 inputs). A run ally-be ends before calling the graph (an early skip or the
+`monthly_cap`) keeps the session's language and, when it recorded none, no `languageSource`.
 
 Field meanings and values are exactly today's `DebriefRun` columns and workspace keys, so ally-be's apply step,
 the Console, the metrics and the PM agent's reporting views read them unchanged.
@@ -246,19 +259,33 @@ Auth: the service `X-API-Key`. Request:
   "history": [ { "role": "user | assistant", "content": "..." } ],             // the thread's last 10, oldest first
   "message": "the learner's new message",
   "run_token": "<JWT, scope reply>",
-  "gateway_url": "https://<ally-be>/api/v1/internal/debrief"
+  "gateway_url": "https://<ally-be>/api/v1/internal/debrief",
+  "language": "hi",                     // the session's language, as the Safety reader reads the message in it
+  "safety_system": "... | null"         // the release-pinned `debrief_safety_reader_system` text; null = ally-ai's default
 }
 ```
 
 Response: `200`, `application/x-ndjson`, one event per line:
 
 - `{ "type": "token", "text": "..." }` — reply text as it arrives (every pass's text, as before);
-- `{ "type": "done", "text": "...", "tool_texts": ["..."], "trace": ReplyTrace }` — `tool_texts` is what each
+- `{ "type": "done", "text": "...", "tool_texts": ["..."], "trace": ReplyTrace, "distress": false }` — `tool_texts` is what each
   successful tool returned (ally-be's quote check accepts quotes from it); `trace` is today's `ReplyTrace`
   (`at, model, turns, costUsd, tools: [{name, topic?, ok, ms, found}], stoppedBy?`), which ally-be keeps on
   `workspace.replyTraces` for the Console — never the learner's message;
-- `{ "type": "error", "error": "...", "text": "...", "trace": ReplyTrace }` — the reply stopped; `text` is what the
-  learner already saw.
+- `{ "type": "error", "error": "...", "text": "...", "trace": ReplyTrace, "distress": false }` — the reply stopped; `text`
+  is what the learner already saw.
+
+**Distress (added 2026-11-11, replacing ally-be's call to the deleted `POST /debrief/safety-reader`).** For every
+request, ally-ai starts the Safety reader (`app/core/debrief/safety_reader.py`, in-process, on its default model)
+on the learner's message — one `counselor` turn, `turn_index` 1, in `language`, with `safety_system` — at the same
+moment as the reply, so the first words never wait for it. Only the last event (`done` or `error`) waits, and
+carries `distress: true` when the reading found the learner's own distress. It is `false` when the reading found
+none, gave no usable answer, raised, or took longer than 60 s (`DISTRESS_TIMEOUT_S`, the old client timeout). A
+stream with no last event (ally-ai unreachable, the stream cut) carries no verdict, and ally-be reads it as false —
+as it read a failed Safety reader call before. ally-be still decides everything: the crisis keyword screen runs
+first and a match never reaches ally-ai; `distress: true` raises the chat-distress flag (`safety reader`) and
+appends the support lines, to the reply, to the words already shown when the reply failed mid-way, or alone when
+nothing was shown.
 
 Limits and behaviour:
 
@@ -281,7 +308,7 @@ run's token still needs `running`); a reply token can't call the debrief run's t
 `get_learner_history` / `get_live_detections`.
 
 ally-be on failure: words already sent → finish with them (checked, distress-screened, saved); nothing sent → the
-support lines alone if the Safety reader heard distress, otherwise an SSE `error` ("Ally could not answer just now.
+support lines alone if the last event's `distress` was true, otherwise an SSE `error` ("Ally could not answer just now.
 Please try again in a moment.") and no saved reply. The reply model is checked against ally-ai's LLM catalog (release
 check and the Console's choices).
 
@@ -291,6 +318,16 @@ identical checks on fixed reply texts for every reply check; crisis keyword mess
 approved copy and lines without a model on both; distress messages (English, Hindi, Hinglish) got the support lines
 on both; each tool question called the same tool on both; every reply took 1–2 passes and under $0.001. The table is
 in the commit message of the change that deleted the old loop.
+
+Distress parity before deleting `POST /debrief/safety-reader` and ally-be's `DebriefAiClient` (2026-11-11, local,
+real Gemini, usage off): `DebriefReplyService` from master (HTTP Safety reader beside the reply) against this
+contract, the same fakes around both, 14 messages × 2 runs per path — normal questions (English, Hindi, Hinglish,
+one quoting the client), crisis keywords (English, Hindi) and distress (two each in English, Hindi and romanised
+Hinglish). Identical decisions on 13 of 14: no flag on normal questions, approved copy and lines without a model on
+keywords, support lines and the flag on every distress message. The 14th ("I have been thinking about ending my
+life", which the keyword list misses) is a borderline reading the Safety reader itself varies on: over 12 runs per
+path it raised the flag 5 times on the old path and 7 on the new — the same reader, prompt and model, so model
+variance rather than a difference between the paths.
 
 
 ## 6. The orchestrator (challenger releases only; spec Part A, D2 steps 7–8)
