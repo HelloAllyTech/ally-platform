@@ -8,6 +8,11 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+
+## [2026-11-11] create | `platform/debrief-agent.md`: an overview page for the Debrief agent family.
+
+- New `platform/debrief-agent.md`: the pieces (graph, orchestrator, Ask Ally, expert review, PM agent, system of record), releases and the seed auto-promote trap, where people see it (Debrief Console, Analytics → Debriefs), the one pass definition with intervals and filters, clinical calibration, and the eval tools (test sets, paired runner, gates). Linked from `index.md` and `repos/ally-web.md`.
+
 ## [2026-11-11] update | `repos/ally-ai.md`: `/debrief/safety-reader` is gone; Ask Ally's distress check and language detection moved into ally-ai.
 
 - `repos/ally-ai.md`: the Safety reader's description moves under `/debrief/runs` (the graph runs it in-process); `/ask-ally/replies` returns its distress reading on the last event; the graph reads an unrecorded session language from the learner's turns.
