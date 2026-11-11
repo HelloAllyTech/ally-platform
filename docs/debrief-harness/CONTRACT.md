@@ -279,3 +279,49 @@ approved copy and lines without a model on both; distress messages (English, Hin
 on both; each tool question called the same tool on both; every reply took 1–2 passes and under $0.001. The table is
 in the commit message of the change that deleted the old loop.
 
+
+## 6. The orchestrator (challenger releases only; spec Part A, D2 steps 7–8)
+
+**Flag:** `bundle.orchestrator.enabled` (`true` = orchestrated; absent or `false` = today's fixed recipe, unchanged).
+The seed bundle never carries the block (a changed seed is promoted to GA at boot), and every release made before
+it validates as it is. A person makes the challenger with the Console action
+`POST /api/v1/debrief/console/releases/orchestrator-challenger` (a DRAFT from the live GA bundle with the block on
+and every registry agent at the build's version, `debriefChallengerBundle`); it ships only through the ladder.
+
+```jsonc
+"orchestrator": {
+  "enabled": true,
+  "plannerModel": "gemini-2.5-flash", "plannerBackupModel": null,
+  "topUp": true,                       // D3: one evidence top-up after the first failed evaluation
+  "maxAgentsPerPlan": 6,               // 1–10
+  "agents": [ { "id": "protocol_check", "version": 1, "model": null, "backupModel": null }, ... ]
+}
+```
+
+Validation (`orchestratorProblems`): ids must be in `DEBRIEF_REGISTRY_AGENTS` at the build's version, no duplicates,
+models approved, priced, pinned and active in ally-ai's catalog. ally-ai refuses an agent the release does not
+enable, or at another version, and never offers it to the planner (the Plan record says why).
+
+**What ally-be adds to an orchestrated run** (and only to one): the run token also lists `get_org_protocols`,
+`get_learner_history`, `query_aggregates`; `prompts` also holds `debrief_planner_system`,
+`debrief_protocol_check_system`, `debrief_history_deep_system`, `debrief_language_specialist_system`; `prices`
+covers the planner's and the agents' models; `context.availability` =
+`{ org_protocols: n, past_debriefs: n, cohort: bool, course: bool }` (cheap counts for the profile; never words).
+
+**Gateway tools (orchestrated run token):**
+
+| Tool | Body | Returns |
+|---|---|---|
+| `get_org_protocols` | `{}` | `{ protocols: [{ code, title, text }], procedures: string \| null }` — the run's organisation's Debrief Guidance entries with facet kind `protocol` (org-scoped, never global) and its Guide profile procedures |
+| `get_learner_history` | `{ limit?: 1–12 }` | run token: `{ sessions: [{ date, recipe, work_on_this: [{skill, point}], strengths: [skill], skills: [{skill, word}] }] }` (no quotes). A reply token keeps §5's `{ points }` |
+| `query_aggregates` | `{ query: "cohort_skill_rates", params: { skills: [≤10] } }` or `{ query: "course_missed_skills" }` | `{ query, rows: [{ skill, learners, observed_share \| missed_share }], min_group: 5, refused? }` — a fixed family of parameterised queries over the redacted view `debrief_reporting.skill_observations`, scoped by code to the run's organisation (and course), excluding the learner, groups of 5+ only, through the Analytics Agent's `guardSelectQuery` + `SqlExecutorService` (READ ONLY, timeout, row cap). Never free SQL |
+
+`progress` also accepts `label_key` (`debrief.progress.<agent>`), stored as `liveProgress.labelKey` for the apps.
+
+**Response additions** (orchestrated runs only): `workspace.profile`, `workspace.plans` (the plan and any top-up:
+`{ phase, source: planner|default|none, fallback, model, profile, chosen: [{agent, inputs, why, estimatedUsd}],
+considered: [{agent, whyNot}], dropped: [{agent, why}], estimatedUsd }`), `workspace.findings` (agent →
+`{ agent, findings: [A3 finding], droppedQuotes, reasoning }`) and `workspace.findingsCount`. Steps gain a
+`planner` record (the model call), a `plan` record (`step: "plan"`, with the plan above in `plan`), and one record
+per agent under its id (`protocol_check`, …) in the usual record shape. Every existing step name, field and
+decision rule is unchanged, so `debrief-stage-metrics` and the Console read them as before.
