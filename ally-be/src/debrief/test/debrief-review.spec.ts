@@ -433,7 +433,8 @@ describe('DebriefReviewService', () => {
       status: DebriefCommentStatus.OPEN,
       limit: 500,
     });
-    const [sql, params] = dataSource.query.mock.calls.at(-1) as unknown as [
+    const calls = dataSource.query.mock.calls;
+    const [sql, params] = calls[calls.length - 1] as unknown as [
       string,
       unknown[],
     ];
