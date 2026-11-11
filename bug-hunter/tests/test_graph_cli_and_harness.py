@@ -211,3 +211,41 @@ def test_a_crashed_agent_keeps_its_cost(repo_config, tmp_path: Path) -> None:
     row = report.cases[0]
     assert row.outcome == "error" and row.error == "GitError: x"
     assert row.cost_usd == 0.45 and report.meta["cost_usd_total"] == 0.45
+
+
+def test_holdout_cases_never_run_without_milestone(repo_config, tmp_path: Path) -> None:
+    import pytest as _pytest
+
+    cfg, repo, bug, clean = repo_config
+    held = bug.model_copy(update={"id": "ally-be-held0001", "split": "holdout"})
+    report, _ = run_evals(
+        cfg,
+        [bug, clean, held],
+        BaselineAgent(),
+        _options(),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=tmp_path / "r",
+    )
+    assert {c.id for c in report.cases} == {bug.id, clean.id}  # dev only by default
+    with _pytest.raises(ValueError, match="milestone"):
+        run_evals(
+            cfg,
+            [held],
+            BaselineAgent(),
+            _options(split="holdout"),
+            repo=repo,
+            guard=DiskGuard(5, probe=lambda: 50.0),
+            results_dir=tmp_path / "r",
+        )
+    report, _ = run_evals(
+        cfg,
+        [bug, held],
+        BaselineAgent(),
+        _options(split="holdout", milestone=True),
+        repo=repo,
+        guard=DiskGuard(5, probe=lambda: 50.0),
+        results_dir=tmp_path / "r",
+    )
+    assert [c.id for c in report.cases] == [held.id]
+    assert report.meta["split"] == "holdout"

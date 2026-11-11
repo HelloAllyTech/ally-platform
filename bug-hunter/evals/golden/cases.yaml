@@ -30,6 +30,7 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 8821e5215782e44b07b664de41a450f4f5f60dc9
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -60,6 +61,7 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 168f627a948f433b6054f8133e036738b40414ec
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -89,6 +91,7 @@ cases:
   src_lines: 3
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -120,6 +123,7 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 099de82c1f76fd6f6fb4d8baa5f44f6098fa80ca
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -150,6 +154,7 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: a981059deb98b7f8bca10f0ab629e885116b3995
   status: active
+  split: dev
   oracle_shape: true
   escalate_acceptable: false
   human_fix_pass:
@@ -182,6 +187,7 @@ cases:
   lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
   introduced_by: 2c2c378e8a99f1623e409d0667a601f89c2abc3a
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -212,6 +218,7 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 88fd1da22fc0b732d3e4245d5edff4e735e48915
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -242,6 +249,7 @@ cases:
   lockfile_blob: ac36e034439c488c4e5182ba51ca425f7ea367ec
   introduced_by: bf5dcf9699ad683933b485454cc7935963098bcd
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -272,6 +280,7 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: f6ed605a08945f1cba2b09824b2bbbd0b99f75ec
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -304,6 +313,7 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 2cff91d1026a17c5f4be4757c2c22e228fc61de7
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -335,6 +345,7 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: 5519e5891bad9218e07be097fd11d4bf547df61b
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: true
   human_fix_pass: {}
@@ -372,6 +383,7 @@ cases:
   lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
   introduced_by: ec3e51c60e2f4ea8a92f66a3980971ac7f27ffe1
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -402,6 +414,7 @@ cases:
   lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
   introduced_by: 48363e1467d348a6a2bf5b706fdb484e1d9021f2
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -430,6 +443,7 @@ cases:
   lockfile_blob: 949b2116aafd183e598c1ff7269a18fe39f702fa
   introduced_by: cfda686b2dd052cc3e2464254b2bd0643ef5032a
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -460,6 +474,7 @@ cases:
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: a3bc5e6939b582207484eba1f8d57a4e9d88dcf6
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -489,6 +504,7 @@ cases:
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: 71ddf4d76520a6b90213d046c238b9ccefbdee3a
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -520,6 +536,7 @@ cases:
   lockfile_blob: c0e06d1fe98c8ab2efab3325ce22bf44ec8ba74e
   introduced_by: 51ac5ac4d3a9307454188f123e87829405b4186b
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -555,6 +572,7 @@ cases:
   lockfile_blob: 4006dfa5966ef211c009513b41c55ba27aa83fff
   introduced_by: d4ae9ebdf5157a7119c5003c0778cc1d37d99dd0
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -584,6 +602,7 @@ cases:
   oracle_tests: []
   src_lines: 33
   status: disputed
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -619,6 +638,7 @@ cases:
   oracle_tests: []
   src_lines: 75
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -644,6 +664,7 @@ cases:
   oracle_tests: []
   src_lines: 29
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -669,6 +690,7 @@ cases:
   oracle_tests: []
   src_lines: 10
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -695,6 +717,7 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -721,6 +744,7 @@ cases:
   oracle_tests: []
   src_lines: 91
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -746,6 +770,7 @@ cases:
   oracle_tests: []
   src_lines: 47
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -772,6 +797,7 @@ cases:
   oracle_tests: []
   src_lines: 30
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -797,6 +823,7 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -823,6 +850,7 @@ cases:
   oracle_tests: []
   src_lines: 33
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -849,6 +877,7 @@ cases:
   oracle_tests: []
   src_lines: 28
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -875,6 +904,7 @@ cases:
   oracle_tests: []
   src_lines: 37
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -902,6 +932,7 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -928,6 +959,7 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -953,6 +985,7 @@ cases:
   oracle_tests: []
   src_lines: 41
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -979,6 +1012,7 @@ cases:
   oracle_tests: []
   src_lines: 41
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1004,6 +1038,7 @@ cases:
   oracle_tests: []
   src_lines: 41
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1030,6 +1065,7 @@ cases:
   oracle_tests: []
   src_lines: 40
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1056,6 +1092,7 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1085,6 +1122,7 @@ cases:
   oracle_tests: []
   src_lines: 39
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1111,6 +1149,7 @@ cases:
   oracle_tests: []
   src_lines: 40
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1137,6 +1176,7 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1164,6 +1204,7 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1191,6 +1232,7 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1219,6 +1261,7 @@ cases:
   oracle_tests: []
   src_lines: 40
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1246,6 +1289,7 @@ cases:
   oracle_tests: []
   src_lines: 42
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1272,6 +1316,7 @@ cases:
   oracle_tests: []
   src_lines: 37
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1298,6 +1343,7 @@ cases:
   oracle_tests: []
   src_lines: 37
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1328,6 +1374,7 @@ cases:
   lockfile_blob: baf594754c56a70cb476b9715f7679e5ebb33dd8
   introduced_by: 06f1157e49daa64b25e1105fef256ecc3533739a
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1363,6 +1410,7 @@ cases:
   lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
   introduced_by: 122a80cbcae35f1abeaad6dac4d5f44f08c1892
   status: active
+  split: dev
   oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
@@ -1395,7 +1443,426 @@ cases:
   lockfile_blob: 6f1c15c2ef3076fa643ce2862fa53c8ef6f8bcc4
   introduced_by: 25d665f80251fce1e5a798533a82d3c2f637b422
   status: active
+  split: dev
   oracle_shape: true
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-be-582b1d5f
+  kind: bug
+  app: ally-be
+  parent: 9ba6b5d9b8fd9b4bb35d3be54f0ff0f1459061d0
+  commit: 582b1d5f9bb4cac4db9cf26ff225c5184a4d65e1
+  expected: fix
+  layout: monorepo
+  modes:
+  - issue
+  risk: false
+  description: Learners sometimes don't receive XP for an activity they completed. At those moments the
+    logs show the XP award failing on a database error, and the XP never shows up afterwards.
+  description_source: hand
+  src_files:
+  - src/progress/service/xp-award.service.ts
+  oracle_tests:
+  - src/progress/service/test/xp-award.service.spec.ts
+  src_lines: 2
+  lockfile_blob: 557b2694fb16b4a8b22ef65af37e47d252f17820
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-be-532727f9
+  kind: bug
+  app: ally-be
+  parent: 834dbd22dd7fb48b2495ebdd766e5d8632f20edf
+  commit: 532727f9d412750fa8c04529c45ab61112b5d0d3
+  expected: fix
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Session event text stays untranslated for some target languages. Most languages translate
+    fine and there is no error in the logs; for the affected ones the translation is silently skipped.
+  description_source: hand
+  src_files:
+  - src/session-event/service/session-event-translation.service.ts
+  oracle_tests:
+  - src/session-event/service/test/session-event-translation.service.spec.ts
+  src_lines: 2
+  lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
+  introduced_by: dd6314ba1c3456f8fc76d096df1b64675e35f316
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-be-0060266c
+  kind: bug
+  app: ally-be
+  parent: 12f1a9b6a35582c4e5e428140e34a457327707a2
+  commit: 0060266cb7361a003d779062941a34b9f0e3da90
+  expected: fix
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: When a learner gives a debrief a thumbs-down, the stored feedback record still says the
+    debrief was helpful, so negative feedback reads as positive in the review data.
+  description_source: hand
+  src_files:
+  - src/debrief-feedback/service/debrief-feedback.service.ts
+  oracle_tests:
+  - src/debrief-feedback/service/test/debrief-feedback.service.spec.ts
+  src_lines: 5
+  lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
+  introduced_by: e2e527735945e02b8020a7e6464df5080d151c7d
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-be-25c97c58
+  kind: bug
+  app: ally-be
+  parent: ec5e1dffec2ccd3b82e2171e21e40576560a7afa
+  commit: 25c97c58c5653268a51d5d5c48d9831c7232642e
+  expected: fix
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: The health endpoint intermittently reports the service as down and healthy replicas are
+    pulled out of rotation. The logs show 'timeout of 1000ms exceeded' for the database check, although
+    the documented per-check deadline is 2 seconds.
+  description_source: hand
+  src_files:
+  - src/health/controller/health.controller.ts
+  oracle_tests:
+  - src/health/controller/test/health.controller.spec.ts
+  src_lines: 5
+  lockfile_blob: 6f1c15c2ef3076fa643ce2862fa53c8ef6f8bcc4
+  introduced_by: 122a80cbcae35f1abeaad6dac4d5f44f08c1892
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-be-d6e4d7ec
+  kind: bug
+  app: ally-be
+  parent: b722751ae669405a255385565a715d5e89c63f59
+  commit: d6e4d7ec862428d8bec8102c4d8c9d026cbd1e34
+  expected: escalate
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: A platform admin turning on Character Library from their own organisation's Settings screen
+    gets the error 'Tenant ID is required'. The other feature switches on the same screen work.
+  description_source: hand
+  src_files:
+  - src/settings/service/settings.service.ts
+  oracle_tests:
+  - src/settings/service/test/settings.service.spec.ts
+  src_lines: 5
+  lockfile_blob: 6f1c15c2ef3076fa643ce2862fa53c8ef6f8bcc4
+  introduced_by: eeacdff38f08642e065da47afb477a71167318ea
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags:
+  - risk-by-topic
+- id: ally-be-b2f2d586
+  kind: bug
+  app: ally-be
+  parent: 834dbd22dd7fb48b2495ebdd766e5d8632f20edf
+  commit: b2f2d586d837c4dab0d953fa4de717fb961015c3
+  expected: escalate
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Some reviewers get 403 Forbidden on the unread-review count badge, while the review list
+    and the reviews themselves load fine for them.
+  description_source: hand
+  src_files:
+  - src/scenario-session-review/controller/review.controller.ts
+  oracle_tests:
+  - src/scenario-session-review/controller/review.controller.spec.ts
+  src_lines: 2
+  lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
+  introduced_by: 138975cf0a0be86306ec3e45ec54573ca72cc207
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags:
+  - risk-by-topic
+- id: ally-be-4ce96778
+  kind: bug
+  app: ally-be
+  parent: dade603b8b50cf1b9268686e3deb705bd68367b9
+  commit: 4ce967783a34f36fa0e98d60b10f48dec76f0aef
+  expected: fix
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'In a roleplay session transcript the messages appear in the wrong order: the conversation
+    does not follow the order in which things were said.'
+  description_source: hand
+  src_files:
+  - src/learn/repository/scenario-session-messages.repository.ts
+  oracle_tests:
+  - src/learn/repository/test/scenario-session-messages.repository.spec.ts
+  src_lines: 2
+  lockfile_blob: c332744b02f50eed8c682be49fd135b48eab3981
+  introduced_by: f11eb596a819d8a7ea72aaf3befe4d5a16e33a7b
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-be-68a34a82
+  kind: bug
+  app: ally-be
+  parent: 14c142fa83d83b4a58274ed2c47b49e506ab9f55
+  commit: 68a34a826bf5e33a3f41cc90d795357238562c75
+  expected: fix
+  layout: root
+  modes:
+  - issue
+  risk: false
+  description: After a platform admin switches a tenant's helpline on, the public talker page keeps saying
+    the helpline is unavailable for a while; after switching it off, it keeps saying it is open.
+  description_source: hand
+  src_files:
+  - src/helpline/service/helpline-settings.service.ts
+  oracle_tests:
+  - src/helpline/service/test/helpline-settings.service.spec.ts
+  src_lines: 6
+  lockfile_blob: 5e576f1bac7ca2a6b3179cf0366ae3a62c4cf0f4
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-web-a33574d4
+  kind: bug
+  app: ally-web
+  parent: 54bbb93b48b44be2b6ddce96e96192c801db6022
+  commit: a33574d4723a5aa2858b4ffcaf4adfa4d054fffc
+  expected: fix
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'For simulations saved without a timer, the session never ends on its own when the agent
+    fails to hang up: no time warning appears and the browser keeps the call going for hours.'
+  description_source: hand
+  src_files:
+  - libs/ui-shared/src/lib/simulation/SimulationPage.tsx
+  oracle_tests:
+  - libs/ui-shared/src/lib/simulation/__tests__/SimulationPage.test.tsx
+  src_lines: 2
+  lockfile_blob: 3eab123675f59dc870508298d63b898897ee2170
+  introduced_by: 541bdf494126ffaa59183222c11de380b5b09803
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-web-a881b21b
+  kind: bug
+  app: ally-web
+  parent: 427869af2508aae915d0f2adaf4b26579769f299
+  commit: a881b21b5ebeb6a61e96383e6970e8a67fdbbf5f
+  expected: fix
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'Opening a shared or bookmarked resource search link that has only a category and no search
+    text shows nothing: the search never runs and the category counts stay empty.'
+  description_source: hand
+  src_files:
+  - apps/ally-helpline-dashboard/src/components/search-resources/SearchResources.tsx
+  oracle_tests:
+  - apps/ally-helpline-dashboard/src/components/search-resources/__test__/SearchResources.test.tsx
+  src_lines: 2
+  lockfile_blob: e155a745fef2ad4257c3f15f76c60c9ed6082111
+  introduced_by: 4e4d2342c71975e6c6c54b7391e11bc315a40da
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-web-596a0eef
+  kind: bug
+  app: ally-web
+  parent: 3084ff80eef9dac7a95a2f5ee49d5f1856c4ac29
+  commit: 596a0eefd6b77a3139d52ee3b49263fdda91a2f1
+  expected: fix
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: On the product roadmap board, dragging a card into the 'No goal' lane moves it, but the
+    card keeps showing its old goal chip until the page is refreshed.
+  description_source: hand
+  src_files:
+  - apps/ally-admin-dashboard/src/api/productRoadmap.ts
+  oracle_tests:
+  - apps/ally-admin-dashboard/src/api/__tests__/productRoadmap.test.ts
+  src_lines: 5
+  lockfile_blob: e155a745fef2ad4257c3f15f76c60c9ed6082111
+  introduced_by: dd2ecfb164fe541d847144805856864253b1b162
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-web-2d664deb
+  kind: bug
+  app: ally-web
+  parent: d0cb7af955366906d5d3408738276bab8b1836bd
+  commit: 2d664deb58310db2f719d45c0b7cd2b2fdb687cf
+  expected: escalate
+  layout: root
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: Start Scribe Mode and Upload Audio have disappeared for every counsellor in the helpline
+    dashboard. The network tab shows the chat-types request failing with 401.
+  description_source: hand
+  src_files:
+  - apps/ally-helpline-dashboard/src/api/baseAPI.ts
+  oracle_tests:
+  - apps/ally-helpline-dashboard/src/api/__tests__/baseAPI.authHeader.test.ts
+  src_lines: 4
+  lockfile_blob: 5ddd5813a9879d12bb56214f200c9fb1bdc737a9
+  introduced_by: c3d4a8b0b74d7d80becdf472e3e0279aba18606a
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags:
+  - risk-by-topic
+- id: ally-web-eeaf1395
+  kind: bug
+  app: ally-web
+  parent: a8bf487dfcb2610c316d263660fa21306ce7dd90
+  commit: eeaf1395011c616d368e3ad6c951eb5d88e89ec9
+  expected: fix
+  layout: root
+  modes:
+  - issue
+  risk: false
+  description: In Roleplay Logs, for a session marked 'Session ended too soon', the drawer's close button
+    and clicking outside do nothing; the drawer stays open.
+  description_source: hand
+  src_files:
+  - apps/ally-helpline-dashboard/src/pages/calls/components/SimulationSummarySidebar.tsx
+  oracle_tests:
+  - apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SimulationSummarySidebar.test.tsx
+  src_lines: 5
+  lockfile_blob: 3eab123675f59dc870508298d63b898897ee2170
+  status: active
+  split: holdout
+  oracle_shape: false
+  escalate_acceptable: false
+  human_fix_pass: {}
+  human_fix_notes: {}
+  report_note: ''
+  dispute_note: ''
+  tags: []
+- id: ally-ai-11eef73c
+  kind: bug
+  app: ally-ai
+  parent: 65509df8c31d759e96935054cd22d8d04c705b76
+  commit: 11eef73cdf0b6a946fa6bb73f7c827a6d0a3f834
+  expected: fix
+  layout: monorepo
+  modes:
+  - sweep
+  - issue
+  risk: false
+  description: 'Bots without configured topics often need an extra rewrite on ''what can you do'' turns:
+    the reply check refuses the first draft for mentioning where its answers come from.'
+  description_source: hand
+  src_files:
+  - app/core/agent_runtime/prompt.py
+  oracle_tests:
+  - tests/core/agent_runtime/test_agent_check.py
+  src_lines: 7
+  lockfile_blob: 10465e39975a70af1a9913d19de790949b153dfb
+  introduced_by: d2691c8236dcaaed82b4bc08d9f53cc7037817ec
+  status: active
+  split: holdout
+  oracle_shape: false
   escalate_acceptable: false
   human_fix_pass: {}
   human_fix_notes: {}

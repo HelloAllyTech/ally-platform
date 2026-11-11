@@ -65,6 +65,8 @@ class HarnessOptions:
     dry_run: bool = False
     min_free_gb: float | None = None
     max_cost_usd: float | None = None  # hard cap for the whole eval run (limits.yaml)
+    split: str = "dev"  # dev | holdout; holdout agent runs need milestone=True
+    milestone: bool = False
     spend_file: Path | None = None  # daily ledger; None (tests) disables it
     override_spend_cap: bool | None = None  # None = read BUGHUNTER_SPEND_OVERRIDE
     runs_dir: Path = RUNS_DIR  # tests pass a temp dir; never share the live one
@@ -589,6 +591,13 @@ def run_evals(
         "stopped_reason": None,
         "free_gb_start": guard.free_gb(),
     }
+    if options.split == "holdout" and not (options.milestone or options.oracle_check):
+        raise ValueError(
+            "the holdout split runs only as a milestone (--milestone); oracle checks "
+            "are the exception"
+        )
+    meta["split"] = options.split
+    cases = [c for c in cases if c.split == options.split]
     disputed = [c.id for c in cases if c.status == "disputed"]
     cases = [c for c in cases if c.status == "active"]
     meta["disputed_skipped"] = disputed

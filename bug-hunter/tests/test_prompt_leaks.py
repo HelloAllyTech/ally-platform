@@ -21,6 +21,10 @@ def test_terms_from_diff_picks_distinctive_things_only() -> None:
     assert "translation-token-guard.util" in terms and "placeholder_re" in terms
     assert "[laughs]" in terms
     assert "generic" not in terms
+    words = terms_from_diff(
+        "diff --git a/x b/x\n+// Regression: Authorization header\n"
+    )
+    assert "regression" not in words and "authorization" not in words
     assert "value" not in terms and "parsed" not in terms and "expect" not in terms
 
 

@@ -13,6 +13,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from bug_hunter.config import RUNS_DIR
 
@@ -52,15 +53,28 @@ def _save(entries: list[Entry], path: Path = SPEND_FILE) -> None:
     )
 
 
+# The ledger's day rolls over at midnight in this zone (IST by default), not UTC.
+ENV_TZ = "BUGHUNTER_SPEND_TZ"
+
+
+def ledger_tz() -> ZoneInfo:
+    return ZoneInfo(os.environ.get(ENV_TZ) or "Asia/Kolkata")
+
+
+def day_of(at: str) -> str:
+    """The ledger day of a UTC timestamp, in the ledger's zone."""
+    return datetime.fromisoformat(at).astimezone(ledger_tz()).date().isoformat()
+
+
 def today() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    return datetime.now(ledger_tz()).date().isoformat()
 
 
 def record(usd: float, source: str, note: str = "", path: Path = SPEND_FILE) -> Entry:
     now = datetime.now(timezone.utc)
     entry = Entry(
         at=now.isoformat(timespec="seconds"),
-        day=now.date().isoformat(),
+        day=day_of(now.isoformat()),
         usd=round(float(usd), 4),
         source=source,
         note=note,
@@ -73,14 +87,14 @@ def record(usd: float, source: str, note: str = "", path: Path = SPEND_FILE) -> 
 
 def total_for(day: str | None = None, path: Path = SPEND_FILE) -> float:
     day = day or today()
-    return round(sum(e.usd for e in _load(path) if e.day == day), 4)
+    return round(sum(e.usd for e in _load(path) if day_of(e.at) == day), 4)
 
 
 def summary(day: str | None = None, path: Path = SPEND_FILE) -> str:
     day = day or today()
-    rows = [e for e in _load(path) if e.day == day]
+    rows = [e for e in _load(path) if day_of(e.at) == day]
     lines = [
-        f"spend {day}: ${total_for(day, path):.2f} "
+        f"spend {day} ({ledger_tz().key}): ${total_for(day, path):.2f} "
         f"of the ${DAILY_CAP_USD:.0f} daily cap"
     ]
     for e in rows:

@@ -246,7 +246,9 @@ def terms_from_diff(diff: str) -> set[str]:
             low = ident.lower()
             if low in GENERIC:
                 continue
-            camel = ident != low and ident != ident.upper()
+            # camelCase / PascalCase with a second hump; a capitalised English word
+            # ('Regression', 'Authorization') is not an identifier signal
+            camel = any(ch.isupper() for ch in ident[1:]) and ident != ident.upper()
             distinctive = (
                 ("_" in ident and len(ident) >= 8)
                 or (camel and len(ident) >= 10)

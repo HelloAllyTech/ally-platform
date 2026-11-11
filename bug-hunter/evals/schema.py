@@ -51,6 +51,10 @@ class Case(BaseModel):
     # "clean" commit, or a fix turned out not to be one). Disputed cases are kept but
     # never run or scored until resolved.
     status: Literal["active", "disputed"] = "active"
+    # dev: used for development, failure analysis and prompt tuning. holdout: never
+    # used for prompt examples or shown in failure analysis; run only as a milestone
+    # (`eval run --split holdout --milestone`), oracle checks excepted.
+    split: Literal["dev", "holdout"] = "dev"
     # The hidden oracle asserts the real fix's shape (a new symbol, an exact log
     # argument), not only behaviour: an equivalent fix fails it. Fix pass for such a
     # case is scored by human review (`human_fix_pass`), and reported both ways.

@@ -593,6 +593,13 @@ def eval_run(
             help="Start even past the $15 daily ledger cap (user's explicit go-ahead).",
         ),
     ] = False,
+    split: Annotated[str, typer.Option(help="dev (default) or holdout.")] = "dev",
+    milestone: Annotated[
+        bool,
+        typer.Option(
+            "--milestone", help="Required to run an agent on the holdout split."
+        ),
+    ] = False,
 ) -> None:
     """Run the golden cases against an agent, one at a time, and write a report."""
     import json as _json
@@ -625,12 +632,17 @@ def eval_run(
         max_cost_usd=max_cost_usd,
         spend_file=spend.SPEND_FILE,
         override_spend_cap=True if override_spend_cap else None,
+        split=split,
+        milestone=milestone,
     )
     try:
         report, path = run_evals(config, selected, load_agent(agent), options)
     except spend.SpendCapExceeded as exc:
         typer.echo(f"refused: {exc}", err=True)
         raise typer.Exit(code=3)
+    except ValueError as exc:
+        typer.echo(f"refused: {exc}", err=True)
+        raise typer.Exit(code=1)
     if dry_run:
         typer.echo(_json.dumps(report.meta["plan"], indent=1))
         return

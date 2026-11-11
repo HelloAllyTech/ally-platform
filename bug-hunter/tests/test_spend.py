@@ -84,3 +84,34 @@ def test_harness_records_and_refuses_through_the_ledger(
         guard=DiskGuard(5, probe=lambda: 50.0),
         results_dir=tmp_path / "r",
     )
+
+
+def test_ledger_day_rolls_over_at_midnight_ist(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv(spend.ENV_TZ, raising=False)
+    ledger = tmp_path / "spend.json"
+    # 18:20 UTC = 23:50 IST (day 10); 18:40 UTC = 00:10 IST (day 11)
+    ledger.write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "at": "2026-11-10T18:20:00+00:00",
+                        "day": "2026-11-10",
+                        "usd": 1.0,
+                        "source": "x",
+                    },
+                    {
+                        "at": "2026-11-10T18:40:00+00:00",
+                        "day": "2026-11-10",
+                        "usd": 2.0,
+                        "source": "x",
+                    },
+                ]
+            }
+        )
+    )
+    assert spend.total_for("2026-11-10", path=ledger) == 1.0
+    assert spend.total_for("2026-11-11", path=ledger) == 2.0
+    assert spend.day_of("2026-11-10T18:40:00+00:00") == "2026-11-11"
+    monkeypatch.setenv(spend.ENV_TZ, "UTC")
+    assert spend.total_for("2026-11-10", path=ledger) == 3.0
