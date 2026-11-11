@@ -141,4 +141,60 @@ describe("Debrief metrics (v9 §3.3)", () => {
     expect(targetState(1, { atLeast: 0.85 }, 5)).toBe("thin");
     expect(targetState(null, { atLeast: 0.85 })).toBe("no_data");
   });
+
+  it("shows the pass rate with its 95% range, by week, language and judge version", () => {
+    const group = (n: number, of: number, extra: Record<string, unknown> = {}) => ({
+      passRate: { n, of, value: of ? n / of : null, low: 0.62, high: 0.9 },
+      outages: 1,
+      unjudged: 2,
+      hardFailRate: { n: of - n, of, value: of ? (of - n) / of : null },
+      judgeMean: 8.4,
+      ...extra,
+    });
+    h.metrics.mockReturnValue({
+      data: {
+        ...VIEW,
+        quality: {
+          byWeek: [{ week: "2026-11-02", ...group(24, 30) }],
+          byLanguage: [{ language: "hi-IN", debriefs: 30, ...group(24, 30) }],
+          bySegment: [
+            {
+              language: "hi-IN",
+              writerModel: "gemini-3-flash-preview",
+              judgeVersion: "gemini-2.5-pro/v3+g1",
+              debriefs: 30,
+              ...group(24, 30),
+            },
+          ],
+        },
+      },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<MetricsTab />);
+    const q = screen.getByTestId("metrics-quality");
+    // The window total is summed in the browser with the same Wilson formula ally-be uses.
+    expect(screen.getByTestId("metrics-quality-headline")).toHaveTextContent(
+      "80% (95% range 62.7%–90.5%, 24 of 30)",
+    );
+    expect(q).toHaveTextContent("Not ready: a model could not be reached: 1");
+    expect(q).toHaveTextContent("Not scored yet: 2");
+    expect(screen.getByTestId("metrics-quality-weeks")).toHaveTextContent("95% range 62%–90%");
+    expect(screen.getByTestId("metrics-quality-languages")).toHaveTextContent("hi-IN");
+    expect(screen.getByTestId("metrics-quality-segments")).toHaveTextContent(
+      "gemini-2.5-pro/v3+g1",
+    );
+  });
+
+  it("says so when no live debrief is in the window", () => {
+    h.metrics.mockReturnValue({
+      data: { ...VIEW, quality: { byWeek: [], byLanguage: [], bySegment: [] } },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<MetricsTab />);
+    expect(screen.getByTestId("metrics-quality")).toHaveTextContent(
+      "No live debrief in this window.",
+    );
+  });
 });

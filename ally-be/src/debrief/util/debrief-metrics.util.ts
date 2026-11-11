@@ -4,18 +4,113 @@
  * Console can say "not enough data" instead of showing a noisy percentage.
  */
 
-/** A rate with the counts behind it; `value` is null when nothing was counted. */
+/**
+ * A rate with the counts behind it; `value` is null when nothing was counted.
+ * `low`/`high` are its 95% Wilson interval — every rate the Console shows
+ * carries one, because a rate without its interval reads as more certain than
+ * it is (Wilson rather than ±1.96·SE, which breaks on small n and near 0/1).
+ */
 export interface Rate {
   value: number | null;
   n: number;
   of: number;
+  low: number | null;
+  high: number | null;
+}
+
+const round3 = (x: number) => Math.round(x * 1000) / 1000;
+
+/** 95% Wilson score interval for n successes out of `of`. */
+export function wilson(
+  n: number,
+  of: number,
+  z = 1.96,
+): { low: number | null; high: number | null } {
+  if (of <= 0) return { low: null, high: null };
+  const p = n / of;
+  const z2 = z * z;
+  const centre = (p + z2 / (2 * of)) / (1 + z2 / of);
+  const half =
+    (z * Math.sqrt((p * (1 - p)) / of + z2 / (4 * of * of))) / (1 + z2 / of);
+  return {
+    low: round3(Math.max(0, centre - half)),
+    high: round3(Math.min(1, centre + half)),
+  };
 }
 
 export const rate = (n: number, of: number): Rate => ({
-  value: of > 0 ? Math.round((n / of) * 1000) / 1000 : null,
+  value: of > 0 ? round3(n / of) : null,
   n,
   of,
+  ...wilson(n, of),
 });
+
+/**
+ * Two versions on the same cases: the difference in pass rate (b − a), its 95%
+ * interval for paired proportions, and how many cases got better and worse —
+ * "same pass rate" can hide as many regressions as improvements. An interval
+ * that includes zero is no measurable difference.
+ */
+export interface PairedDifference {
+  n: number;
+  better: number;
+  worse: number;
+  diff: number | null;
+  low: number | null;
+  high: number | null;
+  /**
+   * Exact two-sided McNemar p on the discordant cases. With few of them the
+   * interval can sit off zero while p is still large: read both, and trust
+   * neither alone below ~10 discordant cases.
+   */
+  mcnemarP: number | null;
+}
+
+/** Two-sided exact binomial test of k successes in m trials at p = 0.5. */
+function exactMcNemar(better: number, worse: number): number | null {
+  const m = better + worse;
+  if (m === 0) return null;
+  const k = Math.min(better, worse);
+  let tail = 0;
+  let c = 1; // C(m, 0)
+  for (let i = 0; i <= k; i++) {
+    if (i > 0) c = (c * (m - i + 1)) / i;
+    tail += c;
+  }
+  return round3(Math.min(1, (2 * tail) / 2 ** m));
+}
+
+export function pairedDifference(
+  pairs: Array<{ a: boolean; b: boolean }>,
+  z = 1.96,
+): PairedDifference {
+  const n = pairs.length;
+  const better = pairs.filter((p) => !p.a && p.b).length;
+  const worse = pairs.filter((p) => p.a && !p.b).length;
+  if (n === 0) {
+    return {
+      n,
+      better,
+      worse,
+      diff: null,
+      low: null,
+      high: null,
+      mcnemarP: null,
+    };
+  }
+  const diff = (better - worse) / n;
+  const se =
+    Math.sqrt(Math.max(0, better + worse - (better - worse) ** 2 / n)) / n;
+  return {
+    n,
+    better,
+    worse,
+    diff: round3(diff),
+    low: round3(Math.max(-1, diff - z * se)),
+    high: round3(Math.min(1, diff + z * se)),
+    mcnemarP: exactMcNemar(better, worse),
+  };
+}
 
 /** Below this many in the denominator a rate is shown but marked thin. */
 export const MIN_RATE_SAMPLE = 20;

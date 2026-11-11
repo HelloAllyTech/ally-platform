@@ -1,4 +1,5 @@
 import {
+  pairedDifference,
   rate,
   skillKey,
   steeringScore,
@@ -133,5 +134,35 @@ describe('learner events', () => {
     await expect(
       svc.recordForLearner('s1', 7, 'practise_next_click', 'web'),
     ).resolves.toEqual({ ok: true });
+  });
+});
+
+/** Checked against the evals skill's eval_stats.py on the 2026-11-11 dev run. */
+describe('rates carry intervals; paired comparisons count both directions', () => {
+  it('Wilson matches the reference implementation', () => {
+    expect(rate(28, 30)).toMatchObject({
+      value: 0.933,
+      low: 0.787,
+      high: 0.982,
+    });
+    expect(rate(24, 30)).toMatchObject({ value: 0.8, low: 0.627, high: 0.905 });
+    expect(rate(0, 0)).toMatchObject({ value: null, low: null, high: null });
+  });
+
+  it('a paired difference reports better, worse, its interval and exact McNemar p', () => {
+    const pairs = [
+      ...Array.from({ length: 24 }, () => ({ a: true, b: true })),
+      ...Array.from({ length: 4 }, () => ({ a: true, b: false })),
+      ...Array.from({ length: 2 }, () => ({ a: false, b: false })),
+    ];
+    const d = pairedDifference(pairs);
+    expect(d).toMatchObject({ n: 30, better: 0, worse: 4, diff: -0.133 });
+    expect(d.high!).toBeLessThan(0);
+    // eval_stats: McNemar exact p = 0.125 — not conclusive on 4 discordant cases.
+    expect(d.mcnemarP).toBe(0.125);
+  });
+
+  it('no pairs is no comparison, not a zero', () => {
+    expect(pairedDifference([])).toMatchObject({ diff: null, mcnemarP: null });
   });
 });

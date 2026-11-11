@@ -408,6 +408,18 @@ export interface DebriefRate {
   value: number | null;
   n: number;
   of: number;
+  /** 95% Wilson interval; absent on rates summed in the browser. */
+  low?: number | null;
+  high?: number | null;
+}
+
+/** The pass rate and its companions for one group of live debriefs (same definition as the eval). */
+export interface DebriefPassGroup {
+  passRate: DebriefRate;
+  outages: number;
+  unjudged: number;
+  hardFailRate: DebriefRate;
+  judgeMean: number | null;
 }
 
 export interface DebriefExperienceRates {
@@ -473,5 +485,17 @@ export interface DebriefMetricsView {
     insufficient: boolean;
   }>;
   safetyRecall: { recorded: false };
+  quality?: {
+    byWeek: Array<{ week: string } & DebriefPassGroup>;
+    byLanguage: Array<{ language: string; debriefs: number } & DebriefPassGroup>;
+    bySegment: Array<
+      {
+        language: string;
+        writerModel: string;
+        judgeVersion: string;
+        debriefs: number;
+      } & DebriefPassGroup
+    >;
+  };
   generatedAt: string;
 }

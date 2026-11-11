@@ -10,6 +10,7 @@ import {
   UptakeRun,
 } from '../util/debrief-metrics.util';
 import { DebriefSettingsService } from './debrief-settings.service';
+import { passRollup, RolledRun } from '../util/debrief-outcome.util';
 
 /** Live debriefs a learner can read. */
 const READABLE = `r.mode = 'live' AND r.status IN ('published','below_bar')`;
@@ -114,13 +115,14 @@ export class DebriefMetricsService {
         experience: experience(r),
       };
     });
-    const [byLanguage, byPlatform, baselines, uptake, safety] =
+    const [byLanguage, byPlatform, baselines, uptake, safety, quality] =
       await Promise.all([
         this.breakdown(w, s.flagReviewSlaHours, 'language'),
         this.breakdown(w, s.flagReviewSlaHours, 'platform'),
         this.baselines(),
         this.uptakeByMonth(6),
         this.latestSafetyRecall(),
+        this.quality(w),
       ]);
     return {
       weeks: w,
@@ -132,6 +134,7 @@ export class DebriefMetricsService {
       baselines,
       uptake,
       safetyRecall: safety,
+      quality,
       generatedAt: new Date().toISOString(),
     };
   }
@@ -253,6 +256,32 @@ export class DebriefMetricsService {
       SELECT wk.week, ${DebriefMetricsService.AGGREGATES}
         FROM wk LEFT JOIN facts ON date_trunc('week', facts."createdAt") = wk.week
        GROUP BY wk.week ORDER BY wk.week`);
+  }
+
+  /**
+   * The pass rate — the same definition the paired eval reports
+   * (`debriefOutcome`) — per week, per language and per language × writer
+   * model × judge version, beside the PRD metrics above. Computed in code from
+   * each live run so the eval and the Console can never define it twice.
+   */
+  private async quality(weeks: number) {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(`
+      SELECT date_trunc('week', r."createdAt") AS week, r.status, r.language,
+             (r.cards IS NOT NULL) AS has_cards, r."checkFailures" AS check_failures,
+             r.steps, r.workspace->'judge' AS judge
+        FROM debrief_runs r
+       WHERE r.mode = 'live'
+         AND r."createdAt" >= date_trunc('week', now()) - make_interval(weeks => ${weeks - 1})`);
+    const runs: RolledRun[] = rows.map((r) => ({
+      week: new Date(r.week).toISOString().slice(0, 10),
+      language: r.language ?? null,
+      status: r.status,
+      cards: r.has_cards ? {} : null,
+      checkFailures: Array.isArray(r.check_failures) ? r.check_failures : [],
+      steps: Array.isArray(r.steps) ? r.steps : [],
+      workspace: r.judge ? { judge: r.judge } : {},
+    }));
+    return passRollup(runs);
   }
 
   /** Experience over the whole window, per language or per device (v9 §3.3). */

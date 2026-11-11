@@ -7,7 +7,7 @@ import { InfoTip } from "@components/ally-guide/InfoTip";
 import { Pill, PillTone } from "@components/ally-guide/Pill";
 import { LineChart } from "@components/charts";
 import { en } from "@constants";
-import { DebriefExperienceRates, DebriefMetricsView, DebriefRate } from "@types";
+import { DebriefExperienceRates, DebriefMetricsView, DebriefPassGroup, DebriefRate } from "@types";
 
 import { ChartCard, lineOpts, PALETTE } from "../Analytics/chartKit";
 
@@ -183,6 +183,8 @@ const MetricsBody: React.FC<{
           </select>
         </label>
       </div>
+
+      <QualitySection quality={view.quality} />
 
       <section className="flex flex-col gap-2" data-testid="metrics-steering">
         <ChartCard
@@ -433,6 +435,149 @@ const MetricTable: React.FC<{
     </section>
   );
 };
+
+/** 95% Wilson interval for a rate summed in the browser (same formula as ally-be's `wilson`). */
+export const wilson = (n: number, of: number): { low: number | null; high: number | null } => {
+  if (of <= 0) return { low: null, high: null };
+  const z = 1.96;
+  const p = n / of;
+  const z2 = z * z;
+  const centre = (p + z2 / (2 * of)) / (1 + z2 / of);
+  const half = (z * Math.sqrt((p * (1 - p)) / of + z2 / (4 * of * of))) / (1 + z2 / of);
+  return { low: Math.max(0, centre - half), high: Math.min(1, centre + half) };
+};
+
+const pctNum = (x: number) => `${Math.round(x * 1000) / 10}%`;
+
+/** "87% (95% range 80–92%, 104 of 120)", or "—" with nothing counted. */
+const rateWithRange = (r: DebriefRate | null | undefined): string => {
+  const s = en.debriefs.metrics.quality;
+  if (!r || r.value == null) return en.debriefs.metrics.none;
+  const ci = r.low != null && r.high != null ? { low: r.low, high: r.high } : wilson(r.n, r.of);
+  const range = ci.low != null && ci.high != null ? s.range(pctNum(ci.low), pctNum(ci.high)) : "";
+  return `${pctNum(r.value)} (${[range, s.of(r.n, r.of)].filter(Boolean).join(", ")})`;
+};
+
+/**
+ * The pass rate (same definition as the test-set evals) by week, by language,
+ * and by language × writing model × judge version, beside the PRD metrics.
+ */
+const QualitySection: React.FC<{ quality: DebriefMetricsView["quality"] }> = ({ quality }) => {
+  const s = en.debriefs.metrics.quality;
+  const c = s.cols;
+  if (!quality) return null;
+  const weeks = quality.byWeek;
+  const total = (pick: (g: DebriefPassGroup) => DebriefRate): DebriefRate => {
+    const n = weeks.reduce((a, w) => a + pick(w).n, 0);
+    const of = weeks.reduce((a, w) => a + pick(w).of, 0);
+    return { n, of, value: of > 0 ? n / of : null, ...wilson(n, of) };
+  };
+  const outages = weeks.reduce((a, w) => a + w.outages, 0);
+  const unjudged = weeks.reduce((a, w) => a + w.unjudged, 0);
+  const th = "py-1 pr-2 font-normal";
+  const td = "py-1 pr-2";
+  return (
+    <section className="flex flex-col gap-3" data-testid="metrics-quality">
+      <h3 className="flex items-center gap-1 text-xl font-normal text-typography-900">
+        {s.heading}
+        <InfoTip label={s.help} ariaLabel={`About ${s.heading}`} />
+      </h3>
+      {weeks.length === 0 ? (
+        <p className="text-sm text-typography-700">{s.empty}</p>
+      ) : (
+        <>
+          <p className="text-2xl text-typography-900" data-testid="metrics-quality-headline">
+            {rateWithRange(total(g => g.passRate))}
+          </p>
+          <p className="text-sm text-typography-700">
+            {s.outages}: {outages} · {s.unjudged}: {unjudged}
+          </p>
+          <QualityTable
+            title={s.byWeek}
+            testId="metrics-quality-weeks"
+            head={[c.week, c.passRate, c.hardFailRate, c.judgeMean]}
+            rows={weeks.map(w => [
+              w.week,
+              rateWithRange(w.passRate),
+              rateWithRange(w.hardFailRate),
+              fixed(w.judgeMean, 2),
+            ])}
+            th={th}
+            td={td}
+          />
+          <QualityTable
+            title={s.byLanguage}
+            testId="metrics-quality-languages"
+            head={[c.language, c.debriefs, c.passRate, c.hardFailRate, c.judgeMean]}
+            rows={quality.byLanguage.map(l => [
+              l.language,
+              String(l.debriefs),
+              rateWithRange(l.passRate),
+              rateWithRange(l.hardFailRate),
+              fixed(l.judgeMean, 2),
+            ])}
+            th={th}
+            td={td}
+          />
+          <QualityTable
+            title={s.bySegment}
+            help={s.segmentHelp}
+            testId="metrics-quality-segments"
+            head={[c.language, c.writerModel, c.judgeVersion, c.debriefs, c.passRate]}
+            rows={quality.bySegment.map(g => [
+              g.language,
+              g.writerModel,
+              g.judgeVersion,
+              String(g.debriefs),
+              rateWithRange(g.passRate),
+            ])}
+            th={th}
+            td={td}
+          />
+        </>
+      )}
+    </section>
+  );
+};
+
+const QualityTable: React.FC<{
+  title: string;
+  help?: string;
+  testId: string;
+  head: string[];
+  rows: string[][];
+  th: string;
+  td: string;
+}> = ({ title, help, testId, head, rows, th, td }) => (
+  <div className="flex flex-col gap-1" data-testid={testId}>
+    <h4 className="flex items-center gap-1 text-base font-semibold text-typography-900">
+      {title}
+      {help && <InfoTip label={help} ariaLabel={`About ${title}`} />}
+    </h4>
+    <table className="w-full text-left text-sm">
+      <thead className="text-typography-700">
+        <tr>
+          {head.map(h => (
+            <th key={h} className={th}>
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(r => (
+          <tr key={r.join("|")} className="border-t border-gray-200">
+            {r.map((cell, i) => (
+              <td key={i} className={td}>
+                {cell}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
 
 const BREAKDOWN_KEYS: Array<keyof DebriefExperienceRates> = [
   "openedWithin24h",

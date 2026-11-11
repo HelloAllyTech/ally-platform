@@ -16,6 +16,8 @@
 // Usage, from a built ally-be (inside the prod container for prod numbers):
 //   node scripts/debrief-eval.js --set gate --limit 200 --change no_guidance --out /tmp/eval
 //     [--concurrency 3] [--rejudge 30]
+// "Passes" is `debriefOutcome` (src/debrief/util/debrief-outcome.util.ts), the same definition
+// the Console's live metrics use.
 // Writes <out>/cases.jsonl (one line per case and arm: ids, codes, booleans — no transcript or
 // debrief text) plus eval_stats.py inputs <out>/{ga,change}.jsonl, and prints a summary.
 const fs = require('fs');
@@ -110,7 +112,10 @@ async function pool(items, n, fn) {
   const { DebriefContextRepository } = req(
     'dist/debrief/service/debrief-context.repository',
   );
-  const { ADVISORY_CHECKS } = req('dist/debrief/util/debrief-cards.util');
+  // The one definition of a passing debrief, shared with stored runs and live metrics.
+  const { debriefOutcome, writerModelOf, judgeVersionOf } = req(
+    'dist/debrief/util/debrief-outcome.util',
+  );
   const { DebriefRunMode, DebriefRunArm } = req(
     'dist/debrief/enum/debrief-run.enum',
   );
@@ -152,60 +157,31 @@ async function pool(items, n, fn) {
       : [];
 
   const grade = async (c, armName, run, level) => {
-    const judged = run.cards
-      ? await judge.judge(run).catch((e) => ({ error: e.message }))
-      : null;
-    const blocking = (run.checkFailures || [])
-      .map((f) => f.code)
-      .filter((code) => !ADVISORY_CHECKS.has(code));
-    const hardFails = (judged && judged.hardFails ? judged.hardFails : []).map(
-      (h) => h.code,
-    );
-    // below_bar still publishes (flagged for review); needs_person and failed reach no learner.
-    const ready =
-      !!run.cards && ['published', 'below_bar'].includes(run.status);
+    if (run.cards) await judge.judge(run).catch(() => null); // stores workspace.judge
+    const o = debriefOutcome(run);
     const passages = await chunkMeta(
       (run.workspace && run.workspace.passages) || [],
     );
     const lvl = String(level || '').toLowerCase();
+    const j = (run.workspace && run.workspace.judge) || null;
     return {
       id: c.session_id,
       caseId: c.case_id,
       category: c.category,
       arm: armName,
       run: run.id,
+      releaseId: run.releaseId,
       status: run.status,
-      skipped: run.status === 'skipped',
-      ready,
-      pass: ready && blocking.length === 0 && hardFails.length === 0,
-      // A step that could not reach its model (timeout, network) is an outage, not a quality
-      // verdict on the writing: reported both inside and outside the headline pass rate.
-      infra:
-        !ready &&
-        (run.steps || []).some(
-          (s) =>
-            s.status === 'failed' &&
-            /timeout|network|ECONN|5\d\d/i.test(s.note || ''),
-        ),
-      checks: blocking,
-      advisory: (run.checkFailures || [])
-        .map((f) => f.code)
-        .filter((x) => ADVISORY_CHECKS.has(x)),
-      hardFails,
-      judgeError:
-        judged && judged.error ? String(judged.error).slice(0, 120) : null,
-      judgeOverall:
-        judged && judged.overall != null ? Number(judged.overall) : null,
-      dims:
-        judged && judged.dimensions
-          ? Object.fromEntries(
-              judged.dimensions.map((d) => [d.dimension, d.score]),
-            )
-          : {},
-      judgeVersion:
-        judged && judged.model
-          ? `${judged.model}/${judged.promptVersion}`
-          : null,
+      outcome: o,
+      skipped: o.skipped,
+      ready: o.ready,
+      pass: o.pass,
+      infra: o.outage,
+      checks: o.blocking,
+      hardFails: o.hardFails,
+      judgeOverall: j && j.overall != null ? Number(j.overall) : null,
+      judgeVersion: judgeVersionOf(run),
+      writerModel: writerModelOf(run),
       riskCue: run.hasRiskCue,
       distress: run.learnerDistress,
       level: lvl,
@@ -266,6 +242,7 @@ async function pool(items, n, fn) {
     ]);
     line(ga);
     line(ch);
+
     console.log(
       `${c.session_id.slice(0, 8)} ${c.category}  ga:${ga.pass ? 'pass' : 'FAIL ' + [...(ga.checks || []), ...(ga.hardFails || []), ga.crash || (ga.ready ? '' : ga.status)].join(',')}` +
         `  ${opt.change}:${ch.pass ? 'pass' : 'FAIL ' + [...(ch.checks || []), ...(ch.hardFails || []), ch.crash || (ch.ready ? '' : ch.status)].join(',')}`,
@@ -306,7 +283,13 @@ async function pool(items, n, fn) {
   const byId = {};
   for (const r of rows) (byId[r.id] = byId[r.id] || {})[r.arm] = r;
   const both = Object.values(byId).filter(
-    (p) => p.ga && p[opt.change] && !(p.ga.skipped && p[opt.change].skipped),
+    // The shared definition: a skipped or not-yet-judged run has no verdict (pass null) and
+    // leaves the pair out of the denominator rather than counting as a failure.
+    (p) =>
+      p.ga &&
+      p[opt.change] &&
+      p.ga.pass !== null &&
+      p[opt.change].pass !== null,
   );
   const write = (name, arm) =>
     fs.writeFileSync(
@@ -340,7 +323,7 @@ async function pool(items, n, fn) {
   const cost = rows.reduce((s, r) => s + (r.cost || 0), 0);
   console.log(
     `done: ${both.length} paired cases; pass ga ${rate('ga')}/${both.length}, ${opt.change} ${rate(opt.change)}/${both.length}; ` +
-      `skipped by both ${Object.keys(byId).length - both.length}; spend $${cost.toFixed(2)} (+ judge)`,
+      `left out (skipped or unjudged) ${Object.keys(byId).length - both.length}; spend $${cost.toFixed(2)} (+ judge)`,
   );
   await app.close();
   process.exit(0);
