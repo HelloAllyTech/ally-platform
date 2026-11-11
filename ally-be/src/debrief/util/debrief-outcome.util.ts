@@ -114,6 +114,13 @@ export function judgeVersionOf(run: DebriefOutcomeRun): string | null {
 export interface RolledRun extends DebriefOutcomeRun {
   week: string;
   language: string | null;
+  /** Skills the debrief named (its cards, Practise next, skill words). */
+  skills?: string[];
+  scenario?: string | null;
+  /** Courses (tracks) the scenario sits in. */
+  courses?: string[];
+  learnerTurns?: number;
+  hasRiskCue?: boolean;
 }
 
 /** Pass rate and its companions for one group of runs. */
@@ -151,13 +158,53 @@ function group(runs: DebriefOutcomeRun[]): PassGroup {
   };
 }
 
+/** One breakdown row: a key and its pass rate with companions. */
+export type PassBreakdownRow = { key: string; debriefs: number } & PassGroup;
+
+/**
+ * Pass rate per key, where a run may count under several keys (a debrief names
+ * several skills; a scenario sits in several courses) or none. Largest first.
+ */
+export function passBreakdown(
+  runs: RolledRun[],
+  keysOf: (r: RolledRun) => string[],
+): PassBreakdownRow[] {
+  const m = new Map<string, RolledRun[]>();
+  for (const r of runs) {
+    for (const k of new Set(keysOf(r))) m.set(k, [...(m.get(k) ?? []), r]);
+  }
+  return [...m.entries()]
+    .map(([key, rs]) => ({ key, debriefs: rs.length, ...group(rs) }))
+    .sort((a, b) => b.debriefs - a.debriefs);
+}
+
+/** The model each step ran on, as "step: model" keys (a backup model counts as its own). */
+export function stepModelKeys(r: DebriefOutcomeRun): string[] {
+  return [
+    ...new Set(
+      (
+        (r.steps ?? []) as Array<{
+          step?: string;
+          status?: string;
+          model?: string | null;
+        }>
+      )
+        .filter((s) => s.status === 'done' && s.step && s.model)
+        .map((s) => `${s.step}: ${s.model}`),
+    ),
+  ];
+}
+
 /**
  * The live quality rollup the Console shows beside the PRD metrics: the pass
  * rate (same definition as the eval) per week, per language, and per
  * language × writer model × judge version — a trend is only read within one
  * judge version, and a language mix shift moves a pooled number on its own.
  */
-export function passRollup(runs: RolledRun[]): {
+export function passRollup(
+  runs: RolledRun[],
+  sessionBand: (learnerTurns: number) => string = (n) => String(n),
+): {
   byWeek: Array<{ week: string } & PassGroup>;
   byLanguage: Array<{ language: string; debriefs: number } & PassGroup>;
   bySegment: Array<
@@ -168,6 +215,14 @@ export function passRollup(runs: RolledRun[]): {
       debriefs: number;
     } & PassGroup
   >;
+  breakdowns: {
+    skill: PassBreakdownRow[];
+    scenario: PassBreakdownRow[];
+    course: PassBreakdownRow[];
+    sessionLength: PassBreakdownRow[];
+    stepModel: PassBreakdownRow[];
+    risk: PassBreakdownRow[];
+  };
 } {
   const groupBy = <K extends string>(key: (r: RolledRun) => K) => {
     const m = new Map<K, RolledRun[]>();
@@ -203,6 +258,18 @@ export function passRollup(runs: RolledRun[]): {
         };
       })
       .sort((a, b) => b.debriefs - a.debriefs),
+    breakdowns: {
+      skill: passBreakdown(runs, (r) => r.skills ?? []),
+      scenario: passBreakdown(runs, (r) => (r.scenario ? [r.scenario] : [])),
+      course: passBreakdown(runs, (r) => r.courses ?? []),
+      sessionLength: passBreakdown(runs, (r) =>
+        r.learnerTurns != null ? [sessionBand(r.learnerTurns)] : [],
+      ),
+      stepModel: passBreakdown(runs, stepModelKeys),
+      risk: passBreakdown(runs, (r) =>
+        r.hasRiskCue == null ? [] : [r.hasRiskCue ? 'risk cue' : 'no risk cue'],
+      ),
+    },
   };
 }
 

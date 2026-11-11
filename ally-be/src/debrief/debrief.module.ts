@@ -13,15 +13,19 @@ import { ScenarioSessionChat } from '../learn/entity/scenario-session-chat.entit
 import { ScenarioSessionChatMessage } from '../learn/entity/scenario-session-chat-message.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentHarnessModule } from '../llm-agent/harness/agent-harness.module';
-import { LlmAgentModule } from '../llm-agent/llm-agent.module';
 import { LearnModule } from '../learn/learn.module';
 import { PromptModule } from '../prompt/prompt.module';
 import { DebriefConsoleController } from './controller/debrief-console.controller';
 import { DebriefLearnerController } from './controller/debrief-learner.controller';
 import { DebriefGatewayController } from './controller/debrief-gateway.controller';
+import { DebriefReviewController } from './controller/debrief-review.controller';
+import { DebriefReview } from './entity/debrief-review.entity';
+import { DebriefReviewComment } from './entity/debrief-review-comment.entity';
+import { DebriefReviewService } from './service/debrief-review.service';
 import { DebriefFeedback } from './entity/debrief-feedback.entity';
 import { DebriefRun } from './entity/debrief-run.entity';
 import { DebriefAgentService } from './service/debrief-agent.service';
+import { AskAllyClient } from './service/ask-ally.client';
 import { DebriefAiClient } from './service/debrief-ai.client';
 import { DebriefConsoleService } from './service/debrief-console.service';
 import { DebriefContextRepository } from './service/debrief-context.repository';
@@ -34,7 +38,6 @@ import { DebriefNotifier } from './service/debrief-notifier.service';
 import { DebriefPracticeService } from './service/debrief-practice.service';
 import { DebriefAudioService } from './service/debrief-audio.service';
 import { DebriefReplyService } from './service/debrief-reply.service';
-import { DebriefReplyAgentService } from './service/debrief-reply-agent.service';
 import { DebriefPublishService } from './service/debrief-publish.service';
 import { DebriefSettingsService } from './service/debrief-settings.service';
 import { DebriefBaselineService } from './service/debrief-baseline.service';
@@ -66,6 +69,9 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
       DebriefOwnerSettings,
       DebriefProbeResult,
       DebriefLearnerEvent,
+      // Expert review (spec Part B): verdicts and comments.
+      DebriefReview,
+      DebriefReviewComment,
       // Ask Ally writes to the same thread today's debrief chat uses.
       ScenarioSessionChat,
       ScenarioSessionChatMessage,
@@ -85,8 +91,6 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     // The bell and phone pushes: "your debrief is ready", "Ally updated it".
     NotificationModule,
     AgentHarnessModule,
-    // Ask Ally's tool loop: the same tool-capable providers the Guide uses.
-    LlmAgentModule,
     PromptModule,
     // "Practise this next" reads the learner's roleplays as their list does.
     LearnModule,
@@ -94,10 +98,14 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
   controllers: [
     DebriefConsoleController,
     DebriefLearnerController,
-    // The gateway tools ally-ai's debrief graph calls back (run token only).
+    // The gateway tools ally-ai's debrief graph and Ask Ally call back (run token only).
     DebriefGatewayController,
+    // Expert review: the queue, the review screen, comments and verdicts.
+    DebriefReviewController,
   ],
   providers: [
+    // Ask Ally's agent in ally-ai (CONTRACT.md §5).
+    AskAllyClient,
     DebriefAiClient,
     DebriefContextRepository,
     DebriefGraphClient,
@@ -112,7 +120,6 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefFeedbackService,
     DebriefPracticeService,
     DebriefReplyService,
-    DebriefReplyAgentService,
     DebriefPublishService,
     DebriefSettingsService,
     DebriefBaselineService,
@@ -123,8 +130,10 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefConsoleAuditInterceptor,
     DebriefAudioService,
     DebriefNotifier,
+    DebriefReviewService,
     GuideCrisisService,
   ],
-  exports: [DebriefAgentService],
+  // DebriefReviewService: `linkIdea` for the PM agent's idea.propose.
+  exports: [DebriefAgentService, DebriefReviewService],
 })
 export class DebriefModule {}

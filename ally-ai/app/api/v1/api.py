@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     agent_runtime,
     analytics_agent,
+    ask_ally,
     builder,
     checkup,
     context_chunk,
@@ -64,6 +65,7 @@ api_router.include_router(
     tags=["feedback-groundedness"],
 )
 api_router.include_router(debrief.router, prefix="/debrief", tags=["debrief"])
+api_router.include_router(ask_ally.router, prefix="/ask-ally", tags=["ask-ally"])
 api_router.include_router(
     debrief_quality.router,
     prefix="/debrief-quality",

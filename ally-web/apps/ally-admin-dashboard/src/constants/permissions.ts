@@ -59,6 +59,8 @@ export enum Permissions {
   VIEW_ALLY_GUIDE = "view:admin:ally-guide",
   EDIT_ALLY_GUIDE = "edit:admin:ally-guide",
   REVIEW_ALLY_GUIDE_TRANSCRIPTS = "review:admin:ally-guide-transcripts",
+  // Debrief expert review: the Debrief Console's Expert review tab (with the Analytics toggle).
+  REVIEW_DEBRIEFS = "review:admin:debriefs",
   // Per-user preferences (e.g. the saved admin sidebar order). Held by every
   // platform-tier group — PLATFORM_ADMIN inherited both from SUPER_DUPER_ADMIN
   // in the role-collapse migration — but NOT by a plain tenant ADMIN or a

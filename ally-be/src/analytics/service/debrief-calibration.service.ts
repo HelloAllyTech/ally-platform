@@ -25,6 +25,7 @@ import {
 } from '../util/debrief-calibration.util';
 import { RatedPair } from '../util/rater-agreement.util';
 import { DebriefQualityRepository } from '../repository/debrief-quality.repository';
+import { DEBRIEF_SEED_BUNDLE } from '../../debrief/constants/debrief-release.constants';
 
 /** The judge series the calibration set is checked against. */
 const JUDGE_PAIR = { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v1' };
@@ -280,6 +281,7 @@ export class DebriefCalibrationService {
 
     const judgeVsHuman = summarise(judged, 'j', 'h');
     return {
+      expertVerdicts: await this.expertVerdictAgreement(codesOf),
       rubricVersion: RUBRIC_VERSION,
       judge: JUDGE_PAIR,
       target: DEBRIEF_CALIBRATION_TARGET,
@@ -291,6 +293,66 @@ export class DebriefCalibrationService {
       judgeVsHuman,
       humanVsHuman: summarise(humans, 'a', 'b'),
       gate: autonomyGate(judgeVsHuman.dimensions, judgeVsHuman.hardFails),
+    };
+  }
+
+  /**
+   * Expert review verdicts (debrief orchestrator spec B2) against the
+   * independent judge on the same Debrief agent run: pass/fail (the judge
+   * passes a debrief at the bar with no hard fail; the expert says Good) and
+   * each hard fail. Read from `debrief_reviews` and `debrief_runs.workspace.judge`,
+   * so a verdict joins the calibration set the moment it is given.
+   */
+  private async expertVerdictAgreement(codesOf: (v: unknown) => Set<string>) {
+    const rows: Array<{
+      id: string;
+      verdict: string;
+      e_fails: unknown;
+      overall: string | null;
+      j_fails: unknown;
+    }> = await this.dataSource.query(
+      `SELECT v."runId" AS id, v.verdict, v."hardFails" AS e_fails,
+              r.workspace->'judge'->>'overall' AS overall,
+              r.workspace->'judge'->'hardFails' AS j_fails
+         FROM debrief_reviews v
+         JOIN debrief_runs r ON r.id = v."runId"
+        WHERE r.workspace ? 'judge'`,
+    );
+    const passScore = DEBRIEF_SEED_BUNDLE.settings.passScore;
+    const judgePasses = (r: (typeof rows)[number]) =>
+      r.overall !== null &&
+      Number(r.overall) >= passScore &&
+      codesOf(r.j_fails).size === 0;
+    const [coverage] = await this.dataSource.query(
+      `SELECT count(DISTINCT "runId")::int AS debriefs,
+              count(*)::int AS verdicts,
+              count(DISTINCT "reviewerId")::int AS reviewers
+         FROM debrief_reviews`,
+    );
+    const hardFails: Record<string, DebriefHardFailAgreement> = {};
+    for (const code of DEBRIEF_HARD_FAIL_CODES) {
+      hardFails[code] = hardFailAgreement(
+        rows.map((r) => ({
+          cutId: r.id,
+          a: codesOf(r.j_fails).has(code) ? 1 : 0,
+          b: codesOf(r.e_fails).has(code) ? 1 : 0,
+        })),
+      );
+    }
+    return {
+      coverage: {
+        debriefs: Number(coverage?.debriefs ?? 0),
+        verdicts: Number(coverage?.verdicts ?? 0),
+        reviewers: Number(coverage?.reviewers ?? 0),
+      },
+      passFail: hardFailAgreement(
+        rows.map((r) => ({
+          cutId: r.id,
+          a: judgePasses(r) ? 1 : 0,
+          b: r.verdict === 'good' ? 1 : 0,
+        })),
+      ),
+      hardFails,
     };
   }
 }

@@ -1,5 +1,6 @@
 import {
   DEBRIEF_MODELS,
+  DEBRIEF_REPLY_DEFAULT,
   DEBRIEF_SEED_BUNDLE,
   DebriefRecipeKey,
   DebriefStep,
@@ -35,7 +36,9 @@ describe('debrief release bundle', () => {
         steps: all,
         reply: new Set(),
       }).join('\n'),
-    ).toContain('in the LLM catalog for ally-be');
+    ).toContain(
+      `${DEBRIEF_REPLY_DEFAULT.model} is not an active model in the LLM catalog for ally-ai`,
+    );
   });
 
   it('refuses a recipe that drops a mandatory step or reorders the loop', () => {

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
@@ -23,7 +23,7 @@ vi.mock("../../Analytics/chartKit", () => ({
 }));
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetDebriefMetricsQuery: () => h.metrics(),
+  useGetDebriefMetricsQuery: (args: unknown) => h.metrics(args),
 }));
 
 // eslint-disable-next-line import/first
@@ -297,5 +297,77 @@ describe("Debrief metrics (v9 §3.3)", () => {
       row("Replies that passed the checks (others were replaced by a fallback)"),
     ).toHaveTextContent("20 of 27");
     expect(row("Promoted / reverted / rejected / waiting")).toHaveTextContent("0 / 0 / 2 / 11");
+  });
+
+  it("filters every metric by organisation, language, level, debrief type, release and judge version", () => {
+    h.metrics.mockReturnValue({
+      data: {
+        ...VIEW,
+        filterOptions: {
+          organisations: [{ id: "5fdabf9a-37b2-440d-bdb2-af4f8ce37794", name: "Ally" }],
+          languages: ["en-IN", "hi-IN"],
+          learnerLevels: ["lay"],
+          recipes: ["short", "standard"],
+          releaseVersions: [5, 4],
+          judgeVersions: ["gemini-2.5-pro/v3+g1"],
+        },
+      },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<MetricsTab />);
+    const bar = screen.getByTestId("metrics-filters");
+    expect(within(bar).getByLabelText("Learner level")).toHaveTextContent("Lay helper");
+    expect(within(bar).getByLabelText("Debrief type")).toHaveTextContent("Short session");
+    fireEvent.change(screen.getByTestId("metrics-filter-language"), { target: { value: "hi-IN" } });
+    fireEvent.change(screen.getByTestId("metrics-filter-releaseVersion"), {
+      target: { value: "5" },
+    });
+    const last = h.metrics.mock.calls[h.metrics.mock.calls.length - 1][0];
+    expect(last).toMatchObject({ weeks: 12, language: "hi-IN", releaseVersion: 5 });
+    expect(bar).toHaveTextContent("Not filtered: baselines, uptake lift and the PM agent.");
+    fireEvent.click(screen.getByTestId("metrics-filter-clear"));
+    const cleared = h.metrics.mock.calls[h.metrics.mock.calls.length - 1][0];
+    expect(cleared).toEqual({ weeks: 12 });
+  });
+
+  it("breaks the pass rate down by skill, scenario, course, session length, step model and risk", () => {
+    const g = (key: string, n: number, of: number) => ({
+      key,
+      debriefs: of,
+      passRate: { n, of, value: n / of },
+      outages: 0,
+      unjudged: 0,
+      hardFailRate: { n: of - n, of, value: (of - n) / of },
+      judgeMean: 8,
+    });
+    h.metrics.mockReturnValue({
+      data: {
+        ...VIEW,
+        quality: {
+          byWeek: [{ week: "2026-11-09", ...g("w", 3, 4) }],
+          byLanguage: [],
+          bySegment: [],
+          breakdowns: {
+            skill: [g("empathy", 3, 4)],
+            scenario: [g("Exam stress", 2, 2)],
+            course: [],
+            sessionLength: [g("16-30", 1, 2)],
+            stepModel: [g("safety_reader: gemini-3-flash-preview", 1, 1)],
+            risk: [g("risk cue", 0, 1)],
+          },
+        },
+      },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<MetricsTab />);
+    expect(screen.getByTestId("metrics-breakdown-skill")).toHaveTextContent("empathy");
+    expect(screen.getByTestId("metrics-breakdown-step-model")).toHaveTextContent(
+      "safety_reader: gemini-3-flash-preview",
+    );
+    expect(screen.getByTestId("metrics-breakdown-risk")).toHaveTextContent("0 of 1");
+    // An empty breakdown is left out rather than shown as an empty table.
+    expect(screen.queryByTestId("metrics-breakdown-course")).toBeNull();
   });
 });

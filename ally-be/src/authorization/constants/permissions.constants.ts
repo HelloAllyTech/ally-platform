@@ -400,6 +400,10 @@ const PERMISSIONS = {
   VIEW_ALLY_GUIDE: 'view:admin:ally-guide',
   EDIT_ALLY_GUIDE: 'edit:admin:ally-guide',
   REVIEW_ALLY_GUIDE_TRANSCRIPTS: 'review:admin:ally-guide-transcripts',
+  // Debrief expert review (debrief orchestrator spec B1): read a debrief run's
+  // transcript beside its cards, comment on exact lines and give a verdict.
+  // Platform-tier groups by migration; clinical experts granted person by person.
+  REVIEW_DEBRIEFS: 'review:admin:debriefs',
 
   // === PRODUCT ROADMAP ===
   // Three tiers, because the roadmap is a voting board rather than a CRUD screen:
@@ -570,6 +574,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.VIEW_ALLY_GUIDE,
   PERMISSIONS.EDIT_ALLY_GUIDE,
   PERMISSIONS.REVIEW_ALLY_GUIDE_TRANSCRIPTS,
+  PERMISSIONS.REVIEW_DEBRIEFS,
   // Product Roadmap: SUPER_ADMIN can see the board and vote on it. The management
   // surface (EDIT_PRODUCT_ROADMAP) is deliberately withheld here and granted only to
   // SUPER_DUPER_ADMIN below.

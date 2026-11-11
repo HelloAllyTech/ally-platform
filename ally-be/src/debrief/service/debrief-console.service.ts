@@ -70,15 +70,12 @@ export class DebriefConsoleService {
   /**
    * Each step's model in the live release, and the models a person may pick
    * for it: active in the LLM catalog where the step runs, from an approved
-   * provider the runtime can call, pinned and priced. Steps run in ally-ai
-   * and Ask Ally in ally-be. The judge is pinned and shown, never chosen.
+   * provider the runtime can call, pinned and priced. Steps and Ask Ally
+   * both run in ally-ai. The judge is pinned and shown, never chosen.
    */
   async models() {
     const { release, bundle } = await this.runner.resolveRelease();
-    const [ai, be] = await Promise.all([
-      this.llmModels.getModels(LlmRuntime.ALLY_AI),
-      this.llmModels.getModels(LlmRuntime.ALLY_BE),
-    ]);
+    const ai = await this.llmModels.getModels(LlmRuntime.ALLY_AI);
     const usable = (
       rows: Array<{ model: string; label: string }>,
       providers: string[],
@@ -111,7 +108,7 @@ export class DebriefConsoleService {
       judge: DEBRIEF_MODELS.judge,
       choices: {
         steps: usable(ai, STEP_PROVIDERS),
-        reply: usable(be, REPLY_PROVIDERS),
+        reply: usable(ai, REPLY_PROVIDERS),
       },
     };
   }

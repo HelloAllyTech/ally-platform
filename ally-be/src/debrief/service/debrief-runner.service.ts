@@ -151,14 +151,11 @@ export class DebriefRunnerService {
    * narrows what may run rather than failing the run.
    */
   async modelCatalog(): Promise<DebriefModelCatalog> {
-    const [steps, reply] = await Promise.all([
-      this.llmModels.getModels(LlmRuntime.ALLY_AI),
-      this.llmModels.getModels(LlmRuntime.ALLY_BE),
-    ]);
-    return {
-      steps: new Set(steps.map((m) => m.model)),
-      reply: new Set(reply.map((m) => m.model)),
-    };
+    // Ask Ally runs in ally-ai too (CONTRACT.md §5): one list for both.
+    const models = new Set(
+      (await this.llmModels.getModels(LlmRuntime.ALLY_AI)).map((m) => m.model),
+    );
+    return { steps: models, reply: models };
   }
 
   /** The GA bundle, or the seed when GA is missing or does not validate. */

@@ -1,11 +1,14 @@
 import React, { useMemo } from "react";
 
+import { useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom";
 
 import { Tabs } from "@ally-ui-mono/ui-shared";
-import { en } from "@constants";
+import { en, Permissions } from "@constants";
+import { RootState } from "@store";
 
 import { CalibrationTab } from "./CalibrationTab";
+import { ExpertReviewTab } from "./ExpertReviewTab";
 import { GuidanceTab } from "./GuidanceTab";
 import { MetricsTab } from "./MetricsTab";
 import { OrganisationsTab } from "./OrganisationsTab";
@@ -19,6 +22,7 @@ export enum DebriefConsoleTab {
   RUNS = "runs",
   METRICS = "metrics",
   REVIEW = "review",
+  EXPERT_REVIEW = "expert-review",
   PM_AGENT = "pm-agent",
   RELEASES = "releases",
   ORGANISATIONS = "organisations",
@@ -32,6 +36,7 @@ const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.RUNS]: RunsTab,
   [DebriefConsoleTab.METRICS]: MetricsTab,
   [DebriefConsoleTab.REVIEW]: ReviewTab,
+  [DebriefConsoleTab.EXPERT_REVIEW]: ExpertReviewTab,
   [DebriefConsoleTab.PM_AGENT]: PmAgentTab,
   [DebriefConsoleTab.RELEASES]: ReleasesTab,
   [DebriefConsoleTab.ORGANISATIONS]: OrganisationsTab,
@@ -40,7 +45,16 @@ const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.SETTINGS]: SettingsTab,
 };
 
-const VALID_TABS = new Set<string>(Object.values(DebriefConsoleTab));
+/** Tabs shown only to holders of a permission beyond the Console's toggle. */
+const TAB_PERMISSION: Partial<Record<DebriefConsoleTab, Permissions>> = {
+  [DebriefConsoleTab.EXPERT_REVIEW]: Permissions.REVIEW_DEBRIEFS,
+};
+
+export const visibleDebriefTabs = (permissions: string[] | undefined): DebriefConsoleTab[] =>
+  Object.values(DebriefConsoleTab).filter(tab => {
+    const needed = TAB_PERMISSION[tab];
+    return !needed || (permissions ?? []).includes(needed);
+  });
 
 /**
  * The Debrief Console: where the team watches the debriefs learners read after a roleplay and the
@@ -49,15 +63,18 @@ const VALID_TABS = new Set<string>(Object.values(DebriefConsoleTab));
  */
 export const DebriefConsole: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  // Read from the store, as useAllyGuideAccess does; PrivateLayout fills it.
+  const permissions = useSelector((state: RootState) => state.user?.permissions);
+  const visible = useMemo(() => visibleDebriefTabs(permissions), [permissions]);
 
   const tabItems = useMemo(
-    () => Object.values(DebriefConsoleTab).map(id => ({ id, label: en.debriefs.tabs[id] })),
-    [],
+    () => visible.map(id => ({ id, label: en.debriefs.tabs[id] })),
+    [visible],
   );
 
   const requested = searchParams.get("tab");
   const activeTab =
-    requested && VALID_TABS.has(requested)
+    requested && (visible as string[]).includes(requested)
       ? (requested as DebriefConsoleTab)
       : DebriefConsoleTab.RUNS;
   const Content = TAB_CONTENT[activeTab];

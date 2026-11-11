@@ -3,11 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Observable, ReplaySubject, startWith } from 'rxjs';
 import { Repository } from 'typeorm';
-import {
-  AiChatService,
-  SseMessageEvent,
-} from '../../ai-chat/service/ai-chat.service';
-import { LlmMessage } from '../../ai-chat/interface/llm-provider.interface';
+import { SseMessageEvent } from '../../ai-chat/service/ai-chat.service';
 import { LlmProviderFactory } from '../../ai-chat/provider/llm-provider.factory';
 import { LlmUsageService } from '../../analytics/service/llm-usage.service';
 import { DEBRIEF_REFLECTION_CHECK_SYSTEM } from '../../prompt/contracts/prompt-contracts';
@@ -24,8 +20,6 @@ import {
   isGenuineReflection,
   isSubstantiveDebriefReply,
 } from '../../learn/type/debrief-engagement-event.type';
-import { ContextRetrievalService } from '../../context-library/service/context-retrieval.service';
-import { guidancePassage, guidanceSearch } from '../util/debrief-guidance.util';
 import { LoggerService } from '../../logger/logger.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
@@ -33,6 +27,7 @@ import {
   DEBRIEF_REFLECTION_CHECK_MODEL,
   DEBRIEF_REPLY_DEFAULT,
 } from '../constants/debrief-release.constants';
+import { modelPrices } from '../util/debrief-budget.util';
 import {
   DebriefCards,
   cardTexts,
@@ -41,16 +36,14 @@ import {
   speakerRuns,
   unmatchedQuotes,
 } from '../util/debrief-cards.util';
+import { AskAllyClient, AskAllyError, ReplyTrace } from './ask-ally.client';
 import { DebriefAgentService } from './debrief-agent.service';
 import { DebriefAiClient } from './debrief-ai.client';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefFeedbackService } from './debrief-feedback.service';
 import { DebriefLearnerEventsService } from './debrief-learner-events.service';
-import {
-  DebriefReplyAgentService,
-  ReplyTrace,
-} from './debrief-reply-agent.service';
 import { DebriefRunnerService } from './debrief-runner.service';
+import { DebriefRunTokenService } from './debrief-run-token.service';
 
 /** The chat's assistant sender, as today's debrief chat stores it. */
 const ALLY_SENDER = -1;
@@ -86,6 +79,12 @@ const event = (data: Record<string, unknown>): SseMessageEvent => ({
  * Safety reader reads each message alongside the reply for distress the
  * keywords miss, and adds the support lines and the review item when it
  * finds some. A reply that fails the code checks is replaced, not shown.
+ *
+ * The reply itself is Ask Ally's agent in ally-ai (CONTRACT.md §5): a
+ * LangGraph tool loop that looks up guidance, the learner's history and the
+ * live detector's record through the Debrief gateway, with a reply token.
+ * This service keeps everything around it: the screens, the checks, the
+ * thread, and the SSE relay.
  */
 /** What the learner sees each part of a debrief called (English; the rest are translations). */
 const CARD_SECTION_NAMES = [
@@ -105,8 +104,11 @@ const CARD_SECTION_NAMES = [
 export const REPLY_LENGTH_REMINDER =
   'Now write your reply: at most 120 words, in short paragraphs, with at most one question back.';
 
-/** Each part of Ask Ally's extra context must arrive within this, or is left out. */
-const EXTRA_CONTEXT_MS = 1200;
+/** The organisation's wording must arrive within this, or is left out. */
+const ORG_WORDING_MS = 1200;
+/** Shown when Ask Ally could not answer and no words had reached the learner. */
+export const REPLY_FAILED =
+  'Ally could not answer just now. Please try again in a moment.';
 
 @Injectable()
 export class DebriefReplyService {
@@ -117,7 +119,6 @@ export class DebriefReplyService {
     private readonly chats: Repository<ScenarioSessionChat>,
     @InjectRepository(ScenarioSessionChatMessage)
     private readonly messages: Repository<ScenarioSessionChatMessage>,
-    private readonly aiChat: AiChatService,
     private readonly ai: DebriefAiClient,
     private readonly context: DebriefContextRepository,
     private readonly runner: DebriefRunnerService,
@@ -128,9 +129,8 @@ export class DebriefReplyService {
     private readonly events: EventEmitter2,
     private readonly llm: LlmProviderFactory,
     private readonly usage: LlmUsageService,
-    @Optional() private readonly guidance?: ContextRetrievalService,
-    /** Ask Ally's tool loop; absent, a reply is one call with context fetched first. */
-    @Optional() private readonly replyAgent?: DebriefReplyAgentService,
+    private readonly askAlly: AskAllyClient,
+    private readonly tokens: DebriefRunTokenService,
     /** v9 §3.3: replies and reflective answers, for the experience metrics. */
     @Optional() private readonly learnerEvents?: DebriefLearnerEventsService,
   ) {}
@@ -194,15 +194,14 @@ export class DebriefReplyService {
       return subject.pipe(startWith(event({ type: 'start' })));
     }
 
-    // With the tool loop, guidance and history are tools the model calls when
-    // a question needs them; only the organisation's short wording is sent
-    // up front. Without it, all three are fetched first, as before.
-    const agent = this.replyAgent;
-    const [transcript, system, { bundle }, extra] = await Promise.all([
+    // Guidance, the learner's history and the live detector's record are
+    // tools Ask Ally calls when a question needs them; only the
+    // organisation's short wording is sent up front.
+    const [transcript, system, { bundle }, org] = await Promise.all([
       this.context.transcript(sessionId),
       this.systemPrompt(),
       this.runner.resolveRelease(),
-      this.extraContext(run, sessionId, userId, agent ? 'org' : 'all'),
+      this.orgContext(tenantId),
     ]);
     // The release names Ask Ally's model, as it names every step's.
     const model = bundle.reply ?? DEBRIEF_REPLY_DEFAULT;
@@ -210,7 +209,7 @@ export class DebriefReplyService {
     const distress = this.readDistress(message, language, sessionId);
     const sources = [
       ...speakerRuns(transcript),
-      ...extra,
+      ...org,
       ...cardTexts(run.cards as unknown as DebriefCards).map((c) => c.text),
       // A card's skill is its name ("Giving Advice"), and Ally quotes it
       // when it names the card.
@@ -222,20 +221,18 @@ export class DebriefReplyService {
       ...CARD_SECTION_NAMES,
     ];
 
-    const promptWith = (context: string[]) =>
-      [
-        system,
-        '',
-        `SESSION LANGUAGE: ${language}`,
-        'DEBRIEF:',
-        JSON.stringify(run.cards),
-        'TRANSCRIPT:',
-        ...transcript.map((t) => `${t.role}: ${t.text}`),
-        ...context,
-        '',
-        REPLY_LENGTH_REMINDER,
-      ].join('\n');
-    const systemPrompt = promptWith(extra);
+    const systemPrompt = [
+      system,
+      '',
+      `SESSION LANGUAGE: ${language}`,
+      'DEBRIEF:',
+      JSON.stringify(run.cards),
+      'TRANSCRIPT:',
+      ...transcript.map((t) => `${t.role}: ${t.text}`),
+      ...org,
+      '',
+      REPLY_LENGTH_REMINDER,
+    ].join('\n');
     // Both names: the web reads `text`, the phones read `content`.
     const token = (text: string) =>
       subject.next(event({ type: 'token', content: text, text }));
@@ -262,98 +259,52 @@ export class DebriefReplyService {
       await finish(content);
     };
 
-    /** One streamed call with everything fetched up front (no tools). */
-    const singleCall = (prompt: string = systemPrompt) => {
-      let full = '';
-      this.aiChat
-        .streamResponse({
-          systemPrompt: prompt,
-          chatHistory: this.history(prior),
-          userMessage: message,
-          providerType: model.provider,
-          // No thinking: it would spend the reply's tokens (a Gemini 2.5 reply
-          // was cut mid-sentence) and delay the first words.
-          llmConfig: {
-            model: model.model,
-            maxTokens: model.maxTokens,
-            thinkingBudget: 0,
-          },
-          usage: {
-            task: LlmTask.DEBRIEF_REPLY,
-            scenarioSessionId: sessionId,
-            tenantId,
-            metadata: { chatId: chat.id, runId: run.id, model: model.model },
-          },
-        })
-        .subscribe({
-          next: (e) => {
-            const data = JSON.parse(e.data);
-            if (data.type === 'token') {
-              full += data.content ?? '';
-              token(data.content);
-            } else if (data.type === 'done') {
-              void settle(full);
-            } else if (data.type === 'error') {
-              subject.next(e);
-              subject.complete();
-            }
-          },
-          error: (err) => {
-            subject.next(
-              event({ type: 'error', error: (err as Error).message }),
-            );
-            subject.complete();
-          },
-        });
-    };
-
-    if (!agent) {
-      singleCall();
-      return subject.pipe(startWith(event({ type: 'start' })));
-    }
-
-    // v9 FR-43: the reply as a small agent that looks up what a question
-    // needs (guidance, the learner's history, the live detector's record)
-    // within its turn and dollar limits.
+    // v9 FR-43: the reply as a small agent in ally-ai that looks up what a
+    // question needs within its pass and dollar limits.
     void (async () => {
       let streamed = '';
       try {
-        const res = await agent.reply({
-          model,
-          system: systemPrompt,
-          history: this.history(prior),
-          message,
-          sessionId,
-          tenantId,
-          userId,
-          chatId: chat.id,
-          runId: run.id,
-          onText: (text) => {
+        const res = await this.askAlly.reply(
+          {
+            run_id: run.id,
+            scenario_session_id: sessionId,
+            chat_id: chat.id,
+            tenant_id: tenantId ?? null,
+            reply: model,
+            prices: modelPrices([model.model]),
+            system: systemPrompt,
+            history: this.history(prior),
+            message,
+            run_token: this.tokens.signReply(run.id, sessionId, userId),
+            gateway_url: this.tokens.gatewayUrl(),
+          },
+          (text) => {
             streamed += text;
             token(text);
           },
-        });
+        );
         // A quote from what a tool returned is not a misquote.
         sources.push(...res.toolTexts);
-        void this.keepReplyTrace(run.id, res.trace);
+        if (res.trace) void this.keepReplyTrace(run.id, res.trace);
         await settle(res.text);
       } catch (e) {
         this.logger.warn(
-          `[debrief] Ask Ally tool loop failed for run ${run.id}: ${(e as Error).message}`,
+          `[debrief] Ask Ally failed for run ${run.id}: ${(e as Error).message}`,
         );
+        if (e instanceof AskAllyError && e.trace) {
+          void this.keepReplyTrace(run.id, e.trace);
+        }
         if (streamed) {
           // Words already reached the learner: finish with what they saw.
           await settle(streamed);
+        } else if (await distress) {
+          // No reply, but the Safety reader heard distress: the support
+          // lines still reach them.
+          void this.feedback.raiseChatDistress(run, userId, 'safety reader');
+          await finish(await this.supportReply(tenantId, language, false));
         } else {
-          // Nothing shown yet: answer the way Ask Ally did before tools.
-          const fallback = await this.extraContext(
-            run,
-            sessionId,
-            userId,
-            'all',
-          );
-          sources.push(...fallback);
-          singleCall(promptWith(fallback));
+          subject.next(event({ type: 'error', error: REPLY_FAILED }));
+          subject.complete();
         }
       }
     })();
@@ -529,92 +480,33 @@ export class DebriefReplyService {
     }
   }
 
-  /** The prompt the GA release pins, else the store's current, else the default file. */
   /**
-   * v9 FR-43: what Ask Ally knows beyond this debrief — Debrief Guidance
-   * from the Context Library (as the learner's organisation may read it),
-   * the learner's own earlier
-   * Work-on-this points, and their organisation's wording. Each part has a
-   * short budget and is simply left out when it is slow or fails: the first
-   * words must stay fast. The knowledge query is built from the debrief's
-   * skills, never from the learner's message.
+   * The organisation's wording (how to refer to their supervisor or its
+   * procedures), sent with every reply. Left out when slow or failing: the
+   * first words must stay fast.
    */
-  private async extraContext(
-    run: { tenantId?: string | null; cards?: unknown },
-    sessionId: string,
-    userId: number,
-    parts: 'all' | 'org' = 'all',
-  ): Promise<string[]> {
-    const within = async <T>(f: () => Promise<T>, fallback: T): Promise<T> => {
-      try {
-        return await Promise.race([
-          f(),
-          new Promise<T>((r) => {
-            setTimeout(() => r(fallback), EXTRA_CONTEXT_MS).unref?.();
-          }),
-        ]);
-      } catch {
-        return fallback;
-      }
-    };
-    const tenantId = run.tenantId ?? null;
-    const cards = (run.cards ?? {}) as DebriefCards;
-    const query = [
-      ...(cards.work_on_this ?? []).map((c) => c.skill),
-      ...(cards.what_worked ?? []).map((c) => c.skill),
-      cards.practise_next?.skill,
-    ]
-      .filter((x): x is string => typeof x === 'string' && !!x.trim())
-      .slice(0, 6)
-      .join('; ');
-    const all = parts === 'all';
-    const [guidance, history, org] = await Promise.all([
-      all && query && this.guidance
-        ? within(
-            () =>
-              this.guidance!.search(
-                // A non-UUID tenant reads the global guidelines only.
-                guidanceSearch(query, tenantId, 3, sessionId),
-              ).then((r) =>
-                r.noConfidentMatch
-                  ? []
-                  : r.results.map(({ chunk }) => guidancePassage(chunk)),
-              ),
-            [] as Array<{ title: string; text: string }>,
-          )
-        : Promise.resolve([] as Array<{ title: string; text: string }>),
-      all
-        ? within(
-            () => this.context.pastWorkOnThis(userId, tenantId, sessionId, 5),
-            [],
-          )
-        : Promise.resolve([]),
-      tenantId
-        ? within(() => this.context.orgWording(tenantId), null)
-        : Promise.resolve(null),
-    ]);
-    const out: string[] = [];
-    if (guidance.length) {
-      out.push(
-        'GUIDANCE (practice guidance your organisation uses; draw on it, never quote it as rules):',
-        ...guidance.map((g) => `- ${g.title}: ${g.text}`),
-      );
+  private async orgContext(tenantId: string | null): Promise<string[]> {
+    if (!tenantId) return [];
+    let org: string | null = null;
+    try {
+      org = await Promise.race([
+        this.context.orgWording(tenantId),
+        new Promise<null>((r) => {
+          setTimeout(() => r(null), ORG_WORDING_MS).unref?.();
+        }),
+      ]);
+    } catch {
+      org = null;
     }
-    if (history.length) {
-      out.push(
-        "THEIR EARLIER POINTS TO WORK ON (link to these when it helps; don't list them):",
-        ...history.map((h) => `- ${h.date} · ${h.skill}: ${h.point}`),
-      );
-    }
-    if (org) {
-      out.push(
-        'THEIR ORGANISATION (use its wording when pointing them to their supervisor or its procedures):',
-        org,
-      );
-    }
-    return out;
+    return org
+      ? [
+          'THEIR ORGANISATION (use its wording when pointing them to their supervisor or its procedures):',
+          org,
+        ]
+      : [];
   }
 
+  /** The prompt the GA release pins, else the store's current, else the default file. */
   private async systemPrompt(
     code: string = DEBRIEF_PROMPT_CODES.reply,
   ): Promise<string> {
@@ -628,9 +520,12 @@ export class DebriefReplyService {
   }
 
   /** The last few turns, as the model reads them. */
-  private history(prior: ScenarioSessionChatMessage[]): LlmMessage[] {
+  private history(
+    prior: ScenarioSessionChatMessage[],
+  ): Array<{ role: 'user' | 'assistant'; content: string }> {
     return prior.slice(-HISTORY_TURNS).map((m) => ({
-      role: m.senderId === ALLY_SENDER ? 'assistant' : 'user',
+      role:
+        m.senderId === ALLY_SENDER ? ('assistant' as const) : ('user' as const),
       content: m.content,
     }));
   }

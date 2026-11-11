@@ -9,7 +9,7 @@ import * as jwt from 'jsonwebtoken';
 import { Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { DebriefRun } from '../entity/debrief-run.entity';
-import { DebriefRunStatus } from '../enum/debrief-run.enum';
+import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 
 /** The gateway tools ally-ai's debrief graph may call back (CONTRACT.md §2). */
 export const DEBRIEF_GATEWAY_TOOLS = [
@@ -19,17 +19,71 @@ export const DEBRIEF_GATEWAY_TOOLS = [
   'finalise_cards',
   'progress',
 ] as const;
-export type DebriefGatewayTool = (typeof DEBRIEF_GATEWAY_TOOLS)[number];
+/**
+ * The tools Ask Ally's agent in ally-ai may call back for one reply
+ * (CONTRACT.md §5). Its token is scoped `reply`: it names the learner, and
+ * its run is the session's published live debrief, never a running one.
+ */
+export const ASK_ALLY_GATEWAY_TOOLS = [
+  'guidance_search',
+  'get_learner_history',
+  'get_live_detections',
+] as const;
+
+export type DebriefGatewayTool =
+  | (typeof DEBRIEF_GATEWAY_TOOLS)[number]
+  | (typeof ASK_ALLY_GATEWAY_TOOLS)[number];
+
+/** Every tool the gateway serves, for either kind of token. */
+export const GATEWAY_TOOLS: readonly DebriefGatewayTool[] = [
+  ...new Set<DebriefGatewayTool>([
+    ...DEBRIEF_GATEWAY_TOOLS,
+    ...ASK_ALLY_GATEWAY_TOOLS,
+  ]),
+];
+
+/**
+ * The gateway tools the PM agent may call (spec C1, B4). Never in a debrief
+ * run's token: a debrief run cannot read expert comments, and an agent token
+ * cannot call a debrief run's tools. Builder and Bug Hunter get no token.
+ */
+export const PM_AGENT_GATEWAY_TOOLS = ['comments_read'] as const;
+export type PmAgentGatewayTool = (typeof PM_AGENT_GATEWAY_TOOLS)[number];
+
+/** An agent token lives at most this long: a PM agent run is minutes, not hours. */
+export const AGENT_TOKEN_MAX_TTL_S = 2 * 60 * 60;
+
+export interface DebriefAgentClaims {
+  kind: 'agent';
+  /** Which agent: today only the PM agent. */
+  agent: 'pm_agent';
+  /** The agent run this token was signed for, for the audit trail. */
+  agentRunId: string;
+  tools: string[];
+  exp: number;
+}
 
 /** A run token lives this long: past any run's deadline, short enough to be useless later. */
 export const RUN_TOKEN_TTL_S = 15 * 60;
+/** A reply token: one reply's tool passes, with room to spare. */
+export const REPLY_TOKEN_TTL_S = 2 * 60;
 
 export interface DebriefRunClaims {
   runId: string;
   sessionId: string;
   tools: string[];
   exp: number;
+  /** `reply` for an Ask Ally token; absent for a debrief run's. */
+  scope?: 'reply';
+  /** Reply tokens only: the learner whose history the tools may read. */
+  userId?: number;
 }
+
+/** Runs an Ask Ally reply token may name: the learner's published live debrief. */
+const REPLY_RUN_STATUSES: readonly DebriefRunStatus[] = [
+  DebriefRunStatus.PUBLISHED,
+  DebriefRunStatus.BELOW_BAR,
+];
 
 /**
  * Signs and verifies the run token: the only credential the Debrief gateway
@@ -66,11 +120,55 @@ export class DebriefRunTokenService {
     });
   }
 
-  /** The token's claims; 401 for a bad signature, an expired token or a malformed one. */
-  verify(token: string): DebriefRunClaims {
-    let claims: jwt.JwtPayload | string;
+  /**
+   * A token for an agent run that is not a debrief run (the PM agent): it
+   * names the agent and its run, and only the agent tools it lists.
+   */
+  signAgent(
+    agentRunId: string,
+    tools: readonly PmAgentGatewayTool[] = PM_AGENT_GATEWAY_TOOLS,
+    ttlS = AGENT_TOKEN_MAX_TTL_S,
+  ): string {
+    const allowed = tools.filter((t) =>
+      (PM_AGENT_GATEWAY_TOOLS as readonly string[]).includes(t),
+    );
+    return jwt.sign(
+      { kind: 'agent', agent: 'pm_agent', agentRunId, tools: allowed },
+      this.secret(),
+      {
+        algorithm: 'HS256',
+        expiresIn: Math.max(1, Math.min(ttlS, AGENT_TOKEN_MAX_TTL_S)),
+      },
+    );
+  }
+
+  /**
+   * A token for one Ask Ally reply: the live run, its session and learner,
+   * and only Ask Ally's tools. ally-be signs it after checking the learner
+   * owns the session.
+   */
+  signReply(runId: string, sessionId: string, userId: number): string {
+    return jwt.sign(
+      {
+        runId,
+        sessionId,
+        userId,
+        scope: 'reply',
+        tools: [...ASK_ALLY_GATEWAY_TOOLS],
+      },
+      this.secret(),
+      { algorithm: 'HS256', expiresIn: REPLY_TOKEN_TTL_S },
+    );
+  }
+
+  /** Where ally-ai calls the gateway back (CONTRACT.md §3: `PUBLIC_API_BASE_URL`). */
+  gatewayUrl(): string {
+    return `${this.config.publicApiBaseUrl.replace(/\/+$/, '')}/api/v1/internal/debrief`;
+  }
+
+  private decode(token: string): jwt.JwtPayload | string {
     try {
-      claims = jwt.verify(token, this.secret(), { algorithms: ['HS256'] });
+      return jwt.verify(token, this.secret(), { algorithms: ['HS256'] });
     } catch (e) {
       throw new UnauthorizedException(
         e instanceof jwt.TokenExpiredError
@@ -78,8 +176,45 @@ export class DebriefRunTokenService {
           : 'Invalid run token',
       );
     }
+  }
+
+  private bearer(authorization: string | undefined): string {
+    const token = /^Bearer\s+(\S+)$/i.exec(authorization ?? '')?.[1];
+    if (!token) throw new UnauthorizedException('Run token missing');
+    return token;
+  }
+
+  /**
+   * An agent token's claims, checked for the tool: 401 for anything that is
+   * not a valid agent token (a debrief run's token included), 403 for a tool
+   * it does not list.
+   */
+  authoriseAgent(
+    authorization: string | undefined,
+    tool: string,
+  ): DebriefAgentClaims {
+    const claims = this.decode(this.bearer(authorization));
     if (
       typeof claims === 'string' ||
+      claims.kind !== 'agent' ||
+      claims.agent !== 'pm_agent' ||
+      typeof claims.agentRunId !== 'string' ||
+      !Array.isArray(claims.tools)
+    ) {
+      throw new UnauthorizedException('Invalid agent token');
+    }
+    if (!claims.tools.includes(tool)) {
+      throw new ForbiddenException(`This agent may not call ${tool}`);
+    }
+    return claims as DebriefAgentClaims;
+  }
+
+  /** The token's claims; 401 for a bad signature, an expired token or a malformed one. */
+  verify(token: string): DebriefRunClaims {
+    const claims = this.decode(token);
+    if (
+      typeof claims === 'string' ||
+      claims.kind === 'agent' ||
       typeof claims.runId !== 'string' ||
       typeof claims.sessionId !== 'string' ||
       !Array.isArray(claims.tools)
@@ -91,25 +226,31 @@ export class DebriefRunTokenService {
 
   /**
    * Everything the gateway checks before a tool runs: a valid token in the
-   * Authorization header, the tool among its `tools`, and its run still
-   * `running` for the session it names. Returns the run.
+   * Authorization header, the tool among its `tools`, and its run for the
+   * session it names — still `running` for a debrief run's token, the
+   * published live debrief for an Ask Ally reply's. Returns the run.
    */
   async authorise(
     authorization: string | undefined,
     tool: string,
   ): Promise<{ claims: DebriefRunClaims; run: DebriefRun }> {
-    const token = /^Bearer\s+(\S+)$/i.exec(authorization ?? '')?.[1];
-    if (!token) throw new UnauthorizedException('Run token missing');
-    const claims = this.verify(token);
+    const claims = this.verify(this.bearer(authorization));
     if (!claims.tools.includes(tool)) {
       throw new ForbiddenException(`This run may not call ${tool}`);
     }
     const run = await this.runs.findOne({ where: { id: claims.runId } });
-    if (
-      !run ||
-      run.scenarioSessionId !== claims.sessionId ||
-      run.status !== DebriefRunStatus.RUNNING
-    ) {
+    if (!run || run.scenarioSessionId !== claims.sessionId) {
+      throw new ForbiddenException('The run is not running');
+    }
+    if (claims.scope === 'reply') {
+      if (
+        typeof claims.userId !== 'number' ||
+        run.mode !== DebriefRunMode.LIVE ||
+        !REPLY_RUN_STATUSES.includes(run.status)
+      ) {
+        throw new ForbiddenException('The debrief is not published');
+      }
+    } else if (run.status !== DebriefRunStatus.RUNNING) {
       throw new ForbiddenException('The run is not running');
     }
     return { claims, run };

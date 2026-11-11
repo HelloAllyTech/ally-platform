@@ -34,6 +34,7 @@ import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-togg
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefAgentService } from '../service/debrief-agent.service';
+import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
 import { DebriefConsoleService } from '../service/debrief-console.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
@@ -311,8 +312,11 @@ export class DebriefConsoleController {
     summary:
       'Success metrics (v9 §3.3): the weekly steering proxy, guardrails, efficiency, experience by language and device, baselines and monthly uptake lift',
   })
-  metricsView(@Query('weeks') weeks?: string) {
-    return this.metrics.view(weeks ? Number(weeks) || 12 : 12);
+  metricsView(@Query() q: Record<string, string>) {
+    const weeks = q.weeks ? Number(q.weeks) || 12 : 12;
+    // Organisation, language, learner level, recipe, release version, judge
+    // version: one set, applied to every live metric (malformed values dropped).
+    return this.metrics.view(weeks, parseMetricsFilter(q));
   }
 
   @Get('settings')

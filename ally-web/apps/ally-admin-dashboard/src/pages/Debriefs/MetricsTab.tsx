@@ -7,7 +7,15 @@ import { InfoTip } from "@components/ally-guide/InfoTip";
 import { Pill, PillTone } from "@components/ally-guide/Pill";
 import { LineChart } from "@components/charts";
 import { en } from "@constants";
-import { DebriefExperienceRates, DebriefMetricsView, DebriefPassGroup, DebriefRate } from "@types";
+import {
+  DebriefExperienceRates,
+  DebriefFilterOptions,
+  DebriefMetricsFilter,
+  DebriefMetricsView,
+  DebriefPassBreakdownRow,
+  DebriefPassGroup,
+  DebriefRate,
+} from "@types";
 
 import { ChartCard, lineOpts, PALETTE } from "../Analytics/chartKit";
 
@@ -56,20 +64,31 @@ const StateCell: React.FC<{ state: State }> = ({ state }) => (
 export const MetricsTab: React.FC = () => {
   const s = en.debriefs.metrics;
   const [weeks, setWeeks] = useState<number>(12);
-  const q = useGetDebriefMetricsQuery({ weeks });
+  const [filter, setFilter] = useState<DebriefMetricsFilter>({});
+  const q = useGetDebriefMetricsQuery({ weeks, ...filter });
 
   if (q.isError) {
     return <ErrorPanel what={s.loadFailed} error={q.error} onRetry={() => void q.refetch()} />;
   }
   if (!q.data) return <LoadingBlock lines={10} />;
-  return <MetricsBody view={q.data} weeks={weeks} onWeeks={setWeeks} />;
+  return (
+    <MetricsBody
+      view={q.data}
+      weeks={weeks}
+      onWeeks={setWeeks}
+      filter={filter}
+      onFilter={setFilter}
+    />
+  );
 };
 
 const MetricsBody: React.FC<{
   view: DebriefMetricsView;
   weeks: number;
   onWeeks: (n: number) => void;
-}> = ({ view, weeks, onWeeks }) => {
+  filter: DebriefMetricsFilter;
+  onFilter: (f: DebriefMetricsFilter) => void;
+}> = ({ view, weeks, onWeeks, filter, onFilter }) => {
   const s = en.debriefs.metrics;
   const series = view.series;
   const last = series[series.length - 1];
@@ -184,6 +203,7 @@ const MetricsBody: React.FC<{
         </label>
       </div>
 
+      <FilterBar options={view.filterOptions} filter={filter} onFilter={onFilter} />
       <QualitySection quality={view.quality} />
       <AgentsSection agents={view.agents} />
 
@@ -535,6 +555,7 @@ const QualitySection: React.FC<{ quality: DebriefMetricsView["quality"] }> = ({ 
             th={th}
             td={td}
           />
+          {quality.breakdowns && <Breakdowns b={quality.breakdowns} th={th} td={td} />}
         </>
       )}
     </section>
@@ -622,6 +643,161 @@ const AgentsSection: React.FC<{ agents: DebriefMetricsView["agents"] }> = ({ age
         td="py-1 pr-2 align-top"
       />
     </section>
+  );
+};
+
+/**
+ * The six filters, applied to every live metric on the page. Only values that
+ * exist in the window are offered; an empty choice means "all".
+ */
+const FilterBar: React.FC<{
+  options: DebriefFilterOptions | undefined;
+  filter: DebriefMetricsFilter;
+  onFilter: (f: DebriefMetricsFilter) => void;
+}> = ({ options, filter, onFilter }) => {
+  const s = en.debriefs.metrics.filters;
+  if (!options) return null;
+  const set = (patch: Partial<DebriefMetricsFilter>) => onFilter({ ...filter, ...patch });
+  const pick = (
+    id: string,
+    label: string,
+    value: string | number | undefined,
+    choices: Array<{ value: string; label: string }>,
+    onChange: (v: string) => void,
+  ) => (
+    <label className="flex flex-col gap-1 text-sm" key={id}>
+      <span className="text-typography-700">{label}</span>
+      <select
+        aria-label={label}
+        data-testid={`metrics-filter-${id}`}
+        className="rounded border border-gray-300 px-2 py-1"
+        value={value === undefined ? "" : String(value)}
+        onChange={e => onChange(e.target.value)}
+      >
+        <option value="">{s.all}</option>
+        {choices.map(c => (
+          <option key={c.value} value={c.value}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  const active = Object.values(filter).some(v => v !== undefined && v !== "");
+  return (
+    <section className="flex flex-col gap-2" data-testid="metrics-filters">
+      <h3 className="flex items-center gap-1 text-base font-semibold text-typography-900">
+        {s.heading}
+        <InfoTip label={s.help} ariaLabel={`About ${s.heading}`} />
+      </h3>
+      <div className="flex flex-wrap items-end gap-4">
+        {pick(
+          "organisation",
+          s.organisation,
+          filter.tenantId,
+          options.organisations.map(o => ({ value: o.id, label: o.name })),
+          v => set({ tenantId: v || undefined }),
+        )}
+        {pick(
+          "language",
+          s.language,
+          filter.language,
+          options.languages.map(l => ({ value: l, label: l })),
+          v => set({ language: v || undefined }),
+        )}
+        {pick(
+          "learnerLevel",
+          s.learnerLevel,
+          filter.learnerLevel,
+          options.learnerLevels.map(l => ({ value: l, label: s.levels[l] ?? l })),
+          v => set({ learnerLevel: v || undefined }),
+        )}
+        {pick(
+          "recipe",
+          s.recipe,
+          filter.recipe,
+          options.recipes.map(r => ({ value: r, label: s.recipes[r] ?? r })),
+          v => set({ recipe: v || undefined }),
+        )}
+        {pick(
+          "releaseVersion",
+          s.releaseVersion,
+          filter.releaseVersion,
+          options.releaseVersions.map(v => ({ value: String(v), label: s.release(v) })),
+          v => set({ releaseVersion: v ? Number(v) : undefined }),
+        )}
+        {pick(
+          "judgeVersion",
+          s.judgeVersion,
+          filter.judgeVersion,
+          options.judgeVersions.map(v => ({ value: v, label: v })),
+          v => set({ judgeVersion: v || undefined }),
+        )}
+        {active && (
+          <button
+            type="button"
+            className="text-sm text-blue-700 underline"
+            data-testid="metrics-filter-clear"
+            onClick={() => onFilter({})}
+          >
+            {s.clear}
+          </button>
+        )}
+      </div>
+      {active && <p className="text-sm text-typography-700">{s.unfilteredNote}</p>}
+    </section>
+  );
+};
+
+/** The pass rate broken down by skill, scenario, course, session length, step model and risk. */
+const Breakdowns: React.FC<{
+  b: NonNullable<NonNullable<DebriefMetricsView["quality"]>["breakdowns"]>;
+  th: string;
+  td: string;
+}> = ({ b, th, td }) => {
+  const s = en.debriefs.metrics.quality;
+  const c = s.cols;
+  const k = s.breakdowns;
+  const rows = (list: DebriefPassBreakdownRow[]) =>
+    list.map(r => [
+      r.key,
+      String(r.debriefs),
+      rateWithRange(r.passRate),
+      rateWithRange(r.hardFailRate),
+      fixed(r.judgeMean, 2),
+    ]);
+  const head = [k.key, c.debriefs, c.passRate, c.hardFailRate, c.judgeMean];
+  const tables: Array<{
+    id: string;
+    title: string;
+    help?: string;
+    list: DebriefPassBreakdownRow[];
+  }> = [
+    { id: "skill", title: k.skill, help: k.skillHelp, list: b.skill },
+    { id: "scenario", title: k.scenario, list: b.scenario },
+    { id: "course", title: k.course, help: k.courseHelp, list: b.course },
+    { id: "session-length", title: k.sessionLength, list: b.sessionLength },
+    { id: "step-model", title: k.stepModel, help: k.stepModelHelp, list: b.stepModel },
+    { id: "risk", title: k.risk, list: b.risk },
+  ];
+  return (
+    <div className="flex flex-col gap-3" data-testid="metrics-quality-breakdowns">
+      <h4 className="text-base font-semibold text-typography-900">{k.heading}</h4>
+      {tables
+        .filter(t => t.list.length > 0)
+        .map(t => (
+          <QualityTable
+            key={t.id}
+            title={t.title}
+            help={t.help}
+            testId={`metrics-breakdown-${t.id}`}
+            head={head}
+            rows={rows(t.list)}
+            th={th}
+            td={td}
+          />
+        ))}
+    </div>
   );
 };
 

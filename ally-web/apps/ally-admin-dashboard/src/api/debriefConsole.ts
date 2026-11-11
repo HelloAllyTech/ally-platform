@@ -1,6 +1,7 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   DebriefStepUsage,
+  DebriefMetricsFilter,
   DebriefMetricsView,
   DebriefSettingsView,
   DebriefCardCorrection,
@@ -36,14 +37,24 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    getDebriefMetrics: builder.query<DebriefMetricsView, { weeks?: number }>({
-      query: ({ weeks }) => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.METRICS,
-        method: HttpMethod.GET,
-        params: weeks ? { weeks } : undefined,
-      }),
-      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
+    getDebriefMetrics: builder.query<DebriefMetricsView, { weeks?: number } & DebriefMetricsFilter>(
+      {
+        query: ({ weeks, ...filter }) => {
+          // Only the filters that are set; an empty value means "all".
+          const params: Record<string, string | number> = {};
+          if (weeks) params.weeks = weeks;
+          for (const [k, v] of Object.entries(filter)) {
+            if (v !== undefined && v !== null && v !== "") params[k] = v;
+          }
+          return {
+            url: ApiEndpoints.DEBRIEF_CONSOLE.METRICS,
+            method: HttpMethod.GET,
+            params: Object.keys(params).length ? params : undefined,
+          };
+        },
+        providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+      },
+    ),
     getDebriefSettings: builder.query<DebriefSettingsView, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SETTINGS, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],

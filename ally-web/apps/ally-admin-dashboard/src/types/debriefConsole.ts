@@ -413,6 +413,27 @@ export interface DebriefRate {
   high?: number | null;
 }
 
+/** The Console's metric filters: one set, applied to every live metric (and later the eval surface). */
+export interface DebriefMetricsFilter {
+  tenantId?: string;
+  language?: string;
+  learnerLevel?: string;
+  recipe?: string;
+  releaseVersion?: number;
+  judgeVersion?: string;
+}
+
+export interface DebriefFilterOptions {
+  organisations: Array<{ id: string; name: string }>;
+  languages: string[];
+  learnerLevels: string[];
+  recipes: string[];
+  releaseVersions: number[];
+  judgeVersions: string[];
+}
+
+export type DebriefPassBreakdownRow = { key: string; debriefs: number } & DebriefPassGroup;
+
 /** The pass rate and its companions for one group of live debriefs (same definition as the eval). */
 export interface DebriefPassGroup {
   passRate: DebriefRate;
@@ -496,8 +517,20 @@ export interface DebriefMetricsView {
         debriefs: number;
       } & DebriefPassGroup
     >;
+    breakdowns?: {
+      skill: DebriefPassBreakdownRow[];
+      scenario: DebriefPassBreakdownRow[];
+      course: DebriefPassBreakdownRow[];
+      sessionLength: DebriefPassBreakdownRow[];
+      stepModel: DebriefPassBreakdownRow[];
+      risk: DebriefPassBreakdownRow[];
+    };
   };
   agents?: DebriefAgentMetrics;
+  filter?: DebriefMetricsFilter;
+  /** Sections read across all organisations and versions whatever the filter says. */
+  unfiltered?: string[];
+  filterOptions?: DebriefFilterOptions;
   generatedAt: string;
 }
 
