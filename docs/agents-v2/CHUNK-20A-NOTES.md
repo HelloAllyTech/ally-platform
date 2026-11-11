@@ -101,7 +101,7 @@ All paths are relative to each app.
 - **ally-web:**
   - `hooks/chatStream/sse.ts` (`parseSse`, `readSse`; any event name; no dashboard imports).
   - `hooks/useChatbotTestStream.ts` (`fetchWithReauth`: admin bearer plus one refresh).
-  - Preview's reveal and typing dots (`pages/WhatsAppBot/ChatbotTestTab.tsx`, not exported).
+  - Preview's reveal and typing dots (`pages/WhatsAppBot/ChatbotTestTab.tsx`, not exported). <!-- docs-path-lint: ignore -->
 
 ### Dashboard components for the two-pane layout
 

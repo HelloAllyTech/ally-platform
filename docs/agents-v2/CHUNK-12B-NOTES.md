@@ -70,7 +70,7 @@ Plan approved 2026-11-07 at `~/.claude/plans/pasted-content-id-f834-we-re-contin
     - a module-local `fetchWithReauth` (admin bearer token plus one refresh);
     - a `TextDecoder` reader loop;
     - `parseCopilotSse`, imported from `hooks/useRoadmapCopilotStream.ts:27-51`, which pulls `logger` from the heavy `@utils` barrel.
-  - `pages/WhatsAppBot/ChatbotTestTab.tsx` has the reveal pacing (`REVEAL_MS`, `MAX_REVEAL_MS`), `ActivityFeed`, `TypingDots` and `PendingBubble`, all Tailwind-only.
+  - `pages/WhatsAppBot/ChatbotTestTab.tsx` has the reveal pacing (`REVEAL_MS`, `MAX_REVEAL_MS`), `ActivityFeed`, `TypingDots` and `PendingBubble`, all Tailwind-only. <!-- docs-path-lint: ignore -->
   - Helpline has a cleaner generic `utils/sseStream.ts`.
 - **ally-be:**
   - `ai/util/sse-parser.ts`.
@@ -93,7 +93,7 @@ Plan approved 2026-11-07 at `~/.claude/plans/pasted-content-id-f834-we-re-contin
 | Analytics, `lastInboundAt` | `wa-analytics.repository.ts`, `whatsapp-business-number.service.ts:283` | **stay on `wa_*`** (chunk 12 decision) |
 
 - Routes: `whatsapp/controller/whatsapp-conversation.controller.ts` (`v1/whatsapp/conversations…`, `unanswered…`, `contacts/:id/…`), behind the `WHATSAPP_BOT` feature permissions.
-- ally-web: `pages/WhatsAppBot/ConversationsTab.tsx`, `ConversationDrawer.tsx`, `UnansweredTab.tsx`, and the stat cards in `ChatbotOverviewTab.tsx` and `WhatsAppBot.tsx:206`. The API layer is `api/whatsappBot.ts`, and the types are in `types/whatsappBot.ts`.
+- ally-web: `pages/WhatsAppBot/ConversationsTab.tsx`, `ConversationDrawer.tsx`, `UnansweredTab.tsx`, and the stat cards in `ChatbotOverviewTab.tsx` and `WhatsAppBot.tsx:206`. The API layer is `api/whatsappBot.ts`, and the types are in `types/whatsappBot.ts`. <!-- docs-path-lint: ignore -->
 - **Tests:** none are snapshot tests. `listConversations`, `getConversation` and `listUnanswered` have **no direct specs** (only the controller permission spec and `corpusCoverage`).
 
 ### Where the code differs from the brief (the code wins)
@@ -167,7 +167,7 @@ The stream sends only `status {code}`, `token {text}`, then `final {reply, citat
 | Entry | `b.html`, `src/botPage/main.tsx`, `vite.config.ts` (`rollupOptions.input` + the `botPageRoutes` dev/preview rewrite), `eslint.config.mjs` (import fence) | The public page. It imports nothing from the dashboard |
 | Page | `src/botPage/BotPageApp.tsx`, `api.ts`, `screens/{Cover,Access,Prechat,Chat,ErrorState}.tsx`, `components/{parts,Turnstile}.tsx`, `copy/{en,hi}.ts`, `theme.ts` | Cover → email and code → pre-chat questions one at a time with progress → chat with suggestions, a live status line, the checked reply typed at reading pace, sources, New chat, resume on reload, and error and limit states. A refused message goes back into the box |
 | SSE | `src/hooks/chatStream/sse.ts` | The one reader. `useChatbotTestStream` and `parseCopilotSse` now use it, unchanged in behaviour |
-| Settings → Bot page | `pages/WhatsAppBot/BotPageTab.tsx`, `src/botPage/BotPagePreview.tsx`, `api/chatbots.ts`, `types/botPage.ts` | Section 2 of the brief; details in section 3 |
+| Settings → Bot page | `pages/WhatsAppBot/BotPageTab.tsx`, `src/botPage/BotPagePreview.tsx`, `api/chatbots.ts`, `types/botPage.ts` | Section 2 of the brief; details in section 3 <!-- docs-path-lint: ignore --> |
 | Conversations | `ConversationsTab.tsx`, `ConversationDrawer.tsx`, `UnansweredTab.tsx`, `api/whatsappBot.ts`, `types/whatsappBot.ts` | Channel badge, channel filter, visitor label, pre-chat answers and consent, and Erase for a visitor. All appear only when the API sends `channel`, so the `wa` mode renders exactly as before |
 
 **Bundle (a production `build:admin`):** the bot page loads `botPage-*.js` (30 KB raw, 9.7 KB gzipped) plus one shared chunk, which is React plus `sse.ts` (145 KB raw, 47 KB gzipped), and `botPage-*.css` (136 KB raw, 22.6 KB gzipped). None of it contains Carbon, Redux or PostHog.
@@ -213,7 +213,7 @@ The stream sends only `status {code}`, `token {text}`, then `final {reply, citat
 | ally-be (Postgres) | `bot-page.pg.spec.ts` (8) | resume and New chat (WhatsApp reuse unchanged), one contact across devices, switching email, `latestMetadata`, retention dropping answers and names, web erasure, `canChat` unchanged on real tables |
 | ally-be (Postgres) | **`dashboard-parity.pg.spec.ts`** (19) | real WhatsApp traffic through the inbound handler, then the backfill. **`listConversations` (10 filter, sort and paging variants), `listLanguages`, `getConversation` for every thread, `listUnanswered` and bot stats are identical in `wa` and `shared` modes** apart from the added channel. A bot page chat appears only in `shared`, with its badge, visitor, intake, queued question and stats, and erases cleanly |
 | ally-web | `botPage/__tests__/BotPageFlow.test.tsx` (10) | cover → email → code → pre-chat questions one at a time (with the required check) → chat streaming with sources; resume; New chat; limits and busy, with the text put back; not found; a wrong code; Hindi; the length limit; the SSE parser |
-| ally-web | `pages/WhatsAppBot/__tests__/BotPageTab.test.tsx` (9), `ConversationsChannel.test.tsx` (3) | QR and link; the preview following edits; public disabled until allowed; save; pre-chat reorder, add, delete and the 8 cap; 4 suggestions; invite paste; read-only for viewers; why the link isn't answering. The badge, filter, visitor and intake card only in shared mode |
+| ally-web | `pages/WhatsAppBot/__tests__/BotPageTab.test.tsx` (9), `ConversationsChannel.test.tsx` (3) | QR and link; the preview following edits; public disabled until allowed; save; pre-chat reorder, add, delete and the 8 cap; 4 suggestions; invite paste; read-only for viewers; why the link isn't answering. The badge, filter, visitor and intake card only in shared mode <!-- docs-path-lint: ignore --> |
 
 **Results:**
 

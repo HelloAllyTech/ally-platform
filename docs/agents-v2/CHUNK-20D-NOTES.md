@@ -28,7 +28,7 @@ The one-screen flow needs from the hook what the two-pane layout didn't: the **c
 - **Entry:** ADMIN/b.html → `src/botPage/main.tsx`, built by Vite as a second input (`vite.config.ts:85-97`, `rollupOptions.input = {main, botPage}`). No `manualChunks`. The dev server and `vite preview` rewrite `/b/<slug>` to `b.html` (`vite.config.ts:17-29`); production rewrites are in CloudFront and Caddy, outside this repo.
 - **Kept small by an ESLint import fence** (`ally-web/apps/ally-admin-dashboard/eslint.config.mjs`, lines 13–60): `src/botPage/**` can't import `@api`, `@components`, `@constants`, `@hooks`, `@store`, `@utils`, `@ally-ui-mono/*`, `@carbon/*`, MUI, Redux or PostHog. It imports only `hooks/chatStream/sse.ts` and `utils/brandColour.ts`, by relative path.
 - **Components** (`src/botPage/`): `BotPageApp.tsx` (the visit's state machine: loading, error, cover, email, code, prechat, chat), `screens/Cover.tsx`, `screens/Access.tsx`, `screens/Prechat.tsx`, `screens/Chat.tsx`, `screens/ErrorState.tsx`, `components/parts.tsx` (heading, avatar, header, typing dots, sources, buttons, footer), `components/Turnstile.tsx`, `api.ts`, `theme.ts` (`--bp-accent`, `--bp-on-accent`), `types.ts`, `copy/{en,hi,index}.ts` (the page's own strings, with Hindi), `botPage.css`.
-- **The dashboard preview:** `BotPagePreview.tsx` renders the real Cover and Chat screens, `aria-hidden` and inert, inside `pages/WhatsAppBot/BotPageTab.tsx` (Settings → Bot page) in a 300 × 600 phone frame.
+- **The dashboard preview:** `BotPagePreview.tsx` renders the real Cover and Chat screens, `aria-hidden` and inert, inside `pages/WhatsAppBot/BotPageTab.tsx` (Settings → Bot page) in a 300 × 600 phone frame. <!-- docs-path-lint: ignore -->
 - **Size today** (last build; gzipped): page JS 9.7 KB + a shared chunk of React and `sse.ts` 46.9 KB + CSS **22.4 KB** = about 79 KB. The CSS is large because `botPage.css` compiles the app's whole Tailwind (content glob `src/**`). No size check exists in CI.
 - **Fonts:** the live page uses the system stack; the dashboard preview adds `font-sans`, which this app maps to IBM Plex Serif, so preview and page don't match today.
 - **Cache:** the deploy workflow sets `immutable` on hashed assets and `no-cache` on `*.html`.
@@ -60,7 +60,7 @@ The one-screen flow needs from the hook what the two-pane layout didn't: the **c
 | `pages/Onboarding/__tests__/copy.test.ts` | Text | Every `COPY` string appears in `ONBOARDING-COPY.md` |
 | `pages/Onboarding/__tests__/Canvas.test.tsx` | Text and behaviour | Card texts through `COPY`, roles (radio disabled), the patches and publish calls | <!-- docs-path-lint: ignore -->
 | `pages/Onboarding/__tests__/useOnboardingSession.test.tsx` | Behaviour only | The hook's decisions; no markup |
-| `pages/WhatsAppBot/__tests__/BotPageTab.test.tsx` | Text, roles, test ids | `bot-page-preview` test id, labels, buttons, preview text, save payloads |
+| `pages/WhatsAppBot/__tests__/BotPageTab.test.tsx` | Text, roles, test ids | `bot-page-preview` test id, labels, buttons, preview text, save payloads <!-- docs-path-lint: ignore --> |
 | `botPage/__tests__/BotPageFlow.test.tsx` | Behaviour through roles and English/Hindi strings | The visit end to end (cover → code → pre-chat → chat), headings, labels, alerts, `lang` |
 
 - **No Playwright, no axe tooling, no bundle-size check** in ally-web. `axe-core` exists only transitively (from `eslint-plugin-jsx-a11y`).

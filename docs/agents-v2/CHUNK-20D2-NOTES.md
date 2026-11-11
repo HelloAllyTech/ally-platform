@@ -142,11 +142,11 @@ Still follow-ups: #25 (one add pattern) and #7 (layout shift).
 ### Now unused (for CL1)
 
 In AI Chatbots' new screens nothing imports these any more; they live on for `?view=classic` and the staff tabs:
-- `WhatsAppBot/KnowledgeTab.tsx`, `KnowledgeUploadPanel.tsx`, `KnowledgeDocumentPanel.tsx` (documents);
-- `WhatsAppBot/UnansweredTab.tsx`, `UnansweredAnswerPanel.tsx`;
+- `WhatsAppBot/KnowledgeTab.tsx`, `KnowledgeUploadPanel.tsx`, `KnowledgeDocumentPanel.tsx` (documents); <!-- docs-path-lint: ignore -->
+- `WhatsAppBot/UnansweredTab.tsx`, `UnansweredAnswerPanel.tsx`; <!-- docs-path-lint: ignore -->
 - `WhatsAppBot/TemplatesTab.tsx`, `TemplatePanel.tsx` (still used by the staff Defaults tab);
-- `WhatsAppBot/PeopleTab.tsx` (`WhoCanChat`, `Team`);
-- `WhatsAppBot/BotPageTab.tsx` `AccessList`;
+- `WhatsAppBot/PeopleTab.tsx` (`WhoCanChat`, `Team`); <!-- docs-path-lint: ignore -->
+- `WhatsAppBot/BotPageTab.tsx` `AccessList`; <!-- docs-path-lint: ignore -->
 - `WhatsAppBot/ConnectorsTab.tsx` `BotConnectorsTab` (the list's Channels tab still uses `AllConnectorsTab`; `NumberTab`'s `ConnectWhatsAppFlow` is still used inside the v2 sheet);
 - `components/v2` `CheckRow` (the Checkup lists cards now; onboarding's checkup screen still uses it);
 - `ChatbotStatusPill` (only the classic page).
