@@ -3,12 +3,14 @@ import React, { useMemo, useState } from "react";
 import "@carbon/charts/styles.css";
 import "../Analytics/analytics-carbon.scss";
 
+import { Button, CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefMetricsQuery } from "@api";
 import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { AreaChart, LineChart } from "@components/charts";
 import { en } from "@constants";
 import {
+  AnalyticsRange,
   DebriefExperienceRates,
   DebriefFilterOptions,
   DebriefMetricsFilter,
@@ -21,6 +23,7 @@ import {
 import { ChangeWhiskers, WhiskerRow } from "../Analytics/ChangeWhiskers";
 import { ChartCard, KpiTile, lineOpts, PALETTE } from "../Analytics/chartKit";
 import { CONTEXT, stableScale } from "../Analytics/chartScales";
+import { TabControls } from "../Analytics/tabControlsSlot";
 import { AgentsSection } from "./metrics/AgentsSection";
 import { BulletRow, BulletRows, NumbersTable, RateDots, RateRow } from "./metrics/metricsCharts";
 import {
@@ -42,7 +45,11 @@ import {
 export { MIN_RATE_SAMPLE, rateWithRange, targetState, wilson };
 export { orchestratorRows } from "./metrics/AgentsSection";
 
-const WEEK_CHOICES = [8, 12, 26] as const;
+/**
+ * The page's time range, in the weeks the metrics endpoint reads. Rounded up so the window always
+ * covers the range the picker names.
+ */
+const WEEKS_FOR_RANGE: Record<AnalyticsRange, number> = { "30d": 5, "90d": 13, "12m": 52, all: 52 };
 
 const pct = (r: DebriefRate | null | undefined) =>
   r?.value == null ? en.debriefs.metrics.none : pctNum(r.value);
@@ -50,9 +57,9 @@ const fixed = (x: number | null | undefined, d = 1) =>
   x == null ? en.debriefs.metrics.none : x.toFixed(d);
 
 /** The debrief's success metrics (v9 §3.3, PRD §4), for switched-on organisations. */
-export const MetricsTab: React.FC = () => {
+export const MetricsTab: React.FC<{ range?: AnalyticsRange }> = ({ range = "90d" }) => {
   const s = en.debriefs.metrics;
-  const [weeks, setWeeks] = useState<number>(12);
+  const weeks = WEEKS_FOR_RANGE[range];
   const [filter, setFilter] = useState<DebriefMetricsFilter>({});
   const q = useGetDebriefMetricsQuery({ weeks, ...filter });
 
@@ -76,13 +83,7 @@ export const MetricsTab: React.FC = () => {
       className={q.isFetching ? "opacity-60 transition-opacity" : "transition-opacity"}
       aria-busy={q.isFetching || undefined}
     >
-      <MetricsBody
-        view={q.data}
-        weeks={weeks}
-        onWeeks={setWeeks}
-        filter={filter}
-        onFilter={setFilter}
-      />
+      <MetricsBody view={q.data} filter={filter} onFilter={setFilter} />
     </div>
   );
 };
@@ -118,38 +119,25 @@ const SectionHeading: React.FC<{ title: string; help?: string }> = ({ title, hel
 
 const MetricsBody: React.FC<{
   view: DebriefMetricsView;
-  weeks: number;
-  onWeeks: (n: number) => void;
   filter: DebriefMetricsFilter;
   onFilter: (f: DebriefMetricsFilter) => void;
-}> = ({ view, weeks, onWeeks, filter, onFilter }) => {
+}> = ({ view, filter, onFilter }) => {
   const s = en.debriefs.metrics;
   const live = hasLiveDebriefs(view);
   const filtered = Object.values(filter).some(v => v !== undefined && v !== "");
   return (
     <div className="flex flex-col gap-8" data-testid="debrief-metrics-tab">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-normal text-typography-900">{s.heading}</h2>
-          <p className="max-w-3xl pt-1 text-sm text-typography-700">{s.help}</p>
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="sr-only">{s.weeks(weeks)}</span>
-          <select
-            aria-label="Window"
-            className="rounded border border-gray-300 px-2 py-1"
-            value={weeks}
-            onChange={e => onWeeks(Number(e.target.value))}
+      <div className="flex flex-col gap-1">
+        <p className="max-w-3xl text-sm text-typography-700">{s.help}</p>
+        {filtered && (
+          <p
+            className="max-w-3xl text-sm text-typography-700"
+            data-testid="metrics-unfiltered-note"
           >
-            {WEEK_CHOICES.map(n => (
-              <option key={n} value={n}>
-                {s.weeks(n)}
-              </option>
-            ))}
-          </select>
-        </label>
+            {s.filters.unfilteredNote}
+          </p>
+        )}
       </div>
-
       <FilterBar options={view.filterOptions} filter={filter} onFilter={onFilter} />
       <HeadlineTiles view={view} />
       {/* The north star sits under the tiles: it is the measure the debrief exists to move. */}
@@ -1009,8 +997,9 @@ const UptakeCard: React.FC<{ uptake: DebriefMetricsView["uptake"] }> = ({ uptake
 /* -------------------------------------------------------------------------- */
 
 /**
- * The six filters, applied to every live metric on the page. Only values that
- * exist in the window are offered; an empty choice means "all".
+ * The six filters, applied to every live metric on the page. They render into the Analytics page's
+ * shared filter row (beside its time range), as Carbon dropdowns like every other tab's filters.
+ * Only values that exist in the window are offered; the first item of each means "all".
  */
 const FilterBar: React.FC<{
   options: DebriefFilterOptions | undefined;
@@ -1020,93 +1009,97 @@ const FilterBar: React.FC<{
   const s = en.debriefs.metrics.filters;
   if (!options) return null;
   const set = (patch: Partial<DebriefMetricsFilter>) => onFilter({ ...filter, ...patch });
+  type Item = { id: string; label: string };
   const pick = (
     id: string,
     label: string,
     value: string | number | undefined,
-    choices: Array<{ value: string; label: string }>,
+    choices: Item[],
     onChange: (v: string) => void,
-  ) => (
-    <label className="flex flex-col gap-1 text-sm" key={id}>
-      <span className="text-typography-700">{label}</span>
-      <select
-        aria-label={label}
-        data-testid={`metrics-filter-${id}`}
-        className="rounded border border-gray-300 px-2 py-1"
-        value={value === undefined ? "" : String(value)}
-        onChange={e => onChange(e.target.value)}
-      >
-        <option value="">{s.all}</option>
-        {choices.map(c => (
-          <option key={c.value} value={c.value}>
-            {c.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
+    width = "sm:w-44",
+  ) => {
+    const items: Item[] = [{ id: "", label: s.allOf[id] ?? s.all }, ...choices];
+    return (
+      <div className={`w-full ${width}`} key={id} data-testid={`metrics-filter-${id}`}>
+        <Dropdown
+          id={`debrief-metrics-${id}`}
+          size="md"
+          titleText={label}
+          hideLabel
+          label={label}
+          items={items}
+          selectedItem={
+            items.find(i => i.id === (value === undefined ? "" : String(value))) ?? items[0]
+          }
+          itemToString={(item: Item | null) => item?.label ?? ""}
+          onChange={({ selectedItem }: { selectedItem: Item | null }) =>
+            onChange(selectedItem?.id ?? "")
+          }
+        />
+      </div>
+    );
+  };
   const active = Object.values(filter).some(v => v !== undefined && v !== "");
   return (
-    <section className="flex flex-col gap-2" data-testid="metrics-filters">
-      <h3 className="flex items-center gap-1 text-base font-semibold text-typography-900">
-        {s.heading}
-        <InfoTip label={s.help} ariaLabel={`About ${s.heading}`} />
-      </h3>
-      <div className="flex flex-wrap items-end gap-4">
-        {pick(
-          "organisation",
-          s.organisation,
-          filter.tenantId,
-          options.organisations.map(o => ({ value: o.id, label: o.name })),
-          v => set({ tenantId: v || undefined }),
-        )}
-        {pick(
-          "language",
-          s.language,
-          filter.language,
-          options.languages.map(l => ({ value: l, label: l })),
-          v => set({ language: v || undefined }),
-        )}
-        {pick(
-          "learnerLevel",
-          s.learnerLevel,
-          filter.learnerLevel,
-          options.learnerLevels.map(l => ({ value: l, label: s.levels[l] ?? l })),
-          v => set({ learnerLevel: v || undefined }),
-        )}
-        {pick(
-          "recipe",
-          s.recipe,
-          filter.recipe,
-          options.recipes.map(r => ({ value: r, label: s.recipes[r] ?? r })),
-          v => set({ recipe: v || undefined }),
-        )}
-        {pick(
-          "releaseVersion",
-          s.releaseVersion,
-          filter.releaseVersion,
-          options.releaseVersions.map(v => ({ value: String(v), label: s.release(v) })),
-          v => set({ releaseVersion: v ? Number(v) : undefined }),
-        )}
-        {pick(
-          "judgeVersion",
-          s.judgeVersion,
-          filter.judgeVersion,
-          options.judgeVersions.map(v => ({ value: v, label: v })),
-          v => set({ judgeVersion: v || undefined }),
-        )}
-        {active && (
-          <button
-            type="button"
-            className="text-sm text-blue-700 underline"
+    <TabControls>
+      {pick(
+        "organisation",
+        s.organisation,
+        filter.tenantId,
+        options.organisations.map(o => ({ id: o.id, label: o.name })),
+        v => set({ tenantId: v || undefined }),
+        "sm:w-56",
+      )}
+      {pick(
+        "language",
+        s.language,
+        filter.language,
+        options.languages.map(l => ({ id: l, label: l })),
+        v => set({ language: v || undefined }),
+      )}
+      {pick(
+        "learnerLevel",
+        s.learnerLevel,
+        filter.learnerLevel,
+        options.learnerLevels.map(l => ({ id: l, label: s.levels[l] ?? l })),
+        v => set({ learnerLevel: v || undefined }),
+        "sm:w-56",
+      )}
+      {pick(
+        "recipe",
+        s.recipe,
+        filter.recipe,
+        options.recipes.map(r => ({ id: r, label: s.recipes[r] ?? r })),
+        v => set({ recipe: v || undefined }),
+      )}
+      {pick(
+        "releaseVersion",
+        s.releaseVersion,
+        filter.releaseVersion,
+        options.releaseVersions.map(v => ({ id: String(v), label: s.release(v) })),
+        v => set({ releaseVersion: v ? Number(v) : undefined }),
+        "sm:w-40",
+      )}
+      {pick(
+        "judgeVersion",
+        s.judgeVersion,
+        filter.judgeVersion,
+        options.judgeVersions.map(v => ({ id: v, label: v })),
+        v => set({ judgeVersion: v || undefined }),
+        "sm:w-56",
+      )}
+      {active && (
+        <div className="flex items-center">
+          <Button
+            kind="ghost"
+            size="md"
             data-testid="metrics-filter-clear"
             onClick={() => onFilter({})}
           >
             {s.clear}
-          </button>
-        )}
-      </div>
-      {active && <p className="text-sm text-typography-700">{s.unfilteredNote}</p>}
-    </section>
+          </Button>
+        </div>
+      )}
+    </TabControls>
   );
 };

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
@@ -294,32 +295,66 @@ describe("Debriefs tab: states", () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it("filters every metric by organisation, language, level, debrief type, release and judge version", () => {
+  const choose = async (user: ReturnType<typeof userEvent.setup>, name: RegExp, option: string) => {
+    await user.click(screen.getByRole("combobox", { name }));
+    await user.click(await screen.findByRole("option", { name: option }));
+  };
+  const lastQuery = () => h.metrics.mock.calls[h.metrics.mock.calls.length - 1][0];
+
+  it("reads the page's time range, in weeks", () => {
     h.metrics.mockReturnValue(answer(fullView()));
-    render(<MetricsTab />);
-    const bar = screen.getByTestId("metrics-filters");
-    expect(within(bar).getByLabelText("Learner level")).toHaveTextContent("Lay helper");
-    expect(within(bar).getByLabelText("Debrief type")).toHaveTextContent("Short session");
-    fireEvent.change(screen.getByTestId("metrics-filter-language"), { target: { value: "hi-IN" } });
-    fireEvent.change(screen.getByTestId("metrics-filter-releaseVersion"), {
-      target: { value: "5" },
-    });
-    const last = h.metrics.mock.calls[h.metrics.mock.calls.length - 1][0];
-    expect(last).toMatchObject({ weeks: 12, language: "hi-IN", releaseVersion: 5 });
-    expect(bar).toHaveTextContent("Not filtered: baselines, uptake lift and the PM agent.");
-    fireEvent.click(screen.getByTestId("metrics-filter-clear"));
-    const cleared = h.metrics.mock.calls[h.metrics.mock.calls.length - 1][0];
-    expect(cleared).toEqual({ weeks: 12 });
+    const { rerender } = render(<MetricsTab />);
+    expect(lastQuery()).toEqual({ weeks: 13 });
+    rerender(<MetricsTab range="30d" />);
+    expect(lastQuery()).toEqual({ weeks: 5 });
+    rerender(<MetricsTab range="12m" />);
+    expect(lastQuery()).toEqual({ weeks: 52 });
   });
 
-  it("says when the filters match nothing", () => {
-    h.metrics.mockReturnValue(answer(emptyView()));
-    const { rerender } = render(<MetricsTab />);
+  it("filters every metric by organisation, language, level, debrief type, release and judge version", async () => {
+    const user = userEvent.setup();
+    h.metrics.mockReturnValue(answer(fullView()));
+    render(<MetricsTab />);
+    for (const id of [
+      "organisation",
+      "language",
+      "learnerLevel",
+      "recipe",
+      "releaseVersion",
+      "judgeVersion",
+    ]) {
+      expect(screen.getByTestId(`metrics-filter-${id}`)).toBeInTheDocument();
+    }
+    expect(screen.getByRole("combobox", { name: /learner level/i })).toHaveTextContent(
+      "All learner levels",
+    );
+    await choose(user, /learner level/i, "Lay helper");
+    await choose(user, /language/i, "hi-IN");
+    await choose(user, /release/i, "v5");
+    await waitFor(() =>
+      expect(lastQuery()).toMatchObject({
+        weeks: 13,
+        learnerLevel: "lay",
+        language: "hi-IN",
+        releaseVersion: 5,
+      }),
+    );
+    expect(screen.getByTestId("metrics-unfiltered-note")).toHaveTextContent(
+      "Not filtered: baselines, uptake lift and the PM agent.",
+    );
+    await user.click(screen.getByTestId("metrics-filter-clear"));
+    await waitFor(() => expect(lastQuery()).toEqual({ weeks: 13 }));
+  });
+
+  it("says when the filters match nothing", async () => {
+    const user = userEvent.setup();
     h.metrics.mockReturnValue(answer({ ...emptyView(), filterOptions: fullView().filterOptions }));
-    rerender(<MetricsTab />);
-    fireEvent.change(screen.getByTestId("metrics-filter-language"), { target: { value: "ta-IN" } });
-    expect(screen.getByTestId("metrics-no-live")).toHaveTextContent(
-      "No live debriefs match these filters",
+    render(<MetricsTab />);
+    await choose(user, /language/i, "ta-IN");
+    await waitFor(() =>
+      expect(screen.getByTestId("metrics-no-live")).toHaveTextContent(
+        "No live debriefs match these filters",
+      ),
     );
   });
 

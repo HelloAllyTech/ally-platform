@@ -9752,6 +9752,14 @@ export const en = {
         releaseVersion: "Release",
         judgeVersion: "Judge version",
         clear: "Clear filters",
+        allOf: {
+          organisation: "All organisations",
+          language: "All languages",
+          learnerLevel: "All learner levels",
+          recipe: "All debrief types",
+          releaseVersion: "All releases",
+          judgeVersion: "All judge versions",
+        } as Record<string, string>,
         release: (v: number) => `v${v}`,
         levels: {
           lay: "Lay helper",
