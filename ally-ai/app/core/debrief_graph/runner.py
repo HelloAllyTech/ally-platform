@@ -20,6 +20,7 @@ from langsmith.run_helpers import tracing_context
 
 from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import Gateway
+from app.core.debrief_graph.registry.profile import resolve_language
 from app.core.debrief_graph.result import build_result
 from app.utils.logger import get_logger
 
@@ -70,6 +71,9 @@ async def _close_after(gateway: Gateway, pending: Set[asyncio.Task]) -> None:
 async def run_debrief(
     graph: CompiledStateGraph, ctx: DebriefRunContext, *, resume: bool = False
 ) -> Dict[str, Any]:
+    # Before any step: every one reads the language (v9 FR-39). Deterministic,
+    # so a resumed run settles on the same one.
+    ctx.session = resolve_language(ctx.session, ctx.transcript)
     config = {
         "configurable": {"thread_id": ctx.run_id},
         "recursion_limit": _recursion_limit(ctx),

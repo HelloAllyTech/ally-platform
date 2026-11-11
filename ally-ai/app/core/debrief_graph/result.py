@@ -54,5 +54,8 @@ def build_result(
         "evaluator_hard_fails": patch.get("evaluator_hard_fails") or [],
         "check_failures": patch.get("check_failures") or [],
         "resumed": ctx.resumed,
+        # The debrief's language: the recorded one, or the one read from the
+        # learner's turns (`workspace.languageSource` says which).
+        "language": ctx.language,
         "error": error[:1000] if error is not None else None,
     }

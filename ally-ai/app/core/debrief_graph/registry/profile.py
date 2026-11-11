@@ -1,12 +1,17 @@
 """The session profile (spec A5): cheap facts computed in code, no model. The
 planner decides from this, the safety reading's flagged turns and a summary of
 the Analyst's evidence map (decided 2026-11-11), never from the transcript.
+
+Also the session's language when it recorded none (v9 FR-39, spec §D1: was
+ally-be's `detect-language.ts`), resolved once at the start of a run because
+every step, the safety reader first, reads it.
 """
 
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List
+import unicodedata
+from typing import Any, Dict, List, Literal, Tuple
 
 from app.core.debrief_graph import inputs as body
 from app.core.debrief_graph.budget import budget_left
@@ -56,6 +61,90 @@ def scripts_used(texts: List[str]) -> Dict[str, float]:
         for s, c in sorted(counts.items(), key=lambda kv: -kv[1])
         if c / total >= _SCRIPT_SHARE
     }
+
+
+# --- The language of a session that recorded none (v9 FR-39) -----------------
+#
+# Read from what the learner wrote. Script decides Tamil, Kannada and English;
+# Devanagari is Hindi or Marathi, told apart by their most common words, and a
+# close call is low confidence: the run is flagged (`languageSource`), never
+# silent. A line-for-line port of ally-be's `detectLanguage`, with its regex
+# semantics kept (JavaScript `\s`, `$` as the end of the text).
+
+LanguageSource = Literal["recorded", "detected", "detected_low_confidence"]
+
+_DETECT_SCRIPTS: List[Tuple[str, "re.Pattern[str]"]] = [
+    ("ta", re.compile("[\u0b80-\u0bff]")),
+    ("kn", re.compile("[\u0c80-\u0cff]")),
+    ("deva", re.compile("[\u0900-\u097f]")),
+    ("en", re.compile("[A-Za-z]")),
+]
+#: JavaScript's `\s`, which the TypeScript patterns used.
+_JS_SPACE = "\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+
+
+def _words(words: str) -> "re.Pattern[str]":
+    return re.compile(f"(?:^|[{_JS_SPACE}])(?:{words})(?=[{_JS_SPACE}]|\\Z|[.,?!])")
+
+
+#: Words common in one of the two and rare in the other.
+_MARATHI = _words("आहे|आहेत|नाही|आणि|तुम्ही|मला|मी|काय|होते|पण|तर|करू")
+_HINDI = _words("है|हैं|नहीं|और|आप|मुझे|मैं|क्या|था|लेकिन|तो|करो")
+#: Fewer letters than this is too little to be sure of.
+_THIN_LETTERS = 20
+#: The top script's share of the letters for a confident call.
+_CONFIDENT_SHARE = 0.6
+
+
+def detect_language(texts: List[str]) -> Tuple[str, LanguageSource]:
+    """The language the learner wrote in, and how sure: `detected` or
+    `detected_low_confidence`."""
+    text = " ".join(t or "" for t in texts)
+    # Letters and their combining marks: Indic vowel signs are marks, not letters.
+    letters = sum(1 for ch in text if unicodedata.category(ch)[0] in "LM")
+    if letters == 0:
+        return "en", "detected_low_confidence"
+    # Too little to be sure of, but the script still says more than a default.
+    thin = letters < _THIN_LETTERS
+    ranked = sorted(
+        ((lang, len(rx.findall(text))) for lang, rx in _DETECT_SCRIPTS),
+        key=lambda x: -x[1],
+    )
+    top_lang, top_n = ranked[0]
+    share = top_n / letters
+    if top_lang != "deva":
+        sure = share >= _CONFIDENT_SHARE and not thin
+        return top_lang, "detected" if sure else "detected_low_confidence"
+    mr = len(_MARATHI.findall(text))
+    hi = len(_HINDI.findall(text))
+    language = "mr" if mr > hi else "hi"
+    clear = abs(mr - hi) >= 2 and share >= _CONFIDENT_SHARE and not thin
+    return language, "detected" if clear else "detected_low_confidence"
+
+
+def resolve_language(
+    session: Dict[str, Any], transcript: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """The session with its debrief language and `language_source` settled.
+
+    A session that recorded a language keeps it (`recorded`). One that recorded
+    none (`language_recorded: false`; ally-be sends its default) gets the
+    language read from the learner's turns. A session without the flag is
+    taken as recorded.
+    """
+    out = dict(session)
+    recorded = out.get("language_recorded", out.get("languageRecorded"))
+    if recorded is False:
+        language, source = detect_language(
+            [t.get("text") or "" for t in transcript if t.get("role") == "counselor"]
+        )
+        out["language"] = language
+        out["language_source"] = source
+    else:
+        out["language_source"] = (
+            out.get("language_source") or out.get("languageSource") or "recorded"
+        )
+    return out
 
 
 def language_facts(ctx: Ctx) -> Dict[str, Any]:

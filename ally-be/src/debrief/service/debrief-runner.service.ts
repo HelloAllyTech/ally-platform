@@ -29,7 +29,6 @@ import {
   FallbackRung,
   modelPrices,
 } from '../util/debrief-budget.util';
-import { LanguageSource, detectLanguage } from '../util/detect-language';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
@@ -319,20 +318,13 @@ export class DebriefRunnerService {
         }),
       };
     }
-    // v9 FR-39: no recorded language → read it from what the learner wrote,
-    // and say so on the run (the Console counts these per organisation).
-    let languageSource: LanguageSource = 'recorded';
-    if (!session.languageRecorded) {
-      const detected = detectLanguage(
-        transcript.filter((t) => t.role === 'counselor').map((t) => t.text),
-      );
-      session.language = detected.language;
-      languageSource = detected.source;
-      run.language = detected.language;
-    }
+    // v9 FR-39: a session that recorded no language is sent with the default
+    // and `language_recorded: false`; the graph reads the language from what
+    // the learner wrote and answers it with `language` and
+    // `workspace.languageSource` (the Console counts these per organisation).
     run.workspace = {
       ...run.workspace,
-      languageSource,
+      ...(session.languageRecorded ? { languageSource: 'recorded' } : {}),
       ...(resumed ? { resumes: Number(run.workspace?.resumes ?? 0) || 1 } : {}),
     };
 
@@ -443,7 +435,7 @@ export class DebriefRunnerService {
         prompts,
         ceiling_usd: ceiling,
         prices: modelPrices(models),
-        session: sessionForGraph(session, languageSource),
+        session: sessionForGraph(session),
         transcript,
         context: {
           live_detections: liveDetections,
@@ -510,6 +502,9 @@ export class DebriefRunnerService {
       steps: res.steps ?? [],
       estimatedCostUsd: Number(res.estimated_cost_usd ?? 0).toFixed(4),
       fallbackRung: Math.max(run.fallbackRung ?? 0, res.fallback_rung ?? 0),
+      // The graph's language: the recorded one, or the one it read from the
+      // learner's turns.
+      ...(res.language ? { language: res.language } : {}),
       hasRiskCue: !!res.has_risk_cue,
       learnerDistress: !!res.learner_distress,
       revisionRounds: res.revision_rounds ?? 0,
@@ -620,7 +615,6 @@ export class DebriefRunnerService {
 /** The session as the graph reads it (CONTRACT.md §1), in its snake_case. */
 export function sessionForGraph(
   s: DebriefSessionContext,
-  languageSource: LanguageSource,
 ): Record<string, unknown> {
   return {
     id: s.id,
@@ -628,7 +622,10 @@ export function sessionForGraph(
     counselor_id: s.counselorId,
     status: s.status,
     language: s.language,
-    language_source: languageSource,
+    // What ally-be knows; the graph reads an unrecorded one from the
+    // learner's turns and sets the source to `detected` or
+    // `detected_low_confidence`.
+    language_source: s.languageRecorded ? 'recorded' : null,
     language_recorded: s.languageRecorded,
     learner_level: s.learnerLevel,
     learner_turns: s.learnerTurns,
