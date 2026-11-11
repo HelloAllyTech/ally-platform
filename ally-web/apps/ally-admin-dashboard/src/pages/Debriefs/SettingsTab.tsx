@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button } from "@ally-ui-mono/ui-shared";
+import { Button, CarbonToggle, NumberInput } from "@ally-ui-mono/ui-shared";
 import {
   useAcceptDebriefBaselineMutation,
   useGetDebriefSettingsQuery,
@@ -17,7 +17,8 @@ import { en } from "@constants";
 import { DebriefOwnerSettingSpec, DebriefSettingsView } from "@types";
 import { getErrorMessage } from "@utils";
 
-import { formatWhen } from "./consoleTable";
+import { settingName, settingValueLabel as shown } from "./consoleLabels";
+import { ConsoleTable, formatWhen } from "./consoleTable";
 
 const GROUPS = [
   "quick",
@@ -31,16 +32,6 @@ const GROUPS = [
 ] as const;
 
 type Value = number | boolean;
-
-/** Shares are stored 0–1 and shown as percentages. */
-const shown = (spec: DebriefOwnerSettingSpec, v: Value): string =>
-  typeof v === "boolean"
-    ? v
-      ? en.debriefs.settings.yes
-      : en.debriefs.settings.no
-    : spec.kind === "share"
-      ? `${Math.round(v * 1000) / 10}%`
-      : String(v);
 
 const toInput = (spec: DebriefOwnerSettingSpec, v: Value): string =>
   typeof v === "boolean"
@@ -156,99 +147,99 @@ export const SettingsTab: React.FC = () => {
         return (
           <section key={group} className="flex flex-col gap-2" data-testid={`settings-${group}`}>
             <h3 className="text-base font-semibold text-typography-900">{s.groups[group]}</h3>
-            <table className="w-full text-left text-sm">
-              <thead className="text-typography-700">
-                <tr>
-                  <th className="w-1/4 py-1 font-normal">{s.columns.setting}</th>
-                  <th className="w-1/6 py-1 font-normal">{s.columns.value}</th>
-                  <th className="w-1/6 py-1 font-normal">{s.columns.proposed}</th>
-                  <th className="py-1 font-normal">{s.columns.why}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {keys.map(k => {
-                  const spec = view.spec[k];
-                  const current =
-                    draft[k] === undefined ? view.values[k] : (draft[k] ?? view.defaults[k]);
-                  const p = proposals[k];
-                  return (
-                    <tr
-                      key={k}
-                      className="border-t border-gray-200 align-top"
-                      data-testid={`setting-${k}`}
-                    >
-                      <td className="py-2 pr-2">
-                        <div className="flex flex-wrap items-center gap-1">
-                          <label htmlFor={`setting-input-${k}`}>{s.names[k] ?? k}</label>
-                          {spec.budget && <Pill tone="info">{s.budgetTag}</Pill>}
-                        </div>
-                        <div className="text-xs text-typography-700">
-                          {s.default(shown(spec, view.defaults[k]))}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-2">
-                        {spec.kind === "bool" ? (
-                          <input
-                            id={`setting-input-${k}`}
-                            type="checkbox"
-                            checked={Boolean(current)}
-                            onChange={e => setDraft(d => ({ ...d, [k]: e.target.checked }))}
-                          />
-                        ) : (
-                          <input
-                            id={`setting-input-${k}`}
-                            type="number"
-                            className="w-24 rounded border border-gray-300 px-2 py-1"
+            <ConsoleTable
+              testId={`settings-table-${group}`}
+              headers={[s.columns.setting, s.columns.value, s.columns.proposed, s.columns.why]}
+              rows={keys.map(k => {
+                const spec = view.spec[k];
+                const current =
+                  draft[k] === undefined ? view.values[k] : (draft[k] ?? view.defaults[k]);
+                const p = proposals[k];
+                const id = `setting-input-${k}`;
+                return {
+                  key: k,
+                  testId: `setting-${k}`,
+                  cells: [
+                    <div key="n" className="min-w-[12rem]">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <label htmlFor={id}>{settingName(k)}</label>
+                        {spec.budget && <Pill tone="info">{s.budgetTag}</Pill>}
+                      </div>
+                      <div className="text-xs text-typography-700">
+                        {s.default(shown(spec, view.defaults[k]))}
+                      </div>
+                    </div>,
+                    <div key="v" className="flex flex-col items-start gap-1">
+                      {spec.kind === "bool" ? (
+                        <CarbonToggle
+                          id={id}
+                          size="sm"
+                          // The setting's name in the first column labels it (htmlFor); the
+                          // side label says the state.
+                          labelText=""
+                          labelA={s.no}
+                          labelB={s.yes}
+                          toggled={Boolean(current)}
+                          onToggle={(on: boolean) => setDraft(d => ({ ...d, [k]: on }))}
+                        />
+                      ) : (
+                        <div className="w-36">
+                          <NumberInput
+                            id={id}
+                            size="sm"
+                            label={settingName(k)}
+                            hideLabel
                             min={
                               spec.kind === "share" && spec.min != null ? spec.min * 100 : spec.min
                             }
                             max={
                               spec.kind === "share" && spec.max != null ? spec.max * 100 : spec.max
                             }
-                            step={spec.kind === "int" ? 1 : "any"}
+                            step={1}
+                            allowEmpty
                             value={toInput(spec, current as Value)}
-                            onChange={e => {
-                              const v = fromInput(spec, e.target.value);
+                            onChange={(_e: unknown, { value }: { value: number | string }) => {
+                              const v = fromInput(spec, String(value));
                               if (v !== null) setDraft(d => ({ ...d, [k]: v }));
                             }}
                           />
-                        )}
-                        {view.changed.includes(k) && (
-                          <button
-                            type="button"
-                            className="block pt-1 text-xs text-link-primary underline"
-                            onClick={() => setDraft(d => ({ ...d, [k]: null }))}
+                        </div>
+                      )}
+                      {view.changed.includes(k) && (
+                        <Button
+                          kind="ghost"
+                          size="sm"
+                          onClick={() => setDraft(d => ({ ...d, [k]: null }))}
+                        >
+                          {s.reset}
+                        </Button>
+                      )}
+                    </div>,
+                    p ? (
+                      <div key="p" className="flex flex-col items-start gap-1">
+                        <span>{shown(spec, p.value)}</span>
+                        {p.misfit && <Pill tone="warning">{s.misfit}</Pill>}
+                        {p.value !== view.values[k] && (
+                          <Button
+                            kind="ghost"
+                            size="sm"
+                            disabled={accepting}
+                            onClick={() => guarded([k], () => acceptKeys([k]))}
                           >
-                            {s.reset}
-                          </button>
+                            {s.accept}
+                          </Button>
                         )}
-                      </td>
-                      <td className="py-2 pr-2">
-                        {p ? (
-                          <div className="flex flex-col items-start gap-1">
-                            <span>{shown(spec, p.value)}</span>
-                            {p.misfit && <Pill tone="warning">{s.misfit}</Pill>}
-                            {p.value !== view.values[k] && (
-                              <Button
-                                kind="ghost"
-                                size="sm"
-                                disabled={accepting}
-                                onClick={() => guarded([k], () => acceptKeys([k]))}
-                              >
-                                {s.accept}
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          s.noProposal
-                        )}
-                      </td>
-                      <td className="py-2 text-typography-700">{p?.reason ?? ""}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    ) : (
+                      s.noProposal
+                    ),
+                    <span key="w" className="text-typography-700">
+                      {p?.reason ?? ""}
+                    </span>,
+                  ],
+                };
+              })}
+            />
           </section>
         );
       })}

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +33,15 @@ vi.mock("@api", async importOriginal => ({
 }));
 
 // eslint-disable-next-line import/first
+import { en } from "@constants";
+// eslint-disable-next-line import/first
 import { SettingsTab } from "../SettingsTab";
+
+/** ally-be's owner settings spec, read from the monorepo checkout beside this app. */
+const SPEC_FILE = resolve(
+  __dirname,
+  "../../../../../../../ally-be/src/debrief/constants/debrief-owner-settings.constants.ts",
+);
 
 const resolves = (v: unknown = {}) => ({ unwrap: () => Promise.resolve(v) });
 
@@ -116,5 +127,45 @@ describe("Debrief owner settings (v9 FR-60)", () => {
     await waitFor(() =>
       expect(h.update).toHaveBeenCalledWith({ changes: { learningBudgetUsd: 200 } }),
     );
+  });
+
+  it("toggles a yes/no setting with a Carbon toggle and saves it", async () => {
+    render(<SettingsTab />);
+    const toggle = screen.getByLabelText("No new hard fails");
+    expect(toggle).toHaveAttribute("role", "switch");
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(h.update).toHaveBeenCalledWith({ changes: { gateNoNewHardFails: false } }),
+    );
+  });
+
+  it("offers Back to default on a changed setting, as a button", async () => {
+    h.settings.mockReturnValue({
+      data: { ...VIEW, values: { ...VIEW.values, gateCases: 80 }, changed: ["gateCases"] },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<SettingsTab />);
+    fireEvent.click(
+      within(screen.getByTestId("setting-gateCases")).getByRole("button", {
+        name: "Back to default",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(h.update).toHaveBeenCalledWith({ changes: { gateCases: null } }));
+  });
+});
+
+describe("Debrief owner settings names", () => {
+  it.skipIf(!existsSync(SPEC_FILE))("names every setting ally-be defines", () => {
+    const source = readFileSync(SPEC_FILE, "utf8");
+    const body = source.slice(source.indexOf("OWNER_SETTINGS_SPEC = {"));
+    const keys = [...body.slice(0, body.indexOf("} as const")).matchAll(/^ {2}(\w+): \{/gm)].map(
+      m => m[1],
+    );
+    expect(keys.length).toBeGreaterThan(10);
+    const names = en.debriefs.settings.names;
+    expect(keys.filter(k => !names[k])).toEqual([]);
   });
 });

@@ -2,31 +2,56 @@ import React, { useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button } from "@ally-ui-mono/ui-shared";
+import { Button, CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import {
   useBuildDebriefTestSetsMutation,
   useDecideIdeaMutation,
   useGetDebriefOverviewQuery,
+  useGetDebriefSettingsQuery,
   useGetPmAgentStateQuery,
   useRunPmAgentMutation,
   useScreenIdeaMutation,
 } from "@api";
-import { formatUsd } from "@components/ally-guide/allyGuideFormat";
+import { formatUsd, shortId } from "@components/ally-guide/allyGuideFormat";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
-import { PmAgentIdeaRow } from "@types";
+import { DebriefOwnerSettingSpec, PmAgentIdeaRow } from "@types";
 import { getErrorMessage } from "@utils";
 
+import {
+  canaryReasonLabel,
+  codeWords,
+  forecastMetricLabel,
+  promptName,
+  settingChangeLabel,
+} from "./consoleLabels";
 import { formatWhen } from "./consoleTable";
+import { RunPanel } from "./RunPanel";
+
+type IdeaStatus = PmAgentIdeaRow["status"];
+type StatusItem = { id: IdeaStatus | ""; label: string };
+/** Every idea status (ally-be), in the order the filter offers them. */
+const IDEA_STATUSES: IdeaStatus[] = [
+  "proposed",
+  "active",
+  "approved",
+  "quarantined",
+  "blocked",
+  "rejected",
+  "retired",
+];
 
 const SCREENABLE = new Set(["prompt_edit", "setting"]);
 const HANDOFF_KINDS = new Set(["needs_code", "defect", "needs_person"]);
 
 /** The brief, report or question the PM agent wrote for a person (no learner quotes). */
-const Handoff: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
+const Handoff: React.FC<{ idea: PmAgentIdeaRow; onOpenRun: (runId: string) => void }> = ({
+  idea,
+  onOpenRun,
+}) => {
   const s = en.debriefs.pmAgent.handoff;
   const h = idea.evidence.handoff;
   if (!h) return null;
@@ -56,8 +81,19 @@ const Handoff: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
         <>
           <p className="whitespace-pre-wrap">{h.summary}</p>
           {h.runIds.length > 0 && (
-            <p className="font-mono text-xs">
-              {s.runs}: {h.runIds.join(", ")}
+            <p className="flex flex-wrap items-center gap-x-2 text-xs" data-testid="handoff-runs">
+              <span>{s.runs}:</span>
+              {h.runIds.map(id => (
+                <button
+                  key={id}
+                  type="button"
+                  className="font-mono text-primary-600 underline"
+                  aria-label={en.debriefs.runs.openLabel(shortId(id))}
+                  onClick={() => onOpenRun(id)}
+                >
+                  {shortId(id)}
+                </button>
+              ))}
             </p>
           )}
         </>
@@ -130,7 +166,7 @@ const Ladder: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
             {!g.passed &&
               ` · ${Object.entries(g.rules)
                 .filter(([, ok]) => !ok)
-                .map(([k]) => s.gateRules[k])
+                .map(([k]) => s.gateRules[k] ?? codeWords(k))
                 .join(", ")}`}
           </span>
         )}
@@ -174,7 +210,7 @@ const Ladder: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
               score(c.canaryMedian),
               score(c.controlMedian),
             )}
-            {c.reason && c.status === "reverted" && ` · ${c.reason}`}
+            {c.reason && c.status === "reverted" && ` · ${canaryReasonLabel(c.reason)}`}
           </span>
         )}
       </li>
@@ -185,7 +221,9 @@ const Ladder: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
 const IdeaCard: React.FC<{
   idea: PmAgentIdeaRow;
   onDecide: (d: "approve" | "reject") => void;
-}> = ({ idea, onDecide }) => {
+  onOpenRun: (runId: string) => void;
+  settingSpec?: Record<string, DebriefOwnerSettingSpec>;
+}> = ({ idea, onDecide, onOpenRun, settingSpec }) => {
   const s = en.debriefs.pmAgent;
   const [screen, { isLoading: screening }] = useScreenIdeaMutation();
   const r = idea.evidence.screen;
@@ -228,7 +266,7 @@ const IdeaCard: React.FC<{
       {idea.evidence.forecast?.checkedAt && (
         <p className="text-sm" data-testid="idea-forecast">
           {s.forecast(
-            idea.evidence.forecast.metric,
+            forecastMetricLabel(idea.evidence.forecast.metric),
             num(idea.evidence.forecast.baseline),
             num(idea.evidence.forecast.after),
             idea.evidence.forecast.moved == null
@@ -239,11 +277,11 @@ const IdeaCard: React.FC<{
           )}
         </p>
       )}
-      <Handoff idea={idea} />
+      <Handoff idea={idea} onOpenRun={onOpenRun} />
       {idea.change.ideaKind === "prompt_edit" && idea.change.find && (
         <div className="text-sm">
           <p className="font-semibold">
-            {s.change} · <span className="font-mono text-xs">{idea.change.promptCode}</span>
+            {s.change} · {promptName(idea.change.promptCode)}
           </p>
           <p className="whitespace-pre-wrap bg-neutral-50 p-2 line-through">{idea.change.find}</p>
           <p className="font-semibold">{s.replaceWith}</p>
@@ -251,8 +289,13 @@ const IdeaCard: React.FC<{
         </div>
       )}
       {idea.change.ideaKind === "setting" && (
-        <p className="font-mono text-sm">
-          {idea.change.settingKey} → {idea.change.settingValue}
+        <p className="text-sm" data-testid="idea-setting">
+          <span className="font-semibold">{s.change}:</span>{" "}
+          {settingChangeLabel(
+            idea.change.settingKey,
+            idea.change.settingValue,
+            idea.change.settingKey ? settingSpec?.[idea.change.settingKey] : undefined,
+          )}
         </p>
       )}
       {SCREENABLE.has(idea.change.ideaKind) && <Ladder idea={idea} />}
@@ -307,6 +350,9 @@ export const PmAgentTab: React.FC = () => {
   const s = en.debriefs.pmAgent;
   const state = useGetPmAgentStateQuery();
   const overview = useGetDebriefOverviewQuery();
+  const settings = useGetDebriefSettingsQuery();
+  const [openRun, setOpenRun] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<IdeaStatus | "">("");
   const [run, { isLoading: running }] = useRunPmAgentMutation();
   const [build, { isLoading: building }] = useBuildDebriefTestSetsMutation();
   const [decide, { isLoading: deciding }] = useDecideIdeaMutation();
@@ -315,6 +361,14 @@ export const PmAgentTab: React.FC = () => {
   );
 
   const ideas = state.data?.ideas ?? [];
+  const shownIdeas = statusFilter ? ideas.filter(i => i.status === statusFilter) : ideas;
+  const statusItems: StatusItem[] = [
+    { id: "", label: s.allStatuses },
+    // Only statuses some idea has; a chosen one stays so it can be cleared.
+    ...IDEA_STATUSES.filter(st => st === statusFilter || ideas.some(i => i.status === st)).map(
+      st => ({ id: st, label: s.ideaStatus[st] ?? codeWords(st) }),
+    ),
+  ];
   const pendingIdea = pending ? ideas.find(i => i.id === pending.id) : undefined;
   const pendingStage = pendingIdea ? stage(pendingIdea) : null;
   const handoffKind = pendingIdea?.evidence.handoff?.kind;
@@ -336,6 +390,14 @@ export const PmAgentTab: React.FC = () => {
       else toast.success(s.ran);
     } catch (e) {
       toast.error(getErrorMessage(e, s.runFailed));
+    }
+  };
+  const buildSets = async () => {
+    try {
+      await build().unwrap();
+      toast.success(s.buildSetsDone);
+    } catch (e) {
+      toast.error(getErrorMessage(e, s.buildSetsFailed));
     }
   };
   const confirm = async () => {
@@ -401,16 +463,37 @@ export const PmAgentTab: React.FC = () => {
           <section className="flex flex-col gap-2">
             <h3 className="flex items-center gap-1 text-xl font-normal text-typography-900">
               {s.testSets}
-              <InfoTip label={s.testSetsHelp} ariaLabel="About the test sets" />
+              <InfoTip label={s.testSetsHelp} ariaLabel={s.testSetsAbout} />
             </h3>
             <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="test-sets">
-              {o &&
+              {overview.isError ? (
+                <span className="text-typography-700" data-testid="test-sets-error">
+                  {s.testSetsFailed}{" "}
+                  <button
+                    type="button"
+                    className="text-primary-600 underline"
+                    onClick={() => void overview.refetch()}
+                  >
+                    {en.debriefs.pmAgent.retry}
+                  </button>
+                </span>
+              ) : !o ? (
+                <div className="w-48" data-testid="test-sets-loading">
+                  <LoadingBlock lines={1} />
+                </div>
+              ) : (
                 Object.entries(o.testSets).map(([k, n]) => (
                   <Pill key={k} tone="neutral">
-                    {s.sets[k] ?? k}: {n}
+                    {s.sets[k] ?? codeWords(k)}: {n}
                   </Pill>
-                ))}
-              <Button kind="tertiary" size="sm" disabled={building} onClick={() => void build()}>
+                ))
+              )}
+              <Button
+                kind="tertiary"
+                size="sm"
+                disabled={building}
+                onClick={() => void buildSets()}
+              >
                 {s.buildSets}
               </Button>
             </div>
@@ -418,23 +501,56 @@ export const PmAgentTab: React.FC = () => {
 
           <section className="flex flex-col gap-2">
             <h3 className="text-xl font-normal text-typography-900">{s.ideas}</h3>
-            {state.data.ideas.length === 0 ? (
-              <EmptyPanel title={s.noIdeas} message={s.noReport} />
+            {ideas.length === 0 ? (
+              <EmptyPanel title={s.noIdeas} message={s.noIdeasMessage} />
             ) : (
-              <ul className="flex flex-col gap-3">
-                {state.data.ideas.map(idea => (
-                  <IdeaCard
-                    key={idea.id}
-                    idea={idea}
-                    onDecide={decision => setPending({ id: idea.id, decision })}
-                  />
-                ))}
-              </ul>
+              <>
+                <div className="flex flex-wrap items-end gap-3" data-testid="ideas-filter">
+                  <div className="w-full sm:w-56">
+                    <Dropdown
+                      id="pm-agent-idea-status"
+                      size="md"
+                      titleText={s.statusFilter}
+                      hideLabel
+                      label={s.statusFilter}
+                      items={statusItems}
+                      selectedItem={statusItems.find(i => i.id === statusFilter) ?? statusItems[0]}
+                      itemToString={(item: StatusItem | null) => item?.label ?? ""}
+                      onChange={({ selectedItem }: { selectedItem: StatusItem | null }) =>
+                        setStatusFilter(selectedItem?.id ?? "")
+                      }
+                    />
+                  </div>
+                  {statusFilter && (
+                    <div className="flex items-center">
+                      <Button kind="ghost" size="md" onClick={() => setStatusFilter("")}>
+                        {s.clearFilter}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                {shownIdeas.length === 0 ? (
+                  <p className="text-sm text-typography-700">{s.noIdeasFiltered}</p>
+                ) : (
+                  <ul className="flex flex-col gap-3">
+                    {shownIdeas.map(idea => (
+                      <IdeaCard
+                        key={idea.id}
+                        idea={idea}
+                        onDecide={decision => setPending({ id: idea.id, decision })}
+                        onOpenRun={setOpenRun}
+                        settingSpec={settings.data?.spec}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </section>
         </>
       )}
 
+      <RunPanel runId={openRun} onClose={() => setOpenRun(null)} />
       <ConfirmDialog
         isOpen={pending !== null}
         title={pending?.decision === "approve" ? approveText("title") : s.rejectTitle}

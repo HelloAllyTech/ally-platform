@@ -10,7 +10,7 @@ import {
 } from "@api";
 import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
-import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
+import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
 import { DebriefTenantRow } from "@types";
@@ -25,18 +25,32 @@ export const OrganisationsTab: React.FC = () => {
   const [setLive, { isLoading }] = useSetDebriefTenantLiveMutation();
   const [target, setTarget] = useState<DebriefTenantRow | null>(null);
   const [setRegion, { isLoading: savingRegion }] = useSetDebriefTenantRegionMutation();
+  // A region change asks first: it decides whether the organisation may be switched on.
+  const [regionTarget, setRegionTarget] = useState<DebriefTenantRow | null>(null);
 
-  const toggleRegion = async (t: DebriefTenantRow) => {
+  const toggleRegion = async () => {
+    const t = regionTarget;
+    if (!t) return;
     try {
       await setRegion({
         tenantId: t.id,
         region: t.region === "india" ? "outside_india" : "india",
       }).unwrap();
       toast.success(s.saved);
+      setRegionTarget(null);
     } catch (e) {
       toast.error(getErrorMessage(e, s.failed));
     }
   };
+  /** What the move does to "Switch on", in words. */
+  const regionEffect = (t: DebriefTenantRow) =>
+    t.region === "outside_india"
+      ? s.regionToIndia
+      : t.hasSupportContact
+        ? s.regionToOutsideWithLine
+        : t.live
+          ? s.regionToOutsideLive
+          : s.regionToOutside;
   // v9 FR-25: outside India there is no default line to fall back on.
   const blocked = (t: DebriefTenantRow) =>
     !t.live && t.region === "outside_india" && !t.hasSupportContact;
@@ -66,6 +80,8 @@ export const OrganisationsTab: React.FC = () => {
         />
       ) : !tenants.data ? (
         <LoadingBlock lines={5} />
+      ) : tenants.data.length === 0 ? (
+        <EmptyPanel title={s.emptyTitle} message={s.emptyMessage} />
       ) : (
         <ConsoleTable
           testId="organisations-table"
@@ -93,7 +109,7 @@ export const OrganisationsTab: React.FC = () => {
                   kind="ghost"
                   size="sm"
                   disabled={savingRegion}
-                  onClick={() => void toggleRegion(t)}
+                  onClick={() => setRegionTarget(t)}
                 >
                   {t.region === "india" ? s.markOutside : s.markIndia}
                 </Button>
@@ -126,6 +142,19 @@ export const OrganisationsTab: React.FC = () => {
         onClose={() => setTarget(null)}
       >
         <p>{target?.live ? s.offBody : s.onBody}</p>
+      </ConfirmDialog>
+      <ConfirmDialog
+        isOpen={regionTarget !== null}
+        title={
+          regionTarget ? s.regionTitle(regionTarget.name, regionTarget.region === "india") : ""
+        }
+        cancelLabel={s.cancel}
+        confirmLabel={s.regionConfirm}
+        isWorking={savingRegion}
+        onConfirm={() => void toggleRegion()}
+        onClose={() => setRegionTarget(null)}
+      >
+        <p>{regionTarget ? regionEffect(regionTarget) : ""}</p>
       </ConfirmDialog>
     </div>
   );
