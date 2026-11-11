@@ -1,9 +1,10 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { DebriefGatewayController } from '../controller/debrief-gateway.controller';
-import { DebriefRunStatus } from '../enum/debrief-run.enum';
+import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefGatewayService } from '../service/debrief-gateway.service';
 import {
+  ASK_ALLY_GATEWAY_TOOLS,
   DEBRIEF_GATEWAY_TOOLS,
   DebriefRunTokenService,
 } from '../service/debrief-run-token.service';
@@ -53,6 +54,7 @@ function build(
           scenarioSessionId: 's1',
           tenantId: '6b0d6a3e-4b8f-4a43-9a5a-1f2b3c4d5e6f',
           status: DebriefRunStatus.RUNNING,
+          mode: DebriefRunMode.LIVE,
           ...(opts.run ?? {}),
         };
   const runs = {
@@ -65,7 +67,16 @@ function build(
   };
   const context = {
     transcript: jest.fn(async () => transcript),
-    loadSession: jest.fn(async () => ({ tenantId: 't-from-session' })),
+    loadSession: jest.fn(async () => ({
+      tenantId: 't-from-session',
+      scenarioId: 41,
+    })),
+    pastWorkOnThis: jest.fn(async () => [
+      { date: '2026-10-20', skill: 'Exploring risk', point: 'Ask directly' },
+    ]),
+    liveDetections: jest.fn(async () => [
+      { behaviour: 'Asks about safety', detected: true, times: 2 },
+    ]),
   };
   const retrieval = {
     search: jest.fn(async () => {
@@ -354,5 +365,108 @@ describe('comments_read (the PM agent reads expert comments)', () => {
     expect(DEBRIEF_GATEWAY_TOOLS as readonly string[]).not.toContain(
       'comments_read',
     );
+  });
+});
+
+describe('Ask Ally reply tokens (CONTRACT.md §5)', () => {
+  const published = { status: DebriefRunStatus.PUBLISHED };
+
+  it('signs a short token scoped to the reply, the learner and Ask Ally’s tools', () => {
+    const { tokens } = build();
+    const claims = tokens.verify(tokens.signReply('run-1', 's1', 7));
+    expect(claims).toMatchObject({
+      runId: 'run-1',
+      sessionId: 's1',
+      userId: 7,
+      scope: 'reply',
+      tools: [...ASK_ALLY_GATEWAY_TOOLS],
+    });
+    expect(claims.exp - Math.floor(Date.now() / 1000)).toBeLessThanOrEqual(120);
+  });
+
+  it.each([DebriefRunStatus.PUBLISHED, DebriefRunStatus.BELOW_BAR])(
+    'works on the learner’s %s live debrief',
+    async (status) => {
+      const { tokens, bearer } = build({ run: { status } });
+      const { run, claims } = await tokens.authorise(
+        bearer(tokens.signReply('run-1', 's1', 7)),
+        'get_live_detections',
+      );
+      expect(run.id).toBe('run-1');
+      expect(claims.userId).toBe(7);
+    },
+  );
+
+  it.each([
+    ['still running', { status: DebriefRunStatus.RUNNING }],
+    ['a shadow run', { ...published, mode: DebriefRunMode.SHADOW }],
+    ['for another session', { ...published, scenarioSessionId: 's2' }],
+  ])('refuses a debrief that is %s', async (_label, run) => {
+    const { tokens, bearer } = build({ run });
+    await expect(
+      tokens.authorise(
+        bearer(tokens.signReply('run-1', 's1', 7)),
+        'get_learner_history',
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('can never call a debrief run’s tools, nor a debrief run token Ask Ally’s', async () => {
+    const { tokens, bearer } = build({ run: published });
+    await expect(
+      tokens.authorise(
+        bearer(tokens.signReply('run-1', 's1', 7)),
+        'run_checks',
+      ),
+    ).rejects.toThrow('This run may not call run_checks');
+    const { tokens: t2, bearer: b2 } = build();
+    await expect(t2.authorise(b2(), 'get_learner_history')).rejects.toThrow(
+      'This run may not call get_learner_history',
+    );
+  });
+
+  it('get_learner_history: the token’s learner, never one the body names', async () => {
+    const { tokens, controller, bearer, context } = build({ run: published });
+    const res = await controller.tool(
+      'get_learner_history',
+      bearer(tokens.signReply('run-1', 's1', 7)),
+      { limit: 50, userId: 99 },
+    );
+    expect(res).toEqual({
+      points: [
+        { date: '2026-10-20', skill: 'Exploring risk', point: 'Ask directly' },
+      ],
+    });
+    expect(context.pastWorkOnThis).toHaveBeenCalledWith(
+      7,
+      '6b0d6a3e-4b8f-4a43-9a5a-1f2b3c4d5e6f',
+      's1',
+      10,
+    );
+  });
+
+  it('get_live_detections: the session’s scenario', async () => {
+    const { tokens, controller, bearer, context } = build({ run: published });
+    const res = await controller.tool(
+      'get_live_detections',
+      bearer(tokens.signReply('run-1', 's1', 7)),
+      {},
+    );
+    expect(res).toEqual({
+      detections: [
+        { behaviour: 'Asks about safety', detected: true, times: 2 },
+      ],
+    });
+    expect(context.liveDetections).toHaveBeenCalledWith('s1', 41);
+  });
+
+  it('guidance_search works for a reply token on a published debrief', async () => {
+    const { tokens, controller, bearer, retrieval } = build({ run: published });
+    await controller.tool(
+      'guidance_search',
+      bearer(tokens.signReply('run-1', 's1', 7)),
+      { topics: [{ situation: 'asking about suicide' }], per_moment: 3 },
+    );
+    expect(retrieval.search).toHaveBeenCalledTimes(1);
   });
 });

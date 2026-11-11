@@ -1,6 +1,6 @@
 # Debrief harness: the ally-be ↔ ally-ai contract
 
-Status: being built (2026-11-10). Design: `~/projects/Ally/ally-debrief-orchestrator-spec.md` (Parts A, D, E).
+Status: being built (2026-11-10); Ask Ally (§5) moved 2026-11-11. Design: `~/projects/Ally/ally-debrief-orchestrator-spec.md` (Parts A, D, E; Ask Ally §A10, §D2 step 4).
 
 The Debrief agent moves from ally-be's `DebriefRunnerService` to a LangGraph graph in ally-ai. **The graph
 decides, ally-be executes**: ally-ai never writes ally-be's database.
@@ -90,6 +90,8 @@ ally-ai never holds the secret.
 | `render_cards` | `{ "cards": {...} }` | `{ "text": "..." }` — `renderCards`, for the Evaluator's input |
 | `finalise_cards` | `{ "cards": {...}, "offered": [41, 7] }` | `{ "cards": {...} }` — `keepOfferedPractice` + `withPointIds` |
 | `progress` | `{ "step": "writer", "round": 1, "topic": "...", "has_risk_cue": bool }` | `{ "ok": true }` — writes `workspace.liveProgress` (FR-27); fire-and-forget on the ally-ai side |
+| `get_learner_history` | `{ "limit": 10 }` (at most 10) | `{ "points": [ { "date", "skill", "point" } ] }` — the learner's earlier Work-on-this points, newest first. **Reply tokens only** (§5); the learner is the token's `userId`, never one the body names |
+| `get_live_detections` | `{}` | `{ "detections": [ { "behaviour", "detected", "times" } ] }` — the live detector's record for the session's scenario. **Reply tokens only** |
 
 ### 2a. PM agent tools (same route, agent token)
 
@@ -205,3 +207,75 @@ Recorded by the ally-be build (2026-11-10).
     checkpoint in memory and lose resume across restarts.
 23. **Rule checks stay in ally-be** (`run_checks` tool), per D11: rules on data stay with the data; the graph
     can't skip them because every draft goes through the `checks` node.
+
+## 5. Ask Ally — `POST /api/v1/ask-ally/replies` (ally-ai)
+
+Added 2026-11-11 (spec §A10, §D2 step 4). Ask Ally answers a learner's reply under their published
+debrief. It replaced ally-be's in-process tool loop (`DebriefReplyAgentService`) and its single-call
+fallback, both deleted.
+
+| ally-be (`DebriefReplyService`, unchanged around the reply) | ally-ai (`app/core/ask_ally/`) |
+|---|---|
+| The learner endpoint (`POST /v1/debriefs/sessions/:id/reply/stream`), the crisis keyword screen (a match never reaches a model), the Safety reader distress screen (read alongside the reply; adds the support lines and the review item), the reply checks (`replyCheckFailures`; a failing reply is replaced by `CHECK_FALLBACK` and kept on `workspace.replacedReplies`), the thread (`scenario_session_chats` / `scenario_session_chat_messages`), the SSE relay, `workspace.replyTraces`, XP | The reply: a LangChain `create_agent` loop on the LangGraph runtime with `search_guidance`, `get_learner_history`, `get_live_detections` through the gateway; at most 4 passes and $0.05; the release's reply model; `llm_usage` per pass under `debrief_reply`; no checkpointer (one request per reply; the thread lives in ally-be); LangSmith off |
+
+Auth: the service `X-API-Key`. Request:
+
+```jsonc
+{
+  "run_id": "uuid",                     // the session's live run (published or below_bar)
+  "scenario_session_id": "uuid",
+  "chat_id": "uuid",
+  "tenant_id": "uuid | null",
+  "reply": { "provider": "gemini | openai | anthropic", "model": "gemini-2.5-flash", "maxTokens": 900,
+             "budgetUsd": 0.05, "maxTurns": 4 },                 // the release bundle's `reply`; the two limits optional
+  "prices": { "<reply model>": { "input_per_m": 0.3, "output_per_m": 2.5 } },   // unpriced = the reply never runs
+  "system": "...",                      // built by ally-be: live reply prompt, debrief, transcript, org wording, length rule
+  "history": [ { "role": "user | assistant", "content": "..." } ],             // the thread's last 10, oldest first
+  "message": "the learner's new message",
+  "run_token": "<JWT, scope reply>",
+  "gateway_url": "https://<ally-be>/api/v1/internal/debrief"
+}
+```
+
+Response: `200`, `application/x-ndjson`, one event per line:
+
+- `{ "type": "token", "text": "..." }` — reply text as it arrives (every pass's text, as before);
+- `{ "type": "done", "text": "...", "tool_texts": ["..."], "trace": ReplyTrace }` — `tool_texts` is what each
+  successful tool returned (ally-be's quote check accepts quotes from it); `trace` is today's `ReplyTrace`
+  (`at, model, turns, costUsd, tools: [{name, topic?, ok, ms, found}], stoppedBy?`), which ally-be keeps on
+  `workspace.replyTraces` for the Console — never the learner's message;
+- `{ "type": "error", "error": "...", "text": "...", "trace": ReplyTrace }` — the reply stopped; `text` is what the
+  learner already saw.
+
+Limits and behaviour:
+
+- **Passes:** at most `maxTurns` (default and ceiling 4). The last allowed pass, or the first one the budget can't
+  stretch past (spent + 2 × last pass × 1.2 > budget), is called with `tool_choice: "none"`, so a reply always ends in
+  words; `stoppedBy` says which. `ModelCallLimitMiddleware` is a backstop that is never reached.
+- **Budget:** `budgetUsd` (default and ceiling $0.05), from each pass's token usage and `prices`.
+- **Tools:** each must answer within 1.5 s; a failed or slow tool is told to the model as "This is unavailable right
+  now. Answer from the debrief and the session." (`ToolErrorMiddleware`) and recorded `ok: false`. `search_guidance`
+  calls `guidance_search` with one topic `{situation: <topic, at most 10 words>}` and `per_moment: 3`;
+  `unavailable: true` counts as a failed tool.
+- **Retries:** a pass that failed before any of its words streamed is retried once (`ModelRetryMiddleware`); one that
+  already streamed words is not (the learner would see a second, different start).
+- **Thinking off** where the model allows it (`thinking_budget: 0` before Gemini 3), as the in-process loop sent it.
+
+The reply token (§2): ally-be signs it per reply after checking the learner owns the session — HS256, claims
+`{ runId, sessionId, userId, scope: "reply", tools: ["guidance_search", "get_learner_history", "get_live_detections"] }`,
+2-minute expiry. The gateway accepts it only for the session's **live** run in `published` or `below_bar` (a debrief
+run's token still needs `running`); a reply token can't call the debrief run's tools and a run token can't call
+`get_learner_history` / `get_live_detections`.
+
+ally-be on failure: words already sent → finish with them (checked, distress-screened, saved); nothing sent → the
+support lines alone if the Safety reader heard distress, otherwise an SSE `error` ("Ally could not answer just now.
+Please try again in a moment.") and no saved reply. The reply model is checked against ally-ai's LLM catalog (release
+check and the Console's choices).
+
+Parity gate before the deletion (2026-11-11, local, synthetic session): the harness ran planted questions through the
+old in-process loop (from `daafdbd8c`) and through this endpoint, with the same screens and checks around both:
+identical checks on fixed reply texts for every reply check; crisis keyword messages (English, Hindi) got the
+approved copy and lines without a model on both; distress messages (English, Hindi, Hinglish) got the support lines
+on both; each tool question called the same tool on both; every reply took 1–2 passes and under $0.001. The table is
+in the commit message of the change that deleted the old loop.
+

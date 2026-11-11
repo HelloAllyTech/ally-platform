@@ -50,6 +50,23 @@ def estimate_step_cost_usd(
     ) * float(price.get("output_per_m", 0))
 
 
+def cost_usd(
+    model: Optional[str],
+    input_tokens: int,
+    output_tokens: int,
+    prices: Dict[str, Dict[str, Any]],
+) -> float:
+    """What a finished call cost, from its token usage and the request's
+    prices (ally-be's `computeCostUsd`). An unpriced model costs infinity, so
+    a caller holding a ceiling stops at once."""
+    price = prices.get(model or "")
+    if not price:
+        return math.inf
+    return (input_tokens / 1_000_000) * float(price.get("input_per_m", 0)) + (
+        output_tokens / 1_000_000
+    ) * float(price.get("output_per_m", 0))
+
+
 def budget_left(ceiling: float, estimated: float) -> float:
     """What is left of the ceiling once everything reserved so far is spent."""
     return round(max(0.0, ceiling - estimated), 4)

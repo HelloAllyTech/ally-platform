@@ -11,16 +11,16 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { Public } from 'src/auth/decorators/auth.metadata';
 import { DebriefGatewayService } from '../service/debrief-gateway.service';
 import {
-  DEBRIEF_GATEWAY_TOOLS,
   DebriefGatewayTool,
   DebriefRunTokenService,
+  GATEWAY_TOOLS,
   PM_AGENT_GATEWAY_TOOLS,
 } from '../service/debrief-run-token.service';
 import { DebriefReviewService } from '../service/debrief-review.service';
 
 /**
- * The Debrief gateway (docs/debrief-harness/CONTRACT.md §2): the tools
- * ally-ai's debrief graph calls back mid-run. Machine-only: `@Public()` to the
+ * The Debrief gateway (docs/debrief-harness/CONTRACT.md §2, §5): the tools
+ * ally-ai's debrief graph calls back mid-run, and Ask Ally's agent mid-reply. Machine-only: `@Public()` to the
  * user-auth guard and no user JWT is ever read here; the only credential is
  * the run token ally-be signed for this run (`Authorization: Bearer`), checked
  * for signature, expiry, the tool, and a run that is still running.
@@ -50,10 +50,10 @@ export class DebriefGatewayController {
       this.tokens.authoriseAgent(authorization, name);
       return this.reviews.commentsForAgent(body ?? {});
     }
-    if (!DEBRIEF_GATEWAY_TOOLS.includes(name as DebriefGatewayTool)) {
+    if (!GATEWAY_TOOLS.includes(name as DebriefGatewayTool)) {
       throw new NotFoundException(`No debrief tool ${name}`);
     }
-    const { run } = await this.tokens.authorise(authorization, name);
+    const { run, claims } = await this.tokens.authorise(authorization, name);
     const b = body ?? {};
     switch (name as DebriefGatewayTool) {
       case 'guidance_search':
@@ -66,6 +66,10 @@ export class DebriefGatewayController {
         return this.gateway.finaliseCards(b as any);
       case 'progress':
         return this.gateway.progress(run, b as any);
+      case 'get_learner_history':
+        return this.gateway.learnerHistory(run, claims, b);
+      case 'get_live_detections':
+        return this.gateway.liveDetections(run);
     }
   }
 }

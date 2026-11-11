@@ -42,6 +42,10 @@ psycopg = {version = "^3.3.0", extras = ["binary", "pool"]}
 # Transitive (langsmith, langgraph-checkpoint-postgres), pinned here only to hold it at
 # a patch bump: the checkpointer needs >=3.11.5 and the lock was on 3.11.2.
 orjson = "~3.11.9"
+# Ask Ally (app/core/ask_ally): LangChain's create_agent tool loop on the LangGraph runtime.
+langchain = "^1.0"
+# The release may name a Claude model for the reply; create_agent needs the LangChain wrapper.
+langchain-anthropic = "^1.0"
 
 [tool.poetry.group.dev.dependencies]
 aiohttp = "^3.13.3"

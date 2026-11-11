@@ -39,17 +39,23 @@ class Gateway(Protocol):
 
 
 class HttpGateway:
-    """The real gateway: one HTTP client per run, closed by the runner."""
+    """The real gateway: one HTTP client per run, closed by the runner.
 
-    def __init__(self, base_url: str, token: str) -> None:
+    `timeout_s` is each tool call's limit (Ask Ally's tools must answer far
+    sooner than a debrief run's)."""
+
+    def __init__(
+        self, base_url: str, token: str, timeout_s: float = TOOL_TIMEOUT_S
+    ) -> None:
+        self._timeout_s = timeout_s
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             headers={"Authorization": f"Bearer {token}"},
-            timeout=TOOL_TIMEOUT_S,
+            timeout=timeout_s,
         )
 
     async def call(self, tool: str, body: Dict[str, Any]) -> Dict[str, Any]:
-        timeout = PROGRESS_TIMEOUT_S if tool == "progress" else TOOL_TIMEOUT_S
+        timeout = PROGRESS_TIMEOUT_S if tool == "progress" else self._timeout_s
         try:
             res = await self._client.post(f"/tools/{tool}", json=body, timeout=timeout)
         except httpx.HTTPError as e:
