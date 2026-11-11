@@ -7,7 +7,7 @@ import { DebriefRun } from '../entity/debrief-run.entity';
 
 /**
  * The only relation `query_aggregates` may read: one row per skill the
- * Analyst judged in a run (migration 1981900700000). No quote, no note, no
+ * Analyst judged in a run (migration 1981900720000). No quote, no note, no
  * transcript, and the learner as a one-way key, so nothing here can carry a
  * learner's words or name.
  */

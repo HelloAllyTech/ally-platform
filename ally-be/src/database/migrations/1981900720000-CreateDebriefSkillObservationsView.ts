@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * so peers can be counted, never named. Groups under five learners are refused
  * in code (DebriefAggregatesService). A view, so nothing to backfill.
  */
-export class CreateDebriefSkillObservationsView1981900700000 implements MigrationInterface {
-  name = 'CreateDebriefSkillObservationsView1981900700000';
+export class CreateDebriefSkillObservationsView1981900720000 implements MigrationInterface {
+  name = 'CreateDebriefSkillObservationsView1981900720000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS debrief_reporting`);
