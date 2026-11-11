@@ -9316,7 +9316,7 @@ export const en = {
       runs: "Runs",
       review: "Review",
       "expert-review": "Expert review",
-      pmAgent: "PM agent",
+      "pm-agent": "PM agent",
       releases: "Releases",
       organisations: "Organisations",
       calibration: "Calibration",
@@ -10308,6 +10308,7 @@ export const en = {
       settingChange: (name: string, value: string) => `${name}: change to ${value}`,
       // ally-be debrief-metric-failures.util `metricValues`.
       forecastMetrics: {
+        fail_rate: "Failure rate",
         opened_within_24h: "Opened within a day",
         read_through: "Read to the end",
         practise_click_through: "Practise-next clicks",

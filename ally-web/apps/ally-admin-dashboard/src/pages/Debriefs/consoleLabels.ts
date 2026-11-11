@@ -36,6 +36,35 @@ export const releaseStatusLabel = from(() => en.debriefs.releases.statuses);
 export const forecastMetricLabel = from(() => en.debriefs.pmAgent.forecastMetrics);
 export const promptName = from(() => en.debriefs.pmAgent.promptNames);
 
+/** A metric or code the PM agent may name in its own text, looked up in every label map we have. */
+const knownLabel = (code: string): string | undefined =>
+  en.debriefs.pmAgent.forecastMetrics[code] ??
+  en.debriefs.run.stepNames[code] ??
+  (en.debriefs.hardFails as Record<string, string>)[code] ??
+  en.debriefs.metrics.codeLabels.checks[code] ??
+  en.debriefs.settings.names[code];
+
+/**
+ * Text the PM agent wrote, with the codes it named turned into their plain names. Only codes we
+ * have a label for are replaced (a bare snake_case token, one in backticks, or "step.metric"), so
+ * ordinary prose is left exactly as written.
+ */
+export const inWords = (text: string | null | undefined): string => {
+  if (!text) return "";
+  return text.replace(
+    /`?\b([a-z][a-z0-9]*(?:_[a-z0-9]+)*)(?:\.([a-z][a-z0-9]*(?:_[a-z0-9]+)+))?\b`?/g,
+    (m, a: string, b?: string) => {
+      if (b) {
+        const step = en.debriefs.run.stepNames[a];
+        const metric = knownLabel(b);
+        return step && metric ? `${step}: ${metric.charAt(0).toLowerCase()}${metric.slice(1)}` : m;
+      }
+      if (!a.includes("_")) return m;
+      return knownLabel(a) ?? m;
+    },
+  );
+};
+
 /**
  * A canary's reason: either one of the few codes ally-be records, or a sentence it already
  * wrote in English (debrief-ladder.util `canaryDecision`), which is shown as it is.

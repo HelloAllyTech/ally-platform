@@ -25,6 +25,7 @@ import {
   canaryReasonLabel,
   codeWords,
   forecastMetricLabel,
+  inWords,
   promptName,
   settingChangeLabel,
 } from "./consoleLabels";
@@ -66,9 +67,9 @@ const Handoff: React.FC<{ idea: PmAgentIdeaRow; onOpenRun: (runId: string) => vo
       </p>
       {h.kind === "builder" && (
         <>
-          <p className="whitespace-pre-wrap">{h.problem}</p>
-          <p className="whitespace-pre-wrap">{h.evidenceSummary}</p>
-          <p className="whitespace-pre-wrap">{h.expectedEffect}</p>
+          <p className="whitespace-pre-wrap">{inWords(h.problem)}</p>
+          <p className="whitespace-pre-wrap">{inWords(h.evidenceSummary)}</p>
+          <p className="whitespace-pre-wrap">{inWords(h.expectedEffect)}</p>
           <p className="font-semibold">{s.checks}</p>
           <ul className="list-disc pl-5">
             {h.acceptanceChecks.map(c => (
@@ -79,7 +80,7 @@ const Handoff: React.FC<{ idea: PmAgentIdeaRow; onOpenRun: (runId: string) => vo
       )}
       {h.kind === "bug_hunter" && (
         <>
-          <p className="whitespace-pre-wrap">{h.summary}</p>
+          <p className="whitespace-pre-wrap">{inWords(h.summary)}</p>
           {h.runIds.length > 0 && (
             <p className="flex flex-wrap items-center gap-x-2 text-xs" data-testid="handoff-runs">
               <span>{s.runs}:</span>
@@ -100,8 +101,10 @@ const Handoff: React.FC<{ idea: PmAgentIdeaRow; onOpenRun: (runId: string) => vo
       )}
       {h.kind === "person" && (
         <>
-          <p className="whitespace-pre-wrap">{h.question}</p>
-          {h.context && <p className="whitespace-pre-wrap text-typography-700">{h.context}</p>}
+          <p className="whitespace-pre-wrap">{inWords(h.question)}</p>
+          {h.context && (
+            <p className="whitespace-pre-wrap text-typography-700">{inWords(h.context)}</p>
+          )}
         </>
       )}
     </div>
@@ -231,7 +234,7 @@ const IdeaCard: React.FC<{
   return (
     <li className="flex flex-col gap-2 border border-border-light p-4" data-testid="idea">
       <div className="flex flex-wrap items-center gap-2">
-        <h4 className="text-base font-semibold text-typography-900">{idea.title}</h4>
+        <h4 className="text-base font-semibold text-typography-900">{inWords(idea.title)}</h4>
         <Pill tone="neutral">{s.kinds[idea.change.ideaKind] ?? idea.change.ideaKind}</Pill>
         {(() => {
           // "Live" only while the release it went out in is the live one.
@@ -249,13 +252,14 @@ const IdeaCard: React.FC<{
       </div>
       {idea.evidence.hypothesis && (
         <p className="text-sm">
-          <span className="font-semibold">{s.why}:</span> {idea.evidence.hypothesis}{" "}
-          {idea.evidence.evidence}
+          <span className="font-semibold">{s.why}:</span> {inWords(idea.evidence.hypothesis)}{" "}
+          {inWords(idea.evidence.evidence)}
         </p>
       )}
       {idea.evidence.expectedEffect && (
         <p className="text-sm">
-          <span className="font-semibold">{s.expected}:</span> {idea.evidence.expectedEffect}
+          <span className="font-semibold">{s.expected}:</span>{" "}
+          {inWords(idea.evidence.expectedEffect)}
         </p>
       )}
       {(idea.evidence.commentIds?.length ?? 0) > 0 && (

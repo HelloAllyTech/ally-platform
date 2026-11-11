@@ -8,6 +8,7 @@ import {
   checkLabel,
   codeWords,
   hardFailLabel,
+  inWords,
   languageLabel,
   modelLabels,
   promptName,
@@ -82,5 +83,30 @@ describe("console labels", () => {
     });
     expect(label("m1")).toBe("Model One");
     expect(label("unknown-model")).toBe("unknown-model");
+  });
+});
+
+describe("inWords", () => {
+  it("names the codes the PM agent writes, and leaves prose alone", () => {
+    expect(inWords("analyst.fail_rate down")).toBe("Analyst: failure rate down");
+    expect(inWords("Expected: hard_fail_rate down")).toBe("Expected: Hard-fail rate down");
+    expect(inWords("leading to `missed_risk_cue` hard fails")).not.toContain("missed_risk_cue");
+    expect(inWords("The analyst and safety_reader steps")).toBe(
+      "The analyst and Safety reader steps",
+    );
+    expect(inWords("an unknown_code_here stays, as does plain text.")).toBe(
+      "an unknown_code_here stays, as does plain text.",
+    );
+    expect(inWords(null)).toBe("");
+  });
+});
+
+describe("console tab labels", () => {
+  it("names every Debrief Console tab (a missing key leaves a blank tab)", async () => {
+    const { DebriefConsoleTab } = await import("../DebriefConsole");
+    const { en } = await import("@constants");
+    for (const id of Object.values(DebriefConsoleTab)) {
+      expect((en.debriefs.tabs as Record<string, string>)[id], id).toBeTruthy();
+    }
   });
 });
