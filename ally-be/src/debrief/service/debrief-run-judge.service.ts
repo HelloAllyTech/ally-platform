@@ -16,7 +16,16 @@ import { DEBRIEF_PROMPT_CODES } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import { DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefCards, renderCards } from '../util/debrief-cards.util';
+import { guidancePassage } from '../util/debrief-guidance.util';
+import { ClChunk } from '../../context-library/entity/cl-chunk.entity';
 import { DebriefContextRepository } from './debrief-context.repository';
+
+/**
+ * Marks run judgments given the Writer's guidance (from 2026-11-11). Without it
+ * the judge could never see a protocol, so `contradicts_protocol` could not
+ * fire; scores before and after are not one series.
+ */
+export const RUN_JUDGE_INPUT_VERSION = 'g1';
 
 export interface RunJudgment {
   model: string;
@@ -65,6 +74,7 @@ export class DebriefRunJudgeService {
       DEBRIEF_PROMPT_CODES.rubric,
       null,
     );
+    const guidance = await this.guidanceSeen(run);
     const { apiUrl, outboundApiKey } = this.config.ai;
     const res = await withJudgeSlot(() =>
       axios.post(
@@ -76,6 +86,7 @@ export class DebriefRunJudgeService {
           learner_level: session?.learnerLevel ?? null,
           rubric,
           history: (run.workspace?.history as string | null) ?? null,
+          guidance,
           scenario_session_id: run.scenarioSessionId,
         },
         {
@@ -95,7 +106,7 @@ export class DebriefRunJudgeService {
     ) as Partial<Record<DebriefQualityDimension, number>>;
     const judgment: RunJudgment = {
       model: d.judge_model,
-      promptVersion: d.judge_prompt_version,
+      promptVersion: `${d.judge_prompt_version}+${RUN_JUDGE_INPUT_VERSION}`,
       overall: computeDebriefOverall(scores, d.hard_fails.length),
       dimensions: d.dimensions.map(({ dimension, score }) => ({
         dimension,
@@ -112,6 +123,31 @@ export class DebriefRunJudgeService {
     );
     run.workspace = { ...run.workspace, judge: judgment };
     return judgment;
+  }
+
+  /**
+   * The guidance passages the Writer was given, rendered as it saw them, so
+   * the judge can tell whether the debrief contradicts or omits a protocol.
+   * Loaded by id whatever their status now: an entry archived since still
+   * shaped this debrief. Null when the run used none.
+   */
+  private async guidanceSeen(run: DebriefRun): Promise<string | null> {
+    const ids: string[] = Array.isArray(run.workspace?.passages)
+      ? run.workspace.passages
+      : [];
+    if (!ids.length) return null;
+    const chunks = await this.runs.manager
+      .getRepository(ClChunk)
+      .find({ where: { id: In(ids) } });
+    const byId = new Map(chunks.map((c) => [c.id, c]));
+    const blocks = ids
+      .map((id) => byId.get(id))
+      .filter((c): c is ClChunk => !!c)
+      .map((c) => {
+        const { title, text } = guidancePassage(c);
+        return `${title}\n${text}`;
+      });
+    return blocks.length ? blocks.join('\n\n') : null;
   }
 
   /** Judge production runs that have cards and no score yet. */

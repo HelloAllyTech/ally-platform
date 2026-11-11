@@ -24,10 +24,34 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const req = (p) => require(path.join(ROOT, p));
 
-/** The changes this script can test against GA. Add one here; it is only ever a run option. */
+/**
+ * The changes this script can test against GA. Add one here; it is only ever a run option,
+ * built once before the first case.
+ *   no_guidance  GA with guidance lookups off.
+ *   draft        the newest DRAFT release (e.g. code defaults changed by a deploy), plus any
+ *                `--prompt <code>=<file>` overrides — how a change is tested before it is promoted.
+ */
 const CHANGES = {
-  no_guidance: { settingOverrides: { guidancePassagesPerMoment: 0 } },
-  ga: {},
+  no_guidance: async () => ({
+    settingOverrides: { guidancePassagesPerMoment: 0 },
+  }),
+  ga: async () => ({}),
+  draft: async ({ ds, opt }) => {
+    const [row] = await ds.query(
+      `SELECT id FROM agent_releases WHERE "agentKey" = 'debrief' AND status = 'draft'
+        ORDER BY version DESC LIMIT 1`,
+    );
+    if (!row) throw new Error('no draft debrief release to test');
+    const release = await ds
+      .getRepository('AgentRelease')
+      .findOne({ where: { id: row.id } });
+    return {
+      release,
+      promptOverrides: Object.keys(opt.prompts).length
+        ? opt.prompts
+        : undefined,
+    };
+  },
 };
 
 const SETS = { open: 'debrief_open', gate: 'debrief_gate' };
@@ -50,6 +74,15 @@ function args() {
     out: get('out', `/tmp/debrief-eval-${set}`),
     concurrency: Number(get('concurrency', 3)),
     rejudge: Number(get('rejudge', 0)),
+    // --prompt <code>=<file>, repeatable: a prompt's text for the change arm only.
+    prompts: Object.fromEntries(
+      a
+        .flatMap((x, i) => (x === '--prompt' ? [a[i + 1]] : []))
+        .map((kv) => {
+          const [code, file] = kv.split('=');
+          return [code, fs.readFileSync(file, 'utf8')];
+        }),
+    ),
   };
 }
 
@@ -89,6 +122,9 @@ async function pool(items, n, fn) {
   const runner = app.get(DebriefRunnerService);
   const judge = app.get(DebriefRunJudgeService);
   const context = app.get(DebriefContextRepository);
+  const changeOpts = await CHANGES[opt.change]({ ds, opt });
+  if (changeOpts.release)
+    console.log(`change arm runs release v${changeOpts.release.version}`);
 
   const cases = await ds.query(
     `SELECT c.id AS case_id, c.category, c.input->>'scenarioSessionId' AS session_id
@@ -226,7 +262,7 @@ async function pool(items, n, fn) {
     };
     const [ga, ch] = await Promise.all([
       arm('ga', DebriefRunArm.BASELINE, {}),
-      arm(opt.change, DebriefRunArm.CHALLENGER, CHANGES[opt.change]),
+      arm(opt.change, DebriefRunArm.CHALLENGER, changeOpts),
     ]);
     line(ga);
     line(ch);

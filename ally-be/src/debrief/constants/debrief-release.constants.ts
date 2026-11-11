@@ -191,6 +191,11 @@ export const PM_AGENT_SETTINGS: Record<string, { min: number; max: number }> = {
 /** Every step's model. Writer and Evaluator differ from each other and from the pinned judge. */
 export const DEBRIEF_MODELS = {
   safetyReader: 'gemini-2.5-flash',
+  // At temperature 0, 2.5-flash loops on about 1% of sessions until its output limit (65k tokens,
+  // ~4 min), and retrying it repeats the loop; this model read those sessions cleanly 6/6 and
+  // passes the safety-recall gate (18/18 x3, 2026-11-11). Without a backup, both attempts fail
+  // and a person has to finish the debrief.
+  safetyReaderBackup: 'gemini-3-flash-preview',
   analyst: 'gemini-2.5-pro',
   progressReader: 'gemini-2.5-flash',
   writer: 'gemini-3-flash-preview',
@@ -226,6 +231,7 @@ const SEED_RECIPES_BASE = {
           DebriefStep.SAFETY_READER,
           'Reading your session…',
           DEBRIEF_MODELS.safetyReader,
+          DEBRIEF_MODELS.safetyReaderBackup,
         ),
         step(
           DebriefStep.ANALYST,
@@ -260,13 +266,16 @@ const SEED_RECIPES_BASE = {
     },
     [DebriefRecipeKey.SHORT]: {
       key: DebriefRecipeKey.SHORT,
-      maxRevisionRounds: 0,
+      // One round: with none, any blocking check (a score mentioned, a body too long) sent a
+      // short session's debrief to a person instead of being fixed.
+      maxRevisionRounds: 1,
       shortForm: true,
       steps: [
         step(
           DebriefStep.SAFETY_READER,
           'Reading your session…',
           DEBRIEF_MODELS.safetyReader,
+          DEBRIEF_MODELS.safetyReaderBackup,
         ),
         step(
           DebriefStep.ANALYST,
@@ -284,6 +293,12 @@ const SEED_RECIPES_BASE = {
           DebriefStep.EVALUATOR,
           'Reviewing my draft…',
           DEBRIEF_MODELS.evaluator,
+        ),
+        step(
+          DebriefStep.REVISER,
+          'Making it clearer…',
+          DEBRIEF_MODELS.reviser,
+          DEBRIEF_MODELS.writerBackup,
         ),
       ],
     },
