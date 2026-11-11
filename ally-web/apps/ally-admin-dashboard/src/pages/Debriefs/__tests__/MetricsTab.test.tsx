@@ -22,7 +22,7 @@ vi.mock("@api", async importOriginal => ({
 }));
 
 // eslint-disable-next-line import/first
-import { MetricsTab, orchestratorRows, targetState } from "../MetricsTab";
+import { groupLabel, MetricsTab, orchestratorRows, targetState } from "../MetricsTab";
 // eslint-disable-next-line import/first
 import { kappaWords } from "../metrics/metricsCharts";
 // eslint-disable-next-line import/first
@@ -143,7 +143,7 @@ describe("Debriefs tab: pass rate", () => {
       "61+",
     ]);
     expect(screen.getByTestId("metrics-breakdown-step-model")).toHaveTextContent(
-      "safety_reader: gpt-5-mini (backup)",
+      "Safety reader: gpt-5-mini (backup)",
     );
     expect(screen.getByTestId("metrics-breakdown-risk")).toHaveTextContent("38 of 58");
   });
@@ -245,7 +245,11 @@ describe("Debriefs tab: each agent", () => {
   it("shows the PM agent's outcomes and the writer's failures as bars", () => {
     render(<MetricsTab />);
     expect(screen.getByTestId("pm-outcome")).toHaveTextContent("Waiting 10");
-    expect(screen.getByTestId("writer-failures")).toHaveTextContent("quote_mismatch41");
+    const failures = screen.getByTestId("writer-failures");
+    expect(failures).toHaveTextContent("Quote doesn't match what was said41");
+    expect(failures).toHaveTextContent("A card is too long33");
+    // No raw check id reaches the chart.
+    expect(failures).not.toHaveTextContent(/[a-z]+_[a-z]+/);
     expect(screen.getByTestId("agent-registry-protocol_check")).toHaveTextContent(
       "Findings that name the protocol",
     );
@@ -439,7 +443,7 @@ describe("the orchestrator's rows in the agents table", () => {
         "Fell back to the standard plan (planner failed, timed out or could not run)",
       ),
     ).toBe("14.3% (95% range 10%–90%, 1 of 7)");
-    expect(find("Planner", "Why it fell back")).toBe("planner_failed (1)");
+    expect(find("Planner", "Why it fell back")).toBe("Planner failed or returned a bad plan (1)");
     expect(find("Planner", "Time, median / slowest 10%")).toBe("1200 / 3000");
     expect(find("Planner", "Agents chosen per debrief, mean / median")).toBe("1.3 / 1");
     expect(find("Planner", "Skipped Protocol check, then its miss showed up")).toContain("1 of 2");
@@ -455,5 +459,14 @@ describe("the orchestrator's rows in the agents table", () => {
     expect(find("Course patterns", "Refused: fewer than 5 learners in the group")).toContain(
       "1 of 1",
     );
+  });
+});
+
+describe("groupLabel", () => {
+  it("names the step in a step-model group and capitalises plain groups", () => {
+    expect(groupLabel("safety_reader: gemini-2.5-flash")).toBe("Safety reader: gemini-2.5-flash");
+    expect(groupLabel("risk cue")).toBe("Risk cue");
+    expect(groupLabel("hi-IN")).toBe("hi-IN");
+    expect(groupLabel("16-30")).toBe("16-30");
   });
 });

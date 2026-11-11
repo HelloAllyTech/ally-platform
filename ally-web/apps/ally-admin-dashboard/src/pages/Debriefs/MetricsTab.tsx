@@ -259,10 +259,24 @@ const bandChartOpts = (title: string, color: string, domain: [number, number]) =
     },
   });
 
+/**
+ * A breakdown group's name as people read it. Step-model groups arrive as "<step>: <model>", so the
+ * step id becomes the step's name from the run view; lower-case groups ("risk cue") get a capital.
+ */
+export const groupLabel = (key: string): string => {
+  const at = key.indexOf(": ");
+  if (at > 0) {
+    const step = key.slice(0, at);
+    const name = en.debriefs.run.stepNames[step];
+    if (name) return `${name}: ${key.slice(at + 2)}`;
+  }
+  return /^[a-z]/.test(key) && !/[-_]/.test(key) ? key.charAt(0).toUpperCase() + key.slice(1) : key;
+};
+
 const groupRows = (list: DebriefPassBreakdownRow[]): RateRow[] => {
   return list.map(r => ({
     key: r.key,
-    label: r.key,
+    label: groupLabel(r.key),
     rate: r.passRate,
     extra: en.debriefs.metrics.sections.groupExtra(pct(r.hardFailRate), fixed(r.judgeMean, 1)),
   }));
@@ -270,7 +284,7 @@ const groupRows = (list: DebriefPassBreakdownRow[]): RateRow[] => {
 
 const groupTable = (list: DebriefPassBreakdownRow[]): string[][] =>
   list.map(r => [
-    r.key,
+    groupLabel(r.key),
     String(r.debriefs),
     rateWithRange(r.passRate),
     rateWithRange(r.hardFailRate),

@@ -22,11 +22,22 @@ import { CONTEXT, PALETTE } from "../../Analytics/chartScales";
 const fixed = (x: number | null | undefined, d = 1) =>
   x == null ? en.debriefs.metrics.none : x.toFixed(d);
 
-const codes = (list: Array<{ code: string; runs: number }>) =>
+/** A code's plain name; an unlisted code reads as words rather than as an id. */
+const words = (code: string) => {
+  const t = code.replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+const checkLabel = (code: string) => en.debriefs.metrics.codeLabels.checks[code] ?? words(code);
+const fallbackLabel = (code: string) =>
+  en.debriefs.metrics.codeLabels.plannerFallback[code] ?? words(code);
+const hardFailLabel = (code: string) =>
+  (en.debriefs.hardFails as Record<string, string>)[code] ?? words(code);
+
+const codes = (list: Array<{ code: string; runs: number }>, label: (code: string) => string) =>
   list.length
     ? list
         .slice(0, 4)
-        .map(f => `${f.code} (${f.runs})`)
+        .map(f => `${label(f.code)} (${f.runs})`)
         .join(", ")
     : en.debriefs.metrics.none;
 
@@ -51,13 +62,13 @@ export const orchestratorRows = (
     [p.name, p.runs, String(o.runs)],
     [p.name, p.fallback, r(o.planner.fallbackRate)],
     [p.name, p.timeout, r(o.planner.timeoutRate)],
-    [p.name, p.reasons, codes(o.planner.fallbackReasons)],
+    [p.name, p.reasons, codes(o.planner.fallbackReasons, fallbackLabel)],
     [p.name, p.time, time(o.planner)],
     [p.name, p.chosen, mean],
     [p.name, p.budget, r(o.planner.droppedForBudgetRate)],
     [p.name, p.deadline, r(o.planner.droppedForTimeRate)],
     [p.name, p.unavailable, r(o.planner.droppedUnavailableRate)],
-    [p.name, p.mostChosen, codes(o.planner.chosen)],
+    [p.name, p.mostChosen, codes(o.planner.chosen, agentName)],
     [p.name, p.skippedMissed, r(o.skippedThenMissed.overall)],
     ...o.skippedThenMissed.byAgent.flatMap(b => [
       [p.name, p.skippedMissedAgent(agentName(b.agent)), r(b.whenSkipped)],
@@ -77,7 +88,7 @@ export const orchestratorRows = (
       [n, g.droppedQuotes, r(ag.droppedQuoteRate)],
       [n, g.used, r(ag.usedByWriterRate)],
       [n, g.hardFail, r(ag.judgedHardFailRate)],
-      [n, g.topHardFails, codes(ag.topHardFails)],
+      [n, g.topHardFails, codes(ag.topHardFails, hardFailLabel)],
     );
     if (ag.agent === "protocol_check") {
       rows.push(
@@ -146,7 +157,7 @@ const allRows = (agents: DebriefAgentMetrics): string[][] => {
     [s.guidance.name, s.guidance.clinicalNoRisk, r(st.guidanceLookup.clinicalOnNoRiskRate)],
     [s.guidance.name, s.guidance.wrongLevel, r(st.guidanceLookup.wrongLevelRate)],
     [s.writer.name, s.writer.firstDraft, r(st.writer.firstDraftPassRate)],
-    [s.writer.name, s.writer.failures, codes(st.writer.firstDraftFailures)],
+    [s.writer.name, s.writer.failures, codes(st.writer.firstDraftFailures, checkLabel)],
     [s.writer.name, s.writer.fail, r(st.writer.failRate)],
     [s.reviser.name, s.reviser.fix, r(st.reviser.fixRate)],
     [s.reviser.name, s.reviser.regression, r(st.reviser.regressionRate)],
@@ -322,7 +333,10 @@ export const AgentsSection: React.FC<{ agents: DebriefMetricsAgents }> = ({ agen
         >
           <Sub title={c.writerFailures}>
             <CountBars
-              items={st.writer.firstDraftFailures.map(f => ({ label: f.code, count: f.runs }))}
+              items={st.writer.firstDraftFailures.map(f => ({
+                label: checkLabel(f.code),
+                count: f.runs,
+              }))}
               testId="writer-failures"
             />
           </Sub>
@@ -448,7 +462,10 @@ const OrchestratorCards: React.FC<{ o: DebriefOrchestratorMetrics }> = ({ o }) =
         >
           <Sub title={c.plannerReasons}>
             <CountBars
-              items={o.planner.fallbackReasons.map(f => ({ label: f.code, count: f.runs }))}
+              items={o.planner.fallbackReasons.map(f => ({
+                label: fallbackLabel(f.code),
+                count: f.runs,
+              }))}
             />
           </Sub>
           <Sub title={c.plannerChosen}>
@@ -539,7 +556,12 @@ const OrchestratorCards: React.FC<{ o: DebriefOrchestratorMetrics }> = ({ o }) =
             >
               {ag.topHardFails.length > 0 && (
                 <Sub title={g.topHardFails}>
-                  <CountBars items={ag.topHardFails.map(f => ({ label: f.code, count: f.runs }))} />
+                  <CountBars
+                    items={ag.topHardFails.map(f => ({
+                      label: hardFailLabel(f.code),
+                      count: f.runs,
+                    }))}
+                  />
                 </Sub>
               )}
             </AgentCard>
