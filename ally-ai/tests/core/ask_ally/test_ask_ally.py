@@ -24,12 +24,19 @@ GUIDANCE = {
 }
 
 
-async def collect(req, model, gateway):
+async def no_distress(req):
+    return False
+
+
+async def collect(req, model, gateway, distress_reader=no_distress):
     with patch("app.core.ask_ally.middleware.emit_llm_usage") as usage:
         events = [
             e
             async for e in ask_agent.stream_reply(
-                req, gateway=gateway, model_factory=lambda cfg: model
+                req,
+                gateway=gateway,
+                model_factory=lambda cfg: model,
+                distress_reader=distress_reader,
             )
         ]
     return events, usage
@@ -255,6 +262,89 @@ async def test_an_unpriced_model_never_runs():
     assert events[-1]["type"] == "error"
     assert "no price" in events[-1]["error"]
     assert model.calls == []
+
+
+@pytest.mark.asyncio
+async def test_the_last_event_carries_the_distress_reading():
+    seen = []
+
+    async def distressed(req):
+        seen.append((req.message, req.language, req.safety_system))
+        return True
+
+    model = ScriptedModel(script=[ai("I hear you.")])
+    req = request(language="hi", safety_system="SAFETY PROMPT")
+    events, _ = await collect(req, model, FakeGateway(), distressed)
+    assert events[-1]["type"] == "done"
+    assert events[-1]["distress"] is True
+    assert seen == [("How should I ask about safety?", "hi", "SAFETY PROMPT")]
+    # Only the last event carries it; the words never wait for it.
+    assert all("distress" not in e for e in events[:-1])
+
+
+@pytest.mark.asyncio
+async def test_a_failed_reply_still_carries_the_distress_reading():
+    async def distressed(req):
+        return True
+
+    model = ScriptedModel(script=[ai("never")])
+    events, _ = await collect(request(prices={}), model, FakeGateway(), distressed)
+    assert events[-1]["type"] == "error"
+    assert events[-1]["distress"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_failed_or_slow_distress_reading_is_false(monkeypatch):
+    async def broken(req):
+        raise RuntimeError("safety model down")
+
+    events, _ = await collect(
+        request(), ScriptedModel(script=[ai("Fine.")]), FakeGateway(), broken
+    )
+    assert events[-1]["distress"] is False
+
+    import asyncio
+
+    monkeypatch.setattr(ask_agent, "DISTRESS_TIMEOUT_S", 0.01)
+
+    async def slow(req):
+        await asyncio.sleep(1)
+        return True
+
+    events, _ = await collect(
+        request(), ScriptedModel(script=[ai("Fine.")]), FakeGateway(), slow
+    )
+    assert events[-1]["type"] == "done"
+    assert events[-1]["distress"] is False
+
+
+@pytest.mark.asyncio
+async def test_read_distress_reads_the_message_as_one_learner_turn(monkeypatch):
+    from app.core.debrief.safety_reader import LearnerDistress, SafetyReading
+
+    calls = []
+
+    async def fake_read(transcript, language, system=None, **kw):
+        calls.append((transcript, language, system, kw))
+        found = [LearnerDistress(turn_index=1, quote="close to home")]
+        return SafetyReading(learner_distress=found), "m"
+
+    monkeypatch.setattr(ask_agent, "read_safety", fake_read)
+    req = request(message="this is close to home", language="ta")
+    assert await ask_agent.read_distress(req) is True
+    ((transcript, language, system, kw),) = calls
+    assert [(t.turn_index, t.role, t.text) for t in transcript] == [
+        (1, "counselor", "this is close to home")
+    ]
+    assert language == "ta" and system is None
+    assert kw == {"scenario_session_id": "sess-1"}
+
+    async def none_read(*a, **kw):
+        return None, "m"
+
+    monkeypatch.setattr(ask_agent, "read_safety", none_read)
+    with pytest.raises(ValueError):
+        await ask_agent.read_distress(req)
 
 
 def test_clean_topic():

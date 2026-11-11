@@ -899,11 +899,13 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'debrief-safety-reader',
     task: LlmTask.DEBRIEF_SAFETY_READER,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Every debrief run, whatever the recipe',
+    trigger:
+      'Every debrief run, whatever the recipe; and every Ask Ally reply that passed the crisis keyword screen',
     detail:
       "Finds the client's risk cues and how the learner responded, and the learner's own " +
       'distress. Mandatory: a recipe cannot drop it. Recall is gated at 100% on the seeded ' +
-      'safety set before any change to its prompt or model.',
+      'safety set before any change to its prompt or model. Ask Ally runs it on the ' +
+      "learner's message inside its reply request, for distress the keywords miss.",
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',

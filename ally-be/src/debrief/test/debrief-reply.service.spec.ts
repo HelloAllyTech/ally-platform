@@ -40,8 +40,8 @@ const TRACE: ReplyTrace = {
 function build(opts: {
   /** Ask Ally's answer: the reply text (and tool texts), or the error it ends with. */
   reply?: { text: string; toolTexts?: string[] } | AskAllyError;
+  /** The Safety reader's verdict on Ask Ally's last event. */
   distress?: boolean;
-  safetyFails?: boolean;
   bundleReply?: Record<string, unknown>;
   onTopic?: boolean;
   org?: boolean;
@@ -63,12 +63,6 @@ function build(opts: {
     save: jest.fn(),
     manager: { query: kept },
   };
-  const ai = {
-    safetyReader: jest.fn(async () => {
-      if (opts.safetyFails) throw new Error('down');
-      return { learner_distress: opts.distress ? [{ turn_index: 1 }] : [] };
-    }),
-  };
   const context = {
     transcript: jest.fn(async () => [
       {
@@ -77,7 +71,11 @@ function build(opts: {
         text: 'I just feel so tired of everything.',
       },
     ]),
-    promptText: jest.fn(async () => 'REPLY PROMPT'),
+    promptText: jest.fn(async (code: string) =>
+      code === 'debrief_safety_reader_system'
+        ? 'SAFETY PROMPT'
+        : 'REPLY PROMPT',
+    ),
     pastWorkOnThis: jest.fn(async () => []),
     orgWording: jest.fn(async () =>
       opts.org ? 'How to refer to their supervisor: your team lead' : null,
@@ -114,7 +112,12 @@ function build(opts: {
         throw r;
       }
       onText(r.text);
-      return { text: r.text, toolTexts: r.toolTexts ?? [], trace: TRACE };
+      return {
+        text: r.text,
+        toolTexts: r.toolTexts ?? [],
+        trace: TRACE,
+        distress: opts.distress ?? false,
+      };
     }),
   };
   const tokens = {
@@ -124,7 +127,6 @@ function build(opts: {
   const svc = new DebriefReplyService(
     chats as any,
     messages as any,
-    ai as any,
     context as any,
     runner as any,
     agent as any,
@@ -319,10 +321,25 @@ describe('DebriefReplyService (Ask Ally)', () => {
     );
   });
 
-  it('still answers when the Safety reader is down', async () => {
-    const { svc } = build({ reply: { text: 'Fine.' }, safetyFails: true });
+  it('sends the session language and the pinned Safety reader prompt with the reply', async () => {
+    const { svc, askAlly, feedback } = build({ reply: { text: 'Fine.' } });
     const done = (await run(svc, 'ok')).find((e) => e.type === 'done');
+    expect(sent(askAlly)).toMatchObject({
+      language: 'hi',
+      safety_system: 'SAFETY PROMPT',
+    });
+    // No distress on the last event: the reply alone, no review item.
     expect(done.content).toBe('Fine.');
+    expect(feedback.raiseChatDistress).not.toHaveBeenCalled();
+  });
+
+  it('sends no Safety reader prompt when none is live, so ally-ai uses its default', async () => {
+    const { svc, askAlly, context } = build({ reply: { text: 'Fine.' } });
+    context.promptText.mockImplementation(async (code: string) =>
+      code === 'debrief_safety_reader_system' ? (null as any) : 'REPLY PROMPT',
+    );
+    await run(svc, 'ok');
+    expect(sent(askAlly).safety_system).toBeNull();
   });
 
   it('keeps how the reply was reached on the run, without the learner’s message', async () => {
@@ -365,10 +382,25 @@ describe('DebriefReplyService (Ask Ally)', () => {
       expect(saved.map((m) => m.senderId)).toEqual([7]);
     });
 
+    it('adds the support lines to the words already shown when the Safety reader heard distress', async () => {
+      const { svc, feedback } = build({
+        reply: new AskAllyError('down', 'That sounds hard.', TRACE, true),
+      });
+      const done = (await run(svc, 'this one hit close to home')).find(
+        (e) => e.type === 'done',
+      );
+      expect(done.content).toContain('That sounds hard.');
+      expect(done.content).toContain('14416');
+      expect(feedback.raiseChatDistress).toHaveBeenCalledWith(
+        RUN,
+        7,
+        'safety reader',
+      );
+    });
+
     it('still gives the support lines when the Safety reader heard distress', async () => {
       const { svc, feedback } = build({
-        reply: new AskAllyError('down', '', null),
-        distress: true,
+        reply: new AskAllyError('down', '', null, true),
       });
       const done = (await run(svc, 'this one hit close to home')).find(
         (e) => e.type === 'done',
