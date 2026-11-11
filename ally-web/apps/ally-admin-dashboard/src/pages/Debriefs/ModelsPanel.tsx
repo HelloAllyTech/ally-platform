@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button, Select, SelectItem, TextArea } from "@ally-ui-mono/ui-shared";
+import { Button, CarbonDropdown as Dropdown, TextArea } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefModelsQuery, useSetDebriefModelsMutation } from "@api";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
@@ -10,9 +10,15 @@ import { en } from "@constants";
 import { DebriefModelChoice } from "@types";
 import { getErrorMessage } from "@utils";
 
+import { modelLabels, stepName } from "./consoleLabels";
 import { ConsoleTable } from "./consoleTable";
 
 const ASK_ALLY = "ask_ally";
+
+/** A model id shown by its catalog name, with the id itself on hover. */
+const ModelName: React.FC<{ id: string; label: (id: string) => string }> = ({ id, label }) => (
+  <span title={id}>{label(id)}</span>
+);
 
 const ModelSelect: React.FC<{
   id: string;
@@ -26,18 +32,24 @@ const ModelSelect: React.FC<{
     ? choices
     : [{ model: value, label: value, provider: null }, ...choices];
   return (
-    <Select
-      id={id}
-      labelText={label}
-      hideLabel
-      size="sm"
-      value={value}
-      onChange={(event: React.ChangeEvent<HTMLSelectElement>) => onChange(event.target.value)}
-    >
-      {options.map(c => (
-        <SelectItem key={c.model} value={c.model} text={`${c.label} (${c.model})`} />
-      ))}
-    </Select>
+    <div className="w-full min-w-[14rem] max-w-xs">
+      <Dropdown
+        id={id}
+        size="sm"
+        titleText={label}
+        hideLabel
+        label={label}
+        items={options}
+        selectedItem={options.find(c => c.model === value) ?? null}
+        itemToString={(c: DebriefModelChoice | null) => c?.label ?? ""}
+        itemToElement={(c: DebriefModelChoice | null) =>
+          c ? <span title={c.model}>{c.label}</span> : null
+        }
+        onChange={({ selectedItem }: { selectedItem: DebriefModelChoice | null }) =>
+          selectedItem && onChange(selectedItem.model)
+        }
+      />
+    </div>
   );
 };
 
@@ -49,7 +61,6 @@ export const ModelsPanel: React.FC = () => {
   const s = en.debriefs.releases.models;
   const models = useGetDebriefModelsQuery();
   const [save, { isLoading }] = useSetDebriefModelsMutation();
-  const [draft, setDraft] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [confirming, setConfirming] = useState(false);
 
@@ -61,9 +72,17 @@ export const ModelsPanel: React.FC = () => {
       [ASK_ALLY]: d.reply,
     };
   }, [models.data]);
-  useEffect(() => setDraft(live), [live]);
+  // The draft starts from the live release and starts again whenever that changes (a save,
+  // a rollback); adjusted while rendering rather than in an effect.
+  const [draft, setDraft] = useState<Record<string, string>>(live);
+  const [draftOf, setDraftOf] = useState(live);
+  if (draftOf !== live) {
+    setDraftOf(live);
+    setDraft(live);
+  }
 
   const changed = Object.entries(draft).filter(([k, v]) => v && v !== live[k]);
+  const label = modelLabels(models.data);
 
   const submit = async () => {
     const steps = Object.fromEntries(changed.filter(([k]) => k !== ASK_ALLY));
@@ -105,27 +124,27 @@ export const ModelsPanel: React.FC = () => {
             key: st.step,
             testId: "model-row",
             cells: [
-              s.steps[st.step] ?? st.step,
+              stepName(st.step),
               <ModelSelect
                 key="m"
                 id={`model-${st.step}`}
-                label={s.steps[st.step] ?? st.step}
+                label={stepName(st.step)}
                 value={draft[st.step] ?? ""}
                 choices={d.choices.steps}
                 onChange={m => setDraft({ ...draft, [st.step]: m })}
               />,
-              st.backupModel ?? s.none,
+              st.backupModel ? <ModelName key="b" id={st.backupModel} label={label} /> : s.none,
             ],
           })),
           {
             key: ASK_ALLY,
             testId: "model-row",
             cells: [
-              s.steps[ASK_ALLY],
+              stepName(ASK_ALLY),
               <ModelSelect
                 key="m"
                 id="model-ask-ally"
-                label={s.steps[ASK_ALLY]}
+                label={stepName(ASK_ALLY)}
                 value={draft[ASK_ALLY] ?? ""}
                 choices={d.choices.reply}
                 onChange={m => setDraft({ ...draft, [ASK_ALLY]: m })}
@@ -136,7 +155,13 @@ export const ModelsPanel: React.FC = () => {
           {
             key: "judge",
             testId: "model-row",
-            cells: [s.steps.judge, `${d.judge} · ${s.fixed}`, s.none],
+            cells: [
+              stepName("judge"),
+              <span key="j">
+                <ModelName id={d.judge} label={label} /> · {s.fixed}
+              </span>,
+              s.none,
+            ],
           },
         ]}
       />
@@ -162,7 +187,7 @@ export const ModelsPanel: React.FC = () => {
         onConfirm={() => void submit()}
         onClose={() => setConfirming(false)}
       >
-        <p>{s.confirmBody(changed.map(([k, v]) => `${s.steps[k] ?? k} on ${v}`).join(", "))}</p>
+        <p>{s.confirmBody(changed.map(([k, v]) => s.on(stepName(k), label(v))).join(", "))}</p>
         <TextArea
           id="models-note"
           labelText={s.noteLabel}

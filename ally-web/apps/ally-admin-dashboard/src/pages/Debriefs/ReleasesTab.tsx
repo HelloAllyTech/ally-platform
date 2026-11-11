@@ -12,6 +12,7 @@ import { en } from "@constants";
 import { DebriefReleaseRow } from "@types";
 import { getErrorMessage } from "@utils";
 
+import { codeWords, releaseStatusLabel } from "./consoleLabels";
 import { ConsoleTable, formatWhen } from "./consoleTable";
 import { ModelsPanel } from "./ModelsPanel";
 import { StepsPanel } from "./StepsPanel";
@@ -30,7 +31,7 @@ export const ReleasesTab: React.FC = () => {
       toast.success(s.rolledBack);
       setTarget(null);
     } catch (e) {
-      toast.error(getErrorMessage(e, en.debriefs.organisations.failed));
+      toast.error(getErrorMessage(e, s.rollbackFailed));
     }
   };
 
@@ -40,53 +41,56 @@ export const ReleasesTab: React.FC = () => {
         <h2 className="text-xl font-normal text-typography-900">{s.heading}</h2>
         <p className="max-w-3xl pt-1 text-sm text-typography-700">{s.help}</p>
       </div>
+      <section className="flex flex-col gap-3" data-testid="releases-versions">
+        <h3 className="text-xl font-normal text-typography-900">{s.versionsHeading}</h3>
+        {releases.isError ? (
+          <ErrorPanel
+            what={s.loadFailed}
+            error={releases.error}
+            onRetry={() => void releases.refetch()}
+          />
+        ) : !releases.data ? (
+          <LoadingBlock lines={4} />
+        ) : releases.data.length === 0 ? (
+          <EmptyPanel title={s.heading} message={s.empty} />
+        ) : (
+          <ConsoleTable
+            testId="releases-table"
+            headers={[
+              s.columns.version,
+              s.columns.status,
+              s.columns.by,
+              s.columns.notes,
+              s.columns.when,
+              "",
+            ]}
+            rows={releases.data.map(r => ({
+              key: r.id,
+              testId: "release-row",
+              cells: [
+                releaseVersionLabel(r.version),
+                r.status === "ga" ? (
+                  <Pill key="p" tone="success">
+                    {s.live}
+                  </Pill>
+                ) : (
+                  releaseStatusLabel(r.status)
+                ),
+                s.authors[r.authorKind] ?? codeWords(r.authorKind),
+                r.notes ?? "—",
+                formatWhen(r.promotedAt ?? r.createdAt),
+                r.status === "ga" ? null : (
+                  <Button key="b" kind="tertiary" size="sm" onClick={() => setTarget(r)}>
+                    {s.rollback}
+                  </Button>
+                ),
+              ],
+            }))}
+          />
+        )}
+      </section>
       <ModelsPanel />
       <StepsPanel />
-      {releases.isError ? (
-        <ErrorPanel
-          what={s.loadFailed}
-          error={releases.error}
-          onRetry={() => void releases.refetch()}
-        />
-      ) : !releases.data ? (
-        <LoadingBlock lines={4} />
-      ) : releases.data.length === 0 ? (
-        <EmptyPanel title={s.heading} message={s.empty} />
-      ) : (
-        <ConsoleTable
-          testId="releases-table"
-          headers={[
-            s.columns.version,
-            s.columns.status,
-            s.columns.by,
-            s.columns.notes,
-            s.columns.when,
-            "",
-          ]}
-          rows={releases.data.map(r => ({
-            key: r.id,
-            testId: "release-row",
-            cells: [
-              releaseVersionLabel(r.version),
-              r.status === "ga" ? (
-                <Pill key="p" tone="success">
-                  {s.live}
-                </Pill>
-              ) : (
-                r.status
-              ),
-              s.authors[r.authorKind] ?? r.authorKind,
-              r.notes ?? "—",
-              formatWhen(r.promotedAt ?? r.createdAt),
-              r.status === "ga" ? null : (
-                <Button key="b" kind="tertiary" size="sm" onClick={() => setTarget(r)}>
-                  {s.rollback}
-                </Button>
-              ),
-            ],
-          }))}
-        />
-      )}
       <ConfirmDialog
         isOpen={target !== null}
         title={target ? s.rollbackTitle(releaseVersionLabel(target.version)) : ""}
