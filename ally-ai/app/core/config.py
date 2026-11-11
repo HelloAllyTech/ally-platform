@@ -165,12 +165,13 @@ class AgentRuntimeSettings(BaseModel):
 class BuilderSettings(BaseModel):
     """Onboarding builder (chunk 20a): the setup guide behind `/builder/*`.
 
-    Dark until ENABLED: the routes answer 404 while it is off. It keeps no state of
-    its own (ally-be holds the draft), so unlike the agent runtime it needs no
-    checkpointer.
+    On by default: ally-be's onboarding (chat, website reading, document uploads)
+    depends on it. ENABLED=false is the kill switch: the routes then answer 404.
+    It keeps no state of its own (ally-be holds the draft), so unlike the agent
+    runtime it needs no checkpointer.
     """
 
-    ENABLED: bool = Field(False)
+    ENABLED: bool = Field(True)
     # Hard cap on one builder step, sub-tasks included. Below ally-be's 60-second
     # relay deadline, so ally-be always gets a clean `error: timeout`.
     STEP_TIMEOUT_SECONDS: float = Field(45.0, gt=0, le=120)

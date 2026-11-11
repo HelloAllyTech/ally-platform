@@ -1096,8 +1096,8 @@ export class AppConfigService {
       crawlAllowHosts: devOrTest ? hosts : [],
       crawlsPerDay:
         Number(
-          this.configService.get<string>('BOT_DRAFT_CRAWLS_PER_DAY', '5'),
-        ) || 5,
+          this.configService.get<string>('BOT_DRAFT_CRAWLS_PER_DAY', '20'),
+        ) || 20,
     };
   }
 

@@ -114,6 +114,12 @@ export class RedisService {
     return this.redis.incr(fullKey);
   }
 
+  /** Decrement a counter key, e.g. to hand back a hit that was refused. */
+  async decr(key: string): Promise<number> {
+    const fullKey = this.getFullKey(key);
+    return this.redis.decr(fullKey);
+  }
+
   /**
    * Increment a counter that lives for a fixed window from its first hit, and
    * return the count after this increment plus the seconds left in the window.

@@ -141,6 +141,10 @@ function harness(allowHosts: string[] = ['127.0.0.1'], crawlsPerDay = 5) {
       counters.set(key, (counters.get(key) ?? 0) + 1);
       return { count: counters.get(key)!, ttlSeconds: 100 };
     }),
+    decr: jest.fn(async (key: string) => {
+      counters.set(key, (counters.get(key) ?? 0) - 1);
+      return counters.get(key)!;
+    }),
   };
   const learned: number[] = [];
   const learner = {
@@ -436,6 +440,17 @@ describe('SiteCrawlService', () => {
     await h.crawl(s.url);
     const second = await h.crawl(s.url);
     expect(second).toMatchObject({ status: 'failed', problem: 'daily_limit' });
+  });
+
+  it("doesn't count a refused attempt against the cap", async () => {
+    const s = await serve({ '/': { body: page('Home', LONG) } });
+    const h = harness(['127.0.0.1'], 1);
+    await h.crawl(s.url);
+    await h.crawl(s.url);
+    await h.crawl(s.url);
+    const [key] = h.redis.incrWithExpiry.mock.calls[0];
+    expect(h.redis.decr).toHaveBeenCalledTimes(2);
+    expect(h.redis.decr).toHaveBeenCalledWith(key);
   });
 
   it('logs domains and counts, never page text', async () => {

@@ -80,8 +80,8 @@ AGENT_RUNTIME__ENABLED=false
 # than parity mode (CHUNK-03A-NOTES.md).
 # AGENT_RUNTIME__AGENT_REASONING_EFFORT=low
 
-# Onboarding builder (chunk 20a): /builder/* answer 404 until this is true.
-# BUILDER__ENABLED=false
+# Onboarding builder (chunk 20a): on by default; false turns /builder/* into 404s.
+# BUILDER__ENABLED=true
 # BUILDER__STEP_TIMEOUT_SECONDS=45
 # BUILDER__EXTRACT_TIMEOUT_SECONDS=40
 # BUILDER__REASONING_EFFORT=low

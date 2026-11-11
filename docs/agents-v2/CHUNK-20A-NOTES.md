@@ -169,7 +169,7 @@ Elsewhere in ally-be: the engine sends the pack as `persona.safety_rules` and `p
 
 ### ally-ai (`app/core/builder/`, `app/api/v1/endpoints/builder.py`)
 
-- `/builder/step`, `/builder/step/stream`, `/builder/extract`, dark until `BUILDER__ENABLED`.
+- `/builder/step`, `/builder/step/stream`, `/builder/extract`; on by default, `BUILDER__ENABLED=false` turns them off (404).
 - Six structured sub-tasks, each with its own prompt (`app/prompts/builder/*.txt`) and task label: the conversation step, fact extraction, classify (business type and care topics), gaps, designs, draft.
 - Code decides what the deck fixes: question order and quick replies, gap checklists per business type, what each design will and won't do, the coming-soon card, and every fixed message. The model writes only what the deck leaves open, and proposes values that code turns into patches on the builder's own paths.
 - Checks in code: facts must cite a page in their batch; sentences stating a number we were never given are dropped; the assistant never claims to book; unknown labels fall back rather than fail a batch.
@@ -210,7 +210,7 @@ Rules for the restyle: take strings from `copy.ts` (add any new ones to the deck
 
 - Every outbound fetch goes through the shared SSRF guard: private ranges refused, every redirect re-checked. Fixture hosts are allowed only in local, development and test (`BOT_DRAFT_CRAWL_ALLOW_HOSTS`).
 - robots.txt is honoured with our own user agent (`AllyAssistantSetup`); a site that disallows us stops with copy §13's message.
-- 5 crawls per owner per day by default (`BOT_DRAFT_CRAWLS_PER_DAY`).
+- 20 crawls per owner per day by default (`BOT_DRAFT_CRAWLS_PER_DAY`). Only crawls that start count; a refused attempt doesn't.
 - The builder never writes: it has no tools, and ally-be checks every proposal.
 - Logs carry draft ids, steps, domains and counts only: no page text, no owner messages, no email addresses. Requests to `/builder/extract` are logged by size only.
 - A health pack's safety is enforced in code twice: the settings floor (classifier on, `safety_locked` to turn it off) and the agent check (no diagnosis or dosing).

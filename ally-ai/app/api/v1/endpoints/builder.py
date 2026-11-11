@@ -1,6 +1,6 @@
 """Onboarding builder (chunk 20a): the setup guide a new customer talks to.
 
-Dark until BUILDER__ENABLED: every route answers 404 while it is off. The builder
+On by default; BUILDER__ENABLED=false turns every route into a 404. The builder
 keeps no state and never writes: ally-be sends the draft with each step, and applies
 what comes back only after its own checks.
 """

@@ -167,12 +167,13 @@ export class SiteCrawlService implements OnModuleInit {
     if (!startUrl) return this.fail(draft, 'unreachable', website);
 
     const day = new Date().toISOString().slice(0, 10);
+    const capKey = `bd:crawl-cap:${draft.ownerUserId}:${day}`;
     try {
-      const { count } = await this.redis.incrWithExpiry(
-        `bd:crawl-cap:${draft.ownerUserId}:${day}`,
-        90_000,
-      );
+      const { count } = await this.redis.incrWithExpiry(capKey, 90_000);
       if (count > this.config.botDraft.crawlsPerDay) {
+        // Only crawls that start count: a refused attempt is handed back, so retrying
+        // past the cap doesn't push the count further out.
+        await this.redis.decr(capKey).catch(() => undefined);
         return this.fail(draft, 'daily_limit', startUrl);
       }
     } catch {
