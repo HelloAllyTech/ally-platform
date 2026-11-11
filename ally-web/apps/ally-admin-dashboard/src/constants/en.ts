@@ -10093,6 +10093,31 @@ export const en = {
           held: "Promotions that still stood 14 days later",
         },
       },
+      filters: {
+        heading: "Filters",
+        help: "Every number on this page follows these filters, except the baselines, uptake lift and the PM agent, which always read across everything. The evals use the same filters.",
+        all: "All",
+        organisation: "Organisation",
+        language: "Language",
+        learnerLevel: "Learner level",
+        recipe: "Debrief type",
+        releaseVersion: "Release",
+        judgeVersion: "Judge version",
+        clear: "Clear filters",
+        release: (v: number) => `v${v}`,
+        levels: {
+          lay: "Lay helper",
+          early_professional: "Early professional",
+          experienced_professional: "Experienced professional",
+        } as Record<string, string>,
+        recipes: {
+          standard: "Standard",
+          short: "Short session",
+          case: "Case",
+          assessment: "Assessment",
+        } as Record<string, string>,
+        unfilteredNote: "Not filtered: baselines, uptake lift and the PM agent.",
+      },
       quality: {
         heading: "Pass rate",
         help: "Share of debriefs that reached the learner with no blocking check failure and no hard fail from the independent judge. It is the same measure the test-set evals report, so the two can be compared. Debriefs not scored yet, and sessions too short to debrief, are left out.",
@@ -10116,6 +10141,21 @@ export const en = {
           judgeMean: "Judge score, mean",
         },
         empty: "No live debrief in this window.",
+        breakdowns: {
+          heading: "Pass rate broken down",
+          skill: "By skill the debrief worked on",
+          skillHelp:
+            "A debrief counts under every skill it named, so these rows add up to more than the total.",
+          scenario: "By scenario",
+          course: "By course",
+          courseHelp: "A scenario used in more than one course counts under each.",
+          sessionLength: "By session length (learner turns)",
+          stepModel: "By the model each step ran on",
+          stepModelHelp:
+            "A debrief counts once for each step's model. A backup model shows as its own row.",
+          risk: "Sessions with and without a client risk cue",
+          key: "Group",
+        },
       },
       guardrails: {
         heading: "Guardrails",
