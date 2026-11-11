@@ -1,8 +1,10 @@
 const { createGlobPatternsForDependencies } = require("@nx/react/tailwind");
 const { join } = require("path");
 
+const { withDarkMode } = require("./dark-mode.tailwind");
+
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+module.exports = withDarkMode({
   content: [
     join(__dirname, "{src,pages,components,app}/**/*!(*.stories|*.spec).{ts,tsx,html}"),
     ...createGlobPatternsForDependencies(__dirname),
@@ -499,4 +501,4 @@ module.exports = {
     },
   },
   plugins: [],
-};
+});

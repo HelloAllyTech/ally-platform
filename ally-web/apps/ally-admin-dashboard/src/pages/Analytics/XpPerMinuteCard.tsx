@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { StackedBarChart } from "@carbon/charts-react";
-
 import { useGetXpPerMinuteQuery } from "@api";
+import { StackedBarChart } from "@components/charts";
 
 import { asOf, windowLabel } from "./analyticsFilters";
 import {

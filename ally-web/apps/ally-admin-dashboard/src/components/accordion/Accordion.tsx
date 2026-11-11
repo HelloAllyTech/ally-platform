@@ -57,7 +57,7 @@ export const Accordion: FC<AccordionProps> = ({
         className={`cursor-pointer ${customAccordionSummaryClassName ?? accordionSummaryClassName}`}
       >
         <span
-          className={`transition-transform duration-200 [&_path]:fill-[#212121] ${
+          className={`transition-transform duration-200 text-typography-900 [&_path]:fill-current ${
             expanded ? "" : "-rotate-90"
           }`}
         >

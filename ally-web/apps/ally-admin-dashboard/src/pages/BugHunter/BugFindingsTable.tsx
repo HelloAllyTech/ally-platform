@@ -942,7 +942,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
     <div id={BUG_FINDINGS_TABLE_ANCHOR_ID} className="scroll-mt-4">
       {/* Above the tabs on purpose: the scope changes what every count below
           it counts, so a reader who has not seen this line will read
-          "Backlog 7" as "seven bugs are waiting". Stacks' *Making Agent
+          "Backlog 7" as "seven bugs are waiting". *Making Agent
           Trustworthiness Visible Through Transparency* is the argument for
           spelling out the audit trail rather than quietly narrowing the view. */}
       {run && (
@@ -1039,7 +1039,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
         ) : view.matched === 0 ? (
           // An empty tab says what lands in it, so "nothing here" reads as
           // nothing yet rather than as something broken — and the counts on
-          // the tabs above are the way on (Stacks: *The Four-Second Rule:
+          // the tabs above are the way on (*The Four-Second Rule:
           // Confusion Triggers Disengagement*).
           <div
             className="border border-border-light rounded-lg py-10 text-center"

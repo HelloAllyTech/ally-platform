@@ -35,6 +35,8 @@ export interface Scenario {
   title?: string;
   scenario?: string;
   description?: string;
+  /** Narration of the description; absent until generated. */
+  descriptionAudioUrl?: string | null;
   /** Text reminders shown to the learner during the roleplay. */
   reminders?: string[];
   /** Whether reminders are shown to the learner during the roleplay — reminders should only render when this is true. */

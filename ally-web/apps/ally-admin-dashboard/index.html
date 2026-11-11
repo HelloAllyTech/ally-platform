@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <title>Ally Admin</title>
-    <base href="/" />
+    <base href="%BASE_URL%" />
 
     <meta
       name="viewport"
@@ -12,8 +12,8 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <link rel="icon" href="/favicon.ico?v=1" sizes="any" />
-    <link rel="shortcut icon" href="/favicon.ico?v=1" />
+    <link rel="icon" href="%BASE_URL%favicon.ico?v=1" sizes="any" />
+    <link rel="shortcut icon" href="%BASE_URL%favicon.ico?v=1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -21,6 +21,16 @@
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add,arrow_back,auto_awesome,bug_report,change_history,flag,person,settings,sort,sticky_note,terminal,tips_and_updates,vertical_align_top"
     />
     <link rel="stylesheet" href="/src/styles.css" />
+    <!-- Apply the saved light/dark choice before first paint, so a dark-mode reload never
+         flashes white. Same key as src/hooks/useColorMode.ts; main.tsx re-applies it. -->
+    <script>
+      try {
+        if (localStorage.getItem("ally-admin-color-mode") === "dark") {
+          document.documentElement.classList.add("dark", "cds--g100");
+          document.documentElement.style.colorScheme = "dark";
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

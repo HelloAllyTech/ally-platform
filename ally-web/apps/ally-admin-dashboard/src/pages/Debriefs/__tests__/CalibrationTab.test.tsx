@@ -141,7 +141,7 @@ describe("CalibrationTab", () => {
     render(<CalibrationTab />);
     expect(screen.getByTestId("kpi-Debriefs rated")).toHaveTextContent("1 of 150");
     expect(screen.getByTestId("kpi-Rated by you")).toHaveTextContent("1");
-    expect(screen.getByTestId("kpi-Improver autonomy")).toHaveTextContent("Needs approval");
+    expect(screen.getByTestId("kpi-PM agent autonomy")).toHaveTextContent("Needs approval");
     expect(within(screen.getByTestId("gate-accuracy")).getByText("Passes")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("gate-missed_risk_cue")).getByText("Needs 20 rated debriefs"),

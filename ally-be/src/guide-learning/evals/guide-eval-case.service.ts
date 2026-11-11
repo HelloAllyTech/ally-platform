@@ -81,7 +81,7 @@ const SUITES: Array<{
  * Eval cases (plans/ally-guide/plan.md §7.12–§7.13): saved from any turn
  * trace, proposed from failed turns, written by the red team, varied
  * counterfactually. Failure traces and success exemplars both belong here
- * (Stacks: Regression Trace Collection from Production Failures; Convert
+ * (Regression Trace Collection from Production Failures; Convert
  * Production Failures and Successes into Regression Tests).
  *
  * A case mined from a conversation stores the learner's words REDACTED, and

@@ -213,7 +213,7 @@ export const BUILDER_INTERVIEWER_SYSTEM = definePrompt(
   {
     name: 'Builder Interviewer — System',
     description:
-      'System prompt for the Builder PRD-interview agent: interviews an Ally admin one option-card question at a time, grounding each question in the codebase (GitHub tools + repo knowledge packs) and the product library (Stacks), resolving contradictions between answers, and keeping a living PRD patched to build-readiness for the coding agent to implement.',
+      'System prompt for the Builder PRD-interview agent: interviews an Ally admin one option-card question at a time, grounding each question in the codebase (GitHub tools + repo knowledge packs) and the team’s principles (the Context Library’s First Principles), resolving contradictions between answers, and keeping a living PRD patched to build-readiness for the coding agent to implement.',
     category: 'Builder',
     runtimes: ['ally-be'],
   },
@@ -339,20 +339,6 @@ export const BUILDER_INTERVIEW_SUMMARY_SYSTEM = definePrompt(
       'Compresses the oldest turns of a long Builder interview into notes the interviewer keeps instead of the full transcript: decisions and reasons, rejected options, stated constraints, open items and unrepaired failures.',
     category: 'Builder',
     runtimes: ['ally-be'],
-  },
-);
-
-/** src/prompts/builder/lesson_curator_system.txt */
-export const BUILDER_LESSON_CURATOR_SYSTEM = definePrompt(
-  'builder_lesson_curator_system',
-  {},
-  {
-    name: 'Builder — Lesson Curator',
-    description:
-      "Folds the lessons a finished build wrote into Builder's capped lesson set, one AGREE / EDIT / ADD / REMOVE operation per candidate. Answers with a JSON array of operations; every guardrail is enforced in code.",
-    category: 'Builder',
-    runtimes: ['ally-be'],
-    output: 'json',
   },
 );
 
@@ -974,6 +960,55 @@ export const PRODUCT_UPDATES_CONSOLIDATE = definePrompt(
   },
 );
 
+/** src/prompts/planning/safety_review.txt */
+export const PLANNING_SAFETY_REVIEW = definePrompt(
+  'planning_safety_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/privacy_review.txt */
+export const PLANNING_PRIVACY_REVIEW = definePrompt(
+  'planning_privacy_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/ai_quality_review.txt */
+export const PLANNING_AI_QUALITY_REVIEW = definePrompt(
+  'planning_ai_quality_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/outcome_review.txt */
+export const PLANNING_OUTCOME_REVIEW = definePrompt(
+  'planning_outcome_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/launch_plan.txt */
+export const PLANNING_LAUNCH_PLAN = definePrompt(
+  'planning_launch_plan',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/research_plan.txt */
+export const PLANNING_RESEARCH_PLAN = definePrompt(
+  'planning_research_plan',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/signal_scout.txt */
+export const PLANNING_SIGNAL_SCOUT = definePrompt(
+  'planning_signal_scout',
+  {},
+  { output: 'json' },
+);
+
 /** src/prompts/roadmap/classify_goal.txt */
 export const ROADMAP_CLASSIFY_GOAL = definePrompt(
   'roadmap_classify_goal',
@@ -1370,13 +1405,13 @@ export const DEBRIEF_REFLECTION_CHECK_SYSTEM = definePrompt(
 );
 
 /** src/prompts/debrief/improver_system.txt */
-export const DEBRIEF_IMPROVER_SYSTEM = definePrompt(
+export const DEBRIEF_PM_AGENT_SYSTEM = definePrompt(
   'debrief_improver_system',
   {},
   {
-    name: 'Debrief Improver',
+    name: 'Debrief PM agent',
     description:
-      "The Improver's instructions: reads aggregate signals from debrief runs, writes the weekly report and proposes ideas. Its own skill; changes go through a person.",
+      "The PM agent's instructions: reads aggregate signals from debrief runs, writes the weekly report and proposes ideas. Its own skill; changes go through a person.",
     category: 'evaluation',
     output: 'structured',
   },
@@ -1449,20 +1484,6 @@ export const OPENAI_TRANSLATION_TOOLTIP_TRANSLATION = definePrompt(
   },
 );
 
-/** src/prompts/agent_memory/curator_system.txt */
-export const AGENT_MEMORY_CURATOR_SYSTEM = definePrompt(
-  'agent_memory_curator_system',
-  {},
-  {
-    name: 'Agent Memory — Notebook Curator',
-    description:
-      "Folds the notes an autonomous agent wrote at the end of a run into its capped notebook, one AGREE / EDIT / ADD / REMOVE operation per candidate, never overriding a person's pinned entry. Bug Hunter today.",
-    category: 'Bug Hunter',
-    runtimes: ['ally-be'],
-    output: 'json',
-  },
-);
-
 /** src/prompts/debrief_chat/summary_system.txt */
 export const DEBRIEF_CHAT_SUMMARY_SYSTEM = definePrompt(
   'debrief_chat_summary_system',
@@ -1490,6 +1511,259 @@ export const OPENAI_TRACK_CONTENT_TRANSLATION = definePrompt(
     name: 'Course Content Translation',
     description:
       "Localises a course's keyed strings (titles, prose, HTML, fill-blank templates, marking keys, rubrics, speakers) into one language, per-field rules by kind. Answers with a JSON object keyed like the input; placeholders and HTML are validated in code.",
+    output: 'structured',
+  },
+);
+
+// ── Context Library (docs/context-library/PLAN.md) ──────────────────────────
+// System prompts are static; the document part, candidates or entry go in the user
+// message as delimited data, so no variables are needed.
+
+/** src/prompts/context_library/overview_system.txt */
+export const CONTEXT_LIBRARY_OVERVIEW_SYSTEM = definePrompt(
+  'context_library_overview_system',
+  {},
+  {
+    name: 'Context Library — Document Overview',
+    description:
+      'Reads the outline and opening and closing parts of an uploaded document and writes a ≤150-word overview, its key terms and which sections are filler, so each part can be extracted with the whole document in mind. Names no one.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_first_principles_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_FIRST_PRINCIPLES_SYSTEM = definePrompt(
+  'context_library_extract_first_principles_system',
+  {},
+  {
+    name: 'Context Library — Extract First Principles',
+    description:
+      'Distils one part of a product, UX or engineering document into short, standalone principles for the Builder PRD interview: statement, rationale, situations, example searches, facets, probe and anti-pattern. Own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_character_insights_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_CHARACTER_INSIGHTS_SYSTEM = definePrompt(
+  'context_library_extract_character_insights_system',
+  {},
+  {
+    name: 'Context Library — Extract Character Insights',
+    description:
+      'Distils one part of a clinical or lived-experience document into short, general insights for the character interview: statement, what it looks like, voice samples in its own words, the stereotype to avoid, aspect, basis and themes. Never about an identifiable person, never treatment guidance; own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_ally_guide_library_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_ALLY_GUIDE_LIBRARY_SYSTEM = definePrompt(
+  'context_library_extract_ally_guide_library_system',
+  {},
+  {
+    name: 'Context Library — Extract Ally Guide Library entries',
+    description:
+      'Distils one part of a helping-skills document, or an organisation’s own procedure, into short, standalone entries for the Ally guide’s library: statement, what it says in practice, situations, example searches, kind, topics and an information-only clinical flag. Keeps a procedure whole; own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_debrief_guidance_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_DEBRIEF_GUIDANCE_SYSTEM = definePrompt(
+  'context_library_extract_debrief_guidance_system',
+  {},
+  {
+    name: 'Context Library — Extract Debrief Guidance',
+    description:
+      'Distils one part of a practice guideline, style guide, level guide or protocol into short guidelines the Debrief agent reads beside a pivotal moment: statement, what good practice looks like, the moments it applies to, kind, learner levels, skills and an information-only clinical flag. Own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_learning_design_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_LEARNING_DESIGN_SYSTEM = definePrompt(
+  'context_library_extract_learning_design_system',
+  {},
+  {
+    name: 'Context Library — Extract Learning Design',
+    description:
+      'Distils one part of a learning-design or training document into short, standalone principles Course Copilot reads while it plans a course for mental-health helpers: statement, rationale, situations, example searches, domain, course stage, item types, probe and anti-pattern. Never clinical treatment guidance; own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/critic_system.txt */
+export const CONTEXT_LIBRARY_CRITIC_SYSTEM = definePrompt(
+  'context_library_critic_system',
+  {},
+  {
+    name: 'Context Library — Critic',
+    description:
+      'Checks each extracted candidate against the part it came from: grounded, standalone (with a rewrite when not), specific, actionable, names, and the collection’s own checks. Decides what is published.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/adjudicate_system.txt */
+export const CONTEXT_LIBRARY_ADJUDICATE_SYSTEM = definePrompt(
+  'context_library_adjudicate_system',
+  {},
+  {
+    name: 'Context Library — Duplicate Adjudicator',
+    description:
+      'Decides whether a new candidate is the same as, refines, conflicts with or differs from its nearest chunks in the collection, so the library keeps one chunk per idea and records trade-offs.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/consolidate_system.txt */
+export const CONTEXT_LIBRARY_CONSOLIDATE_SYSTEM = definePrompt(
+  'context_library_consolidate_system',
+  {},
+  {
+    name: 'Context Library — Consolidator',
+    description:
+      'Tidies the chunks just extracted from one document: merges repeats, ranks the rest for the density cap, and records relations between them.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/enrich_system.txt */
+export const CONTEXT_LIBRARY_ENRICH_SYSTEM = definePrompt(
+  'context_library_enrich_system',
+  {},
+  {
+    name: 'Context Library — Enrich Written Entry',
+    description:
+      'Adds situations, example searches, keywords and missing facets to an entry an admin wrote, without changing its text, so it is found with the words people search with.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/rerank_system.txt */
+export const CONTEXT_LIBRARY_RERANK_SYSTEM = definePrompt(
+  'context_library_rerank_system',
+  {},
+  {
+    name: 'Context Library — Re-ranker',
+    description:
+      'Grades each retrieved candidate 0–3 for the situation being searched, one listwise call per search; grades become the relevance bands every use case sees.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/citation_check_system.txt */
+export const CONTEXT_LIBRARY_CITATION_CHECK_SYSTEM = definePrompt(
+  'context_library_citation_check_system',
+  {},
+  {
+    name: 'Context Library — Citation Check',
+    description:
+      'Checks whether each passage that cites a chunk genuinely applies it. Only a pass counts as a verified use, so the learning loops reward helping, not citing.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/gap_label_system.txt */
+export const CONTEXT_LIBRARY_GAP_LABEL_SYSTEM = definePrompt(
+  'context_library_gap_label_system',
+  {},
+  {
+    name: 'Context Library — Gap Label',
+    description:
+      'Names a cluster of searches that found nothing good, in general words that never repeat a person’s own wording, so the library’s maintainers know what to add.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/agent_curator_system.txt */
+export const CONTEXT_LIBRARY_AGENT_CURATOR_SYSTEM = definePrompt(
+  'context_library_agent_curator_system',
+  {},
+  {
+    name: 'Context Library — Agent Curator',
+    description:
+      "Folds the lessons and notes an agent wrote (Builder Lessons, Bug Hunter Notes) into the collection's capped active set, one AGREE / EDIT / ADD / REMOVE operation per candidate, never overriding a person's pinned entry. Answers with a JSON object of operations; every guardrail is enforced in code.",
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/query_plan_system.txt */
+export const CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM = definePrompt(
+  'context_library_query_plan_system',
+  {},
+  {
+    name: 'Context Library — Query Planner',
+    description:
+      'Turns a rough product idea (or a course brief, or a character so far) into a short context descriptor and 8–12 situational searches across the areas a good result must cover.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/image_studio/compose.txt */
+export const IMAGE_STUDIO_COMPOSE = definePrompt(
+  'image_studio_compose',
+  {
+    cast_json: 'optional',
+    context_json: 'optional',
+    description: 'optional',
+    framing: 'required',
+    image_purpose: 'required',
+    style_name: 'required',
+  },
+  {
+    name: 'Image Studio — Scene Composer',
+    description:
+      "Plans one author-requested image: screens the request against the platform's depiction rules (safe-messaging for self-harm content, no real people's details), drafts or tidies the description, writes alt text and a structured scene the image prompt is compiled from. JSON mode; the guardrails are also appended in code.",
+    category: 'Image Studio',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/image_studio/judge.txt */
+export const IMAGE_STUDIO_JUDGE = definePrompt(
+  'image_studio_judge',
+  {
+    cast_names: 'optional',
+    description: 'required',
+    scene_json: 'optional',
+  },
+  {
+    name: 'Image Studio — Image Checker',
+    description:
+      'Looks at a generated image (and its reference images) and fails it only for problems a trainer would reject: visible text, wrong people, unsafe depiction, anatomical errors, a character who does not match their reference. JSON mode; a failed image is regenerated once.',
+    category: 'Image Studio',
+    runtimes: ['ally-be'],
     output: 'structured',
   },
 );

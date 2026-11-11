@@ -101,6 +101,7 @@ class FeedbackHarness {
         .thenAnswer((_) async => const LearnerDebriefView(state: LearnerDebriefState.notAvailable));
     when(() => learnerDebrief.markRead(any())).thenAnswer((_) async {});
     when(() => learnerDebrief.markOpened(any())).thenAnswer((_) async {});
+    when(() => learnerDebrief.recordEvent(any(), any())).thenAnswer((_) async {});
     when(() => simulations.getEventChecklist(any())).thenAnswer((_) async => <EventChecklistItem>[]);
     when(
       () => simulations.addSimulationFeedback(
@@ -205,4 +206,5 @@ class FeedbackHarness {
 
 void registerFeedbackFallbacks() {
   registerFallbackValue(<String>[]);
+  registerFallbackValue(DebriefLearnerEvent.waited);
 }

@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   Req,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -17,6 +18,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsOptional,
@@ -29,14 +32,17 @@ import { Type } from 'class-transformer';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
+import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefAgentService } from '../service/debrief-agent.service';
 import { DebriefConsoleService } from '../service/debrief-console.service';
 import { DebriefFeedbackService } from '../service/debrief-feedback.service';
-import { DebriefImproverService } from '../service/debrief-improver.service';
-import { DebriefKnowledgeService } from '../service/debrief-knowledge.service';
+import { DebriefPmAgentService } from '../service/debrief-pm-agent.service';
 import { DebriefRunJudgeService } from '../service/debrief-run-judge.service';
 import { DebriefRunnerService } from '../service/debrief-runner.service';
 import { DebriefTestSetsService } from '../service/debrief-test-sets.service';
+import { DebriefSettingsService } from '../service/debrief-settings.service';
+import { DebriefMetricsService } from '../service/debrief-metrics.service';
+import { DebriefBaselineService } from '../service/debrief-baseline.service';
 
 class ReasonDto {
   @ApiProperty({ required: false })
@@ -99,12 +105,6 @@ class ResolveFlagDto {
   correction?: CardCorrectionDto;
 }
 
-class ClinicalDto {
-  @ApiProperty()
-  @IsBoolean()
-  needsSignOff!: boolean;
-}
-
 class TenantLiveDto {
   @ApiProperty()
   @IsBoolean()
@@ -133,6 +133,23 @@ class ModelChangeDto {
   note?: string;
 }
 
+class SettingsChangeDto {
+  @ApiProperty({
+    description:
+      'Settings to change, by key; null returns a key to its default (v9 FR-60)',
+  })
+  @IsObject()
+  changes!: Record<string, number | boolean | null>;
+}
+
+class AcceptBaselineDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  keys!: string[];
+}
+
 class TenantRegionDto {
   @ApiProperty({ enum: ['india', 'outside_india'] })
   @IsIn(['india', 'outside_india'])
@@ -153,12 +170,13 @@ type AuthedRequest = { user: { id: number } };
 
 /**
  * The Debrief Console's API (plan §12): runs and their timelines, the
- * Improver's report and ideas with the approval layer, releases and rollback,
+ * PM agent's report and ideas with the approval layer, releases and rollback,
  * the test sets, and the per-organisation switch. Ally team only, behind the
  * same ANALYTICS toggle as the calibration set.
  */
 @ApiTags('Debriefs')
 @Controller('v1/debriefs/console')
+@UseInterceptors(DebriefConsoleAuditInterceptor)
 @ApiBearerAuth()
 @ApiSecurity('access-token')
 export class DebriefConsoleController {
@@ -167,10 +185,12 @@ export class DebriefConsoleController {
     private readonly agent: DebriefAgentService,
     private readonly runner: DebriefRunnerService,
     private readonly judge: DebriefRunJudgeService,
-    private readonly improver: DebriefImproverService,
+    private readonly pmAgent: DebriefPmAgentService,
     private readonly testSets: DebriefTestSetsService,
     private readonly feedback: DebriefFeedbackService,
-    private readonly knowledge: DebriefKnowledgeService,
+    private readonly settings: DebriefSettingsService,
+    private readonly metrics: DebriefMetricsService,
+    private readonly baseline: DebriefBaselineService,
   ) {}
 
   @Get('review')
@@ -285,6 +305,65 @@ export class DebriefConsoleController {
     return this.console.listRuns({ mode: q.mode, status: q.status });
   }
 
+  @Get('metrics')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Success metrics (v9 §3.3): the weekly steering proxy, guardrails, efficiency, experience by language and device, baselines and monthly uptake lift',
+  })
+  metricsView(@Query('weeks') weeks?: string) {
+    return this.metrics.view(weeks ? Number(weeks) || 12 : 12);
+  }
+
+  @Get('settings')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Owner settings (v9 FR-60): every test-ladder threshold and budget, with the baseline proposal',
+  })
+  settingsView() {
+    return this.settings.view();
+  }
+
+  @Put('settings')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({ summary: 'Change owner settings (audited)' })
+  updateSettings(@Req() req: AuthedRequest, @Body() body: SettingsChangeDto) {
+    return this.settings.update(body.changes, req.user.id);
+  }
+
+  @Post('settings/accept')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: "Accept some of the baseline job's proposed values",
+  })
+  acceptBaseline(@Req() req: AuthedRequest, @Body() body: AcceptBaselineDto) {
+    return this.settings.acceptBaseline(body.keys, req.user.id);
+  }
+
+  @Post('settings/baseline')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Run the baseline job now: propose starting values from production data (it also runs monthly)',
+  })
+  runBaseline() {
+    return this.baseline.run();
+  }
+
+  @Get('steps')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      "The recipe's steps as capabilities: model, and over 30 days how often each ran, failed or was skipped, its time and spend",
+  })
+  steps(@Query('days') days?: string) {
+    const d = Number(days);
+    return this.console.stepUsage(
+      Number.isInteger(d) && d > 0 && d <= 90 ? d : 30,
+    );
+  }
+
   @Get('runs/:id')
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({
@@ -311,33 +390,33 @@ export class DebriefConsoleController {
     return run;
   }
 
-  @Get('improver')
+  @Get(['pm-agent', 'improver'])
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({ summary: "The Improver's latest report and its ideas" })
-  async improverState() {
+  @ApiOperation({ summary: "The PM agent's latest report and its ideas" })
+  async pmAgentState() {
     return {
-      ...(await this.improver.latestReport()),
-      ideas: await this.improver.history(50),
+      ...(await this.pmAgent.latestReport()),
+      ideas: await this.pmAgent.history(50),
     };
   }
 
-  @Post('improver/analyse')
+  @Post(['pm-agent/analyse', 'improver/analyse'])
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({ summary: 'Run the Improver now (it also runs daily)' })
+  @ApiOperation({ summary: 'Run the PM agent now (it also runs daily)' })
   analyse(@Req() req: AuthedRequest) {
-    return this.improver.analyse({ actorUserId: req.user.id });
+    return this.pmAgent.analyse({ actorUserId: req.user.id });
   }
 
-  @Post('improver/ideas/:id/screen')
+  @Post(['pm-agent/ideas/:id/screen', 'improver/ideas/:id/screen'])
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({
     summary: 'Screen an idea on the open test set against the current release',
   })
   screen(@Param('id', ParseUUIDPipe) id: string) {
-    return this.improver.screen(id);
+    return this.pmAgent.screen(id);
   }
 
-  @Post('improver/ideas/:id/approve')
+  @Post(['pm-agent/ideas/:id/approve', 'improver/ideas/:id/approve'])
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({
     summary: 'Approve an idea: it becomes a new release and goes live',
@@ -347,10 +426,10 @@ export class DebriefConsoleController {
     @Req() req: AuthedRequest,
     @Body() body: ReasonDto,
   ) {
-    return this.improver.approve(id, req.user.id, body?.reason);
+    return this.pmAgent.approve(id, req.user.id, body?.reason);
   }
 
-  @Post('improver/ideas/:id/reject')
+  @Post(['pm-agent/ideas/:id/reject', 'improver/ideas/:id/reject'])
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({ summary: 'Reject an idea' })
   reject(
@@ -358,7 +437,7 @@ export class DebriefConsoleController {
     @Req() req: AuthedRequest,
     @Body() body: ReasonDto,
   ) {
-    return this.improver.reject(id, req.user.id, body?.reason);
+    return this.pmAgent.reject(id, req.user.id, body?.reason);
   }
 
   @Get('releases')
@@ -454,40 +533,5 @@ export class DebriefConsoleController {
   ) {
     await this.agent.setRegion(tenantId, body.region, req.user.id);
     return { tenantId, region: body.region };
-  }
-
-  @Get('knowledge')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({
-    summary:
-      'The debrief knowledge base: each document, its audience and its clinical sign-off',
-  })
-  knowledgeList(@Req() req: AuthedRequest) {
-    return this.knowledge.listFor(req.user.id);
-  }
-
-  @Put('knowledge/:id/clinical')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({
-    summary: 'Mark a document clinical (served only once signed off), or not',
-    description: 'Marking either way clears any earlier sign-off.',
-  })
-  setClinical(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: ClinicalDto,
-  ) {
-    return this.knowledge.setClinical(id, body.needsSignOff);
-  }
-
-  @Post('knowledge/:id/sign-off')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({
-    summary:
-      "The clinical advisor signs off a clinical document's current text",
-    description:
-      'Only a platform admin with the "Debriefs — Clinical sign-off" toggle on. An edit afterwards needs a new sign-off.',
-  })
-  signOff(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
-    return this.knowledge.signOff(id, req.user.id);
   }
 }

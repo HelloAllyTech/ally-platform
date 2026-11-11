@@ -88,6 +88,22 @@ export interface DebriefRunStep {
   estimatedUsd?: number;
   round?: number;
   note?: string | null;
+  /** Reasoning out loud (v9 FR-38). Absent on runs made before they were recorded. */
+  why?: string | null;
+  inputs?: string[];
+  reasoning?: string | null;
+  output?: string | null;
+  budgetLeftUsd?: number;
+}
+
+/** One Ask Ally reply: how it was reached. Never the learner's message. */
+export interface DebriefReplyTrace {
+  at: string;
+  model: string;
+  turns: number;
+  costUsd: number;
+  tools: Array<{ name: string; topic?: string; ok: boolean; ms: number; found: string }>;
+  stoppedBy?: "max_turns" | "budget";
 }
 
 export interface DebriefRunDetail {
@@ -116,6 +132,13 @@ export interface DebriefRunDetail {
       hardFails: string[];
       checks: string[];
     }>;
+    decision?: { status: DebriefRunStatus; round: number | null; why: string };
+    drafts?: Array<{
+      round: number;
+      cards: DebriefCardsData;
+      critique: Array<{ section: string; note: string }>;
+    }>;
+    replyTraces?: DebriefReplyTrace[];
     [k: string]: unknown;
   };
   cards: DebriefCardsData | null;
@@ -152,14 +175,14 @@ export interface DebriefCardsData {
   progress_note?: string | null;
 }
 
-export type ImproverIdeaKind = "prompt_edit" | "setting" | "needs_code" | "defect" | "needs_person";
+export type PmAgentIdeaKind = "prompt_edit" | "setting" | "needs_code" | "defect" | "needs_person";
 
-export type ImproverScreen =
+export type PmAgentScreen =
   | { status: "running"; startedAt: string }
   | { status: "failed"; startedAt: string; error?: string }
-  | ImproverScreenResult;
+  | PmAgentScreenResult;
 
-export interface ImproverScreenResult {
+export interface PmAgentScreenResult {
   status: "done";
   cases: number;
   pairs: number;
@@ -176,12 +199,12 @@ export interface ImproverScreenResult {
   ranAt: string;
 }
 
-export interface ImproverIdeaRow {
+export interface PmAgentIdeaRow {
   id: string;
   status: "proposed" | "quarantined" | "approved" | "active" | "blocked" | "rejected" | "retired";
   title: string;
   change: {
-    ideaKind: ImproverIdeaKind;
+    ideaKind: PmAgentIdeaKind;
     promptCode: string | null;
     find: string | null;
     replace: string | null;
@@ -192,18 +215,45 @@ export interface ImproverIdeaRow {
     hypothesis?: string;
     evidence?: string;
     expectedEffect?: string;
-    screen?: ImproverScreen;
+    screen?: PmAgentScreen;
+    /** Rung 2, the full gate test. */
+    gate?:
+      | { status: "running" | "failed"; startedAt: string; error?: string }
+      | (PmAgentLadderResult & {
+          rules: { hardFails: boolean; median: boolean; cost: boolean; scored: boolean };
+        });
+    /** Rung 3, paired trials on real sessions. */
+    trial?: {
+      status: "running" | "passed" | "failed";
+      startedAt: string;
+      comparisons: number;
+      meanDifference?: number | null;
+      lower?: number | null;
+      upper?: number | null;
+    };
+    /** Rung 4, the canary to real learners. */
+    canary?: {
+      status: "running" | "passed" | "reverted" | "promoted";
+      releaseId: string;
+      version: number;
+      share: number;
+      startedAt: string;
+      canaryRuns?: number;
+      canaryMedian?: number | null;
+      controlMedian?: number | null;
+      reason?: string;
+    };
   };
   createdAt: string;
   releaseVersion: number | null;
   releaseStatus: string | null;
 }
 
-export interface ImproverState {
+export interface PmAgentState {
   report: string | null;
   at: string | null;
   learningSpentUsd: number | null;
-  ideas: ImproverIdeaRow[];
+  ideas: PmAgentIdeaRow[];
 }
 
 export interface DebriefReleaseRow {
@@ -227,6 +277,9 @@ export interface DebriefTenantRow {
   region: "india" | "outside_india";
   /** The organisation set support lines of its own in its Ally guide settings. */
   hasSupportContact: boolean;
+  /** v9 FR-8: this calendar month's debrief spend (shadow and live), and how many runs. */
+  monthSpentUsd?: number;
+  monthRuns?: number;
 }
 
 export interface DebriefReviewRun {
@@ -275,28 +328,6 @@ export interface DebriefReviewQueue {
   flags: DebriefReviewFlag[];
 }
 
-/** One document in the debrief knowledge base, with its clinical sign-off. */
-export interface DebriefKnowledgeDocument {
-  id: string;
-  title: string;
-  status: string;
-  isGlobal: boolean;
-  tenantCount: number;
-  chunkCount: number;
-  archived: boolean;
-  updatedAt: string;
-  needsClinicalSignOff: boolean;
-  clinical: "not_clinical" | "signed_off" | "awaiting";
-  signedOffBy: string | null;
-  signedOffAt: string | null;
-}
-
-export interface DebriefKnowledgeList {
-  documents: DebriefKnowledgeDocument[];
-  /** Whether the person looking may sign off clinical guidance. */
-  canSignOff: boolean;
-}
-
 /** A model a person may pick for a debrief step or for Ask Ally. */
 export interface DebriefModelChoice {
   model: string;
@@ -311,4 +342,232 @@ export interface DebriefModels {
   reply: string;
   judge: string;
   choices: { steps: DebriefModelChoice[]; reply: DebriefModelChoice[] };
+}
+
+/** v9 FR-38 "Registry": one recipe step as a capability, with 30 days of production use. */
+export interface DebriefStepUsage {
+  step: string;
+  model: string | null;
+  backupModel: string | null;
+  inRecipes: string[];
+  done: number;
+  failed: number;
+  skipped: number;
+  medianMs: number | null;
+  estimatedUsd: number;
+  models: string[];
+}
+
+export interface PmAgentLadderResult {
+  status: "done";
+  cases: number;
+  pairs: number;
+  baselineMedian: number | null;
+  challengerMedian: number | null;
+  baselineHardFails: number;
+  challengerHardFails: number;
+  baselineCostUsd: number;
+  challengerCostUsd: number;
+  passed: boolean;
+}
+
+/** v9 FR-60: one owner setting's spec, as ally-be sends it. */
+export interface DebriefOwnerSettingSpec {
+  default: number | boolean;
+  kind: "int" | "number" | "share" | "bool";
+  min?: number;
+  max?: number;
+  budget?: boolean;
+  group: "quick" | "gate" | "sealed" | "trials" | "canary" | "budget" | "metrics";
+}
+
+export interface DebriefSettingsView {
+  values: Record<string, number | boolean>;
+  defaults: Record<string, number | boolean>;
+  spec: Record<string, DebriefOwnerSettingSpec>;
+  changed: string[];
+  baseline: {
+    ranAt: string;
+    facts: {
+      runsPerDay?: number;
+      liveRunsPerDay?: number;
+      eligibleSessionsPerMonth?: number;
+      judge?: { scored: number; median: number | null; sd: number | null };
+      rejudge?: { pairs: number; sdOfDifference: number | null };
+      hardFailRate?: number | null;
+      costPerRunUsd?: { p50: number | null; p90: number | null };
+    };
+    proposals: Record<string, { value: number | boolean; reason: string; misfit: boolean }>;
+  } | null;
+  updatedAt: string;
+  updatedBy: number | null;
+}
+
+/** A rate with its counts (v9 §3.3); `value` is null when nothing was counted. */
+export interface DebriefRate {
+  value: number | null;
+  n: number;
+  of: number;
+  /** 95% Wilson interval; absent on rates summed in the browser. */
+  low?: number | null;
+  high?: number | null;
+}
+
+/** The pass rate and its companions for one group of live debriefs (same definition as the eval). */
+export interface DebriefPassGroup {
+  passRate: DebriefRate;
+  outages: number;
+  unjudged: number;
+  hardFailRate: DebriefRate;
+  judgeMean: number | null;
+}
+
+export interface DebriefExperienceRates {
+  openedWithin24h: DebriefRate;
+  readThrough: DebriefRate;
+  practiseClickThrough: DebriefRate;
+  reflectionAnswered: DebriefRate;
+  abandonedBeforeReady: DebriefRate;
+  flagsWithinSla: DebriefRate;
+  listened: DebriefRate;
+  replied: DebriefRate;
+}
+
+export interface DebriefMetricsWeek {
+  week: string;
+  debriefs: number;
+  steering: {
+    value: number | null;
+    missing: Array<"practise" | "thumbs">;
+    components: { judge: number | null; practise: DebriefRate; thumbs: DebriefRate };
+  };
+  guardrails: {
+    judgeP50: number | null;
+    judgeMean: number | null;
+    judged: number;
+    hardFailRate: DebriefRate;
+    fabricatedQuotes: number;
+    thumbsDownRate: DebriefRate;
+    visibleSecondsP50: number | null;
+    visibleSecondsP90: number | null;
+    costP50: number | null;
+    costP90: number | null;
+    evaluatorJudgeGap: number | null;
+  };
+  efficiency: {
+    savedUsdMean: number | null;
+    revisionRoundsP50: number | null;
+    stepsP50: number | null;
+    within10Min: DebriefRate;
+  };
+  experience: DebriefExperienceRates;
+}
+
+export interface DebriefMetricsView {
+  weeks: number;
+  weights: { judge: number; practise: number; thumbs: number };
+  flagReviewSlaHours: number;
+  series: DebriefMetricsWeek[];
+  byLanguage: Array<{ key: string; debriefs: number; experience: DebriefExperienceRates }>;
+  byPlatform: Array<{ key: string; debriefs: number; experience: DebriefExperienceRates }>;
+  baselines: {
+    from: string;
+    until: string;
+    legacyHardFailRate: DebriefRate;
+    legacyThumbsDownRate: DebriefRate;
+  };
+  uptake: Array<{
+    month: string;
+    pairs: number;
+    lift: number | null;
+    lower: number | null;
+    upper: number | null;
+    insufficient: boolean;
+  }>;
+  safetyRecall: { recorded: false };
+  quality?: {
+    byWeek: Array<{ week: string } & DebriefPassGroup>;
+    byLanguage: Array<{ language: string; debriefs: number } & DebriefPassGroup>;
+    bySegment: Array<
+      {
+        language: string;
+        writerModel: string;
+        judgeVersion: string;
+        debriefs: number;
+      } & DebriefPassGroup
+    >;
+  };
+  agents?: DebriefAgentMetrics;
+  generatedAt: string;
+}
+
+export interface DebriefStepHealth {
+  ran: number;
+  failRate: DebriefRate;
+  retryRate: DebriefRate;
+  msP50: number | null;
+  msP90: number | null;
+}
+
+export interface DebriefAgreement {
+  n: number;
+  both: number;
+  referenceOnly: number;
+  candidateOnly: number;
+  neither: number;
+  kappa: number | null;
+  recall: DebriefRate;
+  falseFlagRate: DebriefRate;
+}
+
+/** Live numbers per agent in the debrief family (ally-be debrief-stage-metrics.util). */
+export interface DebriefAgentMetrics {
+  stages: {
+    runs: number;
+    safetyReader: DebriefStepHealth & {
+      riskCueRate: DebriefRate;
+      judgeMissDespiteCoverage: DebriefRate;
+    };
+    analyst: DebriefStepHealth;
+    progressReader: DebriefStepHealth & { unsupportedProgressRate: DebriefRate };
+    guidanceLookup: {
+      ran: number;
+      foundRate: DebriefRate;
+      passagesPerRunMean: number | null;
+      clinicalOnNoRiskRate: DebriefRate;
+      wrongLevelRate: DebriefRate;
+    };
+    writer: DebriefStepHealth & {
+      firstDraftPassRate: DebriefRate;
+      firstDraftFailures: Array<{ code: string; runs: number }>;
+    };
+    reviser: DebriefStepHealth & {
+      fixRate: DebriefRate;
+      regressionRate: DebriefRate;
+      deadlineSkipRate: DebriefRate;
+    };
+    evaluator: DebriefStepHealth & {
+      missedRiskCue: DebriefAgreement;
+      heldOnItsOwnRate: DebriefRate;
+    };
+    judge: { judgedRate: DebriefRate; versions: string[] };
+  };
+  askAlly: {
+    replies: number;
+    questions: number;
+    checkPassRate: DebriefRate;
+    passRate: DebriefRate | null;
+    distressFlags: number;
+    modelCalls: number;
+  };
+  pmAgent: {
+    ideas: number;
+    screened: number;
+    gated: number;
+    promoted: number;
+    reverted: number;
+    rejected: number;
+    pending: number;
+    holdRate: DebriefRate;
+  };
 }

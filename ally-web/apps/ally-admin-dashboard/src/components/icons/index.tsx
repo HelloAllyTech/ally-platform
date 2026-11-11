@@ -20,6 +20,7 @@ import type { SVGProps } from "react";
 
 import {
   Add as CAdd,
+  Asleep as CAsleep,
   Alarm as CAlarm,
   Archive as CArchive,
   ArrowLeft as CArrowLeft,
@@ -42,6 +43,7 @@ import {
   Merge as CMerge,
   Bullhorn as CBullhorn,
   Launch as CLaunch,
+  Light as CLight,
   Link as CLink,
   SortAscending as CSortAscending,
   SortDescending as CSortDescending,
@@ -200,6 +202,9 @@ export const Currency = createCarbonIcon(CCurrency);
 export const CheckCircle = createCarbonIcon(CCheckmarkOutline);
 export const Close = createCarbonIcon(CClose);
 export const Menu = createCarbonIcon(CMenu);
+/** Top-bar colour-mode switch: the moon offers dark mode, the sun offers light mode. */
+export const Moon = createCarbonIcon(CAsleep);
+export const Sun = createCarbonIcon(CLight);
 export const Compress = createCarbonIcon(CMinimize);
 export const Copy = createCarbonIcon(CCopy);
 export const Delete = createCarbonIcon(CTrashCan);
@@ -264,12 +269,12 @@ export const WarningAlt = createCarbonIcon(CWarningAlt);
 /* Colour variants — same Carbon glyph, original colour preserved via CSS     */
 /* -------------------------------------------------------------------------- */
 
-export const AddBlue = createCarbonIcon(CAdd, { className: "text-[#0957D0]" });
-export const BlueAdd = createCarbonIcon(CAdd, { className: "text-[#0957D0]" });
+export const AddBlue = createCarbonIcon(CAdd, { className: "text-blue-600" });
+export const BlueAdd = createCarbonIcon(CAdd, { className: "text-blue-600" });
 export const CloseRed = createCarbonIcon(CClose, { className: "text-[#F93535]" });
 export const TrashRed = createCarbonIcon(CTrashCan, { className: "text-[#FE6F64]" });
 export const BookWhite = createCarbonIcon(CBook, { className: "text-white" });
-export const BlackTick = createCarbonIcon(CCheckmark, { className: "text-[#212121]" });
+export const BlackTick = createCarbonIcon(CCheckmark, { className: "text-typography-900" });
 export const TickGreenBackground = createCarbonIcon(CCheckmarkFilled, {
   className: "text-[#66BB6A]",
 });

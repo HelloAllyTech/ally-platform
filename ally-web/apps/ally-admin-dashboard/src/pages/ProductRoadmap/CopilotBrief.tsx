@@ -27,7 +27,7 @@ const SOURCE_LABEL: Record<RoadmapBriefEvidenceSource, string> = {
   roadmap: "Roadmap",
   codebase: "Code",
   wiki: "Wiki",
-  stacks: "Stacks",
+  principles: "Principles",
   strategy: "Strategy",
 };
 

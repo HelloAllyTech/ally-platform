@@ -5,7 +5,7 @@
 > **Who this is for.** A Claude Code session (or an engineer) that will build the charts. It is
 > written to be the only context that session needs besides the two repos. Read §0 to §5 before
 > touching code; §6 to §8 are the specs; §9 is how to build them the way this codebase expects;
-> §10 is what to ask Stacks first; §11 is what a human must decide.
+> §10 is what to ask the Context Library first; §11 is what a human must decide.
 >
 > **Cross-repo plan.** It lives in ally-be because the backend does most of the work, like
 > `docs/courses-certification-plan.md`. Paths are prefixed with the repo name.
@@ -580,7 +580,7 @@ Recommended shape, so the chart can be built the week the data exists:
 - Chart EFF-72 · Confidence against competence · `ScatterChart`: x = self-rating, y = FHS level
   in the nearest cut, per skill; quadrant labels "under-confident / calibrated / over-confident".
   Over-confidence on `harm` is the one that matters for safety.
-- Ask Stacks about self-efficacy instruments and survey cadence before designing the wording
+- Ask the Context Library about self-efficacy instruments and survey cadence before designing the wording
   (§10).
 
 ### 6.I Efficiency
@@ -821,11 +821,12 @@ it. Opportunity coverage (EFF-30) reads `jsonb_array_elements(a.verdicts)` and g
 
 ---
 
-## 10. Ask Stacks before building
+## 10. Ask the Context Library before building
 
-Stacks was not reachable from the session that wrote this plan. The build session runs these
-`search_chunks` queries first (noun phrases, 2–4 per aspect), calls `get_chunks` on the one or
-two that bear on the decision, and cites chunk titles in the PR body. Retrieved guidance is
+The product-guidance library was not reachable from the session that
+wrote this plan. The build session runs these as `search_context` queries first (up to six per
+call, rephrased as short situations where that reads better), calls `get_chunks` on the one or
+two that bear on the decision, and cites chunk codes such as `[FP-0142]` in the PR body. Retrieved guidance is
 advisory; where it conflicts with §5, state the conflict rather than silently picking one.
 
 - "learning effectiveness measurement framework" and "kirkpatrick evaluation levels"
@@ -839,8 +840,8 @@ advisory; where it conflicts with §5, state the conflict rather than silently p
 - "empty state copy for insufficient data"
 
 The deprecated wiki page on Data Visualisation still holds Ally-specific findings (Carbon
-chart overflow, minimum group size for tenant-isolated metrics); check it if a Stacks block
-returns nothing for those two.
+chart overflow, minimum group size for tenant-isolated metrics); check it if a Context Library
+search turns up nothing for those two.
 
 ---
 
@@ -904,7 +905,7 @@ the plan above — the plan text is left as written so the reasoning stays reada
 |---|---|---|
 | 1 | Skill growth sub-tab | **Option A, re-pointed to R1.** Response keys kept so the deployed admin keeps rendering between deploys; titles, DTO docs, provenance and registry notes now describe the learner ruler and say the series changed in 2026-10. |
 | 2 | Course → competency | **`tracks.competencyIds`** (optional author tag, shared competencies only, ≤ 15) plus a course-builder field. Course impact prefers it and falls back to the roleplay-derived set; `competencySource` says which. |
-| 3 | Self-efficacy instrument | **14 items, one per rubric skill, 0–10** (not 1–5: Stacks "Scaling Questions for Measuring Supervisee Development"), at onboarding, every 3 scored cuts and on course completion. Storage, learner API and charts built; **the learner-facing prompt is not.** |
+| 3 | Self-efficacy instrument | **14 items, one per rubric skill, 0–10** (not 1–5: "Scaling Questions for Measuring Supervisee Development"), at onboarding, every 3 scored cuts and on course completion. Storage, learner API and charts built; **the learner-facing prompt is not.** |
 | 4 | Human rating programme | **30 cuts per calendar quarter**, stratified by composite tercile × language, deterministic. Storage, sample + submit API and the κ chart built; **no rating UI** (as §6.J said). |
 | 5 | Learner-facing composite | **Flagged, not fixed.** The track progress dashboard already reads `scenario_sessions.score`; the one real leak is tenant-analytics `learner-usage` `avgScore` / roleplay points per minute (`tenant-analytics.repository.ts`), which still averages the actor composite for tenant admins. |
 | 6 | Curriculum floors | Withheld-with-counts kept as the intended state. |

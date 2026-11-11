@@ -26,6 +26,7 @@ class Scenario {
     required this.description,
     required this.coverImageUrl,
     this.coverVideoUrl,
+    this.descriptionAudioUrl,
     this.triggerWarnings = const [],
     this.availableLanguages = const [],
     this.completedAttemptCount = 0,
@@ -47,6 +48,7 @@ class Scenario {
     description: json['description'] as String?,
     coverImageUrl: json['coverImageUrl'] as String?,
     coverVideoUrl: json['coverVideoUrl'] as String?,
+    descriptionAudioUrl: json['descriptionAudioUrl'] as String?,
     triggerWarnings: (json['triggerWarnings'] as List<dynamic>? ?? [])
         .map((e) => (e as Map<String, dynamic>)['name'] as String)
         .toList(),
@@ -87,6 +89,9 @@ class Scenario {
   final String? description;
   final String? coverImageUrl;
   final String? coverVideoUrl;
+
+  /// Narration of [description]; null until it has been generated.
+  final String? descriptionAudioUrl;
   final List<String> triggerWarnings;
   final List<ScenarioLanguageOption> availableLanguages;
 

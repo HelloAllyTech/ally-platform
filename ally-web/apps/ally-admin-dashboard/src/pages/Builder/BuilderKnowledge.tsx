@@ -1,312 +1,19 @@
-import React, { useState } from "react";
+import React from "react";
 
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 
-import {
-  Button,
-  CarbonDropdown as Dropdown,
-  InlineNotification,
-  SkeletonText,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  Tabs,
-  Tag,
-  TextArea,
-  TextInput,
-  Tile,
-  Tooltip,
-} from "@ally-ui-mono/ui-shared";
-import {
-  useConsolidateBuilderLessonsMutation,
-  useGetBuilderExemplarsQuery,
-  useGetBuilderLessonsQuery,
-  usePatchBuilderLessonMutation,
-} from "@api";
-import { TooltipIcon } from "@assets";
-import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
+import { Button, InlineNotification, SkeletonText, Tag, Tile } from "@ally-ui-mono/ui-shared";
+import { useGetBuilderExemplarsQuery } from "@api";
+import { ContextCollectionLink } from "@components/context-collection-link";
 import { en, ROUTES } from "@constants";
-import { BuilderExemplar, BuilderLesson, BuilderLessonStatus } from "@types";
-import { asAgentText, asAgentTextList } from "@utils";
+import { BuilderExemplar } from "@types";
+import { asAgentTextList } from "@utils";
 
 import { BUILDER_OUTCOME_TAG_TYPE } from "./builderMotion";
 import { formatHours, formatScoreboardCost } from "./scoreboardChart";
 
-type KnowledgeTab = "lessons" | "exemplars";
-
-const LESSON_STATUS_TAG_TYPE: Record<BuilderLessonStatus, "cool-gray" | "blue" | "green" | "red"> =
-  {
-    candidate: "cool-gray",
-    active: "blue",
-    merged: "green",
-    retired: "red",
-  };
-
-const STATUS_OPTIONS: BuilderLessonStatus[] = ["candidate", "active", "merged", "retired"];
-
-/* -------------------------------------------------------------------------- */
-/* Lessons                                                                    */
-/* -------------------------------------------------------------------------- */
-
-const LessonsTab: React.FC = () => {
-  const strings = en.builder.knowledge.lessons;
-
-  const [statusFilter, setStatusFilter] = useState<BuilderLessonStatus | "">("");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [repoFilter, setRepoFilter] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftText, setDraftText] = useState("");
-  const [retireTarget, setRetireTarget] = useState<BuilderLesson | null>(null);
-
-  const { data, isLoading, isError } = useGetBuilderLessonsQuery({
-    status: statusFilter || undefined,
-    category: categoryFilter.trim() || undefined,
-    repo: repoFilter.trim() || undefined,
-  });
-  const [patchLesson] = usePatchBuilderLessonMutation();
-  const [consolidate, { isLoading: isConsolidating }] = useConsolidateBuilderLessonsMutation();
-
-  const lessons = data ?? [];
-
-  const statusItems = [
-    { id: "", label: strings.filterStatusAll },
-    ...STATUS_OPTIONS.map(status => ({
-      id: status,
-      label: strings.statusLabels[status] ?? status,
-    })),
-  ];
-  const selectedStatusItem = statusItems.find(item => item.id === statusFilter) ?? statusItems[0];
-
-  const startEdit = (lesson: BuilderLesson) => {
-    setEditingId(lesson.id);
-    setDraftText(asAgentText(lesson.lesson));
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setDraftText("");
-  };
-
-  const saveEdit = async (id: string) => {
-    try {
-      await patchLesson({ id, lesson: draftText }).unwrap();
-      cancelEdit();
-    } catch {
-      toast.error(strings.saveFailed);
-    }
-  };
-
-  const togglePin = async (lesson: BuilderLesson) => {
-    try {
-      await patchLesson({ id: lesson.id, pinned: !lesson.pinned }).unwrap();
-    } catch {
-      toast.error(lesson.pinned ? strings.unpinFailed : strings.pinFailed);
-    }
-  };
-
-  const confirmRetire = async () => {
-    if (!retireTarget) return;
-    try {
-      await patchLesson({ id: retireTarget.id, status: "retired" }).unwrap();
-    } catch {
-      toast.error(strings.retireFailed);
-    } finally {
-      setRetireTarget(null);
-    }
-  };
-
-  const handleConsolidate = async () => {
-    try {
-      await consolidate().unwrap();
-      toast.success(strings.consolidateStarted);
-    } catch {
-      toast.error(strings.consolidateFailed);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="relative w-44">
-          <Dropdown
-            id="builder-knowledge-status-filter"
-            size="md"
-            titleText={strings.filterStatusLabel}
-            label={strings.filterStatusLabel}
-            items={statusItems}
-            selectedItem={selectedStatusItem}
-            itemToString={item => item?.label ?? ""}
-            onChange={({ selectedItem }) =>
-              setStatusFilter((selectedItem?.id ?? "") as BuilderLessonStatus | "")
-            }
-          />
-        </div>
-        <TextInput
-          id="builder-knowledge-category-filter"
-          labelText={strings.filterCategoryLabel}
-          placeholder={strings.filterCategoryPlaceholder}
-          value={categoryFilter}
-          onChange={event => setCategoryFilter(event.target.value)}
-        />
-        <TextInput
-          id="builder-knowledge-repo-filter"
-          labelText={strings.filterRepoLabel}
-          placeholder={strings.filterRepoPlaceholder}
-          value={repoFilter}
-          onChange={event => setRepoFilter(event.target.value)}
-        />
-        <div className="ml-auto flex items-center gap-1.5">
-          <Button
-            kind="tertiary"
-            size="md"
-            disabled={isConsolidating}
-            onClick={() => void handleConsolidate()}
-          >
-            {strings.consolidateNow}
-          </Button>
-          <Tooltip label={strings.consolidateHint} align="top">
-            <button
-              type="button"
-              className="-m-1 inline-flex cursor-pointer items-center p-1 md:m-0 md:p-0"
-            >
-              <TooltipIcon />
-            </button>
-          </Tooltip>
-        </div>
-      </div>
-
-      {isError && (
-        <InlineNotification kind="error" lowContrast hideCloseButton title={strings.loadFailed} />
-      )}
-
-      {isLoading ? (
-        <SkeletonText paragraph lineCount={6} />
-      ) : lessons.length === 0 ? (
-        <p className="mt-6 text-center text-sm text-typography-500">{strings.empty}</p>
-      ) : (
-        <div className="overflow-x-auto rounded border border-neutral-200">
-          <Table size="md">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{strings.columnLesson}</TableHeader>
-                <TableHeader>{strings.columnCategory}</TableHeader>
-                <TableHeader>{strings.columnStatus}</TableHeader>
-                <TableHeader>{strings.columnSources}</TableHeader>
-                <TableHeader>{strings.columnApplied}</TableHeader>
-                <TableHeader>{strings.columnContradicted}</TableHeader>
-                <TableHeader>{strings.columnRepos}</TableHeader>
-                <TableHeader>
-                  <span className="inline-flex items-center gap-1">
-                    {strings.columnPinned}
-                    <Tooltip label={strings.pinHint} align="top">
-                      <button
-                        type="button"
-                        className="-m-1 inline-flex cursor-pointer items-center p-1 md:m-0 md:p-0"
-                      >
-                        <TooltipIcon />
-                      </button>
-                    </Tooltip>
-                  </span>
-                </TableHeader>
-                <TableHeader />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {lessons.map(lesson => {
-                const isEditing = editingId === lesson.id;
-                return (
-                  <TableRow key={lesson.id}>
-                    <TableCell>
-                      {isEditing ? (
-                        <div className="flex min-w-[280px] flex-col gap-2">
-                          <TextArea
-                            id={`builder-knowledge-lesson-${lesson.id}`}
-                            labelText={strings.columnLesson}
-                            hideLabel
-                            rows={3}
-                            value={draftText}
-                            onChange={event => setDraftText(event.target.value)}
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              kind="primary"
-                              onClick={() => void saveEdit(lesson.id)}
-                            >
-                              {strings.save}
-                            </Button>
-                            <Button size="sm" kind="tertiary" onClick={cancelEdit}>
-                              {strings.cancel}
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="max-w-[360px] whitespace-pre-wrap text-sm text-typography-900">
-                          {asAgentText(lesson.lesson)}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell>{asAgentText(lesson.category)}</TableCell>
-                    <TableCell>
-                      <Tag type={LESSON_STATUS_TAG_TYPE[lesson.status]} size="sm">
-                        {strings.statusLabels[lesson.status] ?? lesson.status}
-                      </Tag>
-                    </TableCell>
-                    <TableCell>{lesson.sourceCount}</TableCell>
-                    <TableCell>{lesson.timesApplied}</TableCell>
-                    <TableCell>{lesson.timesContradicted}</TableCell>
-                    <TableCell>
-                      <span className="block max-w-[140px] truncate text-xs text-typography-600">
-                        {lesson.repos.join(", ")}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Button size="sm" kind="ghost" onClick={() => void togglePin(lesson)}>
-                        {lesson.pinned ? strings.unpin : strings.pin}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        {!isEditing && (
-                          <Button size="sm" kind="ghost" onClick={() => startEdit(lesson)}>
-                            {strings.edit}
-                          </Button>
-                        )}
-                        {lesson.status !== "retired" && (
-                          <Button
-                            size="sm"
-                            kind="danger--tertiary"
-                            disabled={lesson.pinned}
-                            onClick={() => setRetireTarget(lesson)}
-                          >
-                            {strings.retire}
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      <ActionConfirmationPopup
-        isOpen={Boolean(retireTarget)}
-        onClose={() => setRetireTarget(null)}
-        title={strings.retireConfirmTitle}
-        description={strings.retireConfirmBody}
-        primaryButton={{ label: strings.retire, onClick: () => void confirmRetire() }}
-        secondaryButton={{ label: strings.cancel, onClick: () => setRetireTarget(null) }}
-      />
-    </div>
-  );
-};
+/** The Context Library collection Builder's lessons live in (PLAN §2.2, phase 5). */
+export const BUILDER_LESSONS_COLLECTION = "builder_lessons";
 
 /* -------------------------------------------------------------------------- */
 /* Exemplars                                                                  */
@@ -391,21 +98,16 @@ const ExemplarsTab: React.FC = () => {
 /* -------------------------------------------------------------------------- */
 
 /**
- * What Builder has learned across past builds, and the runs worth reading in
- * full — a lesson is candidate/proposed guidance the curator distilled from
- * transcripts; an exemplar is a whole build, picked for being unusually
- * clean or unusually expensive, so a person can read the real transcript
- * behind a pattern rather than trust the curator's summary of it.
+ * What Builder has learned across past builds, and the runs worth reading in full. The lessons
+ * themselves are the Context Library's Builder Lessons collection — curated there by the agent
+ * curator, and added to, edited, pinned or archived there by people — so this page links to them
+ * rather than keeping a second copy of the list. An exemplar is a whole build, picked for being
+ * unusually clean or unusually expensive, so a person can read the real transcript behind a
+ * pattern rather than trust a summary of it.
  */
 export const BuilderKnowledge: React.FC = () => {
   const strings = en.builder.knowledge;
   const navigate = useNavigate();
-  const [tab, setTab] = useState<KnowledgeTab>("lessons");
-
-  const tabItems = [
-    { id: "lessons", label: strings.tabLessons },
-    { id: "exemplars", label: strings.tabExemplars },
-  ];
 
   return (
     <div className="mx-auto flex h-full max-w-6xl flex-col gap-4 overflow-y-auto md:p-6">
@@ -417,14 +119,9 @@ export const BuilderKnowledge: React.FC = () => {
         <p className="mt-1 text-sm text-typography-600">{strings.subtitle}</p>
       </header>
 
-      <Tabs
-        items={tabItems}
-        activeId={tab}
-        onChange={id => setTab(id as KnowledgeTab)}
-        showCount={false}
-      />
+      <ContextCollectionLink collection={BUILDER_LESSONS_COLLECTION} copy={strings.lessonsLink} />
 
-      {tab === "lessons" ? <LessonsTab /> : <ExemplarsTab />}
+      <ExemplarsTab />
     </div>
   );
 };

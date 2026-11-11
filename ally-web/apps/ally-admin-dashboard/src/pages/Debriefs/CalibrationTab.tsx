@@ -131,7 +131,7 @@ const AgreementTable: React.FC<{ agreement: DebriefCalibrationAgreement }> = ({ 
 
 /**
  * The calibration set: people score a seeded sample of judged debriefs blind, and their
- * agreement with the judge is the standing gate on the Improver's autonomy. The list shows no
+ * agreement with the judge is the standing gate on the PM agent's autonomy. The list shows no
  * judge scores and no quality band — either would anchor the rater.
  */
 export const CalibrationTab: React.FC = () => {

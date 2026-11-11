@@ -35,7 +35,7 @@ export interface NotifyParams {
  *
  * That split is the point of the three levels (see BugHunterNotificationLevel):
  * only ACTION_NEEDED drives the unread badge's urgency, because only that one
- * means work is blocked on a human. Stacks' "Balancing Proactive Agent
+ * means work is blocked on a human. "Balancing Proactive Agent
  * Engagement Without Intrusion" is the same idea — proactive messages have to
  * clear a relevance bar or they train people to ignore the channel.
  */

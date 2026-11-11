@@ -34,19 +34,15 @@ vi.mock("@api", () => ({
   }),
   useRefreshBugHunterFeatureMapsMutation: () => [vi.fn(), { isLoading: false }],
   useRemoveBugHunterFeatureMapMutation: () => [vi.fn(), { isLoading: false }],
-  useGetBugHunterMemoryQuery: vi.fn(() => ({
-    data: { items: [] },
-    isLoading: false,
-    isError: false,
-  })),
-  useGetBugHunterRetiredMemoryQuery: vi.fn(() => ({
-    data: { items: [] },
-    isLoading: false,
-    isError: false,
-  })),
-  useRestoreBugHunterMemoryMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  useAddBugHunterMemoryMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  useRetireBugHunterMemoryMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
+}));
+
+// The notes link has its own test; here it only has to say which collection it opens.
+vi.mock("@components/context-collection-link", () => ({
+  ContextCollectionLink: ({ collection, copy }: any) => (
+    <a data-testid="notes-link" href={`/context-library?collection=${collection}`}>
+      {copy.title}
+    </a>
+  ),
 }));
 
 vi.mock("@utils", () => ({
@@ -385,7 +381,12 @@ describe("BugHunter", () => {
   it("reads the open section out of the address bar, so a section is linkable", () => {
     onDuty();
     mountPage("/?section=notebook");
-    expect(screen.getByText("My notebook")).toBeInTheDocument();
+    // The notes themselves live in the Context Library; the tab links to them.
+    expect(screen.getByTestId("notes-link")).toHaveTextContent("Bug Hunter Notes");
+    expect(screen.getByTestId("notes-link")).toHaveAttribute(
+      "href",
+      "/context-library?collection=bug_hunter_notes",
+    );
   });
 
   it("falls back to Work for a hand-edited section, rather than erroring", () => {

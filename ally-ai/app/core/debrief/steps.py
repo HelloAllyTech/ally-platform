@@ -22,9 +22,13 @@ from pydantic import BaseModel
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import (
     DebriefCards,
+    DebriefCardsReasoned,
     EvaluationOutput,
+    EvaluationOutputReasoned,
     EvidenceMap,
+    EvidenceMapReasoned,
     ProgressReading,
+    ProgressReadingReasoned,
 )
 from app.core.debrief_quality.judge import _enforce_missed_risk_cue
 from app.core.debrief_quality.prompt import build_judge_prompt
@@ -185,18 +189,56 @@ async def analyse(
     learner_level: Optional[str] = None,
     system: Optional[str] = None,
     scenario_session_id: Optional[str] = None,
+    live_detections: Optional[List[Dict[str, Any]]] = None,
+    case_memory: Optional[str] = None,
 ) -> Tuple[Optional[EvidenceMap], str]:
     from app.core.llm_usage.tasks import LLMTask
 
     lines = [system or DEFAULT_ANALYST_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
     if learner_level:
         lines.append(f"TRAINEE LEVEL: {learner_level}")
+    # Code-owned (v9 FR-42): skill coverage is computed in ally-be from these
+    # tags, under the three areas today's debrief reports, so the charts
+    # continue across the cutover.
+    lines.append(
+        "SKILL COVERAGE: set coverage_category on every behaviour to the one "
+        "area it belongs to (Listening Engagement, Emotional Attunement or "
+        "Supportive Engagement), or null when none fits."
+    )
+    # Code-owned (v9 FR-4): the session's emotional movement now comes from
+    # here, on today's debrief's scale.
+    lines.append(
+        "EMOTIONAL MOVEMENT: for every CLIENT turn, rate how the client feels "
+        "at that turn from -5 (very distressed) to +5 (very positive)."
+    )
+    if case_memory:
+        lines.append(
+            "CASE: this session continues a case. Write case_memory_update: "
+            "what the client now carries into the next session, integrating "
+            "CASE MEMORY with this session. About the client and the case "
+            "only, never the trainee."
+        )
+    if live_detections:
+        # Code-owned (v9 FR-11, eval case 19): the live detector is a second
+        # opinion, not ground truth, and a disagreement is never settled by
+        # asserting either side.
+        lines.append(
+            "LIVE DETECTIONS: what the live detector recorded during the "
+            "roleplay, per expected behaviour. It can be wrong. Read the "
+            "transcript yourself; for a behaviour it lists, set "
+            "detector_agreement, and where you disagree lower your confidence "
+            "and say in the note that the evidence is mixed."
+        )
     lines.append("")
     lines += _json_block("scenario", scenario or {})
     lines += _json_block("expected_behaviours", expected_behaviours or [])
+    if live_detections:
+        lines += _json_block("live_detections", live_detections)
+    if case_memory:
+        lines += ["CASE MEMORY:", case_memory, ""]
     lines += _transcript_block(transcript)
     output, meta = await _call(
-        EvidenceMap,
+        EvidenceMapReasoned,
         "\n".join(lines),
         LLMTask.DEBRIEF_ANALYST.value,
         model,
@@ -213,6 +255,12 @@ async def analyse(
     output.pivotal_moments = [
         m for m in output.pivotal_moments if m.turn_index in roles
     ][:5]
+    # A level on a turn that is not the client's describes nobody's feelings.
+    output.emotional_movement = [
+        e for e in output.emotional_movement if roles.get(e.turn_index) == "client"
+    ]
+    if not case_memory:
+        output.case_memory_update = None
     return output, meta["model"]
 
 
@@ -229,7 +277,7 @@ async def read_progress(
     lines += _json_block("latest_evidence_map", evidence)
     lines += _json_block("past_work_on_this_points", past_points)
     output, meta = await _call(
-        ProgressReading,
+        ProgressReadingReasoned,
         "\n".join(lines),
         LLMTask.DEBRIEF_PROGRESS_READER.value,
         model,
@@ -270,6 +318,7 @@ async def write(
     practice_options: Optional[List[Dict[str, Any]]] = None,
     case_memory: Optional[str] = None,
     assessment: bool = False,
+    cohort: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[DebriefCards], str]:
     """Write the cards. The transcript is sent so quotes can be copied exactly;
     the Writer is still told to write from the evidence map."""
@@ -318,6 +367,26 @@ async def write(
             "imply or argue with a grade, a pass or a result. Every point you "
             "make rests on a quoted moment from the transcript."
         )
+    if any(
+        isinstance(b, dict) and b.get("detector_agreement") == "disagrees"
+        for b in (evidence or {}).get("behaviours", [])
+    ):
+        # Code-owned (eval case 19): mixed evidence is never stated as fact.
+        lines.append(
+            "MIXED EVIDENCE: where a behaviour's detector_agreement is "
+            "'disagrees', don't state it as certain; prefer a point the "
+            "evidence supports clearly."
+        )
+    if cohort:
+        # Code-owned (v9 FR-17 get_cohort_stats, NFR-7 no ranking): peers'
+        # results may only make a hard moment feel normal, never compare.
+        lines.append(
+            "COHORT: how other trainees in the same organisation did on this "
+            "roleplay. You may use it only to say a moment is one many "
+            "trainees find hard, or that a strength is less common. Never "
+            "compare this trainee with others, rank them, or give a number or "
+            "share."
+        )
     lines.append("")
     lines += _json_block("evidence_map", evidence)
     lines += _json_block("safety_reading", safety)
@@ -329,9 +398,11 @@ async def write(
         lines += _json_block("guidance", passages)
     if progress:
         lines += _json_block("progress", progress)
+    if cohort:
+        lines += _json_block("cohort", cohort)
     lines += _transcript_block(transcript)
     output, meta = await _call(
-        DebriefCards,
+        DebriefCardsReasoned,
         "\n".join(lines),
         LLMTask.DEBRIEF_WRITER.value,
         model,
@@ -368,7 +439,7 @@ async def evaluate(
         history=history,
     )
     output, meta = await _call(
-        EvaluationOutput,
+        EvaluationOutputReasoned,
         prompt + EVALUATOR_FIX_INSTRUCTIONS,
         LLMTask.DEBRIEF_EVALUATOR.value,
         model,
@@ -419,7 +490,7 @@ async def revise(
     lines += _json_block("evidence_map", evidence)
     lines += _transcript_block(excerpts)
     output, meta = await _call(
-        DebriefCards,
+        DebriefCardsReasoned,
         "\n".join(lines),
         LLMTask.DEBRIEF_REVISER.value,
         model,

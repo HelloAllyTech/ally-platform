@@ -4,7 +4,7 @@ import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 import { ArticleQuestionNode } from "./articleQuestionNode";
@@ -51,6 +51,25 @@ const normalizeForCompare = (html: string) => {
   return collapseWhitespace(normalized);
 };
 
+export interface GenerateImageAtCursor {
+  /** The selected text, else the paragraph the cursor is in (with the one before it if empty). */
+  nearbyText: string;
+  insert: (image: { src: string; alt: string }) => void;
+}
+
+/** Text near the cursor, as context for an image generated for that spot. */
+export const textNearSelection = (editor: Editor): string => {
+  const { state } = editor;
+  const { from, to, $from } = state.selection;
+  const selected = from !== to ? state.doc.textBetween(from, to, " ").trim() : "";
+  if (selected) return selected;
+  const here = $from.parent.textContent.trim();
+  if (here) return here;
+  // An empty line: use the block just before it.
+  const before = state.doc.textBetween(Math.max(0, $from.start() - 600), $from.start(), " ");
+  return before.trim();
+};
+
 interface RichTextEditorProps {
   value: string;
   onChange: (html: string) => void;
@@ -63,6 +82,12 @@ interface RichTextEditorProps {
   allowImages?: boolean;
   /** Upload handler for the toolbar image button; resolves to the public URL. */
   onImageUpload?: (file: File) => Promise<string | null>;
+  /**
+   * Opt-in "Generate image" toolbar action (needs `allowImages`). Called with
+   * the text around the cursor (the selection, or the current paragraph) and
+   * an `insert` that places an `<img src alt>` where the cursor was.
+   */
+  onGenerateImage?: (request: GenerateImageAtCursor) => void;
   /**
    * Opt-in inline question placeholders (track article builder). Creating the
    * question itself is the caller's job — the toolbar button calls this and
@@ -88,6 +113,7 @@ export const RichTextEditor: FC<RichTextEditorProps> = ({
   borderless = false,
   allowImages = false,
   onImageUpload,
+  onGenerateImage,
   onCreateQuestion,
   allowCallouts = false,
 }) => {
@@ -181,6 +207,16 @@ export const RichTextEditor: FC<RichTextEditorProps> = ({
         }
       : undefined;
 
+  const handleGenerateImage =
+    allowImages && onGenerateImage && editor
+      ? () =>
+          onGenerateImage({
+            nearbyText: textNearSelection(editor),
+            // TipTap keeps the selection while the dialog has focus, so this lands where the cursor was.
+            insert: ({ src, alt }) => editor.chain().focus().setImage({ src, alt }).run(),
+          })
+      : undefined;
+
   const handleInsertQuestion =
     onCreateQuestion && editor
       ? () => {
@@ -199,6 +235,7 @@ export const RichTextEditor: FC<RichTextEditorProps> = ({
       <RichTextToolbar
         editor={editor}
         onInsertImage={handleInsertImage}
+        onGenerateImage={handleGenerateImage}
         onInsertQuestion={handleInsertQuestion}
         allowCallouts={allowCallouts}
       />

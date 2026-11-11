@@ -979,8 +979,11 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'A learner replies under the reflective question of a published Debrief-agent debrief',
     detail:
       'Ask Ally: answers from the published debrief and the transcript, streamed, one short reply ' +
-      'per message (≤ $0.05). A first-person risk statement gets the fixed support reply instead, ' +
-      'and the Safety reader reads each message alongside. Replaces coaching-chat for switched-on organisations.',
+      'per message (≤ $0.05). Up to 4 passes, calling tools when a question needs them: ' +
+      'search_guidance (Context Library, Debrief Guidance), get_learner_history and ' +
+      'get_live_detections (v9 FR-43); the last pass never calls a tool. A first-person risk ' +
+      'statement gets the fixed support reply instead, and the Safety reader reads each message ' +
+      'alongside. Replaces coaching-chat for switched-on organisations.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
@@ -1002,6 +1005,24 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'DEBRIEF_READ_ALOUD_VOICE in debrief-audio.service.ts',
   },
   {
+    id: 'scenario-description-narration',
+    task: LlmTask.SCENARIO_DESCRIPTION_NARRATION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'An author publishes a role-play, or edits the description of a published one; also the ' +
+      'backfill script and the retry sweep for a failed attempt',
+    detail:
+      'Speech of the role-play description, one standard narrator voice per language, made in ' +
+      'the background and stored in the assets bucket. Skipped when the text, voice and language ' +
+      'match the stored audio, so a re-save makes no TTS call. Failures retry up to 3 times ' +
+      'over about an hour and never block the save.',
+    kind: AiTaskKind.SPEECH,
+    provider: 'sarvam',
+    defaultModel: 'bulbul:v3',
+    configuredBy:
+      'SCENARIO_NARRATION_VOICE in scenario-description-audio.service.ts',
+  },
+  {
     id: 'debrief-reflection-check',
     task: LlmTask.DEBRIEF_REFLECTION_CHECK,
     runtime: LlmRuntime.ALLY_BE,
@@ -1019,26 +1040,29 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
   },
   {
     id: 'debrief-improver',
-    task: LlmTask.DEBRIEF_IMPROVER,
+    task: LlmTask.DEBRIEF_PM_AGENT,
     runtime: LlmRuntime.ALLY_AI,
     trigger: 'Daily, and on demand from the Debrief Console',
     detail:
-      'The Improver: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
+      'The PM agent: reads aggregate signals (never transcripts), writes the report and proposes ideas. Learning budget only.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
-    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.improver)',
+    configuredBy: 'debrief release bundle (DEBRIEF_MODELS.pmAgent)',
   },
   {
     id: 'rag-quality-judge',
     task: LlmTask.RAG_QUALITY_JUDGE,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Scheduled: corpus retrievals are judged',
+    trigger:
+      'Scheduled: corpus retrievals and a sample of Context Library searches are judged',
     detail:
       'Did the passages retrieved actually answer the query, and what was a short ' +
       'retrieval missing? The similarity floor is calibrated from these labels, because ' +
       'a similarity score is not a measure of usefulness — the character corpus returned ' +
-      'nothing for a question one of its own section titles answered.',
+      'nothing for a question one of its own section titles answered. The Context Library ' +
+      'calls it nightly (ally-be ContextJudgeService) on a sample of live searches; its labels ' +
+      'are the benchmark every learning loop reads.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
@@ -1303,11 +1327,12 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,
     trigger:
-      'Anything is embedded for semantic search — including every document added to ' +
-      "Ally's library and every library search Ally makes for a learner",
+      'Anything is embedded for semantic search — including every Context Library entry and ' +
+      'every library search Ally makes for a learner',
     detail:
-      'All three knowledge corpora (WhatsApp Q&A, the character library and the Ally ' +
-      "guide's library, one Weaviate collection each) plus roadmap opportunities — " +
+      'The WhatsApp Q&A corpus (the one knowledge corpus left; the character library, the Ally ' +
+      "guide's library and Debrief guidance moved into the Context Library, whose indexes embed " +
+      'with the same model) plus roadmap opportunities — ' +
       'embedded once per chunk at ingest and once per query at search. Every corpus embeds with THIS model, ' +
       'because a query vector from another model lands in a different space and makes every ' +
       'similarity number meaningless rather than merely worse. 1536 dimensions; Weaviate ' +
@@ -1690,6 +1715,61 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'openai.imageModel',
   },
   {
+    id: 'image-studio-compose',
+    task: LlmTask.IMAGE_STUDIO_COMPOSE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'An author presses Generate or "Suggest from content" in the Image Studio pop-up on any image slot',
+    detail:
+      'One call per press (not per variation): screens the request against the ' +
+      'depiction rules, drafts or tidies the description, writes alt text and the ' +
+      'scene the image prompt is compiled from. JSON mode. A keyword backstop ' +
+      'runs when this call fails, and generation continues from the raw description.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'image_studio_compose',
+  },
+  {
+    id: 'image-studio-image',
+    task: LlmTask.IMAGE_STUDIO_IMAGE,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'The Image Studio worker renders one image an author asked for (a cover, scene, portrait, quiz or article image, badge icon or cast sheet)',
+    detail:
+      'One call per variation (1–4 per press, up to 20 in a "fill empty scenes" ' +
+      'batch), plus one silent retry when the check fails. Text-only images use ' +
+      'IMAGE_STUDIO_TEXT_PROVIDER/MODEL; images with reference images (scenes with ' +
+      'a cast, cast sheets, refine) use IMAGE_STUDIO_REFERENCE_PROVIDER/MODEL ' +
+      '(Gemini by default). An outage falls back to the other provider. Durable ' +
+      'job rows in generated_images; cost estimated per image in costUsd.',
+    kind: AiTaskKind.IMAGE,
+    provider: 'openai',
+    defaultModel: 'gpt-image-1.5',
+    configuredBy:
+      'IMAGE_STUDIO_TEXT_PROVIDER / IMAGE_STUDIO_TEXT_MODEL / IMAGE_STUDIO_REFERENCE_PROVIDER / IMAGE_STUDIO_REFERENCE_MODEL',
+    configPath: 'openai.imageModel',
+  },
+  {
+    id: 'image-studio-judge',
+    task: LlmTask.IMAGE_STUDIO_JUDGE,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'The Image Studio worker checks a freshly generated image before the author sees it',
+    detail:
+      'Vision call with the generated image (and its reference images): fails it ' +
+      'for visible text, wrong people, unsafe depiction, anatomy errors or a ' +
+      'character who does not match their reference. A failed image is regenerated ' +
+      'once. Off with IMAGE_STUDIO_JUDGE_ENABLED=false; skipped when no OpenAI key.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'IMAGE_STUDIO_JUDGE_MODEL',
+    configPath: 'imageStudio.judgeModel',
+  },
+  {
     id: 'analytics-suggestions',
     task: LlmTask.ANALYTICS_SUGGESTIONS,
     runtime: LlmRuntime.ALLY_BE,
@@ -1893,6 +1973,25 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     promptOverride: 'the prompt row for each roadmap call',
   },
   {
+    id: 'product-planning-ai',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'A roadmap plan runs a review-board check, drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
+    detail:
+      'The planning_* prompts: the safety, privacy and AI-quality reviewers (cold, from the PRD and ' +
+      'design only), the outcome reviewer (scheduled after release), the launch planner, the ' +
+      "research planner and the weekly signal scout. Every call is priced into the plan's " +
+      'spend ledger (plan_spend_entries). Nothing they write leaves Ally without a person ' +
+      'publishing it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'the planning_* prompt row for each call',
+  },
+  {
     id: 'roadmap-opportunity-copilot',
     task: LlmTask.ROADMAP_OPPORTUNITY_COPILOT,
     runtime: LlmRuntime.ALLY_BE,
@@ -1901,7 +2000,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     detail:
       'A tool loop per turn: up to 8 research passes (the board, user-interview notes, the ' +
       'Analytics Agent, UX signals, Bug Hunter findings, repo docs, GitHub code and wiki, ' +
-      'Stacks), then a structured turn — question, readiness verdicts, draft and brief. One ' +
+      'First Principles from the Context Library), then a structured turn — question, readiness verdicts, draft and brief. One ' +
       'llm_usage row per pass. Two cached system blocks: a product map (repos, admin ' +
       'surfaces, the head of each Builder knowledge pack, the wiki and repo-docs index — ' +
       '~10k tokens, re-rendered at most every 30 min) and the Vision & strategy page, goals ' +
@@ -2011,24 +2110,6 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUG_HUNTER_DECIDE_MODEL (compiled in)',
-  },
-  {
-    id: 'agent-memory-curation',
-    task: LlmTask.AGENT_MEMORY_CURATION,
-    runtime: LlmRuntime.ALLY_BE,
-    // Mechanical editing of short entries against a fixed operation set: cost
-    // and time dominate, and a wrong merge is caught by the next pass.
-    tier: LlmModelTier.FAST,
-    trigger: "Hourly, when an agent's notebook has new candidate entries",
-    detail:
-      'Folds the notes a sweep or fix session wrote into the curated active set: agree, ' +
-      'edit, add or remove, one operation per candidate. Bug Hunter today; Builder when ' +
-      'its lessons move to the same table.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'openai',
-    defaultModel: 'gpt-4o-mini',
-    configuredBy: 'LLM_FAST_MODEL',
-    promptOverride: 'agent_memory_curator_system',
   },
   {
     id: 'skill-experiment-judge',
@@ -2376,19 +2457,6 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     promptOverride: 'builder_rule_match_system',
   },
   {
-    id: 'builder-lesson-curation',
-    task: LlmTask.BUILDER_LESSON_CURATION,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A run finishes and the flywheel folds it in',
-    detail: 'Retrospective bullets into the curated lesson set.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
-    configuredBy: 'BUILDER_MECHANICAL_MODEL',
-    promptOverride: 'builder_lesson_curator_system',
-    configPath: 'builder.mechanicalModel',
-  },
-  {
     id: 'builder-outcome-categorise',
     task: LlmTask.BUILDER_OUTCOME_CATEGORISE,
     runtime: LlmRuntime.ALLY_BE,
@@ -2549,7 +2617,10 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
       'take a pass or two more (at most two rejections). Off, the prior loop runs, plus one ' +
       'tool-less wrap-up call when the cap is hit. ' +
       'The system prompt and a per-session library context block are cached; the ' +
-      'brief, blueprint or course outline rides on the newest user turn. Runs on ' +
+      'brief, blueprint or course outline rides on the newest user turn. ' +
+      'design_guidance_search / _get read the Context Library’s Learning Design and ' +
+      'search_library its Content Catalogue — their re-rank and the blueprint’s citation check ' +
+      'are the context-library rows, not this one. Runs on ' +
       'any of the three providers through AgentLlmProviderFactory — the prompt ' +
       'row wins, so set the model there (Claude Sonnet recommended for tool-use ' +
       'reliability in production).',
@@ -3055,6 +3126,206 @@ const GUIDE_TASKS: AiTaskEntry[] = [
   },
 ];
 
+/**
+ * Context Library (docs/context-library/PLAN.md). Extraction writes the chunks, so it runs on
+ * Builder's interview model (the owner's decision); the checks around it are mechanical and
+ * high-volume, so they run on the fast tier. Every row reads its prompt's own model first.
+ */
+const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
+  {
+    id: 'context-library-overview',
+    task: LlmTask.CONTEXT_LIBRARY_OVERVIEW,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'An admin adds a document to the Context Library',
+    detail:
+      'Once per document of more than three parts: the outline plus opening and closing parts ' +
+      'become a ≤150-word overview and key terms, shared by every collection the document feeds ' +
+      'and sent as the cached prefix of each extraction call.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'LLM_REASONING_MODEL — the call passes BUILDER_INTERVIEW_MODEL explicitly when it is set, so in practice the chunks are written by Builder’s interview model',
+    promptOverride: 'context_library_overview_system',
+  },
+  {
+    id: 'context-library-extract',
+    task: LlmTask.CONTEXT_LIBRARY_EXTRACT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'A document part is extracted into a Context Library collection',
+    detail:
+      'One call per part per target collection (~2,500-token parts, up to 8 principles or 12 ' +
+      'insights each). The prompt is the collection’s own extractor — ' +
+      '`context_library_extract_first_principles_system` for First Principles, ' +
+      '`context_library_extract_character_insights_system` for Character Insights (including ' +
+      'the one-off distillation of the retired character corpus), ' +
+      '`context_library_extract_ally_guide_library_system` for the Ally Guide Library, ' +
+      '`context_library_extract_debrief_guidance_system` for Debrief Guidance and ' +
+      '`context_library_extract_learning_design_system` for Learning Design — and each prompt’s own model ' +
+      'is read first. The overview and vocabularies are an identical prefix across a document, ' +
+      'so prompt caching applies.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'LLM_REASONING_MODEL — the call passes BUILDER_INTERVIEW_MODEL explicitly when it is set, so in practice the chunks are written by Builder’s interview model',
+    promptOverride: 'context_library_extract_first_principles_system',
+  },
+  {
+    id: 'context-library-critic',
+    task: LlmTask.CONTEXT_LIBRARY_CRITIC,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Candidates extracted from a document part are checked before publishing',
+    detail:
+      'One call per part per collection, with the part text: grounded, standalone (with a ' +
+      'rewrite), specificity, actionability, names and the collection’s own checks. A separate ' +
+      'call from the extractor because models grade their own output generously.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_critic_system',
+  },
+  {
+    id: 'context-library-adjudicate',
+    task: LlmTask.CONTEXT_LIBRARY_ADJUDICATE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A new chunk is close to existing ones in its collection',
+    detail:
+      'Only for candidates between the merge and publish similarity thresholds: same, refines, ' +
+      'conflicts or different, against the nearest three. Keeps people out of the easy cases.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_adjudicate_system',
+  },
+  {
+    id: 'context-library-consolidate',
+    task: LlmTask.CONTEXT_LIBRARY_CONSOLIDATE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A document finishes extracting into a collection',
+    detail:
+      'Once per document per collection: merges repeats, ranks for the density cap (enforced in ' +
+      'code), and records relations.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_consolidate_system',
+  },
+  {
+    id: 'context-library-enrich',
+    task: LlmTask.CONTEXT_LIBRARY_ENRICH,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'An admin writes or bulk-uploads an entry, an agent writes a lesson, a platform admin enriches the Ally guide and Debrief passages imported from the Knowledge Base, or a Studio item is synced into the Content Catalogue',
+    detail:
+      'Adds situations, example searches, keywords and missing facets without touching the ' +
+      'entry text (an imported passage also gets a one-line statement in place of its citation). ' +
+      'One call per entry; bulk uploads and the import enrichment run them in small parallel batches. ' +
+      'A synced Content Catalogue item gets example searches only — its text and facets are its ' +
+      'Studio row’s — once after it is created or renamed, at most 300 a night (ContextCatalogueSyncService).',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_enrich_system',
+  },
+  {
+    id: 'context-library-rerank',
+    task: LlmTask.CONTEXT_LIBRARY_RERANK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Any use case searches the Context Library (Builder, Bug Hunter, the character interview, Course Copilot, the Ally guide, Debrief, engineers)',
+    detail:
+      'One listwise call per search over up to 50 fused candidates, grading each 0–3; capped at ' +
+      '2.5 s, after which the search falls back to retriever agreement. A different model family ' +
+      'from the Gemini judge that grades samples of these searches, so the loop cannot grade its own work.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_rerank_system',
+  },
+  {
+    id: 'context-library-citation-check',
+    task: LlmTask.CONTEXT_LIBRARY_CITATION_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A PRD, blueprint or answer cites Context Library codes',
+    detail:
+      'One call per saved version that adds citations, over the new ones only: Builder’s PRD ' +
+      '(`[FP-…]`) and Course Copilot’s blueprint (`[LD-…]`, `[CC-…]`). Codes never surfaced in ' +
+      'the session are stripped in code before this runs.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_citation_check_system',
+  },
+  {
+    id: 'context-library-query-plan',
+    task: LlmTask.CONTEXT_LIBRARY_QUERY_PLAN,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A Builder interview (or a Course Copilot brief) starts',
+    detail:
+      'Once per session: a short context descriptor plus 8–12 situational searches, fanned out ' +
+      'in parallel to build the guiding brief. Runs alongside the first turn, never before it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_query_plan_system',
+  },
+  {
+    id: 'context-library-gap-label',
+    task: LlmTask.CONTEXT_LIBRARY_GAP_LABEL,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Nightly: the Context Library gap loop clusters searches that found nothing good',
+    detail:
+      'One call per cluster of three or more similar unanswered searches: a general topic label ' +
+      'for Insights → What’s missing?. Never repeats a person’s own words, so sensitive queries ' +
+      'reach the page only as this label.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_gap_label_system',
+  },
+  {
+    id: 'context-library-agent-curate',
+    task: LlmTask.CONTEXT_LIBRARY_AGENT_CURATE,
+    runtime: LlmRuntime.ALLY_BE,
+    // Mechanical editing of short entries against a fixed operation set: cost and time
+    // dominate, and a wrong merge is caught by the next pass (or undone from Insights).
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Hourly, when Builder Lessons or Bug Hunter Notes have new candidates an agent wrote',
+    detail:
+      'One call per collection per pass over its candidates and active set: agree, edit, add or ' +
+      'remove, one operation per candidate. Pins, the per-pass change budget and the active cap ' +
+      'are enforced in code; every change is a Context Library loop action an admin can undo. ' +
+      'Replaces the agent-memory and Builder lesson curators.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_agent_curator_system',
+  },
+];
+
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...AI_LEARN_TASKS,
   ...ALLY_AI_TASKS,
@@ -3063,6 +3334,7 @@ export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...BUG_HUNTER_TASKS,
   ...COURSE_COPILOT_TASKS,
   ...GUIDE_TASKS,
+  ...CONTEXT_LIBRARY_TASKS,
 ];
 
 /**

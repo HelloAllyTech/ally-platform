@@ -65,6 +65,23 @@ import { RoadmapBuilderService } from './service/roadmap-builder.service';
 import { RoadmapUpNextService } from './service/roadmap-up-next.service';
 import { RoadmapUpNextController } from './controller/roadmap-up-next.controller';
 import { BuilderModule } from 'src/builder/builder.module';
+import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
+import { RoadmapPlanController } from './controller/roadmap-plan.controller';
+import { PlanSessionStore } from './plan/plan-session.store';
+import { PlanStageService } from './plan/plan-stage.service';
+import { PlanReadinessService } from './plan/plan-readiness.service';
+import { PlanViewService } from './plan/plan-view.service';
+import { PlanIdeaService } from './plan/plan-idea.service';
+import { PlanLeadService } from './plan/plan-lead.service';
+import { PlanCheckService } from './plan/plan-check.service';
+import { PlanAiService } from './plan/plan-ai.service';
+import { PlanOutcomeService } from './plan/plan-outcome.service';
+import { PlanLaunchService } from './plan/plan-launch.service';
+import { PlanDiscoveryService } from './plan/plan-discovery.service';
+import { PlanExportService } from './plan/plan-export.service';
+import { PlanSchedulerRegistrationService } from './plan/plan-scheduler-registration.service';
+
+import { ContextLibraryModule } from 'src/context-library/context-library.module';
 import { RoadmapBoardService } from './service/roadmap-board.service';
 import { RoadmapTaxonomyService } from './service/roadmap-taxonomy.service';
 import { RoadmapStrategyGoalService } from './service/roadmap-strategy-goal.service';
@@ -157,6 +174,10 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
      * imports ProductRoadmapModule.
      */
     BuilderModule,
+    /** PlanAccessService: every filing door needs the Product Planning — Ideas toggle. */
+    ProductPlanningModule,
+    // The opportunity copilot's principles_search/principles_get, on First Principles.
+    ContextLibraryModule,
     /**
      * S3Service — presigned PUTs for opportunity reference images, and the URL parsing that
      * checks a stored image really is one of our own uploads.
@@ -169,8 +190,23 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapAdminController,
     RoadmapUpNextController,
     RoadmapIdeaDraftController,
+    RoadmapPlanController,
   ],
   providers: [
+    // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
+    PlanSessionStore,
+    PlanStageService,
+    PlanReadinessService,
+    PlanViewService,
+    PlanIdeaService,
+    PlanLeadService,
+    PlanCheckService,
+    PlanAiService,
+    PlanOutcomeService,
+    PlanLaunchService,
+    PlanDiscoveryService,
+    PlanExportService,
+    PlanSchedulerRegistrationService,
     // repositories
     RoadmapProductGoalRepository,
     RoadmapStrategyGoalRepository,

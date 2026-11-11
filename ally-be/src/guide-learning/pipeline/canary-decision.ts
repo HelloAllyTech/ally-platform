@@ -3,7 +3,7 @@ import { GuardResult } from '../evals/gate';
 
 /**
  * The canary's automatic decision (plans/ally-guide/plan.md §7.13,
- * Appendix A "Learning loop"; Stacks: Canary Deployments for Safe Agent
+ * Appendix A "Learning loop"; Canary Deployments for Safe Agent
  * Iteration — compare version-tagged metrics against the baseline, roll back
  * at once on a regression). Pure: the monitor gathers, this decides.
  *

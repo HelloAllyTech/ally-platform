@@ -33,6 +33,15 @@ export interface FeatureToggleOptions {
    * the org's switch), so the refusal can name the fix.
    */
   orgAdminPermission?: string;
+  /**
+   * A second toggle that also opens the route, for a caller who lacks the
+   * first. Used on Builder's `:sessionId` routes so a Product Planning Lead can
+   * work a plan's PRD, design and build without the Builder toggle. The guard
+   * marks such a caller (`request.viaAlternateToggle`) so the route's own
+   * scope check can confine them — BuilderSessionVisibilityInterceptor lets
+   * them reach plan sessions only.
+   */
+  alsoAllowedBy?: FeatureToggleKey;
 }
 
 /**
@@ -59,6 +68,7 @@ export function RequireFeatureToggle(
     operator?: 'AND' | 'OR';
     tenantPreference?: PreferenceName;
     orgAdminPermission?: string;
+    alsoAllowedBy?: FeatureToggleKey;
   } = {},
 ) {
   const permissions = options.permissions ?? [PERMISSIONS.SYSTEM_ACCESS];
@@ -69,6 +79,7 @@ export function RequireFeatureToggle(
       featureKey,
       tenantPreference: options.tenantPreference,
       orgAdminPermission: options.orgAdminPermission,
+      alsoAllowedBy: options.alsoAllowedBy,
     } as FeatureToggleOptions),
   );
 }

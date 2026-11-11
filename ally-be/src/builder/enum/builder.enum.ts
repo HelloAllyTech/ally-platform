@@ -63,6 +63,28 @@ export const BUILDER_PRD_FROZEN_STATUSES: BuilderSessionStatus[] = [
  * stages inside a phase (TESTING, E2E_VERIFY, OPENING_PRS, REPORTING) are
  * still agent-asserted.
  */
+/**
+ * What a session is for. BUILD is every session Builder has ever had: a PRD
+ * interview that becomes build runs. PLAN is the roadmap's idea-to-outcome plan
+ * (plans/roadmap-owns-planning rev 5.2), which reuses these tables from its
+ * first message and can later be sent to build on the same session.
+ */
+export enum BuilderSessionKind {
+  BUILD = 'build',
+  PLAN = 'plan',
+}
+
+/**
+ * Who may see a session. SHARED is every session Builder has ever had. PRIVATE
+ * is a plan its author has not filed yet: visible to that author only, and
+ * never in Builder's own lists (mission control, Now, History). See
+ * the session repository's visibleToWhere and the visibility interceptor.
+ */
+export enum BuilderSessionVisibility {
+  PRIVATE = 'private',
+  SHARED = 'shared',
+}
+
 export enum BuilderStage {
   SETUP = 'SETUP',
   PLANNING = 'PLANNING',
@@ -308,30 +330,6 @@ export enum BuilderPrdVersionAuthor {
 }
 
 /**
- * Categories for cross-session memory. The interviewer and the build prompt
- * both receive recent lessons, which is how build N+1 stops rediscovering
- * what build N learned the hard way.
- */
-/**
- * Where a lesson is in its life.
- *
- * The flat table this replaces had no such notion: every retrospective bullet
- * went straight into the set fed to every future prompt, so the same trap
- * learned five times was five rows competing for the same context budget. A
- * candidate is raw harvest; the curator promotes, merges or retires it.
- */
-export enum BuilderLessonStatus {
-  /** Freshly harvested, not yet curated. Not fed to prompts. */
-  CANDIDATE = 'candidate',
-  /** In the curated set. This is what runs actually read. */
-  ACTIVE = 'active',
-  /** Folded into another lesson; kept as a tombstone for provenance. */
-  MERGED = 'merged',
-  /** Stale, contradicted, or subsumed. */
-  RETIRED = 'retired',
-}
-
-/**
  * How a build turned out, once the humans have had their say.
  *
  * `closed_unmerged` is the most informative value here and the one the old
@@ -380,6 +378,11 @@ export enum BuilderFailureTag {
   OTHER = 'other',
 }
 
+/**
+ * Categories of a Builder lesson — the `category` facet of the Context Library's Builder Lessons
+ * collection, whose profile reads this list. The outcome categoriser and the correction pass
+ * write lessons in these categories.
+ */
 export enum BuilderLessonCategory {
   /** A trap that cost time — a build-order surprise, a silent failure mode. */
   GOTCHA = 'gotcha',

@@ -1,9 +1,11 @@
+import { ImageAssetService } from 'src/image-studio/service/image-asset.service';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource, DeepPartial, EntityManager, In } from 'typeorm';
 
@@ -142,6 +144,7 @@ import {
   OpenAITranslationsService,
   TranslationProgressCallback,
 } from 'src/common/service/openai-translation.service';
+import { ScenarioDescriptionAudioService } from './scenario-description-audio.service';
 import { ScenarioTranslationNotificationService } from './scenario-translation-notification.service';
 import {
   ScenarioTranslationAction,
@@ -252,6 +255,9 @@ export class ScenarioService {
     private readonly cohortVisibilityService: CohortVisibilityService,
     private readonly tenantFeatureService: TenantFeatureService,
     private readonly contentAccessService: ContentAccessService,
+    @Optional() private readonly imageAssetService?: ImageAssetService,
+    @Optional()
+    private readonly descriptionAudioService?: ScenarioDescriptionAudioService,
   ) {}
 
   async getScenarios(): Promise<GetScenarioDto[]> {
@@ -523,6 +529,11 @@ export class ScenarioService {
     }
 
     if (languageCode) {
+      // The narration reads the base-language description: hide it when the
+      // learner is shown a translated one.
+      if (scenario.translations?.[languageCode]?.description) {
+        scenario.descriptionAudioUrl = null;
+      }
       applyScenarioTranslations(scenario, languageCode);
       scenario.triggerWarnings?.forEach((triggerWarning) => {
         if (
@@ -702,6 +713,14 @@ export class ScenarioService {
       throw new Error(
         'S3 bucket name for learnMediaPublicBucket is not defined',
       );
+    }
+    // A cover can be shared: a character's portrait copied in by the
+    // character picker, a library image, an AI-generated image. Deleting it
+    // when this roleplay's cover changes would blank it everywhere else.
+    if (
+      await this.imageAssetService?.isShared(deleteCoverImageDto.coverImageUrl)
+    ) {
+      return { success: true };
     }
     return this.s3Service.deleteS3Image(
       bucket,
@@ -1032,6 +1051,10 @@ export class ScenarioService {
             savedScenarios[i].metadata,
           );
         }
+      }
+
+      for (const saved of savedScenarios) {
+        void this.descriptionAudioService?.onScenarioSaved(saved.id);
       }
 
       return savedScenarios;
@@ -1738,6 +1761,10 @@ export class ScenarioService {
       const success = manager
         ? await runUpdate(manager)
         : await this.dataSource.transaction(runUpdate);
+
+      if (success) {
+        void this.descriptionAudioService?.onScenarioSaved(id, manager);
+      }
 
       if (
         success &&

@@ -68,7 +68,7 @@ const MemorySources: FC<{ sources: GuideMemorySource[]; language: string }> = ({
 /**
  * What Ally remembers (plan §6, memory: view, forget one, forget all, turn
  * off). Shown plainly, theirs to remove, with the switch right above the
- * list (Stacks: "Make Agent Memory Transparent and User-Controllable").
+ * list ("Make Agent Memory Transparent and User-Controllable").
  */
 export const MemoryPanel: FC<{ onForgotten?: (scope: "one" | "all") => void }> = ({
   onForgotten,

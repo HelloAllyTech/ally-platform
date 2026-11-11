@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 
 import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -11,10 +11,11 @@ import {
   useLazyGetTrackByIdQuery,
   useUpdateTrackByIdMutation,
   useUpdateTrackStructureMutation,
-  useUpdateLiveQuizSettingsMutation,
+  useUpdateLiveAttemptLimitMutation,
 } from "@api";
 import { WandStars, WarningAlt } from "@assets";
 import { ActionConfirmationPopup, Button, Header } from "@components";
+import { CourseImageContext, CourseImageContextValue } from "@components/image-studio";
 import { ButtonVariant } from "@components/types";
 import { DEFAULT_TRACK_FORM_VALUES, ROUTES, TRACK_ENTITY_LABEL, en } from "@constants";
 import { useAllyGuideAccess, useCanUseCourseCopilot, useContentAuthoring } from "@hooks";
@@ -45,7 +46,7 @@ import {
   createItemOfType,
   deserializeTrack,
   extractTrackMetadata,
-  getLiveQuizAttemptChanges,
+  getLiveAttemptLimitChanges,
   serializeTrackForm,
   validateTrackForPublish,
 } from "./trackFormUtils";
@@ -81,7 +82,7 @@ export const CreateTrack: FC = () => {
   const [createTrack] = useCreateTrackMutation();
   const [updateTrackMetadata] = useUpdateTrackByIdMutation();
   const [updateTrackStructure] = useUpdateTrackStructureMutation();
-  const [updateLiveQuizSettings] = useUpdateLiveQuizSettingsMutation();
+  const [updateLiveAttemptLimit] = useUpdateLiveAttemptLimitMutation();
   const { track } = useAnalytics();
 
   const formMethods = useForm<TrackFormValues>({
@@ -218,14 +219,19 @@ export const CreateTrack: FC = () => {
         setTrackId(created.id);
       }
 
-      // A raised attempt limit on a live course goes through its own endpoint: the
-      // structure PUT treats `maxAttempts` as structural and 409s once learners are
-      // enrolled. Sent first, so the PUT below then matches what is stored.
+      // A raised attempt limit (quiz or annotation) on a live course goes through
+      // its own endpoint: the structure PUT treats `maxAttempts` as structural and
+      // 409s once learners are enrolled. Sent first, so the PUT below then matches
+      // what is stored.
       if (trackId && trackDetail?.status === SimulationStatus.ACTIVE) {
-        for (const change of getLiveQuizAttemptChanges(trackDetail, values)) {
-          await updateLiveQuizSettings(change).unwrap();
+        for (const change of getLiveAttemptLimitChanges(trackDetail, values)) {
+          await updateLiveAttemptLimit({
+            trackItemId: change.trackItemId,
+            maxAttempts: change.maxAttempts,
+          }).unwrap();
           track(ANALYTICS_EVENTS.LIVE_QUIZ_ATTEMPTS_INCREASED, {
             trackItemId: change.trackItemId,
+            itemType: change.itemType,
             maxAttempts: change.maxAttempts,
           });
         }
@@ -297,6 +303,35 @@ export const CreateTrack: FC = () => {
     setShowDiscardPopup(false);
     navigate(-1);
   };
+
+  /* ----------------------------- Image Studio ---------------------------- */
+
+  // The backend makes the first image accepted in a course with no style
+  // example that example; mirror it, so the next save doesn't clear it.
+  const handleImageAccepted = useCallback(
+    (imageId: string) => {
+      if (!trackId || getValues("imageStyleAnchorId")) return;
+      formMethods.setValue("imageStyleAnchorId", imageId, { shouldDirty: true });
+    },
+    [trackId, getValues, formMethods],
+  );
+
+  const courseImage = useMemo<CourseImageContextValue>(
+    () => ({
+      trackId,
+      courseStyleId: watchedValues.imageStyleId ?? null,
+      courseStyleAnchorId: watchedValues.imageStyleAnchorId ?? null,
+      courseTitle: watchedValues.title,
+      onImageAccepted: handleImageAccepted,
+    }),
+    [
+      trackId,
+      watchedValues.imageStyleId,
+      watchedValues.imageStyleAnchorId,
+      watchedValues.title,
+      handleImageAccepted,
+    ],
+  );
 
   /* -------------------------------- Render ------------------------------- */
 
@@ -404,79 +439,81 @@ export const CreateTrack: FC = () => {
 
   return (
     <FormProvider {...formMethods}>
-      {/* Below lg the outline rail sits above the editor and the page scrolls as
+      <CourseImageContext.Provider value={courseImage}>
+        {/* Below lg the outline rail sits above the editor and the page scrolls as
           one; side by side, the rail leaves the editor too narrow to use. */}
-      <div className="lg:h-[100vh] lg:overflow-hidden font-primary">
-        <Header
-          isValid={canPublish}
-          isPublishing={isSaving}
-          onBack={handleBack}
-          onPublish={handlePublish}
-          onSaveDraft={handleSaveDraft}
-          title={title}
-          showPreview={false}
-          type="Track"
-          extraActions={askCopilotButton}
-          actionsFooter={publishIssues}
-          viewOnly={
-            isViewOnly
-              ? {
-                  title: en.contentAccess.viewOnlyBannerTitle,
-                  subtitle: en.contentAccess.viewOnlyBannerSubtitle(
-                    en.contentAccess.courses,
-                    en.contentAccess.createCoursesToggle,
-                  ),
-                }
-              : undefined
-          }
-        />
-
-        {/* `disabled` reaches every native control below; the rail's drag-reorder
-            is not a control, so its handlers are no-ops instead. */}
-        <fieldset
-          disabled={isViewOnly}
-          className="m-0 min-w-0 border-0 p-0 flex flex-col lg:flex-row lg:h-[calc(100vh-140px)]"
-        >
-          <TrackOutlineRail
-            sections={sections}
-            selection={selection}
-            errorKeys={errorKeys}
-            onSelectSettings={() => setSelection("settings")}
-            onSelectLanding={() => setSelection("landing")}
-            onSelectTranslations={() => setSelection("translations")}
-            onSelectAllyNotes={allyAccess.canView ? () => setSelection("allyNotes") : undefined}
-            publishedLanguageCount={publishedLanguageCount}
-            onSelectItem={(sectionIndex, itemIndex) => setSelection({ sectionIndex, itemIndex })}
-            onAddSection={handleAddSection}
-            onAddItem={handleAddItem}
-            onAddItemFromTemplate={handleAddItemFromTemplate}
-            onDeleteSection={handleDeleteSection}
-            onReorderSections={isViewOnly ? () => undefined : handleReorderSections}
-            onReorderItems={isViewOnly ? () => undefined : handleReorderItems}
+        <div className="lg:h-[100vh] lg:overflow-hidden font-primary">
+          <Header
+            isValid={canPublish}
+            isPublishing={isSaving}
+            onBack={handleBack}
+            onPublish={handlePublish}
+            onSaveDraft={handleSaveDraft}
+            title={title}
+            showPreview={false}
+            type="Track"
+            extraActions={askCopilotButton}
+            actionsFooter={publishIssues}
+            viewOnly={
+              isViewOnly
+                ? {
+                    title: en.contentAccess.viewOnlyBannerTitle,
+                    subtitle: en.contentAccess.viewOnlyBannerSubtitle(
+                      en.contentAccess.courses,
+                      en.contentAccess.createCoursesToggle,
+                    ),
+                  }
+                : undefined
+            }
           />
-          <div className="flex-1 min-w-0 lg:overflow-y-auto custom-scrollbar py-4 lg:p-6">
-            {renderCanvas()}
-          </div>
-        </fieldset>
 
-        <ActionConfirmationPopup
-          isOpen={showDiscardPopup}
-          onClose={() => setShowDiscardPopup(false)}
-          title={en.simulation.unsaved}
-          titleItalic={en.simulation.changes}
-          description={en.simulation.discardDescription}
-          primaryButton={{
-            label: en.simulation.saveAndExit,
-            onClick: handleSaveAndExit,
-            variant: ButtonVariant.PRIMARY,
-          }}
-          secondaryButton={{
-            label: en.simulation.discardChanges,
-            onClick: handleDiscard,
-            variant: ButtonVariant.SECONDARY,
-          }}
-        />
-      </div>
+          {/* `disabled` reaches every native control below; the rail's drag-reorder
+            is not a control, so its handlers are no-ops instead. */}
+          <fieldset
+            disabled={isViewOnly}
+            className="m-0 min-w-0 border-0 p-0 flex flex-col lg:flex-row lg:h-[calc(100vh-140px)]"
+          >
+            <TrackOutlineRail
+              sections={sections}
+              selection={selection}
+              errorKeys={errorKeys}
+              onSelectSettings={() => setSelection("settings")}
+              onSelectLanding={() => setSelection("landing")}
+              onSelectTranslations={() => setSelection("translations")}
+              onSelectAllyNotes={allyAccess.canView ? () => setSelection("allyNotes") : undefined}
+              publishedLanguageCount={publishedLanguageCount}
+              onSelectItem={(sectionIndex, itemIndex) => setSelection({ sectionIndex, itemIndex })}
+              onAddSection={handleAddSection}
+              onAddItem={handleAddItem}
+              onAddItemFromTemplate={handleAddItemFromTemplate}
+              onDeleteSection={handleDeleteSection}
+              onReorderSections={isViewOnly ? () => undefined : handleReorderSections}
+              onReorderItems={isViewOnly ? () => undefined : handleReorderItems}
+            />
+            <div className="flex-1 min-w-0 lg:overflow-y-auto custom-scrollbar py-4 lg:p-6">
+              {renderCanvas()}
+            </div>
+          </fieldset>
+
+          <ActionConfirmationPopup
+            isOpen={showDiscardPopup}
+            onClose={() => setShowDiscardPopup(false)}
+            title={en.simulation.unsaved}
+            titleItalic={en.simulation.changes}
+            description={en.simulation.discardDescription}
+            primaryButton={{
+              label: en.simulation.saveAndExit,
+              onClick: handleSaveAndExit,
+              variant: ButtonVariant.PRIMARY,
+            }}
+            secondaryButton={{
+              label: en.simulation.discardChanges,
+              onClick: handleDiscard,
+              variant: ButtonVariant.SECONDARY,
+            }}
+          />
+        </div>
+      </CourseImageContext.Provider>
     </FormProvider>
   );
 };

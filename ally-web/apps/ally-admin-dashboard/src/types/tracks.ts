@@ -413,8 +413,21 @@ export interface BranchingScenarioSettings {
   maxAttempts?: number | null;
 }
 
+/** A Character Library character cast in a branching scenario's images. */
+export interface BranchingCastMember {
+  /** `scenario_characters.id`. */
+  characterId: string;
+  name: string;
+}
+
 export interface BranchingScenarioContent {
   intro?: string;
+  /**
+   * Characters who appear in this scenario's scene images. Sent as
+   * `castCharacterIds` when a scene image is generated, so each looks the same
+   * in every scene. Absent = no cast (and never written when empty).
+   */
+  imageCast?: BranchingCastMember[];
   /** Absent = CLASSIC. Stored only when STORY, so classic content stays unchanged. */
   experience?: BranchingExperience;
   settings?: BranchingScenarioSettings;
@@ -607,6 +620,10 @@ export interface TrackDetail {
    * fills something in; absent on a backend that predates the column.
    */
   landingPage?: TrackLandingPage | null;
+  /** `tracks.imageStyleId`: the course's Image Studio style. Absent on an older backend. */
+  imageStyleId?: string | null;
+  /** `tracks.imageStyleAnchorId`: a `generated_images.id` new images copy the look of. */
+  imageStyleAnchorId?: string | null;
   updatedAt?: string;
   sections: TrackSectionDetail[];
 }
@@ -625,6 +642,10 @@ export interface TrackMetadataInput {
   competencyIds?: string[];
   /** Omit to leave the page unchanged; `null` clears it. */
   landingPage?: TrackLandingPage | null;
+  /** Omit to leave unchanged; `null` clears it. */
+  imageStyleId?: string | null;
+  /** Omit to leave unchanged; `null` clears it. */
+  imageStyleAnchorId?: string | null;
 }
 
 export interface UpdateTrackInput extends TrackMetadataInput {
@@ -861,6 +882,13 @@ export interface TrackFormValues {
   competencyIds?: string[];
   /** The story-led landing page. Null for a course that has not been saved yet. */
   landingPage?: TrackLandingPage | null;
+  /**
+   * The course's Image Studio style. Undefined = not loaded from (or set for)
+   * the server, so it is left out of the save; null clears it.
+   */
+  imageStyleId?: string | null;
+  /** The course's style example (`generated_images.id`); same rules as `imageStyleId`. */
+  imageStyleAnchorId?: string | null;
   sections: TrackSectionFormValue[];
 }
 

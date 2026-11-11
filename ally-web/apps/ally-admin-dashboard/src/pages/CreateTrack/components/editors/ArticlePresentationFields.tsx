@@ -5,13 +5,14 @@ import { toast } from "sonner";
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon } from "@assets";
 import { Button } from "@components";
+import { ImageSourceField } from "@components/image-studio";
 import { ButtonVariant } from "@components/types";
 import {
   MAX_ARTICLE_COVER_ALT_LENGTH,
   MAX_ARTICLE_TAKEAWAY_LENGTH,
   MAX_ARTICLE_TAKEAWAYS,
 } from "@constants";
-import { ArticleCover, ArticleExperience } from "@types";
+import { ArticleCover, ArticleExperience, ImageContext } from "@types";
 
 import { useTrackMediaUpload } from "../../useTrackMediaUpload";
 
@@ -181,6 +182,9 @@ interface ArticleCoverFieldProps {
   onChange: (cover: ArticleCover | undefined) => void;
   experience?: ArticleExperience;
   readingMinutes: number;
+  /** Image Studio: this slot's id and what the article is about. Without them, upload only. */
+  slotKey?: string;
+  imageContext?: ImageContext;
 }
 
 export const ArticleCoverField: FC<ArticleCoverFieldProps> = ({
@@ -189,6 +193,8 @@ export const ArticleCoverField: FC<ArticleCoverFieldProps> = ({
   onChange,
   experience,
   readingMinutes,
+  slotKey,
+  imageContext,
 }) => {
   const { upload, isUploading } = useTrackMediaUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +216,57 @@ export const ArticleCoverField: FC<ArticleCoverFieldProps> = ({
     onChange({ url, ...(cover?.alt ? { alt: cover.alt } : {}) });
   };
 
+  const renderCover = () =>
+    cover ? (
+      <div className="flex flex-col gap-2 border border-border-light rounded-md p-3">
+        <img
+          src={cover.url}
+          alt={cover.alt || "Cover photo preview"}
+          className="h-32 w-full rounded-md object-cover"
+        />
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-typography-700">
+            Describe the photo for screen readers
+          </span>
+          <input
+            id={`${name}.alt`}
+            type="text"
+            maxLength={MAX_ARTICLE_COVER_ALT_LENGTH}
+            value={cover.alt ?? ""}
+            onChange={event => onChange({ ...cover, alt: event.target.value })}
+            placeholder="e.g. Two people talking on a park bench"
+            className={inputClass}
+          />
+        </label>
+        <div className="flex items-center gap-3">
+          <Button
+            variant={ButtonVariant.SECONDARY}
+            className="!h-8 w-fit text-xs"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            {isUploading ? "Uploading…" : "Replace"}
+          </Button>
+          <button
+            type="button"
+            onClick={() => onChange(undefined)}
+            className="text-xs text-destructive-500 hover:text-destructive-600"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    ) : (
+      <Button
+        variant={ButtonVariant.SECONDARY}
+        className="!h-9 w-fit text-sm"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isUploading}
+      >
+        {isUploading ? "Uploading…" : "Upload cover photo"}
+      </Button>
+    );
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-0.5">
@@ -229,54 +286,23 @@ export const ArticleCoverField: FC<ArticleCoverFieldProps> = ({
         onChange={handleFileChange}
         data-testid="article-cover-file-input"
       />
-      {cover ? (
-        <div className="flex flex-col gap-2 border border-border-light rounded-md p-3">
-          <img
-            src={cover.url}
-            alt={cover.alt || "Cover photo preview"}
-            className="h-32 w-full rounded-md object-cover"
-          />
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-typography-700">
-              Describe the photo for screen readers
-            </span>
-            <input
-              id={`${name}.alt`}
-              type="text"
-              maxLength={MAX_ARTICLE_COVER_ALT_LENGTH}
-              value={cover.alt ?? ""}
-              onChange={event => onChange({ ...cover, alt: event.target.value })}
-              placeholder="e.g. Two people talking on a park bench"
-              className={inputClass}
-            />
-          </label>
-          <div className="flex items-center gap-3">
-            <Button
-              variant={ButtonVariant.SECONDARY}
-              className="!h-8 w-fit text-xs"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-            >
-              {isUploading ? "Uploading…" : "Replace"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => onChange(undefined)}
-              className="text-xs text-destructive-500 hover:text-destructive-600"
-            >
-              Remove
-            </button>
-          </div>
-        </div>
-      ) : (
-        <Button
-          variant={ButtonVariant.SECONDARY}
-          className="!h-9 w-fit text-sm"
-          onClick={() => fileInputRef.current?.click()}
+      {slotKey ? (
+        <ImageSourceField
+          slotKind="article_cover"
+          slotKey={slotKey}
+          context={imageContext}
           disabled={isUploading}
+          onAccept={generated =>
+            onChange({
+              url: generated.url,
+              ...(generated.altText || cover?.alt ? { alt: generated.altText || cover?.alt } : {}),
+            })
+          }
         >
-          {isUploading ? "Uploading…" : "Upload cover photo"}
-        </Button>
+          {renderCover()}
+        </ImageSourceField>
+      ) : (
+        renderCover()
       )}
       {needsCover && (
         <p className="text-xs text-warning-800">

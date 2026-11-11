@@ -35,7 +35,7 @@ const CLOSING_REASONS = new Set<HelplineEndedReason>([
  * `markEnded` is a conditional UPDATE, so the side effects below run exactly
  * once even when two of those race — the sweep expiring a wait at the moment
  * the talker leaves, say. Ending an already-ended chat is a no-op that returns
- * the chat as it is (idempotent processing — see the Stacks chunk "Design for
+ * the chat as it is (idempotent processing — see the guidance "Design for
  * idempotent message processing").
  */
 @Injectable()

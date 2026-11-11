@@ -320,12 +320,12 @@ export const READ_ONLY_EDIT_TOOLS = new Set(['get_course_outline', 'get_item']);
  * path — so a change made in the editor between turns is never overwritten
  * and the copilot can never save something the editor would reject. Each
  * change lands in the change log and is pushed to the pane as a
- * `course_patch` frame mid-turn. Stacks: "Making Agent Trustworthiness
+ * `course_patch` frame mid-turn. "Making Agent Trustworthiness
  * Visible Through Transparency".
  *
  * Publishing, assigning to organisations and duplicating are confirmed in
  * code, not just in the prompt: the tool raises a question and only acts when
- * the trainer's next message answers THAT question with "confirm". Stacks:
+ * the trainer's next message answers THAT question with "confirm".
  * "Progressive Delegation: Staged Autonomy Growth".
  */
 @Injectable()

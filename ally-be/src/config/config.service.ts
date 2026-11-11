@@ -248,7 +248,8 @@ export class AppConfigService {
   get builderHealthUrls(): Record<string, string> {
     const defaults: Record<string, string> = {
       'ally-be': `${this.publicApiBaseUrl}/api/health`,
-      'ally-web:admin': 'https://admin.helloally.ai',
+      'ally-web:admin': 'https://app.helloally.ai/admin/',
+      'ally-web:frontends': 'https://app.helloally.ai/admin/',
     };
     try {
       const raw = this.configService.get<string>('BUILDER_HEALTH_URLS', '');
@@ -1023,6 +1024,18 @@ export class AppConfigService {
   }
 
   /**
+   * Optional dedicated secret for the Debrief harness's run tokens (the
+   * bearer token ally-ai's debrief graph sends to the gateway tools). Empty
+   * when unset, and that is supported: `DebriefRunTokenService` then derives
+   * one as HMAC-SHA256(JWT_ACCESS_SECRET, 'debrief-gateway-v1'), so it is
+   * never the access secret itself and a user JWT can never pass as a run
+   * token (nor the reverse). Never leaves ally-be.
+   */
+  get debriefGatewaySecret(): string {
+    return this.configService.get<string>('DEBRIEF_GATEWAY_SECRET', '');
+  }
+
+  /**
    * User ids allowed to put a new version of a PINNED prompt live — the judge
    * rubrics, measuring instruments and guards in `PINNED_PROMPTS`.
    *
@@ -1113,18 +1126,6 @@ export class AppConfigService {
         'BOT_PAGE_VISITOR_SECRET',
         '',
       ),
-    };
-  }
-
-  /**
-   * Stacks — the team's curated product-guidance library, reached over HTTP
-   * (ally-be is not an MCP client). Optional: unset simply means the
-   * interview runs without product guidance.
-   */
-  get stacks() {
-    return {
-      apiUrl: this.configService.get<string>('STACKS_API_URL'),
-      apiKey: this.configService.get<string>('STACKS_API_KEY'),
     };
   }
 
@@ -1219,6 +1220,61 @@ export class AppConfigService {
         'CHARACTER_IMAGE_DEFAULT_PROVIDER',
         'openai',
       ),
+    };
+  }
+
+  /**
+   * Image Studio (src/image-studio): the author-facing generator behind every
+   * image slot. Text-only images and images with references are routed
+   * separately because the model that keeps a character consistent across
+   * reference images is not the cheapest one for a cover. See
+   * docs/image-studio.md → Configuration.
+   */
+  get imageStudio() {
+    const flag = (key: string, fallback: boolean) => {
+      const raw = this.configService.get<string>(key);
+      if (raw === undefined || raw === null || raw === '') return fallback;
+      return !['false', '0', 'no', 'off'].includes(String(raw).toLowerCase());
+    };
+    const num = (key: string, fallback: number) => {
+      const value = Number(this.configService.get<string>(key));
+      return Number.isFinite(value) && value > 0 ? value : fallback;
+    };
+    const quality = this.configService.get<string>(
+      'IMAGE_STUDIO_QUALITY',
+      'medium',
+    );
+    return {
+      enabled: flag('IMAGE_STUDIO_ENABLED', true),
+      // The worker is a polling loop; unit and e2e test runs never want it.
+      workerEnabled: flag(
+        'IMAGE_STUDIO_WORKER_ENABLED',
+        process.env.NODE_ENV !== 'test',
+      ),
+      textProvider:
+        this.configService.get<string>('IMAGE_STUDIO_TEXT_PROVIDER') ||
+        this.characterImage.defaultProvider,
+      textModel:
+        this.configService.get<string>('IMAGE_STUDIO_TEXT_MODEL') || undefined,
+      referenceProvider: this.configService.get<string>(
+        'IMAGE_STUDIO_REFERENCE_PROVIDER',
+        'gemini',
+      ),
+      referenceModel:
+        this.configService.get<string>('IMAGE_STUDIO_REFERENCE_MODEL') ||
+        undefined,
+      quality: (['low', 'medium', 'high'].includes(quality)
+        ? quality
+        : 'medium') as 'low' | 'medium' | 'high',
+      judgeEnabled: flag('IMAGE_STUDIO_JUDGE_ENABLED', true),
+      judgeModel: this.configService.get<string>(
+        'IMAGE_STUDIO_JUDGE_MODEL',
+        'gpt-4o-mini',
+      ),
+      workerConcurrency: num('IMAGE_STUDIO_WORKER_CONCURRENCY', 3),
+      maxActivePerUser: num('IMAGE_STUDIO_MAX_ACTIVE_PER_USER', 12),
+      maxReferences: num('IMAGE_STUDIO_MAX_REFERENCES', 5),
+      costPerImageUsd: num('IMAGE_STUDIO_COST_PER_IMAGE_USD', 0),
     };
   }
 

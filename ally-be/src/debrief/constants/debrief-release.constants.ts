@@ -5,7 +5,7 @@
  * A release is an immutable `agent_releases` row (agentKey `debrief`), the same
  * harness the Ally guide uses, so promotion, rollback and the audit trail are
  * shared. The bundle below is version 1, seeded from code; every later version
- * comes from an approved Improver idea or a person, never from editing GA.
+ * comes from an approved PM agent idea or a person, never from editing GA.
  *
  * Prompts live in the Skills Store. `prompts` pins each code to a version
  * number; `null` means "the store's current version", which is what the seed
@@ -49,7 +49,7 @@ export function modelProblem(model: string): string | null {
   if (!computeCostUsd(model, 1, 1).priced) return `${model} has no known price`;
   return null;
 }
-/** Learning-loop calls (Improver, screens) are ledgered apart from production. */
+/** Learning-loop calls (PM agent, screens) are ledgered apart from production. */
 export const DEBRIEF_LEARNING_AGENT_KEY = 'debrief_learning';
 
 export enum DebriefStep {
@@ -106,7 +106,11 @@ export interface DebriefSettings {
   deadlineMs: number;
   riskDeadlineMs: number;
   guidancePassagesPerMoment: number;
-  guidanceMinSimilarity: number;
+  /**
+   * Retired with the Knowledge Base's similarity floor: Debrief Guidance answers in relevance
+   * bands, not similarities. Releases made before it still carry the value; nothing reads it.
+   */
+  guidanceMinSimilarity?: number;
 }
 
 /** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */
@@ -116,7 +120,16 @@ export interface DebriefReplyConfig {
   model: string;
   /** Room for a 120-word reply in an Indic script, which costs far more tokens than English. */
   maxTokens: number;
+  /** v9 FR-43: dollars one reply may spend across its tool turns; default DEBRIEF_REPLY_BUDGET_USD. */
+  budgetUsd?: number;
+  /** v9 FR-43: model passes per reply, tool turns included; default DEBRIEF_REPLY_MAX_TURNS. */
+  maxTurns?: number;
 }
+
+/** v9 FR-43 / NFR-2: an Ask Ally reply costs at most this. */
+export const DEBRIEF_REPLY_BUDGET_USD = 0.05;
+/** v9 FR-43: at most this many model passes per reply, the last never calling a tool. */
+export const DEBRIEF_REPLY_MAX_TURNS = 4;
 
 export interface DebriefBundle {
   /** Standard and Short always; Case and Assessment from the release that added them. */
@@ -135,7 +148,7 @@ export const DEBRIEF_PROMPT_CODES = {
   writer: 'debrief_writer_system',
   reviser: 'debrief_reviser_system',
   rubric: 'debrief_quality_rubric',
-  improver: 'debrief_improver_system',
+  pmAgent: 'debrief_improver_system',
   reply: 'debrief_reply_system',
 } as const;
 
@@ -153,11 +166,11 @@ export const DEBRIEF_REPLY_DEFAULT: DebriefReplyConfig = {
 };
 
 /**
- * Prompts the Improver may propose edits to. The rubric and the Safety
- * reader are pinned (named people only), and the Improver's own instructions
+ * Prompts the PM agent may propose edits to. The rubric and the Safety
+ * reader are pinned (named people only), and the PM agent's own instructions
  * change only through a person.
  */
-export const IMPROVER_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
+export const PM_AGENT_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.writer,
@@ -165,20 +178,24 @@ export const IMPROVER_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Settings the Improver may propose, each with the range it may move in. The
+ * Settings the PM agent may propose, each with the range it may move in. The
  * budget ceiling and cap are the owner's, and the deadlines are learner
  * promises, so neither is here.
  */
-export const IMPROVER_SETTINGS: Record<string, { min: number; max: number }> = {
+export const PM_AGENT_SETTINGS: Record<string, { min: number; max: number }> = {
   maxRevisionRounds: { min: 0, max: 3 },
   guidancePassagesPerMoment: { min: 0, max: 3 },
-  guidanceMinSimilarity: { min: 0.25, max: 0.6 },
   standardMinLearnerTurns: { min: 3, max: 10 },
 };
 
 /** Every step's model. Writer and Evaluator differ from each other and from the pinned judge. */
 export const DEBRIEF_MODELS = {
   safetyReader: 'gemini-2.5-flash',
+  // At temperature 0, 2.5-flash loops on about 1% of sessions until its output limit (65k tokens,
+  // ~4 min), and retrying it repeats the loop; this model read those sessions cleanly 6/6 and
+  // passes the safety-recall gate (18/18 x3, 2026-11-11). Without a backup, both attempts fail
+  // and a person has to finish the debrief.
+  safetyReaderBackup: 'gemini-3-flash-preview',
   analyst: 'gemini-2.5-pro',
   progressReader: 'gemini-2.5-flash',
   writer: 'gemini-3-flash-preview',
@@ -187,7 +204,7 @@ export const DEBRIEF_MODELS = {
   writerBackup: 'gemini-2.5-flash',
   evaluator: 'gemini-2.5-flash',
   reviser: 'gemini-3-flash-preview',
-  improver: 'gemini-2.5-pro',
+  pmAgent: 'gemini-2.5-pro',
   judge: 'gemini-2.5-pro',
 } as const;
 
@@ -214,6 +231,7 @@ const SEED_RECIPES_BASE = {
           DebriefStep.SAFETY_READER,
           'Reading your session…',
           DEBRIEF_MODELS.safetyReader,
+          DEBRIEF_MODELS.safetyReaderBackup,
         ),
         step(
           DebriefStep.ANALYST,
@@ -248,13 +266,16 @@ const SEED_RECIPES_BASE = {
     },
     [DebriefRecipeKey.SHORT]: {
       key: DebriefRecipeKey.SHORT,
-      maxRevisionRounds: 0,
+      // One round: with none, any blocking check (a score mentioned, a body too long) sent a
+      // short session's debrief to a person instead of being fixed.
+      maxRevisionRounds: 1,
       shortForm: true,
       steps: [
         step(
           DebriefStep.SAFETY_READER,
           'Reading your session…',
           DEBRIEF_MODELS.safetyReader,
+          DEBRIEF_MODELS.safetyReaderBackup,
         ),
         step(
           DebriefStep.ANALYST,
@@ -273,6 +294,12 @@ const SEED_RECIPES_BASE = {
           'Reviewing my draft…',
           DEBRIEF_MODELS.evaluator,
         ),
+        step(
+          DebriefStep.REVISER,
+          'Making it clearer…',
+          DEBRIEF_MODELS.reviser,
+          DEBRIEF_MODELS.writerBackup,
+        ),
       ],
     },
   },
@@ -290,11 +317,13 @@ const SEED_RECIPES_BASE = {
     runCeilingUsd: 0.5,
     runFloorUsd: 0.15,
     poolPerSessionUsd: 0.25,
-    monthlyCapUsd: 500,
+    // Lowered from 500 on 2026-11-10 as a safety net while the Debrief agent
+    // is still in development (~$3 a month today). Raise it to a proper level
+    // once the whole loop is finished.
+    monthlyCapUsd: 50,
     deadlineMs: 150_000,
     riskDeadlineMs: 180_000,
     guidancePassagesPerMoment: 2,
-    guidanceMinSimilarity: 0.35,
   },
   reply: DEBRIEF_REPLY_DEFAULT,
 };

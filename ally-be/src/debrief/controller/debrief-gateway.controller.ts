@@ -1,0 +1,60 @@
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+} from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
+import { Public } from 'src/auth/decorators/auth.metadata';
+import { DebriefGatewayService } from '../service/debrief-gateway.service';
+import {
+  DEBRIEF_GATEWAY_TOOLS,
+  DebriefGatewayTool,
+  DebriefRunTokenService,
+} from '../service/debrief-run-token.service';
+
+/**
+ * The Debrief gateway (docs/debrief-harness/CONTRACT.md §2): the tools
+ * ally-ai's debrief graph calls back mid-run. Machine-only: `@Public()` to the
+ * user-auth guard and no user JWT is ever read here; the only credential is
+ * the run token ally-be signed for this run (`Authorization: Bearer`), checked
+ * for signature, expiry, the tool, and a run that is still running.
+ */
+@ApiExcludeController()
+@Controller('v1/internal/debrief')
+export class DebriefGatewayController {
+  constructor(
+    private readonly tokens: DebriefRunTokenService,
+    private readonly gateway: DebriefGatewayService,
+  ) {}
+
+  @Public()
+  @Post('tools/:name')
+  @HttpCode(200)
+  async tool(
+    @Param('name') name: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: Record<string, any>,
+  ): Promise<Record<string, unknown>> {
+    if (!DEBRIEF_GATEWAY_TOOLS.includes(name as DebriefGatewayTool)) {
+      throw new NotFoundException(`No debrief tool ${name}`);
+    }
+    const { run } = await this.tokens.authorise(authorization, name);
+    const b = body ?? {};
+    switch (name as DebriefGatewayTool) {
+      case 'guidance_search':
+        return this.gateway.guidanceSearch(run, b);
+      case 'run_checks':
+        return this.gateway.runChecks(run, b as any);
+      case 'render_cards':
+        return this.gateway.renderCards(b as any);
+      case 'finalise_cards':
+        return this.gateway.finaliseCards(b as any);
+      case 'progress':
+        return this.gateway.progress(run, b as any);
+    }
+  }
+}

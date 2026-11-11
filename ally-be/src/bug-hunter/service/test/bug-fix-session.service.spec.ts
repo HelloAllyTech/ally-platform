@@ -1877,14 +1877,14 @@ describe('resolveReleaseTarget', () => {
     [
       'ally-web',
       'apps/ally-admin-dashboard/src/pages/BugHunter/BugHunter.tsx',
-      'production-release-admin-dashboard.yaml',
-      'admin-v',
+      'production-release-frontends.yaml',
+      'frontend-v',
     ],
     [
       'ally-web',
       'apps/ally-helpline-dashboard/src/x.tsx',
-      'production-release-helpline-dashboard.yaml',
-      'helpline-v',
+      'production-release-frontends.yaml',
+      'frontend-v',
     ],
   ])('maps %s/%s to %s', (repo, file, workflow, tagPrefix) => {
     expect(resolveReleaseTarget(repo, file)).toMatchObject({

@@ -12,7 +12,6 @@ import {
   useGetCharacterLibraryEnabledQuery,
 } from "@api";
 import { Sidebar, AccessDenied, ErrorBoundary } from "@components";
-import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import {
@@ -23,6 +22,7 @@ import {
   en,
   normalizeEmailForAllowlist,
 } from "@constants";
+import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 import { setUser, setPermissions, setFeatures } from "@reducer";
 import { hasPermissions, hasFeature } from "@utils";
 
@@ -257,10 +257,11 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
             scroll height far past the content, producing a phantom second
             scrollbar and empty white space you can scroll into below the page. */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {/* The app-wide top bar. On a phone it carries the menu button; from md up it exists for the
-              global idea-capture mic, pinned top-right on every screen. */}
-          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:h-12 md:px-4">
-            {/* 44px target: the only way into navigation on a phone. */}
+          {/* Phone only: the menu button is the one way into navigation there. From md up the
+              Sidebar is always on screen and carries the idea mic and light/dark switch itself,
+              so no second bar is drawn. */}
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:hidden">
+            {/* 44px target. */}
             <button
               type="button"
               onClick={() => setIsMobileNavOpen(true)}
@@ -268,13 +269,10 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
               aria-expanded={isMobileNavOpen}
               aria-controls="admin-nav-sidebar"
               data-testid="admin-mobile-menu-button"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 md:hidden"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
             >
               <Menu size={24} aria-hidden="true" />
             </button>
-            <div className="ml-auto flex items-center">
-              <IdeaCaptureLauncher />
-            </div>
           </div>
           {/* The barrier sits inside the shell, not around it: a page that
               throws during render should cost the admin that page, not the
@@ -321,6 +319,9 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
           </div>
         </main>
         <ReportUploadProgressDialog />
+        {/* Context Library's upload dock: draws nothing until documents are added, then keeps
+            following them on every admin page. */}
+        <UploadDockHost />
       </div>
     </ScenarioReportsSocketProvider>
   );

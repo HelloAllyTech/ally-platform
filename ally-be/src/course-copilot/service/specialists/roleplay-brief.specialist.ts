@@ -52,7 +52,7 @@ const DIFFICULTIES = new Set<RoleplayBriefDifficulty>([
  * the trainer's own words. Each axis scores 0 at its simple end; the sum is
  * the difficulty. Null on an axis means the task class says nothing about it.
  *
- * Stacks: "Define Task Classes via Simplifying Conditions Variation" — a task
+ * "Define Task Classes via Simplifying Conditions Variation" — a task
  * class is named by the simplifying condition it varies, so the condition is
  * what difficulty should follow, not how the model happened to write the
  * client. Checked most-severe first, so "no longer cooperative, now
@@ -124,7 +124,7 @@ const list = (value: unknown, fallback = '—'): string => {
  *
  * The brief has to carry the slot's task class, because it is the only thing
  * the field chain reads: every persona, role instruction and opening line is
- * written from it. Two Stacks chunks shaped how the prompt describes the
+ * written from it. Two pieces of design guidance shaped how the prompt describes the
  * harder classes: an ambivalent client is reluctant, not resistant — they
  * soften when invited and harden when pushed ("Resistance as Perceived
  * Coercion, Not Actual Coercion") — and a distressed client stays workable,

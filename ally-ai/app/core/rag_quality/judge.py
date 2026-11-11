@@ -35,6 +35,7 @@ async def judge_retrieval(
     passages: List[JudgedPassage],
     min_similarity: float,
     rubric: Optional[str] = None,
+    corpus_purpose: Optional[str] = None,
 ) -> Tuple[List[PassageJudgment], Optional[RetrievalJudgment], str]:
     """Judge one retrieval: each passage against the query, then the set.
 
@@ -52,7 +53,14 @@ async def judge_retrieval(
     if not query.strip():
         return [], None, settings.RAG_QUALITY_JUDGE.MODEL
 
-    prompt = build_judge_prompt(query, corpus, passages, min_similarity, rubric=rubric)
+    prompt = build_judge_prompt(
+        query,
+        corpus,
+        passages,
+        min_similarity,
+        rubric=rubric,
+        corpus_purpose=corpus_purpose,
+    )
 
     from app.core.llm.dispatch import PROVIDER_GEMINI, generate_structured
     from app.core.llm_usage.tasks import LLMTask

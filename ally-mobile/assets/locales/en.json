@@ -636,6 +636,12 @@
       "shareTitle": "Share this scenario",
       "shareCopied": "Scenario link copied to clipboard!",
       "scenarioLabel": "Situation",
+      "narration": {
+        "listen": "Listen to description",
+        "pause": "Pause",
+        "resume": "Resume",
+        "error": "Audio couldn't be played. You can still read the description."
+      },
       "startAria": "Start role play",
       "preStart": {
         "titleNormal": "Before you get started",

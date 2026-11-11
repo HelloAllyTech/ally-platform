@@ -188,7 +188,7 @@ export const OpportunityListCard: React.FC<OpportunityListCardProps> = ({
             RENDERED ONLY WHEN SET. No "No owner" / "Unscheduled" placeholder, because on this
             board unowned and unscheduled ARE the common case — a chip on every one of 159 rows
             saying so is noise rather than signal, the same reasoning that keeps the 'staff'
-            source badge off every row (Stacks: "Default to Common Case, Hide Alternatives"). The
+            source badge off every row ("Default to Common Case, Hide Alternatives"). The
             absence of a chip is the fact. Those two labels exist in laneLabel for the board's
             catch-all lanes, where a lane must be named even when its contents are defined by
             what they lack.

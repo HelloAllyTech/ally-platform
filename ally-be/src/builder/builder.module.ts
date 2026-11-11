@@ -19,7 +19,6 @@ import { BuilderMessage } from './entity/builder-message.entity';
 import { BuilderPrdDoc } from './entity/builder-prd-doc.entity';
 import { BuilderPrdVersion } from './entity/builder-prd-version.entity';
 import { BuilderRepoMap } from './entity/builder-repo-map.entity';
-import { BuilderLesson } from './entity/builder-lesson.entity';
 import { BuilderExemplar } from './entity/builder-exemplar.entity';
 import { BuilderMilestone } from './entity/builder-milestone.entity';
 import { BuilderBuildRun } from './entity/builder-build-run.entity';
@@ -31,13 +30,14 @@ import { BuilderNotification } from './entity/builder-notification.entity';
 import { BuilderRepoCatalog } from './entity/builder-repo-catalog.entity';
 import { BuilderEvidence } from './entity/builder-evidence.entity';
 import { BuilderController } from './controller/builder.controller';
+import { BuilderPrinciplesController } from './controller/builder-principles.controller';
 import { BuilderPipelineController } from './controller/builder-pipeline.controller';
 import { BuilderGateway } from './gateway/builder.gateway';
 import { BuilderSessionService } from './service/builder-session.service';
 import { BuilderPrdService } from './service/builder-prd.service';
 import { BuilderKnowledgeService } from './service/builder-knowledge.service';
 import { BuilderGithubReadService } from './service/builder-github-read.service';
-import { BuilderStacksService } from './service/builder-stacks.service';
+import { ContextLibraryModule } from 'src/context-library/context-library.module';
 import { BuilderEvidenceService } from './service/builder-evidence.service';
 import { BuilderInterviewToolsService } from './service/builder-interview-tools.service';
 import { BuilderInterviewOrchestratorService } from './service/builder-interview-orchestrator.service';
@@ -45,7 +45,7 @@ import { BuilderBuildService } from './service/builder-build.service';
 import { BuilderEventService } from './service/builder-event.service';
 import { BuilderPullRequestService } from './service/builder-pull-request.service';
 import { BuilderSettingsService } from './service/builder-settings.service';
-import { BuilderLessonCuratorService } from './service/builder-lesson-curator.service';
+import { BuilderLessonsService } from './service/builder-lessons.service';
 import { BuilderExemplarService } from './service/builder-exemplar.service';
 import { BuilderOutcomeService } from './service/builder-outcome.service';
 import { BuilderMetricsService } from './service/builder-metrics.service';
@@ -54,6 +54,7 @@ import { BuilderResearchService } from './service/builder-research.service';
 import { BuilderCatalogService } from './service/builder-catalog.service';
 import { BuilderEvidenceLogService } from './service/builder-evidence-log.service';
 import { BuilderPrdReviewService } from './service/builder-prd-review.service';
+import { BuilderPrinciplesService } from './service/builder-principles.service';
 import { BuilderEvalFixture } from './entity/builder-eval-fixture.entity';
 import { BuilderEvalSuite } from './entity/builder-eval-suite.entity';
 import { BuilderEvalRun } from './entity/builder-eval-run.entity';
@@ -89,12 +90,12 @@ import { BuilderRule } from './entity/builder-rule.entity';
 import { BuilderSchedulerRegistrationService } from './service/builder-scheduler-registration.service';
 import { BuilderSessionRepository } from './repository/builder-session.repository';
 import { BuilderMessageRepository } from './repository/builder-message.repository';
+import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
 import {
   BuilderPrdDocRepository,
   BuilderPrdVersionRepository,
 } from './repository/builder-prd.repository';
 import {
-  BuilderLessonRepository,
   BuilderEvidenceRepository,
   BuilderExemplarRepository,
   BuilderRepoCatalogRepository,
@@ -128,13 +129,14 @@ import {
  */
 @Module({
   imports: [
+    // Plan sessions price their interview into the plan spend ledger. Entities only: no cycle.
+    ProductPlanningModule,
     TypeOrmModule.forFeature([
       BuilderSession,
       BuilderMessage,
       BuilderPrdDoc,
       BuilderPrdVersion,
       BuilderRepoMap,
-      BuilderLesson,
       BuilderExemplar,
       BuilderMilestone,
       BuilderBuildRun,
@@ -178,6 +180,9 @@ import {
     UxSignalsModule,
     // SlackService: the inbox is a pull surface, so a paused build needs a push.
     NotificationModule,
+    // The interview's principles (search, guiding brief, citation checks) and, later, its
+    // lessons.
+    ContextLibraryModule,
   ],
   controllers: [
     BuilderSlackController,
@@ -186,15 +191,16 @@ import {
     BuilderEvalController,
     BuilderCorrectionsController,
     BuilderRoomController,
+    BuilderPrinciplesController,
   ],
   providers: [
+    BuilderPrinciplesService,
     BuilderSlackService,
     BuilderGateway,
     BuilderSessionService,
     BuilderPrdService,
     BuilderKnowledgeService,
     BuilderGithubReadService,
-    BuilderStacksService,
     BuilderEvidenceService,
     BuilderInterviewToolsService,
     BuilderInterviewOrchestratorService,
@@ -202,7 +208,7 @@ import {
     BuilderEventService,
     BuilderPullRequestService,
     BuilderSettingsService,
-    BuilderLessonCuratorService,
+    BuilderLessonsService,
     BuilderExemplarService,
     BuilderOutcomeService,
     BuilderMetricsService,
@@ -238,7 +244,6 @@ import {
     BuilderRepoMapRepository,
     BuilderRepoCatalogRepository,
     BuilderEvidenceRepository,
-    BuilderLessonRepository,
     BuilderExemplarRepository,
     BuilderBuildRunRepository,
     BuilderBuildEventRepository,
@@ -248,6 +253,10 @@ import {
   ],
   exports: [
     BuilderSessionService,
+    // The roadmap's plan flow (product-roadmap/plan) keeps a plan in a Builder session from its
+    // first message, so it appends to the transcript and reads session rows directly.
+    BuilderSessionRepository,
+    BuilderMessageRepository,
     // The Builder tab's Up next, Start and Put back live with the roadmap
     // (which owns opportunities); they read these to gate, seed and record.
     BuilderNowService,
@@ -256,10 +265,9 @@ import {
     BuilderLiveService,
     BuilderKnowledgeService,
     // The read-only research belt, reused by the roadmap's opportunity copilot so it reads the
-    // same repos, the same Stacks library and the same production evidence through the same
+    // same repos, the same Context Library and the same production evidence through the same
     // fail-soft wrappers — rather than a second GitHub client and a second deadline policy.
     BuilderGithubReadService,
-    BuilderStacksService,
     BuilderEvidenceService,
     // One product map for both agents: the copilot renders it whole, the interview reads the
     // reusable-systems and docs sections. See BuilderProductMapService.

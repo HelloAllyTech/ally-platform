@@ -14,6 +14,7 @@ import { getErrorMessage } from "@utils";
 
 import { ConsoleTable, formatWhen } from "./consoleTable";
 import { ModelsPanel } from "./ModelsPanel";
+import { StepsPanel } from "./StepsPanel";
 
 /** Releases: every version of the Debrief agent, and one-click rollback. */
 export const ReleasesTab: React.FC = () => {
@@ -40,6 +41,7 @@ export const ReleasesTab: React.FC = () => {
         <p className="max-w-3xl pt-1 text-sm text-typography-700">{s.help}</p>
       </div>
       <ModelsPanel />
+      <StepsPanel />
       {releases.isError ? (
         <ErrorPanel
           what={s.loadFailed}
@@ -88,7 +90,7 @@ export const ReleasesTab: React.FC = () => {
       <ConfirmDialog
         isOpen={target !== null}
         title={target ? s.rollbackTitle(releaseVersionLabel(target.version)) : ""}
-        cancelLabel={en.debriefs.improver.cancel}
+        cancelLabel={en.debriefs.pmAgent.cancel}
         confirmLabel={s.rollbackConfirm}
         isWorking={isLoading}
         onConfirm={() => void confirm()}

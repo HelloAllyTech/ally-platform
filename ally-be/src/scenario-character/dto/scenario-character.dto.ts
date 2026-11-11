@@ -120,6 +120,17 @@ export class ScenarioCharacterRequestDto {
 
   @ApiPropertyOptional({
     description:
+      'One line on how the character looks; keeps them consistent in AI-generated images',
+    maxLength: 500,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  appearance?: string | null;
+
+  @ApiPropertyOptional({
+    description:
       'Voice per language, keyed by `languages.id`: the scenario voice this ' +
       'character speaks with in that language. A voice may only be filed ' +
       'under its own language — see validateCharacterVoices.',
@@ -264,6 +275,9 @@ export class ScenarioCharacterResponseDto {
     required: false,
   })
   characterProfileText?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  appearance?: string | null;
 
   @ApiPropertyOptional({
     description: 'Voice per language, keyed by `languages.id`',

@@ -13,7 +13,10 @@ import { RedisService } from 'src/redis/service/redis.service';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderMessage } from '../entity/builder-message.entity';
 import { BuilderPullRequest } from '../entity/builder-pull-request.entity';
-import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import {
+  BuilderSessionRepository,
+  SHARED_SESSIONS_ONLY,
+} from '../repository/builder-session.repository';
 import { BuilderMessageRepository } from '../repository/builder-message.repository';
 import { BuilderPullRequestRepository } from '../repository/builder-build.repository';
 import { BuilderPrdService } from './builder-prd.service';
@@ -149,7 +152,9 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
    */
   async listPending(): Promise<BuilderDecision[]> {
     const sessions = await this.sessionRepository.find({
-      where: { archivedAt: IsNull() },
+      // A private (unfiled) plan's questions are its author's, answered in the
+      // plan itself — never in the shared decision inbox.
+      where: { ...SHARED_SESSIONS_ONLY, archivedAt: IsNull() },
       order: { updatedAt: 'ASC' },
     });
     if (!sessions.length) return [];
@@ -207,7 +212,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     const parsed = parseDecisionId(decisionId);
     if (!parsed) return null;
     const session = await this.sessionRepository.findOne({
-      where: { id: parsed.sessionId },
+      where: { id: parsed.sessionId, ...SHARED_SESSIONS_ONLY },
     });
     if (!session) return null;
     const [names, pullRequests] = await Promise.all([

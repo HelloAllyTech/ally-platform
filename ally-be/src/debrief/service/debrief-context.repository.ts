@@ -12,6 +12,8 @@ export interface DebriefSessionContext {
   language: string;
   learnerLevel: string;
   learnerTurns: number;
+  /** Null for a session whose scenario row is gone. */
+  scenarioId: number | null;
   scenario: { title: string | null; description: string | null };
   expectedBehaviours: string[];
   /** Played for a course roleplay item in assessment mode: a graded attempt. */
@@ -20,6 +22,23 @@ export interface DebriefSessionContext {
   inCase: boolean;
   /** False when the session recorded no language and `language` is only a default. */
   languageRecorded: boolean;
+}
+
+/** One event the live detector watched for during the roleplay. */
+export interface LiveDetection {
+  behaviour: string;
+  description?: string;
+  detected: boolean;
+  times: number;
+}
+
+/** No cohort view below this many other trainees (v9 FR-17: minimum group 5). */
+export const COHORT_MIN_LEARNERS = 5;
+
+export interface CohortStats {
+  /** Deliberately not a count: the Writer must never give one. */
+  trainees: 'five or more';
+  skills: Array<{ skill: string; how_often: string }>;
 }
 
 /**
@@ -41,6 +60,7 @@ export class DebriefContextRepository {
               COALESCE(l.value, 'en') AS language,
               l.value IS NOT NULL AS language_recorded,
               u.metadata AS user_metadata,
+              s."scenarioId" AS scenario_id,
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
               s."caseSessionItemId" IS NOT NULL AS in_case,
               COALESCE((ti."completionCriteria"->>'assessmentMode')::boolean, false) AS assessment,
@@ -74,6 +94,7 @@ export class DebriefContextRepository {
       language: String(r.language || 'en').slice(0, 10),
       learnerLevel: resolveWorkerType(r.user_metadata),
       learnerTurns: Number(r.learner_turns ?? 0),
+      scenarioId: r.scenario_id == null ? null : Number(r.scenario_id),
       scenario: { title: r.title ?? null, description: r.description ?? null },
       expectedBehaviours: competencies.map((c: { name: string }) => c.name),
       assessment: r.assessment === true,
@@ -109,6 +130,113 @@ export class DebriefContextRepository {
       if (memory) return memory;
     }
     return null;
+  }
+
+  /**
+   * What the live detector recorded during the roleplay (v9 FR-17
+   * get_live_detections): each event the scenario watches for, and any other
+   * that fired in this session, with how often it fired. A second opinion for the Analyst, never ground
+   * truth. Empty when the scenario watches for nothing.
+   */
+  async liveDetections(
+    sessionId: string,
+    scenarioId: number | null,
+  ): Promise<LiveDetection[]> {
+    const rows: Array<{
+      name: string;
+      description: string | null;
+      fired: number;
+    }> = await this.dataSource.query(
+      `SELECT e.name, e.description, count(sse.id)::int AS fired
+         FROM session_events e
+         LEFT JOIN scenario_session_events sse
+           ON sse."eventId" = e.id AND sse."scenarioSessionId" = $1
+        WHERE e."deletedAt" IS NULL
+          AND (sse.id IS NOT NULL
+               OR e.id IN (SELECT se."eventId" FROM scenario_events se
+                            WHERE se."scenarioId" = $2 AND se."deletedAt" IS NULL))
+        GROUP BY e.id, e.name, e.description
+        ORDER BY e.name
+        LIMIT 30`,
+      [sessionId, scenarioId ?? -1],
+    );
+    return (rows ?? []).map((r) => ({
+      behaviour: r.name,
+      ...(r.description ? { description: r.description.slice(0, 300) } : {}),
+      detected: Number(r.fired) > 0,
+      times: Number(r.fired) || 0,
+    }));
+  }
+
+  /**
+   * How the organisation's other trainees did on this roleplay (v9 FR-17
+   * get_cohort_stats): per expected behaviour, how often trainees who had the
+   * chance showed it, from each trainee's latest debrief in the last 90 days.
+   * Words, never numbers, so no share can reach a learner; null under
+   * COHORT_MIN_LEARNERS other trainees, so no one's result can be singled out.
+   */
+  async cohortStats(
+    session: Pick<
+      DebriefSessionContext,
+      'id' | 'tenantId' | 'scenarioId' | 'counselorId' | 'expectedBehaviours'
+    >,
+  ): Promise<CohortStats | null> {
+    if (!session.tenantId || session.scenarioId == null) return null;
+    const wanted = new Map(
+      session.expectedBehaviours.map((b) => [b.trim().toLowerCase(), b]),
+    );
+    if (wanted.size === 0) return null;
+    const rows: Array<{
+      learners: number;
+      skill: string | null;
+      chances: number;
+      observed: number;
+    }> = await this.dataSource.query(
+      `WITH latest AS (
+         SELECT DISTINCT ON (s."counselorId") s."counselorId" AS cid,
+                r.workspace->'evidence'->'behaviours' AS b
+           FROM debrief_runs r
+           JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+          WHERE s."scenarioId" = $1
+            AND s.tenant_id = $2
+            AND s."counselorId" IS NOT NULL
+            AND s."counselorId" IS DISTINCT FROM $3
+            AND r."scenarioSessionId" <> $4
+            AND r.mode IN ('shadow','live')
+            AND r.status IN ('published','below_bar')
+            AND r."createdAt" > now() - interval '90 days'
+          ORDER BY s."counselorId", r."createdAt" DESC
+       )
+       SELECT (SELECT count(*)::int FROM latest) AS learners,
+              lower(trim(x->>'skill')) AS skill,
+              count(*) FILTER (WHERE x->>'opportunity' = 'true')::int AS chances,
+              count(*) FILTER (WHERE x->>'opportunity' = 'true'
+                                 AND x->>'observation' = 'observed')::int AS observed
+         FROM latest
+         LEFT JOIN LATERAL jsonb_array_elements(
+           CASE WHEN jsonb_typeof(latest.b) = 'array' THEN latest.b ELSE '[]'::jsonb END
+         ) x ON true
+        GROUP BY 2`,
+      [session.scenarioId, session.tenantId, session.counselorId, session.id],
+    );
+    const learners = Number(rows?.[0]?.learners ?? 0);
+    if (learners < COHORT_MIN_LEARNERS) return null;
+    const skills: CohortStats['skills'] = [];
+    for (const r of rows) {
+      const name = r.skill ? wanted.get(r.skill) : undefined;
+      if (!name || Number(r.chances) < COHORT_MIN_LEARNERS) continue;
+      const share = Number(r.observed) / Number(r.chances);
+      skills.push({
+        skill: name,
+        how_often:
+          share >= 2 / 3
+            ? 'most trainees show this'
+            : share <= 1 / 3
+              ? 'few trainees show this'
+              : 'about half of trainees show this',
+      });
+    }
+    return skills.length ? { trainees: 'five or more', skills } : null;
   }
 
   async transcript(sessionId: string): Promise<TranscriptTurn[]> {

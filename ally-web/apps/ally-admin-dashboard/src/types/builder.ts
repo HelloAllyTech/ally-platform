@@ -331,7 +331,7 @@ export interface BuilderDoneEvent {
  * `BuilderTurnReceipt`. Agent-adjacent JSON: read every field through an `Array.isArray` guard.
  */
 export interface BuilderTurnReceipt {
-  /** Files and pages read: `ally-be/src/builder/x.ts`, `Stacks: 2 chunks`. */
+  /** Files and pages read: `ally-be/src/builder/x.ts`, `Principles search "empty state"`. */
   read: string[];
   /** Searches and lookups with what came back: `Code search "debrief rating" — 4 matches`. */
   searched: string[];
@@ -644,6 +644,16 @@ export interface BuilderPrFeedback {
 export interface BuilderSettings {
   id: string;
   enabled: boolean;
+  /**
+   * Builder's own new-session door. Off once plans start on the Product Roadmap: new work is
+   * filed as an idea there and its plan comes here to build.
+   */
+  builderDirectInterviewEnabled?: boolean;
+  /** Planning on the roadmap (idea to outcome). */
+  planningEnabled?: boolean;
+  planCeilingUsd?: string;
+  planIdeaCeilingUsd?: string;
+  planCloseConfirmVotes?: number;
   /** Whether Builder reviews its own open pull requests. Writes findings, touches no branch. */
   autoReviewEnabled: boolean;
   /** Whether a review that found nothing may submit an approving review. */
@@ -872,37 +882,7 @@ export interface BuilderPipelineHealth {
   outcomes: BuilderPipelineOutcome[];
 }
 
-/* ── Knowledge: lessons + exemplars ────────────────────────────────────── */
-
-export type BuilderLessonStatus = "candidate" | "active" | "merged" | "retired";
-
-export interface BuilderLesson {
-  id: string;
-  lesson: string;
-  category: string;
-  status: BuilderLessonStatus;
-  /**
-   * A pinned lesson is exempt from the automatic curator's edits and
-   * retirement — a person put it there on purpose, and the periodic
-   * consolidation pass must not touch it.
-   */
-  pinned: boolean;
-  sourceCount: number;
-  timesApplied: number;
-  timesContradicted: number;
-  repos: string[];
-  tags: string[];
-  createdAt: string;
-}
-
-export interface PatchBuilderLessonRequest {
-  id: string;
-  lesson?: string;
-  category?: string;
-  status?: BuilderLessonStatus;
-  pinned?: boolean;
-  tags?: string[];
-}
+/* ── Knowledge: exemplars (lessons live in the Context Library) ────────── */
 
 export interface BuilderExemplar {
   id: string;
@@ -1493,4 +1473,44 @@ export interface BuilderPartnerScoreboard {
   byClient: { client: string; decisions: number; undone: number }[];
   decidedByRules: number;
   outcome: { started: number; released: number };
+}
+
+/* ── Principles in play (`GET v1/builder/sessions/:id/principles`) ─────── */
+
+/**
+ * Where a principle stands in this session, from usage rather than anyone grading it: Applied
+ * when a citation passed the check, Trade-off when two in play pull against each other, Cited
+ * when the PRD cites it, Open when surfaced but not yet used.
+ */
+export type BuilderPrincipleStatus = "applied" | "trade_off" | "cited" | "open";
+
+export interface BuilderPrincipleInPlay {
+  code: string;
+  statement: string;
+  collectionId: string;
+  prdSections: string[];
+  /** The question this principle prompts, when its profile has one. */
+  probe: string | null;
+  status: BuilderPrincipleStatus;
+  /** Part of the guiding brief built at session start. */
+  inBrief: boolean;
+}
+
+export interface BuilderPrincipleTension {
+  a: string;
+  b: string;
+  note: string | null;
+}
+
+export interface BuilderPrinciples {
+  /** Principles can run for this session (the service and the session switch allow it). */
+  enabled: boolean;
+  /** Switched off for this session by an admin. */
+  off: boolean;
+  /** The guiding brief has been built. */
+  briefReady: boolean;
+  /** The brief's one-line reading of the idea. */
+  descriptor: string | null;
+  items: BuilderPrincipleInPlay[];
+  tensions: BuilderPrincipleTension[];
 }

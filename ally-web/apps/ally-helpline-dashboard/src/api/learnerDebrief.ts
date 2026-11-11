@@ -12,6 +12,13 @@ export const LEARNER_DEBRIEF_POLL_MS = 3000;
 export const LEARNER_DEBRIEF_SLOW_POLL_MS = 30_000;
 export const LEARNER_DEBRIEF_FAST_FOR_MS = 4 * 60_000;
 
+/** The learner events only the app can see (ally-be `DEBRIEF_CLIENT_EVENT_KINDS`). */
+export type DebriefEventKind =
+  | "read_through"
+  | "practise_next_click"
+  | "waited"
+  | "left_before_ready";
+
 const learnerDebriefAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
     /**
@@ -79,6 +86,15 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
       query: sessionId => ({
         url: ApiEndpoints.DEBRIEFS.OPENED(sessionId),
         method: HttpMethod.POST,
+        body: { platform: "web" },
+      }),
+    }),
+    /** v9 §3.3: something the learner did that only the app can see; recorded once per kind. */
+    reportDebriefEvent: builder.mutation<unknown, { sessionId: string; kind: DebriefEventKind }>({
+      query: ({ sessionId, kind }) => ({
+        url: ApiEndpoints.DEBRIEFS.EVENTS(sessionId),
+        method: HttpMethod.POST,
+        body: { kind, platform: "web" },
       }),
     }),
     /** Read-aloud: one card's audio, made on the first request and cached. */
@@ -101,6 +117,7 @@ export const {
   useLazyGetDebriefCardAudioQuery,
   useMarkDebriefReadMutation,
   useMarkDebriefOpenedMutation,
+  useReportDebriefEventMutation,
   useGetLearnerDebriefQuery,
   useSetDebriefHelpfulMutation,
   useFlagDebriefCardMutation,

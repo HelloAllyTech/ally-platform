@@ -19,7 +19,7 @@ describe('BugHunterWrongFixService', () => {
   let rows: BugFinding[];
   let repo: { findOne: jest.Mock; update: jest.Mock; find: jest.Mock };
   let hunter: { appendFindingEvent: jest.Mock };
-  let memory: { write: jest.Mock };
+  let memory: { writeAgentChunk: jest.Mock };
   let service: BugHunterWrongFixService;
 
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('BugHunterWrongFixService', () => {
       find: jest.fn().mockImplementation(() => Promise.resolve(rows)),
     };
     hunter = { appendFindingEvent: jest.fn().mockResolvedValue(undefined) };
-    memory = { write: jest.fn().mockResolvedValue({ id: 'm-1' }) };
+    memory = { writeAgentChunk: jest.fn().mockResolvedValue({ id: 'm-1' }) };
     service = new BugHunterWrongFixService(
       repo as never,
       hunter as never,
@@ -77,11 +77,18 @@ describe('BugHunterWrongFixService', () => {
         summary: expect.stringMatching(/A person reverted my fix .* reopened/),
       }),
     );
-    const lesson = memory.write.mock.calls[0][0];
-    expect(lesson.tags).toEqual(['wrong-fix', 'fix-gotcha', 'link:held']);
+    // A Bug Hunter Notes candidate in the Context Library, with the finding as evidence.
+    const lesson = memory.writeAgentChunk.mock.calls[0][0];
+    expect(lesson.collection).toBe('bug_hunter_notes');
+    expect(lesson.facets.tags).toEqual([
+      'wrong-fix',
+      'fix-gotcha',
+      'link:held',
+    ]);
     expect(lesson.repos).toEqual(['ally-web']);
-    expect(lesson.body.length).toBeLessThanOrEqual(600);
-    expect(lesson.body).toMatch(
+    expect(lesson.evidence).toEqual({ findingId: finding().id });
+    expect(lesson.statement.length).toBeLessThanOrEqual(600);
+    expect(lesson.statement).toMatch(
       /re-run the reporter's steps at the PR head and again after release/,
     );
   });
@@ -101,7 +108,7 @@ describe('BugHunterWrongFixService', () => {
       { reopen: false },
     );
     expect(rows[0].status).toBe(BugFindingStatus.PR_OPENED);
-    expect(memory.write.mock.calls[0][0].body).toMatch(
+    expect(memory.writeAgentChunk.mock.calls[0][0].statement).toMatch(
       /locate the fault in production first/,
     );
   });

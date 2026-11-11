@@ -1,7 +1,7 @@
 /**
  * The copilot's verdict on how strong an opportunity is, in three words a voter can read.
  *
- * DELIBERATELY NOT A SCORE. Stacks, "Avoid Scoring Formulas When Prioritizing Opportunities":
+ * DELIBERATELY NOT A SCORE. "Avoid Scoring Formulas When Prioritizing Opportunities":
  * scoring each lens and ranking the totals falsely implies one correct answer and stops people
  * thinking once a number exists. A three-step judgement with its reasons written next to it
  * keeps the reasons as the thing people argue with.
@@ -26,7 +26,7 @@ export enum RoadmapBriefEvidenceSource {
   ROADMAP = 'roadmap',
   CODEBASE = 'codebase',
   WIKI = 'wiki',
-  STACKS = 'stacks',
+  PRINCIPLES = 'principles',
   STRATEGY = 'strategy',
 }
 
@@ -45,7 +45,7 @@ export interface RoadmapBriefEvidence {
 
 export interface RoadmapBriefReach {
   /**
-   * How many — and separately how often. Stacks, "Distinguish customer count from frequency in
+   * How many — and separately how often. "Distinguish customer count from frequency in
    * opportunity sizing": one group hitting something constantly is a different case from many
    * hitting it occasionally, and one blended "lots of users" hides which it is.
    */

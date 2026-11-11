@@ -8,10 +8,10 @@ const h = vi.hoisted(() => ({
   overview: vi.fn(),
   runs: vi.fn(),
   run: vi.fn(),
-  improver: vi.fn(),
+  pmAgent: vi.fn(),
   releases: vi.fn(),
   tenants: vi.fn(),
-  runImprover: vi.fn(),
+  runPmAgent: vi.fn(),
   screen: vi.fn(),
   decide: vi.fn(),
   rollback: vi.fn(),
@@ -23,10 +23,8 @@ const h = vi.hoisted(() => ({
   resolve: vi.fn(),
   escalate: vi.fn(),
   models: vi.fn(),
+  steps: vi.fn(),
   setModels: vi.fn(),
-  knowledge: vi.fn(),
-  setClinical: vi.fn(),
-  signOff: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }));
@@ -49,10 +47,10 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefOverviewQuery: () => h.overview(),
   useGetDebriefRunsQuery: (a: unknown) => h.runs(a),
   useGetDebriefRunQuery: (id: string) => h.run(id),
-  useGetImproverStateQuery: () => h.improver(),
+  useGetPmAgentStateQuery: () => h.pmAgent(),
   useGetDebriefReleasesQuery: () => h.releases(),
   useGetDebriefTenantsQuery: () => h.tenants(),
-  useRunImproverMutation: () => [h.runImprover, { isLoading: false }],
+  useRunPmAgentMutation: () => [h.runPmAgent, { isLoading: false }],
   useScreenIdeaMutation: () => [h.screen, { isLoading: false }],
   useDecideIdeaMutation: () => [h.decide, { isLoading: false }],
   useRollbackDebriefReleaseMutation: () => [h.rollback, { isLoading: false }],
@@ -64,22 +62,20 @@ vi.mock("@api", async importOriginal => ({
   useSetDebriefTenantRegionMutation: () => [h.setRegion, { isLoading: false }],
   useEscalateDebriefMutation: () => [h.escalate, { isLoading: false }],
   useGetDebriefModelsQuery: () => h.models(),
+  useGetDebriefStepsQuery: () => h.steps(),
   useSetDebriefModelsMutation: () => [h.setModels, { isLoading: false }],
-  useGetDebriefKnowledgeQuery: () => h.knowledge(),
-  useSetDebriefKnowledgeClinicalMutation: () => [h.setClinical, { isLoading: false }],
-  useSignOffDebriefKnowledgeMutation: () => [h.signOff, { isLoading: false }],
-  useGetKbDocumentQuery: () => ({ data: undefined }),
 }));
-vi.mock("@components/knowledge-corpus", () => ({
-  CorpusDocumentPanel: ({ corpus }: { corpus?: string }) => (
-    <div data-testid="corpus-panel">{corpus}</div>
+// The guidance is the Context Library's Debrief Guidance; the link has its own suite.
+vi.mock("@components/context-collection-link", () => ({
+  ContextCollectionLink: ({ collection }: { collection: string }) => (
+    <div data-testid="collection-link" data-collection={collection} />
   ),
 }));
 
 // eslint-disable-next-line import/first
-import { ImproverTab } from "../ImproverTab";
+import { PmAgentTab } from "../PmAgentTab";
 // eslint-disable-next-line import/first
-import { KnowledgeTab } from "../KnowledgeTab";
+import { GuidanceTab } from "../GuidanceTab";
 // eslint-disable-next-line import/first
 import { OrganisationsTab } from "../OrganisationsTab";
 // eslint-disable-next-line import/first
@@ -226,7 +222,7 @@ describe("Debrief Console tabs", () => {
         error: null,
       }),
     );
-    h.improver.mockReturnValue(
+    h.pmAgent.mockReturnValue(
       ok({
         report: "Scores are up.",
         at: "2026-10-29T10:00:00Z",
@@ -241,7 +237,7 @@ describe("Debrief Console tabs", () => {
           version: 2,
           status: "ga",
           authorKind: "human",
-          notes: "Improver idea",
+          notes: "PM agent idea",
           createdAt: "",
           promotedAt: "",
           prompts: {},
@@ -269,6 +265,8 @@ describe("Debrief Console tabs", () => {
           isTest: false,
           region: "india",
           hasSupportContact: false,
+          monthSpentUsd: 1.25,
+          monthRuns: 12,
         },
         {
           id: "t2",
@@ -277,6 +275,22 @@ describe("Debrief Console tabs", () => {
           isTest: false,
           region: "outside_india",
           hasSupportContact: false,
+        },
+      ]),
+    );
+    h.steps.mockReturnValue(
+      ok([
+        {
+          step: "writer",
+          model: "gemini-3-flash-preview",
+          backupModel: "gemini-2.5-flash",
+          inRecipes: ["standard", "short"],
+          done: 40,
+          failed: 2,
+          skipped: 0,
+          medianMs: 12000,
+          estimatedUsd: 0.8,
+          models: ["gemini-3-flash-preview"],
         },
       ]),
     );
@@ -320,7 +334,7 @@ describe("Debrief Console tabs", () => {
       h.escalate,
       h.setRegion,
     ].forEach(f => f.mockReturnValue(resolves()));
-    h.runImprover.mockReturnValue(resolves({ report: "r", ideas: [] }));
+    h.runPmAgent.mockReturnValue(resolves({ report: "r", ideas: [] }));
     h.models.mockReturnValue(
       ok({
         releaseVersion: 2,
@@ -354,7 +368,7 @@ describe("Debrief Console tabs", () => {
     expect(row).toHaveTextContent("Important moment");
     fireEvent.click(within(row).getByRole("button", { name: "Open" }));
     expect(h.run).toHaveBeenCalledWith(RUN_ROW.id);
-    expect(screen.getByTestId("run-steps")).toHaveTextContent("safety_reader");
+    expect(screen.getByTestId("run-how-made")).toHaveTextContent("Safety reader");
     expect(screen.getByTestId("run-body")).toHaveTextContent("quote_mismatch");
   });
 
@@ -364,22 +378,128 @@ describe("Debrief Console tabs", () => {
     expect(h.runs).toHaveBeenLastCalledWith({ status: "needs_person" });
   });
 
-  it("Improver shows its report and an idea with its screen, and approval asks first", async () => {
-    render(<ImproverTab />);
-    expect(screen.getByTestId("improver-report")).toHaveTextContent("Scores are up.");
+  it("PM agent shows its report and each rung; a change cannot start a canary before its paired trial passes", () => {
+    render(<PmAgentTab />);
+    expect(screen.getByTestId("pm-agent-report")).toHaveTextContent("Scores are up.");
     expect(screen.getByTestId("idea-screen")).toHaveTextContent("+0.50 on 6 sessions");
+    expect(screen.getByTestId("idea-gate")).toHaveTextContent("Waiting");
     expect(screen.getByTestId("test-sets")).toHaveTextContent("Sealed: 11");
-    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(screen.getByRole("button", { name: "Start canary" })).toBeDisabled();
+  });
+
+  it("after a passed paired trial, starting the canary asks first", async () => {
+    h.pmAgent.mockReturnValue(
+      ok({
+        report: null,
+        at: null,
+        learningSpentUsd: 0,
+        ideas: [
+          {
+            ...IDEA,
+            evidence: {
+              ...IDEA.evidence,
+              trial: {
+                status: "passed",
+                startedAt: "2026-11-01T00:00:00Z",
+                comparisons: 34,
+                meanDifference: 0.4,
+                lower: 0.1,
+                upper: 0.7,
+              },
+            },
+          },
+        ],
+      }),
+    );
+    render(<PmAgentTab />);
+    expect(screen.getByTestId("idea-trial")).toHaveTextContent("34 pairs · +0.40 (+0.10 to +0.70)");
+    fireEvent.click(screen.getByRole("button", { name: "Start canary" }));
     expect(h.decide).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Put it live" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start the canary" }));
     await waitFor(() =>
       expect(h.decide).toHaveBeenCalledWith({ id: IDEA.id, decision: "approve" }),
     );
-    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith("The change is live"));
+    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith("Canary started."));
   });
 
-  it("an idea that did not do better cannot be approved", () => {
-    h.improver.mockReturnValue(
+  it("a canary that passed is promoted by a person, after confirming", async () => {
+    h.pmAgent.mockReturnValue(
+      ok({
+        report: null,
+        at: null,
+        learningSpentUsd: 0,
+        ideas: [
+          {
+            ...IDEA,
+            evidence: {
+              ...IDEA.evidence,
+              trial: { status: "passed", startedAt: "2026-11-01T00:00:00Z", comparisons: 34 },
+              canary: {
+                status: "passed",
+                releaseId: "r3",
+                version: 3,
+                share: 0.1,
+                startedAt: "2026-11-05T00:00:00Z",
+                canaryRuns: 31,
+                canaryMedian: 8.7,
+                controlMedian: 8.5,
+              },
+            },
+          },
+        ],
+      }),
+    );
+    render(<PmAgentTab />);
+    expect(screen.getByTestId("idea-canary")).toHaveTextContent("Ready to promote");
+    expect(screen.getByTestId("idea-canary")).toHaveTextContent("10% of live debriefs · 31 so far");
+    fireEvent.click(screen.getByRole("button", { name: "Promote to everyone" }));
+    fireEvent.click(screen.getByRole("button", { name: "Promote" }));
+    await waitFor(() =>
+      expect(h.toastSuccess).toHaveBeenCalledWith("Promoted. Every learner now gets this change."),
+    );
+  });
+
+  it("a running canary cannot be promoted, and a failed trial reads as not passed", () => {
+    h.pmAgent.mockReturnValue(
+      ok({
+        report: null,
+        at: null,
+        learningSpentUsd: 0,
+        ideas: [
+          {
+            ...IDEA,
+            id: "a",
+            evidence: {
+              ...IDEA.evidence,
+              trial: { status: "passed", startedAt: "2026-11-01T00:00:00Z", comparisons: 34 },
+              canary: {
+                status: "running",
+                releaseId: "r3",
+                version: 3,
+                share: 0.1,
+                startedAt: "2026-11-05T00:00:00Z",
+              },
+            },
+          },
+          {
+            ...IDEA,
+            id: "b",
+            evidence: {
+              ...IDEA.evidence,
+              trial: { status: "failed", startedAt: "2026-11-01T00:00:00Z", comparisons: 40 },
+            },
+          },
+        ],
+      }),
+    );
+    render(<PmAgentTab />);
+    for (const b of screen.getAllByRole("button", { name: "Start canary" }))
+      expect(b).toBeDisabled();
+    expect(screen.getAllByTestId("idea-trial")[1]).toHaveTextContent("Did not pass");
+  });
+
+  it("a quick test that did not do better reads as not passed", () => {
+    h.pmAgent.mockReturnValue(
       ok({
         report: null,
         at: null,
@@ -389,13 +509,13 @@ describe("Debrief Console tabs", () => {
         ],
       }),
     );
-    render(<ImproverTab />);
-    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
-    expect(screen.getByTestId("idea-screen")).toHaveTextContent("Not better");
+    render(<PmAgentTab />);
+    expect(screen.getByRole("button", { name: "Start canary" })).toBeDisabled();
+    expect(screen.getByTestId("idea-screen")).toHaveTextContent("Did not pass");
   });
 
   it("an approved idea reads live only while its release is", () => {
-    h.improver.mockReturnValue(
+    h.pmAgent.mockReturnValue(
       ok({
         report: null,
         at: null,
@@ -406,14 +526,14 @@ describe("Debrief Console tabs", () => {
         ],
       }),
     );
-    render(<ImproverTab />);
+    render(<PmAgentTab />);
     const [first, second] = screen.getAllByTestId("idea");
     expect(first).toHaveTextContent("Live");
     expect(second).toHaveTextContent("No longer live");
   });
 
   it("an idea that needs code can only be rejected, never approved", () => {
-    h.improver.mockReturnValue(
+    h.pmAgent.mockReturnValue(
       ok({
         report: null,
         at: null,
@@ -421,8 +541,8 @@ describe("Debrief Console tabs", () => {
         ideas: [{ ...IDEA, change: { ...IDEA.change, ideaKind: "needs_code" }, evidence: {} }],
       }),
     );
-    render(<ImproverTab />);
-    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    render(<PmAgentTab />);
+    expect(screen.queryByRole("button", { name: "Start canary" })).toBeNull();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
   });
 
@@ -558,6 +678,43 @@ describe("Debrief Console tabs", () => {
     );
   });
 
+  it("Review works by keyboard: j / k move, Enter opens the debrief, e escalates (FR-38)", async () => {
+    render(<ReviewTab />);
+    expect(screen.getByTestId("review-keys")).toHaveTextContent("j and k");
+    expect(screen.getByTestId("review-run")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(window, { key: "j" });
+    expect(screen.getByTestId("review-flag")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(window, { key: "e" });
+    await waitFor(() => expect(h.escalate).toHaveBeenCalledWith({ kind: "flags", id: "flag-1" }));
+    fireEvent.keyDown(window, { key: "k" });
+    expect(screen.getByTestId("review-run")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(window, { key: "Enter" });
+    await waitFor(() => expect(h.run).toHaveBeenCalledWith(RUN_ROW.id));
+  });
+
+  it("Review ignores the keys while someone is typing a reason", () => {
+    render(<ReviewTab />);
+    const box = within(screen.getByTestId("review-flag")).getAllByRole("textbox")[0];
+    fireEvent.keyDown(box, { key: "e" });
+    expect(h.escalate).not.toHaveBeenCalled();
+  });
+
+  it("Organisations shows each organisation's debrief spend this month (FR-8)", () => {
+    render(<OrganisationsTab />);
+    const [first] = screen.getAllByTestId("organisation-spend");
+    expect(first).toHaveTextContent("12 debriefs");
+    expect(first).toHaveTextContent("$1.25");
+  });
+
+  it("Releases lists the recipe's steps with their model and 30 days of use (FR-38 registry)", () => {
+    render(<ReleasesTab />);
+    const row = screen.getByTestId("step-row");
+    expect(row).toHaveTextContent("Writer");
+    expect(row).toHaveTextContent("gemini-3-flash-preview (gemini-2.5-flash)");
+    expect(row).toHaveTextContent("standard, short");
+    expect(row).toHaveTextContent("40");
+  });
+
   it("Review: a published debrief with learner distress asks someone to check on them (FR-23)", async () => {
     h.review.mockReturnValue(
       ok({
@@ -613,56 +770,12 @@ describe("Debrief Console tabs", () => {
     await waitFor(() => expect(h.act).toHaveBeenCalledWith({ id: RUN_ROW.id, action: "reviewed" }));
   });
 
-  describe("Knowledge", () => {
-    const DOC = {
-      id: "d1",
-      title: "Asking about suicide",
-      status: "indexed",
-      isGlobal: true,
-      tenantCount: 0,
-      chunkCount: 4,
-      archived: false,
-      updatedAt: "2026-11-02T00:00:00Z",
-      needsClinicalSignOff: true,
-      clinical: "awaiting",
-      signedOffBy: null,
-      signedOffAt: null,
-    };
-
-    it("adds a document to the debrief corpus", () => {
-      h.knowledge.mockReturnValue(ok({ documents: [], canSignOff: false }));
-      render(<KnowledgeTab />);
-      fireEvent.click(screen.getByRole("button", { name: "Add a document" }));
-      expect(screen.getByTestId("corpus-panel")).toHaveTextContent("debrief_knowledge");
-    });
-
-    it("shows a clinical document as not used until signed off, and only the advisor can sign", async () => {
-      h.knowledge.mockReturnValue(ok({ documents: [DOC], canSignOff: false }));
-      const { unmount } = render(<KnowledgeTab />);
-      expect(screen.getByText("Waiting for sign-off — not used")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Sign off" })).not.toBeInTheDocument();
-      unmount();
-
-      h.signOff.mockReturnValue(resolves());
-      h.knowledge.mockReturnValue(ok({ documents: [DOC], canSignOff: true }));
-      render(<KnowledgeTab />);
-      fireEvent.click(screen.getAllByRole("button", { name: "Sign off" })[0]);
-      fireEvent.click(screen.getAllByRole("button", { name: "Sign off" }).at(-1)!);
-      await waitFor(() => expect(h.signOff).toHaveBeenCalledWith("d1"));
-    });
-
-    it("the Ally team marks a document clinical or not", async () => {
-      h.setClinical.mockReturnValue(resolves());
-      h.knowledge.mockReturnValue(
-        ok({
-          documents: [{ ...DOC, needsClinicalSignOff: false, clinical: "not_clinical" }],
-          canSignOff: false,
-        }),
-      );
-      render(<KnowledgeTab />);
-      fireEvent.click(screen.getByRole("button", { name: "Mark clinical" }));
-      await waitFor(() =>
-        expect(h.setClinical).toHaveBeenCalledWith({ id: "d1", needsSignOff: true }),
+  describe("Guidance", () => {
+    it("points at Debrief Guidance in the Context Library, where clinical is information only", () => {
+      render(<GuidanceTab />);
+      expect(screen.getByTestId("collection-link")).toHaveAttribute(
+        "data-collection",
+        "debrief_guidance",
       );
     });
   });

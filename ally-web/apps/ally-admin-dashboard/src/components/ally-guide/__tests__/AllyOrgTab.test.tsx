@@ -15,7 +15,6 @@ const h = vi.hoisted(() => ({
   withdrawCrisis: vi.fn(),
   configLayer: vi.fn(),
   saveConfig: vi.fn(),
-  library: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   access: { current: { canEditOrg: true, canViewOrg: true } as Record<string, boolean> },
@@ -33,13 +32,15 @@ vi.mock("@api", async importOriginal => ({
   useSaveAllyGuideOrgProfileMutation: () => [h.saveProfile, { isLoading: false }],
   useSaveAllyGuideOrgCrisisResponseMutation: () => [h.saveCrisis],
   useDeleteAllyGuideOrgCrisisResponseMutation: () => [h.withdrawCrisis],
-  // The configuration and library sections have their own suites.
+  // The configuration section has its own suite.
   useGetAllyGuideConfigLayerQuery: (arg: unknown) => h.configLayer(arg),
   useSaveAllyGuideConfigMutation: () => [h.saveConfig],
-  useGetAllyGuideLibraryQuery: (arg: unknown) => h.library(arg),
-  useCreateAllyGuideLibraryUploadUrlMutation: () => [vi.fn()],
-  useCreateAllyGuideLibraryDocumentMutation: () => [vi.fn()],
-  useArchiveAllyGuideLibraryDocumentMutation: () => [vi.fn(), { isLoading: false }],
+}));
+// The library is the Context Library's Ally Guide Library; the link has its own suite.
+vi.mock("@components/context-collection-link", () => ({
+  ContextCollectionLink: ({ collection, tenantId }: { collection: string; tenantId?: string }) => (
+    <div data-testid="collection-link" data-collection={collection} data-tenant={tenantId} />
+  ),
 }));
 
 // eslint-disable-next-line import/first
@@ -129,27 +130,6 @@ describe("AllyOrgTab", () => {
       isError: false,
     });
     h.saveConfig.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-    h.library.mockReturnValue({
-      data: {
-        documents: [
-          {
-            id: "d-1",
-            title: "Our safeguarding protocol",
-            sourceType: "pdf",
-            fileName: "protocol.pdf",
-            status: "indexed",
-            statusMessage: null,
-            chunkCount: 4,
-            indexedChunkCount: 4,
-            isArchived: false,
-            createdAt: "2026-10-20T09:00:00.000Z",
-          },
-        ],
-        count: 1,
-      },
-      isLoading: false,
-      isError: false,
-    });
   });
 
   describe("the settings and library sections", () => {
@@ -177,13 +157,13 @@ describe("AllyOrgTab", () => {
       });
     });
 
-    it("lists this organisation's own documents, from its own library", () => {
+    it("points at this organisation's entries in the Ally Guide Library", () => {
       renderTab();
 
-      expect(h.library).toHaveBeenCalledWith({ scope: "organisation", tenantId: TENANT });
-      expect(screen.getByText("Documents for Ally")).toBeInTheDocument();
-      expect(screen.getByTestId("library-row")).toHaveTextContent("Our safeguarding protocol");
-      expect(screen.getByRole("button", { name: "Add a document…" })).toBeInTheDocument();
+      expect(screen.getByText("Entries for Ally")).toBeInTheDocument();
+      const link = screen.getByTestId("collection-link");
+      expect(link).toHaveAttribute("data-collection", "ally_guide_library");
+      expect(link).toHaveAttribute("data-tenant", TENANT);
     });
 
     it("lets an admin who can only view read both, and change neither", () => {
@@ -192,9 +172,7 @@ describe("AllyOrgTab", () => {
 
       expect(screen.getByLabelText("nudgeAfterDays")).toBeDisabled();
       expect(screen.getByTestId("config-view-only")).toBeInTheDocument();
-      expect(screen.getByTestId("library-row")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Add a document…" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+      expect(screen.getByTestId("collection-link")).toBeInTheDocument();
     });
   });
 

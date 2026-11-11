@@ -30,7 +30,7 @@
     "migration:permissions": "ts-node -r tsconfig-paths/register src/database/scripts/generate-permission-migration.ts",
     "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/$npm_config_name -d src/database/data-source.ts",
     "migration:create": "npm run typeorm -- migration:create src/database/migrations/$npm_config_name",
-    "migration:run": "npm run typeorm -- migration:run -d src/database/data-source.ts",
+    "migration:run": "ts-node -r tsconfig-paths/register src/database/scripts/run-migrations.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
     "migration:show": "npm run typeorm -- migration:show -d src/database/data-source.ts",
     "seed": "ts-node -r tsconfig-paths/register src/database/seeds/run.ts",
@@ -42,7 +42,8 @@
     "backfill:bug-finding-descriptions": "ts-node -r tsconfig-paths/register scripts/backfill-bug-finding-descriptions.ts",
     "backfill:chatbot-shared-store": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-chatbot-shared-store.ts",
     "reingest:onboarding-docs": "ts-node -r tsconfig-paths/register src/database/scripts/reingest-onboarding-docs.ts",
-    "check:chatbot-shared-store": "ts-node -r tsconfig-paths/register src/database/scripts/check-chatbot-shared-store.ts"
+    "check:chatbot-shared-store": "ts-node -r tsconfig-paths/register src/database/scripts/check-chatbot-shared-store.ts",
+    "backfill:scenario-description-audio": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-scenario-description-audio.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

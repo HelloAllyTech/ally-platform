@@ -1,12 +1,11 @@
-"""The debrief agent's steps after the Safety reader, and the Improver's
+"""The debrief agent's steps after the Safety reader, and the PM agent's
 analysis: each runs on the model the recipe names with no silent substitute,
 keeps only evidence anchored to the right speaker, and never coerces a missing
 answer into an empty one."""
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.core.debrief.improver import ImproverAnalysis, ImproverIdea
+from app.core.debrief.pm_agent import PmAgentAnalysis, PmAgentIdea
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import (
     BehaviourEvidence,
@@ -176,8 +175,8 @@ async def test_evaluator_with_partial_scores_is_no_answer(dispatch_returns):
 
 
 @pytest.mark.asyncio
-async def test_improver_turns_an_unappliable_edit_into_a_question(dispatch_returns):
-    from app.core.debrief.improver import analyse_signals
+async def test_pm_agent_turns_an_unappliable_edit_into_a_question(dispatch_returns):
+    from app.core.debrief.pm_agent import analyse_signals
 
     def idea(**kw):
         base = dict(
@@ -189,10 +188,10 @@ async def test_improver_turns_an_unappliable_edit_into_a_question(dispatch_retur
             prompt_code="debrief_writer_system",
         )
         base.update(kw)
-        return ImproverIdea(**base)
+        return PmAgentIdea(**base)
 
     dispatch_returns(
-        ImproverAnalysis(
+        PmAgentAnalysis(
             report="r",
             ideas=[
                 idea(find="Warm, direct", replace="Warm and direct"),
@@ -215,25 +214,22 @@ async def test_improver_turns_an_unappliable_edit_into_a_question(dispatch_retur
     ]
 
 
-def test_endpoints_return_502_when_the_model_gives_nothing(monkeypatch):
-    from app.core.config import settings
+@pytest.mark.asyncio
+async def test_a_step_with_no_usable_answer_is_a_502_failure(monkeypatch):
+    """The graph treats it like any failed attempt: retry on the backup model."""
     from app.core.debrief import steps
-    from app.main import app
+    from app.core.debrief_graph.step_functions import InProcessSteps, StepError
 
     async def _none(*args, **kwargs):
         return None, "gemini-2.5-pro"
 
     monkeypatch.setattr(steps, "analyse", _none)
     monkeypatch.setattr(steps, "write", _none)
-    client = TestClient(app)
-    headers = {"x-api-key": settings.API.X_API_KEY}
-    for path, body in [
-        ("/api/v1/debrief/analyst", {"transcript": []}),
-        ("/api/v1/debrief/writer", {"evidence": {}}),
-    ]:
-        res = client.post(path, json=body, headers=headers)
-        assert res.status_code == 502, res.text
-        assert "no usable answer" in res.json()["detail"]
+    for path, body in [("analyst", {"transcript": []}), ("writer", {"evidence": {}})]:
+        with pytest.raises(StepError) as err:
+            await InProcessSteps().run(path, body, None, None)
+        assert err.value.status == 502
+        assert "no usable answer" in str(err.value)
 
 
 def test_judge_and_evaluator_see_the_history_the_writer_saw():
@@ -323,3 +319,189 @@ async def test_each_step_runs_on_the_provider_its_model_names(monkeypatch):
     for model in ("claude-sonnet-5-5", "gpt-5-mini", "gemini-2.5-flash"):
         await write({}, {}, "en", model, TRANSCRIPT)
     assert seen == ["anthropic", "openai", "gemini"]
+
+
+# --- Reasoning out loud, live detections, cohort (v9 FR-7, FR-17, FR-38) -------
+
+
+@pytest.mark.asyncio
+async def test_steps_ask_for_a_rationale_last_in_their_schema(dispatch_returns):
+    from app.core.debrief.schemas import DebriefCardsReasoned, EvidenceMapReasoned
+    from app.core.debrief.steps import analyse, write
+
+    calls = dispatch_returns(EvidenceMapReasoned(reasoning="Turn 3 changed topic."))
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert calls["schema"] is EvidenceMapReasoned
+    assert list(EvidenceMapReasoned.model_fields)[-1] == "reasoning"
+
+    calls = dispatch_returns(DebriefCardsReasoned(opening="Hi", reasoning="x"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert calls["schema"] is DebriefCardsReasoned
+    assert list(DebriefCardsReasoned.model_fields)[-1] == "reasoning"
+
+
+@pytest.mark.asyncio
+async def test_the_rationale_never_reaches_the_cards_or_the_evidence(monkeypatch):
+    """The step functions serialise the parent types, so the rationale travels
+    only in `reasoning`: nothing a learner reads can carry it."""
+    from app.core.debrief import steps
+    from app.core.debrief.schemas import DebriefCardsReasoned, EvidenceMapReasoned
+    from app.core.debrief_graph.step_functions import InProcessSteps
+
+    async def _analyse(*args, **kwargs):
+        return EvidenceMapReasoned(reasoning="Why I read it so."), "gemini-2.5-pro"
+
+    async def _write(*args, **kwargs):
+        return (
+            DebriefCardsReasoned(opening="Hi", reasoning="Why I wrote it so."),
+            "gemini-3-flash-preview",
+        )
+
+    monkeypatch.setattr(steps, "analyse", _analyse)
+    monkeypatch.setattr(steps, "write", _write)
+
+    body = await InProcessSteps().run("analyst", {"transcript": []}, None, None)
+    assert body["reasoning"] == "Why I read it so."
+    assert "reasoning" not in body["evidence"]
+
+    body = await InProcessSteps().run("writer", {"evidence": {}}, None, None)
+    assert body["reasoning"] == "Why I wrote it so."
+    assert "reasoning" not in body["cards"]
+
+
+@pytest.mark.asyncio
+async def test_analyst_reads_the_live_detector_as_a_second_opinion(dispatch_returns):
+    from app.core.debrief.steps import analyse
+
+    calls = dispatch_returns(EvidenceMap())
+    await analyse(
+        TRANSCRIPT,
+        "en",
+        "gemini-2.5-pro",
+        live_detections=[{"behaviour": "Explores risk", "detected": False, "times": 0}],
+    )
+    prompt = calls["prompt"]
+    assert "LIVE DETECTIONS" in prompt and "It can be wrong" in prompt
+    assert '"behaviour": "Explores risk"' in prompt
+
+    calls = dispatch_returns(EvidenceMap())
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert "LIVE DETECTIONS" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_may_use_the_cohort_only_to_normalise(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    cohort = {
+        "trainees": "five or more",
+        "skills": [{"skill": "Explores risk", "how_often": "few trainees show this"}],
+    }
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, cohort=cohort)
+    prompt = calls["prompt"]
+    assert "COHORT:" in prompt and "Never compare this trainee" in prompt
+    assert "few trainees show this" in prompt
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "COHORT" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_never_states_mixed_evidence_as_fact(dispatch_returns):
+    from app.core.debrief.steps import write
+
+    evidence = {
+        "behaviours": [{"skill": "Reflections", "detector_agreement": "disagrees"}]
+    }
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(evidence, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "MIXED EVIDENCE" in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_analyst_tags_behaviours_for_skill_coverage(dispatch_returns):
+    """v9 FR-42: ally-be computes skill coverage from these tags."""
+    from app.core.debrief.steps import analyse
+
+    calls = dispatch_returns(EvidenceMap())
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert "SKILL COVERAGE" in calls["prompt"]
+    b = BehaviourEvidence(
+        skill="reflections",
+        opportunity=True,
+        observation="observed",
+        confidence="high",
+        importance=2,
+        note="ok",
+        coverage_category="Emotional Attunement",
+    )
+    assert b.coverage_category == "Emotional Attunement"
+
+
+@pytest.mark.asyncio
+async def test_analyst_rates_client_turns_and_updates_case_memory(dispatch_returns):
+    """v9 FR-4: emotional movement and a case's memory now come from here."""
+    from app.core.debrief.schemas import EmotionLevel
+    from app.core.debrief.steps import analyse
+
+    calls = dispatch_returns(
+        EvidenceMap(
+            emotional_movement=[
+                EmotionLevel(turn_index=2, level=-3),
+                # A counsellor turn: dropped.
+                EmotionLevel(turn_index=1, level=2),
+            ],
+            case_memory_update="She is still anxious about exams.",
+        )
+    )
+    out, _ = await analyse(
+        TRANSCRIPT, "en", "gemini-2.5-pro", case_memory="Exams worry her."
+    )
+    assert [(e.turn_index, e.level) for e in out.emotional_movement] == [(2, -3)]
+    assert out.case_memory_update == "She is still anxious about exams."
+    prompt = calls["prompt"]
+    assert "EMOTIONAL MOVEMENT" in prompt and "CASE MEMORY:" in prompt
+
+    calls = dispatch_returns(EvidenceMap(case_memory_update="invented"))
+    out, _ = await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    assert out.case_memory_update is None
+    assert "CASE MEMORY" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_pm_agent_asks_for_queries_only_with_rounds_left(dispatch_returns):
+    """v9 FR-61: follow-up SQL over the reporting views, at most three, and
+    only while a pass may still ask."""
+    from app.core.debrief.pm_agent import PmAgentAnalysis, analyse_signals
+
+    asked = [f"SELECT {i} FROM debrief_reporting.runs" for i in range(5)]
+    calls = dispatch_returns(PmAgentAnalysis(report="r", follow_up_queries=asked))
+    out, _ = await analyse_signals(
+        {},
+        {},
+        {},
+        [],
+        "gemini-2.5-pro",
+        catalog="debrief_reporting.runs: one row per run",
+        rounds_left=1,
+        review="monthly",
+    )
+    assert len(out.follow_up_queries) == 3
+    prompt = calls["prompt"]
+    assert "REPORTING VIEWS" in prompt and "QUERY ROUNDS LEFT: 1" in prompt
+    assert "REVIEW: monthly" in prompt
+
+    dispatch_returns(PmAgentAnalysis(report="r", follow_up_queries=asked))
+    out, _ = await analyse_signals(
+        {},
+        {},
+        {},
+        [],
+        "gemini-2.5-pro",
+        catalog="x",
+        rounds_left=0,
+        query_results=[{"sql": "SELECT 1", "rows": [{"n": 1}]}],
+    )
+    assert out.follow_up_queries == []

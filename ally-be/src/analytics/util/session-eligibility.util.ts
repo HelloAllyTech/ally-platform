@@ -17,6 +17,15 @@ export function countableSessionPredicate(alias = 's'): string {
 }
 
 /**
+ * Excludes voice-to-voice test sessions (an AI plays the learner; flagged
+ * `metadata.v2vTest` when the v2v tester creates them). They are test traffic,
+ * never a learner's practice, so nothing measured on learners may include them.
+ */
+export function notV2vTestPredicate(alias = 's'): string {
+  return `COALESCE((${alias}.metadata->>'v2vTest')::boolean, false) = false`;
+}
+
+/**
  * "This roleplay is over and its transcript has stopped changing" — the
  * precondition for any judge that reads a WHOLE transcript.
  *

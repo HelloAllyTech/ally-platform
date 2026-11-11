@@ -64,6 +64,15 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
   bool _openLongEnough = false;
   bool _readEndSeen = false;
 
+  // Experience metrics (`read_through`): the end of the FIRST Work-on-this
+  // point on screen while the debrief is open — no minimum time.
+  final _readThroughKey = GlobalKey();
+  bool _readThroughSeen = false;
+
+  // Experience metrics (`waited` / `left_before_ready`): the working state
+  // was shown, so leaving before the debrief is ready is worth recording.
+  bool _waitedShown = false;
+
   /// The state last seen, so the move from writing to ready is announced.
   LearnerDebriefState? _lastState;
 
@@ -77,6 +86,7 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
 
   @override
   void dispose() {
+    _recordLeftBeforeReady();
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_announceWhenReady);
     _openedTimer?.cancel();
@@ -123,6 +133,7 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
     if (state == AppLifecycleState.resumed) {
       _armOpened();
     } else {
+      if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) _recordLeftBeforeReady();
       _openedTimer?.cancel();
       _openedTimer = null;
     }
@@ -138,18 +149,34 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkReadEnd());
   }
 
-  /// Whether the read-end marker is inside the list's visible area.
+  /// Whether the read-end markers are inside the list's visible area.
   void _checkReadEnd() {
-    if (!mounted || _readEndSeen) return;
-    final marker = _readEndKey.currentContext?.findRenderObject();
-    final list = _listKey.currentContext?.findRenderObject();
-    if (marker is! RenderBox || list is! RenderBox || !marker.attached || !marker.hasSize || !list.hasSize) return;
-    final top = marker.localToGlobal(Offset.zero).dy;
-    final listTop = list.localToGlobal(Offset.zero).dy;
-    if (top >= listTop && top <= listTop + list.size.height) {
+    if (!mounted) return;
+    if (!_readThroughSeen && _onScreen(_readThroughKey)) {
+      _readThroughSeen = true;
+      widget.controller.recordEvent(DebriefLearnerEvent.readThrough);
+    }
+    if (!_readEndSeen && _onScreen(_readEndKey)) {
       _readEndSeen = true;
       _maybeMarkRead();
     }
+  }
+
+  bool _onScreen(GlobalKey key) {
+    final marker = key.currentContext?.findRenderObject();
+    final list = _listKey.currentContext?.findRenderObject();
+    if (marker is! RenderBox || list is! RenderBox || !marker.attached || !marker.hasSize || !list.hasSize) return false;
+    final top = marker.localToGlobal(Offset.zero).dy;
+    final listTop = list.localToGlobal(Offset.zero).dy;
+    return top >= listTop && top <= listTop + list.size.height;
+  }
+
+  /// `left_before_ready`: the working state was shown and the debrief still
+  /// isn't ready as the learner leaves (screen closed or app backgrounded).
+  void _recordLeftBeforeReady() {
+    if (!_waitedShown || widget.readOnly) return;
+    if (widget.controller.view?.state == LearnerDebriefState.ready) return;
+    widget.controller.recordEvent(DebriefLearnerEvent.leftBeforeReady);
   }
 
   void _maybeMarkRead() {
@@ -178,12 +205,17 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
             controller: widget.controller,
             readAloud: _readAloud,
             readEndKey: _readEndKey,
+            readThroughKey: _readThroughKey,
             replyThread: widget.replyThread,
           ),
           _ => const SizedBox.shrink(),
         };
         if (ready && view.distress) content = _DistressFirst(view: view, child: content);
         if (ready) _afterReadyFrame();
+        if (view.state == LearnerDebriefState.working && !widget.readOnly && view.supervisor == null) {
+          _waitedShown = true;
+          widget.controller.recordEvent(DebriefLearnerEvent.waited);
+        }
         final status = _readAloud.status;
         return _Frame(
           title: ref.t('$_k.header'),
@@ -546,6 +578,7 @@ class _ReadyCards extends ConsumerWidget {
     required this.controller,
     required this.readAloud,
     required this.readEndKey,
+    required this.readThroughKey,
     this.replyThread,
   });
 
@@ -556,6 +589,9 @@ class _ReadyCards extends ConsumerWidget {
 
   /// Marks the end of the last Work-on-this card, for DEBRIEF_READ XP.
   final GlobalKey readEndKey;
+
+  /// Marks the end of the first Work-on-this point, for `read_through`.
+  final GlobalKey readThroughKey;
   final Widget? replyThread;
 
   static const _k = 'postSim.debriefCards';
@@ -656,16 +692,19 @@ class _ReadyCards extends ConsumerWidget {
           icon: const Icon(Icons.track_changes, size: 20, color: _amberStrong),
           children: [
             for (final (:index, :item) in growth)
-              _Item(
-                reading: readAloud.isBeingRead('work_on_this[$index]'),
-                children: [
-                  _Lead(item.lead),
-                  _Quote(item.quote),
-                  _Body(item.why),
-                  _TrySaying(label: ref.t('$_k.trySaying'), text: item.trySaying),
-                  if (view.practiceFor(item.scenarioId) case final scenario?) _PractiseLink(scenario: scenario),
-                  flag('work_on_this[$index]', item.lead),
-                ],
+              _withMarker(
+                index == growth.first.index ? readThroughKey : null,
+                _Item(
+                  reading: readAloud.isBeingRead('work_on_this[$index]'),
+                  children: [
+                    _Lead(item.lead),
+                    _Quote(item.quote),
+                    _Body(item.why),
+                    _TrySaying(label: ref.t('$_k.trySaying'), text: item.trySaying),
+                    if (view.practiceFor(item.scenarioId) case final scenario?) _PractiseLink(scenario: scenario),
+                    flag('work_on_this[$index]', item.lead),
+                  ],
+                ),
               ),
             SizedBox(key: readEndKey, height: 0),
           ],
@@ -680,7 +719,11 @@ class _ReadyCards extends ConsumerWidget {
             _Lead(practise.skill),
             _Body(practise.reason),
             if (view.practiceFor(practise.scenarioId) case final scenario?)
-              _PractiseLink(scenario: scenario, primary: true),
+              _PractiseLink(
+                scenario: scenario,
+                primary: true,
+                onOpen: () => controller.recordEvent(DebriefLearnerEvent.practiseNextClick),
+              ),
             flag('practise_next', practiseTitle),
           ],
         ),
@@ -763,6 +806,15 @@ class _ReadyCards extends ConsumerWidget {
       ],
     );
   }
+
+  /// [child] with a zero-height marker under it, so the marker's position
+  /// is the child's end without adding a gap; [child] alone when no [key].
+  static Widget _withMarker(GlobalKey? key, Widget child) => key == null
+      ? child
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [child, SizedBox(key: key, height: 0)],
+        );
 
   static Widget _skillWordIcon(DebriefSkillWord word) => switch (word) {
     DebriefSkillWord.strength => const Icon(Icons.star, size: 16, color: AppColors.success),
@@ -932,16 +984,22 @@ class _SupportLines extends StatelessWidget {
 /// trigger warnings come first. Only for a roleplay the server says the
 /// learner can still open.
 class _PractiseLink extends ConsumerWidget {
-  const _PractiseLink({required this.scenario, this.primary = false});
+  const _PractiseLink({required this.scenario, this.primary = false, this.onOpen});
 
   final DebriefPracticeScenario scenario;
   final bool primary;
+
+  /// Called before the roleplay opens (the `practise_next_click` event).
+  final VoidCallback? onOpen;
 
   static const _k = 'postSim.debriefCards.practise';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    void open() => context.push('/simulations/${scenario.id}');
+    void open() {
+      onOpen?.call();
+      context.push('/simulations/${scenario.id}');
+    }
     final label = ref.t(primary ? '$_k.next' : '$_k.this');
     final button = primary
         ? FilledButton(

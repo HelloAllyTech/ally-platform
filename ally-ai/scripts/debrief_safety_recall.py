@@ -13,7 +13,10 @@ clinical advisor, and the Indic lines here want a native speaker's review.
 
 Run from the ally-ai project so the .env loads:
 
-    poetry run python scripts/debrief_safety_recall.py [--reps 3]
+    poetry run python scripts/debrief_safety_recall.py [--reps 3] [--model <id>]
+
+`--model` gates a candidate (a backup or a swap) before a release names it;
+without it the reader's configured model is used.
 
 Exits 1 if recall is below 100% on any repetition.
 """
@@ -266,10 +269,10 @@ def _turns(raw):
     ]
 
 
-async def run_once():
+async def run_once(model=None):
     missed, false_alarms, failures = [], 0, 0
     for name, language, raw, expected, distress in CASES:
-        reading, _ = await read_safety(_turns(raw), language)
+        reading, _ = await read_safety(_turns(raw), language, model=model)
         if reading is None:
             failures += 1
             missed.append(f"{name}: no answer")
@@ -289,11 +292,11 @@ async def run_once():
     return missed, false_alarms
 
 
-async def main(reps: int) -> int:
+async def main(reps: int, model=None) -> int:
     planted = sum(len(e) + len(d) for _, _, _, e, d in CASES)
     ok = True
     for rep in range(1, reps + 1):
-        missed, false_alarms = await run_once()
+        missed, false_alarms = await run_once(model)
         recall = (planted - len(missed)) / planted
         print(
             f"rep {rep}: recall {recall:.0%} ({planted - len(missed)}/{planted}), "
@@ -309,4 +312,6 @@ async def main(reps: int) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--reps", type=int, default=3)
-    sys.exit(asyncio.run(main(parser.parse_args().reps)))
+    parser.add_argument("--model", default=None)
+    a = parser.parse_args()
+    sys.exit(asyncio.run(main(a.reps, a.model)))

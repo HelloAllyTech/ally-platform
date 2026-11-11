@@ -1,7 +1,34 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
 import { BuilderSession } from '../entity/builder-session.entity';
-import { BuilderSessionStatus } from '../enum/builder.enum';
+import {
+  BuilderSessionStatus,
+  BuilderSessionVisibility,
+} from '../enum/builder.enum';
+
+/**
+ * A `where` that keeps PRIVATE sessions out. Every Builder surface that lists
+ * sessions (mission control, archive, Now) spreads this in: an unfiled plan is
+ * its author's alone and is worked on the roadmap, never in Builder's feeds.
+ */
+export const SHARED_SESSIONS_ONLY: FindOptionsWhere<BuilderSession> = {
+  visibility: BuilderSessionVisibility.SHARED,
+};
+
+/**
+ * Whether `viewerId` may see this session: every SHARED session, and a PRIVATE
+ * one only to its author. The single rule behind visibleToWhere, the
+ * interceptor on Builder's session routes and the plan's own reads.
+ */
+export function isSessionVisibleTo(
+  session: Pick<BuilderSession, 'visibility' | 'createdBy'>,
+  viewerId: number,
+): boolean {
+  return (
+    session.visibility !== BuilderSessionVisibility.PRIVATE ||
+    session.createdBy === viewerId
+  );
+}
 
 @Injectable()
 export class BuilderSessionRepository extends Repository<BuilderSession> {
@@ -22,6 +49,54 @@ export class BuilderSessionRepository extends Repository<BuilderSession> {
       where: { status: BuilderSessionStatus.FAILED },
       order: { updatedAt: 'DESC' },
       take,
+    });
+  }
+
+  /**
+   * `where` (one branch or an OR-list of branches) narrowed to what `viewerId`
+   * may see: each branch becomes "shared" OR "private and authored by the
+   * viewer". A branch that already pins `createdBy` to someone else gets no
+   * private half, so it can never widen to another author's drafts.
+   */
+  static visibleToWhere(
+    viewerId: number,
+    where:
+      | FindOptionsWhere<BuilderSession>
+      | FindOptionsWhere<BuilderSession>[] = {},
+  ): FindOptionsWhere<BuilderSession>[] {
+    const branches = Array.isArray(where) ? where : [where];
+    return branches.flatMap((branch) => {
+      const shared = { ...branch, visibility: BuilderSessionVisibility.SHARED };
+      if (branch.createdBy !== undefined && branch.createdBy !== viewerId) {
+        return [shared];
+      }
+      return [
+        shared,
+        {
+          ...branch,
+          visibility: BuilderSessionVisibility.PRIVATE,
+          createdBy: viewerId,
+        },
+      ];
+    });
+  }
+
+  /** Visibility and author only, for the per-route check — no row hydration. */
+  findVisibilityFacts(
+    sessionId: string,
+  ): Promise<Pick<
+    BuilderSession,
+    'id' | 'visibility' | 'createdBy' | 'kind' | 'leadUserId'
+  > | null> {
+    return this.findOne({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        visibility: true,
+        createdBy: true,
+        kind: true,
+        leadUserId: true,
+      },
     });
   }
 

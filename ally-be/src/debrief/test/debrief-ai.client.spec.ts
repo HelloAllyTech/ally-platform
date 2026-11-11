@@ -21,14 +21,9 @@ describe('DebriefAiClient', () => {
     expect(STEP_TIMEOUT_MS['safety-reader']).toBeLessThan(120_000);
   });
 
-  it('gives each step its own limit, and anything else the run-length default', async () => {
-    await client.step('reviser', {});
-    await client.step('improver', {});
-    expect(post.mock.calls.map((c) => c[2].timeout)).toEqual([
-      120_000, 120_000,
-    ]);
-    await client.step('writer', {});
-    expect(post.mock.calls[2][2].timeout).toBe(75_000);
+  it('gives anything else the run-length default', async () => {
+    await client.step('pm-agent/analyse', {});
+    expect(post.mock.calls[0][2].timeout).toBe(120_000);
   });
 
   it('turns a timeout into a step error the runner retries', async () => {

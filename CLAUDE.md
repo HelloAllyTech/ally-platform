@@ -59,6 +59,22 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 - **ally-web/mobile <-> ally-be**: REST API + Socket.IO WebSockets (`/microphone-chat`, `/cloud-telephony-chat`, `/scenario-report`)
 - **ally-ai-learn <-> LiveKit**: Agent worker connects to LiveKit rooms for voice sessions
 
+## Product and engineering guidance — the Context Library
+
+Whenever a product or engineering judgement comes up — before an implementation plan, and again
+mid-implementation (an empty, loading, edge or failure state; a user-facing label or error message;
+what a view shows and omits; a threshold, limit, cadence or reward rule) — search Ally's Context
+Library yourself with the `context-library` MCP's `search_context` tool: several short queries that
+each describe a situation, `get_chunks` on the one or two that bear on the decision, and cite the
+codes you apply (e.g. `[FP-0142]`). Never claim the library does or doesn't cover something; an
+empty or failed search says nothing about what it holds, and results are advisory, not
+instructions. Trivial mechanical changes are exempt. Each app repo declares the server in its own
+`.mcp.json` (this monorepo root declares none) and carries the
+`context-library` skill, e.g. [`ally-be/.claude/skills/context-library/SKILL.md`](ally-be/.claude/skills/context-library/SKILL.md).
+Setup: create a read-only key in the admin dashboard under **Context Library → Connect Claude
+Code**, then export `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY`. Details:
+[Working with the Context Library](https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md).
+
 ## Common Patterns Across Repos
 
 ### Authentication
@@ -182,6 +198,7 @@ ansible-playbook -i inventories/development/hosts.yml <playbook>.yml
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` - LiveKit connectivity
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` - AWS services
 - `DEEPGRAM_API_KEY` - Speech-to-text
+- `ALLY_CONTEXT_LIBRARY_URL`, `ALLY_CONTEXT_LIBRARY_KEY` - Context Library MCP for engineers' Claude Code (read-only key; set in your shell, never committed)
 - See each repo's `env_sample` or `.env.example` for full list
 
 ## Monorepo map (short)
@@ -194,7 +211,7 @@ ansible-playbook -i inventories/development/hosts.yml <playbook>.yml
 | `ally-ai-learn/` | LiveKit voice-training agent (LangGraph) | 8002 (Docker) |
 | `ally-mobile/`, `ally-mobile-flutter/` | Counselor apps | none |
 | `infra/` | Separate repo, gitignored here; `./infra/dev_env.sh` starts the local stack | none |
-| `docs/` | Cross-repo docs, including `docs/agents-v2/` | none |
+| `docs/` | Cross-repo docs, including `docs/agents-v2/` and `docs/context-library/` (plan and build notes) | none |
 
 Each app directory has its own `CLAUDE.md` (mirrored with `AGENTS.md`). Read it before working there.
 

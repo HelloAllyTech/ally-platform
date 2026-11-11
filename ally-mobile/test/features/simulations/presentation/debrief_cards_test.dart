@@ -886,4 +886,201 @@ void main() {
       );
     });
   });
+
+  group('learner events (experience metrics)', () {
+    void stubPractiseNext() {
+      final json = readyDebriefJson();
+      final cards = json['cards'] as Map<String, dynamic>;
+      stubDebrief({
+        ...json,
+        'cards': {
+          ...cards,
+          'practise_next': {...cards['practise_next'] as Map<String, dynamic>, 'scenario_id': 42},
+        },
+        'practice': [
+          {'id': 42, 'title': 'Supporting a grieving parent'},
+        ],
+      });
+    }
+
+    void reduceMotion(WidgetTester tester) {
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    }
+
+    testWidgets('"Practise this next" sends practise_next_click once, however often it is tapped', (tester) async {
+      stubPractiseNext();
+      final router = await h.pump(tester);
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.practiseNextClick));
+
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      expect(find.text('SIMULATION_DETAILS:42'), findsOneWidget);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.practiseNextClick)).called(1);
+
+      router.pop();
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.practiseNextClick));
+    });
+
+    testWidgets('"Practise this" on a Work-on-this point is not practise_next_click', (tester) async {
+      final json = readyDebriefJson();
+      final cards = json['cards'] as Map<String, dynamic>;
+      stubDebrief({
+        ...json,
+        'cards': {
+          ...cards,
+          'work_on_this': [
+            {...(cards['work_on_this'] as List).first as Map<String, dynamic>, 'scenario_id': 7},
+          ],
+        },
+        'practice': [
+          {'id': 7, 'title': 'Open questions'},
+        ],
+      });
+      await h.pump(tester);
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-this')));
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.practiseNextClick));
+    });
+
+    testWidgets('working shows send waited once; leaving before ready sends left_before_ready', (tester) async {
+      reduceMotion(tester);
+      stubDebrief({'state': 'working'});
+      final router = await h.pump(tester);
+      expect(find.byKey(const Key('debrief-working')), findsOneWidget);
+      // Polls rebuild the working state; waited still goes once.
+      await tester.pump(const Duration(seconds: 7));
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.waited)).called(1);
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+
+      router.go('/home');
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.leftBeforeReady)).called(1);
+    });
+
+    testWidgets('the app going to the background while working sends left_before_ready once', (tester) async {
+      reduceMotion(tester);
+      stubDebrief({'state': 'working'});
+      final router = await h.pump(tester);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.leftBeforeReady)).called(1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      router.go('/home');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+    });
+
+    testWidgets('leaving once the debrief is ready is not left_before_ready', (tester) async {
+      reduceMotion(tester);
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer(
+        (_) async => LearnerDebriefView.fromJson(calls++ == 0 ? {'state': 'working'} : readyDebriefJson()),
+      );
+      final router = await h.pump(tester);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text('What worked'), findsOneWidget);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.waited)).called(1);
+
+      router.go('/home');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+    });
+
+    testWidgets('a ready debrief never sends waited or left_before_ready', (tester) async {
+      stubDebrief(readyDebriefJson());
+      final router = await h.pump(tester);
+      router.go('/home');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.waited));
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.leftBeforeReady));
+    });
+
+    testWidgets('read_through once the end of the FIRST Work-on-this point is on screen', (tester) async {
+      final json = readyDebriefJson();
+      final cards = json['cards'] as Map<String, dynamic>;
+      final first = (cards['work_on_this'] as List).first as Map<String, dynamic>;
+      stubDebrief({
+        ...json,
+        'cards': {
+          ...cards,
+          'work_on_this': [
+            first,
+            // Long, so its end (the read-XP marker) stays below the screen.
+            {...first, 'lead': 'A second point.', 'why': 'Why it matters. ' * 120, 'try_saying': 'Something else to try.'},
+          ],
+        },
+      });
+      await h.pump(tester);
+      await tester.pump(const Duration(seconds: 2));
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.readThrough));
+
+      // The first point's last line in view; no minimum time, unlike read XP.
+      await tester.ensureVisible(find.byKey(const Key('debrief-flag-work_on_this[0]')));
+      await tester.pumpAndSettle();
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.readThrough)).called(1);
+      verifyNever(() => h.learnerDebrief.markRead(any()));
+
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, 400));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('debrief-flag-work_on_this[0]')));
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), DebriefLearnerEvent.readThrough));
+    });
+
+    testWidgets('failing event calls never throw or show anything', (tester) async {
+      reduceMotion(tester);
+      when(() => h.learnerDebrief.recordEvent(any(), any())).thenThrow(Exception('404'));
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer((_) async {
+        final json = readyDebriefJson();
+        final cards = json['cards'] as Map<String, dynamic>;
+        return LearnerDebriefView.fromJson(
+          calls++ == 0
+              ? {'state': 'working'}
+              : {
+                  ...json,
+                  'cards': {
+                    ...cards,
+                    'practise_next': {...cards['practise_next'] as Map<String, dynamic>, 'scenario_id': 42},
+                  },
+                  'practice': [
+                    {'id': 42, 'title': 'Supporting a grieving parent'},
+                  ],
+                },
+        );
+      });
+      await h.pump(tester);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('What worked'), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('debrief-flag-work_on_this[0]')));
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const Key('debrief-practise-next')));
+      expect(tester.takeException(), isNull);
+      expect(find.text('SIMULATION_DETAILS:42'), findsOneWidget);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.waited)).called(1);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.readThrough)).called(1);
+      verify(() => h.learnerDebrief.recordEvent('session-1', DebriefLearnerEvent.practiseNextClick)).called(1);
+    });
+
+    testWidgets('from Logs (supervisor) nothing is sent', (tester) async {
+      stubSupervisor(supervisorJson());
+      final router = await h.pump(tester, fromLogs: true);
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+      router.go('/home');
+      await tester.pumpAndSettle();
+      verifyNever(() => h.learnerDebrief.recordEvent(any(), any()));
+    });
+  });
 }

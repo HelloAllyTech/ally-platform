@@ -8,6 +8,7 @@ import {
   useSetDebriefTenantLiveMutation,
   useSetDebriefTenantRegionMutation,
 } from "@api";
+import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
@@ -68,7 +69,7 @@ export const OrganisationsTab: React.FC = () => {
       ) : (
         <ConsoleTable
           testId="organisations-table"
-          headers={[s.columns.name, s.columns.state, s.columns.region, ""]}
+          headers={[s.columns.name, s.columns.state, s.columns.spend, s.columns.region, ""]}
           rows={tenants.data.map(t => ({
             key: t.id,
             testId: "organisation-row",
@@ -80,6 +81,9 @@ export const OrganisationsTab: React.FC = () => {
               <Pill key="s" tone={t.live ? "success" : "neutral"}>
                 {t.live ? s.newDebrief : s.todays}
               </Pill>,
+              <span key="c" className="text-sm" data-testid="organisation-spend">
+                {s.spendLine(formatUsd(t.monthSpentUsd ?? 0), t.monthRuns ?? 0)}
+              </span>,
               <span key="r" className="flex flex-wrap items-center gap-2">
                 {t.region === "india" ? s.india : s.outsideIndia}
                 {t.region === "outside_india" && !t.hasSupportContact && (

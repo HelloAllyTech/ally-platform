@@ -216,7 +216,6 @@ const PERMISSIONS = {
 
   // === CASES ===
   VIEW_ADMIN_CASES: 'view:admin:cases',
-  VIEW_ADMIN_CASE: 'view:admin:case',
   EDIT_ADMIN_CASE: 'edit:admin:case',
   DELETE_ADMIN_CASE: 'delete:admin:case',
   EDIT_CASE_TENANT: 'edit:case-tenant',
@@ -230,7 +229,6 @@ const PERMISSIONS = {
   VIEW_ADMIN_TRACK: 'view:admin:track',
   EDIT_ADMIN_TRACK: 'edit:admin:track',
   DELETE_ADMIN_TRACK: 'delete:admin:track',
-  EDIT_TENANT_TRACK: 'edit:tenant:track',
   EDIT_TRACK_TENANT: 'edit:track-tenant',
   DELETE_TRACK_TENANT: 'delete:track-tenant',
   VIEW_TRACKS: 'view:tracks',
@@ -389,6 +387,13 @@ const PERMISSIONS = {
   // the course it made outlives it.
   VIEW_COURSE_COPILOT: 'view:admin:course-copilot',
   EDIT_COURSE_COPILOT: 'edit:admin:course-copilot',
+
+  // === CONTEXT LIBRARY (docs/context-library/PLAN.md) ===
+  // VIEW browses and searches the library; EDIT uploads documents, writes and bulk-uploads
+  // entries, archives, and changes use-case grants. Platform-tier only for now; organisation
+  // admins get their own scoped access when organisation-owned collections arrive.
+  VIEW_CONTEXT_LIBRARY: 'view:admin:context-library',
+  EDIT_CONTEXT_LIBRARY: 'edit:admin:context-library',
   // Ally guide (plans/ally-guide/plan.md §10.5): the Ally Console and the org
   // Ally tab. Reading individual learner transcripts is a separate permission
   // AND a per-person toggle (ally_guide_transcripts), never a role default.
@@ -508,7 +513,6 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.VIEW_ADMIN_TRACK,
   PERMISSIONS.EDIT_ADMIN_TRACK,
   PERMISSIONS.DELETE_ADMIN_TRACK,
-  PERMISSIONS.EDIT_TENANT_TRACK,
   PERMISSIONS.EDIT_TRACK_TENANT,
   PERMISSIONS.DELETE_TRACK_TENANT,
   PERMISSIONS.EDIT_SCENARIO_TENANT,
@@ -561,6 +565,8 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.EDIT_BUILDER,
   PERMISSIONS.VIEW_COURSE_COPILOT,
   PERMISSIONS.EDIT_COURSE_COPILOT,
+  PERMISSIONS.VIEW_CONTEXT_LIBRARY,
+  PERMISSIONS.EDIT_CONTEXT_LIBRARY,
   PERMISSIONS.VIEW_ALLY_GUIDE,
   PERMISSIONS.EDIT_ALLY_GUIDE,
   PERMISSIONS.REVIEW_ALLY_GUIDE_TRANSCRIPTS,

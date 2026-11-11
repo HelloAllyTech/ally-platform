@@ -9,7 +9,7 @@ const ROUTING = [
   '',
   '**Generated — do not edit.** Fetch as https://tech.helloally.ai/#/wiki/<path>.',
   '',
-  '## Product practice — DEPRECATED 2026-08-07, superseded by the Stacks MCP; history only',
+  '## Product practice — DEPRECATED 2026-08-07, superseded by the Context Library; history only',
   '',
   '- `product/ui.md` (1735w) — How Ally screens should behave…',
   '',
@@ -115,7 +115,7 @@ describe('BuilderProductMapService', () => {
 
     expect(text).toContain('#### Platform & architecture');
     expect(text).toContain('#### Per-repo pages');
-    // Deprecated product practice (Stacks replaced it), process pages, meta pages, preamble.
+    // Deprecated product practice (the Context Library replaced it), process pages, meta pages, preamble.
     expect(text).not.toContain('product/ui.md');
     expect(text).not.toContain('contributing/guide.md');
     expect(text).not.toContain('log.md');

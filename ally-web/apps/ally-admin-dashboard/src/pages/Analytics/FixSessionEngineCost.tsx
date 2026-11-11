@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { SimpleBarChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetFixSessionEngineCostQuery } from "@api";
+import { SimpleBarChart } from "@components/charts";
 
 import { asOf } from "./analyticsFilters";
 import { CHART_HEIGHT, ChartCard, ScrollableChart, barOpts, buildSource } from "./chartKit";

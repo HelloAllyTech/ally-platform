@@ -866,7 +866,7 @@ export const ChartIdBadge = ({ id }: { id?: string }) => {
           copy();
         }
       }}
-      className="shrink-0 cursor-pointer select-none rounded-sm border border-[#e0e0e0] px-1 py-px font-mono text-xs leading-none text-typography-400 hover:text-typography-700"
+      className="shrink-0 cursor-pointer select-none rounded-sm border border-border-light px-1 py-px font-mono text-xs leading-none text-typography-400 hover:text-typography-700"
     >
       {copied ? "copied" : id}
     </span>
@@ -1227,7 +1227,7 @@ export const ChartCard = ({
     </div>
   ) : thin ? (
     <div
-      className="flex flex-col items-center justify-center gap-1 rounded border border-dashed border-[#e0e0e0] text-center max-sm:px-4"
+      className="flex flex-col items-center justify-center gap-1 rounded border border-dashed border-border-light text-center max-sm:px-4"
       style={{ height }}
     >
       <p className="text-sm font-medium text-typography-600">Not enough data to show a trend</p>
@@ -1237,7 +1237,7 @@ export const ChartCard = ({
     </div>
   ) : empty ? (
     <div
-      className="flex items-center justify-center rounded border border-dashed border-[#e0e0e0] text-sm text-typography-500 max-sm:px-4 max-sm:text-center"
+      className="flex items-center justify-center rounded border border-dashed border-border-light text-sm text-typography-500 max-sm:px-4 max-sm:text-center"
       style={{ height }}
     >
       {emptyText}

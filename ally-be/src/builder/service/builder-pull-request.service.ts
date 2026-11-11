@@ -1099,6 +1099,7 @@ export class BuilderPullRequestService {
           repo: targets[0].repo,
           workflow: targets[0].workflow,
           since: pullRequest.mergedAt,
+          apps: targets[0].inputs?.apps,
         });
         if (!run) continue;
 
@@ -1254,7 +1255,7 @@ export class BuilderPullRequestService {
   /**
    * After a release lands, check the service it went to is answering.
    *
-   * Stacks, "Canary Deployments for Safe Agent Iteration": an automatic
+   * "Canary Deployments for Safe Agent Iteration": an automatic
    * release is only safe with a check after it and a stop when it fails. A
    * pipeline that went green is not the same as a service that works.
    *
@@ -1402,7 +1403,7 @@ export class BuilderPullRequestService {
 
   /**
    * How Builder's recent opencode pull requests went, for deciding whether
-   * it has earned more autonomy. Stacks, "Progressive Delegation: Staged
+   * it has earned more autonomy. "Progressive Delegation: Staged
    * Autonomy Growth": widen autonomy as the agent proves reliable.
    *
    * Over the last `window` opencode PRs that got at least one review verdict:
@@ -2291,7 +2292,7 @@ export class BuilderPullRequestService {
    * Decide, from the review just filed, whether this pull request is still
    * converging or needs a person.
    *
-   * Stacks, "Escalation Criteria for Human-in-the-Loop Review": route to a
+   * "Escalation Criteria for Human-in-the-Loop Review": route to a
    * person on exceeded thresholds, persistent errors and unresolved conflicts.
    * Each rule below is one of those:
    *  - out of rounds: serious findings remain once the fix ceiling is spent;
@@ -2486,7 +2487,7 @@ export class BuilderPullRequestService {
    * Stop automation on one pull request and tell a person why. Idempotent: a
    * PR already waiting on someone is not escalated (or announced) again.
    *
-   * Stacks, "Escalate Agent Errors to Human Operators Transparently": the
+   * "Escalate Agent Errors to Human Operators Transparently": the
    * stop is said, with its reason, rather than left as a loop that went quiet.
    */
   /**

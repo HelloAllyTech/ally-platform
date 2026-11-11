@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { ComboChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetXpLevelReachedQuery } from "@api";
+import { ComboChart } from "@components/charts";
 
 import { withoutInProgress } from "./analyticsGrouping";
 import { ChartDetailModal } from "./ChartDetailModal";

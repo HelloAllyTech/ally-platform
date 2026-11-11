@@ -19,8 +19,8 @@ const TOOL_LABELS: Record<string, string> = {
   github_search_code: "Searching the codebase",
   github_read_file: "Reading a file",
   github_repo_tree: "Looking through a repo",
-  stacks_search: "Checking product guidance",
-  stacks_get: "Reading product guidance",
+  principles_search: "Checking principles",
+  principles_get: "Reading principles",
   list_repo_commands: "Checking repo commands",
   // Lookups.
   capability_lookup: "Checking what already exists",

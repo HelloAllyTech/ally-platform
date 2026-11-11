@@ -47,9 +47,9 @@ import {
 } from '../dto/create-track.dto';
 import { UpdateTrackDto } from '../dto/update-track.dto';
 import {
-  UpdateQuizSettingsDto,
-  UpdateQuizSettingsResponseDto,
-} from '../dto/update-quiz-settings.dto';
+  UpdateAttemptLimitDto,
+  UpdateAttemptLimitResponseDto,
+} from '../dto/update-attempt-limit.dto';
 import {
   UpsertTrackItemDto,
   UpsertTrackSectionDto,
@@ -76,6 +76,12 @@ import {
   AuthoredContentType,
   ContentAccessService,
 } from 'src/authorization/service/content-access.service';
+
+import { findImageStyle } from 'src/image-studio/constants/image-styles.constants';
+
+const normaliseImageStyleId = (
+  styleId: string | null | undefined,
+): string | null => (styleId && findImageStyle(styleId) ? styleId : null);
 
 @Injectable()
 export class TrackService {
@@ -269,6 +275,8 @@ export class TrackService {
       landingPage: createTrackDto.landingPage
         ? normaliseTrackLandingPage(createTrackDto.landingPage)
         : null,
+      imageStyleId: normaliseImageStyleId(createTrackDto.imageStyleId),
+      imageStyleAnchorId: createTrackDto.imageStyleAnchorId ?? null,
       ...(userId ? { createdBy: userId, updatedBy: userId } : {}),
     });
 
@@ -358,6 +366,18 @@ export class TrackService {
         : null;
     }
 
+    // Image Studio course style: absent = unchanged, null = cleared. An
+    // unknown style id is dropped rather than refused, so a style retired
+    // from the gallery never blocks saving a course that still names it.
+    if (updateTrackDto.imageStyleId !== undefined) {
+      updatePayload.imageStyleId = normaliseImageStyleId(
+        updateTrackDto.imageStyleId,
+      );
+    }
+    if (updateTrackDto.imageStyleAnchorId !== undefined) {
+      updatePayload.imageStyleAnchorId = updateTrackDto.imageStyleAnchorId;
+    }
+
     await this.trackRepository.update(id, updatePayload);
 
     if (
@@ -385,15 +405,16 @@ export class TrackService {
    * remain allowed.
    */
   /**
-   * Raise (never lower) the attempt limit of a quiz on a published course.
-   * `maxAttempts` is part of a quiz's structural signature, so once learners
-   * are enrolled the structure PUT refuses it; this is the one live edit that
-   * is safe, because a higher limit can only unblock learners.
+   * Raises a component's attempt limit on a published course. Quizzes and
+   * annotations carry one, and `maxAttempts` is part of both structural
+   * signatures, so once learners are enrolled the structure PUT refuses it.
+   * This is the one live edit that is safe, because a higher limit can only
+   * unblock learners.
    */
-  async updateQuizSettings(
+  async updateAttemptLimit(
     trackItemId: string,
-    dto: UpdateQuizSettingsDto,
-  ): Promise<UpdateQuizSettingsResponseDto> {
+    dto: UpdateAttemptLimitDto,
+  ): Promise<UpdateAttemptLimitResponseDto> {
     const itemRepo = this.dataSource.getRepository(TrackItem);
     const item = await itemRepo.findOne({ where: { id: trackItemId } });
     if (!item) {
@@ -401,8 +422,11 @@ export class TrackService {
     }
     await this.assertCallerMayEdit(item.trackId);
 
-    if (item.type !== TrackItemType.QUIZ) {
-      throw new BadRequestException('This component is not a quiz');
+    if (
+      item.type !== TrackItemType.QUIZ &&
+      item.type !== TrackItemType.ANNOTATED_ARTIFACT
+    ) {
+      throw new BadRequestException('This component has no attempt limit');
     }
     const track = await this.trackRepository.findOne({
       where: { id: item.trackId },
@@ -414,8 +438,8 @@ export class TrackService {
       );
     }
 
-    const quiz = item.content as QuizContent;
-    const current = quiz.settings?.maxAttempts ?? null;
+    const content = item.content as QuizContent | AnnotationContent;
+    const current = content.settings?.maxAttempts ?? null;
     const next = dto.maxAttempts;
     // Unlimited is the highest limit there is: nothing can go up from it, and
     // anything numeric is a decrease.
@@ -423,7 +447,7 @@ export class TrackService {
     if (!isIncrease) {
       throw new BadRequestException(
         current === null
-          ? 'This quiz already allows unlimited attempts'
+          ? 'This component already allows unlimited attempts'
           : `The new limit must be higher than the current limit of ${current}`,
       );
     }
@@ -431,7 +455,10 @@ export class TrackService {
     await itemRepo.update(
       { id: item.id },
       {
-        content: { ...quiz, settings: { ...quiz.settings, maxAttempts: next } },
+        content: {
+          ...content,
+          settings: { ...content.settings, maxAttempts: next },
+        },
       },
     );
     return { trackItemId: item.id, maxAttempts: next };
@@ -645,6 +672,8 @@ export class TrackService {
         // otherwise; dropping the tag would silently switch the copy's Course
         // impact reading to the derived roleplay set.
         competencyIds: normaliseTrackCompetencyIds(source.competencyIds),
+        imageStyleId: source.imageStyleId ?? null,
+        imageStyleAnchorId: source.imageStyleAnchorId ?? null,
         ...(userId ? { createdBy: userId, updatedBy: userId } : {}),
       });
 
@@ -1010,6 +1039,8 @@ export class TrackService {
       status: track.status,
       competencyIds: track.competencyIds ?? null,
       isPublicView: track.isPublicView ?? false,
+      imageStyleId: track.imageStyleId ?? null,
+      imageStyleAnchorId: track.imageStyleAnchorId ?? null,
     };
   }
 

@@ -6,31 +6,38 @@ import { Tabs } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
 
 import { CalibrationTab } from "./CalibrationTab";
-import { ImproverTab } from "./ImproverTab";
-import { KnowledgeTab } from "./KnowledgeTab";
+import { GuidanceTab } from "./GuidanceTab";
+import { MetricsTab } from "./MetricsTab";
 import { OrganisationsTab } from "./OrganisationsTab";
+import { PmAgentTab } from "./PmAgentTab";
 import { ReleasesTab } from "./ReleasesTab";
 import { ReviewTab } from "./ReviewTab";
 import { RunsTab } from "./RunsTab";
+import { SettingsTab } from "./SettingsTab";
 
 export enum DebriefConsoleTab {
   RUNS = "runs",
+  METRICS = "metrics",
   REVIEW = "review",
-  IMPROVER = "improver",
+  PM_AGENT = "pm-agent",
   RELEASES = "releases",
   ORGANISATIONS = "organisations",
   CALIBRATION = "calibration",
-  KNOWLEDGE = "knowledge",
+  // Kept as `knowledge` so links to the old Knowledge tab still open here.
+  GUIDANCE = "knowledge",
+  SETTINGS = "settings",
 }
 
 const TAB_CONTENT: Record<DebriefConsoleTab, React.FC> = {
   [DebriefConsoleTab.RUNS]: RunsTab,
+  [DebriefConsoleTab.METRICS]: MetricsTab,
   [DebriefConsoleTab.REVIEW]: ReviewTab,
-  [DebriefConsoleTab.IMPROVER]: ImproverTab,
+  [DebriefConsoleTab.PM_AGENT]: PmAgentTab,
   [DebriefConsoleTab.RELEASES]: ReleasesTab,
   [DebriefConsoleTab.ORGANISATIONS]: OrganisationsTab,
   [DebriefConsoleTab.CALIBRATION]: CalibrationTab,
-  [DebriefConsoleTab.KNOWLEDGE]: KnowledgeTab,
+  [DebriefConsoleTab.GUIDANCE]: GuidanceTab,
+  [DebriefConsoleTab.SETTINGS]: SettingsTab,
 };
 
 const VALID_TABS = new Set<string>(Object.values(DebriefConsoleTab));

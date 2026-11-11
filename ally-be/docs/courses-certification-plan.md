@@ -245,9 +245,9 @@ This is the judgement call with the most at stake. Today `passed = scorePct >= p
 (`track-quiz.service.ts:259`), and open-ended questions are scored by an Anthropic call
 (`track-quiz-llm-grader.service.ts`). A model deciding, unreviewed, that someone earns a credential violates the
 principle Ally already wrote down for itself: *a model output is a proposal until a person accepts it*
-(`helloallytech.github.io/wiki/product/ai-product-patterns.md`, principle 1). Stacks corroborates the general form — combining automated
+(`helloallytech.github.io/wiki/product/ai-product-patterns.md`, principle 1). Product guidance corroborates the general form — combining automated
 evaluation with expert review of sampled outputs, and using those reviews to calibrate the automated grader
-(Stacks: *Human-in-the-loop validation for agent output verification*).
+(*Human-in-the-loop validation for agent output verification*).
 
 **Rule:** an assessment whose result issues a credential must satisfy one of:
 
@@ -473,9 +473,9 @@ due dates are what tenant admins ask for first), and it is independently valuabl
 
 ---
 
-## 7. Stacks provenance
+## 7. Guidance provenance
 
-Six `search_chunks` queries were run across the task's distinct aspects — course structure and curriculum
+Six guidance-library queries were run across the task's distinct aspects — course structure and curriculum
 sequencing, assessment design and mastery criteria, certification and credential motivation, learner progress and
 completion rewards, gamification reward schedules, and instructional design scaffolding. Every hit returned from a
 single AI-agent-engineering book at weak scores (0.33–0.48); none bears on course or certification product design.
@@ -492,4 +492,4 @@ topics:
 - `helloallytech.github.io/wiki/product/ai-product-patterns.md` — principles 1 (a model output is a proposal until a person accepts it),
   2 (provenance on the artefact), 5 (empty ≠ broken), 12 (meter every LLM call).
 
-These are deprecated, not gates; where future Stacks guidance conflicts, Stacks wins.
+These are deprecated, not gates; where Context Library guidance conflicts, the Context Library wins.

@@ -10,6 +10,9 @@ const LANDING_ITEM_NOUNS: Record<string, [string, string]> = {
   GAME: ["game", "games"],
 };
 
+/** "24 h", "1.5 h": the Context Library's grace period before an old corpus is removed. */
+const formatHours = (hours: number): string => `${Number(hours.toFixed(2))} h`;
+
 export const en = {
   orgBranding: {
     tabLabel: "Branding",
@@ -198,6 +201,10 @@ export const en = {
    * account. Telling someone whose entitlements failed to load that the page "isn't turned on
    * for your role" sends them to an admin to fix something that is not broken.
    */
+  colorMode: {
+    switchToDark: "Switch to dark mode",
+    switchToLight: "Switch to light mode",
+  },
   accessCheck: {
     checking: "Checking your access…",
     failedTitle: "Couldn't check your access",
@@ -1140,13 +1147,11 @@ export const en = {
     failed: "Couldn't load retrieval quality",
     consumer: "Asked by",
     allConsumers: "Everything",
-    interviewAgent: "Interview agent",
     whatsappBot: "WhatsApp bot",
     queryWithheld: "Question withheld — asked by a health worker",
     adminPreview: "Admin preview",
     corpus: "Corpus",
     allCorpora: "Both",
-    characterLibrary: "Character library",
     whatsappQa: "WhatsApp Q&A",
     referenceDocuments: "Reference documents",
     roadmapOpportunities: "Roadmap duplicates",
@@ -1169,7 +1174,7 @@ export const en = {
     floorHelp:
       "The floor decides which passages reach the agent at all. This is what each candidate would have kept and discarded over the judged passages in this window.",
     floorCaveat:
-      "Every passage here already cleared the floor in force when it was retrieved, so this measures precision and estimates what a HIGHER floor would have lost. What a lower floor would have found is not recorded — re-run the query in the corpus panel's retrieval preview to see that.",
+      "Every passage here already cleared the floor in force when it was retrieved, so this measures precision and estimates what a HIGHER floor would have lost. What a lower floor would have found is not recorded.",
     floor: "Floor",
     kept: "Kept",
     relevant: "Relevant",
@@ -1193,51 +1198,18 @@ export const en = {
     missingPrefix: "Judge wanted:",
   },
 
-  characterCorpus: {
-    trigger: "Reference corpus",
-    title: "Reference corpus",
-    subtitle:
-      "Craft guidance on building believable people, plus lived-experience and observational material. This is what the interview agent reaches for so its questions are specific and its drafts are real rather than plausible \u2014 clinical guidelines and protocols belong in the WhatsApp bot's corpus, not here.",
-    empty: "Nothing here yet",
-    emptyBody:
-      "Add a case account, a first-person piece, notes on how people in a particular situation actually talk, or distilled craft principles for writing characters — anything the agent should know that an admin shouldn't have to type.",
-    add: "Add material",
-    topics: "Grounds",
-    topicsHelp:
-      "Which parts of a character this helps with. A hint that ranks it higher for those, never a restriction — leave it blank if you're not sure.",
-    topicsNone: "No hint",
-    saveTopics: "Save",
-    topicsSaved: "Saved",
-    topicsFailed: "Couldn't save that",
-    preview: "Try a search",
-    previewHelp:
-      "Ask what the agent would ask, and see what comes back with its match score. Scores below the floor are never returned.",
-    previewPlaceholder: "e.g. how does early-stage dementia change how someone speaks?",
-    previewRun: "Search",
-    previewEmpty:
-      "Nothing matched at this floor — the agent would be told so, and would not invent a source.",
-    // Three states, three sentences. "Nothing matched" is only the truthful one when there is
-    // something to match against; the other two name what to do instead of implying a
-    // threshold problem.
-    previewNothingIndexed:
-      "No passages are indexed yet, so a search cannot match anything. Add material, or wait for indexing to finish.",
-    previewIndexFailed:
-      "Indexing failed, so there are no passages to search. Check the failed document above and re-upload it.",
-    previewEmptyTryFloor:
-      "Nothing matched at the default floor. Similarity search is brittle across phrasing, so try a lower floor before concluding the corpus is missing this — the agent also retries at a different angle.",
-    floor: "Match floor",
-    archive: "Archive",
-    unarchive: "Restore",
-    archived: "Archived",
-    archiveFailed: "Couldn't archive that",
-    archiveHelp:
-      "Archiving deletes the passages so the agent stops using this, and keeps the document here so any citation already recorded still resolves. It is reversible.",
-    previewFailed: "The search failed",
-    score: "match",
-    indexed: "Indexed",
-    inProgress: "In progress",
-    failed: "Failed",
-    passages: "Passages",
+  /**
+   * The Character Library's door to what the character interview draws on. The material lives
+   * in the Context Library's Character Insights collection, so this summarises and links rather
+   * than offering a second place to manage it.
+   */
+  characterInsights: {
+    title: "Character Insights",
+    description: "What the interview draws on.",
+    count: (n: number) =>
+      n === 0 ? "No insights yet" : `${n} ${n === 1 ? "insight" : "insights"}`,
+    manage: "Manage in Context Library",
+    manageLabel: "Manage Character Insights in the Context Library",
   },
 
   characterInterview: {
@@ -3294,54 +3266,15 @@ export const en = {
     drawerAnswerSubmit: "Send answer",
     drawerAnswerFailed: "Couldn't send that answer. Try again.",
     // ── The notebook ─────────────────────────────────────────────────────────
-    notebookTitle: "My notebook",
-    notebookIntro:
-      "What I write down at the end of a run so the next one starts smarter — where bugs hide, what turned out not to be one, how a hard fix was made to work. You can add to it too. I read the strongest entries for a repo before every sweep and search the rest as I work.",
-    notebookRepoLabel: "Repo",
-    notebookRepoAll: "Platform-wide only",
-    notebookEmpty:
-      "Nothing written for this scope yet. It fills in as sweeps finish, or start it off below.",
-    notebookLoading: "Reading the notebook…",
-    notebookError: "Couldn't read the notebook right now.",
-    notebookSeen: "seen {count}×",
-    notebookPinned: "Pinned",
-    notebookByMe: "written by me",
-    notebookByHuman: "added by an admin",
-    notebookPlatformWide: "every repo",
-    notebookRetire: "Retire",
-    notebookRetireConfirmTitle: "Retire this entry?",
-    notebookRetireConfirmBody:
-      "It stops being read before sweeps and stops turning up in searches. Nothing is deleted, and an admin can write it again.",
-    notebookRetireConfirm: "Retire it",
-    notebookRetired: "Retired.",
-    notebookRetireFailed: "Couldn't retire that entry.",
-    notebookAddTitle: "Add an entry",
-    notebookAddHint:
-      "One lesson, written for someone who wasn't there: name the repo, the file or command, and the symptom. Under {max} characters.",
-    notebookAddLabel: "What should the next sweep know?",
-    notebookAddPlaceholder:
-      "e.g. ally-web: the admin dashboard suite needs NX_DAEMON=false or unrelated tests fail with a socket error — rerun before filing it as a bug.",
-    notebookAddTooLong: "{length} of {max} characters — trim it to the one lesson.",
-    notebookAddRepoLabel: "Applies to",
-    notebookAddRepoAll: "Every repo",
-    notebookAddTagsLabel: "Tags (optional, comma-separated)",
-    notebookAddTagsPlaceholder: "flaky-test, false-positive, fix-gotcha",
-    notebookAddPinLabel: "Pin it",
-    notebookAddPinTooltip:
-      "A pinned entry is a person's decision: the hourly curator never edits or retires it.",
-    notebookAddButton: "Add to notebook",
-    notebookAddButtonBusy: "Adding…",
-    notebookAdded: "Added. I'll read it before the next sweep.",
-    notebookAddFailed: "Couldn't add that entry.",
-    notebookReadOnly: "You can read the notebook; adding and retiring needs the Bug Hunter toggle.",
-    // ── What the agent retired on its own (OPP-0752) ─────────────────────────
-    notebookRetiredByMeTitle: "Retired by me recently ({count})",
-    notebookRetiredByMeIntro:
-      "Entries I took out of my own notebook in the last 30 days, each with the rule that fired. Put one back if I got it wrong.",
-    notebookRetiredBecause: "Retired {when} because: {reason}",
-    notebookRestore: "Put it back",
-    notebookRestored: "Back in the notebook. I'll read it before the next sweep.",
-    notebookRestoreFailed: "Couldn't restore that entry.",
+    // My notes are the Context Library's Bug Hunter Notes collection, managed there.
+    notesLink: {
+      title: "Bug Hunter Notes",
+      description:
+        "What I write down at the end of a run so the next one starts smarter. I read the strongest before every sweep and search the rest as I work.",
+      count: (n: number) => (n === 0 ? "No notes yet" : `${n} ${n === 1 ? "note" : "notes"}`),
+      manage: "Manage in Context Library",
+      manageLabel: "Manage Bug Hunter Notes in the Context Library",
+    },
     // ── Multi-repo plan ──────────────────────────────────────────────────────
     planTitle: "This fix spans {count} repos",
     planSubtitle:
@@ -4401,6 +4334,35 @@ export const en = {
         count === 1 ? "I'm working on 1 answer…" : `I'm working on ${count} answers…`,
     },
 
+    // "Principles in play" on a session: First Principles from the Context Library, with a
+    // status that comes from usage (never from anyone grading them).
+    principles: {
+      heading: "Principles in play",
+      count: (count: number) => `${count} in play`,
+      status: {
+        applied: "Applied",
+        trade_off: "Trade-off",
+        cited: "Cited",
+        open: "Open",
+      } as Record<string, string>,
+      finding: "Finding principles for this idea…",
+      off: "Principles are off for this session.",
+      unavailable: "Principles aren't available right now. The interview carries on without them.",
+      none: "None yet. Principles appear as the interview reaches them.",
+      readAs: (descriptor: string) => `Read as: ${descriptor}`,
+      inBrief: "In the brief",
+      sections: (sections: string) => `For ${sections}`,
+      tensionsHeading: "Trade-offs",
+      tension: (a: string, b: string) => `${a} and ${b} pull against each other`,
+      switchLabel: "Use principles in this session",
+      on: "On",
+      offWord: "Off",
+      turnedOn: "Principles switched on for this session",
+      turnedOff: "Principles switched off for this session. The interview carries on without them.",
+      failed: "That didn't go through. Nothing changed.",
+      loadFailed: "Couldn't load the principles.",
+      retry: "Retry",
+    },
     // The Builder tab: Now · Rules · History. One name per thing, in copy and in code:
     // Decision, Waiting on you, In progress, Up next, Start, Put back, Ask, Tell, Rule,
     // Decide for me, History, Limit. The agent speaks about the work; the app about itself.
@@ -4409,6 +4371,8 @@ export const en = {
       tabTitle: (count: number) =>
         count ? `(${count}) Builder · Ally Admin` : "Builder · Ally Admin",
       more: "More Builder pages",
+      principlesLink: "Principles",
+      principlesLinkLabel: "Open First Principles in the Context Library",
       overflow: {
         sessions: "All sessions",
         pipeline: "Pipeline",
@@ -5011,65 +4975,24 @@ export const en = {
       } as Record<string, string>,
     },
 
-    // Knowledge — what the automatic curator has distilled from past builds,
-    // and the runs worth reading in full because they were unusually clean
-    // or unusually expensive.
+    // Knowledge — where Builder's lessons live (the Context Library), and the
+    // runs worth reading in full because they were unusually clean or
+    // unusually expensive.
     knowledge: {
       navLink: "Knowledge",
       title: "Builder knowledge",
       subtitle: "What Builder has learned from past builds, and the runs worth learning from.",
       backToBuilder: "Back to Builder",
-      tabLessons: "Lessons",
-      tabExemplars: "Exemplars",
 
-      lessons: {
-        loadFailed: "Couldn't load Builder's lessons.",
-        empty: "Nothing here yet — lessons appear once a few builds have run.",
-        filterStatusLabel: "Status",
-        filterStatusAll: "All statuses",
-        filterCategoryLabel: "Category",
-        filterCategoryPlaceholder: "Any category…",
-        filterRepoLabel: "Repo",
-        filterRepoPlaceholder: "Any repo…",
-        statusLabels: {
-          candidate: "Candidate",
-          active: "Active",
-          merged: "Merged",
-          retired: "Retired",
-        } as Record<string, string>,
-        columnLesson: "Lesson",
-        columnCategory: "Category",
-        columnStatus: "Status",
-        columnSources: "Sources",
-        columnApplied: "Applied",
-        columnContradicted: "Contradicted",
-        columnRepos: "Repos",
-        columnPinned: "Pinned",
-        edit: "Edit",
-        save: "Save",
-        cancel: "Cancel",
-        saveFailed: "Couldn't save that lesson.",
-        pin: "Pin",
-        unpin: "Unpin",
-        // The curator runs on its own schedule and edits or retires lessons
-        // without asking — pinning is the one way to take a lesson out of its
-        // reach on purpose, and the copy says so rather than just naming the
-        // toggle. (Stacks: "Automated Pipelines as Amplifiers, Not
-        // Replacements" — automation proposes, a person can override it.)
-        pinHint:
-          "A pinned lesson is one the automatic curator may never edit or retire. Pin the ones you've checked and want kept exactly as written.",
-        pinFailed: "Couldn't pin that lesson.",
-        unpinFailed: "Couldn't unpin that lesson.",
-        retire: "Retire",
-        retireConfirmTitle: "Retire this lesson?",
-        retireConfirmBody:
-          "A retired lesson stops being read into new builds. Nothing is deleted — set its status back to bring it back.",
-        retireFailed: "Couldn't retire that lesson.",
-        consolidateNow: "Consolidate now",
-        consolidateHint:
-          "Runs the curator immediately instead of waiting for its next scheduled pass — it reviews candidate lessons and merges duplicates, and never edits or retires a pinned one.",
-        consolidateStarted: "Consolidation started — check back in a moment for the result.",
-        consolidateFailed: "Couldn't start consolidation.",
+      // Lessons are the Context Library's Builder Lessons collection, managed there.
+      lessonsLink: {
+        title: "Builder Lessons",
+        description:
+          "What past builds learned. Each interview reads the pinned lessons and the ones most relevant to it.",
+        count: (n: number) =>
+          n === 0 ? "No lessons yet" : `${n} ${n === 1 ? "lesson" : "lessons"}`,
+        manage: "Manage in Context Library",
+        manageLabel: "Manage Builder Lessons in the Context Library",
       },
 
       exemplars: {
@@ -5915,7 +5838,7 @@ export const en = {
       raiseFailed: "Couldn't raise the ceiling.",
       archiveFailed: "Couldn't archive that session.",
       // Placeholder says what this state accepts, so the composer teaches the capability
-      // (Stacks: "Communicate Agent Capabilities via Visual Affordances").
+      // ("Communicate Agent Capabilities via Visual Affordances").
       composerPlaceholder: {
         INTERVIEWING: "Answer, or tell me something I haven't asked about…",
         AWAITING_BLUEPRINT: "Ask for a change — “drop the game, make section 3 two roleplays”…",
@@ -7297,76 +7220,28 @@ export const en = {
         working: "Rejecting…",
       },
     },
+    // Ally's library is the Context Library's Ally Guide Library, managed there
+    // (docs/context-library/PLAN.md §10.2: "Ally guide admin → Ally Guide Library").
     library: {
-      platformIntro:
-        "The platform library: documents every learner and visitor can have Ally draw on, such as guidance on supporting someone in distress. Removing one stops Ally using it at once; its rows stay so citations already given still resolve.",
-      orgIntro:
-        "This organisation's own documents for Ally, such as protocols and handbooks. Only this organisation's learners' Ally reads them. Removing one stops Ally using it at once.",
-      add: "Add a document…",
-      emptyTitle: "No documents yet",
-      emptyMessage: "Add a document and Ally will draw on it once it has been indexed.",
-      columns: {
-        title: "Title",
-        source: "Source",
-        status: "Status",
-        chunks: "Indexed",
-        added: "Added",
+      link: {
+        title: "Ally Guide Library",
+        description:
+          "What Ally can look up for learners: Ally's own entries for everyone, and each organisation's own protocols for its learners.",
+        count: (n: number) =>
+          n === 0 ? "No entries yet" : `${n} ${n === 1 ? "entry" : "entries"}`,
+        manage: "Manage in Context Library",
+        manageLabel: "Manage the Ally Guide Library in the Context Library",
       },
-      sources: {
-        paste: "Pasted text",
-        pdf: "PDF",
-        docx: "Word",
-        epub: "EPUB",
-        url: "Web page",
-      } as Record<string, string>,
-      statuses: {
-        pending: "Waiting to be read",
-        extracting: "Reading the file",
-        chunking: "Splitting into passages",
-        indexing: "Indexing",
-        indexed: "Ready",
-        failed: "Failed",
-      } as Record<string, string>,
-      statusHelp:
-        "A document is only used by Ally once it is Ready. This list refreshes by itself while any document is still being read.",
-      failedWhy: (message: string) => message,
-      chunks: (indexed: number, total: number) => `${indexed} of ${total} passages`,
-      archive: "Remove",
-      archiveLabel: (title: string) => `Remove ${title}`,
-      archiveDialog: {
-        title: (title: string) => `Remove ${title}?`,
-        body: "Ally stops using this document at once. Its rows stay so citations already given still resolve. You cannot add it back; add it again as a new document.",
-        cancel: "Keep it",
-        confirm: "Remove document",
-        working: "Removing…",
-        success: "Removed.",
-        failed: "Could not remove the document.",
-      },
-      loadFailed: "the library",
-      needsOrg: "Choose an organisation to see its library.",
-      addDialog: {
-        title: "Add a document",
-        titleLabel: "Title",
-        titlePlaceholder: "For example: Our safeguarding protocol",
-        sourceLabel: "Source",
-        sourceOptions: { paste: "Paste text", pdf: "PDF", docx: "Word", epub: "EPUB" },
-        textLabel: "Text",
-        textPlaceholder: "Paste the document here",
-        textHelp: (max: number) => `Up to ${max} characters.`,
-        fileLabel: "File",
-        fileHelp: "PDF, Word or EPUB, up to 25 MB.",
-        fileChosen: (name: string) => `Chosen: ${name}`,
-        languageLabel: "Language (optional)",
-        languageHelp: "A language tag such as en or hi. Detected when left empty.",
-        invalidFileType: "That is not the right kind of file for this source.",
-        fileTooLarge: "That file is too large.",
-        cancel: "Cancel",
-        confirm: "Add document",
-        working: "Adding…",
-        uploading: "Uploading the file…",
-        success: "Added. Ally can use it once it shows Ready.",
-        failed: "Could not add the document.",
-        uploadFailed: "The file did not upload. Nothing was added.",
+      orgLink: {
+        title: "This organisation's entries",
+        description:
+          "Protocols and policies only this organisation's learners' Ally reads, beside Ally's own entries.",
+        count: (n: number) =>
+          n === 0
+            ? "None yet. Add your organisation's protocols so your learners' guide can use them"
+            : `${n} ${n === 1 ? "entry" : "entries"}`,
+        manage: "Manage in Context Library",
+        manageLabel: "Manage this organisation's entries in the Context Library",
       },
     },
     evals: {
@@ -7755,6 +7630,7 @@ export const en = {
       draftFailed: "Could not draft the notes.",
       draftKeeps: "Your edits are kept: the draft only replaces the text after you confirm.",
       draftReplace: "Replace what is there with the draft?",
+      keepWhatIsThere: "Keep it",
       tensionHeading: "Pacing, by item",
       tensionHelp:
         "How much tension an item carries decides how gently Ally paces around it. Ally assumes a level from the item's type, raised by trigger warnings. Set one only where you know better.",
@@ -7780,9 +7656,9 @@ export const en = {
       configHeading: "Ally settings for this organisation",
       configDescription:
         "The numbers Ally runs on for this organisation's learners, where the platform allows an organisation to choose. Anything left alone uses the live release.",
-      libraryHeading: "Documents for Ally",
+      libraryHeading: "Entries for Ally",
       libraryDescription:
-        "Protocols, handbooks and policies Ally can draw on for this organisation's learners.",
+        "Protocols and policies Ally can draw on for this organisation's learners, kept in the Context Library's Ally Guide Library.",
     },
     delegation: {
       heading: "How much runs on its own",
@@ -9427,44 +9303,271 @@ export const en = {
   debriefs: {
     title: "Debriefs",
     intro:
-      "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the Improver is changing, and which organisations have it.",
+      "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the PM agent is changing, and which organisations have it.",
     tabs: {
       runs: "Runs",
       review: "Review",
-      improver: "Improver",
+      pmAgent: "PM agent",
       releases: "Releases",
       organisations: "Organisations",
       calibration: "Calibration",
       knowledge: "Knowledge",
+      settings: "Settings",
+      metrics: "Metrics",
     },
-    knowledge: {
-      title: "Guidance the Debrief agent can use",
-      help: "Practice guidelines, the debrief style guide, level guides and organisations' protocols. The agent looks up to two passages for each important moment. A document marked clinical is used only once the clinical advisor has signed off its current text; editing it afterwards needs a new sign-off. An empty knowledge base never stops a debrief.",
-      add: "Add a document",
-      empty: "No guidance yet. Debriefs are written without it until you add some.",
+    // v9 FR-60: every threshold of the PM agent's test ladder, and the budgets.
+    settings: {
+      heading: "Settings",
+      help: "Every threshold the PM agent's tests use, and its learning budget. Each change is recorded with who made it, and takes effect on the next run. The baseline job reads this month's debriefs and proposes values with its reasons; nothing changes until you accept.",
+      loadFailed: "the settings",
+      groups: {
+        quick: "1. Quick test (open set)",
+        gate: "2. Full test (gate set)",
+        trials: "3. Paired trials on real sessions",
+        canary: "4. Canary to real learners",
+        sealed: "5. Sealed set (monthly)",
+        budget: "Learning budget",
+        metrics: "Metrics",
+      } as Record<string, string>,
+      names: {
+        quickTestCases: "Sessions in the quick test",
+        quickTestMinLift: "Lift needed to pass (points)",
+        gateCases: "Sessions in the gate set",
+        gateRotationShare: "Share of the gate set replaced each month",
+        gateNoNewHardFails: "No new hard fails",
+        gateJudgeMedianNotLower: "Judge's median not lower",
+        gateMaxCostIncreasePct: "Most extra cost allowed (%)",
+        sealedCases: "Sessions in the sealed set",
+        pairedMinComparisons: "Pairs needed before deciding",
+        pairedConfidence: "Confidence",
+        probeCapPerSessionUsd: "Most a trial may spend on one session ($)",
+        canaryShare: "Share of live debriefs on the canary",
+        canaryMinRuns: "Canary debriefs needed",
+        canaryMinDays: "Days the canary must run",
+        learningBudgetUsd: "Fixed learning budget a month ($)",
+        learningSkimPct: "Share of every debrief's budget added",
+        steeringWeightJudge: "Steering score: weight of the judge",
+        steeringWeightPractise: "Steering score: weight of Practise-next click-through",
+        steeringWeightThumbs: "Steering score: weight of thumbs-up",
+        flagReviewSlaHours: "Hours to review a learner's flag",
+      } as Record<string, string>,
       columns: {
-        title: "Document",
-        audience: "Who it's for",
-        status: "Indexing",
-        clinical: "Clinical sign-off",
-        actions: "",
+        setting: "Setting",
+        value: "In force",
+        proposed: "Proposed",
+        why: "Why",
       },
-      everyone: "Every organisation",
-      organisations: (n: number) => (n === 1 ? "1 organisation" : `${n} organisations`),
-      nobody: "No one yet",
-      archived: "Archived",
-      notClinical: "Not clinical",
-      awaiting: "Waiting for sign-off — not used",
-      signedOff: (by: string | null, when: string) => `Signed off${by ? ` by ${by}` : ""}, ${when}`,
-      edit: "Edit",
-      markClinical: "Mark clinical",
-      markNotClinical: "Not clinical",
-      signOff: "Sign off",
-      signOffConfirm:
-        "Sign off this document's current text as sound clinical guidance? The Debrief agent will start using it.",
-      saved: "Saved",
-      signedOffToast: "Signed off. The Debrief agent now uses it.",
-      failed: "That didn't save. Try again.",
+      default: (v: string) => `Default ${v}`,
+      budgetTag: "Budget",
+      misfit: "No longer fits",
+      noProposal: "—",
+      accept: "Accept",
+      acceptAll: "Accept every proposed value that isn't a budget",
+      save: "Save changes",
+      saved: "Settings saved",
+      saveFailed: "Couldn't save the settings",
+      reset: "Back to default",
+      runBaseline: "Propose values from this month's data",
+      baselineRunning: "Reading this month's debriefs…",
+      baselineDone: "New values proposed",
+      baselineFailed: "Couldn't propose values",
+      baselineNever: "No proposal yet. It runs monthly, or now with the button.",
+      baselineFacts: (when: string, perDay: string, median: string, noise: string, cost: string) =>
+        `Proposed ${when} from ${perDay} debriefs a day; judge median ${median}, re-judging moves scores by ${noise}; typical cost ${cost}.`,
+      budgetTitle: "Change the learning budget?",
+      budgetBody:
+        "Budget settings decide how much the PM agent may spend on tests each month. The change is recorded with your name.",
+      budgetConfirm: "Change the budget",
+      cancel: "Cancel",
+      yes: "Yes",
+      no: "No",
+    },
+    // v9 §3.3 / PRD §4: the success metrics.
+    metrics: {
+      heading: "Metrics",
+      help: "How the debrief is doing for learners in switched-on organisations, week by week. Each number is shown with how many debriefs it counts; below 20 it is marked as too few to read.",
+      weeks: (n: number) => `Last ${n} weeks`,
+      loadFailed: "the metrics",
+      steering: {
+        heading: "Steering score",
+        help: "The weekly score the PM agent steers by (v9 §3.3): the judge's score, Practise-next click-through and thumbs-up rate, weighted in Settings. When a part has no data that week the others are re-weighted, and the week is marked.",
+        weights: (j: number, p: number, t: number) =>
+          `Judge ${Math.round(j * 100)}% · Practise next ${Math.round(p * 100)}% · Thumbs-up ${Math.round(t * 100)}%`,
+        series: {
+          score: "Steering score",
+          judge: "Judge (×10)",
+          practise: "Practise-next click-through",
+          thumbs: "Thumbs-up rate",
+        },
+        partial: (parts: string) => `Without ${parts}`,
+        parts: { practise: "Practise next", thumbs: "thumbs" } as Record<string, string>,
+        latest: (v: string) => `This week: ${v}`,
+        empty: "No live debrief has been judged in this window yet.",
+      },
+      uptake: {
+        heading: "Uptake lift (north star)",
+        help: "Monthly: does a skill the debrief said to work on improve in the learner's next session within 14 days, more than a matched skill it didn't target? Below 150 pairs it reads \"insufficient data\". Skills are matched by name and by the same score in the first session.",
+        insufficient: (pairs: number) => `Insufficient data (${pairs} of 150 pairs)`,
+        lift: (lift: string, lo: string, hi: string, pairs: number) =>
+          `${lift} (${lo} to ${hi}) over ${pairs} pairs`,
+      },
+      columns: {
+        metric: "Metric",
+        target: "Target",
+        latest: "This week",
+        window: "Whole window",
+        state: "",
+      },
+      states: {
+        met: "On target",
+        missed: "Off target",
+        thin: "Too few to read",
+        no_data: "No data",
+      } as Record<string, string>,
+      agents: {
+        heading: "Each agent",
+        help: "Live numbers for every agent in the debrief, so a failure can be traced to the step that caused it. Numbers that need answers known in advance (recall on planted risk cues, the judge's catch rate on planted faults, the PM agent's accuracy on planted ideas) come from the offline checks and evals, not from here.",
+        cols: { agent: "Agent", measure: "Measure", value: "Value" },
+        time: (p50: string, p90: string) => `${p50} / ${p90}`,
+        seconds: (s: number) => `${Math.round(s / 100) / 10}s`,
+        notMeasured: "Not measured yet",
+        safetyReader: {
+          name: "Safety reader",
+          fail: "Gave no reading (both attempts failed)",
+          retry: "Needed a second attempt",
+          time: "Time, median / slowest 10%",
+          riskCue: "Sessions with a client risk cue",
+          missDespiteCoverage:
+            "Judge found a missed risk cue although every cue the reader found was covered",
+        },
+        analyst: {
+          name: "Analyst",
+          fail: "Gave no evidence map",
+          time: "Time, median / slowest 10%",
+        },
+        progressReader: {
+          name: "Progress reader",
+          fail: "Gave no progress reading",
+          unsupported: "Claimed progress without the history to support it (judge)",
+        },
+        guidance: {
+          name: "Guidance lookup",
+          found: "Found guidance for the session",
+          perRun: "Guidance entries per debrief, mean",
+          clinicalNoRisk: "Risk entries given to a session with no risk cue",
+          wrongLevel: "Level guide written for another learner level",
+        },
+        writer: {
+          name: "Writer",
+          firstDraft: "First drafts that passed every check",
+          failures: "Most common first-draft failures",
+          fail: "Gave no draft",
+        },
+        reviser: {
+          name: "Reviser",
+          fix: "Fixed a first draft that failed a check",
+          regression: "Revisions that broke a check the draft before passed",
+          deadline: "Ran out of time for another revision",
+        },
+        evaluator: {
+          name: "Evaluator",
+          kappa: "Agreement with the judge on missed risk cues, beyond chance (0–1)",
+          recall: "Missed risk cues the judge found that it also found",
+          falseFlag: "Missed risk cues it reported that the judge did not",
+          held: "Debriefs it held for a person on its own",
+        },
+        judge: {
+          name: "Independent judge",
+          judged: "Debriefs that reached the learner and were scored",
+          versions: "Judge versions in this window",
+        },
+        askAlly: {
+          name: "Ask Ally",
+          replies: "Replies",
+          checks: "Replies that passed the checks (others were replaced by a fallback)",
+          pass: "Pass rate (needs the Ask Ally judge)",
+          distress: "Learner distress flagged",
+        },
+        pmAgent: {
+          name: "PM agent",
+          ideas: "Ideas",
+          tested: "Screened / gate-tested",
+          outcome: "Promoted / reverted / rejected / waiting",
+          held: "Promotions that still stood 14 days later",
+        },
+      },
+      quality: {
+        heading: "Pass rate",
+        help: "Share of debriefs that reached the learner with no blocking check failure and no hard fail from the independent judge. It is the same measure the test-set evals report, so the two can be compared. Debriefs not scored yet, and sessions too short to debrief, are left out.",
+        range: (lo: string, hi: string) => `95% range ${lo}–${hi}`,
+        of: (n: number, of: number) => `${n} of ${of}`,
+        outages: "Not ready: a model could not be reached",
+        unjudged: "Not scored yet",
+        byWeek: "By week",
+        byLanguage: "By language",
+        bySegment: "By language, writing model and judge version",
+        segmentHelp:
+          "Read a trend within one judge version only: a new judge version scores differently.",
+        cols: {
+          week: "Week",
+          language: "Language",
+          writerModel: "Writing model",
+          judgeVersion: "Judge version",
+          debriefs: "Debriefs",
+          passRate: "Pass rate",
+          hardFailRate: "Hard-fail rate",
+          judgeMean: "Judge score, mean",
+        },
+        empty: "No live debrief in this window.",
+      },
+      guardrails: {
+        heading: "Guardrails",
+        judgeP50: "Judge score, median",
+        hardFailRate: "Hard-fail rate",
+        fabricated: "Fabricated or mismatched quotes",
+        thumbsDown: "Thumbs-down rate",
+        visible: "Time to a debrief, median / slowest 10%",
+        cost: "Cost per debrief, median / slowest 10%",
+        gap: "Internal check minus judge",
+        safety: "Safety recall on the seeded set",
+        safetyNote: "Measured offline by the safety-recall gate, not from production yet.",
+        legacy: (v: string) => `Below today's debrief: ${v}`,
+        preLaunch: (v: string) => `Not above before launch: ${v}`,
+      },
+      efficiency: {
+        heading: "Agent efficiency",
+        saved: "Budget left unspent per debrief, mean",
+        revisions: "Revision rounds, median",
+        steps: "Steps per debrief, median",
+        within10: "Debriefs ready within 10 minutes (no risk cue)",
+      },
+      experience: {
+        heading: "Learner experience",
+        help: "What learners did with their debriefs. By language and by device below.",
+        openedWithin24h: "Opened within 24 hours",
+        readThrough: "Read through the first Work-on-this card",
+        practiseClickThrough: "Practise-next click-through",
+        reflectionAnswered: "Reflective question answered",
+        abandonedBeforeReady: "Left before it was ready",
+        flagsWithinSla: (h: number) => `Flags reviewed within ${h} hours`,
+        listened: "Listened",
+        replied: "Asked Ally or replied",
+        byLanguage: "By language",
+        byDevice: "By device",
+        noTarget: "—",
+      },
+      count: (n: number, of: number) => `${n} of ${of}`,
+      none: "—",
+    },
+    // The guidance moved into the Context Library's Debrief Guidance (PLAN.md §9.7).
+    guidance: {
+      title: "Debrief Guidance",
+      description:
+        "Practice guidelines, the debrief style guide, level guides and organisations' protocols the Debrief agent reads beside each important moment. An empty collection never stops a debrief.",
+      count: (n: number) =>
+        n === 0 ? "No guidelines yet" : `${n} ${n === 1 ? "guideline" : "guidelines"}`,
+      manage: "Manage in Context Library",
+      manageLabel: "Manage Debrief Guidance in the Context Library",
     },
     status: {
       queued: "Queued",
@@ -9501,7 +9604,7 @@ export const en = {
         costHelp: "Typical (p50) and expensive (p90) runs. The ceiling is shown underneath.",
         ceiling: (v: string) => `Ceiling ${v}`,
         month: "Spent this month",
-        monthHelp: "Production debriefs only. The Improver's learning budget is separate.",
+        monthHelp: "Production debriefs only. The PM agent's learning budget is separate.",
         cap: (v: string) => `Monthly cap: ${v}.`,
       },
       filterLabel: "Show runs",
@@ -9558,6 +9661,76 @@ export const en = {
       cost: (est: string, actual: string) => `Estimated ${est} · actual ${actual}`,
       skipped: "Skipped",
       failed: "Failed",
+      // Reasoning out loud (v9 FR-38): how the debrief was made, step by step.
+      howMade: "How this debrief was made",
+      howMadeHelp:
+        "Each step in the order it ran: why it ran, what it was given, what it was thinking and what it produced. The recipe decides the order; the thinking is the step's own account, for the Ally team only.",
+      decision: "Outcome",
+      noReasoning:
+        "This run was made before steps recorded their reasoning, so only timings and notes are shown.",
+      why: "Why",
+      given: "Given",
+      thinking: "Thinking",
+      result: "Result",
+      budgetLeft: (usd: string) => `${usd} left`,
+      stepCost: (usd: string) => `~${usd}`,
+      showOutput: "Show what it produced",
+      outputs: {
+        safety: "Safety reading",
+        evidence: "Evidence map",
+        liveDetections: "Live detector's record",
+        progress: "Progress reading",
+        cohort: "How other trainees did",
+      },
+      draftChanges: "What changed between drafts",
+      draftChangesNone: "The first draft was not revised.",
+      critique: "What it was asked to fix",
+      revisionChanged: (round: number, count: number) =>
+        `Revision ${round}: ${count === 0 ? "no section changed" : count === 1 ? "1 section changed" : `${count} sections changed`}`,
+      before: "Before",
+      after: "After",
+      removed: "(removed)",
+      added: "(new)",
+      replies: "Ask Ally replies",
+      repliesHelp:
+        "How each reply to the learner was reached: the lookups it made and what they found. The learner's messages are not shown here.",
+      replyLine: (at: string, passes: number, cost: string) =>
+        `${at} · ${passes === 1 ? "1 pass" : `${passes} passes`} · ${cost}`,
+      noTools: "Answered from the debrief and the session, without lookups.",
+      stoppedBy: {
+        budget: "Stopped looking things up: the reply's budget was nearly spent.",
+        max_turns: "Stopped looking things up: it reached its limit of passes.",
+      },
+      registry: "Steps",
+      registryHelp:
+        "Each step the recipes run, the model the live release names for it, and how it did over the last 30 days of debriefs. Change a step's model under Models above; the order of steps is the recipe's.",
+      registryColumns: {
+        step: "Step",
+        model: "Model (backup)",
+        recipes: "In recipes",
+        ran: "Ran",
+        failed: "Failed",
+        skipped: "Skipped",
+        time: "Typical time",
+        spend: "Estimated spend",
+      },
+      registryEmpty: "No debriefs in the last 30 days.",
+      registryLoadFailed: "the steps",
+      stepNames: {
+        safety_reader: "Safety reader",
+        analyst: "Analyst",
+        progress_reader: "Progress reader",
+        guidance_lookup: "Guidance lookup",
+        writer: "Writer",
+        checks: "Rule checks",
+        evaluator: "Evaluator",
+        reviser: "Reviser",
+      } as Record<string, string>,
+      toolNames: {
+        search_guidance: "Searched guidance",
+        get_learner_history: "Read the learner's earlier points",
+        get_live_detections: "Read the live detector's record",
+      } as Record<string, string>,
     },
     review: {
       heading: "Review",
@@ -9567,6 +9740,8 @@ export const en = {
       emptyMessage: "Live debriefs that need a person, and learners' flags, appear here.",
       runsHeading: "Debriefs waiting for a person",
       flagsHeading: "Learners' flags",
+      keyboardHint:
+        "Keyboard: j and k move through the queue, Enter opens the debrief, e escalates to the clinical advisor.",
       distress: "Learner distress",
       judgeBelow: "Judge below the bar",
       judgeHelp:
@@ -9634,24 +9809,24 @@ export const en = {
         reviewed: "It stays as the learner has it and leaves this queue.",
       } as Record<string, string>,
     },
-    improver: {
-      heading: "The Improver",
-      help: "Each day the Improver reads how debriefs are doing, writes a short report and proposes changes. It tries prompt and setting changes on the open test set on its own; nothing reaches learners until a person approves it here.",
-      loadFailed: "the Improver",
+    pmAgent: {
+      heading: "The PM agent",
+      help: "Each week the PM agent reads how debriefs are doing, writes a short report and proposes changes, and once a month it takes a longer look. Each change climbs a ladder of tests on its own — a quick test, the full gate test, then paired trials on real sessions — and reaches learners only after a person starts a canary and promotes it here.",
+      loadFailed: "the PM agent",
       report: "Latest report",
       noReport:
-        "The Improver has not written a report yet. It runs once there are debrief runs to read.",
+        "The PM agent has not written a report yet. It runs once there are debrief runs to read.",
       ranAt: (when: string) => `Written ${when}`,
-      runNow: "Run the Improver now",
+      runNow: "Run the PM agent now",
       running: "Running…",
-      ran: "The Improver has finished",
-      skipped: (why: string) => `The Improver did not run: ${why}`,
-      runFailed: "The Improver could not run",
+      ran: "The PM agent has finished",
+      skipped: (why: string) => `The PM agent did not run: ${why}`,
+      runFailed: "The PM agent could not run",
       budget: (spent: string, of: string) =>
-        `Learning budget: ${spent} spent of ${of} set aside this month (20% of every debrief's budget)`,
+        `Learning budget: ${spent} spent of ${of} set aside this month (see Settings)`,
       testSets: "Test sets",
       testSetsHelp:
-        "Real sessions, split three ways. The Improver screens ideas on the open set; the gate set decides releases; the sealed set is never shown to it.",
+        "Real sessions, split three ways. The PM agent screens ideas on the open set; the gate set decides releases; the sealed set is never shown to it.",
       sets: { debrief_open: "Open", debrief_gate: "Gate", debrief_sealed: "Sealed" } as Record<
         string,
         string
@@ -9683,6 +9858,48 @@ export const en = {
       notScreened: "Not tried yet",
       screenPassed: "Better",
       screenFailed: "Not better",
+      ladder: {
+        quick: "Quick test",
+        gate: "Gate test",
+        trial: "Paired trial",
+        canary: "Canary",
+      },
+      rungRunning: "Running…",
+      rungFailed: "Did not finish",
+      rungPassed: "Passed",
+      rungNotPassed: "Did not pass",
+      rungWaiting: "Waiting",
+      gateLine: (base: string, chal: string, pairs: number) =>
+        `median ${base} → ${chal} on ${pairs} sessions`,
+      gateRules: {
+        hardFails: "new hard fails",
+        median: "judge's median lower",
+        cost: "cost above the limit",
+        scored: "too few sessions scored",
+      } as Record<string, string>,
+      trialLine: (n: number, diff: string, lo: string, hi: string) =>
+        `${n} pairs · ${diff} (${lo} to ${hi})`,
+      canaryLine: (share: number, runs: number, canary: string, control: string) =>
+        `${share}% of live debriefs · ${runs} so far · median ${canary} against ${control}`,
+      canaryStatus: {
+        running: "Running",
+        passed: "Ready to promote",
+        reverted: "Reverted",
+        promoted: "Promoted",
+      } as Record<string, string>,
+      startCanary: "Start canary",
+      promote: "Promote to everyone",
+      canaryNeedsTrial: "Only a change that passed its paired trial can start a canary.",
+      canaryTitle: "Start a canary?",
+      canaryBody:
+        "A share of live debriefs in switched-on organisations will use this change (set in Settings). It is reverted on its own if it does worse.",
+      canaryConfirm: "Start the canary",
+      promoteTitle: "Promote this change to everyone?",
+      promoteBody:
+        "The canary did not do worse than the release in force. Promoting makes it the release every learner gets. You can roll it back from Releases.",
+      promoteConfirm: "Promote",
+      promoted: "Promoted. Every learner now gets this change.",
+      canaryStarted: "Canary started.",
       approve: "Approve",
       reject: "Reject",
       approveNeedsScreen: "Only a change that did better when tried can go live.",
@@ -9693,7 +9910,7 @@ export const en = {
       approveConfirm: "Put it live",
       rejectTitle: "Reject this idea?",
       rejectBody:
-        "The Improver will see it was rejected and will not propose it again unless the numbers change.",
+        "The PM agent will see it was rejected and will not propose it again unless the numbers change.",
       rejectConfirm: "Reject",
       cancel: "Cancel",
       approved: "The change is live",
@@ -9745,7 +9962,7 @@ export const en = {
         notes: "What changed",
         when: "Made",
       },
-      authors: { seed: "Code", human: "A person", curator: "Improver", system: "System" } as Record<
+      authors: { seed: "Code", human: "A person", curator: "PM agent", system: "System" } as Record<
         string,
         string
       >,
@@ -9760,7 +9977,14 @@ export const en = {
       heading: "Organisations",
       help: "Switch an organisation on and its learners read the Debrief agent's debrief instead of today's. Switching off is the emergency stop for that organisation.",
       loadFailed: "the organisations",
-      columns: { name: "Organisation", state: "Learners read", region: "Works in" },
+      columns: {
+        name: "Organisation",
+        state: "Learners read",
+        region: "Works in",
+        spend: "Spent this month",
+      },
+      spendLine: (usd: string, runs: number) =>
+        `${usd} · ${runs === 1 ? "1 debrief" : `${runs} debriefs`}`,
       india: "India",
       outsideIndia: "Outside India",
       markOutside: "Mark as outside India",
@@ -9785,7 +10009,7 @@ export const en = {
     },
     calibration: {
       heading: "Score debriefs by hand",
-      help: "People score a fixed sample of debriefs on the same rubric the quality judge uses, without seeing its scores. How closely the judge agrees with people decides whether the Improver may put changes live without asking.",
+      help: "People score a fixed sample of debriefs on the same rubric the quality judge uses, without seeing its scores. How closely the judge agrees with people decides whether the PM agent may put changes live without asking.",
       loadFailed: "the calibration sample",
       agreementFailed: "agreement",
       kpis: {
@@ -9795,14 +10019,14 @@ export const en = {
         ratersHelp: "Two or more lets us measure how much people agree with each other.",
         mine: "Rated by you",
         mineHelp: "Your scores count wherever the sample moves.",
-        gate: "Improver autonomy",
+        gate: "PM agent autonomy",
         gateHelp:
           "Met only while the judge agrees with people well enough on accuracy, evidence and missed risk.",
         met: "Allowed",
         notMet: "Needs approval",
       },
       ofTarget: (n: number, target: number) => `${n} of ${target}`,
-      gateHeading: "What the Improver's autonomy depends on",
+      gateHeading: "What the PM agent's autonomy depends on",
       gateHelp:
         "Agreement is Cohen's kappa: 1 is perfect, 0 is chance. Each check needs 0.6 or more, measured on at least 20 rated debriefs.",
       gateColumns: { measure: "Check", agreement: "Judge vs people", status: "Status" },
@@ -9918,5 +10142,684 @@ export const en = {
       evidence_specificity: "Evidence",
       missed_risk_cue: "Missed risk",
     } as Record<string, string>,
+  },
+  // ── Context Library ────────────────────────────────────────────────────────
+  // docs/context-library/PLAN.md §10. Copy rules: each collection's own noun (from the
+  // collections response) instead of "chunk", which appears only on the Settings view;
+  // "extract", never "distil"; "part", never "segment"; "document", never "source". Status
+  // and origin words always sit next to an icon, never colour alone.
+  contextLibrary: {
+    /** A citation chip's accessible name, wherever an agent cites a code (PRD, Course Copilot). */
+    citationOpen: (code: string) => `Open ${code} in the Context Library`,
+    navLabel: "Context Library",
+    title: "Context Library",
+    subtitle: "What Ally's agents look up before they answer.",
+    views: { library: "Library", insights: "Insights", settings: "Settings" },
+    viewsLabel: "Context Library views",
+    switcher: { label: "Collection", all: "All collections" },
+    // §10.2: an organisation's admins see the collections that take organisation entries.
+    org: {
+      subtitle: "Your organisation's entries, and Ally's own for every learner.",
+      pickerLabel: "Organisation",
+      none: "You aren't an admin of any organisation yet, so there is nothing to show here.",
+      emptyOwn: "Add your organisation's protocols so your learners' guide can use them",
+      globalReadOnly:
+        "Ally's own entry, read by every learner's guide. You can read it, not change it.",
+    },
+    // §10.4/§10.6: who an entry reaches. Badges always pair an icon with a word.
+    audience: {
+      label: "Audience",
+      all: "All",
+      global: "Global",
+      mine: "My organisation",
+      yours: "Your organisation",
+      oneOrganisation: "One organisation",
+      organisations: (count: number) => `${count} organisations`,
+      nobody: "No one yet",
+      pick: "Choose an organisation",
+      filterHelp:
+        "Global entries reach every learner. An organisation's reach only its own learners.",
+      pickerLabel: "Who can read this",
+      pickerHelp:
+        "Every organisation, or only the ones you tick. Learners in other organisations never see a targeted entry in the Ally guide, Debrief or Course Copilot. Builder and Bug Hunter read everything either way.",
+      documentHelp:
+        "Every entry drawn from these documents reaches the organisations you choose here. You can change it later from the document.",
+      bulkNote:
+        "For new rows that leave is_global and tenant_ids blank. A row's own columns win, and rows that update an entry keep its audience unless they set one.",
+      everyOrganisation: "Every organisation (global)",
+      onlyThese: "Only these organisations",
+      filterOrganisations: "Filter organisations",
+      noOrganisationMatches: "No organisation matches.",
+      noOrganisations: "No organisations to choose from.",
+      unknownOrganisation: "Unknown organisation",
+      selectedCount: (count: number) =>
+        count === 1 ? "1 organisation selected" : `${count} organisations selected`,
+      chooseOne: "Choose at least one organisation.",
+      change: "Change",
+      save: "Save",
+      saving: "Saving…",
+      cancel: "Cancel",
+      saved: "Audience updated.",
+      saveFailed: "Couldn't change who can read this.",
+      ownedByOrganisation: "Belongs to an organisation, so it reaches that organisation only.",
+      followsStudio: "Follows its owner in Studio.",
+      documentSaved: (updated: number, shared: number) =>
+        [
+          updated === 1 ? "1 entry updated." : `${updated} entries updated.`,
+          shared
+            ? shared === 1
+              ? "1 entry also comes from another document and kept its audience."
+              : `${shared} entries also come from other documents and kept their audience.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+    },
+    /** For "All": no single collection noun applies. */
+    allNoun: "item",
+    allNounPlural: "items",
+    documents: "Documents",
+    segmentLabel: "Show",
+    loading: { still: "Still loading…" },
+    loadFailed: (what: string) => `Couldn't load ${what}.`,
+    retry: "Retry",
+    add: {
+      button: "Add",
+      menuLabel: "Add to the library",
+      upload: "Upload documents",
+      uploadHint: "PDF or EPUB. Read in memory, then discarded",
+      entry: "New entry",
+      entryHint: "Typed in and kept exactly as written",
+      bulk: "Bulk upload",
+      bulkHint: "A CSV or JSON file, one row each",
+    },
+    drop: {
+      overlay: (count: number, target: string) =>
+        `Drop to add ${count} ${count === 1 ? "document" : "documents"} to ${target}`,
+      overlayUnknown: (target: string) => `Drop to add documents to ${target}`,
+      onlyPdfEpub: "PDF and EPUB only; anything else is skipped.",
+      confirmTitle: (count: number) => `Add ${count} ${count === 1 ? "document" : "documents"}`,
+      targetLabel: "Add to",
+      pickCollection: "Choose at least one collection.",
+      skipped: (name: string) => `${name}: only PDF and EPUB can be added, so it's skipped`,
+      nothingToAdd: "None of these are PDF or EPUB files, so there is nothing to add.",
+      version: "Version (optional)",
+      year: "Year (optional)",
+      versionHelp:
+        "Shown with the title wherever an entry says where it came from. Never the author's name.",
+      confirm: "Add",
+      cancel: "Cancel",
+      chooseFiles: "Choose files",
+    },
+    firstRun: {
+      title: "Drop documentation. We extract what matters and delete the text.",
+      privacy:
+        "Files are never stored: they're read in memory and discarded, and their text is deleted once extracted, within 24 hours at most.",
+      dropHere: "Drop PDF or EPUB files here",
+      or: "or",
+      collectionsLabel: "Extract into",
+      orWrite: "Or write an entry yourself",
+    },
+    library: {
+      searchLabel: "Search the library",
+      searchPlaceholder: (nounPlural: string) => `Search ${nounPlural}…  (press / to focus)`,
+      clearSearch: "Clear search",
+      filtersLabel: "Filters",
+      originLabel: "Origin",
+      lowConfidence: "Low confidence",
+      howFound: "How was this found?",
+      howFoundHelp:
+        "Shows how each result ranked in keyword search and the two meaning searches, the grade it was given, and why any were left out.",
+      fromDocuments: (count: number) => `from ${count} ${count === 1 ? "document" : "documents"}`,
+      copyCode: (code: string) => `Copy ${code}`,
+      copied: (code: string) => `${code} copied`,
+      pinned: "Pinned",
+      archived: "Archived",
+      candidate: "Not in use yet",
+      mergedInto: (noun: string) => `Merged into another ${noun}`,
+      showMore: (shown: number, total: number) => `Show more (${shown} of ${total})`,
+      count: (total: number, nounPlural: string) => `${total} ${nounPlural}`,
+      noConfidentMatch: "No confident match. This says nothing about what the library holds.",
+      closestMatch: "The closest it found:",
+      emptyCollection: (nounPlural: string) => `No ${nounPlural} here yet.`,
+      emptyFiltered: (nounPlural: string) => `No ${nounPlural} match these filters.`,
+      clearFilters: "Clear filters",
+      bands: { strong: "Strong match", good: "Good match", low: "Closest match" },
+      diagnostics: {
+        keyword: "Keyword rank",
+        statement: "Meaning rank",
+        situations: "Situation rank",
+        grade: "Grade",
+        notRanked: "not found",
+        dropped: "Left out",
+      },
+      facetsTruncated: "Facet filters apply to the results loaded so far.",
+    },
+    origins: {
+      distilled: "Extracted",
+      authored: "Written",
+      imported: "Imported",
+      agent: "Agent",
+      synced: "Synced from Studio",
+    } as Record<string, string>,
+    originFilters: {
+      distilled: "Extracted",
+      authored: "Written",
+      imported: "Imported",
+      agent: "Agent",
+      synced: "Synced",
+    } as Record<string, string>,
+    sheet: {
+      close: "Close",
+      notFound: "This entry doesn't exist any more.",
+      statement: "Statement",
+      body: "Text, exactly as written",
+      citation: "Cited from",
+      whereFrom: "Where it came from",
+      whereFromNone: "Written here, not taken from a document.",
+      pages: (from?: number | null, to?: number | null) =>
+        from && to && to !== from ? `pages ${from}–${to}` : from ? `page ${from}` : "",
+      history: "History",
+      historyPlaceholder: "Edits and what the system changed will show here once Insights arrive.",
+      edit: "Edit",
+      pin: "Pin",
+      unpin: "Unpin",
+      pinHelp: "Pinned entries are never edited or retired by the system.",
+      archive: "Archive",
+      restore: "Restore",
+      syncedNote: "Synced from Studio — edit the item there.",
+      openInStudio: "Open in Studio",
+      openInStudioLabel: (code: string) => `Open ${code} in Studio to edit it`,
+      readOnly: "You can read the library but not change it.",
+      toasts: {
+        archived: (code: string) => `${code} archived`,
+        restored: (code: string) => `${code} restored`,
+        pinned: (code: string) => `${code} pinned`,
+        unpinned: (code: string) => `${code} unpinned`,
+        undo: "Undo",
+        undone: "Undone",
+        failed: "That didn't go through. Nothing changed.",
+      },
+    },
+    documentsView: {
+      columns: {
+        title: "Title",
+        version: "Version",
+        added: "Added",
+        kept: "Kept",
+        low: "Low confidence",
+        cost: "Cost",
+        status: "Status",
+      },
+      empty: "No documents yet. Drop some on this page, or use Add.",
+      overview: "What it covers",
+      noOverview: "Too short to need an overview.",
+      yieldHeading: (collection: string) => `In ${collection}`,
+      notFinished: "Still being extracted. The report appears when it's done.",
+      cost: (cost: string) => `Cost so far: ${cost}`,
+      statuses: {
+        queued: "Waiting",
+        extracting: "Extracting",
+        consolidating: "Finishing up",
+        paused: "Paused",
+        complete: "Done",
+        failed: "Couldn't finish",
+        cancelled: "Cancelled",
+        archived: "Archived",
+      } as Record<string, string>,
+    },
+    yield: {
+      read: (parts: number) => `Read ${parts} ${parts === 1 ? "part" : "parts"}`,
+      kept: (count: number, noun: string, nounPlural: string) =>
+        `kept ${count} ${count === 1 ? noun : nounPlural}`,
+      strengthened: (count: number) =>
+        `strengthened ${count} existing ${count === 1 ? "one" : "ones"}`,
+      leftOut: (count: number, why: string) => `left out ${count} ${why}`,
+      overCap: (count: number) => `left out ${count} past this document's limit`,
+      low: (count: number) => `${count} low confidence`,
+      nothing: "Nothing worth keeping was found.",
+      reasons: {
+        platitude: "as too generic",
+        verbatim: "as too close to the original wording",
+        ungrounded: "as not supported by the document",
+        not_standalone: "as unclear on their own",
+        unresolved_reference: "as unclear on their own",
+        names: "for naming people or organisations",
+        attribution: "for naming people or organisations",
+        injection: "as unsafe instructions",
+        identifiability: "as identifying someone",
+        stereotype: "as stereotyping",
+        sensitive_doubt: "as too sensitive to be sure of",
+      } as Record<string, string>,
+      otherReason: "for other reasons",
+    },
+    dock: {
+      region: "Documents being added",
+      collapse: "Collapse",
+      expand: "Expand",
+      dismissAll: "Clear finished",
+      adding: (count: number) => `Adding ${count} ${count === 1 ? "document" : "documents"}`,
+      added: (count: number) => `Added ${count} ${count === 1 ? "document" : "documents"}`,
+      timeLeft: (minutes: number) =>
+        minutes <= 1 ? "under a minute left" : `about ${minutes} min left`,
+      safeToClose: "Safe to close this tab",
+      leaveWarning: "Documents are still uploading. Leave anyway?",
+      tabTitle: (done: number, total: number) => `(${done}/${total}) Context Library`,
+      stages: {
+        uploading: "Uploading",
+        reading: "Reading",
+        waiting: "Waiting",
+        waitingInLine: (ordinal: string) => `Waiting (${ordinal} in line)`,
+        extracting: (done: number, total: number) => `Extracting (${done} of ${total} parts)`,
+        finishing: "Finishing up",
+        paused: "Paused",
+        costCap: (cost: string, cap: string) => `Paused at its cost cap (${cost} of ${cap})`,
+        partsFailed: (count: number) => `${count} ${count === 1 ? "part" : "parts"} failed`,
+        added: (count: number, noun: string, nounPlural: string) =>
+          `${count} ${count === 1 ? noun : nounPlural} added`,
+        failed: "Couldn't finish",
+        cancelled: "Cancelled",
+        cancelling: "Cancelling…",
+        uploadFailed: "Couldn't upload",
+        outlivesTtl:
+          "Starts after its text expires (24 hours), so some parts may not be extracted.",
+      },
+      outcomes: {
+        already_in_collection: "Already in this collection, so it was skipped",
+        same_title: "A document with this title is already here, so it was skipped",
+        duplicate_in_drop: "Dropped twice, so it was added once",
+        unsupported: "Only PDF and EPUB can be added",
+        too_large: "Too large to read",
+        no_text: "No text found: it looks scanned, and scanned pages can't be read",
+        failed: "Couldn't read this file",
+      } as Record<string, string>,
+      actions: {
+        pause: "Pause",
+        resume: "Resume",
+        cancel: "Cancel",
+        undoCancel: "Undo",
+        front: "Move up",
+        retry: "Retry",
+        continue: "Continue",
+        stop: "Stop",
+        skip: "Skip",
+        reextract: "Re-extract",
+        addAnyway: "Add anyway",
+        remove: "Remove",
+        dismiss: "Dismiss",
+      } as Record<string, string>,
+      actionFailed: "That didn't go through. Try again.",
+    },
+    entry: {
+      newTitle: (noun: string) => `New ${noun}`,
+      editTitle: (code: string) => `Edit ${code}`,
+      collection: "Collection",
+      syncedOnly: (name: string) => `${name} is synced from Studio — edit the item there.`,
+      statement: "Statement",
+      statementHelp:
+        "One sentence that makes sense on its own. This is what search matches and what agents read first.",
+      body: "Full text (optional)",
+      bodyHelp: "Kept and shown exactly as you write it. Search metadata is added alongside it.",
+      pinned: "Pin it",
+      pinnedHelp: "Pinned entries are never edited or retired by the system.",
+      textListHelp: "One per line.",
+      freeTextHelp: "Separate with commas.",
+      chars: (used: number, max: number) => `${used} / ${max}`,
+      save: "Save",
+      saving: "Saving…",
+      cancel: "Cancel",
+      saved: (code: string) => `${code} saved`,
+      saveFailed: "Couldn't save. Check the fields marked below.",
+      hints: {
+        tooLong: (max: number) => `Keep it under ${max} characters.`,
+        unresolved: (phrase: string) => `Say what '${phrase}' is: it's read on its own.`,
+        names: "No names of people or organisations.",
+        required: "Write a statement first.",
+      },
+      findings: {
+        missing_statement: "Write a statement.",
+        statement_too_long: "Too long. Shorten it.",
+        body_too_long: "Too long. Shorten it.",
+        missing_facet: "Choose a value.",
+        invalid_facet: "That value isn't one of the choices.",
+        invalid_attribute: "That value isn't valid here.",
+        attribute_too_long: "Too long. Shorten it.",
+        attribution: "No names of people or organisations.",
+        unresolved_reference: "Say what this refers to: it's read on its own.",
+        injection: "Looks like instructions to an AI. Rephrase it as guidance.",
+      } as Record<string, string>,
+      otherFinding: "Needs fixing.",
+    },
+    bulk: {
+      title: "Bulk upload",
+      collection: "Collection",
+      step1: "Download the template",
+      step1Help: "One row per entry. Add a code column to update an existing one.",
+      download: "Download template",
+      downloadFailed: "Couldn't download the template.",
+      step2: "Choose the filled-in file",
+      choose: "Choose CSV or JSON",
+      dropHint: "or drop it here",
+      checking: "Checking every row…",
+      dryRun: (create: number, update: number, rejected: number) =>
+        `${create} to create · ${update} to update · ${rejected} rejected`,
+      rejectedHeading: "Rejected rows (fix them in the file and choose it again)",
+      row: "Row",
+      reason: "Reason",
+      nothingToApply: "Nothing to apply.",
+      apply: "Apply",
+      applying: "Applying…",
+      chooseAnother: "Choose another file",
+      applied: (
+        collection: string,
+        added: number,
+        updated: number,
+        skipped: number,
+        noun: string,
+        nounPlural: string,
+      ) =>
+        `${collection}: ${added} ${added === 1 ? noun : nounPlural} added, ${updated} updated, ${skipped} skipped`,
+      failed: "Couldn't read that file.",
+      wrongType: "Choose a .csv or .json file.",
+    },
+    settings: {
+      title: "Who reads what",
+      intro:
+        "Each use case retrieves chunks only from the collections switched on for it. Locks are set in code and can't be changed here.",
+      readOnly: "You can see these settings but not change them.",
+      useCase: "Use case",
+      never: "Never allowed",
+      neverHelp:
+        "This collection holds learner-facing, clinical or organisation content, so this use case may never read it.",
+      on: "On",
+      off: "Off",
+      organisation: "Searches for one organisation",
+      sensitive: "Queries may hold personal details",
+      toggled: (useCase: string, collection: string, on: boolean) =>
+        `${useCase} ${on ? "now reads" : "no longer reads"} ${collection}`,
+      empty: "No use cases yet.",
+      // The selected collection's learning loops. Here, under Settings, "chunk" is allowed.
+      loops: {
+        title: "Learning loops",
+        heading: (collection: string) => `Learning loops: ${collection}`,
+        intro:
+          "They run nightly on how this collection is used. Every change they make can be undone under Insights → What changed?",
+        pick: "Choose a collection at the top of the page to see its learning loops.",
+        names: {
+          judge: "Judge",
+          query_learning: "Query learning",
+          effectiveness: "Usage ranking",
+          curator: "Curator",
+          gaps: "Gaps",
+          tuning: "Tuning",
+          rollback: "Rollback",
+        } as Record<string, string>,
+        help: {
+          judge: "Grades a sample of searches for relevance.",
+          query_learning:
+            "Adds wordings that found a chunk only by luck to that chunk's example queries.",
+          effectiveness: "Moves chunks that get used a little higher in results.",
+          curator:
+            "Archives, demotes or merges extracted chunks that never help. Never touches written ones.",
+          gaps: "Groups searches that found nothing into missing topics.",
+          tuning:
+            "Tries other search setups at most weekly, and keeps one only if it ranks better on searches set aside for checking.",
+          rollback: "Puts the previous search setup back if results get worse after a change.",
+        } as Record<string, string>,
+        switchLabel: (name: string) => `${name} runs for this collection`,
+        on: "On",
+        paused: "Paused",
+        toggled: (name: string, collection: string, on: boolean) =>
+          `${name} ${on ? "switched on" : "paused"} for ${collection}`,
+        sampleRate: "Judge sample rate",
+        sampleRateHelp:
+          "Share of live searches the judge grades. More gives steadier numbers sooner, and costs more.",
+        sampleRateValue: (percent: number) => `${percent}% of searches`,
+        sampleRateSaved: (percent: number, collection: string) =>
+          `The judge now grades ${percent}% of searches in ${collection}`,
+        setup: {
+          heading: "Search setup in force",
+          weights: "Weights",
+          keyword: "Keyword",
+          meaning: "Meaning",
+          situations: "Situations",
+          rerank: "Re-rank",
+          diversity: "Diversity",
+          diversityHelp:
+            "1.00 ranks purely by relevance; lower values spread results across different chunks.",
+          fusion: "Fusion constant",
+          fusionHelp:
+            "How the keyword and meaning rankings are blended. Higher gives lower-ranked matches more say.",
+          on: "On",
+          off: "Off",
+          isDefault: "The collection's starting setup. Tuning hasn't changed it.",
+          changed: (date: string) => `Last changed ${date}`,
+          none: "No search setup yet.",
+        },
+        run: {
+          nightly: "Run nightly loops now",
+          tuning: "Run tuning now",
+          started: "Started — changes will appear under Insights → What changed?",
+          failed: "Couldn't start. Try again.",
+        },
+      },
+    },
+    // The automatic steps after a release, per old corpus (ally-be ContextLibraryRolloutService).
+    releaseSteps: {
+      title: "Release steps",
+      intro: (hours: number) =>
+        `After a release, each old corpus moves into the Context Library by itself: its material is imported or enriched, recent searches are replayed against the new collection, and ${hours === 0 ? "then" : `${formatHours(hours)} later`} the old corpus is removed. Nothing here needs you; each step can still be run by hand.`,
+      manual:
+        "Automatic release steps are switched off on the server. Each step stays manual until they are switched back on.",
+      loadFailed: "release steps",
+      corpora: {
+        character_library: "Character library",
+        ally_guide_library: "Ally guide's library",
+        debrief_knowledge: "Debrief's guidance",
+      } as Record<string, string>,
+      into: (collection: string) => `into ${collection}`,
+      statuses: {
+        pending: "Waiting",
+        running: "In progress",
+        done: "Done",
+        failed: "Failed",
+        skipped: "Skipped",
+      } as Record<string, string>,
+      steps: {
+        import: {
+          pending: "Importing character material: not started",
+          running: "Importing character material",
+          done: "Character material imported",
+          failed: "Importing character material stopped",
+          skipped: "No character material to import",
+        },
+        enrich: {
+          pending: "Enriching the copied passages: not started",
+          running: "Enriching the copied passages",
+          done: "Copied passages enriched",
+          failed: "Enriching the copied passages stopped",
+          skipped: "No copied passages to enrich",
+        },
+        smoke_check: {
+          pending: "Replaying recent searches: waits for the step above",
+          running: "Replaying recent searches",
+          done: "Recent searches replayed",
+          failed: "Replaying recent searches failed",
+          skipped: "No searches to replay",
+        },
+        retire: {
+          pending: "Removing the old corpus: waits for the steps above",
+          running: "Removing the old corpus",
+          done: "Old corpus removed",
+          failed: "Removing the old corpus failed",
+          skipped: "No old corpus to remove",
+        },
+      } as Record<string, Record<string, string>>,
+      waitingGrace: (hours: number) =>
+        `Waiting ${formatHours(hours)} before removing the old corpus`,
+      waitingImport: "Waiting for every document to finish importing",
+      waitingEntries: "Waiting for the new collection to have an active entry",
+      removedByHand: "Old corpus already removed by hand",
+      counts: {
+        imported: (complete: number, importable: number) =>
+          `${complete} of ${importable} ${importable === 1 ? "document" : "documents"} imported`,
+        failedParts: (n: number) => `${n} with failed parts`,
+        enrichPending: (pending: number) =>
+          `${pending} ${pending === 1 ? "passage" : "passages"} still to enrich`,
+        passages: (n: number) => `${n} ${n === 1 ? "passage" : "passages"}`,
+        replayed: (answered: number, replayed: number) =>
+          `${answered} of ${replayed} ${replayed === 1 ? "search" : "searches"} found a good answer`,
+        gaps: (queries: number, topics: number) =>
+          `${queries} in ${topics} missing ${topics === 1 ? "topic" : "topics"}`,
+        replayFailed: (n: number) => `${n} could not be replayed`,
+        activeEntries: (n: number) =>
+          `${n} active ${n === 1 ? "entry" : "entries"} in the new collection`,
+        removed: (documents: number, passages: number, files: number, logs: number) =>
+          `${documents} documents, ${passages} passages, ${files} files and ${logs} search logs removed`,
+        filesKept: (n: number) => `${n} ${n === 1 ? "file" : "files"} could not be deleted yet`,
+      },
+      when: {
+        finished: (at: string) => `Finished ${at}`,
+        started: (at: string) => `Started ${at}`,
+        due: (at: string) => `Due ${at}`,
+        retry: (at: string) => `Trying again ${at}`,
+        gaveUp: (attempts: number) =>
+          `Stopped after ${attempts} ${attempts === 1 ? "try" : "tries"}; run it by hand once the cause is fixed`,
+      },
+    },
+    insights: {
+      pickCollection: "Insights are per collection. Choose one to see how it's doing.",
+      window: (days: number) => `Last ${days} days`,
+      helping: {
+        heading: "Is it helping?",
+        precision: "Results judged useful",
+        precisionHelp: (nounPlural: string) =>
+          `Share of the ${nounPlural} shown in searches that the judge rated useful.`,
+        precisionUnit: "judged results",
+        holdout: "Ranking quality",
+        holdoutHelp:
+          "How close the order shown was to the best possible order, on searches set aside for checking. 1.00 is perfect.",
+        holdoutUnit: "searches",
+        noneJudgedTitle: "Nothing judged yet",
+        noneJudged: (percent: number) =>
+          `Each night the judge grades a sample of searches (${percent}% of them). The numbers appear here after the first night with searches.`,
+        // An organisation's admin: their own entries only, and no Settings to point at.
+        noneJudgedOwn:
+          "Each night the judge grades a sample of searches. Numbers for your organisation's entries appear here once a graded search has shown one.",
+        judgePaused:
+          "The judge is paused for this collection, so nothing is being graded. Switch it on in Settings.",
+        weeklyLabel: "Share judged useful, week by week",
+        week: (label: string, percent: string, judged: number) =>
+          `Week of ${label}: ${percent} of ${judged} judged`,
+        weekNone: (label: string) => `Week of ${label}: nothing judged`,
+        usageHeading: "Where it's used",
+        usageCaption: (nounPlural: string) =>
+          `How often each use case was shown ${nounPlural}, opened them, cited them and acted on them.`,
+        columns: {
+          useCase: "Use case",
+          surfaced: "Shown",
+          read: "Read",
+          cited: "Cited",
+          applied: "Applied",
+        },
+        rejected: (count: number) => `${count} turned down`,
+        rejectedHelp:
+          "Citations the check turned down because the code didn't match what was shown.",
+        noUsage: (days: number) => `Not searched in the last ${days} days.`,
+      },
+      missing: {
+        heading: "What's missing?",
+        intro: "Topics searches keep asking about that found nothing good.",
+        none: "Nothing missing that searches have noticed.",
+        searches: (count: number) => `${count} ${count === 1 ? "search" : "searches"}`,
+        askedAs: "Asked as",
+        upload: "Upload documents",
+        addEntries: (nounPlural: string) => `Add ${nounPlural}`,
+        dismiss: "Dismiss",
+        dismissLabel: (label: string) => `Dismiss "${label}"`,
+        dismissed: (label: string) => `"${label}" won't be listed again`,
+      },
+      changes: {
+        heading: "What changed?",
+        intro: (noun: string) =>
+          `What the system changed on its own, newest first. Undo anything: it won't do the same to that ${noun} again.`,
+        none: "No changes yet. The learning loops run nightly.",
+        undo: "Undo",
+        undoLabel: (what: string) => `Undo: ${what}`,
+        undone: "Undone",
+        undoneToast: "Undone. The system won't make that change again.",
+        undoFailed: "Couldn't undo that. Nothing changed.",
+        showMore: "Show more",
+        loadingMore: "Loading…",
+        actions: {
+          archive: (code: string) => `Archived ${code}`,
+          demote: (code: string) => `Marked ${code} low confidence`,
+          promote: (code: string) => `Raised ${code} back to standard confidence`,
+          learn_query: (code: string) => `Taught ${code} a new way to be found`,
+          merge: (code: string, noun: string) => `Merged ${code} into another ${noun}`,
+          promote_setup: () => "Changed how this collection is searched",
+          rollback_setup: () => "Put the previous search setup back",
+          agree: (code: string, noun: string) =>
+            `Folded ${code} into a ${noun} that already said it`,
+          edit: (code: string) => `Reworded ${code}`,
+          add: (code: string) => `Added ${code}`,
+          remove: (code: string) => `Removed ${code} as stale or wrong`,
+          retire: (code: string) => `Retired ${code}: it wasn't helping`,
+        } as Record<string, (code: string, noun: string) => string>,
+        unknownAction: (action: string, code: string | null) =>
+          code ? `${action} on ${code}` : action,
+        anEntry: (noun: string) => `a ${noun}`,
+      },
+      owners: {
+        heading: "For owners",
+        intro: (nounPlural: string) =>
+          `Written ${nounPlural} that keep being shown but never help. The system never rewrites or archives them, so whether to rewrite one is up to its owner.`,
+        none: (nounPlural: string) => `No written ${nounPlural} stand out as unhelpful.`,
+        stats: (surfaced: number, offTopic: number, judged: number) =>
+          `Shown ${surfaced} ${surfaced === 1 ? "time" : "times"} · judged off-topic ${offTopic} of ${judged}`,
+      },
+    },
+    connect: {
+      button: "Connect Claude Code",
+      title: "Connect Claude Code",
+      intro:
+        "Lets engineers' Claude Code search this library while it works, and cite what it used.",
+      introKeys:
+        "Keys are personal and read-only. They reach only what engineers may read: nothing clinical, learner-facing or organisation-specific.",
+      createHeading: "Create a key",
+      labelLabel: "Name it after the machine it's for",
+      labelPlaceholder: "My laptop",
+      create: "Create key",
+      creating: "Creating…",
+      createFailed: "Couldn't create a key. Nothing changed.",
+      newKeyHeading: (label: string) => `Your key for ${label}`,
+      newKeyWarning: "Copy it now. You won't see this key again.",
+      copyKey: "Copy key",
+      copied: "Copied",
+      copyFailed: "Couldn't copy. Select the text and copy it yourself.",
+      done: "I've copied it",
+      testConnection: "Test connection",
+      testing: "Testing…",
+      testHelp: "Checks this key against the library the way Claude Code will.",
+      testResult: {
+        reachable: "Connected. Claude Code can reach the library with this key.",
+        refused: "The library turned this key away. Revoke it, create a new one and test again.",
+        unreachable:
+          "Couldn't reach the library from here. Check the address in the first line, then test again.",
+      } as Record<"reachable" | "refused" | "unreachable", string>,
+      shellHeading: "Set these in your shell",
+      shellHelp:
+        "Add both lines to your shell profile, then restart Claude Code. Never commit either.",
+      keyPlaceholder: "<your key>",
+      copyCommands: "Copy both lines",
+      keysHeading: "Your keys",
+      noKeys: "No keys yet.",
+      created: (date: string) => `Created ${date}`,
+      lastUsed: (date: string) => `last used ${date}`,
+      neverUsed: "never used",
+      revoke: "Revoke",
+      revokeLabel: (label: string) => `Revoke ${label}`,
+      revoked: (label: string) => `${label} revoked`,
+    },
   },
 };

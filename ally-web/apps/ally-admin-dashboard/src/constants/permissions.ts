@@ -44,6 +44,10 @@ export enum Permissions {
   // No delete — a session is cancelled, never removed, because its PRs outlive it.
   VIEW_BUILDER = "view:admin:builder",
   EDIT_BUILDER = "edit:admin:builder",
+  // Context Library. VIEW browses and searches; EDIT adds documents and entries, edits,
+  // archives and changes which use case reads which collection (Settings).
+  VIEW_CONTEXT_LIBRARY = "view:admin:context-library",
+  EDIT_CONTEXT_LIBRARY = "edit:admin:context-library",
   // Course Copilot. Gated on toggle AND EDIT everywhere (one gate — a view-only session list has
   // nothing to show without the chat), but both grants exist so the backend can tier them later.
   VIEW_COURSE_COPILOT = "view:admin:course-copilot",
@@ -117,6 +121,7 @@ export const SIDEBAR_ITEMS = {
   WHATSAPP_BOT: "whatsapp-bot",
   BUG_HUNTER: "bug-hunter",
   BUILDER: "builder",
+  CONTEXT_LIBRARY: "context-library",
   COURSE_COPILOT: "course-copilot",
   ALLY_GUIDE: "ally-guide",
   COMPONENT_LIBRARY: "component-library",

@@ -484,7 +484,7 @@ describe("useCourseCopilotStream — frames", () => {
 
 describe("useCourseCopilotStream — failure handling", () => {
   /**
-   * Stacks: "Preserve State During Agent Failure in Multistep Tasks" — the failed bubble keeps
+   * "Preserve State During Agent Failure in Multistep Tasks" — the failed bubble keeps
    * its place and says why; the feed is not wiped.
    */
   it.each([

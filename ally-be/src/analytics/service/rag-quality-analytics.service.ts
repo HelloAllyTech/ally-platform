@@ -40,7 +40,7 @@ const FLOOR_CANDIDATES = [0.2, 0.3, 0.35, 0.4, 0.45, 0.5];
  * percentage to be read off four rows.
  *
  * Stated as a count, not a rate, deliberately: "7 of 10" and "70%" are not the same claim, and
- * a corpus can legitimately see a handful of retrievals a day (Stacks: "Define success criteria
+ * a corpus can legitimately see a handful of retrievals a day ("Define success criteria
  * with specific numbers, not percentages"). Surfaces show the counts either way and suppress
  * the percentages below it.
  */
@@ -55,7 +55,7 @@ const GAP_LIMIT = 15;
  * WHAT LEADS, AND WHY: sufficiency and relevance, not retrieval volume. Volume is the
  * gameable number here — an operator probing thresholds in the admin preview can double it in
  * an afternoon without anything improving — and the outcome anyone actually cares about is
- * whether what came back answered the question (Stacks: "Measure true customer outcomes, not
+ * whether what came back answered the question ("Measure true customer outcomes, not
  * vanity metrics").
  *
  * Everything is a count. Rates are computed by the client only when `coverage` says the sample

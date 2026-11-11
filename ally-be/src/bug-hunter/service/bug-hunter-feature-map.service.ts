@@ -19,8 +19,8 @@ import {
   FEATURE_VALUE_SOURCES,
   FeatureValueSource,
 } from '../entity/bug-hunter-feature-map.entity';
-import { AgentMemoryService } from 'src/agent-memory/service/agent-memory.service';
-import { AgentMemoryAgent } from 'src/agent-memory/enum/agent-memory.enum';
+import { ClCollectionId } from 'src/context-library/enum/context-library.enum';
+import { ContextAgentChunkService } from 'src/context-library/service/context-agent-chunk.service';
 import { BugHunterMode } from '../enum/bug-finding.enum';
 import { BugHuntRunStatus, BugHuntTrigger } from '../enum/bug-hunt-run.enum';
 import { BugHunterFeatureMapRepository } from '../repository/bug-hunter-feature-map.repository';
@@ -74,7 +74,7 @@ export class BugHunterFeatureMapService {
     private readonly bugHunterService: BugHunterService,
     private readonly github: GithubActionsService,
     private readonly configService: AppConfigService,
-    private readonly memoryService: AgentMemoryService,
+    private readonly notes: ContextAgentChunkService,
   ) {}
 
   /**
@@ -201,9 +201,10 @@ export class BugHunterFeatureMapService {
   }
 
   /**
-   * A person removes a card as wrong. The reason becomes an active notebook
-   * lesson for the card's repo, tagged so the next map run is shown it and
-   * does not write the same card again.
+   * A person removes a card as wrong. The reason becomes a Bug Hunter note for
+   * the card's repo, tagged so the next map run is shown it and does not write
+   * the same card again. It lands as a candidate like every agent note; the
+   * hourly curator takes it in long before the next weekly map run.
    */
   async remove(
     id: string,
@@ -216,16 +217,13 @@ export class BugHunterFeatureMapService {
     const why = text(reason, 400);
     if (!why) return;
     try {
-      await this.memoryService.write({
-        agent: AgentMemoryAgent.BUG_HUNTER,
-        body: `Feature card "${card.title}" (${card.repo}, ${card.slug}) was removed as wrong: ${why}`.slice(
-          0,
-          600,
-        ),
+      await this.notes.writeAgentChunk({
+        collection: ClCollectionId.BUG_HUNTER_NOTES,
+        agent: 'bug_hunter',
+        statement: `Feature card "${card.title}" (${card.repo}, ${card.slug}) was removed as wrong: ${why}`,
         repos: [card.repo],
-        tags: ['feature-map', 'wrong-card'],
+        facets: { tags: ['feature-map', 'wrong-card'] },
         createdBy: userId,
-        curated: true,
       });
     } catch (error) {
       this.logger.warn(

@@ -33,7 +33,8 @@ describe("whatsappBot API tag registration", () => {
 });
 
 /**
- * `@carbon/charts` stays out of AI Chatbots' pages.
+ * The chart library (`@carbon/charts`, or the themed `@components/charts`) stays out of AI
+ * Chatbots' pages.
  *
  * The AI Chatbots route loads eagerly, so one top-level chart import in any of its files pulls the
  * whole chart library into the eager bundle, and nothing about the page looks or behaves
@@ -59,9 +60,11 @@ describe("AI Chatbots stay free of the chart library", () => {
     expect(Object.keys(sources).length).toBeGreaterThan(20);
   });
 
-  it("imports @carbon/charts nowhere", () => {
+  it("imports the chart library nowhere", () => {
     const chartImporters = Object.entries(sources)
-      .filter(([, source]) => /from "@carbon\/charts/.test(source))
+      // Charts arrive through the themed wrapper (`@components/charts`) or Carbon directly; either
+      // one pulls the chart library in.
+      .filter(([, source]) => /from "(@carbon\/charts|@components\/charts)/.test(source))
       .map(([path]) => path);
     expect(chartImporters).toEqual([]);
   });

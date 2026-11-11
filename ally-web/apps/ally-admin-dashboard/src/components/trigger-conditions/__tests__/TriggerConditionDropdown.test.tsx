@@ -125,21 +125,21 @@ describe("TriggerConditionDropdown", () => {
       const { container } = render(<TriggerConditionDropdown {...defaultProps} value="" />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
 
     it("applies black text color when value is present", () => {
       const { container } = render(<TriggerConditionDropdown {...defaultProps} value="opt1" />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
 
     it("applies black text color when value is whitespace only", () => {
       const { container } = render(<TriggerConditionDropdown {...defaultProps} value="   " />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
 
     it("applies black text color when displayValue is empty", () => {
@@ -148,7 +148,7 @@ describe("TriggerConditionDropdown", () => {
       );
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
   });
 
@@ -231,7 +231,7 @@ describe("TriggerConditionDropdown", () => {
       const { container } = render(<TriggerConditionDropdown {...defaultProps} value="" />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
 
     it("applies black text color when value is undefined", () => {
@@ -240,21 +240,21 @@ describe("TriggerConditionDropdown", () => {
       );
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
 
     it("applies black text color when value is whitespace only", () => {
       const { container } = render(<TriggerConditionDropdown {...defaultProps} value="   " />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
 
     it("applies black text color when value exists", () => {
       const { container } = render(<TriggerConditionDropdown {...defaultProps} value="opt1" />);
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
 
     it("applies black text color when value is empty and displayValue is empty", () => {
@@ -263,7 +263,7 @@ describe("TriggerConditionDropdown", () => {
       );
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
 
     it("applies black text color when value is empty and displayValue is whitespace", () => {
@@ -272,7 +272,7 @@ describe("TriggerConditionDropdown", () => {
       );
 
       const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("[&_button>span]:!text-[#4A4459]");
+      expect(wrapper).toHaveClass("[&_button>span]:!text-typography-700");
     });
   });
 

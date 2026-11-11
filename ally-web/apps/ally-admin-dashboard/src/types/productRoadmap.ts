@@ -487,7 +487,7 @@ export type RoadmapBriefEvidenceSource =
   | "roadmap"
   | "codebase"
   | "wiki"
-  | "stacks"
+  | "principles"
   | "strategy";
 
 /**

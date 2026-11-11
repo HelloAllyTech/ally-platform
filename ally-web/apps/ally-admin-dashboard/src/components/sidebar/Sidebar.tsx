@@ -34,6 +34,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
+import { LibraryBig } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -63,6 +64,8 @@ import { UserModal } from "@components";
 // Direct path, not the @components barrel: this file is the barrel's own
 // neighbour and several suites mock it wholesale.
 import { AgentAvatar } from "@components/agent-avatar";
+import { ColorModeToggle } from "@components/color-mode-toggle/ColorModeToggle";
+import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import { SIDEBAR_ITEMS, ROUTES, en, profileSettings, USER_MODAL_FIELDS_IDS } from "@constants";
 import { useClickOutside, useUser } from "@hooks";
 
@@ -326,6 +329,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // companion, and the two would be indistinguishable once the sidebar collapses to icons.
       case SIDEBAR_ITEMS.ALLY_GUIDE:
         return <ChatBot size={20} />;
+      // A library of shelved volumes: the central store every agent looks things up in. Not
+      // Catalog (Component Library's) or Document (Blog's), which sit nearby in the nav.
+      case SIDEBAR_ITEMS.CONTEXT_LIBRARY:
+        return <LibraryBig size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
         return <Roadmap size={20} />;
       case SIDEBAR_ITEMS.SETTINGS:
@@ -504,6 +511,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     </div>
   );
 
+  /*
+    The app-wide quick actions — "Say an idea" and the light/dark switch — live in the primary
+    nav rather than a bar of their own, so the shell has one navigation, not two. A row when the
+    sidebar is expanded, a column under the nav icons when it is collapsed to a rail.
+  */
+  const quickActions = (
+    <div
+      data-testid="sidebar-quick-actions"
+      className={`flex flex-shrink-0 items-center gap-1 border-t border-border-light pt-3 ${
+        showExpanded ? "flex-row px-2" : "flex-col"
+      }`}
+    >
+      <IdeaCaptureLauncher />
+      <ColorModeToggle />
+    </div>
+  );
+
   const profileSection = (
     <>
       <div ref={containerRef} className="flex-shrink-0 border-t border-border-light py-4">
@@ -643,6 +667,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         </div>
 
         {sidebarItems}
+        {quickActions}
         {profileSection}
       </div>
       {isMobileOpen && (

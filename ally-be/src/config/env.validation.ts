@@ -23,6 +23,8 @@ export const validationSchema = Joi.object({
   DB_USERNAME: Joi.string().required(),
   DB_PASSWORD: Joi.string().required(),
   DB_DATABASE: Joi.string().required(),
+  // false in production, where the deploy migrates before the swap (see migration-runner.ts)
+  DB_MIGRATIONS_ON_BOOT: Joi.boolean().default(true),
 
   // AI
   AI_SERVICE_API_URL: Joi.string().required(),
@@ -183,8 +185,13 @@ export const validationSchema = Joi.object({
   // Comma-separated addresses for the daily team digest.
   PRODUCT_UPDATES_DIGEST_TO: Joi.string().allow('').optional(),
   PRODUCT_UPDATES_DIGEST_HOUR: Joi.number().integer().min(0).max(23).optional(),
-  /** Publicly reachable base URL a GitHub-hosted runner can call this API back on. */
+  /**
+   * Publicly reachable base URL a GitHub-hosted runner can call this API back
+   * on; also how ally-ai's debrief graph reaches the Debrief gateway tools.
+   */
   PUBLIC_API_BASE_URL: Joi.string().uri().optional(),
+  // Signs the Debrief harness's run tokens; derived from JWT_ACCESS_SECRET when unset.
+  DEBRIEF_GATEWAY_SECRET: Joi.string().allow('').optional(),
 
   // PostHog product analytics. Optional: without a key the client is disabled
   // and every capture is a no-op, which is what local/CI/test runs want.

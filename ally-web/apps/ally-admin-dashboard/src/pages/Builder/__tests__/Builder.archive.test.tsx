@@ -103,6 +103,7 @@ vi.mock("@api", () => ({
   },
   useGetBuilderDecisionsQuery: () => ({ data: { decisions: [], count: 0 } }),
   useCreateBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],
+  useGetBuilderSettingsQuery: () => ({ data: undefined }),
   useArchiveBuilderSessionMutation: () => [
     (id: string) => {
       archiveSpy(id);

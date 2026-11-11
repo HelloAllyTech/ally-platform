@@ -142,7 +142,7 @@ export const showsStaleness = (finding: BugFinding): boolean => bucketOf(finding
  * row's possible moves (reject, "put me on it", stop, stage) live in the drawer
  * and, for the ones that batch, in the bulk bar. A column of three tinted
  * buttons on every row made every row look like it needed you; one button on
- * the rows that do is what makes those rows findable (Stacks: *Desert Oasis:
+ * the rows that do is what makes those rows findable (*Desert Oasis:
  * Isolating the Primary Call-to-Action*).
  *
  * - `approve` — PENDING_APPROVAL. Confirmed in place, like the `a` key.

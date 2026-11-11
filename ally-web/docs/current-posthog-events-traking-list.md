@@ -41,7 +41,7 @@ Currently Tracked Events Reference
 | `SIMULATION_STARTED`           | `simulation_started`           | The agent actually joined and the learner can practise — **not** merely that a room opened. A session that never got an agent emits nothing, so an infrastructure failure cannot read as a completion problem                                                                                              | `hooks/useLiveKitRoom.ts` (`transitionToAgentJoined`)             |
 | `SIMULATION_COMPLETED`         | `simulation_completed`         | Room disconnected after a real start. Carries `duration_seconds` and `ended_by_learner`, which separates a finished practice from one that dropped                                                                                                                                                         | `hooks/useLiveKitRoom.ts` (`onRoomDisconnect`)                    |
 | `SIMULATION_CREDITS_USED`      | `simulation_credits_used`      | Credits consumed                                                                                                                                                                                                                                                                                           | —                                                                 |
-| `LIVE_QUIZ_ATTEMPTS_INCREASED` | `live_quiz_attempts_increased` | Admin raised a quiz's attempt limit on a published course. Carries `trackItemId` and the new `maxAttempts` (`null` = unlimited); fires once per quiz, after the PATCH succeeds                                                                                                                             | `apps/ally-admin-dashboard/src/pages/CreateTrack/CreateTrack.tsx` |
+| `LIVE_QUIZ_ATTEMPTS_INCREASED` | `live_quiz_attempts_increased` | Admin raised a quiz's or annotation's attempt limit on a published course. Carries `trackItemId`, `itemType` (the component's `TrackItemType`) and the new `maxAttempts` (`null` = unlimited); fires once per component, after the PATCH succeeds                                                          | `apps/ally-admin-dashboard/src/pages/CreateTrack/CreateTrack.tsx` |
 | `SIMULATION_CONNECTION_FAILED` | `simulation_connection_failed` | The learner was shown a start-failure screen. `failure_kind` is `connect` (room connect threw), `microphone` (room connected but the browser refused the mic) or `agent_absent` (no agent joined within 30s); `connect`/`microphone` also carry `error_name` (e.g. `NotReadableError`) and `error_message` | `hooks/useLiveKitRoom.ts` (`captureConnectionFailure`)            |
 
 A **text-chat** roleplay adds `interaction_mode: "TEXT"` to `simulation_started` and
@@ -348,11 +348,18 @@ detectors:
 
 ### Admin & Organization
 
-| Constant               | Event Name             | Description                                                 |
-| ---------------------- | ---------------------- | ----------------------------------------------------------- | -------------------------------------------------------------- |
-| `UPGRADE_PROMPT_SHOWN` | `upgrade.prompt_shown` | An upgrade prompt or paywall is shown to a learner or admin | —                                                              |
-| `UPGRADE_CLICKED`      | `upgrade.clicked`      | Learner or admin clicks an upgrade call-to-action           | —                                                              |
-| `SIDEBAR_INTERACTION`  | `sidebar_interaction`  | Admin pins or unpins the sidebar                            | `apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx` |
+| Constant                         | Event Name                       | Description                                                                                                                       |
+| -------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `UPGRADE_PROMPT_SHOWN`           | `upgrade.prompt_shown`           | An upgrade prompt or paywall is shown to a learner or admin                                                                       | —                                                                       |
+| `UPGRADE_CLICKED`                | `upgrade.clicked`                | Learner or admin clicks an upgrade call-to-action                                                                                 | —                                                                       |
+| `SIDEBAR_INTERACTION`            | `sidebar_interaction`            | Admin pins or unpins the sidebar                                                                                                  | `apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx`          |
+| `IDEA_CAPTURE_SESSION_STARTED`   | `idea_capture_session_started`   | Admin opened the Idea Capture overlay from the header mic-and-bulb button (the mic starts with it)                                | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+| `IDEA_CAPTURE_DRAFT_SAVED`       | `idea_capture_draft_saved`       | An idea was saved to My drafts, after the save succeeds. Carries `capture_mode` (`voice` if any of it was dictated, else `typed`) | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+| `IDEA_CAPTURE_SESSION_ABANDONED` | `idea_capture_session_abandoned` | The overlay was closed with words in it and nothing saved (Discard on the leave prompt). Carries `capture_mode`                   | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+
+The three `idea_capture_*` events measure the save rate of voice-initiated idea captures:
+`idea_capture_draft_saved` over `idea_capture_session_started`, filtered to
+`capture_mode = voice`. They never carry the idea's text.
 
 `upgrade.prompt_shown` sends `org_id`, `trigger_source`, `current_plan`; `upgrade.clicked` sends
 `org_id`, `current_plan`, `target_plan`. Both are **registered but not yet emitted** — this app has

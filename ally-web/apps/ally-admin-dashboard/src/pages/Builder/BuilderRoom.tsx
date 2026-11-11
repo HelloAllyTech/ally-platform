@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArrowDown, BackArrowIcon, Search, ThreeDot } from "@icons";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Library } from "lucide-react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
@@ -1077,6 +1078,17 @@ export const BuilderRoom: React.FC = () => {
           ))}
         </nav>
         <div className="relative ml-auto flex items-center gap-1 py-1.5">
+          {/* The principles the interviews are guided by, in the Context Library (§10.2). */}
+          <Link
+            to={`${ROUTES.CONTEXT_LIBRARY}?collection=first_principles`}
+            aria-label={strings.principlesLinkLabel}
+            title={strings.principlesLinkLabel}
+            className="inline-flex h-10 items-center gap-1.5 px-2.5 text-sm text-typography-600 hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+            data-testid="builder-principles-link"
+          >
+            <Library className="h-4 w-4" aria-hidden />
+            <span className="max-sm:sr-only">{strings.principlesLink}</span>
+          </Link>
           <button
             type="button"
             aria-label={strings.find}

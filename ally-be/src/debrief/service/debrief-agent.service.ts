@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -29,9 +30,15 @@ import {
   ScenarioSessionLeaderboardEndedEventParams,
   ScenarioSessionLeaderboardEvent,
 } from '../../learn/type/scenario-session-leaderboard-event.type';
-import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
+import {
+  DebriefRunArm,
+  DebriefRunMode,
+  DebriefRunStatus,
+} from '../enum/debrief-run.enum';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefPublishService } from './debrief-publish.service';
+import { DebriefTrialsService } from './debrief-trials.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import {
   DebriefProgress,
@@ -51,6 +58,12 @@ export const LIVE_START_DELAY_MS = 45_000;
 const DRAIN_WINDOW_HOURS = 48;
 /** Well past the longest deadline (risk cue: 3 min) plus a slow drain. */
 const STUCK_AFTER_MINUTES = 10;
+/**
+ * v9 FR-3: a run still "running" this long is past every deadline (150 s,
+ * 180 s with a risk cue), so its worker is gone: resume it, once.
+ */
+const RESUME_AFTER_MINUTES = 5;
+const MAX_RESUMES = 1;
 
 /** The tenant switch: the only per-org setting the Debrief agent has in v1. */
 export const DEBRIEF_POLICY: PolicySchema = {
@@ -105,7 +118,9 @@ function practiceIds(cards?: Record<string, any> | null): number[] {
 
 /**
  * Owns when the Debrief agent runs: the 5-minute drain over ended sessions
- * (shadow everywhere, live for switched-on tenants), the release seed, the
+ * of switched-on tenants (live; while the agent is in development no other
+ * organisation's sessions are debriefed automatically — a shadow run is
+ * only ever asked for from the Console), the release seed, the
  * tenant switch, and the nightly reconciliation of estimated against actual
  * cost from `llm_usage`.
  */
@@ -161,6 +176,10 @@ export class DebriefAgentService implements OnModuleInit {
     private readonly config: AppConfigService,
     private readonly practice: DebriefPracticeService,
     private readonly notifier: DebriefNotifier,
+    /** v9 FR-20: a readable live debrief is written where today's was. */
+    @Optional() private readonly publisher?: DebriefPublishService,
+    /** The PM agent's paired trials and canary (v9 FR-52). */
+    @Optional() private readonly trials?: DebriefTrialsService,
   ) {}
 
   /**
@@ -178,6 +197,7 @@ export class DebriefAgentService implements OnModuleInit {
         run.status,
       )
     ) {
+      await this.publisher?.applyToSession(run);
       await this.notifier.ready(run);
     }
   }
@@ -190,6 +210,7 @@ export class DebriefAgentService implements OnModuleInit {
       this.reconcileCosts(),
     );
     scheduledTaskRegistry.register('5min', 'debrief-stuck-sweep', async () => {
+      await this.resumeStuckRuns();
       await this.sweepStuckRuns();
     });
   }
@@ -298,14 +319,17 @@ export class DebriefAgentService implements OnModuleInit {
     return rows.map((r: { scopeId: string }) => r.scopeId);
   }
 
-  /** Ended sessions with messages and no production run yet. */
+  /** Ended sessions of the given tenants with messages and no production run yet. */
   async pendingSessions(
     limit: number,
+    tenantIds: string[],
   ): Promise<Array<{ id: string; tenant_id: string | null }>> {
+    if (tenantIds.length === 0) return [];
     return this.dataSource.query(
       `SELECT s.id, s.tenant_id
          FROM scenario_sessions s
         WHERE ${settledEndedSessionPredicate('s')}
+          AND s.tenant_id::text = ANY($3::text[])
           AND s."createdAt" >= now() - make_interval(hours => $1)
           AND s."roomId" NOT LIKE 'preview-%'
           AND s."roomId" NOT LIKE 'seed-room-%'
@@ -315,26 +339,29 @@ export class DebriefAgentService implements OnModuleInit {
                            WHERE r."scenarioSessionId" = s.id AND r.mode IN ('shadow','live'))
         ORDER BY s."endedAt" DESC NULLS LAST
         LIMIT $2`,
-      [DRAIN_WINDOW_HOURS, limit],
+      [DRAIN_WINDOW_HOURS, limit, tenantIds],
     );
   }
 
   async drain(): Promise<void> {
     if (this.config.debriefAgentMode === 'off') return;
     await this.ensureRelease();
-    const pending = await this.pendingSessions(DRAIN_BATCH);
+    // Only switched-on organisations: no automatic shadow runs elsewhere.
+    const pending = await this.pendingSessions(
+      DRAIN_BATCH,
+      await this.liveTenants(),
+    );
     if (pending.length === 0) {
       await this.judge.drain(5);
       return;
     }
-    const live = new Set(await this.liveTenants());
     let done = 0;
     await runWithConcurrency(pending, DRAIN_CONCURRENCY, async (s) => {
-      const mode =
-        s.tenant_id && live.has(s.tenant_id)
-          ? DebriefRunMode.LIVE
-          : DebriefRunMode.SHADOW;
-      const run = await this.runner.run(s.id, { mode });
+      const mode = DebriefRunMode.LIVE;
+      const run = await this.runner.run(s.id, {
+        mode,
+        ...(await this.canaryOptions(s.id, mode)),
+      });
       await this.announceReady(run);
       // The independent judge scores every debrief, published or not, blind.
       if (run.cards) {
@@ -345,6 +372,7 @@ export class DebriefAgentService implements OnModuleInit {
               `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
             ),
           );
+        void this.trials?.onPublished(run);
       }
       done++;
       this.logger.info(
@@ -383,6 +411,7 @@ export class DebriefAgentService implements OnModuleInit {
       await this.ensureRelease();
       const run = await this.runner.run(sessionId, {
         mode: DebriefRunMode.LIVE,
+        ...(await this.canaryOptions(sessionId, DebriefRunMode.LIVE)),
       });
       await this.announceReady(run);
       this.logger.info(
@@ -396,6 +425,7 @@ export class DebriefAgentService implements OnModuleInit {
               `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
             ),
           );
+        void this.trials?.onPublished(run);
       }
     } catch (e) {
       this.logger.error(
@@ -408,9 +438,75 @@ export class DebriefAgentService implements OnModuleInit {
    * The sweeper (v9 FR-3): a run still "running" well past every deadline
    * lost its worker — a deploy or a crash. A live one goes to a person to
    * finish (the learner sees "on its way", never an endless progress panel);
-   * a shadow or replay one is marked failed. Resuming mid-run is not built:
-   * the paid steps' results are not checkpointed yet.
+   * a shadow or replay one is marked failed. Runs are resumed once first
+   * (resumeStuckRuns); this catches the ones that died again, and replays.
    */
+  /**
+   * v9 FR-52 rung 4: a live debrief in a switched-on organisation runs on the
+   * canary release when one is running and the session falls in its share,
+   * marked as the canary's challenger arm. Never for shadow runs: the canary
+   * is about what learners read. A failed read means no canary.
+   */
+  private async canaryOptions(
+    sessionId: string,
+    mode: DebriefRunMode,
+  ): Promise<Record<string, unknown>> {
+    if (mode !== DebriefRunMode.LIVE || !this.trials) return {};
+    const canary = await this.trials.canaryFor(sessionId).catch(() => null);
+    return canary
+      ? {
+          release: canary.release,
+          experimentId: canary.ideaId,
+          arm: DebriefRunArm.CHALLENGER,
+        }
+      : {};
+  }
+
+  /**
+   * v9 FR-3 durable runs: a production run whose worker died mid-run (a
+   * deploy, a crash) is resumed once from its checkpoint — the paid steps that
+   * finished are replayed, not paid again — with a fresh deadline. Each is
+   * claimed by bumping its resume count in one statement, so two replicas
+   * never resume the same run. One that dies again goes to the sweeper below.
+   */
+  async resumeStuckRuns(): Promise<number> {
+    const res = await this.dataSource.query(
+      `UPDATE debrief_runs
+          SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{resumes}',
+                to_jsonb(COALESCE((workspace->>'resumes')::int, 0) + 1)),
+              "startedAt" = now(),
+              "updatedAt" = now()
+        WHERE status = $1
+          AND mode IN ('shadow','live')
+          AND COALESCE((workspace->>'resumes')::int, 0) < $2
+          AND COALESCE("startedAt", "createdAt") < now() - interval '${RESUME_AFTER_MINUTES} minutes'
+        RETURNING id`,
+      [DebriefRunStatus.RUNNING, MAX_RESUMES],
+    );
+    const rows: Array<{ id: string }> = Array.isArray(res?.[0])
+      ? res[0]
+      : (res ?? []);
+    for (const { id } of rows) {
+      const run = await this.runs.findOne({ where: { id } });
+      if (!run) continue;
+      try {
+        const done = await this.runner.resume(run);
+        this.logger.warn(
+          `[debrief] resumed stuck ${done.mode} run ${done.id} session=${done.scenarioSessionId} status=${done.status}`,
+        );
+        await this.announceReady(done);
+        if (done.cards) {
+          await this.judge.judge(done).catch(() => undefined);
+        }
+      } catch (e) {
+        this.logger.error(
+          `[debrief] resuming run ${id} failed: ${(e as Error).message}`,
+        );
+      }
+    }
+    return rows.length;
+  }
+
   async sweepStuckRuns(): Promise<number> {
     const res = await this.dataSource.query(
       `UPDATE debrief_runs
