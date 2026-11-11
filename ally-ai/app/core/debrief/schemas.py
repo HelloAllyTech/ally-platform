@@ -11,10 +11,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from app.core.debrief_quality.schemas import (
-    DimensionScore,
-    HardFailFinding,
-)
+from app.core.debrief_quality.schemas import DimensionScore, HardFailFinding
 from app.core.debrief_quality.schemas import RiskCue as JudgeRiskCue
 
 # --- Analyst: the evidence map ---------------------------------------------
@@ -263,6 +260,80 @@ class DebriefCardsReasoned(DebriefCards):
 
 
 class EvaluationOutputReasoned(EvaluationOutput):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+# --- The orchestrator: the findings contract and the plan (spec A3, A5) --------
+
+FindingKind = Literal[
+    "missed", "done_well", "risk", "context", "progress", "comparison"
+]
+
+
+class Finding(BaseModel):
+    """One thing an analysis agent found. Every agent answers in this shape, so
+    the Writer never changes when an agent is added."""
+
+    kind: FindingKind
+    point: str = Field(
+        description=(
+            "One or two sentences in plain words: what was found and why it "
+            "matters."
+        )
+    )
+    turn_index: Optional[int] = Field(
+        default=None, description="The transcript turn it is about, or null."
+    )
+    quote: Optional[str] = Field(
+        default=None,
+        description=(
+            "Exact words from that turn, copied as written (same script), or null. "
+            "Never invent, translate or tidy a quote."
+        ),
+    )
+    importance: int = Field(
+        ge=1, le=3, description="1 = matters most in this session, 3 = least."
+    )
+    confidence: Confidence
+    source: Optional[str] = Field(
+        default=None,
+        description=(
+            "Where it comes from beyond the transcript: protocol:<code>, "
+            "history:<date or session>, aggregate:<query>, guidance:<code>; or null."
+        ),
+    )
+
+
+class AgentFindings(BaseModel):
+    findings: List[Finding] = Field(default_factory=list)
+
+
+class AgentFindingsReasoned(AgentFindings):
+    reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
+
+
+class PlannedAction(BaseModel):
+    agent: str = Field(description="The id of an agent from AVAILABLE AGENTS.")
+    why: str = Field(description="One sentence: what in the profile calls for it.")
+    focus_turns: List[int] = Field(
+        default_factory=list,
+        description=(
+            "Turns worth its closer look (e.g. a risk cue's turn); may be empty."
+        ),
+    )
+
+
+class ConsideredAgent(BaseModel):
+    agent: str
+    why_not: str = Field(description="One sentence: why it is not worth running here.")
+
+
+class PlannerOutput(BaseModel):
+    actions: List[PlannedAction] = Field(default_factory=list)
+    considered: List[ConsideredAgent] = Field(default_factory=list)
+
+
+class PlannerOutputReasoned(PlannerOutput):
     reasoning: str = Field(default="", description=REASONING_DESCRIPTION)
 
 

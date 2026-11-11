@@ -134,6 +134,11 @@ export enum LlmTask {
   DEBRIEF_WRITER = 'debrief_writer',
   DEBRIEF_EVALUATOR = 'debrief_evaluator',
   DEBRIEF_REVISER = 'debrief_reviser',
+  // The orchestrated debrief (spec A5, A9): the planner and its prompt-only agents.
+  DEBRIEF_PLANNER = 'debrief_planner',
+  DEBRIEF_PROTOCOL_CHECK = 'debrief_protocol_check',
+  DEBRIEF_HISTORY_DEEP = 'debrief_history_deep',
+  DEBRIEF_LANGUAGE_SPECIALIST = 'debrief_language_specialist',
   // Ask Ally: the Debrief agent answering the learner's replies, streamed.
   DEBRIEF_REPLY = 'debrief_reply',
   // Read-aloud of a debrief card (Sarvam TTS), cached per card text.

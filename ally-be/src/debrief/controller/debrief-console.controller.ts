@@ -477,6 +477,18 @@ export class DebriefConsoleController {
     );
   }
 
+  @Post('releases/orchestrator-challenger')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Make a DRAFT release from the live one with the orchestrator on (a challenger)',
+    description:
+      'The planner chooses the analysis agents from the registry. Nothing changes for learners until the draft passes the ladder and a person promotes it.',
+  })
+  orchestratorChallenger(@Req() req: AuthedRequest, @Body() body: ReasonDto) {
+    return this.console.createOrchestratorChallenger(req.user.id, body?.reason);
+  }
+
   @Post('releases/:id/rollback')
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({

@@ -43,6 +43,12 @@ class LLMTask(str, Enum):
     DEBRIEF_WRITER = "debrief_writer"
     DEBRIEF_EVALUATOR = "debrief_evaluator"
     DEBRIEF_REVISER = "debrief_reviser"
+    # The orchestrated debrief (spec A5, A9): the planner that picks the
+    # analysis agents, and the prompt-only agents it can pick.
+    DEBRIEF_PLANNER = "debrief_planner"
+    DEBRIEF_PROTOCOL_CHECK = "debrief_protocol_check"
+    DEBRIEF_HISTORY_DEEP = "debrief_history_deep"
+    DEBRIEF_LANGUAGE_SPECIALIST = "debrief_language_specialist"
     # The PM agent's own analysis; paid from the learning budget, never production.
     DEBRIEF_PM_AGENT = "debrief_improver"
     # Ask Ally: one row per model pass of a learner's reply (app/core/ask_ally).

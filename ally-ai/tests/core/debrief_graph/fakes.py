@@ -130,6 +130,38 @@ STANDARD_STEPS = [
 ]
 
 
+ALL_AGENTS = [
+    "analyst",
+    "progress_reader",
+    "guidance_lookup",
+    "case_memory",
+    "assessment_anchoring",
+    "protocol_check",
+    "history_deep",
+    "language_specialist",
+    "cohort_comparison",
+    "course_patterns",
+]
+
+
+def orchestrated_bundle(agents=None, **orchestrator: Any) -> Dict[str, Any]:
+    """A challenger release: today's recipes plus the orchestrator block."""
+    b = bundle()
+    b["orchestrator"] = {
+        "enabled": True,
+        "plannerModel": "planner-m",
+        "plannerBackupModel": None,
+        "topUp": True,
+        "maxAgentsPerPlan": 6,
+        "agents": [
+            {"id": a, "version": 1, "model": "agent-m"}
+            for a in (ALL_AGENTS if agents is None else agents)
+        ],
+        **orchestrator,
+    }
+    return b
+
+
 def bundle(**settings: Any) -> Dict[str, Any]:
     short_steps = [
         s
@@ -179,6 +211,8 @@ PRICES = {
         "eval-b",
         "reviser-m",
         "reviser-b",
+        "planner-m",
+        "agent-m",
     ]
 }
 
@@ -257,7 +291,35 @@ class FakeSteps:
             "writer": {"cards": CARDS, "reasoning": "Led with risk."},
             "evaluator": {"evaluation": evaluation(9), "reasoning": "Good."},
             "reviser": {"cards": REVISED, "reasoning": "Fixed the quote."},
-        }[path]
+            "planner": {
+                "plan": {
+                    "actions": [
+                        {"agent": "analyst", "why": "Always.", "focus_turns": []},
+                        {
+                            "agent": "guidance_lookup",
+                            "why": "A pivotal moment.",
+                            "focus_turns": [],
+                        },
+                    ],
+                    "considered": [],
+                },
+                "reasoning": "Planned from the profile.",
+            },
+        }.get(path) or {
+            # A prompt-only registry agent (`agent-<id>`).
+            "findings": [
+                {
+                    "kind": "context",
+                    "point": f"{path} found something.",
+                    "turn_index": 2,
+                    "quote": "I don't see the point anymore.",
+                    "importance": 1,
+                    "confidence": "high",
+                    "source": None,
+                }
+            ],
+            "reasoning": f"{path} read it.",
+        }
 
 
 class FakeGateway:
@@ -268,6 +330,7 @@ class FakeGateway:
         self.checks: List[List[Dict[str, Any]]] = []
         self.progress_error: Optional[Exception] = None
         self.raise_on: Dict[str, Callable[[], Exception]] = {}
+        self.answers: Dict[str, Any] = {}
         self.closed = False
 
     def tools(self, name: str) -> List[Dict[str, Any]]:
@@ -303,6 +366,25 @@ class FakeGateway:
             return {"text": "rendered: " + body["cards"]["opening"]}
         if tool == "finalise_cards":
             return {"cards": {**body["cards"], "point_ids": True}}
+        if tool in self.answers:
+            answer = self.answers[tool]
+            return answer(body) if callable(answer) else answer
+        if tool == "get_org_protocols":
+            return {
+                "protocols": [
+                    {"code": "DG-9", "title": "Refer on self-harm", "text": "Refer."}
+                ],
+                "procedures": None,
+            }
+        if tool == "get_learner_history":
+            return {
+                "sessions": [
+                    {"date": f"2026-10-0{i}", "work_on_this": [{"skill": "pacing"}]}
+                    for i in range(1, 5)
+                ]
+            }
+        if tool == "query_aggregates":
+            return {"rows": [], "min_group": 5}
         raise GatewayError(tool, 404, "unknown tool")
 
     async def aclose(self) -> None:

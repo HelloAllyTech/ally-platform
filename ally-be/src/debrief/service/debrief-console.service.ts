@@ -19,6 +19,8 @@ import {
   DEBRIEF_SEED_BUNDLE,
   DebriefBundle,
   DebriefStep,
+  debriefChallengerBundle,
+  isOrchestrated,
   modelProblem,
   providerOfModel,
   validateDebriefBundle,
@@ -423,7 +425,37 @@ export class DebriefConsoleService {
       settings: (r.bundle as any)?.settings ?? {},
       maxRevisionRounds:
         (r.bundle as any)?.recipes?.standard?.maxRevisionRounds ?? null,
+      orchestrated: isOrchestrated((r.bundle ?? {}) as Partial<DebriefBundle>),
     }));
+  }
+
+  /**
+   * The orchestrator as a challenger (spec A11): a DRAFT release made from the
+   * live GA bundle (the seed when there is none) with the orchestrator on and
+   * every registry agent at this build's version. Never promoted here: it goes
+   * through the ladder (quick test, gate, paired trials, canary) and a person
+   * promotes it. Never through the seed, which is promoted to GA at boot.
+   */
+  async createOrchestratorChallenger(userId: number, note?: string) {
+    const { bundle: live } = await this.runner.resolveRelease();
+    const draft = debriefChallengerBundle(live);
+    const problems = validateDebriefBundle(
+      draft,
+      await this.runner.modelCatalog(),
+    );
+    if (problems.length) throw new BadRequestException(problems.join('; '));
+    const release = await this.releases.createDraft(
+      DEBRIEF_AGENT_KEY,
+      draft as unknown as Record<string, unknown>,
+      userId,
+      `Orchestrator challenger: planner + registry agents${note ? ` — ${note}` : ''}`,
+    );
+    return {
+      releaseId: release.id,
+      version: release.version,
+      status: release.status,
+      agents: draft.orchestrator!.agents.map((a) => a.id),
+    };
   }
 
   async rollback(releaseId: string, userId: number, reason?: string) {

@@ -26,7 +26,12 @@ def live_detections(state: State, ctx: Ctx) -> List[Dict[str, Any]]:
 
 
 def case_memory(state: State, ctx: Ctx) -> Optional[str]:
-    """A case's memory so far, for Case runs only (v9 FR-4)."""
+    """A case's memory so far, for Case runs only (v9 FR-4); in an
+    orchestrated run, only when the planner chose the `case_memory` agent."""
+    if state.get("orchestrated"):
+        if "case_memory" not in (state.get("data_agents") or []):
+            return None
+        return ctx.inputs.get("case_memory") or None
     if state["recipe_key"] != Recipe.CASE:
         return None
     return ctx.inputs.get("case_memory") or None
@@ -78,9 +83,26 @@ def progress_body(state: State, ctx: Ctx) -> Dict[str, Any]:
     }
 
 
+def writer_findings(
+    state: State, agents: Optional[List[str]] = None, own_blocks: bool = False
+):
+    """The Writer's generic findings section (spec A3): every agent whose output
+    has no block of its own, grouped by kind, most important first."""
+    from app.core.debrief_graph.findings import for_writer
+    from app.core.debrief_graph.registry.manifest import REGISTRY
+
+    found = state.get("findings") or {}
+    names = [
+        a
+        for a in (agents if agents is not None else list(found))
+        if a in REGISTRY and (own_blocks or not REGISTRY[a].writer_has_own_block)
+    ]
+    return for_writer(found, names, quoted_only=bool(state.get("anchor_quotes")))
+
+
 def writer_body(state: State, ctx: Ctx) -> Dict[str, Any]:
     r = recipe(state, ctx)
-    return {
+    out = {
         "practice_options": practice_options(ctx),
         "case_memory": case_memory(state, ctx),
         "cohort": cohort(ctx),
@@ -95,6 +117,9 @@ def writer_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "short": bool(r.get("shortForm")),
         "system_prompt": ctx.prompt(PROMPT_CODES["writer"]),
     }
+    if state.get("orchestrated"):
+        out["findings"] = writer_findings(state) or None
+    return out
 
 
 def evaluator_body(state: State, ctx: Ctx) -> Dict[str, Any]:
@@ -153,4 +178,13 @@ def reviser_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "excerpts": excerpts(state, ctx),
         "language": ctx.language,
         "system_prompt": ctx.prompt(PROMPT_CODES["reviser"]),
+        # What the evidence top-up found (D3), for an orchestrated run only.
+        **(
+            {
+                "findings": writer_findings(state, state.get("top_up_agents"), True)
+                or None
+            }
+            if state.get("orchestrated") and state.get("top_up_agents")
+            else {}
+        ),
     }

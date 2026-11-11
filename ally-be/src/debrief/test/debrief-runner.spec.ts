@@ -1,8 +1,14 @@
 import {
   DEBRIEF_MODELS,
+  DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
   DEBRIEF_PROMPT_CODES,
   DEBRIEF_SEED_BUNDLE,
+  debriefChallengerBundle,
 } from '../constants/debrief-release.constants';
+import {
+  DEBRIEF_ORCHESTRATOR_TOOLS,
+  DEBRIEF_GATEWAY_TOOLS,
+} from '../service/debrief-run-token.service';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import {
   DebriefGraphError,
@@ -73,6 +79,7 @@ function build(
     graph?: DebriefGraphResponse | Error;
     live?: unknown[] | Error;
     cohort?: unknown;
+    bundle?: unknown;
   } = {},
 ) {
   const saved: any[] = [];
@@ -144,6 +151,12 @@ function build(
       return opts.live ?? [];
     }),
     cohortStats: jest.fn(async () => opts.cohort ?? null),
+    availability: jest.fn(async () => ({
+      org_protocols: 2,
+      past_debriefs: 4,
+      cohort: true,
+      course: false,
+    })),
   };
   const graph = {
     run: jest.fn(async () => {
@@ -155,7 +168,11 @@ function build(
   const tokens = { sign: jest.fn(() => 'signed-run-token') };
   const config = { publicApiBaseUrl: 'https://be.example/' };
   const releases = {
-    getGa: async () => ({ id: 'rel', version: 3, bundle: DEBRIEF_SEED_BUNDLE }),
+    getGa: async () => ({
+      id: 'rel',
+      version: 3,
+      bundle: opts.bundle ?? DEBRIEF_SEED_BUNDLE,
+    }),
   };
   const practice = {
     optionsFor: jest.fn(async () => [
@@ -217,7 +234,11 @@ describe('DebriefRunnerService', () => {
         gateway_url: 'https://be.example/api/v1/internal/debrief',
         transcript,
       });
-      expect(tokens.sign).toHaveBeenCalledWith('run-1', 's1');
+      expect(tokens.sign).toHaveBeenCalledWith(
+        'run-1',
+        's1',
+        DEBRIEF_GATEWAY_TOOLS,
+      );
       expect(req.bundle.settings.passScore).toBe(7);
       expect(req.bundle.settings.deadlineMs).toBe(
         DEBRIEF_SEED_BUNDLE.settings.deadlineMs,
@@ -477,5 +498,55 @@ describe('DebriefRunnerService', () => {
       expect(done.workspace.resumes).toBe(1);
       expect(done.workspace.stepResults).toBeUndefined();
     });
+  });
+});
+
+describe('DebriefRunnerService with the orchestrator (spec A11)', () => {
+  it('a release without the orchestrator runs as before: base tools, no availability, no orchestrator prompts', async () => {
+    const { svc, request, tokens, context } = build();
+    await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    expect(tokens.sign).toHaveBeenCalledWith(
+      'run-1',
+      's1',
+      DEBRIEF_GATEWAY_TOOLS,
+    );
+    expect(context.availability).not.toHaveBeenCalled();
+    expect(request().context).not.toHaveProperty('availability');
+    for (const code of DEBRIEF_ORCHESTRATOR_PROMPT_CODES) {
+      expect(request().prompts).not.toHaveProperty(code);
+    }
+    expect(request().bundle.orchestrator).toBeUndefined();
+  });
+
+  it('a challenger release sends the orchestrator, its tools, prompts, prices and the availability facts', async () => {
+    const { svc, request, tokens } = build({
+      bundle: debriefChallengerBundle(DEBRIEF_SEED_BUNDLE),
+    });
+    await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+    const req = request();
+    expect(req.bundle.orchestrator.enabled).toBe(true);
+    expect(tokens.sign).toHaveBeenCalledWith('run-1', 's1', [
+      ...DEBRIEF_GATEWAY_TOOLS,
+      ...DEBRIEF_ORCHESTRATOR_TOOLS,
+    ]);
+    expect(req.context.availability).toEqual({
+      org_protocols: 2,
+      past_debriefs: 4,
+      cohort: true,
+      course: false,
+    });
+    for (const code of DEBRIEF_ORCHESTRATOR_PROMPT_CODES) {
+      expect(req.prompts).toHaveProperty(code);
+    }
+    for (const model of [
+      DEBRIEF_MODELS.planner,
+      DEBRIEF_MODELS.registryAgent,
+      DEBRIEF_MODELS.registryAgentBackup,
+    ]) {
+      expect(req.prices[model]).toEqual({
+        input_per_m: expect.any(Number),
+        output_per_m: expect.any(Number),
+      });
+    }
   });
 });

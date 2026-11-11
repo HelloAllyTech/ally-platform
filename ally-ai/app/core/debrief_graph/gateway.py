@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Protocol
 
 import httpx
+from langgraph.types import RetryPolicy
 
 #: A tool call that has not answered in this long is a transient failure.
 TOOL_TIMEOUT_S = 30.0
@@ -30,6 +31,11 @@ class GatewayError(Exception):
 
 def is_transient(error: Exception) -> bool:
     return isinstance(error, GatewayError) and error.transient
+
+
+#: Gateway tools (checks, render, finalise, the agents' data tools) that did
+#: not answer are retried.
+GATEWAY_RETRY = RetryPolicy(max_attempts=3, initial_interval=0.5, retry_on=is_transient)
 
 
 class Gateway(Protocol):

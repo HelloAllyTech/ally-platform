@@ -30,15 +30,27 @@ export const ASK_ALLY_GATEWAY_TOOLS = [
   'get_live_detections',
 ] as const;
 
+/**
+ * The orchestrator's data tools (spec A4): in a debrief run's token only when
+ * its release turns the orchestrator on (DebriefRunnerService).
+ */
+export const DEBRIEF_ORCHESTRATOR_TOOLS = [
+  'get_org_protocols',
+  'get_learner_history',
+  'query_aggregates',
+] as const;
+
 export type DebriefGatewayTool =
   | (typeof DEBRIEF_GATEWAY_TOOLS)[number]
-  | (typeof ASK_ALLY_GATEWAY_TOOLS)[number];
+  | (typeof ASK_ALLY_GATEWAY_TOOLS)[number]
+  | (typeof DEBRIEF_ORCHESTRATOR_TOOLS)[number];
 
 /** Every tool the gateway serves, for either kind of token. */
 export const GATEWAY_TOOLS: readonly DebriefGatewayTool[] = [
   ...new Set<DebriefGatewayTool>([
     ...DEBRIEF_GATEWAY_TOOLS,
     ...ASK_ALLY_GATEWAY_TOOLS,
+    ...DEBRIEF_ORCHESTRATOR_TOOLS,
   ]),
 ];
 

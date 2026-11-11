@@ -29,6 +29,9 @@ logger = get_logger(__name__)
 #: evaluator, score); LangGraph's recursion limit is set from the recipe.
 _BASE_STEPS = 20
 _STEPS_PER_ROUND = 5
+#: The orchestrated middle: profile, planner, a dispatch per wave and the
+#: waves themselves, twice (the plan and the top-up).
+_ORCHESTRATED_STEPS = 24
 
 #: Gateway clients closing once their progress calls land (kept so they are
 #: not garbage-collected mid-flight).
@@ -40,7 +43,12 @@ def _recursion_limit(ctx: DebriefRunContext) -> int:
         (int(r.get("maxRevisionRounds") or 0) for r in ctx.bundle["recipes"].values()),
         default=0,
     )
-    return _BASE_STEPS + _STEPS_PER_ROUND * rounds
+    orchestrated = (ctx.bundle.get("orchestrator") or {}).get("enabled") is True
+    return (
+        _BASE_STEPS
+        + _STEPS_PER_ROUND * rounds
+        + (_ORCHESTRATED_STEPS if orchestrated else 0)
+    )
 
 
 async def _send_progress(gateway: Gateway, data: Dict[str, Any]) -> None:

@@ -13,6 +13,9 @@ import {
   DebriefRecipe,
   DebriefRecipeKey,
   DebriefModelCatalog,
+  DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
+  isOrchestrated,
+  orchestratorModels,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
@@ -40,7 +43,11 @@ import {
   DebriefGraphResponse,
 } from './debrief-graph.client';
 import { DebriefPracticeService } from './debrief-practice.service';
-import { DebriefRunTokenService } from './debrief-run-token.service';
+import {
+  DEBRIEF_ORCHESTRATOR_TOOLS,
+  DEBRIEF_GATEWAY_TOOLS,
+  DebriefRunTokenService,
+} from './debrief-run-token.service';
 
 /** What a running debrief is doing now, for the learner's "working" panel. */
 export interface DebriefProgress {
@@ -213,7 +220,14 @@ export class DebriefRunnerService {
       const res = await this.graph.run(
         {
           ...prepared.request,
-          run_token: this.tokens.sign(run.id, sessionId),
+          // The orchestrator's data tools only for a run that may plan.
+          run_token: this.tokens.sign(
+            run.id,
+            sessionId,
+            isOrchestrated(bundle)
+              ? [...DEBRIEF_GATEWAY_TOOLS, ...DEBRIEF_ORCHESTRATOR_TOOLS]
+              : DEBRIEF_GATEWAY_TOOLS,
+          ),
           gateway_url: `${this.config.publicApiBaseUrl.replace(/\/+$/, '')}/api/v1/internal/debrief`,
         },
         bundle.settings.riskDeadlineMs,
@@ -379,6 +393,7 @@ export class DebriefRunnerService {
       cohort,
       practiceOptions,
       prompts,
+      availability,
     ] = await Promise.all([
       orFallback(
         () => this.context.liveDetections(sessionId, session.scenarioId),
@@ -401,6 +416,11 @@ export class DebriefRunnerService {
       orFallback(() => this.context.cohortStats(session), null),
       this.practice.optionsFor(session.counselorId, session.tenantId),
       this.prompts(bundle, opts.promptOverrides),
+      // What the orchestrator's planner may build on (spec A5: presence of
+      // org protocols, past debriefs, cohort and course data), cheap counts.
+      isOrchestrated(bundle)
+        ? orFallback(() => this.context.availability(session), null)
+        : Promise.resolve(null),
     ]);
     if (liveDetections.length) {
       run.workspace = { ...run.workspace, liveDetections };
@@ -412,6 +432,7 @@ export class DebriefRunnerService {
       (r?.steps ?? []).flatMap((s) => [s.model, s.backupModel]),
     );
     if (bundle.reply?.model) models.push(bundle.reply.model);
+    models.push(...orchestratorModels(bundle));
 
     return {
       request: {
@@ -435,6 +456,7 @@ export class DebriefRunnerService {
           cohort,
           case_memory: caseMemory,
           practice_options: practiceOptions,
+          ...(availability ? { availability } : {}),
         },
       },
     };
@@ -448,6 +470,7 @@ export class DebriefRunnerService {
     const codes = [
       ...new Set([
         ...GRAPH_PROMPT_CODES,
+        ...(isOrchestrated(bundle) ? DEBRIEF_ORCHESTRATOR_PROMPT_CODES : []),
         ...Object.keys(bundle.prompts ?? {}),
         ...Object.keys(overrides),
       ]),

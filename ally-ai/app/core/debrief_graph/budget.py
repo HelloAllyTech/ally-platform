@@ -24,6 +24,11 @@ OUTPUT_TOKENS: Dict[str, int] = {
     Step.CHECKS: 0,
     Step.EVALUATOR: 2000,
     Step.REVISER: 2500,
+    # The orchestrator's planner and its prompt-only agents (spec A5, A9).
+    "planner": 800,
+    "protocol_check": 1200,
+    "history_deep": 1200,
+    "language_specialist": 1000,
 }
 
 #: Thinking models bill reasoning as output; allow for it rather than under-reserve.

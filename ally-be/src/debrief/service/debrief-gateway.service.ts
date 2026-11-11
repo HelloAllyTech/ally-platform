@@ -14,6 +14,7 @@ import {
   withPointIds,
 } from '../util/debrief-cards.util';
 import { guidancePassage, guidanceSearch } from '../util/debrief-guidance.util';
+import { DebriefAggregatesService } from './debrief-aggregates.service';
 import { DebriefContextRepository } from './debrief-context.repository';
 import { DebriefRunClaims } from './debrief-run-token.service';
 
@@ -41,7 +42,58 @@ export class DebriefGatewayService {
     private readonly runs: Repository<DebriefRun>,
     private readonly context: DebriefContextRepository,
     private readonly guidance: ContextRetrievalService,
+    private readonly aggregates: DebriefAggregatesService,
   ) {}
+
+  /** The session the run is for, as the orchestrator's data tools scope to it. */
+  private async session(run: DebriefRun) {
+    return this.context.loadSession(run.scenarioSessionId);
+  }
+
+  /**
+   * `get_org_protocols` (spec A4): the learner's organisation's own protocols
+   * (Debrief Guidance entries with facet kind `protocol`, and the procedures
+   * in its Guide profile). Scoped to the run's session, never to a body field.
+   */
+  async orgProtocols(run: DebriefRun) {
+    const tenantId =
+      run.tenantId ?? (await this.session(run))?.tenantId ?? null;
+    return this.context.orgProtocols(tenantId);
+  }
+
+  /**
+   * `get_learner_history` (spec A4): this learner's last debriefs (Work-on-this
+   * points, strengths, skill words), newest first, without quotes.
+   */
+  async runLearnerHistory(run: DebriefRun, body: { limit?: number }) {
+    const s = await this.session(run);
+    if (!s?.counselorId) return { sessions: [] };
+    const limit = Math.max(1, Math.min(Number(body?.limit ?? 8) || 8, 12));
+    return {
+      sessions: await this.context.learnerHistory(
+        s.counselorId,
+        s.tenantId,
+        run.scenarioSessionId,
+        limit,
+      ),
+    };
+  }
+
+  /**
+   * `query_aggregates` (spec A4): one of a fixed family of parameterised
+   * aggregate queries over redacted views, groups of five or more, through
+   * the Analytics Agent's guard and executor. Never free SQL.
+   */
+  async queryAggregates(
+    run: DebriefRun,
+    body: { query?: string; params?: Record<string, unknown> },
+  ) {
+    return this.aggregates.run(
+      run,
+      String(body?.query ?? ''),
+      body?.params && typeof body.params === 'object' ? body.params : {},
+    );
+  }
 
   /**
    * Debrief Guidance for up to three moments, as the learner's organisation
@@ -156,10 +208,16 @@ export class DebriefGatewayService {
       round?: number | null;
       topic?: string | null;
       has_risk_cue?: boolean;
+      label_key?: string | null;
     },
   ) {
     const p = {
       step: String(body.step ?? ''),
+      // A registry agent's keyed progress label (FR-27), translated by the apps.
+      ...(typeof body.label_key === 'string' &&
+      /^debrief\.progress\.[a-z_]{1,40}$/.test(body.label_key)
+        ? { labelKey: body.label_key }
+        : {}),
       ...(body.round ? { round: Number(body.round) } : {}),
       ...(typeof body.topic === 'string' && body.topic.trim()
         ? { topic: body.topic.trim().slice(0, 60) }

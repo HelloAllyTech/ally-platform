@@ -63,6 +63,7 @@ def progress_event(
     has_risk_cue: bool,
     round_: Optional[int] = None,
     topic: Optional[str] = None,
+    label_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """What the learner's "working" panel says now (v9 FR-27): emitted on the
     graph's custom stream; the runner sends it to the gateway's `progress`."""
@@ -71,5 +72,8 @@ def progress_event(
         data["round"] = round_
     if topic:
         data["topic"] = topic
+    if label_key:
+        # A registry agent's keyed progress label (FR-27), translated by the apps.
+        data["label_key"] = label_key
     data["has_risk_cue"] = bool(has_risk_cue)
     return {"event": "progress", "data": data}
