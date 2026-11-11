@@ -242,6 +242,9 @@ export const agentsFixture = (runs = 412): DebriefAgentMetrics => ({
     passRate: null,
     distressFlags: 2,
     modelCalls: 240,
+    spendUsd: 3.6,
+    costPerReplyMean: 0.03,
+    costPerReplyTarget: 0.05,
   },
   pmAgent: {
     ideas: 13,

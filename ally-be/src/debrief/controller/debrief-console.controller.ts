@@ -406,9 +406,7 @@ export class DebriefConsoleController {
     };
   }
 
-  // `improver/analyse`: the path the released admin still calls; remove it
-  // once an admin build that calls `pm-agent/analyse` is live.
-  @Post(['pm-agent/analyse', 'improver/analyse'])
+  @Post('pm-agent/analyse')
   @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
   @ApiOperation({
     summary:

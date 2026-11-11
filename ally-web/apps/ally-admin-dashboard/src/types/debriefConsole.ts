@@ -706,6 +706,10 @@ export interface DebriefAgentMetrics {
     passRate: DebriefRate | null;
     distressFlags: number;
     modelCalls: number;
+    /** Ask Ally model spend over the window, and over the replies sent (PRD: at most $0.05). Absent from an older backend. */
+    spendUsd?: number;
+    costPerReplyMean?: number | null;
+    costPerReplyTarget?: number;
   };
   pmAgent: {
     ideas: number;

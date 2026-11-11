@@ -137,7 +137,7 @@ evidence map), so with the orchestrator on it also has a registry-agent row (fin
 
 | | Number | Where | Status |
 |---|---|---|---|
-| PRD (kept) | Learners who replied (experience); ≤ $0.05 per reply | Console (replied); cost **to wire** | Live (replied) |
+| PRD (kept) | Learners who replied (experience); ≤ $0.05 per reply: mean cost per reply = the window's Ask Ally (`debrief_reply`) model spend on the same live debriefs, priced from tokens like the learning budget, over replies sent (fallback replies included) | Console | Live (wired 2026-11-11) |
 | Excerpt | **Pass rate, the share of replies with no failure:** no code check failed (a reply that fails is replaced by the fallback) and the judge finds no unsupported claim, no contradiction of the debrief, no unsafe advice | Console | Checks live; **pass rate needs the Ask Ally judge** (no verdict until then) |
 | Evals skill | Replies that passed the checks; learner distress flagged | Console | Live. Prod read 2026-11-11: 7 of 27 replies on live debriefs were replaced by the fallback |
 | Evals skill | Test set of real follow-up questions, graders, paired runner | Eval | **To build** (Part B) |

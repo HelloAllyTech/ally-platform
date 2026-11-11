@@ -1,10 +1,12 @@
 import React, { ReactNode } from "react";
 
+import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { en } from "@constants";
 import { DebriefAgentMetrics, DebriefOrchestratorMetrics, DebriefRate } from "@types";
 
 import {
+  BulletRows,
   CountBars,
   KappaScale,
   MiniStat,
@@ -15,7 +17,7 @@ import {
   TimeRanges,
   TimeRow,
 } from "./metricsCharts";
-import { MIN_RATE_SAMPLE, rateWithRange } from "./metricsData";
+import { MIN_RATE_SAMPLE, rateWithRange, targetState } from "./metricsData";
 import { ChartCard } from "../../Analytics/chartKit";
 import { CONTEXT, PALETTE } from "../../Analytics/chartScales";
 import { agentName, checkLabel, hardFailLabel, plannerFallbackLabel } from "../consoleLabels";
@@ -162,6 +164,13 @@ const allRows = (agents: DebriefAgentMetrics): string[][] => {
     [s.askAlly.name, s.askAlly.checks, r(askAlly.checkPassRate)],
     [s.askAlly.name, s.askAlly.pass, askAlly.passRate ? r(askAlly.passRate) : s.notMeasured],
     [s.askAlly.name, s.askAlly.distress, String(askAlly.distressFlags)],
+    [
+      s.askAlly.name,
+      s.askAlly.cost,
+      askAlly.costPerReplyMean == null
+        ? en.debriefs.metrics.none
+        : formatUsd(askAlly.costPerReplyMean),
+    ],
     [s.pmAgent.name, s.pmAgent.ideas, String(pmAgent.ideas)],
     [s.pmAgent.name, s.pmAgent.tested, `${pmAgent.screened} / ${pmAgent.gated}`],
     [
@@ -211,6 +220,40 @@ const Sub: React.FC<{ title: string; children: ReactNode }> = ({ title, children
  * say which step is the problem (how often each gave nothing, and how long each
  * takes), then one card per agent family, then the full numbers as a table.
  */
+/** Ask Ally's cost per reply against the PRD's ceiling, as a bullet like the guardrails' cost row. */
+const AskAllyCost: React.FC<{ askAlly: DebriefAgentMetrics["askAlly"] }> = ({ askAlly }) => {
+  const s = en.debriefs.metrics.agents.askAlly;
+  const target = askAlly.costPerReplyTarget ?? 0.05;
+  const mean = askAlly.costPerReplyMean ?? null;
+  return (
+    <BulletRows
+      testId="ask-ally-cost"
+      rows={[
+        {
+          key: "cost-per-reply",
+          label: s.cost,
+          targetLabel: s.costTarget(formatUsd(target)),
+          value: mean,
+          targets: [target],
+          max: Math.max(target * 2, mean == null ? 0 : Math.ceil((mean * 1.2) / 0.01) * 0.01),
+          words:
+            mean == null ? (
+              en.debriefs.metrics.none
+            ) : (
+              <span>
+                {formatUsd(mean)}
+                <span className="block text-xs text-typography-500">
+                  {s.costSub(formatUsd(askAlly.spendUsd ?? 0), askAlly.replies)}
+                </span>
+              </span>
+            ),
+          state: targetState(mean, { atMost: target }, askAlly.replies),
+        },
+      ]}
+    />
+  );
+};
+
 export const AgentsSection: React.FC<{ agents: DebriefMetricsAgents }> = ({ agents }) => {
   const s = en.debriefs.metrics.agents;
   const c = en.debriefs.metrics.agentCharts;
@@ -381,6 +424,7 @@ export const AgentsSection: React.FC<{ agents: DebriefMetricsAgents }> = ({ agen
               {s.askAlly.pass}: {s.notMeasured}
             </p>
           )}
+          {askAlly.costPerReplyTarget != null && <AskAllyCost askAlly={askAlly} />}
         </AgentCard>
         <AgentCard
           title={s.pmAgent.name}

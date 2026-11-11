@@ -9679,6 +9679,10 @@ export const en = {
           checks: "Replies that passed the checks (others were replaced by a fallback)",
           pass: "Pass rate (needs the Ask Ally judge)",
           distress: "Learner distress flagged",
+          cost: "Cost per reply, mean",
+          costTarget: (usd: string) => `≤ ${usd}`,
+          costSub: (spend: string, replies: number) =>
+            `${spend} across ${replies} ${replies === 1 ? "reply" : "replies"}`,
         },
         pmAgent: {
           name: "PM agent",

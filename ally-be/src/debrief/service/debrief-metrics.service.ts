@@ -26,6 +26,10 @@ import {
   SESSION_LENGTH_BANDS,
 } from '../util/debrief-metrics-filter.util';
 import { lengthBand } from '../util/debrief-metrics.util';
+import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants';
+
+/** PRD: an Ask Ally reply costs at most this much. */
+export const ASK_ALLY_COST_TARGET_USD = 0.05;
 import { cardSkills, DebriefCards } from '../util/debrief-cards.util';
 
 /** Live debriefs a learner can read. */
@@ -457,6 +461,38 @@ export class DebriefMetricsService {
         : null,
       distressFlags: num(r?.distress_flags),
       modelCalls: num(r?.calls),
+      ...(await this.askAllyCost(weeks, fsql, replies)),
+    };
+  }
+
+  /**
+   * What a reply costs (PRD: at most $0.05): the window's Ask Ally model spend on the same live
+   * debriefs, priced from tokens like the learning budget, over the replies sent. Replaced replies
+   * count too: they cost a call as well. Null with no replies.
+   */
+  private async askAllyCost(weeks: number, fsql: string, replies: number) {
+    const usage: Array<{ model: string; p: number; c: number }> =
+      await this.dataSource.query(
+        `SELECT lu.model, sum(lu."promptTokens")::bigint AS p, sum(lu."completionTokens")::bigint AS c
+           FROM llm_usage lu
+          WHERE lu.task = 'debrief_reply'
+            AND lu."createdAt" >= date_trunc('week', now()) - make_interval(weeks => $1)
+            AND lu."scenarioSessionId" IN (
+              SELECT r."scenarioSessionId" FROM debrief_runs r
+                JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+                LEFT JOIN users u ON u.id = s."counselorId"
+               WHERE r.mode = 'live'${fsql})
+          GROUP BY lu.model`,
+        [weeks - 1],
+      );
+    const spendUsd = usage.reduce(
+      (n, u) => n + computeCostUsd(u.model, Number(u.p), Number(u.c)).costUsd,
+      0,
+    );
+    return {
+      spendUsd,
+      costPerReplyMean: replies > 0 ? spendUsd / replies : null,
+      costPerReplyTarget: ASK_ALLY_COST_TARGET_USD,
     };
   }
 

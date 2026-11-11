@@ -290,6 +290,24 @@ describe("Debriefs tab: each agent", () => {
   });
 });
 
+describe("Debriefs tab: Ask Ally cost", () => {
+  it("draws the cost per reply against the $0.05 ceiling, and says none without replies", () => {
+    h.metrics.mockReturnValue(answer(fullView()));
+    const { unmount } = render(<MetricsTab />);
+    const cost = screen.getByTestId("ask-ally-cost");
+    expect(cost).toHaveTextContent("Cost per reply, mean");
+    expect(cost).toHaveTextContent("≤ $0.05");
+    expect(cost).toHaveTextContent("$0.03");
+    expect(cost).toHaveTextContent("$3.60 across");
+    unmount();
+    const v = fullView();
+    v.agents!.askAlly = { ...v.agents!.askAlly, replies: 0, spendUsd: 0, costPerReplyMean: null };
+    h.metrics.mockReturnValue(answer(v));
+    render(<MetricsTab />);
+    expect(screen.getByTestId("ask-ally-cost")).not.toHaveTextContent("$0.03");
+  });
+});
+
 describe("Debriefs tab: states", () => {
   it("says there are no live debriefs, and draws no empty charts, when every organisation is off", () => {
     h.metrics.mockReturnValue(answer(emptyView()));
