@@ -157,6 +157,15 @@ export class CreateBotDraftDto {
   upload?: boolean;
 }
 
+/** "Describe it instead", after a website gave too little (chunk 20a-2). */
+export class DescribeBotDraftDto {
+  @ApiProperty({ description: 'What the business does, in a few sentences' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  description!: string;
+}
+
 export class AddBotDraftDocumentDto {
   @ApiProperty({
     description:

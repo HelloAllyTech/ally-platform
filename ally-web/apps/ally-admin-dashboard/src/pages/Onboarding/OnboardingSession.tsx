@@ -54,6 +54,7 @@ export const OnboardingSession: React.FC = () => {
       s={s}
       editor={editor}
       onLeave={() => navigate(ROUTES.WHATSAPP_BOT)}
+      onStartOver={() => navigate(ROUTES.CHATBOT_NEW)}
       onConnectWhatsApp={chatbotId =>
         navigate(`${ROUTES.CHATBOT_DETAIL.replace(":botId", chatbotId)}?tab=connectors`)
       }
@@ -69,8 +70,10 @@ export const OnboardingView: React.FC<{
   s: OnboardingSessionState;
   editor?: BrandEditor;
   onLeave: () => void;
+  /** Back to the start, after "Try a different website" removed this unfinished assistant. */
+  onStartOver?: () => void;
   onConnectWhatsApp: (chatbotId: string) => void;
-}> = ({ s, editor, onLeave, onConnectWhatsApp }) => {
+}> = ({ s, editor, onLeave, onStartOver, onConnectWhatsApp }) => {
   const view = s.view;
   const flow = s.flow;
 
@@ -101,6 +104,11 @@ export const OnboardingView: React.FC<{
             busy={s.sending}
             onPatch={s.edit}
             onConfirm={s.confirmLearned}
+            onDescribe={s.describe}
+            onUpload={s.upload}
+            onStartOver={async () => {
+              if (await s.discard()) onStartOver?.();
+            }}
           />
         );
       case "safety":

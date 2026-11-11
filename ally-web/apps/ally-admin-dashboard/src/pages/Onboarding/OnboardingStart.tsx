@@ -6,7 +6,8 @@ import { Button, PrimaryButton, Question, StepFrame } from "@components/v2";
 import { ROUTES } from "@constants";
 
 import { COPY, fill } from "./copy";
-import { ACCEPTED_FILES, useOnboardingStart } from "./useOnboardingStart";
+import { ACCEPTED_FILES } from "./useDraftUpload";
+import { useOnboardingStart } from "./useOnboardingStart";
 
 /** Before the read, the flow's length is a guess: the screenshots' typical twelve steps. */
 const TYPICAL_STEPS = 12;

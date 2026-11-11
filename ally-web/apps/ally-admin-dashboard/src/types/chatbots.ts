@@ -112,6 +112,8 @@ export interface Chatbot {
   lastTestedAt: string | null;
   /** The caller's own unfinished onboarding for this bot (chunk 20a), if any. */
   setupDraftId?: string | null;
+  /** When it was removed: an archived assistant is read-only. */
+  archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

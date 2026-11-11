@@ -75,7 +75,7 @@ export class HomeListsService {
   } | null> {
     const rows: { id: string; name: string }[] = await this.dataSource.query(
       `SELECT t.id::text AS id, t.name
-         FROM users u JOIN tenants t ON t.id = u.tenant_id
+         FROM users u JOIN tenants t ON t.id::text = u.tenant_id
         WHERE u.id = $1
         LIMIT 1`,
       [Number(ExecutionManager.getUserId() ?? 0)],

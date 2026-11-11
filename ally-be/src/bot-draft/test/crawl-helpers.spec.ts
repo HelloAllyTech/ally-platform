@@ -4,6 +4,7 @@ import { parseRobots } from '../crawl/robots';
 import { parseSitemap } from '../crawl/sitemap';
 import {
   isJunk,
+  nextToRead,
   normaliseUrl,
   sameSite,
   siteKey,
@@ -215,5 +216,61 @@ describe('decodeEntities', () => {
       ),
     ).toBe('Research & Survey – Live Love ’Laugh’');
     expect(decodeEntities('&bogus; &#0;')).toBe('&bogus; &#0;');
+  });
+});
+
+describe('nextToRead', () => {
+  const at = (path: string) => `https://lab.example${path}`;
+  const order = (
+    queue: string[],
+    start = '/',
+    sitemapOnly: string[] = [],
+  ): string[] => {
+    const q = queue.map(at);
+    const seen: string[] = [];
+    const only = new Set(sitemapOnly.map(at));
+    while (q.length) {
+      seen.push(q.splice(nextToRead(q, seen, at(start), only), 1)[0]);
+    }
+    return seen.map((url) => new URL(url).pathname);
+  };
+
+  it('is -1 for an empty queue', () => {
+    expect(nextToRead([], [], at('/'), new Set())).toBe(-1);
+  });
+
+  it('reads pages under the address the owner gave first', () => {
+    expect(
+      order(
+        ['/calc/a', '/mumbai/package/x', '/contact', '/mumbai/test/y'],
+        '/mumbai',
+      ),
+    ).toEqual(['/mumbai/package/x', '/mumbai/test/y', '/calc/a', '/contact']);
+  });
+
+  it('reads linked pages before ones only the sitemap lists', () => {
+    expect(
+      order(['/calc/a', '/calc/b', '/fees', '/team'], '/', [
+        '/calc/a',
+        '/calc/b',
+      ]),
+    ).toEqual(['/fees', '/team', '/calc/a', '/calc/b']);
+  });
+
+  it('spreads reading across sections, so one big section cannot take every page', () => {
+    expect(
+      order(['/calc/a', '/calc/b', '/calc/c', '/fees', '/tests/x', '/tests/y']),
+    ).toEqual([
+      '/calc/a',
+      '/fees',
+      '/tests/x',
+      '/calc/b',
+      '/tests/y',
+      '/calc/c',
+    ]);
+  });
+
+  it('still reads blog and news pages last', () => {
+    expect(order(['/blog/one', '/fees'])).toEqual(['/fees', '/blog/one']);
   });
 });

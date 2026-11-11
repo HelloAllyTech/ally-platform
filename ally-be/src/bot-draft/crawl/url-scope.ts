@@ -124,6 +124,58 @@ export function isArticle(url: string): boolean {
 /** How many blog and news pages one crawl reads, at most. */
 export const MAX_ARTICLES = 10;
 
+const segments = (url: string): string[] =>
+  new URL(url).pathname.toLowerCase().split('/').filter(Boolean);
+
+/**
+ * Which queued page to read next, as its index (-1 when the queue is empty). In order: the
+ * business's own pages before blog and news; pages under the address the owner gave (they typed
+ * `/mumbai`, so `/mumbai/…` first); pages the site links to before ones only its sitemap lists;
+ * then the section read least so far, so one big section (a catalogue of hundreds of test pages)
+ * can't fill the whole page budget. Ties keep queue order.
+ */
+export function nextToRead(
+  queue: string[],
+  seen: string[],
+  startUrl: string,
+  sitemapOnly: Set<string>,
+): number {
+  const start = segments(startUrl);
+  const under = (path: string[]) => start.every((s, i) => path[i] === s);
+  // A page's section: its first segment below the start address, or its first segment outside it.
+  const section = (url: string) => {
+    const path = segments(url);
+    return under(path)
+      ? `in:${path[start.length] ?? ''}`
+      : `out:${path[0] ?? ''}`;
+  };
+  const taken = new Map<string, number>();
+  for (const url of seen) {
+    const key = section(url);
+    taken.set(key, (taken.get(key) ?? 0) + 1);
+  }
+  const rank = (url: string) => [
+    isArticle(url) ? 1 : 0,
+    under(segments(url)) ? 0 : 1,
+    sitemapOnly.has(url) ? 1 : 0,
+    taken.get(section(url)) ?? 0,
+  ];
+  const before = (a: number[], b: number[]) => {
+    const k = a.findIndex((v, i) => v !== b[i]);
+    return k >= 0 && a[k] < b[k];
+  };
+  let best = -1;
+  let bestRank: number[] = [];
+  queue.forEach((url, i) => {
+    const r = rank(url);
+    if (best < 0 || before(r, bestRank)) {
+      best = i;
+      bestRank = r;
+    }
+  });
+  return best;
+}
+
 /**
  * Which pages the owner chose (chunk 20a-2, "Choose pages"): path patterns, each a path prefix
  * on segment boundaries ("/blog" is /blog and /blog/…, not /blogroll). No includes means every

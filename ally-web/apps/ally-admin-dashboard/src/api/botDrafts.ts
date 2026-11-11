@@ -58,6 +58,14 @@ export const botDraftsApi = baseAPI.injectEndpoints({
       }),
     }),
 
+    describeBotDraft: builder.mutation<BotDraftView, { id: string; description: string }>({
+      query: ({ id, description }) => ({
+        url: ApiEndpoints.BOT_DRAFTS.DESCRIPTION(id),
+        method: HttpMethod.POST,
+        body: { description },
+      }),
+    }),
+
     publishBotDraft: builder.mutation<
       PublishResult,
       {
@@ -93,6 +101,7 @@ export const {
   useUndoBotDraftMutation,
   useBackBotDraftMutation,
   useAddBotDraftDocumentMutation,
+  useDescribeBotDraftMutation,
   usePublishBotDraftMutation,
   useAbandonBotDraftMutation,
 } = botDraftsApi;

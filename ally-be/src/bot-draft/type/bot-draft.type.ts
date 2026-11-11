@@ -119,6 +119,8 @@ export interface CrawlState {
   finishedAt?: string;
   /** URLs still to visit, saved after every page so a restart can resume. */
   queue: string[];
+  /** Queued URLs only the sitemap listed: read after pages the site links to. */
+  sitemapOnly?: string[];
   seen: string[];
   pages: CrawlPage[];
   findings: string[];

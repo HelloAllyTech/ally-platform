@@ -1,6 +1,6 @@
 import React from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,6 +31,13 @@ vi.mock("@constants", async () => {
       connectors: "Connectors",
       defaults: "Defaults",
       library: "Knowledge library",
+      archived: "Archived",
+    },
+    archived: {
+      empty: "Nothing archived",
+      emptyHint: "Removed ones appear here",
+      removed: "Removed {date}",
+      loadFailed: "Could not load archived",
     },
     status: { draft: "Draft", live: "Live", paused: "Paused" },
     role: { viewer: "Viewer", editor: "Editor", owner: "Owner" },
@@ -98,11 +105,22 @@ const bot = (over: Partial<Chatbot> = {}): Chatbot => ({
 });
 
 let mockList: { chatbots: Chatbot[]; canCreate: boolean };
+const mockArchive = vi.fn((_id: string) => ({ unwrap: () => Promise.resolve() }));
+const mockRestore = vi.fn((_id: string) => ({ unwrap: () => Promise.resolve() }));
 let mockBot: Chatbot | undefined;
+let mockArchived: { chatbots: Chatbot[] };
 
 vi.mock("@api", () => ({
   useGetChatbotsQuery: () => ({ data: mockList, isLoading: false, isError: false }),
   useGetChatbotQuery: () => ({ data: mockBot, isLoading: false, isError: false }),
+  useArchiveChatbotMutation: () => [mockArchive, { isLoading: false }],
+  useRestoreChatbotMutation: () => [mockRestore, { isLoading: false }],
+  useGetArchivedChatbotsQuery: () => ({
+    data: mockArchived,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
 }));
 
 /** Mirrors the shared Tabs: one span per tab. */
@@ -166,6 +184,7 @@ const renderAt = (path: string) =>
 describe("Chatbots home", () => {
   beforeEach(() => {
     mockList = { chatbots: [bot()], canCreate: true };
+    mockArchived = { chatbots: [] };
   });
 
   it("lists the bots as cards with their status and activity", () => {
@@ -190,10 +209,95 @@ describe("Chatbots home", () => {
     renderAt("/chatbots?tab=defaults");
     expect(screen.queryByText("New chatbot")).toBeNull();
     // The inbox (chunk 11a) is for everyone who can see an assistant.
-    expect(screen.getByTestId("tabs").textContent).toBe("ChatbotsInbox");
+    expect(screen.getByTestId("tabs").textContent).toBe("ChatbotsInboxArchived");
     expect(screen.queryByTestId("defaults-settings")).toBeNull();
     expect(screen.queryByTestId("defaults-settings")).toBeNull();
     expect(screen.getByText("Policy helper")).toBeTruthy();
+  });
+
+  it("lets an owner remove an assistant from its ··· menu, even one still being set up", async () => {
+    mockList = {
+      chatbots: [bot({ status: ChatbotStatus.DRAFT, setupDraftId: "draft-1" })],
+      canCreate: true,
+    };
+    mockArchive.mockClear();
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    // Asked in a dialog on the page, not the browser's own confirm box.
+    const dialog = screen.getByRole("dialog", { name: "Remove Policy helper?" });
+    expect(dialog.textContent).toContain("Its conversations are kept.");
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(mockArchive).toHaveBeenCalledWith("bot-1");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("removes nothing when the owner keeps it", () => {
+    mockArchive.mockClear();
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+    expect(mockArchive).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("says so, and stays open, when removing fails", async () => {
+    mockArchive.mockImplementationOnce(() => ({ unwrap: () => Promise.reject(new Error("500")) }));
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(await screen.findByText("Couldn't remove it. Try again.")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("gives no menu to someone who doesn't own the assistant", () => {
+    mockList = { chatbots: [bot({ myRole: ChatbotMemberRole.EDITOR })], canCreate: true };
+    renderAt("/chatbots");
+    expect(screen.queryByRole("button", { name: "More for Policy helper" })).toBeNull();
+  });
+
+  it("keeps removed assistants under Archived, to open and read", () => {
+    mockArchived = {
+      chatbots: [bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" })],
+    };
+    renderAt("/chatbots?tab=archived");
+    expect(screen.getByText("Old helper")).toBeTruthy();
+    expect(screen.getByText(/^Removed /)).toBeTruthy();
+    // Removed already: its menu offers Restore, never Remove.
+    fireEvent.click(screen.getByRole("button", { name: "More for Old helper" }));
+    expect(screen.queryByRole("menuitem", { name: "Remove assistant" })).toBeNull();
+  });
+
+  it("lets an owner restore a removed assistant from its ··· menu", async () => {
+    mockArchived = {
+      chatbots: [bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" })],
+    };
+    mockRestore.mockClear();
+    renderAt("/chatbots?tab=archived");
+    fireEvent.click(screen.getByRole("button", { name: "More for Old helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Restore assistant" }));
+    await waitFor(() => expect(mockRestore).toHaveBeenCalledWith("bot-9"));
+  });
+
+  it("gives no Restore to someone who doesn't own the removed assistant", () => {
+    mockArchived = {
+      chatbots: [
+        bot({
+          name: "Old helper",
+          archivedAt: "2026-11-10T09:00:00Z",
+          myRole: ChatbotMemberRole.VIEWER,
+        }),
+      ],
+    };
+    renderAt("/chatbots?tab=archived");
+    expect(screen.queryByRole("button", { name: "More for Old helper" })).toBeNull();
+  });
+
+  it("says when nothing has been archived", () => {
+    renderAt("/chatbots?tab=archived");
+    expect(screen.getByText("Nothing archived")).toBeTruthy();
   });
 
   it("tells a member with no bots who to ask", () => {

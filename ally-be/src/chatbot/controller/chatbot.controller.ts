@@ -97,6 +97,16 @@ export class ChatbotController {
     return this.chatbots.create(dto);
   }
 
+  @Get('archived')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
+  @ApiOperation({
+    summary:
+      'Removed chatbots you can see, most recent first; open one to read its conversations',
+  })
+  async listArchived() {
+    return { chatbots: await this.chatbots.listArchived() };
+  }
+
   @Get(':id')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   get(@Param('id', ParseUUIDPipe) id: string) {
@@ -131,6 +141,16 @@ export class ChatbotController {
   })
   async archive(@Param('id', ParseUUIDPipe) id: string) {
     await this.chatbots.archive(id);
+  }
+
+  @Post(':id/restore')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      'Bring a removed chatbot back, paused; its channels are reconnected by hand',
+  })
+  restore(@Param('id', ParseUUIDPipe) id: string) {
+    return this.chatbots.restore(id);
   }
 
   // ── settings ──────────────────────────────────────────────────────────

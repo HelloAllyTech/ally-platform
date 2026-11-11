@@ -61,6 +61,12 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 - **Empty section:** Not found on your website
 - **Item actions:** Edit · Remove · View source
 - **Confirm button:** Looks right
+- **When the website gave nothing** (chunk 20a-2; replaces the empty sections and Looks right):
+  - Title: We couldn't find much on {domain} · We couldn't find much yet (no website)
+  - Why, from the crawl's problem: We couldn't reach the site. The address may be wrong, or the site may be down. · The site asks automated readers not to visit, so we've respected that. · The site loads its content with scripts, so we couldn't read it. · The pages we read didn't say much about your business.
+  - Choices: How would you like to fill this in? · Describe your business (A few sentences is plenty) · Upload documents (A brochure, price list or FAQ) · Try a different website (Start again with another address) · Skip, I'll answer questions (We'll ask a few quick questions instead)
+  - Describing: Read this · Choose another way
+  - After sending: Reading what you sent… · We still couldn't find any details in that. Try another way, or skip and answer a few questions.
 
 ## 5. Industry and safety
 
@@ -409,14 +415,16 @@ says when a save can't be made. More lines for the home's sections are added her
   - Share: Who can use your assistant, and where.
 - **Saving:** Changes save as you go · Saving… · Saved · Couldn't save. Try again.
 - **Overview:**
-  - Live: Your assistant is live
+  - Live: Your assistant is live. People can chat with it on its page, your website and WhatsApp. (One switch: Turn on also turns its page on; Pause leaves the page on, showing that it's away.)
   - Paused: Your assistant is paused. People see a note that it's away.
   - Not live: Your assistant isn't live yet
   - Buttons: Pause · Turn on
   - Link: Your link · Copy link · Link copied · Download QR code
   - Numbers: Last 30 days · People · Messages · Answered · Couldn't answer · All numbers
   - Needs you: Needs your input · {n} questions it couldn't answer · 1 question it couldn't answer · Review · Nothing needs you right now.
-  - Remove: Remove assistant · Remove {name}? Its page stops working and nobody can chat with it. Conversations are kept.
+  - Remove: Remove assistant · More for {name} (the `···` on its card in the assistants list) · a dialog: Remove {name}? · Its page stops working and nobody can chat with it. Any WhatsApp number it uses is freed for another assistant. Its conversations are kept. · Keep it · Remove · Couldn't remove it. Try again.
+  - Removed (opened from the Archived tab, read-only): Removed · Archived assistants (the breadcrumb) · Removed on {date}. You can still read what it knew and its conversations, but it can't be changed or chatted with.
+  - Restore (an owner, from the banner or the card's `···` on the Archived tab): Restore assistant · {name} is back, paused. Turn it on from its Overview, and reconnect WhatsApp under Share if it used a number. · Couldn't restore it. Try again.
 - **What it knows:**
   - Groups: From your website · Your notes · Documents · Needs your input
   - Facts: Correct this · Show original · Hide original · Corrected by you · Original
@@ -443,7 +451,7 @@ says when a save can't be made. More lines for the home's sections are added her
   - At risk: When someone may be at risk · What it says before pointing people to help.
 - **Page:**
   - Business name: Business name · Shown at the top of your page.
-  - Page switch: Your page is on · Your page is off · Turn on · Turn off
+  - Page status (no switch of its own; it follows the assistant's in Overview): Your page is on · Your page is off · It's on whenever your assistant is live. Turn it on or pause it from Overview. · Your assistant is paused, so people who open it see a note that it's away. · Go to Overview
   - Questions before the chat: Questions before the chat · Asked one at a time before the chat starts. Up to 8. · Question {n} · Add a question · Required
   - Question types: Short answer · Email · Phone · Choice · Date · Agreement
   - Options: Options, one per line

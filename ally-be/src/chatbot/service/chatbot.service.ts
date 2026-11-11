@@ -1,11 +1,12 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
@@ -96,6 +97,8 @@ export interface ChatbotSummary {
   lastTestedAt: Date | null;
   /** The caller's own unfinished onboarding for this bot (chunk 20a): "Continue setup". */
   setupDraftId: string | null;
+  /** When it was removed: an archived bot is read-only. */
+  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -205,6 +208,18 @@ export class ChatbotService {
     return this.summarise(bots);
   }
 
+  /** Removed (archived) bots the caller can see, most recently removed first: read-only. */
+  async listArchived(): Promise<ChatbotSummary[]> {
+    const ids = await this.access.accessibleChatbotIds();
+    if (ids !== null && !ids.length) return [];
+    const bots = await this.chatbotRepository.find({
+      where: { archivedAt: Not(IsNull()), ...(ids ? { id: In(ids) } : {}) },
+      order: { archivedAt: 'DESC' },
+      take: 200,
+    });
+    return this.summarise(bots);
+  }
+
   /**
    * One bot's numbers over the last 7 or 30 days, counted as the list counts its 30 (chunk 20d-2:
    * the home's 7 days / 30 days switch). Access is checked by the caller.
@@ -263,6 +278,7 @@ export class ChatbotService {
       stats: stats.get(bot.id) ?? EMPTY_STATS,
       lastTestedAt: bot.lastTestedAt ?? null,
       setupDraftId: setups.get(bot.id) ?? null,
+      archivedAt: bot.archivedAt ?? null,
       createdAt: bot.createdAt,
       updatedAt: bot.updatedAt,
     }));
@@ -451,6 +467,14 @@ export class ChatbotService {
       { id },
       { status, updatedBy: currentUserId() },
     );
+    // One switch: live means people can use it, so its page (and website chat) turns on with it.
+    // Pausing leaves the page on, where visitors see that it's away rather than a missing page.
+    if (status === ChatbotStatus.LIVE) {
+      await this.chatbotRepository.manager.query(
+        `UPDATE chatbot_pages SET status = 'on', "updatedAt" = now() WHERE chatbot_id = $1`,
+        [id],
+      );
+    }
     this.logger.info(`Chatbot ${id} is now ${status}`);
     return this.get(id);
   }
@@ -461,6 +485,8 @@ export class ChatbotService {
    */
   async archive(id: string): Promise<void> {
     await this.access.assert(id, ChatbotMemberRole.OWNER);
+    // Taken first, so every document archived below is at or after it: restore() finds them so.
+    const removedAt = new Date();
     await this.connectorRepository.update(
       { chatbotId: id },
       { chatbotId: null, updatedBy: currentUserId() },
@@ -472,12 +498,72 @@ export class ChatbotService {
     await this.chatbotRepository.update(
       { id },
       {
-        archivedAt: new Date(),
+        archivedAt: removedAt,
         status: ChatbotStatus.PAUSED,
         updatedBy: currentUserId(),
       },
     );
+    // An unfinished setup goes with it, so a bot removed mid-setup isn't read or resumed again.
+    await this.chatbotRepository.manager.query(
+      `UPDATE bot_drafts SET status = 'abandoned'
+        WHERE chatbot_id = $1 AND status = 'active'`,
+      [id],
+    );
     this.logger.info(`Chatbot ${id} archived`);
+  }
+
+  /**
+   * Bring a removed bot back, paused, so nothing answers until an owner turns it on. Its own
+   * documents archived by the removal come back (not ones removed before it); a bot removed
+   * mid-setup gets its setup back. Its channels don't: a number may serve another bot by now.
+   */
+  async restore(id: string): Promise<ChatbotSummary> {
+    // Viewing is all an archived bot allows, so the owner check is made here.
+    const { chatbot, role } = await this.access.assert(id);
+    if (!chatbot.archivedAt) return this.get(id);
+    if (role !== ChatbotMemberRole.OWNER) {
+      throw new ForbiddenException("Only this chatbot's owners can do this.");
+    }
+    const documents = await this.chatbotRepository.manager.query<
+      { id: string }[]
+    >(
+      // A minute's grace for bots removed before archive() took its time first.
+      `SELECT id FROM kb_documents
+        WHERE owner_chatbot_id = $1
+          AND archived_at >= $2::timestamptz - interval '1 minute'`,
+      [id, chatbot.archivedAt],
+    );
+    for (const { id: documentId } of documents) {
+      await this.knowledgeBase.unarchiveForChatbot(id, documentId);
+    }
+    // Never live: its setup comes back, to continue where it stopped.
+    const setup = await this.chatbotRepository.manager.query<{ id: string }[]>(
+      `SELECT id FROM bot_drafts
+        WHERE chatbot_id = $1 AND status = 'abandoned'
+          AND NOT EXISTS (
+            SELECT 1 FROM bot_drafts p WHERE p.chatbot_id = $1 AND p.status = 'published'
+          )
+        ORDER BY "updatedAt" DESC LIMIT 1`,
+      [id],
+    );
+    if (setup[0]) {
+      await this.chatbotRepository.manager.query(
+        `UPDATE bot_drafts SET status = 'active' WHERE id = $1`,
+        [setup[0].id],
+      );
+    }
+    await this.chatbotRepository.update(
+      { id },
+      {
+        archivedAt: null,
+        status: setup[0] ? ChatbotStatus.DRAFT : ChatbotStatus.PAUSED,
+        updatedBy: currentUserId(),
+      },
+    );
+    this.logger.info(
+      `Chatbot ${id} restored (${documents.length} documents back)`,
+    );
+    return this.get(id);
   }
 
   /** Only models ally-ai can run, from the platform's model catalog. */
@@ -774,6 +860,8 @@ export class ChatbotService {
     live?: LiveReply,
   ): Promise<ChatbotTestResult> {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
+    // A removed assistant can be read, never run.
+    if (chatbot.archivedAt) throw new NotFoundException('Chatbot not found');
     const draft = dto.draft ?? {};
     if (draft.model) await this.assertModel(draft.model);
     const conversationId = dto.conversationId ?? `preview-${randomUUID()}`;

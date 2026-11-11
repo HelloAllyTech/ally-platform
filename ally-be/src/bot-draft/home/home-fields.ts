@@ -22,7 +22,10 @@ import {
   MAX_WIDGET_DOMAINS,
   normaliseDomain,
 } from '../../chatbot/bot-page/widget-host';
-import { ChatbotAccessMode } from '../../chatbot/enum/chatbot.enum';
+import {
+  ChatbotAccessMode,
+  ChatbotStatus,
+} from '../../chatbot/enum/chatbot.enum';
 import {
   ChatbotSettingsOverride,
   MAX_SYSTEM_PROMPT_CHARS,
@@ -64,7 +67,7 @@ interface HomeWrite {
   chatbot?: Partial<
     Pick<
       Chatbot,
-      'name' | 'description' | 'persona' | 'settings' | 'accessMode'
+      'name' | 'description' | 'persona' | 'settings' | 'accessMode' | 'status'
     >
   >;
   page?: Partial<BotPageSettings>;
@@ -356,7 +359,10 @@ export const HOME_FIELDS = {
     write: (value) => ({ page: { language: value } }),
   } as HomeField<BotPageLanguage>,
 
-  /** The page on or off. */
+  /**
+   * The page on or off. One switch with the assistant's own: on is live (people can use it), off
+   * is paused, so "Live" never means a page nobody can open.
+   */
   pageStatus: {
     read: (s) => s.pageRow.status,
     parse: (value) => {
@@ -365,7 +371,15 @@ export const HOME_FIELDS = {
       }
       return value as BotPageStatus;
     },
-    write: (value) => ({ pageRow: { status: value } }),
+    write: (value) => ({
+      pageRow: { status: value },
+      chatbot: {
+        status:
+          value === BotPageStatus.ON
+            ? ChatbotStatus.LIVE
+            : ChatbotStatus.PAUSED,
+      },
+    }),
   } as HomeField<BotPageStatus>,
 
   /** Who can open the page. Public only while the platform allows it (12b). */

@@ -20,6 +20,23 @@
   padding: 20px 0 16px;
   border-bottom: 1px solid var(--ally-line);
 }
+/* A removed assistant (opened from Archived): says so under the title. */
+.ally-home__archived {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-sunken);
+  color: var(--ally-ink-2);
+}
+.ally-home__archived p {
+  flex: 1 1 320px;
+  margin: 0;
+}
 .ally-home__crumb {
   color: var(--ally-faint);
 }
@@ -674,46 +691,6 @@
 .ally-home__actions {
   align-items: center;
   gap: 8px;
-}
-.ally-more {
-  position: relative;
-}
-.ally-more__button {
-  width: 44px;
-  padding: 0;
-}
-.ally-more__menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 30;
-  min-width: 200px;
-  margin: 0;
-  padding: 6px;
-  list-style: none;
-  background: var(--ally-surface);
-  border: 1px solid var(--ally-line);
-  border-radius: var(--ally-radius-md);
-  box-shadow: 0 12px 30px rgba(23, 23, 28, 0.12);
-}
-.ally-more__menu :is(a, button) {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--ally-radius-sm);
-  background: none;
-  color: var(--ally-ink);
-  font: 400 15px/1.3 var(--ally-font-ui);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-.ally-more__menu :is(a, button):is(:hover, :focus-visible) {
-  background: var(--ally-sunken);
-  outline: none;
 }
 /* Open page has its own button on a wide screen; the menu holds it on a phone. */
 .ally-more__phone,

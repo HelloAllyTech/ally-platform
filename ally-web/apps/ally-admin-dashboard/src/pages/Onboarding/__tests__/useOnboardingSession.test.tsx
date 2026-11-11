@@ -21,6 +21,11 @@ vi.mock("@api", () => ({
   useBackBotDraftMutation: () => [vi.fn()],
   usePublishBotDraftMutation: () => [publish, { isLoading: false }],
   useGetBotPageQuery: () => ({ data: { publicAllowed: false } }),
+  useDescribeBotDraftMutation: () => [vi.fn()],
+  useArchiveChatbotMutation: () => [vi.fn()],
+  useAddBotDraftDocumentMutation: () => [vi.fn()],
+  useCreateChatbotDocumentUploadUrlMutation: () => [vi.fn()],
+  useCreatePrivateChatbotDocumentMutation: () => [vi.fn()],
 }));
 vi.mock("@constants", () => ({}));
 

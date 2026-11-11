@@ -2,17 +2,22 @@ import React, { useCallback, useMemo, useState } from "react";
 
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { useGetChatbotsQuery } from "@api";
+import { useGetArchivedChatbotsQuery, useGetChatbotsQuery } from "@api";
 import { EmptyState } from "@components";
 import { Button as V2Button } from "@components/v2";
 import { en, ROUTES } from "@constants";
-import { Chatbot, ChatbotStatus } from "@types";
+import { Chatbot, ChatbotMemberRole, ChatbotStatus } from "@types";
 
 import { BotSettingsTab } from "./BotSettingsTab";
 import { AllConnectorsTab } from "./ConnectorsTab";
 import { CorpusTab } from "./CorpusTab";
 import { fill, LoadError } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
+import { HOME } from "../AssistantHome/copy";
+import { day } from "../AssistantHome/dates";
+import { MoreMenu } from "../AssistantHome/ui/Menu";
+import { RemoveDialog } from "../AssistantHome/ui/RemoveDialog";
+import { useRestoreAssistant } from "../AssistantHome/ui/useRestoreAssistant";
 import { Inbox } from "../Inbox";
 import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
 
@@ -21,7 +26,7 @@ import "./list-page.css";
 
 const t = en.whatsappBot.bots;
 
-type HomeTab = "bots" | "inbox" | "connectors" | "defaults" | "library";
+type HomeTab = "bots" | "inbox" | "archived" | "connectors" | "defaults" | "library";
 
 /**
  * Chatbots home.
@@ -48,6 +53,7 @@ export const WhatsAppBot: React.FC = () => {
         ? [
             { id: "bots", label: t.homeTabs.bots },
             { id: "inbox", label: t.homeTabs.inbox },
+            { id: "archived", label: t.homeTabs.archived },
             { id: "connectors", label: t.homeTabs.connectors },
             { id: "defaults", label: t.homeTabs.defaults },
             { id: "library", label: t.homeTabs.library },
@@ -55,6 +61,7 @@ export const WhatsAppBot: React.FC = () => {
         : [
             { id: "bots", label: t.homeTabs.bots },
             { id: "inbox", label: t.homeTabs.inbox },
+            { id: "archived", label: t.homeTabs.archived },
           ],
     [canCreate],
   );
@@ -127,9 +134,89 @@ export const WhatsAppBot: React.FC = () => {
             <Inbox />
           </div>
         )}
+        {activeTab === "archived" && <ArchivedTab />}
         {activeTab === "defaults" && <DefaultsTab />}
         {activeTab === "library" && <CorpusTab />}
       </div>
+    </div>
+  );
+};
+
+/**
+ * Removed assistants, most recent first. Opening one shows its page read-only: what it knew, its
+ * numbers and its conversations, nothing that changes it.
+ */
+const ArchivedTab: React.FC = () => {
+  const { data, isLoading, isError, refetch } = useGetArchivedChatbotsQuery();
+  const navigate = useNavigate();
+  const { restore, restoring } = useRestoreAssistant();
+  if (isLoading) {
+    return (
+      <div className="ally-list-page__grid" aria-busy="true">
+        {[0, 1].map(n => (
+          <span key={n} className="ally-card ally-list-page__card ally-list-page__card--skeleton" />
+        ))}
+      </div>
+    );
+  }
+  if (isError) return <LoadError title={t.archived.loadFailed} onRetry={() => void refetch()} />;
+  const bots = data?.chatbots ?? [];
+  if (!bots.length) {
+    return <EmptyState title={t.archived.empty} subtitle={t.archived.emptyHint} hideActionButton />;
+  }
+  return (
+    <div className="ally-list-page__grid">
+      {bots.map(bot => (
+        <div
+          key={bot.id}
+          className={`ally-list-page__card-wrap${
+            bot.myRole === ChatbotMemberRole.OWNER ? " ally-list-page__card-wrap--menu" : ""
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => navigate(ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id))}
+            className="ally-card ally-list-page__card ally-list-page__card--archived"
+          >
+            <span className="ally-list-page__card-top">
+              <span className="ally-list-page__name">
+                <span className="ally-list-page__bot">{bot.name}</span>
+                {bot.persona.displayName && bot.persona.displayName !== bot.name && (
+                  <span className="ally-small">{bot.persona.displayName}</span>
+                )}
+              </span>
+              {bot.archivedAt && (
+                <span className="ally-badge ally-badge--muted ally-list-page__status">
+                  {fill(t.archived.removed, { date: day(bot.archivedAt) })}
+                </span>
+              )}
+            </span>
+            {bot.description && (
+              <span className="ally-small ally-list-page__desc">{bot.description}</span>
+            )}
+            <span className="ally-list-page__stats ally-small">
+              <span>{fill(t.cardMessages, { count: bot.stats.messages })}</span>
+              <span>{fill(t.cardPeople, { count: bot.stats.people })}</span>
+              <span className="ally-list-page__role">{t.role[bot.myRole]}</span>
+            </span>
+          </button>
+          {bot.myRole === ChatbotMemberRole.OWNER && (
+            <div className="ally-list-page__menu">
+              <MoreMenu
+                label={fill(HOME.overview.moreFor, { name: bot.name })}
+                items={[
+                  {
+                    label: HOME.archived.restore,
+                    onSelect: () => {
+                      if (!restoring) void restore(bot);
+                    },
+                  },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 };
@@ -179,6 +266,8 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
   onCreate,
 }) => {
   const navigate = useNavigate();
+  // Owners can remove an assistant they no longer want, finished or not, without opening it.
+  const [removing, setRemoving] = useState<Chatbot | null>(null);
   if (!bots.length) {
     return (
       <EmptyState
@@ -193,56 +282,73 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
   return (
     <div className="ally-list-page__grid">
       {bots.map(bot => (
-        <button
+        <div
           key={bot.id}
-          type="button"
-          onClick={() =>
-            // An unfinished setup opens where it left off (chunk 20a), not the bot's page.
-            navigate(
-              bot.status === ChatbotStatus.DRAFT && bot.setupDraftId
-                ? ROUTES.CHATBOT_NEW_SESSION(bot.setupDraftId)
-                : ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id),
-            )
-          }
-          className="ally-card ally-list-page__card"
+          className={`ally-list-page__card-wrap${
+            bot.myRole === ChatbotMemberRole.OWNER ? " ally-list-page__card-wrap--menu" : ""
+          }`}
         >
-          <span className="ally-list-page__card-top">
-            <span className="ally-list-page__name">
-              <span className="ally-list-page__bot">{bot.name}</span>
-              {bot.persona.displayName && bot.persona.displayName !== bot.name && (
-                <span className="ally-small">{bot.persona.displayName}</span>
+          <button
+            type="button"
+            onClick={() =>
+              // An unfinished setup opens where it left off (chunk 20a), not the bot's page.
+              navigate(
+                bot.status === ChatbotStatus.DRAFT && bot.setupDraftId
+                  ? ROUTES.CHATBOT_NEW_SESSION(bot.setupDraftId)
+                  : ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id),
+              )
+            }
+            className="ally-card ally-list-page__card"
+          >
+            <span className="ally-list-page__card-top">
+              <span className="ally-list-page__name">
+                <span className="ally-list-page__bot">{bot.name}</span>
+                {bot.persona.displayName && bot.persona.displayName !== bot.name && (
+                  <span className="ally-small">{bot.persona.displayName}</span>
+                )}
+              </span>
+              <span
+                className={`ally-badge ally-list-page__status ally-list-page__status--${bot.status}`}
+              >
+                {t.status[bot.status]}
+              </span>
+            </span>
+            {bot.description && (
+              <span className="ally-small ally-list-page__desc">{bot.description}</span>
+            )}
+            <span className="ally-list-page__channels">
+              {bot.connectors.length ? (
+                bot.connectors.map(connector => (
+                  <span key={connector.id} className="ally-badge ally-badge--muted">
+                    {connector.typeLabel} {connector.summary?.address ?? ""}
+                  </span>
+                ))
+              ) : (
+                <span className="ally-small">{t.noConnector}</span>
               )}
             </span>
-            <span
-              className={`ally-badge ally-list-page__status ally-list-page__status--${bot.status}`}
-            >
-              {t.status[bot.status]}
+            <span className="ally-list-page__stats ally-small">
+              <span>{fill(t.cardMessages, { count: bot.stats.messages })}</span>
+              <span>{fill(t.cardPeople, { count: bot.stats.people })}</span>
+              {bot.status === ChatbotStatus.DRAFT && bot.setupDraftId && (
+                <span className="ally-list-page__continue">{ONBOARDING_COPY.continueSetup}</span>
+              )}
+              <span className="ally-list-page__role">{t.role[bot.myRole]}</span>
             </span>
-          </span>
-          {bot.description && (
-            <span className="ally-small ally-list-page__desc">{bot.description}</span>
+          </button>
+          {bot.myRole === ChatbotMemberRole.OWNER && (
+            <div className="ally-list-page__menu">
+              <MoreMenu
+                label={fill(HOME.overview.moreFor, { name: bot.name })}
+                items={[
+                  { label: HOME.overview.remove, danger: true, onSelect: () => setRemoving(bot) },
+                ]}
+              />
+            </div>
           )}
-          <span className="ally-list-page__channels">
-            {bot.connectors.length ? (
-              bot.connectors.map(connector => (
-                <span key={connector.id} className="ally-badge ally-badge--muted">
-                  {connector.typeLabel} {connector.summary?.address ?? ""}
-                </span>
-              ))
-            ) : (
-              <span className="ally-small">{t.noConnector}</span>
-            )}
-          </span>
-          <span className="ally-list-page__stats ally-small">
-            <span>{fill(t.cardMessages, { count: bot.stats.messages })}</span>
-            <span>{fill(t.cardPeople, { count: bot.stats.people })}</span>
-            {bot.status === ChatbotStatus.DRAFT && bot.setupDraftId && (
-              <span className="ally-list-page__continue">{ONBOARDING_COPY.continueSetup}</span>
-            )}
-            <span className="ally-list-page__role">{t.role[bot.myRole]}</span>
-          </span>
-        </button>
+        </div>
       ))}
+      {removing && <RemoveDialog bot={removing} onClose={() => setRemoving(null)} />}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
 import "@constants";
@@ -133,6 +133,103 @@ describe("What we learned", () => {
       />,
     );
     expect(screen.queryByText(COPY.learned.confirm)).toBeNull();
+  });
+});
+
+describe("What we learned, when the website gave nothing (chunk 20a-2)", () => {
+  afterEach(() => vi.useRealTimers());
+  const N = COPY.learned.nothing;
+  const empty = (problem: string | null = "little_found", transcript: unknown[] = []) =>
+    view({
+      learned: { facts: [], dropped: 0 },
+      crawl: { ...view().crawl, problem },
+      transcript: transcript as BotDraftView["transcript"],
+    });
+  const actions = () => ({
+    onDescribe: vi.fn().mockResolvedValue(true),
+    onUpload: vi.fn().mockResolvedValue(true),
+    onStartOver: vi.fn(),
+  });
+  /** Options tick, then fire after AUTO_ADVANCE_MS. */
+  const pick = (label: string) => {
+    fireEvent.click(screen.getByText(label));
+    act(() => void vi.advanceTimersByTime(500));
+  };
+
+  it("says why and offers ways on, instead of eight empty sections and Looks right", () => {
+    render(
+      <LearnedScreen
+        view={empty("blocked")}
+        busy={false}
+        onPatch={vi.fn()}
+        onConfirm={vi.fn()}
+        {...actions()}
+      />,
+    );
+    expect(screen.getByText("We couldn't find much on sunrise.example")).toBeTruthy();
+    expect(screen.getByText(N.why.blocked)).toBeTruthy();
+    for (const label of [N.describe, N.upload, N.otherSite, N.skip]) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    expect(screen.queryByText(COPY.learned.empty)).toBeNull();
+    expect(screen.queryByText(COPY.learned.confirm)).toBeNull();
+  });
+
+  it("reads a description, then says so if it still had no details", async () => {
+    vi.useFakeTimers();
+    const a = actions();
+    const { rerender } = render(
+      <LearnedScreen view={empty()} busy={false} onPatch={vi.fn()} onConfirm={vi.fn()} {...a} />,
+    );
+    pick(N.describe);
+    fireEvent.change(screen.getByLabelText(N.describe), {
+      target: { value: "We run a diagnostic lab in Mumbai with home sample collection." },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText(N.read));
+    });
+    expect(a.onDescribe).toHaveBeenCalledWith(
+      "We run a diagnostic lab in Mumbai with home sample collection.",
+    );
+    expect(screen.getByText(N.reading)).toBeTruthy();
+    // The builder replied, and there are still no details.
+    rerender(
+      <LearnedScreen
+        view={empty("little_found", [{ role: "builder", text: "Done" }])}
+        busy={false}
+        onPatch={vi.fn()}
+        onConfirm={vi.fn()}
+        {...a}
+      />,
+    );
+    expect(screen.getByText(N.stillNothing)).toBeTruthy();
+  });
+
+  it("starts again with another website, or skips on to the questions", () => {
+    vi.useFakeTimers();
+    const a = actions();
+    const onConfirm = vi.fn();
+    render(
+      <LearnedScreen view={empty()} busy={false} onPatch={vi.fn()} onConfirm={onConfirm} {...a} />,
+    );
+    pick(N.otherSite);
+    expect(a.onStartOver).toHaveBeenCalled();
+    pick(N.skip);
+    expect(onConfirm).toHaveBeenCalled();
+  });
+
+  it("offers no other website to a setup that didn't start from one", () => {
+    render(
+      <LearnedScreen
+        view={{ ...empty(), source: { website: null, description: "x" } }}
+        busy={false}
+        onPatch={vi.fn()}
+        onConfirm={vi.fn()}
+        {...actions()}
+      />,
+    );
+    expect(screen.getByText(N.titleNoSite)).toBeTruthy();
+    expect(screen.queryByText(N.otherSite)).toBeNull();
   });
 });
 

@@ -12,15 +12,17 @@ jest.mock('src/common/execution/execution-manager', () => ({
  */
 describe('ChatbotAccessService', () => {
   const BOT = { id: 'bot-1', name: 'Bot' };
+  let bot: { id: string; name: string; archivedAt?: Date | null };
   let platformWide: boolean;
   let membership: { role: ChatbotMemberRole } | null;
   let service: ChatbotAccessService;
 
   beforeEach(() => {
+    bot = BOT;
     platformWide = false;
     membership = null;
     service = new ChatbotAccessService(
-      { findOne: jest.fn(async () => BOT) } as never,
+      { findOne: jest.fn(async () => bot) } as never,
       {
         findOne: jest.fn(async () => membership),
         find: jest.fn(async () => [{ chatbotId: 'bot-1' }]),
@@ -61,6 +63,21 @@ describe('ChatbotAccessService', () => {
     await expect(
       service.assert('bot-1', ChatbotMemberRole.OWNER),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets a removed bot be read, by its members only, and never changed', async () => {
+    bot = { ...BOT, archivedAt: new Date('2026-11-11') };
+    platformWide = true;
+    await expect(service.assert('bot-1')).resolves.toBeTruthy();
+    for (const role of [ChatbotMemberRole.EDITOR, ChatbotMemberRole.OWNER]) {
+      await expect(service.assert('bot-1', role)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    }
+    platformWide = false;
+    await expect(service.assert('bot-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('lists only a member’s bots, and every bot for a platform admin', async () => {

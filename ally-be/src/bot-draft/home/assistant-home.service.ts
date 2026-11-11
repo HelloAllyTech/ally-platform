@@ -96,7 +96,8 @@ export class AssistantHomeService {
       version: versionOf(fact.text),
     }));
     return {
-      canEdit: role !== ChatbotMemberRole.VIEWER,
+      // A removed assistant is read-only.
+      canEdit: role !== ChatbotMemberRole.VIEWER && !chatbot.archivedAt,
       fields: readAll(state),
       safety: {
         ...safetyView(chatbot.safetyPack, chatbot.rules?.never ?? []),
