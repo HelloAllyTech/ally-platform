@@ -2,7 +2,7 @@
 
 Every agent in the Debrief family has the numbers the PRD and plan v9 asked for, plus the numbers the
 evals skill (`~/projects/Ally/.claude/skills/evals`) and the article it follows require. "Right" is
-defined **once, in code**, and the paired eval, stored results and the Console's live metrics all
+defined **once, in code**, and the paired eval, stored results and the live metrics (Analytics → Debriefs) all
 use that one definition: `ally-be/src/debrief/util/debrief-outcome.util.ts` (whole debrief, Ask
 Ally, PM agent) and `ally-be/src/debrief/util/debrief-stage-metrics.util.ts` (each agent inside a
 run).
@@ -28,11 +28,28 @@ From the excerpt the user shared and the evals skill:
   offline. Live data gets the same graders, minus the gold.
 - **Graders get checked too:** planted-fault catch rate (the gate), flip rate when re-judging, and
   later agreement with a judge from another model family (κ, plus recall on the reference's flagged
-  cases). No hand-labelled sets (team decision).
+  cases). **Debrief quality and safety judging is calibrated by a clinical expert** (expert review
+  comments and verdicts, the Calibration tab's people-rated sample, κ ≥ 0.6 gate on the PM agent's
+  autonomy). "No hand-labelled sets" is the **language-eval** rule only (no experts in every language);
+  it does not apply here.
 
-Where each number is read: **Console** = Debriefs → Metrics (live, from production runs). **Eval** =
+Where each number is read: **Console** = admin **Analytics → Debriefs** (live, from production runs; moved out of the Debrief Console on 2026-11-11), and for the PM agent the Debrief Console's PM agent tab. **Eval** =
 `ally-be/scripts/debrief-eval.js` on the prod test sets (open = dev, gate = test, sealed = never
 tuned on). **Gate** = a script that exits 1 on a miss.
+
+## Filters
+
+Same set for the live metrics and the eval runner, validated then escaped in
+`ally-be/src/debrief/util/debrief-metrics-filter.util.ts`:
+
+- **Page-wide** (narrow every live metric; in the Analytics page's shared filter row): organisation,
+  language, learner level, debrief type (recipe), release version, judge version — plus the page's
+  time range (30 days → 5 weeks, 90 days → 13, 12 months → 52).
+- **Pass-rate segments** (narrow only the pass rate; under the Pass rate heading): skill, scenario,
+  course, session length (learner-turn bands `1-5 / 6-15 / 16-30 / 31+`), step model (`<step>: <model>`),
+  client risk cue. These were the pass rate's breakdown lists until 2026-11-11. With a segment set the
+  API also returns `qualityAll`, so the headline tiles keep the whole pass rate.
+- Read across everything whatever the filters say: baselines, uptake lift, PM agent (`unfiltered`).
 
 ## The whole debrief
 
@@ -137,7 +154,7 @@ evidence map), so with the orchestrator on it also has a registry-agent row (fin
 ## Planner (orchestrated runs only)
 
 Definitions: `orchestratorMetrics` in `ally-be/src/debrief/util/debrief-stage-metrics.util.ts`, read from each run's
-Plan records (`workspace.plans`), its `planner` step records, findings and the judge, honouring the six filters.
+Plan records (`workspace.plans`), its `planner` step records, findings and the judge, honouring the page-wide filters.
 Shown on the Console under Each agent → Planner. Wired with synthetic runs (`debrief-orchestrator-metrics.spec.ts`);
 live numbers fill in once a challenger release runs. Synthetic planner cases for the offline eval:
 `docs/debrief-harness/fixtures/orchestrator/planner_cases.json`.
