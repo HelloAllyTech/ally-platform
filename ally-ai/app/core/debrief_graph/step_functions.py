@@ -224,6 +224,7 @@ class InProcessSteps:
             system=body.get("system_prompt"),
             critique=body.get("critique"),
             already=body.get("already"),
+            evidence_summary=body.get("evidence_summary"),
             scenario_session_id=session_id,
         )
         if out is None:

@@ -9,6 +9,7 @@ from typing import Any, Dict
 from app.core.debrief_graph import inputs as body
 from app.core.debrief_graph.constants import FallbackRung, Status, Step
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
+from app.core.debrief_graph.findings import evidence_findings
 from app.core.debrief_graph.model_step import ModelStep
 from app.core.debrief_graph.narration import (
     cards_summary,
@@ -20,6 +21,7 @@ from app.core.debrief_graph.narration import (
     safety_narration,
     safety_summary,
 )
+from app.core.debrief_graph.registry.manifest import agent_config
 from app.core.debrief_graph.state import DebriefState as State
 
 
@@ -68,6 +70,14 @@ def _analyst_inputs(state: State, ctx: Ctx):
     ]
 
 
+def _analyst_config(state: State, ctx: Ctx) -> Dict[str, Any]:
+    """The recipe's step; with the orchestrator on, the release's `analyst`
+    entry first (the Analyst is in the orchestrated floor, decided 2026-11-11)."""
+    if state.get("orchestrated"):
+        return agent_config(state, ctx, "analyst", Step.ANALYST)
+    return ctx.step_of(state["recipe_key"], Step.ANALYST) or {}
+
+
 ANALYST = ModelStep(
     step=Step.ANALYST,
     path="analyst",
@@ -77,6 +87,9 @@ ANALYST = ModelStep(
     summarise=lambda r: evidence_summary(r["evidence"]),
     on_success=_stay,
     on_failure=_stay,
+    config=_analyst_config,
+    # Kept on the run as findings in orchestrated runs only (model_step.py).
+    findings=lambda s, c, r: evidence_findings(r.get("evidence") or {}),
 )
 
 

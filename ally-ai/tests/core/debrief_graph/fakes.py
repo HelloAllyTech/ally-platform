@@ -294,7 +294,6 @@ class FakeSteps:
             "planner": {
                 "plan": {
                     "actions": [
-                        {"agent": "analyst", "why": "Always.", "focus_turns": []},
                         {
                             "agent": "guidance_lookup",
                             "why": "A pivotal moment.",

@@ -319,9 +319,34 @@ covers the planner's and the agents' models; `context.availability` =
 `progress` also accepts `label_key` (`debrief.progress.<agent>`), stored as `liveProgress.labelKey` for the apps.
 
 **Response additions** (orchestrated runs only): `workspace.profile`, `workspace.plans` (the plan and any top-up:
-`{ phase, source: planner|default|none, fallback, model, profile, chosen: [{agent, inputs, why, estimatedUsd}],
-considered: [{agent, whyNot}], dropped: [{agent, why}], estimatedUsd }`), `workspace.findings` (agent →
+`{ phase, source: planner|default|none, fallback, fallbackCode, model, profile, evidenceSummary, chosen: [{agent,
+inputs, why, estimatedUsd}], considered: [{agent, whyNot}], dropped: [{agent, code, why}], estimatedUsd }`;
+`fallbackCode` ∈ `planner_failed` (failed or timed out: the `planner` step's note says which) · `no_agents` ·
+`no_model` · `no_price` · `no_budget` · `nothing_left` · `no_time`, null when the planner planned; a dropped
+agent's `code` ∈ `already_ran` · `refused` · `unavailable` · `requires` · `limit` · `no_price` · `budget` · `time`), `workspace.findings` (agent →
 `{ agent, findings: [A3 finding], droppedQuotes, reasoning }`) and `workspace.findingsCount`. Steps gain a
 `planner` record (the model call), a `plan` record (`step: "plan"`, with the plan above in `plan`), and one record
 per agent under its id (`protocol_check`, …) in the usual record shape. Every existing step name, field and
 decision rule is unchanged, so `debrief-stage-metrics` and the Console read them as before.
+
+**The orchestrated floor (decided 2026-11-11).** With the flag on, the Analyst is no longer a planner choice: it
+runs at once beside the safety reader for every non-Short session (the Short recipe has no Analyst step), on the
+release's `analyst` entry's model (else the recipe's), and its evidence map is also summarised into findings. For
+a Case session with memory, `case_memory` is applied in code before it (the Analyst reads the memory). Both are
+marked `floor` in their manifests, are never offered to the planner, and are left out of the default plan; agents
+that `require` the Analyst are satisfied by the floor, and are not offered when it gave no evidence map. Run order:
+
+```
+flag off:  plan ─┬→ safety_reader ─┐→ after_reading → progress_reader? → guidance_lookup → writer → …   (unchanged)
+                 └→ analyst ───────┘
+flag on:   plan ─┬→ safety_reader ─┐→ after_reading → profile → planner → dispatch ─Send→ agents → writer → …
+          (case_memory applied)    │
+                 └→ analyst ───────┘
+```
+
+**Planner input:** `{ profile, evidence_summary, agents, max_agents, system_prompt, (top-up: critique, already) }`.
+`evidence_summary` = `{ pivotal_moments: [{turn, summary}] (≤6), skills: {observed, partial, missed} (skill names,
+≤12 each), ai_client_faults: [{turn, note}] (≤5) }` — the Analyst's own words, anything between quotation marks
+replaced by "…", each text ≤200 characters; never a quote, a skill note, or the transcript. The Plan record keeps
+it as `evidenceSummary`. **Planner timeout:** 20 s (`PLANNER_TIMEOUT_S`; spec A5 said 8 s — measured on the
+synthetic planner cases, gemini-2.5-flash p50 10.8 s / p90 17.8 s / max 17.9 s), then the default plan.

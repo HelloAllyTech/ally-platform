@@ -1,6 +1,8 @@
-"""`case_memory`: the Case recipe's part as a data agent. When chosen, the
-case's memory so far goes to the Analyst (who writes the memory's update) and
-the Writer (who must not contradict it), as the Case recipe did."""
+"""`case_memory`: the Case recipe's part as a data agent. The case's memory so
+far goes to the Analyst (who writes the memory's update) and the Writer (who
+must not contradict it), as the Case recipe did. In the floor with the
+Analyst: the Analyst runs before the planner, so its input cannot wait for
+the planner's choice; applied in code for every Case session with memory."""
 
 from app.core.debrief_graph.registry.manifest import AgentManifest, register
 
@@ -22,7 +24,7 @@ MANIFEST = register(
             "learner's earlier sessions in the same case, so the debrief agrees "
             "with it and the case memory is updated."
         ),
-        use_when="A case session with case memory.",
+        use_when="Always for a case session with case memory (in the floor).",
         skip_when="Never for a case session that has memory.",
         progress_label="Reading your session…",
         progress_label_key="debrief.progress.case_memory",
@@ -30,6 +32,7 @@ MANIFEST = register(
         reads=("learner_history",),
         privacy_class="learner",
         writer_has_own_block=True,
+        floor=True,
         apply=apply,
     )
 )

@@ -1,7 +1,8 @@
 """The orchestrated middle of the debrief (spec A1, A5, D2, D3), used only when
 the release's challenger flag (`bundle.orchestrator.enabled`) is on.
 
-    safety_reader → after_reading ─(orchestrated)→ profile ─→ planner ─→ dispatch
+    safety_reader ┐
+    analyst ──────┴→ after_reading ─(orchestrated)→ profile ─→ planner ─→ dispatch
                                     └(no planner / no budget)→ dispatch
     dispatch ─Send→ agent_<id> … ─→ dispatch          (one wave per `requires` level)
     dispatch ─(plan done)→ prepare_writer → writer → checks → evaluator → score_draft
@@ -9,11 +10,15 @@ the release's challenger flag (`bundle.orchestrator.enabled`) is on.
                      └(nothing to add / no time / no budget)→ revise_gate
 
 The floor stays in code: the safety reader runs first and nothing is published
-without it; the Writer, the checks, the Evaluator and the revision loop are
-today's nodes; the planner only chooses analysis agents, once, plus at most one
-top-up. Code reserves every chosen agent's cost before it runs (after holding
-back the floor's own budget) and drops what does not fit, recording why on the
-Plan record. A planner that fails or takes longer than 8 s gives way to the
+without it; the Analyst runs beside it for every session long enough to map
+(decided 2026-11-11: the Writer writes from its evidence map and five agents
+require it), with the case memory it reads; the Writer, the checks, the
+Evaluator and the revision loop are today's nodes. The planner reads the
+session profile and a summary of the evidence map (never the transcript) and
+only chooses analysis agents, once, plus at most one top-up. Code reserves
+every chosen agent's cost before it runs (after holding back the floor's own
+budget) and drops what does not fit, recording why on the Plan record. A
+planner that fails or takes longer than PLANNER_TIMEOUT_S gives way to the
 default plan for the session type: today's recipe, read from the release.
 """
 
@@ -46,12 +51,17 @@ from app.core.debrief_graph.registry.manifest import (
     orchestrator,
     refusal,
 )
-from app.core.debrief_graph.registry.profile import build_profile
+from app.core.debrief_graph.registry.profile import build_profile, evidence_summary
 from app.core.debrief_graph.state import DebriefState as State
 
 PLANNER_PROMPT = "debrief_planner_system"
-#: spec A5: a planner slower than this gives way to the default plan.
-PLANNER_TIMEOUT_S = 8.0
+#: A planner slower than this gives way to the default plan. Spec A5 said
+#: 8 s; measured 2026-11-11 on the synthetic planner cases with the evidence
+#: summary in the input, gemini-2.5-flash took p50 10.8 s, p90 17.8 s, max
+#: 17.9 s (n=18): at 8 s nearly every plan would fall back. 20 s keeps the
+#: fallback for a planner that is really stuck. Watch the planner's time and
+#: fallback rate on the Console (Each agent → Planner).
+PLANNER_TIMEOUT_S = 20.0
 #: At most this many agents per plan unless the release says otherwise.
 DEFAULT_MAX_AGENTS = 6
 #: Time held back for the floor (Writer, checks, Evaluator) before any agent.
@@ -74,16 +84,27 @@ _DROP_BUDGET = (
 _DROP_TIME = "Too little time was left before the deadline."
 
 
+def _drop(agent: str, code: str, why: str) -> Dict[str, str]:
+    """A dropped agent on the Plan record: `code` is what the metrics count
+    (already_ran · refused · unavailable · requires · limit · no_price ·
+    budget · time), `why` what a person reads."""
+    return {"agent": agent, "code": code, "why": why}
+
+
 # --- the default plan and the floor's reservation -------------------------------
 
 
 def default_plan(state: State, ctx: Ctx) -> List[str]:
     """Today's recipe, kept as data: the release's recipe for this session type,
-    its analysis steps as registry agents, plus the agent its own part became."""
+    its analysis steps as registry agents, plus the agent its own part became.
+    The floor's agents already ran and are left out."""
     recipe = ctx.recipe(state["recipe_key"])
     steps = [s.get("step") for s in recipe.get("steps") or []]
-    return _RECIPE_DATA_AGENTS.get(recipe["key"], []) + [
-        s for s in steps if s in REGISTRY
+    return [
+        a
+        for a in _RECIPE_DATA_AGENTS.get(recipe["key"], [])
+        + [s for s in steps if s in REGISTRY]
+        if not REGISTRY[a].floor
     ]
 
 
@@ -119,11 +140,19 @@ def agent_estimate(m: AgentManifest, state: State, ctx: Ctx) -> float:
     return _est(m.id, model, chars + 2000, ctx)
 
 
-def offered_agents(profile: Dict[str, Any], ctx: Ctx) -> List[str]:
-    """Enabled by the release and available for this session; nothing else is
+def offered_agents(
+    profile: Dict[str, Any], ctx: Ctx, answered: Optional[Dict[str, bool]] = None
+) -> List[str]:
+    """Enabled by the release, available for this session, not in the floor,
+    and with every floor agent it requires answered (FR-10); nothing else is
     ever shown to the planner."""
+    answered = answered or {}
     out = []
     for m in enabled(ctx):
+        if m.floor or any(
+            REGISTRY[r].floor and not answered.get(r) for r in m.requires
+        ):
+            continue
         try:
             if m.available(profile):
                 out.append(m.id)
@@ -165,6 +194,7 @@ def finalise_plan(
     considered: List[Dict[str, Any]],
     source: str,
     fallback: Optional[str] = None,
+    fallback_code: Optional[str] = None,
     reasoning: Optional[str] = None,
     model: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -185,13 +215,17 @@ def finalise_plan(
             continue
         seen.add(agent)
         if agent in already:
-            dropped.append({"agent": agent, "why": "It already ran in this debrief."})
+            dropped.append(
+                _drop(agent, "already_ran", "It already ran in this debrief.")
+            )
             continue
         refused = refusal(ctx, agent)
         if refused:
-            dropped.append({"agent": agent, "why": refused})
+            dropped.append(_drop(agent, "refused", refused))
         elif agent not in offered:
-            dropped.append({"agent": agent, "why": "Not available for this session."})
+            dropped.append(
+                _drop(agent, "unavailable", "Not available for this session.")
+            )
         else:
             picked.append(a)
 
@@ -210,17 +244,18 @@ def finalise_plan(
             if missing:
                 picked.remove(p)
                 dropped.append(
-                    {
-                        "agent": p["agent"],
-                        "why": f"Needs {', '.join(missing)}, which is not in the plan.",
-                    }
+                    _drop(
+                        p["agent"],
+                        "requires",
+                        f"Needs {', '.join(missing)}, which is not in the plan.",
+                    )
                 )
                 changed = True
 
     limit = max_agents(ctx)
     for p in picked[limit:]:
         dropped.append(
-            {"agent": p["agent"], "why": f"The plan already has {limit} agents."}
+            _drop(p["agent"], "limit", f"The plan already has {limit} agents.")
         )
     picked = picked[:limit]
     by_id = {p["agent"]: p for p in picked}
@@ -242,16 +277,20 @@ def finalise_plan(
         est = agent_estimate(m, state, ctx)
         why_dropped = None
         if lost:
-            why_dropped = f"Needs {', '.join(lost)}, which was dropped."
+            why_dropped = _drop(
+                agent, "requires", f"Needs {', '.join(lost)}, which was dropped."
+            )
         elif math.isinf(est):
-            why_dropped = "Its model has no known price, so it never runs."
+            why_dropped = _drop(
+                agent, "no_price", "Its model has no known price, so it never runs."
+            )
         elif est > available:
-            why_dropped = _DROP_BUDGET
+            why_dropped = _drop(agent, "budget", _DROP_BUDGET)
         elif latency > time_left:
-            why_dropped = _DROP_TIME
+            why_dropped = _drop(agent, "time", _DROP_TIME)
         if why_dropped:
             gone.add(agent)
-            dropped.append({"agent": agent, "why": why_dropped})
+            dropped.append(why_dropped)
             if agent == "analyst":
                 rung = int(FallbackRung.WRITER_AND_CHECKS_ONLY)
             continue
@@ -286,8 +325,15 @@ def finalise_plan(
         "phase": phase,
         "source": source,
         "fallback": fallback,
+        # What the metrics count: planner_failed (failed or timed out; the
+        # planner's step record says which) · no_agents · no_model · no_price
+        # · no_budget · nothing_left · no_time; None when the planner planned.
+        "fallbackCode": fallback_code,
         "model": model,
         "profile": state.get("profile") if phase == "plan" else None,
+        "evidenceSummary": (
+            evidence_summary(state.get("evidence") or {}) if phase == "plan" else None
+        ),
         "chosen": chosen,
         "considered": not_chosen,
         "dropped": dropped,
@@ -312,7 +358,11 @@ def finalise_plan(
             else "Chooses which analysis agents run for this session."
         ),
         "inputs": (
-            ["the session profile", n(len(offered), "available agent")]
+            [
+                "the session profile",
+                "the evidence map's summary",
+                n(len(offered), "available agent"),
+            ]
             + (["the Evaluator's critique"] if phase == "top_up" else [])
         ),
         "reasoning": reasoning,
@@ -366,6 +416,8 @@ def planner_body(state: State, ctx: Ctx) -> Dict[str, Any]:
     top_up = state.get("phase") == "top_up"
     return {
         "profile": state.get("profile") or {},
+        # The Analyst's words, never the transcript (decided 2026-11-11).
+        "evidence_summary": evidence_summary(state.get("evidence") or {}),
         "agents": [REGISTRY[a].card() for a in _candidates(state)],
         "max_agents": max_agents(ctx),
         "system_prompt": ctx.prompt(PLANNER_PROMPT),
@@ -403,6 +455,7 @@ def _plan_failed(state: State, ctx: Ctx):
             considered=[],
             source="none",
             fallback="Planning the top-up failed; revising without more evidence.",
+            fallback_code="planner_failed",
         )
         return update, "revise_gate"
     update = finalise_plan(
@@ -414,6 +467,7 @@ def _plan_failed(state: State, ctx: Ctx):
         considered=[],
         source="default",
         fallback=f"the planner failed or took longer than {PLANNER_TIMEOUT_S:g} s",
+        fallback_code="planner_failed",
     )
     return update, "dispatch"
 
@@ -429,6 +483,7 @@ PLANNER = ModelStep(
     ),
     inputs=lambda s, c: [
         "the session profile (never the transcript)",
+        "the evidence map's summary (no quotes)",
         n(len(_candidates(s)), "available agent"),
         *(["the Evaluator's critique"] if s.get("phase") == "top_up" else []),
     ],
@@ -467,7 +522,7 @@ async def profile(
     or straight to the default plan when it cannot run."""
     ctx = runtime.context
     prof = build_profile(state, ctx)
-    offered = offered_agents(prof, ctx)
+    offered = offered_agents(prof, ctx, state.get("agent_ok") or {})
     floor = floor_reserve(state, ctx, "plan")
     base = {
         "profile": prof,
@@ -480,15 +535,18 @@ async def profile(
     estimated = state.get("estimated", 0.0)
     model = planner_config(now, ctx).get("model")
     est = _planner_estimate(now, ctx) if model else math.inf
-    reason = None
+    reason = code = None
     if not offered:
-        reason = "no agent in this release is available for this session"
+        code, reason = (
+            "no_agents",
+            "no agent in this release is available for this session",
+        )
     elif not model:
-        reason = "the release names no planner model"
+        code, reason = "no_model", "the release names no planner model"
     elif math.isinf(est):
-        reason = "the planner's model has no known price"
+        code, reason = "no_price", "the planner's model has no known price"
     elif estimated + floor + est > ctx.ceiling_usd:
-        reason = "not enough of the run budget was left to plan"
+        code, reason = "no_budget", "not enough of the run budget was left to plan"
     if reason:
         update = finalise_plan(
             now,
@@ -499,6 +557,7 @@ async def profile(
             considered=[],
             source="default",
             fallback=reason,
+            fallback_code=code,
         )
         return Command(
             update={
@@ -622,13 +681,14 @@ async def top_up(
     now["floor_reserve"] = floor
     ran = state.get("agent_ok") or {}
     candidates = [a for a in state.get("offered") or [] if a not in ran]
-    reason = None
+    reason = code = None
     est = 0.0
     if not candidates:
-        reason = "Every available agent already ran."
+        code, reason = "nothing_left", "Every available agent already ran."
     elif ctx.time_left_ms(state.get("has_risk_cue", False)) < (
         _REVISION_MIN_MS + PLANNER_TIMEOUT_S * 1000
     ):
+        code = "no_time"
         reason = "Too little time was left to add evidence before revising."
     else:
         est = _planner_estimate(now, ctx)
@@ -636,10 +696,17 @@ async def top_up(
             math.isinf(est)
             or state.get("estimated", 0.0) + floor + est > ctx.ceiling_usd
         ):
+            code = "no_budget"
             reason = "Not enough of the run budget was left to add evidence."
     if reason:
         update = finalise_plan(
-            now, ctx, proposed=[], considered=[], source="none", fallback=reason
+            now,
+            ctx,
+            proposed=[],
+            considered=[],
+            source="none",
+            fallback=reason,
+            fallback_code=code,
         )
         return Command(
             update={**base, "floor_reserve": floor, **update}, goto="revise_gate"

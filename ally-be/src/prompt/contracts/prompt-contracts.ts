@@ -1386,7 +1386,7 @@ export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
   {
     name: 'Debrief planner',
     description:
-      "The orchestrated debrief's planner (challenger releases only): from the session profile and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the manifests and the limits around this text. Release-only.",
+      "The orchestrated debrief's planner (challenger releases only): runs after the safety reader and the Analyst; from the session profile, a summary of the Analyst's evidence map (pivotal moments with their turns, skills observed / partial / missed, the AI client's faults: the Analyst's words, no quotes) and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the evidence summary, the manifests and the limits around this text. Release-only.",
     category: 'evaluation',
     output: 'structured',
   },
