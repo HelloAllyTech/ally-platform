@@ -490,6 +490,17 @@ export const ApiEndpoints = {
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
     ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
   },
+  // Expert review (debrief orchestrator spec Part B): "Review debriefs (expert)" + the Analytics toggle.
+  DEBRIEF_EXPERT_REVIEW: {
+    QUEUE: "/v1/debriefs/expert-review/queue",
+    MY_COMMENTS: "/v1/debriefs/expert-review/my-comments",
+    RUN: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}`,
+    VERDICT: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}/verdict`,
+    COMMENTS: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}/comments`,
+    COMMENT: (id: string) => `/v1/debriefs/expert-review/comments/${id}`,
+    COMMENT_ACTION: (id: string, action: "resolve" | "reopen" | "still-happening") =>
+      `/v1/debriefs/expert-review/comments/${id}/${action}`,
+  },
   DEBRIEF_CALIBRATION: {
     SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
     AGREEMENT: "/v1/analytics/debrief-quality/calibration/agreement",
@@ -1340,6 +1351,8 @@ export const TAG_TYPES = {
   SKILL_EXPERIMENTS: "skillExperiments",
   DEBRIEF_CALIBRATION: "debriefCalibration",
   DEBRIEF_CONSOLE: "debriefConsole",
+  // Also registered in baseApi.ts's `tagTypes`.
+  DEBRIEF_EXPERT_REVIEW: "debriefExpertReview",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",

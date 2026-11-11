@@ -44,6 +44,7 @@ export * from "./helpline";
 export * from "./skillExperiments";
 export * from "./debriefCalibration";
 export * from "./debriefConsole";
+export * from "./debriefExpertReview";
 export * from "./courseCopilot";
 export * from "./agentChat";
 export * from "./allyGuide";
