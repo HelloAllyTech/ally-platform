@@ -102,7 +102,10 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
     final view = widget.controller.view;
     final previous = _lastState;
     _lastState = view?.state;
-    final wasWaiting = previous == LearnerDebriefState.working || previous == LearnerDebriefState.onItsWay;
+    final wasWaiting =
+        previous == LearnerDebriefState.working ||
+        previous == LearnerDebriefState.onItsWay ||
+        previous == LearnerDebriefState.takingLonger;
     if (!mounted || !wasWaiting || view?.state != LearnerDebriefState.ready || view?.cards == null) return;
     SemanticsService.sendAnnouncement(
       View.of(context),
@@ -197,6 +200,7 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
             progress: view.progress,
             latestStep: view.steps.isEmpty ? null : view.steps.last,
           ),
+          LearnerDebriefState.takingLonger => _TakingLonger(controller: widget.controller),
           LearnerDebriefState.onItsWay => _Body(ref.t('$_k.onItsWay'), key: const Key('debrief-on-its-way')),
           LearnerDebriefState.tooShort => _Body(ref.t('$_k.tooShort'), key: const Key('debrief-too-short')),
           LearnerDebriefState.failed => _LoadProblem(controller: widget.controller, offline: false),
@@ -1635,6 +1639,42 @@ class _LoadProblem extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Plan §7.5 / §10.3 "taking longer + Check again": a person is finishing
+/// the debrief (no risk cue). Calm, not a failure; Check again asks now
+/// instead of waiting for the next slow poll.
+class _TakingLonger extends ConsumerWidget {
+  const _TakingLonger({required this.controller});
+
+  final LearnerDebriefController controller;
+
+  static const _k = 'postSim.debriefCards.takingLonger';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final checking = controller.retrying;
+    return Column(
+      key: const Key('debrief-taking-longer'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(liveRegion: true, child: Text(ref.t('$_k.body'), style: _bodyStyle)),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: const Key('debrief-check-again'),
+          onPressed: checking ? null : controller.retry,
+          icon: const Icon(Icons.refresh, size: 18),
+          label: Text(ref.t(checking ? '$_k.checking' : '$_k.checkAgain')),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(44, 44),
+            foregroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+            textStyle: _leadStyle,
+          ),
+        ),
+      ],
     );
   }
 }

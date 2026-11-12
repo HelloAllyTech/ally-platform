@@ -96,7 +96,7 @@ export const useLearnerDebrief = (
 
   useEffect(() => {
     setIsWorking(data?.state === "working");
-    setIsWaiting(data?.state === "on_its_way");
+    setIsWaiting(data?.state === "on_its_way" || data?.state === "taking_longer");
   }, [data?.state]);
 
   // Stays failed through a retry, so Try again never flashes the old note.

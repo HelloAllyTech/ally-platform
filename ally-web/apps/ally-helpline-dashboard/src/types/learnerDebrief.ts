@@ -5,6 +5,9 @@
  * `not_available` means the learner's organisation isn't switched on for the
  * new debrief — callers must then keep showing the existing debrief unchanged.
  *
+ * `taking_longer` is a run a person is finishing without a risk cue (plan
+ * §10.3): the learner can Check again. With a risk cue it is `on_its_way`.
+ *
  * `failed` is never sent by the server: the app sets it when the request
  * itself failed (a 5xx or no connection), so the learner sees "Your debrief
  * didn't load" with Try again rather than the old note (PRD §6.12).
@@ -12,6 +15,7 @@
 export type LearnerDebriefState =
   | "ready"
   | "working"
+  | "taking_longer"
   | "on_its_way"
   | "too_short"
   | "not_available"

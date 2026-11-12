@@ -19,7 +19,8 @@ import '../../../data/learner_debrief_repository.dart';
 ///
 /// Polls every [pollInterval] (3 s) while the state is `working`, for up to
 /// [fastPollFor] (4 minutes), then every [slowPollInterval] (30 s); every
-/// [slowPollInterval] while a person finishes one (`on_its_way`); and not at
+/// [slowPollInterval] while a person finishes one (`on_its_way`,
+/// `taking_longer`); and not at
 /// all otherwise (v9 FR-33, web `useLearnerDebrief`). Once an answer has landed, a later failed request keeps it
 /// (like RTK Query keeps the last good `data`), so a blip mid-poll doesn't
 /// swap the learner back to the old view.
@@ -142,6 +143,7 @@ class LearnerDebriefController extends ChangeNotifier {
         _fastTimer ??= Timer(fastPollFor, () => _slow = true);
         _pollTimer = Timer(_slow ? slowPollInterval : pollInterval, _fetch);
       case LearnerDebriefState.onItsWay:
+      case LearnerDebriefState.takingLonger:
         _pollTimer = Timer(slowPollInterval, _fetch);
       default:
         break;

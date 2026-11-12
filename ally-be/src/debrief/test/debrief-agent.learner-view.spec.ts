@@ -209,14 +209,30 @@ describe('DebriefAgentService.learnerView', () => {
     ).toBe('not_available');
   });
 
-  it('a run a person must finish reads as on its way', async () => {
+  it('a run a person must finish reads as on its way with a risk cue, else taking longer', async () => {
     expect(
       (
         await build({
-          runs: [{ mode: 'live', status: 'needs_person', steps: [] }],
+          runs: [
+            {
+              mode: 'live',
+              status: 'needs_person',
+              hasRiskCue: true,
+              steps: [],
+            },
+          ],
         }).learnerView('s', 7)
       ).state,
     ).toBe('on_its_way');
+    for (const status of ['needs_person', 'failed']) {
+      expect(
+        (
+          await build({
+            runs: [{ mode: 'live', status, hasRiskCue: false, steps: [] }],
+          }).learnerView('s', 7)
+        ).state,
+      ).toBe('taking_longer');
+    }
   });
 });
 

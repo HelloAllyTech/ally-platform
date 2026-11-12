@@ -135,6 +135,14 @@ These keys are in `en.json` but no code in `lib/` refers to them by name. Most a
 | `conferenceListening.endSession` | End session | सत्र समाप्त करें | ಸೆಷನ್ ಕೊನೆಗೊಳಿಸಿ | सत्र थांबवा | அமர்வை முடி |
 | `conferenceListening.callEnded` | The call has ended | कॉल समाप्त हो गई है | ಕಾಲ್ ಕೊನೆಗೊಂಡಿದೆ | कॉल संपला आहे | அழைப்பு முடிந்தது |
 
-## "Your debrief" (Debrief agent) (79)
+## "Your debrief" (Debrief agent) (82)
 
 `postSim.debriefCards.*`, added 2026-10-30: one machine translation (gpt-4.1) shared by the web helpline, the React Native app and this app, written to match the words the existing Debrief tab already uses for "debrief" and "Ally" in each language. Needs a native speaker's read like the rest of this page. 2026-11-02: +17 keys (`postSim.debriefCards.{distress,practise,reply,listen}.*`) and a changed `importantMoment.support` (now ends "…you can talk to:" before the support lines), copied verbatim from the web helpline's locale files, same machine translation. 2026-11-02 (later): +11 keys (`postSim.debriefCards.working.steps.*` (8), `corrections.corrected`, `supervisor.canRead`, `ready.announce`), copied verbatim from the web helpline's locale files, same machine translation. Then +11 more (`postSim.debriefCards.supervisor.*` other than `canRead`, for the Roleplay Logs supervisor view), same source. 2026-11-12: +21 keys (`postSim.debriefCards.{failed,offline,explainer,pulse}.*` — the didn't-load and offline states, the "How Ally writes your debrief" sheet, the post-launch pulse) and `onItsWay` now ends "We'll let you know." in every language; written by Claude for both this app and the web helpline (the web has the same keys except `offline.*`), not by the i18n:sync script. Needs a native speaker's read like the rest of this page.
+
+2026-11-12 (later): +3 keys for the "taking longer + Check again" state (plan §7.5, §10.3), written by Claude for both this app and the web helpline, same terms as `onItsWay`. Needs a native speaker's read:
+
+| Key | English | Hindi | Kannada | Marathi | Tamil |
+|---|---|---|---|---|---|
+| `postSim.debriefCards.takingLonger.body` | This is taking longer than usual. I'll let you know when it's ready. | इसमें सामान्य से ज़्यादा समय लग रहा है। तैयार होते ही मैं आपको बता दूँगा। | ಇದು ಸಾಮಾನ್ಯಕ್ಕಿಂತ ಹೆಚ್ಚು ಸಮಯ ತೆಗೆದುಕೊಳ್ಳುತ್ತಿದೆ. ಸಿದ್ಧವಾದಾಗ ನಾನು ನಿಮಗೆ ತಿಳಿಸುತ್ತೇನೆ. | याला नेहमीपेक्षा जास्त वेळ लागत आहे. ती तयार झाली की मी तुम्हाला कळवेन. | இது வழக்கத்தை விட அதிக நேரம் எடுக்கிறது. தயாரானதும் நான் உங்களுக்குத் தெரிவிக்கிறேன். |
+| `postSim.debriefCards.takingLonger.checkAgain` | Check again | फिर से देखें | ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ | पुन्हा तपासा | மீண்டும் பார்க்கவும் |
+| `postSim.debriefCards.takingLonger.checking` | Checking… | देख रहे हैं… | ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ… | तपासत आहे… | பார்க்கிறது… |

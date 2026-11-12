@@ -18,6 +18,10 @@ import '../../../core/network/api_client.dart';
 enum LearnerDebriefState {
   ready,
   working,
+
+  /// A person is finishing it, no risk cue (plan §10.3): "taking longer"
+  /// with Check again. With a risk cue the server says [onItsWay].
+  takingLonger,
   onItsWay,
   tooShort,
   notAvailable,
@@ -27,6 +31,7 @@ enum LearnerDebriefState {
   static LearnerDebriefState parse(Object? value) => switch (value) {
     'ready' => ready,
     'working' => working,
+    'taking_longer' => takingLonger,
     'on_its_way' => onItsWay,
     'too_short' => tooShort,
     _ => notAvailable,

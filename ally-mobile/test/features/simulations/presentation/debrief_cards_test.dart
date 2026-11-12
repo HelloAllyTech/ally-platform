@@ -934,6 +934,22 @@ void main() {
       expect(find.text('from Ally'), findsNothing);
     });
 
+    testWidgets('taking_longer shows Check again, which asks now (plan §7.5)', (tester) async {
+      var calls = 0;
+      when(() => h.learnerDebrief.getDebrief('session-1')).thenAnswer(
+        (_) async => LearnerDebriefView.fromJson(calls++ == 0 ? {'state': 'taking_longer'} : readyDebriefJson()),
+      );
+      await h.pump(tester);
+      expect(find.byKey(const Key('debrief-taking-longer')), findsOneWidget);
+      expect(find.text("This is taking longer than usual. I'll let you know when it's ready."), findsOneWidget);
+      expect(tester.getSize(find.byKey(const Key('debrief-check-again'))).height, greaterThanOrEqualTo(44));
+
+      await tapVisible(tester, find.byKey(const Key('debrief-check-again')));
+      expect(calls, 2);
+      expect(find.byKey(const Key('debrief-taking-longer')), findsNothing);
+      expect(find.text('What worked'), findsOneWidget);
+    });
+
     testWidgets('too_short', (tester) async {
       stubDebrief({'state': 'too_short'});
       await h.pump(tester);

@@ -111,7 +111,13 @@ export type DebriefRegion = 'india' | 'outside_india';
 
 /** What a learner can read: cards only once published, nothing about the run. */
 export interface LearnerDebriefView {
-  state: 'ready' | 'working' | 'on_its_way' | 'too_short' | 'not_available';
+  state:
+    | 'ready'
+    | 'working'
+    | 'taking_longer'
+    | 'on_its_way'
+    | 'too_short'
+    | 'not_available';
   runId?: string;
   cards?: Record<string, any> | null;
   language?: string | null;
@@ -720,7 +726,10 @@ export class DebriefAgentService implements OnModuleInit {
           state: run.skipReason === 'too_short' ? 'too_short' : 'not_available',
         };
       default:
-        return { state: 'on_its_way' };
+        // Plan §10.3 rung 6: a person finishes it. With a risk cue the
+        // learner reads "on its way" (urgent in the queue); otherwise
+        // "taking longer" with Check again (plan §7.5).
+        return { state: run.hasRiskCue ? 'on_its_way' : 'taking_longer' };
     }
   }
 

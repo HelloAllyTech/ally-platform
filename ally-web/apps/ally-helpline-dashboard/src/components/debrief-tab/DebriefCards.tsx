@@ -715,6 +715,32 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
         </div>
       </div>
     );
+  } else if (view.state === "taking_longer") {
+    // Plan §7.5 / §10.3: a person is finishing it (no risk cue). Calm, not a
+    // failure; the learner can check again rather than wait on a poll.
+    content = (
+      <div data-testid="debrief-taking-longer" className="flex flex-col gap-3">
+        <div role="status" aria-live="polite">
+          <Body>{t("postSim.debriefCards.takingLonger.body")}</Body>
+        </div>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="inline-flex min-h-[44px] items-center gap-2 self-start rounded-full border border-primary-200 bg-primary-50 px-4 font-primary text-sm font-semibold text-primary-600 transition-colors hover:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={`h-4 w-4 ${retrying ? "animate-spin motion-reduce:animate-none" : ""}`}
+            />
+            {retrying
+              ? t("postSim.debriefCards.takingLonger.checking")
+              : t("postSim.debriefCards.takingLonger.checkAgain")}
+          </button>
+        )}
+      </div>
+    );
   } else if (view.state === "on_its_way") {
     content = <Body>{t("postSim.debriefCards.onItsWay")}</Body>;
   } else if (view.state === "too_short") {

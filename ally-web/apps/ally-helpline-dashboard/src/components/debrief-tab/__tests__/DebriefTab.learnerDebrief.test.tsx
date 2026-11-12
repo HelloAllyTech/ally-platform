@@ -434,6 +434,26 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
   });
 
+  it("says it is taking longer, with Check again, while a person finishes it (plan §7.5)", () => {
+    const refetch = vi.fn();
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "taking_longer" }, refetch });
+    renderTab();
+
+    expect(screen.getByTestId("debrief-taking-longer")).toHaveTextContent(
+      "postSim.debriefCards.takingLonger.body",
+    );
+    expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /postSim.debriefCards.takingLonger.checkAgain/ }),
+    );
+    expect(refetch).toHaveBeenCalled();
+    // And it keeps asking slowly, like "on its way".
+    expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
+      "s-1",
+      expect.objectContaining({ pollingInterval: 30000 }),
+    );
+  });
+
   describe("feedback and review outcomes", () => {
     const ready = (extra: Record<string, unknown> = {}) =>
       mockLearnerDebriefQuery.mockReturnValue({
