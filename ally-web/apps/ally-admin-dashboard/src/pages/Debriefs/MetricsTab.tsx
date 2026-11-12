@@ -22,11 +22,11 @@ import {
   DebriefSafetyRecallRun,
 } from "@types";
 
+import { languageLabel } from "./consoleLabels";
 import { ChangeWhiskers, WhiskerRow } from "../Analytics/ChangeWhiskers";
 import { ChartCard, KpiTile, lineOpts, PALETTE } from "../Analytics/chartKit";
 import { CONTEXT, stableScale } from "../Analytics/chartScales";
 import { TabControls } from "../Analytics/tabControlsSlot";
-import { languageLabel } from "./consoleLabels";
 import { AgentsSection } from "./metrics/AgentsSection";
 import { BulletRow, BulletRows, NumbersTable, RateDots, RateRow } from "./metrics/metricsCharts";
 import {
