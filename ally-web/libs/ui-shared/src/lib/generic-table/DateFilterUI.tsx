@@ -132,20 +132,26 @@ const DateFilterUI: React.FC<DateFilterUIProps> = ({ selectedValues, onChange, o
       </div>
       <div className="flex gap-2 mb-2">
         <input
-          className="border rounded px-2 py-1 w-full text-[#6e6656]"
+          className="border rounded px-2 py-1 w-full text-[#6e6656] cursor-pointer"
           placeholder="Starting"
           value={
             Array.isArray(range) && range[0] instanceof Date ? range[0].toLocaleDateString() : ""
           }
           readOnly
+          // These fields had no click handler at all — clicking into "From"/
+          // "To" did nothing, since only the separate "Custom" preset button
+          // opened the calendar. Clicking either field now opens it too,
+          // matching what a date input visually invites someone to do.
+          onClick={() => setSelectedPreset("Custom")}
         />
         <input
-          className="border rounded px-2 py-1 w-full text-[#6e6656]"
+          className="border rounded px-2 py-1 w-full text-[#6e6656] cursor-pointer"
           placeholder="Ending"
           value={
             Array.isArray(range) && range[1] instanceof Date ? range[1].toLocaleDateString() : ""
           }
           readOnly
+          onClick={() => setSelectedPreset("Custom")}
         />
       </div>
       {selectedPreset === "Custom" && (

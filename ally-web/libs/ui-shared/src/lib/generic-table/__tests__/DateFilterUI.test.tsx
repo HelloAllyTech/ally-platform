@@ -77,6 +77,18 @@ describe("DateFilterUI", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("opens the calendar when clicking directly into the From or To field, not only the Custom button", () => {
+    // The From/To boxes had no click handler at all — a counsellor clicking
+    // into what visually looks like a date field got nothing, since only the
+    // separate "Custom" preset button opened the calendar.
+    const onChange = vi.fn();
+    render(<DateFilterUI selectedValues={[]} onChange={onChange} />);
+
+    expect(screen.queryByText("calendar-range")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByPlaceholderText("Starting"));
+    expect(screen.getByText("calendar-range")).toBeInTheDocument();
+  });
+
   it("enables Save only when a range is selected and calls onDateSelect", () => {
     const onChange = vi.fn();
     const onDateSelect = vi.fn();
