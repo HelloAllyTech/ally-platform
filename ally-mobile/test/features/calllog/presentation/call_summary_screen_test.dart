@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:record/record.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
@@ -16,6 +17,9 @@ import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.da
 import 'package:ally_mobile_flutter/features/calllog/data/call_summary_fields.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
 
+import '../../../support/mock_path_provider.dart';
+import '../../../support/mock_record_platform.dart';
+import '../../../support/phone_viewport.dart';
 import '../../../support/pump_app.dart';
 
 class MockCallLogRepository extends Mock implements CallLogRepository {}
@@ -48,6 +52,11 @@ List<Override> _editorOverrides({List<String>? visibleFields}) => [
 ];
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(const RecordConfig());
+    installFakePathProvider();
+  });
+
   testWidgets(
     'CallSummaryScreen: renders sections, tracks dirty fields, and saves only changes',
     (tester) async {
@@ -391,6 +400,179 @@ void main() {
       expect(fieldText(), 'Polished notes.');
       expect(find.text('Polished notes.'), findsOneWidget);
       expect(find.byType(AppButton), findsOneWidget, reason: 'the enhanced text is an unsaved change');
+    },
+  );
+
+  testWidgets(
+    'CallSummaryScreen: an in-progress dictation survives switching to the Transcript tab and back',
+    (tester) async {
+      // TabBarView disposes an off-screen tab's whole subtree by default —
+      // including VoiceNoteSection's recorder — the moment another tab is
+      // switched to, silently killing an in-progress dictation. Without
+      // _SummaryTabState's AutomaticKeepAliveClientMixin, switching to
+      // Transcript and back would reset this screen to the idle "record"
+      // CTA instead of still showing the recording in progress.
+      usePhoneViewport(tester);
+      final repository = MockCallLogRepository();
+      final platform = installMockRecordPlatform();
+      when(() => platform.onStateChanged(any())).thenAnswer((_) => const Stream.empty());
+      when(() => platform.hasPermission(any(), request: any(named: 'request'))).thenAnswer((_) async => true);
+      when(() => platform.start(any(), any(), path: any(named: 'path'))).thenAnswer((_) async {});
+
+      // isManualNote: summaryStatus SUCCESS with no AI summary object.
+      final summary = CallSummaryDetails(
+        counselorId: 7,
+        fields: {'callId': 1001},
+        summaryStatus: 'SUCCESS',
+        isSummaryAvailable: false,
+      );
+      when(() => repository.getCallSummary(1001)).thenAnswer((_) async => summary);
+      when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+
+      await pumpApp(
+        tester,
+        CallSummaryScreen(log: _log),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          summaryVisibleFieldsProvider.overrideWith((ref) async => _allSummaryFieldKeys),
+          userPermissionsProvider.overrideWith(
+            (ref) async => const [UserPermissions.viewMessages, UserPermissions.counselorAccess],
+          ),
+          currentUserProvider.overrideWith((ref) async => _user(7)),
+          scribeVoiceNoteEnabledProvider.overrideWith((ref) async => true),
+        ],
+      );
+
+      // Tabs are addressed by their own stable Key ('call-summary-tab-0'/
+      // '-1'), not by translated label text — VoiceNoteSection's first
+      // ref.t() call is gated behind two FutureProviders still AsyncLoading
+      // on the very first build (see voice_note_section_test.dart's own
+      // comment on this exact trap), and alongside other tests in this file
+      // the real translation load it then triggers can hang for real rather
+      // than just showing raw keys. Untranslated keys don't affect whether
+      // the recording itself survives, which is all this test checks.
+      expect(find.byKey(const Key('call-summary-tab-0')), findsOneWidget);
+      expect(find.byKey(const Key('call-summary-tab-1')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('voice-note-record-cta')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const Key('voice-note-recording')), findsOneWidget);
+
+      // Switch to Transcript, then back to Summary. No pumpAndSettle() from
+      // here on — the recorder's duration ticker is a real Timer.periodic
+      // that never quiets one, same trap voice_note_section_test.dart's own
+      // comment documents.
+      await tester.tap(find.byKey(const Key('call-summary-tab-1')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('call-summary-tab-0')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Still recording — not reset to the idle CTA.
+      expect(find.byKey(const Key('voice-note-recording')), findsOneWidget);
+      expect(find.byKey(const Key('voice-note-record-cta')), findsNothing);
+      verify(() => platform.start(any(), any(), path: any(named: 'path'))).called(1);
+
+      // This test's bare MaterialApp(home:) host has no Scaffold/navigator
+      // chrome reserving space the way the real app does, and untranslated
+      // fallback keys run noticeably longer than the real short strings
+      // they stand in for — both produce layout overflow in this harness
+      // that isn't a production bug; this test's own concern is purely
+      // whether the recording survives the tab switch.
+      while (tester.takeException() != null) {}
+    },
+  );
+
+  testWidgets(
+    'CallSummaryScreen: generating a dictated note invalidates callSummaryProvider so a reopened note is not stale',
+    (tester) async {
+      // _applyVoiceValues persisted the generated built-in field values to
+      // the backend and updated this screen's own local form optimistically,
+      // but never invalidated callSummaryProvider(chatId) — so reopening the
+      // SAME note from a fresh screen instance (e.g. back out to Call Log
+      // and back in) kept serving whatever callSummaryProvider had cached
+      // from before Generate was pressed: an empty/stale summary until the
+      // app itself restarted and built a fresh provider container.
+      //
+      // A narrow phone-width viewport (usePhoneViewport) made the recording
+      // panel's own Row overflow badly enough that its Stop button fell
+      // outside the hit-testable area — tapping its Key found the widget
+      // but the tap never actually reached it. A wide, generously tall
+      // surface avoids that without fighting this screen's own layout.
+      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = MockCallLogRepository();
+      final platform = installMockRecordPlatform();
+      when(() => platform.onStateChanged(any())).thenAnswer((_) => const Stream.empty());
+      when(() => platform.hasPermission(any(), request: any(named: 'request'))).thenAnswer((_) async => true);
+      when(() => platform.start(any(), any(), path: any(named: 'path'))).thenAnswer((_) async {});
+      when(() => platform.stop(any())).thenAnswer((_) async => null);
+
+      final summary = CallSummaryDetails(
+        counselorId: 7,
+        fields: {'callId': 1001},
+        summaryStatus: 'SUCCESS',
+        isSummaryAvailable: false,
+      );
+      when(() => repository.getCallSummary(1001)).thenAnswer((_) async => summary);
+      when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+      when(
+        () => repository.generateNoteFromAudio(
+          audioFilePath: any(named: 'audioFilePath'),
+          fields: any(named: 'fields'),
+        ),
+      ).thenAnswer(
+        (_) async => (
+          transcript: 'Client discussed anxiety.',
+          values: [(id: 'sessionSummary', value: 'Discussed anxiety')],
+        ),
+      );
+      when(
+        () => repository.updateCallSummary(1001, {'sessionSummary': 'Discussed anxiety'}),
+      ).thenAnswer((_) async => summary);
+      when(
+        () => repository.saveNoteTranscript(chatId: 1001, transcript: 'Client discussed anxiety.'),
+      ).thenAnswer((_) async {});
+
+      await pumpApp(
+        tester,
+        CallSummaryScreen(log: _log),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          summaryVisibleFieldsProvider.overrideWith((ref) async => _allSummaryFieldKeys),
+          userPermissionsProvider.overrideWith(
+            (ref) async => const [UserPermissions.viewMessages, UserPermissions.counselorAccess],
+          ),
+          currentUserProvider.overrideWith((ref) async => _user(7)),
+          scribeVoiceNoteEnabledProvider.overrideWith((ref) async => true),
+        ],
+      );
+      await tester.tap(find.byKey(const Key('voice-note-record-cta')));
+      await tester.pump();
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('voice-note-stop')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const Key('voice-note-ready')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('voice-note-generate')));
+      await tester.pump();
+      await tester.pump();
+      // VoiceNoteRecorder.reset() (called once generation succeeds) does
+      // real dart:io file-existence/delete calls on the fake temp path —
+      // the one real-zone window this needs, same as voice_note_section_test.dart.
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+
+      // One fetch from the screen's initial build, one more from the
+      // generate flow's invalidation — proving a fresh screen instance for
+      // this chatId would no longer see the pre-generation cached summary.
+      verify(() => repository.getCallSummary(1001)).called(2);
+
+      while (tester.takeException() != null) {}
     },
   );
 }

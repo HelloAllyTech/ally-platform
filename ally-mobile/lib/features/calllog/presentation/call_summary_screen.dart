@@ -760,7 +760,7 @@ class _SummaryTab extends ConsumerStatefulWidget {
   ConsumerState<_SummaryTab> createState() => _SummaryTabState();
 }
 
-class _SummaryTabState extends ConsumerState<_SummaryTab> {
+class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliveClientMixin {
   /// Built-in field values + last-saved baseline (RN `formData` /
   /// `savedFormData`); dirty = differs from the baseline. See
   /// [SummaryFormState] for why that, not a touched-set, keeps edits made
@@ -770,6 +770,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   bool _isSaving = false;
   bool _isRetrying = false;
   Timer? _notesDebounce;
+
+  // Without this, TabBarView disposes this tab's whole subtree — including
+  // VoiceNoteSection's recorder — the moment the Transcript tab is switched
+  // to, silently killing an in-progress dictation.
+  @override
+  bool get wantKeepAlive => true;
 
   int get _chatId => widget.chatId!;
 
@@ -996,6 +1002,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     });
     await ref.read(callLogRepositoryProvider).updateCallSummary(_chatId, updates);
     if (mounted) setState(() => _form.markSaved(updates));
+    // Without this, callSummaryProvider's cache for this chatId is never
+    // told the generated values exist — reopening this note from a fresh
+    // screen instance (e.g. back out to Call Log and back in) kept serving
+    // whatever it had cached from before Generate was pressed, showing an
+    // empty/stale summary until the app itself restarted.
+    ref.invalidate(callSummaryProvider(_chatId));
   }
 
   // RN's global bottom Save button only ever shows/acts on built-in-field
@@ -1164,6 +1176,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// bare error text. Only a 403 (`isUnauthorized`) gets its own view.
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final summaryAsync = widget.summaryAsync;
     final error = summaryAsync.error;
     if (error is DioException && error.response?.statusCode == 403) {
