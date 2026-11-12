@@ -426,7 +426,7 @@ Defaults are the old ticks, so a deploy changes nothing (server clock UTC → In
 | `debrief-pm-agent-forecasts` | Check forecasts | daily 05:35 | 1 min / hourly / 6 h / daily |
 | `debrief-pm-agent` | PM agent analysis | weekly Mon 07:30 | daily / weekly / every 2 weeks · budget confirm |
 | `debrief-pm-agent-review` | PM agent monthly review | monthly 1st 08:30 | weekly / monthly · budget confirm |
-| `debrief-baseline` | Propose setting values | monthly 1st 08:30 | 1 min / weekly / monthly · budget confirm |
+| `debrief-baseline` | Propose setting values | monthly 1st 08:30 | weekly / monthly · budget confirm |
 
 There is no Run now: to test a job, set it to run often (every 1 min where offered) and set it back.
 The PM agent page keeps "Run the PM agent now". `debrief-canary-watch` and `debrief-test-sets` stay on

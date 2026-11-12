@@ -427,6 +427,7 @@ describe('DebriefScheduleService', () => {
     for (const k of [
       'debrief-pm-agent',
       'debrief-pm-agent-review',
+      'debrief-baseline',
       'debrief-judge',
     ])
       await expect(

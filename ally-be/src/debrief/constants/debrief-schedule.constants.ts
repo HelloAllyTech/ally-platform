@@ -171,7 +171,7 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
   },
   {
     key: 'debrief-baseline',
-    options: ['1min', 'weekly', 'monthly'],
+    options: ['weekly', 'monthly'],
     defaults: monthlyFirst,
     locked: false,
     learningBudget: true,
