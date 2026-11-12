@@ -406,14 +406,25 @@ export interface KindEligibility {
   reason: string;
 }
 
+/** The steps learners never see (plan §4: free to experiment before learners are involved). */
+export const LEARNER_FREE_STEPS: readonly AutonomyStep[] = [
+  'quick_test',
+  'gate_test',
+  'paired_trial',
+];
+
 /**
- * May the owner set this kind to "on its own" at any step? Only while the
- * judge agrees with people (κ ≥ 0.6 on the gated measures) and the track
- * record is clean. Pinned rules never.
+ * May the owner set this kind to "on its own" at this step? Plan §4 "Improver
+ * autonomy": quick tests, gate tests and paired trials never reach a learner,
+ * so they may run on their own whatever the judge's agreement; only a clean
+ * track record is needed (re-locks still apply). The canary reaches learners:
+ * it also needs the judge to agree with people (κ ≥ 0.6 on the gated
+ * measures). Promotion is always a person; pinned rules never.
  */
 export function kindEligibility(
   kind: ChangeKind,
   f: AutonomyFacts,
+  step: AutonomyStep = 'canary',
 ): KindEligibility {
   if (kind === 'pinned_rules') {
     return {
@@ -424,6 +435,13 @@ export function kindEligibility(
   }
   const relock = relockReason(kind, f);
   if (relock) return { kind, eligible: false, reason: `Not now: ${relock}.` };
+  if (LEARNER_FREE_STEPS.includes(step)) {
+    return {
+      kind,
+      eligible: true,
+      reason: 'Yes: learners never see it; budget-capped.',
+    };
+  }
   if (!f.gate.met) {
     const low = f.gate.failing
       .map(
@@ -444,9 +462,23 @@ export function kindEligibility(
   };
 }
 
+/** Each step's eligibility for one kind (the Settings matrix, the PM agent's chips). */
+export function stepEligibility(
+  kind: ChangeKind,
+  f: AutonomyFacts,
+): Record<AutonomyStep, { eligible: boolean; reason: string }> {
+  return Object.fromEntries(
+    AUTONOMY_STEPS.map((st) => {
+      const e = kindEligibility(kind, f, st);
+      return [st, { eligible: e.eligible, reason: e.reason }];
+    }),
+  ) as Record<AutonomyStep, { eligible: boolean; reason: string }>;
+}
+
 /**
  * Why an owner's change to the matrix is refused (null when it is fine):
- * pinned rules are not configurable, and "auto" needs an eligible kind.
+ * pinned rules are not configurable, and "auto" needs the kind eligible at
+ * that step (the κ gate only on the canary).
  */
 export function matrixChangeRefusal(
   kind: string,
@@ -467,7 +499,7 @@ export function matrixChangeRefusal(
     return `${value} is not auto, ask or off`;
   }
   if (value === 'auto') {
-    const e = kindEligibility(kind as ChangeKind, f);
+    const e = kindEligibility(kind as ChangeKind, f, step as AutonomyStep);
     if (!e.eligible)
       return `${kind} cannot run ${step} on its own: ${e.reason}`;
   }

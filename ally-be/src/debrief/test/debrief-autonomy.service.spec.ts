@@ -52,6 +52,47 @@ describe('DebriefAutonomyService', () => {
     expect(row.autonomy).toBeNull();
   });
 
+  it('with no calibration yet, the tests learners never see may still run on their own; the canary may not', async () => {
+    const { service, row } = build();
+    jest
+      .spyOn(service, 'facts')
+      .mockResolvedValue(
+        facts({
+          gate: { met: false, failing: [{ measure: 'accuracy', kappa: null }] },
+        }),
+      );
+    await service.setMatrix(
+      [
+        { kind: 'settings', step: 'quick_test', value: 'auto' },
+        { kind: 'prompts', step: 'gate_test', value: 'auto' },
+        { kind: 'prompts', step: 'paired_trial', value: 'auto' },
+      ],
+      7,
+    );
+    expect(row.autonomy.matrix.settings.quick_test).toBe('auto');
+    expect(row.autonomy.matrix.prompts.gate_test).toBe('auto');
+    expect(row.autonomy.matrix.prompts.paired_trial).toBe('auto');
+    await expect(
+      service.setMatrix(
+        [{ kind: 'prompts', step: 'canary', value: 'auto' }],
+        7,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    const view = await service.policy();
+    expect(view.matrix.pinned_rules.quick_test).not.toBe('auto');
+  });
+
+  it('the old quick-test switch turns quick tests on for settings and prompts without κ', async () => {
+    const { service, row } = build();
+    jest
+      .spyOn(service, 'facts')
+      .mockResolvedValue(facts({ gate: { met: false, failing: [] } }));
+    await service.mirrorLegacyQuickTestSwitch(true);
+    expect(row.autonomy.matrix.settings.quick_test).toBe('auto');
+    expect(row.autonomy.matrix.prompts.quick_test).toBe('auto');
+    expect(row.autonomy.matrix.prompts.canary).not.toBe('auto');
+  });
+
   it('accepts "auto" for an eligible kind and audits it', async () => {
     const { service, row, audit } = build();
     jest.spyOn(service, 'facts').mockResolvedValue(facts());

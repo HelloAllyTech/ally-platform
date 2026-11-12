@@ -362,7 +362,9 @@ type WaitingRelease = {
 { enabled: boolean;                       // pmAgentEnabled, the master switch
   steps: ['quick_test','gate_test','paired_trial','canary']; promote: 'person';
   kinds: Array<{ kind: 'settings'|'prompts'|'pinned_rules'; configurable: boolean;
-                 cells: Record<Step, 'auto'|'ask'|'off'>; eligible: boolean; reason: string;
+                 cells: Record<Step, 'auto'|'ask'|'off'>;
+                 eligible: boolean; reason: string;      // the canary's (the κ gate's step)
+                 eligibility: Record<Step, { eligible: boolean; reason: string }>;
                  relockedAt: string|null; relockReason: string|null }>;
   orgs: Array<{ tenantId; tenantName; live: boolean;
                 overrides: { paired_trial; canary: 'default'|'ask'|'never' } }>;
@@ -374,10 +376,16 @@ type WaitingRelease = {
 ```
 - **Kinds.** `settings` covers non-budget settings. `prompts` covers prompt edits, registry agents and default plans. `pinned_rules` is always never.
 - **Guidance and models are not kinds.** The PM agent never touches Context Library chunks (spec C4), and model trials come in Release 2. Stored cells for them are dropped when the policy is read.
-- `PUT autonomy/matrix {changes: [{kind, step, value}]}` (owner) is all or nothing. It returns 400 when `auto` is set on an ineligible kind, when `pinned_rules` is changed, or when the step is unknown.
+- `PUT autonomy/matrix {changes: [{kind, step, value}]}` (owner) is all or nothing. It returns 400 when `auto` is set where the kind is not eligible at that step, when `pinned_rules` is changed, or when the step is unknown.
 - `PUT autonomy/orgs/:tenantId {changes: {paired_trial?|canary?: 'default'|'ask'|'never'}}` (owner) only tightens: the stricter of the global and org settings applies.
 
-A kind is eligible when κ ≥ 0.6 on the gated measures and its track record is clean. A kind
+Eligibility is per step (plan §4 "Improver autonomy": free to analyse, measure and experiment
+before learners are involved). **Quick test, gate test and paired trial** never reach a learner,
+so `settings` and `prompts` may be `auto` there whatever κ is, as long as the track record is
+clean (still owner-set, budget-capped and behind `pmAgentEnabled`). **Canary** reaches learners:
+`auto` there also needs κ ≥ 0.6 on the gated measures. Promotion is always a person; pinned rules
+never. The old `pmAgentStartsQuickTests` switch mirrors into the quick-test column under the same
+rule (no κ gate). A kind
 re-locks by itself (its `auto` cells become `ask`, with the reason recorded) after 2 canary
 reverts in 4 weeks or a failed monthly sealed baseline. **Judge drift** comes from the nightly
 evaluator job (Release 2). Until then it reads "not measured" and never blocks or re-locks.

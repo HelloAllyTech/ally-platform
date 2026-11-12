@@ -18,6 +18,7 @@ import {
   effectivePolicy,
   JUDGE_DRIFT_SOURCE,
   kindEligibility,
+  stepEligibility,
   matrixChangeRefusal,
   normaliseAutonomy,
   ORG_POLICY_STEPS,
@@ -290,7 +291,8 @@ export class DebriefAutonomyService implements OnModuleInit {
   /**
    * The old `pmAgentStartsQuickTests` switch, changed through the settings
    * page: mirrored into the quick-test column. Turning it on is held to the
-   * same rule as the matrix: only eligible kinds go to "auto".
+   * same rule as the matrix at that step: a quick test reaches no learner, so
+   * any kind not re-locked goes to "auto" (no κ gate); pinned rules never.
    */
   async mirrorLegacyQuickTestSwitch(on: boolean): Promise<void> {
     const f = on ? await this.facts() : null;
@@ -302,7 +304,7 @@ export class DebriefAutonomyService implements OnModuleInit {
         }
       } else if (
         policy.matrix[kind].quick_test === 'ask' &&
-        kindEligibility(kind, f!).eligible
+        kindEligibility(kind, f!, 'quick_test').eligible
       ) {
         policy.matrix[kind].quick_test = 'auto';
       }
@@ -319,8 +321,11 @@ export class DebriefAutonomyService implements OnModuleInit {
       kind: ChangeKind;
       configurable: boolean;
       cells: Record<AutonomyStep, StepPolicy>;
+      /** The canary (the step the κ gate applies to); kept for older clients. */
       eligible: boolean;
       reason: string;
+      /** Per step: tests learners never see need only a clean record; the canary also κ ≥ 0.6. */
+      eligibility: Record<AutonomyStep, { eligible: boolean; reason: string }>;
       relockedAt: string | null;
       relockReason: string | null;
     }>;
@@ -354,7 +359,7 @@ export class DebriefAutonomyService implements OnModuleInit {
       steps: AUTONOMY_STEPS,
       promote: 'person',
       kinds: CHANGE_KINDS.map((kind) => {
-        const e = kindEligibility(kind, f);
+        const e = kindEligibility(kind, f, 'canary');
         const last = [...policy.relocks].reverse().find((r) => r.kind === kind);
         return {
           kind,
@@ -362,6 +367,7 @@ export class DebriefAutonomyService implements OnModuleInit {
           cells: policy.matrix[kind],
           eligible: e.eligible,
           reason: e.reason,
+          eligibility: stepEligibility(kind, f),
           relockedAt: last?.at ?? null,
           relockReason: last?.reason ?? null,
         };

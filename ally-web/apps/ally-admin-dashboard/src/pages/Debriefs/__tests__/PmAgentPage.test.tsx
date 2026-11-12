@@ -528,9 +528,27 @@ describe("PM agent › Ideas", () => {
     });
     renderPage();
     const chips = screen.getByTestId("autonomy-chips");
-    expect(chips).toHaveTextContent("Settings: yes");
+    // Plan §4: tests alone, the canary (learners) still asks first.
+    expect(chips).toHaveTextContent("Settings: tests alone, asks before learners");
     expect(chips).toHaveTextContent("Prompts and agents: asks first");
     expect(chips).toHaveTextContent("Pinned rules: never");
+  });
+
+  it("says yes only when the canary itself runs alone", () => {
+    const all = (v: string) => ({ quick_test: v, gate_test: v, paired_trial: v, canary: v });
+    h.autonomy.mockReturnValue({
+      data: {
+        kinds: [
+          { kind: "settings", cells: all("auto"), reason: "", relockReason: null },
+          { kind: "prompts", cells: all("ask"), reason: "", relockReason: null },
+          { kind: "pinned_rules", cells: all("off"), reason: "", relockReason: null },
+        ],
+      },
+    });
+    renderPage();
+    const chips = screen.getByTestId("autonomy-chips");
+    expect(chips).toHaveTextContent("Settings: yes");
+    expect(chips).toHaveTextContent("Prompts and agents: asks first");
   });
 
   it("splits ideas into Open and Closed by ally-be's state; a promoted one links to its release", () => {

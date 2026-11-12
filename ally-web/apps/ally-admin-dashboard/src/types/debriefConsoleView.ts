@@ -359,8 +359,11 @@ export interface DebriefAutonomyView {
     kind: DebriefAutonomyKind;
     configurable: boolean;
     cells: Record<DebriefAutonomyStep, DebriefAutonomyValue>;
+    /** The canary's (the κ gate's step). */
     eligible: boolean;
     reason: string;
+    /** Per step: quick test, gate test and paired trial need only a clean record (plan §4). */
+    eligibility?: Record<DebriefAutonomyStep, { eligible: boolean; reason: string }>;
     relockedAt: string | null;
     relockReason: string | null;
   }>;

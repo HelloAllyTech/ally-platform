@@ -25,6 +25,7 @@ import {
   DebriefAutonomyKind,
   DebriefAutonomyStep,
   DebriefAutonomyValue,
+  DebriefAutonomyView,
   DebriefOrgOverride,
   DebriefOwnerSettingSpec,
 } from "@types";
@@ -230,6 +231,33 @@ const CellSelect: React.FC<{
 );
 
 /**
+ * "Eligible?" for one kind (plan §4): the tests learners never see need only a clean track record;
+ * the judge-agreement requirement (κ ≥ 0.6) is shown on the Canary alone.
+ */
+const EligibleCell: React.FC<{ row: DebriefAutonomyView["kinds"][number]; pinned: boolean }> = ({
+  row,
+  pinned,
+}) => {
+  const s = en.debriefs.settingsPage.autonomy;
+  if (pinned) return <span className="text-xs text-[#8A3800]">{s.pinnedOnly}</span>;
+  const tests = row.eligibility?.quick_test ?? { eligible: row.eligible, reason: row.reason };
+  const canary = row.eligibility?.canary ?? { eligible: row.eligible, reason: row.reason };
+  const tone = (ok: boolean) => (ok ? "text-success-600" : "text-[#8A3800]");
+  return (
+    <span className="flex flex-col gap-0.5 text-xs" data-testid="autonomy-eligible">
+      <span className={tone(tests.eligible)} data-testid="autonomy-eligible-tests">
+        {s.testsLabel}: {tests.eligible ? s.eligibleYes : s.eligibleNo}
+        {!tests.eligible && ` · ${row.relockReason ?? tests.reason}`}
+      </span>
+      <span className={tone(canary.eligible)} data-testid="autonomy-eligible-canary">
+        {s.columns.canary}: {canary.eligible ? s.eligibleYes : s.eligibleNo} ·{" "}
+        {row.relockReason ?? canary.reason}
+      </span>
+    </span>
+  );
+};
+
+/**
  * What the PM agent may do alone: kind of change × test step (on its own / asks first / off), and
  * per organisation, which can only tighten. The owner changes them; everyone else reads them.
  */
@@ -290,7 +318,12 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
                     value={row.cells[st]}
                     className={CELL_TONE[row.cells[st]]}
                     items={(["auto", "ask", "off"] as DebriefAutonomyValue[])
-                      .filter(v => v !== "auto" || row.eligible || row.cells[st] === "auto")
+                      .filter(
+                        v =>
+                          v !== "auto" ||
+                          (row.eligibility?.[st]?.eligible ?? row.eligible) ||
+                          row.cells[st] === "auto",
+                      )
                       .map(v => ({ id: v, label: s.cells[v] }))}
                     onChange={v =>
                       void run(
@@ -313,11 +346,7 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
               <span>
                 <ConsoleTag>{kind === "pinned_rules" ? s.never : s.aPerson}</ConsoleTag>
               </span>
-              <span className={`text-xs ${row.eligible ? "text-success-600" : "text-[#8A3800]"}`}>
-                {kind === "pinned_rules"
-                  ? s.pinnedOnly
-                  : `${row.eligible ? s.eligibleYes : s.eligibleNo} · ${row.relockReason ?? row.reason}`}
-              </span>
+              <EligibleCell row={row} pinned={kind === "pinned_rules"} />
             </div>
           );
         })}

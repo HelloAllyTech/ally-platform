@@ -259,6 +259,12 @@ const AUTONOMY = {
       cells: cells("ask"),
       eligible: false,
       reason: "Accuracy 0.52",
+      eligibility: {
+        quick_test: { eligible: true, reason: "Yes: learners never see it; budget-capped." },
+        gate_test: { eligible: true, reason: "Yes: learners never see it; budget-capped." },
+        paired_trial: { eligible: true, reason: "Yes: learners never see it; budget-capped." },
+        canary: { eligible: false, reason: "Not yet: judge agreement below 0.6 (accuracy 0.52)." },
+      },
       relockedAt: null,
       relockReason: null,
     },
@@ -500,14 +506,27 @@ describe("What the PM agent may do alone", () => {
     expect(screen.queryByTestId("autonomy-settings-quick_test")).toBeNull();
   });
 
-  it("lets the owner change a cell; an ineligible kind can't be set to on its own", async () => {
+  it("lets the owner change a cell; only the canary needs judge agreement for on its own", async () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage();
-    const prompts = screen.getByLabelText("Prompts, agents and default plans, Quick test");
-    expect(Array.from((prompts as HTMLSelectElement).options).map(o => o.textContent)).toEqual([
+    // Plan §4: learners never see a quick test, so no κ gate there.
+    const quick = screen.getByLabelText("Prompts, agents and default plans, Quick test");
+    expect(Array.from((quick as HTMLSelectElement).options).map(o => o.textContent)).toEqual([
+      "On its own",
       "Asks first",
       "Off",
     ]);
+    const canary = screen.getByLabelText("Prompts, agents and default plans, Canary");
+    expect(Array.from((canary as HTMLSelectElement).options).map(o => o.textContent)).toEqual([
+      "Asks first",
+      "Off",
+    ]);
+    const prompts = screen.getAllByTestId("autonomy-row")[1];
+    expect(within(prompts).getByTestId("autonomy-eligible-tests")).toHaveTextContent("Tests: Yes");
+    expect(within(prompts).getByTestId("autonomy-eligible-canary")).toHaveTextContent(
+      "Canary: Not yet · Not yet: judge agreement below 0.6",
+    );
+    expect(within(prompts).getByTestId("autonomy-eligible-tests")).not.toHaveTextContent("0.6");
     fireEvent.change(screen.getByLabelText("Settings (not budgets), Canary"), {
       target: { value: "On its own" },
     });

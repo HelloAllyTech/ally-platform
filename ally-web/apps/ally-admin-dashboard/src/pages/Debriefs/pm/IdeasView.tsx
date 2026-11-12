@@ -77,13 +77,25 @@ const AutonomyChips: React.FC<{ autonomy: DebriefAutonomyView }> = ({ autonomy }
       {CHIP_KINDS.map(kind => {
         const row = autonomy.kinds.find(k => k.kind === kind);
         if (!row) return null;
-        const alone = Object.values(row.cells).some(v => v === "auto");
-        const state = kind === "pinned_rules" ? "never" : alone ? "alone" : "asks_first";
+        // Plan §4: tests learners never see may run alone; the canary is what reaches learners.
+        const alone = row.cells.canary === "auto";
+        const testsAlone = Object.entries(row.cells).some(
+          ([step, v]) => step !== "canary" && v === "auto",
+        );
+        const state =
+          kind === "pinned_rules"
+            ? "never"
+            : alone
+              ? "alone"
+              : testsAlone
+                ? "tests_alone"
+                : "asks_first";
         return (
           <span
             key={kind}
             title={row.relockReason ?? row.reason}
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] font-semibold ${alone ? "bg-success-50 text-success-600" : "bg-[#FFF2E8] text-[#8A3800]"}`}
+            data-state={state}
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] font-semibold ${alone || testsAlone ? "bg-success-50 text-success-600" : "bg-[#FFF2E8] text-[#8A3800]"}`}
           >
             {p.autonomyKinds[kind]}: {p.autonomyStates[state]}
           </span>

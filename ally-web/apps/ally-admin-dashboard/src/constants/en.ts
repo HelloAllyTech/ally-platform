@@ -10415,6 +10415,7 @@ export const en = {
       } as Record<string, string>,
       autonomyStates: {
         alone: "yes",
+        tests_alone: "tests alone, asks before learners",
         asks_first: "asks first",
         always_asks: "always asks",
         never: "never",
@@ -10797,6 +10798,7 @@ export const en = {
         pinnedOnly: "Never · clinical advisor or owner only",
         eligibleYes: "Yes",
         eligibleNo: "Not yet",
+        testsLabel: "Tests",
         loading: "Loading…",
         loadFailed: "Couldn't load what the PM agent may do alone.",
         driftFrom: "Judge drift: measured from Release 2.",

@@ -6,6 +6,7 @@ import {
   effectivePolicy,
   heldReasons,
   kindEligibility,
+  stepEligibility,
   matrixChangeRefusal,
   normaliseAutonomy,
   parseSessionFilters,
@@ -107,9 +108,28 @@ describe('approvals expire after 14 days as "no decision"', () => {
 
 describe('PM agent autonomy policy', () => {
   it('rejects "auto" when the kind is not eligible, and pinned rules always', () => {
+    // Plan §4: the κ gate is the canary's alone; learners never see the tests.
     expect(
-      matrixChangeRefusal('prompts', 'quick_test', 'auto', ineligible),
-    ).toMatch(/cannot run quick_test on its own.*0\.52/);
+      matrixChangeRefusal('prompts', 'canary', 'auto', ineligible),
+    ).toMatch(/cannot run canary on its own.*0\.52/);
+    for (const step of ['quick_test', 'gate_test', 'paired_trial']) {
+      expect(
+        matrixChangeRefusal('prompts', step, 'auto', ineligible),
+      ).toBeNull();
+      expect(
+        matrixChangeRefusal('settings', step, 'auto', ineligible),
+      ).toBeNull();
+      expect(
+        matrixChangeRefusal('pinned_rules', step, 'auto', eligible),
+      ).toMatch(/pinned rules/);
+    }
+    // A re-lock (2 reverts) still blocks every step.
+    expect(
+      matrixChangeRefusal('prompts', 'quick_test', 'auto', {
+        ...eligible,
+        reverts: { prompts: 2 },
+      }),
+    ).toMatch(/Not now/);
     expect(
       matrixChangeRefusal('prompts', 'quick_test', 'auto', eligible),
     ).toBeNull();
@@ -123,6 +143,20 @@ describe('PM agent autonomy policy', () => {
       /always a person/,
     );
     expect(kindEligibility('pinned_rules', eligible).eligible).toBe(false);
+    expect(
+      kindEligibility('pinned_rules', eligible, 'quick_test').eligible,
+    ).toBe(false);
+    expect(kindEligibility('prompts', ineligible).eligible).toBe(false);
+    expect(kindEligibility('prompts', ineligible, 'gate_test')).toMatchObject({
+      eligible: true,
+      reason: expect.stringMatching(/learners never see it/),
+    });
+    expect(stepEligibility('settings', ineligible)).toMatchObject({
+      quick_test: { eligible: true },
+      gate_test: { eligible: true },
+      paired_trial: { eligible: true },
+      canary: { eligible: false, reason: expect.stringMatching(/0\.6/) },
+    });
   });
 
   it('an organisation only tightens: the stricter of global and org wins', () => {
