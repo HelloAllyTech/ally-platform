@@ -38,6 +38,8 @@ interface DebriefTabProps {
   /** True once polling gave up — used to stop showing "still writing". */
   retryMaxReached: boolean;
   onOpenMoment?: (messageId: string) => void;
+  /** "See this moment" on a card's quote: open the transcript at that turn. */
+  onSeeQuote?: (quote: string) => void;
   /** Ask the polling hook to check again after it has given up. */
   checkAgain?: () => void;
   /** True while a manual `checkAgain` is in flight. */
@@ -75,6 +77,7 @@ export const DebriefTab: FC<DebriefTabProps> = ({
   summaryData,
   retryMaxReached,
   onOpenMoment,
+  onSeeQuote,
   checkAgain,
   isCheckingAgain = false,
   readOnly = false,
@@ -215,6 +218,7 @@ export const DebriefTab: FC<DebriefTabProps> = ({
       <DebriefCards
         view={learnerDebrief}
         sessionId={sessionId}
+        onSeeQuote={onSeeQuote}
         onRetry={retryDebrief}
         retrying={retryingDebrief}
         replyThread={

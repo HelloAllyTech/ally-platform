@@ -411,7 +411,9 @@ export interface SimulationTranscriptMessage {
  * tapping the same chip twice scrolls to the moment twice.
  */
 export interface TranscriptFocusRequest {
-  messageId: string;
+  messageId?: string;
+  /** A debrief card's quote: the transcript turn it was taken from, found by its exact words. */
+  quote?: string;
   requestId: number;
 }
 

@@ -371,6 +371,23 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     );
   });
 
+  it("gives each quote a See this moment that opens the transcript at that quote (PRD §6.3)", () => {
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "ready", cards: CARDS } });
+    const onSeeQuote = vi.fn();
+    render(
+      <DebriefTab
+        sessionId="s-1"
+        summaryData={summaryWithNote}
+        retryMaxReached={false}
+        onSeeQuote={onSeeQuote}
+      />,
+    );
+    const buttons = screen.getAllByRole("button", { name: "postSim.debrief.momentLabel" });
+    expect(buttons.length).toBeGreaterThan(0);
+    fireEvent.click(buttons[0]);
+    expect(onSeeQuote).toHaveBeenCalledWith(CARDS.important_moment.quote);
+  });
+
   it("falls back to the default step label when no steps have arrived", () => {
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "working", steps: [] } });
     renderTab();

@@ -120,6 +120,12 @@ export const PostSimulationSummary: FC = () => {
     setSelectedTab(TAB_IDS.TRANSCRIPT);
   }, []);
 
+  const handleSeeQuote = useCallback((quote: string) => {
+    momentRequestCountRef.current += 1;
+    setMomentRequest({ quote, requestId: momentRequestCountRef.current });
+    setSelectedTab(TAB_IDS.TRANSCRIPT);
+  }, []);
+
   const { data: availableLanguages } = useGetAvailableLanguagesQuery({});
   const originalLanguageCode = useMemo(() => {
     const languageId = summary?.metadata?.languageId;
@@ -157,6 +163,7 @@ export const PostSimulationSummary: FC = () => {
                 // a transcript tab to open; otherwise they render as plain
                 // prose.
                 onOpenMoment={feedbackTabs.transcript ? handleOpenMoment : undefined}
+                onSeeQuote={feedbackTabs.transcript ? handleSeeQuote : undefined}
                 agentName={summary?.scenario?.metadata?.name}
               />
             ),
