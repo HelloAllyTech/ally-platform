@@ -142,6 +142,14 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
     learningBudget: false,
   },
   {
+    // Plan §13: a deleted session's read-aloud audio goes too.
+    key: 'debrief-audio-retention',
+    options: DAY,
+    defaults: daily,
+    locked: false,
+    learningBudget: false,
+  },
+  {
     key: 'debrief-autonomy-relock',
     options: DAY,
     defaults: daily,

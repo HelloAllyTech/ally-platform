@@ -135,6 +135,7 @@ describe('debrief schedules: defaults are the old @Cron ticks', () => {
     for (const k of [
       'debrief-cost-reconcile',
       'debrief-pm-agent-expiry',
+      'debrief-audio-retention',
       'debrief-autonomy-relock',
       'debrief-pm-agent-forecasts',
     ])

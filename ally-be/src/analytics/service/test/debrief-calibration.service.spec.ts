@@ -125,7 +125,8 @@ describe('DebriefCalibrationService', () => {
           model: 'gemini-2.5-pro',
           promptVersion: 'v1+g1',
           dimensions: dims.map(([d]) => ({ dimension: d, score })),
-          hardFails: i === 0 ? [{ code: 'missed_risk_cue', evidence: 'x' }] : [],
+          hardFails:
+            i === 0 ? [{ code: 'missed_risk_cue', evidence: 'x' }] : [],
         },
       };
       for (const [d, col] of dims) {

@@ -10633,6 +10633,10 @@ export const en = {
             name: "Expire approvals",
             what: "Closes approvals with no decision after 14 days",
           },
+          "debrief-audio-retention": {
+            name: "Remove deleted sessions' audio",
+            what: "Deletes the read-aloud audio of sessions that no longer exist",
+          },
           "debrief-autonomy-relock": {
             name: "Re-lock autonomy",
             what: "Takes back “on its own” after reverts or a failed baseline",
