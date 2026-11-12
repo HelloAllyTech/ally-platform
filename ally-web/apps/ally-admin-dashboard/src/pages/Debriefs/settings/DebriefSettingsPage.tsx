@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { useSelector } from "react-redux";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { CarbonDropdown as Dropdown, NumberInput } from "@ally-ui-mono/ui-shared";
@@ -426,6 +427,43 @@ export const DebriefSettingsPage: React.FC = () => {
   const features = useSelector((state: RootState) => state.user?.features);
   const schedules = hasFeature(features, FeatureToggleKey.DEBRIEF_SCHEDULES);
   const sections = schedules ? [...SECTIONS, "schedules" as const] : SECTIONS;
+  // In-page menu: the admin app has a <base href>, so a bare "#budget" resolved to the site root
+  // (and from there to a page the viewer may not reach). Stay on this path, scroll to the section,
+  // keep the hash for sharing, and mark the section being read.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [active, setActive] = useState<SettingsSection>(
+    () => (location.hash.slice(1) as SettingsSection) || "orgs",
+  );
+  const goTo = (id: SettingsSection) => {
+    setActive(id);
+    document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    navigate({ pathname: location.pathname, search: location.search, hash: id }, { replace: true });
+  };
+  // Opened with a hash (settingsPath("budget")): go there once the sections exist.
+  useEffect(() => {
+    const id = location.hash.slice(1);
+    if (id) document.getElementById(id)?.scrollIntoView?.({ block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Highlight follows the reader as they scroll.
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(
+      entries => {
+        const top = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (top) setActive(top.target.id as SettingsSection);
+      },
+      { rootMargin: "0px 0px -60% 0px" },
+    );
+    [...sections, "guidance"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [sections.length]);
   return (
     <div className="flex flex-col gap-6 font-primary" data-testid="debrief-settings-page">
       <div className="flex flex-wrap items-center gap-3">
@@ -441,21 +479,31 @@ export const DebriefSettingsPage: React.FC = () => {
           aria-label={s.sectionsLabel}
           className="flex max-w-[220px] flex-[1_1_200px] flex-col gap-0.5 text-sm"
         >
-          {sections.map(id => (
+          {[...sections, "guidance" as const].map(id => (
             <a
               key={id}
-              href={`#${id}`}
-              className="px-3 py-2 text-neutral-700 no-underline hover:bg-neutral-50"
+              href={`${location.pathname}#${id}`}
+              onClick={event => {
+                event.preventDefault();
+                goTo(id);
+              }}
+              aria-current={active === id ? "location" : undefined}
+              data-testid={`settings-nav-${id}`}
+              className={`px-3 py-2 no-underline hover:bg-neutral-50 ${
+                active === id
+                  ? "border-l-2 border-primary-600 bg-neutral-50 font-semibold text-neutral-900"
+                  : "border-l-2 border-transparent text-neutral-700"
+              }`}
             >
               {s.nav[id]}
+              {id === "guidance" && (
+                <>
+                  {" "}
+                  <span className="text-xs text-neutral-600">{s.contextLibrary}</span>
+                </>
+              )}
             </a>
           ))}
-          <a
-            href="#guidance"
-            className="px-3 py-2 text-neutral-700 no-underline hover:bg-neutral-50"
-          >
-            {s.nav.guidance} <span className="text-xs text-neutral-600">{s.contextLibrary}</span>
-          </a>
         </nav>
         <div className="flex min-w-0 max-w-[960px] flex-[999_1_640px] flex-col gap-8">
           <Section id="orgs" title={s.nav.orgs} help={s.orgsHelp}>

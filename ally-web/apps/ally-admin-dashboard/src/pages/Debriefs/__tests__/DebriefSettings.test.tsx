@@ -66,7 +66,7 @@ vi.mock("@components/context-collection-link", () => ({
 // eslint-disable-next-line import/first
 import { en } from "@constants";
 // eslint-disable-next-line import/first
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 // eslint-disable-next-line import/first
 import { DebriefSettingsPage } from "../settings/DebriefSettingsPage";
@@ -310,6 +310,42 @@ describe("Debrief settings page: who can change what", () => {
         <DebriefSettingsPage />
       </MemoryRouter>,
     );
+
+  it("the section menu stays on /debriefs/settings, scrolls to the section and marks it", () => {
+    h.permissions = [];
+    let where = "";
+    const Where = () => {
+      const l = useLocation();
+      where = `${l.pathname}${l.hash}`;
+      return null;
+    };
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    render(
+      <MemoryRouter initialEntries={["/debriefs/settings"]}>
+        <Routes>
+          <Route
+            path="/debriefs/settings"
+            element={
+              <>
+                <DebriefSettingsPage />
+                <Where />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const budget = screen.getByTestId("settings-nav-budget");
+    expect(budget).toHaveAttribute("href", "/debriefs/settings#budget");
+    fireEvent.click(budget);
+    expect(where).toBe("/debriefs/settings#budget");
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(budget).toHaveAttribute("aria-current", "location");
+    expect(screen.getByTestId("settings-nav-orgs")).not.toHaveAttribute("aria-current");
+    fireEvent.click(screen.getByTestId("settings-nav-guidance"));
+    expect(where).toBe("/debriefs/settings#guidance");
+  });
 
   it("is read-only for someone who isn't the owner, and says who can change it", () => {
     h.permissions = [];
