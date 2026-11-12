@@ -33,7 +33,7 @@ No new roles were created. The console uses the existing groups and adds one new
 | Role | Held as | Notes |
 |---|---|---|
 | Ally team | `system:access` (PLATFORM_ADMIN, SUPER_ADMIN, SUPER_DUPER_ADMIN) | The platform tier that already reaches the console |
-| Clinical advisor | `review:admin:debriefs` | Granted person by person; no group holds it (migration 1981900780000 revoked it from the platform groups). Advisor routes need it alone, never `system:access` |
+| Clinical advisor | `review:admin:debriefs` | Through the `CLINICAL_ADVISOR` role (migration 1981900930000), added person by person in `user_groups` alongside the account's own role. The platform groups no longer hold it (1981900780000). Platform-managed: the generic role picker can't grant it. Advisor routes need it alone, never `system:access` |
 | Owner | `manage:admin:debrief-settings` (**new**, migration 1981900730000) | SUPER_DUPER_ADMIN, or granted person by person |
 | Engineering (Schedules only) | the `debrief_schedules` admin feature toggle ("Debriefs — Schedules") + `system:access` | Granted person by person, never to a group; nobody holds it after deploy. See "Schedules" |
 
@@ -665,5 +665,5 @@ as failed.
 - **Judge drift and model trials** are Release 2.
 - **Step win rates** are `null` until step-level trials exist (Release 2).
 
-- **Verdicts by platform admins:** decided 2026-11-12: revoked. The platform groups no longer hold `review:admin:debriefs` (migration 1981900780000); clinical advisors are granted it person by person.
+- **Verdicts by platform admins:** decided 2026-11-12: revoked. The platform groups no longer hold `review:admin:debriefs` (migration 1981900780000); clinical advisors get it from the `CLINICAL_ADVISOR` role, added person by person (1981900930000).
 - **Calibration routes:** all removed on 2026-11-12 with Score by hand (`GET /v1/analytics/debrief-quality/calibration/:id`, `POST sessions/:sessionId/score`). `debrief_human_ratings` stays as history; agreement is in `GET analytics` and `GET autonomy`, from the advisor's answers.
