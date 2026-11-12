@@ -575,7 +575,7 @@ describe("PM agent › Ideas", () => {
         ]),
       );
       renderPage();
-      expect(buttons()).toEqual(["Approve", "Ask for a change", "Reject"]);
+      expect(buttons()).toEqual(["Approve", "Reject", "Ask for a change"]);
       // The diff first; the whole rule below it, collapsed, the new wording highlighted.
       expect(screen.getByTestId("idea-diff")).toBeInTheDocument();
       expect(screen.getByTestId("pinned-rule-text").tagName).toBe("DETAILS");

@@ -11200,6 +11200,7 @@ export const en = {
         debrief_writer_system: "Writer's prompt",
         debrief_reviser_system: "Reviser's prompt",
         debrief_quality_rubric: "Quality rubric",
+        debrief_quality_judge_system: "Judge's instructions",
         debrief_improver_system: "PM agent's prompt",
         debrief_reply_system: "Ask Ally's prompt",
         debrief_planner_system: "Planner's prompt",

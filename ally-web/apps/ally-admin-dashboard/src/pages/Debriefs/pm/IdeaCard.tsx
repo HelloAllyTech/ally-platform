@@ -362,6 +362,11 @@ export const IdeaCard: React.FC<{
             </Button>
           )}
           <div className="flex flex-wrap gap-2.5">
+            {pinnedButtons.includes("reject") && (
+              <Button kind="danger--tertiary" size="md" onClick={() => onDecide("reject")}>
+                {s.reject}
+              </Button>
+            )}
             {pinnedButtons.includes("ask") && (
               <Button kind="tertiary" size="md" onClick={() => setAskingChange(true)}>
                 {pr.askForChange}
@@ -370,11 +375,6 @@ export const IdeaCard: React.FC<{
             {pinnedButtons.includes("withdraw") && (
               <Button kind="danger--tertiary" size="md" onClick={() => onDecide("withdraw")}>
                 {pr.withdraw}
-              </Button>
-            )}
-            {pinnedButtons.includes("reject") && (
-              <Button kind="danger--tertiary" size="md" onClick={() => onDecide("reject")}>
-                {s.reject}
               </Button>
             )}
           </div>

@@ -23,7 +23,7 @@ export const PinnedRulesSection: React.FC<{ canAsk: boolean }> = ({ canAsk }) =>
     <div className="rounded-sm bg-neutral-50" data-testid="pinned-rules">
       {rules.map(r => (
         <div key={r.code} className="border-b border-neutral-100 px-5 py-3">
-          <div className="grid grid-cols-[minmax(200px,1.4fr)_90px_minmax(200px,1.6fr)_auto] items-center gap-3 text-sm">
+          <div className="grid grid-cols-[minmax(200px,1.4fr)_90px_minmax(200px,1.6fr)_160px] items-center gap-3 text-sm">
             <span className="font-medium">{r.label}</span>
             <span>{r.version == null ? "—" : `v${r.version}`}</span>
             <span className="text-[13px] text-neutral-700">
