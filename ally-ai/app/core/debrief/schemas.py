@@ -277,8 +277,7 @@ class Finding(BaseModel):
     kind: FindingKind
     point: str = Field(
         description=(
-            "One or two sentences in plain words: what was found and why it "
-            "matters."
+            "One or two sentences in plain words: what was found and why it matters."
         )
     )
     turn_index: Optional[int] = Field(

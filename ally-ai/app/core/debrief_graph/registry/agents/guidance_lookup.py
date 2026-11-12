@@ -43,8 +43,7 @@ MANIFEST = register(
         ),
         use_when="A moment where practice guidance would help the learner.",
         skip_when=(
-            "A short or unremarkable session with no pivotal moment worth "
-            "guidance."
+            "A short or unremarkable session with no pivotal moment worth guidance."
         ),
         progress_label="Looking up guidance…",
         progress_label_key="debrief.progress.guidance_lookup",
