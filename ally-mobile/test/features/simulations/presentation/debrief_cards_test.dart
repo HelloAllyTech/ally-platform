@@ -564,6 +564,54 @@ void main() {
     );
   });
 
+  group('the screen header folds away (Mobile round 2)', () {
+    double titleTop(WidgetTester tester) => tester.getTopLeft(find.byKey(const Key('simulation-feedback-title'))).dy;
+
+    testWidgets('scrolling the debrief folds the title and stars; the tabs stay; scrolling back opens them', (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      final tabs = find.text('Transcript');
+      final tabsTop = tester.getTopLeft(tabs).dy;
+      expect(titleTop(tester), lessThan(tabsTop));
+
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -600));
+      await tester.pumpAndSettle();
+      // The title has folded away: the tab bar moved up to the top and is still there.
+      expect(find.byKey(const Key('simulation-feedback-header')), findsOneWidget);
+      final align = tester.widget<Align>(
+        find.descendant(of: find.byKey(const Key('simulation-feedback-header')), matching: find.byType(Align)).first,
+      );
+      expect(align.heightFactor, 0);
+      expect(tester.getTopLeft(tabs).dy, lessThan(tabsTop - 40));
+      expect(tabs.hitTestable(), findsOneWidget);
+
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, 3000));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('simulation-feedback-header')), findsNothing);
+      expect(tester.getTopLeft(tabs).dy, tabsTop);
+    });
+
+    testWidgets('the Transcript tab still opens and lists the session', (tester) async {
+      stubDebrief(readyDebriefJson());
+      when(
+        () => h.transcript.getMessages(scenarioSessionId: 'session-1', offset: 0, languageCode: any(named: 'languageCode')),
+      ).thenAnswer(
+        (_) async => (
+          messages: [
+            SimulationTranscriptMessage.fromJson({'id': 41, 'senderId': -1, 'content': 'Hello there', 'startSeconds': 3}),
+          ],
+          count: 1,
+        ),
+      );
+      await h.pump(tester);
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -600));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transcript'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hello there'), findsOneWidget);
+    });
+  });
+
   group('Ask Ally composer (design A5)', () {
     bool docked(WidgetTester tester) => !tester
         .widget<IgnorePointer>(

@@ -110,6 +110,35 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   FeedbackValue _existingFeedback = (rating: 0, tags: const <String>[], comment: '');
 
   TranscriptFocusRequest? _momentRequest;
+
+  /// How far the title, stars and checklist have folded away (0 shown, 1
+  /// gone): follows the open tab's vertical scroll over the header's height.
+  double _headerCollapse = 0;
+  final _headerKey = GlobalKey();
+
+  /// The header's height, measured after layout (never read mid-layout).
+  double _headerHeight = 120;
+
+  bool _onContentScroll(ScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    // Only the tab's own list (the nearest one), not lists inside it.
+    if (n.depth > 2) return false;
+    final pixels = n.metrics.pixels;
+    // Notifications can arrive during layout (ensureVisible, a jump): settle
+    // after the frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = _headerKey.currentContext?.findRenderObject();
+      if (box is RenderBox && box.hasSize && _headerCollapse == 0) _headerHeight = box.size.height;
+      if (_headerHeight <= 0) return;
+      final next = (pixels / _headerHeight).clamp(0.0, 1.0);
+      if (next != _headerCollapse && ((next - _headerCollapse).abs() > 0.01 || next == 0 || next == 1)) {
+        setState(() => _headerCollapse = next);
+      }
+    });
+    return false;
+  }
+
   int _momentRequestCount = 0;
 
   /// RN `useHideReviewDetails`'s `hideReviewDetails` (starts `true`).
@@ -529,6 +558,13 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _CollapsingHeader(
+                    collapse: showTabs ? _headerCollapse : 0,
+                    child: Column(
+                      key: _headerKey,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                   Padding(
                     padding: EdgeInsets.only(top: rn.vs(8), bottom: rn.vs(8), left: 10, right: 20),
                     child: Row(
@@ -559,12 +595,20 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
                       padding: EdgeInsets.only(left: 10, right: 10, bottom: rn.vs(8)),
                       child: EventChecklist(scenarioSessionId: widget.scenarioSessionId),
                     ),
+                      ],
+                    ),
+                  ),
                   if (showTabs) ...[
+                    // The tab bar stays; the title, stars and checklist above it fold
+                    // away as the tab's content scrolls, so the debrief gets the screen.
                     _buildTabBar(),
                     Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [for (final tab in _tabs) _buildScene(tab)],
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: _onContentScroll,
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [for (final tab in _tabs) _buildScene(tab)],
+                        ),
                       ),
                     ),
                   ],
@@ -794,6 +838,31 @@ class _ReviewButton extends StatelessWidget {
             'assets/icons/chatBubble.svg',
             colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The screen's title block, folding up by [collapse] (0 open, 1 gone) and
+/// fading as it goes; gone from the accessibility tree once fully folded.
+class _CollapsingHeader extends StatelessWidget {
+  const _CollapsingHeader({required this.collapse, required this.child});
+
+  final double collapse;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (collapse <= 0) return child;
+    return ExcludeSemantics(
+      excluding: collapse >= 1,
+      child: ClipRect(
+        key: const Key('simulation-feedback-header'),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          heightFactor: 1 - collapse,
+          child: Opacity(opacity: (1 - collapse).clamp(0.0, 1.0), child: child),
         ),
       ),
     );
