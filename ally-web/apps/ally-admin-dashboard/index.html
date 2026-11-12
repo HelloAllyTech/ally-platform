@@ -2,6 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- `/b/<slug>` is the bot page (b.html). Deployed, the CDN answers unknown paths with this
+         file, so hand over here before the dashboard loads: write b.html into the same document.
+         Unlike a redirect, that keeps the URL, the referrer and ancestorOrigins, which the
+         embedded widget's host check reads (src/botPage/embed.ts). The <plaintext> turns the rest
+         of this file into inert text so the dashboard never runs; window.stop() would instead
+         abort the parser, and document.open() is then a no-op. Locally the botPageRoutes
+         middleware in vite.config.ts serves b.html directly. -->
+    <script>
+      (function () {
+        var base = "%BASE_URL%".replace(/\/$/, "");
+        var path = location.pathname;
+        if (path.indexOf(base) === 0) path = path.slice(base.length);
+        if (!/^\/b\/[^/]+\/?$/.test(path)) return;
+        document.write("<plaintext hidden>");
+        var write = function (html) {
+          document.open();
+          document.write(html);
+          document.close();
+        };
+        fetch(base + "/b.html", { cache: "no-cache" })
+          .then(function (res) {
+            if (!res.ok) throw new Error(String(res.status));
+            return res.text();
+          })
+          .then(write)
+          .catch(function () {
+            write(
+              "<!doctype html><title>Chat</title><p>This page couldn't load. Please refresh.</p>",
+            );
+          });
+      })();
+    </script>
     <title>Ally Admin</title>
     <base href="%BASE_URL%" />
 

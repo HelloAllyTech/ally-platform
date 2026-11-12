@@ -10,7 +10,11 @@ import "./page.css";
  * The public bot page (chunk 12b): a second entry of this app (`b.html`), served for `/b/<slug>`.
  * It shares no providers, store or styles with the dashboard, so a visitor downloads only this.
  */
-const slug = decodeURIComponent(/^\/b\/([^/?#]+)/.exec(window.location.pathname)?.[1] ?? "");
+// Deployed under a base path (app.helloally.ai/admin/), so match after it.
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const pathname = window.location.pathname;
+const path = pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
+const slug = decodeURIComponent(/^\/b\/([^/?#]+)/.exec(path)?.[1] ?? "");
 /** Framed by another site (the website widget, chunk 13), or null on the page itself. */
 const embed = embedContext();
 

@@ -14,8 +14,8 @@ const projectRoot = __dirname;
 
 /**
  * `/b/<slug>` is the bot page (b.html). The dev server and `vite preview` would otherwise answer it
- * with the dashboard's index.html. Deployed, CloudFront and Caddy do the same rewrite (see
- * CHUNK-12B-NOTES).
+ * with the dashboard's index.html. Deployed, the CDN does answer with index.html, and a script at
+ * the top of it hands over to b.html in place.
  */
 function botPageRoutes(): Plugin {
   const rewrite = (req: { url?: string }, _res: unknown, next: () => void) => {
