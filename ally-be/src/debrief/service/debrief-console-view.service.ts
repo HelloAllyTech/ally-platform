@@ -405,14 +405,20 @@ export class DebriefConsoleViewService implements OnModuleInit {
       f.category === 'needs' || f.category === 'escalated'
         ? queueOrder
         : `"createdAt" DESC`;
-    params.push(f.limit, f.offset);
+    // Only the "To score" category reads the sample; an unreferenced
+    // parameter has no type and Postgres rejects the whole query.
+    const rowParams =
+      f.category === 'to_score' ? [...params] : params.slice(0, -1);
+    const rowSampleParam =
+      f.category === 'to_score' ? sampleParam : 'NULL::uuid[]';
+    rowParams.push(f.limit, f.offset);
     const rows: Array<Record<string, any>> = await this.dataSource.query(
       `${base}
        SELECT * FROM ranked
-        WHERE ${this.categorySql(f.category, sampleParam)}
+        WHERE ${this.categorySql(f.category, rowSampleParam)}
         ORDER BY ${order}
-        LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params,
+        LIMIT $${rowParams.length - 1} OFFSET $${rowParams.length}`,
+      rowParams,
     );
     return {
       category: f.category,
