@@ -33,6 +33,9 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+/** Reads whose 403 is expected for some roles and handled by the caller: no toast. */
+export const SILENT_FORBIDDEN_READS: string[] = [ApiEndpoints.AUTH.GET_USER_PREFERENCES];
+
 /**
  * This function wraps the base query to handle authentication token refresh.
  * When a 401 error is received, it attempts to refresh the access token using
@@ -107,7 +110,13 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
       // AiLabErrorState / the AI Lab tabs). One consistent toast here means
       // every endpoint gets a permission message even when the calling
       // component only checks `isError`.
-      toast.error(en.error.forbidden);
+      // Except a read every signed-in admin makes at start whose 403 is expected and handled:
+      // the saved sidebar order (only holders of the preference grant have one; a clinical
+      // advisor does not), which otherwise greeted them with this toast on every load.
+      const url = typeof args === "string" ? args : args.url;
+      if (!SILENT_FORBIDDEN_READS.some(path => url.split("?")[0].endsWith(path))) {
+        toast.error(en.error.forbidden);
+      }
     }
 
     return result;

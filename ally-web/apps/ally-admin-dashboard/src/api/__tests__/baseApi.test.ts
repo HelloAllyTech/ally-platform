@@ -214,3 +214,10 @@ describe("baseAPI", () => {
     });
   });
 });
+
+describe("403 toast", () => {
+  it("stays quiet for the saved sidebar order, whose 403 is expected for roles without it", async () => {
+    const { SILENT_FORBIDDEN_READS } = await import("../baseApi");
+    expect(SILENT_FORBIDDEN_READS).toEqual(["/v1/users/me/preferences"]);
+  });
+});
