@@ -1,14 +1,15 @@
 import { FC, KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 
-import { X } from "lucide-react";
+import { Info, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /** The explainer's paragraphs, in order (PRD §6.12 copy, plan §7.5). */
 const PARAGRAPHS = ["how", "quotes", "wrong", "supervisor"] as const;
 
 /**
- * "How Ally writes your debrief" in the header strip (PRD §6.3, FR-26): a
- * link that opens a short, static explainer — Ally checks and revises its own
+ * "How Ally writes your debrief" in the header strip (PRD §6.3, FR-26): an
+ * "ⓘ" beside "Written by Ally (AI)" (Mobile round 2), named for screen
+ * readers and on hover, that opens a short, static explainer — Ally checks and revises its own
  * draft, quotes are checked, it can still be wrong, and supervisors can read
  * debriefs. A modal dialog: focus moves to Close, Escape closes it, and focus
  * goes back to the link.
@@ -46,10 +47,12 @@ export const DebriefExplainer: FC = () => {
         type="button"
         data-testid="debrief-explainer-link"
         aria-haspopup="dialog"
+        aria-label={t("postSim.debriefCards.explainer.link")}
+        title={t("postSim.debriefCards.explainer.link")}
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-[44px] items-center rounded-md px-1 font-primary text-sm text-white underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+        className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-full text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
       >
-        {t("postSim.debriefCards.explainer.link")}
+        <Info aria-hidden="true" className="h-5 w-5" />
       </button>
       {open && (
         <div

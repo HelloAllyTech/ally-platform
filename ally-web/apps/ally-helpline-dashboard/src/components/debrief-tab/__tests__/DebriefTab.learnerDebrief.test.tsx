@@ -212,6 +212,9 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     renderTab();
 
     const link = screen.getByTestId("debrief-explainer-link");
+    // An "ⓘ" beside "Written by Ally (AI)", not its own line (Mobile round 2).
+    expect(link).toHaveAccessibleName("postSim.debriefCards.explainer.link");
+    expect(link.previousElementSibling).toHaveTextContent("postSim.debriefCards.aiLabel");
     fireEvent.click(link);
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("postSim.debriefCards.explainer.how");
