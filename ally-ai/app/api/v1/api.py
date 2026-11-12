@@ -56,6 +56,9 @@ api_router.include_router(
     tags=["knowledge_agent"],
 )
 api_router.include_router(agent_runtime.router, prefix="/agent", tags=["agent_runtime"])
+api_router.include_router(
+    agent_runtime.builder_router, prefix="/agent", tags=["agent_runtime"]
+)
 api_router.include_router(builder.router, prefix="/builder", tags=["builder"])
 api_router.include_router(checkup.router, prefix="/checkup", tags=["checkup"])
 api_router.include_router(helpline.router, prefix="/helpline", tags=["helpline"])

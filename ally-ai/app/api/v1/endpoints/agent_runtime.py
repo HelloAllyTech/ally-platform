@@ -1,9 +1,11 @@
 """Agents v2 runtime endpoint — the conversational agent, run as a LangGraph loop.
 
-Dark until AGENT_RUNTIME__ENABLED: every route here answers 404 while it is off, so
+Dark until AGENT_RUNTIME__ENABLED: every run route here answers 404 while it is off, so
 shipping this changes nothing in production, and 503 if it is on but its checkpoint
-database could not be opened at startup. Every run adds a run id, a per-step trace
-and a stored checkpoint to what /knowledge-agent/answer returns. /run and
+database could not be opened at startup. The builder's /instructions routes are on
+`builder_router` instead and always answer: they make no model call and open nothing.
+Every run adds a run id, a per-step trace and a stored checkpoint to what
+/knowledge-agent/answer returns. /run and
 /run/stream share one runner (agent_runtime/runner.py).
 """
 
@@ -50,6 +52,9 @@ async def get_graph(
 
 
 router = APIRouter(dependencies=[Depends(require_agent_runtime)])
+# The owner's "How it works" and the instructions safety check: plain functions of the
+# request, so they don't wait for the runtime to be switched on.
+builder_router = APIRouter()
 
 
 @router.post(
@@ -84,7 +89,7 @@ async def run(
         )
 
 
-@router.post(
+@builder_router.post(
     "/instructions",
     response_model=InstructionsResponse,
     status_code=status.HTTP_200_OK,
@@ -99,7 +104,7 @@ async def instructions(payload: AgentRunRequest):
     return describe_instructions(payload.to_bot())
 
 
-@router.post(
+@builder_router.post(
     "/instructions/check",
     response_model=OwnerTextCheckResponse,
     status_code=status.HTTP_200_OK,

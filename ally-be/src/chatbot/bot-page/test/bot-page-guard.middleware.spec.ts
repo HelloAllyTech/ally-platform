@@ -3,6 +3,7 @@ import { BotPageGuardMiddleware } from '../bot-page-guard.middleware';
 describe('BotPageGuardMiddleware', () => {
   const guard = new BotPageGuardMiddleware({
     botPage: { origin: 'https://chat.example.com' },
+    cors: { allowedOrigins: ['https://app.example.com'] },
   } as never);
   const run = (headers: Record<string, string>, body?: unknown) => {
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
@@ -16,8 +17,12 @@ describe('BotPageGuardMiddleware', () => {
     expect(run({}).next).toHaveBeenCalled();
   });
 
-  it('refuses any other origin, even one the app allows elsewhere', () => {
-    const { res, next } = run({ origin: 'https://admin.example.com' });
+  it('lets Ally’s other origins through (the page is also served under app/admin)', () => {
+    expect(run({ origin: 'https://app.example.com' }).next).toHaveBeenCalled();
+  });
+
+  it('refuses any origin that is not Ally’s own', () => {
+    const { res, next } = run({ origin: 'https://evil.example.net' });
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
   });

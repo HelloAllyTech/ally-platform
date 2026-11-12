@@ -8,9 +8,11 @@ const BOT_PAGE_MAX_BODY_BYTES = 16 * 1024;
 /**
  * Two checks in front of the public bot-page routes:
  *
- * - **Origin.** The app's CORS list (`ALLOWED_ORIGINS`) is global. These routes also refuse a
- *   browser request from any origin but the bot page's own, so another site can't drive a
- *   visitor's session. Requests with no `Origin` (curl, server-side) pass, as CORS lets them.
+ * - **Origin.** These routes refuse a browser request from any origin but Ally's own — the bot
+ *   page's, or one on the app's CORS list (`ALLOWED_ORIGINS`) — so another site can't drive a
+ *   visitor's session. Ally's own origins all pass because the page is served from more than one
+ *   (admin.helloally.ai redirects to app.helloally.ai/admin). Requests with no `Origin` (curl,
+ *   server-side) pass, as CORS lets them.
  * - **Size.** The app accepts 1 MB JSON bodies; a page never needs more than 16 KB.
  */
 @Injectable()
@@ -19,7 +21,11 @@ export class BotPageGuardMiddleware implements NestMiddleware {
 
   use(req: Request, res: Response, next: NextFunction): void {
     const origin = req.headers.origin;
-    if (origin && origin !== this.config.botPage.origin) {
+    if (
+      origin &&
+      origin !== this.config.botPage.origin &&
+      !this.config.cors.allowedOrigins.includes(origin)
+    ) {
       res.status(403).json({ statusCode: 403, code: 'origin_not_allowed' });
       return;
     }

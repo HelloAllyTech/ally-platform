@@ -14,6 +14,7 @@ from app.core.agent_runtime.instructions import (
     check_owner_text,
     describe,
 )
+from app.core.config import settings
 from app.schemas.agent_runtime import AgentRunRequest
 from tests.core.agent_runtime.conftest import BODY, URL
 from tests.core.agent_runtime.steps import CONVERSATION, FakeLLM, reply, search
@@ -69,6 +70,16 @@ class TestSameAsARun:
         data = response.json()
         assert data["full"].startswith("# Who you are")
         assert data["search"]["top_k"] > 0
+
+    def test_the_builder_routes_answer_with_the_runtime_off(self, client, monkeypatch):
+        """How it works and the instructions check don't wait for the runtime switch."""
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", False)
+        shown = client.post("/api/v1/agent/instructions", json=INSTRUCTIONS_BODY)
+        assert shown.status_code == 200
+        checked = client.post(
+            "/api/v1/agent/instructions/check", json={"text": "Be kind."}
+        )
+        assert checked.status_code == 200
 
 
 class TestLayers:
