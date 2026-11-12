@@ -37,6 +37,9 @@ class DebriefQualityRequest(BaseModel):
     # debrief that refers to them is not marked as an unsupported claim.
     history: Optional[str] = None
     rubric: Optional[str] = None
+    # The judge's instructions from the Skills Store
+    # (`debrief_quality_judge_system`); the code's text when absent.
+    judge_instructions: Optional[str] = None
     # Attribution only: carried onto the call's llm_usage row.
     scenario_session_id: Optional[str] = None
 
@@ -71,6 +74,7 @@ async def judge(req: DebriefQualityRequest) -> DebriefQualityResponse:
             guidance=req.guidance,
             history=req.history,
             rubric=req.rubric,
+            instructions=req.judge_instructions,
             scenario_session_id=req.scenario_session_id,
         )
     except Exception as exc:  # noqa: BLE001 - surface as 500, keep caller decoupled

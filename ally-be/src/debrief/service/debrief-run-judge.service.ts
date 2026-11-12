@@ -27,6 +27,9 @@ import { DebriefContextRepository } from './debrief-context.repository';
  */
 export const RUN_JUDGE_INPUT_VERSION = 'g1';
 
+/** The judge's instructions in the Skills Store (a pinned rule); ally-ai's own text when absent. */
+export const DEBRIEF_JUDGE_INSTRUCTIONS_CODE = 'debrief_quality_judge_system';
+
 export interface RunJudgment {
   model: string;
   promptVersion: string;
@@ -74,6 +77,10 @@ export class DebriefRunJudgeService {
       DEBRIEF_PROMPT_CODES.rubric,
       null,
     );
+    const judgeInstructions = await this.context.promptText(
+      DEBRIEF_JUDGE_INSTRUCTIONS_CODE,
+      null,
+    );
     const guidance = await this.guidanceSeen(run);
     const { apiUrl, outboundApiKey } = this.config.ai;
     const res = await withJudgeSlot(() =>
@@ -85,6 +92,7 @@ export class DebriefRunJudgeService {
           language: run.language ?? session?.language ?? 'en',
           learner_level: session?.learnerLevel ?? null,
           rubric,
+          judge_instructions: judgeInstructions,
           history: (run.workspace?.history as string | null) ?? null,
           guidance,
           scenario_session_id: run.scenarioSessionId,

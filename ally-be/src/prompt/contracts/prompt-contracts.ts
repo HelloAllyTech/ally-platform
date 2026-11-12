@@ -1314,6 +1314,19 @@ export const DEBRIEF_QUALITY_RUBRIC = definePrompt(
   },
 );
 
+/** src/prompts/debrief_quality/judge_system.txt */
+export const DEBRIEF_QUALITY_JUDGE_SYSTEM = definePrompt(
+  'debrief_quality_judge_system',
+  {},
+  {
+    name: "Debrief Quality Judge's Instructions",
+    description:
+      "What the independent debrief-quality judge is told to do after the rubric, the transcript and the debrief: list the risk cues, score the eight dimensions, list the hard fails. A pinned rule: a change is approved by the clinical advisor or the owner, and bumps ally-ai's DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION. The Evaluator inside a debrief run keeps ally-ai's own copy.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
 /** src/prompts/debrief/safety_reader_system.txt */
 export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
   'debrief_safety_reader_system',

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import {
+  DEBRIEF_JUDGE_INSTRUCTIONS_CODE,
   DebriefRunJudgeService,
   RUN_JUDGE_INPUT_VERSION,
 } from '../service/debrief-run-judge.service';
@@ -13,7 +14,10 @@ jest.mock('axios');
 describe('the run judge is given the Writer’s guidance', () => {
   const post = axios.post as jest.Mock;
 
-  function build(chunks: Array<Record<string, unknown>>) {
+  function build(
+    chunks: Array<Record<string, unknown>>,
+    prompts: Record<string, string> = {},
+  ) {
     const query = jest.fn(async () => []);
     const find = jest.fn(async () => chunks);
     const svc = new DebriefRunJudgeService(
@@ -26,7 +30,7 @@ describe('the run judge is given the Writer’s guidance', () => {
           language: 'en',
           learnerLevel: 'LAY',
         })),
-        promptText: jest.fn(async () => null),
+        promptText: jest.fn(async (code: string) => prompts[code] ?? null),
       } as any,
       { ai: { apiUrl: 'http://ai', outboundApiKey: 'k' } } as any,
     );
@@ -80,6 +84,23 @@ describe('the run judge is given the Writer’s guidance', () => {
       'Name a missed feeling\nQuote it.\n\nORGANISATION PROTOCOL: Refer weeks of low mood\nAlways refer.',
     );
     expect(j!.promptVersion).toBe(`v3+${RUN_JUDGE_INPUT_VERSION}`);
+  });
+
+  it("sends the judge's instructions from the Skills Store with the rubric", async () => {
+    const { svc } = build([], {
+      debrief_quality_rubric: 'RUBRIC',
+      [DEBRIEF_JUDGE_INSTRUCTIONS_CODE]: 'INSTRUCTIONS',
+    });
+    await svc.judge(run(), { store: false });
+    const body = post.mock.calls[0][1];
+    expect(body.rubric).toBe('RUBRIC');
+    expect(body.judge_instructions).toBe('INSTRUCTIONS');
+  });
+
+  it('sends none when the store has none, so ally-ai uses its own text', async () => {
+    const { svc } = build([]);
+    await svc.judge(run(), { store: false });
+    expect(post.mock.calls[0][1].judge_instructions).toBeNull();
   });
 
   it('sends no guidance when the run used none, without a lookup', async () => {

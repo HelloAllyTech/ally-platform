@@ -211,6 +211,7 @@ export class DebriefQualityJudgeService {
   ): Promise<void> {
     try {
       const rubric = await this.repo.fetchRubric();
+      const instructions = await this.repo.fetchJudgeInstructions();
       const sessions = await this.repo.selectSessions({
         sinceDays,
         unjudgedForVersion,
@@ -244,6 +245,7 @@ export class DebriefQualityJudgeService {
             s.worker_type,
             rubric,
             s.id,
+            instructions,
           );
 
           // ally-ai answers 200 with no dimensions when the model's answer was
@@ -315,6 +317,7 @@ export class DebriefQualityJudgeService {
     learnerLevel: string,
     rubric: string | null,
     scenarioSessionId: string,
+    judgeInstructions: string | null = null,
   ): Promise<JudgeResult> {
     const { apiUrl, outboundApiKey } = this.config.ai;
     // Held inside the GLOBAL judge slot, shared with every other judge.
@@ -327,6 +330,7 @@ export class DebriefQualityJudgeService {
           language,
           learner_level: learnerLevel,
           rubric,
+          judge_instructions: judgeInstructions,
           scenario_session_id: scenarioSessionId,
         },
         {

@@ -84,6 +84,66 @@ class TestPrompt:
         assert "WHO IS WHO" not in prompt
 
 
+class TestInstructions:
+    """The judge's instructions: the Skills Store's text, else the code's."""
+
+    def test_without_the_store_the_prompt_ends_with_the_code_text(self):
+        from app.core.debrief_quality.prompt import DEFAULT_JUDGE_INSTRUCTIONS
+
+        prompt = build_judge_prompt(TRANSCRIPT, "x", "en")
+        assert prompt.endswith(DEFAULT_JUDGE_INSTRUCTIONS)
+        # A blank store text is no text: the fallback, not an empty ending.
+        assert build_judge_prompt(TRANSCRIPT, "x", "en", instructions="  ") == prompt
+
+    def test_the_store_text_replaces_the_code_text(self):
+        from app.core.debrief_quality.prompt import DEFAULT_JUDGE_INSTRUCTIONS
+
+        prompt = build_judge_prompt(
+            TRANSCRIPT, "x", "en", instructions="LIVE INSTRUCTIONS"
+        )
+        assert prompt.endswith("LIVE INSTRUCTIONS")
+        assert DEFAULT_JUDGE_INSTRUCTIONS not in prompt
+
+    def test_the_store_text_identical_to_the_code_changes_nothing(self):
+        from app.core.debrief_quality.prompt import DEFAULT_JUDGE_INSTRUCTIONS
+
+        assert build_judge_prompt(
+            TRANSCRIPT, "x", "en", instructions=DEFAULT_JUDGE_INSTRUCTIONS
+        ) == build_judge_prompt(TRANSCRIPT, "x", "en")
+
+    def test_the_default_matches_ally_be_seed_file(self):
+        from pathlib import Path
+
+        from app.core.debrief_quality.prompt import DEFAULT_JUDGE_INSTRUCTIONS
+
+        seed = (
+            Path(__file__).resolve().parents[3]
+            / "ally-be/src/prompts/debrief_quality/judge_system.txt"
+        )
+        if not seed.exists():
+            pytest.skip("ally-be is not checked out beside ally-ai")
+        assert seed.read_text().strip() == DEFAULT_JUDGE_INSTRUCTIONS
+
+    @pytest.mark.asyncio
+    async def test_the_judge_sends_the_store_text(self, dispatch_returns):
+        from app.core.debrief_quality.judge import judge_debrief
+
+        calls = dispatch_returns(_output())
+        await judge_debrief(
+            TRANSCRIPT, "You listened.", "en", instructions="LIVE INSTRUCTIONS"
+        )
+        assert calls["prompt"].endswith("LIVE INSTRUCTIONS")
+
+    @pytest.mark.asyncio
+    async def test_the_judge_falls_back_to_the_code_text(self, dispatch_returns):
+        from app.core.debrief_quality.judge import judge_debrief
+        from app.core.debrief_quality.prompt import DEFAULT_JUDGE_INSTRUCTIONS
+
+        calls = dispatch_returns(_output())
+        await judge_debrief(TRANSCRIPT, "You listened.", "en")
+        assert calls["prompt"].endswith(DEFAULT_JUDGE_INSTRUCTIONS)
+
+
 class TestJudge:
     @pytest.mark.asyncio
     async def test_returns_a_complete_answer(self, dispatch_returns):
@@ -194,3 +254,18 @@ class TestEndpoint:
         body = r.json()
         assert body["dimensions"] == [] and body["hard_fails"] == []
         assert body["judge_prompt_version"] == "v1"
+
+    def test_the_endpoint_passes_the_store_instructions(self, client, dispatch_returns):
+        calls = dispatch_returns(_output())
+        r = client.post(
+            "/api/v1/debrief-quality/judge",
+            json={
+                "transcript": TRANSCRIPT,
+                "debrief": "You listened.",
+                "judge_instructions": "LIVE INSTRUCTIONS",
+            },
+        )
+        assert r.status_code == 200
+        assert calls["prompt"].endswith("LIVE INSTRUCTIONS")
+        # Same text, same series: the version label does not move.
+        assert r.json()["judge_prompt_version"] == "v1"
