@@ -9836,6 +9836,9 @@ export const en = {
         flagsWithinSla: (h: number) => `Flags reviewed within ${h} hours`,
         listened: "Listened",
         replied: "Asked Ally or replied",
+        pulseKnewNext: "Pulse: knew what to practise next",
+        pulseFair: "Pulse: felt fair",
+        pulseFairImportantMoment: "Pulse: felt fair, with an important moment",
         byLanguage: "By language",
         byDevice: "By device",
         noTarget: "—",
@@ -9975,6 +9978,7 @@ export const en = {
       columns: { judge: "Judge", evaluator: "Evaluator", cost: "Cost", time: "Time" },
       layoutLabel: "Layout",
       layout: { cards: "Cards", list: "List" },
+      analytics: "Analytics",
       pmAgent: "PM agent",
       needsYouCount: (n: number) => `${n} ${n === 1 ? "needs" : "need"} you`,
       settings: "Settings",
@@ -10160,6 +10164,7 @@ export const en = {
         save: (version: number) => `Save as version ${version}`,
       },
       how: {
+        guidanceCodes: "Debrief Guidance entries used",
         skillHeading: "Learner's skill estimate",
         skillOnlyHere: "Shown only here, never to the learner",
         skillFrom: (n: number) =>
@@ -11106,6 +11111,16 @@ export const en = {
       regionToOutsideWithLine:
         "Debriefs use this organisation's own support line, so it can still be switched on to the new debrief.",
       regionConfirm: "Change where it works",
+      providersLine: (names: string) => `Models from: ${names}`,
+      providerNames: { gemini: "Google", openai: "OpenAI", anthropic: "Anthropic" } as Record<
+        string,
+        string
+      >,
+      providersTitle: (name: string) => `Which model providers may ${name}'s debriefs use?`,
+      providersBody:
+        "For an organisation whose contract restricts providers. Its learners' debriefs, paired trials and Ask Ally use only these. A step with no model on an allowed provider goes to a person instead.",
+      providersAtLeastOne: "Allow at least one provider. To stop its debriefs, use Emergency stop.",
+      providersConfirm: "Save providers",
     },
     calibration: {
       sectionHeading: "Judge agreement",

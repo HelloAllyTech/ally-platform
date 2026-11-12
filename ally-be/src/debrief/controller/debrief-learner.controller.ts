@@ -44,6 +44,8 @@ import { DebriefLearnerEventsService } from '../service/debrief-learner-events.s
 import {
   DEBRIEF_CLIENT_EVENT_KINDS,
   DEBRIEF_PLATFORMS,
+  DEBRIEF_PULSE_QUESTIONS,
+  DebriefPulseQuestion,
 } from '../entity/debrief-learner-event.entity';
 
 class PlatformDto {
@@ -56,6 +58,15 @@ class LearnerEventDto extends PlatformDto {
   @ApiProperty({ enum: DEBRIEF_CLIENT_EVENT_KINDS })
   @IsIn(DEBRIEF_CLIENT_EVENT_KINDS as unknown as string[])
   kind!: (typeof DEBRIEF_CLIENT_EVENT_KINDS)[number];
+}
+class PulseDto extends PlatformDto {
+  @ApiProperty({ enum: DEBRIEF_PULSE_QUESTIONS })
+  @IsIn(DEBRIEF_PULSE_QUESTIONS as unknown as string[])
+  question!: DebriefPulseQuestion;
+
+  @ApiProperty()
+  @IsBoolean()
+  answer!: boolean;
 }
 class HelpfulDto {
   @ApiProperty()
@@ -225,7 +236,32 @@ export class DebriefLearnerController {
     @CurrentUser() user: TokenUser,
   ) {
     const view = await this.agent.learnerView(sessionId, user.id);
-    return this.feedback.decorate(view, user.id);
+    const decorated = await this.feedback.decorate(view, user.id);
+    // PRD §9: the pulse, only on a debrief it asks on.
+    const pulse = await this.learnerEvents.pulseFor(view, user.id);
+    return pulse ? { ...decorated, pulse } : decorated;
+  }
+
+  @Put('sessions/:sessionId/pulse')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary:
+      'The post-launch pulse (PRD §9): "Did you know what to practise next?" / "Did this feel fair?"',
+    description:
+      'Asked on 1 in 10 debriefs for the first 8 weeks after an organisation goes live (the view carries `pulse` then). One answer per question; answering again changes it. 404 on a debrief the pulse does not ask on.',
+  })
+  pulse(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() body: PulseDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.learnerEvents.answerPulse(
+      sessionId,
+      user.id,
+      body.question,
+      body.answer,
+      DebriefLearnerEventsService.platform(body.platform),
+    );
   }
 
   @Put('sessions/:sessionId/helpful')

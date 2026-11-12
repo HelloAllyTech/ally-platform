@@ -284,6 +284,9 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
         )
         seen: List[str] = []
         passages: List[Dict[str, str]] = []
+        # The Guidance entries' codes (`DG-…`, PRD §14) for the Console's
+        # "How it was made"; the Writer reads only titles and text.
+        citations: List[Dict[str, str]] = []
         lookups = 0
         stopped: Optional[str] = None
         for m in moments:
@@ -312,6 +315,12 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
                     continue
                 seen.append(pid)
                 passages.append(_passage(p))
+                citations.append(
+                    {
+                        "code": str(p.get("code") or ""),
+                        "title": passages[-1]["title"],
+                    }
+                )
             if found.get("unavailable"):
                 stopped = "Guidance could not be reached; writing without it."
                 break
@@ -351,6 +360,7 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
                 "output": (
                     f"{n(lookups, 'lookup')}, {n(len(passages), 'passage')} kept{kept}"
                 ),
+                "citations": citations,
                 "budgetLeftUsd": budget_left(
                     ctx.ceiling_usd, state.get("estimated", 0.0)
                 ),

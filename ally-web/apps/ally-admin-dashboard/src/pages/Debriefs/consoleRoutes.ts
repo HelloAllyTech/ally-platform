@@ -3,6 +3,9 @@ import { ROUTES } from "@constants";
 /** The Analytics tab the Debriefs metrics live under (kept here so this module stays light). */
 export const ANALYTICS_DEBRIEFS_TAB = "debriefs";
 
+/** Analytics › Debriefs: the debriefs' metrics, PM agent and agent numbers included. */
+export const analyticsDebriefsPath = () => `${ROUTES.ANALYTICS}?tab=${ANALYTICS_DEBRIEFS_TAB}`;
+
 /** Where a PM agent link opens: `?view=` picks the tab, `?idea=` the idea in focus. */
 export type PmAgentView = "ideas" | "releases" | "test-sets";
 export const pmAgentPath = (view: PmAgentView = "ideas", idea?: string): string => {

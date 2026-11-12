@@ -87,6 +87,11 @@ class TestStandardRun:
             "This learner has 1 earlier Work-on-this point to follow up."
         )
         assert by_step["guidance_lookup"]["note"] == "2 lookup(s), 2 passage(s)"
+        # PRD §14: each passage's Guidance code, for the Console's run view.
+        assert [c["code"] for c in by_step["guidance_lookup"]["citations"]] == [
+            "DG-1",
+            "DG-1",
+        ]
         assert by_step["guidance_lookup"]["reasoning"] == (
             "Led by the skill that mattered most: open questions."
         )

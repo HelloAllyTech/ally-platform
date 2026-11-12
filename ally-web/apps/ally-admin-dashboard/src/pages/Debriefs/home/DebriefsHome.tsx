@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import { BarChart3 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -15,7 +16,12 @@ import { DebriefAttention } from "@types";
 import { getErrorMessage } from "@utils";
 
 import { languageLabel, recipeLabel } from "../consoleLabels";
-import { ANALYTICS_DEBRIEFS_TAB, pmAgentPath, settingsPath } from "../consoleRoutes";
+import {
+  ANALYTICS_DEBRIEFS_TAB,
+  analyticsDebriefsPath,
+  pmAgentPath,
+  settingsPath,
+} from "../consoleRoutes";
 import { AlertBanner, Segmented } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import {
@@ -328,6 +334,14 @@ export const DebriefsHome: React.FC = () => {
             </button>
           ))}
         </div>
+        <Link
+          to={analyticsDebriefsPath()}
+          data-testid="analytics-button"
+          className="inline-flex h-9 items-center gap-2 rounded-sm border border-primary-500 px-3.5 text-sm font-medium text-primary-500 no-underline"
+        >
+          <BarChart3 aria-hidden="true" className="h-4 w-4" />
+          {h.analytics}
+        </Link>
         <Link
           to={pmAgentPath()}
           data-testid="pm-agent-button"

@@ -22,6 +22,11 @@ export const EXPERIENCE_TARGETS: Record<
   flagsWithinSla: { atLeast: 0.95 },
   listened: null,
   replied: null,
+  // PRD §9 pulse: only "fair" on important-moment debriefs has a bar —
+  // below 70% is a design-failure signal the PM agent reads weekly.
+  pulseKnewNext: null,
+  pulseFair: null,
+  pulseFairImportantMoment: { atLeast: 0.7 },
 };
 
 /** The judge's bar (PRD §8). */

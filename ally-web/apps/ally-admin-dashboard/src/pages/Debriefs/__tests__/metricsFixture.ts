@@ -25,6 +25,9 @@ const exp = (scale = 1, tweak = 0): DebriefExperienceRates => ({
   flagsWithinSla: rate(Math.round(3 * scale), Math.round(3 * scale)),
   listened: rate(Math.round(2 * scale), 20 * scale),
   replied: rate(Math.round(6 * scale), 20 * scale),
+  pulseKnewNext: rate(Math.round(2 * scale), 3 * scale),
+  pulseFair: rate(Math.round(3 * scale), 3 * scale),
+  pulseFairImportantMoment: rate(Math.round(1 * scale), 2 * scale),
 });
 
 const isoWeek = (i: number) => {

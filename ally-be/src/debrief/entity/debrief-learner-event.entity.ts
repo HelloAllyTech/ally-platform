@@ -15,6 +15,11 @@ export const DEBRIEF_LEARNER_EVENT_KINDS = [
   'replied',
   'waited',
   'left_before_ready',
+  // The post-launch pulse (PRD §9): one answer per question, yes or no.
+  'pulse_knew_next_yes',
+  'pulse_knew_next_no',
+  'pulse_fair_yes',
+  'pulse_fair_no',
 ] as const;
 export type DebriefLearnerEventKind =
   (typeof DEBRIEF_LEARNER_EVENT_KINDS)[number];
@@ -26,6 +31,10 @@ export const DEBRIEF_CLIENT_EVENT_KINDS = [
   'waited',
   'left_before_ready',
 ] as const satisfies readonly DebriefLearnerEventKind[];
+
+/** The pulse's two questions (PRD §9): "Did you know what to practise next?" and "Did this feel fair?". */
+export const DEBRIEF_PULSE_QUESTIONS = ['knew_next', 'fair'] as const;
+export type DebriefPulseQuestion = (typeof DEBRIEF_PULSE_QUESTIONS)[number];
 
 export const DEBRIEF_PLATFORMS = ['web', 'ios', 'android'] as const;
 export type DebriefPlatform = (typeof DEBRIEF_PLATFORMS)[number];

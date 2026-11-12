@@ -71,6 +71,8 @@ export interface DebriefRunStep {
   reasoning?: string | null;
   output?: string | null;
   budgetLeftUsd?: number;
+  /** Guidance lookup: the Debrief Guidance entries it kept, by code (`DG-…`, PRD §14). */
+  citations?: Array<{ code: string; title: string }>;
 }
 
 export interface DebriefCardsData {
@@ -320,6 +322,8 @@ export interface DebriefTenantRow {
   /** v9 FR-8: this calendar month's debrief spend (shadow and live), and how many runs. */
   monthSpentUsd?: number;
   monthRuns?: number;
+  /** Plan §8.9 (FR-57): the approved providers its debriefs may use; all when absent. */
+  providers?: string[];
 }
 
 /** The words of a card a reviewer may rewrite; the quote never changes. */
@@ -455,6 +459,10 @@ export interface DebriefExperienceRates {
   flagsWithinSla: DebriefRate;
   listened: DebriefRate;
   replied: DebriefRate;
+  /** PRD §9 pulse (absent from servers before it). */
+  pulseKnewNext?: DebriefRate;
+  pulseFair?: DebriefRate;
+  pulseFairImportantMoment?: DebriefRate;
 }
 
 export interface DebriefMetricsWeek {

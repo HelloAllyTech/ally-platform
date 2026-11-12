@@ -164,6 +164,18 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    /** Plan §8.9 (FR-57): which approved providers an organisation's debriefs may use. */
+    setDebriefTenantProviders: builder.mutation<
+      { tenantId: string; providers: string[] },
+      { tenantId: string; providers: string[] }
+    >({
+      query: ({ tenantId, providers }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.TENANT_PROVIDERS(tenantId),
+        method: HttpMethod.PUT,
+        body: { providers },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     actOnDebriefRun: builder.mutation<
       unknown,
       { id: string; action: "publish" | "todays-debrief" | "reviewed"; reason?: string }
@@ -451,6 +463,7 @@ export const {
   useResolveDebriefFlagMutation,
   useGetDebriefModelsQuery,
   useSetDebriefTenantRegionMutation,
+  useSetDebriefTenantProvidersMutation,
   useEscalateDebriefMutation,
   useGetDebriefMeQuery,
   useGetDebriefSessionsQuery,

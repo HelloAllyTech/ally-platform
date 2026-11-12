@@ -719,6 +719,9 @@ const EfficiencyCard: React.FC<{ view: DebriefMetricsView }> = ({ view }) => {
   );
 };
 
+/** A rate with nothing counted (a server from before the pulse). */
+const NO_RATE: DebriefRate = { n: 0, of: 0, value: null };
+
 const BREAKDOWN_KEYS: Array<keyof DebriefExperienceRates> = [
   "openedWithin24h",
   "readThrough",
@@ -784,6 +787,20 @@ const ExperienceSection: React.FC<{ view: DebriefMetricsView }> = ({ view }) => 
     },
     { key: "listened", label: s.experience.listened, pick: e => e.listened },
     { key: "replied", label: s.experience.replied, pick: e => e.replied },
+    // PRD §9: the post-launch pulse, asked on 1 in 10 debriefs for 8 weeks.
+    {
+      key: "pulseKnewNext",
+      label: s.experience.pulseKnewNext,
+      pick: e => e.pulseKnewNext ?? NO_RATE,
+    },
+    { key: "pulseFair", label: s.experience.pulseFair, pick: e => e.pulseFair ?? NO_RATE },
+    {
+      key: "pulseFairMoment",
+      label: s.experience.pulseFairImportantMoment,
+      pick: e => e.pulseFairImportantMoment ?? NO_RATE,
+      target: { atLeast: 0.7 },
+      targetLabel: "≥ 70%",
+    },
   ];
   const rows = defs.map(d =>
     rateBullet(d.key, d.label, window(d.pick), {

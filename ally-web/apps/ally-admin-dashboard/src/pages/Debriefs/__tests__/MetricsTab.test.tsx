@@ -217,6 +217,11 @@ describe("Debriefs tab: steering, guardrails, experience, uptake", () => {
     expect(screen.getByTestId("metrics-experience-listened")).not.toHaveTextContent("target");
     expect(screen.getByTestId("metrics-by-language")).toHaveTextContent("kn-IN");
     expect(screen.getByTestId("metrics-by-device")).toHaveTextContent("ios");
+    // PRD §9: the pulse's two questions, "fair" on important moments against 70%.
+    expect(screen.getByTestId("metrics-experience-pulseKnewNext")).toHaveTextContent(
+      "Pulse: knew what to practise next",
+    );
+    expect(screen.getByTestId("metrics-experience-pulseFairMoment")).toHaveTextContent("≥ 70%");
   });
 
   it("marks a rate with fewer than 20 counted as too few to read", () => {

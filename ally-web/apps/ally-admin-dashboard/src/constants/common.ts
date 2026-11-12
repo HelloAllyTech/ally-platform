@@ -480,6 +480,7 @@ export const ApiEndpoints = {
     TENANTS: "/v1/debriefs/console/tenants",
     TENANT_LIVE: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/live`,
     TENANT_REGION: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/region`,
+    TENANT_PROVIDERS: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/providers`,
     RUN_ACTION: (id: string, action: "publish" | "todays-debrief" | "reviewed") =>
       `/v1/debriefs/console/runs/${id}/${action}`,
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,

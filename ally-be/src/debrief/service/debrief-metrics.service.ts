@@ -72,6 +72,12 @@ export interface ExperienceRates {
   flagsWithinSla: Rate;
   listened: Rate;
   replied: Rate;
+  /** PRD §9 pulse: "Did you know what to practise next?" yes, of answers. */
+  pulseKnewNext: Rate;
+  /** PRD §9 pulse: "Did this feel fair?" yes, of answers. */
+  pulseFair: Rate;
+  /** The same on debriefs with an important moment; below 70% is a design-failure signal. */
+  pulseFairImportantMoment: Rate;
 }
 
 /**
@@ -200,6 +206,7 @@ export class DebriefMetricsService {
                COALESCE(jsonb_array_length(r.workspace->'judge'->'hardFails'), 0) AS hard_fails,
                COALESCE(r.workspace->'judge'->'hardFails' @> '[{"code":"fabricated_quote"}]', false) AS fabricated,
                (r.cards ? 'practise_next' AND r.cards->'practise_next' <> 'null'::jsonb) AS has_practise,
+               (r.cards ? 'important_moment' AND r.cards->'important_moment' <> 'null'::jsonb) AS has_moment,
                EXTRACT(EPOCH FROM (r."finishedAt" - s."endedAt"))::float AS visible_s,
                ${READABLE} AS readable
           FROM debrief_runs r
@@ -218,7 +225,11 @@ export class DebriefMetricsService {
                bool_or(e.kind = 'reflection_answered') AS reflected,
                bool_or(e.kind = 'replied') AS replied,
                bool_or(e.kind = 'waited') AS waited,
-               bool_or(e.kind = 'left_before_ready') AS left_early
+               bool_or(e.kind = 'left_before_ready') AS left_early,
+               bool_or(e.kind = 'pulse_knew_next_yes') AS knew_yes,
+               bool_or(e.kind = 'pulse_knew_next_no') AS knew_no,
+               bool_or(e.kind = 'pulse_fair_yes') AS fair_yes,
+               bool_or(e.kind = 'pulse_fair_no') AS fair_no
           FROM debrief_learner_events e
          WHERE e."scenarioSessionId" IN (SELECT session_id FROM runs)
          GROUP BY 1
@@ -248,6 +259,10 @@ export class DebriefMetricsService {
                COALESCE(ev.replied, false) AS replied,
                COALESCE(ev.waited, false) AS waited,
                COALESCE(ev.left_early, false) AS left_early,
+               COALESCE(ev.knew_yes, false) AS knew_yes,
+               COALESCE(ev.knew_no, false) AS knew_no,
+               COALESCE(ev.fair_yes, false) AS fair_yes,
+               COALESCE(ev.fair_no, false) AS fair_no,
                COALESCE(thumbs.up, false) AS thumbs_up,
                COALESCE(thumbs.down, false) AS thumbs_down,
                COALESCE(flags.due, 0) AS flags_due,
@@ -291,6 +306,12 @@ export class DebriefMetricsService {
       count(*) FILTER (WHERE waited AND left_early)::int AS left_early,
       count(*) FILTER (WHERE readable AND thumbs_up)::int AS thumbs_up,
       count(*) FILTER (WHERE readable AND thumbs_down)::int AS thumbs_down,
+      count(*) FILTER (WHERE readable AND knew_yes)::int AS pulse_knew_yes,
+      count(*) FILTER (WHERE readable AND (knew_yes OR knew_no))::int AS pulse_knew_answered,
+      count(*) FILTER (WHERE readable AND fair_yes)::int AS pulse_fair_yes,
+      count(*) FILTER (WHERE readable AND (fair_yes OR fair_no))::int AS pulse_fair_answered,
+      count(*) FILTER (WHERE readable AND has_moment AND fair_yes)::int AS pulse_fair_moment_yes,
+      count(*) FILTER (WHERE readable AND has_moment AND (fair_yes OR fair_no))::int AS pulse_fair_moment_answered,
       sum(flags_due)::int AS flags_due,
       sum(flags_on_time)::int AS flags_on_time`;
 
@@ -771,6 +792,12 @@ function experience(r: any): ExperienceRates {
     flagsWithinSla: rate(num(r.flags_on_time), num(r.flags_due)),
     listened: rate(num(r.listened), num(r.opened)),
     replied: rate(num(r.replied), num(r.opened)),
+    pulseKnewNext: rate(num(r.pulse_knew_yes), num(r.pulse_knew_answered)),
+    pulseFair: rate(num(r.pulse_fair_yes), num(r.pulse_fair_answered)),
+    pulseFairImportantMoment: rate(
+      num(r.pulse_fair_moment_yes),
+      num(r.pulse_fair_moment_answered),
+    ),
   };
 }
 

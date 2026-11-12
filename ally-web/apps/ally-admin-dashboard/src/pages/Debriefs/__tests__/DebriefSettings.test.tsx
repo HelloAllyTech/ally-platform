@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@constants";
 
 const h = vi.hoisted(() => ({
+  providers: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
   settings: vi.fn(),
   update: vi.fn(),
   accept: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefTenantsQuery: () => h.tenants(),
   useSetDebriefTenantLiveMutation: () => [h.setLive, { isLoading: false }],
   useSetDebriefTenantRegionMutation: () => [vi.fn(), { isLoading: false }],
+  useSetDebriefTenantProvidersMutation: () => [h.providers, { isLoading: false }],
   useEmergencyStopDebriefTenantMutation: () => [h.stop, { isLoading: false }],
   useSetDebriefBudgetsMutation: () => [h.budgets, { isLoading: false }],
   useGetDebriefMeQuery: () => ({ data: undefined }),
@@ -356,6 +358,55 @@ describe("Debrief settings page: who can change what", () => {
     );
     expect(screen.getByRole("dialog")).toHaveTextContent("it is proposed as a change");
     expect(screen.getAllByRole("button", { name: "Save changes" }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("Settings › Organisations › model providers (plan §8.9)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.settings.mockReturnValue({ data: VIEW, isError: false, refetch: vi.fn() });
+    h.overview.mockReturnValue({ data: OVERVIEW, isError: false, refetch: vi.fn() });
+    h.tenants.mockReturnValue({
+      data: [{ ...TENANTS[1], providers: ["gemini", "openai"] }],
+      isError: false,
+      refetch: vi.fn(),
+    });
+    h.autonomy.mockReturnValue({ data: AUTONOMY });
+  });
+  const renderPage = () =>
+    render(
+      <MemoryRouter>
+        <DebriefSettingsPage />
+      </MemoryRouter>,
+    );
+
+  it("shows each organisation's providers and lets the owner narrow them, never to none", async () => {
+    h.permissions = ["manage:admin:debrief-settings"];
+    renderPage();
+    const row = screen.getByTestId("organisation-row");
+    expect(within(row).getByTestId("organisation-providers")).toHaveTextContent(
+      "Models from: Google, OpenAI",
+    );
+    fireEvent.click(within(within(row).getByTestId("organisation-providers")).getByRole("button"));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByLabelText("Google"));
+    fireEvent.click(within(dialog).getByLabelText("OpenAI"));
+    const save = within(dialog).getByRole("button", { name: "Save providers" });
+    expect(save).toBeDisabled();
+    expect(dialog).toHaveTextContent("Allow at least one provider");
+    fireEvent.click(within(dialog).getByLabelText("Anthropic"));
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(h.providers).toHaveBeenCalledWith({ tenantId: "t2", providers: ["anthropic"] }),
+    );
+  });
+
+  it("shows no change link to someone who can't switch organisations on", () => {
+    h.permissions = [];
+    renderPage();
+    expect(
+      within(screen.getByTestId("organisation-providers")).queryByRole("button"),
+    ).not.toBeInTheDocument();
   });
 });
 

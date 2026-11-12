@@ -273,6 +273,18 @@ describe("Debriefs home", () => {
     expect(screen.getByTestId("pm-needs-you")).toHaveTextContent("3");
   });
 
+  it("puts Analytics before PM agent, linking to Analytics › Debriefs", () => {
+    h.attention.mockReturnValue(attention(TEAM, []));
+    renderAt();
+    const analytics = screen.getByTestId("analytics-button");
+    expect(analytics).toHaveTextContent("Analytics");
+    expect(analytics).toHaveAttribute("href", "/analytics?tab=debriefs");
+    expect(
+      analytics.compareDocumentPosition(screen.getByTestId("pm-agent-button")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("hides To score, the ! badge and e for someone who doesn't score or escalate", () => {
     h.sessions.mockReturnValue(page(QUEUE, READER));
     h.attention.mockReturnValue(attention(READER));

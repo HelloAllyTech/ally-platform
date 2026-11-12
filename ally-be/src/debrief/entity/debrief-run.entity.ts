@@ -31,6 +31,8 @@ export interface DebriefRunStepRecord {
   reasoning?: string | null;
   output?: string | null;
   budgetLeftUsd?: number;
+  /** Guidance lookup only: the Debrief Guidance entries it kept, by code (`DG-…`, PRD §14). */
+  citations?: Array<{ code: string; title: string }>;
 }
 
 /**

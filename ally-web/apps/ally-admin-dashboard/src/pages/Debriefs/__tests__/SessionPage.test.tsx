@@ -614,6 +614,38 @@ describe("Session page", () => {
     expect(screen.getByTestId("skill-row")).toHaveTextContent("Too early to tell");
   });
 
+  it("How it was made names each guidance entry the lookup kept by its DG- code (PRD §14)", () => {
+    h.session.mockReturnValue(
+      ok(
+        view({
+          howItWasMade: {
+            ...view().howItWasMade,
+            steps: [
+              {
+                step: "guidance_lookup",
+                label: "Looking up guidance",
+                status: "done",
+                startedAt: "2026-11-10T10:00:00Z",
+                ms: 400,
+                output: "2 lookups, 2 passages kept",
+                citations: [
+                  { code: "DG-0012", title: "Asking about suicide directly" },
+                  { code: "DG-0040", title: "Reflecting feelings" },
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "How it was made" }));
+    const codes = screen.getByTestId("run-step-citations");
+    expect(codes).toHaveTextContent("DG-0012");
+    expect(codes).toHaveTextContent("Asking about suicide directly");
+    expect(codes).toHaveTextContent("DG-0040");
+  });
+
   it("the Ask Ally tab reads the conversation, with what a replaced reply blocked", () => {
     h.session.mockReturnValue(
       ok(

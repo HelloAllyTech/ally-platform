@@ -176,6 +176,9 @@ describe('metric failure points (spec C2)', () => {
     flagsWithinSla: rate(0, 0),
     listened: rate(1, 100),
     replied: rate(1, 100),
+    pulseKnewNext: rate(0, 0),
+    pulseFair: rate(0, 0),
+    pulseFairImportantMoment: rate(0, 0),
   });
   const week = (
     w: string,

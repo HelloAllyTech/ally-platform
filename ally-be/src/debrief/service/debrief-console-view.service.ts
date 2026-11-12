@@ -1,3 +1,4 @@
+import { DebriefRunStepRecord } from '../entity/debrief-run.entity';
 import {
   ForbiddenException,
   Injectable,
@@ -534,6 +535,38 @@ export class DebriefConsoleViewService implements OnModuleInit {
    * the judge's reasons, comments, scoring, the queue position, and what this
    * viewer's role must decide now with its anchors.
    */
+  /**
+   * PRD §14: each guidance step names the Debrief Guidance entries it used by
+   * code (`DG-…`). Runs record them on the step; a run from before that has
+   * only the passages' ids, read back to codes here (a missing entry is left
+   * out, never guessed).
+   */
+  private async withGuidanceCodes(
+    steps: DebriefRunStepRecord[],
+    passageIds: string[],
+  ): Promise<DebriefRunStepRecord[]> {
+    const lookup = steps.findIndex(
+      (x) => x.step === 'guidance_lookup' && !x.citations,
+    );
+    if (lookup < 0 || passageIds.length === 0) return steps;
+    let rows: Array<{ code: string; title: string }> = [];
+    try {
+      rows = await this.dataSource.query(
+        `SELECT code, title FROM cl_chunks WHERE id::text = ANY($1::text[])
+          ORDER BY array_position($1::text[], id::text)`,
+        [passageIds],
+      );
+    } catch {
+      return steps;
+    }
+    const out = [...steps];
+    out[lookup] = {
+      ...out[lookup],
+      citations: rows.map((r) => ({ code: r.code, title: r.title })),
+    };
+    return out;
+  }
+
   async session(runId: string, viewer: DebriefViewer) {
     const run = await this.runs.findOne({ where: { id: runId } });
     if (!run) throw new NotFoundException('Run not found');
@@ -794,7 +827,10 @@ export class DebriefConsoleViewService implements OnModuleInit {
                   1000,
               )
             : null,
-        steps: run.steps ?? [],
+        steps: await this.withGuidanceCodes(
+          run.steps ?? [],
+          Array.isArray(ws.passages) ? (ws.passages as string[]) : [],
+        ),
         checkFailures: run.checkFailures ?? [],
         error: run.error ?? null,
       },

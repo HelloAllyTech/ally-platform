@@ -422,6 +422,24 @@ const HowItWasMade: React.FC<Props> = ({ view, modelLabel }) => {
                     st.note ??
                     (st.status === "skipped" ? r.skipped : st.status === "failed" ? r.failed : "")}
                 </div>
+                {!!st.citations?.length && (
+                  <ul
+                    className="mt-1 flex flex-wrap gap-1.5"
+                    aria-label={s.guidanceCodes}
+                    data-testid="run-step-citations"
+                  >
+                    {st.citations.map(c => (
+                      <li
+                        key={c.code || c.title}
+                        title={c.title}
+                        className="rounded-sm bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-800"
+                      >
+                        {c.code}
+                        <span className="font-primary text-neutral-600"> · {c.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {(st.why || st.reasoning) && (
                   <details className="mt-1 text-[13px]">
                     <summary className="cursor-pointer text-primary-500">{s.reasoning}</summary>
