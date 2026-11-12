@@ -23,7 +23,7 @@ No new roles were created. The console uses the existing groups and adds one new
 | Role | Held as | Notes |
 |---|---|---|
 | Ally team | `system:access` (PLATFORM_ADMIN, SUPER_ADMIN, SUPER_DUPER_ADMIN) | The platform tier that already reaches the console |
-| Clinical advisor | `review:admin:debriefs` | Granted person by person (migration 1981900710000 also gave it to the platform groups) |
+| Clinical advisor | `review:admin:debriefs` | Granted person by person; no group holds it (migration 1981900780000 revoked it from the platform groups). Advisor routes need it alone, never `system:access` |
 | Owner | `manage:admin:debrief-settings` (**new**, migration 1981900730000) | SUPER_DUPER_ADMIN, or granted person by person |
 | Engineering (Schedules only) | the `debrief_schedules` admin feature toggle ("Debriefs — Schedules") + `system:access` | Granted person by person, never to a group; nobody holds it after deploy. See "Schedules" |
 
@@ -38,18 +38,20 @@ rather than disable it.
 | `flagDecision` | yes | escalated flags only (checked per flag, 403) | yes | `flags/:id/resolve` |
 | `heldDebrief` | yes | no | yes | `runs/:id/publish`, `runs/:id/todays-debrief`, `runs/:id/reviewed`, `runs/:id/correct` |
 | `escalate` | yes | no | yes | `flags/:id/escalate`, `runs/:id/escalate` |
-| `verdict` | no* | yes | no* | expert-review `runs/:id/verdict` |
-| `score` | in the scoring sample only (403 otherwise) | yes | no | `sessions/:sessionId/score` |
+| `verdict` | no | yes | no | expert-review `runs/:id/verdict` |
+| `score` | in the scoring sample only (403 otherwise) | yes | no | `sessions/:sessionId/score`, `GET /v1/analytics/debrief-quality/calibration/:id` (the Score by hand item) |
 | `pmAgent` | yes | no | yes | `pm-agent/analyse`, `ideas/:id/screen`, `approve` (a budgets-only change: owner), `reject`, `questions`, `start-step`, `ideas/propose` and `ideas/:id/draft` (with `settings`: owner); `pinned-rules/proposals` |
-| `approvePinnedRule` | no* | yes | yes | `pm-agent/ideas/:id/approve-pinned-rule` |
+| `approvePinnedRule` | no | yes | yes | `pm-agent/ideas/:id/approve-pinned-rule` |
 | `testSets` | yes | no | yes | `test-sets/build` |
 | `releases` | yes | no | yes | `releases/orchestrator-challenger`, `releases/:id/rollback`, `releases/:id/promote-waiting`, `releases/:id/dismiss-waiting`, `sessions/:sessionId/run` |
 | `switchOrgOn` | no | no | yes | `tenants/:id/live` with `live: true` (403 for the Ally team), `tenants/:id/region` |
 | `emergencyStop` | yes | no | yes | `tenants/:id/live` with `live: false`, `tenants/:id/emergency-stop` |
 | `ownerSettings` | no | no | yes | `settings` (PUT), `settings/accept`, `settings/baseline`, `budgets`, `autonomy/matrix`, `autonomy/orgs/:id` |
 
-\* Platform admins also hold `review:admin:debriefs` today, so by default they can give a verdict
-and sign off pinned rules. Revoke it from the groups if that is not wanted (product decision).
+The clinical advisor's routes (verdict, comments, Score by hand item and save, escalated flags,
+pinned-rule sign-off) accept `review:admin:debriefs` without `system:access`; the Ally team's
+actions stay on `system:access`. Platform admins no longer hold `review:admin:debriefs` (migration
+1981900780000), so they give no verdicts and sign off no pinned rules unless granted it by hand.
 
 "Escalated to you" (the bar, the banner and the `escalated` count) goes only to
 `roles.receivesEscalations`. That is an advisor named with the clinical-advisor toggle, or a
@@ -529,5 +531,5 @@ as failed.
 - **Judge drift and model trials** are Release 2.
 - **Step win rates** are `null` until step-level trials exist (Release 2).
 
-- **Verdicts by platform admins:** platform groups hold `review:admin:debriefs`, so they also count as clinical advisors for verdicts and pinned-rule sign-off.
+- **Verdicts by platform admins:** decided 2026-11-12: revoked. The platform groups no longer hold `review:admin:debriefs` (migration 1981900780000); clinical advisors are granted it person by person.
 - **Calibration routes:** only `GET /v1/analytics/debrief-quality/calibration/:id` remains (the Score by hand panel reads it). The old sample, agreement and submit routes were removed; scores are saved through `sessions/:sessionId/score`, and the agreement is in `GET analytics`.

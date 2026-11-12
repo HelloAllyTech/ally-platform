@@ -13,8 +13,8 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
  * - TEAM: the Ally team, the platform tier that already reaches the console
  *   (`system:access`: PLATFORM_ADMIN, SUPER_ADMIN, SUPER_DUPER_ADMIN).
  * - ADVISOR: the clinical advisor, `review:admin:debriefs`, granted person by
- *   person. The platform groups hold it too (migration 1981900710000), so for
- *   them it adds verdicts and pinned-rule sign-off.
+ *   person; no group holds it (1981900780000 revoked it from the platform
+ *   groups). Advisor routes accept it on its own, without `system:access`.
  * - OWNER: `manage:admin:debrief-settings` (SUPER_DUPER_ADMIN, or person by
  *   person).
  */
@@ -82,8 +82,8 @@ export interface DebriefViewerRoles {
   /**
    * Escalations are addressed to this viewer: a clinical advisor named with
    * the "Debriefs — Clinical advisor" toggle (who is notified), or one who is
-   * not also on the Ally team. Platform admins hold `review:admin:debriefs`
-   * by default; without this they would all see "Escalated to you".
+   * not also on the Ally team (a team member granted `review:admin:debriefs`
+   * by hand does not see "Escalated to you" unless named).
    */
   receivesEscalations: boolean;
 }

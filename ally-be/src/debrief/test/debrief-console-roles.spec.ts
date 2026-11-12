@@ -4,6 +4,7 @@ import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { DebriefConsoleController } from '../controller/debrief-console.controller';
 import { DebriefReviewController } from '../controller/debrief-review.controller';
+import { DebriefCalibrationController } from '../../analytics/controller/debrief-calibration.controller';
 import {
   canDecideFlag,
   debriefCan,
@@ -109,6 +110,41 @@ describe('Debrief console role gating', () => {
     expect(await allowed(TEAM, C, 'approvePinnedRule')).toBe(false);
   });
 
+  it('the clinical advisor needs only review:admin:debriefs, never system:access (PE-06, RA-15)', async () => {
+    const C = DebriefConsoleController;
+    // Verdict, comments, Score by hand (item + save), escalated flags,
+    // pinned-rule sign-off.
+    expect(await allowed(ADVISOR, DebriefReviewController, 'verdict')).toBe(
+      true,
+    );
+    for (const h of [
+      'addComment',
+      'editComment',
+      'resolveComment',
+      'score',
+      'resolveFlag',
+      'approvePinnedRule',
+    ]) {
+      expect(await allowed(ADVISOR, C, h)).toBe(true);
+    }
+    expect(
+      await allowed(ADVISOR, DebriefCalibrationController, 'getItem'),
+    ).toBe(true);
+    // The Ally team keeps scoring (in the sample) on platform access.
+    expect(await allowed(TEAM, DebriefCalibrationController, 'getItem')).toBe(
+      true,
+    );
+    expect(await allowed(TEAM, C, 'score')).toBe(true);
+    expect(await allowed(NOBODY, DebriefCalibrationController, 'getItem')).toBe(
+      false,
+    );
+    // The team's own actions stay on system:access.
+    for (const h of ['publishRun', 'escalateFlag', 'proposeChange']) {
+      expect(await allowed(ADVISOR, C, h)).toBe(false);
+      expect(await allowed(TEAM, C, h)).toBe(true);
+    }
+  });
+
   it('flag decisions: the advisor reaches the route but decides only escalated flags', async () => {
     expect(
       await allowed(ADVISOR, DebriefConsoleController, 'resolveFlag'),
@@ -154,8 +190,8 @@ describe('Debrief console role gating', () => {
       approvePinnedRule: true,
       pmAgent: false,
     });
-    // A platform admin also holds review:admin:debriefs by default, but
-    // escalations are addressed only to the named advisor.
+    // A team member granted review:admin:debriefs by hand: escalations are
+    // addressed only to the named advisor.
     expect(debriefRoles([...TEAM, ...ADVISOR]).receivesEscalations).toBe(false);
     expect(debriefRoles([...TEAM, ...ADVISOR], true).receivesEscalations).toBe(
       true,
