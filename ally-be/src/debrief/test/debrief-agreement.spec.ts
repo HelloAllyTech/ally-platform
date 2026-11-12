@@ -377,7 +377,7 @@ describe('debrief agreement: canary eligibility reads it', () => {
     expect(kindEligibility('prompts', f, 'canary')).toMatchObject({
       eligible: false,
       reason:
-        'Not yet: judge agreement below 0.6 (Accuracy not measured yet, 37 of 50).',
+        'Not yet: judge agreement below 0.6 (Accuracy not measured yet: 37 of 50 reviews).',
     });
     // Steps learners never see stay free of the gate.
     expect(kindEligibility('prompts', f, 'paired_trial').eligible).toBe(true);

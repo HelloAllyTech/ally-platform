@@ -477,7 +477,7 @@ function gateMeasureState(c: { kappa: number | null; n?: number }): string {
   if (c.kappa != null) return c.kappa.toFixed(2);
   if (c.n == null) return 'not measured';
   if (c.n < GATE_MIN_REVIEWS) {
-    return `not measured yet, ${c.n} of ${GATE_MIN_REVIEWS}`;
+    return `not measured yet: ${c.n} of ${GATE_MIN_REVIEWS} reviews`;
   }
   return 'not measurable yet (every answer the same)';
 }
@@ -521,7 +521,7 @@ export function kindEligibility(
   if (!f.gate.met) {
     const low = f.gate.failing
       .map((c) => `${gateMeasureLabel(c.measure)} ${gateMeasureState(c)}`)
-      .join(', ');
+      .join('; ');
     return {
       kind,
       eligible: false,

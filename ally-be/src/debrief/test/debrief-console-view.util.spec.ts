@@ -178,7 +178,7 @@ describe('PM agent autonomy policy', () => {
       }
     }
     expect(kindEligibility('prompts', f).reason).toBe(
-      'Not yet: judge agreement below 0.6 (Accuracy not measured, Evidence 0.41, Missed risk cue not measured, Some new measure not measured).',
+      'Not yet: judge agreement below 0.6 (Accuracy not measured; Evidence 0.41; Missed risk cue not measured; Some new measure not measured).',
     );
   });
 
