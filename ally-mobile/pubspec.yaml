@@ -20,7 +20,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # the store accepts this app as an update to RN's listing. The build number
 # here is a placeholder: release workflows pass --build-number (scheme in
 # docs/RELEASE.md) so it always exceeds RN's.
-version: 2.0.5+1
+version: 2.0.6+1
 
 environment:
   sdk: ^3.13.5
