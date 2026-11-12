@@ -406,6 +406,20 @@ export interface KindEligibility {
   reason: string;
 }
 
+/** The κ gate's measures in words (the admin's gateMeasures); a reason never shows a code. */
+export const GATE_MEASURE_LABELS: Record<string, string> = {
+  accuracy: 'Accuracy',
+  evidence_specificity: 'Evidence',
+  missed_risk_cue: 'Missed risk cue',
+};
+
+export function gateMeasureLabel(measure: string): string {
+  const known = GATE_MEASURE_LABELS[measure];
+  if (known) return known;
+  const words = measure.replace(/[_-]+/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /** The steps learners never see (plan §4: free to experiment before learners are involved). */
 export const LEARNER_FREE_STEPS: readonly AutonomyStep[] = [
   'quick_test',
@@ -446,7 +460,7 @@ export function kindEligibility(
     const low = f.gate.failing
       .map(
         (c) =>
-          `${c.measure} ${c.kappa == null ? 'not measured' : c.kappa.toFixed(2)}`,
+          `${gateMeasureLabel(c.measure)} ${c.kappa == null ? 'not measured' : c.kappa.toFixed(2)}`,
       )
       .join(', ');
     return {

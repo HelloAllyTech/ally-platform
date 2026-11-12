@@ -31,7 +31,7 @@ import {
 } from "@types";
 import { getErrorMessage, hasFeature } from "@utils";
 
-import { settingName, settingValueLabel } from "../consoleLabels";
+import { inWords, settingName, settingValueLabel } from "../consoleLabels";
 import { SettingsSection } from "../consoleRoutes";
 import { BackLink, ConsoleTag, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
@@ -247,11 +247,11 @@ const EligibleCell: React.FC<{ row: DebriefAutonomyView["kinds"][number]; pinned
     <span className="flex flex-col gap-0.5 text-xs" data-testid="autonomy-eligible">
       <span className={tone(tests.eligible)} data-testid="autonomy-eligible-tests">
         {s.testsLabel}: {tests.eligible ? s.eligibleYes : s.eligibleNo}
-        {!tests.eligible && ` · ${row.relockReason ?? tests.reason}`}
+        {!tests.eligible && ` · ${inWords(row.relockReason ?? tests.reason)}`}
       </span>
       <span className={tone(canary.eligible)} data-testid="autonomy-eligible-canary">
         {s.columns.canary}: {canary.eligible ? s.eligibleYes : s.eligibleNo} ·{" "}
-        {row.relockReason ?? canary.reason}
+        {inWords(row.relockReason ?? canary.reason)}
       </span>
     </span>
   );

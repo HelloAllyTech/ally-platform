@@ -521,7 +521,12 @@ describe("PM agent › Ideas", () => {
       data: {
         kinds: [
           { kind: "settings", cells: cells("auto"), reason: "agreement 0.71", relockReason: null },
-          { kind: "prompts", cells: cells("ask"), reason: "Accuracy 0.52", relockReason: null },
+          {
+            kind: "prompts",
+            cells: cells("ask"),
+            reason: "Not yet: judge agreement below 0.6 (evidence_specificity 0.52).",
+            relockReason: null,
+          },
           { kind: "pinned_rules", cells: cells("off"), reason: "", relockReason: null },
         ],
       },
@@ -532,6 +537,14 @@ describe("PM agent › Ideas", () => {
     expect(chips).toHaveTextContent("Settings: tests alone, asks before learners");
     expect(chips).toHaveTextContent("Prompts and agents: asks first");
     expect(chips).toHaveTextContent("Pinned rules: never");
+    // Its reason, on hover, never shows a code.
+    for (const chip of chips.querySelectorAll("[title]")) {
+      expect(chip.getAttribute("title")).not.toMatch(/[a-z]+_[a-z]+/);
+    }
+    expect(chips.querySelector("[data-state=asks_first]")).toHaveAttribute(
+      "title",
+      "Not yet: judge agreement below 0.6 (Evidence 0.52).",
+    );
   });
 
   it("says yes only when the canary itself runs alone", () => {

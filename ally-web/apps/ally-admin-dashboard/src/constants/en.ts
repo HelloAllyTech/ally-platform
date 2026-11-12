@@ -11430,7 +11430,7 @@ export const en = {
     gateMeasures: {
       accuracy: "Accuracy",
       evidence_specificity: "Evidence",
-      missed_risk_cue: "Missed risk",
+      missed_risk_cue: "Missed risk cue",
     } as Record<string, string>,
   },
   // ── Context Library ────────────────────────────────────────────────────────

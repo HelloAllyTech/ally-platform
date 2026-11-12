@@ -36,6 +36,7 @@ export const promptName = from(() => en.debriefs.pmAgent.promptNames);
 
 /** A metric or code the PM agent may name in its own text, looked up in every label map we have. */
 const knownLabel = (code: string): string | undefined =>
+  en.debriefs.gateMeasures[code] ??
   en.debriefs.pmAgent.forecastMetrics[code] ??
   en.debriefs.run.stepNames[code] ??
   (en.debriefs.hardFails as Record<string, string>)[code] ??

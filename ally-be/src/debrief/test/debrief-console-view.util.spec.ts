@@ -159,6 +159,29 @@ describe('PM agent autonomy policy', () => {
     });
   });
 
+  it('reasons name the gate measures in words, never a code', () => {
+    const f = {
+      ...ineligible,
+      gate: {
+        met: false,
+        failing: [
+          { measure: 'accuracy', kappa: null },
+          { measure: 'evidence_specificity', kappa: 0.41 },
+          { measure: 'missed_risk_cue', kappa: null },
+          { measure: 'some_new_measure', kappa: null },
+        ],
+      },
+    };
+    for (const kind of ['settings', 'prompts', 'pinned_rules'] as const) {
+      for (const e of Object.values(stepEligibility(kind, f))) {
+        expect(e.reason).not.toMatch(/[a-z]+_[a-z]+/);
+      }
+    }
+    expect(kindEligibility('prompts', f).reason).toBe(
+      'Not yet: judge agreement below 0.6 (Accuracy not measured, Evidence 0.41, Missed risk cue not measured, Some new measure not measured).',
+    );
+  });
+
   it('an organisation only tightens: the stricter of global and org wins', () => {
     const policy = normaliseAutonomy({
       orgs: {

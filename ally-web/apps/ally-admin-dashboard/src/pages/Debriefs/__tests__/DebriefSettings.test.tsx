@@ -506,6 +506,35 @@ describe("What the PM agent may do alone", () => {
     expect(screen.queryByTestId("autonomy-settings-quick_test")).toBeNull();
   });
 
+  it("never shows a code: an older server's reasons read in words", () => {
+    h.permissions = [];
+    h.autonomy.mockReturnValue({
+      data: {
+        ...AUTONOMY,
+        kinds: AUTONOMY.kinds.map(k =>
+          k.kind === "prompts"
+            ? {
+                ...k,
+                eligibility: {
+                  ...k.eligibility,
+                  canary: {
+                    eligible: false,
+                    reason:
+                      "Not yet: judge agreement below 0.6 (accuracy not measured, evidence_specificity 0.41, missed_risk_cue not measured).",
+                  },
+                },
+              }
+            : k,
+        ),
+      },
+    });
+    renderPage();
+    const matrix = screen.getByTestId("autonomy-matrix");
+    expect(matrix.textContent).not.toMatch(/[a-z]+_[a-z]+/);
+    expect(matrix).toHaveTextContent("Evidence 0.41");
+    expect(matrix).toHaveTextContent("Missed risk cue not measured");
+  });
+
   it("lets the owner change a cell; only the canary needs judge agreement for on its own", async () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage();

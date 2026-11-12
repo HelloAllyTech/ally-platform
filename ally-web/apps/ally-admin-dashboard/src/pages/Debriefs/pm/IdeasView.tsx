@@ -93,7 +93,7 @@ const AutonomyChips: React.FC<{ autonomy: DebriefAutonomyView }> = ({ autonomy }
         return (
           <span
             key={kind}
-            title={row.relockReason ?? row.reason}
+            title={inWords(row.relockReason ?? row.reason)}
             data-state={state}
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] font-semibold ${alone || testsAlone ? "bg-success-50 text-success-600" : "bg-[#FFF2E8] text-[#8A3800]"}`}
           >
