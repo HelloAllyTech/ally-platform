@@ -181,9 +181,10 @@ export interface DebriefAskAllyExchange {
   costUsd: number | null;
   model: string | null;
   tools: Array<{ name?: string; topic?: string; found?: string }> | unknown[];
-  /** The card the question was about, when ally-be sends it. */
-  section?: string | null;
-  firstWordsMs?: number | null;
+  /** The card asked about ("work_on_this[0]"), when the learner app sent it. */
+  section: string | null;
+  /** Time from the question to Ally's first words (null before this release). */
+  firstWordsMs: number | null;
 }
 
 export interface DebriefJudgeReason {
@@ -317,6 +318,7 @@ export interface DebriefAttention {
       | "escalated"
       | "canary_reverted"
       | "approval_expiring"
+      | "release_waiting"
       | "agent_off"
       | "cap"
       | "provider_down"
@@ -411,17 +413,41 @@ export interface AppNotification {
 /** Where a release came from (`release-history`). */
 export type DebriefReleaseOrigin =
   | { kind: "idea"; ideaId: string; title: string; proposedBy: "pm_agent" | "person" }
-  | { kind: "code"; tag: string | null }
-  | { kind: "settings_change"; by: { id: number; name: string | null } | null; note: string | null }
-  | { kind: "roll_back"; fromVersion: number | null; reason: string | null }
-  /** A Skills Store publish that became a release by itself (shape pending in CONSOLE_API.md). */
   | {
       kind: "skills_store";
       by: { id: number; name: string | null } | null;
-      promptCode?: string | null;
-      version?: number | null;
-      note?: string | null;
-    };
+      promptCode: string;
+      from: number | null;
+      to: number;
+      note: string | null;
+    }
+  | { kind: "code"; tag: string | null; promptCode: string | null; note: string | null }
+  | { kind: "settings_change"; by: { id: number; name: string | null } | null; note: string | null }
+  | { kind: "roll_back"; fromVersion: number | null; reason: string | null };
+
+/** A Skills Store or code release waiting because it would undo a promoted change. */
+export interface DebriefWaitingRelease {
+  id: string;
+  version: number;
+  title: string;
+  source: {
+    kind: "skills_store" | "code";
+    by: number | null;
+    tag: string | null;
+    promptCode: string | null;
+    from: number | null;
+    to: number | null;
+    note: string | null;
+  };
+  wouldUndo: Array<{
+    path: string;
+    what: string;
+    live: unknown;
+    wouldBecome: unknown;
+    changedBy: { version: number; ideaId: string | null; label: string };
+  }>;
+  problems: string[];
+}
 
 export interface DebriefReleaseHistoryItem {
   id: string;
@@ -442,16 +468,7 @@ export interface DebriefReleaseHistoryItem {
 
 export interface DebriefReleaseHistory {
   items: DebriefReleaseHistoryItem[];
-  /** Code or Skills Store releases waiting as drafts because they would undo a promoted change. */
-  pendingCodeDrafts: Array<{
-    id: string;
-    version: number;
-    note: string | null;
-    createdAt: string;
-    /** The promoted change it would undo, in words, when ally-be says. */
-    wouldUndo?: string | null;
-    source?: "code" | "skills_store";
-  }>;
+  waiting: DebriefWaitingRelease[];
 }
 
 export type DebriefRungState = "passed" | "failed" | "running" | "waiting" | "skipped" | "off";
@@ -478,10 +495,8 @@ export interface DebriefReleaseDetail extends DebriefReleaseHistoryItem {
       after: string | null;
       source: "diff" | "written";
     }>;
+    /** False when nothing explains it; `why` then says so. */
     written: boolean;
-    writtenBy: number | null;
-    writtenAt: string | null;
-    canWrite: boolean;
   };
   evidence: {
     beforeLive: {
@@ -551,4 +566,65 @@ export interface DebriefProposal {
   }>;
   settings?: { runCeilingUsd?: number; monthlyCapUsd?: number; passScore?: number };
   reply?: string;
+  /** Ship these published Skills Store versions. */
+  prompts?: Record<string, number>;
+}
+
+/** Analytics › Debriefs (`GET analytics?days=`). */
+export interface DebriefAnalyticsView {
+  windowDays: number;
+  tiles: {
+    runs: number;
+    judgeMean: number | null;
+    meetsTheBar: number | null;
+    needsAPerson: number;
+    costP50Usd: number | null;
+    costP90Usd: number | null;
+    spentThisMonthUsd: number | null;
+  };
+  cost: {
+    perOrg: Array<{
+      tenantId: string;
+      tenantName: string;
+      live: boolean;
+      monthSpentUsd: number;
+      monthRuns: number;
+    }>;
+    pool: {
+      sessionsThisMonth: number;
+      addedUsd: number | null;
+      spentUsd: number | null;
+      balanceUsd: number | null;
+      monthlyCapUsd: number;
+      capLeftUsd: number | null;
+      runCeilingUsd: number;
+    };
+    learning: { spentUsd: number | null; budgetUsd: number; balanceUsd: number | null };
+    burnRate: {
+      perDayUsd: number | null;
+      last7DaysUsd: number | null;
+      projectedMonthUsd: number | null;
+    };
+  };
+  judgeAgreement: null | {
+    gate: {
+      met: boolean;
+      checks: Array<{ measure: string; kappa: number | null; passes: boolean }>;
+    };
+    target: number;
+    debriefsRated: number;
+    ratings: number;
+    peopleRating: number;
+    dimensions: Array<{
+      dimension: string;
+      kappa: number | null;
+      withinOnePct: number | null;
+      meanDifference: number | null;
+      pairs: number;
+    }>;
+    hardFails: Array<{ code: string; kappa: number | null; pairs: number }>;
+    /** People with each other, by dimension (shape as ally-be sends it). */
+    humanVsHuman: unknown;
+    expertVerdicts: unknown;
+  };
 }

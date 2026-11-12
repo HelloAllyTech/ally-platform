@@ -10096,6 +10096,7 @@ export const en = {
       } as Record<string, { title: string; message: string }>,
       bannerActions: {
         open: "Open it",
+        releases: "See Releases",
         show: "Show them",
         answer: "Answer it",
         settings: "Budgets",
@@ -10123,6 +10124,10 @@ export const en = {
             : "Debriefs have spent 80% or more of this month's cap.",
         provider: "A model provider is failing: more than half its steps failed in the last hour.",
         language: "Some sessions are not recording their language.",
+        releaseWaiting: (n: number) =>
+          n === 1
+            ? "A Skills Store or code release is waiting: it would undo a promoted change."
+            : `${n} Skills Store or code releases are waiting: each would undo a promoted change.`,
       },
     },
     // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
@@ -10376,7 +10381,16 @@ export const en = {
         help: "Your change becomes an idea with its own draft release, copied from the live one. It climbs the same tests as the PM agent's ideas before it reaches learners; the live release is never edited. Budget changes the owner proposes go live directly.",
         titleLabel: "What it is, in a few words",
         whyLabel: "Why (optional)",
-        cols: { step: "Step", model: "Model", on: "On" },
+        cols: {
+          step: "Step",
+          model: "Model",
+          on: "On",
+          prompt: "Prompt",
+          version: "Skills Store version",
+        },
+        version: (v: number) => `v${v}`,
+        versionInRelease: (v: number) => `v${v} (in the live release)`,
+        loadingVersions: "Loading…",
         fixed: "Always on",
         onLabel: (step: string) => `${step} on`,
         budgets: {
@@ -10496,12 +10510,12 @@ export const en = {
           agentIdea: (t: string) => `From the PM agent's idea “${t}”`,
           personIdea: (t: string) => `From a person's proposal “${t}”`,
           code: "A code release",
-          codeTag: (tag: string) => `Code release ${tag}`,
+          codeTag: (tag: string) => `Code · ${tag}`,
           settings: (who: string) => `A settings change by ${who}`,
           rollBack: (v: number) => `A roll back from v${v}`,
           rollBackPlain: "A roll back",
-          skillsStore: (who: string, prompt: string | null, v: number | null) =>
-            `Skills Store edit by ${who}${prompt ? ` (published ${prompt}${v != null ? ` v${v}` : ""})` : ""} · went live on publish`,
+          skillsStore: (who: string, prompt: string, from: number | null, to: number) =>
+            `Skills Store · ${who}: published ${prompt} ${from != null ? `v${from} → ` : ""}v${to} · went live on publish`,
           someone: "someone",
         },
         retiredReplaced: (v: number | null) =>
@@ -10509,18 +10523,29 @@ export const en = {
         retiredRolledBack: (why: string | null) => `rolled back${why ? `: ${why}` : ""}`,
         rollBack: "Roll back to this",
         waiting: (v: string, what: string) => `Waiting: ${v} would undo ${what}.`,
-        waitingHelp:
-          "It waits as a draft instead of going live. Promote it only if undoing that change is what you want.",
+        waitingFromStore: (prompt: string | null, from: number | null, to: number | null) =>
+          `from a Skills Store publish${prompt ? ` of ${prompt}` : ""}${to != null ? ` (${from != null ? `v${from} → ` : ""}v${to})` : ""}`,
+        waitingFromCode: (tag: string | null) => `from a code deploy${tag ? ` (${tag})` : ""}`,
+        undoLine: (what: string, live: string, next: string, by: string) =>
+          `${what}: live ${live} would become ${next} (set by ${by})`,
+        problems: (list: string) => `It also fails release checks: ${list}`,
         aChange: "a promoted change",
         promoteDraft: "Promote",
-        draftPromoted: "Promoted. It is the live release now.",
+        dismiss: "Dismiss",
+        promoteWaitingBody:
+          "Promoting puts this release live and overwrites the promoted change above. The owner is told.",
+        dismissWaitingBody:
+          "Dismissing means this release never goes live. The owner and the Ally team are told.",
+        reasonLabel: "Why (optional)",
+        waitingPromoted: "Promoted. It is the live release now.",
+        waitingDismissed: "Dismissed. It won't go live.",
         confirmLabel: "Confirm roll back",
         confirmTitle: (v: string) => `Roll back to ${v}?`,
         confirmBody:
           "Every prompt, recipe, model and setting goes back to this release for all switched-on organisations. Debriefs already written don't change.",
         whatChanged: (v: string) => `What changed from ${v}`,
         whatChangedFirst: "What's in the first release",
-        noNotes: "No notes written for this code release.",
+        noNotes: "No note written.",
         why: (why: string) => `Why: ${why}`,
         before: "Before",
         after: "After",
@@ -11318,6 +11343,7 @@ export const en = {
     },
     calibration: {
       sectionHeading: "Judge agreement",
+      noAgreement: "Nobody has scored debriefs by hand yet, so there's no agreement to show.",
       sectionHelp:
         "How closely the independent judge agrees with people who score debriefs by hand. Each gate check needs a κ of 0.6 before the PM agent may change that kind of thing on its own.",
       heading: "Score debriefs by hand",

@@ -9,7 +9,6 @@ import {
   useGetDebriefReleaseCompareQuery,
   useGetDebriefReleaseDetailQuery,
   useGetDebriefReleaseHistoryQuery,
-  usePromoteDebriefCodeDraftMutation,
   useRollbackDebriefReleaseMutation,
 } from "@api";
 import { formatUsd, releaseVersionLabel } from "@components/ally-guide/allyGuideFormat";
@@ -28,6 +27,7 @@ import { pmAgentPath, settingsPath } from "../consoleRoutes";
 import { score } from "../consoleTable";
 import { ConsoleTag } from "../consoleUi";
 import { EvidenceBlock, EvidenceStat, RungState } from "./EvidenceBlock";
+import { WaitingRelease } from "./WaitingRelease";
 
 const day = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "—";
@@ -44,11 +44,7 @@ export const originText = (item: DebriefReleaseHistoryItem): string => {
     case "settings_change":
       return p.settings(c.by?.name ?? p.someone);
     case "skills_store":
-      return p.skillsStore(
-        c.by?.name ?? p.someone,
-        c.promptCode ? promptName(c.promptCode) : null,
-        c.version ?? null,
-      );
+      return p.skillsStore(c.by?.name ?? p.someone, promptName(c.promptCode), c.from, c.to);
     default:
       return c.fromVersion != null ? p.rollBack(c.fromVersion) : p.rollBackPlain;
   }
@@ -229,8 +225,7 @@ const Detail: React.FC<{ id: string; canAct: boolean }> = ({ id, canAct }) => {
         {d.notes.summary ? (
           <p className="text-sm text-neutral-700">{d.notes.summary}</p>
         ) : (
-          !d.notes.written &&
-          d.cameFrom.kind === "code" && <p className="text-sm text-neutral-600">{p.noNotes}</p>
+          !d.notes.written && <p className="text-sm text-neutral-600">{p.noNotes}</p>
         )}
         {d.notes.changes.map((c, i) => (
           <div
@@ -409,15 +404,6 @@ export const ReleasesView: React.FC<{
   const s = en.debriefs.releases;
   const p = en.debriefs.pmPage.releases;
   const history = useGetDebriefReleaseHistoryQuery();
-  const [promoteDraft, { isLoading: promoting }] = usePromoteDebriefCodeDraftMutation();
-  const promote = async (id: string) => {
-    try {
-      await promoteDraft({ id }).unwrap();
-      toast.success(p.draftPromoted);
-    } catch (e) {
-      toast.error(getErrorMessage(e, en.debriefs.pmAgent.actionFailed));
-    }
-  };
 
   if (history.isError) {
     return (
@@ -450,28 +436,8 @@ export const ReleasesView: React.FC<{
           </Link>
         )}
       </div>
-      {history.data.pendingCodeDrafts.map(d => (
-        <div
-          key={d.id}
-          role="alert"
-          data-testid="release-waiting"
-          className="flex flex-wrap items-center gap-x-4 gap-y-2 border-l-[3px] border-destructive-500 bg-destructive-50 px-4 py-3 text-sm"
-        >
-          <div className="min-w-[16rem] flex-1">
-            <b>{p.waiting(releaseVersionLabel(d.version), d.wouldUndo ?? d.note ?? p.aChange)}</b>{" "}
-            {p.waitingHelp}
-          </div>
-          {canAct && (
-            <Button
-              kind="primary"
-              size="sm"
-              disabled={promoting}
-              onClick={() => void promote(d.id)}
-            >
-              {p.promoteDraft}
-            </Button>
-          )}
-        </div>
+      {(history.data.waiting ?? []).map(w => (
+        <WaitingRelease key={w.id} release={w} canAct={canAct} />
       ))}
       {!sel ? (
         <EmptyPanel title={s.heading} message={s.empty} />

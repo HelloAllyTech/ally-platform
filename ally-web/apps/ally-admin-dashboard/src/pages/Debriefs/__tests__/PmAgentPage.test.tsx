@@ -25,7 +25,9 @@ const h = vi.hoisted(() => ({
   history: vi.fn(),
   detail: vi.fn(),
   propose: vi.fn(),
-  promoteDraft: vi.fn(),
+  promoteWaiting: vi.fn(),
+  attention: vi.fn(),
+  dismissWaiting: vi.fn(),
   permissions: [] as string[],
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -67,7 +69,17 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefReleaseDetailQuery: (id: string) => h.detail(id),
   useGetDebriefReleaseCompareQuery: () => ({ data: { prompts: [] } }),
   useProposeDebriefChangeMutation: () => [h.propose, { isLoading: false }],
-  usePromoteDebriefCodeDraftMutation: () => [h.promoteDraft, { isLoading: false }],
+  usePromoteWaitingReleaseMutation: () => [h.promoteWaiting, { isLoading: false }],
+  useDismissWaitingReleaseMutation: () => [h.dismissWaiting, { isLoading: false }],
+  useGetDebriefAttentionQuery: () => h.attention(),
+  useGetPromptVersionsQuery: () => ({
+    data: [
+      { version: 14, status: "live", publishedAt: "2026-11-12", note: "Shorter lines" },
+      { version: 13, status: "history", publishedAt: "2026-11-01", note: null },
+      { version: 15, status: "candidate", publishedAt: null, note: null },
+    ],
+    isLoading: false,
+  }),
 }));
 
 /* eslint-disable import/first */
@@ -125,7 +137,7 @@ const HISTORY = {
       retired: { at: "2026-11-01T00:00:00Z", reason: "replaced", byVersion: 2, why: null },
     }),
   ],
-  pendingCodeDrafts: [],
+  waiting: [],
 };
 const contents = {
   prompts: [
@@ -244,6 +256,7 @@ beforeEach(() => {
   h.steps.mockReturnValue(ok(STEPS));
   h.settings.mockReturnValue(ok(SETTINGS));
   h.autonomy.mockReturnValue({ data: undefined });
+  h.attention.mockReturnValue({ data: undefined });
   h.history.mockReturnValue(ok(HISTORY));
   h.detail.mockImplementation((id: string) => ok(id === "r1" ? DETAIL_OLD : DETAIL_LIVE));
   h.propose.mockReturnValue(
@@ -495,6 +508,30 @@ describe("PM agent › Ideas", () => {
     expect(screen.getByTestId("pm-expiry-banner")).toHaveTextContent("PM-12 expires in 2 days.");
   });
 
+  it("raises the release-waiting banner from attention, linking to Releases", () => {
+    h.attention.mockReturnValue({
+      data: {
+        banners: [
+          {
+            kind: "release_waiting",
+            level: "red",
+            count: 1,
+            message: "x",
+            link: { page: "pm_agent" },
+          },
+        ],
+        counts: { urgent: null, oldestUrgentSince: null, escalatedToMe: null, pmAgentNeedsYou: 0 },
+      },
+    });
+    renderPage();
+    const banner = screen.getByTestId("pm-release-waiting-banner");
+    expect(banner).toHaveTextContent("would undo a promoted change");
+    expect(within(banner).getByRole("link", { name: "See Releases" })).toHaveAttribute(
+      "href",
+      "/debriefs/pm-agent?view=releases",
+    );
+  });
+
   it("shows what it may change alone as read-only chips", () => {
     const cells = (v: string) => ({ quick_test: v, gate_test: v, paired_trial: v, canary: "ask" });
     h.autonomy.mockReturnValue({
@@ -559,12 +596,20 @@ describe("PM agent › Ideas", () => {
       target: { value: "Writer on GPT-4.1" },
     });
     fireEvent.change(within(form).getByLabelText("Writer"), { target: { value: "GPT-4.1" } });
+    // A published Skills Store version per prompt; drafts aren't offered.
+    const prompt = within(form).getByLabelText("Writer's prompt");
+    expect(Array.from((prompt as HTMLSelectElement).options).map(o => o.textContent)).toEqual([
+      "v14 · Shorter lines",
+      "v13 (in the live release)",
+    ]);
+    fireEvent.change(prompt, { target: { value: "v14 · Shorter lines" } });
     expect(within(form).queryByTestId("propose-budgets")).toBeNull();
     fireEvent.click(submit);
     await waitFor(() =>
       expect(h.propose).toHaveBeenCalledWith({
         title: "Writer on GPT-4.1",
         steps: [{ step: "writer", model: "gpt-4.1" }],
+        prompts: { debrief_writer_system: 14 },
       }),
     );
   });
@@ -644,7 +689,7 @@ describe("PM agent › Releases", () => {
   it("rolls back to a retired release after an inline confirm; a failure says so", async () => {
     renderPage("/debriefs/pm-agent?view=releases&releaseId=r1");
     expect(screen.getByTestId("release-source")).toHaveTextContent("retired when v2 went live");
-    expect(screen.getByTestId("release-changes")).toHaveTextContent("No notes written");
+    expect(screen.getByTestId("release-changes")).toHaveTextContent("No note written");
     fireEvent.click(screen.getByRole("button", { name: "Roll back to this" }));
     const confirm = screen.getByTestId("rollback-confirm");
     expect(confirm).toHaveTextContent("Debriefs already written don't change.");
@@ -654,8 +699,9 @@ describe("PM agent › Releases", () => {
     await waitFor(() => expect(h.toastError).toHaveBeenCalled());
   });
 
-  it("shows a Skills Store or code release that would undo a promoted change as waiting, with Promote", async () => {
-    h.promoteDraft.mockReturnValue(resolves());
+  it("shows a release that would undo a promoted change as waiting, with Promote and Dismiss", async () => {
+    h.promoteWaiting.mockReturnValue(resolves());
+    h.dismissWaiting.mockReturnValue(resolves());
     h.history.mockReturnValue(
       ok({
         ...HISTORY,
@@ -666,18 +712,37 @@ describe("PM agent › Releases", () => {
               kind: "skills_store",
               by: { id: 3, name: "Priya" },
               promptCode: "debrief_writer_system",
-              version: 13,
+              from: 12,
+              to: 13,
+              note: null,
             },
           },
           HISTORY.items[1],
         ],
-        pendingCodeDrafts: [
+        waiting: [
           {
             id: "d9",
             version: 9,
-            note: null,
-            createdAt: "2026-11-12T00:00:00Z",
-            wouldUndo: "Shorter “Try saying” lines",
+            title: "Writer prompt v13 → v14",
+            source: {
+              kind: "skills_store",
+              by: 3,
+              tag: null,
+              promptCode: "debrief_writer_system",
+              from: 13,
+              to: 14,
+              note: "Tidy wording",
+            },
+            wouldUndo: [
+              {
+                path: "prompts.debrief_writer_system",
+                what: "the Writer prompt version",
+                live: 13,
+                wouldBecome: 14,
+                changedBy: { version: 2, ideaId: IDEA.id, label: "idea “Shorter lines” (v2)" },
+              },
+            ],
+            problems: [],
           },
         ],
       }),
@@ -685,12 +750,30 @@ describe("PM agent › Releases", () => {
     renderPage("/debriefs/pm-agent?view=releases");
     const waiting = screen.getByTestId("release-waiting");
     expect(waiting).toHaveAttribute("role", "alert");
-    expect(waiting).toHaveTextContent("Waiting: v9 would undo Shorter “Try saying” lines.");
+    expect(waiting).toHaveTextContent("Waiting: v9 would undo idea “Shorter lines” (v2).");
+    expect(within(waiting).getByTestId("would-undo")).toHaveTextContent(
+      "the Writer prompt version: live 13 would become 14",
+    );
     expect(screen.getAllByTestId("release-row")[0]).toHaveTextContent(
-      "Skills Store edit by Priya (published Writer's prompt v13)",
+      "Skills Store · Priya: published Writer's prompt v12 → v13",
+    );
+    fireEvent.click(within(waiting).getByRole("button", { name: "Dismiss" }));
+    fireEvent.change(within(waiting).getByLabelText("Why (optional)"), {
+      target: { value: "Keep the promoted one" },
+    });
+    fireEvent.click(
+      within(screen.getByTestId("waiting-confirm")).getByRole("button", { name: "Dismiss" }),
+    );
+    await waitFor(() =>
+      expect(h.dismissWaiting).toHaveBeenCalledWith({ id: "d9", reason: "Keep the promoted one" }),
     );
     fireEvent.click(within(waiting).getByRole("button", { name: "Promote" }));
-    await waitFor(() => expect(h.promoteDraft).toHaveBeenCalledWith({ id: "d9" }));
+    fireEvent.click(
+      within(screen.getByTestId("waiting-confirm")).getByRole("button", { name: "Promote" }),
+    );
+    await waitFor(() =>
+      expect(h.promoteWaiting).toHaveBeenCalledWith({ id: "d9", reason: undefined }),
+    );
   });
 
   it("offers no roll back when ally-be says the viewer can't", () => {

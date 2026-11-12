@@ -84,6 +84,7 @@ type Banner = DebriefAttention["banners"][number];
 
 /** Where a banner's link goes. Banners link to the thing to read; they never act. */
 export const bannerHref = (b: Banner): string => {
+  if (b.kind === "release_waiting") return pmAgentPath("releases");
   switch (b.link.page) {
     case "session":
       return b.link.runId ? ROUTES.DEBRIEF_SESSION(b.link.runId) : ROUTES.DEBRIEFS;
@@ -122,6 +123,8 @@ export const bannerText = (b: Banner): string => {
       return t.provider;
     case "language_not_recorded":
       return t.language;
+    case "release_waiting":
+      return t.releaseWaiting(n);
     default:
       return b.message;
   }
@@ -254,7 +257,11 @@ export const DebriefsHome: React.FC = () => {
                   : "text-sm font-semibold"
               }
             >
-              {h.bannerActions[BANNER_ACTION[b.link.page] ?? "show"]}
+              {
+                h.bannerActions[
+                  b.kind === "release_waiting" ? "releases" : (BANNER_ACTION[b.link.page] ?? "show")
+                ]
+              }
             </Link>
           }
         >

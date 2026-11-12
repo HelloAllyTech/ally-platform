@@ -10,13 +10,19 @@ import {
   TextArea,
   TextInput,
 } from "@ally-ui-mono/ui-shared";
-import { useGetDebriefModelsQuery, useProposeDebriefChangeMutation } from "@api";
+import {
+  useGetDebriefModelsQuery,
+  useGetDebriefReleaseDetailQuery,
+  useGetDebriefReleaseHistoryQuery,
+  useGetPromptVersionsQuery,
+  useProposeDebriefChangeMutation,
+} from "@api";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { en } from "@constants";
 import { DebriefModelChoice, DebriefProposal } from "@types";
 import { getErrorMessage } from "@utils";
 
-import { stepName } from "../consoleLabels";
+import { promptName, stepName } from "../consoleLabels";
 
 /** Steps the recipe can't run without; ally-be refuses to turn them off. */
 const FIXED_STEPS = new Set(["safety_reader", "writer", "checks", "evaluator", "judge"]);
@@ -50,6 +56,58 @@ const ModelSelect: React.FC<{
   );
 };
 
+type VersionItem = { id: string; label: string };
+
+/** Pick a published Skills Store version of one prompt; the live release's version first. */
+const PromptVersionPicker: React.FC<{
+  code: string;
+  promptId: string;
+  current: number | null;
+  value: number | null;
+  onChange: (v: number) => void;
+}> = ({ code, promptId, current, value, onChange }) => {
+  const s = en.debriefs.pmPage.propose;
+  const versions = useGetPromptVersionsQuery(promptId);
+  const published = (versions.data ?? []).filter(v => v.status !== "candidate" && v.publishedAt);
+  const items: VersionItem[] = published.map(v => ({
+    id: String(v.version),
+    label:
+      v.version === current
+        ? s.versionInRelease(v.version)
+        : `${s.version(v.version)}${v.note ? ` · ${v.note}` : ""}`,
+  }));
+  if (current != null && !items.some(i => i.id === String(current))) {
+    items.unshift({ id: String(current), label: s.versionInRelease(current) });
+  }
+  const selected = String(value ?? current ?? "");
+  return (
+    <div
+      className="grid min-w-[640px] grid-cols-[180px_minmax(180px,1fr)_120px] items-center gap-3 border-b border-neutral-100 px-4 py-2 text-sm"
+      data-testid="propose-prompt"
+    >
+      <span>{promptName(code)}</span>
+      <div className="w-full min-w-[10rem]">
+        <Dropdown
+          id={`propose-prompt-${code}`}
+          size="sm"
+          titleText={promptName(code)}
+          hideLabel
+          label={promptName(code)}
+          items={items}
+          selectedItem={items.find(i => i.id === selected) ?? null}
+          itemToString={(i: VersionItem | null) => i?.label ?? ""}
+          onChange={({ selectedItem }: { selectedItem: VersionItem | null }) =>
+            selectedItem && onChange(Number(selectedItem.id))
+          }
+        />
+      </div>
+      <span className="text-xs text-neutral-600">
+        {versions.isLoading ? s.loadingVersions : ""}
+      </span>
+    </div>
+  );
+};
+
 /**
  * "Propose a change" (replaces "Draft a new release"): a person's change to steps, models or
  * budgets becomes an idea with its own draft release, copied from the live one. It then climbs
@@ -70,8 +128,16 @@ export const ProposeChange: React.FC<{
   const [off, setOff] = useState<Record<string, boolean>>({});
   const [reply, setReply] = useState<string | null>(null);
   const [budgets, setBudgets] = useState<DebriefProposal["settings"]>({});
+  const [prompts, setPrompts] = useState<Record<string, number>>({});
+  // The live release's prompts (not the pinned rules, which have their own sign-off).
+  const history = useGetDebriefReleaseHistoryQuery();
+  const liveId = history.data?.items.find(r => r.status === "live")?.id;
+  const live = useGetDebriefReleaseDetailQuery(liveId ?? "", { skip: !liveId });
+  const livePrompts = (live.data?.contents.prompts ?? []).filter(
+    x => x.lock === "release_only" && x.promptId,
+  );
 
-  const live = useMemo(
+  const liveModels = useMemo(
     () => Object.fromEntries((models.data?.steps ?? []).map(st => [st.step, st.model ?? ""])),
     [models.data],
   );
@@ -79,7 +145,7 @@ export const ProposeChange: React.FC<{
     .map(st => {
       const m = model[st.step];
       const change: NonNullable<DebriefProposal["steps"]>[number] = { step: st.step };
-      if (m && m !== live[st.step]) change.model = m;
+      if (m && m !== liveModels[st.step]) change.model = m;
       if (off[st.step]) change.enabled = false;
       return change;
     })
@@ -88,7 +154,16 @@ export const ProposeChange: React.FC<{
     Object.entries(budgets ?? {}).filter(([, v]) => v !== undefined && !Number.isNaN(v)),
   );
   const replyChange = reply && reply !== models.data?.reply ? reply : undefined;
-  const anything = stepChanges.length > 0 || Object.keys(budgetChanges).length > 0 || !!replyChange;
+  const promptChanges = Object.fromEntries(
+    Object.entries(prompts).filter(
+      ([code, v]) => v !== livePrompts.find(x => x.code === code)?.version,
+    ),
+  );
+  const anything =
+    stepChanges.length > 0 ||
+    Object.keys(budgetChanges).length > 0 ||
+    !!replyChange ||
+    Object.keys(promptChanges).length > 0;
 
   const submit = async () => {
     try {
@@ -98,6 +173,7 @@ export const ProposeChange: React.FC<{
         ...(stepChanges.length ? { steps: stepChanges } : {}),
         ...(Object.keys(budgetChanges).length ? { settings: budgetChanges } : {}),
         ...(replyChange ? { reply: replyChange } : {}),
+        ...(Object.keys(promptChanges).length ? { prompts: promptChanges } : {}),
       }).unwrap();
       toast.success(r.budgetOnly ? s.doneBudget(r.version) : s.done(r.version));
       onDone(r.ideaId);
@@ -183,6 +259,25 @@ export const ProposeChange: React.FC<{
             />
             <span />
           </div>
+        </div>
+      )}
+      {livePrompts.length > 0 && (
+        <div className="overflow-x-auto rounded-sm bg-neutral-50" data-testid="propose-prompts">
+          <div className="grid min-w-[640px] grid-cols-[180px_minmax(180px,1fr)_120px] gap-3 border-b border-neutral-100 px-4 py-2 text-xs text-neutral-600">
+            <span>{s.cols.prompt}</span>
+            <span>{s.cols.version}</span>
+            <span />
+          </div>
+          {livePrompts.map(x => (
+            <PromptVersionPicker
+              key={x.code}
+              code={x.code}
+              promptId={x.promptId as string}
+              current={x.version}
+              value={prompts[x.code] ?? null}
+              onChange={v => setPrompts({ ...prompts, [x.code]: v })}
+            />
+          ))}
         </div>
       )}
       {canChangeBudgets && (

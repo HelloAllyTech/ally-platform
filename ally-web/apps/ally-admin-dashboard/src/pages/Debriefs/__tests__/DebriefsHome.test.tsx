@@ -33,6 +33,7 @@ vi.mock("@api", async importOriginal => ({
 /* eslint-disable import/first */
 import { redirectForOldTab } from "../consoleRoutes";
 import { DebriefConsole } from "../DebriefConsole";
+import { bannerHref, bannerText } from "../home/DebriefsHome";
 import { queueOrder } from "../queue";
 import { ok, resolves } from "./consoleFixtures";
 /* eslint-enable import/first */
@@ -317,5 +318,19 @@ describe("old ?tab= links", () => {
   it("follows the redirect when the page opens", () => {
     renderAt("/debriefs?tab=releases");
     expect(screen.getByTestId("where")).toHaveTextContent("/debriefs/pm-agent?view=releases");
+  });
+});
+
+describe("release waiting banner", () => {
+  it("says a release would undo a promoted change and links to Releases", () => {
+    const b = {
+      kind: "release_waiting",
+      level: "red",
+      count: 2,
+      message: "x",
+      link: { page: "pm_agent" },
+    } as never;
+    expect(bannerText(b)).toContain("2 Skills Store or code releases are waiting");
+    expect(bannerHref(b)).toBe("/debriefs/pm-agent?view=releases");
   });
 });

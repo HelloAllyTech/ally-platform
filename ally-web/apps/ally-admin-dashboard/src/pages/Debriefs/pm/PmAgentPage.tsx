@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@ally-ui-mono/ui-shared";
 import {
   useBuildDebriefTestSetsMutation,
+  useGetDebriefAttentionQuery,
   useGetDebriefOverviewQuery,
   useGetPmAgentStateQuery,
   useRunPmAgentMutation,
@@ -17,11 +18,12 @@ import { getErrorMessage } from "@utils";
 
 import { codeWords } from "../consoleLabels";
 import { pmAgentPath, PmAgentView } from "../consoleRoutes";
-import { BackLink, Tile } from "../consoleUi";
+import { AlertBanner, BackLink, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { IdeasView } from "./IdeasView";
 import { ProposeChange } from "./ProposeChange";
 import { ReleasesView } from "./ReleasesView";
+import { bannerText } from "../home/DebriefsHome";
 
 const VIEWS: PmAgentView[] = ["ideas", "releases", "test-sets"];
 
@@ -99,6 +101,8 @@ export const PmAgentPage: React.FC = () => {
   const closed = useGetPmAgentStateQuery({ state: "closed" });
   const access = useDebriefAccess(open.data?.viewer);
   const [proposing, setProposing] = useState(false);
+  const attention = useGetDebriefAttentionQuery();
+  const waitingBanner = attention.data?.banners.find(b => b.kind === "release_waiting");
   const [params, setParams] = useSearchParams();
   const raw = params.get("view") as PmAgentView | null;
   const view: PmAgentView = raw && VIEWS.includes(raw) ? raw : "ideas";
@@ -155,6 +159,21 @@ export const PmAgentPage: React.FC = () => {
         </nav>
       </header>
 
+      {waitingBanner && view !== "releases" && (
+        <div className="px-8 pt-4">
+          <AlertBanner
+            kind={waitingBanner.level === "red" ? "error" : "warning"}
+            testId="pm-release-waiting-banner"
+            action={
+              <Link to={pmAgentPath("releases")} className="text-sm font-semibold">
+                {en.debriefs.home.bannerActions.releases}
+              </Link>
+            }
+          >
+            {bannerText(waitingBanner)}
+          </AlertBanner>
+        </div>
+      )}
       {proposing && (
         <ProposeChange
           canChangeBudgets={access.settings}

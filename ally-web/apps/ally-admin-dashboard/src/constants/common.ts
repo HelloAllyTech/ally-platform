@@ -514,7 +514,8 @@ export const ApiEndpoints = {
     RELEASE_HISTORY_ITEM: (id: string) => `/v1/debriefs/console/release-history/${id}`,
     RELEASE_COMPARE: (id: string) => `/v1/debriefs/console/releases/${id}/compare`,
     PROPOSE: "/v1/debriefs/console/pm-agent/ideas/propose",
-    PROMOTE_CODE_DRAFT: (id: string) => `/v1/debriefs/console/releases/${id}/promote-code-draft`,
+    PROMOTE_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/promote-waiting`,
+    DISMISS_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/dismiss-waiting`,
     EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
   },
   // Expert review (debrief orchestrator spec Part B): "Review debriefs (expert)" + the Analytics toggle.

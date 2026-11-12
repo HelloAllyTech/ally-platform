@@ -1,10 +1,9 @@
 import React from "react";
 
-import { useGetDebriefCalibrationAgreementQuery, useGetDebriefCalibrationSampleQuery } from "@api";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { en } from "@constants";
-import { DebriefCalibrationAgreement } from "@types";
+import { DebriefAnalyticsView, DebriefCalibrationAgreement } from "@types";
 
 import { ChartCard, KpiTile } from "../../Analytics/chartKit";
 import { codeWords } from "../consoleLabels";
@@ -133,20 +132,47 @@ const AgreementChart: React.FC<{ agreement: DebriefCalibrationAgreement }> = ({ 
   );
 };
 
+type Agreement = NonNullable<DebriefAnalyticsView["judgeAgreement"]>;
+
+/** `GET analytics`'s judge agreement in the shape the two charts read. */
+export const toCalibrationShape = (a: Agreement): DebriefCalibrationAgreement =>
+  ({
+    gate: a.gate,
+    target: a.target,
+    judgeVsHuman: {
+      dimensions: Object.fromEntries(
+        a.dimensions.map(d => [
+          d.dimension,
+          {
+            pairs: d.pairs,
+            debriefs: d.pairs,
+            weightedKappa: d.kappa,
+            withinOnePct: d.withinOnePct,
+            meanDifference: d.meanDifference,
+          },
+        ]),
+      ),
+      hardFails: {},
+    },
+    humanVsHuman: (a.humanVsHuman as DebriefCalibrationAgreement["humanVsHuman"] | null) ?? {
+      dimensions: {},
+      hardFails: {},
+    },
+  }) as unknown as DebriefCalibrationAgreement;
+
 /**
  * Analytics › Debriefs › Judge agreement (moved from the console's Calibration tab, 2026-11-12):
  * how far the judge agrees with people who score by hand, which gates the PM agent's autonomy.
+ * Read from `GET analytics` with the rest of the page's console numbers.
  */
-export const JudgeAgreementSection: React.FC = () => {
+export const JudgeAgreementSection: React.FC<{
+  agreement: DebriefAnalyticsView["judgeAgreement"] | undefined;
+  loading: boolean;
+  error: unknown;
+  onRetry: () => void;
+}> = ({ agreement, loading, error, onRetry }) => {
   const strings = en.debriefs.calibration;
-  const sample = useGetDebriefCalibrationSampleQuery();
-  const agreement = useGetDebriefCalibrationAgreementQuery();
-  const rated = (sample.data?.items ?? []).filter(item => item.raters > 0).length;
-  const tileState = {
-    loading: agreement.isLoading,
-    error: agreement.isError,
-    onRetry: () => void agreement.refetch(),
-  };
+  const tileState = { loading, error: !!error, onRetry };
   return (
     <section className="flex flex-col gap-6" data-testid="judge-agreement">
       <div>
@@ -157,37 +183,35 @@ export const JudgeAgreementSection: React.FC = () => {
         <KpiTile
           label={strings.kpis.rated}
           description={strings.kpis.ratedHelp}
-          value={sample.data ? strings.ofTarget(rated, sample.data.target) : "—"}
-          loading={sample.isLoading}
-          error={sample.isError}
-          onRetry={() => void sample.refetch()}
+          value={agreement ? strings.ofTarget(agreement.debriefsRated, agreement.target) : "—"}
+          {...tileState}
         />
         <KpiTile
           label={strings.kpis.raters}
           description={strings.kpis.ratersHelp}
-          value={String(agreement.data?.coverage.raters ?? "—")}
+          value={String(agreement?.peopleRating ?? "—")}
           {...tileState}
         />
         <KpiTile
           label={strings.kpis.gate}
           description={strings.kpis.gateHelp}
-          value={agreement.data?.gate.met ? strings.kpis.met : strings.kpis.notMet}
+          value={agreement?.gate.met ? strings.kpis.met : strings.kpis.notMet}
           {...tileState}
         />
       </div>
-      {agreement.isError ? (
-        <ErrorPanel
-          what={strings.agreementFailed}
-          error={agreement.error}
-          onRetry={() => void agreement.refetch()}
-        />
-      ) : agreement.data ? (
+      {error ? (
+        <ErrorPanel what={strings.agreementFailed} error={error} onRetry={onRetry} />
+      ) : loading ? (
+        <LoadingBlock lines={4} />
+      ) : agreement ? (
         <>
-          <GateChart agreement={agreement.data} />
-          <AgreementChart agreement={agreement.data} />
+          <GateChart agreement={toCalibrationShape(agreement)} />
+          <AgreementChart agreement={toCalibrationShape(agreement)} />
         </>
       ) : (
-        <LoadingBlock lines={4} />
+        <p className="text-sm text-typography-700" data-testid="judge-agreement-empty">
+          {strings.noAgreement}
+        </p>
       )}
     </section>
   );

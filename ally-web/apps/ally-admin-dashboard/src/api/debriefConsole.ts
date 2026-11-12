@@ -14,6 +14,7 @@ import {
   DebriefRunStatus,
   DebriefTenantRow,
   PmAgentState,
+  DebriefAnalyticsView,
   DebriefAttention,
   DebriefAutonomyKind,
   DebriefAutonomyStep,
@@ -424,13 +425,32 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PROPOSE, method: HttpMethod.POST, body }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    promoteDebriefCodeDraft: builder.mutation<unknown, { id: string; reason?: string }>({
+    promoteWaitingRelease: builder.mutation<
+      { id: string; version: number },
+      { id: string; reason?: string }
+    >({
       query: ({ id, reason }) => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.PROMOTE_CODE_DRAFT(id),
+        url: ApiEndpoints.DEBRIEF_CONSOLE.PROMOTE_WAITING(id),
         method: HttpMethod.POST,
         body: reason ? { reason } : {},
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    dismissWaitingRelease: builder.mutation<unknown, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.DISMISS_WAITING(id),
+        method: HttpMethod.POST,
+        body: reason ? { reason } : {},
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefAnalytics: builder.query<DebriefAnalyticsView, { days?: number }>({
+      query: ({ days }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.ANALYTICS,
+        method: HttpMethod.GET,
+        params: days ? { days } : undefined,
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     emergencyStopDebriefTenant: builder.mutation<unknown, { tenantId: string; reason: string }>({
       query: ({ tenantId, reason }) => ({
@@ -492,5 +512,7 @@ export const {
   useGetDebriefReleaseDetailQuery,
   useGetDebriefReleaseCompareQuery,
   useProposeDebriefChangeMutation,
-  usePromoteDebriefCodeDraftMutation,
+  usePromoteWaitingReleaseMutation,
+  useDismissWaitingReleaseMutation,
+  useGetDebriefAnalyticsQuery,
 } = debriefConsoleAPI;

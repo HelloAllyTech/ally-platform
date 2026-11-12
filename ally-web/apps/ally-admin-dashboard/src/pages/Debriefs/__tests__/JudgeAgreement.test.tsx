@@ -23,6 +23,7 @@ vi.mock("sonner", () => ({
   toast: { error: (m: string) => h.toastError(m), success: (m: string) => h.toastSuccess(m) },
 }));
 vi.mock("../../Analytics/chartKit", () => ({
+  PALETTE: { blue: "#264D8E", orange: "#ff832b" },
   KpiTile: ({ label, value }: { label: string; value: string }) => (
     <div data-testid={`kpi-${label}`}>{value}</div>
   ),
@@ -41,6 +42,8 @@ vi.mock("@api", async importOriginal => ({
   useScoreDebriefSessionMutation: () => [h.submit, { isLoading: false }],
 }));
 
+// eslint-disable-next-line import/first
+import { ConsoleOverviewSection } from "../metrics/ConsoleOverviewSection";
 // eslint-disable-next-line import/first
 import { JudgeAgreementSection } from "../metrics/JudgeAgreementSection";
 // eslint-disable-next-line import/first
@@ -126,6 +129,34 @@ const AGREEMENT = {
   },
 };
 
+/** `GET analytics`'s judge agreement for the same data. */
+const ANALYTICS_AGREEMENT = {
+  gate: AGREEMENT.gate,
+  target: 150,
+  debriefsRated: 1,
+  ratings: 2,
+  peopleRating: 2,
+  dimensions: DIMS.map(d => ({
+    dimension: d,
+    kappa: d === "accuracy" ? 0.72 : 0.5,
+    withinOnePct: 80,
+    meanDifference: 0.6,
+    pairs: 25,
+  })),
+  hardFails: [],
+  humanVsHuman: AGREEMENT.humanVsHuman,
+  expertVerdicts: null,
+};
+const renderAgreement = (agreement: unknown = ANALYTICS_AGREEMENT) =>
+  render(
+    <JudgeAgreementSection
+      agreement={agreement as never}
+      loading={false}
+      error={null}
+      onRetry={vi.fn()}
+    />,
+  );
+
 const ITEM = {
   scenarioSessionId: "aaaaaaaa-0000-4000-8000-000000000001",
   language: "hi",
@@ -147,7 +178,7 @@ describe("Analytics › Debriefs › Judge agreement", () => {
   });
 
   it("shows progress and the gate as a chart, with the table behind it", () => {
-    render(<JudgeAgreementSection />);
+    renderAgreement();
     expect(screen.getByTestId("kpi-Debriefs rated")).toHaveTextContent("1 of 150");
     expect(screen.getByTestId("kpi-PM agent autonomy")).toHaveTextContent("Needs approval");
     const accuracy = screen.getByTestId("gate-chart-accuracy");
@@ -165,7 +196,7 @@ describe("Analytics › Debriefs › Judge agreement", () => {
   });
 
   it("shows agreement per part of the rubric as a chart, with the table behind it", () => {
-    render(<JudgeAgreementSection />);
+    renderAgreement();
     const accuracy = screen.getByTestId("agreement-chart-accuracy");
     expect(accuracy).toHaveTextContent("Accuracy");
     expect(accuracy).toHaveTextContent("0.72, substantial");
@@ -208,5 +239,71 @@ describe("Analytics › Debriefs › Judge agreement", () => {
         note: null,
       },
     });
+  });
+});
+
+describe("Analytics › Debriefs › Runs and spend", () => {
+  it("shows the six tiles, spend per organisation, both pools and the burn rate", () => {
+    render(
+      <ConsoleOverviewSection
+        loading={false}
+        error={false}
+        onRetry={vi.fn()}
+        view={
+          {
+            windowDays: 7,
+            tiles: {
+              runs: 12,
+              judgeMean: 8.6,
+              meetsTheBar: 0.75,
+              needsAPerson: 2,
+              costP50Usd: 0.09,
+              costP90Usd: 0.21,
+              spentThisMonthUsd: 3.2,
+            },
+            cost: {
+              perOrg: [
+                {
+                  tenantId: "t1",
+                  tenantName: "Sangath",
+                  live: true,
+                  monthSpentUsd: 2.1,
+                  monthRuns: 30,
+                },
+                {
+                  tenantId: "t2",
+                  tenantName: "Quiet",
+                  live: false,
+                  monthSpentUsd: 0,
+                  monthRuns: 0,
+                },
+              ],
+              pool: {
+                sessionsThisMonth: 30,
+                addedUsd: 10,
+                spentUsd: 45,
+                balanceUsd: 5,
+                monthlyCapUsd: 50,
+                capLeftUsd: 5,
+                runCeilingUsd: 0.5,
+              },
+              learning: { spentUsd: 4, budgetUsd: 40, balanceUsd: 36 },
+              burnRate: { perDayUsd: 1.5, last7DaysUsd: 10.5, projectedMonthUsd: 46.5 },
+            },
+            judgeAgreement: null,
+          } as never
+        }
+      />,
+    );
+    expect(screen.getByTestId("kpi-Runs")).toHaveTextContent("12");
+    expect(screen.getByTestId("spend-per-org")).toHaveTextContent("Sangath");
+    expect(screen.getByTestId("spend-per-org")).not.toHaveTextContent("Quiet");
+    expect(screen.getByTestId("pool-debriefs")).toHaveTextContent("$45.00 of $50.00");
+    expect(screen.getByTestId("burn-rate")).toHaveTextContent("$1.50 a day");
+  });
+
+  it("says when nobody has scored by hand yet", () => {
+    renderAgreement(null);
+    expect(screen.getByTestId("judge-agreement-empty")).toBeInTheDocument();
   });
 });
