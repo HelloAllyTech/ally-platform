@@ -1222,6 +1222,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
             chatId: _chatId,
             onValuesApplied: _applyVoiceValues,
             onCustomValuesApplied: _reseedCustomFields,
+            onTranscriptSaved: () => ref.invalidate(chatMessagesProvider(_chatId)),
             existingTranscript: summary.transcript,
           ),
         Expanded(
