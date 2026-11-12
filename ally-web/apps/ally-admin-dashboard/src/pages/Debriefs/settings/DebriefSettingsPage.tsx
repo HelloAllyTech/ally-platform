@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 
+import { useSelector } from "react-redux";
 import { toast } from "sonner";
 
 import { CarbonDropdown as Dropdown, NumberInput } from "@ally-ui-mono/ui-shared";
@@ -17,7 +18,8 @@ import {
 import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { ContextCollectionLink } from "@components/context-collection-link";
-import { en, ROUTES } from "@constants";
+import { en, FeatureToggleKey, ROUTES } from "@constants";
+import { RootState } from "@store";
 import {
   DebriefAutonomyKind,
   DebriefAutonomyStep,
@@ -25,13 +27,14 @@ import {
   DebriefOrgOverride,
   DebriefOwnerSettingSpec,
 } from "@types";
-import { getErrorMessage } from "@utils";
+import { getErrorMessage, hasFeature } from "@utils";
 
 import { settingName, settingValueLabel } from "../consoleLabels";
 import { SettingsSection } from "../consoleRoutes";
 import { BackLink, ConsoleTag, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { OrganisationsSection } from "./OrganisationsSection";
+import { SchedulesSection } from "./SchedulesSection";
 import { SettingsGroups } from "./SettingsGroups";
 
 /** The Debrief Guidance collection, which the Debrief agent reads beside each important moment. */
@@ -419,6 +422,10 @@ export const DebriefSettingsPage: React.FC = () => {
   const s = en.debriefs.settingsPage;
   const me = useGetDebriefMeQuery();
   const access = useDebriefAccess(me.data);
+  // Schedules are for engineering: the per-person `debrief_schedules` toggle (ally-be 403s without it).
+  const features = useSelector((state: RootState) => state.user?.features);
+  const schedules = hasFeature(features, FeatureToggleKey.DEBRIEF_SCHEDULES);
+  const sections = schedules ? [...SECTIONS, "schedules" as const] : SECTIONS;
   return (
     <div className="flex flex-col gap-6 font-primary" data-testid="debrief-settings-page">
       <div className="flex flex-wrap items-center gap-3">
@@ -434,7 +441,7 @@ export const DebriefSettingsPage: React.FC = () => {
           aria-label={s.sectionsLabel}
           className="flex max-w-[220px] flex-[1_1_200px] flex-col gap-0.5 text-sm"
         >
-          {SECTIONS.map(id => (
+          {sections.map(id => (
             <a
               key={id}
               href={`#${id}`}
@@ -477,6 +484,11 @@ export const DebriefSettingsPage: React.FC = () => {
           <Section id="pinned" title={s.nav.pinned} help={s.pinnedHelp}>
             <PinnedRules />
           </Section>
+          {schedules && (
+            <Section id="schedules" title={s.nav.schedules} help={s.schedulesHelp}>
+              <SchedulesSection />
+            </Section>
+          )}
           <Section id="guidance" title={s.nav.guidance}>
             <div className="max-w-3xl">
               <ContextCollectionLink

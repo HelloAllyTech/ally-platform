@@ -23,6 +23,7 @@ export type SettingsSection =
   | "autonomy"
   | "weights"
   | "pinned"
+  | "schedules"
   | "guidance";
 export const settingsPath = (section?: SettingsSection): string =>
   `${ROUTES.DEBRIEFS_SETTINGS}${section ? `#${section}` : ""}`;

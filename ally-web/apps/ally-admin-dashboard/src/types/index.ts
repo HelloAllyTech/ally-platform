@@ -48,6 +48,7 @@ export * from "./debriefCalibration";
 export * from "./debriefConsole";
 export * from "./debriefConsoleView";
 export * from "./debriefExpertReview";
+export * from "./debriefSchedules";
 export * from "./courseCopilot";
 export * from "./agentChat";
 export * from "./allyGuide";

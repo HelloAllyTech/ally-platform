@@ -65,6 +65,8 @@ export const FeatureToggleKey = {
   BUG_HUNTER: "bug_hunter",
   /** Signs off clinical guidance in Debriefs → Knowledge (the clinical advisor). */
   DEBRIEF_CLINICAL_SIGN_OFF: "debrief_clinical_sign_off",
+  /** Debriefs › Settings › Schedules: engineering, granted person by person. Mirrors ally-be. */
+  DEBRIEF_SCHEDULES: "debrief_schedules",
   BUILDER: "builder",
   // The Context Library page: documents, entries and use-case grants. Mirrors ally-be.
   CONTEXT_LIBRARY: "context_library",
@@ -183,6 +185,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.ANALYTICS_SUGGESTIONS]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   // The Debriefs console sits on Analytics access; sign-off rides with it.
   [FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
+  [FeatureToggleKey.DEBRIEF_SCHEDULES]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
 
   [FeatureToggleKey.MANAGE_SCENARIO_LANGUAGES]:
     FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,

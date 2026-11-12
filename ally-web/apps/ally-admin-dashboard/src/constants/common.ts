@@ -468,6 +468,8 @@ export const ApiEndpoints = {
     SETTINGS: "/v1/debriefs/console/settings",
     METRICS: "/v1/debriefs/console/metrics",
     SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
+    /** Settings › Schedules (engineering only). */
+    SCHEDULES: "/v1/debriefs/console/schedules",
     SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
     PM_AGENT: "/v1/debriefs/console/pm-agent",

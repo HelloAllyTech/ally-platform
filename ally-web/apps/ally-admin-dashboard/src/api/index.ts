@@ -47,6 +47,7 @@ export * from "./helplineAdmin";
 export * from "./skillExperiments";
 export * from "./debriefCalibration";
 export * from "./debriefConsole";
+export * from "./debriefSchedules";
 export * from "./debriefExpertReview";
 export * from "./notifications";
 export * from "./publicRoadmap";
