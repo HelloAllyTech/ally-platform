@@ -148,6 +148,83 @@ describe('VoiceNoteService', () => {
     });
   });
 
+  describe('WAV chunking for long dictations', () => {
+    /** A minimal, valid mono 16-bit PCM WAV buffer of the given duration. */
+    function buildWav(seconds: number, sampleRate = 16000): Buffer {
+      const blockAlign = 2; // mono, 16-bit
+      const dataLength = Math.round(sampleRate * seconds) * blockAlign;
+      const header = Buffer.alloc(44);
+      header.write('RIFF', 0, 'ascii');
+      header.writeUInt32LE(36 + dataLength, 4);
+      header.write('WAVE', 8, 'ascii');
+      header.write('fmt ', 12, 'ascii');
+      header.writeUInt32LE(16, 16);
+      header.writeUInt16LE(1, 20);
+      header.writeUInt16LE(1, 22);
+      header.writeUInt32LE(sampleRate, 24);
+      header.writeUInt32LE(sampleRate * blockAlign, 28);
+      header.writeUInt16LE(blockAlign, 32);
+      header.writeUInt16LE(16, 34);
+      header.write('data', 36, 'ascii');
+      header.writeUInt32LE(dataLength, 40);
+      return Buffer.concat([header, Buffer.alloc(dataLength)]);
+    }
+
+    beforeEach(() => {
+      settingsService.getScribeVoiceNoteEnabled.mockResolvedValue(true);
+    });
+
+    it('sends one request for a WAV no longer than the chunk size', async () => {
+      const shortWav = {
+        buffer: buildWav(30),
+        mimetype: 'audio/wav',
+        size: 1,
+      } as Express.Multer.File;
+      mockTranscriptionsCreate.mockResolvedValue({ text: 'a short note' });
+
+      const result = await service.generateFromAudio(shortWav, undefined);
+
+      expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(1);
+      expect(result.transcript).toBe('a short note');
+    });
+
+    it('splits a long WAV into multiple transcription requests and stitches the results in order', async () => {
+      // 10 minutes at the 240s chunk size used in the service: 3 chunks (4m, 4m, 2m).
+      const longWav = {
+        buffer: buildWav(600),
+        mimetype: 'audio/wav',
+        size: 100,
+      } as Express.Multer.File;
+      let call = 0;
+      const chunkTexts = ['first part', 'second part', 'third part'];
+      mockTranscriptionsCreate.mockImplementation(async () => ({
+        text: chunkTexts[call++],
+      }));
+
+      const result = await service.generateFromAudio(longWav, undefined);
+
+      expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(3);
+      expect(result.transcript).toBe('first part second part third part');
+    });
+
+    it('does not chunk a long non-WAV (web) recording — a single request, same as before', async () => {
+      // webm has no fixed-rate PCM layout to cut losslessly; chunking is WAV-only.
+      const longWebm = {
+        buffer: Buffer.alloc((30 * 1024 * 1024) / 10), // large, but format is webm
+        mimetype: 'audio/webm',
+        size: 100,
+      } as Express.Multer.File;
+      mockTranscriptionsCreate.mockResolvedValue({
+        text: 'whole thing at once',
+      });
+
+      const result = await service.generateFromAudio(longWebm, undefined);
+
+      expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(1);
+      expect(result.transcript).toBe('whole thing at once');
+    });
+  });
+
   describe('extraction failure', () => {
     const fields = JSON.stringify([
       { id: 'sessionSummary', label: 'Summary', type: 'multiline' },
