@@ -104,7 +104,8 @@ export interface DebriefSessionsPage {
     needs: number;
     urgent: number;
     flagged: number;
-    below: number;
+    /** Null for a viewer blind to the checks until their verdict (the clinical advisor). */
+    below: number | null;
     published: number;
     escalated: number;
     /** Only for whoever gives verdicts. */

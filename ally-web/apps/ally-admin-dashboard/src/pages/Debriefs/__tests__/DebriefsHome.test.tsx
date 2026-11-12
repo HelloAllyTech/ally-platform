@@ -329,6 +329,28 @@ describe("Debriefs home", () => {
     expect(card).toHaveTextContent("Ally’s own check");
     expect(card).not.toHaveTextContent("Evaluator");
   });
+
+  it("gives the clinical advisor no Below the bar until their verdict; the Ally team keeps it", () => {
+    // ally-be reads a below-the-bar run as published for the advisor (status, belowBar, rank).
+    const blinded = item({ runId: "blind", status: "published", belowBar: false });
+    const blindPage = page([blinded], ADVISOR) as { data: { counts: Record<string, unknown> } };
+    blindPage.data.counts = { ...blindPage.data.counts, below: null };
+    h.sessions.mockReturnValue(blindPage);
+    h.attention.mockReturnValue(attention(ADVISOR));
+    const { unmount } = renderAt("/debriefs?cat=below");
+    expect(screen.queryByRole("button", { name: /Below the bar/ })).toBeNull();
+    // A link to the Below the bar list falls back to the advisor's own default.
+    expect(h.sessions).not.toHaveBeenCalledWith(expect.objectContaining({ category: "below" }));
+    expect(screen.getAllByTestId("session-card")[0]).not.toHaveTextContent("Below the bar");
+    expect(categoriesFor({ escalations: true, verdict: true, team: false })).not.toContain("below");
+    unmount();
+
+    h.sessions.mockReturnValue(page(QUEUE, TEAM));
+    h.attention.mockReturnValue(attention(TEAM));
+    renderAt();
+    expect(screen.getByRole("button", { name: /Below the bar/ })).toBeInTheDocument();
+    expect(categoriesFor({ escalations: false, team: true })).toContain("below");
+  });
 });
 
 describe("old ?tab= links", () => {

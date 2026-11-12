@@ -55,10 +55,20 @@ export const FILTER_KEYS = [
 ] as const;
 export type HomeFilters = Pick<DebriefSessionsQuery, (typeof FILTER_KEYS)[number]>;
 
-/** Which categories this viewer gets. */
-export const categoriesFor = (opts: { escalations: boolean; verdict?: boolean }): HomeCategory[] =>
+/**
+ * Which categories this viewer gets. "Below the bar" is a hint of the checks' result, so only the
+ * Ally team and the owner (`team`) get it: the clinical advisor gives their verdict blind (spec Q3).
+ */
+export const categoriesFor = (opts: {
+  escalations: boolean;
+  verdict?: boolean;
+  team?: boolean;
+}): HomeCategory[] =>
   HOME_CATEGORIES.filter(
-    c => (c !== "escalated" || opts.escalations) && (c !== "agreement" || !!opts.verdict),
+    c =>
+      (c !== "escalated" || opts.escalations) &&
+      (c !== "agreement" || !!opts.verdict) &&
+      (c !== "below" || opts.team !== false),
   );
 
 /**

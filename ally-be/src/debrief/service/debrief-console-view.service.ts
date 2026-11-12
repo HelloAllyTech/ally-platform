@@ -292,14 +292,18 @@ export class DebriefConsoleViewService implements OnModuleInit {
       )`;
   }
 
-  private categorySql(cat: SessionFilters['category']) {
+  private categorySql(cat: SessionFilters['category'], blind = false) {
     switch (cat) {
       case 'needs':
         return `rank < 3`;
       case 'flagged':
         return `flagged`;
       case 'below':
-        return `(status = 'below_bar' OR (status = 'published' AND judge_below))`;
+        // A viewer blind to the checks (the clinical advisor) has no "Below
+        // the bar" list: the list itself would be the hint.
+        return blind
+          ? `false`
+          : `(status = 'below_bar' OR (status = 'published' AND judge_below))`;
       case 'published':
         return `status = 'published'`;
       case 'escalated':
@@ -344,7 +348,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
     const rows: Array<Record<string, any>> = await this.dataSource.query(
       `${base}
        SELECT * FROM ranked
-        WHERE ${this.categorySql(f.category)}
+        WHERE ${this.categorySql(f.category, isBlindToChecks(viewer))}
         ORDER BY ${order}
         LIMIT $${rowParams.length - 1} OFFSET $${rowParams.length}`,
       rowParams,
@@ -355,7 +359,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
         needs: Number(counts?.needs ?? 0),
         urgent: Number(counts?.urgent ?? 0),
         flagged: Number(counts?.flagged ?? 0),
-        below: Number(counts?.below ?? 0),
+        // Not for a viewer blind to the checks (see blindForAdvisor).
+        below: isBlindToChecks(viewer) ? null : Number(counts?.below ?? 0),
         published: Number(counts?.published ?? 0),
         escalated: Number(counts?.escalated ?? 0),
         // Only for whoever gives verdicts (the clinical advisor).
@@ -375,17 +380,24 @@ export class DebriefConsoleViewService implements OnModuleInit {
 
   /**
    * A clinical advisor alone gives their verdict before seeing the judge's (spec Q3):
-   * the list hides both scores on runs they have not given a verdict on, as the
-   * session page does.
+   * on runs they have not given a verdict on, the list hides both scores and
+   * every other hint of the checks' result, as the session page does: no
+   * "Below the bar" (a below-the-bar run reads as the published debrief the
+   * learner has), and no place in the queue for being below the bar.
    */
   private async blindForAdvisor<
     T extends {
       runId: string;
+      status: string;
       judgeOverall: number | null;
       evaluatorOverall: number | null;
+      belowBar: boolean;
+      rank: number;
+      needsPerson: boolean;
+      waitingSince: string | null;
     },
   >(items: T[], viewer: DebriefViewer): Promise<T[]> {
-    if (viewer.roles.allyTeam || viewer.roles.owner || !items.length) {
+    if (!isBlindToChecks(viewer) || !items.length) {
       return items;
     }
     const mine = new Set(
@@ -397,11 +409,22 @@ export class DebriefConsoleViewService implements OnModuleInit {
         )) as Array<{ runId: string }>
       ).map((r) => r.runId),
     );
-    return items.map((i) =>
-      mine.has(i.runId)
-        ? i
-        : { ...i, judgeOverall: null, evaluatorOverall: null },
-    );
+    return items.map((i) => {
+      if (mine.has(i.runId)) return i;
+      // Rank 2 is "held or below the bar"; a held run stays held.
+      const queuedForBar =
+        i.rank === 2 && !['needs_person', 'failed'].includes(i.status);
+      return {
+        ...i,
+        status: blindStatus(i.status),
+        judgeOverall: null,
+        evaluatorOverall: null,
+        belowBar: false,
+        ...(queuedForBar
+          ? { rank: 3, needsPerson: false, waitingSince: null }
+          : {}),
+      };
+    });
   }
 
   private toItem(r: Record<string, any>) {
@@ -725,7 +748,9 @@ export class DebriefConsoleViewService implements OnModuleInit {
         id: run.id,
         sessionId: run.scenarioSessionId,
         mode: run.mode,
-        status: run.status,
+        // Blind to the checks: a below-the-bar run reads as published, which
+        // is what the learner has.
+        status: judgeHidden ? blindStatus(run.status) : run.status,
         skipReason: run.skipReason ?? null,
         language: run.language ?? null,
         languageSource: ws.languageSource ?? null,
@@ -799,9 +824,12 @@ export class DebriefConsoleViewService implements OnModuleInit {
                   1000,
               )
             : null,
-        steps: await this.withGuidanceCodes(
-          run.steps ?? [],
-          Array.isArray(ws.passages) ? (ws.passages as string[]) : [],
+        steps: blindSteps(
+          await this.withGuidanceCodes(
+            run.steps ?? [],
+            Array.isArray(ws.passages) ? (ws.passages as string[]) : [],
+          ),
+          judgeHidden,
         ),
         checkFailures: run.checkFailures ?? [],
         error: run.error ?? null,
@@ -1427,4 +1455,28 @@ export class DebriefConsoleViewService implements OnModuleInit {
       can: { change: viewer.can.ownerSettings },
     };
   }
+}
+
+/**
+ * Who reads the Debriefs console blind to the checks' result until their own
+ * verdict (spec Q3): everyone but the Ally team and the owner, in practice the
+ * clinical advisor.
+ */
+export function isBlindToChecks(viewer: Pick<DebriefViewer, 'roles'>): boolean {
+  return !viewer.roles.allyTeam && !viewer.roles.owner;
+}
+
+/** A run's status as a viewer blind to the checks reads it. */
+export function blindStatus(status: string): string {
+  return status === 'below_bar' ? 'published' : status;
+}
+
+/** The run's steps without the Evaluator's score and reasoning, when blind. */
+export function blindSteps<
+  S extends { step?: string; output?: unknown; reasoning?: unknown },
+>(steps: S[], blind: boolean): S[] {
+  if (!blind) return steps;
+  return steps.map((x) =>
+    x.step === 'evaluator' ? { ...x, output: null, reasoning: undefined } : x,
+  );
 }

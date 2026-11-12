@@ -160,6 +160,7 @@ export const DebriefsHome: React.FC = () => {
   const allowedBefore = categoriesFor({
     escalations: preAccess.receivesEscalations,
     verdict: preAccess.verdict,
+    team: preAccess.team,
   });
   const { cat, filters, list } = readHomeState(
     params,
@@ -182,8 +183,9 @@ export const DebriefsHome: React.FC = () => {
       categoriesFor({
         escalations: access.receivesEscalations,
         verdict: access.verdict,
+        team: access.team,
       }),
-    [access.receivesEscalations, access.verdict],
+    [access.receivesEscalations, access.verdict, access.team],
   );
 
   const set = (patch: Record<string, string | null>) => {
