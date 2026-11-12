@@ -20,10 +20,16 @@ import { settledEndedSessionPredicate } from '../../analytics/util/session-eligi
 import { runWithConcurrency } from '../../analytics/util/judge-concurrency.util';
 import {
   DEBRIEF_AGENT_KEY,
+  DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_SEED_BUNDLE,
+  DebriefProvider,
   DebriefStep,
 } from '../constants/debrief-release.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
+import {
+  PROVIDER_ALLOWED_KEY,
+  allowlistFromValues,
+} from '../util/debrief-provider-allowlist.util';
 import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
 import { resolveSupportLines } from '../../guide/safety/fixed-responses';
 import {
@@ -85,6 +91,20 @@ export const DEBRIEF_POLICY: PolicySchema = {
     overridableBy: ['org'],
     group: 'Launch',
   },
+  // Plan §8.9 / v9 FR-57 (Q12): an organisation whose contract restricts
+  // providers. Not set = allowed; see debrief-provider-allowlist.util.ts.
+  ...Object.fromEntries(
+    DEBRIEF_APPROVED_PROVIDERS.map((p) => [
+      PROVIDER_ALLOWED_KEY(p),
+      {
+        type: 'boolean',
+        default: true,
+        description: `This organisation's debriefs may use ${p} models. Off keeps its learners' sessions (live runs, paired trials, Ask Ally) away from ${p}.`,
+        overridableBy: ['org'],
+        group: 'Providers',
+      },
+    ]),
+  ),
 };
 
 export type DebriefRegion = 'india' | 'outside_india';
@@ -309,6 +329,62 @@ export class DebriefAgentService implements OnModuleInit {
       change: region === 'india' ? { clear: ['region'] } : { set: { region } },
       actorUserId: userId,
     });
+  }
+
+  /** Plan §8.9 (FR-57): each organisation's provider allowlist, for those that set one. */
+  async providerAllowlists(): Promise<Map<string, DebriefProvider[]>> {
+    const rows: Array<{ scopeId: string; values: Record<string, unknown> }> =
+      await this.dataSource.query(
+        `SELECT "scopeId", "values" FROM agent_config_overrides
+          WHERE "agentKey" = $1 AND layer = 'org'`,
+        [DEBRIEF_AGENT_KEY],
+      );
+    return new Map(
+      rows.map((r) => [r.scopeId, allowlistFromValues(r.values)] as const),
+    );
+  }
+
+  /**
+   * The owner sets which approved providers an organisation's debriefs may
+   * use. At least one: an empty list would stop every debrief, which is what
+   * switching the organisation off is for.
+   */
+  async setProviderAllowlist(
+    tenantId: string,
+    providers: string[],
+    userId: number,
+  ): Promise<DebriefProvider[]> {
+    const allowed = DEBRIEF_APPROVED_PROVIDERS.filter((p) =>
+      providers.includes(p),
+    );
+    const unknown = providers.filter(
+      (p) => !(DEBRIEF_APPROVED_PROVIDERS as readonly string[]).includes(p),
+    );
+    if (unknown.length) {
+      throw new BadRequestException(
+        `Not an approved provider: ${unknown.join(', ')}`,
+      );
+    }
+    if (!allowed.length) {
+      throw new BadRequestException(
+        "Allow at least one provider. To stop this organisation's debriefs, switch it off instead.",
+      );
+    }
+    const set: Record<string, boolean> = {};
+    const clear: string[] = [];
+    for (const p of DEBRIEF_APPROVED_PROVIDERS) {
+      if (allowed.includes(p)) clear.push(PROVIDER_ALLOWED_KEY(p));
+      else set[PROVIDER_ALLOWED_KEY(p)] = false;
+    }
+    await this.overrides.save({
+      agentKey: DEBRIEF_AGENT_KEY,
+      layer: AgentConfigLayer.ORG,
+      scopeId: tenantId,
+      schema: DEBRIEF_POLICY,
+      change: { set, clear },
+      actorUserId: userId,
+    });
+    return allowed;
   }
 
   /** Whether the organisation set support lines of its own in its Guide profile. */

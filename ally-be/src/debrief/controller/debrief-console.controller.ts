@@ -37,6 +37,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { DEBRIEF_APPROVED_PROVIDERS } from '../constants/debrief-release.constants';
 import { DebriefAct, DebriefRead } from '../util/debrief-console-roles.util';
 import {
   AUTONOMY_STEPS,
@@ -156,6 +157,14 @@ class TenantRegionDto {
   @ApiProperty({ enum: ['india', 'outside_india'] })
   @IsIn(['india', 'outside_india'])
   region!: 'india' | 'outside_india';
+}
+
+class TenantProvidersDto {
+  @ApiProperty({ enum: DEBRIEF_APPROVED_PROVIDERS, isArray: true })
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsIn(DEBRIEF_APPROVED_PROVIDERS as unknown as string[], { each: true })
+  providers!: string[];
 }
 
 class CorrectCardDto {
@@ -847,6 +856,27 @@ export class DebriefConsoleController {
   ) {
     await this.agent.setRegion(tenantId, body.region, req.user.id);
     return { tenantId, region: body.region };
+  }
+
+  @Put('tenants/:tenantId/providers')
+  @DebriefAct('switchOrgOn')
+  @ApiOperation({
+    summary:
+      "Which approved model providers an organisation's debriefs may use",
+    description:
+      'Plan §8.9 / v9 FR-57: live runs, paired trials and Ask Ally on its sessions reach only these providers. At least one.',
+  })
+  async setProviders(
+    @Param('tenantId') tenantId: string,
+    @Body() body: TenantProvidersDto,
+    @Req() req: AuthedRequest,
+  ) {
+    const providers = await this.agent.setProviderAllowlist(
+      tenantId,
+      body.providers,
+      req.user.id,
+    );
+    return { tenantId, providers };
   }
 
   // --- Redesigned console (docs/debrief-harness/CONSOLE_API.md) ---------------------

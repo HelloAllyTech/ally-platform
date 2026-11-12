@@ -9,6 +9,22 @@ import { DebriefCheckFailure } from '../util/debrief-cards.util';
 /** Past the graph's own deadline: room for its last write and the response. */
 export const GRAPH_MARGIN_MS = 60_000;
 
+/** `POST /api/v1/debrief/safety-recall`: the seeded safety set, every repetition. */
+export interface DebriefSafetyRecall {
+  passed: boolean;
+  reps: Array<{
+    rep: number;
+    found: number;
+    planted: number;
+    recall: number;
+    missed: string[];
+    false_alarms: number;
+  }>;
+  cases: number;
+  planted: number;
+  model?: string | null;
+}
+
 /** `POST /api/v1/debrief/runs` (docs/debrief-harness/CONTRACT.md §1). */
 export interface DebriefGraphRequest {
   run_id: string;
@@ -99,5 +115,29 @@ export class DebriefGraphClient {
         }`,
       );
     }
+  }
+
+  /**
+   * The gate rule "safety recall 100% × 3" (plan §9, PRD §12): ally-ai runs
+   * the seeded safety set (synthetic sessions only) through this Safety
+   * reader — its model and system prompt — `reps` times. Throws when ally-ai
+   * does not answer; the gate then fails closed.
+   */
+  async safetyRecall(body: {
+    model?: string | null;
+    system?: string | null;
+    reps?: number;
+  }): Promise<DebriefSafetyRecall> {
+    const { apiUrl, outboundApiKey } = this.config.ai;
+    const res = await axios.post(
+      `${apiUrl}/api/v1/debrief/safety-recall`,
+      { reps: 3, ...body },
+      {
+        headers: { 'x-api-key': outboundApiKey },
+        // ~20 cases × 3 short readings, run one after another.
+        timeout: 10 * 60_000,
+      },
+    );
+    return res.data as DebriefSafetyRecall;
   }
 }

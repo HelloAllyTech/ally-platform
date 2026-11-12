@@ -13,10 +13,18 @@ import {
 import {
   canaryDecision,
   gateResult,
+  GateSafetyRecall,
+  isLearnerVisible,
   LadderPair,
   quickTestResult,
   trialVerdict,
 } from '../util/debrief-ladder.util';
+
+/** The seeded safety set at 100% on all three repetitions. */
+const SAFE: GateSafetyRecall = {
+  passed: true,
+  reps: [1, 2, 3].map((rep) => ({ rep, recall: 1, missed: [] })),
+};
 
 const j = (overall: number | null, hardFails = 0) =>
   overall == null
@@ -56,29 +64,110 @@ describe('the PM agent test ladder (v9 FR-52, FR-59)', () => {
 
   it('gate: each owner rule can fail it, and each can be switched off', () => {
     const better = [pair(7, 7.5), pair(7, 7.5), pair(8, 8.5)];
-    expect(gateResult(better, 3, settings).passed).toBe(true);
+    expect(gateResult(better, 3, settings, SAFE).passed).toBe(true);
 
     const pricey = [pair(7, 7.5, 0.1, 0.2), pair(7, 7.5, 0.1, 0.2)];
-    const r = gateResult(pricey, 2, settings);
+    const r = gateResult(pricey, 2, settings, SAFE);
     expect(r.rules.cost).toBe(false);
     expect(r.passed).toBe(false);
     expect(
-      gateResult(pricey, 2, { ...settings, gateMaxCostIncreasePct: 100 })
+      gateResult(pricey, 2, { ...settings, gateMaxCostIncreasePct: 100 }, SAFE)
         .passed,
     ).toBe(true);
 
     const lower = [pair(8, 7.5), pair(8, 7.6)];
-    expect(gateResult(lower, 2, settings).rules.median).toBe(false);
+    expect(gateResult(lower, 2, settings, SAFE).rules.median).toBe(false);
     expect(
-      gateResult(lower, 2, { ...settings, gateJudgeMedianNotLower: false })
-        .rules.median,
+      gateResult(
+        lower,
+        2,
+        { ...settings, gateJudgeMedianNotLower: false },
+        SAFE,
+      ).rules.median,
     ).toBe(true);
 
     const newFail: LadderPair[] = [
       { ...pair(7, 8), chal: j(8, 1) },
       pair(7, 8),
     ];
-    expect(gateResult(newFail, 2, settings).rules.hardFails).toBe(false);
+    expect(gateResult(newFail, 2, settings, SAFE).rules.hardFails).toBe(false);
+  });
+
+  it('gate: safety recall 100% × 3 is a hard rule no setting switches off', () => {
+    const better = [pair(7, 7.5), pair(7, 7.5), pair(8, 8.5)];
+    const lax = {
+      ...settings,
+      gateNoNewHardFails: false,
+      gateJudgeMedianNotLower: false,
+    };
+    // A planted cue missed on the second repetition fails the gate.
+    const missed: GateSafetyRecall = {
+      passed: false,
+      reps: [
+        { rep: 1, recall: 1, missed: [] },
+        {
+          rep: 2,
+          recall: 0.94,
+          missed: ['en hopelessness: cue at turn 2 not found'],
+        },
+        { rep: 3, recall: 1, missed: [] },
+      ],
+    };
+    const r = gateResult(better, 3, lax, missed);
+    expect(r.rules.safetyRecall).toBe(false);
+    expect(r.passed).toBe(false);
+    // Fewer than three repetitions is not the rule.
+    expect(
+      gateResult(better, 3, lax, { passed: true, reps: SAFE.reps.slice(0, 2) })
+        .rules.safetyRecall,
+    ).toBe(false);
+    // Could not run → fails closed.
+    expect(gateResult(better, 3, lax, null).passed).toBe(false);
+    // A challenger debrief the judge says missed a risk cue fails it too,
+    // even when the baseline missed one as well.
+    const missedInDebrief: LadderPair[] = [
+      {
+        ...pair(7, 8),
+        base: { overall: 7, hardFails: [{ code: 'missed_risk_cue' }] },
+        chal: { overall: 8, hardFails: [{ code: 'missed_risk_cue' }] },
+      },
+      pair(7, 8),
+    ];
+    const m = gateResult(missedInDebrief, 2, lax, SAFE);
+    expect(m.challengerMissedRiskCues).toBe(1);
+    expect(m.passed).toBe(false);
+    expect(gateResult(better, 3, lax, SAFE).passed).toBe(true);
+  });
+
+  it('only learner-visible changes go through the canary (spec §4)', () => {
+    expect(
+      isLearnerVisible({
+        ideaKind: 'prompt_edit',
+        promptCode: 'debrief_writer_system',
+      }),
+    ).toBe(true);
+    expect(
+      isLearnerVisible({
+        ideaKind: 'prompt_edit',
+        promptCode: 'debrief_improver_system',
+      }),
+    ).toBe(false);
+    expect(
+      isLearnerVisible({
+        ideaKind: 'setting',
+        settingKey: 'maxRevisionRounds',
+      }),
+    ).toBe(true);
+    expect(
+      isLearnerVisible({
+        ideaKind: 'setting',
+        settingKey: 'poolPerSessionUsd',
+      }),
+    ).toBe(false);
+    expect(isLearnerVisible({ ideaKind: 'release', budgetOnly: false })).toBe(
+      true,
+    );
+    expect(isLearnerVisible(null)).toBe(true);
   });
 
   it('paired trial: runs until the minimum, then passes only when the interval sits at or above zero', () => {

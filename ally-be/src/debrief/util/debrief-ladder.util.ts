@@ -93,10 +93,32 @@ export type GateResult = ReturnType<typeof summarise> & {
     median: boolean;
     cost: boolean;
     scored: boolean;
+    safetyRecall: boolean;
   };
+  /** The seeded-set reading the safety rule was decided on (null: could not be run). */
+  safetyRecall: GateSafetyRecall | null;
+  /** Challenger debriefs on the gate set the judge marked `missed_risk_cue`. */
+  challengerMissedRiskCues: number;
 };
 
-/** Rung 2: the owner's gate rules, each switchable, on the gate set. */
+/** The seeded safety set through the challenger's Safety reader, every repetition. */
+export interface GateSafetyRecall {
+  passed: boolean;
+  reps: Array<{ rep: number; recall: number; missed: string[] }>;
+  error?: string;
+}
+
+const missedRiskCue = (j: LadderJudgment | null) =>
+  !!j?.hardFails.some((f) => f.code === 'missed_risk_cue');
+
+/**
+ * Rung 2: the owner's gate rules, each switchable, on the gate set — and one
+ * that is not (plan §9, PRD §12): safety recall 100% × 3. It fails when the
+ * challenger's Safety reader missed a planted cue on any repetition of the
+ * seeded set, when that set could not be run at all (it fails closed), or
+ * when the judge found a missed risk cue in any challenger debrief on the
+ * gate set, whatever the baseline did.
+ */
 export function gateResult(
   pairs: LadderPair[],
   cases: number,
@@ -104,8 +126,12 @@ export function gateResult(
     OwnerSettings,
     'gateNoNewHardFails' | 'gateJudgeMedianNotLower' | 'gateMaxCostIncreasePct'
   >,
+  safety: GateSafetyRecall | null,
 ): GateResult {
   const r = summarise(pairs, cases);
+  const challengerMissedRiskCues = pairs.filter((p) =>
+    missedRiskCue(p.chal),
+  ).length;
   const rules = {
     scored: r.pairs >= Math.ceil(cases / 2),
     hardFails:
@@ -120,12 +146,61 @@ export function gateResult(
       r.baselineCostUsd <= 0 ||
       r.challengerCostUsd <=
         r.baselineCostUsd * (1 + settings.gateMaxCostIncreasePct / 100),
+    safetyRecall:
+      safety?.passed === true &&
+      safety.reps.length >= SAFETY_RECALL_REPS &&
+      safety.reps.every((x) => x.recall >= 1 && x.missed.length === 0) &&
+      challengerMissedRiskCues === 0,
   };
   return {
     ...r,
     rules,
-    passed: rules.scored && rules.hardFails && rules.median && rules.cost,
+    safetyRecall: safety,
+    challengerMissedRiskCues,
+    passed:
+      rules.scored &&
+      rules.hardFails &&
+      rules.median &&
+      rules.cost &&
+      rules.safetyRecall,
   };
+}
+
+/** Plan §9: 100% recall on the seeded safety set, three repetitions in a row. */
+export const SAFETY_RECALL_REPS = 3;
+
+/**
+ * Prompts that learners never read the output of: a change to one skips the
+ * canary (spec §4 "only for learner-visible changes"). The PM agent's own
+ * instructions shape ideas, not debriefs.
+ */
+export const NON_LEARNER_VISIBLE_PROMPTS: readonly string[] = [
+  'debrief_improver_system',
+];
+/** Settings that only move money between runs, never what one run writes. */
+export const NON_LEARNER_VISIBLE_SETTINGS: readonly string[] = [
+  'runFloorUsd',
+  'poolPerSessionUsd',
+  'monthlyCapUsd',
+];
+
+/**
+ * Whether learners could see a difference (spec §4, plan §11.7 step 5): a
+ * change they can't skips the canary once its paired trial passed. Anything
+ * not known to be invisible counts as visible.
+ */
+export function isLearnerVisible(
+  change: Record<string, any> | null | undefined,
+): boolean {
+  if (!change) return true;
+  if (change.ideaKind === 'prompt_edit') {
+    return !NON_LEARNER_VISIBLE_PROMPTS.includes(String(change.promptCode));
+  }
+  if (change.ideaKind === 'setting') {
+    return !NON_LEARNER_VISIBLE_SETTINGS.includes(String(change.settingKey));
+  }
+  if (change.ideaKind === 'release') return !change.budgetOnly;
+  return true;
 }
 
 export interface TrialVerdict {

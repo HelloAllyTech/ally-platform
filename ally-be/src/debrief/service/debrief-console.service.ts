@@ -7,6 +7,7 @@ import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
   DEBRIEF_AGENT_KEY,
+  DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_MODELS,
   DEBRIEF_REPLY_DEFAULT,
   DEBRIEF_SEED_BUNDLE,
@@ -263,11 +264,14 @@ export class DebriefConsoleService {
       /** v9 FR-8: this calendar month's production spend (shadow + live), actual where reconciled. */
       monthSpentUsd: number;
       monthRuns: number;
+      /** Plan §8.9 (FR-57): the providers its debriefs may use. */
+      providers: string[];
     }>
   > {
-    const [live, regions, spend] = await Promise.all([
+    const [live, regions, allowlists, spend] = await Promise.all([
       this.agent.liveTenants().then((ids) => new Set(ids)),
       this.agent.regions(),
+      this.agent.providerAllowlists(),
       this.dataSource
         .query(
           `SELECT tenant_id AS id,
@@ -301,6 +305,7 @@ export class DebriefConsoleService {
         ...t,
         live: live.has(t.id),
         region: regions.get(t.id) ?? 'india',
+        providers: allowlists.get(t.id) ?? [...DEBRIEF_APPROVED_PROVIDERS],
         monthSpentUsd: Number((spend.get(t.id)?.spent ?? 0).toFixed(4)),
         monthRuns: Number(spend.get(t.id)?.runs ?? 0),
       }),

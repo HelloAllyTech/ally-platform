@@ -22,8 +22,10 @@ import { PromptVersioningService } from '../../prompt/service/prompt-versioning.
 import { PromptVersionSource } from '../../prompt/entity/prompt-version.entity';
 import {
   DEBRIEF_AGENT_KEY,
+  DEBRIEF_PROMPT_CODES,
   DebriefBundle,
   DebriefRecipeKey,
+  DebriefStep,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
 import { PM_HOLD_DAYS } from '../util/debrief-outcome.util';
@@ -43,13 +45,17 @@ import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefMetricsService } from './debrief-metrics.service';
 import {
   GateResult,
+  GateSafetyRecall,
   gateResult,
+  isLearnerVisible,
   LadderPair,
+  SAFETY_RECALL_REPS,
   quickTestResult,
 } from '../util/debrief-ladder.util';
 import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefRunnerService, RunOptions } from './debrief-runner.service';
+import { DebriefGraphClient } from './debrief-graph.client';
 import {
   DebriefTestSet,
   DebriefTestSetsService,
@@ -93,6 +99,8 @@ export class DebriefPmAgentService implements OnModuleInit {
     @Optional() private readonly autonomy?: DebriefAutonomyService,
     /** FR-54: the owner hears about promotions, filings and proposals. */
     @Optional() private readonly notifier?: DebriefNotifier,
+    /** The gate's safety-recall rule runs the seeded set in ally-ai. Absent → the rule fails closed. */
+    @Optional() private readonly graph?: DebriefGraphClient,
   ) {}
 
   /** The policy for this idea at this step; 'auto' when no policy is wired (tests). */
@@ -381,12 +389,12 @@ export class DebriefPmAgentService implements OnModuleInit {
         status: 'running',
         startedAt,
       });
-      const pairs = await this.runPairs(
-        ideaId,
-        sessions,
-        await this.challengerOptions(idea),
-      );
-      const result = gateResult(pairs, sessions.length, settings);
+      const challenger = await this.challengerOptions(idea);
+      const [pairs, safety] = await Promise.all([
+        this.runPairs(ideaId, sessions, challenger),
+        this.safetyRecall(challenger),
+      ]);
+      const result = gateResult(pairs, sessions.length, settings, safety);
       await this.writeEvidence(ideaId, 'gate', result);
       await this.audit('pipeline_step', ideaId, null, {
         step: 'gate',
@@ -404,6 +412,52 @@ export class DebriefPmAgentService implements OnModuleInit {
         error: (e as Error).message.slice(0, 300),
       }).catch(() => undefined);
       return null;
+    }
+  }
+
+  /**
+   * The gate's hard rule (plan §9, PRD §12): the challenger's Safety reader —
+   * the model its release names for the step and its system prompt, with
+   * this idea's edit applied — on the seeded safety set, three times. Any
+   * failure to run it reads as a failed rule, never a pass.
+   */
+  async safetyRecall(
+    challenger: Partial<RunOptions>,
+  ): Promise<GateSafetyRecall | null> {
+    const code = DEBRIEF_PROMPT_CODES.safetyReader;
+    try {
+      if (!this.graph) throw new Error('ally-ai is not wired');
+      const bundle =
+        (challenger.release as { bundle?: DebriefBundle } | undefined)
+          ?.bundle ?? (await this.gaBundle()).bundle;
+      const step = bundle.recipes[DebriefRecipeKey.STANDARD]?.steps.find(
+        (x) => x.step === DebriefStep.SAFETY_READER,
+      );
+      const system =
+        challenger.promptOverrides?.[code] ??
+        (await this.context.promptText(code, bundle.prompts?.[code] ?? null));
+      const r = await this.graph.safetyRecall({
+        model: step?.model ?? null,
+        system,
+        reps: SAFETY_RECALL_REPS,
+      });
+      return {
+        passed: r.passed,
+        reps: r.reps.map((x) => ({
+          rep: x.rep,
+          recall: x.recall,
+          missed: x.missed,
+        })),
+      };
+    } catch (e) {
+      this.logger.warn(
+        `[pm-agent] safety recall could not run: ${(e as Error).message}`,
+      );
+      return {
+        passed: false,
+        reps: [],
+        error: (e as Error).message.slice(0, 300),
+      };
     }
   }
 
@@ -627,7 +681,10 @@ export class DebriefPmAgentService implements OnModuleInit {
         'only a change that passed its paired trial on real sessions can start a canary',
       );
     }
-    if ((await this.stepPolicy(idea, 'canary')) === 'off') {
+    // Spec §4: the canary is only for changes learners can see; anything
+    // else is promoted once its paired trial passed.
+    const visible = isLearnerVisible(idea.change);
+    if (visible && (await this.stepPolicy(idea, 'canary')) === 'off') {
       throw new ConflictException(
         'canaries are off for this kind of change (owner policy)',
       );
@@ -635,7 +692,9 @@ export class DebriefPmAgentService implements OnModuleInit {
     if (kind === 'release') {
       // A person's proposed change already carries its draft release.
       const draftRelease = await this.releases.getById(idea.change.releaseId);
-      return this.startCanaryFor(idea, draftRelease, userId, note);
+      return visible
+        ? this.startCanaryFor(idea, draftRelease, userId, note)
+        : this.promoteWithoutCanary(idea, draftRelease, userId, note);
     }
     const { bundle } = await this.gaBundle();
     const next: DebriefBundle = JSON.parse(JSON.stringify(bundle));
@@ -697,7 +756,54 @@ export class DebriefPmAgentService implements OnModuleInit {
     );
     // Plan §8.8: the exact prompt versions it runs, recorded now.
     await this.runner.pinPrompts(draft);
-    return this.startCanaryFor(idea, draft, userId, note);
+    return visible
+      ? this.startCanaryFor(idea, draft, userId, note)
+      : this.promoteWithoutCanary(idea, draft, userId, note);
+  }
+
+  /**
+   * Spec §4: a change learners can't see (isLearnerVisible) skips the canary.
+   * Its paired trial passed, so a person's approval makes it the release in
+   * force; the canary evidence says why there was none.
+   */
+  private async promoteWithoutCanary(
+    idea: Record<string, any>,
+    draft: { id: string; version: number },
+    userId: number,
+    note?: string,
+  ): Promise<{ releaseId: string; version: number; stage: 'promoted' }> {
+    const ideaId = idea.id as string;
+    const released = await this.releases.makeGa(
+      draft.id,
+      userId,
+      AgentReleaseAuditAction.PROMOTED,
+      note,
+    );
+    const version =
+      (released as { version?: number })?.version ?? draft.version;
+    await this.dataSource.query(
+      `UPDATE agent_lessons SET status = 'active', "releaseId" = $2, "updatedAt" = now() WHERE id = $1`,
+      [ideaId, draft.id],
+    );
+    await this.writeEvidence(ideaId, 'canary', {
+      status: 'skipped',
+      reason: 'not learner-visible',
+      releaseId: draft.id,
+      version,
+      promotedAt: new Date().toISOString(),
+    });
+    await this.audit('activated', ideaId, userId, {
+      releaseId: draft.id,
+      canary: 'skipped: not learner-visible',
+      note: note ?? null,
+    });
+    await this.notifier?.owner({
+      title: `Debriefs: v${version} is live for everyone`,
+      body: `Promoted from idea “${idea.text}” without a canary: learners don't see this change.${note ? ` ${note}` : ''}`,
+      data: { ideaId, releaseId: draft.id },
+      excludeUserId: userId,
+    });
+    return { releaseId: draft.id, version, stage: 'promoted' };
   }
 
   /** Rung 4: the candidate release reaches a share of live learners; the canary watcher decides. */

@@ -4,13 +4,22 @@
   ally-be prepares the inputs and applies the result; the graph runs every step
   in-process.
 
-The Safety reader has no endpoint of its own: the graph runs it in-process, and
-Ask Ally's distress check runs it inside `POST /ask-ally/replies` (CONTRACT.md §5).
+- `POST /debrief/safety-recall`: the seeded safety set through a Safety reader
+  (a model and system prompt), every repetition; the PM agent's gate rule
+  "safety recall 100% x 3" (plan §9, PRD §12). Synthetic sessions only.
+
+The Safety reader has no endpoint of its own for real sessions: the graph runs it
+in-process, and Ask Ally's distress check runs it inside `POST /ask-ally/replies`
+(CONTRACT.md §5).
 """
 
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 
 from app.core.agent_runtime.checkpointer import checkpointer_available
+from app.core.debrief.safety_recall import run_recall
 from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import HttpGateway
 from app.core.debrief_graph.graph import get_debrief_graph
@@ -62,3 +71,30 @@ async def debrief_run(
     )
     result = await run_debrief(graph, ctx, resume=req.resume)
     return DebriefRunResponse(**result)
+
+
+# --- The safety-recall gate --------------------------------------------------------
+
+
+class SafetyRecallRequest(BaseModel):
+    """The Safety reader to gate: its model (None = the configured one) and
+    system prompt (None = the default text)."""
+
+    model: Optional[str] = None
+    system: Optional[str] = None
+    reps: int = Field(default=3, ge=1, le=5)
+
+
+class SafetyRecallResponse(BaseModel):
+    passed: bool
+    reps: List[Dict[str, Any]]
+    cases: int
+    planted: int
+    model: Optional[str] = None
+
+
+@router.post("/safety-recall", response_model=SafetyRecallResponse)
+async def debrief_safety_recall(req: SafetyRecallRequest) -> SafetyRecallResponse:
+    """Run the seeded safety set `reps` times; `passed` only at 100% every time."""
+    result = await run_recall(req.reps, req.model, req.system)
+    return SafetyRecallResponse(**result)

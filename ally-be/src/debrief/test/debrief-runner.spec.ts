@@ -76,6 +76,7 @@ function build(
     languageRecorded?: boolean;
     inCase?: boolean;
     monthToDate?: { sessions: number; spentUsd: number };
+    providerAllowlist?: string[];
     graph?: DebriefGraphResponse | Error;
     live?: unknown[] | Error;
     cohort?: unknown;
@@ -142,6 +143,9 @@ function build(
     promptText: jest.fn(
       async (code: string, version: number | null) =>
         `live ${code}@${version ?? 'current'}`,
+    ),
+    providerAllowlist: jest.fn(
+      async () => opts.providerAllowlist ?? ['gemini', 'openai', 'anthropic'],
     ),
     monthToDate: jest.fn(
       async () => opts.monthToDate ?? { sessions: 10, spentUsd: 0 },
@@ -320,6 +324,15 @@ describe('DebriefRunnerService', () => {
       expect(ceiling).toBeLessThanOrEqual(1);
       expect(ceiling).toBeGreaterThan(0);
       expect(run.ceilingUsd).toBe(ceiling.toFixed(4));
+    });
+
+    it('holds the run for a person when no allowed provider can run a step (plan §8.9)', async () => {
+      const { svc, graph } = build({ providerAllowlist: ['openai'] });
+      const run = await svc.run('s1', { mode: DebriefRunMode.SHADOW });
+      expect(run.status).toBe(DebriefRunStatus.NEEDS_PERSON);
+      expect(run.skipReason).toBe('provider_not_allowed');
+      expect(run.workspace?.providerAllowlist?.allowed).toEqual(['openai']);
+      expect(graph.run).not.toHaveBeenCalled();
     });
 
     it('holds the run for a person at the monthly cap, without calling the graph', async () => {

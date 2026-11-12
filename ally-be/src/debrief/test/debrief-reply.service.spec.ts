@@ -45,6 +45,8 @@ function build(opts: {
   bundleReply?: Record<string, unknown>;
   onTopic?: boolean;
   org?: boolean;
+  /** The organisation's provider allowlist (plan §8.9). */
+  providers?: string[];
 }) {
   const saved: any[] = [];
   const messages = {
@@ -64,6 +66,9 @@ function build(opts: {
     manager: { query: kept },
   };
   const context = {
+    providerAllowlist: jest.fn(
+      async () => opts.providers ?? ['gemini', 'openai', 'anthropic'],
+    ),
     transcript: jest.fn(async () => [
       {
         turn_index: 1,
@@ -219,6 +224,20 @@ describe('DebriefReplyService (Ask Ally)', () => {
       model: 'gpt-4.1-mini',
       maxTokens: 300,
     });
+  });
+
+  it('never reaches a provider the organisation does not allow (plan §8.9)', async () => {
+    const { svc, askAlly } = build({
+      providers: ['openai'],
+      bundleReply: {
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        maxTokens: 300,
+      },
+    });
+    const events = await run(svc, 'question');
+    expect(askAlly.reply).not.toHaveBeenCalled();
+    expect(events.some((e) => e.type === 'error')).toBe(true);
   });
 
   it('never lets a model answer a learner in crisis', async () => {

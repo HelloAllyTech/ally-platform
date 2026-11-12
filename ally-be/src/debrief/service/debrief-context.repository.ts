@@ -5,6 +5,11 @@ import { resolveWorkerType } from '../../user/enum/user.enum';
 import { TranscriptTurn } from '../util/debrief-cards.util';
 import { guidancePassage } from '../util/debrief-guidance.util';
 import { ClChunk } from '../../context-library/entity/cl-chunk.entity';
+import {
+  DEBRIEF_AGENT_KEY,
+  DebriefProvider,
+} from '../constants/debrief-release.constants';
+import { allowlistFromValues } from '../util/debrief-provider-allowlist.util';
 
 export interface DebriefSessionContext {
   id: string;
@@ -503,6 +508,28 @@ export class DebriefContextRepository {
         WHERE id = $1 AND NOT (coalesce("changeSet", '{}'::jsonb) ? 'pinnedPrompts')`,
       [releaseId, JSON.stringify(pins), source],
     );
+  }
+
+  /**
+   * The organisation's model-provider allowlist (plan §8.9, FR-57): every
+   * approved provider unless the owner restricted it. Unreadable reads as
+   * "nothing allowed" — a run then waits for a person rather than reaching a
+   * provider the contract may forbid.
+   */
+  async providerAllowlist(
+    tenantId: string | null | undefined,
+  ): Promise<DebriefProvider[]> {
+    if (!tenantId) return allowlistFromValues(null);
+    try {
+      const [row] = await this.dataSource.query(
+        `SELECT "values" FROM agent_config_overrides
+          WHERE "agentKey" = $1 AND layer = 'org' AND "scopeId" = $2`,
+        [DEBRIEF_AGENT_KEY, tenantId],
+      );
+      return allowlistFromValues(row?.values ?? null);
+    } catch {
+      return [];
+    }
   }
 
   /** Production spend and volume so far this month, for the pool. */

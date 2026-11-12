@@ -1,3 +1,4 @@
+import { restrictBundleToProviders } from '../util/debrief-provider-allowlist.util';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -102,6 +103,8 @@ const END_WHY: Record<string, string> = {
   no_transcript: 'No debrief: the session has no transcript.',
   monthly_cap:
     'Held for a person: this month’s debrief budget is spent, so no run could start.',
+  provider_not_allowed:
+    'Held for a person: a step has no model on a provider this organisation allows (Settings › Organisations).',
 };
 
 const GRAPH_STATUSES: ReadonlySet<string> = new Set([
@@ -327,8 +330,9 @@ export class DebriefRunnerService {
     sessionId: string,
     opts: RunOptions,
     release: AgentRelease | null,
-    { bundle, now }: { bundle: DebriefBundle; now: () => number },
+    { bundle: released, now }: { bundle: DebriefBundle; now: () => number },
   ): Promise<Prepared> {
+    let bundle = released;
     const settings = bundle.settings;
     const resumed = !!opts.resume;
     const session = await this.context.loadSession(sessionId);
@@ -396,6 +400,36 @@ export class DebriefRunnerService {
                 : DebriefRecipeKey.STANDARD
           ] ?? bundle.recipes[DebriefRecipeKey.STANDARD]);
     run.recipeKey = recipe.key;
+
+    // Plan §8.9 (FR-57, Q12): an organisation whose contract restricts
+    // providers gets the release with only those providers' models. A recipe
+    // with a step no allowed model can run goes to a person — never to
+    // another company.
+    const allowed = await this.context.providerAllowlist(session.tenantId);
+    const restricted = restrictBundleToProviders(bundle, allowed);
+    if (restricted.changed) {
+      run.workspace = {
+        ...run.workspace,
+        providerAllowlist: {
+          allowed,
+          ...(restricted.blockedSteps.length
+            ? { blockedSteps: restricted.blockedSteps }
+            : {}),
+          ...(restricted.orchestratorOff ? { orchestratorOff: true } : {}),
+        },
+      };
+    }
+    if (restricted.blockedRecipes.includes(recipe.key)) {
+      return {
+        ended: await this.finish(
+          run,
+          DebriefRunStatus.NEEDS_PERSON,
+          { skipReason: 'provider_not_allowed' },
+          FallbackRung.PERSON_FINISHES,
+        ),
+      };
+    }
+    bundle = restricted.bundle;
 
     let ceiling = settings.runCeilingUsd;
     if (opts.mode !== DebriefRunMode.REPLAY) {

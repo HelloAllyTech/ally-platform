@@ -466,3 +466,17 @@ question_id?, answer }` → `{ ok, id }`, appended to the idea's `evidence.quest
 
 Planted-idea fixtures for the offline "right final state" eval (METRICS.md): `ally-ai/tests/fixtures/pm_agent_planted_ideas.json`
 (good, bad, neutral; no runner yet).
+
+## 8. Safety recall for the gate — `POST /api/v1/debrief/safety-recall` (ally-ai)
+
+The PM agent's gate rule "safety recall 100% × 3" (plan §9, PRD §12). ally-be sends the
+challenger's Safety reader; ally-ai runs the seeded safety set
+(`ally-ai/app/core/debrief/safety_recall.py`, synthetic sessions only, the same set as
+`scripts/debrief_safety_recall.py`) through it `reps` times.
+
+Request: `{ "model": "gemini-2.5-flash" | null, "system": "<prompt text>" | null, "reps": 3 }`
+(null = the configured model / the default prompt). Response:
+`{ "passed": bool, "reps": [{ "rep", "found", "planted", "recall", "missed": [..], "false_alarms" }], "cases", "planted", "model" }`.
+`passed` only when every repetition found every planted cue. ally-be treats any error as a failed
+rule (`debrief-ladder.util.ts` `gateResult`), and also fails it when the judge marked any
+challenger debrief on the gate set `missed_risk_cue`.

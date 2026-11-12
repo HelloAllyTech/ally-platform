@@ -214,6 +214,20 @@ export class DebriefReplyService {
       ]);
     // The release names Ask Ally's model, as it names every step's.
     const model = bundle.reply ?? DEBRIEF_REPLY_DEFAULT;
+    // Plan §8.9 (FR-57): never to a provider the organisation doesn't allow.
+    // No fallback model: the learner gets the usual "try again" instead.
+    const allowed = await this.context.providerAllowlist(tenantId);
+    if (!allowed.includes(model.provider)) {
+      this.logger.warn(
+        `[debrief] Ask Ally for run ${run.id}: ${model.provider} is not on this organisation's provider allowlist`,
+      );
+      // After the caller has subscribed, like every other ending.
+      setTimeout(() => {
+        subject.next(event({ type: 'error', error: REPLY_FAILED }));
+        subject.complete();
+      }, 0);
+      return subject.pipe(startWith(event({ type: 'start' })));
+    }
     const sources = [
       ...speakerRuns(transcript),
       ...org,
