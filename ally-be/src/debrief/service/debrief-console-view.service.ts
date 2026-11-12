@@ -59,12 +59,6 @@ const num = (v: unknown, d = 2) =>
     : Math.round(Number(v) * 10 ** d) / 10 ** d;
 const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
 
-/** Calibration sample membership, as the session list and view read it. */
-interface ScoringSample {
-  inSample: Set<string>;
-  ratedByMe: Set<string>;
-}
-
 /**
  * Read models for the redesigned Debrief console (debrief-console-redesign-
  * notes.md): the viewer's roles and allowed actions, the home list with its
@@ -176,28 +170,16 @@ export class DebriefConsoleViewService implements OnModuleInit {
   // --- The viewer -------------------------------------------------------------------
 
   async viewer(userId: number): Promise<DebriefViewer> {
-    const [perms, keys, rated] = await Promise.all([
+    const [perms, keys] = await Promise.all([
       this.permissions.getUserPermissions(userId),
       this.toggles.getEnabledKeys(userId).catch(() => [] as string[]),
-      this.dataSource
-        .query(
-          `SELECT EXISTS (SELECT 1 FROM debrief_human_ratings WHERE "raterId" = $1) AS rated`,
-          [userId],
-        )
-        .then((r: Array<{ rated: boolean }>) => !!r?.[0]?.rated)
-        .catch(() => false),
     ]);
     const roles = debriefRoles(
       perms,
       keys.includes(FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF),
     );
     const can = debriefCan(perms);
-    return {
-      userId,
-      roles,
-      can,
-      scorer: roles.clinicalAdvisor || (can.score && rated),
-    };
+    return { userId, roles, can };
   }
 
   /** May this viewer decide this flag? 403 otherwise (an advisor: only escalated flags). */
@@ -212,55 +194,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
         'The clinical advisor decides only flags escalated to them',
       );
     }
-  }
-
-  // --- Scoring sample ------------------------------------------------------------------
-
-  private async calibration() {
-    const { DebriefCalibrationService } =
-      await import('../../analytics/service/debrief-calibration.service');
-    return this.moduleRef.get(DebriefCalibrationService, { strict: false });
-  }
-
-  private async scoringSample(userId: number): Promise<ScoringSample> {
-    try {
-      const sample = await (await this.calibration()).getSample(userId);
-      return {
-        inSample: new Set(sample.items.map((i) => i.scenarioSessionId)),
-        ratedByMe: new Set(
-          sample.items
-            .filter((i) => i.ratedByMe)
-            .map((i) => i.scenarioSessionId),
-        ),
-      };
-    } catch {
-      return { inSample: new Set(), ratedByMe: new Set() };
-    }
-  }
-
-  /**
-   * Score by hand from the session view: the clinical advisor on any session
-   * the judge scored; an Ally team reviewer only on sessions in the scoring
-   * sample. Stored as the calibration set's rating (it feeds the κ gate).
-   */
-  async score(
-    sessionId: string,
-    viewer: DebriefViewer,
-    input: {
-      scores: Record<string, number>;
-      hardFails: string[];
-      note?: string | null;
-    },
-  ) {
-    if (!viewer.roles.clinicalAdvisor) {
-      const sample = await this.scoringSample(viewer.userId);
-      if (!sample.inSample.has(sessionId)) {
-        throw new ForbiddenException(
-          'The Ally team scores only sessions in the scoring sample',
-        );
-      }
-    }
-    return (await this.calibration()).submit(viewer.userId, sessionId, input);
   }
 
   // --- Home list --------------------------------------------------------------------
@@ -359,7 +292,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
       )`;
   }
 
-  private categorySql(cat: SessionFilters['category'], sampleParam: string) {
+  private categorySql(cat: SessionFilters['category']) {
     switch (cat) {
       case 'needs':
         return `rank < 3`;
@@ -371,8 +304,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
         return `status = 'published'`;
       case 'escalated':
         return `escalated`;
-      case 'to_score':
-        return `"scenarioSessionId" = ANY(${sampleParam}::uuid[])`;
       case 'agreement_sample':
         return `(agreement_sample AND NOT has_verdict)`;
       default:
@@ -390,14 +321,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
   async sessions(f: SessionFilters, viewer: DebriefViewer) {
     const params: unknown[] = [];
     const base = this.baseSql(f, params);
-    const sample = viewer.can.score
-      ? await this.scoringSample(viewer.userId)
-      : { inSample: new Set<string>(), ratedByMe: new Set<string>() };
-    const toScore = [...sample.inSample].filter(
-      (id) => !sample.ratedByMe.has(id),
-    );
-    params.push(toScore);
-    const sampleParam = `$${params.length}`;
     const countParams = [...params];
     const [counts] = await this.dataSource.query(
       `${base}
@@ -407,7 +330,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
               count(*) FILTER (WHERE status = 'below_bar' OR (status = 'published' AND judge_below))::int AS below,
               count(*) FILTER (WHERE status = 'published')::int AS published,
               count(*) FILTER (WHERE escalated)::int AS escalated,
-              count(*) FILTER (WHERE "scenarioSessionId" = ANY(${sampleParam}::uuid[]))::int AS to_score,
               count(*) FILTER (WHERE agreement_sample AND NOT has_verdict)::int AS agreement_sample,
               count(*)::int AS "all"
          FROM ranked`,
@@ -418,17 +340,11 @@ export class DebriefConsoleViewService implements OnModuleInit {
       f.category === 'needs' || f.category === 'escalated'
         ? queueOrder
         : `"createdAt" DESC`;
-    // Only the "To score" category reads the sample; an unreferenced
-    // parameter has no type and Postgres rejects the whole query.
-    const rowParams =
-      f.category === 'to_score' ? [...params] : params.slice(0, -1);
-    const rowSampleParam =
-      f.category === 'to_score' ? sampleParam : 'NULL::uuid[]';
-    rowParams.push(f.limit, f.offset);
+    const rowParams = [...params, f.limit, f.offset];
     const rows: Array<Record<string, any>> = await this.dataSource.query(
       `${base}
        SELECT * FROM ranked
-        WHERE ${this.categorySql(f.category, rowSampleParam)}
+        WHERE ${this.categorySql(f.category)}
         ORDER BY ${order}
         LIMIT $${rowParams.length - 1} OFFSET $${rowParams.length}`,
       rowParams,
@@ -442,20 +358,19 @@ export class DebriefConsoleViewService implements OnModuleInit {
         below: Number(counts?.below ?? 0),
         published: Number(counts?.published ?? 0),
         escalated: Number(counts?.escalated ?? 0),
-        toScore: viewer.scorer ? Number(counts?.to_score ?? 0) : null,
         // Only for whoever gives verdicts (the clinical advisor).
         agreementSample: viewer.can.verdict
           ? Number(counts?.agreement_sample ?? 0)
           : null,
         all: Number(counts?.all ?? 0),
       },
-      items: rows.map((r) => this.toItem(r, sample)),
+      items: rows.map((r) => this.toItem(r)),
       filterOptions: await this.filterOptions(),
       viewer: this.viewerPayload(viewer),
     };
   }
 
-  private toItem(r: Record<string, any>, sample: ScoringSample) {
+  private toItem(r: Record<string, any>) {
     const rank = Number(r.rank);
     return {
       runId: r.id,
@@ -490,10 +405,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
         (r.status === 'published' && !!r.judge_below),
       reviewed: !!r.reviewed,
       agreementSample: !!r.agreement_sample && !r.has_verdict,
-      inMyScoringSample: sample.inSample.has(r.scenarioSessionId),
-      toScore:
-        sample.inSample.has(r.scenarioSessionId) &&
-        !sample.ratedByMe.has(r.scenarioSessionId),
       waitingSince: rank < 3 ? iso(r.flag_since ?? r.createdAt) : null,
     };
   }
@@ -546,7 +457,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
   }
 
   private viewerPayload(viewer: DebriefViewer) {
-    return { roles: viewer.roles, can: viewer.can, scorer: viewer.scorer };
+    return { roles: viewer.roles, can: viewer.can };
   }
 
   // --- One session --------------------------------------------------------------------
@@ -611,7 +522,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
       comments,
       earlierComments,
       thread,
-      sample,
       queue,
       ownerSettings,
     ] = await Promise.all([
@@ -634,12 +544,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
             [run.scenarioSessionId, meta.learnerId],
           ) as Promise<Array<Record<string, any>>>)
         : Promise.resolve([] as Array<Record<string, any>>),
-      viewer.can.score
-        ? this.scoringSample(viewer.userId)
-        : Promise.resolve({
-            inSample: new Set<string>(),
-            ratedByMe: new Set<string>(),
-          }),
       this.queueIds(viewer),
       this.settings.get(),
     ]);
@@ -779,7 +683,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
       } as any,
       Number(meta?.learnerId ?? 0),
     )) as { corrections?: unknown[] };
-    const inSample = sample.inSample.has(run.scenarioSessionId);
     const pos = queue.indexOf(run.id);
     const reviewedSet = !!ws.review;
     const held = ['needs_person', 'below_bar', 'failed'].includes(run.status);
@@ -902,10 +805,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
             ),
           }
         : null,
-      scoring: {
-        inMyScoringSample: inSample,
-        scoredByMe: sample.ratedByMe.has(run.scenarioSessionId),
-      },
       queue: {
         position: pos >= 0 ? pos + 1 : null,
         total: queue.length,
@@ -937,7 +836,6 @@ export class DebriefConsoleViewService implements OnModuleInit {
           !!run.cards,
         escalate: viewer.can.escalate && run.mode === 'live' && !ws.escalation,
         verdict: viewer.can.verdict && !!run.cards && run.mode !== 'replay',
-        score: viewer.roles.clinicalAdvisor || (viewer.can.score && inSample),
         runAgain: viewer.can.releases,
       },
     };
@@ -1107,7 +1005,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         kind: 'canary_reverted',
         level: 'red',
         count: reverted.length,
-        message: `Canary reverted on its own: ${reverted[0].text}${reverted[0].canary?.reason ? ` (${reverted[0].canary.reason})` : ''}.`,
+        message: `A learner try-out was taken back on its own: ${reverted[0].text}${reverted[0].canary?.reason ? ` (${reverted[0].canary.reason})` : ''}.`,
         link: { page: 'pm_agent', ideaId: reverted[0].id },
       });
     }
@@ -1185,7 +1083,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
           level: 'red',
           count: w.conflicts.length,
           message: c
-            ? `${w.source.kind === 'code' ? 'Code release' : 'Skills Store release'} v${w.version} is waiting: it would undo ${c.changedBy?.label ?? 'a promoted change'} on ${c.what}${w.conflicts.length > 1 ? ` (and ${w.conflicts.length - 1} more)` : ''}.`
+            ? `${w.source.kind === 'code' ? 'Code release' : 'Skills Store release'} v${w.version} is waiting: it would undo ${c.changedBy?.label ?? 'a change put live for everyone'} on ${c.what}${w.conflicts.length > 1 ? ` (and ${w.conflicts.length - 1} more)` : ''}.`
             : `Release v${w.version} is waiting: it does not pass the release checks.`,
           link: { page: 'pm_agent', releaseId: w.id } as any,
         });
@@ -1262,8 +1160,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
   // --- Analytics › Debriefs --------------------------------------------------------------
 
   /**
-   * The tiles that moved from the console, the cost panel and judge
-   * agreement (the calibration page's numbers) for Analytics › Debriefs.
+   * The tiles that moved from the console, the cost panel and agreement
+   * with the clinical advisor's answers for Analytics › Debriefs.
    */
   async analytics(days: number) {
     const overview = await this.console.overview(days);
@@ -1300,12 +1198,11 @@ export class DebriefConsoleViewService implements OnModuleInit {
       `${base} SELECT count(*) FILTER (WHERE rank < 3)::int AS n FROM ranked`,
       params,
     );
-    let agreement: Record<string, any> | null = null;
-    try {
-      agreement = await (await this.calibration()).getAgreement();
-    } catch {
-      agreement = null;
-    }
+    // Agreement between the independent check (the judge) and the clinical
+    // advisor's yes/no answers under their verdicts: the same numbers as
+    // Settings › What the PM agent may do alone (hand scoring was removed
+    // 2026-11-12).
+    const agreement = await this.agreement.view().catch(() => null);
     return {
       windowDays: days,
       tiles: {
@@ -1355,29 +1252,19 @@ export class DebriefConsoleViewService implements OnModuleInit {
       judgeAgreement: agreement
         ? {
             gate: agreement.gate,
-            target: agreement.target,
-            debriefsRated: agreement.coverage?.debriefs ?? 0,
-            ratings: agreement.coverage?.ratings ?? 0,
-            peopleRating: agreement.coverage?.raters ?? 0,
-            // κ per dimension and agreement by rubric part (within one point).
-            dimensions: Object.entries(
-              (agreement.judgeVsHuman?.dimensions ?? {}) as Record<string, any>,
-            ).map(([dimension, a]) => ({
-              dimension,
-              kappa: a.weightedKappa ?? null,
-              withinOnePct: a.withinOnePct ?? null,
-              meanDifference: a.meanDifference ?? null,
-              pairs: a.pairs ?? 0,
+            /** κ each measure needs (0.6) and the reviews it needs first (50). */
+            kappa: agreement.kappa,
+            minReviews: agreement.minReviews,
+            measures: agreement.measures.map((m) => ({
+              measure: m.measure,
+              n: m.n,
+              kappa: m.kappa,
+              agreementPct: m.agreementPct,
+              recallOnNo: m.recallOnNo,
+              state: m.state,
+              passes: m.passes,
             })),
-            hardFails: Object.entries(
-              (agreement.judgeVsHuman?.hardFails ?? {}) as Record<string, any>,
-            ).map(([code, a]) => ({
-              code,
-              kappa: a.kappa ?? null,
-              pairs: a.pairs ?? 0,
-            })),
-            humanVsHuman: agreement.humanVsHuman ?? null,
-            expertVerdicts: agreement.expertVerdicts ?? null,
+            sample: agreement.sample,
           }
         : null,
     };

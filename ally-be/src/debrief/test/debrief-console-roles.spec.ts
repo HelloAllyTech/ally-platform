@@ -4,7 +4,6 @@ import { PermissionsGuard } from '../../auth/guards/permissions.guard';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { DebriefConsoleController } from '../controller/debrief-console.controller';
 import { DebriefReviewController } from '../controller/debrief-review.controller';
-import { DebriefCalibrationController } from '../../analytics/controller/debrief-calibration.controller';
 import {
   canDecideFlag,
   debriefCan,
@@ -134,23 +133,15 @@ describe('Debrief console role gating', () => {
       'addComment',
       'editComment',
       'resolveComment',
-      'score',
       'resolveFlag',
       'approvePinnedRule',
     ]) {
       expect(await allowed(ADVISOR, C, h)).toBe(true);
     }
+    // Score by hand is gone (2026-11-12): no route left for anyone.
     expect(
-      await allowed(ADVISOR, DebriefCalibrationController, 'getItem'),
-    ).toBe(true);
-    // The Ally team keeps scoring (in the sample) on platform access.
-    expect(await allowed(TEAM, DebriefCalibrationController, 'getItem')).toBe(
-      true,
-    );
-    expect(await allowed(TEAM, C, 'score')).toBe(true);
-    expect(await allowed(NOBODY, DebriefCalibrationController, 'getItem')).toBe(
-      false,
-    );
+      (C.prototype as unknown as Record<string, unknown>).score,
+    ).toBeUndefined();
     // The team's own actions stay on system:access.
     for (const h of ['publishRun', 'escalateFlag', 'proposeChange']) {
       expect(await allowed(ADVISOR, C, h)).toBe(false);
@@ -199,7 +190,6 @@ describe('Debrief console role gating', () => {
       flagDecision: true,
       heldDebrief: false,
       verdict: true,
-      score: true,
       approvePinnedRule: true,
       pmAgent: false,
     });

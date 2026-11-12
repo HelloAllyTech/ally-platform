@@ -98,8 +98,8 @@ export const riskCueTurnsOf = (run: {
  * Expert review (debrief orchestrator spec Part B): clinical experts read a
  * run's transcript beside the cards the learner read, comment on exact lines
  * and give a verdict. Comments are the PM agent's main signal (read through
- * the gateway, `commentsForAgent`); verdicts calibrate the judge (read by
- * `DebriefCalibrationService.getAgreement`). Learners never see any of it.
+ * the gateway, `commentsForAgent`); the yes/no answers under a verdict
+ * measure the judge (`DebriefAgreementService`). Learners never see any of it.
  *
  * Reviewers work across organisations, so these reads are deliberately
  * platform-wide: every caller is a Debrief Console route behind its role

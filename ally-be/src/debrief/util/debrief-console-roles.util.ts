@@ -32,8 +32,6 @@ export const DEBRIEF_ACTIONS = {
   escalate: [TEAM, OWNER],
   /** Expert verdict and hard fails. */
   verdict: [ADVISOR],
-  /** Score by hand (the Ally team: only sessions in the scoring sample). */
-  score: [TEAM, ADVISOR],
   /** PM agent: approve, promote, reject, try it, ask a question, run now; propose a pinned rule. */
   pmAgent: [TEAM, OWNER],
   approvePinnedRule: [ADVISOR, OWNER],
@@ -120,8 +118,6 @@ export interface DebriefViewer {
   userId: number;
   roles: DebriefViewerRoles;
   can: DebriefCan;
-  /** Scores by hand: the clinical advisor, or anyone who has rated before. */
-  scorer: boolean;
 }
 
 /**

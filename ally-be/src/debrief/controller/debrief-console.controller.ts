@@ -380,24 +380,6 @@ class EmergencyStopDto {
   reason!: string;
 }
 
-class ScoreDto {
-  @ApiProperty({ description: 'dimension -> 0..10' })
-  @IsObject()
-  scores!: Record<string, number>;
-
-  @ApiProperty({ type: [String] })
-  @IsArray()
-  @ArrayMaxSize(10)
-  @IsString({ each: true })
-  hardFails!: string[];
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  note?: string;
-}
-
 class StepEditDto {
   @ApiProperty({
     description:
@@ -639,18 +621,8 @@ export class DebriefConsoleController {
   @Put('settings')
   @DebriefAct('ownerSettings')
   @ApiOperation({ summary: 'Change owner settings (audited)' })
-  async updateSettings(
-    @Req() req: AuthedRequest,
-    @Body() body: SettingsChangeDto,
-  ) {
-    const after = await this.settings.update(body.changes, req.user.id);
-    // The old quick-test switch now lives in the autonomy policy's quick-test column.
-    if (body.changes && 'pmAgentStartsQuickTests' in body.changes) {
-      await this.autonomy.mirrorLegacyQuickTestSwitch(
-        after.pmAgentStartsQuickTests,
-      );
-    }
-    return after;
+  updateSettings(@Req() req: AuthedRequest, @Body() body: SettingsChangeDto) {
+    return this.settings.update(body.changes, req.user.id);
   }
 
   @Post('settings/accept')
@@ -910,14 +882,14 @@ export class DebriefConsoleController {
   })
   async me(@Req() req: AuthedRequest) {
     const v = await this.view.viewer(req.user.id);
-    return { userId: v.userId, roles: v.roles, can: v.can, scorer: v.scorer };
+    return { userId: v.userId, roles: v.roles, can: v.can };
   }
 
   @Get('sessions')
   @DebriefRead()
   @ApiOperation({
     summary:
-      'The home list: a category (needs / flagged / below / published / escalated / to_score / all), filters, queue order and counts',
+      'The home list: a category (needs / flagged / below / published / escalated / agreement_sample / all), filters, queue order and counts',
   })
   async sessions(
     @Req() req: AuthedRequest,
@@ -980,24 +952,6 @@ export class DebriefConsoleController {
       body.correction,
       body.note,
       req.user.id,
-    );
-  }
-
-  @Post('sessions/:sessionId/score')
-  @DebriefAct('score')
-  @ApiOperation({
-    summary:
-      'Score by hand (clinical advisor; the Ally team only in the scoring sample). Feeds the κ gate',
-  })
-  async score(
-    @Param('sessionId', ParseUUIDPipe) sessionId: string,
-    @Req() req: AuthedRequest,
-    @Body() body: ScoreDto,
-  ) {
-    return this.view.score(
-      sessionId,
-      await this.view.viewer(req.user.id),
-      body,
     );
   }
 

@@ -8,6 +8,12 @@ import { parseSessionFilters } from '../util/debrief-console-view.util';
  * the Debriefs home list answered 500.
  */
 describe('DebriefConsoleViewService.sessions parameters', () => {
+  it('an old "to_score" link falls back to Needs a person (Score by hand is gone)', () => {
+    expect(parseSessionFilters({ category: 'to_score' }).category).toBe(
+      'needs',
+    );
+  });
+
   const referenced = (sql: string) =>
     new Set([...sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1])));
 
@@ -20,18 +26,12 @@ describe('DebriefConsoleViewService.sessions parameters', () => {
       }),
     };
     const svc = new (DebriefConsoleViewService as any)(dataSource);
-    // No calibration service in this test: the sample is empty.
-    svc.scoringSample = async () => ({
-      inSample: new Set(['a']),
-      ratedByMe: new Set(),
-    });
     return { svc, calls };
   };
   const viewer = {
     userId: 1,
     roles: {},
-    can: { score: true },
-    scorer: true,
+    can: { verdict: true },
   } as any;
 
   for (const category of [
@@ -40,7 +40,7 @@ describe('DebriefConsoleViewService.sessions parameters', () => {
     'below',
     'published',
     'escalated',
-    'to_score',
+    'agreement_sample',
     'all',
   ]) {
     it(`references every parameter it sends (${category})`, async () => {
@@ -71,15 +71,10 @@ describe('DebriefConsoleViewService queue: urgent flags skip the undo window', (
         return [];
       }),
     });
-    svc.scoringSample = async () => ({
-      inSample: new Set(),
-      ratedByMe: new Set(),
-    });
     await svc.sessions(parseSessionFilters({ category: 'needs' }), {
       userId: 1,
       roles: {},
-      can: { score: false },
-      scorer: false,
+      can: {},
     } as any);
     const sql = calls[0].replace(/\s+/g, ' ');
     expect(sql).toContain(

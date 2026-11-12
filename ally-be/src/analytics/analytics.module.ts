@@ -165,8 +165,6 @@ import { FeedbackGroundednessRepository } from './repository/feedback-groundedne
 // debrief quality bar is read from.
 import { DebriefQualityJudgeService } from './service/debrief-quality-judge.service';
 import { DebriefQualityRepository } from './repository/debrief-quality.repository';
-import { DebriefCalibrationService } from './service/debrief-calibration.service';
-import { DebriefCalibrationController } from './controller/debrief-calibration.controller';
 import { RagQualityJudgeService } from './service/rag-quality-judge.service';
 import { RagQualityAnalyticsService } from './service/rag-quality-analytics.service';
 import { RagQualityAnalyticsRepository } from './repository/rag-quality-analytics.repository';
@@ -206,11 +204,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     // tenant population (RSI loop, judge-side wiring).
     LanguageModule,
   ],
-  controllers: [
-    AnalyticsController,
-    TenantAnalyticsController,
-    DebriefCalibrationController,
-  ],
+  controllers: [AnalyticsController, TenantAnalyticsController],
   providers: [
     AnalyticsService,
     WeakMetricsAnalyticsService,
@@ -219,7 +213,6 @@ import { TenantModule } from 'src/tenant/tenant.module';
     FeedbackGroundednessRepository,
     DebriefQualityJudgeService,
     DebriefQualityRepository,
-    DebriefCalibrationService,
     RagQualityJudgeService,
     RagQualityRepository,
     RagQualityAnalyticsService,
