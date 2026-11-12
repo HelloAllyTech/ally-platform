@@ -95,5 +95,10 @@ describe("NotificationBell", () => {
       notificationHref(N({ data: { screen: "DebriefConsole", releaseId: "r3" } }) as never),
     ).toBe("/debriefs/pm-agent?view=releases&releaseId=r3");
     expect(notificationHref(N({ data: { screen: "Simulations" } }) as never)).toBeNull();
+    expect(
+      notificationHref(
+        N({ data: { screen: "DebriefConsole", settings: "autonomy", kind: "prompts" } }) as never,
+      ),
+    ).toBe("/debriefs/settings#autonomy");
   });
 });

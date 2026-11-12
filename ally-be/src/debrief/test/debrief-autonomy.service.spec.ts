@@ -25,14 +25,15 @@ function build(stored: Record<string, any> | null = null) {
     })),
   };
   const audit = { log: jest.fn() };
+  const notifier = { owner: jest.fn(async () => 1) };
   const service = new DebriefAutonomyService(
     {} as any,
     rows as any,
     settings as any,
     audit as any,
-    {} as any,
+    { get: jest.fn(() => notifier) } as any,
   );
-  return { service, row, audit };
+  return { service, row, audit, notifier };
 }
 
 describe('DebriefAutonomyService', () => {
@@ -54,13 +55,11 @@ describe('DebriefAutonomyService', () => {
 
   it('with no calibration yet, the tests learners never see may still run on their own; the canary may not', async () => {
     const { service, row } = build();
-    jest
-      .spyOn(service, 'facts')
-      .mockResolvedValue(
-        facts({
-          gate: { met: false, failing: [{ measure: 'accuracy', kappa: null }] },
-        }),
-      );
+    jest.spyOn(service, 'facts').mockResolvedValue(
+      facts({
+        gate: { met: false, failing: [{ measure: 'accuracy', kappa: null }] },
+      }),
+    );
     await service.setMatrix(
       [
         { kind: 'settings', step: 'quick_test', value: 'auto' },
@@ -91,6 +90,54 @@ describe('DebriefAutonomyService', () => {
     expect(row.autonomy.matrix.settings.quick_test).toBe('auto');
     expect(row.autonomy.matrix.prompts.quick_test).toBe('auto');
     expect(row.autonomy.matrix.prompts.canary).not.toBe('auto');
+  });
+
+  it('a judge agreement below 0.6 drops a canary on its own back to asks first, recorded and told to the owner', async () => {
+    const { service, row, notifier } = build();
+    jest.spyOn(service, 'facts').mockResolvedValue(facts());
+    await service.setMatrix(
+      [{ kind: 'prompts', step: 'canary', value: 'auto' }],
+      7,
+    );
+    const f = facts({
+      gate: { met: false, failing: [{ measure: 'accuracy', kappa: 0.5 }] },
+    });
+    await service.refreshRelocks(f);
+    expect(row.autonomy.matrix.prompts.canary).toBe('ask');
+    // The tests learners never see are not touched by κ.
+    expect(row.autonomy.matrix.prompts.quick_test).toBe('auto');
+    expect(row.autonomy.relocks.at(-1)).toMatchObject({
+      kind: 'prompts',
+      steps: ['canary'],
+      by: 'system',
+      reason: 'judge agreement fell below 0.6',
+    });
+    expect(notifier.owner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Prompts, agents and default plans: back to asks first',
+        body: expect.stringContaining('Canary back to "Asks first"'),
+        data: { settings: 'autonomy', kind: 'prompts' },
+      }),
+    );
+  });
+
+  it('tells the owner once when a canary can run on its own, and never switches it on', async () => {
+    const { service, row, notifier } = build();
+    await service.refreshRelocks(facts({ gate: { met: false, failing: [] } }));
+    expect(notifier.owner).not.toHaveBeenCalled();
+    await service.refreshRelocks(facts());
+    expect(row.autonomy.matrix.settings.canary).toBe('ask');
+    expect(row.autonomy.matrix.prompts.canary).toBe('ask');
+    expect(notifier.owner).toHaveBeenCalledTimes(2);
+    expect(notifier.owner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Canary can now run on its own for settings (not budgets)',
+        body: expect.stringContaining('Turn it on?'),
+        data: { settings: 'autonomy', kind: 'settings' },
+      }),
+    );
+    await service.refreshRelocks(facts());
+    expect(notifier.owner).toHaveBeenCalledTimes(2);
   });
 
   it('accepts "auto" for an eligible kind and audits it', async () => {

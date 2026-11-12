@@ -365,6 +365,7 @@ type WaitingRelease = {
                  cells: Record<Step, 'auto'|'ask'|'off'>;
                  eligible: boolean; reason: string;      // the canary's (the κ gate's step)
                  eligibility: Record<Step, { eligible: boolean; reason: string }>;
+                 relock: { at; reason; steps: Step[]; by: 'system' } | null;  // latest system re-lock still asking first
                  relockedAt: string|null; relockReason: string|null }>;
   orgs: Array<{ tenantId; tenantName; live: boolean;
                 overrides: { paired_trial; canary: 'default'|'ask'|'never' } }>;
@@ -385,7 +386,12 @@ so `settings` and `prompts` may be `auto` there whatever κ is, as long as the t
 clean (still owner-set, budget-capped and behind `pmAgentEnabled`). **Canary** reaches learners:
 `auto` there also needs κ ≥ 0.6 on the gated measures. Promotion is always a person; pinned rules
 never. The old `pmAgentStartsQuickTests` switch mirrors into the quick-test column under the same
-rule (no κ gate). A kind
+rule (no κ gate). If κ falls below 0.6 while a canary is `auto`, the system sets that canary
+back to `ask`. Every system re-lock records the cells, the reason and `by: 'system'`, and the
+owner gets an in-app notification (`DEBRIEF_OWNER_ALERT`, `data.settings: 'autonomy'`, opening
+Settings › autonomy). When a kind's canary becomes eligible (κ ≥ 0.6, clean record), the owner is
+told once ("Canary can now run on its own for …. Turn it on?"); it is never switched on for them.
+Both run in the `debrief-autonomy-relock` schedule and whenever `GET autonomy` is read. A kind
 re-locks by itself (its `auto` cells become `ask`, with the reason recorded) after 2 canary
 reverts in 4 weeks or a failed monthly sealed baseline. **Judge drift** comes from the nightly
 evaluator job (Release 2). Until then it reads "not measured" and never blocks or re-locks.

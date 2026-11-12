@@ -264,8 +264,20 @@ export type AutonomyMatrix = Record<
 export interface AutonomyPolicy {
   matrix: AutonomyMatrix;
   orgs: Record<string, Partial<Record<OrgPolicyStep, OrgPolicy>>>;
-  /** Why a kind was dropped back to "ask" on its own, newest last. */
-  relocks: Array<{ kind: ChangeKind; at: string; reason: string }>;
+  /** Why a kind was dropped back to "ask" on its own (by the system), newest last. */
+  relocks: Array<{
+    kind: ChangeKind;
+    at: string;
+    reason: string;
+    /** The cells it set to "ask" (older entries: every auto cell of the kind). */
+    steps?: AutonomyStep[];
+    by?: 'system';
+  }>;
+  /**
+   * Whether each kind's canary could run on its own when last checked, so the
+   * owner is told once when it becomes possible (never switched on for them).
+   */
+  canaryEligible?: Partial<Record<ChangeKind, boolean>>;
 }
 
 /**
@@ -314,10 +326,16 @@ export function normaliseAutonomy(
     }
     if (Object.keys(clean).length) orgs[org] = clean;
   }
+  const canaryEligible: Partial<Record<ChangeKind, boolean>> = {};
+  for (const kind of CONFIGURABLE_KINDS) {
+    const v = stored?.canaryEligible?.[kind];
+    if (typeof v === 'boolean') canaryEligible[kind] = v;
+  }
   return {
     matrix,
     orgs,
     relocks: Array.isArray(stored?.relocks) ? stored!.relocks.slice(-50) : [],
+    canaryEligible,
   };
 }
 

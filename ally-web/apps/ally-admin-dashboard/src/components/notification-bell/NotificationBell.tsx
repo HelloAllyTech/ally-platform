@@ -23,6 +23,8 @@ export const notificationHref = (n: AppNotification): string | null => {
   if (d.screen !== "DebriefConsole") return null;
   if (typeof d.runId === "string") return ROUTES.DEBRIEF_SESSION(d.runId);
   if (typeof d.ideaId === "string") return `${ROUTES.DEBRIEFS_PM_AGENT}?idea=${d.ideaId}`;
+  // Autonomy: the canary can now run alone, or the system set a cell back to asks first.
+  if (d.settings === "autonomy") return `${ROUTES.DEBRIEFS_SETTINGS}#autonomy`;
   if (typeof d.releaseId === "string") {
     return `${ROUTES.DEBRIEFS_PM_AGENT}?view=releases&releaseId=${d.releaseId}`;
   }

@@ -39,6 +39,19 @@ import { DebriefSettingsService } from './debrief-settings.service';
  * `pmAgentEnabled` stays the master switch. Promoting to everyone, Builder
  * hand-offs and bug reports always wait for a person: they are not steps here.
  */
+/** The kinds and steps in the owner's words (Settings › What the PM agent may do alone). */
+const KIND_WORDS: Record<ChangeKind, string> = {
+  settings: 'Settings (not budgets)',
+  prompts: 'Prompts, agents and default plans',
+  pinned_rules: 'Pinned rules',
+};
+const STEP_WORDS: Record<AutonomyStep, string> = {
+  quick_test: 'Quick test',
+  gate_test: 'Gate test',
+  paired_trial: 'Paired trial',
+  canary: 'Canary',
+};
+
 @Injectable()
 export class DebriefAutonomyService implements OnModuleInit {
   private readonly logger = LoggerService.getInstance(
@@ -201,27 +214,99 @@ export class DebriefAutonomyService implements OnModuleInit {
   }
 
   /**
-   * Re-lock on its own: a kind whose track record broke drops every "auto"
-   * cell to "ask", and the reason is recorded. Going back takes the owner.
+   * Re-lock on its own: a kind whose track record broke (2 canary reverts in
+   * 4 weeks, a failed baseline, judge drift) drops every "auto" cell to
+   * "ask"; a judge agreement below 0.6 drops the canary alone (the only step
+   * the κ gate applies to). Each re-lock records the cells, the reason and
+   * that the system set it, and tells the owner. Going back takes the owner.
+   *
+   * It also tells the owner, once, when a kind's canary becomes able to run on
+   * its own (κ ≥ 0.6, clean record): an invitation, never switched on here.
    */
   async refreshRelocks(facts?: AutonomyFacts): Promise<AutonomyPolicy> {
     const f = facts ?? (await this.facts());
     const policy = await this.policy();
     let changed = false;
+    const relocked: Array<{
+      kind: ChangeKind;
+      steps: AutonomyStep[];
+      reason: string;
+    }> = [];
+    const nowEligible: ChangeKind[] = [];
     for (const kind of CONFIGURABLE_KINDS) {
-      const reason = relockReason(kind, f);
-      if (!reason) continue;
-      const auto = AUTONOMY_STEPS.filter(
-        (s) => policy.matrix[kind][s] === 'auto',
-      );
-      if (!auto.length) continue;
-      for (const s of auto) policy.matrix[kind][s] = 'ask';
-      policy.relocks.push({ kind, at: new Date().toISOString(), reason });
-      changed = true;
-      this.logger.warn(`[debrief] autonomy: ${kind} re-locked: ${reason}`);
+      const record = relockReason(kind, f);
+      const steps = record
+        ? AUTONOMY_STEPS.filter((s) => policy.matrix[kind][s] === 'auto')
+        : !f.gate.met && policy.matrix[kind].canary === 'auto'
+          ? (['canary'] as AutonomyStep[])
+          : [];
+      const reason = record ?? 'judge agreement fell below 0.6';
+      if (steps.length) {
+        for (const s of steps) policy.matrix[kind][s] = 'ask';
+        policy.relocks.push({
+          kind,
+          at: new Date().toISOString(),
+          reason,
+          steps,
+          by: 'system',
+        });
+        relocked.push({ kind, steps, reason });
+        changed = true;
+        this.logger.warn(`[debrief] autonomy: ${kind} re-locked: ${reason}`);
+      }
+      const eligible = kindEligibility(kind, f, 'canary').eligible;
+      const before = policy.canaryEligible?.[kind];
+      if (before !== eligible) {
+        policy.canaryEligible = {
+          ...(policy.canaryEligible ?? {}),
+          [kind]: eligible,
+        };
+        changed = true;
+        // Told only on a change to eligible (not on the first check after deploy).
+        if (
+          eligible &&
+          before === false &&
+          policy.matrix[kind].canary !== 'auto'
+        ) {
+          nowEligible.push(kind);
+        }
+      }
     }
     if (changed) await this.save(policy);
+    for (const r of relocked) {
+      await this.notifyOwner({
+        title: `${KIND_WORDS[r.kind]}: back to asks first`,
+        body: `The system set ${r.steps.map((s) => STEP_WORDS[s]).join(', ')} back to "Asks first": ${r.reason}. Turning it back on is up to you in Debrief settings.`,
+        data: { settings: 'autonomy', kind: r.kind },
+      });
+    }
+    for (const kind of nowEligible) {
+      await this.notifyOwner({
+        title: `Canary can now run on its own for ${KIND_WORDS[kind].toLowerCase()}`,
+        body: `Canary can now run on its own for ${KIND_WORDS[kind].toLowerCase()}. Turn it on? It stays "Asks first" until you change it in Debrief settings.`,
+        data: { settings: 'autonomy', kind },
+      });
+    }
     return policy;
+  }
+
+  private async notifyOwner(alert: {
+    title: string;
+    body: string;
+    data: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      const { DebriefNotifier } =
+        await import('./debrief-notifier.service');
+      const notifier = this.moduleRef.get(DebriefNotifier, {
+        strict: false,
+      });
+      await notifier.owner(alert);
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] autonomy: owner notification failed: ${(e as Error).message}`,
+      );
+    }
   }
 
   // --- The owner's changes ----------------------------------------------------------
@@ -328,6 +413,13 @@ export class DebriefAutonomyService implements OnModuleInit {
       eligibility: Record<AutonomyStep, { eligible: boolean; reason: string }>;
       relockedAt: string | null;
       relockReason: string | null;
+      /** The latest re-lock by the system whose cells still ask first (shown in the row). */
+      relock: {
+        at: string;
+        reason: string;
+        steps: AutonomyStep[];
+        by: 'system';
+      } | null;
     }>;
     orgs: Array<{
       tenantId: string;
@@ -370,6 +462,20 @@ export class DebriefAutonomyService implements OnModuleInit {
           eligibility: stepEligibility(kind, f),
           relockedAt: last?.at ?? null,
           relockReason: last?.reason ?? null,
+          relock: (() => {
+            if (!last) return null;
+            const steps = (last.steps ?? AUTONOMY_STEPS.slice()).filter(
+              (st) => policy.matrix[kind][st] === 'ask',
+            );
+            return steps.length
+              ? {
+                  at: last.at,
+                  reason: last.reason,
+                  steps,
+                  by: 'system' as const,
+                }
+              : null;
+          })(),
         };
       }),
       orgs: tenants.map((t) => {
