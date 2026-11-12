@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
   Optional,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
@@ -15,6 +16,7 @@ import {
   DEBRIEF_MODELS,
   DEBRIEF_REGISTRY_AGENTS,
   DEBRIEF_REPLY_DEFAULT,
+  DEBRIEF_SEED_BUNDLE,
   providerOfModel,
   DebriefBundle,
   DebriefStep,
@@ -35,6 +37,16 @@ import {
   withPinnedPrompts,
 } from '../util/debrief-releases.util';
 import { DebriefRunnerService } from './debrief-runner.service';
+import { AgentReleaseAuthorKind } from '../../llm-agent/harness/enum/harness.enum';
+import {
+  describePath,
+  leaves,
+  mergeCodeRelease,
+} from '../util/debrief-code-merge.util';
+import {
+  onPromptPublished,
+  PromptPublishedEvent,
+} from '../../prompt/util/prompt-published.events';
 import { DebriefNotifier } from './debrief-notifier.service';
 
 /** The bundle a release really runs: unpinned prompts at the versions recorded for it (plan §8.8). */
@@ -43,6 +55,44 @@ const eff = (r: Record<string, any>) =>
     r.bundle as DebriefBundle,
     r.changeSet?.pinnedPrompts as Record<string, number> | undefined,
   );
+
+/** The deploy's tag for a code release (the image's version), when known. */
+const codeTag = (): string | null =>
+  process.env.APP_VERSION ?? process.env.npm_package_version ?? null;
+
+/** A waiting release as the Releases page and the attention item show it. */
+export function waitingView(w: {
+  id: string;
+  version: number;
+  title: string;
+  source: Record<string, any>;
+  conflicts: any[];
+  problems: string[];
+}) {
+  return {
+    id: w.id,
+    version: w.version,
+    title: w.title,
+    source: {
+      kind: w.source.kind as 'skills_store' | 'code',
+      by: w.source.by ?? null,
+      tag: w.source.tag ?? null,
+      promptCode: w.source.promptCode ?? null,
+      from: w.source.from ?? null,
+      to: w.source.to ?? null,
+      note: w.source.note ?? null,
+    },
+    // The promoted changes it would undo.
+    wouldUndo: w.conflicts.map((c: Record<string, any>) => ({
+      path: c.path as string,
+      what: c.what as string,
+      live: c.live ?? null,
+      wouldBecome: c.code ?? null,
+      changedBy: c.changedBy ?? null,
+    })),
+    problems: w.problems,
+  };
+}
 
 const num = (v: unknown, d = 2) =>
   v == null || !Number.isFinite(Number(v))
@@ -97,7 +147,7 @@ interface LivePeriod {
  * the same ladder as the PM agent's ideas.
  */
 @Injectable()
-export class DebriefReleasesService {
+export class DebriefReleasesService implements OnModuleInit {
   constructor(
     private readonly dataSource: DataSource,
     private readonly releases: AgentReleaseService,
@@ -182,8 +232,26 @@ export class DebriefReleasesService {
         proposedBy: idea.change?.ideaKind === 'release' ? 'person' : 'pm_agent',
       };
     }
-    if (r.authorKind === 'seed') {
-      return { kind: 'code' as const, tag: r.notes ?? null };
+    const src = r.changeSet?.source as Record<string, any> | undefined;
+    if (src?.kind === 'skills_store') {
+      return {
+        kind: 'skills_store' as const,
+        by: src.by
+          ? { id: Number(src.by), name: r.createdByName ?? null }
+          : null,
+        promptCode: src.promptCode as string,
+        from: (src.from as number | null) ?? null,
+        to: src.to as number,
+        note: (src.note as string | null) ?? null,
+      };
+    }
+    if (src?.kind === 'code' || r.authorKind === 'seed') {
+      return {
+        kind: 'code' as const,
+        tag: (src?.tag as string | null) ?? null,
+        promptCode: (src?.promptCode as string | null) ?? null,
+        note: r.notes ?? null,
+      };
     }
     return {
       kind: 'settings_change' as const,
@@ -214,51 +282,12 @@ export class DebriefReleasesService {
     const versions = new Map(
       rows.map((r) => [r.id as string, Number(r.version)]),
     );
-    // Drafts the code made ("the defaults in code changed") once people were
-    // involved: they wait for a person to put them live, so they show here.
-    const codeDrafts: Array<Record<string, any>> = await this.dataSource.query(
-      `SELECT id, version, notes, "createdAt" FROM agent_releases
-        WHERE "agentKey" = $1 AND "authorKind" = 'seed' AND status = 'draft'
-        ORDER BY version DESC`,
-      [DEBRIEF_AGENT_KEY],
-    );
     return {
       items: rows.map((r) => this.summary(r, periods, ideas, versions)),
-      pendingCodeDrafts: codeDrafts.map((d) => ({
-        id: d.id as string,
-        version: Number(d.version),
-        note: d.notes ?? null,
-        createdAt: iso(d.createdAt),
-      })),
+      // Releases from the Skills Store or code that wait because they would
+      // undo a promoted change: Promote (accept the overwrite) or Dismiss.
+      waiting: (await this.waitingReleases()).map((w) => waitingView(w)),
     };
-  }
-
-  /**
-   * Put a code release live (a seed draft: "the defaults in code changed").
-   * Code releases skip the ladder, as the seed always has; only seed drafts.
-   */
-  async promoteCodeDraft(id: string, userId: number, note?: string) {
-    const r = await this.releases.getById(id);
-    if (
-      r.agentKey !== DEBRIEF_AGENT_KEY ||
-      r.authorKind !== 'seed' ||
-      r.status !== 'draft'
-    ) {
-      throw new ConflictException('only a code release waiting as a draft');
-    }
-    const live = await this.releases.makeGa(
-      id,
-      userId,
-      AgentReleaseAuditAction.PROMOTED,
-      note,
-    );
-    await this.notifier?.owner({
-      title: `Debriefs: code release v${live.version} is live`,
-      body: note ?? 'A person put the code release live.',
-      data: { releaseId: id },
-      excludeUserId: userId,
-    });
-    return { id: live.id, version: live.version };
   }
 
   private summary(
@@ -304,7 +333,7 @@ export class DebriefReleasesService {
       status: r.status === 'ga' ? ('live' as const) : ('retired' as const),
       title: (idea?.text as string) ?? r.notes ?? `Release v${r.version}`,
       summary:
-        (r.changeSet?.notes?.summary as string | undefined) ??
+        (r.changeSet?.source?.note as string | undefined) ??
         (idea?.evidence?.hypothesis as string | undefined) ??
         (idea?.evidence?.why as string | undefined) ??
         null,
@@ -361,9 +390,11 @@ export class DebriefReleasesService {
         beforeLive: {
           ladder: ladderOf(
             idea,
-            r.authorKind === 'seed'
-              ? 'seed release: code releases skip the ladder'
-              : 'made before releases went through the ladder',
+            r.changeSet?.source?.kind === 'skills_store'
+              ? 'skipped (Skills Store edit)'
+              : r.changeSet?.source?.kind === 'code' || r.authorKind === 'seed'
+                ? 'skipped (code release)'
+                : 'made before releases went through the ladder',
           ),
           ideaId: idea?.id ?? null,
         },
@@ -400,12 +431,6 @@ export class DebriefReleasesService {
   ) {
     const bundle = eff(r);
     const diff = bundleDiff(previous, bundle);
-    const written = (r.changeSet?.notes ?? null) as {
-      summary?: string | null;
-      changes?: Array<Record<string, string | null>>;
-      writtenBy?: number;
-      writtenAt?: string;
-    } | null;
     let why: string | null = null;
     let what: string | null = null;
     let proposer: string | null = null;
@@ -426,6 +451,12 @@ export class DebriefReleasesService {
           ev.problem?.summary ?? ev.hypothesis ?? ev.evidence ?? null;
         why = `${problem ? `${problem} ` : ''}(idea ${idea.id})`;
       }
+    } else if (r.changeSet?.source) {
+      const src = r.changeSet.source as Record<string, any>;
+      what = src.promptCode
+        ? `${promptLabel(src.promptCode)} prompt v${src.from ?? '?'} → v${src.to}`
+        : `Code defaults${src.tag ? ` · ${src.tag}` : ''}`;
+      why = src.note ?? 'No note written';
     } else if (r.authorKind !== 'seed' && r.notes) {
       what = r.notes;
       why = r.createdByName ? `Changed by ${r.createdByName}` : null;
@@ -447,7 +478,7 @@ export class DebriefReleasesService {
       why: string | null;
       before: string | null;
       after: string | null;
-      source: 'diff' | 'written';
+      source: 'diff';
     }> = [];
     for (const p of diff.prompts) {
       const [b, a] = await Promise.all([
@@ -538,86 +569,45 @@ export class DebriefReleasesService {
           'the versions live when the record was made (migration 1981900750000) are what it restores.',
         before: null,
         after: null,
-        source: 'written',
+        source: 'diff',
       });
     }
-    for (const c of written?.changes ?? []) {
+    const merge = r.changeSet?.merge as Record<string, any> | undefined;
+    for (const c of (merge?.conflicts ?? []) as Array<Record<string, any>>) {
       changes.push({
-        area: c.area ?? 'Code',
-        what: c.what ?? null,
-        why: c.why ?? null,
-        before: c.before ?? null,
-        after: c.after ?? null,
-        source: 'written',
+        area: 'Would undo a promoted change',
+        what: `${c.changedBy?.label ?? 'A promoted change'} on ${c.what}`,
+        why: 'A Skills Store or code release never overwrites a promoted change without a person',
+        before: JSON.stringify(c.live ?? null),
+        after: JSON.stringify(c.code ?? null),
+        source: 'diff',
       });
     }
-    const summary =
-      written?.summary ??
-      (idea
-        ? (idea.evidence?.hypothesis ?? idea.evidence?.why ?? idea.text ?? null)
+    if (merge?.keptFromLive?.length) {
+      changes.push({
+        area: 'Carried forward',
+        what: `Kept ${merge.keptFromLive.length} promoted change(s): ${(merge.keptFromLive as string[]).map(describePath).join(', ')}`,
+        why: 'Promoted changes this release does not touch stay as they are',
+        before: null,
+        after: null,
+        source: 'diff',
+      });
+    }
+    const src = r.changeSet?.source as Record<string, any> | undefined;
+    const summary = idea
+      ? (idea.evidence?.hypothesis ?? idea.evidence?.why ?? idea.text ?? null)
+      : src
+        ? `${what}${src.note ? `: ${src.note}` : ''}`
         : r.authorKind !== 'seed'
           ? (r.notes ?? null)
-          : null);
+          : null;
     return {
       summary,
       changes,
-      // A code release with nothing written: the UI says "No notes written".
-      written: r.authorKind === 'seed' ? !!written : true,
-      writtenBy: written?.writtenBy ?? null,
-      writtenAt: written?.writtenAt ?? null,
-      canWrite: r.authorKind === 'seed',
+      // Notes are derived from the idea, the proposer or the Skills Store
+      // note; with none, `why` says "No note written".
+      written: !!(idea || src?.note || (r.authorKind !== 'seed' && r.notes)),
     };
-  }
-
-  /**
-   * Write the notes for a code release (it has no idea to take them from):
-   * a summary and the code changes. Kept in `changeSet`, beside the bundle,
-   * so the release itself never changes.
-   */
-  async writeNotes(
-    id: string,
-    input: {
-      summary?: string | null;
-      changes?: Array<{
-        area?: string;
-        what?: string;
-        why?: string | null;
-        before?: string | null;
-        after?: string | null;
-      }>;
-    },
-    userId: number,
-  ) {
-    const r = await this.releases.getById(id);
-    if (r.agentKey !== DEBRIEF_AGENT_KEY) {
-      throw new NotFoundException('Release not found');
-    }
-    if (r.authorKind !== 'seed') {
-      throw new ConflictException(
-        'notes come from the idea or the person who proposed this release',
-      );
-    }
-    const clip = (v: unknown, n: number) =>
-      typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null;
-    const notes = {
-      summary: clip(input.summary, 400),
-      changes: (input.changes ?? []).slice(0, 30).map((c) => ({
-        area: clip(c.area, 80) ?? 'Code',
-        what: clip(c.what, 300),
-        why: clip(c.why, 600),
-        before: clip(c.before, 600),
-        after: clip(c.after, 600),
-      })),
-      writtenBy: userId,
-      writtenAt: new Date().toISOString(),
-    };
-    await this.dataSource.query(
-      `UPDATE agent_releases
-          SET "changeSet" = coalesce("changeSet", '{}'::jsonb) || jsonb_build_object('notes', $2::jsonb)
-        WHERE id = $1`,
-      [id, JSON.stringify(notes)],
-    );
-    return { id, notes };
   }
 
   /** Debriefs written, judge median, hard fails, cost and time over a live period. */
@@ -882,6 +872,368 @@ export class DebriefReleasesService {
       ...diff,
       prompts,
     };
+  }
+
+  // --- Releases from the Skills Store and from code ---------------------------------
+
+  /** One at a time in this process: each change starts from the release live after the last. */
+  private sourceQueue: Promise<unknown> = Promise.resolve();
+  /** The code defaults this process already compared with (rule: a deploy that changes nothing makes nothing). */
+  private checkedDefaultsHash: string | null = null;
+
+  onModuleInit(): void {
+    // A debrief prompt published in the Skills Store becomes a release.
+    onPromptPublished(async (e) => {
+      await this.fromPublish(e);
+    });
+  }
+
+  /**
+   * A debrief prompt published in the Skills Store (dashboard, `prompts` CLI,
+   * revert, experiment) becomes a release with that version: live at once,
+   * unless it would undo a promoted PM-agent or person-proposed change.
+   * Pinned rules are not affected (their own sign-off route), nor prompts the
+   * live release does not use.
+   */
+  async fromPublish(e: PromptPublishedEvent) {
+    if (PINNED_RULE_PROMPTS.some((p) => p.code === e.promptCode)) return null;
+    const run = () => this.fromPublishNow(e);
+    const next = this.sourceQueue.then(run, run);
+    this.sourceQueue = next.catch(() => undefined);
+    return next;
+  }
+
+  private async fromPublishNow(e: PromptPublishedEvent) {
+    const ga = await this.releases.getGa(DEBRIEF_AGENT_KEY);
+    if (!ga) return null;
+    const live = eff(ga);
+    if (!(e.promptCode in (live.prompts ?? {}))) return null;
+    if (live.prompts[e.promptCode] === e.version) return null;
+    const base = JSON.parse(JSON.stringify(live)) as DebriefBundle;
+    base.prompts[e.promptCode] = e.previousVersion;
+    const next = JSON.parse(JSON.stringify(live)) as DebriefBundle;
+    next.prompts[e.promptCode] = e.version;
+    const kind = e.source === 'sync' ? 'code' : 'skills_store';
+    return this.releaseFromSource(base, live, next, ga, {
+      kind,
+      by: e.createdBy || null,
+      promptCode: e.promptCode,
+      from: e.previousVersion,
+      to: e.version,
+      note: e.note?.trim() || null,
+      tag: kind === 'code' ? codeTag() : null,
+    });
+  }
+
+  /**
+   * A deploy whose default models, settings or recipes changed: one release
+   * with the code's changes on top of what people promoted, by the same rule.
+   * A deploy that changes no release contents makes no release. Default
+   * prompt texts reach learners through the Skills Store sync, as a publish.
+   */
+  async fromCodeDefaults(defaults: DebriefBundle = DEBRIEF_SEED_BUNDLE) {
+    const hash = canonicalHash(defaults);
+    if (this.checkedDefaultsHash === hash) return null;
+    const run = async () => {
+      const ga = await this.releases.getGa(DEBRIEF_AGENT_KEY);
+      if (!ga) return null;
+      const [last] = await this.dataSource.query(
+        `SELECT bundle, "changeSet", "authorKind" FROM agent_releases
+          WHERE "agentKey" = $1
+            AND ("authorKind" = 'seed' OR "changeSet" ? 'codeDefaults')
+          ORDER BY version DESC LIMIT 1`,
+        [DEBRIEF_AGENT_KEY],
+      );
+      const base = ((last?.changeSet?.codeDefaults as
+        | DebriefBundle
+        | undefined) ??
+        (last?.bundle as DebriefBundle | undefined) ??
+        null) as DebriefBundle | null;
+      if (base && canonicalHash(base) === hash) {
+        this.checkedDefaultsHash = hash;
+        return null;
+      }
+      const out = await this.releaseFromSource(base, eff(ga), defaults, ga, {
+        kind: 'code',
+        by: null,
+        tag: codeTag(),
+        codeDefaults: defaults,
+      });
+      this.checkedDefaultsHash = hash;
+      return out;
+    };
+    const next = this.sourceQueue.then(run, run);
+    this.sourceQueue = next.catch(() => undefined);
+    return next;
+  }
+
+  /**
+   * The one rule for a change from the Skills Store or from code. Three-way
+   * merge (base = what the source said before, live = the release in force,
+   * next = what the source says now): the source's changes on top of what
+   * people promoted. Nothing moves: no release. No conflict: a new release,
+   * live now (the owner is told). A conflict — it would undo a promoted
+   * PM-agent or person-proposed change — : the release waits as a draft (all
+   * of it; parts are not shipped separately), the owner and the Ally team are
+   * told, Debriefs home and the PM agent show a red item, and a person
+   * promotes it (accepting the overwrite) or dismisses it.
+   */
+  async releaseFromSource(
+    base: DebriefBundle | null,
+    live: DebriefBundle,
+    next: DebriefBundle,
+    ga: { id: string; version: number },
+    source: {
+      kind: 'skills_store' | 'code';
+      by: number | null;
+      tag: string | null;
+      promptCode?: string;
+      from?: number | null;
+      to?: number;
+      note?: string | null;
+      codeDefaults?: DebriefBundle;
+    },
+  ): Promise<{
+    releaseId: string;
+    version: number;
+    live: boolean;
+    conflicts: number;
+  } | null> {
+    const m = mergeCodeRelease(base, live, next);
+    // Only promoted PM-agent or person-proposed changes count as conflicts;
+    // a value the store or code itself set earlier is just carried along.
+    const blame = m.conflicts.length
+      ? await this.whoChanged(m.conflicts.map((c) => c.path))
+      : new Map();
+    const conflicts = m.conflicts
+      .filter((c) => blame.has(c.path))
+      .map((c) => ({
+        ...c,
+        what: describePath(c.path),
+        changedBy: blame.get(c.path)!,
+      }));
+    if (!m.fromCode.length && !m.conflicts.length) return null;
+    const problems = validateDebriefBundle(
+      m.merged,
+      await this.runner.modelCatalog(),
+    );
+    const title =
+      source.promptCode != null
+        ? `${promptLabel(source.promptCode)} prompt v${source.from ?? '?'} → v${source.to}`
+        : `Code defaults${source.tag ? ` · ${source.tag}` : ''}`;
+    const draft = await this.releases.createDraft(
+      DEBRIEF_AGENT_KEY,
+      m.merged as unknown as Record<string, unknown>,
+      source.by ?? 0,
+      title,
+    );
+    await this.dataSource.query(
+      `UPDATE agent_releases
+          SET "authorKind" = $2, "createdBy" = $3,
+              "changeSet" = coalesce("changeSet", '{}'::jsonb) || $4::jsonb
+        WHERE id = $1`,
+      [
+        draft.id,
+        source.kind === 'code' ? 'system' : 'human',
+        source.by,
+        JSON.stringify({
+          source: {
+            kind: source.kind,
+            by: source.by,
+            tag: source.tag,
+            promptCode: source.promptCode ?? null,
+            from: source.from ?? null,
+            to: source.to ?? null,
+            note: source.note ?? null,
+          },
+          ...(source.codeDefaults ? { codeDefaults: source.codeDefaults } : {}),
+          merge: {
+            baseReleaseId: ga.id,
+            fromSource: m.fromCode,
+            keptFromLive: m.keptFromLive,
+            conflicts,
+            problems,
+          },
+        }),
+      ],
+    );
+    await this.runner.pinPrompts({ ...draft, changeSet: null } as any);
+    if (!conflicts.length && !problems.length) {
+      const promoted = await this.releases.makeGa(
+        draft.id,
+        null,
+        AgentReleaseAuditAction.PROMOTED,
+        `${source.kind === 'code' ? 'code' : 'Skills Store'}: ${title}`,
+        AgentReleaseAuthorKind.SYSTEM,
+      );
+      await this.notifier?.owner({
+        title: `Debriefs: v${promoted.version} is live (${title})`,
+        body:
+          source.note ??
+          (source.kind === 'code'
+            ? 'Code defaults changed on deploy.'
+            : 'Published in the Skills Store.'),
+        data: { releaseId: draft.id },
+        excludeUserId: source.by,
+      });
+      return {
+        releaseId: draft.id,
+        version: draft.version,
+        live: true,
+        conflicts: 0,
+      };
+    }
+    const first = conflicts[0];
+    const alert = {
+      title: `Debriefs: v${draft.version} (${title}) is waiting`,
+      body: first
+        ? `It would undo ${first.changedBy.label} on ${first.what}${conflicts.length > 1 ? ` and ${conflicts.length - 1} more` : ''}. Promote it to accept the overwrite, or dismiss it.`
+        : `It does not pass the release checks: ${problems.join('; ')}`,
+      data: { releaseId: draft.id },
+    };
+    await this.notifier?.owner(alert);
+    await this.notifier?.team(alert);
+    return {
+      releaseId: draft.id,
+      version: draft.version,
+      live: false,
+      conflicts: conflicts.length,
+    };
+  }
+
+  /**
+   * Which promoted PM-agent or person-proposed release last set each path,
+   * for "it would undo <change> on <what>". Releases from the Skills Store or
+   * from code, and seed releases, never count.
+   */
+  private async whoChanged(paths: string[]) {
+    const out = new Map<
+      string,
+      { version: number; ideaId: string | null; label: string }
+    >();
+    const [periods, ideas] = await Promise.all([
+      this.periods(),
+      this.ideasByRelease(),
+    ]);
+    const starts: Array<{ id: string; p: LivePeriod }> = [];
+    for (const [id, ps] of periods) {
+      for (const p of ps) if (p.via === 'promoted') starts.push({ id, p });
+    }
+    starts.sort((a, b) => a.p.from.localeCompare(b.p.from));
+    for (const { id, p } of starts) {
+      const r = await this.releases.getById(id).catch(() => null);
+      if (!r || r.authorKind === 'seed') continue;
+      const before = p.fromReleaseId
+        ? await this.releases.getById(p.fromReleaseId).catch(() => null)
+        : null;
+      const a = leaves(before ? eff(before) : null);
+      const b = leaves(eff(r));
+      const fromSource = !!(r.changeSet as Record<string, any> | null)?.source;
+      const idea = ideas.get(id) ?? null;
+      for (const path of paths) {
+        if (
+          JSON.stringify(a.get(path) ?? null) !==
+          JSON.stringify(b.get(path) ?? null)
+        ) {
+          if (fromSource) {
+            // The store or code set it later: no longer a person's change.
+            out.delete(path);
+            continue;
+          }
+          out.set(path, {
+            version: r.version,
+            ideaId: idea?.id ?? null,
+            label: idea
+              ? `“${idea.text}” (idea, v${r.version})`
+              : `v${r.version}${r.notes ? ` (“${r.notes}”)` : ''}`,
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Releases from the Skills Store or code waiting because they would undo a promoted change. */
+  async waitingReleases(): Promise<
+    Array<{
+      id: string;
+      version: number;
+      title: string;
+      source: Record<string, any>;
+      conflicts: any[];
+      problems: string[];
+    }>
+  > {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT id, version, notes, "changeSet" FROM agent_releases
+        WHERE "agentKey" = $1 AND status = 'draft' AND "changeSet" ? 'source'
+          AND NOT ("changeSet" ? 'dismissed')
+        ORDER BY version DESC`,
+      [DEBRIEF_AGENT_KEY],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      version: Number(r.version),
+      title: r.notes ?? `Release v${r.version}`,
+      source: r.changeSet?.source ?? {},
+      conflicts: (r.changeSet?.merge?.conflicts ?? []) as any[],
+      problems: (r.changeSet?.merge?.problems ?? []) as string[],
+    }));
+  }
+
+  /** Promote a waiting release: accept the overwrite. */
+  async promoteWaiting(id: string, userId: number, note?: string) {
+    const r = await this.waitingOne(id);
+    const live = await this.releases.makeGa(
+      r.id,
+      userId,
+      AgentReleaseAuditAction.PROMOTED,
+      note ?? 'accepted the overwrite',
+    );
+    await this.notifier?.owner({
+      title: `Debriefs: v${live.version} is live (${r.notes ?? 'waiting release'})`,
+      body: note ?? 'A person accepted the overwrite.',
+      data: { releaseId: r.id },
+      excludeUserId: userId,
+    });
+    return { id: live.id, version: live.version };
+  }
+
+  /** Dismiss a waiting release: it never goes live. */
+  async dismissWaiting(id: string, userId: number, reason?: string) {
+    const r = await this.waitingOne(id);
+    await this.dataSource.query(
+      `UPDATE agent_releases SET status = 'retired', "retiredAt" = now(),
+              "changeSet" = coalesce("changeSet", '{}'::jsonb)
+                || jsonb_build_object('dismissed', jsonb_build_object('by', $2::int, 'at', now()::text, 'reason', $3::text))
+        WHERE id = $1 AND status = 'draft'`,
+      [r.id, userId, reason ?? null],
+    );
+    const alert = {
+      title: `Debriefs: v${r.version} (${r.notes ?? 'waiting release'}) was dismissed`,
+      body: reason ? `Dismissed: ${reason}` : 'Dismissed; it will not go live.',
+      data: { releaseId: r.id },
+      excludeUserId: userId,
+    };
+    await this.notifier?.owner(alert);
+    await this.notifier?.team(alert);
+    return { id: r.id, dismissed: true, by: userId, reason: reason ?? null };
+  }
+
+  private async waitingOne(id: string) {
+    const r = await this.releases.getById(id);
+    const cs = r.changeSet as Record<string, any> | null;
+    if (
+      r.agentKey !== DEBRIEF_AGENT_KEY ||
+      r.status !== 'draft' ||
+      !cs?.source ||
+      cs?.dismissed
+    ) {
+      throw new ConflictException(
+        'only a release from the Skills Store or code that is waiting',
+      );
+    }
+    return r;
   }
 
   // --- Changes: always a draft carried by an idea ----------------------------------------

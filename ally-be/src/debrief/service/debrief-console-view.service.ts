@@ -873,6 +873,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
   ) {
     const traces = (ws.replyTraces ?? []) as Array<Record<string, any>>;
     const replaced = (ws.replacedReplies ?? []) as Array<Record<string, any>>;
+    const meta = (ws.replyMeta ?? []) as Array<Record<string, any>>;
     const exchanges: Array<{
       question: string;
       askedAt: string;
@@ -880,6 +881,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
       repliedAt: string | null;
       check: 'passed' | 'replaced' | 'no_reply';
       replacedReply: { reply: string; fails: string[] } | null;
+      section: string | null;
+      firstWordsMs: number | null;
       costUsd: number | null;
       model: string | null;
       tools: unknown[];
@@ -895,6 +898,15 @@ export class DebriefConsoleViewService implements OnModuleInit {
         !!reply && String(reply.content ?? '').startsWith(CHECK_FALLBACK);
       const trace = reply ? (traces[replyIdx++] ?? null) : null;
       const rep = wasReplaced ? (replaced[replacedIdx++] ?? null) : null;
+      // The reply's own record: the one finished closest after it was saved.
+      const rm = reply
+        ? (meta.find(
+            (x) =>
+              Math.abs(
+                new Date(x.at).getTime() - new Date(reply.createdAt).getTime(),
+              ) < 10_000,
+          ) ?? null)
+        : null;
       exchanges.push({
         question: String(m.content ?? ''),
         askedAt: new Date(m.createdAt).toISOString(),
@@ -904,6 +916,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
         replacedReply: rep
           ? { reply: String(rep.reply ?? ''), fails: rep.fails ?? [] }
           : null,
+        section: (rm?.section as string | null) ?? null,
+        firstWordsMs: rm?.firstWordsMs != null ? Number(rm.firstWordsMs) : null,
         costUsd: trace ? num(trace.costUsd, 4) : null,
         model: trace?.model ?? null,
         tools: trace?.tools ?? [],
@@ -1075,6 +1089,24 @@ export class DebriefConsoleViewService implements OnModuleInit {
         message: `$${spent.toFixed(2)} of the $${cap.toFixed(2)} monthly cap spent (${Math.round((spent / cap) * 100)}%).`,
         link: { page: 'settings' },
       });
+    }
+    // A Skills Store or code release waiting because it would undo a
+    // promoted change.
+    if (team && this.releasesView) {
+      for (const w of await this.releasesView
+        .waitingReleases()
+        .catch(() => [])) {
+        const c = w.conflicts[0];
+        banners.push({
+          kind: 'release_waiting',
+          level: 'red',
+          count: w.conflicts.length,
+          message: c
+            ? `${w.source.kind === 'code' ? 'Code release' : 'Skills Store release'} v${w.version} is waiting: it would undo ${c.changedBy?.label ?? 'a promoted change'} on ${c.what}${w.conflicts.length > 1 ? ` (and ${w.conflicts.length - 1} more)` : ''}.`
+            : `Release v${w.version} is waiting: it does not pass the release checks.`,
+          link: { page: 'pm_agent', releaseId: w.id } as any,
+        });
+      }
     }
     const failing = await this.providersFailing();
     if (team && failing.length) {

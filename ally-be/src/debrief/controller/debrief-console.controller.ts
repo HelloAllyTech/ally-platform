@@ -456,30 +456,6 @@ class ProposeChangeDto {
   prompts?: Record<string, number>;
 }
 
-class ReleaseNoteChangeDto {
-  @IsOptional() @IsString() @MaxLength(80) area?: string;
-  @IsOptional() @IsString() @MaxLength(300) what?: string;
-  @IsOptional() @IsString() @MaxLength(600) why?: string;
-  @IsOptional() @IsString() @MaxLength(600) before?: string;
-  @IsOptional() @IsString() @MaxLength(600) after?: string;
-}
-
-class ReleaseNotesDto {
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  @MaxLength(400)
-  summary?: string;
-
-  @ApiProperty({ required: false, type: [ReleaseNoteChangeDto] })
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(30)
-  @ValidateNested({ each: true })
-  @Type(() => ReleaseNoteChangeDto)
-  changes?: ReleaseNoteChangeDto[];
-}
-
 type AuthedRequest = { user: { id: number } };
 
 /**
@@ -1342,24 +1318,8 @@ export class DebriefConsoleController {
     const r = await this.releaseHistory.detail(id);
     return {
       ...r,
-      can: {
-        rollBack: viewer.can.releases && r.status === 'retired',
-        writeNotes: viewer.can.releases && r.notes.canWrite,
-      },
+      can: { rollBack: viewer.can.releases && r.status === 'retired' },
     };
-  }
-
-  @Put('release-history/:id/notes')
-  @DebriefAct('releases')
-  @ApiOperation({
-    summary: 'Write the release notes of a code release',
-  })
-  writeReleaseNotes(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: AuthedRequest,
-    @Body() body: ReleaseNotesDto,
-  ) {
-    return this.releaseHistory.writeNotes(id, body, req.user.id);
   }
 
   @Get('releases/:id/compare')
@@ -1378,17 +1338,31 @@ export class DebriefConsoleController {
     );
   }
 
-  @Post('releases/:id/promote-code-draft')
+  @Post('releases/:id/promote-waiting')
   @DebriefAct('releases')
   @ApiOperation({
     summary:
-      'Put a code release waiting as a draft live (code releases skip the ladder)',
+      'Promote a Skills Store or code release that waits because it would undo a promoted change (accept the overwrite)',
   })
-  promoteCodeDraft(
+  promoteWaiting(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthedRequest,
     @Body() body: ReasonDto,
   ) {
-    return this.releaseHistory.promoteCodeDraft(id, req.user.id, body?.reason);
+    return this.releaseHistory.promoteWaiting(id, req.user.id, body?.reason);
+  }
+
+  @Post('releases/:id/dismiss-waiting')
+  @DebriefAct('releases')
+  @ApiOperation({
+    summary:
+      'Dismiss a waiting Skills Store or code release: it never goes live (who and why are recorded)',
+  })
+  dismissWaiting(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    return this.releaseHistory.dismissWaiting(id, req.user.id, body?.reason);
   }
 }

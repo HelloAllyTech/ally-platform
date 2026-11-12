@@ -23,7 +23,7 @@ describe('the Debrief drain runs only for switched-on organisations', () => {
     Object.assign(svc, {
       dataSource: { query },
       config: { debriefAgentMode: 'shadow' },
-      releases: { syncSeed: jest.fn() },
+      releases: { syncSeed: jest.fn(), getGa: jest.fn(async () => null) },
       runner: { run },
       judge: { drain: jest.fn(), judge: jest.fn() },
       logger: { info: jest.fn(), warn: jest.fn() },

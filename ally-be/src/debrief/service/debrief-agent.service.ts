@@ -39,6 +39,7 @@ import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefPublishService } from './debrief-publish.service';
 import { DebriefTrialsService } from './debrief-trials.service';
+import { DebriefReleasesService } from './debrief-releases.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import {
   DebriefProgress,
@@ -180,6 +181,8 @@ export class DebriefAgentService implements OnModuleInit {
     @Optional() private readonly publisher?: DebriefPublishService,
     /** The PM agent's paired trials and canary (v9 FR-52). */
     @Optional() private readonly trials?: DebriefTrialsService,
+    /** Code releases on deploy: live unless they would undo a promoted change. */
+    @Optional() private readonly releaseHistory?: DebriefReleasesService,
   ) {}
 
   /**
@@ -215,14 +218,29 @@ export class DebriefAgentService implements OnModuleInit {
     });
   }
 
-  /** Seed version 1 from code; a deploy never undoes a deliberate rollback. */
+  /**
+   * The release in force. The first boot seeds version 1 from code; after
+   * that a deploy makes a release only when it changes release contents
+   * (default models, settings, recipes): live at once, unless it would undo a
+   * promoted change (DebriefReleasesService.fromCodeDefaults). Default prompt
+   * texts reach learners through the Skills Store, as a publish does.
+   */
   async ensureRelease(): Promise<void> {
-    await this.releases.syncSeed(
-      DEBRIEF_AGENT_KEY,
-      DEBRIEF_SEED_BUNDLE as unknown as Record<string, unknown>,
-    );
-    // Plan §8.8: a seed release made just now records the exact prompt
-    // versions it runs, as every release does when it is created.
+    if (!(await this.releases.getGa(DEBRIEF_AGENT_KEY))) {
+      await this.releases.syncSeed(
+        DEBRIEF_AGENT_KEY,
+        DEBRIEF_SEED_BUNDLE as unknown as Record<string, unknown>,
+      );
+    } else {
+      try {
+        await this.releaseHistory?.fromCodeDefaults();
+      } catch (e) {
+        this.logger.warn(
+          `[debrief] could not check the code defaults: ${(e as Error).message}`,
+        );
+      }
+    }
+    // Plan §8.8: every release records the exact prompt versions it runs.
     try {
       await this.runner.pinAll();
     } catch (e) {

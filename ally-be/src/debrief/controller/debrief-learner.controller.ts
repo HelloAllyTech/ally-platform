@@ -68,6 +68,16 @@ class ReplyDto {
   @IsString()
   @MaxLength(4000)
   message!: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'The card the question is about, when the learner asked from one (e.g. `work_on_this[0]`)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(48)
+  section?: string;
 }
 
 class FlagDto {
@@ -271,7 +281,9 @@ export class DebriefLearnerController {
   ) {
     // Ownership and a published debrief are checked before the stream opens,
     // so a refusal is an ordinary HTTP error, not a broken stream.
-    const stream = await this.replies.stream(sessionId, user.id, body.message);
+    const stream = await this.replies.stream(sessionId, user.id, body.message, {
+      section: body.section ?? null,
+    });
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');

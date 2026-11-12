@@ -40,7 +40,7 @@ rather than disable it.
 | `pmAgent` | yes | no | yes | `pm-agent/analyse`, `ideas/:id/screen`, `approve` (a budgets-only change: owner), `reject`, `questions`, `start-step`, `ideas/propose` and `ideas/:id/draft` (with `settings`: owner); `pinned-rules/proposals` |
 | `approvePinnedRule` | no* | yes | yes | `pm-agent/ideas/:id/approve-pinned-rule` |
 | `testSets` | yes | no | yes | `test-sets/build` |
-| `releases` | yes | no | yes | `models` (POST, makes a proposal), `releases/orchestrator-challenger`, `releases/:id/rollback`, `releases/:id/promote-code-draft`, `release-history/:id/notes`, `sessions/:sessionId/run` |
+| `releases` | yes | no | yes | `models` (POST, makes a proposal), `releases/orchestrator-challenger`, `releases/:id/rollback`, `releases/:id/promote-waiting`, `releases/:id/dismiss-waiting`, `sessions/:sessionId/run` |
 | `switchOrgOn` | no | no | yes | `tenants/:id/live` with `live: true` (403 for the Ally team), `tenants/:id/region` |
 | `emergencyStop` | yes | no | yes | `tenants/:id/live` with `live: false`, `tenants/:id/emergency-stop` |
 | `ownerSettings` | no | no | yes | `settings` (PUT), `settings/accept`, `settings/baseline`, `budgets`, `autonomy/matrix`, `autonomy/orgs/:id` |
@@ -122,10 +122,14 @@ undo window are not work yet. Other categories are newest first. Comments never 
                  turns: number[]; canDecide: boolean }>;
   askAlly: {
     exchanges: Array<{ question; askedAt; reply: string|null; repliedAt; check: 'passed'|'replaced'|'no_reply';
+                       section: string | null;      // the card asked about ("work_on_this[0]"), when the app sent it
+                       firstWordsMs: number | null; // time from the question to Ally's first words (null before this release)
                        replacedReply: { reply; fails: string[] } | null; costUsd: number|null; model; tools: unknown[] }>;
     totalCostUsd: number|null;
     distressItems: Flag[];               // the Ask Ally distress queue items
   };                                     // read-only
+  // `section` comes from the learner apps: POST /v1/debriefs/sessions/:id/reply/stream now accepts an
+  // optional `section` (the card the question was asked from). Until the apps send it, it is null.
   learnerDistress: { present; inSession; inAskAlly; riskCueTurns: number[] };  // show the banner first
   skillEstimate: { progress: ProgressItem[]; skillWords: SkillWord[]; learnerLevel; pastSessions: number|null }; // ONLY here
   howItWasMade: { recipe; releaseVersion; fallbackRung; revisionRounds; estimatedCostUsd; actualCostUsd;
@@ -275,25 +279,35 @@ Only releases that **have been live** are listed, newest first. The old `GET rel
     id; version; status: 'live' | 'retired';
     title: string; summary: string | null;
     cameFrom: { kind: 'idea'; ideaId; title; proposedBy: 'pm_agent'|'person' }
-            | { kind: 'code'; tag: string|null }                       // a seed (code) release
+            | { kind: 'skills_store'; by: {id,name}|null; promptCode: string; from: number|null; to: number; note: string|null }
+            | { kind: 'code'; tag: string|null; promptCode: string|null; note: string|null }  // "Code · <tag>": a deploy or the seed
             | { kind: 'settings_change'; by: {id,name}|null; note }    // a person's release made before proposals
             | { kind: 'roll_back'; fromVersion: number|null; reason: string|null };
     wentLiveAt: string; liveTimes: number;
     retired: null | { at; reason: 'replaced' | 'rolled_back'; byVersion: number|null; why: string|null } }>;
-  pendingCodeDrafts: Array<{ id; version; note; createdAt }> }   // "defaults in code changed" drafts
+  waiting: WaitingRelease[] }       // Skills Store / code releases waiting because they would undo a promoted change
+
+type WaitingRelease = {
+  id; version; title: string;                                     // e.g. "Writer prompt v12 → v13"
+  source: { kind: 'skills_store'|'code'; by: number|null; tag: string|null;
+            promptCode: string|null; from: number|null; to: number|null; note: string|null };
+  wouldUndo: Array<{ path: string;                                 // e.g. "prompts.debrief_writer_system"
+                     what: string;                                 // "the debrief_writer_system prompt version"
+                     live: unknown; wouldBecome: unknown;
+                     changedBy: { version: number; ideaId: string|null; label: string } }>;
+  problems: string[] }                                             // release checks it fails, if any
 ```
 
 ### `GET release-history/:id`
 ```ts
 { ...item, previous: { id; version } | null,      // the release it replaced when it last went live
   notes: {
-    summary: string | null;                         // from the idea, a person's proposal, or written for a code release
+    summary: string | null;                         // from the idea, the proposer, or the Skills Store note
     changes: Array<{ area: string;                  // "Writer prompt v12 → v13" | "Settings" | "Model" | "Step" | "Recipe: standard" | "Code"
                      what: string | null; why: string | null;   // from the idea (problem + idea id) or the proposer
                      before: string | null; after: string | null;  // prompt excerpt / old→new setting / model
-                     source: 'diff' | 'written' }>;
-    written: boolean;                               // false on a code release with no notes → "No notes written"
-    writtenBy: number | null; writtenAt: string | null; canWrite: boolean };
+                     source: 'diff' }>;
+    written: boolean };                             // false when nothing explains it; `why` then says "No note written"
   evidence: {
     beforeLive: { ladder: Array<{ rung: 'quick_test'|'gate_test'|'paired_trial'|'canary';
                                   state: 'passed'|'failed'|'running'|'waiting'|'skipped'|'off'; detail: string|null }>;
@@ -313,7 +327,7 @@ Only releases that **have been live** are listed, newest first. The old `GET rel
   can: { rollBack: boolean; writeNotes: boolean } }
 ```
 - **Release notes.** Prompt, setting, step, model, recipe and orchestrator changes come automatically from the version diff against the previous live release. Prompt changes include the changed part of the text from the Skills Store. `what`, `why` and `summary` come from the idea, whether the PM agent's or a person's proposal. A code release only has notes a person writes.
-- `PUT release-history/:id/notes {summary?, changes?: [{area?, what?, why?, before?, after?}]}` (`releases`) writes notes for a **code release only** (409 otherwise). They are stored in `agent_releases.changeSet.notes`, beside the bundle, so the release itself never changes.
+- A Skills Store or code release's notes: `what` = "<Prompt> prompt vN → vN+1" (or "Code defaults · <tag>"), `why` = the version's publish note (else "No note written"), before/after = the changed passage from the version diff. A release made by merging also lists "Would undo a promoted change" (when it waited) and "Carried forward" (promoted changes it kept). Ladder rungs read `skipped (Skills Store edit)` / `skipped (code release)`.
 - `GET releases/:id/compare?with=<id>` (`with` defaults to the release it replaced) returns:
   ```ts
   BundleDiff & { release; against;
@@ -322,7 +336,16 @@ Only releases that **have been live** are listed, newest first. The old `GET rel
   Feed `before.text` and `after.text` to the Skills Store diff view.
 - `POST releases/:id/rollback {reason?}` (Ally team or owner) only works on a release that **has been live** and is not live now (409 otherwise). Everything comes back together, **including the exact prompt texts**, and the owner is notified.
 - **Exact prompt versions (plan §8.8).** Every release records the exact Skills Store version of each prompt it left unpinned, at the moment it is created. This is stored in `agent_releases.changeSet.pinnedPrompts`, so the bundle and its hash never change. The runner always runs those versions, so a prompt published later in the Skills Store reaches learners only through a new release. To ship one, use `POST pm-agent/ideas/propose {prompts: {code: version}}` (pinned-rule prompts are refused: use a pinned-rule proposal). Existing releases were backfilled by migration 1981900750000 with the version published at or before each one went live. Where that history doesn't exist, the version current at migration time is used, the release is marked `changeSet.pinSource = 'migration'`, and its release notes say so. `contents.prompts[].version` and all diffs show these exact versions.
-- `POST releases/:id/promote-code-draft {reason?}` (`releases`) puts a waiting code (seed) draft live. Code releases skip the ladder.
+- `POST releases/:id/promote-waiting {reason?}` (Ally team or owner) puts a waiting Skills Store or code release live, accepting the overwrite. It notifies the owner and returns `{id, version}`.
+- `POST releases/:id/dismiss-waiting {reason?}` (Ally team or owner) means the release never goes live. It is retired, `changeSet.dismissed = {by, at, reason}` is recorded, and the owner and the Ally team are notified. It returns `{id, dismissed: true, by, reason}`.
+
+### Releases from the Skills Store and from code (one rule)
+- **Skills Store publish.** Publishing a new version of a debrief prompt the live release uses (dashboard, `prompts` CLI, revert, experiment Apply) creates **one release per publish** containing it. Pinned-rule prompts are excluded; they have their own sign-off.
+- **Deploy.** A deploy that changes default models, settings or recipes (`DEBRIEF_SEED_BUNDLE`) creates one release, made by "Code · <tag>" (`APP_VERSION`). A deploy that changes no release contents creates **nothing**. Default prompt texts reach learners only through the Skills Store (the sync is a publish).
+- **The rule** is a three-way merge: base is what the source said before, live is the release in force, and next is what the source says now. The result is the source's changes on top of what people promoted.
+  - **No conflict:** the release goes live at once and the owner is notified.
+  - **It would undo a promoted PM-agent or person-proposed change** (one that set the same prompt version, step, model or setting): the **whole** release waits as a draft. Parts are not shipped separately. The owner and the Ally team are notified, a red `release_waiting` attention item appears, and a person uses Promote or Dismiss.
+- The record lives in `changeSet.source` (who, what, the note) and `changeSet.merge` (`fromSource`, `keptFromLive`, `conflicts`, `problems`). Releases appear in `release-history` once live, with the `cameFrom` shapes above.
 
 `BundleDiff = { prompts: [{code, before, after, pinned}], settings: [{key, before, after}], recipes: [...], steps: [{step, field: 'enabled'|'model'|'backupModel', before, after}], reply, orchestrator, budgetOnly }`.
 
@@ -361,7 +384,8 @@ These are in-app notifications only: the bell (`/v1/notifications`), with no Sla
 
 | Event | Who | `type` |
 |---|---|---|
-| Promotion: an idea's canary promoted, a budgets change, a code release put live | the owner (holders of `manage:admin:debrief-settings`) | `DEBRIEF_OWNER_ALERT` |
+| Promotion: an idea's canary promoted, a budgets change, a Skills Store or code release live, a waiting release promoted | the owner (holders of `manage:admin:debrief-settings`) | `DEBRIEF_OWNER_ALERT` |
+| A Skills Store or code release waiting (it would undo a promoted change); one dismissed | the owner and the Ally team | `DEBRIEF_OWNER_ALERT` / `DEBRIEF_TEAM_ALERT` |
 | Roll back; canary auto-revert | the owner | `DEBRIEF_OWNER_ALERT` |
 | Builder or Bug Hunter filing; a route-D question (`person_ask`); a pinned-rule proposal | the owner | `DEBRIEF_OWNER_ALERT` |
 | Approval entering its last 3 days (once per idea; pinned rules also go to the owner) | the Ally team (Analytics toggle + platform access) | `DEBRIEF_TEAM_ALERT` |
@@ -382,7 +406,7 @@ until the console shows `/v1/notifications` (frontend).
 
 ### `GET attention`
 ```ts
-{ banners: Array<{ kind: 'urgent'|'held'|'escalated'|'canary_reverted'|'approval_expiring'|'agent_off'|'cap'|'provider_down'|'language_not_recorded';
+{ banners: Array<{ kind: 'urgent'|'held'|'escalated'|'canary_reverted'|'approval_expiring'|'release_waiting'|'agent_off'|'cap'|'provider_down'|'language_not_recorded';
                    level: 'red'|'yellow'; count?; oldestSince?; overdue?; message: string;
                    link: { page: 'session'|'home'|'pm_agent'|'settings'|'analytics'; runId?; ideaId?; category? } }>;
   counts: { urgent: number|null; oldestUrgentSince: string|null; escalatedToMe: number|null; pmAgentNeedsYou: number };
@@ -397,6 +421,8 @@ Banners only appear for roles that can act:
 - held turns red once overdue.
 
 ## Analytics › Debriefs
+
+`GET analytics` has everything the Analytics › Debriefs page needs, so the page can switch to it: the six tiles, the cost panel (spend per organisation, pool balance, learning budget, burn rate) and judge agreement (gate, κ per dimension, agreement by rubric part, debriefs rated, people rating). It takes `days` (1–90, default 7).
 
 ### `GET analytics?days=7`
 ```ts
@@ -418,6 +444,6 @@ Banners only appear for roles that can act:
 - **Org `ask`** for paired trials and canaries is treated as "not on this organisation's learners unless the global step was started by a person". There is no per-organisation go-ahead.
 - **Judge drift and model trials** are Release 2.
 - **Step win rates** are `null` until step-level trials exist (Release 2).
-- **The seed auto-promote stops.** The first person-proposed change ends it, because the harness only auto-promotes code defaults while every release is seed-authored. Later code changes arrive as `pendingCodeDrafts` for a person to put live.
+- **Two instances releasing at once.** If two app instances check new code defaults at the same moment on a deploy, they could both make the same release. Skills Store publishes are handled once, by the instance that served the publish.
 - **Verdicts by platform admins:** platform groups hold `review:admin:debriefs`, so they also count as clinical advisors for verdicts and pinned-rule sign-off.
 - **The old Calibration route** `POST /v1/analytics/debrief-quality/calibration/:id` is unchanged. The sample rule applies only to the new console route.

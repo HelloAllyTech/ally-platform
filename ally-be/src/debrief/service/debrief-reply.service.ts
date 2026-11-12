@@ -136,7 +136,10 @@ export class DebriefReplyService {
     sessionId: string,
     userId: number,
     message: string,
+    opts: { section?: string | null } = {},
   ): Promise<Observable<SseMessageEvent>> {
+    const startedAt = Date.now();
+    let firstWordsMs: number | null = null;
     const run = await this.feedback.ownLiveRun(sessionId, userId);
     const tenantId = run.tenantId as string;
     const language = (run.language ?? 'en').split(/[-_]/)[0].toLowerCase();
@@ -174,6 +177,13 @@ export class DebriefReplyService {
     const finish = async (content: string) => {
       subject.next(event({ type: 'done', content, citations: [] }));
       subject.complete();
+      // For the Console's Ask Ally tab: which card it was about (when the app
+      // says), and how long the learner waited for the first words.
+      void this.keepReplyMeta(run.id, {
+        at: new Date().toISOString(),
+        section: opts.section?.trim() ? opts.section.trim().slice(0, 48) : null,
+        firstWordsMs: firstWordsMs ?? Date.now() - startedAt,
+      });
       await this.messages
         .save({ chatId: chat.id, senderId: ALLY_SENDER, content, tenantId })
         .catch((e) =>
@@ -231,8 +241,10 @@ export class DebriefReplyService {
       REPLY_LENGTH_REMINDER,
     ].join('\n');
     // Both names: the web reads `text`, the phones read `content`.
-    const token = (text: string) =>
+    const token = (text: string) => {
+      if (firstWordsMs == null) firstWordsMs = Date.now() - startedAt;
       subject.next(event({ type: 'token', content: text, text }));
+    };
 
     /** The finished reply: checked, distress-screened, then sent and saved. */
     const settle = async (full: string, distress: boolean) => {
@@ -340,6 +352,31 @@ export class DebriefReplyService {
     } catch (e) {
       this.logger.warn(
         `[debrief] could not keep a reply trace for run ${runId}: ${(e as Error).message}`,
+      );
+    }
+  }
+
+  /** Each reply's card and time to first words, kept on the run (the last 50). Never throws. */
+  private async keepReplyMeta(
+    runId: string,
+    entry: { at: string; section: string | null; firstWordsMs: number },
+  ): Promise<void> {
+    try {
+      await this.chats.manager.query(
+        `UPDATE debrief_runs
+            SET workspace = jsonb_set(
+              coalesce(workspace, '{}'::jsonb), '{replyMeta}',
+              (SELECT coalesce(jsonb_agg(x.e ORDER BY x.n), '[]'::jsonb)
+                 FROM jsonb_array_elements(
+                        coalesce(workspace->'replyMeta', '[]'::jsonb) || jsonb_build_array($2::jsonb)
+                      ) WITH ORDINALITY AS x(e, n)
+                WHERE x.n > jsonb_array_length(coalesce(workspace->'replyMeta', '[]'::jsonb)) + 1 - 50))
+          WHERE id = $1`,
+        [runId, JSON.stringify(entry)],
+      );
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] could not keep reply timing for run ${runId}: ${(e as Error).message}`,
       );
     }
   }

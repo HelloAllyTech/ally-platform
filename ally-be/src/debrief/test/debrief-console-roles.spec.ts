@@ -172,8 +172,8 @@ describe('Debrief console role gating', () => {
     for (const h of [
       'proposeChange',
       'editDraft',
-      'promoteCodeDraft',
-      'writeReleaseNotes',
+      'promoteWaiting',
+      'dismissWaiting',
     ]) {
       expect(await allowed(TEAM, C, h)).toBe(true);
       expect(await allowed(ADVISOR, C, h)).toBe(false);

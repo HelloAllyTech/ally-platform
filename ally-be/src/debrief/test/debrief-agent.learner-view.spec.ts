@@ -237,7 +237,7 @@ describe('DebriefAgentService.onSessionEnded', () => {
         cards: null,
       })),
     };
-    const releases = { syncSeed: jest.fn() };
+    const releases = { syncSeed: jest.fn(), getGa: jest.fn(async () => null) };
     const overrides = {
       get: jest.fn(async () => (live ? { values: { live: true } } : null)),
     };
