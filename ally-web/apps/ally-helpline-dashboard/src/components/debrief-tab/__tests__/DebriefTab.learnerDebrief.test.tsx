@@ -360,7 +360,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
     const steps = screen.getByTestId("debrief-working-steps");
     const items = within(steps).getAllByRole("listitem");
-    expect(items.map((li) => li.textContent)).toEqual([
+    expect(items.map(li => li.textContent)).toEqual([
       "postSim.debriefCards.working.steps.reading",
       "postSim.debriefCards.working.steps.writing",
     ]);
@@ -389,6 +389,30 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     fireEvent.click(buttons[0]);
     expect(onSeeQuote).toHaveBeenCalledWith(CARDS.important_moment.quote);
   });
+
+  it.each([
+    [true, "postSim.debriefCards.importantMoment.titleHandledWell"],
+    [false, "postSim.debriefCards.importantMoment.title"],
+  ])(
+    "names a risk cue handled well as the learner's (case 3): handled_well=%s",
+    (handled, title) => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: {
+            ...CARDS,
+            important_moment: { ...CARDS.important_moment, handled_well: handled },
+          },
+        },
+      });
+      renderTab();
+      expect(
+        within(screen.getByTestId("debrief-card-important-moment")).getByRole("heading", {
+          name: title,
+        }),
+      ).toBeInTheDocument();
+    },
+  );
 
   it("falls back to the default step label when no steps have arrived", () => {
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "working", steps: [] } });

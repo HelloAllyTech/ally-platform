@@ -292,6 +292,10 @@ const ReadyCards: FC<{
     .filter(({ index }) => !removed.has(`work_on_this[${index}]`));
   const practise = removed.has("practise_next") ? null : cards.practise_next;
 
+  const momentTitle = moment?.handled_well
+    ? t("postSim.debriefCards.importantMoment.titleHandledWell")
+    : t("postSim.debriefCards.importantMoment.title");
+
   return (
     <div className="flex flex-col gap-4">
       {moment && (
@@ -300,7 +304,8 @@ const ReadyCards: FC<{
             testId="debrief-card-important-moment"
             readSection="important_moment"
             tone="attention"
-            title={t("postSim.debriefCards.importantMoment.title")}
+            // PRD §6.2, case 3: a risk cue the learner handled well is named as theirs.
+            title={momentTitle}
             icon={<Bookmark aria-hidden="true" className="h-5 w-5 text-warning-700" />}
           >
             <Lead>{moment.lead}</Lead>
@@ -321,7 +326,7 @@ const ReadyCards: FC<{
             )}
             <Body>{t("postSim.debriefCards.importantMoment.support")}</Body>
             {!!view.supportLines?.length && <SupportLines lines={view.supportLines} />}
-            {flagControl("important_moment", t("postSim.debriefCards.importantMoment.title"))}
+            {flagControl("important_moment", momentTitle)}
           </Card>
         </ul>
       )}
