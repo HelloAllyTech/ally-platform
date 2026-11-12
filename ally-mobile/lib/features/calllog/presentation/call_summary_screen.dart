@@ -1811,18 +1811,29 @@ class _EditableField extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget child;
     if (isEditing) {
+      // A bordered box, not just bare text, so it's visually obvious this is
+      // a tappable input rather than a label — without it, a field blended
+      // into the surrounding read-only text with no indication of where to
+      // tap. Added 2026-11.
       child = Padding(
         padding: const EdgeInsets.only(right: 20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 200),
-          child: _SyncedTextField(
-            key: ValueKey(fieldKey),
-            value: value ?? '',
-            onChanged: onChanged,
-            multiline: true,
-            autofocus: true,
-            keyboardType: keyboardType,
-            style: _dropdownItemTextStyle,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.rnGray, width: 0.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: _SyncedTextField(
+              key: ValueKey(fieldKey),
+              value: value ?? '',
+              onChanged: onChanged,
+              multiline: true,
+              autofocus: true,
+              keyboardType: keyboardType,
+              style: _dropdownItemTextStyle,
+            ),
           ),
         ),
       );
@@ -2170,11 +2181,18 @@ class _CustomFieldEditor extends ConsumerWidget {
                   key: ValueKey('date-field-${def.id}'),
                   behavior: HitTestBehavior.opaque,
                   onTap: () => _pickDate(context, value),
-                  child: Text(
-                    isEmpty ? ref.t('common.select') : displayValue,
-                    style: isEmpty
-                        ? _fieldValueTextStyle.copyWith(color: AppColors.charcoal2.withValues(alpha: 0.5))
-                        : _fieldValueTextStyle,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.rnGray, width: 0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      isEmpty ? ref.t('common.select') : displayValue,
+                      style: isEmpty
+                          ? _fieldValueTextStyle.copyWith(color: AppColors.charcoal2.withValues(alpha: 0.5))
+                          : _fieldValueTextStyle,
+                    ),
                   ),
                 )
               : null,
