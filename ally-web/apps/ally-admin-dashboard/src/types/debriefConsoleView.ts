@@ -23,7 +23,6 @@ export type DebriefCanAction =
   | "heldDebrief"
   | "escalate"
   | "verdict"
-  | "score"
   | "pmAgent"
   | "approvePinnedRule"
   | "testSets"
@@ -40,8 +39,6 @@ export interface DebriefViewer {
     receivesEscalations: boolean;
   };
   can: Record<DebriefCanAction, boolean>;
-  /** Shows the "To score" category and the "!" badge. */
-  scorer: boolean;
 }
 
 export type DebriefHomeCategoryParam =
@@ -50,7 +47,6 @@ export type DebriefHomeCategoryParam =
   | "below"
   | "published"
   | "escalated"
-  | "to_score"
   | "agreement_sample"
   | "all";
 
@@ -97,8 +93,6 @@ export interface DebriefSessionListItem {
   learnerDistress: boolean;
   belowBar: boolean;
   reviewed: boolean;
-  inMyScoringSample: boolean;
-  toScore: boolean;
   /** In the weekly agreement sample, waiting for a verdict. */
   agreementSample?: boolean;
   waitingSince: string | null;
@@ -113,7 +107,6 @@ export interface DebriefSessionsPage {
     below: number;
     published: number;
     escalated: number;
-    toScore: number | null;
     /** Only for whoever gives verdicts. */
     agreementSample?: number | null;
     all: number;
@@ -216,6 +209,8 @@ export interface DebriefSessionView {
     languageSource: string | null;
     recipe: string | null;
     releaseVersion: number | null;
+    /** In a side-by-side trial: which version this run is ("baseline" is the current one). */
+    arm?: "baseline" | "challenger" | null;
     createdAt: string;
     hasRiskCue: boolean;
     learnerDistress: boolean;
@@ -300,8 +295,7 @@ export interface DebriefSessionView {
   /** Threads on this learner's earlier debriefs of the same scenario, newest first (spec C5). */
   earlierComments: ExpertComment[];
   verdict: { verdict: ExpertVerdict; hardFails: string[]; updatedAt: string | null } | null;
-  scoring: { inMyScoringSample: boolean; scoredByMe: boolean };
-  /** The κ gate's questions under the verdict (who gives verdicts). */
+  /** The agreement questions under the verdict (who gives verdicts). */
   agreement?: { inSample: boolean; questions: AgreementQuestion[] } | null;
   queue: {
     position: number | null;
@@ -320,7 +314,6 @@ export interface DebriefSessionView {
     correct: boolean;
     escalate: boolean;
     verdict: boolean;
-    score: boolean;
     runAgain: boolean;
   };
 }
@@ -374,6 +367,8 @@ export interface DebriefAutonomyView {
     cells: Record<DebriefAutonomyStep, DebriefAutonomyValue>;
     /** The canary's (the κ gate's step). */
     eligible: boolean;
+    /** Learner try-outs may be switched on early (confirmed): agreement is the only thing missing. */
+    overridable?: boolean;
     reason: string;
     /** Per step: quick test, gate test and paired trial need only a clean record (plan §4). */
     eligibility?: Record<DebriefAutonomyStep, { eligible: boolean; reason: string }>;
@@ -659,25 +654,22 @@ export interface DebriefAnalyticsView {
       projectedMonthUsd: number | null;
     };
   };
+  /**
+   * Agreement between the independent check and the clinical advisor's yes/no answers under
+   * their verdicts (ally-be `DebriefAgreementService.view`); hand scoring was removed 2026-11-12.
+   */
   judgeAgreement: null | {
-    gate: {
-      met: boolean;
-      checks: Array<{ measure: string; kappa: number | null; passes: boolean }>;
-    };
-    target: number;
-    debriefsRated: number;
-    ratings: number;
-    peopleRating: number;
-    dimensions: Array<{
-      dimension: string;
-      kappa: number | null;
-      withinOnePct: number | null;
-      meanDifference: number | null;
-      pairs: number;
-    }>;
-    hardFails: Array<{ code: string; kappa: number | null; pairs: number }>;
-    /** People with each other, by dimension (shape as ally-be sends it). */
-    humanVsHuman: unknown;
-    expertVerdicts: unknown;
+    gate: { met: boolean; failing?: unknown[] };
+    /** The agreement each measure needs (0.6). */
+    kappa: number;
+    /** Reviews a measure needs before its agreement counts (50). */
+    minReviews: number;
+    measures: Array<
+      Pick<
+        DebriefMeasureAgreement,
+        "measure" | "n" | "kappa" | "agreementPct" | "recallOnNo" | "state" | "passes"
+      >
+    >;
+    sample: { size: number; thisWeek: number; waiting: number };
   };
 }

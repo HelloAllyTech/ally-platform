@@ -31,19 +31,6 @@ export const statusOf = (s: {
 export const scenarioTitle = (title: string | null | undefined, sessionId: string) =>
   title || en.debriefs.home.untitled(shortId(sessionId));
 
-const ToScoreBadge: React.FC<{ size: number }> = ({ size }) => (
-  <span
-    role="img"
-    aria-label={en.debriefs.home.toScoreBadge}
-    title={en.debriefs.home.toScoreBadge}
-    data-testid="to-score-badge"
-    style={{ width: size, height: size }}
-    className="inline-flex shrink-0 items-center justify-center rounded-full bg-primary-500 text-sm font-bold text-white"
-  >
-    !
-  </span>
-);
-
 const time = (iso: string) =>
   iso ? new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "—";
 
@@ -92,8 +79,7 @@ export const SessionCard: React.FC<{
   item: SessionItem;
   to: string;
   selected: boolean;
-  showScore: boolean;
-}> = ({ item, to, selected, showScore }) => {
+}> = ({ item, to, selected }) => {
   const h = en.debriefs.home;
   return (
     <Link
@@ -109,7 +95,6 @@ export const SessionCard: React.FC<{
       <div className="flex flex-wrap items-center gap-2">
         <Tags item={item} />
         <span className="ml-auto text-[13px] text-neutral-600">{time(item.createdAt)}</span>
-        {showScore && item.toScore && <ToScoreBadge size={22} />}
       </div>
       <div className="flex flex-col gap-1">
         <div className="text-[17px] font-semibold">
@@ -139,8 +124,7 @@ export const SessionRow: React.FC<{
   item: SessionItem;
   to: string;
   selected: boolean;
-  showScore: boolean;
-}> = ({ item, to, selected, showScore }) => (
+}> = ({ item, to, selected }) => (
   <Link
     to={to}
     data-testid="session-row"
@@ -172,7 +156,6 @@ export const SessionRow: React.FC<{
     <div className="text-sm">{secs(item.seconds)}</div>
     <div className="flex items-center justify-end gap-2 text-[13px] text-neutral-600">
       {time(item.createdAt)}
-      {showScore && item.toScore ? <ToScoreBadge size={20} /> : <span className="w-5" />}
     </div>
   </Link>
 );

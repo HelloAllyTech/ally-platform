@@ -44,7 +44,6 @@ export * from "./cohorts";
 export * from "./internalMonologue";
 export * from "./helpline";
 export * from "./skillExperiments";
-export * from "./debriefCalibration";
 export * from "./debriefConsole";
 export * from "./debriefConsoleView";
 export * from "./debriefExpertReview";

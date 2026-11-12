@@ -12,6 +12,8 @@ export type ExpertCommentTag =
   | "protocol"
   | "language"
   | "too_long_or_unclear"
+  /** Names no specific moment: pre-fills Evidence = No. */
+  | "too_vague"
   | "good_keep_this";
 
 export interface ExpertTranscriptTurn {

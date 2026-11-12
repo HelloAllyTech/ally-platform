@@ -3,167 +3,36 @@ import React from "react";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { en } from "@constants";
-import { DebriefAnalyticsView, DebriefCalibrationAgreement } from "@types";
+import { DebriefAnalyticsView } from "@types";
 
 import { ChartCard, KpiTile } from "../../Analytics/chartKit";
-import { codeWords } from "../consoleLabels";
-import { DEBRIEF_DIMENSIONS } from "../ScoreByHand";
-import { BulletRow, BulletRows, kappaWords, NumbersTable } from "./metricsCharts";
+import { gateMeasureLabel } from "../consoleLabels";
+import { BulletRows, kappaWords, NumbersTable } from "./metricsCharts";
 import { TargetState } from "./metricsData";
 
-const kappa = (value: number | null) =>
-  value === null ? en.debriefs.calibration.needsMore : value.toFixed(2);
-
-/** ally-be `DEBRIEF_AUTONOMY_KAPPA`: each gate check needs κ ≥ 0.6. */
-const GATE_KAPPA = 0.6;
-
-/** κ in words beside the bar: "0.72, substantial", or what it still needs. */
-const kappaInWords = (value: number | null) =>
-  value === null
-    ? en.debriefs.calibration.needsMore
-    : en.debriefs.calibration.kappaWords(value.toFixed(2), kappaWords(value));
-
-const stateOf = (value: number | null, passes?: boolean): TargetState =>
-  value === null ? "no_data" : (passes ?? value >= GATE_KAPPA) ? "met" : "missed";
-
-const kappaRow = (
-  key: string,
-  label: string,
-  value: number | null,
-  passes: boolean | undefined,
-  extra?: string,
-): BulletRow => ({
-  key,
-  label,
-  value,
-  min: 0,
-  max: 1,
-  targets: [GATE_KAPPA],
-  targetLabel: `≥ ${GATE_KAPPA.toFixed(1)}`,
-  words: (
-    <>
-      {kappaInWords(value)}
-      {extra && <span className="block text-typography-500">{extra}</span>}
-    </>
-  ),
-  state: stateOf(value, passes),
-});
-
-/** The autonomy gate: each check's κ against the 0.6 it needs, with the table behind it. */
-const GateChart: React.FC<{ agreement: DebriefCalibrationAgreement }> = ({ agreement }) => {
-  const strings = en.debriefs.calibration;
-  const label = (m: string) => en.debriefs.gateMeasures[m] ?? codeWords(m);
-  return (
-    <section className="flex flex-col gap-2" data-testid="calibration-gate">
-      <h3 className="flex items-center gap-1 text-xl font-normal text-typography-900">
-        {strings.gateHeading}
-        <InfoTip label={strings.gateHelp} ariaLabel={strings.gateAbout} />
-      </h3>
-      <ChartCard title={strings.gateColumns.agreement} caption={strings.kappaGloss}>
-        <BulletRows
-          testId="gate-chart"
-          head={[strings.gateColumns.measure, strings.chartAxis, strings.gateColumns.agreement]}
-          rows={agreement.gate.checks.map(check =>
-            kappaRow(check.measure, label(check.measure), check.kappa, check.passes),
-          )}
-        />
-        <NumbersTable
-          testId="gate-numbers"
-          head={Object.values(strings.gateColumns)}
-          rows={agreement.gate.checks.map(check => [
-            label(check.measure),
-            kappa(check.kappa),
-            check.passes ? strings.gatePasses : strings.gateNotYet,
-          ])}
-        />
-      </ChartCard>
-    </section>
-  );
-};
-
-/** Agreement on each part of the rubric: the judge against people, κ against the same 0.6. */
-const AgreementChart: React.FC<{ agreement: DebriefCalibrationAgreement }> = ({ agreement }) => {
-  const strings = en.debriefs.calibration;
-  const lean = (d: number | null) =>
-    d === null
-      ? "—"
-      : Math.abs(d) < 0.05
-        ? strings.leanEven
-        : d > 0
-          ? strings.leanHigher(d)
-          : strings.leanLower(d);
-  const parts = DEBRIEF_DIMENSIONS.map(dimension => ({
-    dimension,
-    label: en.debriefs.dimensions[dimension].label,
-    judge: agreement.judgeVsHuman.dimensions[dimension],
-    people: agreement.humanVsHuman.dimensions[dimension],
-  }));
-  return (
-    <section className="flex flex-col gap-2" data-testid="calibration-agreement">
-      <h3 className="text-xl font-normal text-typography-900">{strings.agreementHeading}</h3>
-      <ChartCard title={strings.agreementColumns.judge} caption={strings.kappaGloss}>
-        <BulletRows
-          testId="agreement-chart"
-          head={[strings.agreementColumns.part, strings.chartAxis, strings.agreementColumns.judge]}
-          rows={parts.map(p =>
-            kappaRow(
-              p.dimension,
-              p.label,
-              p.judge?.weightedKappa ?? null,
-              undefined,
-              strings.peopleLine(kappa(p.people?.weightedKappa ?? null)),
-            ),
-          )}
-        />
-        <NumbersTable
-          testId="agreement-numbers"
-          head={Object.values(strings.agreementColumns)}
-          rows={parts.map(p => [
-            p.label,
-            kappa(p.judge?.weightedKappa ?? null),
-            p.judge?.withinOnePct == null ? "—" : `${p.judge.withinOnePct}%`,
-            // The judge is the first rater in judge-vs-human, so positive = judge higher.
-            lean(p.judge?.meanDifference ?? null),
-            kappa(p.people?.weightedKappa ?? null),
-          ])}
-        />
-      </ChartCard>
-    </section>
-  );
-};
-
 type Agreement = NonNullable<DebriefAnalyticsView["judgeAgreement"]>;
+type Measure = Agreement["measures"][number];
 
-/** `GET analytics`'s judge agreement in the shape the two charts read. */
-export const toCalibrationShape = (a: Agreement): DebriefCalibrationAgreement =>
-  ({
-    gate: a.gate,
-    target: a.target,
-    judgeVsHuman: {
-      dimensions: Object.fromEntries(
-        a.dimensions.map(d => [
-          d.dimension,
-          {
-            pairs: d.pairs,
-            debriefs: d.pairs,
-            weightedKappa: d.kappa,
-            withinOnePct: d.withinOnePct,
-            meanDifference: d.meanDifference,
-          },
-        ]),
-      ),
-      hardFails: {},
-    },
-    humanVsHuman: (a.humanVsHuman as DebriefCalibrationAgreement["humanVsHuman"] | null) ?? {
-      dimensions: {},
-      hardFails: {},
-    },
-  }) as unknown as DebriefCalibrationAgreement;
+const STATE: Record<Measure["state"], TargetState> = {
+  not_enough: "no_data",
+  undefined: "no_data",
+  below: "missed",
+  met: "met",
+};
+
+/** The agreement in words beside the bar: "0.72, substantial", or what it still needs. */
+const inWords = (m: Measure, minReviews: number) => {
+  const strings = en.debriefs.calibration;
+  if (m.state === "not_enough") return strings.notYet(m.n, minReviews);
+  if (m.state === "undefined" || m.kappa === null) return strings.states.undefined;
+  return strings.kappaWords(m.kappa.toFixed(2), kappaWords(m.kappa));
+};
 
 /**
- * Analytics › Debriefs › Judge agreement (moved from the console's Calibration tab, 2026-11-12):
- * how far the judge agrees with people who score by hand, which gates the PM agent's autonomy.
- * Read from `GET analytics` with the rest of the page's console numbers.
+ * Analytics › Debriefs › Judge agreement: how far the independent check agrees with the clinical
+ * advisor's yes/no answers under their verdicts (the same numbers as Settings › What the PM agent
+ * may do alone). Hand scoring was removed on 2026-11-12; this replaced its κ-by-rubric-part
+ * charts. Read from `GET analytics` with the rest of the page's console numbers.
  */
 export const JudgeAgreementSection: React.FC<{
   agreement: DebriefAnalyticsView["judgeAgreement"] | undefined;
@@ -173,6 +42,8 @@ export const JudgeAgreementSection: React.FC<{
 }> = ({ agreement, loading, error, onRetry }) => {
   const strings = en.debriefs.calibration;
   const tileState = { loading, error: !!error, onRetry };
+  const reviews = agreement ? Math.max(0, ...agreement.measures.map(m => m.n)) : null;
+  const line = agreement?.kappa ?? 0.6;
   return (
     <section className="flex flex-col gap-6" data-testid="judge-agreement">
       <div>
@@ -183,13 +54,17 @@ export const JudgeAgreementSection: React.FC<{
         <KpiTile
           label={strings.kpis.rated}
           description={strings.kpis.ratedHelp}
-          value={agreement ? strings.ofTarget(agreement.debriefsRated, agreement.target) : "—"}
+          value={agreement && reviews !== null ? String(reviews) : "—"}
           {...tileState}
         />
         <KpiTile
-          label={strings.kpis.raters}
-          description={strings.kpis.ratersHelp}
-          value={String(agreement?.peopleRating ?? "—")}
+          label={strings.kpis.sample}
+          description={strings.kpis.sampleHelp}
+          value={
+            agreement
+              ? strings.kpis.sampleValue(agreement.sample.thisWeek, agreement.sample.waiting)
+              : "—"
+          }
           {...tileState}
         />
         <KpiTile
@@ -208,11 +83,49 @@ export const JudgeAgreementSection: React.FC<{
         />
       ) : loading ? (
         <LoadingBlock lines={4} />
-      ) : agreement ? (
-        <>
-          <GateChart agreement={toCalibrationShape(agreement)} />
-          <AgreementChart agreement={toCalibrationShape(agreement)} />
-        </>
+      ) : agreement && agreement.measures.length > 0 ? (
+        <section className="flex flex-col gap-2" data-testid="calibration-gate">
+          <h3 className="flex items-center gap-1 text-xl font-normal text-typography-900">
+            {strings.gateHeading}
+            <InfoTip label={strings.gateHelp(agreement.minReviews)} ariaLabel={strings.gateAbout} />
+          </h3>
+          <ChartCard title={strings.columns.agreement} caption={strings.chartCaption}>
+            <BulletRows
+              testId="gate-chart"
+              head={[strings.columns.measure, strings.chartAxis, strings.columns.agreement]}
+              rows={agreement.measures.map(m => ({
+                key: m.measure,
+                label: gateMeasureLabel(m.measure),
+                value: m.kappa,
+                min: 0,
+                max: 1,
+                targets: [line],
+                targetLabel: `≥ ${line.toFixed(1)}`,
+                words: (
+                  <>
+                    {inWords(m, agreement.minReviews)}
+                    <span className="block text-typography-500">
+                      {strings.caught(m.recallOnNo.caught, m.recallOnNo.of)}
+                    </span>
+                  </>
+                ),
+                state: STATE[m.state],
+              }))}
+            />
+            <NumbersTable
+              testId="gate-numbers"
+              head={Object.values(strings.columns)}
+              rows={agreement.measures.map(m => [
+                gateMeasureLabel(m.measure),
+                m.kappa === null ? "—" : m.kappa.toFixed(2),
+                strings.reviews(m.n, agreement.minReviews),
+                m.agreementPct === null ? "—" : `${m.agreementPct}%`,
+                m.recallOnNo.of === 0 ? "—" : `${m.recallOnNo.caught} of ${m.recallOnNo.of}`,
+                strings.states[m.state],
+              ])}
+            />
+          </ChartCard>
+        </section>
       ) : (
         <p className="text-sm text-typography-700" data-testid="judge-agreement-empty">
           {strings.noAgreement}

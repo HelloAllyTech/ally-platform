@@ -98,7 +98,7 @@ const Facts: React.FC<{ view: DebriefSessionView }> = ({ view }) => {
     {
       k: f.release,
       v: view.run.releaseVersion != null ? releaseVersionLabel(view.run.releaseVersion) : "—",
-      sub: "",
+      sub: view.run.arm ? (f.arm[view.run.arm] ?? "") : "",
     },
   ];
   return (
@@ -450,7 +450,6 @@ export const DebriefSessionPage: React.FC = () => {
             onFocusThread={setActiveId}
             onDecide={decide}
             onClose={() => setPaneOpen(false)}
-            onScored={() => setDone(s.reviewed.scored)}
           />
         )}
       </div>

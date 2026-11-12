@@ -6,7 +6,7 @@ import { DebriefSessionView, ExpertComment, ExpertReviewDetail } from "@types";
 
 import { sectionLabel } from "../consoleLabels";
 import { DebriefAccess } from "../debriefAccess";
-import { HARD_FAILS, ScoreByHand } from "../ScoreByHand";
+import { HARD_FAILS } from "../hardFails";
 import { EarlierComments, Thread, VerdictPanel } from "./commentParts";
 import { isRed, pendingBody, pendingHeadline } from "./pendingActions";
 import { Decision, decisionLabel } from "./WaitingBar";
@@ -79,8 +79,8 @@ const JudgeReasons: React.FC<{ view: DebriefSessionView }> = ({ view }) => {
 
 /**
  * The Review button's drop-down panel (closed by default): the decisions waiting on the viewer's
- * role, then the comments, then the advisor's verdict and scoring. Folds in what the Review tab,
- * Expert review and the calibration drawer did before the redesign.
+ * role, then the comments, then the advisor's verdict and the agreement questions. Folds in what the
+ * Review tab and Expert review did before the redesign.
  */
 export const ReviewPanel: React.FC<{
   view: DebriefSessionView;
@@ -91,7 +91,6 @@ export const ReviewPanel: React.FC<{
   onFocusThread: (id: string) => void;
   onDecide: (d: Decision) => void;
   onClose: () => void;
-  onScored: () => void;
 }> = props => {
   const { view, access } = props;
   const s = en.debriefs.session.panel;
@@ -241,21 +240,6 @@ export const ReviewPanel: React.FC<{
               ))}
             </ul>
           </Card>
-        )}
-
-        {view.can.score && view.scoring.inMyScoringSample && (
-          <details
-            className="rounded-sm bg-neutral-50 px-4 py-3.5 text-sm"
-            data-testid="score-by-hand"
-          >
-            <summary className="cursor-pointer text-[15px] font-semibold">
-              {s.scoreByHand}{" "}
-              <span className="text-xs font-normal text-neutral-600">· {s.inSample}</span>
-            </summary>
-            <div className="mt-2.5">
-              <ScoreByHand sessionId={view.run.sessionId} onSaved={props.onScored} />
-            </div>
-          </details>
         )}
       </div>
     </aside>

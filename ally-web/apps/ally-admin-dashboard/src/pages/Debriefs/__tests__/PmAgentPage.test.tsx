@@ -265,7 +265,7 @@ beforeEach(() => {
 });
 
 describe("PM agent › Ideas", () => {
-  it("shows the report inline, each rung, and no canary button before the paired trial passes", () => {
+  it("shows the report inline, each rung, and no try-out button before the side-by-side trial passes", () => {
     renderPage();
     expect(screen.getByTestId("pm-agent-report")).toHaveTextContent("Scores are up.");
     expect(screen.getByTestId("idea-screen")).toHaveTextContent("+0.50 on 6 sessions");
@@ -273,7 +273,9 @@ describe("PM agent › Ideas", () => {
     expect(screen.getByTestId("idea-group-testing")).toHaveTextContent(
       "Put the risk-cue point first",
     );
-    expect(screen.queryByRole("button", { name: /Approve and start canary/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Approve and try it on some learners/ }),
+    ).toBeNull();
   });
 
   it("names a prompt change's prompt, not its code, and shows the diff", () => {
@@ -321,7 +323,7 @@ describe("PM agent › Ideas", () => {
     );
     renderPage();
     expect(screen.getByTestId("idea-setting")).toHaveTextContent(
-      "Share of live debriefs on the canary: change to 20%",
+      "Try-out share of new debriefs: change to 20%",
     );
     expect(screen.getByTestId("idea-forecast")).toHaveTextContent("Read to the end:");
     expect(screen.getByTestId("idea-canary")).toHaveTextContent(
@@ -329,7 +331,7 @@ describe("PM agent › Ideas", () => {
     );
   });
 
-  it("puts an idea whose trial passed under Needs you; starting the canary asks first", async () => {
+  it("puts an idea whose trial passed under Needs you; trying it on learners asks first", async () => {
     h.pmAgent.mockReturnValue(
       state([{ ...IDEA, evidence: { ...IDEA.evidence, trial: TRIAL_PASSED } }]),
     );
@@ -339,18 +341,20 @@ describe("PM agent › Ideas", () => {
     );
     expect(screen.getByTestId("pm-strip")).toHaveTextContent("1 needs you");
     expect(screen.getByTestId("idea-trial")).toHaveTextContent("34 pairs · +0.40 (+0.10 to +0.70)");
-    const approve = screen.getByRole("button", { name: /Approve and start canary/ });
-    expect(approve).toHaveTextContent("Recommended · up to 30% of live debriefs");
+    const approve = screen.getByRole("button", { name: /Approve and try it on some learners/ });
+    expect(approve).toHaveTextContent(
+      "Recommended · up to 30% of new debriefs; everyone only after a person puts it live",
+    );
     fireEvent.click(approve);
     expect(h.decide).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Start the canary" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try it on some learners" }));
     await waitFor(() =>
       expect(h.decide).toHaveBeenCalledWith({ id: IDEA.id, decision: "approve" }),
     );
-    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith("Canary started."));
+    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith("Trying it on some learners."));
   });
 
-  it("a canary that passed sits under In canary and is promoted after confirming", async () => {
+  it("a try-out that passed sits under Trying on learners and goes live for everyone after confirming", async () => {
     h.pmAgent.mockReturnValue(
       state([
         {
@@ -374,12 +378,16 @@ describe("PM agent › Ideas", () => {
     );
     renderPage();
     expect(screen.getByTestId("idea-group-canary")).toHaveTextContent(
-      "Ready to promote · 31 so far",
+      "Ready to put live for everyone · 31 so far",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Promote to everyone" }));
-    fireEvent.click(screen.getByRole("button", { name: "Promote" }));
+    fireEvent.click(screen.getByRole("button", { name: "Put live for everyone" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Put live for everyone" }),
+    );
     await waitFor(() =>
-      expect(h.toastSuccess).toHaveBeenCalledWith("Promoted. Every learner now gets this change."),
+      expect(h.toastSuccess).toHaveBeenCalledWith(
+        "Live for everyone. Every learner now gets this change.",
+      ),
     );
   });
 
@@ -390,7 +398,9 @@ describe("PM agent › Ideas", () => {
       ]),
     );
     renderPage();
-    expect(screen.queryByRole("button", { name: /Approve and start canary/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Approve and try it on some learners/ }),
+    ).toBeNull();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
   });
 
@@ -536,6 +546,9 @@ describe("PM agent › Ideas", () => {
       );
       renderPage();
       expect(buttons()).toEqual(["Approve", "Ask for a change"]);
+      expect(screen.getByTestId("idea")).toHaveTextContent(
+        "Written by the Ally engineering team and not yet reviewed by a clinician. Read it, then approve it or ask for a change.",
+      );
       const rule = screen.getByTestId("pinned-rule-text");
       expect(rule.tagName).not.toBe("DETAILS");
       expect(rule).toHaveTextContent(LIVE);
@@ -585,6 +598,11 @@ describe("PM agent › Ideas", () => {
       );
       fireEvent.click(screen.getByRole("button", { name: "Reject" }));
       const dialog = screen.getByRole("dialog");
+      // The confirm button is Carbon danger (red).
+      expect(within(dialog).getByRole("button", { name: "Reject" })).toHaveAttribute(
+        "data-kind",
+        "danger",
+      );
       fireEvent.click(within(dialog).getByRole("button", { name: "Reject" }));
       expect(h.rejectPinned).not.toHaveBeenCalled();
       expect(dialog).toHaveTextContent("Say why you are rejecting it.");
@@ -689,7 +707,7 @@ describe("PM agent › Ideas", () => {
     });
     renderPage();
     const banner = screen.getByTestId("pm-release-waiting-banner");
-    expect(banner).toHaveTextContent("would undo a promoted change");
+    expect(banner).toHaveTextContent("would undo a change a person put live");
     expect(within(banner).getByRole("link", { name: "See Releases" })).toHaveAttribute(
       "href",
       "/debriefs/pm-agent?view=releases",
@@ -705,7 +723,7 @@ describe("PM agent › Ideas", () => {
           {
             kind: "prompts",
             cells: cells("ask"),
-            reason: "Not yet: judge agreement below 0.6 (evidence_specificity 0.52).",
+            reason: "Not yet: agreement below 0.6 (evidence_specificity 0.52).",
             relockReason: null,
           },
           { kind: "pinned_rules", cells: cells("off"), reason: "", relockReason: null },
@@ -714,21 +732,21 @@ describe("PM agent › Ideas", () => {
     });
     renderPage();
     const chips = screen.getByTestId("autonomy-chips");
-    // Plan §4: tests alone, the canary (learners) still asks first.
-    expect(chips).toHaveTextContent("Settings: tests alone, asks before learners");
+    // The checks learners never see always run alone; the chip is about learner try-outs.
+    expect(chips).toHaveTextContent("Settings: asks first");
     expect(chips).toHaveTextContent("Prompts and agents: asks first");
     expect(chips).toHaveTextContent("Pinned rules: never");
     // Its reason, on hover, never shows a code.
     for (const chip of chips.querySelectorAll("[title]")) {
       expect(chip.getAttribute("title")).not.toMatch(/[a-z]+_[a-z]+/);
     }
-    expect(chips.querySelector("[data-state=asks_first]")).toHaveAttribute(
+    expect(chips.querySelectorAll("[data-state=asks_first]")[1]).toHaveAttribute(
       "title",
-      "Not yet: judge agreement below 0.6 (Evidence 0.52).",
+      "Not yet: agreement below 0.6 (Evidence 0.52).",
     );
   });
 
-  it("says yes only when the canary itself runs alone", () => {
+  it("says on its own only when learner try-outs run alone", () => {
     const all = (v: string) => ({ quick_test: v, gate_test: v, paired_trial: v, canary: v });
     h.autonomy.mockReturnValue({
       data: {
@@ -741,7 +759,7 @@ describe("PM agent › Ideas", () => {
     });
     renderPage();
     const chips = screen.getByTestId("autonomy-chips");
-    expect(chips).toHaveTextContent("Settings: yes");
+    expect(chips).toHaveTextContent("Settings: on its own");
     expect(chips).toHaveTextContent("Prompts and agents: asks first");
   });
 
@@ -896,7 +914,7 @@ describe("PM agent › Releases", () => {
     await waitFor(() => expect(h.toastError).toHaveBeenCalled());
   });
 
-  it("shows a release that would undo a promoted change as waiting, with Promote and Dismiss", async () => {
+  it("shows a release that would undo a change a person put live as waiting, with Put live and Dismiss", async () => {
     h.promoteWaiting.mockReturnValue(resolves());
     h.dismissWaiting.mockReturnValue(resolves());
     h.history.mockReturnValue(
@@ -964,9 +982,11 @@ describe("PM agent › Releases", () => {
     await waitFor(() =>
       expect(h.dismissWaiting).toHaveBeenCalledWith({ id: "d9", reason: "Keep the promoted one" }),
     );
-    fireEvent.click(within(waiting).getByRole("button", { name: "Promote" }));
+    fireEvent.click(within(waiting).getByRole("button", { name: "Put live for everyone" }));
     fireEvent.click(
-      within(screen.getByTestId("waiting-confirm")).getByRole("button", { name: "Promote" }),
+      within(screen.getByTestId("waiting-confirm")).getByRole("button", {
+        name: "Put live for everyone",
+      }),
     );
     await waitFor(() =>
       expect(h.promoteWaiting).toHaveBeenCalledWith({ id: "d9", reason: undefined }),

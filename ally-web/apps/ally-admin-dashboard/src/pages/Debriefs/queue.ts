@@ -7,8 +7,8 @@ import {
 
 /**
  * The Debriefs home's categories, in the order the switcher shows them. "Escalated to you" shows
- * only to someone who receives escalations; "To score" only to a scorer; "Agreement sample" only to
- * whoever gives verdicts (the clinical advisor).
+ * only to someone who receives escalations; "Agreement sample" only to whoever gives verdicts (the
+ * clinical advisor).
  */
 export const HOME_CATEGORIES = [
   "needs",
@@ -17,7 +17,6 @@ export const HOME_CATEGORIES = [
   "below",
   "published",
   "all",
-  "score",
   "agreement",
 ] as const;
 export type HomeCategory = (typeof HOME_CATEGORIES)[number];
@@ -32,7 +31,6 @@ export const CATEGORY_PARAM: Record<HomeCategory, DebriefHomeCategoryParam> = {
   below: "below",
   published: "published",
   all: "all",
-  score: "to_score",
   agreement: "agreement_sample",
 };
 
@@ -42,7 +40,6 @@ export const categoryCount = (
   cat: HomeCategory,
 ): number | null => {
   if (!counts) return null;
-  if (cat === "score") return counts.toScore;
   if (cat === "agreement") return counts.agreementSample ?? null;
   return counts[cat];
 };
@@ -59,16 +56,9 @@ export const FILTER_KEYS = [
 export type HomeFilters = Pick<DebriefSessionsQuery, (typeof FILTER_KEYS)[number]>;
 
 /** Which categories this viewer gets. */
-export const categoriesFor = (opts: {
-  score: boolean;
-  escalations: boolean;
-  verdict?: boolean;
-}): HomeCategory[] =>
+export const categoriesFor = (opts: { escalations: boolean; verdict?: boolean }): HomeCategory[] =>
   HOME_CATEGORIES.filter(
-    c =>
-      (c !== "score" || opts.score) &&
-      (c !== "escalated" || opts.escalations) &&
-      (c !== "agreement" || !!opts.verdict),
+    c => (c !== "escalated" || opts.escalations) && (c !== "agreement" || !!opts.verdict),
   );
 
 /**
@@ -93,18 +83,18 @@ export const readHomeState = (
 /**
  * Where the home opens with no category in the link. A clinical advisor who is not on the Ally
  * team has nothing to do in "Needs a person" (the team's queue): they open on "Escalated to you",
- * or "To score" when they get no escalations.
+ * or "Agreement sample" when they get no escalations.
  */
 export const defaultCategory = (access: {
   team: boolean;
   owner: boolean;
   advisor: boolean;
   receivesEscalations: boolean;
-  score: boolean;
+  verdict?: boolean;
 }): HomeCategory => {
   if (access.team || access.owner || !access.advisor) return "needs";
   if (access.receivesEscalations) return "escalated";
-  return access.score ? "score" : "needs";
+  return access.verdict ? "agreement" : "needs";
 };
 
 /** The query for a category and its filters. */

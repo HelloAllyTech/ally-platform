@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,8 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@constants";
 
 const h = vi.hoisted(() => ({
-  item: vi.fn(),
-  submit: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }));
@@ -32,95 +30,39 @@ vi.mock("../../Analytics/chartKit", () => ({
     </div>
   ),
 }));
-vi.mock("@api", async importOriginal => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useGetDebriefCalibrationItemQuery: (id: string) => h.item(id),
-  useScoreDebriefSessionMutation: () => [h.submit, { isLoading: false }],
-}));
 
 // eslint-disable-next-line import/first
 import { ConsoleOverviewSection } from "../metrics/ConsoleOverviewSection";
 // eslint-disable-next-line import/first
 import { JudgeAgreementSection } from "../metrics/JudgeAgreementSection";
-// eslint-disable-next-line import/first
-import { ScoreByHand } from "../ScoreByHand";
 
-const ok = (data: unknown) => ({
-  data,
-  isLoading: false,
-  isError: false,
-  error: undefined,
-  refetch: vi.fn(),
+const measure = (
+  m: string,
+  n: number,
+  kappa: number | null,
+  state: string,
+  caught: [number, number],
+) => ({
+  measure: m,
+  n,
+  kappa,
+  agreementPct: kappa === null ? null : 88.5,
+  recallOnNo: { caught: caught[0], of: caught[1], pct: null },
+  state,
+  passes: state === "met",
 });
 
-const DIMS = [
-  "evidence_specificity",
-  "accuracy",
-  "actionability",
-  "prioritisation",
-  "personalisation_progress",
-  "practice_alignment",
-  "tone",
-  "clarity",
-];
-const FAILS = [
-  "fabricated_quote",
-  "missed_risk_cue",
-  "diagnoses_trainee",
-  "wrong_language",
-  "contradicts_protocol",
-  "unsupported_progress_claim",
-];
-
-const dim = (k: number | null) => ({
-  pairs: 25,
-  debriefs: 25,
-  weightedKappa: k,
-  withinOnePct: k === null ? null : 80,
-  meanDifference: k === null ? null : 0.6,
-});
-const fail = (k: number | null) => ({ pairs: 25, debriefs: 25, kappa: k, exactAgreementPct: 90 });
-
-const AGREEMENT = {
-  rubricVersion: "v1",
-  judge: { judgeModel: "gemini-2.5-pro", judgePromptVersion: "v1" },
-  target: 150,
-  coverage: { debriefs: 25, ratings: 30, raters: 2 },
-  judgeVsHuman: {
-    dimensions: Object.fromEntries(DIMS.map(d => [d, dim(d === "accuracy" ? 0.72 : 0.5)])),
-    hardFails: Object.fromEntries(FAILS.map(f => [f, fail(0.8)])),
-  },
-  humanVsHuman: {
-    dimensions: Object.fromEntries(DIMS.map(d => [d, dim(null)])),
-    hardFails: Object.fromEntries(FAILS.map(f => [f, fail(null)])),
-  },
-  gate: {
-    met: false,
-    checks: [
-      { measure: "accuracy", kappa: 0.72, passes: true },
-      { measure: "evidence_specificity", kappa: 0.5, passes: false },
-      { measure: "missed_risk_cue", kappa: null, passes: false },
-    ],
-  },
-};
-
-/** `GET analytics`'s judge agreement for the same data. */
+/** `GET analytics`'s judge agreement: from the clinical advisor's yes/no answers. */
 const ANALYTICS_AGREEMENT = {
-  gate: AGREEMENT.gate,
-  target: 150,
-  debriefsRated: 1,
-  ratings: 2,
-  peopleRating: 2,
-  dimensions: DIMS.map(d => ({
-    dimension: d,
-    kappa: d === "accuracy" ? 0.72 : 0.5,
-    withinOnePct: 80,
-    meanDifference: 0.6,
-    pairs: 25,
-  })),
-  hardFails: [],
-  humanVsHuman: AGREEMENT.humanVsHuman,
-  expertVerdicts: null,
+  gate: { met: false },
+  kappa: 0.6,
+  minReviews: 50,
+  measures: [
+    measure("accuracy", 62, 0.72, "met", [3, 4]),
+    measure("evidence_specificity", 55, null, "undefined", [0, 0]),
+    measure("missed_risk_cue", 12, null, "not_enough", [1, 1]),
+  ],
+  sample: { size: 5, thisWeek: 3, waiting: 2 },
 };
 const renderAgreement = (agreement: unknown = ANALYTICS_AGREEMENT) =>
   render(
@@ -132,86 +74,42 @@ const renderAgreement = (agreement: unknown = ANALYTICS_AGREEMENT) =>
     />,
   );
 
-const ITEM = {
-  scenarioSessionId: "aaaaaaaa-0000-4000-8000-000000000001",
-  language: "hi",
-  transcript: [
-    { turnIndex: 1, speaker: "client", text: "I don't want to be here anymore" },
-    { turnIndex: 2, speaker: "learner", text: "Tell me more" },
-  ],
-  debrief: "At (turn 2) you invited the client to say more.",
-  myRating: null,
-};
+describe("Analytics › Debriefs › Judge agreement (from the advisor's answers)", () => {
+  beforeEach(() => vi.clearAllMocks());
 
-describe("Analytics › Debriefs › Judge agreement", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    h.item.mockReturnValue(ok(ITEM));
-    h.submit.mockReturnValue({ unwrap: () => Promise.resolve({ created: true }) });
+  it("shows reviews, the sample and whether try-outs may run alone", () => {
+    renderAgreement();
+    expect(screen.getByTestId("kpi-Reviews with answers")).toHaveTextContent("62");
+    expect(screen.getByTestId("kpi-Agreement sample")).toHaveTextContent("3 this week · 2 waiting");
+    expect(screen.getByTestId("kpi-Learner try-outs on their own")).toHaveTextContent(
+      "Needs approval",
+    );
   });
 
-  it("shows progress and the gate as a chart, with the table behind it", () => {
+  it("charts each measure's agreement against 0.6, with the problems caught and the table", () => {
     renderAgreement();
-    expect(screen.getByTestId("kpi-Debriefs rated")).toHaveTextContent("1 of 150");
-    expect(screen.getByTestId("kpi-PM agent autonomy")).toHaveTextContent("Needs approval");
     const accuracy = screen.getByTestId("gate-chart-accuracy");
     expect(accuracy).toHaveTextContent("0.72, substantial");
     expect(accuracy).toHaveTextContent("Target: ≥ 0.6");
     expect(accuracy).toHaveTextContent("On target");
-    expect(screen.getByTestId("gate-chart-evidence_specificity")).toHaveTextContent("Off target");
-    expect(screen.getByTestId("gate-chart-missed_risk_cue")).toHaveTextContent(
-      "Needs 20 rated debriefs",
+    expect(accuracy).toHaveTextContent("Independent check caught 3 of 4 problems you found");
+    expect(screen.getByTestId("gate-chart-evidence_specificity")).toHaveTextContent(
+      "Not measurable yet: every answer is the same",
     );
-    expect(screen.getByTestId("calibration-gate")).toHaveTextContent("0 is chance, 1 is always");
+    expect(screen.getByTestId("gate-chart-missed_risk_cue")).toHaveTextContent(
+      "Not measured yet: 12 of 50 reviews",
+    );
     const numbers = screen.getByTestId("gate-numbers");
     expect(numbers.tagName).toBe("DETAILS");
-    expect(within(numbers).getAllByText("Passes")).toHaveLength(1);
+    expect(numbers).toHaveTextContent("88.5%");
+    expect(numbers).toHaveTextContent("12 of 50");
+    expect(within(numbers).getAllByText("Met")).toHaveLength(1);
+    expect(screen.getByTestId("judge-agreement")).not.toHaveTextContent("κ");
   });
 
-  it("shows agreement per part of the rubric as a chart, with the table behind it", () => {
-    renderAgreement();
-    const accuracy = screen.getByTestId("agreement-chart-accuracy");
-    expect(accuracy).toHaveTextContent("Accuracy");
-    expect(accuracy).toHaveTextContent("0.72, substantial");
-    expect(accuracy).toHaveTextContent("People with each other: Needs 20 rated debriefs");
-    expect(screen.getByTestId("agreement-chart-tone")).toHaveTextContent("0.50, moderate");
-    expect(screen.getByTestId("agreement-numbers")).toHaveTextContent("0.6 higher");
-  });
-
-  it("score by hand saves only once every part is scored", async () => {
-    const onSaved = vi.fn();
-    render(<ScoreByHand sessionId={ITEM.scenarioSessionId} onSaved={onSaved} />);
-    expect(h.item).toHaveBeenCalledWith(ITEM.scenarioSessionId);
-
-    const save = screen.getByRole("button", { name: "Save rating" });
-    expect(save).toBeDisabled();
-    expect(screen.getByTestId("rating-left")).toHaveTextContent("8 parts left to score");
-
-    const labels = [
-      "Evidence",
-      "Accuracy",
-      "Next steps",
-      "Focus",
-      "Fit to the learner",
-      "Sound practice",
-      "Tone",
-      "Clarity",
-    ];
-    labels.forEach(label => fireEvent.click(screen.getByLabelText(`${label}: 7`)));
-    fireEvent.click(screen.getByLabelText(/ignores how the learner responded/));
-    expect(save).not.toBeDisabled();
-
-    fireEvent.click(save);
-    await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith("Rating saved"));
-    expect(onSaved).toHaveBeenCalled();
-    expect(h.submit).toHaveBeenCalledWith({
-      sessionId: ITEM.scenarioSessionId,
-      rating: {
-        scores: Object.fromEntries(DIMS.map(d => [d, 7])),
-        hardFails: ["missed_risk_cue"],
-        note: null,
-      },
-    });
+  it("says so when the advisor hasn't answered yet", () => {
+    renderAgreement({ ...ANALYTICS_AGREEMENT, measures: [] });
+    expect(screen.getByTestId("judge-agreement-empty")).toBeInTheDocument();
   });
 });
 

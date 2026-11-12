@@ -55,7 +55,7 @@ describe("console labels", () => {
   it("states a proposed setting the way the Settings tab shows it", () => {
     expect(
       settingChangeLabel("canaryShare", "0.25", { default: 0.1, kind: "share", group: "canary" }),
-    ).toBe("Share of live debriefs on the canary: change to 25%");
+    ).toBe("Try-out share of new debriefs: change to 25%");
     expect(
       settingChangeLabel("gateNoNewHardFails", "0", { default: true, kind: "bool", group: "gate" }),
     ).toBe("No new hard fails: change to No");
@@ -111,17 +111,17 @@ describe("Debriefs home labels", () => {
 });
 
 describe("the Debriefs home's opening category", () => {
-  it("opens a clinical advisor (not on the Ally team) on Escalated to you, else To score", async () => {
+  it("opens a clinical advisor (not on the Ally team) on Escalated to you, else the Agreement sample", async () => {
     const { defaultCategory } = await import("../queue");
     const base = {
       team: false,
       owner: false,
       advisor: true,
       receivesEscalations: true,
-      score: true,
+      verdict: true,
     };
     expect(defaultCategory(base)).toBe("escalated");
-    expect(defaultCategory({ ...base, receivesEscalations: false })).toBe("score");
+    expect(defaultCategory({ ...base, receivesEscalations: false })).toBe("agreement");
     expect(defaultCategory({ ...base, team: true })).toBe("needs");
     expect(defaultCategory({ ...base, owner: true })).toBe("needs");
     expect(defaultCategory({ ...base, advisor: false })).toBe("needs");

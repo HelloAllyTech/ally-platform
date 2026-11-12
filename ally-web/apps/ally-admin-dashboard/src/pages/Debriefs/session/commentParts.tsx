@@ -39,6 +39,8 @@ export const COMMENT_TAGS: ExpertCommentTag[] = [
   "wrong_or_unsupported",
   "tone",
   "advice_doesnt_fit",
+  // Pre-fills "Does each point name a specific moment?" as No (ally-be prefillAnswers).
+  "too_vague",
   "good_keep_this",
 ];
 

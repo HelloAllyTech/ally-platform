@@ -247,20 +247,6 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    scoreDebriefSession: builder.mutation<
-      unknown,
-      {
-        sessionId: string;
-        rating: { scores: Record<string, number>; hardFails: string[]; note?: string | null };
-      }
-    >({
-      query: ({ sessionId, rating }) => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.SCORE(sessionId),
-        method: HttpMethod.POST,
-        body: rating,
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE, TAG_TYPES.DEBRIEF_CALIBRATION],
-    }),
     addDebriefComment: builder.mutation<
       ExpertComment,
       { runId: string; comment: NewExpertComment }
@@ -499,7 +485,6 @@ export const {
   useGetDebriefSessionQuery,
   useGetDebriefAttentionQuery,
   useCorrectDebriefRunMutation,
-  useScoreDebriefSessionMutation,
   useAddDebriefCommentMutation,
   useEditDebriefCommentMutation,
   useDeleteDebriefCommentMutation,

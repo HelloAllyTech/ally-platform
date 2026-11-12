@@ -58,18 +58,15 @@ const CAN = (on: boolean) =>
   );
 const TEAM = {
   roles: { allyTeam: true, clinicalAdvisor: false, owner: false, receivesEscalations: false },
-  can: { ...CAN(true), verdict: false, score: false },
-  scorer: false,
+  can: { ...CAN(true), verdict: false },
 };
 const READER = {
   roles: { allyTeam: false, clinicalAdvisor: false, owner: false, receivesEscalations: false },
   can: CAN(false),
-  scorer: false,
 };
-const SCORER = {
+const ADVISOR = {
   roles: { allyTeam: false, clinicalAdvisor: true, owner: false, receivesEscalations: true },
-  can: { ...CAN(false), comment: true, verdict: true, score: true },
-  scorer: true,
+  can: { ...CAN(false), comment: true, verdict: true },
 };
 
 const item = (over: Record<string, unknown> = {}) => ({
@@ -102,8 +99,6 @@ const item = (over: Record<string, unknown> = {}) => ({
   learnerDistress: false,
   belowBar: false,
   reviewed: false,
-  inMyScoringSample: false,
-  toScore: false,
   waitingSince: null,
   ...over,
 });
@@ -143,7 +138,6 @@ const QUEUE = [
     flagged: true,
     needsPerson: true,
     waitingSince: "2026-11-12T04:00:00Z",
-    toScore: true,
   }),
 ];
 
@@ -157,7 +151,6 @@ const page = (items = QUEUE, viewer = TEAM) =>
       below: 1,
       published: 120,
       escalated: 0,
-      toScore: viewer.scorer ? 3 : null,
       all: 142,
     },
     items,
@@ -323,13 +316,18 @@ describe("Debriefs home", () => {
     expect(h.escalate).not.toHaveBeenCalled();
   });
 
-  it("gives a scorer To score and the ! badge", () => {
-    h.sessions.mockReturnValue(page(QUEUE, SCORER));
-    h.attention.mockReturnValue(attention(SCORER));
+  it("gives the clinical advisor no To score (Score by hand is gone), and plain column names", () => {
+    h.sessions.mockReturnValue(page(QUEUE, ADVISOR));
+    h.attention.mockReturnValue(attention(ADVISOR));
     renderAt();
-    expect(screen.getByRole("button", { name: /To score/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /To score/ })).toBeNull();
     expect(screen.getByRole("button", { name: /Escalated to you/ })).toBeInTheDocument();
-    expect(screen.getAllByTestId("to-score-badge")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /Agreement sample/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("to-score-badge")).toBeNull();
+    const card = screen.getAllByTestId("session-card")[0];
+    expect(card).toHaveTextContent("Independent check");
+    expect(card).toHaveTextContent("Ally’s own check");
+    expect(card).not.toHaveTextContent("Evaluator");
   });
 });
 

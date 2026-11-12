@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
   budgets: vi.fn(),
   autonomy: vi.fn(),
   setMatrix: vi.fn(),
+  setOrg: vi.fn(),
   permissions: [] as string[],
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -49,7 +50,7 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefMeQuery: () => ({ data: undefined }),
   useGetDebriefAutonomyQuery: () => h.autonomy(),
   useSetDebriefAutonomyMatrixMutation: () => [h.setMatrix, { isLoading: false }],
-  useSetDebriefOrgAutonomyMutation: () => [vi.fn(), { isLoading: false }],
+  useSetDebriefOrgAutonomyMutation: () => [h.setOrg, { isLoading: false }],
   useGetDebriefPinnedRulesQuery: () => ({ data: { rules: [] } }),
 }));
 vi.mock("react-redux", async importOriginal => ({
@@ -153,7 +154,7 @@ describe("Debrief owner settings (v9 FR-60)", () => {
   it("saves only what changed, with shares sent as fractions", async () => {
     render(<SettingsTab />);
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("Share of live debriefs on the canary"), {
+    fireEvent.change(screen.getByLabelText("Try-out share of new debriefs"), {
       target: { value: "20" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -239,6 +240,7 @@ const TENANTS = [
 ];
 
 const cells = (v: string) => ({ quick_test: v, gate_test: v, paired_trial: v, canary: "ask" });
+const ALWAYS = "Always on its own: learners never see it; paid from the learning budget.";
 const AUTONOMY = {
   enabled: true,
   steps: ["quick_test", "gate_test", "paired_trial", "canary"],
@@ -258,12 +260,13 @@ const AUTONOMY = {
       configurable: true,
       cells: cells("ask"),
       eligible: false,
+      overridable: true,
       reason: "Accuracy 0.52",
       eligibility: {
-        quick_test: { eligible: true, reason: "Yes: learners never see it; budget-capped." },
-        gate_test: { eligible: true, reason: "Yes: learners never see it; budget-capped." },
-        paired_trial: { eligible: true, reason: "Yes: learners never see it; budget-capped." },
-        canary: { eligible: false, reason: "Not yet: judge agreement below 0.6 (accuracy 0.52)." },
+        quick_test: { eligible: true, reason: ALWAYS },
+        gate_test: { eligible: true, reason: ALWAYS },
+        paired_trial: { eligible: true, reason: ALWAYS },
+        canary: { eligible: false, reason: "Not yet: agreement below 0.6 (accuracy 0.52)." },
       },
       relockedAt: null,
       relockReason: null,
@@ -490,7 +493,7 @@ describe("What the PM agent may do alone", () => {
       </MemoryRouter>,
     );
 
-  it("shows judge agreement with the clinical advisor per measure: κ, reviews, problems caught", () => {
+  it("shows agreement with the clinical advisor per measure: agreement, reviews, problems caught", () => {
     h.permissions = [];
     const m = (measure: string, over: Record<string, unknown>) => ({
       measure,
@@ -530,67 +533,112 @@ describe("What the PM agent may do alone", () => {
     expect(panel).toHaveTextContent("Judge agreement with the clinical advisor");
     expect(panel).toHaveTextContent("random sample: 3 this week");
     expect(screen.getByTestId("agreement-row-accuracy")).toHaveTextContent(
-      "AccuracyNot measured yet37 of 50 reviews · Judge caught 3 of 4 problems",
+      "AccuracyNot measured yet37 of 50 reviews · Independent check caught 3 of 4 problems you found",
     );
     expect(screen.getByTestId("agreement-row-evidence_specificity")).toHaveTextContent(
-      "EvidenceMetκ 0.71 · 52 reviews · Judge caught 6 of 7 problems",
+      "EvidenceMetAgreement 0.71 · 52 reviews · Independent check caught 6 of 7 problems you found",
     );
     expect(screen.getByTestId("agreement-row-missed_risk_cue")).toHaveTextContent(
-      "Missed risk cueEvery answer the same so farκ — · 60 reviews · No problems found yet",
+      "Missed risk cueNot measurable yet: every answer is the sameAgreement — · 60 reviews · No problems found yet",
     );
-    expect(panel).toHaveTextContent("Each needs 50 reviews and κ ≥ 0.6");
-    expect(panel.textContent).not.toMatch(/[a-z]+_[a-z]+/);
+    expect(panel).toHaveTextContent(
+      "Each measure needs 50 reviews and agreement of at least 0.6. If any drops below, learner try-outs go back to asking a person.",
+    );
+    expect(panel.textContent).not.toMatch(/κ|[a-z]+_[a-z]+/);
   });
 
-  it("shows three rows, pinned rules always a person, and only the two per-organisation columns", () => {
+  it("shows two rows and two columns: Try on learners and Live for everyone (always a person)", () => {
     h.permissions = [];
     renderPage();
     const rows = screen.getAllByTestId("autonomy-row");
     expect(rows.map(r => r.firstElementChild?.textContent)).toEqual([
       "Settings (not budgets)",
       "Prompts, agents and default plans",
-      "Pinned rules",
     ]);
-    // Every cell is a dropdown; pinned rules and Promote are disabled ones with their reason.
-    for (const step of ["quick_test", "gate_test", "paired_trial", "canary", "promote"]) {
-      const cell = screen.getByTestId(`autonomy-pinned_rules-${step}`);
-      expect(within(cell).getByRole("combobox")).toBeDisabled();
-      expect(within(cell).getByRole("combobox")).toHaveDisplayValue("Always a person");
-      expect(cell).toHaveAttribute(
-        "title",
-        "Pinned rules are written and signed off by the clinical advisor or the owner",
-      );
+    const matrix = screen.getByTestId("autonomy-matrix");
+    expect(matrix).toHaveTextContent("Try on learners");
+    expect(matrix).toHaveTextContent("Live for everyone");
+    for (const gone of ["Quick check", "Pass test", "Side-by-side trial", "Pinned rules"]) {
+      expect(matrix).not.toHaveTextContent(gone);
     }
+    expect(screen.queryByTestId("autonomy-settings-quick_test")).toBeNull();
     const promote = screen.getByTestId("autonomy-settings-promote");
     expect(within(promote).getByRole("combobox")).toBeDisabled();
     expect(within(promote).getByRole("combobox")).toHaveDisplayValue("Always a person");
-    expect(promote).toHaveAttribute("title", "Promoting to everyone always needs a person.");
-    expect(screen.getByTestId("autonomy-intro")).toHaveTextContent(
-      "A canary reaches real learners, so it opens only once the judge agrees",
+    expect(promote).toHaveAttribute("title", "The plan requires a person to put every change live");
+    // The five-point intro from the design.
+    const intro = screen.getByTestId("autonomy-intro");
+    expect(intro.querySelectorAll("li")).toHaveLength(5);
+    expect(intro).toHaveTextContent(
+      "Quick check, pass test, side-by-side trial: learners never see these, so the PM agent always runs them on its own, paid from the learning budget.",
     );
-    expect(screen.getByTestId("org-autonomy")).toHaveTextContent("Canaries on its learners");
-    expect(screen.getByTestId("org-autonomy")).not.toHaveTextContent("guidance");
+    expect(intro).toHaveTextContent("Taken back automatically:");
+    expect(intro).toHaveTextContent("The system only tightens, never loosens.");
+    expect(intro).toHaveTextContent("Live for everyone: always a person approves");
+    expect(within(intro).getByRole("link", { name: "Pinned rules" })).toBeInTheDocument();
     expect(screen.getByTestId("autonomy-facts")).toHaveTextContent("measured from Release 2");
-    // Someone who isn't the owner sees the same dropdowns, disabled.
+    // Someone who isn't the owner sees the same dropdown, disabled.
     expect(
-      within(screen.getByTestId("autonomy-settings-quick_test")).getByRole("combobox"),
+      within(screen.getByTestId("autonomy-settings-canary")).getByRole("combobox"),
     ).toBeDisabled();
-    expect(screen.getByTestId("autonomy-settings-quick_test")).toHaveAttribute(
+    expect(screen.getByTestId("autonomy-settings-canary")).toHaveAttribute(
       "title",
       "Only the owner changes this.",
     );
   });
 
-  describe("canary override before the judge-agreement gate", () => {
+  it("per organisation: side-by-side trials Allowed / Not on its sessions; try-outs three choices", () => {
+    h.permissions = ["manage:admin:debrief-settings"];
+    h.autonomy.mockReturnValue({
+      data: {
+        ...AUTONOMY,
+        orgs: [
+          {
+            tenantId: "t1",
+            tenantName: "Ally Demo",
+            live: true,
+            // An older "ask" on side-by-side trials reads as Allowed.
+            overrides: { paired_trial: "ask", canary: "ask" },
+          },
+        ],
+      },
+    });
+    h.setOrg.mockReturnValue(resolves());
+    renderPage();
+    const org = screen.getByTestId("org-autonomy");
+    expect(org).toHaveTextContent("Side-by-side trials on its learners");
+    expect(org).toHaveTextContent("Try-outs on its learners");
+    expect(org).not.toHaveTextContent("guidance");
+    const trials = screen.getByLabelText("Ally Demo, Side-by-side trials on its learners");
+    expect(Array.from((trials as HTMLSelectElement).options).map(o => o.textContent)).toEqual([
+      "Allowed",
+      "Not on its sessions",
+    ]);
+    expect(trials).toHaveDisplayValue("Allowed");
+    const tries = screen.getByLabelText("Ally Demo, Try-outs on its learners");
+    expect(Array.from((tries as HTMLSelectElement).options).map(o => o.textContent)).toEqual([
+      "Same as the table above",
+      "Always ask first",
+      "Never",
+    ]);
+    expect(tries).toHaveDisplayValue("Always ask first");
+    fireEvent.change(trials, { target: { value: "Not on its sessions" } });
+    expect(h.setOrg).toHaveBeenCalledWith({ tenantId: "t1", changes: { paired_trial: "never" } });
+  });
+
+  describe("try-out override before agreement is reached", () => {
     it("asks to confirm, says what learners will get, then saves it as an override", async () => {
       h.permissions = ["manage:admin:debrief-settings"];
       renderPage();
-      fireEvent.change(screen.getByLabelText("Prompts, agents and default plans, Canary"), {
-        target: { value: "On its own (override)" },
-      });
+      fireEvent.change(
+        screen.getByLabelText("Prompts, agents and default plans, Try on learners"),
+        {
+          target: { value: "On its own (override: asks to confirm)" },
+        },
+      );
       expect(h.setMatrix).not.toHaveBeenCalled();
       expect(screen.getByTestId("autonomy-override-body")).toHaveTextContent(
-        "The judge hasn't been shown to agree with the clinical advisor yet. Canaries for prompts, agents and default plans will reach learners without approval.",
+        "The independent check hasn't been shown to agree with the clinical advisor yet. Learner try-outs for prompts, agents and default plans will reach learners without approval.",
       );
       fireEvent.click(screen.getByRole("button", { name: "Let them run" }));
       await waitFor(() =>
@@ -604,14 +652,17 @@ describe("What the PM agent may do alone", () => {
     it("cancelling saves nothing", () => {
       h.permissions = ["manage:admin:debrief-settings"];
       renderPage();
-      fireEvent.change(screen.getByLabelText("Prompts, agents and default plans, Canary"), {
-        target: { value: "On its own (override)" },
-      });
+      fireEvent.change(
+        screen.getByLabelText("Prompts, agents and default plans, Try on learners"),
+        {
+          target: { value: "On its own (override: asks to confirm)" },
+        },
+      );
       fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
       expect(h.setMatrix).not.toHaveBeenCalled();
     });
 
-    it("an override in force is shown in the row; with the gate met there is no override wording", () => {
+    it("an override in force is shown in the row; with agreement reached there is no override wording", () => {
       h.permissions = ["manage:admin:debrief-settings"];
       h.autonomy.mockReturnValue({
         data: {
@@ -630,10 +681,9 @@ describe("What the PM agent may do alone", () => {
       renderPage();
       const rows = screen.getAllByTestId("autonomy-row");
       expect(within(rows[1]).getByTestId("autonomy-override")).toHaveTextContent(
-        "Canary: On its own · owner override, Gopi, 12 Nov 2026",
+        "Try on learners: On its own · owner override, Gopi, 12 Nov 2026",
       );
-      // Settings is eligible (κ met in this fixture): plain "On its own", no override.
-      const settingsCanary = screen.getByLabelText("Settings (not budgets), Canary");
+      const settingsCanary = screen.getByLabelText("Settings (not budgets), Try on learners");
       expect(Array.from((settingsCanary as HTMLSelectElement).options)[0]).toHaveTextContent(
         /^On its own$/,
       );
@@ -642,22 +692,22 @@ describe("What the PM agent may do alone", () => {
 
     it("a re-locked kind can't be overridden", () => {
       h.permissions = ["manage:admin:debrief-settings"];
-      const no = { eligible: false, reason: "Not now: 2 canaries reverted in the last 4 weeks." };
+      const no = {
+        eligible: false,
+        reason: "Not now: 2 learner try-outs were taken back in the last 4 weeks.",
+      };
       h.autonomy.mockReturnValue({
         data: {
           ...AUTONOMY,
           kinds: AUTONOMY.kinds.map(k =>
             k.kind === "prompts"
-              ? {
-                  ...k,
-                  eligibility: { quick_test: no, gate_test: no, paired_trial: no, canary: no },
-                }
+              ? { ...k, overridable: false, eligibility: { ...k.eligibility, canary: no } }
               : k,
           ),
         },
       });
       renderPage();
-      const canary = screen.getByLabelText("Prompts, agents and default plans, Canary");
+      const canary = screen.getByLabelText("Prompts, agents and default plans, Try on learners");
       const first = Array.from((canary as HTMLSelectElement).options)[0];
       expect(first).toHaveTextContent("On its own (not now)");
       expect(first).toBeDisabled();
@@ -675,7 +725,7 @@ describe("What the PM agent may do alone", () => {
                 ...k,
                 relock: {
                   at: "2026-11-12T05:35:00Z",
-                  reason: "judge agreement fell below 0.6",
+                  reason: "agreement fell below 0.6",
                   steps: ["canary"],
                   by: "system",
                 },
@@ -687,7 +737,7 @@ describe("What the PM agent may do alone", () => {
     renderPage();
     const row = screen.getAllByTestId("autonomy-row")[0];
     expect(within(row).getByTestId("autonomy-relock")).toHaveTextContent(
-      "Canary: Asks first · set by the system on 12 Nov 2026: judge agreement fell below 0.6. Turning it back on is up to the owner.",
+      "Try on learners: Asks first · set by the system on 12 Nov 2026: agreement fell below 0.6. Turning it back on is up to the owner.",
     );
     expect(
       screen.getAllByTestId("autonomy-row")[1].querySelector("[data-testid=autonomy-relock]"),
@@ -708,7 +758,7 @@ describe("What the PM agent may do alone", () => {
                   canary: {
                     eligible: false,
                     reason:
-                      "Not yet: judge agreement below 0.6 (accuracy not measured, evidence_specificity 0.41, missed_risk_cue not measured).",
+                      "Not yet: agreement below 0.6 (accuracy not measured, evidence_specificity 0.41, missed_risk_cue not measured).",
                   },
                 },
               }
@@ -723,35 +773,28 @@ describe("What the PM agent may do alone", () => {
     expect(matrix).toHaveTextContent("Missed risk cue not measured");
   });
 
-  it("lets the owner change a cell; only the canary needs judge agreement for on its own", async () => {
+  it("lets the owner change learner try-outs; on its own needs agreement or a confirmed override", async () => {
     h.permissions = ["manage:admin:debrief-settings"];
     renderPage();
-    // Plan §4: learners never see a quick test, so no κ gate there.
-    const quick = screen.getByLabelText("Prompts, agents and default plans, Quick test");
-    expect(Array.from((quick as HTMLSelectElement).options).map(o => o.textContent)).toEqual([
-      "On its own",
+    const canary = screen.getByLabelText("Prompts, agents and default plans, Try on learners");
+    const options = Array.from((canary as HTMLSelectElement).options);
+    expect(options.map(o => o.textContent)).toEqual([
+      "On its own (override: asks to confirm)",
       "Asks first",
       "Off",
     ]);
-    // The canary: a dropdown like the rest, "On its own" shown but disabled until agreement.
-    const canary = screen.getByLabelText("Prompts, agents and default plans, Canary");
-    const options = Array.from((canary as HTMLSelectElement).options);
-    expect(options.map(o => o.textContent)).toEqual(["On its own (override)", "Asks first", "Off"]);
-    // Selectable by the owner as a confirmed override.
     expect(options[0]).not.toBeDisabled();
     expect(canary).toHaveDisplayValue("Asks first");
-    expect(options[2]).not.toBeDisabled();
     const prompts = screen.getAllByTestId("autonomy-row")[1];
-    expect(within(prompts).queryByTestId("autonomy-eligible-tests")).toBeNull();
     expect(within(prompts).getByTestId("autonomy-eligible-canary")).toHaveTextContent(
-      "Canary: not yet · Not yet: judge agreement below 0.6",
+      "Try on learners: not yet · Not yet: agreement below 0.6",
     );
-    fireEvent.change(screen.getByLabelText("Settings (not budgets), Canary"), {
-      target: { value: "On its own" },
+    fireEvent.change(screen.getByLabelText("Settings (not budgets), Try on learners"), {
+      target: { value: "Asks first" },
     });
     await waitFor(() =>
       expect(h.setMatrix).toHaveBeenCalledWith({
-        changes: [{ kind: "settings", step: "canary", value: "auto" }],
+        changes: [{ kind: "settings", step: "canary", value: "ask" }],
       }),
     );
   });

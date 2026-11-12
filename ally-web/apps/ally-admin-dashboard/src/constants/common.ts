@@ -493,7 +493,6 @@ export const ApiEndpoints = {
     ATTENTION: "/v1/debriefs/console/attention",
     ANALYTICS: "/v1/debriefs/console/analytics",
     CORRECT_RUN: (runId: string) => `/v1/debriefs/console/runs/${runId}/correct`,
-    SCORE: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/score`,
     COMMENTS: (runId: string) => `/v1/debriefs/console/runs/${runId}/comments`,
     COMMENT: (id: string) => `/v1/debriefs/console/comments/${id}`,
     COMMENT_ACTION: (id: string, action: "resolve" | "reopen" | "still-happening") =>
@@ -530,9 +529,6 @@ export const ApiEndpoints = {
   // Expert review (debrief orchestrator spec Part B): the verdict, from the session's Review panel.
   DEBRIEF_EXPERT_REVIEW: {
     VERDICT: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}/verdict`,
-  },
-  DEBRIEF_CALIBRATION: {
-    ITEM: (sessionId: string) => `/v1/analytics/debrief-quality/calibration/${sessionId}`,
   },
   SKILL_EXPERIMENTS: {
     LIST: "/v1/skill-experiments",
@@ -1447,7 +1443,6 @@ export const TAG_TYPES = {
   // Skill experiments (auto-improve on Skills Store). Also registered in
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
-  DEBRIEF_CALIBRATION: "debriefCalibration",
   DEBRIEF_CONSOLE: "debriefConsole",
   // Also registered in baseApi.ts's `tagTypes`.
   DEBRIEF_EXPERT_REVIEW: "debriefExpertReview",

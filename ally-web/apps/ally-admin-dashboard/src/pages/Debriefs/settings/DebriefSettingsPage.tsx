@@ -23,7 +23,6 @@ import { RootState } from "@store";
 import {
   DebriefAgreementView,
   DebriefAutonomyKind,
-  DebriefAutonomyStep,
   DebriefAutonomyValue,
   DebriefAutonomyView,
   DebriefMeasureAgreement,
@@ -197,8 +196,11 @@ const Budgets: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
   );
 };
 
-/** The rows the grid shows (design 2026-11-12), in this order. */
-const MATRIX_KINDS: DebriefAutonomyKind[] = ["settings", "prompts", "pinned_rules"];
+/**
+ * The rows the grid shows (design `Settings.dc.html` v63), in this order. Pinned rules are not in
+ * the grid: the clinical advisor or the owner always approves them (the intro says so).
+ */
+const MATRIX_KINDS: DebriefAutonomyKind[] = ["settings", "prompts"];
 const CELL_TONE: Record<DebriefAutonomyValue, string> = {
   auto: "bg-success-50",
   ask: "bg-white",
@@ -209,8 +211,8 @@ type Item = { id: string; label: string; disabled?: boolean };
 
 /**
  * One cell of the autonomy grid: always a dropdown (design `Settings.dc.html`). A cell nobody may
- * change here (Promote, pinned rules, or a reader without the owner's rights) is a disabled
- * dropdown whose reason is in its name and tooltip.
+ * change here (Live for everyone, or a reader without the owner's rights) is a disabled dropdown
+ * whose reason is in its name and tooltip.
  */
 const CellSelect: React.FC<{
   id: string;
@@ -247,27 +249,16 @@ const CellSelect: React.FC<{
 );
 
 /**
- * "Eligible?" for one kind (plan §4): the tests learners never see need only a clean track record;
- * the judge-agreement requirement (κ ≥ 0.6) is shown on the Canary alone.
+ * "Eligible?" for one kind: may "Try on learners" run on its own yet (agreement ≥ 0.6 and a clean
+ * track record)? The steps learners never see always run on their own, so they aren't shown.
  */
-const EligibleCell: React.FC<{ row: DebriefAutonomyView["kinds"][number]; pinned: boolean }> = ({
-  row,
-  pinned,
-}) => {
+const EligibleCell: React.FC<{ row: DebriefAutonomyView["kinds"][number] }> = ({ row }) => {
   const s = en.debriefs.settingsPage.autonomy;
-  if (pinned) return <span className="text-xs text-[#8A3800]">{s.pinnedOnly}</span>;
-  const tests = row.eligibility?.quick_test ?? { eligible: true, reason: "" };
   const canary = row.eligibility?.canary ?? { eligible: row.eligible, reason: row.reason };
-  const tone = (ok: boolean) => (ok ? "text-success-600" : "text-[#8A3800]");
+  const tone = canary.eligible ? "text-success-600" : "text-[#8A3800]";
   return (
-    <span className="flex flex-col gap-0.5 text-xs" data-testid="autonomy-eligible">
-      {/* Tests learners never see need only a clean record: said only when that broke. */}
-      {!tests.eligible && (
-        <span className={tone(false)} data-testid="autonomy-eligible-tests">
-          {s.testsLabel}: {s.eligibleNo} · {inWords(row.relockReason ?? tests.reason)}
-        </span>
-      )}
-      <span className={tone(canary.eligible)} data-testid="autonomy-eligible-canary">
+    <span className={`text-xs ${tone}`} data-testid="autonomy-eligible">
+      <span data-testid="autonomy-eligible-canary">
         {s.columns.canary}: {canary.eligible ? s.eligibleYes : s.eligibleNo.toLowerCase()} ·{" "}
         {inWords(canary.eligible ? canary.reason : (row.relockReason ?? canary.reason))}
       </span>
@@ -339,7 +330,7 @@ export const AgreementPanel: React.FC<{ agreement: DebriefAgreementView }> = ({ 
   );
 };
 
-const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
+const Autonomy: React.FC<{ canEdit: boolean; onPinned: () => void }> = ({ canEdit, onPinned }) => {
   const s = en.debriefs.settingsPage.autonomy;
   const q = useGetDebriefAutonomyQuery();
   const [setMatrix] = useSetDebriefAutonomyMatrixMutation();
@@ -390,94 +381,95 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
         </p>
         <p className="m-0">{s.overrideSafety}</p>
       </ConfirmDialog>
-      <p className="m-0 max-w-3xl text-sm text-neutral-600" data-testid="autonomy-intro">
-        {s.intro}
-      </p>
+      <ul
+        className="m-0 flex max-w-3xl list-disc flex-col gap-1.5 pl-5 text-sm text-neutral-600"
+        data-testid="autonomy-intro"
+      >
+        {s.intro.map(point => (
+          <li key={point.lead}>
+            <strong className="font-semibold text-neutral-900">{point.lead}</strong> {point.text}
+            {point.link && (
+              <>
+                {" "}
+                <a
+                  href="#pinned"
+                  className="text-primary-600 underline"
+                  onClick={event => {
+                    event.preventDefault();
+                    onPinned();
+                  }}
+                >
+                  {point.link}
+                </a>
+                .
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
       {view.agreement && <AgreementPanel agreement={view.agreement} />}
       <div className="overflow-x-auto rounded-sm bg-neutral-50" data-testid="autonomy-matrix">
-        <div className="grid min-w-[980px] grid-cols-[minmax(170px,1.3fr)_repeat(5,minmax(110px,1fr))_minmax(170px,1.3fr)] gap-2.5 border-b border-neutral-100 px-5 py-2.5 text-xs text-neutral-600">
+        <div className="grid min-w-[720px] grid-cols-[minmax(200px,1.4fr)_repeat(2,minmax(170px,1fr))_minmax(200px,1.4fr)] gap-2.5 border-b border-neutral-100 px-5 py-2.5 text-xs text-neutral-600">
           <span>{s.columns.kind}</span>
-          {view.steps.map(st => (
-            <span key={st}>{s.columns[st]}</span>
-          ))}
+          <span>{s.columns.canary}</span>
           <span>{s.columns.promote}</span>
           <span>{s.columns.eligible}</span>
         </div>
         {MATRIX_KINDS.map(kind => {
           const row = view.kinds.find(k => k.kind === kind);
           if (!row) return null;
-          const fixed = kind === "pinned_rules" || !row.configurable;
+          const fixed = !row.configurable;
+          const e = row.eligibility?.canary ?? { eligible: row.eligible, reason: row.reason };
+          // Only the agreement requirement can be overridden (by the owner, confirmed); never a
+          // re-lock after reverts or a failed baseline.
+          const overridable = row.overridable ?? !e.eligible;
+          const value = row.cells.canary;
+          const autoLabel = e.eligible
+            ? s.cells.auto
+            : overridable
+              ? s.autoNeedsAgreement
+              : s.autoNotNow;
           return (
             <div
               key={kind}
               data-testid="autonomy-row"
-              className="grid min-w-[980px] grid-cols-[minmax(170px,1.3fr)_repeat(5,minmax(110px,1fr))_minmax(170px,1.3fr)] items-center gap-2.5 border-b border-neutral-100 px-5 py-2.5 text-sm"
+              className="grid min-w-[720px] grid-cols-[minmax(200px,1.4fr)_repeat(2,minmax(170px,1fr))_minmax(200px,1.4fr)] items-center gap-2.5 border-b border-neutral-100 px-5 py-2.5 text-sm"
             >
               <span className="font-medium">{s.kinds[kind]}</span>
-              {view.steps.map((st: DebriefAutonomyStep) => {
-                if (kind === "pinned_rules") {
-                  return (
-                    <CellSelect
-                      key={st}
-                      id={`autonomy-${kind}-${st}`}
-                      label={`${s.kinds[kind]}, ${s.columns[st]}`}
-                      value="person"
-                      items={[{ id: "person", label: s.aPerson }]}
-                      disabled
-                      reason={s.pinnedReason}
-                      className="bg-neutral-100"
-                    />
-                  );
+              <CellSelect
+                id={`autonomy-${kind}-canary`}
+                label={`${s.kinds[kind]}, ${s.columns.canary}`}
+                value={value}
+                className={CELL_TONE[value]}
+                disabled={!editable || fixed}
+                reason={!editable || fixed ? s.ownerOnlyReason : undefined}
+                items={(["auto", "ask", "off"] as DebriefAutonomyValue[]).map(v => ({
+                  id: v,
+                  label: v === "auto" ? autoLabel : s.cells[v],
+                  // Shown, but not selectable until eligible (an existing "auto" stays as it is).
+                  disabled: v === "auto" && !e.eligible && !overridable && value !== "auto",
+                }))}
+                onChange={v =>
+                  v === "auto" && overridable && value !== "auto"
+                    ? setOverriding(kind)
+                    : void run(
+                        setMatrix({
+                          changes: [{ kind, step: "canary", value: v as DebriefAutonomyValue }],
+                        }).unwrap(),
+                      )
                 }
-                const e = row.eligibility?.[st] ?? { eligible: row.eligible, reason: row.reason };
-                // Only the κ gate can be overridden (by the owner, confirmed); never a re-lock,
-                // which shows on the steps learners never see too.
-                const overridable =
-                  st === "canary" && !e.eligible && (row.eligibility?.quick_test?.eligible ?? true);
-                const autoLabel = e.eligible
-                  ? s.cells.auto
-                  : overridable
-                    ? s.autoNeedsAgreement
-                    : s.autoNotNow;
-                return (
-                  <CellSelect
-                    key={st}
-                    id={`autonomy-${kind}-${st}`}
-                    label={`${s.kinds[kind]}, ${s.columns[st]}`}
-                    value={row.cells[st]}
-                    className={CELL_TONE[row.cells[st]]}
-                    disabled={!editable || fixed}
-                    reason={!editable || fixed ? s.ownerOnlyReason : undefined}
-                    items={(["auto", "ask", "off"] as DebriefAutonomyValue[]).map(v => ({
-                      id: v,
-                      label: v === "auto" ? autoLabel : s.cells[v],
-                      // Shown, but not selectable until eligible (an existing "auto" stays as it is).
-                      disabled:
-                        v === "auto" && !e.eligible && !overridable && row.cells[st] !== "auto",
-                    }))}
-                    onChange={v =>
-                      v === "auto" && overridable && row.cells[st] !== "auto"
-                        ? setOverriding(kind)
-                        : void run(
-                            setMatrix({
-                              changes: [{ kind, step: st, value: v as DebriefAutonomyValue }],
-                            }).unwrap(),
-                          )
-                    }
-                  />
-                );
-              })}
+              />
               <CellSelect
                 id={`autonomy-${kind}-promote`}
                 label={`${s.kinds[kind]}, ${s.columns.promote}`}
                 value="person"
                 items={[{ id: "person", label: s.aPerson }]}
                 disabled
-                reason={kind === "pinned_rules" ? s.pinnedReason : s.promoteReason}
+                reason={s.promoteReason}
                 className="bg-neutral-100"
               />
-              <EligibleCell row={row} pinned={kind === "pinned_rules"} />
-              {row.override && row.cells.canary === "auto" && (
+              <EligibleCell row={row} />
+              {row.override && value === "auto" && (
                 <p
                   className="col-span-full m-0 text-xs text-[#8A3800]"
                   data-testid="autonomy-override"
@@ -492,13 +484,13 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
                   )}
                 </p>
               )}
-              {row.relock && (
+              {row.relock?.steps.includes("canary") && (
                 <p
                   className="col-span-full m-0 text-xs text-[#8A3800]"
                   data-testid="autonomy-relock"
                 >
                   {s.relockedLine(
-                    row.relock.steps.map(st => s.columns[st]).join(", "),
+                    s.columns.canary,
                     new Date(row.relock.at).toLocaleDateString("en-GB", {
                       day: "numeric",
                       month: "short",
@@ -540,17 +532,21 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
                     {o.live ? s.orgLive : s.orgNotLive}
                   </div>
                 </div>
-                {(["paired_trial", "canary"] as const).map(k =>
-                  editable ? (
+                {(["paired_trial", "canary"] as const).map(k => {
+                  // Side-by-side trials: Allowed / Not on its sessions. An older "ask" reads as
+                  // allowed (ally-be normalises it); try-outs keep all three.
+                  const words = k === "canary" ? s.orgPolicy : s.orgTrialPolicy;
+                  const values: DebriefOrgOverride[] =
+                    k === "canary" ? ["default", "ask", "never"] : ["default", "never"];
+                  const current =
+                    k === "paired_trial" && o.overrides[k] === "ask" ? "default" : o.overrides[k];
+                  return editable ? (
                     <CellSelect
                       key={k}
                       id={`org-autonomy-${o.tenantId}-${k}`}
                       label={`${o.tenantName}, ${k === "canary" ? s.orgColumns.canaries : s.orgColumns.trials}`}
-                      value={o.overrides[k]}
-                      items={(["default", "ask", "never"] as DebriefOrgOverride[]).map(v => ({
-                        id: v,
-                        label: s.orgPolicy[v],
-                      }))}
+                      value={current}
+                      items={values.map(v => ({ id: v, label: words[v] }))}
                       onChange={v =>
                         void run(
                           setOrg({
@@ -561,9 +557,9 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
                       }
                     />
                   ) : (
-                    <span key={k}>{s.orgPolicy[o.overrides[k]]}</span>
-                  ),
-                )}
+                    <span key={k}>{words[current]}</span>
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -678,8 +674,8 @@ export const DebriefSettingsPage: React.FC = () => {
               withBaseline
             />
           </Section>
-          <Section id="autonomy" title={s.nav.autonomy} help={s.autonomyHelp}>
-            <Autonomy canEdit={access.settings} />
+          <Section id="autonomy" title={s.nav.autonomy}>
+            <Autonomy canEdit={access.settings} onPinned={() => goTo("pinned")} />
           </Section>
           <Section id="weights" title={s.nav.weights} help={s.weightsHelp}>
             <SettingsGroups

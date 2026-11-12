@@ -56,6 +56,7 @@ const CLOSED_AS: Record<string, IdeaGroup> = {
   handed_off: "promoted",
   answered: "promoted",
   rejected: "rejected",
+  withdrawn: "rejected",
   did_not_pass: "rejected",
   retired: "rejected",
   expired: "expired",

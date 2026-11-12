@@ -102,7 +102,7 @@ export const bannerHref = (b: Banner): string => {
     case "analytics":
       return `${ROUTES.ANALYTICS}?tab=${ANALYTICS_DEBRIEFS_TAB}`;
     default:
-      return `${ROUTES.DEBRIEFS}${b.link.category ? `?cat=${b.link.category === "to_score" ? "score" : b.link.category}` : ""}`;
+      return `${ROUTES.DEBRIEFS}${b.link.category ? `?cat=${b.link.category === "agreement_sample" ? "agreement" : b.link.category}` : ""}`;
   }
 };
 
@@ -158,13 +158,12 @@ export const DebriefsHome: React.FC = () => {
   // The access before the list has said: the attention payload, then the user's permissions.
   const preAccess = useDebriefAccess(attention.data?.viewer);
   const allowedBefore = categoriesFor({
-    score: preAccess.score,
     escalations: preAccess.receivesEscalations,
     verdict: preAccess.verdict,
   });
   const { cat, filters, list } = readHomeState(
     params,
-    [...allowedBefore, "score", "escalated", "agreement"],
+    [...allowedBefore, "escalated", "agreement"],
     defaultCategory(preAccess),
   );
   // Fresh on every visit, and every 15 s while a debrief is being written.
@@ -181,11 +180,10 @@ export const DebriefsHome: React.FC = () => {
   const categories = useMemo(
     () =>
       categoriesFor({
-        score: access.score,
         escalations: access.receivesEscalations,
         verdict: access.verdict,
       }),
-    [access.score, access.receivesEscalations, access.verdict],
+    [access.receivesEscalations, access.verdict],
   );
 
   const set = (patch: Record<string, string | null>) => {
@@ -475,7 +473,6 @@ export const DebriefsHome: React.FC = () => {
                       item={item}
                       to={sessionLink(item.runId, params)}
                       selected={shown[selected]?.runId === item.runId}
-                      showScore={access.score}
                     />
                   ))}
                 </div>
@@ -487,7 +484,6 @@ export const DebriefsHome: React.FC = () => {
                       item={item}
                       to={sessionLink(item.runId, params)}
                       selected={shown[selected]?.runId === item.runId}
-                      showScore={access.score}
                     />
                   ))}
                 </div>

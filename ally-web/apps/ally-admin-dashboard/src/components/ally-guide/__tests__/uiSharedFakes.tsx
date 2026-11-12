@@ -35,6 +35,7 @@ export const uiSharedFakes = {
       onClick={onClick}
       disabled={disabled}
       aria-expanded={rest["aria-expanded"]}
+      data-kind={rest.kind}
     >
       {children}
     </button>

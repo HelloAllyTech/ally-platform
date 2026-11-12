@@ -348,7 +348,9 @@ describe("Debriefs tab: each agent", () => {
       row("Agreement with the judge on missed risk cues, beyond chance (0–1)"),
     ).toHaveTextContent("0.62");
     expect(row("Pass rate (needs the Ask Ally judge)")).toHaveTextContent("Not measured yet");
-    expect(row("Promoted / reverted / rejected / waiting")).toHaveTextContent("1 / 0 / 2 / 10");
+    expect(row("Live for everyone / reverted / rejected / waiting")).toHaveTextContent(
+      "1 / 0 / 2 / 10",
+    );
   });
 });
 

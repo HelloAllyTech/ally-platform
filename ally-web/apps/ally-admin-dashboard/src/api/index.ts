@@ -45,7 +45,6 @@ export * from "./characterInterview";
 export * from "./cohorts";
 export * from "./helplineAdmin";
 export * from "./skillExperiments";
-export * from "./debriefCalibration";
 export * from "./debriefConsole";
 export * from "./debriefSchedules";
 export * from "./debriefExpertReview";
