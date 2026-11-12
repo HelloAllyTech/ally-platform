@@ -161,6 +161,25 @@ describe("GenericTable", () => {
     );
   });
 
+  it("scrolls the add-filter column list internally instead of the whole page, when there are many filterable columns", () => {
+    // A table with many filterable columns (e.g. custom fields) had no
+    // scroll container here at all — the list just grew past the viewport,
+    // so scrolling it scrolled the whole page behind it along with it.
+    const columns = Array.from({ length: 30 }, (_, i) => ({
+      key: `col${i}`,
+      header: `Column ${i}`,
+      filterable: true,
+      filterType: "text",
+    }));
+    render(<GenericTable columns={columns as any} data={[]} showSelectedFilters />);
+
+    fireEvent.click(screen.getByRole("button", { name: /filter/i }));
+
+    const firstEntry = screen.getAllByText("Column 0")[0];
+    const scrollContainer = firstEntry.closest("div.overflow-y-auto");
+    expect(scrollContainer).toHaveClass("max-h-[300px]");
+  });
+
   it("prefills the TEXT filter's own value box with the already-applied value when reopened", () => {
     // TEXT has its own dedicated draft (not the option-list search box).
     // Reopening the popover used to always blank it out, so re-applying

@@ -272,7 +272,11 @@ export const GenericTable = forwardRef(
         >
           <span aria-hidden className="block h-0 w-0" />
           <PopoverContent className="border border-[#e3dbce] mt-[2px]">
-            <div>
+            {/* A table with many filterable columns (custom fields included)
+                had no scroll container here at all, unlike the option lists
+                below — the list just grew past the viewport, so scrolling it
+                scrolled the whole page behind it instead of just the list. */}
+            <div className="max-h-[300px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
               {filterableColumns.map(col => (
                 <div
                   key={col.key as string}
