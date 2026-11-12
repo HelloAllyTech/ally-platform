@@ -502,7 +502,12 @@ export const ApiEndpoints = {
     IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,
     IDEA_APPROVE_PINNED: (id: string) =>
       `/v1/debriefs/console/pm-agent/ideas/${id}/approve-pinned-rule`,
+    IDEA_WITHDRAW_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/withdraw-pinned-rule`,
+    IDEA_REJECT_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/reject-pinned-rule`,
     PINNED_RULES: "/v1/debriefs/console/pinned-rules",
+    PINNED_RULE_PROPOSALS: "/v1/debriefs/console/pinned-rules/proposals",
     AUTONOMY: "/v1/debriefs/console/autonomy",
     AUTONOMY_MATRIX: "/v1/debriefs/console/autonomy/matrix",
     AUTONOMY_ORG: (tenantId: string) => `/v1/debriefs/console/autonomy/orgs/${tenantId}`,

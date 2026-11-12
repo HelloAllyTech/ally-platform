@@ -2,9 +2,12 @@ import React, { useState } from "react";
 
 import { toast } from "sonner";
 
+import { TextArea } from "@ally-ui-mono/ui-shared";
 import {
   useApprovePinnedRuleMutation,
   useDecideIdeaMutation,
+  useRejectPinnedRuleMutation,
+  useWithdrawPinnedRuleMutation,
   useGetDebriefAutonomyQuery,
   useGetDebriefSettingsQuery,
 } from "@api";
@@ -120,9 +123,14 @@ export const IdeasView: React.FC<{
   const autonomy = useGetDebriefAutonomyQuery();
   const [decide, deciding] = useDecideIdeaMutation();
   const [approvePinned, approvingPinned] = useApprovePinnedRuleMutation();
-  const [pending, setPending] = useState<{ id: string; decision: "approve" | "reject" } | null>(
-    null,
-  );
+  const [rejectPinned, rejectingPinned] = useRejectPinnedRuleMutation();
+  const [withdrawPinned, withdrawingPinned] = useWithdrawPinnedRuleMutation();
+  const [pending, setPending] = useState<{
+    id: string;
+    decision: "approve" | "reject" | "withdraw";
+  } | null>(null);
+  const [reason, setReason] = useState("");
+  const [reasonTried, setReasonTried] = useState(false);
   const ideas = state.ideas;
   const grouped = Object.fromEntries(
     IDEA_GROUPS.map(g => [g, ideas.filter(i => ideaGroup(i, access) === g)]),
@@ -154,9 +162,13 @@ export const IdeasView: React.FC<{
   const pendingStage = pendingIdea ? stage(pendingIdea) : null;
   const handoffKind = pendingIdea?.evidence.handoff?.kind;
   const pinned = pendingIdea?.change.ideaKind === "pinned_rule";
+  const firstVersion = !!pendingIdea?.change.firstVersion;
+  const pr = p.pinnedRule;
   const approveText = (k: "title" | "body") =>
     pinned
-      ? p.pinned[k]
+      ? firstVersion
+        ? p.pinned[k === "title" ? "firstTitle" : "firstBody"]
+        : p.pinned[k]
       : pendingStage === "handoff" && handoffKind
         ? s.handoff[k][handoffKind]
         : pendingStage === "promote"
@@ -166,24 +178,48 @@ export const IdeasView: React.FC<{
           : k === "title"
             ? s.canaryTitle
             : s.canaryBody;
+  const close = () => {
+    setPending(null);
+    setReason("");
+    setReasonTried(false);
+  };
   const confirm = async () => {
     if (!pending) return;
+    // A pinned-rule rejection always says why: the PM agent reads it.
+    if (pinned && pending.decision === "reject" && !reason.trim()) {
+      setReasonTried(true);
+      return;
+    }
     try {
       if (pinned && pending.decision === "approve")
         await approvePinned({ id: pending.id }).unwrap();
-      else await decide(pending).unwrap();
+      else if (pinned && pending.decision === "reject")
+        await rejectPinned({ id: pending.id, reason: reason.trim() }).unwrap();
+      else if (pinned && pending.decision === "withdraw")
+        await withdrawPinned({ id: pending.id }).unwrap();
+      else
+        await decide({
+          id: pending.id,
+          decision: pending.decision === "reject" ? "reject" : "approve",
+        }).unwrap();
       toast.success(
-        pending.decision === "reject"
-          ? s.rejected
-          : pinned
-            ? p.pinned.done
-            : pendingStage === "handoff" && handoffKind
-              ? s.handoff.done[handoffKind]
-              : pendingStage === "promote"
-                ? s.promoted
-                : s.canaryStarted,
+        pending.decision === "withdraw"
+          ? pr.withdrawDone
+          : pending.decision === "reject"
+            ? pinned
+              ? pr.rejectDone
+              : s.rejected
+            : pinned
+              ? firstVersion
+                ? p.pinned.firstDone
+                : p.pinned.done
+              : pendingStage === "handoff" && handoffKind
+                ? s.handoff.done[handoffKind]
+                : pendingStage === "promote"
+                  ? s.promoted
+                  : s.canaryStarted,
       );
-      setPending(null);
+      close();
     } catch (e) {
       toast.error(getErrorMessage(e, s.actionFailed));
     }
@@ -381,7 +417,15 @@ export const IdeasView: React.FC<{
 
       <ConfirmDialog
         isOpen={pending !== null}
-        title={pending?.decision === "approve" ? approveText("title") : s.rejectTitle}
+        title={
+          pending?.decision === "approve"
+            ? approveText("title")
+            : pending?.decision === "withdraw"
+              ? pr.withdrawTitle
+              : pinned
+                ? pr.rejectTitle
+                : s.rejectTitle
+        }
         cancelLabel={s.cancel}
         confirmLabel={
           pending?.decision === "approve"
@@ -392,13 +436,41 @@ export const IdeasView: React.FC<{
                 : pendingStage === "promote"
                   ? s.promoteConfirm
                   : s.canaryConfirm
-            : s.rejectConfirm
+            : pending?.decision === "withdraw"
+              ? pr.withdraw
+              : s.rejectConfirm
         }
-        isWorking={deciding.isLoading || approvingPinned.isLoading}
+        isWorking={
+          deciding.isLoading ||
+          approvingPinned.isLoading ||
+          rejectingPinned.isLoading ||
+          withdrawingPinned.isLoading
+        }
         onConfirm={() => void confirm()}
-        onClose={() => setPending(null)}
+        onClose={close}
       >
-        <p>{pending?.decision === "approve" ? approveText("body") : s.rejectBody}</p>
+        <p>
+          {pending?.decision === "approve"
+            ? approveText("body")
+            : pending?.decision === "withdraw"
+              ? pr.withdrawBody
+              : pinned
+                ? pr.rejectBody
+                : s.rejectBody}
+        </p>
+        {pinned && pending?.decision === "reject" && (
+          <div className="mt-3">
+            <TextArea
+              id="pinned-reject-reason"
+              labelText={pr.reasonLabel}
+              rows={3}
+              value={reason}
+              invalid={reasonTried && !reason.trim()}
+              invalidText={pr.reasonRequired}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
+            />
+          </div>
+        )}
       </ConfirmDialog>
     </>
   );

@@ -193,9 +193,16 @@ export interface PmAgentIdeaRow {
     replace: string | null;
     settingKey: string | null;
     settingValue: string | null;
+    /** A pinned rule's first version: the text in force, never approved; no find/replace. */
+    firstVersion?: boolean;
+    /** The version a first-version item asks to approve. */
+    version?: number;
   };
   evidence: {
     hypothesis?: string;
+    /** A pinned-rule proposal: who proposed it and why. */
+    proposedBy?: number;
+    why?: string;
     evidence?: string;
     expectedEffect?: string;
     commentIds?: string[];
@@ -258,6 +265,7 @@ export interface PmAgentIdeaRow {
     | "handed_off"
     | "answered"
     | "signed_off"
+    | "withdrawn"
     | "retired"
     | null;
   closedWhy?: string | null;
@@ -281,8 +289,9 @@ export interface PmAgentIdeaRow {
       | "start_canary"
       | "promote";
     since: string;
-    expiresAt: string;
-    expiresInDays: number;
+    /** Null when it never expires (a pinned rule's first version). */
+    expiresAt: string | null;
+    expiresInDays: number | null;
     expired: boolean;
     expiringSoon: boolean;
   } | null;
@@ -304,7 +313,38 @@ export interface PmAgentIdeaRow {
     askQuestion: boolean;
     startStep: boolean;
     editDraft?: boolean;
+    /** Pinned rules: withdraw one's own proposal. */
+    withdraw?: boolean;
+    /** Pinned rules: propose a change from this item. */
+    askForChange?: boolean;
   };
+  /** Pinned-rule items only: the rule as it would read, and what else is open on it. */
+  pinnedRule?: PmAgentPinnedRule;
+}
+
+/** One run of a pinned rule's text; `changed` is the proposed wording. */
+export interface PinnedRuleSegment {
+  text: string;
+  changed: boolean;
+}
+
+export interface PmAgentPinnedRule {
+  /** "Safety rules", "Rubric", "Judge's instructions". */
+  name: string;
+  firstVersion: boolean;
+  /** The viewer proposed it. */
+  mine: boolean;
+  proposedBy: number | null;
+  liveVersion: number | null;
+  /** The text in force, which a further change is written against (open items only). */
+  liveText: string | null;
+  /** The whole rule as it would read after the change (open items only). */
+  segments: PinnedRuleSegment[] | null;
+  /** The passage is no longer in the rule: it changed since. */
+  stale: boolean;
+  /** Other open proposals on the same rule. */
+  otherOpen: number;
+  approvedNote: string | null;
 }
 
 export interface PmAgentState {

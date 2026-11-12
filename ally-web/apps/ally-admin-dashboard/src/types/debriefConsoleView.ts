@@ -403,6 +403,13 @@ export interface DebriefPinnedRulesView {
     writtenBy: { id: number; name: string | null } | null;
     writtenAt: string | null;
     note: string | null;
+    /** The whole rule in force, for "Ask for a change". */
+    text?: string | null;
+  }>;
+  /** Pinned-rule items still waiting (first versions included). */
+  proposals?: Array<{
+    id: string;
+    change?: { promptCode?: string; firstVersion?: boolean } | null;
   }>;
 }
 

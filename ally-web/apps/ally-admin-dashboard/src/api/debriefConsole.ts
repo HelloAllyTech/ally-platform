@@ -335,6 +335,33 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    withdrawPinnedRule: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_WITHDRAW_PINNED(id),
+        method: HttpMethod.POST,
+        body: {},
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    rejectPinnedRule: builder.mutation<void, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_REJECT_PINNED(id),
+        method: HttpMethod.POST,
+        body: { reason },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    proposePinnedRule: builder.mutation<
+      { id: string },
+      { promptCode: string; find: string; replace: string; why: string }
+    >({
+      query: body => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.PINNED_RULE_PROPOSALS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     getDebriefPinnedRules: builder.query<DebriefPinnedRulesView, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PINNED_RULES, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
@@ -481,6 +508,9 @@ export const {
   useAskIdeaQuestionMutation,
   useStartIdeaStepMutation,
   useApprovePinnedRuleMutation,
+  useWithdrawPinnedRuleMutation,
+  useRejectPinnedRuleMutation,
+  useProposePinnedRuleMutation,
   useGetDebriefPinnedRulesQuery,
   useGetDebriefAutonomyQuery,
   useSetDebriefAutonomyMatrixMutation,

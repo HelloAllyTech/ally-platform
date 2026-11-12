@@ -10455,12 +10455,70 @@ export const en = {
       needsApproval: "Needs your approval",
       approveCanary: "Approve and start canary",
       recommended: (pct: number) => `Recommended · up to ${pct}% of live debriefs`,
-      approvePinned: "Approve the new version",
+      approvePinned: "Approve",
       pinned: {
         title: "Approve this pinned-rule change?",
-        body: "Every organisation's debriefs follow the new version from the next run. Your name is recorded as its signer.",
+        body: "Your name and today's date are recorded as its approval. The change becomes a draft release, and the Ally team puts it live.",
+        firstTitle: "Approve the rule as it reads now?",
+        firstBody:
+          "Your name and today's date are recorded as its approval. Nothing changes in what runs.",
         confirm: "Approve",
-        done: "The new version is in force",
+        done: "Approved. The Ally team will put it live.",
+        firstDone: "Approved",
+      },
+      pinnedRule: {
+        readWhole: "Read the whole rule",
+        asItReads: (name: string, v: number | null) =>
+          v == null ? `${name} as it reads now` : `${name} v${v}, as it reads now`,
+        afterChange: "As it would read after this change. The new wording is highlighted.",
+        firstVersionIntro:
+          "Written by engineering and never clinically approved. Read it, then approve it or ask for a change.",
+        stale:
+          "The rule has changed since this was proposed, and the passage is no longer in it. It can't be approved as it is.",
+        otherOpen: (n: number) =>
+          n === 1
+            ? "Another change to this rule is waiting for approval."
+            : `${n} other changes to this rule are waiting for approval.`,
+        proposedByYou: "You proposed this change.",
+        why: "Why",
+        approved: "Approved. The Ally team will put it live.",
+        approvedFirst: "Approved.",
+        approvedStatus: "Approved",
+        withdrawnStatus: "Withdrawn",
+        withdraw: "Withdraw",
+        askForChange: "Ask for a change",
+        withdrawTitle: "Withdraw your proposal?",
+        withdrawBody: "It closes as withdrawn. You can propose a change to the rule again later.",
+        withdrawDone: "Withdrawn",
+        rejectTitle: "Reject this change?",
+        rejectBody: "The PM agent reads your reason before it proposes anything like this again.",
+        reasonLabel: "Why are you rejecting it?",
+        reasonRequired: "Say why you are rejecting it.",
+        rejectDone: "Rejected",
+        form: {
+          title: (name: string) => `Ask for a change to the ${name}`,
+          help: "Select the passage to change in the rule, or paste it. Then write the new wording and why.",
+          ruleLabel: "The rule as it reads now",
+          passage: "Passage to change",
+          passageHelp: "Your selection lands here. It must appear exactly once in the rule.",
+          replace: "Replace it with",
+          why: "Why",
+          whyHelp: "The person who approves it reads this.",
+          submit: "Send for approval",
+          cancel: "Cancel",
+          sent: "Sent. It waits in PM agent › Ideas for the clinical advisor or the owner.",
+          empty: "Select the passage to change in the rule, or paste it.",
+          notFound:
+            "That passage is not in the current rule. Select it in the text, or paste it exactly as it reads.",
+          notUnique:
+            "That passage appears more than once in the rule. Select a longer passage, so it is found only once.",
+          same: "The replacement is the same as the passage. Write the new wording.",
+          noWhy: "Say why the rule should change.",
+          otherOpen: (n: number) =>
+            n === 1
+              ? "Another change to this rule is already waiting. You can still send this one."
+              : `${n} other changes to this rule are already waiting. You can still send this one.`,
+        },
       },
       basedOn: (what: string) => `Based on: ${what}.`,
       ofNeedYou: (i: number, n: number) => `${i} of ${n} that need you`,
@@ -10841,9 +10899,10 @@ export const en = {
         orgNotLive: "Not switched on yet · no trials or canaries",
       },
       pinned: {
-        notYet: "The pinned rules' versions show here once ally-be records who signed them.",
-        signed: (who: string, when: string) => `Signed by ${who}, ${when}`,
-        unsigned: "Not signed yet",
+        notYet: "The pinned rules' versions show here once ally-be records who approved them.",
+        signed: (who: string, when: string) => `Approved by ${who}, ${when}`,
+        unsigned: "Not approved yet",
+        askForChange: "Ask for a change",
         someone: "someone",
         roles: { clinical_advisor: "the clinical advisor", owner: "the owner" } as Record<
           string,

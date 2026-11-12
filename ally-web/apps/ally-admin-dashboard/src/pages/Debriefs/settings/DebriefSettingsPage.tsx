@@ -9,7 +9,6 @@ import {
   useGetDebriefAutonomyQuery,
   useGetDebriefMeQuery,
   useGetDebriefOverviewQuery,
-  useGetDebriefPinnedRulesQuery,
   useGetDebriefSettingsQuery,
   useSetDebriefAutonomyMatrixMutation,
   useSetDebriefBudgetsMutation,
@@ -36,6 +35,7 @@ import { SettingsSection } from "../consoleRoutes";
 import { BackLink, ConsoleTag, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { OrganisationsSection } from "./OrganisationsSection";
+import { PinnedRulesSection } from "./PinnedRulesSection";
 import { SchedulesSection } from "./SchedulesSection";
 import { SettingsGroups } from "./SettingsGroups";
 
@@ -510,37 +510,6 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
   );
 };
 
-const PinnedRules: React.FC = () => {
-  const s = en.debriefs.settingsPage.pinned;
-  const q = useGetDebriefPinnedRulesQuery();
-  const rules = q.data?.rules;
-  if (!rules?.length) return <p className="text-sm text-neutral-600">{s.notYet}</p>;
-  return (
-    <div className="rounded-sm bg-neutral-50" data-testid="pinned-rules">
-      {rules.map(r => (
-        <div
-          key={r.code}
-          className="grid grid-cols-[minmax(200px,1.4fr)_90px_minmax(200px,1.6fr)] items-center gap-3 border-b border-neutral-100 px-5 py-3 text-sm"
-        >
-          <span className="font-medium">{r.label}</span>
-          <span>{r.version == null ? "—" : `v${r.version}`}</span>
-          <span className="text-[13px] text-neutral-700">
-            {r.signedAt
-              ? s.signed(
-                  r.signedBy?.name ?? s.someone,
-                  new Date(r.signedAt).toLocaleDateString(undefined, {
-                    day: "numeric",
-                    month: "short",
-                  }),
-                )
-              : s.unsigned}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
 /**
  * Debrief settings (redesign 2026-11-12): organisations, budgets, the PM agent's tests and
  * freedom, the steering score, the pinned rules, and a link to the guidance. Everyone with the
@@ -657,7 +626,7 @@ export const DebriefSettingsPage: React.FC = () => {
             />
           </Section>
           <Section id="pinned" title={s.nav.pinned} help={s.pinnedHelp}>
-            <PinnedRules />
+            <PinnedRulesSection canAsk={access.approvePinnedRule} />
           </Section>
           {schedules && (
             <Section id="schedules" title={s.nav.schedules} help={s.schedulesHelp}>

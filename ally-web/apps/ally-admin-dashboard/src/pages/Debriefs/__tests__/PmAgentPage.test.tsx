@@ -17,6 +17,9 @@ const h = vi.hoisted(() => ({
   build: vi.fn(),
   autonomy: vi.fn(),
   approvePinned: vi.fn(),
+  rejectPinned: vi.fn(),
+  withdrawPinned: vi.fn(),
+  proposePinned: vi.fn(),
   ask: vi.fn(),
   startStep: vi.fn(),
   history: vi.fn(),
@@ -56,6 +59,9 @@ vi.mock("@api", async importOriginal => ({
   useBuildDebriefTestSetsMutation: () => [h.build, { isLoading: false }],
   useGetDebriefAutonomyQuery: () => h.autonomy(),
   useApprovePinnedRuleMutation: () => [h.approvePinned, { isLoading: false }],
+  useRejectPinnedRuleMutation: () => [h.rejectPinned, { isLoading: false }],
+  useWithdrawPinnedRuleMutation: () => [h.withdrawPinned, { isLoading: false }],
+  useProposePinnedRuleMutation: () => [h.proposePinned, { isLoading: false }],
   useAskIdeaQuestionMutation: () => [h.ask, { isLoading: false }],
   useStartIdeaStepMutation: () => [h.startStep, { isLoading: false }],
   useGetDebriefPinnedRulesQuery: () => ({ data: { rules: [] } }),
@@ -450,11 +456,186 @@ describe("PM agent › Ideas", () => {
     };
     h.pmAgent.mockReturnValue(state([pinned]));
     renderPage();
-    expect(screen.queryByRole("button", { name: "Approve the new version" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Reject" })).toBeNull();
     h.permissions = ["review:admin:debriefs"];
     renderPage();
-    expect(screen.getByRole("button", { name: "Approve the new version" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sign off/i })).toBeNull();
+  });
+
+  describe("pinned rules: the buttons, the whole rule and Ask for a change", () => {
+    const LIVE = "Find every risk cue. Name the moment. Say how they responded.";
+    const pinnedIdea = (over: {
+      firstVersion?: boolean;
+      mine?: boolean;
+      can: Record<string, boolean>;
+      otherOpen?: number;
+    }) => ({
+      ...IDEA,
+      id: "dddddddd-0000-4000-8000-000000000004",
+      title: over.firstVersion
+        ? "Approve the current Safety rules (v1)"
+        : "Pinned rule: Name every moment",
+      change: {
+        ...IDEA.change,
+        ideaKind: "pinned_rule",
+        promptCode: "debrief_safety_reader_system",
+        find: over.firstVersion ? null : "Name the moment.",
+        replace: over.firstVersion ? null : "Name every moment.",
+        firstVersion: over.firstVersion,
+        version: over.firstVersion ? 1 : undefined,
+      },
+      evidence: over.firstVersion ? {} : { why: "Clearer", proposedBy: over.mine ? 7 : 9 },
+      state: "open",
+      approval: {
+        wait: "pinned_rule",
+        since: "2026-11-12T00:00:00Z",
+        expiresAt: over.firstVersion ? null : "2026-11-26T00:00:00Z",
+        expiresInDays: over.firstVersion ? null : 14,
+        expired: false,
+        expiringSoon: false,
+      },
+      can: { tryIt: false, askQuestion: false, startStep: false, ...over.can },
+      pinnedRule: {
+        name: "Safety rules",
+        firstVersion: !!over.firstVersion,
+        mine: !!over.mine,
+        proposedBy: over.firstVersion ? null : over.mine ? 7 : 9,
+        liveVersion: 1,
+        liveText: LIVE,
+        segments: over.firstVersion
+          ? [{ text: LIVE, changed: false }]
+          : [
+              { text: "Find every risk cue. ", changed: false },
+              { text: "Name every moment.", changed: true },
+              { text: " Say how they responded.", changed: false },
+            ],
+        stale: false,
+        otherOpen: over.otherOpen ?? 0,
+        approvedNote: null,
+      },
+    });
+    const buttons = () =>
+      within(screen.getByTestId("idea-actions"))
+        .getAllByRole("button")
+        .map(b => b.textContent);
+
+    beforeEach(() => {
+      h.permissions = ["review:admin:debriefs"];
+    });
+
+    it("a first version: Approve · Ask for a change, the whole rule open, no expiry", () => {
+      h.pmAgent.mockReturnValue(
+        state([
+          pinnedIdea({
+            firstVersion: true,
+            can: { approve: true, reject: false, withdraw: false, askForChange: true },
+          }),
+        ]),
+      );
+      renderPage();
+      expect(buttons()).toEqual(["Approve", "Ask for a change"]);
+      const rule = screen.getByTestId("pinned-rule-text");
+      expect(rule.tagName).not.toBe("DETAILS");
+      expect(rule).toHaveTextContent(LIVE);
+      expect(screen.queryByTestId("pinned-rule-change")).toBeNull();
+      expect(screen.queryByText(/expires/)).toBeNull();
+    });
+
+    it("the viewer's own proposal: Approve · Withdraw", async () => {
+      h.withdrawPinned.mockReturnValue(resolves(undefined));
+      h.pmAgent.mockReturnValue(
+        state([
+          pinnedIdea({
+            mine: true,
+            can: { approve: true, reject: false, withdraw: true, askForChange: false },
+          }),
+        ]),
+      );
+      renderPage();
+      expect(buttons()).toEqual(["Approve", "Withdraw"]);
+      fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Withdraw" }));
+      await waitFor(() =>
+        expect(h.withdrawPinned).toHaveBeenCalledWith({
+          id: "dddddddd-0000-4000-8000-000000000004",
+        }),
+      );
+    });
+
+    it("someone else's: Approve · Reject (with a reason) · Ask for a change", async () => {
+      h.rejectPinned.mockReturnValue(resolves(undefined));
+      h.pmAgent.mockReturnValue(
+        state([
+          pinnedIdea({
+            otherOpen: 1,
+            can: { approve: true, reject: true, withdraw: false, askForChange: true },
+          }),
+        ]),
+      );
+      renderPage();
+      expect(buttons()).toEqual(["Approve", "Ask for a change", "Reject"]);
+      // The diff first; the whole rule below it, collapsed, the new wording highlighted.
+      expect(screen.getByTestId("idea-diff")).toBeInTheDocument();
+      expect(screen.getByTestId("pinned-rule-text").tagName).toBe("DETAILS");
+      expect(screen.getByTestId("pinned-rule-change")).toHaveTextContent("Name every moment.");
+      expect(screen.getByTestId("pinned-rule-other-open")).toHaveTextContent(
+        "Another change to this rule is waiting for approval.",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Reject" }));
+      expect(h.rejectPinned).not.toHaveBeenCalled();
+      expect(dialog).toHaveTextContent("Say why you are rejecting it.");
+      fireEvent.change(within(dialog).getByLabelText("Why are you rejecting it?"), {
+        target: { value: "Too vague" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Reject" }));
+      await waitFor(() =>
+        expect(h.rejectPinned).toHaveBeenCalledWith({
+          id: "dddddddd-0000-4000-8000-000000000004",
+          reason: "Too vague",
+        }),
+      );
+      expect(h.decide).not.toHaveBeenCalled();
+    });
+
+    it("Ask for a change says when the passage isn't found or isn't unique, then sends it", async () => {
+      h.proposePinned.mockReturnValue(resolves({ id: "new" }));
+      h.pmAgent.mockReturnValue(
+        state([
+          pinnedIdea({
+            firstVersion: true,
+            can: { approve: true, reject: false, withdraw: false, askForChange: true },
+          }),
+        ]),
+      );
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: "Ask for a change" }));
+      const form = screen.getByTestId("pinned-rule-ask");
+      const passage = within(form).getByLabelText("Passage to change");
+      fireEvent.change(passage, { target: { value: "not in the rule" } });
+      fireEvent.change(within(form).getByLabelText("Replace it with"), {
+        target: { value: "x" },
+      });
+      fireEvent.change(within(form).getByLabelText("Why"), { target: { value: "Clearer" } });
+      fireEvent.click(within(form).getByRole("button", { name: "Send for approval" }));
+      expect(form).toHaveTextContent("That passage is not in the current rule.");
+      fireEvent.change(passage, { target: { value: ". " } });
+      expect(form).toHaveTextContent("appears more than once in the rule");
+      expect(h.proposePinned).not.toHaveBeenCalled();
+      fireEvent.change(passage, { target: { value: "Name the moment." } });
+      fireEvent.click(within(form).getByRole("button", { name: "Send for approval" }));
+      await waitFor(() =>
+        expect(h.proposePinned).toHaveBeenCalledWith({
+          promptCode: "debrief_safety_reader_system",
+          find: "Name the moment.",
+          replace: "x",
+          why: "Clearer",
+        }),
+      );
+    });
   });
 
   it("shows nothing to act on, and no Run now, to someone without the role", () => {

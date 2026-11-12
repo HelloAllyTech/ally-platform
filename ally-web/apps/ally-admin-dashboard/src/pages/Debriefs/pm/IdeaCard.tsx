@@ -31,6 +31,8 @@ import {
   SCREENABLE,
   stage,
 } from "./ideaGroups";
+import { AskForChange, PinnedRuleText } from "./PinnedRule";
+import { pinnedRuleButtons } from "./pinnedRuleButtons";
 
 export const ideaCode = (idea: PmAgentIdeaRow) => idea.code ?? shortId(idea.id);
 
@@ -155,7 +157,7 @@ export const IdeaCard: React.FC<{
   settingSpec?: Record<string, DebriefOwnerSettingSpec>;
   canaryShare?: number;
   liveVersion?: number | null;
-  onDecide: (d: "approve" | "reject") => void;
+  onDecide: (d: "approve" | "reject" | "withdraw") => void;
   onOpenRelease?: (releaseId: string) => void;
 }> = ({ idea, access, settingSpec, canaryShare, liveVersion, onDecide, onOpenRelease }) => {
   const s = en.debriefs.pmAgent;
@@ -163,12 +165,16 @@ export const IdeaCard: React.FC<{
   const [screen, { isLoading: screening }] = useScreenIdeaMutation();
   const [startStep, { isLoading: starting }] = useStartIdeaStepMutation();
   const [asking, setAsking] = useState(false);
+  const [askingChange, setAskingChange] = useState(false);
   const next = stage(idea);
   const mine = needsViewer(idea, access);
   const left = daysLeft(idea);
   const group = ideaGroup(idea, access);
   const open = idea.status === "proposed" && !["expired", "reverted", "rejected"].includes(group);
   const pinned = idea.change.ideaKind === "pinned_rule";
+  const rule = idea.pinnedRule;
+  const pr = p.pinnedRule;
+  const pinnedButtons = pinned ? pinnedRuleButtons(idea, access) : [];
   const can = idea.can ?? {
     approve: mine,
     reject: pinned ? access.approvePinnedRule : access.pmAgent,
@@ -179,13 +185,17 @@ export const IdeaCard: React.FC<{
   const wait = idea.approval?.wait;
   const canPromote = access.pmAgent && (wait === "promote" || next === "promote");
   const statusLabel =
-    group === "expired"
-      ? p.expired
-      : group === "promoted"
-        ? idea.releaseStatus === "ga"
-          ? s.ideaStatus.active
-          : s.noLongerLive
-        : (p.groupStatus[group] ?? s.ideaStatus[idea.status] ?? idea.status);
+    pinned && idea.closedReason === "withdrawn"
+      ? pr.withdrawnStatus
+      : pinned && idea.closedReason === "signed_off"
+        ? pr.approvedStatus
+        : group === "expired"
+          ? p.expired
+          : group === "promoted"
+            ? idea.releaseStatus === "ga"
+              ? s.ideaStatus.active
+              : s.noLongerLive
+            : (p.groupStatus[group] ?? s.ideaStatus[idea.status] ?? idea.status);
   const draft = open
     ? (idea.draftRelease?.version ??
       (idea.releaseVersion != null && idea.releaseStatus !== "ga" ? idea.releaseVersion : null))
@@ -252,6 +262,35 @@ export const IdeaCard: React.FC<{
           </div>
         </div>
       )}
+      {pinned && rule?.firstVersion && open && (
+        <p className="text-sm text-neutral-700">{pr.firstVersionIntro}</p>
+      )}
+      {pinned && rule?.mine && open && (
+        <p className="text-sm text-neutral-700">{pr.proposedByYou}</p>
+      )}
+      {pinned && rule?.segments && (
+        <PinnedRuleText
+          name={rule.name}
+          version={rule.liveVersion}
+          segments={rule.segments}
+          firstVersion={rule.firstVersion}
+        />
+      )}
+      {pinned && open && rule?.stale && (
+        <p className="text-sm text-destructive-600" data-testid="pinned-rule-stale">
+          {pr.stale}
+        </p>
+      )}
+      {pinned && open && (rule?.otherOpen ?? 0) > 0 && (
+        <p className="text-sm text-[#8A3800]" data-testid="pinned-rule-other-open">
+          {pr.otherOpen(rule?.otherOpen ?? 0)}
+        </p>
+      )}
+      {pinned && idea.status === "approved" && (
+        <p className="text-sm text-success-600" data-testid="pinned-rule-approved">
+          {idea.change.firstVersion ? pr.approvedFirst : pr.approved}
+        </p>
+      )}
       {idea.change.ideaKind === "setting" && (
         <p className="text-sm" data-testid="idea-setting">
           <span className="font-semibold">{s.change}:</span>{" "}
@@ -315,7 +354,43 @@ export const IdeaCard: React.FC<{
         </p>
       )}
 
-      {open &&
+      {pinned && open && pinnedButtons.length > 0 && (
+        <div className="flex flex-col gap-2.5" data-testid="idea-actions">
+          {pinnedButtons.includes("approve") && (
+            <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
+              {p.approvePinned}
+            </Button>
+          )}
+          <div className="flex flex-wrap gap-2.5">
+            {pinnedButtons.includes("ask") && (
+              <Button kind="tertiary" size="md" onClick={() => setAskingChange(true)}>
+                {pr.askForChange}
+              </Button>
+            )}
+            {pinnedButtons.includes("withdraw") && (
+              <Button kind="danger--tertiary" size="md" onClick={() => onDecide("withdraw")}>
+                {pr.withdraw}
+              </Button>
+            )}
+            {pinnedButtons.includes("reject") && (
+              <Button kind="danger--tertiary" size="md" onClick={() => onDecide("reject")}>
+                {s.reject}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+      {pinned && askingChange && rule?.liveText && idea.change.promptCode && (
+        <AskForChange
+          code={idea.change.promptCode}
+          name={rule.name}
+          text={rule.liveText}
+          otherOpen={(rule.otherOpen ?? 0) + (rule.firstVersion ? 0 : 1)}
+          onClose={() => setAskingChange(false)}
+        />
+      )}
+      {!pinned &&
+        open &&
         (can.approve ||
           canPromote ||
           can.reject ||
@@ -345,11 +420,6 @@ export const IdeaCard: React.FC<{
             {can.approve && next === "handoff" && idea.evidence.handoff && (
               <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
                 {s.handoff.approve[idea.evidence.handoff.kind]}
-              </Button>
-            )}
-            {pinned && (idea.can ? idea.can.approve : access.approvePinnedRule) && (
-              <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
-                {p.approvePinned}
               </Button>
             )}
             {can.startStep && (wait === "start_gate" || wait === "start_trial") && (
