@@ -955,7 +955,8 @@ export function ideaState(idea: {
     if (e.canary?.status === 'reverted') {
       return closed('reverted', e.canary.reason ?? null);
     }
-    return closed('rejected');
+    // The person's reason (required for a pinned rule) is what the PM agent reads too.
+    return closed('rejected', e.rejection?.reason ?? null);
   }
   if (e.canary?.status === 'reverted') {
     return closed('reverted', e.canary.reason ?? null);

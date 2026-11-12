@@ -149,6 +149,16 @@ describe('ideas are open or closed, like pull requests', () => {
     ).toBe('expired');
     expect(
       ideaState({
+        status: 'rejected',
+        evidence: { rejection: { at: 'x', by: 2, reason: 'adds nothing' } },
+      }),
+    ).toMatchObject({ closedReason: 'rejected', closedWhy: 'adds nothing' });
+    expect(ideaState({ status: 'rejected' })).toMatchObject({
+      closedReason: 'rejected',
+      closedWhy: null,
+    });
+    expect(
+      ideaState({
         status: 'proposed',
         evidence: {
           canary: { status: 'reverted', reason: 'missed a risk cue' },
