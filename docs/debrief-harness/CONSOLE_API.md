@@ -73,7 +73,7 @@ Returns `{ userId: number } & Viewer`.
 
 ### `GET sessions`
 Query: `category` = `needs` (default) | `flagged` | `below` | `published` | `escalated` |
-`to_score` | `all`; `tenantId`; `language`; `recipe` (`standard`|`short`|`case`|`assessment`);
+`to_score` | `agreement_sample` | `all`; `tenantId`; `language`; `recipe` (`standard`|`short`|`case`|`assessment`);
 `fallback` = `none` (ran as written) | `light` (steps 1–2) | `heavy` (steps 3–6); `riskCue` =
 `true`|`false`; `cost` = `over_0_20` | `hit_ceiling` (≥ 95% of the run's ceiling); `mode` =
 `production` (default, shadow and live) | `live` | `shadow` | `replay` | `any`; `limit` (≤ 200,
@@ -97,11 +97,15 @@ undo window are not work yet. Other categories are newest first. Comments never 
     createdAt; rank: 0|1|2|3; needsPerson; urgent; flagged; flagCount; importantMomentFlagged;
     escalated; riskCue; learnerDistress; belowBar; reviewed;
     inMyScoringSample: boolean; toScore: boolean; waitingSince: string|null;
+    agreementSample: boolean;            // in the weekly agreement sample, no verdict yet
   }>;
   filterOptions: { tenants: {id,name}[]; languages: string[]; recipes: string[]; fallback; riskCue; cost; modes };
   viewer: Viewer;
 }
 ```
+
+`agreement_sample` (counts: `agreementSample`, null unless `can.verdict`) lists the weekly random
+agreement sample's runs that have no verdict yet (see "Judge agreement" below).
 
 `toScore` and `inMyScoringSample` come from the calibration sample (the seeded, stratified sample
 `DebriefCalibrationService.getSample` draws). They are only computed when `can.score` is true.
@@ -148,6 +152,7 @@ undo window are not work yet. Other categories are newest first. Comments never 
   earlierComments: Comment[];            // threads on this learner's earlier debriefs of the same
                                          // scenario, newest first (≤ 30), minus ones already repeated here
   verdict: { verdict; hardFails; updatedAt } | null;  // the viewer's own
+  agreement: { inSample: boolean; questions: AgreementQuestion[] } | null; // can.verdict only
   scoring: { inMyScoringSample: boolean; scoredByMe: boolean };
   queue: { position: number|null; total; previousRunId: string|null; nextRunId: string|null }; // Previous/Next, j/k
   pendingActions: PendingAction[];       // the "waiting on you" bar, for THIS viewer's role
@@ -204,10 +209,59 @@ and `too_long_or_unclear`). `PATCH comments/:id {body?, tag?}`, `DELETE comments
 can read comments in the session payload but get 403 on writes. Comments feed the PM agent's
 evidence, never the queue. You cannot comment on a session from your own practice (403).
 
+## Judge agreement (the canary's κ gate)
+
+The κ that gates the PM agent's canary comes from the clinical advisor's ordinary reviews, not a
+separate labelling task. Under the verdict they confirm one yes/no per measure the judge emits and
+the gate reads. **Three questions, not four**: the judge scores evidence and specificity as one
+dimension (`evidence_specificity`), so there is one Evidence question.
+
+| Measure | Question (Yes is good) | Judge says Yes when |
+|---|---|---|
+| `accuracy` | Is everything the debrief says about the session accurate? | accuracy ≥ 8 and no `fabricated_quote` / `unsupported_progress_claim` |
+| `evidence_specificity` | Does each point name a specific moment from the session? | evidence_specificity ≥ 8 |
+| `missed_risk_cue` | Does the debrief cover every risk the client raised? (Yes if none) | no `missed_risk_cue` hard fail |
+
+```ts
+type AgreementQuestion = {
+  measure: 'accuracy'|'evidence_specificity'|'missed_risk_cue';
+  answer: boolean;        // what the panel starts with: saved, else the pre-fill
+  prefilled: boolean;     // from the reviewer's own comments / ticked hard fails
+  source: { kind: 'comment'; commentId; anchorKind; turnIndex: number|null; section: string|null }
+        | { kind: 'hard_fail'; code } | null;
+  saved: boolean | null;
+};
+```
+
+**Pre-fill** (server-side, `debrief-agreement.util.ts`): a comment by the reviewer tagged
+`wrong_or_unsupported`, or a ticked `fabricated_quote` / `unsupported_progress_claim` → Accuracy No;
+a `missed_moment` comment on a risk-cue transcript turn, or a ticked `missed_risk_cue` → Missed risk
+cue No; otherwise Yes. No tag maps to Evidence today, so it starts Yes. The admin shows the source
+as "From your comment on turn 12" / "From the hard fail you ticked".
+
+`PUT /v1/debriefs/expert-review/runs/:id/verdict` takes `answers?: {accuracy?, evidence_specificity?,
+missed_risk_cue?: boolean}`. Measures left out keep the pre-fill; with no `answers` (an older client)
+nothing is stored. Each answer is stored in `debrief_review_answers` with the pre-fill (recomputed
+on the server from the submitted hard fails) and `changed`.
+
+**κ** (`DebriefAgreementService`): per measure, Cohen's κ between the answer under the **latest
+verdict per debrief that carries answers** (any reviewer) and the judge's finding on the same run.
+A measure counts from **50 reviews**; below that it is "not measured yet, n of 50". When both sides
+only ever gave one answer κ is undefined (null) and the measure does not pass. Recall on the
+advisor's No (how many of the debriefs they said No to the judge also said No to) is shown beside
+κ. The canary needs κ ≥ 0.6 on every measure; this replaces the hand-scored calibration set as
+`facts.gate`. The κ re-lock and the owner's override work as before.
+
+**Weekly sample** (`debrief-agreement-sample`, Settings › Schedules, weekly Mon 07:30 India time, no
+model spend): up to **5** judged live/shadow debriefs from the last 28 days, nobody's verdict yet,
+outside test organisations, while fewer than 10 sampled ones wait. Stored in
+`debrief_agreement_samples`; they show as "Agreement sample" until a verdict exists. Verdicts from
+ordinary reviews count too.
+
 ## Score by hand
 
 `POST sessions/:sessionId/score` takes `{ scores: Record<dimension, 0..10>, hardFails: string[], note? }`. It is stored
-as the calibration rating and feeds the κ gate. The Ally team can only score sessions in the scoring sample (403
+as the calibration rating (Analytics › Debriefs; since the advisor's yes/no answers it no longer feeds the canary's κ gate). The Ally team can only score sessions in the scoring sample (403
 otherwise). It returns 404 when the judge has not scored the session.
 
 ## PM agent: ideas (like pull requests) and approvals (plan §11.7)
@@ -370,11 +424,17 @@ type WaitingRelease = {
                  relockedAt: string|null; relockReason: string|null }>;
   orgs: Array<{ tenantId; tenantName; live: boolean;
                 overrides: { paired_trial; canary: 'default'|'ask'|'never' } }>;
-  facts: { gate: { met; failing: {measure,kappa}[] }; reverts: Partial<Record<Kind, number>>;
+  facts: { gate: { met; failing: {measure,kappa,n}[] }; reverts: Partial<Record<Kind, number>>;
            failedBaseline: { failed; detail }; judgeDrift: null };
   judgeDrift: { measured: false; from: 'release_2'; note: string };   // UI: "measured from Release 2"
   relocks: Array<{ kind; at; reason }>;
-  can: { change: boolean } }
+  can: { change: boolean };
+  // "Judge agreement with the clinical advisor" (see Judge agreement)
+  agreement: { measures: Array<{ measure; n; minReviews: 50; kappa: number|null; agreementPct: number|null;
+                                 recallOnNo: { caught; of; pct: number|null };
+                                 state: 'not_enough'|'undefined'|'below'|'met'; passes: boolean }>;
+               gate: { met; failing }; minReviews: 50; kappa: 0.6;
+               sample: { size: 5; thisWeek: number; waiting: number } } | null }
 ```
 - **Kinds.** `settings` covers non-budget settings. `prompts` covers prompt edits, registry agents and default plans. `pinned_rules` is always never.
 - **Guidance and models are not kinds.** The PM agent never touches Context Library chunks (spec C4), and model trials come in Release 2. Stored cells for them are dropped when the policy is read.
@@ -440,6 +500,7 @@ Defaults are the old ticks, so a deploy changes nothing (server clock UTC → In
 | `debrief-cost-reconcile` | Reconcile costs | daily 05:35 | 1 min / hourly / 6 h / daily |
 | `debrief-pm-agent-expiry` | Expire approvals | daily 05:35 | 1 min / hourly / 6 h / daily |
 | `debrief-autonomy-relock` | Re-lock autonomy | daily 05:35 | 1 min / hourly / 6 h / daily |
+| `debrief-agreement-sample` (**new**) | Agreement sample | weekly Mon 07:30 | 1 min / weekly / every 2 weeks |
 | `debrief-pm-agent-forecasts` | Check forecasts | daily 05:35 | 1 min / hourly / 6 h / daily |
 | `debrief-pm-agent` | PM agent analysis | weekly Mon 07:30 | daily / weekly / every 2 weeks · budget confirm |
 | `debrief-pm-agent-review` | PM agent monthly review | monthly 1st 08:30 | weekly / monthly · budget confirm |
