@@ -643,6 +643,18 @@ export function keepOfferedPractice(
 }
 
 /**
+ * Plan §8.2: a short session's debrief is the opening and one card. Writers
+ * still sometimes add "Practise this next" and the skill words; the learner
+ * (and the supervisor reading their debrief) never sees them on a short one.
+ */
+export function cardsForReader<
+  T extends Record<string, any> | null | undefined,
+>(cards: T, recipeKey?: string | null): T {
+  if (!cards || recipeKey !== 'short') return cards;
+  return { ...cards, practise_next: null, skill_words: [] } as T;
+}
+
+/**
  * The code checks on one Ask Ally reply (v9 FR-43): no score, no diagnosis,
  * no turn numbers, and anything it puts in quotation marks is said
  * somewhere — in the transcript, or in the debrief it is talking about.

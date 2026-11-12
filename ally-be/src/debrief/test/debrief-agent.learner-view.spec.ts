@@ -376,6 +376,33 @@ describe('DebriefAgentService.onSessionEnded', () => {
     }
   });
 
+  it('a short session reads as the opening and one card: no Practise next, no skill words (plan §8.2)', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          recipeKey: 'short',
+          language: 'en',
+          steps: [],
+          cards: {
+            opening: 'o',
+            work_on_this: [{ lead: 'w', scenario_id: 7 }],
+            practise_next: { skill: 'x', reason: 'y', scenario_id: 41 },
+            skill_words: [{ skill: 'x', word: 'strength' }],
+          },
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view.cards).toMatchObject({
+      opening: 'o',
+      practise_next: null,
+      skill_words: [],
+    });
+    expect(view.cards?.work_on_this).toHaveLength(1);
+    expect(view.practice).toEqual([]);
+  });
+
   it('links only roleplays the learner can still open', async () => {
     const view = await build({
       runs: [

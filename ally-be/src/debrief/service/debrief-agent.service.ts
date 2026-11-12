@@ -48,6 +48,7 @@ import { DebriefTrialsService } from './debrief-trials.service';
 import { DebriefReleasesService } from './debrief-releases.service';
 import { DebriefPracticeService } from './debrief-practice.service';
 import { hasLegacyFeedback } from '../util/debrief-live.util';
+import { cardsForReader } from '../util/debrief-cards.util';
 import {
   DebriefProgress,
   DebriefRunnerService,
@@ -771,20 +772,22 @@ export class DebriefAgentService implements OnModuleInit {
           ),
         };
       case DebriefRunStatus.PUBLISHED:
-      case DebriefRunStatus.BELOW_BAR:
+      case DebriefRunStatus.BELOW_BAR: {
+        const cards = cardsForReader(run.cards, run.recipeKey);
         return {
           state: 'ready',
           runId: run.id,
-          cards: run.cards,
+          cards,
           language: run.language,
           distress: run.learnerDistress === true,
           supportLines: await this.supportLines(s.tenant_id, run.language),
           practice: await this.practice.available(
             userId,
             s.tenant_id,
-            practiceIds(run.cards),
+            practiceIds(cards),
           ),
         };
+      }
       case DebriefRunStatus.SKIPPED:
         return {
           state: run.skipReason === 'too_short' ? 'too_short' : 'not_available',

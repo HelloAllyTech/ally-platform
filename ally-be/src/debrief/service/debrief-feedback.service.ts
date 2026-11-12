@@ -17,7 +17,7 @@ import {
   DebriefRunMode,
   DebriefRunStatus,
 } from '../enum/debrief-run.enum';
-import { DebriefCards } from '../util/debrief-cards.util';
+import { DebriefCards, cardsForReader } from '../util/debrief-cards.util';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefPublishService } from './debrief-publish.service';
 import { LearnerDebriefView } from './debrief-agent.service';
@@ -439,7 +439,7 @@ export class DebriefFeedbackService {
     return {
       state: 'ready',
       readOnly: true,
-      cards: run.cards,
+      cards: cardsForReader(run.cards, run.recipeKey),
       language: run.language,
       corrections: decorated.corrections ?? [],
       flags: learner
