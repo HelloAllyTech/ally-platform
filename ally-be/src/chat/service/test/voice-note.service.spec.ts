@@ -207,6 +207,42 @@ describe('VoiceNoteService', () => {
       expect(result.transcript).toBe('first part second part third part');
     });
 
+    it('transcribes chunks concurrently and stitches them in chunk order even when they resolve out of order', async () => {
+      // A sequential await-per-chunk loop made a long dictation's total
+      // latency scale with its chunk count (each an extra full OpenAI
+      // round-trip) — long enough to exceed the mobile client's receive
+      // timeout and surface as "no summary generated" for exactly the long
+      // dictations this chunking exists to fix. Deliberately resolve the
+      // chunks out of call order (last chunk fastest) so a regression back
+      // to sequential — or any future implementation that stitches results
+      // as they arrive instead of by chunk position — would both show up
+      // here: timing would scale with the sum of delays, and/or the
+      // transcript would come out reordered.
+      const longWav = {
+        buffer: buildWav(600),
+        mimetype: 'audio/wav',
+        size: 100,
+      } as Express.Multer.File;
+      const chunkTexts = ['first part', 'second part', 'third part'];
+      const delaysMs = [30, 20, 10];
+      let callIndex = 0;
+      mockTranscriptionsCreate.mockImplementation(() => {
+        const index = callIndex++;
+        return new Promise((resolve) =>
+          setTimeout(() => resolve({ text: chunkTexts[index] }), delaysMs[index]),
+        );
+      });
+
+      const startedAt = Date.now();
+      const result = await service.generateFromAudio(longWav, undefined);
+      const elapsedMs = Date.now() - startedAt;
+
+      expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(3);
+      expect(result.transcript).toBe('first part second part third part');
+      // Concurrent: ~max(delays)=30ms. Sequential would be ~sum(delays)=60ms.
+      expect(elapsedMs).toBeLessThan(50);
+    });
+
     it('does not chunk a long non-WAV (web) recording — a single request, same as before', async () => {
       // webm has no fixed-rate PCM layout to cut losslessly; chunking is WAV-only.
       const longWebm = {

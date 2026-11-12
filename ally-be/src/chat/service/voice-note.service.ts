@@ -194,18 +194,28 @@ export class VoiceNoteService {
         );
       }
 
-      const texts: string[] = [];
-      for (const chunkBuffer of chunks) {
-        const file = await toFile(chunkBuffer, `dictation.${ext}`, { type });
-        const result = await this.openai.audio.transcriptions.create({
-          file,
-          model: this.transcriptionModel,
-          // Only pass a language when the client sent a hint; otherwise let the
-          // model auto-detect (Ally serves many languages).
-          ...(languageHint ? { language: languageHint } : {}),
-        });
-        texts.push((result.text ?? '').trim());
-      }
+      // Chunks are independent, so transcribe them concurrently rather than
+      // one at a time — a sequential loop made a long dictation's total
+      // latency scale with its chunk count (each an extra full OpenAI
+      // round-trip), which pushed the whole request past the mobile
+      // client's receive timeout and surfaced as "no summary generated" for
+      // exactly the long dictations this chunking was meant to fix.
+      // `Promise.all` preserves input order in its results regardless of
+      // resolution order, so chunk order survives even though completion
+      // order doesn't.
+      const texts = await Promise.all(
+        chunks.map(async (chunkBuffer) => {
+          const file = await toFile(chunkBuffer, `dictation.${ext}`, { type });
+          const result = await this.openai.audio.transcriptions.create({
+            file,
+            model: this.transcriptionModel,
+            // Only pass a language when the client sent a hint; otherwise let the
+            // model auto-detect (Ally serves many languages).
+            ...(languageHint ? { language: languageHint } : {}),
+          });
+          return (result.text ?? '').trim();
+        }),
+      );
 
       const text = texts.filter(Boolean).join(' ').trim();
       this.logger.info(
