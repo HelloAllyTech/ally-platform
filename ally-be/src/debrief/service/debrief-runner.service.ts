@@ -5,6 +5,7 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
+import { withPinnedPrompts } from '../util/debrief-releases.util';
 import {
   DEBRIEF_AGENT_KEY,
   DEBRIEF_PROMPT_CODES,
@@ -173,7 +174,22 @@ export class DebriefRunnerService {
       ? validateDebriefBundle(r.bundle, await this.modelCatalog())
       : [];
     if (r && problems.length === 0) {
-      return { release: r, bundle: r.bundle as unknown as DebriefBundle };
+      // Recording pins must never fail a learner's debrief: on a failed
+      // write the release runs with what it has recorded so far.
+      const pins = r.id
+        ? await this.pinPrompts(r).catch((e) => {
+            this.logger.warn(
+              `[debrief] could not record prompt versions for release v${r.version}: ${(e as Error).message}`,
+            );
+            return (
+              (r.changeSet as Record<string, any> | null)?.pinnedPrompts ?? null
+            );
+          })
+        : null;
+      return {
+        release: r,
+        bundle: withPinnedPrompts(r.bundle as unknown as DebriefBundle, pins),
+      };
     }
     if (r) {
       this.logger.error(
@@ -181,6 +197,44 @@ export class DebriefRunnerService {
       );
     }
     return { release: null, bundle: DEBRIEF_SEED_BUNDLE };
+  }
+
+  /**
+   * The exact Skills Store version of every prompt this release left
+   * unpinned (plan §8.8), recorded once: when the release is created (the
+   * services that make releases call this straight after), or at the latest
+   * the first time it is resolved. A release that has them never follows the
+   * store's current version again, so rolling back restores its texts.
+   */
+  async pinPrompts(r: AgentRelease): Promise<Record<string, number>> {
+    const existing = (r.changeSet as Record<string, any> | null)
+      ?.pinnedPrompts as Record<string, number> | undefined;
+    if (existing) return existing;
+    const unpinned = Object.entries(
+      ((r.bundle as Record<string, any>)?.prompts ?? {}) as Record<
+        string,
+        number | null
+      >,
+    )
+      .filter(([, v]) => v == null)
+      .map(([code]) => code);
+    const pins = await this.context.currentPromptVersions(unpinned);
+    await this.context.recordPromptPins(r.id, pins, 'created');
+    r.changeSet = { ...(r.changeSet ?? {}), pinnedPrompts: pins };
+    return pins;
+  }
+
+  /** Pin every debrief release that has no record yet (after the seed sync at boot). */
+  async pinAll(): Promise<number> {
+    const all = await this.releases.list(DEBRIEF_AGENT_KEY);
+    let n = 0;
+    for (const r of all) {
+      if (!(r.changeSet as Record<string, any> | null)?.pinnedPrompts) {
+        await this.pinPrompts(r);
+        n++;
+      }
+    }
+    return n;
   }
 
   /**

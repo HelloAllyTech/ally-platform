@@ -242,7 +242,8 @@ A passed canary that was never promoted is stopped. `approve` on an expired item
   { title: string; why?: string;
     steps?: Array<{ step: string /* 'reviser' | 'agent:protocol_check' */; enabled?: boolean; model?: string|null; backupModel?: string|null }>;
     settings?: { runCeilingUsd?; monthlyCapUsd?; passScore? };   // passScore = the evaluator bar
-    reply?: string }                                                // Ask Ally's model
+    reply?: string;                                                 // Ask Ally's model
+    prompts?: { [promptCode: string]: number } }                    // ship these Skills Store versions
   ```
   It returns `{ ideaId, releaseId, version, budgetOnly, diff: BundleDiff }`. The draft is copied from the live release with these changes and checked like every release. The live release is never edited.
   - Fixed steps (safety reader, writer, checks, evaluator) and the judge cannot be turned off. The judge's model is pinned.
@@ -319,7 +320,8 @@ Only releases that **have been live** are listed, newest first. The old `GET rel
     prompts: Array<{ code; pinned; before: {promptId, version, text}|null; after: {...}|null }> }
   ```
   Feed `before.text` and `after.text` to the Skills Store diff view.
-- `POST releases/:id/rollback {reason?}` (Ally team or owner) only works on a release that **has been live** and is not live now (409 otherwise). Everything comes back together, and the owner is notified. A prompt the old release left at `null` follows the Skills Store's current version and cannot be restored.
+- `POST releases/:id/rollback {reason?}` (Ally team or owner) only works on a release that **has been live** and is not live now (409 otherwise). Everything comes back together, **including the exact prompt texts**, and the owner is notified.
+- **Exact prompt versions (plan §8.8).** Every release records the exact Skills Store version of each prompt it left unpinned, at the moment it is created. This is stored in `agent_releases.changeSet.pinnedPrompts`, so the bundle and its hash never change. The runner always runs those versions, so a prompt published later in the Skills Store reaches learners only through a new release. To ship one, use `POST pm-agent/ideas/propose {prompts: {code: version}}` (pinned-rule prompts are refused: use a pinned-rule proposal). Existing releases were backfilled by migration 1981900750000 with the version published at or before each one went live. Where that history doesn't exist, the version current at migration time is used, the release is marked `changeSet.pinSource = 'migration'`, and its release notes say so. `contents.prompts[].version` and all diffs show these exact versions.
 - `POST releases/:id/promote-code-draft {reason?}` (`releases`) puts a waiting code (seed) draft live. Code releases skip the ladder.
 
 `BundleDiff = { prompts: [{code, before, after, pinned}], settings: [{key, before, after}], recipes: [...], steps: [{step, field: 'enabled'|'model'|'backupModel', before, after}], reply, orchestrator, budgetOnly }`.

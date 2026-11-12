@@ -695,6 +695,8 @@ export class DebriefPmAgentService implements OnModuleInit {
       userId,
       `PM agent idea (canary): ${idea.text}`,
     );
+    // Plan §8.8: the exact prompt versions it runs, recorded now.
+    await this.runner.pinPrompts(draft);
     return this.startCanaryFor(idea, draft, userId, note);
   }
 
@@ -1189,6 +1191,8 @@ export class DebriefPmAgentService implements OnModuleInit {
         userId,
         `Pinned rule (${code} v${version.version}): ${idea.text}`.slice(0, 300),
       );
+      // Plan §8.8: the exact prompt versions it runs, recorded now.
+      await this.runner.pinPrompts(draft);
       releaseId = draft.id;
       releaseVersion = draft.version;
     }

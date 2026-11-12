@@ -24,6 +24,7 @@ function build() {
     makeGa: jest.fn(async () => undefined),
   };
   const runner = {
+    pinPrompts: jest.fn(async () => ({})),
     resolveRelease: jest.fn(async () => ({
       release: { version: 2 },
       bundle: DEBRIEF_SEED_BUNDLE,

@@ -221,6 +221,15 @@ export class DebriefAgentService implements OnModuleInit {
       DEBRIEF_AGENT_KEY,
       DEBRIEF_SEED_BUNDLE as unknown as Record<string, unknown>,
     );
+    // Plan §8.8: a seed release made just now records the exact prompt
+    // versions it runs, as every release does when it is created.
+    try {
+      await this.runner.pinAll();
+    } catch (e) {
+      this.logger.warn(
+        `[debrief] could not record release prompt versions: ${(e as Error).message}`,
+      );
+    }
   }
 
   async isLive(tenantId: string | null): Promise<boolean> {

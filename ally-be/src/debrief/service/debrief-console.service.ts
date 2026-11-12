@@ -174,6 +174,8 @@ export class DebriefConsoleService {
       userId,
       `Model change: ${changed.join(', ')}${note ? ` — ${note}` : ''}`,
     );
+    // Plan §8.8: the exact prompt versions it runs, recorded now.
+    await this.runner.pinPrompts(draft);
     await this.releases.makeGa(
       draft.id,
       userId,
@@ -450,6 +452,8 @@ export class DebriefConsoleService {
       userId,
       `Orchestrator challenger: planner + registry agents${note ? ` — ${note}` : ''}`,
     );
+    // Plan §8.8: the exact prompt versions it runs, recorded now.
+    await this.runner.pinPrompts(release);
     return {
       releaseId: release.id,
       version: release.version,

@@ -32,9 +32,17 @@ import {
   ladderOf,
   OPTIONAL_STEPS,
   StepEdit,
+  withPinnedPrompts,
 } from '../util/debrief-releases.util';
 import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefNotifier } from './debrief-notifier.service';
+
+/** The bundle a release really runs: unpinned prompts at the versions recorded for it (plan §8.8). */
+const eff = (r: Record<string, any>) =>
+  withPinnedPrompts(
+    r.bundle as DebriefBundle,
+    r.changeSet?.pinnedPrompts as Record<string, number> | undefined,
+  );
 
 const num = (v: unknown, d = 2) =>
   v == null || !Number.isFinite(Number(v))
@@ -367,15 +375,11 @@ export class DebriefReleasesService {
             }
           : null,
       },
-      notes: await this.releaseNotes(
-        r,
-        (previous?.bundle as DebriefBundle | undefined) ?? null,
-        idea,
-      ),
+      notes: await this.releaseNotes(r, previous ? eff(previous) : null, idea),
       // The full inventory: secondary to the notes.
       contents: await this.contents(
-        r.bundle as DebriefBundle,
-        (previous?.bundle as DebriefBundle | undefined) ?? null,
+        eff(r),
+        previous ? eff(previous) : null,
         r.id,
       ),
       compareWith: previous ? previous.id : null,
@@ -394,7 +398,7 @@ export class DebriefReleasesService {
     previous: DebriefBundle | null,
     idea: Record<string, any> | null,
   ) {
-    const bundle = r.bundle as DebriefBundle;
+    const bundle = eff(r);
     const diff = bundleDiff(previous, bundle);
     const written = (r.changeSet?.notes ?? null) as {
       summary?: string | null;
@@ -522,6 +526,19 @@ export class DebriefReleasesService {
         before: JSON.stringify(diff.orchestrator.before),
         after: JSON.stringify(diff.orchestrator.after),
         source: 'diff',
+      });
+    }
+    if (r.changeSet?.pinSource === 'migration') {
+      const fallbacks = (r.changeSet?.pinFallbacks ?? []) as string[];
+      changes.push({
+        area: 'Prompt versions',
+        what: 'Prompt versions recorded after the fact',
+        why:
+          `This release did not name exact versions for ${fallbacks.length ? fallbacks.map(promptLabel).join(', ') : 'some prompts'}; ` +
+          'the versions live when the record was made (migration 1981900750000) are what it restores.',
+        before: null,
+        after: null,
+        source: 'written',
       });
     }
     for (const c of written?.changes ?? []) {
@@ -839,10 +856,7 @@ export class DebriefReleasesService {
         mine[mine.length - 1]?.fromReleaseId ?? a.parentReleaseId ?? null;
       b = from ? await this.releases.getById(from).catch(() => null) : null;
     }
-    const diff = bundleDiff(
-      (b?.bundle as DebriefBundle) ?? null,
-      a.bundle as DebriefBundle,
-    );
+    const diff = bundleDiff(b ? eff(b) : null, eff(a));
     const text = async (code: string, version: number | null) => {
       const [row] = await this.dataSource.query(
         `SELECT p.id, pv.version, pv.prompt FROM prompts p
@@ -887,6 +901,8 @@ export class DebriefReleasesService {
       settings?: ReleaseSettingChange;
       /** Ask Ally's model. */
       reply?: string | null;
+      /** Skills Store versions to ship, by prompt code. */
+      prompts?: Record<string, number> | null;
     },
     userId: number,
   ): Promise<{
@@ -902,6 +918,7 @@ export class DebriefReleasesService {
       input.steps,
       input.settings,
       input.reply,
+      input.prompts,
     );
     const diff = bundleDiff(bundle, next);
     if (
@@ -922,6 +939,8 @@ export class DebriefReleasesService {
       userId,
       title.slice(0, 300),
     );
+    // Plan §8.8: the exact prompt versions it runs, recorded now.
+    await this.runner.pinPrompts(draft);
     const change = {
       ideaKind: 'release',
       route: 'A',
@@ -977,7 +996,7 @@ export class DebriefReleasesService {
   ): Promise<{ ideaId: string; releaseId: string }> {
     const draft = await this.releases.getById(releaseId);
     const { release: live, bundle } = await this.runner.resolveRelease();
-    const diff = bundleDiff(bundle, draft.bundle as DebriefBundle);
+    const diff = bundleDiff(bundle, eff(draft));
     const [row] = await this.dataSource.query(
       `INSERT INTO agent_lessons
          ("agentKey", kind, scope, status, text, change, evidence, "contentHash", "authorKind")
@@ -1005,8 +1024,30 @@ export class DebriefReleasesService {
     steps?: StepEdit[],
     settings?: ReleaseSettingChange,
     reply?: string | null,
+    prompts?: Record<string, number> | null,
   ): Promise<DebriefBundle> {
     let next = JSON.parse(JSON.stringify(bundle)) as DebriefBundle;
+    // A Skills Store version reaches learners only through a release (§8.8).
+    for (const [code, version] of Object.entries(prompts ?? {})) {
+      if (!(code in (next.prompts ?? {}))) {
+        throw new BadRequestException(
+          `${code} is not a prompt of this release`,
+        );
+      }
+      if (PINNED_RULE_PROMPTS.some((p) => p.code === code)) {
+        throw new BadRequestException(
+          `${code} is a pinned rule: propose it as a pinned-rule change`,
+        );
+      }
+      const [row] = await this.dataSource.query(
+        `SELECT 1 FROM prompts p JOIN prompts_versions pv ON pv."promptId" = p.id
+          WHERE p."promptCode" = $1 AND pv.version = $2`,
+        [code, version],
+      );
+      if (!row)
+        throw new BadRequestException(`${code} has no version ${version}`);
+      next.prompts[code] = version;
+    }
     for (const e of steps ?? []) {
       for (const m of [e.model, e.backupModel]) {
         if (m && !RUNNABLE_PROVIDERS.includes(providerOfModel(m) as string)) {
@@ -1064,6 +1105,7 @@ export class DebriefReleasesService {
       steps?: StepEdit[];
       settings?: ReleaseSettingChange;
       reply?: string | null;
+      prompts?: Record<string, number> | null;
     },
   ) {
     const [idea] = await this.dataSource.query(
@@ -1086,10 +1128,11 @@ export class DebriefReleasesService {
       throw new ConflictException(`its release is ${draft.status}`);
     }
     const next = await this.applyChanges(
-      draft.bundle as DebriefBundle,
+      eff(draft),
       input.steps,
       input.settings,
       input.reply,
+      input.prompts,
     );
     const { bundle: live } = await this.runner.resolveRelease();
     const diff = bundleDiff(live, next);
@@ -1124,7 +1167,7 @@ export class DebriefReleasesService {
       id: r.id,
       version: r.version,
       status: r.status,
-      changedVsLive: bundleDiff(live, r.bundle as DebriefBundle),
+      changedVsLive: bundleDiff(live, eff(r)),
       compare: { releaseId: r.id },
     };
   }

@@ -446,6 +446,14 @@ class ProposeChangeDto {
   @IsString()
   @MaxLength(100)
   reply?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Skills Store versions to ship: { promptCode: version }',
+  })
+  @IsOptional()
+  @IsObject()
+  prompts?: Record<string, number>;
 }
 
 class ReleaseNoteChangeDto {
@@ -1285,6 +1293,7 @@ export class DebriefConsoleController {
         steps: body.steps,
         settings: body.settings,
         reply: body.reply ?? null,
+        prompts: body.prompts ?? null,
       },
       req.user.id,
     );
@@ -1305,6 +1314,7 @@ export class DebriefConsoleController {
       steps: body.steps,
       settings: body.settings,
       reply: body.reply ?? null,
+      prompts: body.prompts ?? null,
     });
   }
 

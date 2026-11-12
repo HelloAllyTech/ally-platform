@@ -470,6 +470,41 @@ export class DebriefContextRepository {
     return rows?.[0]?.prompt ?? null;
   }
 
+  /** Each prompt's version live in the Skills Store now, by code (codes not in the store are left out). */
+  async currentPromptVersions(
+    codes: string[],
+  ): Promise<Record<string, number>> {
+    if (!codes.length) return {};
+    const rows: Array<{ code: string; v: number | null }> =
+      await this.dataSource.query(
+        `SELECT "promptCode" AS code, "currentVersion" AS v FROM prompts WHERE "promptCode" = ANY($1)`,
+        [codes],
+      );
+    const out: Record<string, number> = {};
+    for (const r of rows) if (r.v != null) out[r.code] = Number(r.v);
+    return out;
+  }
+
+  /**
+   * Record, once, the exact Skills Store version of every prompt a release
+   * left unpinned (plan §8.8), in `changeSet` beside the bundle so the
+   * bundle and its content hash never change. Never overwrites.
+   */
+  async recordPromptPins(
+    releaseId: string,
+    pins: Record<string, number>,
+    source: 'created' | 'go_live' | 'migration',
+  ): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE agent_releases
+          SET "changeSet" = coalesce("changeSet", '{}'::jsonb)
+                || jsonb_build_object('pinnedPrompts', $2::jsonb, 'pinSource', $3::text,
+                                      'pinnedAt', now()::text)
+        WHERE id = $1 AND NOT (coalesce("changeSet", '{}'::jsonb) ? 'pinnedPrompts')`,
+      [releaseId, JSON.stringify(pins), source],
+    );
+  }
+
   /** Production spend and volume so far this month, for the pool. */
   async monthToDate(): Promise<{ sessions: number; spentUsd: number }> {
     const rows = await this.dataSource.query(

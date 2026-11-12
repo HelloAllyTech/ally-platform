@@ -492,3 +492,20 @@ export function changedExcerpt(
   };
   return { before: cut(before), after: cut(after) };
 }
+
+/**
+ * The bundle a release really runs (plan §8.8): every prompt it left
+ * unpinned resolved to the exact version recorded when it was created
+ * (`changeSet.pinnedPrompts`). Rolling back to it therefore restores those
+ * versions, whatever the Skills Store serves now.
+ */
+export function withPinnedPrompts<
+  T extends { prompts?: Record<string, number | null> },
+>(bundle: T, pins: Record<string, number> | null | undefined): T {
+  if (!pins || !bundle?.prompts) return bundle;
+  const prompts = { ...bundle.prompts };
+  for (const [code, v] of Object.entries(prompts)) {
+    if (v == null && pins[code] != null) prompts[code] = pins[code];
+  }
+  return { ...bundle, prompts };
+}
