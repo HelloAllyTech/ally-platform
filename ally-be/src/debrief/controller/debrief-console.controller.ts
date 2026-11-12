@@ -303,6 +303,13 @@ class PinnedRuleProposalDto {
   why!: string;
 }
 
+class RequiredReasonDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
 class MatrixCellDto {
   @ApiProperty({ enum: CHANGE_KINDS })
   @IsString()
@@ -690,9 +697,14 @@ export class DebriefConsoleController {
     @Query('state') state?: string,
   ) {
     const viewer = await this.view.viewer(req.user.id);
+    // Each pinned rule whose version in force is unapproved gets its item.
+    await this.pmAgent.ensureFirstVersionItems().catch(() => 0);
     const ideas = (await this.pmAgent.history(100)).map((i) =>
       this.view.ideaView(i, viewer),
     );
+    // Pinned rules: the whole rule with the change highlighted, and the
+    // viewer's buttons (first version, own proposal, someone else's).
+    await this.pmAgent.pinnedRuleDetails(ideas, viewer);
     const open = ideas.filter((i) => i.state === 'open');
     // An open idea's draft release (its version, what changed against live).
     for (const i of open) {
@@ -1103,7 +1115,7 @@ export class DebriefConsoleController {
   @DebriefAct('approvePinnedRule')
   @ApiOperation({
     summary:
-      'Sign off a pinned-rule change (clinical advisor or owner): a new prompt version and a DRAFT release',
+      'Approve a pinned-rule change (clinical advisor or owner, their own included): a new prompt version and a DRAFT release the Ally team puts live. A first version records the approval only',
   })
   approvePinnedRule(
     @Param('id', ParseUUIDPipe) id: string,
@@ -1113,11 +1125,38 @@ export class DebriefConsoleController {
     return this.pmAgent.approvePinnedRule(id, req.user.id, body?.reason);
   }
 
-  @Post('pinned-rules/proposals')
-  @DebriefAct('pmAgent')
+  @Post('pm-agent/ideas/:id/withdraw-pinned-rule')
+  @DebriefAct('approvePinnedRule')
   @ApiOperation({
     summary:
-      'Propose a change to a pinned rule (safety rules, rubric, judge instructions); it waits for the clinical advisor or owner',
+      'Withdraw your own pinned-rule proposal (clinical advisor or owner): closed as withdrawn, audited',
+  })
+  withdrawPinnedRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.pmAgent.withdrawPinnedRule(id, req.user.id);
+  }
+
+  @Post('pm-agent/ideas/:id/reject-pinned-rule')
+  @DebriefAct('approvePinnedRule')
+  @ApiOperation({
+    summary:
+      'Reject a pinned-rule change from the PM agent or another person (clinical advisor or owner), with a reason the PM agent reads. Never a first version',
+  })
+  rejectPinnedRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: RequiredReasonDto,
+  ) {
+    return this.pmAgent.rejectPinnedRule(id, req.user.id, body.reason);
+  }
+
+  @Post('pinned-rules/proposals')
+  @DebriefAct('approvePinnedRule')
+  @ApiOperation({
+    summary:
+      "Propose a change to a pinned rule (safety rules, rubric, judge's instructions), clinical advisor or owner; it waits in PM agent › Ideas for one of them",
   })
   proposePinnedRule(
     @Req() req: AuthedRequest,
@@ -1132,7 +1171,8 @@ export class DebriefConsoleController {
     summary:
       'Current pinned versions (safety rules, rubric, judge instructions) with who signed and when, and open proposals',
   })
-  pinnedRules() {
+  async pinnedRules() {
+    await this.pmAgent.ensureFirstVersionItems().catch(() => 0);
     return this.view.pinnedRules();
   }
 

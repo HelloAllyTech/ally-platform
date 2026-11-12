@@ -110,6 +110,19 @@ describe('Debrief console role gating', () => {
     expect(await allowed(TEAM, C, 'approvePinnedRule')).toBe(false);
   });
 
+  it('pinned rules: propose, withdraw and reject follow approval (advisor or owner)', async () => {
+    const C = DebriefConsoleController;
+    for (const h of [
+      'proposePinnedRule',
+      'withdrawPinnedRule',
+      'rejectPinnedRule',
+    ]) {
+      expect(await allowed(ADVISOR, C, h)).toBe(true);
+      expect(await allowed(OWNER, C, h)).toBe(true);
+      expect(await allowed(TEAM, C, h)).toBe(false);
+    }
+  });
+
   it('the clinical advisor needs only review:admin:debriefs, never system:access (PE-06, RA-15)', async () => {
     const C = DebriefConsoleController;
     // Verdict, comments, Score by hand (item + save), escalated flags,

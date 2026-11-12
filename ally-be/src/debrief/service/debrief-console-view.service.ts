@@ -125,7 +125,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
     );
     for (const i of ideas) {
       const a = approvalState(i as any, now);
-      if (!a?.expiringSoon) continue;
+      if (!a?.expiringSoon || !a.expiresAt) continue;
       const alert = {
         title: `Debriefs: an approval expires in ${a.expiresInDays} day(s)`,
         body: `"${i.text}" expires with no decision on ${a.expiresAt.slice(0, 10)}.`,
@@ -1135,7 +1135,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         expiring.push({
           id: i.id,
           text: i.text,
-          days: a.expiresInDays,
+          days: a.expiresInDays ?? 0,
           pinned,
         });
       }
@@ -1450,7 +1450,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         (bundle.prompts as Record<string, number | null>)[p.code] ?? null;
       const [v] = await this.dataSource.query(
         `SELECT pv.version, pv."createdAt", pv."createdBy", pv.note, u.name AS "createdByName",
-                p."currentVersion"
+                p."currentVersion", pv.prompt
            FROM prompts p
            JOIN prompts_versions pv ON pv."promptId" = p.id
            LEFT JOIN users u ON u.id = pv."createdBy"
@@ -1484,6 +1484,9 @@ export class DebriefConsoleViewService implements OnModuleInit {
           : null,
         writtenAt: iso(v?.createdAt),
         note: v?.note ?? null,
+        // The whole rule in force: the clinical advisor and the owner read it
+        // and select a passage to change ("Ask for a change").
+        text: v?.prompt ?? null,
       });
     }
     const proposals = await this.dataSource.query(

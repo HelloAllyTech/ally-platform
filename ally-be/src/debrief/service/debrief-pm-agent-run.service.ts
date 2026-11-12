@@ -466,6 +466,9 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       handoff: h.evidence?.handoff?.status ?? null,
       forecast: h.evidence?.forecast ?? null,
       release: h.releaseVersion ?? null,
+      // Why a person rejected it (pinned-rule rejections always say why).
+      rejected_because: h.evidence?.rejection?.reason ?? null,
+      withdrawn: !!h.evidence?.withdrawn,
     }));
     const autonomy = pmAgentAutonomy(await this.ownerSettings.get());
     return {

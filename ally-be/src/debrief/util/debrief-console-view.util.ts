@@ -160,9 +160,10 @@ export function awaitingDecision(idea: {
 export interface ApprovalState {
   wait: ApprovalWait;
   since: string;
-  expiresAt: string;
-  /** Whole days left, rounded up; 0 once expired. */
-  expiresInDays: number;
+  /** Null when it never expires: a pinned rule's first version waits until approved. */
+  expiresAt: string | null;
+  /** Whole days left, rounded up; 0 once expired; null when it never expires. */
+  expiresInDays: number | null;
   expired: boolean;
   /** Within APPROVAL_WARN_DAYS of expiring: the yellow banner. */
   expiringSoon: boolean;
@@ -174,6 +175,17 @@ export function approvalState(
 ): ApprovalState | null {
   const w = awaitingDecision(idea);
   if (!w) return null;
+  // A pinned rule's first version: a base version must exist, so it neither
+  // expires nor can be rejected; it waits until it is approved.
+  if (idea.change?.firstVersion) {
+    return {
+      ...w,
+      expiresAt: null,
+      expiresInDays: null,
+      expired: false,
+      expiringSoon: false,
+    };
+  }
   const expiresAt = new Date(
     new Date(w.since).getTime() + APPROVAL_EXPIRY_DAYS * 86_400_000,
   );
@@ -883,6 +895,7 @@ export type IdeaClosedReason =
   | 'handed_off'
   | 'answered'
   | 'signed_off'
+  | 'withdrawn'
   | 'retired';
 
 /**
@@ -920,7 +933,9 @@ export function ideaState(idea: {
       idea.releaseId ?? e.canary?.releaseId ?? idea.change?.releaseId ?? null,
     );
   }
-  if (idea.status === 'retired') return closed('retired');
+  if (idea.status === 'retired') {
+    return e.withdrawn ? closed('withdrawn') : closed('retired');
+  }
   if (idea.status === 'rejected') {
     if (e.expiry) return closed('expired', 'no decision within 14 days');
     if (e.canary?.status === 'reverted') {
