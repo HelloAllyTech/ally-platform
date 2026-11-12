@@ -3,25 +3,6 @@ import {
   DebriefCommentTag,
 } from '../enum/debrief-review.enum';
 
-/** Why a run is in the expert review queue (spec B2). A run can have several. */
-export const REVIEW_SOURCES = [
-  'risk_cue',
-  'below_bar',
-  'learner_flag',
-  'disagreement',
-  'sample',
-] as const;
-export type ReviewSource = (typeof REVIEW_SOURCES)[number];
-
-/**
- * One run in every SAMPLE_MODULO lands in the random sample. Keyed on the run
- * id, so the sample is stable and nobody steers it by choosing what to open.
- */
-export const SAMPLE_MODULO = 10;
-
-/** The Evaluator and the judge disagree when they are this far apart, or on opposite sides of the bar. */
-export const DISAGREEMENT_POINTS = 2;
-
 export const COMMENT_BODY_MAX = 4000;
 export const QUOTE_MAX = 2000;
 

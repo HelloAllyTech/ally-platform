@@ -62,13 +62,6 @@ describe('Debrief console role gating', () => {
     ]) {
       expect(await allowed(NOBODY, C, h)).toBe(false);
     }
-    // The old Expert review routes follow the same rule.
-    expect(await allowed(NOBODY, DebriefReviewController, 'addComment')).toBe(
-      false,
-    );
-    expect(await allowed(TEAM, DebriefReviewController, 'addComment')).toBe(
-      true,
-    );
   });
 
   it('held debriefs, escalation and the PM agent: Ally team or owner, never the advisor alone', async () => {

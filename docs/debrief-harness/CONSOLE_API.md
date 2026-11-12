@@ -33,7 +33,7 @@ rather than disable it.
 
 | `can.<action>` | Ally team | Advisor | Owner | Routes |
 |---|---|---|---|---|
-| `comment` | yes | yes | yes | console `runs/:id/comments`, `comments/:id` (PATCH, DELETE, resolve, reopen); expert-review comment routes |
+| `comment` | yes | yes | yes | console `runs/:id/comments`, `comments/:id` (PATCH, DELETE, resolve, reopen) |
 | `flagDecision` | yes | escalated flags only (checked per flag, 403) | yes | `flags/:id/resolve` |
 | `heldDebrief` | yes | no | yes | `runs/:id/publish`, `runs/:id/todays-debrief`, `runs/:id/reviewed`, `runs/:id/correct` |
 | `escalate` | yes | no | yes | `flags/:id/escalate`, `runs/:id/escalate` |
@@ -100,8 +100,8 @@ undo window are not work yet. Other categories are newest first. Comments never 
 }
 ```
 
-`toScore` and `inMyScoringSample` come from the calibration sample (the same seeded sample as
-`/v1/analytics/debrief-quality/calibration/sample`). They are only computed when `can.score` is true.
+`toScore` and `inMyScoringSample` come from the calibration sample (the seeded, stratified sample
+`DebriefCalibrationService.getSample` draws). They are only computed when `can.score` is true.
 
 ## One session
 
@@ -447,4 +447,4 @@ Banners only appear for roles that can act:
 - **Step win rates** are `null` until step-level trials exist (Release 2).
 
 - **Verdicts by platform admins:** platform groups hold `review:admin:debriefs`, so they also count as clinical advisors for verdicts and pinned-rule sign-off.
-- **The old Calibration route** `POST /v1/analytics/debrief-quality/calibration/:id` is unchanged. The sample rule applies only to the new console route.
+- **Calibration routes:** only `GET /v1/analytics/debrief-quality/calibration/:id` remains (the Score by hand panel reads it). The old sample, agreement and submit routes were removed; scores are saved through `sessions/:sessionId/score`, and the agreement is in `GET analytics`.

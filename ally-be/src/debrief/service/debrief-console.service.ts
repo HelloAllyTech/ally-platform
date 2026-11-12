@@ -1,10 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
 import { debriefOverallSql } from '../../analytics/constants/debrief-quality.constants';
-import { DebriefRun } from '../entity/debrief-run.entity';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
@@ -50,8 +48,6 @@ const REPLY_PROVIDERS: string[] = ['gemini', 'openai'];
 export class DebriefConsoleService {
   constructor(
     private readonly dataSource: DataSource,
-    @InjectRepository(DebriefRun)
-    private readonly runs: Repository<DebriefRun>,
     private readonly agent: DebriefAgentService,
     private readonly context: DebriefContextRepository,
     private readonly testSets: DebriefTestSetsService,

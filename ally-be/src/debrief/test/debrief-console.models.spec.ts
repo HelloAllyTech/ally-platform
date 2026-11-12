@@ -14,26 +14,14 @@ function build() {
     ]),
   ];
   const catalog = all.map((model) => ({ model, label: model }));
-  const releases = {
-    createDraft: jest.fn(async (_k: string, bundle: any) => ({
-      id: 'r3',
-      version: 3,
-      bundle,
-    })),
-    makeGa: jest.fn(async () => undefined),
-  };
   const runner = {
-    pinPrompts: jest.fn(async () => ({})),
     resolveRelease: jest.fn(async () => ({
       release: { version: 2 },
       bundle: DEBRIEF_SEED_BUNDLE,
     })),
-    modelCatalog: jest.fn(async () => ({
-      steps: new Set(all),
-      reply: new Set(all),
-    })),
   };
   const llmModels = { getModels: jest.fn(async () => catalog) };
+  // dataSource, agent, context, testSets, pmAgent, releases, config, llmModels, runner
   const svc = new DebriefConsoleService(
     {} as any,
     {} as any,
@@ -41,12 +29,11 @@ function build() {
     {} as any,
     {} as any,
     {} as any,
-    releases as any,
     {} as any,
     llmModels as any,
     runner as any,
   );
-  return { svc, releases };
+  return { svc };
 }
 
 describe('DebriefConsoleService models', () => {

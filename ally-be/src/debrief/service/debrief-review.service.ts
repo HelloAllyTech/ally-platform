@@ -11,7 +11,6 @@ import {
   DEBRIEF_HARD_FAIL_CODES,
   DebriefHardFailCode,
 } from '../../analytics/util/debrief-calibration.util';
-import { DEBRIEF_SEED_BUNDLE } from '../constants/debrief-release.constants';
 import { DebriefReview } from '../entity/debrief-review.entity';
 import { DebriefReviewComment } from '../entity/debrief-review-comment.entity';
 import { DebriefRun } from '../entity/debrief-run.entity';
@@ -31,12 +30,8 @@ import {
   COMMENT_BODY_MAX,
   CommentAnchorInput,
   CommentRow,
-  DISAGREEMENT_POINTS,
   GatewayComment,
   isCommentTag,
-  REVIEW_SOURCES,
-  ReviewSource,
-  SAMPLE_MODULO,
   toGatewayComments,
   validateAnchor,
 } from '../util/debrief-review.util';
@@ -44,19 +39,6 @@ import { DebriefContextRepository } from './debrief-context.repository';
 
 /** The PM agent's ideas live in agent_lessons under this key. */
 const IDEA_AGENT_KEY = 'debrief';
-
-/** Runs the review screen can open: a debrief with cards, written for a real session. */
-const REVIEWABLE = `r.mode IN ('live','shadow') AND r.cards IS NOT NULL
-  AND r.status IN ('published','below_bar','needs_person')`;
-
-export interface QueueFilters {
-  tenantId?: string;
-  language?: string;
-  sessionType?: string;
-  source?: ReviewSource;
-  /** Include runs the caller already gave a verdict on. */
-  includeReviewed?: boolean;
-}
 
 export interface NewComment extends CommentAnchorInput {
   body: string;
@@ -91,8 +73,8 @@ const trimBody = (body: unknown): string => {
  * `DebriefCalibrationService.getAgreement`). Learners never see any of it.
  *
  * Reviewers work across organisations, so these reads are deliberately
- * platform-wide: every route is behind the expert permission and the Debrief
- * Console's toggle, and every view is audited.
+ * platform-wide: every caller is a Debrief Console route behind its role
+ * gating, and every view is audited.
  */
 @Injectable()
 export class DebriefReviewService {
@@ -108,120 +90,6 @@ export class DebriefReviewService {
     private readonly feedback: Repository<DebriefFeedback>,
     private readonly context: DebriefContextRepository,
   ) {}
-
-  // --- Queue --------------------------------------------------------------------------
-
-  /**
-   * Runs worth an expert's eye, each with why it is here. The judge's score
-   * is withheld until the caller has given their own verdict (spec Q3), so
-   * the queue never anchors the review.
-   */
-  async queue(reviewerId: number, f: QueueFilters = {}) {
-    const passScore = DEBRIEF_SEED_BUNDLE.settings.passScore;
-    const judge = `(r.workspace->'judge'->>'overall')::float`;
-    const evaluator = `r."evaluatorOverall"::float`;
-    const conditions = {
-      risk_cue: `r."hasRiskCue"`,
-      below_bar: `(r.status IN ('below_bar','needs_person') OR ${judge} < $2
-        OR jsonb_array_length(coalesce(r.workspace->'judge'->'hardFails','[]'::jsonb)) > 0)`,
-      learner_flag: `EXISTS (SELECT 1 FROM debrief_run_feedback f
-        WHERE f."runId" = r.id AND f.kind = 'flag' AND f.status <> 'withdrawn')`,
-      disagreement: `(${judge} IS NOT NULL AND ${evaluator} IS NOT NULL AND (
-        abs(${judge} - ${evaluator}) >= $3 OR ((${judge} >= $2) <> (${evaluator} >= $2))))`,
-      sample: `(abs(hashtext(r.id::text)) % $4) = 0`,
-    } satisfies Record<ReviewSource, string>;
-    const params: unknown[] = [
-      reviewerId,
-      passScore,
-      DISAGREEMENT_POINTS,
-      SAMPLE_MODULO,
-    ];
-    const where = [REVIEWABLE];
-    const sources = f.source ? [f.source] : [...REVIEW_SOURCES];
-    where.push(`(${sources.map((s) => conditions[s]).join(' OR ')})`);
-    if (f.tenantId) {
-      params.push(f.tenantId);
-      where.push(`r.tenant_id = $${params.length}`);
-    }
-    if (f.language) {
-      params.push(f.language);
-      where.push(`r.language = $${params.length}`);
-    }
-    if (f.sessionType) {
-      params.push(f.sessionType);
-      where.push(`r."recipeKey" = $${params.length}`);
-    }
-    if (!f.includeReviewed) {
-      where.push(`mine.id IS NULL`);
-    }
-    // You do not review a debrief of your own practice.
-    where.push(`s."counselorId" IS DISTINCT FROM $1`);
-    const rows: Array<Record<string, any>> = await this.dataSource.query(
-      `SELECT r.id, r."scenarioSessionId", r.status, r.mode, r.language, r."recipeKey",
-              r."createdAt", r.tenant_id AS "tenantId", t.name AS "tenantName",
-              ${conditions.risk_cue} AS risk_cue,
-              ${conditions.below_bar} AS below_bar,
-              ${conditions.learner_flag} AS learner_flag,
-              ${conditions.disagreement} AS disagreement,
-              ${conditions.sample} AS sample,
-              ${judge} AS "judgeOverall",
-              mine.verdict AS "myVerdict",
-              (SELECT count(*)::int FROM debrief_review_comments c WHERE c."runId" = r.id) AS "commentCount",
-              (SELECT count(*)::int FROM debrief_reviews v WHERE v."runId" = r.id) AS "reviewCount"
-         FROM debrief_runs r
-         JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
-         LEFT JOIN tenants t ON t.id::text = r.tenant_id
-         LEFT JOIN debrief_reviews mine ON mine."runId" = r.id AND mine."reviewerId" = $1
-        WHERE ${where.join(' AND ')}
-        ORDER BY r."hasRiskCue" DESC, r."createdAt" DESC
-        LIMIT 100`,
-      params,
-    );
-    return {
-      items: rows.map((r) => ({
-        runId: r.id,
-        sessionId: r.scenarioSessionId,
-        status: r.status,
-        mode: r.mode,
-        language: r.language ?? null,
-        sessionType: r.recipeKey ?? null,
-        tenantId: r.tenantId ?? null,
-        tenantName: r.tenantName ?? null,
-        createdAt: new Date(r.createdAt).toISOString(),
-        reasons: REVIEW_SOURCES.filter((s) => r[s] === true),
-        commentCount: Number(r.commentCount ?? 0),
-        reviewCount: Number(r.reviewCount ?? 0),
-        myVerdict: (r.myVerdict as DebriefReviewVerdict | null) ?? null,
-        judgeOverall:
-          r.myVerdict && r.judgeOverall != null ? Number(r.judgeOverall) : null,
-      })),
-      filters: await this.queueFilterOptions(),
-    };
-  }
-
-  /** The organisations, languages and session types the queue's filters offer. */
-  private async queueFilterOptions() {
-    const tenants: Array<{ id: string; name: string | null }> =
-      await this.dataSource.query(
-        `SELECT DISTINCT r.tenant_id AS id, t.name
-           FROM debrief_runs r LEFT JOIN tenants t ON t.id::text = r.tenant_id
-          WHERE ${REVIEWABLE} AND r.tenant_id IS NOT NULL
-          ORDER BY t.name NULLS LAST LIMIT 200`,
-      );
-    const languages: Array<{ v: string }> = await this.dataSource.query(
-      `SELECT DISTINCT r.language AS v FROM debrief_runs r
-        WHERE ${REVIEWABLE} AND r.language IS NOT NULL ORDER BY 1`,
-    );
-    const types: Array<{ v: string }> = await this.dataSource.query(
-      `SELECT DISTINCT r."recipeKey" AS v FROM debrief_runs r
-        WHERE ${REVIEWABLE} AND r."recipeKey" IS NOT NULL ORDER BY 1`,
-    );
-    return {
-      tenants: tenants.map((t) => ({ id: t.id, name: t.name ?? t.id })),
-      languages: languages.map((l) => l.v),
-      sessionTypes: types.map((t) => t.v),
-    };
-  }
 
   // --- Review screen ------------------------------------------------------------------
 
@@ -456,12 +324,7 @@ export class DebriefReviewService {
 
   // --- Comments -----------------------------------------------------------------------
 
-  async addComment(
-    runId: string,
-    reviewerId: number,
-    input: NewComment,
-    opts: { repeatOfId?: string } = {},
-  ) {
+  async addComment(runId: string, reviewerId: number, input: NewComment) {
     const run = await this.reviewableRun(runId, reviewerId);
     const body = trimBody(input.body);
     if (input.tag != null && !isCommentTag(input.tag)) {
@@ -507,7 +370,6 @@ export class DebriefReviewService {
         body,
         tag: input.tag ?? null,
         status: DebriefCommentStatus.OPEN,
-        repeatOfId: opts.repeatOfId ?? null,
       }),
     );
     return this.viewOne(saved.id, reviewerId);
@@ -576,71 +438,6 @@ export class DebriefReviewService {
       ],
     );
     return this.viewOne(rootId, reviewerId);
-  }
-
-  /**
-   * "Still happening" (spec C5): the problem an earlier comment raised shows
-   * up again on a later run. Re-opens the earlier thread and records a new
-   * comment on this run that points back at it, so the PM agent sees the
-   * problem recur with the idea it already tried.
-   */
-  async stillHappening(
-    commentId: string,
-    reviewerId: number,
-    input: NewComment & { runId: string },
-  ) {
-    const earlier = await this.comments.findOne({ where: { id: commentId } });
-    if (!earlier) throw new NotFoundException('Comment not found');
-    const root = earlier.parentId
-      ? await this.comments.findOneOrFail({ where: { id: earlier.parentId } })
-      : earlier;
-    if (root.runId === input.runId) {
-      throw new BadRequestException(
-        'Mark it still happening on a later debrief, not the same one.',
-      );
-    }
-    const created = await this.addComment(
-      input.runId,
-      reviewerId,
-      {
-        ...input,
-        body: input.body?.trim() ? input.body : 'Still happening.',
-        tag: input.tag ?? root.tag ?? null,
-        parentId: null,
-      },
-      { repeatOfId: root.id },
-    );
-    await this.setStatus(root.id, reviewerId, DebriefCommentStatus.OPEN);
-    return created;
-  }
-
-  /**
-   * "What happened to my comment": the caller's comments across runs, newest
-   * first, each with the idea it fed and that idea's status.
-   */
-  async myComments(reviewerId: number, limit = 100) {
-    const rows: Array<Record<string, any>> = await this.dataSource.query(
-      `SELECT c.*, u.name AS "reviewerName",
-              l.status AS "ideaStatus", l.text AS "ideaTitle",
-              rep."runId" AS "repeatOfRunId", rep.body AS "repeatOfBody",
-              r.language, r."recipeKey"
-         FROM debrief_review_comments c
-         JOIN debrief_runs r ON r.id = c."runId"
-         LEFT JOIN users u ON u.id = c."reviewerId"
-         LEFT JOIN agent_lessons l ON l.id = c."ideaId"
-         LEFT JOIN debrief_review_comments rep ON rep.id = c."repeatOfId"
-        WHERE c."reviewerId" = $1 AND c."parentId" IS NULL
-        ORDER BY c."createdAt" DESC
-        LIMIT $2`,
-      [reviewerId, Math.max(1, Math.min(limit, 200))],
-    );
-    return {
-      items: rows.map((c) => ({
-        ...this.toView(c, reviewerId),
-        language: c.language ?? null,
-        sessionType: c.recipeKey ?? null,
-      })),
-    };
   }
 
   // --- Verdict ------------------------------------------------------------------------

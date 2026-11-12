@@ -129,7 +129,7 @@ export class DebriefAutonomyService implements OnModuleInit {
     return { gate, reverts, failedBaseline: baseline, judgeDrift: null };
   }
 
-  /** The calibration gate (κ ≥ 0.6), from the agreement the Analytics calibration page reads. */
+  /** The calibration gate (κ ≥ 0.6), from the agreement Analytics › Debriefs shows. */
   private async gate(): Promise<AutonomyFacts['gate']> {
     try {
       const { DebriefCalibrationService } =
