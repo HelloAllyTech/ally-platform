@@ -112,6 +112,14 @@ undo window are not work yet. Other categories are newest first. Comments never 
 }
 ```
 
+**Blind until the verdict (spec Q3).** For a viewer who is neither the Ally team nor the owner (in
+practice the clinical advisor), on runs they have not given a verdict on: `judgeOverall` and
+`evaluatorOverall` are null, `belowBar` is false, a `below_bar` run's `status` reads `published`
+(what the learner has) and it takes no rank-2 queue place, `counts.below` is null and the `below`
+category is empty. The session view does the same: `judge: { hidden: true }`, `run.status` reads
+`published` for a `below_bar` run, and the Evaluator step in `howItWasMade.steps` has no `output`
+or `reasoning`. A held run (`needs_person`) stays held.
+
 `agreement_sample` (counts: `agreementSample`, null unless `can.verdict`) lists the weekly random
 agreement sample's runs that have no verdict yet (see "Judge agreement" below).
 
