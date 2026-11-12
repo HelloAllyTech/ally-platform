@@ -609,6 +609,9 @@ void main() {
       await tester.tap(find.text('Transcript'));
       await tester.pumpAndSettle();
       expect(find.text('Hello there'), findsOneWidget);
+      // Switching tabs brings the title and its back arrow back.
+      expect(find.byKey(const Key('simulation-feedback-header')), findsNothing);
+      expect(find.byKey(const Key('simulation-feedback-back')).hitTestable(), findsOneWidget);
     });
   });
 

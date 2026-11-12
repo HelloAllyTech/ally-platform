@@ -496,7 +496,13 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     final controller = _tabController;
     if (controller == null || !mounted) return;
     final tab = _tabs[controller.index];
-    if (tab != _activeTab) setState(() => _activeTab = tab);
+    // Another tab starts with the title (and its back arrow) showing again.
+    if (tab != _activeTab) {
+      setState(() {
+        _activeTab = tab;
+        _headerCollapse = 0;
+      });
+    }
   }
 
   /// RN re-runs `fetchSimulationDetailsWithRetry` when `activeLanguageCode`
