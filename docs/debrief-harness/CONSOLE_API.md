@@ -25,6 +25,7 @@ No new roles were created. The console uses the existing groups and adds one new
 | Ally team | `system:access` (PLATFORM_ADMIN, SUPER_ADMIN, SUPER_DUPER_ADMIN) | The platform tier that already reaches the console |
 | Clinical advisor | `review:admin:debriefs` | Granted person by person (migration 1981900710000 also gave it to the platform groups) |
 | Owner | `manage:admin:debrief-settings` (**new**, migration 1981900730000) | SUPER_DUPER_ADMIN, or granted person by person |
+| Engineering (Schedules only) | the `debrief_schedules` admin feature toggle ("Debriefs — Schedules") + `system:access` | Granted person by person, never to a group; nobody holds it after deploy. See "Schedules" |
 
 To read the console you need the Analytics toggle (or the "Debriefs — Clinical advisor" toggle)
 **and** one of the three permissions. Each action below requires one of its permissions, and the
@@ -395,7 +396,7 @@ These are in-app notifications only: the bell (`/v1/notifications`), with no Sla
 | Urgent item past `flagReviewSlaHours` (once per run) | the Ally team | `DEBRIEF_TEAM_ALERT` |
 
 `data` is `{ screen: 'DebriefConsole', ideaId?, releaseId?, runId?, filedId? }`. The person who acted is not
-notified. A job runs every 30 minutes (`debrief-console-alerts`). **The admin dashboard has no general
+notified. A job runs every 30 minutes by default (`debrief-console-alerts`; see "Schedules"). **The admin dashboard has no general
 notification bell**, only Builder's own (`BuilderNotificationBell`, its own endpoint). Admins won't see these
 until the console shows `/v1/notifications` (frontend).
 
@@ -404,6 +405,51 @@ until the console shows `/v1/notifications` (frontend).
 - `GET settings` (unchanged). It now includes `pmAgentEnabled` and `pmAgentStartsQuickTests`. Learning share is `learningSkimPct`, and the steering weights are `steeringWeightJudge`, `steeringWeightPractise` and `steeringWeightThumbs`. Change them with `PUT settings` (owner).
 - `PUT budgets` creates a proposed change (see "Propose a change").
 - `POST tenants/:tenantId/emergency-stop {reason}` (Ally team or owner) returns `{tenantId, live:false, learnersSee:'not_available', reason}`. Switching on (`PUT tenants/:id/live {live:true}`) is owner-only and still requires a support line outside India.
+
+## Schedules (engineering only)
+
+When the Debrief agent's and the PM agent's jobs run is stored (`debrief_schedules`, India time), not
+a fixed @Cron tick. A one-minute tick in ally-be (`DebriefScheduleService`) runs each enabled job
+whose next run has come, under a per-job Postgres advisory lock, so two replicas never run the same
+job at once and a run still going is not started again. Other modules' scheduled tasks are unchanged.
+Defaults are the old ticks, so a deploy changes nothing (server clock UTC → India time):
+
+| Job (key) | On screen | Default | Allowed |
+|---|---|---|---|
+| `debrief-agent-drain` | Write waiting debriefs | every 5 min | 1 / 5 / 15 min, always on |
+| `debrief-stuck-sweep` | Rescue stuck debriefs | every 5 min | 1 / 5 / 15 min, always on |
+| `debrief-console-alerts` | Console alerts | every 30 min | 1 / 15 / 30 / 60 min, always on |
+| `debrief-judge` (**new**: `DebriefRunJudgeService.drain(5)`) | Judge new debriefs | every 30 min | 15 / 30 / 60 min |
+| `debrief-cost-reconcile` | Reconcile costs | daily 05:35 | 1 min / hourly / 6 h / daily |
+| `debrief-pm-agent-expiry` | Expire approvals | daily 05:35 | 1 min / hourly / 6 h / daily |
+| `debrief-autonomy-relock` | Re-lock autonomy | daily 05:35 | 1 min / hourly / 6 h / daily |
+| `debrief-pm-agent-forecasts` | Check forecasts | daily 05:35 | 1 min / hourly / 6 h / daily |
+| `debrief-pm-agent` | PM agent analysis | weekly Mon 07:30 | daily / weekly / every 2 weeks · budget confirm |
+| `debrief-pm-agent-review` | PM agent monthly review | monthly 1st 08:30 | weekly / monthly · budget confirm |
+| `debrief-baseline` | Propose setting values | monthly 1st 08:30 | 1 min / weekly / monthly · budget confirm |
+
+There is no Run now: to test a job, set it to run often (every 1 min where offered) and set it back.
+The PM agent page keeps "Run the PM agent now". `debrief-canary-watch` and `debrief-test-sets` stay on
+the fixed ticks (not in the design).
+
+Every route needs `system:access` **and** the `debrief_schedules` toggle (403 otherwise).
+Grant it in the admin dashboard: Platform admins → the person → Feature access → Analytics → "Debriefs —
+Schedules" (a platform admin account). Without it the Settings menu has no Schedules item.
+
+- `GET schedules` returns `{ timezone: 'Asia/Kolkata', jobs: Array<{ key; frequency; time /* HH:MM IST */;
+  weekday /* 0=Sun */; monthDay /* 1–28 */; enabled; locked; options; learningBudget; runCostUsd /* one run,
+  learning-budget jobs: average of the last 6 runs, else the run cap */; nextRunAt /* null when off */;
+  running; lastRun: null | { trigger:'schedule'; startedAt; durationMs; result:'running'|'ok'|'failed';
+  summary /* "3 approvals expired", "PM agent: 2 ideas, $0.84" */; error } }> }`. A `running` run whose
+  lock nobody holds (a restart cut it off) is reported as `failed`.
+- `PATCH schedules/:key {frequency?, time?, weekday?, monthDay?, enabled?, confirmBudget?}` returns the job.
+  **400** when a locked job is switched off or a frequency is outside the job's `options`. For
+  learning-budget jobs a frequency or on/off change without `confirmBudget: true` is **409**
+  `{code:'BUDGET_CONFIRM_REQUIRED', spend: {runCostUsd, monthlyBeforeUsd, monthlyAfterUsd} | null}`.
+  The change is logged as a `config_change` row (who, `{before, after}`).
+- `GET schedules/runs?page=1&pageSize=20` returns `{page, pageSize, total, runs: Array<{id; key;
+  trigger:'schedule'|'config_change'; by: {id, name} | null; startedAt; durationMs; result; summary;
+  error; change: {before, after} | null}>}`, newest first.
 
 ## Attention
 
@@ -470,6 +516,9 @@ as failed.
   guidance_propose: the clinical advisor decides and adds it to the Context Library; you never write
   there."), push, publish.
 - **Migration `1981900760000-AddDebriefPulseEventKinds`** (pulse answers) runs with the deploy.
+- **Migration `1981900770000-AddDebriefSchedules`** runs with the deploy; rows appear at their defaults
+  on the first tick. Then grant the `debrief_schedules` toggle to each engineer (Platform admins → the person →
+  Feature access → "Debriefs — Schedules").
 - **Deploy ally-ai before ally-be**: the gate's safety-recall rule calls ally-ai's
   `POST /debrief/safety-recall`; an ally-be that reaches an older ally-ai fails every gate closed.
 

@@ -13,7 +13,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   who, and `change` = {before, after}).
  *
  * Access is the `debrief_schedules` admin feature toggle, granted person by
- * person (Users › the person › Admin features). No grant is written here.
+ * person (admin dashboard: Platform admins › the person › Feature access ›
+ * Analytics › "Debriefs — Schedules"). No grant is written here.
  */
 export class AddDebriefSchedules1981900770000 implements MigrationInterface {
   name = 'AddDebriefSchedules1981900770000';
