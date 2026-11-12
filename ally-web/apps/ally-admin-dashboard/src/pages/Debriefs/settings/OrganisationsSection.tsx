@@ -11,16 +11,21 @@ import {
 import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
-import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
 import { DebriefTenantRow } from "@types";
 import { getErrorMessage } from "@utils";
 
-import { ConsoleTable } from "./consoleTable";
+import { ConsoleTag } from "../consoleUi";
+import { DebriefAccess } from "../debriefAccess";
 
-/** Organisations: the per-organisation switch between today's debrief and the new one. */
-export const OrganisationsTab: React.FC = () => {
+/**
+ * Settings › Organisations: which organisations' learners read the new debrief. Switching one on
+ * is the owner's; once live, the Ally team may stop it in an emergency (after confirming what
+ * learners will see).
+ */
+export const OrganisationsSection: React.FC<{ access: DebriefAccess }> = ({ access }) => {
   const s = en.debriefs.organisations;
+  const t2 = en.debriefs.settingsPage.orgs;
   const tenants = useGetDebriefTenantsQuery();
   const [setLive, { isLoading }] = useSetDebriefTenantLiveMutation();
   const [target, setTarget] = useState<DebriefTenantRow | null>(null);
@@ -66,12 +71,18 @@ export const OrganisationsTab: React.FC = () => {
     }
   };
 
+  const supportLine = (t: DebriefTenantRow) =>
+    t.supportLine ??
+    (t.hasSupportContact ? t2.ownLine : t.region === "india" ? t2.indiaDefault : t2.none);
+  const note = (t: DebriefTenantRow) =>
+    blocked(t)
+      ? t2.addLine
+      : t.live
+        ? `${s.newDebrief}${t.isTest ? ` · ${t2.testOrg}` : ""}`
+        : s.todays;
+
   return (
-    <div className="flex flex-col gap-6" data-testid="organisations-tab">
-      <div>
-        <h2 className="text-xl font-normal text-typography-900">{s.heading}</h2>
-        <p className="max-w-3xl pt-1 text-sm text-typography-700">{s.help}</p>
-      </div>
+    <div className="flex flex-col gap-3" data-testid="organisations-tab">
       {tenants.isError ? (
         <ErrorPanel
           what={s.loadFailed}
@@ -83,65 +94,76 @@ export const OrganisationsTab: React.FC = () => {
       ) : tenants.data.length === 0 ? (
         <EmptyPanel title={s.emptyTitle} message={s.emptyMessage} />
       ) : (
-        <ConsoleTable
-          testId="organisations-table"
-          headers={[s.columns.name, s.columns.state, s.columns.spend, s.columns.region, ""]}
-          rows={tenants.data.map(t => ({
-            key: t.id,
-            testId: "organisation-row",
-            cells: [
-              <span key="n" className="flex items-center gap-2">
-                {t.name}
-                {t.isTest && <Pill tone="neutral">{s.test}</Pill>}
-              </span>,
-              <Pill key="s" tone={t.live ? "success" : "neutral"}>
-                {t.live ? s.newDebrief : s.todays}
-              </Pill>,
-              <span key="c" className="text-sm" data-testid="organisation-spend">
-                {s.spendLine(formatUsd(t.monthSpentUsd ?? 0), t.monthRuns ?? 0)}
-              </span>,
-              <span key="r" className="flex flex-wrap items-center gap-2">
+        <div className="overflow-x-auto rounded-sm bg-neutral-50" data-testid="organisations-table">
+          {tenants.data.map(t => (
+            <div
+              key={t.id}
+              data-testid="organisation-row"
+              className="grid min-w-[860px] grid-cols-[minmax(200px,1.6fr)_minmax(140px,1fr)_minmax(170px,1fr)_minmax(170px,1fr)_150px] items-center gap-3 border-b border-neutral-100 px-5 py-3.5"
+            >
+              <div>
+                <div className="flex items-center gap-2 text-[15px] font-semibold">
+                  {t.name}
+                  {t.isTest && <ConsoleTag>{s.test}</ConsoleTag>}
+                </div>
+                <div className={`text-xs ${blocked(t) ? "text-[#8A3800]" : "text-neutral-600"}`}>
+                  {note(t)}
+                </div>
+              </div>
+              <div className="text-sm text-neutral-700">
                 {t.region === "india" ? s.india : s.outsideIndia}
-                {t.region === "outside_india" && !t.hasSupportContact && (
-                  <Pill tone="warning">{s.noSupportLine}</Pill>
+                {access.switchOn && (
+                  <>
+                    {" · "}
+                    <button
+                      type="button"
+                      className="text-[13px] text-primary-500 underline"
+                      disabled={savingRegion}
+                      onClick={() => setRegionTarget(t)}
+                    >
+                      {t2.change}
+                    </button>
+                  </>
                 )}
-                <Button
-                  kind="ghost"
-                  size="sm"
-                  disabled={savingRegion}
-                  onClick={() => setRegionTarget(t)}
-                >
-                  {t.region === "india" ? s.markOutside : s.markIndia}
-                </Button>
-              </span>,
-              <span key="b" className="flex flex-col items-start gap-1">
-                <Button
-                  kind="tertiary"
-                  size="sm"
-                  disabled={blocked(t)}
-                  onClick={() => setTarget(t)}
-                >
-                  {t.live ? s.switchOff : s.switchOn}
-                </Button>
-                {blocked(t) && (
-                  <span className="max-w-xs text-xs text-typography-700">{s.needsSupportLine}</span>
-                )}
-              </span>,
-            ],
-          }))}
-        />
+              </div>
+              <div className="text-sm text-neutral-700">{t2.supportLine(supportLine(t))}</div>
+              <div className="text-sm text-neutral-700" data-testid="organisation-spend">
+                {s.spendLine(formatUsd(t.monthSpentUsd ?? 0), t.monthRuns ?? 0)}
+              </div>
+              <div className="justify-self-end">
+                {t.live
+                  ? access.emergencyStop && (
+                      <Button kind="danger--tertiary" size="sm" onClick={() => setTarget(t)}>
+                        {t2.emergencyStop}
+                      </Button>
+                    )
+                  : access.switchOn && (
+                      <Button
+                        kind="tertiary"
+                        size="sm"
+                        disabled={blocked(t)}
+                        title={blocked(t) ? s.needsSupportLine : undefined}
+                        onClick={() => setTarget(t)}
+                      >
+                        {s.switchOn}
+                      </Button>
+                    )}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
       <ConfirmDialog
         isOpen={target !== null}
-        title={target ? (target.live ? s.offTitle(target.name) : s.onTitle(target.name)) : ""}
+        title={target ? (target.live ? t2.stopTitle(target.name) : s.onTitle(target.name)) : ""}
         cancelLabel={s.cancel}
-        confirmLabel={target?.live ? s.switchOff : s.switchOn}
+        confirmLabel={target?.live ? t2.emergencyStop : s.switchOn}
         danger={target?.live}
         isWorking={isLoading}
         onConfirm={() => void confirm()}
         onClose={() => setTarget(null)}
       >
-        <p>{target?.live ? s.offBody : s.onBody}</p>
+        <p>{target?.live ? t2.stopBody : s.onBody}</p>
       </ConfirmDialog>
       <ConfirmDialog
         isOpen={regionTarget !== null}

@@ -2,9 +2,8 @@ import React, { useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button, Checkbox, SidePanel, TextArea } from "@ally-ui-mono/ui-shared";
+import { Button, Checkbox, TextArea } from "@ally-ui-mono/ui-shared";
 import { useGetDebriefCalibrationItemQuery, useSubmitDebriefRatingMutation } from "@api";
-import { shortId } from "@components/ally-guide/allyGuideFormat";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { en } from "@constants";
@@ -73,7 +72,14 @@ const ScoreRow: React.FC<{
   );
 };
 
-const RatingBody: React.FC<{ item: DebriefCalibrationItem }> = ({ item }) => {
+/**
+ * Score by hand: the eight rubric parts, the hard fails and a note, for one session in the
+ * scorer's sample. Lives in the clinical advisor's Review panel on the session page.
+ */
+const RatingForm: React.FC<{ item: DebriefCalibrationItem; onSaved?: () => void }> = ({
+  item,
+  onSaved,
+}) => {
   const strings = en.debriefs.rating;
   const [submit, { isLoading: isSaving }] = useSubmitDebriefRatingMutation();
   const [scores, setScores] = useState<Partial<Record<DebriefDimension, number>>>(
@@ -97,47 +103,14 @@ const RatingBody: React.FC<{ item: DebriefCalibrationItem }> = ({ item }) => {
         },
       }).unwrap();
       toast.success(editing ? strings.updated : strings.saved);
+      onSaved?.();
     } catch (failure) {
       toast.error(getErrorMessage(failure, strings.failed));
     }
   };
 
   return (
-    <div className="flex flex-col gap-8" data-testid="rating-body">
-      <p className="text-xs text-typography-700">{strings.redacted}</p>
-
-      <section className="flex flex-col gap-2" aria-labelledby="rating-transcript-heading">
-        <h3 id="rating-transcript-heading" className="text-xl font-normal text-typography-900">
-          {strings.transcriptHeading}
-        </h3>
-        <ol
-          className="flex max-h-96 flex-col gap-2 overflow-y-auto border border-border-light p-3"
-          data-testid="rating-transcript"
-        >
-          {item.transcript.map(turn => (
-            <li key={turn.turnIndex} className="text-sm text-typography-800">
-              <span className="mr-2 font-mono text-xs text-typography-600">{turn.turnIndex}</span>
-              <span className="font-semibold">
-                {turn.speaker === "client" ? strings.client : strings.learner}:{" "}
-              </span>
-              <span className="whitespace-pre-wrap break-words">{turn.text}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="flex flex-col gap-2" aria-labelledby="rating-debrief-heading">
-        <h3 id="rating-debrief-heading" className="text-xl font-normal text-typography-900">
-          {strings.debriefHeading}
-        </h3>
-        <p
-          className="whitespace-pre-wrap break-words bg-neutral-50 p-3 text-sm text-typography-900"
-          data-testid="rating-debrief"
-        >
-          {item.debrief.trim() || strings.noDebrief}
-        </p>
-      </section>
-
+    <div className="flex flex-col gap-4" data-testid="rating-body">
       <section className="flex flex-col gap-4" aria-labelledby="rating-form-heading">
         <div>
           <h3 id="rating-form-heading" className="text-xl font-normal text-typography-900">
@@ -208,10 +181,14 @@ const RatingBody: React.FC<{ item: DebriefCalibrationItem }> = ({ item }) => {
   );
 };
 
-const RatingLoader: React.FC<{ sessionId: string }> = ({ sessionId }) => {
+/** Loads the session's scoring item and shows the form. */
+export const ScoreByHand: React.FC<{ sessionId: string; onSaved?: () => void }> = ({
+  sessionId,
+  onSaved,
+}) => {
   const strings = en.debriefs.rating;
   const { data, isLoading, isError, error, refetch } = useGetDebriefCalibrationItemQuery(sessionId);
-  if (isLoading) return <LoadingBlock lines={8} />;
+  if (isLoading) return <LoadingBlock lines={6} />;
   if (isError || !data) {
     return (
       <ErrorPanel
@@ -222,28 +199,5 @@ const RatingLoader: React.FC<{ sessionId: string }> = ({ sessionId }) => {
       />
     );
   }
-  return <RatingBody item={data} />;
+  return <RatingForm item={data} onSaved={onSaved} />;
 };
-
-/** One debrief in a drawer: the redacted roleplay, the debrief, and the scoring form. */
-export const RatingPanel: React.FC<{ sessionId: string | null; onClose: () => void }> = ({
-  sessionId,
-  onClose,
-}) => (
-  <SidePanel
-    open={sessionId !== null}
-    onClose={onClose}
-    title={
-      <h2 className="truncate text-lg font-semibold text-typography-900">
-        {en.debriefs.rating.title}
-        {sessionId && (
-          <span className="ml-2 font-mono text-sm font-normal">{shortId(sessionId)}</span>
-        )}
-      </h2>
-    }
-    closeLabel={en.debriefs.rating.close}
-    className="w-[min(860px,100vw)]"
-  >
-    {sessionId && <RatingLoader key={sessionId} sessionId={sessionId} />}
-  </SidePanel>
-);

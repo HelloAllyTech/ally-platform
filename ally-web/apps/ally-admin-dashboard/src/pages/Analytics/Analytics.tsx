@@ -29,7 +29,6 @@ import { BugAgentPerformance } from "./BugAgentPerformance";
 import { CodingAgentCost } from "./CodingAgentCost";
 import { FixSessionEngineCost } from "./FixSessionEngineCost";
 import { TabControlsSlotProvider } from "./tabControlsSlot";
-import { MetricsTab as DebriefMetricsTab } from "../Debriefs/MetricsTab";
 import { AllyGuideTab } from "./tabs/AllyGuideTab";
 import { AnalyticsAgentTab } from "./tabs/AnalyticsAgentTab";
 import { GlossaryAdherenceTab } from "./tabs/GlossaryAdherenceTab";
@@ -44,6 +43,7 @@ import { SuggestionsTab } from "./tabs/suggestions/SuggestionsTab";
 import { WeakPerformingMetricsTab } from "./tabs/WeakPerformingMetricsTab";
 import { TokenConsumption } from "./TokenConsumption";
 import { ConversationDrift } from "../ConversationDrift/ConversationDrift";
+import { DebriefAnalytics } from "../Debriefs/metrics/DebriefAnalytics";
 
 const RANGE_ITEMS: { id: AnalyticsRange; label: string }[] = [
   { id: "30d", label: "Last 30 days" },
@@ -167,7 +167,7 @@ const TABS: TabDef[] = [
     id: ANALYTICS_DEBRIEFS_TAB_ID,
     label: "Debriefs",
     uses: { language: false, range: true },
-    render: f => <DebriefMetricsTab range={f.query.range} />,
+    render: f => <DebriefAnalytics range={f.query.range} />,
   },
   {
     id: "latency",

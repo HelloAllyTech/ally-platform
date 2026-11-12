@@ -9,6 +9,7 @@ export const ANCHOR_ATTR = "data-anchor";
 
 export const turnAnchor = (turnIndex: number) => `turn:${turnIndex}`;
 export const cardAnchor = (section: string) => `card:${section}`;
+export const askAnchor = (i: number) => `ask:${i}`;
 
 /** `turn:3` → transcript anchor; `card:opening` → card anchor; anything else → null. */
 export function parseAnchorKey(
@@ -19,6 +20,9 @@ export function parseAnchorKey(
   if (turn) return { anchorKind: "transcript", turnIndex: Number(turn[1]) };
   const card = /^card:(.+)$/.exec(key);
   if (card) return { anchorKind: "card", section: card[1] };
+  // Ask Ally exchanges: a comment on the debrief as a whole, quoting the words.
+  const ask = /^ask:(\d+)$/.exec(key);
+  if (ask) return { anchorKind: "debrief", section: `ask_ally[${ask[1]}]` };
   return null;
 }
 

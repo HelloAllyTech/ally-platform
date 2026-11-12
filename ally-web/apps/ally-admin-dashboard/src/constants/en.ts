@@ -9312,17 +9312,6 @@ export const en = {
     title: "Debriefs",
     intro:
       "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the PM agent is changing, and which organisations have it.",
-    tabs: {
-      runs: "Runs",
-      review: "Review",
-      "expert-review": "Expert review",
-      "pm-agent": "PM agent",
-      releases: "Releases",
-      organisations: "Organisations",
-      calibration: "Calibration",
-      knowledge: "Knowledge",
-      settings: "Settings",
-    },
     // Expert review (debrief orchestrator spec Part B): clinical experts comment on exact lines.
     expertReview: {
       heading: "Expert review",
@@ -10004,6 +9993,519 @@ export const en = {
       manage: "Manage in Context Library",
       manageLabel: "Manage Debrief Guidance in the Context Library",
     },
+    // The Debriefs home (redesign 2026-11-12): categories, cards, filters and banners.
+    home: {
+      intro:
+        "The debriefs learners read after a roleplay. Open one to read it beside the session and review it.",
+      categoriesLabel: "Categories",
+      categories: {
+        needs: "Needs a person",
+        flagged: "Flagged",
+        below: "Below the bar",
+        published: "Published",
+        all: "All",
+        score: "To score",
+      } as Record<string, string>,
+      status: { needs: "Needs a person", below: "Below the bar" },
+      urgent: "Urgent",
+      learnerFlagged: "Learner flagged",
+      flaggedShort: "Flagged",
+      importantMoment: "Important moment",
+      toScoreBadge: "To score: in your scoring sample",
+      untitled: (id: string) => `Roleplay ${id}`,
+      columns: { judge: "Judge", evaluator: "Evaluator", cost: "Cost", time: "Time" },
+      layoutLabel: "Layout",
+      layout: { cards: "Cards", list: "List" },
+      pmAgent: "PM agent",
+      needsYouCount: (n: number) => `${n} ${n === 1 ? "needs" : "need"} you`,
+      settings: "Settings",
+      filters: {
+        org: { label: "Organisation", all: "All organisations" },
+        language: { label: "Language", all: "All languages" },
+        recipe: { label: "Recipe", all: "All recipes" },
+        fallback: {
+          label: "Fallback step",
+          all: "Any fallback step",
+          none: "Ran as written",
+          low: "Step 1–2",
+          high: "Step 3–6",
+        },
+        risk: {
+          label: "Risk cue",
+          all: "With or without a risk cue",
+          yes: "With a risk cue",
+          no: "Without a risk cue",
+        },
+        cost: { label: "Cost", all: "Any cost", over: "Over $0.20", ceiling: "Hit the ceiling" },
+      },
+      keys: "j / k move · Enter open · e escalate",
+      keysNoEscalate: "j / k move · Enter open",
+      queueNote:
+        "Most urgent first: important-moment flags, then other flags, then debriefs below the bar.",
+      inOrder: "In order of urgency",
+      today: "Today",
+      yesterday: "Yesterday",
+      loadFailed: "the debriefs",
+      empty: {
+        needs: {
+          title: "Nothing needs a person",
+          message:
+            "Learners' flags and debriefs held below the bar appear here, most urgent first.",
+        },
+        flagged: {
+          title: "No open flags",
+          message: "Learners' “This isn't right” flags appear here.",
+        },
+        below: {
+          title: "Nothing below the bar",
+          message: "Debriefs the judge scored under the bar appear here.",
+        },
+        published: {
+          title: "Nothing published yet",
+          message: "Debriefs learners can read appear here.",
+        },
+        all: {
+          title: "No debriefs yet",
+          message:
+            "The Debrief agent debriefs ended sessions every five minutes. They appear here as they finish.",
+        },
+        score: {
+          title: "Nothing left to score",
+          message: "Sessions in your scoring sample that you haven't scored appear here.",
+        },
+      } as Record<string, { title: string; message: string }>,
+      openIt: "Open it",
+      readIt: "Read it",
+      budgets: "Budgets",
+      urgentBanner: (n: number, waited: string) =>
+        n === 1
+          ? `1 urgent flag waiting ${waited}.`
+          : `${n} urgent items, the oldest waiting ${waited}.`,
+      urgentWhere: (scenario: string) =>
+        `A learner flagged the important moment, or showed distress, in “${scenario}”.`,
+      escalatedBanner: (n: number) =>
+        n === 1 ? "1 debrief escalated to you." : `${n} debriefs escalated to you.`,
+      reverted: (n: number) =>
+        n === 1
+          ? "A canary went back on its own: it missed a risk cue or did clearly worse."
+          : `${n} canaries went back on their own.`,
+      capBanner: (spent: string, cap: string) =>
+        `Debriefs have spent ${spent} of this month's ${cap} cap.`,
+    },
+    // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
+    session: {
+      turn: (n: number) => `Turn ${n}`,
+      turns: (n: number) => `${n} ${n === 1 ? "turn" : "turns"}`,
+      roleplay: "Roleplay",
+      debrief: "Debrief",
+      learner: "Learner",
+      client: "Client",
+      riskCue: (category: string) => `Risk cue: ${category.toLowerCase()}`,
+      selectHint: "Select words to comment",
+      noTranscript: "The roleplay can't be shown here",
+      noTranscriptHelp: "Open the session log to read it.",
+      noCards: "No debrief was written for this session",
+      position: (i: number, n: number, where: string) => `${i} of ${n} in ${where}`,
+      theQueue: "the queue",
+      previous: "Previous · k",
+      next: "Next · j",
+      review: "Review",
+      reviewedButton: (what: string) => `Reviewed · ${what}`,
+      reviewed: {
+        published: "published",
+        "todays-debrief": "today's debrief shown",
+        reviewed: "checked",
+        kept: "kept",
+        removed: "removed",
+        corrected: "corrected",
+        scored: "scored",
+        escalated: "escalated",
+        verdict: (v: string) => `verdict: ${v.toLowerCase()}`,
+      },
+      facts: {
+        session: "Session",
+        organisation: "Organisation",
+        recipe: "Recipe",
+        language: "Language",
+        judge: "Judge",
+        evaluator: "Evaluator",
+        cost: "Cost",
+        time: "Time",
+        release: "Release",
+        outOf10: (v: string) => `${v} / 10`,
+        bar: (n: number) => `Bar is ${n}`,
+        revisions: (n: number) =>
+          n === 0 ? "No revisions" : `${n} ${n === 1 ? "revision" : "revisions"}`,
+        ceiling: (v: string) => `Ceiling ${v}`,
+        arm: { baseline: "Baseline arm", challenger: "Challenger arm" } as Record<string, string>,
+      },
+      tabs: {
+        debrief: "The debrief",
+        how: "How it was made",
+        ask: "Ask Ally",
+        askCount: (n: number) => `Ask Ally · ${n}`,
+      },
+      kinds: {
+        importantMoment: "An important moment",
+        whatWorked: "What worked",
+        workOnThis: "Work on this",
+        practiseNext: "Practise this next",
+        question: "One question to think about",
+        progress: "Progress note",
+      },
+      whyItMatters: "Why it matters:",
+      trySaying: "Try saying:",
+      flaggedTag: (reason: string) => `Flagged: “${reason}”`,
+      correctedTag: (version: number) => `Corrected by the Ally team · version ${version}`,
+      distressTitle: "Learner distress.",
+      distressBody:
+        "The learner stepped out of the roleplay in distress. Their debrief opened with care and the support lines.",
+      correct: {
+        correcting: (version: number) => `Correcting · saves as version ${version}`,
+        quoteLocked: "Quote (can't be changed)",
+        whatChanged: "What changed (the learner reads this)",
+        preview: (date: string, note: string) =>
+          `The learner will see: “Updated on ${date} after a review by the Ally team: ${note}”`,
+        previewEmpty: "…",
+        save: (version: number) => `Save as version ${version}`,
+      },
+      how: {
+        skillHeading: "Learner's skill estimate",
+        skillOnlyHere: "Shown only here, never to the learner",
+        skillFrom: (n: number) =>
+          `From ${n} past ${n === 1 ? "session" : "sessions"} · used by the Progress reader and the Writer`,
+        noSkill: "No skill estimate was recorded for this run.",
+        didntComeUp: "Didn't come up",
+        asWritten: "ran as written",
+        release: (v: number) => `release v${v}`,
+        reasoning: "Its reasoning",
+        code: "Code",
+        stepOk: "Done",
+        stepNotOk: "Failed or skipped",
+      },
+      ask: {
+        none: "The learner hasn't asked Ally anything",
+        noneHelp: "Questions the learner asks after reading their debrief appear here.",
+        asked: (when: string) => `Learner asked · ${when}`,
+        outcome: { passed: "Passed the checks", replaced: "Replaced by the fallback" } as Record<
+          string,
+          string
+        >,
+        summary: {
+          questions: (n: number) => `${n} ${n === 1 ? "question" : "questions"}`,
+          replaced: (n: number) =>
+            n === 0
+              ? "No reply replaced"
+              : `${n} ${n === 1 ? "reply" : "replies"} replaced by the fallback`,
+          distress: "Distress found",
+          noDistress: "No distress found",
+          firstWords: (t: string) => `First words in ${t}`,
+          total: (cost: string) => `${cost} in all`,
+        },
+        help: "The learner's conversation with Ally after reading the debrief, exactly as they saw it. Read-only; select words to comment.",
+        helpReadOnly:
+          "The learner's conversation with Ally after reading the debrief, exactly as they saw it. Read-only.",
+        about: "About:",
+        ally: "Ally",
+        replyNotKept: "The reply's words aren't kept for this run.",
+        whatBlocked: "What was blocked",
+        failedCheck: (check: string) => `Check that failed: ${check}`,
+        lookedUp: (what: string) => `Looked up: ${what}`,
+        firstWordsOne: (t: string) => `first words ${t}`,
+        keep: {
+          title: "Keep this point?",
+          confirm: "Keep it",
+          label: "Why it stays (the learner reads this)",
+        },
+        remove: {
+          title: "Remove this point from the learner's debrief?",
+          confirm: "Remove it",
+          label: "Why it was removed (optional; the learner reads this)",
+        },
+        learnerReads: "Shown to the learner on their debrief.",
+      },
+      comment: {
+        label: "Comment on the selected words",
+        input: "Your comment",
+        placeholder: "Add a comment",
+        post: "Post comment",
+      },
+      bar: {
+        label: "Waiting on you",
+        readFirst: "Read first:",
+        turn: (n: number) => `turn ${n} in the roleplay`,
+        turns: (a: number, b: number) => `turns ${a}–${b} in the roleplay`,
+        flaggedCard: "the flagged card",
+        theirNote: "their note",
+        judgeReasons: (n: number) => `the judge's ${n} ${n === 1 ? "reason" : "reasons"}`,
+        theDebrief: "the debrief",
+        urgent: (w: string) => `Urgent · ${w}.`,
+        flag: (w: string) => `Learner flag · ${w}.`,
+        held: (w: string) => `Held · ${w}.`,
+        distress: (w: string) => `Learner distress · ${w}.`,
+        belowBar: (w: string) => `Below the bar · ${w}.`,
+        escalated: (w: string) => `Escalated to you · ${w}.`,
+        flagBody: (card: string, reason: string) => `The learner flagged “${card}”: “${reason}”.`,
+        heldBody: (judge: string) =>
+          `The judge scored it ${judge}; the learner sees “on its way” until you decide.`,
+        distressBody:
+          "The learner stepped out in distress. They have their debrief with the support lines; check on them.",
+        belowBarBody: (judge: string) =>
+          `Already published; the judge scored it ${judge}, below the bar.`,
+        escalatedAsk: "The Ally team asks for your view.",
+        giveVerdict: "Give your verdict",
+      },
+      panel: {
+        label: "Review",
+        close: "Close review",
+        nothing: "Nothing here waits on you.",
+        urgentFlag: (w: string) => `Urgent · flag on an important moment · ${w}`,
+        flag: (w: string) => `Learner's flag · ${w}`,
+        escalatedTo: (w: string) => `Escalated to you · ${w}`,
+        flagTitle: (card: string, reason: string) => `Learner's flag on “${card}”: “${reason}”`,
+        theyAdded: (note: string) => `They added: “${note}”`,
+        keepRemoveHelp:
+          "Keep and Remove ask for a reason the learner reads. Correct edits the card in place.",
+        held: (judge: string, w: string) =>
+          `Held · the judge scored it ${judge}, below the bar · ${w}`,
+        heldHelp: "The learner sees “on its way” until you decide.",
+        distress: (w: string) => `Learner distress · ${w}`,
+        belowBar: (judge: string, w: string) =>
+          `Published, then judged below the bar (${judge}) · ${w}`,
+        whyHeld: "Why the judge held it",
+        escalate: "Escalate to clinical advisor · e",
+        comments: "Comments",
+        commentHint: "Select words in the roleplay or the debrief to add one.",
+        commentsReadOnly: "Reviewers and the clinical advisor add comments.",
+        scoreByHand: "Score by hand",
+        inSample: "in your sample",
+      },
+    },
+    // The PM agent page (redesign 2026-11-12): Ideas, Releases and Test sets.
+    pmPage: {
+      title: "PM agent",
+      tabs: { ideas: "Ideas", releases: "Releases", "test-sets": "Test sets" } as Record<
+        string,
+        string
+      >,
+      needYou: (n: number) => `${n} ${n === 1 ? "needs" : "need"} you`,
+      oldest: (w: string) => `oldest ${w}`,
+      inCanary: (n: number) => `${n} in canary`,
+      beingTested: (n: number) => `${n} being tested`,
+      learningBudget: "Learning budget",
+      ofThisMonth: (budget: string) => `of ${budget} this month`,
+      actsAlone: "Acts on its own for:",
+      autonomyKinds: {
+        settings: "Settings",
+        guidance: "Guidance",
+        prompts: "Prompts",
+        models: "Models",
+        pinned_rules: "Pinned rules",
+      } as Record<string, string>,
+      autonomyStates: {
+        alone: "yes",
+        asks_first: "asks first",
+        always_asks: "always asks",
+        never: "never",
+      } as Record<string, string>,
+      groups: {
+        needs: "Needs you",
+        canary: "In canary",
+        testing: "Being tested",
+        live: "Live",
+        dropped: "Not taken forward",
+      } as Record<string, string>,
+      kinds: {
+        pinned_rule: "Pinned rule",
+      } as Record<string, string>,
+      expired: "No decision",
+      expiredNoDecision: "Expired · no decision in 14 days",
+      canaryMeta: (status: string, runs: number) => `${status} · ${runs} so far`,
+      passedTrial: "passed paired trial",
+      gateRunning: "Gate test running",
+      daysLeft: (d: number) => (d <= 0 ? "expires today" : `${d} d left`),
+      waiting: (w: string) => `waiting ${w}`,
+      expiresIn: (d: number) =>
+        d <= 0
+          ? "expires today with no decision"
+          : `expires in ${d} ${d === 1 ? "day" : "days"} with no decision`,
+      revertedBanner: (code: string) =>
+        `${code}'s canary went back on its own: it missed a risk cue or did clearly worse.`,
+      readIt: "Read it",
+      expiresBanner: (code: string, d: number) =>
+        d <= 0 ? `${code} expires today.` : `${code} expires in ${d} ${d === 1 ? "day" : "days"}.`,
+      expiresBody: (title: string) => `“${title}” closes as “no decision” if nobody answers.`,
+      answerIt: "Answer it",
+      report: (when: string) => `This week's report · written ${when}`,
+      tests: "Tests",
+      needsApproval: "Needs your approval",
+      approveCanary: "Approve and start canary",
+      recommended: (pct: number) => `Recommended · up to ${pct}% of live debriefs`,
+      approvePinned: "Approve the new version",
+      pinned: {
+        title: "Approve this pinned-rule change?",
+        body: "Every organisation's debriefs follow the new version from the next run. Your name is recorded as its signer.",
+        confirm: "Approve",
+        done: "The new version is in force",
+      },
+      basedOn: (what: string) => `Based on: ${what}.`,
+      ofNeedYou: (i: number, n: number) => `${i} of ${n} that need you`,
+      previous: "Previous",
+      next: "Next",
+      setHelp: {
+        debrief_open: "The PM agent tries ideas here",
+        debrief_gate: "Decides whether a change may go further",
+        debrief_sealed: "Never shown to the PM agent",
+      } as Record<string, string>,
+      releases: {
+        since: (when: string, by: string) => `since ${when} · made by ${by}`,
+        judge: (median: string, n: number) => `Judge average ${median} on ${n} debriefs`,
+        cost: (v: string) => `${v} a debrief`,
+        otherVersions: "Other versions",
+        noOthers: "No other versions yet.",
+        fromIdea: (code: string) => `From idea ${code}`,
+        rollBack: "Roll back to this",
+      },
+      steps: {
+        heading: "Steps and models",
+        columns: {
+          step: "Step",
+          model: "Model",
+          fallback: "If it fails",
+          used: "Used in",
+          cost: "Cost",
+          win: "Win rate",
+          on: "On",
+        },
+        on: "On",
+        off: "Off",
+        fixed: "Fixed",
+        neverFallsBack: "never falls back",
+        makeRelease: "Make a release with these changes",
+        winHelp:
+          "Win rate: how often a challenger using the step beat the baseline in paired trials.",
+      },
+    },
+    // Debrief settings page (redesign 2026-11-12).
+    settingsPage: {
+      title: "Debrief settings",
+      ownerOnly: "Only the owner can change these.",
+      readOnly: "Read only",
+      sectionsLabel: "Settings sections",
+      contextLibrary: "Context Library",
+      nav: {
+        orgs: "Organisations",
+        budget: "Budgets",
+        tests: "PM agent tests",
+        autonomy: "What the PM agent may do alone",
+        weights: "Steering score",
+        pinned: "Pinned rules",
+        guidance: "Guidance",
+      } as Record<string, string>,
+      orgsHelp:
+        "Which organisations' learners read the new debrief. Once an organisation is live, switching it off is an emergency stop: its learners see “not available”, not today's debrief.",
+      budgetHelp:
+        "Every change asks you to confirm. The PM agent can never change a budget. Spend and burn rate are in Analytics › Debriefs.",
+      testsHelp: "How much an idea must prove at each step before it reaches learners.",
+      autonomyHelp:
+        "For each kind of change and each test step: on its own, asks first, or off. A step can be on its own only when that kind is eligible (judge agreement of 0.6 or more and a clean track record). It drops back to asking first by itself after 2 reverts in 4 weeks, judge drift or a failed baseline. Promoting to everyone always needs a person.",
+      weightsHelp:
+        "How the weekly steering score weighs each signal, and how soon a learner's flag should be reviewed.",
+      pinnedHelp:
+        "Apply to every organisation and change rarely. A change arrives as a proposal in the PM agent's “Needs you” list, and only the clinical advisor or the owner can approve it.",
+      orgs: {
+        change: "change",
+        supportLine: (line: string) => `Support line: ${line}`,
+        indiaDefault: "India default",
+        ownLine: "its own",
+        none: "none",
+        addLine: "Add a support line to switch on",
+        testOrg: "test organisation",
+        emergencyStop: "Emergency stop",
+        stopTitle: (name: string) => `Stop the new debrief for ${name}?`,
+        stopBody:
+          "From now on its learners see “not available” where their debrief would be, not today's debrief. Debriefs already written stay as they are. Switching it back on is the owner's.",
+      },
+      budgets: {
+        ceiling: "Run ceiling",
+        ceilingSub: "Most one debrief may spend",
+        cap: "Monthly cap for debriefs",
+        capSub: (spent: string) => `${spent} spent this month`,
+        learning: "Fixed learning budget",
+        learningSub: "A month, for the PM agent",
+        share: "Learning share",
+        shareSub: "Of each debrief's unspent budget",
+        change: "Change",
+        changeTitle: (name: string) => `Change ${name}?`,
+      },
+      autonomy: {
+        columns: {
+          kind: "Kind of change",
+          quick: "Quick test",
+          gate: "Gate test",
+          trial: "Paired trial",
+          canary: "Canary",
+          promote: "Promote",
+          eligible: "Eligible?",
+        } as Record<string, string>,
+        cells: {
+          alone: "On its own",
+          asks_first: "Asks first",
+          off: "Off",
+          never: "Never",
+        } as Record<string, string>,
+        aPerson: "A person",
+        eligibleYes: "Yes",
+        eligibleNo: "Not yet",
+        notYet:
+          "The PM agent asks a person before every canary and promotion. Its freedom per kind of change shows here once ally-be records it.",
+        perOrg: "Per organisation",
+        perOrgHelp:
+          "Paired trials and canaries reach real learners, so each organisation can tighten the defaults above. It can never loosen them. Prompts, models and the rubric are shared by every organisation, so they're set only above.",
+        orgColumns: {
+          org: "Organisation",
+          trials: "Paired trials on its learners",
+          canaries: "Canaries on its learners",
+          guidance: "Changes to its own guidance",
+        },
+        orgPolicy: {
+          default: "Use the default",
+          asks_first: "Asks first",
+          never: "Never",
+        } as Record<string, string>,
+        orgLive: "Live",
+        orgNotLive: "Not switched on yet · no trials or canaries",
+      },
+      pinned: {
+        notYet: "The pinned rules' versions show here once ally-be records who signed them.",
+        signed: (who: string, when: string) => `Signed by ${who}, ${when}`,
+        unsigned: "Not signed yet",
+        someone: "someone",
+        roles: { clinical_advisor: "the clinical advisor", owner: "the owner" } as Record<
+          string,
+          string
+        >,
+      },
+    },
+    // Analytics › Debriefs additions (redesign 2026-11-12): the console's tiles and spend.
+    analytics: {
+      overviewHeading: "Runs and spend",
+      overviewHelp: (days: number) =>
+        `Across every organisation over the last ${days} days; the filters above don't narrow these.`,
+      cost: {
+        perOrg: "Spend per organisation",
+        perOrgCaption: "This calendar month, shadow and live debriefs.",
+        noSpend: "No organisation has spent anything on debriefs this month.",
+        pools: "Budgets",
+        poolsCaption: "What each pool has spent of its size this month, and the burn rate.",
+        debriefPool: "Debriefs (monthly cap)",
+        learningPool: "PM agent (learning budget)",
+        poolLine: (spent: string, of: string, left: string) => `${spent} of ${of} · ${left} left`,
+        burn: (perDay: string, monthEnd: string, cap: string) =>
+          `Burn rate ${perDay} a day: about ${monthEnd} by the end of the month, against a ${cap} cap.`,
+        noBurn: "No spend recorded this month.",
+      },
+    },
     status: {
       queued: "Queued",
       running: "Running",
@@ -10597,6 +11099,9 @@ export const en = {
       regionConfirm: "Change where it works",
     },
     calibration: {
+      sectionHeading: "Judge agreement",
+      sectionHelp:
+        "How closely the independent judge agrees with people who score debriefs by hand. Each gate check needs a κ of 0.6 before the PM agent may change that kind of thing on its own.",
       heading: "Score debriefs by hand",
       help: "People score a fixed sample of debriefs on the same rubric the quality judge uses, without seeing its scores. How closely the judge agrees with people decides whether the PM agent may put changes live without asking.",
       loadFailed: "the calibration sample",

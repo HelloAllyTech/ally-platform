@@ -17,19 +17,18 @@ import { en } from "@constants";
 import { DebriefOwnerSettingSpec, DebriefSettingsView } from "@types";
 import { getErrorMessage } from "@utils";
 
-import { settingName, settingValueLabel as shown } from "./consoleLabels";
-import { ConsoleTable, formatWhen } from "./consoleTable";
+import { settingName, settingValueLabel as shown } from "../consoleLabels";
+import { ConsoleTable, formatWhen } from "../consoleTable";
 
-const GROUPS = [
-  "quick",
-  "gate",
-  "trials",
-  "canary",
-  "sealed",
-  "budget",
-  "metrics",
-  "agent",
-] as const;
+export type SettingsGroup =
+  | "quick"
+  | "gate"
+  | "trials"
+  | "canary"
+  | "sealed"
+  | "budget"
+  | "metrics"
+  | "agent";
 
 type Value = number | boolean;
 
@@ -47,8 +46,17 @@ const fromInput = (spec: DebriefOwnerSettingSpec, raw: string): number | null =>
   return spec.kind === "share" ? n / 100 : n;
 };
 
-/** The owner settings page (v9 FR-60): every threshold of the PM agent's test ladder, and its budgets. */
-export const SettingsTab: React.FC = () => {
+/**
+ * Owner settings (v9 FR-60) for some of the groups: each setting with its value in force, the
+ * baseline's proposal and why. Only the owner changes them; anyone else reads the same table.
+ */
+export const SettingsGroups: React.FC<{
+  groups: SettingsGroup[];
+  canEdit: boolean;
+  /** Show the "Propose values from this month's data" button and its facts. */
+  withBaseline?: boolean;
+  testId?: string;
+}> = ({ groups: GROUPS, canEdit, withBaseline, testId }) => {
   const s = en.debriefs.settings;
   const settings = useGetDebriefSettingsQuery();
   const [update, { isLoading: saving }] = useUpdateDebriefSettingsMutation();
@@ -110,36 +118,37 @@ export const SettingsTab: React.FC = () => {
   if (!view) return <LoadingBlock lines={8} />;
 
   const proposals = view.baseline?.proposals ?? {};
+  const inGroups = (k: string) => (GROUPS as string[]).includes(view.spec[k]?.group);
   const acceptable = Object.keys(proposals).filter(
-    k => !view.spec[k]?.budget && proposals[k].value !== view.values[k],
+    k => inGroups(k) && !view.spec[k]?.budget && proposals[k].value !== view.values[k],
   );
 
   return (
-    <div className="flex flex-col gap-6" data-testid="debrief-settings-tab">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-normal text-typography-900">{s.heading}</h2>
-          <p className="max-w-3xl pt-1 text-sm text-typography-700">{s.help}</p>
-          <p className="max-w-3xl pt-1 text-sm text-typography-700" data-testid="baseline-facts">
+    <div className="flex flex-col gap-6" data-testid={testId ?? "debrief-settings-tab"}>
+      {withBaseline && (
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <p className="max-w-3xl text-sm text-typography-700" data-testid="baseline-facts">
             {view.baseline ? <BaselineFacts view={view} /> : s.baselineNever}
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button kind="tertiary" size="md" disabled={proposing} onClick={() => void propose()}>
-            {proposing ? s.baselineRunning : s.runBaseline}
-          </Button>
-          {acceptable.length > 0 && (
-            <Button
-              kind="secondary"
-              size="md"
-              disabled={accepting}
-              onClick={() => void acceptKeys(acceptable)}
-            >
-              {s.acceptAll}
-            </Button>
+          {canEdit && (
+            <div className="flex flex-wrap gap-2">
+              <Button kind="tertiary" size="md" disabled={proposing} onClick={() => void propose()}>
+                {proposing ? s.baselineRunning : s.runBaseline}
+              </Button>
+              {acceptable.length > 0 && (
+                <Button
+                  kind="secondary"
+                  size="md"
+                  disabled={accepting}
+                  onClick={() => void acceptKeys(acceptable)}
+                >
+                  {s.acceptAll}
+                </Button>
+              )}
+            </div>
           )}
         </div>
-      </div>
+      )}
 
       {GROUPS.map(group => {
         const keys = Object.keys(view.spec).filter(k => view.spec[k].group === group);
@@ -170,7 +179,11 @@ export const SettingsTab: React.FC = () => {
                       </div>
                     </div>,
                     <div key="v" className="flex flex-col items-start gap-1">
-                      {spec.kind === "bool" ? (
+                      {!canEdit ? (
+                        <span data-testid={`setting-value-${k}`}>
+                          {shown(spec, view.values[k])}
+                        </span>
+                      ) : spec.kind === "bool" ? (
                         <CarbonToggle
                           id={id}
                           size="sm"
@@ -205,7 +218,7 @@ export const SettingsTab: React.FC = () => {
                           />
                         </div>
                       )}
-                      {view.changed.includes(k) && (
+                      {canEdit && view.changed.includes(k) && (
                         <Button
                           kind="ghost"
                           size="sm"
@@ -219,7 +232,7 @@ export const SettingsTab: React.FC = () => {
                       <div key="p" className="flex flex-col items-start gap-1">
                         <span>{shown(spec, p.value)}</span>
                         {p.misfit && <Pill tone="warning">{s.misfit}</Pill>}
-                        {p.value !== view.values[k] && (
+                        {canEdit && p.value !== view.values[k] && (
                           <Button
                             kind="ghost"
                             size="sm"
@@ -244,16 +257,18 @@ export const SettingsTab: React.FC = () => {
         );
       })}
 
-      <div>
-        <Button
-          kind="primary"
-          size="md"
-          disabled={saving || Object.keys(changes).length === 0}
-          onClick={() => guarded(Object.keys(changes), save)}
-        >
-          {s.save}
-        </Button>
-      </div>
+      {canEdit && (
+        <div>
+          <Button
+            kind="primary"
+            size="md"
+            disabled={saving || Object.keys(changes).length === 0}
+            onClick={() => guarded(Object.keys(changes), save)}
+          >
+            {s.save}
+          </Button>
+        </div>
+      )}
 
       <ConfirmDialog
         isOpen={budgetAsk !== null}
