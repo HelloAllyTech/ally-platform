@@ -383,6 +383,8 @@ export interface DebriefAutonomyView {
     tenantId: string;
     tenantName: string;
     live: boolean;
+    /** Switched off by an emergency stop; older ally-be builds leave it out. */
+    stopped?: boolean;
     overrides: {
       paired_trial: DebriefOrgOverride;
       canary: DebriefOrgOverride;

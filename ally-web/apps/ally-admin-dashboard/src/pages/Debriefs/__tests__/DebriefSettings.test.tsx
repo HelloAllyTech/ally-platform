@@ -626,6 +626,27 @@ describe("What the PM agent may do alone", () => {
     expect(h.setOrg).toHaveBeenCalledWith({ tenantId: "t1", changes: { paired_trial: "never" } });
   });
 
+  it("per organisation: a stopped organisation reads Stopped, not 'Not switched on yet'", () => {
+    h.permissions = ["manage:admin:debrief-settings"];
+    const row = (tenantId: string, tenantName: string, live: boolean, stopped: boolean) => ({
+      tenantId,
+      tenantName,
+      live,
+      stopped,
+      overrides: { paired_trial: "default", canary: "default" },
+    });
+    h.autonomy.mockReturnValue({
+      data: {
+        ...AUTONOMY,
+        orgs: [row("t1", "Northwind", false, true), row("t2", "Bright Path", false, false)],
+      },
+    });
+    renderPage();
+    const org = screen.getByTestId("org-autonomy");
+    expect(org).toHaveTextContent("Northwind" + "Stopped · no trials or try-outs");
+    expect(org).toHaveTextContent("Bright Path" + "Not switched on yet · no trials or try-outs");
+  });
+
   describe("try-out override before agreement is reached", () => {
     it("asks to confirm, says what learners will get, then saves it as an override", async () => {
       h.permissions = ["manage:admin:debrief-settings"];

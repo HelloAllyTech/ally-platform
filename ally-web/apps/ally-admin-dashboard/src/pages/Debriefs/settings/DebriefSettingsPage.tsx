@@ -529,7 +529,7 @@ const Autonomy: React.FC<{ canEdit: boolean; onPinned: () => void }> = ({ canEdi
                 <div>
                   <div className="font-medium">{o.tenantName}</div>
                   <div className="text-xs text-neutral-600">
-                    {o.live ? s.orgLive : s.orgNotLive}
+                    {o.live ? s.orgLive : o.stopped ? s.orgStopped : s.orgNotLive}
                   </div>
                 </div>
                 {(["paired_trial", "canary"] as const).map(k => {

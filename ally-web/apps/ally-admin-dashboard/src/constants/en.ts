@@ -10953,6 +10953,7 @@ export const en = {
         } as Record<string, string>,
         orgLive: "Live",
         orgNotLive: "Not switched on yet · no trials or try-outs",
+        orgStopped: "Stopped · no trials or try-outs",
         // Agreement between the independent check and the clinical advisor's yes/no answers.
         agreement: {
           heading: "Judge agreement with the clinical advisor",

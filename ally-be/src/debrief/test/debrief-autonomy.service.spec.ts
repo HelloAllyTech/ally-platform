@@ -286,4 +286,33 @@ describe('DebriefAutonomyService per organisation', () => {
     await service.setOrg('org1', { paired_trial: 'default' }, 7);
     expect(row.autonomy.orgs.org1).toEqual({ canary: 'ask' });
   });
+
+  it('the view says which organisations are live and which were stopped', async () => {
+    const { service } = build();
+    const query = jest.fn(async (sql: string) =>
+      sql.includes('FROM tenants')
+        ? [
+            { id: 'a', name: 'Ally' },
+            { id: 'n', name: 'Northwind' },
+            { id: 'b', name: 'Bright Path' },
+          ]
+        : sql.includes('agent_config_overrides')
+          ? [
+              { scopeId: 'a', live: true, stopped: false },
+              { scopeId: 'n', live: false, stopped: true },
+            ]
+          : [],
+    );
+    (service as any).dataSource = { query };
+    jest.spyOn(service, 'facts').mockResolvedValue(facts());
+    jest
+      .spyOn(service as any, 'agreementService')
+      .mockRejectedValue(new Error('not needed'));
+    const v = await service.view();
+    expect(v.orgs.map((o) => [o.tenantName, o.live, o.stopped])).toEqual([
+      ['Ally', true, false],
+      ['Northwind', false, true],
+      ['Bright Path', false, false],
+    ]);
+  });
 });

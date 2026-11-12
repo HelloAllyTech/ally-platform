@@ -456,6 +456,8 @@ export class DebriefAutonomyService implements OnModuleInit {
       tenantId: string;
       tenantName: string;
       live: boolean;
+      /** Switched off by an emergency stop (not merely never switched on). */
+      stopped: boolean;
       overrides: Record<OrgPolicyStep, OrgPolicy>;
     }>;
     facts: AutonomyFacts;
@@ -474,13 +476,16 @@ export class DebriefAutonomyService implements OnModuleInit {
       await this.dataSource.query(
         `SELECT t.id::text AS id, t.name FROM tenants t WHERE t."deletedAt" IS NULL ORDER BY t.name`,
       );
-    const live = new Set(
-      (
-        (await this.dataSource.query(
-          `SELECT "scopeId" FROM agent_config_overrides
-            WHERE "agentKey" = 'debrief' AND layer = 'org' AND ("values"->>'live')::boolean`,
-        )) as Array<{ scopeId: string }>
-      ).map((r) => r.scopeId),
+    const orgRows = (await this.dataSource.query(
+      `SELECT "scopeId",
+              COALESCE(("values"->>'live')::boolean, false) AS live,
+              ("values" ? 'stoppedAt') AS stopped
+         FROM agent_config_overrides
+        WHERE "agentKey" = 'debrief' AND layer = 'org'`,
+    )) as Array<{ scopeId: string; live: boolean; stopped: boolean }>;
+    const live = new Set(orgRows.filter((r) => r.live).map((r) => r.scopeId));
+    const stopped = new Set(
+      orgRows.filter((r) => !r.live && r.stopped).map((r) => r.scopeId),
     );
     return {
       enabled: s.pmAgentEnabled,
@@ -523,6 +528,7 @@ export class DebriefAutonomyService implements OnModuleInit {
           tenantId: t.id,
           tenantName: t.name,
           live: live.has(t.id),
+          stopped: stopped.has(t.id),
           overrides: {
             paired_trial: o.paired_trial ?? 'default',
             canary: o.canary ?? 'default',
