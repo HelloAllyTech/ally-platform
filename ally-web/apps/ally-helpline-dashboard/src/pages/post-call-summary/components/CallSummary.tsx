@@ -541,7 +541,16 @@ const CallSummary: FC<CallSummaryProps> = ({
         <div className={`overflow-y-auto font-primary pb-[60px] ${className}`}>
           {sections.map(({ title, icon, key }, index) => {
             const sectionFields = getSectionFields(key, visibleFields, translatedFields);
-            if (sectionFields?.length === 0) return null;
+            // A section with no built-in fields configured as visible still
+            // has to render if it holds any custom fields — this used to drop
+            // the whole accordion (custom fields included) the moment a
+            // section's built-in fields were hidden, which is how a tenant's
+            // "Flow" custom fields (Comments, Counsellor Comment) vanished
+            // entirely: Flow has only one built-in field, and it wasn't in
+            // this tenant's visible-fields config. Fixed 2026-11.
+            const sectionHasCustomFields =
+              customFieldsActive && (customFieldValues ?? []).some(f => f.sectionKey === key);
+            if (sectionFields?.length === 0 && !sectionHasCustomFields) return null;
 
             return (
               <motion.div

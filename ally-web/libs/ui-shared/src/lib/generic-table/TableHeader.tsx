@@ -57,7 +57,6 @@ const TableHeader = <T extends Record<string, any>>({
   // Open filter popover
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
     setFilterAnchorEl(event.currentTarget);
-    setSearchText("");
     // Prefill array-valued filters (multiselect + number range) from current state
     if (
       activeCol &&
@@ -65,7 +64,17 @@ const TableHeader = <T extends Record<string, any>>({
     ) {
       const existing = filter.find(f => f.key === activeCol.key);
       setMultiSelectValues(Array.isArray(existing?.value) ? existing?.value : []);
+      setSearchText("");
+    } else if (activeCol && activeCol.filterType === "text") {
+      // TEXT reuses this same search box as its actual committed filter
+      // value (there's no separate option list to search within), so
+      // reopening it must restore what's already applied — otherwise
+      // clicking Apply with the box blanked out silently clears it.
+      const existing = filter.find(f => f.key === activeCol.key);
+      setSearchText(typeof existing?.value === "string" ? existing.value : "");
+      setMultiSelectValues([]);
     } else {
+      setSearchText("");
       setMultiSelectValues([]);
     }
   };

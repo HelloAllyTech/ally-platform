@@ -69,6 +69,11 @@ const DateFilterUI: React.FC<DateFilterUIProps> = ({ selectedValues, onChange, o
       setRange([start, end]);
       const arr = [start.toISOString(), end.toISOString()];
       onChange(arr);
+      // Presets must commit the filter the same way the explicit Save button
+      // does — onChange alone only reaches the (unrelated) multiselect
+      // staging array via FilterPopover's wiring, so without this, clicking
+      // a preset looked like it applied the filter but never actually did.
+      onDateSelect?.(arr);
     } else {
       setRange(null);
     }
@@ -82,9 +87,15 @@ const DateFilterUI: React.FC<DateFilterUIProps> = ({ selectedValues, onChange, o
       value[0] instanceof Date &&
       value[1] instanceof Date
     ) {
+      // react-calendar's own range-select behaviour: the FIRST click already
+      // fires onChange with [date, date] (an anchor, both ends the same) —
+      // there is no separate "still choosing" signal distinguishing that from
+      // a real same-day range, so calling this component's own onChange here
+      // applied the filter immediately on that first click, before a second
+      // click could ever set a different end date. Only update the local
+      // preview here; the explicit Save button below is what actually commits
+      // the range (it already existed for exactly this purpose).
       setRange([value[0], value[1]]);
-      const arr = [value[0].toISOString(), value[1].toISOString()];
-      onChange(arr);
     } else if (value === null) {
       setRange(null);
     } else if (Array.isArray(value)) {
