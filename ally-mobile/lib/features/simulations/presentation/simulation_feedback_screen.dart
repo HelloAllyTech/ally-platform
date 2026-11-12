@@ -120,7 +120,8 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     api: () => ref.read(askAiChatApiProvider),
     // Read-only (from Logs): no thread — it's keyed by session, so an admin
     // would otherwise be typing into the learner's own conversation.
-    sessionId: widget.fromLogs ? '' : widget.scenarioSessionId,
+    // The learner's own session from the logs keeps their thread (Ask Ally).
+    sessionId: widget.fromLogs && !widget.ownSession ? '' : widget.scenarioSessionId,
   );
 
   @override
@@ -341,7 +342,19 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   void _openMoment(String messageId) {
     _momentRequestCount++;
     setState(() {
-      _momentRequest = (messageId: messageId, requestId: _momentRequestCount);
+      _momentRequest = (messageId: messageId, quote: null, requestId: _momentRequestCount);
+      _activeTab = FeedbackTab.transcript;
+    });
+    final index = _tabs.indexOf(FeedbackTab.transcript);
+    if (index != -1) _tabController?.animateTo(index);
+  }
+
+  /// "See this moment" under a debrief card's quote: the transcript at the
+  /// turn holding those words (web `handleSeeQuote`).
+  void _openQuote(String quote) {
+    _momentRequestCount++;
+    setState(() {
+      _momentRequest = (messageId: '', quote: quote, requestId: _momentRequestCount);
       _activeTab = FeedbackTab.transcript;
     });
     final index = _tabs.indexOf(FeedbackTab.transcript);
@@ -728,10 +741,13 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           sessionId: widget.scenarioSessionId,
           summary: _summary,
           retryLimitReached: _retryLimitReached,
-          readOnly: widget.fromLogs,
+          // The learner's own session from the logs is the full learner view,
+          // Ask Ally included; read-only is for someone else's (supervisors).
+          readOnly: widget.fromLogs && !widget.ownSession,
           supervisorView: widget.fromLogs && !widget.ownSession,
           // Anchors are chips only when there's a transcript to open.
           onOpenMoment: (_summary?.showTranscriptTab ?? true) ? _openMoment : null,
+          onSeeQuote: (_summary?.showTranscriptTab ?? true) ? _openQuote : null,
         );
       case FeedbackTab.transcript:
         return SimulationTranscriptTab(

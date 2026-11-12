@@ -1271,6 +1271,7 @@
       "aiLabel": "Written by Ally (AI)",
       "importantMoment": {
         "title": "An important moment",
+        "titleHandledWell": "You noticed an important moment",
         "support": "Moments like this are hard. If this session brought something up for you, you can talk to:",
         "others": "Other moments like this"
       },

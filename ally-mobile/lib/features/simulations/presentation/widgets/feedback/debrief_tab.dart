@@ -43,6 +43,7 @@ class DebriefTab extends ConsumerStatefulWidget {
     required this.summary,
     required this.retryLimitReached,
     this.onOpenMoment,
+    this.onSeeQuote,
     this.readOnly = false,
     bool? supervisorView,
   }) : supervisorView = supervisorView ?? readOnly;
@@ -54,6 +55,10 @@ class DebriefTab extends ConsumerStatefulWidget {
   final SimulationSummary? summary;
   final bool retryLimitReached;
   final ValueChanged<String>? onOpenMoment;
+
+  /// "See this moment" under a debrief card's quote: the transcript at the
+  /// turn holding those words.
+  final ValueChanged<String>? onSeeQuote;
   final bool readOnly;
 
   /// Whose view of the debrief: the supervisor's (Roleplay Logs, someone
@@ -165,14 +170,10 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
           const SizedBox(height: 12),
         ],
         SizedBox(key: _threadEndKey, height: 0),
-        AskAiReplyInput(
-          placeholder: ref.t('postSim.debriefCards.reply.placeholder'),
-          disabled: chat.isStreaming,
-          onSend: chat.sendMessage,
-        ),
         // v9 Q47: supervisors read this thread, and the learner is told.
+        // The composer itself docks at the bottom of the screen ([_composer]).
         Padding(
-          padding: const EdgeInsets.only(top: 8),
+          padding: EdgeInsets.zero,
           child: Text(
             ref.t('postSim.debriefCards.supervisor.canRead'),
             key: const Key('ask-ally-supervisor-can-read'),
@@ -186,6 +187,14 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
       ],
     );
   }
+
+  /// Ask Ally's composer, docked by [DebriefCards] while the reflective
+  /// question is in view (design A5).
+  Widget _composer(AskAiChatController chat) => AskAiReplyInput(
+    placeholder: ref.t('postSim.debriefCards.reply.placeholder'),
+    disabled: chat.isStreaming,
+    onSend: chat.sendMessage,
+  );
 
   /// Roleplay Logs: the learner's Ask Ally thread, read-only (web
   /// `supervisor-thread`).
@@ -243,7 +252,9 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
       return DebriefCards(
         controller: _learnerDebrief,
         replyThread: widget.readOnly ? _supervisorThread(_learnerDebrief.view?.supervisor) : _askAlly(chat),
+        composer: widget.readOnly ? null : _composer(chat),
         readOnly: widget.readOnly,
+        onSeeQuote: widget.onSeeQuote,
       );
     }
     final note = widget.summary?.supervisorNote;

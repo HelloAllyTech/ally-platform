@@ -10,6 +10,7 @@ import 'package:url_launcher_platform_interface/url_launcher_platform_interface.
 
 import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/learner_debrief_repository.dart';
+import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/feedback/debrief_read_aloud.dart';
 
 import '../data/learner_debrief_repository_test.dart' show readyDebriefJson;
@@ -99,6 +100,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Design A5: scroll "One question to think about" into view, which docks
+  /// the composer.
+  Future<void> showQuestion(WidgetTester tester) async {
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('debrief-card-reflective-question')),
+      200,
+      scrollable: find.descendant(of: find.byKey(const Key('debrief-cards')), matching: find.byType(Scrollable)),
+    );
+    await tester.pumpAndSettle();
+  }
+
   group('today\'s debrief stays unchanged', () {
     testWidgets('when the organisation isn\'t switched on (not_available)', (tester) async {
       await h.pump(tester);
@@ -143,7 +155,9 @@ void main() {
     expect(find.text('Your debrief'), findsOneWidget);
     expect(find.text('Written by Ally (AI)'), findsOneWidget);
     expect(find.byKey(const Key('debrief-card-important-moment')), findsOneWidget);
-    expect(find.text('An important moment'), findsOneWidget);
+    // The fixture's learner asked directly and stayed (handled_well).
+    expect(find.text('You noticed an important moment'), findsOneWidget);
+    expect(find.text('An important moment'), findsNothing);
     expect(
       find.text(
         'Moments like this are hard. If this session brought something up for you, you can talk to:',
@@ -528,25 +542,125 @@ void main() {
     await h.pump(tester);
     verify(() => h.chatApi.getHistory('session-1')).called(1);
 
-    await tester.ensureVisible(find.byKey(const Key('ask-ai-input')));
+    await showQuestion(tester);
     await tester.enterText(find.byKey(const Key('ask-ai-input')), 'Why?');
     await tester.pump();
-    await tapVisible(tester, find.byKey(const Key('ask-ai-send')));
+    await tester.tap(find.byKey(const Key('ask-ai-send')));
+    await tester.pumpAndSettle();
 
     expect(find.text('Why?'), findsOneWidget);
     expect(find.textContaining('opened her up', findRichText: true), findsOneWidget);
     verifyNever(() => h.chatApi.streamChat(any(), any(), cancelToken: any(named: 'cancelToken')));
   });
 
-  testWidgets('Ask Ally tells the learner their supervisor can read it, under the input', (tester) async {
+  testWidgets('Ask Ally tells the learner their supervisor can read it, under the question', (tester) async {
     stubDebrief(readyDebriefJson());
     await h.pump(tester);
     final note = find.text('Your supervisor can read this conversation.');
     expect(find.descendant(of: find.byKey(const Key('ask-ally')), matching: note), findsOneWidget);
     expect(
-      tester.getTopLeft(note).dy,
-      greaterThan(tester.getTopLeft(find.byKey(const Key('ask-ai-input'))).dy),
+      find.descendant(of: find.byKey(const Key('debrief-card-reflective-question')), matching: note),
+      findsOneWidget,
     );
+  });
+
+  group('Ask Ally composer (design A5)', () {
+    bool docked(WidgetTester tester) => !tester
+        .widget<IgnorePointer>(
+          find.ancestor(of: find.byKey(const Key('ask-ally-composer')), matching: find.byType(IgnorePointer)).first,
+        )
+        .ignoring;
+
+    testWidgets('hidden while reading the cards, docked once the question is in view, hidden again above',
+        (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      expect(find.byKey(const Key('ask-ally-composer')), findsOneWidget);
+      expect(docked(tester), isFalse);
+      // No per-card ask icon and no floating button: one composer.
+      expect(find.byKey(const Key('ask-ai-input')), findsOneWidget);
+      // The composer is not inside any card.
+      expect(
+        find.descendant(of: find.byKey(const Key('debrief-card-reflective-question')), matching: find.byKey(const Key('ask-ai-input'))),
+        findsNothing,
+      );
+
+      await showQuestion(tester);
+      expect(docked(tester), isTrue);
+      // Docked at the bottom of the debrief, below the question's heading.
+      expect(
+        tester.getTopLeft(find.byKey(const Key('ask-ally-composer'))).dy,
+        greaterThan(tester.getTopLeft(find.text('One question to think about')).dy),
+      );
+
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, 3000));
+      await tester.pumpAndSettle();
+      expect(docked(tester), isFalse);
+    });
+
+    testWidgets('the header scrolls away with the cards', (tester) async {
+      stubDebrief(readyDebriefJson());
+      await h.pump(tester);
+      expect(
+        find.descendant(of: find.byKey(const Key('debrief-cards')), matching: find.byKey(const Key('debrief-header'))),
+        findsOneWidget,
+      );
+      final top = tester.getTopLeft(find.text('Your debrief')).dy;
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -150));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.text('Your debrief')).dy, lessThan(top));
+      // ⓘ beside "Written by Ally (AI)", not its own line.
+      expect(
+        (tester.getCenter(find.byKey(const Key('debrief-explainer-link'))).dy -
+                tester.getCenter(find.text('Written by Ally (AI)')).dy)
+            .abs(),
+        lessThan(4),
+      );
+    });
+
+    testWidgets('distress first: no composer until the learner opens the debrief', (tester) async {
+      stubDebrief({...readyDebriefJson(), 'distress': true, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+      await tester.drag(find.byKey(const Key('debrief-cards')), const Offset(0, -3000));
+      await tester.pumpAndSettle();
+      expect(docked(tester), isFalse);
+
+      await tapVisible(tester, find.byKey(const Key('debrief-when-ready')));
+      await showQuestion(tester);
+      expect(docked(tester), isTrue);
+    });
+  });
+
+  testWidgets('every quote has See this moment, which opens the transcript at those words', (tester) async {
+    stubDebrief(readyDebriefJson());
+    when(
+      () => h.transcript.getMessages(scenarioSessionId: 'session-1', offset: 0, languageCode: any(named: 'languageCode')),
+    ).thenAnswer(
+      (_) async => (
+        messages: [
+          SimulationTranscriptMessage.fromJson({'id': 41, 'senderId': -1, 'content': 'Hello', 'startSeconds': 3}),
+          SimulationTranscriptMessage.fromJson(
+            {'id': 42, 'senderId': -1, 'content': 'Honestly, I sometimes think it would be  easier not to be here.', 'startSeconds': 65},
+          ),
+        ],
+        count: 2,
+      ),
+    );
+    await h.pump(tester);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('debrief-card-important-moment')),
+        matching: find.byKey(const Key('debrief-see-moment')),
+      ),
+      findsNWidgets(2),
+    );
+    await tapVisible(tester, find.byKey(const Key('debrief-see-moment')).first);
+
+    // The Transcript tab, that turn outlined (found by its words, spacing aside).
+    final row = find.textContaining('easier not to be here');
+    expect(row, findsOneWidget);
+    final focused = tester.widget<Container>(find.ancestor(of: row, matching: find.byType(Container)).first);
+    expect((focused.decoration! as BoxDecoration).border!.top.width, 2);
   });
 
   void stubSupervisor(Map<String, dynamic> json) {
@@ -567,6 +681,19 @@ void main() {
       'thread': thread ?? <Object>[],
     };
   }
+
+  testWidgets('the learner\'s own session from Session Logs is the full learner view, Ask Ally included', (tester) async {
+    stubDebrief(readyDebriefJson());
+    await h.pump(tester, fromLogs: true, ownSession: true);
+
+    verify(() => h.learnerDebrief.getDebrief('session-1')).called(1);
+    verifyNever(() => h.learnerDebrief.getSupervisorDebrief(any()));
+    verify(() => h.chatApi.getHistory('session-1')).called(1);
+    expect(find.byKey(const Key('debrief-flag-open')), findsWidgets);
+    expect(find.byKey(const Key('ask-ally')), findsOneWidget);
+    await showQuestion(tester);
+    expect(find.byKey(const Key('ask-ai-input')), findsOneWidget);
+  });
 
   group('supervisor view from Roleplay Logs (v9 FR-26)', () {
     testWidgets('the same cards, read-only: no controls and no learner-only calls', (tester) async {

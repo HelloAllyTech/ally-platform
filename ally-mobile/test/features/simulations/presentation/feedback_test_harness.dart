@@ -141,6 +141,7 @@ class FeedbackHarness {
   Future<GoRouter> pump(
     WidgetTester tester, {
     bool fromLogs = false,
+    bool ownSession = false,
     String? pathId,
     String? caseId,
     List<String> permissions = allPermissions,
@@ -156,6 +157,7 @@ class FeedbackHarness {
           builder: (context, state) => SimulationFeedbackScreen(
             scenarioSessionId: 'session-1',
             fromLogs: fromLogs,
+            ownSession: ownSession,
             pathId: pathId,
             caseId: caseId,
           ),
