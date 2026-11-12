@@ -931,6 +931,27 @@ class _ReadyCards extends ConsumerWidget {
           icon: Icon(Icons.trending_up, size: 20, color: AppColors.primary),
           children: [_Body(cards.progressNote!)],
         ),
+      // A short debrief may come without a question (its rule checks don't
+      // require one): no empty "One question to think about" card, but Ask
+      // Ally stays, and the composer still docks where the question would be.
+      if (cards.reflectiveQuestion.trim().isEmpty)
+        if (replyThread != null)
+          KeyedSubtree(
+            key: _QuestionKeyScope.of(context),
+            child: Container(
+              key: const Key('debrief-ask-ally-no-question'),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.blue50),
+              ),
+              child: replyThread,
+            ),
+          )
+        else
+          const SizedBox.shrink()
+      else
       KeyedSubtree(
         key: _QuestionKeyScope.of(context),
         child: _Card(

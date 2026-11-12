@@ -52,6 +52,62 @@ describe("DebriefCards language", () => {
     expect(i18n.language).toBe("en");
   });
 
+  it("a reply thread rendered inside the cards reads the debrief's language too", async () => {
+    const i18n = i18next.createInstance();
+    await i18n.use(initReactI18next).init({
+      lng: "en",
+      fallbackLng: "en",
+      resources: {
+        en: {
+          translation: {
+            postSim: {
+              debriefCards: {
+                supervisor: { canRead: "Your supervisor can read this conversation." },
+              },
+            },
+          },
+        },
+        hi: {
+          translation: {
+            postSim: {
+              debriefCards: { supervisor: { canRead: "आपके सुपरवाइज़र यह बातचीत पढ़ सकते हैं।" } },
+            },
+          },
+        },
+      },
+    });
+    const Note = () => (
+      <p data-testid="note">{useTranslation().t("postSim.debriefCards.supervisor.canRead")}</p>
+    );
+    render(
+      <I18nextProvider i18n={i18n}>
+        <DebriefCards
+          view={
+            {
+              state: "ready",
+              language: "hi-IN",
+              cards: {
+                opening: "ठीक",
+                what_worked: [],
+                work_on_this: [],
+                skill_words: [],
+                reflective_question: "",
+              },
+            } as never
+          }
+          sessionId="s-1"
+          replyThread={<Note />}
+        />
+      </I18nextProvider>,
+    );
+    expect(screen.getByTestId("note")).toHaveTextContent("आपके सुपरवाइज़र");
+    // A short debrief without a question: no empty question card, Ask Ally stays.
+    expect(screen.queryByTestId("debrief-card-reflective-question")).toBeNull();
+    expect(screen.getByTestId("debrief-ask-ally-no-question")).toContainElement(
+      screen.getByTestId("note"),
+    );
+  });
+
   it("knows which scripts need the taller line height", () => {
     expect(isIndicLanguage("hi-IN")).toBe(true);
     expect(isIndicLanguage("ta")).toBe(true);

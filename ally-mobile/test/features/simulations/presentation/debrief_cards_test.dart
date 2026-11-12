@@ -196,6 +196,25 @@ void main() {
     expect(find.text('Answer here, or ask Ally anything about this session…'), findsOneWidget);
   });
 
+  testWidgets('a debrief without a question shows no empty question card; Ask Ally stays', (tester) async {
+    final json = readyDebriefJson();
+    stubDebrief({
+      ...json,
+      'cards': {...(json['cards'] as Map<String, dynamic>), 'reflective_question': ''},
+    });
+    await h.pump(tester);
+
+    expect(find.byKey(const Key('debrief-card-reflective-question')), findsNothing);
+    expect(find.text('One question to think about'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('debrief-ask-ally-no-question')),
+        matching: find.byKey(const Key('ask-ally')),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('a removed point is hidden by its stored index; a kept one says why', (tester) async {
     stubDebrief({
       ...readyDebriefJson(),

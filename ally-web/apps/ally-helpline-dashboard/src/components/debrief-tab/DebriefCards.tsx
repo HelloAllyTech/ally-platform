@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 
+import i18next, { type i18n } from "i18next";
 import {
   Bookmark,
   Check,
@@ -27,7 +28,6 @@ import {
   ThumbsUp,
   TrendingUp,
 } from "lucide-react";
-import i18next, { type i18n } from "i18next";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -459,19 +459,32 @@ const ReadyCards: FC<{
           </Card>
         )}
 
-        <Card
-          testId="debrief-card-reflective-question"
-          readSection="reflective_question"
-          title={t("postSim.debriefCards.reflectiveQuestion")}
-          icon={<HelpCircle aria-hidden="true" className="h-5 w-5 text-primary-600" />}
-        >
-          <Body>{cards.reflective_question}</Body>
-          <ListenButton
-            section="reflective_question"
-            cardLabel={t("postSim.debriefCards.reflectiveQuestion")}
-          />
-          {replyThread}
-        </Card>
+        {cards.reflective_question?.trim() ? (
+          <Card
+            testId="debrief-card-reflective-question"
+            readSection="reflective_question"
+            title={t("postSim.debriefCards.reflectiveQuestion")}
+            icon={<HelpCircle aria-hidden="true" className="h-5 w-5 text-primary-600" />}
+          >
+            <Body>{cards.reflective_question}</Body>
+            <ListenButton
+              section="reflective_question"
+              cardLabel={t("postSim.debriefCards.reflectiveQuestion")}
+            />
+            {replyThread}
+          </Card>
+        ) : (
+          // A short debrief may come without a question (its rule checks don't require one):
+          // no empty "One question to think about" card, but Ask Ally stays.
+          replyThread && (
+            <li
+              data-testid="debrief-ask-ally-no-question"
+              className="flex flex-col gap-3 rounded-lg border border-primary-100 bg-white p-4"
+            >
+              {replyThread}
+            </li>
+          )
+        )}
       </ul>
       {removed.size > 0 && (
         <p data-testid="debrief-removed-note" className="font-primary text-xs text-typography-700">

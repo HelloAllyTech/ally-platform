@@ -72,6 +72,30 @@ interface DebriefTabProps {
  * In `readOnly` mode the same note is mounted in the Roleplay Logs surfaces
  * with the thread removed entirely — see the prop for why.
  */
+/**
+ * Ask Ally's composer and the supervisor note. Rendered inside DebriefCards, so its
+ * useTranslation reads the debrief's own language (PRD §9), not the app's.
+ */
+const AskAllyComposer: FC<{ onSend: (text: string) => void; disabled: boolean }> = ({
+  onSend,
+  disabled,
+}) => {
+  const { t } = useTranslation();
+  return (
+    <>
+      <DebriefReplyInput
+        onSend={onSend}
+        disabled={disabled}
+        placeholder={t("postSim.debriefCards.reply.placeholder")}
+      />
+      {/* v9 Q47: supervisors read this thread, and the learner is told. */}
+      <p className="font-primary text-xs text-typography-700">
+        {t("postSim.debriefCards.supervisor.canRead")}
+      </p>
+    </>
+  );
+};
+
 export const DebriefTab: FC<DebriefTabProps> = ({
   sessionId,
   summaryData,
@@ -225,15 +249,7 @@ export const DebriefTab: FC<DebriefTabProps> = ({
           askAlly ? (
             <div data-testid="ask-ally" className="flex flex-col gap-3">
               {thread}
-              <DebriefReplyInput
-                onSend={sendMessage}
-                disabled={isStreaming}
-                placeholder={t("postSim.debriefCards.reply.placeholder")}
-              />
-              {/* v9 Q47: supervisors read this thread, and the learner is told. */}
-              <p className="font-primary text-xs text-typography-700">
-                {t("postSim.debriefCards.supervisor.canRead")}
-              </p>
+              <AskAllyComposer onSend={sendMessage} disabled={isStreaming} />
             </div>
           ) : undefined
         }
