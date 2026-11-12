@@ -75,6 +75,22 @@ describe('DebriefAgentService.learnerView', () => {
     });
   });
 
+  it('keeps a debrief already written after an emergency stop (FR-46)', async () => {
+    const view = await build({
+      live: false,
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: { opening: 'x' },
+          language: 'en',
+          steps: [],
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view).toMatchObject({ state: 'ready', cards: { opening: 'x' } });
+  });
+
   it('serves a published live debrief, cards only', async () => {
     const view = await build({
       runs: [

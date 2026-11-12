@@ -664,11 +664,20 @@ export class DebriefAgentService implements OnModuleInit {
     if (!s || Number(s.counselor_id) !== Number(userId)) {
       throw new ForbiddenException('Not your session');
     }
-    if (!(await this.isLive(s.tenant_id))) return { state: 'not_available' };
     const runs = await this.runs.find({
       where: { scenarioSessionId: sessionId },
     });
     const run = runs.find((r) => r.mode === DebriefRunMode.LIVE);
+    // FR-46: an emergency stop stops new debriefs; ones already written stay
+    // as they are ("Debriefs already written stay as they are").
+    const written =
+      !!run?.cards &&
+      [DebriefRunStatus.PUBLISHED, DebriefRunStatus.BELOW_BAR].includes(
+        run.status,
+      );
+    if (!written && !(await this.isLive(s.tenant_id))) {
+      return { state: 'not_available' };
+    }
     if (!run || run.status === DebriefRunStatus.QUEUED) {
       // Only a session the drain will still pick up is "on its way": one
       // debriefed in shadow before the switch, or older than the drain's
