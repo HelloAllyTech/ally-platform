@@ -73,6 +73,15 @@ import { PublicRoute } from "./PublicRoute";
 import { AssistantHome } from "../pages/AssistantHome";
 import { OnboardingSession, OnboardingStart } from "../pages/Onboarding";
 
+/**
+ * The Debrief console opens with the Analytics toggle or the clinical
+ * advisor's own toggle, as ally-be's DebriefRead allows (CONSOLE_API "Roles").
+ */
+const DEBRIEF_CONSOLE_FEATURES = [
+  FeatureToggleKey.ANALYTICS,
+  FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+];
+
 /** `/inbox` (an owner's email from before the inbox moved): AI Chatbots → Inbox, same chat. */
 const InboxRedirect: React.FC = () => {
   const [params] = useSearchParams();
@@ -762,7 +771,7 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.DEBRIEFS}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
               <DebriefConsole />
             </PrivateLayout>
           }
@@ -770,7 +779,7 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.DEBRIEF_SESSION(":runId")}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
               <DebriefSessionPage />
             </PrivateLayout>
           }
@@ -778,7 +787,7 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.DEBRIEFS_PM_AGENT}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
               <PmAgentPage />
             </PrivateLayout>
           }
@@ -786,7 +795,7 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.DEBRIEFS_SETTINGS}
           element={
-            <PrivateLayout requiredFeature={FeatureToggleKey.ANALYTICS}>
+            <PrivateLayout requiredFeature={DEBRIEF_CONSOLE_FEATURES}>
               <DebriefSettingsPage />
             </PrivateLayout>
           }

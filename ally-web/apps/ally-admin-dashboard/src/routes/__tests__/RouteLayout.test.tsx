@@ -223,6 +223,20 @@ describe("RouteLayout", () => {
     expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
   });
 
+  // CONSOLE_API "Roles": the Analytics toggle or the clinical advisor's toggle opens the console,
+  // as ally-be's DebriefRead allows; an advisor has only the second.
+  it("opens the Debrief console with the Analytics or the clinical-advisor toggle", () => {
+    for (const path of [ROUTES.DEBRIEFS, ROUTES.DEBRIEF_SESSION("r1")]) {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", path);
+      render(<RouteLayout />);
+      expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toEqual([
+        FeatureToggleKey.ANALYTICS,
+        FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+      ]);
+    }
+  });
+
   describe("Ally Console route", () => {
     it("renders at /ally", () => {
       window.history.pushState({}, "", ROUTES.ALLY_CONSOLE);
