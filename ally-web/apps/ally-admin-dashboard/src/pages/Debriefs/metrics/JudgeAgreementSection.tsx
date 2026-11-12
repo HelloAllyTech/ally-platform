@@ -200,7 +200,12 @@ export const JudgeAgreementSection: React.FC<{
         />
       </div>
       {error ? (
-        <ErrorPanel what={strings.agreementFailed} error={error} onRetry={onRetry} />
+        <ErrorPanel
+          forbiddenMessage={en.debriefs.noAccess}
+          what={strings.agreementFailed}
+          error={error}
+          onRetry={onRetry}
+        />
       ) : loading ? (
         <LoadingBlock lines={4} />
       ) : agreement ? (

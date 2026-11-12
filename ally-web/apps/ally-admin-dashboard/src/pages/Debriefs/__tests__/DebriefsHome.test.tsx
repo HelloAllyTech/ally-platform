@@ -199,6 +199,20 @@ beforeEach(() => {
 });
 
 describe("queue order", () => {
+  it("tells a reader without console access why, in the Debriefs console's words (PE-02)", () => {
+    h.sessions.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      error: { status: 403, data: { message: "Missing required permissions" } },
+      refetch: vi.fn(),
+    });
+    renderAt();
+    expect(screen.getByTestId("ally-forbidden")).toHaveTextContent("Debriefs console");
+    expect(screen.getByTestId("ally-forbidden")).not.toHaveTextContent("Ally guide");
+  });
+
   it("puts urgent before other flags before below the bar, the longest wait first", () => {
     expect(queueOrder(QUEUE as never).map(i => i.runId)).toEqual([
       "urgent-old",

@@ -322,6 +322,7 @@ export const DebriefSessionPage: React.FC = () => {
           <BackLink to={backTo}>{backLabel}</BackLink>
         </div>
         <ErrorPanel
+          forbiddenMessage={en.debriefs.noAccess}
           what={en.debriefs.run.loadFailed}
           error={q.error}
           onRetry={() => void q.refetch()}

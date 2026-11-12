@@ -140,7 +140,14 @@ const Detail: React.FC<{ id: string; canAct: boolean }> = ({ id, canAct }) => {
   const [confirming, setConfirming] = useState(false);
   const [comparing, setComparing] = useState(false);
   if (q.isError) {
-    return <ErrorPanel what={s.loadFailed} error={q.error} onRetry={() => void q.refetch()} />;
+    return (
+      <ErrorPanel
+        forbiddenMessage={en.debriefs.noAccess}
+        what={s.loadFailed}
+        error={q.error}
+        onRetry={() => void q.refetch()}
+      />
+    );
   }
   const d: DebriefReleaseDetail | undefined = q.data;
   if (!d) return <LoadingBlock lines={8} />;
@@ -409,6 +416,7 @@ export const ReleasesView: React.FC<{
     return (
       <div className="px-8 py-6">
         <ErrorPanel
+          forbiddenMessage={en.debriefs.noAccess}
           what={s.loadFailed}
           error={history.error}
           onRetry={() => void history.refetch()}

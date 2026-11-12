@@ -120,6 +120,7 @@ export const OrganisationsSection: React.FC<{ access: DebriefAccess }> = ({ acce
     <div className="flex flex-col gap-3" data-testid="organisations-tab">
       {tenants.isError ? (
         <ErrorPanel
+          forbiddenMessage={en.debriefs.noAccess}
           what={s.loadFailed}
           error={tenants.error}
           onRetry={() => void tenants.refetch()}

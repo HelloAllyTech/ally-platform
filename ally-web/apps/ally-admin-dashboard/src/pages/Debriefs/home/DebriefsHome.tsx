@@ -442,6 +442,7 @@ export const DebriefsHome: React.FC = () => {
 
       {sessions.isError && !page ? (
         <ErrorPanel
+          forbiddenMessage={en.debriefs.noAccess}
           what={h.loadFailed}
           error={sessions.error}
           onRetry={() => void sessions.refetch()}

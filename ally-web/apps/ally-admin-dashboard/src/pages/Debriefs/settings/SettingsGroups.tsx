@@ -109,6 +109,7 @@ export const SettingsGroups: React.FC<{
   if (settings.isError) {
     return (
       <ErrorPanel
+        forbiddenMessage={en.debriefs.noAccess}
         what={s.loadFailed}
         error={settings.error}
         onRetry={() => void settings.refetch()}

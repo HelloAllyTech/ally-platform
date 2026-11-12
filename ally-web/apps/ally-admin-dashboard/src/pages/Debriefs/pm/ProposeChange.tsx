@@ -207,6 +207,7 @@ export const ProposeChange: React.FC<{
       />
       {models.isError ? (
         <ErrorPanel
+          forbiddenMessage={en.debriefs.noAccess}
           what={en.debriefs.releases.models.loadFailed}
           error={models.error}
           onRetry={() => void models.refetch()}

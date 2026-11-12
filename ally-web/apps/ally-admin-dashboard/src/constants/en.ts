@@ -9317,6 +9317,9 @@ export const en = {
     error: "Couldn't load notifications.",
   },
   debriefs: {
+    /** A Debriefs console page the reader may not see (a 403 from ally-be). */
+    noAccess:
+      "Your account can't open the Debriefs console. It needs the Analytics toggle and the Ally team, clinical advisor or owner permission. Ask a platform admin.",
     title: "Debriefs",
     intro:
       "The debriefs learners read after a roleplay: what the Debrief agent writes, how good it is, what the PM agent is changing, and which organisations have it.",

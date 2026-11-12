@@ -189,6 +189,7 @@ export const PmAgentPage: React.FC = () => {
       ) : state.isError ? (
         <div className="px-8 py-6">
           <ErrorPanel
+            forbiddenMessage={en.debriefs.noAccess}
             what={s.loadFailed}
             error={state.error}
             onRetry={() => void state.refetch()}
