@@ -18,6 +18,12 @@ const KEPT_QUERY = new Set([
   'language',
   'sessionType',
   'source',
+  // The redesigned home list's filters.
+  'category',
+  'recipe',
+  'fallback',
+  'riskCue',
+  'cost',
 ]);
 
 /**
