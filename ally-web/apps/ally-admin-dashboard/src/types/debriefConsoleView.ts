@@ -286,6 +286,8 @@ export interface DebriefSessionView {
   review: { by: number; at: string; action: string; note: string | null } | null;
   escalation: { at: string; note: string | null; by: { id: number; name: string | null } } | null;
   comments: ExpertComment[];
+  /** Threads on this learner's earlier debriefs of the same scenario, newest first (spec C5). */
+  earlierComments: ExpertComment[];
   verdict: { verdict: ExpertVerdict; hardFails: string[]; updatedAt: string | null } | null;
   scoring: { inMyScoringSample: boolean; scoredByMe: boolean };
   queue: {

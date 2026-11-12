@@ -59,9 +59,12 @@ describe('Debrief console role gating', () => {
       'deleteComment',
       'resolveComment',
       'reopenComment',
+      'stillHappening',
     ]) {
       expect(await allowed(NOBODY, C, h)).toBe(false);
     }
+    expect(await allowed(TEAM, C, 'stillHappening')).toBe(true);
+    expect(await allowed(ADVISOR, C, 'stillHappening')).toBe(true);
   });
 
   it('held debriefs, escalation and the PM agent: Ally team or owner, never the advisor alone', async () => {

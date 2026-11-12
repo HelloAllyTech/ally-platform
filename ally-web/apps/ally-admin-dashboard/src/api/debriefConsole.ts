@@ -285,6 +285,17 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    markDebriefCommentStillHappening: builder.mutation<
+      ExpertComment,
+      { id: string; runId: string }
+    >({
+      query: ({ id, runId }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.COMMENT_ACTION(id, "still-happening"),
+        method: HttpMethod.POST,
+        body: { runId },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     askIdeaQuestion: builder.mutation<{ id: string; at: string }, { id: string; text: string }>({
       query: ({ id, text }) => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_QUESTIONS(id),
@@ -451,6 +462,7 @@ export const {
   useEditDebriefCommentMutation,
   useDeleteDebriefCommentMutation,
   useSetDebriefCommentStatusMutation,
+  useMarkDebriefCommentStillHappeningMutation,
   useAskIdeaQuestionMutation,
   useStartIdeaStepMutation,
   useApprovePinnedRuleMutation,

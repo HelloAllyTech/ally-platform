@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   add: vi.fn(),
   verdict: vi.fn(),
   status: vi.fn(),
+  stillHappening: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }));
@@ -44,6 +45,7 @@ vi.mock("@api", async importOriginal => {
     useEditDebriefCommentMutation: () => [vi.fn(), { isLoading: false }],
     useDeleteDebriefCommentMutation: () => [vi.fn(), { isLoading: false }],
     useSetDebriefCommentStatusMutation: () => [h.status, { isLoading: false }],
+    useMarkDebriefCommentStillHappeningMutation: () => [h.stillHappening, { isLoading: false }],
     useSetExpertVerdictMutation: () => [h.verdict, { isLoading: false }],
   };
 });
@@ -257,6 +259,7 @@ const view = (over: Record<string, unknown> = {}) => ({
   review: null,
   escalation: null,
   comments: [comment],
+  earlierComments: [],
   verdict: null,
   scoring: { inMyScoringSample: false, scoredByMe: false },
   queue: { position: 1, total: 2, previousRunId: null, nextRunId: "run-2" },
@@ -289,8 +292,8 @@ const renderPage = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   h.session.mockReturnValue(ok(view()));
-  [h.act, h.resolve, h.correct, h.escalate, h.add, h.verdict, h.status].forEach(f =>
-    f.mockReturnValue(resolves()),
+  [h.act, h.resolve, h.correct, h.escalate, h.add, h.verdict, h.status, h.stillHappening].forEach(
+    f => f.mockReturnValue(resolves()),
   );
 });
 
@@ -512,6 +515,57 @@ describe("Session page", () => {
         "She should have paused here.",
       );
       expect(screen.queryByRole("button", { name: "Resolve" })).toBeNull();
+    });
+  });
+
+  describe("comments from the learner's earlier debriefs (spec C5)", () => {
+    const earlier = {
+      ...comment,
+      id: "old-1",
+      runId: "run-0",
+      body: "Missed the sleep cue again.",
+      status: "resolved",
+      createdAt: "2026-11-01T10:00:00Z",
+      idea: { id: "i1", title: "Name the risk cue first", status: "approved" },
+    };
+
+    it("lists them with their idea, and Still happening here links this run", async () => {
+      h.session.mockReturnValue(ok(view({ earlierComments: [earlier] })));
+      renderPage();
+      fireEvent.click(screen.getByTestId("review-button"));
+      const item = screen.getByTestId("earlier-comment");
+      expect(item).toHaveTextContent("Missed the sleep cue again.");
+      fireEvent.click(within(item).getByRole("button", { name: "Still happening here" }));
+      await waitFor(() =>
+        expect(h.stillHappening).toHaveBeenCalledWith({ id: "old-1", runId: "run-1" }),
+      );
+      await waitFor(() =>
+        expect(h.toastSuccess).toHaveBeenCalledWith("Marked as still happening on this debrief."),
+      );
+    });
+
+    it("shows them read-only without review rights, and nothing when there are none", () => {
+      h.session.mockReturnValue(
+        ok(
+          view({
+            viewer: NOBODY,
+            pendingActions: [],
+            earlierComments: [earlier],
+            can: { ...view().can, comment: false },
+          }),
+        ),
+      );
+      const { unmount } = renderPage();
+      fireEvent.click(screen.getByTestId("review-button"));
+      expect(screen.getByTestId("earlier-comment")).toHaveTextContent(
+        "Missed the sleep cue again.",
+      );
+      expect(screen.queryByRole("button", { name: "Still happening here" })).toBeNull();
+      unmount();
+      h.session.mockReturnValue(ok(view()));
+      renderPage();
+      fireEvent.click(screen.getByTestId("review-button"));
+      expect(screen.queryByTestId("earlier-comments")).toBeNull();
     });
   });
 

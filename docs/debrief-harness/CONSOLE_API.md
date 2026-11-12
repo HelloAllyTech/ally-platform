@@ -33,7 +33,7 @@ rather than disable it.
 
 | `can.<action>` | Ally team | Advisor | Owner | Routes |
 |---|---|---|---|---|
-| `comment` | yes | yes | yes | console `runs/:id/comments`, `comments/:id` (PATCH, DELETE, resolve, reopen) |
+| `comment` | yes | yes | yes | console `runs/:id/comments`, `comments/:id` (PATCH, DELETE, resolve, reopen, still-happening) |
 | `flagDecision` | yes | escalated flags only (checked per flag, 403) | yes | `flags/:id/resolve` |
 | `heldDebrief` | yes | no | yes | `runs/:id/publish`, `runs/:id/todays-debrief`, `runs/:id/reviewed`, `runs/:id/correct` |
 | `escalate` | yes | no | yes | `flags/:id/escalate`, `runs/:id/escalate` |
@@ -142,6 +142,8 @@ undo window are not work yet. Other categories are newest first. Comments never 
   review: { by; at; action; note } | null;
   escalation: { at; note; by: {id,name} } | null;
   comments: Comment[];                   // the same shape as expert review's comments
+  earlierComments: Comment[];            // threads on this learner's earlier debriefs of the same
+                                         // scenario, newest first (≤ 30), minus ones already repeated here
   verdict: { verdict; hardFails; updatedAt } | null;  // the viewer's own
   scoring: { inMyScoringSample: boolean; scoredByMe: boolean };
   queue: { position: number|null; total; previousRunId: string|null; nextRunId: string|null }; // Previous/Next, j/k
@@ -195,7 +197,7 @@ These go to `POST runs/:id/comments` with the same body as expert review: `{ anc
 section?, spanStart?, spanEnd?, quotedText?, body, tag?, parentId? }`. Tags are `missed_moment`,
 `wrong_or_unsupported`, `tone`, `advice_doesnt_fit` and `good_keep_this` (plus the older `protocol`, `language`
 and `too_long_or_unclear`). `PATCH comments/:id {body?, tag?}`, `DELETE comments/:id`,
-`POST comments/:id/resolve`, `POST comments/:id/reopen`. All of them need `can.comment`. Viewers without review rights
+`POST comments/:id/resolve`, `POST comments/:id/reopen`, and `POST comments/:id/still-happening {runId, body?, tag?}` (spec C5: the earlier thread re-opens and a new comment on `runId` points back at it as `repeatOf`; 400 on the same run; `body` defaults to "Still happening."). All of them need `can.comment`. Viewers without review rights
 can read comments in the session payload but get 403 on writes. Comments feed the PM agent's
 evidence, never the queue. You cannot comment on a session from your own practice (403).
 

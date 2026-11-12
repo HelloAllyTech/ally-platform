@@ -7,7 +7,7 @@ import { DebriefSessionView, ExpertComment, ExpertReviewDetail } from "@types";
 import { sectionLabel } from "../consoleLabels";
 import { DebriefAccess } from "../debriefAccess";
 import { HARD_FAILS, ScoreByHand } from "../ScoreByHand";
-import { Thread, VerdictPanel } from "./commentParts";
+import { EarlierComments, Thread, VerdictPanel } from "./commentParts";
 import { isRed, pendingBody, pendingHeadline } from "./pendingActions";
 import { Decision, decisionLabel } from "./WaitingBar";
 
@@ -214,6 +214,11 @@ export const ReviewPanel: React.FC<{
           <div className="text-xs text-neutral-600">
             {view.can.comment ? s.commentHint : s.commentsReadOnly}
           </div>
+          <EarlierComments
+            comments={view.earlierComments ?? []}
+            runId={view.run.id}
+            canAct={view.can.comment}
+          />
         </Card>
 
         {decidedFlags.length > 0 && (

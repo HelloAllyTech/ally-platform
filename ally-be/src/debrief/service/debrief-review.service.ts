@@ -270,6 +270,38 @@ export class DebriefReviewService {
     return rows.map((c) => this.toView(c, reviewerId));
   }
 
+  /**
+   * Comments on this learner's earlier debriefs of the same scenario (spec
+   * C5), newest first: threads only (no replies), each with the idea it fed,
+   * so a reviewer can mark one "still happening" on this run. Threads already
+   * repeated on this run are left out.
+   */
+  async earlierComments(runId: string, reviewerId: number, limit = 30) {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT c.*, u.name AS "reviewerName",
+              l.status AS "ideaStatus", l.text AS "ideaTitle",
+              rep."runId" AS "repeatOfRunId", rep.body AS "repeatOfBody"
+         FROM debrief_runs here
+         JOIN scenario_sessions hs ON hs.id = here."scenarioSessionId"
+         JOIN scenario_sessions es ON es."counselorId" = hs."counselorId"
+                                  AND es."scenarioId" = hs."scenarioId"
+         JOIN debrief_runs er ON er."scenarioSessionId" = es.id
+                             AND er.id <> here.id
+                             AND er."createdAt" < here."createdAt"
+         JOIN debrief_review_comments c ON c."runId" = er.id AND c."parentId" IS NULL
+         LEFT JOIN users u ON u.id = c."reviewerId"
+         LEFT JOIN agent_lessons l ON l.id = c."ideaId"
+         LEFT JOIN debrief_review_comments rep ON rep.id = c."repeatOfId"
+        WHERE here.id = $1
+          AND NOT EXISTS (SELECT 1 FROM debrief_review_comments again
+                           WHERE again."runId" = here.id AND again."repeatOfId" = c.id)
+        ORDER BY c."createdAt" DESC
+        LIMIT $2`,
+      [runId, Math.max(1, Math.min(limit, 100))],
+    );
+    return rows.map((c) => this.toView(c, reviewerId));
+  }
+
   private toView(c: Record<string, any>, reviewerId: number) {
     return {
       id: c.id,
@@ -324,7 +356,12 @@ export class DebriefReviewService {
 
   // --- Comments -----------------------------------------------------------------------
 
-  async addComment(runId: string, reviewerId: number, input: NewComment) {
+  async addComment(
+    runId: string,
+    reviewerId: number,
+    input: NewComment,
+    opts: { repeatOfId?: string } = {},
+  ) {
     const run = await this.reviewableRun(runId, reviewerId);
     const body = trimBody(input.body);
     if (input.tag != null && !isCommentTag(input.tag)) {
@@ -370,6 +407,7 @@ export class DebriefReviewService {
         body,
         tag: input.tag ?? null,
         status: DebriefCommentStatus.OPEN,
+        repeatOfId: opts.repeatOfId ?? null,
       }),
     );
     return this.viewOne(saved.id, reviewerId);
@@ -438,6 +476,42 @@ export class DebriefReviewService {
       ],
     );
     return this.viewOne(rootId, reviewerId);
+  }
+
+  /**
+   * "Still happening" (spec C5): the problem an earlier comment raised shows
+   * up again on a later run. Re-opens the earlier thread and records a new
+   * comment on this run that points back at it, so the PM agent sees the
+   * problem recur with the idea it already tried.
+   */
+  async stillHappening(
+    commentId: string,
+    reviewerId: number,
+    input: NewComment & { runId: string },
+  ) {
+    const earlier = await this.comments.findOne({ where: { id: commentId } });
+    if (!earlier) throw new NotFoundException('Comment not found');
+    const root = earlier.parentId
+      ? await this.comments.findOneOrFail({ where: { id: earlier.parentId } })
+      : earlier;
+    if (root.runId === input.runId) {
+      throw new BadRequestException(
+        'Mark it still happening on a later debrief, not the same one.',
+      );
+    }
+    const created = await this.addComment(
+      input.runId,
+      reviewerId,
+      {
+        ...input,
+        body: input.body?.trim() ? input.body : 'Still happening.',
+        tag: input.tag ?? root.tag ?? null,
+        parentId: null,
+      },
+      { repeatOfId: root.id },
+    );
+    await this.setStatus(root.id, reviewerId, DebriefCommentStatus.OPEN);
+    return created;
   }
 
   // --- Verdict ------------------------------------------------------------------------

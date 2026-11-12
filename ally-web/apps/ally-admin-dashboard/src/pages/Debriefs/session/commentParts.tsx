@@ -7,6 +7,7 @@ import {
   useAddDebriefCommentMutation,
   useDeleteDebriefCommentMutation,
   useEditDebriefCommentMutation,
+  useMarkDebriefCommentStillHappeningMutation,
   useSetDebriefCommentStatusMutation,
   useSetExpertVerdictMutation,
 } from "@api";
@@ -344,5 +345,63 @@ export const VerdictPanel: React.FC<{ detail: ExpertReviewDetail }> = ({ detail 
         <p className="text-xs text-typography-700">{v.hiddenNote}</p>
       )}
     </section>
+  );
+};
+
+/**
+ * Threads from this learner's earlier debriefs of the same scenario (spec C5). A reviewer marks
+ * one "still happening" on this run: the thread re-opens and a comment here points back at it.
+ */
+export const EarlierComments: React.FC<{
+  comments: ExpertComment[];
+  runId: string;
+  canAct: boolean;
+}> = ({ comments, runId, canAct }) => {
+  const p = en.debriefs.session.panel;
+  const [mark, { isLoading }] = useMarkDebriefCommentStillHappeningMutation();
+  if (comments.length === 0) return null;
+  const markHere = async (c: ExpertComment) => {
+    try {
+      await mark({ id: c.id, runId }).unwrap();
+      toast.success(p.stillHappeningDone);
+    } catch (e) {
+      toast.error(getErrorMessage(e, p.stillHappeningFailed));
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2 border-t border-neutral-100 pt-3">
+      <div className="text-sm font-semibold">{p.earlier}</div>
+      <div className="text-xs text-neutral-600">{p.earlierHelp}</div>
+      <ul className="flex flex-col gap-2" data-testid="earlier-comments">
+        {comments.map(c => (
+          <li
+            key={c.id}
+            className="flex flex-col gap-1 rounded-sm bg-white p-2 text-sm"
+            data-testid="earlier-comment"
+          >
+            <p className="text-xs text-neutral-600">{p.earlierOn(formatWhen(c.createdAt))}</p>
+            {c.quotedText && <p className="italic text-neutral-700">“{c.quotedText}”</p>}
+            <p className="whitespace-pre-wrap">{c.body}</p>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {c.tag && <Pill tone="info">{s().tags[c.tag]}</Pill>}
+              <Pill tone={c.idea ? "info" : "neutral"}>{ideaStatusLabel(c.idea)}</Pill>
+              {c.status === "resolved" && <Pill tone="success">{s().threads.resolved}</Pill>}
+            </div>
+            {canAct && (
+              <div>
+                <Button
+                  size="sm"
+                  kind="tertiary"
+                  disabled={isLoading}
+                  onClick={() => void markHere(c)}
+                >
+                  {p.stillHappening}
+                </Button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 };

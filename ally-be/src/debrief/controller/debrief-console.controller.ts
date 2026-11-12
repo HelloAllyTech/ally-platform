@@ -175,6 +175,26 @@ class CorrectCardDto {
   note!: string;
 }
 
+class StillHappeningDto {
+  @ApiProperty({ description: 'The later run the problem happened again on' })
+  @IsUUID()
+  runId!: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Defaults to "Still happening."',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMENT_BODY_MAX)
+  body?: string;
+
+  @ApiProperty({ required: false, enum: DebriefCommentTag, nullable: true })
+  @IsOptional()
+  @IsEnum(DebriefCommentTag)
+  tag?: DebriefCommentTag | null;
+}
+
 class ConsoleCommentDto {
   @ApiProperty({ enum: DebriefCommentAnchor })
   @IsEnum(DebriefCommentAnchor)
@@ -987,6 +1007,27 @@ export class DebriefConsoleController {
     @Req() req: AuthedRequest,
   ) {
     return this.reviews.setStatus(id, req.user.id, DebriefCommentStatus.OPEN);
+  }
+
+  @Post('comments/:id/still-happening')
+  @DebriefAct('comment')
+  @ApiOperation({
+    summary:
+      "Still happening (spec C5): an earlier comment's problem happened again on this later run",
+    description:
+      'Re-opens the earlier thread and adds a comment on `runId` that points back at it (`repeatOf`). 400 on the same run.',
+  })
+  stillHappening(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: StillHappeningDto,
+  ) {
+    return this.reviews.stillHappening(id, req.user.id, {
+      runId: body.runId,
+      anchorKind: DebriefCommentAnchor.DEBRIEF,
+      body: body.body ?? '',
+      tag: body.tag ?? null,
+    });
   }
 
   @Post('pm-agent/ideas/:id/questions')

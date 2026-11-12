@@ -552,6 +552,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
       transcript,
       flagRows,
       comments,
+      earlierComments,
       thread,
       sample,
       queue,
@@ -565,6 +566,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         [run.id],
       ) as Promise<Array<Record<string, any>>>,
       this.reviews.commentsForRun(run.id, viewer.userId),
+      this.reviews.earlierComments(run.id, viewer.userId).catch(() => []),
       meta?.learnerId
         ? (this.dataSource.query(
             `SELECT m."senderId", m.content, m."createdAt"
@@ -812,6 +814,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
       review: ws.review ?? null,
       escalation,
       comments,
+      // Comments on this learner's earlier debriefs of the same scenario (spec C5).
+      earlierComments,
       verdict: myVerdict.length
         ? {
             verdict: myVerdict[0].verdict,

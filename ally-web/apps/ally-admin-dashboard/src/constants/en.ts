@@ -10286,6 +10286,13 @@ export const en = {
         comments: "Comments",
         commentHint: "Select words in the roleplay or the debrief to add one.",
         commentsReadOnly: "Reviewers and the clinical advisor add comments.",
+        earlier: "From this learner's earlier debriefs",
+        earlierHelp:
+          "Comments on this learner's earlier debriefs of the same scenario. If the problem happened again here, mark it: the thread re-opens and the PM agent sees it recur.",
+        earlierOn: (when: string) => `On the debrief from ${when}`,
+        stillHappening: "Still happening here",
+        stillHappeningDone: "Marked as still happening on this debrief.",
+        stillHappeningFailed: "Couldn't mark it as still happening",
         decidedFlags: "Flags already decided",
         scoreByHand: "Score by hand",
         inSample: "in your sample",

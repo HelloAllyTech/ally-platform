@@ -493,7 +493,7 @@ export const ApiEndpoints = {
     SCORE: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/score`,
     COMMENTS: (runId: string) => `/v1/debriefs/console/runs/${runId}/comments`,
     COMMENT: (id: string) => `/v1/debriefs/console/comments/${id}`,
-    COMMENT_ACTION: (id: string, action: "resolve" | "reopen") =>
+    COMMENT_ACTION: (id: string, action: "resolve" | "reopen" | "still-happening") =>
       `/v1/debriefs/console/comments/${id}/${action}`,
     IDEA_QUESTIONS: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/questions`,
     IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,

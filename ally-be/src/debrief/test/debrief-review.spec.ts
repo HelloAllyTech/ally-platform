@@ -6,6 +6,7 @@ import {
 import {
   DebriefCommentAnchor,
   DebriefCommentStatus,
+  DebriefCommentTag,
   DebriefReviewVerdict,
 } from '../enum/debrief-review.enum';
 import { DebriefReviewService } from '../service/debrief-review.service';
@@ -445,5 +446,131 @@ describe('DebriefReviewService', () => {
     await expect(
       service.commentsForAgent({ since: 'yesterday' }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('still happening (spec C5)', () => {
+  const build = (earlier: Record<string, unknown> | null) => {
+    const comments = {
+      findOne: jest.fn(async () => earlier),
+      findOneOrFail: jest.fn(async () => ({
+        id: 'root-1',
+        runId: 'run-old',
+        tag: DebriefCommentTag.TONE,
+        parentId: null,
+      })),
+    };
+    const service = new DebriefReviewService(
+      {} as any,
+      {} as any,
+      {} as any,
+      comments as any,
+      {} as any,
+      {} as any,
+    );
+    const add = jest
+      .spyOn(service, 'addComment')
+      .mockResolvedValue({ id: 'new-1' } as any);
+    const status = jest
+      .spyOn(service, 'setStatus')
+      .mockResolvedValue({} as any);
+    return { service, add, status };
+  };
+
+  it('records a comment on the later run that points back at the thread, and re-opens it', async () => {
+    const { service, add, status } = build({
+      id: 'reply-1',
+      runId: 'run-old',
+      tag: null,
+      parentId: 'root-1',
+    });
+    await service.stillHappening('reply-1', 7, {
+      runId: 'run-new',
+      anchorKind: DebriefCommentAnchor.DEBRIEF,
+      body: '  ',
+    });
+    expect(add).toHaveBeenCalledWith(
+      'run-new',
+      7,
+      expect.objectContaining({
+        body: 'Still happening.',
+        tag: DebriefCommentTag.TONE,
+        parentId: null,
+      }),
+      { repeatOfId: 'root-1' },
+    );
+    expect(status).toHaveBeenCalledWith('root-1', 7, DebriefCommentStatus.OPEN);
+  });
+
+  it('refuses the same run, and a comment that is not there', async () => {
+    const same = build({
+      id: 'root-1',
+      runId: 'run-old',
+      tag: null,
+      parentId: null,
+    });
+    await expect(
+      same.service.stillHappening('root-1', 7, {
+        runId: 'run-old',
+        anchorKind: DebriefCommentAnchor.DEBRIEF,
+        body: '',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(same.add).not.toHaveBeenCalled();
+    await expect(
+      build(null).service.stillHappening('x', 7, {
+        runId: 'run-new',
+        anchorKind: DebriefCommentAnchor.DEBRIEF,
+        body: '',
+      }),
+    ).rejects.toThrow('Comment not found');
+  });
+
+  it("reads threads from the learner's earlier debriefs of the same scenario, with their idea", async () => {
+    const dataSource = {
+      query: jest.fn(async () => [
+        {
+          id: 'c1',
+          runId: 'run-old',
+          parentId: null,
+          anchorKind: 'debrief',
+          body: 'Missed the sleep cue',
+          tag: 'missed_moment',
+          status: 'resolved',
+          reviewerId: 7,
+          reviewerName: 'Asha',
+          createdAt: '2026-11-01T00:00:00Z',
+          updatedAt: '2026-11-01T00:00:00Z',
+          ideaId: 'i1',
+          ideaTitle: 'Name the risk cue first',
+          ideaStatus: 'approved',
+        },
+      ]),
+    };
+    const service = new DebriefReviewService(
+      dataSource as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    const out = await service.earlierComments('run-new', 7);
+    expect(out[0]).toMatchObject({
+      id: 'c1',
+      runId: 'run-old',
+      mine: true,
+      idea: { id: 'i1', status: 'approved' },
+    });
+    const [sql, params] = dataSource.query.mock.calls[0] as unknown as [
+      string,
+      unknown[],
+    ];
+    expect(sql).toContain(`es."counselorId" = hs."counselorId"`);
+    expect(sql).toContain(`es."scenarioId" = hs."scenarioId"`);
+    expect(sql).toContain(`er."createdAt" < here."createdAt"`);
+    expect(sql).toContain(`c."parentId" IS NULL`);
+    expect(sql).toContain(`again."repeatOfId" = c.id`);
+    expect(params).toEqual(['run-new', 30]);
   });
 });
