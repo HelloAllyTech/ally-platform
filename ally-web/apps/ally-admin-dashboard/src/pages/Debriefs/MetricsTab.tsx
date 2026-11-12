@@ -26,6 +26,7 @@ import { ChangeWhiskers, WhiskerRow } from "../Analytics/ChangeWhiskers";
 import { ChartCard, KpiTile, lineOpts, PALETTE } from "../Analytics/chartKit";
 import { CONTEXT, stableScale } from "../Analytics/chartScales";
 import { TabControls } from "../Analytics/tabControlsSlot";
+import { languageLabel } from "./consoleLabels";
 import { AgentsSection } from "./metrics/AgentsSection";
 import { BulletRow, BulletRows, NumbersTable, RateDots, RateRow } from "./metrics/metricsCharts";
 import {
@@ -291,18 +292,24 @@ export const groupLabel = (key: string): string => {
   return /^[a-z]/.test(key) && !/[-_]/.test(key) ? key.charAt(0).toUpperCase() + key.slice(1) : key;
 };
 
-const groupRows = (list: DebriefPassBreakdownRow[]): RateRow[] => {
+const groupRows = (
+  list: DebriefPassBreakdownRow[],
+  label: (key: string) => string = groupLabel,
+): RateRow[] => {
   return list.map(r => ({
     key: r.key,
-    label: groupLabel(r.key),
+    label: label(r.key),
     rate: r.passRate,
     extra: en.debriefs.metrics.sections.groupExtra(pct(r.hardFailRate), fixed(r.judgeMean, 1)),
   }));
 };
 
-const groupTable = (list: DebriefPassBreakdownRow[]): string[][] =>
+const groupTable = (
+  list: DebriefPassBreakdownRow[],
+  label: (key: string) => string = groupLabel,
+): string[][] =>
   list.map(r => [
-    groupLabel(r.key),
+    label(r.key),
     String(r.debriefs),
     rateWithRange(r.passRate),
     rateWithRange(r.hardFailRate),
@@ -410,14 +417,14 @@ const QualitySection: React.FC<{
             {languageRows.length > 0 && (
               <ChartCard title={s.byLanguage} caption={sec.breakdownsCaption}>
                 <RateDots
-                  rows={groupRows(languageRows)}
+                  rows={groupRows(languageRows, languageLabel)}
                   max={1}
                   testId="metrics-by-language-dots"
                 />
                 <NumbersTable
                   testId="metrics-quality-languages"
                   head={[c.language, c.debriefs, c.passRate, c.hardFailRate, c.judgeMean]}
-                  rows={groupTable(languageRows)}
+                  rows={groupTable(languageRows, languageLabel)}
                 />
               </ChartCard>
             )}
@@ -896,6 +903,7 @@ const ExperienceSection: React.FC<{ view: DebriefMetricsView }> = ({ view }) => 
             s.experience.byLanguage.replace(/^By /, "").toLowerCase(),
           )}
           rows={view.byLanguage}
+          label={languageLabel}
           testId="metrics-by-language"
         />
         <ExperienceStrips
@@ -919,7 +927,9 @@ const ExperienceStrips: React.FC<{
   title: string;
   testId: string;
   rows: DebriefMetricsView["byLanguage"];
-}> = ({ title, testId, rows }) => {
+  /** How a group is named (a language code becomes its name: no raw codes). */
+  label?: (key: string) => string;
+}> = ({ title, testId, rows, label = key => key }) => {
   const s = en.debriefs.metrics;
   if (!rows.length) return null;
   const scale = stableScale(rows.map(r => r.key));
@@ -934,7 +944,7 @@ const ExperienceStrips: React.FC<{
                 className="inline-block h-2.5 w-2.5 rounded-full"
                 style={{ background: scale[r.key] }}
               />
-              {r.key} <span className="text-typography-500">({r.debriefs})</span>
+              {label(r.key)} <span className="text-typography-500">({r.debriefs})</span>
             </span>
           ))}
         </div>
@@ -965,7 +975,7 @@ const ExperienceStrips: React.FC<{
                 return (
                   <span
                     key={r.key}
-                    title={`${r.key}: ${pctNum(rate.value)} (${s.count(rate.n, rate.of)})${thin ? ` · ${s.states.thin}` : ""}`}
+                    title={`${label(r.key)}: ${pctNum(rate.value)} (${s.count(rate.n, rate.of)})${thin ? ` · ${s.states.thin}` : ""}`}
                     className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
                     style={{
                       // Each group on its own lane, so equal values never hide each other.
@@ -983,7 +993,7 @@ const ExperienceStrips: React.FC<{
         <NumbersTable
           head={["", ...BREAKDOWN_KEYS.map(k => s.experience[k] as string)]}
           rows={rows.map(r => [
-            r.key,
+            label(r.key),
             ...BREAKDOWN_KEYS.map(
               k => `${pct(r.experience[k])} (${s.count(r.experience[k].n, r.experience[k].of)})`,
             ),

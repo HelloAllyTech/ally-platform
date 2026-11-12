@@ -125,7 +125,8 @@ describe("Debriefs tab: pass rate", () => {
   it("draws pass rate by language as sorted dots with whiskers, thin groups hollow and labelled", () => {
     render(<MetricsTab />);
     const lang = screen.getAllByTestId("metrics-by-language-dots-row");
-    expect(lang.map(r => r.textContent?.slice(0, 5))).toEqual(["en-IN", "hi-IN", "ta-IN", "kn-IN"]);
+    // Languages by name, never their raw codes (AN-07).
+    expect(lang.map(r => r.textContent?.slice(0, 5))).toEqual(["Engli", "Hindi", "Tamil", "Kanna"]);
     // kn-IN has 9 scored: too few to read, sorted last and marked.
     expect(lang[3]).toHaveAttribute("data-thin", "true");
     expect(lang[3]).toHaveTextContent("too few to read");
@@ -215,7 +216,8 @@ describe("Debriefs tab: steering, guardrails, experience, uptake", () => {
     expect(screen.getByTestId("metrics-experience-opened")).toHaveTextContent("On target");
     expect(screen.getByTestId("metrics-experience-read")).toHaveTextContent("Off target");
     expect(screen.getByTestId("metrics-experience-listened")).not.toHaveTextContent("target");
-    expect(screen.getByTestId("metrics-by-language")).toHaveTextContent("kn-IN");
+    expect(screen.getByTestId("metrics-by-language")).toHaveTextContent("Kannada");
+    expect(screen.getByTestId("metrics-by-language")).not.toHaveTextContent("kn-IN");
     expect(screen.getByTestId("metrics-by-device")).toHaveTextContent("ios");
     // PRD §9: the pulse's two questions, "fair" on important moments against 70%.
     expect(screen.getByTestId("metrics-experience-pulseKnewNext")).toHaveTextContent(
