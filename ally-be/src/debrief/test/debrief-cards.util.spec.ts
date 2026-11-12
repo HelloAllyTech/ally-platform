@@ -395,6 +395,99 @@ describe('debrief checks', () => {
     ).toBe(true);
   });
 
+  it('a Hindi debrief of a romanised Hinglish session: verbatim Latin quotes pass, romanised prose is held', () => {
+    // GOLD-MIX-MEANS, 2026-11-12: every turn was typed in Latin letters.
+    const hinglish: TranscriptTurn[] = [
+      { turn_index: 1, role: 'counselor', text: 'Kitna loan baaki hai?' },
+      {
+        turn_index: 2,
+        role: 'client',
+        text: 'Ghar mein chuha maarne wali dawai rakhi hai. Kabhi kabhi sochta hoon wahi kha loon.',
+      },
+      {
+        turn_index: 3,
+        role: 'counselor',
+        text: 'Sarkar ki kuch schemes hain, unke baare mein pata kiya?',
+      },
+    ];
+    const cards: DebriefCards = {
+      opening:
+        'आपने किसान की परेशानी सुनी, पर एक ज़रूरी पल छूट गया जिस पर रुकना था।',
+      important_moment: {
+        turn_index: 2,
+        quote:
+          'Ghar mein chuha maarne wali dawai rakhi hai. Kabhi kabhi sochta hoon wahi kha loon.',
+        handled_well: false,
+        lead: 'यहाँ क्लाइंट ने ज़हर खाने की बात कही थी।',
+        body: 'ऐसे में सीधे और नरमी से पूछिए कि क्या वे अपनी जान लेने के बारे में सोच रहे हैं।',
+        others: [],
+      },
+      what_worked: [
+        {
+          skill: 'Open questions',
+          turn_index: 1,
+          quote: 'Kitna loan baaki hai?',
+          lead: 'आपने बातचीत शुरू करने के लिए सवाल पूछा।',
+          body: 'इससे क्लाइंट को अपनी स्थिति बताने का मौका मिला।',
+        },
+      ],
+      work_on_this: [
+        {
+          skill: 'Exploring risk',
+          turn_index: 3,
+          quote: 'Sarkar ki kuch schemes hain, unke baare mein pata kiya?',
+          lead: 'ज़हर की बात के बाद योजनाओं पर जाना जल्दी था।',
+          why: 'पहले उनकी सुरक्षा के बारे में पूछना ज़रूरी था।',
+          try_saying:
+            'Aap dawai khaane ki baat kar rahe hain, kya aap apni jaan lene ka soch rahe hain?',
+        },
+      ],
+      practise_next: null,
+      skill_words: [],
+      reflective_question:
+        'जब क्लाइंट ऐसी बात कहे, तो आपको रुककर पूछने से क्या रोकता है?',
+      progress_note: null,
+    };
+    const hiSafety = {
+      risk_cues: [
+        {
+          turn_index: 2,
+          quote: 'Ghar mein chuha maarne wali dawai rakhi hai.',
+          category: 'suicide_or_self_harm',
+          learner_response: 'missed',
+        },
+      ],
+      learner_distress: [],
+    };
+    const check = (c: DebriefCards) =>
+      run(c, { transcript: hinglish, safety: hiSafety, language: 'hi-IN' });
+    expect(check(cards)).not.toContain(DebriefCheckCode.WRONG_LANGUAGE);
+    // The same debrief written in romanised Hindi is still held: not loosened.
+    const romanised: DebriefCards = {
+      ...cards,
+      opening:
+        'Maine dekha ki aapne samasyaon ko suljhane ki koshish ki, lekin unka dukh gehra tha.',
+      important_moment: {
+        ...cards.important_moment!,
+        lead: 'Suraksha ke baare mein turant puchna zaroori tha.',
+        body: 'Seedhe suicide par baat karne se unhe mehsoos hota ki unki baat suni gayi hai.',
+      },
+      reflective_question:
+        'Jab koi client apni jaan lene ki baat kare, toh aapko salah dene ki itni jaldi kyun lagti hai?',
+    };
+    romanised.what_worked = cards.what_worked.map((w) => ({
+      ...w,
+      lead: 'Aapne baatcheet shuru karne ke liye sawal poocha.',
+      body: 'Isse client ko apni sthiti batane ka mauka mila.',
+    }));
+    romanised.work_on_this = cards.work_on_this.map((w) => ({
+      ...w,
+      lead: 'Zeher ki baat ke baad yojanaon par jaana jaldi tha.',
+      why: 'Pehle unki suraksha ke baare mein poochna zaroori tha.',
+    }));
+    expect(check(romanised)).toContain(DebriefCheckCode.WRONG_LANGUAGE);
+  });
+
   it('treats whitespace and curly quotes as the same quote', () => {
     expect(normaliseForQuote('  I don’t  see  ')).toBe("i don't see");
   });

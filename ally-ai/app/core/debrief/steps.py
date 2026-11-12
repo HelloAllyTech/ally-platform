@@ -159,6 +159,26 @@ needs to change.\
 """
 
 
+#: The script ally-be's language check expects for a session language
+#: (`SCRIPT_BY_LANGUAGE` in debrief-cards.util.ts). A Hindi session spoken in
+#: romanised Hinglish still gets its debrief in Devanagari.
+_SCRIPTS = {"hi": "Devanagari", "mr": "Devanagari", "ta": "Tamil", "kn": "Kannada"}
+
+
+def _script_line(language: str) -> List[str]:
+    """Code-owned: write in the session language's own script, whatever
+    script the transcript was typed in; quotes stay verbatim."""
+    script = _SCRIPTS.get((language or "")[:2].lower())
+    if not script:
+        return []
+    return [
+        f"SCRIPT: write everything in {script} script, even where the "
+        "transcript is in Latin letters (romanised). Only quotes from the "
+        "transcript keep the script they were written in, copied exactly; "
+        "a try-saying line may follow the script the session was spoken in."
+    ]
+
+
 def _transcript_block(transcript: List[TranscriptTurn]) -> List[str]:
     lines = ["<transcript>"]
     for t in transcript:
@@ -351,6 +371,7 @@ async def write(
     from app.core.llm_usage.tasks import LLMTask
 
     lines = [system or DEFAULT_WRITER_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
+    lines += _script_line(language)
     if learner_level:
         lines.append(f"TRAINEE LEVEL: {learner_level}")
     if tone:
@@ -528,6 +549,7 @@ async def revise(
     from app.core.llm_usage.tasks import LLMTask
 
     lines = [system or DEFAULT_REVISER_SYSTEM, "", f"SESSION LANGUAGE: {language}"]
+    lines += _script_line(language)
     # Code-owned: the roleplay a card points to is the learner's own list.
     lines.append(
         "Keep every scenario_id as it is in the draft; if you change a card's "

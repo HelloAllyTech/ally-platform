@@ -466,3 +466,25 @@ async def test_analyst_rates_client_turns_and_updates_case_memory(dispatch_retur
     out, _ = await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
     assert out.case_memory_update is None
     assert "CASE MEMORY" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_a_hindi_debrief_is_written_in_devanagari_even_from_romanised_turns(
+    dispatch_returns,
+):
+    """GOLD-MIX-MEANS (2026-11-12): an all-Latin Hinglish transcript got a
+    romanised Hindi debrief, and ally-be's language check held it."""
+    from app.core.debrief.steps import revise, write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "hi-IN", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "SCRIPT: write everything in Devanagari script" in calls["prompt"]
+    assert "quotes from the transcript keep the script" in calls["prompt"]
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await revise({}, [], {}, TRANSCRIPT, "hi", "gemini-3-flash-preview")
+    assert "SCRIPT: write everything in Devanagari script" in calls["prompt"]
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
+    assert "SCRIPT:" not in calls["prompt"]
