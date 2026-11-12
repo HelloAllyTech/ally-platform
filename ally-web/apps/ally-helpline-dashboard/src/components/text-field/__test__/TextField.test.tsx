@@ -90,6 +90,57 @@ describe("TextField", () => {
     });
   });
 
+  describe("An adornment appearing/disappearing must not remount the input", () => {
+    // The Enhance wand (Scribe's "enhanceEndAdornment") only renders once a
+    // field has non-empty text, so this happens on literally the first
+    // keystroke of any enhanceable field. The old implementation swapped in
+    // an extra wrapping div the moment hasAdornment flipped true, which
+    // changes the input's position in the tree — React unmounts the real
+    // <textarea>/<input> and mounts a fresh one, dropping focus and (in the
+    // live app, via the parent's own controlled-value plumbing) the
+    // keystroke itself. Confirmed via a screen recording 2026-11: typing one
+    // letter cleared the field and dropped focus, "have to click back in to
+    // keep typing".
+    it("keeps the same textarea DOM node and its focus when an endAdornment appears", () => {
+      const { container, rerender } = render(<TextField {...defaultProps} multiline value="" />);
+      const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+      textarea.focus();
+      expect(textarea).toHaveFocus();
+
+      rerender(
+        <TextField
+          {...defaultProps}
+          multiline
+          value="u"
+          InputProps={{ endAdornment: <span data-testid="wand" /> }}
+        />,
+      );
+
+      expect(screen.getByTestId("wand")).toBeInTheDocument();
+      expect(container.querySelector("textarea")).toBe(textarea);
+      expect(textarea).toHaveFocus();
+    });
+
+    it("keeps the same input DOM node when an adornment disappears again", () => {
+      const { container, rerender } = render(
+        <TextField
+          {...defaultProps}
+          value="u"
+          InputProps={{ endAdornment: <span data-testid="wand" /> }}
+        />,
+      );
+      const input = screen.getByRole("textbox");
+      input.focus();
+      expect(input).toHaveFocus();
+
+      rerender(<TextField {...defaultProps} value="" />);
+
+      expect(screen.queryByTestId("wand")).not.toBeInTheDocument();
+      expect(container.querySelector("input")).toBe(input);
+      expect(input).toHaveFocus();
+    });
+  });
+
   describe("Error Handling", () => {
     it("should display string errorMessage when hideError is false", () => {
       const errorMessage = "This field is required.";
