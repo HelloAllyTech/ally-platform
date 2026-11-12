@@ -341,7 +341,7 @@ type WaitingRelease = {
 
 ### Releases from the Skills Store and from code (one rule)
 - **Skills Store publish.** Publishing a new version of a debrief prompt the live release uses (dashboard, `prompts` CLI, revert, experiment Apply) creates **one release per publish** containing it. Pinned-rule prompts are excluded; they have their own sign-off.
-- **Deploy.** A deploy that changes default models, settings or recipes (`DEBRIEF_SEED_BUNDLE`) creates one release, made by "Code · <tag>" (`APP_VERSION`). A deploy that changes no release contents creates **nothing**. Default prompt texts reach learners only through the Skills Store (the sync is a publish).
+- **Deploy.** A deploy that changes default models, settings or recipes (`DEBRIEF_SEED_BUNDLE`) creates one release (only one even when several instances start together: the check holds a Postgres advisory lock, and the others skip), made by "Code · <tag>" (`APP_VERSION`). A deploy that changes no release contents creates **nothing**. Default prompt texts reach learners only through the Skills Store (the sync is a publish).
 - **The rule** is a three-way merge: base is what the source said before, live is the release in force, and next is what the source says now. The result is the source's changes on top of what people promoted.
   - **No conflict:** the release goes live at once and the owner is notified.
   - **It would undo a promoted PM-agent or person-proposed change** (one that set the same prompt version, step, model or setting): the **whole** release waits as a draft. Parts are not shipped separately. The owner and the Ally team are notified, a red `release_waiting` attention item appears, and a person uses Promote or Dismiss.
@@ -444,6 +444,6 @@ Banners only appear for roles that can act:
 - **Org `ask`** for paired trials and canaries is treated as "not on this organisation's learners unless the global step was started by a person". There is no per-organisation go-ahead.
 - **Judge drift and model trials** are Release 2.
 - **Step win rates** are `null` until step-level trials exist (Release 2).
-- **Two instances releasing at once.** If two app instances check new code defaults at the same moment on a deploy, they could both make the same release. Skills Store publishes are handled once, by the instance that served the publish.
+
 - **Verdicts by platform admins:** platform groups hold `review:admin:debriefs`, so they also count as clinical advisors for verdicts and pinned-rule sign-off.
 - **The old Calibration route** `POST /v1/analytics/debrief-quality/calibration/:id` is unchanged. The sample rule applies only to the new console route.

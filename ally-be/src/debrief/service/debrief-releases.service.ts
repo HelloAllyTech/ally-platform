@@ -57,6 +57,9 @@ const eff = (r: Record<string, any>) =>
   );
 
 /** The deploy's tag for a code release (the image's version), when known. */
+/** The advisory lock around the deploy's code-defaults check. */
+const DEFAULTS_LOCK = 'debrief-code-defaults';
+
 const codeTag = (): string | null =>
   process.env.APP_VERSION ?? process.env.npm_package_version ?? null;
 
@@ -934,37 +937,67 @@ export class DebriefReleasesService implements OnModuleInit {
   async fromCodeDefaults(defaults: DebriefBundle = DEBRIEF_SEED_BUNDLE) {
     const hash = canonicalHash(defaults);
     if (this.checkedDefaultsHash === hash) return null;
-    const run = async () => {
-      const ga = await this.releases.getGa(DEBRIEF_AGENT_KEY);
-      if (!ga) return null;
-      const [last] = await this.dataSource.query(
-        `SELECT bundle, "changeSet", "authorKind" FROM agent_releases
-          WHERE "agentKey" = $1
-            AND ("authorKind" = 'seed' OR "changeSet" ? 'codeDefaults')
-          ORDER BY version DESC LIMIT 1`,
-        [DEBRIEF_AGENT_KEY],
-      );
-      const base = ((last?.changeSet?.codeDefaults as
-        | DebriefBundle
-        | undefined) ??
-        (last?.bundle as DebriefBundle | undefined) ??
-        null) as DebriefBundle | null;
-      if (base && canonicalHash(base) === hash) {
-        this.checkedDefaultsHash = hash;
-        return null;
-      }
-      const out = await this.releaseFromSource(base, eff(ga), defaults, ga, {
-        kind: 'code',
-        by: null,
-        tag: codeTag(),
-        codeDefaults: defaults,
-      });
-      this.checkedDefaultsHash = hash;
-      return out;
-    };
+    const run = () =>
+      this.withDefaultsLock(() => this.defaultsOnce(defaults, hash));
     const next = this.sourceQueue.then(run, run);
     this.sourceQueue = next.catch(() => undefined);
     return next;
+  }
+
+  /**
+   * One instance at a time across the deployment (several start together on
+   * a deploy): a Postgres session advisory lock on its own connection. An
+   * instance that does not get it skips; the holder makes the release, and
+   * the next check sees it recorded and does nothing.
+   */
+  private async withDefaultsLock<T>(work: () => Promise<T>): Promise<T | null> {
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    try {
+      const [row] = await qr.query(
+        `SELECT pg_try_advisory_lock(hashtext($1)) AS locked`,
+        [DEFAULTS_LOCK],
+      );
+      if (!row?.locked) return null;
+      try {
+        return await work();
+      } finally {
+        await qr.query(`SELECT pg_advisory_unlock(hashtext($1))`, [
+          DEFAULTS_LOCK,
+        ]);
+      }
+    } finally {
+      await qr.release();
+    }
+  }
+
+  private async defaultsOnce(defaults: DebriefBundle, hash: string) {
+    const ga = await this.releases.getGa(DEBRIEF_AGENT_KEY);
+    if (!ga) return null;
+    const [last] = await this.dataSource.query(
+      `SELECT bundle, "changeSet", "authorKind" FROM agent_releases
+        WHERE "agentKey" = $1
+          AND ("authorKind" = 'seed' OR "changeSet" ? 'codeDefaults')
+        ORDER BY version DESC LIMIT 1`,
+      [DEBRIEF_AGENT_KEY],
+    );
+    const base = ((last?.changeSet?.codeDefaults as
+      | DebriefBundle
+      | undefined) ??
+      (last?.bundle as DebriefBundle | undefined) ??
+      null) as DebriefBundle | null;
+    if (base && canonicalHash(base) === hash) {
+      this.checkedDefaultsHash = hash;
+      return null;
+    }
+    const out = await this.releaseFromSource(base, eff(ga), defaults, ga, {
+      kind: 'code',
+      by: null,
+      tag: codeTag(),
+      codeDefaults: defaults,
+    });
+    this.checkedDefaultsHash = hash;
+    return out;
   }
 
   /**

@@ -110,13 +110,30 @@ function build() {
     owner: jest.fn(async () => 1),
     team: jest.fn(async () => 1),
   };
-  const svc = new DebriefReleasesService(
-    dataSource as any,
-    releases as any,
-    runner as any,
-    notifier as any,
-  );
-  return { svc, releases, notifier, updates };
+  // A shared advisory lock, as Postgres holds it across instances.
+  const lock = { held: false };
+  (dataSource as any).createQueryRunner = () => ({
+    connect: async () => undefined,
+    release: async () => undefined,
+    query: async (sql: string) => {
+      if (sql.includes('pg_try_advisory_lock')) {
+        if (lock.held) return [{ locked: false }];
+        lock.held = true;
+        return [{ locked: true }];
+      }
+      if (sql.includes('pg_advisory_unlock')) lock.held = false;
+      return [];
+    },
+  });
+  const make = () =>
+    new DebriefReleasesService(
+      dataSource as any,
+      releases as any,
+      runner as any,
+      notifier as any,
+    );
+  const svc = make();
+  return { svc, make, releases, notifier, updates };
 }
 
 describe('releases from the Skills Store and code', () => {
@@ -189,6 +206,30 @@ describe('releases from the Skills Store and code', () => {
     const bundle = t.releases.createDraft.mock.calls[0][1] as DebriefBundle;
     expect(bundle.settings.deadlineMs).toBe(160_000);
     expect(bundle.prompts[WRITER]).toBe(12); // the idea's pin stays
+  });
+});
+
+describe('two instances on one deploy', () => {
+  it('make one release: the second does not get the lock and skips', async () => {
+    const t = build();
+    const a = t.svc;
+    const b = t.make();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const original = t.releases.createDraft.getMockImplementation()!;
+    t.releases.createDraft.mockImplementationOnce(async (...args: any[]) => {
+      await gate;
+      return (original as any)(...args);
+    });
+    const next = seed();
+    next.settings.deadlineMs = 170_000;
+    const first = a.fromCodeDefaults(next);
+    await new Promise((r) => setImmediate(r));
+    const second = await b.fromCodeDefaults(next);
+    release();
+    expect(second).toBeNull();
+    expect(await first).toMatchObject({ live: true });
+    expect(t.releases.createDraft).toHaveBeenCalledTimes(1);
   });
 });
 
