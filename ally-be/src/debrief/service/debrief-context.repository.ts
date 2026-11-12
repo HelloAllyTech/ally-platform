@@ -71,8 +71,11 @@ export class DebriefContextRepository {
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
               s."caseSessionItemId" IS NOT NULL AS in_case,
               COALESCE((ti."completionCriteria"->>'assessmentMode')::boolean, false) AS assessment,
+              -- PRD §6.1: a blank line (an empty transcription) is not a
+              -- learner turn; the transcript the Writer reads skips it too.
               (SELECT count(*)::int FROM scenario_session_messages m
-                WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1) AS learner_turns
+                WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1
+                  AND btrim(m.content) <> '') AS learner_turns
          FROM scenario_sessions s
          LEFT JOIN users u ON u.id = s."counselorId"
          LEFT JOIN scenarios sc ON sc.id = s."scenarioId"
