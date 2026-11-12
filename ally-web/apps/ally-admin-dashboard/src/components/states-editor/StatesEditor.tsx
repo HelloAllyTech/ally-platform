@@ -3,9 +3,14 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
-import { FilterableMultiSelect, TextArea, TextInput } from "@ally-ui-mono/ui-shared";
+import {
+  FilterableMultiSelect,
+  TextArea,
+  TextInput,
+  MEMORIES_PLACEHOLDER,
+} from "@ally-ui-mono/ui-shared";
 import { TrashRed } from "@assets";
-import { en, ENHANCE_TYPE, MEMORIES_PLACEHOLDER } from "@constants";
+import { en, ENHANCE_TYPE } from "@constants";
 import { useIsPlaceholderUsed } from "@hooks";
 import type { ScenarioMemory } from "@types";
 

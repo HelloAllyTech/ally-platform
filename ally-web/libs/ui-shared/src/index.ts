@@ -36,6 +36,7 @@ import { Tabs } from "./lib/tabs";
 import Toggle from "./lib/toggle";
 import { logger } from "./logger";
 
+export * from "./constants";
 export * from "./lib/analytics";
 
 // Central design system: canonical Carbon primitives, the single theme

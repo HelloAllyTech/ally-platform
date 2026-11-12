@@ -1,5 +1,6 @@
 import { UseFormReturn } from "react-hook-form";
 
+import { MEMORIES_PLACEHOLDER } from "@ally-ui-mono/ui-shared";
 import { cellTypes } from "@components";
 import { en, ExperienceMode, TooltipLocation } from "@src/constants";
 import { CreatorFieldGroups, FormFieldConfig } from "@types";
@@ -153,14 +154,6 @@ export const StepperList = [
   { id: SIMULATION_CREATOR_STEP_IDS.advancedSettings, title: "Advanced Settings" },
   { id: SIMULATION_CREATOR_STEP_IDS.report, title: "Report" },
 ];
-
-/**
- * Placeholder a main-agent prompt declares to run on Memories instead of
- * Knowledge Sources + retrieval (the Stage Director prompt). The editor swaps
- * Knowledge Sources for the Memories editor whenever the selected prompt body
- * uses it — driven by the body, never by a hard-coded prompt code.
- */
-export const MEMORIES_PLACEHOLDER = "memories";
 
 /**
  * Backstory + every memory's title and text, in characters, above which the
