@@ -499,3 +499,43 @@ async def test_answer_only_run_reads_questions_and_posts_answers():
     assert answer["idea_id"] == IDEA and answer["question_id"] == "q1"
     assert QUOTE not in answer["answer"] and REMOVED in answer["answer"]
     assert "question_answer" in [s["step"] for s in out["steps"]]
+
+
+@pytest.mark.asyncio
+async def test_guidance_propose_goes_to_a_person_with_quotes_stripped():
+    """Route D (spec C4): the agent drafts a Debrief Guidance entry; ally-be stores
+    it for the clinical advisor. The tool never writes to the Context Library."""
+    model = ScriptedModel(
+        script=[
+            ai(
+                calls=[
+                    {
+                        "name": "guidance_propose",
+                        "args": {
+                            "idea_id": IDEA,
+                            "title": "Asking about hopelessness first",
+                            "situation": "A client hints at hopelessness",
+                            "guidance": f'Ask about it directly. "{QUOTE}" was missed.',
+                            "run_ids": ["r1"],
+                        },
+                        "id": "g",
+                    }
+                ]
+            ),
+            ai("ok"),
+        ]
+    )
+    gateway = FakeGateway({"guidance_propose": {"ok": True}})
+    await run_pm_agent(
+        request(),
+        store=InMemoryStore(),
+        checkpointer=None,
+        default_model=PRIMARY,
+        models_factory=factory({PRIMARY: model}),
+        gateway=gateway,
+    )
+    sent = [c for c in gateway.calls if c["tool"] == "guidance_propose"]
+    assert len(sent) == 1
+    assert QUOTE not in sent[0]["body"]["guidance"]
+    assert sent[0]["body"]["action"] == "new"
+    assert "guidance_propose" in ALL_TOOLS and "guidance_propose" not in READ_TOOLS

@@ -38,7 +38,9 @@ ally-be runs the rest of the ladder and people promote.
 with the "brief Builder" skill.
    - C (Bug Hunter): a defect against existing intent. bug_hunter_report with run ids.
    - D (a person): the rubric, safety rules, budgets, data access, clinical content. \
-person_ask.
+person_ask. When the guidance the Writer reads is missing or wrong for a situation, \
+draft the entry with guidance_propose: the clinical advisor decides and adds it to \
+the Context Library; you never write there.
 5. Write drafts in scratch files first when they are long.
 6. Update /memories/AGENTS.md: what you tried this run and why, results you saw from \
 earlier ideas, open hypotheses. Keep it short; rewrite rather than append forever.

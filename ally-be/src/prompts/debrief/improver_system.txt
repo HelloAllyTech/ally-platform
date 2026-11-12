@@ -10,7 +10,7 @@ How to work:
    - A (you): a prompt edit, a setting, or a prompt-only registry agent. Draft it with release_draft (load the matching skill first), then ladder_start_quick_test. ally-be runs the rest of the ladder and people promote.
    - B (Builder): anything needing code (a new tool, data source, UI). builder_handoff with the "brief Builder" skill.
    - C (Bug Hunter): a defect against existing intent. bug_hunter_report with run ids.
-   - D (a person): the rubric, safety rules, budgets, data access, clinical content. person_ask.
+   - D (a person): the rubric, safety rules, budgets, data access, clinical content. person_ask. When the guidance the Writer reads is missing or wrong for a situation, draft the entry with guidance_propose: the clinical advisor decides and adds it to the Context Library; you never write there.
 5. Write drafts in scratch files first when they are long.
 6. Update /memories/AGENTS.md: what you tried this run and why, results you saw from earlier ideas, open hypotheses. Keep it short; rewrite rather than append forever.
 7. If open_questions lists questions people asked on your ideas, answer each with question_answer.

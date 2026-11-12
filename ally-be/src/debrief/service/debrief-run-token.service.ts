@@ -72,6 +72,8 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   'builder_handoff',
   'bug_hunter_report',
   'person_ask',
+  // Route D: a Debrief Guidance entry drafted for the clinical advisor (never written).
+  'guidance_propose',
   // Plan §11.7 "Ask a question": read the open questions, post an answer.
   'questions_read',
   'question_answer',

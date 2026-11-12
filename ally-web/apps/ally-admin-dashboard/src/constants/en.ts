@@ -10933,6 +10933,15 @@ export const en = {
         builder: "Brief for Builder",
         bug_hunter: "Report for Bug Hunter",
         person: "Question",
+        guidance: "Proposed Debrief Guidance entry",
+        guidanceNew: "A new entry",
+        guidanceChange: (code: string, title: string) => `A change to ${code} · ${title}`,
+        guidanceSituation: "When it applies",
+        guidanceWhy: "Why",
+        guidanceEvidence: (learners: number, tenants: number, platform: boolean) =>
+          `From ${learners} learners in ${tenants} ${tenants === 1 ? "organisation" : "organisations"} · ${platform ? "for every organisation" : "for this organisation"}`,
+        guidanceNotWritten:
+          "The PM agent has not written anything to the Context Library. If you agree, add or edit the entry there yourself, then mark this done.",
         checks: "Acceptance checks",
         runs: "Debrief runs",
         forWhom: { owner: "For the owner", clinical_advisor: "For the clinical advisor" } as Record<
@@ -10948,11 +10957,13 @@ export const en = {
           builder: "Open a Builder session",
           bug_hunter: "Send to Bug Hunter",
           person: "Mark answered",
+          guidance: "Mark done",
         } as Record<string, string>,
         title: {
           builder: "Open a Builder session for this?",
           bug_hunter: "Send this to Bug Hunter?",
           person: "Mark this question answered?",
+          guidance: "Mark this guidance proposal done?",
         } as Record<string, string>,
         body: {
           builder:
@@ -10960,11 +10971,14 @@ export const en = {
           bug_hunter:
             "This files a bug report with this summary and the debrief run ids. Bug Hunter triages it like any other report.",
           person: "The PM agent will see the question as answered on its next run.",
+          guidance:
+            "Nothing is added to the Context Library from here. Add or edit the entry there if you agree; the PM agent sees this proposal as decided on its next run.",
         } as Record<string, string>,
         done: {
           builder: "Builder session opened",
           bug_hunter: "Sent to Bug Hunter",
           person: "Marked answered",
+          guidance: "Marked done",
         } as Record<string, string>,
       },
       forecast: (metric: string, before: string, after: string, moved: string) =>
@@ -11006,6 +11020,7 @@ export const en = {
         median: "judge's median lower",
         cost: "cost above the limit",
         scored: "too few sessions scored",
+        safetyRecall: "safety recall below 100% × 3",
       } as Record<string, string>,
       trialLine: (n: number, diff: string, lo: string, hi: string) =>
         `${n} pairs · ${diff} (${lo} to ${hi})`,
@@ -11016,6 +11031,7 @@ export const en = {
         passed: "Ready to promote",
         reverted: "Reverted",
         promoted: "Promoted",
+        skipped: "Not needed: learners don't see this change",
       } as Record<string, string>,
       promote: "Promote to everyone",
       canaryTitle: "Start a canary?",

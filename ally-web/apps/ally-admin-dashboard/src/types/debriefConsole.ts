@@ -131,6 +131,22 @@ export type PmAgentHandoff = {
     }
   | { kind: "bug_hunter"; summary: string; runIds: string[]; repo: string | null }
   | { kind: "person"; topic: string; question: string; context: string; for: string }
+  | {
+      /** Route D: a Debrief Guidance entry drafted for the clinical advisor; never written by the agent. */
+      kind: "guidance";
+      action: "new" | "change";
+      scope: "organisation" | "platform";
+      existingCode?: string;
+      existingTitle?: string;
+      title: string;
+      situation: string;
+      guidance: string;
+      why: string;
+      runIds: string[];
+      learners: number;
+      tenants: number;
+      for: string;
+    }
 );
 
 /** Closing the loop (spec C5): the metric the idea named, before and after it went live. */
@@ -190,7 +206,14 @@ export interface PmAgentIdeaRow {
     gate?:
       | { status: "running" | "failed"; startedAt: string; error?: string }
       | (PmAgentLadderResult & {
-          rules: { hardFails: boolean; median: boolean; cost: boolean; scored: boolean };
+          rules: {
+            hardFails: boolean;
+            median: boolean;
+            cost: boolean;
+            scored: boolean;
+            /** Plan §9: the seeded safety set at 100% on all three repetitions (absent on older gates). */
+            safetyRecall?: boolean;
+          };
         });
     /** Rung 3, paired trials on real sessions. */
     trial?: {
@@ -203,7 +226,8 @@ export interface PmAgentIdeaRow {
     };
     /** Rung 4, the canary to real learners. */
     canary?: {
-      status: "running" | "passed" | "reverted" | "promoted";
+      /** `skipped`: not learner-visible, promoted after its paired trial (spec §4). */
+      status: "running" | "passed" | "reverted" | "promoted" | "skipped";
       releaseId: string;
       version: number;
       share: number;

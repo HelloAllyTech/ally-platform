@@ -21,6 +21,9 @@ import {
   Refusal,
   registryAgentRefusal,
   RegistryAgentManifest,
+  copiesSessionText,
+  guidanceEvidenceRefusal,
+  instructionPatternIn,
   ROUTE_KIND,
   settingRefusal,
   stripQuotes,
@@ -114,6 +117,8 @@ export class DebriefPmAgentToolsService {
           return await this.bugHunterReport(claims, b);
         case 'person_ask':
           return await this.personAsk(claims, b);
+        case 'guidance_propose':
+          return await this.guidanceProposal(claims, b);
         case 'questions_read':
           return await this.questionsRead();
         case 'question_answer':
@@ -356,7 +361,7 @@ export class DebriefPmAgentToolsService {
             ? 'builder_handoff'
             : route === 'C'
               ? 'bug_hunter_report'
-              : 'person_ask',
+              : 'person_ask (or guidance_propose for a Debrief Guidance entry)',
     };
   }
 
@@ -629,6 +634,114 @@ export class DebriefPmAgentToolsService {
       data: { ideaId: idea.id },
     });
     return out;
+  }
+
+  /**
+   * Route D (spec C3, C4; plan §11.6 route A's "new knowledge passage" made a
+   * person's call): a Debrief Guidance entry the agent thinks should exist
+   * or change, drafted for the clinical advisor. Nothing is written to the
+   * Context Library — the agent can't (C4); the advisor adds or edits the
+   * entry there if they agree, and approving marks the idea answered. The
+   * draft must cite runs from at least 10 learners (3 organisations when
+   * platform-wide), read as guidance rather than instructions, and copy no
+   * session's words.
+   */
+  async guidanceProposal(claims: DebriefAgentClaims, b: Record<string, any>) {
+    await this.requireOn();
+    const idea = await this.idea(claims, b.idea_id, 'D');
+    const action = b.action === 'change' ? 'change' : 'new';
+    const scope = b.scope === 'organisation' ? 'organisation' : 'platform';
+    const title = text(b.title, 200);
+    const situation = text(b.situation, 600);
+    const guidance = text(b.guidance, 2500);
+    const why = text(b.why, 1500);
+    if (title.length < 5 || situation.length < 10 || guidance.length < 40) {
+      refuse(
+        'a guidance proposal needs a title, the situation it is for, and the guidance itself (at least 40 characters)',
+      );
+    }
+    let existing: { code: string; title: string } | null = null;
+    if (action === 'change') {
+      const code = text(b.existing_code, 40);
+      if (!/^DG-\d+$/i.test(code)) {
+        refuse('a change names the entry it changes by its code (DG-…)');
+      }
+      const [row] = await this.dataSource.query(
+        `SELECT code, title FROM cl_chunks WHERE upper(code) = upper($1)`,
+        [code],
+      );
+      if (!row) refuse(`there is no Debrief Guidance entry ${code}`);
+      existing = { code: row.code, title: row.title };
+    }
+    const asked = (Array.isArray(b.run_ids) ? b.run_ids : [])
+      .map(String)
+      .filter((id: string) => UUID.test(id))
+      .slice(0, 50);
+    const runs: Array<{
+      id: string;
+      session_id: string;
+      learner: number | null;
+      tenant_id: string | null;
+    }> = asked.length
+      ? await this.dataSource.query(
+          `SELECT r.id, r."scenarioSessionId" AS session_id,
+                  s."counselorId" AS learner, r.tenant_id
+             FROM debrief_runs r JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+            WHERE r.id = ANY($1::uuid[]) AND r.mode IN ('live','shadow')`,
+          [asked],
+        )
+      : [];
+    const learners = new Set(
+      runs.map((r) => r.learner).filter((x) => x != null),
+    ).size;
+    const tenants = new Set(runs.map((r) => r.tenant_id).filter(Boolean)).size;
+    const evidence = guidanceEvidenceRefusal(scope, learners, tenants);
+    if (evidence) throw new Refused(evidence);
+    const draft = [title, situation, guidance, why].join('\n');
+    const pattern = instructionPatternIn(draft);
+    if (pattern) {
+      refuse(
+        `the draft reads as instructions to a model ("${pattern}"); write guidance for a counsellor`,
+      );
+    }
+    // Plan §11.6: never a learner's (or the simulated client's) own words.
+    const turns: string[] = [...(await this.knownTexts(idea))];
+    for (const r of runs) {
+      const t = await this.context.transcript(r.session_id).catch(() => []);
+      turns.push(...t.map((x) => x.text));
+    }
+    if (copiesSessionText(draft, turns)) {
+      refuse(
+        "the draft copies words from a session or a comment; write it in your own words, with no one's quotes",
+      );
+    }
+    const out = await this.storeHandoff(claims, idea, {
+      kind: 'guidance',
+      action,
+      scope,
+      ...(existing
+        ? { existingCode: existing.code, existingTitle: existing.title }
+        : {}),
+      title,
+      situation,
+      guidance,
+      why,
+      runIds: runs.map((r) => r.id),
+      learners,
+      tenants,
+      // Clinical content is the clinical advisor's (route D).
+      for: 'clinical_advisor',
+    });
+    // FR-54: every route-D proposal tells the owner.
+    await this.notifier?.owner({
+      title: 'Debriefs: the PM agent proposes a Debrief Guidance entry',
+      body: `${action === 'change' ? `A change to ${existing!.code}` : 'A new entry'}: ${title}`,
+      data: { ideaId: idea.id },
+    });
+    return {
+      ...out,
+      note: 'Nothing was written to the Context Library; the clinical advisor decides and adds it there.',
+    };
   }
 
   // --- "Ask a question" (plan §11.7, spec C5) -------------------------------------------

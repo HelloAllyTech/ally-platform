@@ -171,10 +171,13 @@ export const SAFETY_RECALL_REPS = 3;
 
 /**
  * Prompts that learners never read the output of: a change to one skips the
- * canary (spec §4 "only for learner-visible changes"). The PM agent's own
- * instructions shape ideas, not debriefs.
+ * canary (spec §4 "only for learner-visible changes"): the independent
+ * judge's instructions measure debriefs, and the PM agent's shape ideas;
+ * neither is run while a debrief is written. (Both are on the PM agent's
+ * never-list, so only a person's proposed change can carry them.)
  */
 export const NON_LEARNER_VISIBLE_PROMPTS: readonly string[] = [
+  'debrief_quality_judge_system',
   'debrief_improver_system',
 ];
 /** Settings that only move money between runs, never what one run writes. */
@@ -199,7 +202,9 @@ export function isLearnerVisible(
   if (change.ideaKind === 'setting') {
     return !NON_LEARNER_VISIBLE_SETTINGS.includes(String(change.settingKey));
   }
-  if (change.ideaKind === 'release') return !change.budgetOnly;
+  if (change.ideaKind === 'release') {
+    return !change.budgetOnly && change.learnerVisible !== false;
+  }
   return true;
 }
 

@@ -17,6 +17,16 @@ const seed = (): DebriefBundle =>
   JSON.parse(JSON.stringify(DEBRIEF_SEED_BUNDLE));
 
 describe('release diff', () => {
+  it('a change only to the judge’s prompt is not learner-visible (it skips the canary, spec §4)', () => {
+    const before = seed();
+    before.prompts = { ...before.prompts, debrief_quality_judge_system: 3 };
+    const next = JSON.parse(JSON.stringify(before)) as DebriefBundle;
+    next.prompts.debrief_quality_judge_system = 4;
+    expect(bundleDiff(before, next).learnerVisible).toBe(false);
+    next.prompts.debrief_writer_system = 9;
+    expect(bundleDiff(before, next).learnerVisible).toBe(true);
+  });
+
   it('a budgets-only change is marked so (it skips the ladder)', () => {
     const next = seed();
     next.settings.runCeilingUsd = 0.4;

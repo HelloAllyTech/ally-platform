@@ -139,7 +139,7 @@ export const Ladder: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
                 : s.rungWaiting
           }
           detail={
-            c
+            c && c.status !== "skipped"
               ? `${s.canaryLine(Math.round(c.share * 100), c.canaryRuns ?? 0, fixed1(c.canaryMedian), fixed1(c.controlMedian))}${
                   c.reason && c.status === "reverted" ? ` · ${canaryReasonLabel(c.reason)}` : ""
                 }`

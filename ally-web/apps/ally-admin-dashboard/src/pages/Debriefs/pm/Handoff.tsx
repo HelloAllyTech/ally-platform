@@ -21,7 +21,9 @@ export const Handoff: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
         <Pill tone={h.status === "waiting" ? "info" : "success"}>
           {s.status[h.status] ?? h.status}
         </Pill>
-        {h.kind === "person" && <span className="font-normal">{s.forWhom[h.for] ?? h.for}</span>}
+        {(h.kind === "person" || h.kind === "guidance") && (
+          <span className="font-normal">{s.forWhom[h.for] ?? h.for}</span>
+        )}
       </p>
       {h.kind === "builder" && (
         <>
@@ -55,6 +57,44 @@ export const Handoff: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
             </p>
           )}
         </>
+      )}
+      {h.kind === "guidance" && (
+        <div className="flex flex-col gap-1" data-testid="handoff-guidance">
+          <p className="text-typography-700">
+            {h.action === "change" && h.existingCode
+              ? s.guidanceChange(h.existingCode, h.existingTitle ?? "")
+              : s.guidanceNew}
+          </p>
+          <p className="font-semibold">{h.title}</p>
+          <p>
+            <span className="font-semibold">{s.guidanceSituation}:</span> {inWords(h.situation)}
+          </p>
+          <p className="whitespace-pre-wrap">{inWords(h.guidance)}</p>
+          {h.why && (
+            <p className="whitespace-pre-wrap text-typography-700">
+              <span className="font-semibold">{s.guidanceWhy}:</span> {inWords(h.why)}
+            </p>
+          )}
+          <p className="text-xs text-typography-700">
+            {s.guidanceEvidence(h.learners, h.tenants, h.scope === "platform")}
+          </p>
+          {h.runIds.length > 0 && (
+            <p className="flex flex-wrap items-center gap-x-2 text-xs" data-testid="handoff-runs">
+              <span>{s.runs}:</span>
+              {h.runIds.map(id => (
+                <Link
+                  key={id}
+                  to={ROUTES.DEBRIEF_SESSION(id)}
+                  className="font-mono text-primary-600 underline"
+                  aria-label={en.debriefs.runs.openLabel(shortId(id))}
+                >
+                  {shortId(id)}
+                </Link>
+              ))}
+            </p>
+          )}
+          <p className="text-xs text-typography-700">{s.guidanceNotWritten}</p>
+        </div>
       )}
       {h.kind === "person" && (
         <>

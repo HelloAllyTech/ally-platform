@@ -1,3 +1,4 @@
+import { NON_LEARNER_VISIBLE_PROMPTS } from './debrief-ladder.util';
 import {
   DebriefBundle,
   DebriefRecipeKey,
@@ -157,6 +158,12 @@ export interface BundleDiff {
   orchestrator: { before: unknown; after: unknown } | null;
   /** Only budget settings changed: the change does not alter what learners read. */
   budgetOnly: boolean;
+  /**
+   * Spec §4: whether learners could see a difference. False when the change
+   * touches only prompts no learner-facing step runs (the judge's, the PM
+   * agent's) and budget settings; such a change skips the canary.
+   */
+  learnerVisible: boolean;
 }
 
 const same = (a: unknown, b: unknown) =>
@@ -302,7 +309,19 @@ export function bundleDiff(
     !steps.length &&
     !reply &&
     !orchestrator;
+  const learnerVisible = !(
+    prompts.length > 0 &&
+    prompts.every((x) => NON_LEARNER_VISIBLE_PROMPTS.includes(x.code)) &&
+    settings.every((x) =>
+      (BUDGET_SETTING_KEYS as readonly string[]).includes(x.key),
+    ) &&
+    !recipes.length &&
+    !steps.length &&
+    !reply &&
+    !orchestrator
+  );
   return {
+    learnerVisible,
     prompts,
     settings,
     recipes,

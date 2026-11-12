@@ -298,3 +298,99 @@ export function stripQuotes(
   }
   return { text: out, removed };
 }
+
+// --- Guidance proposals: route D, never a write (spec C4, plan §11.6, FR-56) -------
+
+/** Plan §11.6: a new or changed passage is backed by at least this many learners… */
+export const GUIDANCE_MIN_LEARNERS = 10;
+/** …and, when it applies platform-wide, this many organisations. */
+export const GUIDANCE_MIN_TENANTS = 3;
+/** A run of this many of a learner's words in a row is copying, not paraphrase. */
+export const GUIDANCE_COPY_WORDS = 6;
+
+/**
+ * Text that reads as instructions to a model rather than practice guidance
+ * for a counsellor (plan §11.6 "instruction-pattern filter"): a passage the
+ * Writer reads must not be able to steer it.
+ */
+const INSTRUCTION_PATTERNS: RegExp[] = [
+  /\bignore\b.{0,30}\b(instruction|rule|prompt|above|previous)/i,
+  /\b(disregard|override|bypass)\b.{0,30}\b(instruction|rule|prompt|guideline|safety)/i,
+  /\bsystem prompt\b/i,
+  /\byou are (now |an? )?(ai|assistant|model|chatbot|language model)\b/i,
+  /\b(as an ai|as a language model)\b/i,
+  /\b(always|never) (respond|reply|answer|output|say)\b/i,
+  /\b(do not|don't) (mention|reveal|tell)\b.{0,30}\b(instruction|prompt|rule)/i,
+  /<\/?(system|assistant|user|instructions?)>/i,
+  /\[\/?(inst|system)\]/i,
+  /<\|[a-z_]+\|>/i,
+  /```/,
+  /\{[a-z_][a-z0-9_]*\}/i,
+];
+
+/** The first instruction-like pattern in a draft, or null. */
+export function instructionPatternIn(text: string): string | null {
+  for (const p of INSTRUCTION_PATTERNS) {
+    const m = (text ?? '').match(p);
+    if (m) return m[0];
+  }
+  return null;
+}
+
+const words = (s: string) =>
+  (s ?? '')
+    .toLowerCase()
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+/**
+ * Whether a draft copies a learner's (or client's) words: any
+ * `GUIDANCE_COPY_WORDS` words in a row that also appear in a row in one of
+ * the cited sessions' turns (plan §11.6 "doesn't copy learner text").
+ */
+export function copiesSessionText(
+  draft: string,
+  turns: string[],
+  n = GUIDANCE_COPY_WORDS,
+): boolean {
+  const grams = new Set<string>();
+  for (const t of turns) {
+    const w = words(t);
+    for (let i = 0; i + n <= w.length; i++) {
+      grams.add(w.slice(i, i + n).join(' '));
+    }
+  }
+  if (!grams.size) return false;
+  const d = words(draft);
+  for (let i = 0; i + n <= d.length; i++) {
+    if (grams.has(d.slice(i, i + n).join(' '))) return true;
+  }
+  return false;
+}
+
+/** The evidence rule for a guidance proposal; a refusal sentence or null. */
+export function guidanceEvidenceRefusal(
+  scope: 'organisation' | 'platform',
+  learners: number,
+  tenants: number,
+): Refusal | null {
+  if (learners < GUIDANCE_MIN_LEARNERS) {
+    return {
+      reason: `a guidance proposal needs evidence from at least ${GUIDANCE_MIN_LEARNERS} learners; the cited runs have ${learners}`,
+    };
+  }
+  if (scope === 'platform' && tenants < GUIDANCE_MIN_TENANTS) {
+    return {
+      reason: `platform-wide guidance needs evidence from at least ${GUIDANCE_MIN_TENANTS} organisations; the cited runs have ${tenants}`,
+    };
+  }
+  if (scope === 'organisation' && tenants > 1) {
+    return {
+      reason:
+        "guidance for one organisation cites that organisation's runs only; use scope platform",
+    };
+  }
+  return null;
+}

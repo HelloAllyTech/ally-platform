@@ -167,6 +167,9 @@ describe('the PM agent test ladder (v9 FR-52, FR-59)', () => {
     expect(isLearnerVisible({ ideaKind: 'release', budgetOnly: false })).toBe(
       true,
     );
+    expect(
+      isLearnerVisible({ ideaKind: 'release', learnerVisible: false }),
+    ).toBe(false);
     expect(isLearnerVisible(null)).toBe(true);
   });
 

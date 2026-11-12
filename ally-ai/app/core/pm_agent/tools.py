@@ -32,6 +32,7 @@ ACTION_TOOLS = (
     "builder_handoff",
     "bug_hunter_report",
     "person_ask",
+    "guidance_propose",
     "question_answer",
 )
 ALL_TOOLS = READ_TOOLS + ACTION_TOOLS
@@ -173,6 +174,29 @@ class PersonAskArgs(BaseModel):
     context: str = ""
 
 
+class GuidanceProposeArgs(BaseModel):
+    """Route D: a Debrief Guidance entry drafted for the clinical advisor. Nothing
+    is written to the Context Library; the advisor adds or edits it there."""
+
+    idea_id: str
+    action: Literal["new", "change"] = "new"
+    existing_code: Optional[str] = Field(
+        default=None, description="For a change: the entry's code, DG-…"
+    )
+    scope: Literal["platform", "organisation"] = "platform"
+    title: str
+    situation: str = Field(description="When it applies, in your own words.")
+    guidance: str = Field(
+        description="What a counsellor should do, written for a counsellor; never "
+        "instructions to a model, never anyone's quoted words."
+    )
+    why: str = Field(default="", description="What the evidence shows.")
+    run_ids: List[str] = Field(
+        description="Debrief runs backing it: at least 10 learners (3 organisations "
+        "when platform-wide)."
+    )
+
+
 def _answer(res: Dict[str, Any]) -> str:
     text = json.dumps(res, ensure_ascii=False, default=str)
     if len(text) > MAX_ANSWER_CHARS:
@@ -237,6 +261,12 @@ def make_tools(
 
     async def person_ask(**a: Any) -> str:
         return await call("person_ask", PersonAskArgs(**a).model_dump())
+
+    async def guidance_propose(**a: Any) -> str:
+        body = GuidanceProposeArgs(**a).model_dump(exclude_none=True)
+        for key in ("situation", "guidance", "why"):
+            body[key] = strip_quotes(body.get(key, ""))[0]
+        return await call("guidance_propose", body)
 
     async def questions_read(**a: Any) -> str:
         return await call("questions_read", {})
@@ -303,6 +333,14 @@ def make_tools(
             PersonAskArgs,
             "Route D: put a question to the owner or clinical advisor (rubric, "
             "safety rules, budgets, data access, clinical content).",
+        ),
+        (
+            guidance_propose,
+            GuidanceProposeArgs,
+            "Route D: propose a new or changed Debrief Guidance entry for the "
+            "clinical advisor. You never write to the Context Library; this only "
+            "puts your draft in front of a person. Needs run ids from at least 10 "
+            "learners (3 organisations when platform-wide); no quotes.",
         ),
         (
             questions_read,

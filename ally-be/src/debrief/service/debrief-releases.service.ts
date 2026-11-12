@@ -1332,6 +1332,7 @@ export class DebriefReleasesService implements OnModuleInit {
       releaseId: draft.id,
       baseReleaseId: live?.id ?? null,
       budgetOnly: diff.budgetOnly,
+      learnerVisible: diff.learnerVisible,
     };
     const [row] = await this.dataSource.query(
       `INSERT INTO agent_lessons
