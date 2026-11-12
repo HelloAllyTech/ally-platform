@@ -29,6 +29,7 @@ import {
   StepPolicy,
 } from '../util/debrief-console-view.util';
 import { DebriefSettingsService } from './debrief-settings.service';
+import type { AgreementView } from './debrief-agreement.service';
 
 /**
  * What the PM agent may do alone (PRD §12; plan §11.7), per kind of change
@@ -144,27 +145,28 @@ export class DebriefAutonomyService implements OnModuleInit {
     return { gate, reverts, failedBaseline: baseline, judgeDrift: null };
   }
 
-  /** The calibration gate (κ ≥ 0.6), from the agreement Analytics › Debriefs shows. */
+  /**
+   * The canary's κ gate: Cohen's κ between the clinical advisor's yes/no
+   * answers under their verdicts and the judge's findings on the same
+   * debriefs, κ ≥ 0.6 on every measure from 50+ reviews each
+   * (DebriefAgreementService). Replaces the old hand-scored calibration set.
+   */
   private async gate(): Promise<AutonomyFacts['gate']> {
     try {
-      const { DebriefCalibrationService } =
-        await import('../../analytics/service/debrief-calibration.service');
-      const calibration = this.moduleRef.get(DebriefCalibrationService, {
-        strict: false,
-      });
-      const a = await calibration.getAgreement();
-      return {
-        met: a.gate.met,
-        failing: a.gate.checks
-          .filter((c) => !c.passes)
-          .map((c) => ({ measure: c.measure, kappa: c.kappa })),
-      };
+      const g = await (await this.agreementService()).gate();
+      return { met: g.met, failing: g.failing };
     } catch (e) {
       this.logger.warn(
         `[debrief] autonomy: could not read the κ gate: ${(e as Error).message}`,
       );
       return { met: false, failing: [] };
     }
+  }
+
+  private async agreementService() {
+    const { DebriefAgreementService } =
+      await import('./debrief-agreement.service');
+    return this.moduleRef.get(DebriefAgreementService, { strict: false });
   }
 
   /** Canary reverts in the last 4 weeks, by kind of change. */
@@ -479,8 +481,13 @@ export class DebriefAutonomyService implements OnModuleInit {
     facts: AutonomyFacts;
     judgeDrift: typeof JUDGE_DRIFT_SOURCE;
     relocks: AutonomyPolicy['relocks'];
+    /** "Judge agreement with the clinical advisor": κ, n and recall per measure; the sample. */
+    agreement: AgreementView | null;
   }> {
     const f = await this.facts();
+    const agreement = await this.agreementService()
+      .then((a) => a.view())
+      .catch(() => null);
     const policy = await this.refreshRelocks(f);
     const s = await this.settings.get();
     const tenants: Array<{ id: string; name: string }> =
@@ -543,6 +550,7 @@ export class DebriefAutonomyService implements OnModuleInit {
       facts: f,
       judgeDrift: JUDGE_DRIFT_SOURCE,
       relocks: policy.relocks,
+      agreement,
     };
   }
 }

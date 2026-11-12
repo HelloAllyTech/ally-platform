@@ -10,6 +10,11 @@
  * The gate: the PM agent may put changes live on its own only while κ ≥ 0.6
  * on accuracy, evidence and specificity, and the missed-risk-cue hard fail.
  * Below the reporting floor κ is null, and a null κ never passes the gate.
+ *
+ * Since 2026-11-12 the PM agent's canary no longer reads this gate: it reads
+ * κ from the clinical advisor's yes/no answers under their verdicts
+ * (src/debrief/util/debrief-agreement.util.ts, DebriefAgreementService).
+ * This one remains for Analytics › Debriefs.
  */
 
 import {

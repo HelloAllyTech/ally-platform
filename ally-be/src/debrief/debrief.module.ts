@@ -47,6 +47,9 @@ import { DebriefSettingsService } from './service/debrief-settings.service';
 import { DebriefBaselineService } from './service/debrief-baseline.service';
 import { DebriefReportingService } from './service/debrief-reporting.service';
 import { DebriefTrialsService } from './service/debrief-trials.service';
+import { DebriefAgreementService } from './service/debrief-agreement.service';
+import { DebriefReviewAnswer } from './entity/debrief-review-answer.entity';
+import { DebriefAgreementSample } from './entity/debrief-agreement-sample.entity';
 import { DebriefAutonomyService } from './service/debrief-autonomy.service';
 import { DebriefReleasesService } from './service/debrief-releases.service';
 import { DebriefConsoleViewService } from './service/debrief-console-view.service';
@@ -79,6 +82,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
       // Expert review (spec Part B): verdicts and comments.
       DebriefReview,
       DebriefReviewComment,
+      DebriefReviewAnswer,
+      DebriefAgreementSample,
       // Ask Ally writes to the same thread today's debrief chat uses.
       ScenarioSessionChat,
       ScenarioSessionChatMessage,
@@ -139,6 +144,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefTrialsService,
     // What the PM agent may do alone, per kind and step (PRD §12).
     DebriefAutonomyService,
+    // Judge agreement from the advisor's yes/no answers: the canary's κ gate, the weekly sample.
+    DebriefAgreementService,
     // Releases that have been live, release notes, proposed changes' drafts.
     DebriefReleasesService,
     // The redesigned console's read models: sessions, session view, attention.

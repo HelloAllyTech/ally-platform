@@ -21,6 +21,8 @@ export const SESSION_CATEGORIES = [
   'escalated',
   /** In the viewer's scoring sample and not scored by them. */
   'to_score',
+  /** The weekly random sample for the κ gate, still without a verdict (who gives verdicts). */
+  'agreement_sample',
   'all',
 ] as const;
 export type SessionCategory = (typeof SESSION_CATEGORIES)[number];
@@ -396,7 +398,8 @@ export interface AutonomyFacts {
   /** The calibration gate: κ ≥ 0.6 on every gated measure. */
   gate: {
     met: boolean;
-    failing: Array<{ measure: string; kappa: number | null }>;
+    /** `n`: reviewed debriefs behind it (κ counts from 50). */
+    failing: Array<{ measure: string; kappa: number | null; n?: number }>;
   };
   /** Canary reverts in the last 4 weeks, by kind. */
   reverts: Partial<Record<ChangeKind, number>>;
@@ -454,6 +457,19 @@ export function gateMeasureLabel(measure: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** Minimum reviewed debriefs before a measure's κ counts (debrief-agreement.util AGREEMENT_MIN_REVIEWS). */
+const GATE_MIN_REVIEWS = 50;
+
+/** One failing measure in words: its κ, or why there is none yet. */
+function gateMeasureState(c: { kappa: number | null; n?: number }): string {
+  if (c.kappa != null) return c.kappa.toFixed(2);
+  if (c.n == null) return 'not measured';
+  if (c.n < GATE_MIN_REVIEWS) {
+    return `not measured yet, ${c.n} of ${GATE_MIN_REVIEWS}`;
+  }
+  return 'not measurable yet (every answer the same)';
+}
+
 /** The steps learners never see (plan §4: free to experiment before learners are involved). */
 export const LEARNER_FREE_STEPS: readonly AutonomyStep[] = [
   'quick_test',
@@ -492,10 +508,7 @@ export function kindEligibility(
   }
   if (!f.gate.met) {
     const low = f.gate.failing
-      .map(
-        (c) =>
-          `${gateMeasureLabel(c.measure)} ${c.kappa == null ? 'not measured' : c.kappa.toFixed(2)}`,
-      )
+      .map((c) => `${gateMeasureLabel(c.measure)} ${gateMeasureState(c)}`)
       .join(', ');
     return {
       kind,

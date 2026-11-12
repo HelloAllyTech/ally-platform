@@ -51,6 +51,7 @@ import { DebriefPmAgentService } from './debrief-pm-agent.service';
 import { DebriefReviewService } from './debrief-review.service';
 import { DebriefSettingsService } from './debrief-settings.service';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
+import { DebriefAgreementService } from './debrief-agreement.service';
 
 const num = (v: unknown, d = 2) =>
   v == null || !Number.isFinite(Number(v))
@@ -87,6 +88,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
     private readonly pmAgent: DebriefPmAgentService,
     private readonly settings: DebriefSettingsService,
     private readonly autonomy: DebriefAutonomyService,
+    private readonly agreement: DebriefAgreementService,
     private readonly config: AppConfigService,
     private readonly moduleRef: ModuleRef,
     @Optional() private readonly notifier?: DebriefNotifier,
@@ -322,6 +324,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
                r."createdAt", r.tenant_id AS "tenantId", t.name AS "tenantName",
                sc.title AS "scenarioTitle", s."scenarioId" AS "scenarioId",
                (r.workspace ? 'review') AS reviewed,
+               EXISTS (SELECT 1 FROM debrief_agreement_samples ags WHERE ags."runId" = r.id) AS agreement_sample,
+               EXISTS (SELECT 1 FROM debrief_reviews dv WHERE dv."runId" = r.id) AS has_verdict,
                (r.workspace ? 'escalation' AND NOT (r.workspace ? 'review')) AS run_escalated,
                (r.workspace->'escalation'->>'at') AS escalated_at,
                (r.workspace ? 'judge' AND (
@@ -369,6 +373,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
         return `escalated`;
       case 'to_score':
         return `"scenarioSessionId" = ANY(${sampleParam}::uuid[])`;
+      case 'agreement_sample':
+        return `(agreement_sample AND NOT has_verdict)`;
       default:
         return `true`;
     }
@@ -402,6 +408,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
               count(*) FILTER (WHERE status = 'published')::int AS published,
               count(*) FILTER (WHERE escalated)::int AS escalated,
               count(*) FILTER (WHERE "scenarioSessionId" = ANY(${sampleParam}::uuid[]))::int AS to_score,
+              count(*) FILTER (WHERE agreement_sample AND NOT has_verdict)::int AS agreement_sample,
               count(*)::int AS "all"
          FROM ranked`,
       countParams,
@@ -436,6 +443,10 @@ export class DebriefConsoleViewService implements OnModuleInit {
         published: Number(counts?.published ?? 0),
         escalated: Number(counts?.escalated ?? 0),
         toScore: viewer.scorer ? Number(counts?.to_score ?? 0) : null,
+        // Only for whoever gives verdicts (the clinical advisor).
+        agreementSample: viewer.can.verdict
+          ? Number(counts?.agreement_sample ?? 0)
+          : null,
         all: Number(counts?.all ?? 0),
       },
       items: rows.map((r) => this.toItem(r, sample)),
@@ -478,6 +489,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         r.status === 'below_bar' ||
         (r.status === 'published' && !!r.judge_below),
       reviewed: !!r.reviewed,
+      agreementSample: !!r.agreement_sample && !r.has_verdict,
       inMyScoringSample: sample.inSample.has(r.scenarioSessionId),
       toScore:
         sample.inSample.has(r.scenarioSessionId) &&
@@ -878,6 +890,16 @@ export class DebriefConsoleViewService implements OnModuleInit {
             verdict: myVerdict[0].verdict,
             hardFails: myVerdict[0].hardFails ?? [],
             updatedAt: iso(myVerdict[0].updatedAt),
+          }
+        : null,
+      // The κ gate's yes/no questions under the verdict, pre-filled (who gives verdicts).
+      agreement: viewer.can.verdict
+        ? {
+            inSample: await this.agreement.inSample(run.id),
+            questions: await this.reviews.agreementQuestions(
+              run,
+              viewer.userId,
+            ),
           }
         : null,
       scoring: {

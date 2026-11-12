@@ -157,6 +157,15 @@ export const DEBRIEF_SCHEDULE_JOBS: readonly DebriefScheduleJob[] = [
     learningBudget: false,
   },
   {
+    // The κ gate's random sample: judged debriefs into the clinical advisor's
+    // queue as "Agreement sample". Calls no model.
+    key: 'debrief-agreement-sample',
+    options: ['1min', 'weekly', '2weeks'],
+    defaults: weeklyMonday,
+    locked: false,
+    learningBudget: false,
+  },
+  {
     key: 'debrief-pm-agent-forecasts',
     options: DAY,
     defaults: daily,
