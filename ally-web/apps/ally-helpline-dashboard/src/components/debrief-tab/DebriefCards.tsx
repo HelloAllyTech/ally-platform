@@ -1,7 +1,8 @@
-import { FC, ReactNode, useCallback, useRef, useState } from "react";
+import { FC, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   Bookmark,
+  Check,
   ChevronDown,
   CircleDashed,
   HeartHandshake,
@@ -569,6 +570,32 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
     return t(`postSim.debriefCards.working.steps.${p.key}`);
   };
 
+  // FR-27: the steps already done stay on the panel as quiet ticks, in the
+  // order the run took them; the current one keeps the spinner.
+  const currentLine = view.state === "working" ? progressLine() : null;
+  const [doneLines, setDoneLines] = useState<string[]>([]);
+  const lastLine = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentLine) return;
+    const previous = lastLine.current;
+    if (previous && previous !== currentLine) {
+      setDoneLines((d) => (d.includes(previous) ? d : [...d, previous]));
+    }
+    lastLine.current = currentLine;
+  }, [currentLine]);
+
+  // Plan §7.8: when a debrief the learner waited for is ready, focus moves to
+  // the heading (never on a page that opened on a ready debrief).
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const wasWorking = useRef(false);
+  useEffect(() => {
+    if (view.state === "working") wasWorking.current = true;
+    else if (wasWorking.current && view.state === "ready" && view.cards) {
+      wasWorking.current = false;
+      headingRef.current?.focus();
+    }
+  }, [view.state, view.cards]);
+
   let content: ReactNode = null;
   if (view.state === "working") {
     content = (
@@ -586,7 +613,22 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
           <p className="font-primary text-sm font-semibold text-typography-900">
             {t("postSim.debriefCards.working.title")}
           </p>
-          <p className="font-primary text-sm text-typography-700">{progressLine()}</p>
+          <ul className="flex flex-col gap-1" data-testid="debrief-working-steps">
+            {doneLines
+              .filter((line) => line !== currentLine)
+              .map((line) => (
+                <li
+                  key={line}
+                  className="flex items-center gap-1.5 font-primary text-sm text-typography-600"
+                >
+                  <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-primary-600" />
+                  {line.replace(/…$/, "")}
+                </li>
+              ))}
+            <li className="font-primary text-sm text-typography-700" aria-current="step">
+              {currentLine}
+            </li>
+          </ul>
         </div>
       </div>
     );
@@ -642,7 +684,11 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
     <ReadAloudContext.Provider value={ready ? readAloud : null}>
       <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
         <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
-          <h2 className="font-primary text-lg font-semibold text-white">
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            className="font-primary text-lg font-semibold text-white focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          >
             {t("postSim.debriefCards.header")}
           </h2>
           <div className="flex flex-wrap items-center justify-end gap-2">

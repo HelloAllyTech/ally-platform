@@ -347,6 +347,30 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     expect(screen.getByTestId("debrief-working")).toHaveTextContent(label);
   });
 
+  it("keeps the steps already done as ticks, then focuses the heading when ready (FR-27, §7.8)", () => {
+    mockLearnerDebriefQuery.mockReturnValue({
+      data: { state: "working", steps: [], progress: { key: "reading" } },
+    });
+    const { rerender } = renderTab();
+    mockLearnerDebriefQuery.mockReturnValue({
+      data: { state: "working", steps: [], progress: { key: "writing" } },
+    });
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    const steps = screen.getByTestId("debrief-working-steps");
+    const items = within(steps).getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual([
+      "postSim.debriefCards.working.steps.reading",
+      "postSim.debriefCards.working.steps.writing",
+    ]);
+    expect(items[1]).toHaveAttribute("aria-current", "step");
+
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "ready", cards: CARDS } });
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "postSim.debriefCards.header" }),
+    );
+  });
+
   it("falls back to the default step label when no steps have arrived", () => {
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "working", steps: [] } });
     renderTab();
