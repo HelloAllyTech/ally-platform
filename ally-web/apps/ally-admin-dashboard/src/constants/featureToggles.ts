@@ -145,7 +145,8 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.BUG_HUNTER, FeatureToggleKey.BUG_HUNTER],
     [sidebarItems.BUILDER, FeatureToggleKey.BUILDER],
     [sidebarItems.ANALYTICS, FeatureToggleKey.ANALYTICS],
-    [sidebarItems.DEBRIEFS, FeatureToggleKey.ANALYTICS],
+    // DEBRIEFS is not here: the Analytics toggle OR the clinical advisor's, with a console
+    // permission (utils/navigation.ts), as the console's routes require.
     [sidebarItems.COMPETENCIES, FeatureToggleKey.COMPETENCIES],
     [sidebarItems.AI_LAB, FeatureToggleKey.AI_LAB],
     [sidebarItems.ROLEPLAY_SESSION_LOGS, FeatureToggleKey.ROLEPLAY_SESSION_LOGS],

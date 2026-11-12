@@ -292,6 +292,32 @@ describe("deriveNavigationItems", () => {
     expect(result.map(i => i.id)).toEqual([SIDEBAR_ITEMS.EVENTS]);
   });
 
+  it("shows Debriefs to a clinical advisor with only review:admin:debriefs and the advisor's toggle", () => {
+    const ids = deriveNavigationItems({
+      permissions: [Permissions.REVIEW_DEBRIEFS],
+      features: [FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF],
+      savedOrder: undefined,
+    }).map(item => item.id);
+    expect(ids).toEqual([SIDEBAR_ITEMS.DEBRIEFS]);
+  });
+
+  it("shows Debriefs to the Ally team and the owner with the Analytics toggle, never without a console permission", () => {
+    for (const perm of [Permissions.SYSTEM_ACCESS, Permissions.MANAGE_DEBRIEF_SETTINGS]) {
+      const ids = deriveNavigationItems({
+        permissions: [perm],
+        features: [FeatureToggleKey.ANALYTICS],
+        savedOrder: undefined,
+      }).map(item => item.id);
+      expect(ids).toContain(SIDEBAR_ITEMS.DEBRIEFS);
+    }
+    const ids = deriveNavigationItems({
+      permissions: ["view:admin:analytics"],
+      features: [FeatureToggleKey.ANALYTICS, FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF],
+      savedOrder: undefined,
+    }).map(item => item.id);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.DEBRIEFS);
+  });
+
   it("shows WhatsApp Bot to a holder of the whatsapp_bot toggle", () => {
     const result = deriveNavigationItems({
       permissions: [],

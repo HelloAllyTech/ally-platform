@@ -91,6 +91,8 @@ export const en = {
     updating: "updating…",
     searchMenu: "Search menu...",
     noMenuResults: "No matching tabs",
+    noMenuAccess:
+      "Your account can't open any page here yet. Ask an Ally admin to give you access.",
     clearSearch: "Clear search",
     filter: "Filter",
     removeFilter: "Remove filter",

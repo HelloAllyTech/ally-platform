@@ -4,7 +4,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import { useGetUserQuery, useGetPermissionsQuery, useGetUserPreferencesQuery } from "@api";
+import {
+  useGetUserQuery,
+  useGetPermissionsQuery,
+  useGetUserPreferencesQuery,
+  useGetFeatureTogglesQuery,
+} from "@api";
 import { LOCAL_STORAGE_KEYS, ROUTES, Permissions, SIDEBAR_ITEMS, UserRole } from "@constants";
 
 import { DefaultRedirect } from "../DefaultRedirect";
@@ -60,6 +65,7 @@ const renderAtRoot = () =>
         <Route path={ROUTES.LOGIN} element={<div>LoginPage</div>} />
         <Route path={ROUTES.SIMULATION_STUDIO} element={<div>StudioPage</div>} />
         <Route path={ROUTES.MANAGE_EVENTS} element={<div>EventsPage</div>} />
+        <Route path={ROUTES.DEBRIEFS} element={<div>DebriefsPage</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -129,11 +135,40 @@ describe("DefaultRedirect", () => {
     expect(screen.getByText("EventsPage")).toBeInTheDocument();
   });
 
-  it("falls back to Simulation Studio when the user has no resolvable tabs", () => {
+  it("says so, instead of Simulation Studio's access-denied page, when the user can open nothing", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    mockPermsQuery.mockReturnValue({
+      data: [Permissions.REVIEW_DEBRIEFS],
+      isLoading: false,
+    } as any);
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({ data: [], isLoading: false } as any);
+    renderAtRoot();
+    expect(screen.queryByText("StudioPage")).not.toBeInTheDocument();
+    expect(screen.getByTestId("default-redirect-no-access")).toHaveTextContent(
+      "Your account can't open any page here yet.",
+    );
+  });
+
+  it("falls back to Simulation Studio when neither permissions nor toggles arrived", () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
     mockPermsQuery.mockReturnValue({ data: [], isLoading: false } as any);
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({ data: [], isLoading: false } as any);
     renderAtRoot();
     expect(screen.getByText("StudioPage")).toBeInTheDocument();
+  });
+
+  it("lands a clinical advisor (review:admin:debriefs, the advisor's toggle, no platform group) on Debriefs", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    mockPermsQuery.mockReturnValue({
+      data: [Permissions.REVIEW_DEBRIEFS],
+      isLoading: false,
+    } as any);
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({
+      data: ["debrief_clinical_sign_off"],
+      isLoading: false,
+    } as any);
+    renderAtRoot();
+    expect(screen.getByText("DebriefsPage")).toBeInTheDocument();
   });
 
   it("still resolves the first tab when the preferences query errors (403)", () => {

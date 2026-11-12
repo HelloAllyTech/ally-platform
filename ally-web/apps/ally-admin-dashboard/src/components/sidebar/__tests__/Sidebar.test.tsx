@@ -6,6 +6,12 @@ const navigateMock = vi.fn();
 const logoutMock = vi.fn();
 const trackMock = vi.fn();
 
+// Lets a test sign in someone who can open no page at all.
+const navState: { empty: boolean; permissions: string[] } = vi.hoisted(() => ({
+  empty: false,
+  permissions: ["system:access"],
+}));
+
 let mockUser = {
   name: "Alice",
   email: "alice@example.com",
@@ -76,20 +82,27 @@ vi.mock("@hooks", () => ({
     user: mockUser,
     logout: logoutMock,
     features: mockUser.features,
-    filteredNavigationItems: [
-      { id: "SIMULATION_STUDIO", label: "Simulation Studio", path: "/simulation-studio" },
-      { id: "EVENT_MANAGEMENT", label: "Events", path: "/events" },
-      { id: "SCENARIO_LANGUAGES", label: "Scenario Languages", path: "/manage-scenario-languages" },
-      { id: "SCENARIO_VOICES", label: "Scenario Voices", path: "/manage-scenario-voices" },
-      { id: "PROMPTS", label: "Prompts", path: "/manage-prompts" },
-      { id: "TRANSLATIONS", label: "Translations", path: "/manage-translations" },
-      { id: "USERS", label: "Users", path: "/users" },
-      {
-        id: "SETTINGS",
-        label: "Settings",
-        path: "/settings",
-      },
-    ],
+    permissions: navState.permissions,
+    filteredNavigationItems: navState.empty
+      ? []
+      : [
+          { id: "SIMULATION_STUDIO", label: "Simulation Studio", path: "/simulation-studio" },
+          { id: "EVENT_MANAGEMENT", label: "Events", path: "/events" },
+          {
+            id: "SCENARIO_LANGUAGES",
+            label: "Scenario Languages",
+            path: "/manage-scenario-languages",
+          },
+          { id: "SCENARIO_VOICES", label: "Scenario Voices", path: "/manage-scenario-voices" },
+          { id: "PROMPTS", label: "Prompts", path: "/manage-prompts" },
+          { id: "TRANSLATIONS", label: "Translations", path: "/manage-translations" },
+          { id: "USERS", label: "Users", path: "/users" },
+          {
+            id: "SETTINGS",
+            label: "Settings",
+            path: "/settings",
+          },
+        ],
   }),
 }));
 
@@ -142,6 +155,7 @@ vi.mock("@constants", () => ({
     common: {
       searchMenu: "Search menu...",
       noMenuResults: "No matching tabs",
+      noMenuAccess: "Your account can't open any page here yet.",
       clearSearch: "Clear search",
     },
     auth: {
@@ -182,6 +196,7 @@ const renderWithProvider = (component: React.ReactElement) => {
 
 describe("Sidebar", () => {
   beforeEach(() => {
+    navState.empty = false;
     navigateMock.mockReset();
     logoutMock.mockReset();
     // Mock window.innerWidth to be large enough to keep sidebar expanded
@@ -190,6 +205,19 @@ describe("Sidebar", () => {
       configurable: true,
       value: 1400,
     });
+  });
+
+  it("says so when a signed-in user can open no page, instead of an empty sidebar", () => {
+    navState.empty = true;
+    renderWithProvider(<Sidebar />);
+    expect(screen.getByTestId("sidebar-no-access")).toHaveTextContent(
+      "Your account can't open any page here yet.",
+    );
+  });
+
+  it("shows no such note while there are pages to open", () => {
+    renderWithProvider(<Sidebar />);
+    expect(screen.queryByTestId("sidebar-no-access")).toBeNull();
   });
 
   it("renders navigation items by title when collapsed", () => {

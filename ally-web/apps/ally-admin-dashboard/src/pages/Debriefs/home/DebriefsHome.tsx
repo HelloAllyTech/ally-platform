@@ -28,6 +28,7 @@ import {
   categoriesFor,
   categoryCount,
   FILTER_KEYS,
+  defaultCategory,
   groupByDay,
   queueOrder,
   readHomeState,
@@ -160,7 +161,11 @@ export const DebriefsHome: React.FC = () => {
     score: preAccess.score,
     escalations: preAccess.receivesEscalations,
   });
-  const { cat, filters, list } = readHomeState(params, [...allowedBefore, "score", "escalated"]);
+  const { cat, filters, list } = readHomeState(
+    params,
+    [...allowedBefore, "score", "escalated"],
+    defaultCategory(preAccess),
+  );
   // Fresh on every visit, and every 15 s while a debrief is being written.
   const sessions = useGetDebriefSessionsQuery(sessionsQuery(cat, filters), {
     refetchOnMountOrArgChange: true,
@@ -279,7 +284,7 @@ export const DebriefsHome: React.FC = () => {
         <Segmented
           label={h.categoriesLabel}
           value={cat}
-          onChange={c => set({ cat: c === "needs" ? null : c })}
+          onChange={c => set({ cat: c === defaultCategory(preAccess) ? null : c })}
           items={categories.map(c => ({
             id: c,
             label: (

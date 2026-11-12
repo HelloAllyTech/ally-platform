@@ -9,7 +9,7 @@ import {
   useGetCharacterLibraryEnabledQuery,
   useGetFeatureTogglesQuery,
 } from "@api";
-import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle } from "@constants";
+import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, en } from "@constants";
 // Import the specific module rather than the "@utils" barrel: the barrel pulls
 // in Redux-logger and component dependencies that this root-path redirect has no
 // need for, and would otherwise bloat its chunk.
@@ -125,6 +125,20 @@ export const DefaultRedirect: React.FC = () => {
       [OrgToggle.CHARACTER_LIBRARY]: Boolean(isCharacterLibraryOrgEnabled),
     },
   });
+
+  // Nothing this account can open (a clinical advisor before their toggle, say): a clear
+  // message, not Simulation Studio's "This page is not accessible" beside an empty sidebar.
+  if (!items.length && (permissions?.length || features?.length)) {
+    return (
+      <div
+        className="flex h-screen items-center justify-center p-6 text-center font-primary text-sm text-typography-700"
+        data-testid="default-redirect-no-access"
+        role="status"
+      >
+        {en.common.noMenuAccess}
+      </div>
+    );
+  }
 
   return <Navigate to={items[0]?.path ?? ROUTES.SIMULATION_STUDIO} replace />;
 };

@@ -124,6 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     uploadProfileImage,
     refetchUser,
     features,
+    permissions,
   } = useUser();
   const { track } = useAnalytics();
 
@@ -503,6 +504,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
                 />
               ))}
             </ul>
+            {/* Signed in, permissions known, and no page to open: say so, not a blank sidebar. */}
+            {showExpanded &&
+              !isSearching &&
+              filteredNavigationItems.length === 0 &&
+              Boolean(permissions?.length) && (
+                <p
+                  data-testid="sidebar-no-access"
+                  className="px-3 py-2 text-sm text-typography-600"
+                >
+                  {en.common.noMenuAccess}
+                </p>
+              )}
             {showExpanded && isSearching && displayedNavItems.length === 0 && (
               <p className="px-3 py-2 text-sm text-typography-600">{en.common.noMenuResults}</p>
             )}

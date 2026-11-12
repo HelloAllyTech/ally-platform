@@ -66,15 +66,33 @@ export const categoriesFor = (opts: { score: boolean; escalations: boolean }): H
 export const readHomeState = (
   params: URLSearchParams,
   allowed: HomeCategory[],
+  fallback: HomeCategory = "needs",
 ): { cat: HomeCategory; filters: HomeFilters; list: boolean } => {
   const raw = params.get("cat") as HomeCategory | null;
-  const cat = raw && allowed.includes(raw) ? raw : "needs";
+  const cat = raw && allowed.includes(raw) ? raw : fallback;
   const filters: HomeFilters = {};
   for (const k of FILTER_KEYS) {
     const v = params.get(k);
     if (v) (filters as Record<string, string>)[k] = v;
   }
   return { cat, filters, list: params.get("view") === "list" };
+};
+
+/**
+ * Where the home opens with no category in the link. A clinical advisor who is not on the Ally
+ * team has nothing to do in "Needs a person" (the team's queue): they open on "Escalated to you",
+ * or "To score" when they get no escalations.
+ */
+export const defaultCategory = (access: {
+  team: boolean;
+  owner: boolean;
+  advisor: boolean;
+  receivesEscalations: boolean;
+  score: boolean;
+}): HomeCategory => {
+  if (access.team || access.owner || !access.advisor) return "needs";
+  if (access.receivesEscalations) return "escalated";
+  return access.score ? "score" : "needs";
 };
 
 /** The query for a category and its filters. */

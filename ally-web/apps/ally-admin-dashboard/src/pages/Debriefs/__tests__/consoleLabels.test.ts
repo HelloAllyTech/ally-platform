@@ -109,3 +109,21 @@ describe("Debriefs home labels", () => {
     }
   });
 });
+
+describe("the Debriefs home's opening category", () => {
+  it("opens a clinical advisor (not on the Ally team) on Escalated to you, else To score", async () => {
+    const { defaultCategory } = await import("../queue");
+    const base = {
+      team: false,
+      owner: false,
+      advisor: true,
+      receivesEscalations: true,
+      score: true,
+    };
+    expect(defaultCategory(base)).toBe("escalated");
+    expect(defaultCategory({ ...base, receivesEscalations: false })).toBe("score");
+    expect(defaultCategory({ ...base, team: true })).toBe("needs");
+    expect(defaultCategory({ ...base, owner: true })).toBe("needs");
+    expect(defaultCategory({ ...base, advisor: false })).toBe("needs");
+  });
+});

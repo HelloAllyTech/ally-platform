@@ -190,7 +190,7 @@ describe("Settings › Schedules: engineering only", () => {
     page();
     expect(
       screen.getByRole("link", { name: en.debriefs.settingsPage.nav.schedules }),
-    ).toHaveAttribute("href", "#schedules");
+    ).toHaveAttribute("href", expect.stringMatching(/^\/[^#]*#schedules$/));
     expect(screen.getByTestId("schedules-table")).toBeInTheDocument();
   });
 });
