@@ -16,6 +16,16 @@ Build notes: debrief-console-redesign-notes.md (outside the repo). Code:
 **No redaction.** The console shows real names and the real transcript, including the expert-review
 routes the session page uses.
 
+**Plain words (2026-11-12).** API fields, enum values and stored data keep their names; only the
+text people read changed. In the admin and in ally-be's reasons, notifications and release notes:
+`quick_test` → Quick check, `gate_test` → Pass test, `paired_trial` → Side-by-side trial, `canary` →
+Try on learners / learner try-out, promote → Live for everyone / put live for everyone, the open and
+gate test sets → Practice sessions and Test sessions, κ → Agreement. On the Debriefs list and the
+session review: the judge → Independent check, the Evaluator → Ally's own check, and a run in a
+trial reads "Version vN · In a trial: the current version". A person's pinned-rule proposal is
+titled "<rule name>: <why>" (e.g. "Safety rules: …"); the closed groups are "Rejected or
+withdrawn" and "Live for everyone".
+
 ## Roles and who can act
 
 No new roles were created. The console uses the existing groups and adds one new permission.
@@ -39,7 +49,6 @@ rather than disable it.
 | `heldDebrief` | yes | no | yes | `runs/:id/publish`, `runs/:id/todays-debrief`, `runs/:id/reviewed`, `runs/:id/correct` |
 | `escalate` | yes | no | yes | `flags/:id/escalate`, `runs/:id/escalate` |
 | `verdict` | no | yes | no | expert-review `runs/:id/verdict` |
-| `score` | in the scoring sample only (403 otherwise) | yes | no | `sessions/:sessionId/score`, `GET /v1/analytics/debrief-quality/calibration/:id` (the Score by hand item) |
 | `pmAgent` | yes | no | yes | `pm-agent/analyse`, `ideas/:id/screen`, `approve` (a budgets-only change: owner), `reject` (never a pinned rule), `questions`, `start-step`, `ideas/propose` and `ideas/:id/draft` (with `settings`: owner) |
 | `approvePinnedRule` | no | yes | yes | `pinned-rules/proposals`, `pm-agent/ideas/:id/approve-pinned-rule`, `withdraw-pinned-rule` (own only), `reject-pinned-rule` |
 | `testSets` | yes | no | yes | `test-sets/build` |
@@ -48,7 +57,7 @@ rather than disable it.
 | `emergencyStop` | yes | no | yes | `tenants/:id/live` with `live: false`, `tenants/:id/emergency-stop` |
 | `ownerSettings` | no | no | yes | `settings` (PUT), `settings/accept`, `settings/baseline`, `budgets`, `autonomy/matrix`, `autonomy/orgs/:id` |
 
-The clinical advisor's routes (verdict, comments, Score by hand item and save, escalated flags,
+The clinical advisor's routes (verdict, comments, escalated flags,
 pinned-rule sign-off) accept `review:admin:debriefs` without `system:access`; the Ally team's
 actions stay on `system:access`. Platform admins no longer hold `review:admin:debriefs` (migration
 1981900780000), so they give no verdicts and sign off no pinned rules unless granted it by hand.
@@ -60,9 +69,8 @@ actions stay on `system:access`. Platform admins no longer hold `review:admin:de
 ```ts
 type Viewer = {
   roles: { allyTeam: boolean; clinicalAdvisor: boolean; owner: boolean; receivesEscalations: boolean };
-  can: Record<'comment'|'flagDecision'|'heldDebrief'|'escalate'|'verdict'|'score'|'pmAgent'|
+  can: Record<'comment'|'flagDecision'|'heldDebrief'|'escalate'|'verdict'|'pmAgent'|
               'approvePinnedRule'|'testSets'|'releases'|'switchOrgOn'|'emergencyStop'|'ownerSettings', boolean>;
-  scorer: boolean; // shows the "To score" category and "!" badge
 };
 ```
 
@@ -73,7 +81,7 @@ Returns `{ userId: number } & Viewer`.
 
 ### `GET sessions`
 Query: `category` = `needs` (default) | `flagged` | `below` | `published` | `escalated` |
-`to_score` | `agreement_sample` | `all`; `tenantId`; `language`; `recipe` (`standard`|`short`|`case`|`assessment`);
+`agreement_sample` | `all` (an old `to_score` link falls back to `needs`); `tenantId`; `language`; `recipe` (`standard`|`short`|`case`|`assessment`);
 `fallback` = `none` (ran as written) | `light` (steps 1–2) | `heavy` (steps 3–6); `riskCue` =
 `true`|`false`; `cost` = `over_0_20` | `hit_ceiling` (≥ 95% of the run's ceiling); `mode` =
 `production` (default, shadow and live) | `live` | `shadow` | `replay` | `any`; `limit` (≤ 200,
@@ -89,14 +97,14 @@ undo window are not work yet. Other categories are newest first. Comments never 
 ```ts
 {
   category: string;
-  counts: { needs; urgent; flagged; below; published; escalated; toScore: number | null; all }; // same filters
+  counts: { needs; urgent; flagged; below; published; escalated; agreementSample: number | null; all }; // same filters
   items: Array<{
     runId; sessionId; scenario: { id: string|null; title: string|null };
     tenantId; tenantName; language; recipe; mode; status; skipReason; releaseVersion;
     judgeOverall: number|null; evaluatorOverall: number|null; costUsd; ceilingUsd; seconds; fallbackRung;
     createdAt; rank: 0|1|2|3; needsPerson; urgent; flagged; flagCount; importantMomentFlagged;
     escalated; riskCue; learnerDistress; belowBar; reviewed;
-    inMyScoringSample: boolean; toScore: boolean; waitingSince: string|null;
+    waitingSince: string|null;
     agreementSample: boolean;            // in the weekly agreement sample, no verdict yet
   }>;
   filterOptions: { tenants: {id,name}[]; languages: string[]; recipes: string[]; fallback; riskCue; cost; modes };
@@ -107,8 +115,9 @@ undo window are not work yet. Other categories are newest first. Comments never 
 `agreement_sample` (counts: `agreementSample`, null unless `can.verdict`) lists the weekly random
 agreement sample's runs that have no verdict yet (see "Judge agreement" below).
 
-`toScore` and `inMyScoringSample` come from the calibration sample (the seeded, stratified sample
-`DebriefCalibrationService.getSample` draws). They are only computed when `can.score` is true.
+**Score by hand was removed on 2026-11-12** (no `to_score` category, `toScore`, `scorer` or
+`can.score`; `POST sessions/:sessionId/score` and `GET /v1/analytics/debrief-quality/calibration/:id`
+are gone). Agreement comes only from the clinical advisor's yes/no answers (see "Judge agreement").
 
 ## One session
 
@@ -117,6 +126,7 @@ agreement sample's runs that have no verdict yet (see "Judge agreement" below).
 ```ts
 {
   run: { id; sessionId; mode; status; skipReason; language; languageSource; recipe; releaseVersion;
+         arm: 'baseline'|'challenger'|null;   // in a side-by-side trial (shown "In a trial: the current version")
          createdAt; hasRiskCue; learnerDistress; openedByLearnerAt };
   session: { id; scenario: {id,title}; learner: {id,name,level}; tenantId; tenantName; startedAt; endedAt; turns };
   transcript: Array<{ turnIndex: number; speaker: 'client'|'learner'; text: string; gap: boolean;
@@ -153,11 +163,10 @@ agreement sample's runs that have no verdict yet (see "Judge agreement" below).
                                          // scenario, newest first (≤ 30), minus ones already repeated here
   verdict: { verdict; hardFails; updatedAt } | null;  // the viewer's own
   agreement: { inSample: boolean; questions: AgreementQuestion[] } | null; // can.verdict only
-  scoring: { inMyScoringSample: boolean; scoredByMe: boolean };
   queue: { position: number|null; total; previousRunId: string|null; nextRunId: string|null }; // Previous/Next, j/k
   pendingActions: PendingAction[];       // the "waiting on you" bar, for THIS viewer's role
   viewer: Viewer;
-  can: { comment; decideFlags; publish; showTodaysDebrief; looksFine; correct; escalate; verdict; score; runAgain };
+  can: { comment; decideFlags; publish; showTodaysDebrief; looksFine; correct; escalate; verdict; runAgain };
 }
 
 type PendingAction = {
@@ -203,8 +212,8 @@ that differs from the original gets a 400. The learner's note is updated, and th
 
 These go to `POST runs/:id/comments` with the same body as expert review: `{ anchorKind: 'transcript'|'card'|'debrief', turnIndex?,
 section?, spanStart?, spanEnd?, quotedText?, body, tag?, parentId? }`. Tags are `missed_moment`,
-`wrong_or_unsupported`, `tone`, `advice_doesnt_fit` and `good_keep_this` (plus the older `protocol`, `language`
-and `too_long_or_unclear`). `PATCH comments/:id {body?, tag?}`, `DELETE comments/:id`,
+`wrong_or_unsupported`, `tone`, `advice_doesnt_fit`, `too_vague` ("Too vague", migration 1981900920000) and
+`good_keep_this` (plus the older `protocol`, `language` and `too_long_or_unclear`). `PATCH comments/:id {body?, tag?}`, `DELETE comments/:id`,
 `POST comments/:id/resolve`, `POST comments/:id/reopen`, and `POST comments/:id/still-happening {runId, body?, tag?}` (spec C5: the earlier thread re-opens and a new comment on `runId` points back at it as `repeatOf`; 400 on the same run; `body` defaults to "Still happening."). All of them need `can.comment`. Viewers without review rights
 can read comments in the session payload but get 403 on writes. Comments feed the PM agent's
 evidence, never the queue. You cannot comment on a session from your own practice (403).
@@ -236,7 +245,7 @@ type AgreementQuestion = {
 **Pre-fill** (server-side, `debrief-agreement.util.ts`): a comment by the reviewer tagged
 `wrong_or_unsupported`, or a ticked `fabricated_quote` / `unsupported_progress_claim` → Accuracy No;
 a `missed_moment` comment on a risk-cue transcript turn, or a ticked `missed_risk_cue` → Missed risk
-cue No; otherwise Yes. No tag maps to Evidence today, so it starts Yes. The admin shows the source
+cue No; a `too_vague` comment → Evidence No; otherwise Yes. The admin shows the source
 as "From your comment on turn 12" / "From the hard fail you ticked".
 
 `PUT /v1/debriefs/expert-review/runs/:id/verdict` takes `answers?: {accuracy?, evidence_specificity?,
@@ -258,11 +267,9 @@ outside test organisations, while fewer than 10 sampled ones wait. Stored in
 `debrief_agreement_samples`; they show as "Agreement sample" until a verdict exists. Verdicts from
 ordinary reviews count too.
 
-## Score by hand
-
-`POST sessions/:sessionId/score` takes `{ scores: Record<dimension, 0..10>, hardFails: string[], note? }`. It is stored
-as the calibration rating (Analytics › Debriefs; since the advisor's yes/no answers it no longer feeds the canary's κ gate). The Ally team can only score sessions in the scoring sample (403
-otherwise). It returns 404 when the judge has not scored the session.
+In the admin these read in plain words (2026-11-12): "Agreement" for κ (κ only in a tooltip),
+"Independent check caught 3 of 4 problems you found", and "Not measurable yet: every answer is the
+same" for an undefined κ.
 
 ## PM agent: ideas (like pull requests) and approvals (plan §11.7)
 
@@ -455,8 +462,9 @@ type WaitingRelease = {
 { enabled: boolean;                       // pmAgentEnabled, the master switch
   steps: ['quick_test','gate_test','paired_trial','canary']; promote: 'person';
   kinds: Array<{ kind: 'settings'|'prompts'|'pinned_rules'; configurable: boolean;
-                 cells: Record<Step, 'auto'|'ask'|'off'>;
+                 cells: Record<Step, 'auto'|'ask'|'off'>;  // quick_test, gate_test, paired_trial always 'auto'
                  eligible: boolean; reason: string;      // the canary's (the κ gate's step)
+                 overridable: boolean;                   // the owner may confirm an early canary override
                  eligibility: Record<Step, { eligible: boolean; reason: string }>;
                  relock: { at; reason; steps: Step[]; by: 'system' } | null;  // latest system re-lock still asking first
                  override: { at; by: number; name: string|null } | null;      // owner's canary override in force
@@ -478,21 +486,23 @@ type WaitingRelease = {
 - **Kinds.** `settings` covers non-budget settings. `prompts` covers prompt edits, registry agents and default plans. `pinned_rules` is always never.
 - **Guidance and models are not kinds.** The PM agent never touches Context Library chunks (spec C4), and model trials come in Release 2. Stored cells for them are dropped when the policy is read.
 - `PUT autonomy/matrix {changes: [{kind, step, value}], override?: boolean}` (owner) is all or nothing. `override: true` is the owner's confirmed **canary override**: a canary may be set `auto` before the κ gate is met (never past a re-lock, never for pinned rules). It is recorded in `overrides[kind]` (who, when; audited with `override`), shown in the row as "On its own · owner override, <name>, <date>", and the κ re-lock leaves it be; reverts, a failed baseline and drift still re-lock it (and clear it), and a canary that misses a risk cue still auto-reverts. With the gate met there is no override. It returns 400 when `auto` is set where the kind is not eligible at that step, when `pinned_rules` is changed, or when the step is unknown.
-- `PUT autonomy/orgs/:tenantId {changes: {paired_trial?|canary?: 'default'|'ask'|'never'}}` (owner) only tightens: the stricter of the global and org settings applies.
+- `PUT autonomy/orgs/:tenantId {changes: {paired_trial?: 'default'|'never'; canary?: 'default'|'ask'|'never'}}` (owner) only tightens: the stricter of the global and org settings applies. The admin calls them, for side-by-side trials, "Allowed" (`default`) / "Not on its sessions" (`never`); for learner try-outs, "Same as the table above" / "Always ask first" / "Never". `paired_trial: 'ask'` is refused (400); a stored one reads as `default` (it behaved as allowed: trials run on their own).
+- `PUT autonomy/matrix` refuses `quick_test`, `gate_test` and `paired_trial` (400): they always run on their own. The admin grid shows only "Try on learners" (canary) and a locked "Live for everyone · Always a person", with the rows `settings` and `prompts` (pinned rules are not in the grid).
 
-Eligibility is per step (plan §4 "Improver autonomy": free to analyse, measure and experiment
-before learners are involved). **Quick test, gate test and paired trial** never reach a learner,
-so `settings` and `prompts` may be `auto` there whatever κ is, as long as the track record is
-clean (still owner-set, budget-capped and behind `pmAgentEnabled`). **Canary** reaches learners:
-`auto` there also needs κ ≥ 0.6 on the gated measures. Promotion is always a person; pinned rules
-never. The old `pmAgentStartsQuickTests` switch mirrors into the quick-test column under the same
-rule (no κ gate). If κ falls below 0.6 while a canary is `auto`, the system sets that canary
+Plan §4 "Improver autonomy" and §11.1 "Experiment: free" (decided 2026-11-12): **quick check,
+pass test and side-by-side trial** (`quick_test`, `gate_test`, `paired_trial`) never reach a
+learner, so the PM agent always runs them on its own, paid from the learning budget and behind
+`pmAgentEnabled`. They are not settings: the server reads them as `auto` whatever an older policy
+stored, and re-locks never touch them. **Canary** ("Try on learners") reaches learners: `auto`
+there needs κ ≥ 0.6 on the gated measures and a clean record. Live for everyone is always a person;
+pinned rules never. The owner setting `pmAgentStartsQuickTests` (and propose-only mode) was
+removed (migration 1981900910000). If κ falls below 0.6 while a canary is `auto`, the system sets that canary
 back to `ask`. Every system re-lock records the cells, the reason and `by: 'system'`, and the
 owner gets an in-app notification (`DEBRIEF_OWNER_ALERT`, `data.settings: 'autonomy'`, opening
 Settings › autonomy). When a kind's canary becomes eligible (κ ≥ 0.6, clean record), the owner is
-told once ("Canary can now run on its own for …. Turn it on?"); it is never switched on for them.
+told once ("Learner try-outs can now run on their own for …. Switch it on?"); it is never switched on for them.
 Both run in the `debrief-autonomy-relock` schedule and whenever `GET autonomy` is read. A kind
-re-locks by itself (its `auto` cells become `ask`, with the reason recorded) after 2 canary
+re-locks by itself (its canary cell becomes `ask`, with the reason recorded) after 2 canary
 reverts in 4 weeks or a failed monthly sealed baseline. **Judge drift** comes from the nightly
 evaluator job (Release 2). Until then it reads "not measured" and never blocks or re-locks.
 Defaults keep today's behaviour (migration 1981900740000). Promoting, Builder hand-offs and bug
@@ -518,7 +528,7 @@ until the console shows `/v1/notifications` (frontend).
 
 ## Settings
 
-- `GET settings` (unchanged). It now includes `pmAgentEnabled` and `pmAgentStartsQuickTests`. Learning share is `learningSkimPct`, and the steering weights are `steeringWeightJudge`, `steeringWeightPractise` and `steeringWeightThumbs`. Change them with `PUT settings` (owner).
+- `GET settings` (unchanged). It includes `pmAgentEnabled` (`pmAgentStartsQuickTests` was removed on 2026-11-12). Learning share is `learningSkimPct`, and the steering weights are `steeringWeightJudge`, `steeringWeightPractise` and `steeringWeightThumbs`. Change them with `PUT settings` (owner).
 - `PUT budgets` creates a proposed change (see "Propose a change").
 - `POST tenants/:tenantId/emergency-stop {reason}` (Ally team or owner) returns `{tenantId, live:false, learnersSee:'not_available', reason}`. Switching on (`PUT tenants/:id/live {live:true}`) is owner-only and still requires a support line outside India.
 
@@ -588,7 +598,7 @@ Banners only appear for roles that can act:
 
 ## Analytics › Debriefs
 
-`GET analytics` has everything the Analytics › Debriefs page needs, so the page can switch to it: the six tiles, the cost panel (spend per organisation, pool balance, learning budget, burn rate) and judge agreement (gate, κ per dimension, agreement by rubric part, debriefs rated, people rating). It takes `days` (1–90, default 7).
+`GET analytics` has everything the Analytics › Debriefs page needs, so the page can switch to it: the six tiles, the cost panel (spend per organisation, pool balance, learning budget, burn rate) and judge agreement from the clinical advisor's yes/no answers (the same numbers as `GET autonomy`'s `agreement`: per measure κ, reviews, raw agreement and problems caught; the gate; the weekly sample). Before 2026-11-12 it came from Score by hand (κ per rubric dimension, people rating); that is gone. It takes `days` (1–90, default 7).
 
 ### `GET analytics?days=7`
 ```ts
@@ -599,9 +609,10 @@ Banners only appear for roles that can act:
           pool: { sessionsThisMonth; addedUsd; spentUsd; balanceUsd; monthlyCapUsd; capLeftUsd; runCeilingUsd };
           learning: { spentUsd; budgetUsd; balanceUsd };
           burnRate: { perDayUsd; last7DaysUsd; projectedMonthUsd } };
-  judgeAgreement: null | { gate: {met, checks}; target; debriefsRated; ratings; peopleRating;
-                           dimensions: Array<{dimension; kappa; withinOnePct; meanDifference; pairs}>;
-                           hardFails: Array<{code; kappa; pairs}>; humanVsHuman; expertVerdicts } }
+  judgeAgreement: null | { gate: { met; failing }; kappa: 0.6; minReviews: 50;
+                           measures: Array<{ measure; n; kappa: number|null; agreementPct: number|null;
+                                             recallOnNo: { caught; of; pct }; state; passes }>;
+                           sample: { size; thisWeek; waiting } } }
 ```
 
 ### Safety recall on the seeded set (`GET metrics` → `safetyRecall`)
@@ -642,9 +653,9 @@ as failed.
 ## Not built, or defaulted (product decisions)
 
 - **The admin bell.** The admin dashboard has no general notification bell, so admins don't see in-app notifications yet. See Notifications.
-- **Org `ask`** for paired trials and canaries is treated as "not on this organisation's learners unless the global step was started by a person". There is no per-organisation go-ahead.
+- **Org `ask`** for canaries is treated as "not on this organisation's learners unless the global step was started by a person". There is no per-organisation go-ahead. Side-by-side trials have no `ask` (2026-11-12).
 - **Judge drift and model trials** are Release 2.
 - **Step win rates** are `null` until step-level trials exist (Release 2).
 
 - **Verdicts by platform admins:** decided 2026-11-12: revoked. The platform groups no longer hold `review:admin:debriefs` (migration 1981900780000); clinical advisors are granted it person by person.
-- **Calibration routes:** only `GET /v1/analytics/debrief-quality/calibration/:id` remains (the Score by hand panel reads it). The old sample, agreement and submit routes were removed; scores are saved through `sessions/:sessionId/score`, and the agreement is in `GET analytics`.
+- **Calibration routes:** all removed on 2026-11-12 with Score by hand (`GET /v1/analytics/debrief-quality/calibration/:id`, `POST sessions/:sessionId/score`). `debrief_human_ratings` stays as history; agreement is in `GET analytics` and `GET autonomy`, from the advisor's answers.
