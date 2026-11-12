@@ -1267,7 +1267,7 @@ export class DebriefPmAgentService
     await this.audit('proposed', rows[0].id, userId, { kind: 'pinned_rule' });
     await this.notifier?.owner({
       title: 'Debriefs: a pinned-rule change needs approval',
-      body: `Proposed change to ${input.promptCode}: ${why}`,
+      body: `Proposed change to the ${pinnedRuleName(input.promptCode)}: ${why}`,
       data: { ideaId: rows[0].id },
       excludeUserId: userId,
     });

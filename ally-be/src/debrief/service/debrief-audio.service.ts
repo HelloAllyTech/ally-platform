@@ -69,7 +69,9 @@ export class DebriefAudioService implements OnModuleInit {
       'debrief-audio-retention',
       async () => {
         const n = await this.sweepDeletedSessions();
-        return `${n} deleted session(s)' audio removed`;
+        return n === 0
+          ? 'No audio to remove'
+          : `Audio removed for ${n} deleted ${n === 1 ? 'session' : 'sessions'}`;
       },
     );
   }

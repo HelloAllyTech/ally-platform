@@ -320,6 +320,22 @@ describe('pinned rules: proposals', () => {
     expect(passageProblem('a b', '  ')).toBe('empty');
   });
 
+  it('tells the owner in plain words, naming the rule, not its prompt code', async () => {
+    const { svc } = build();
+    const owner = jest.fn(async () => 1);
+    Object.defineProperty(svc, 'notifier', {
+      value: { owner },
+      configurable: true,
+    });
+    await propose(svc, ADVISOR);
+    expect(owner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'Proposed change to the Safety rules: Clearer',
+        excludeUserId: ADVISOR,
+      }),
+    );
+  });
+
   it('the proposer may approve their own proposal: a new version and a DRAFT release', async () => {
     const { svc, lessons, createVersion, createDraft } = build();
     const { id } = await propose(svc, ADVISOR);
