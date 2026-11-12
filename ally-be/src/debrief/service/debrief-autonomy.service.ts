@@ -432,6 +432,11 @@ export class DebriefAutonomyService implements OnModuleInit {
       cells: Record<AutonomyStep, StepPolicy>;
       /** The canary (the step the κ gate applies to); kept for older clients. */
       eligible: boolean;
+      /**
+       * The owner may switch learner try-outs on before agreement is reached (confirmed, and
+       * recorded): only while agreement is the one thing missing, never after a re-lock.
+       */
+      overridable: boolean;
       reason: string;
       /** Per step: tests learners never see need only a clean record; the canary also κ ≥ 0.6. */
       eligibility: Record<AutonomyStep, { eligible: boolean; reason: string }>;
@@ -489,6 +494,8 @@ export class DebriefAutonomyService implements OnModuleInit {
           configurable: kind !== 'pinned_rules',
           cells: policy.matrix[kind],
           eligible: e.eligible,
+          overridable:
+            kind !== 'pinned_rules' && !e.eligible && !relockReason(kind, f),
           reason: e.reason,
           eligibility: stepEligibility(kind, f),
           override: policy.overrides?.[kind] ?? null,

@@ -697,6 +697,8 @@ export class DebriefConsoleViewService implements OnModuleInit {
         languageSource: ws.languageSource ?? null,
         recipe: run.recipeKey ?? null,
         releaseVersion: run.releaseVersion ?? null,
+        /** In a side-by-side trial: baseline (the current version) or challenger. */
+        arm: run.arm ?? null,
         createdAt: run.createdAt.toISOString(),
         hasRiskCue: run.hasRiskCue,
         learnerDistress: run.learnerDistress,
