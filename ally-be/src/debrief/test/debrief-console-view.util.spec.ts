@@ -107,37 +107,41 @@ describe('approvals expire after 14 days as "no decision"', () => {
 });
 
 describe('PM agent autonomy policy', () => {
-  it('rejects "auto" when the kind is not eligible, and pinned rules always', () => {
+  it('only the learner try-out can be set; "auto" there needs an eligible kind; pinned rules never', () => {
     // Plan §4: the κ gate is the canary's alone; learners never see the tests.
     expect(
       matrixChangeRefusal('prompts', 'canary', 'auto', ineligible),
-    ).toMatch(/cannot run canary on its own.*0\.52/);
+    ).toMatch(/cannot run learner try-outs on its own.*0\.52/);
+    // Quick check, pass test and side-by-side trial always run on their own:
+    // not settings any more (2026-11-12).
     for (const step of ['quick_test', 'gate_test', 'paired_trial']) {
-      expect(
-        matrixChangeRefusal('prompts', step, 'auto', ineligible),
-      ).toBeNull();
-      expect(
-        matrixChangeRefusal('settings', step, 'auto', ineligible),
-      ).toBeNull();
+      for (const value of ['auto', 'ask', 'off']) {
+        expect(matrixChangeRefusal('prompts', step, value, eligible)).toMatch(
+          /always runs on its own/,
+        );
+      }
       expect(
         matrixChangeRefusal('pinned_rules', step, 'auto', eligible),
       ).toMatch(/pinned rules/);
     }
-    // A re-lock (2 reverts) still blocks every step.
     expect(
-      matrixChangeRefusal('prompts', 'quick_test', 'auto', {
-        ...eligible,
-        reverts: { prompts: 2 },
-      }),
+      matrixChangeRefusal('prompts', 'canary', 'ask', ineligible),
+    ).toBeNull();
+    expect(
+      matrixChangeRefusal('prompts', 'canary', 'auto', eligible),
+    ).toBeNull();
+    // A re-lock (2 reverts) blocks the try-out, even with an override.
+    expect(
+      matrixChangeRefusal(
+        'prompts',
+        'canary',
+        'auto',
+        { ...eligible, reverts: { prompts: 2 } },
+        true,
+      ),
     ).toMatch(/Not now/);
     expect(
-      matrixChangeRefusal('prompts', 'quick_test', 'auto', eligible),
-    ).toBeNull();
-    expect(
-      matrixChangeRefusal('prompts', 'quick_test', 'ask', ineligible),
-    ).toBeNull();
-    expect(
-      matrixChangeRefusal('pinned_rules', 'quick_test', 'ask', eligible),
+      matrixChangeRefusal('pinned_rules', 'canary', 'ask', eligible),
     ).toMatch(/pinned rules/);
     expect(matrixChangeRefusal('prompts', 'promote', 'auto', eligible)).toMatch(
       /always a person/,
@@ -147,7 +151,13 @@ describe('PM agent autonomy policy', () => {
       kindEligibility('pinned_rules', eligible, 'quick_test').eligible,
     ).toBe(false);
     expect(kindEligibility('prompts', ineligible).eligible).toBe(false);
-    expect(kindEligibility('prompts', ineligible, 'gate_test')).toMatchObject({
+    expect(
+      kindEligibility(
+        'prompts',
+        { ...ineligible, reverts: { prompts: 2 } },
+        'gate_test',
+      ),
+    ).toMatchObject({
       eligible: true,
       reason: expect.stringMatching(/learners never see it/),
     });
@@ -178,16 +188,18 @@ describe('PM agent autonomy policy', () => {
       }
     }
     expect(kindEligibility('prompts', f).reason).toBe(
-      'Not yet: judge agreement below 0.6 (Accuracy not measured; Evidence 0.41; Missed risk cue not measured; Some new measure not measured).',
+      'Not yet: agreement below 0.6 (Accuracy not measured; Evidence 0.41; Missed risk cue not measured; Some new measure not measured).',
     );
   });
 
   it('an organisation only tightens: the stricter of global and org wins', () => {
     const policy = normaliseAutonomy({
       orgs: {
-        org1: { canary: 'never', paired_trial: 'ask' },
+        org1: { canary: 'never', paired_trial: 'never' },
         // An attempt to loosen is dropped: "auto" is not an org value.
         org2: { canary: 'auto' as any },
+        // The old side-by-side "asks first" reads as allowed.
+        org3: { paired_trial: 'ask', canary: 'ask' },
       },
     });
     policy.matrix.settings.canary = 'auto';
@@ -199,38 +211,54 @@ describe('PM agent autonomy policy', () => {
     );
     expect(
       effectivePolicy(policy, true, 'settings', 'paired_trial', 'org1'),
-    ).toBe('ask');
+    ).toBe('off');
     expect(effectivePolicy(policy, true, 'settings', 'canary', 'org2')).toBe(
       'auto',
     );
-    // Never looser than the global, whatever the org says.
-    policy.matrix.settings.paired_trial = 'off';
+    expect(policy.orgs.org3).toEqual({ canary: 'ask' });
     expect(
-      effectivePolicy(policy, true, 'settings', 'paired_trial', 'org1'),
-    ).toBe('off');
+      effectivePolicy(policy, true, 'settings', 'paired_trial', 'org3'),
+    ).toBe('auto');
+    expect(effectivePolicy(policy, true, 'settings', 'canary', 'org3')).toBe(
+      'ask',
+    );
     // The master switch.
     expect(effectivePolicy(policy, false, 'settings', 'quick_test', null)).toBe(
       'off',
     );
   });
 
-  it("defaults keep today's behaviour, the quick test following the old switch", () => {
-    expect(normaliseAutonomy(null, true).matrix.prompts).toEqual({
+  it('the steps learners never see always run on their own, whatever was stored', () => {
+    expect(normaliseAutonomy(null).matrix.prompts).toEqual({
       quick_test: 'auto',
       gate_test: 'auto',
       paired_trial: 'auto',
       canary: 'ask',
     });
-    expect(normaliseAutonomy(null, false).matrix.prompts.quick_test).toBe(
-      'ask',
-    );
+    // An older policy (the quick-test switch off, a step set to ask) reads as auto.
+    const old = normaliseAutonomy({
+      matrix: {
+        settings: {
+          quick_test: 'ask',
+          gate_test: 'off',
+          paired_trial: 'ask',
+          canary: 'auto',
+        },
+      } as any,
+    });
+    expect(old.matrix.settings).toEqual({
+      quick_test: 'auto',
+      gate_test: 'auto',
+      paired_trial: 'auto',
+      canary: 'auto',
+    });
     expect(normaliseAutonomy(null).matrix.pinned_rules.quick_test).toBe('off');
   });
 
   it('re-locks on 2 reverts in 4 weeks, a failed baseline or judge drift, not on κ alone', () => {
     expect(
       relockReason('prompts', { ...eligible, reverts: { prompts: 2 } }),
-    ).toMatch(/2 canaries reverted/);
+    ).toMatch(/2 learner try-outs were taken back/);
     expect(
       relockReason('settings', { ...eligible, reverts: { prompts: 2 } }),
     ).toBeNull();

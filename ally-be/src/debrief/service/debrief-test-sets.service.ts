@@ -34,9 +34,11 @@ export enum DebriefTestSet {
 }
 
 const SUITE_NAMES: Record<DebriefTestSet, string> = {
-  [DebriefTestSet.OPEN]: 'Debrief: open set (PM agent screens)',
-  [DebriefTestSet.GATE]: 'Debrief: gate set (release decisions)',
-  [DebriefTestSet.SEALED]: 'Debrief: sealed set (drills, launch)',
+  [DebriefTestSet.OPEN]:
+    'Debrief: practice sessions (the PM agent tries ideas)',
+  [DebriefTestSet.GATE]: 'Debrief: test sessions (decide what goes further)',
+  [DebriefTestSet.SEALED]:
+    'Debrief: sealed sessions (never shown to the PM agent)',
 };
 
 /** Split by a hash of the session id, so a session's set never changes. */

@@ -306,7 +306,7 @@ export function canaryDecision(
   if (r.canaryMissedRiskCues > 0) {
     return {
       status: 'reverted',
-      reason: `the canary missed a risk cue in ${r.canaryMissedRiskCues} debrief(s)`,
+      reason: `the learner try-out missed a risk cue in ${r.canaryMissedRiskCues} debrief(s)`,
     };
   }
   const worse =
@@ -326,7 +326,7 @@ export function canaryDecision(
       status: 'reverted',
       reason: worse
         ? `the judge's median was ${r.canaryMedian} against ${r.controlMedian}`
-        : `hard fails in ${Math.round((r.canaryHardFailShare ?? 0) * 100)}% of canary debriefs against ${Math.round((r.controlHardFailShare ?? 0) * 100)}%`,
+        : `hard fails in ${Math.round((r.canaryHardFailShare ?? 0) * 100)}% of try-out debriefs against ${Math.round((r.controlHardFailShare ?? 0) * 100)}%`,
     };
   }
   if (
@@ -339,15 +339,16 @@ export function canaryDecision(
     return notWorse
       ? {
           status: 'passed',
-          reason: 'not worse than the release in force; ready to promote',
+          reason:
+            'not worse than the version in force; ready to put live for everyone',
         }
       : {
           status: 'reverted',
-          reason: 'it finished below the release in force',
+          reason: 'it finished below the version in force',
         };
   }
   return {
     status: 'running',
-    reason: `${r.canaryRuns}/${settings.canaryMinRuns} runs, ${r.days}/${settings.canaryMinDays} days`,
+    reason: `${r.canaryRuns}/${settings.canaryMinRuns} debriefs, ${r.days}/${settings.canaryMinDays} days`,
   };
 }

@@ -147,16 +147,13 @@ export const OWNER_SETTINGS_SPEC = {
     max: 168,
     group: 'metrics',
   },
-  // The PM agent's autonomy (v9 FR-55), as two switches: off runs nothing;
-  // on without quick tests is propose-only (a person starts every quick
-  // test); both on is auto. Builder hand-offs, bug reports, canaries and
-  // promotions always wait for a person (approve-everything stage).
-  // `pmAgentEnabled` is the master switch. `pmAgentStartsQuickTests` was
-  // copied into the autonomy policy's quick-test column (migration
-  // 1981900740000); the policy (DebriefAutonomyService) now decides, and a
-  // change to this key is mirrored into that column.
+  // The PM agent's master switch (v9 FR-55): off runs nothing. On, it starts
+  // quick checks, pass tests and side-by-side trials on its own (learners
+  // never see them; decided 2026-11-12, so the old `pmAgentStartsQuickTests`
+  // switch is gone, migration 1981900910000). Learner try-outs follow the
+  // autonomy policy (DebriefAutonomyService); live for everyone, Builder
+  // hand-offs and bug reports always wait for a person.
   pmAgentEnabled: { default: true, kind: 'bool', group: 'agent' },
-  pmAgentStartsQuickTests: { default: true, kind: 'bool', group: 'agent' },
   // What one PM agent run may spend on its own model calls, inside the
   // learning budget.
   pmAgentRunCapUsd: {
@@ -180,15 +177,13 @@ export const OWNER_SETTING_KEYS = Object.keys(
   OWNER_SETTINGS_SPEC,
 ) as OwnerSettingKey[];
 
-/** v9 FR-55's three modes, from the two switches. */
-export type PmAgentAutonomy = 'auto' | 'propose_only' | 'off';
+/** v9 FR-55's modes: the master switch alone (propose-only was retired 2026-11-12). */
+export type PmAgentAutonomy = 'auto' | 'off';
 
 export function pmAgentAutonomy(s: {
   pmAgentEnabled: boolean;
-  pmAgentStartsQuickTests: boolean;
 }): PmAgentAutonomy {
-  if (!s.pmAgentEnabled) return 'off';
-  return s.pmAgentStartsQuickTests ? 'auto' : 'propose_only';
+  return s.pmAgentEnabled ? 'auto' : 'off';
 }
 
 export function defaultOwnerSettings(): OwnerSettings {

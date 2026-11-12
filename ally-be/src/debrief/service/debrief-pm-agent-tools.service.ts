@@ -478,19 +478,14 @@ export class DebriefPmAgentToolsService {
     if (kind !== 'prompt_edit' && kind !== 'setting') {
       refuse('draft the change first with release_draft');
     }
-    if (mode === 'propose_only') {
-      refuse(
-        'propose-only mode: a person starts the quick test in the Console; the draft is waiting there',
-      );
-    }
     const policy = this.autonomy
       ? await this.autonomy.forIdea(idea, 'quick_test')
       : 'auto';
     if (policy !== 'auto') {
       refuse(
         policy === 'off'
-          ? 'quick tests are off for this kind of change (owner policy)'
-          : 'this kind of change asks first: a person starts the quick test in the Console; the draft is waiting there',
+          ? 'quick checks are off for this kind of change'
+          : 'this kind of change asks first: a person starts the quick check in the Console; the draft is waiting there',
       );
     }
     const started = await this.pm.screen(idea.id);
@@ -500,7 +495,7 @@ export class DebriefPmAgentToolsService {
     });
     return {
       ...started,
-      note: 'ally-be runs the ladder from here: gate, paired trials, canary; a person starts the canary and promotes',
+      note: 'ally-be runs the ladder from here: the pass test and the side-by-side trial on their own; a learner try-out follows the policy; a person puts it live for everyone',
     };
   }
 

@@ -578,9 +578,9 @@ export class DebriefReleasesService implements OnModuleInit {
     const merge = r.changeSet?.merge as Record<string, any> | undefined;
     for (const c of (merge?.conflicts ?? []) as Array<Record<string, any>>) {
       changes.push({
-        area: 'Would undo a promoted change',
-        what: `${c.changedBy?.label ?? 'A promoted change'} on ${c.what}`,
-        why: 'A Skills Store or code release never overwrites a promoted change without a person',
+        area: 'Would undo a change put live for everyone',
+        what: `${c.changedBy?.label ?? 'A change put live for everyone'} on ${c.what}`,
+        why: 'A Skills Store or code release never overwrites a change a person put live without asking',
         before: JSON.stringify(c.live ?? null),
         after: JSON.stringify(c.code ?? null),
         source: 'diff',
@@ -589,8 +589,8 @@ export class DebriefReleasesService implements OnModuleInit {
     if (merge?.keptFromLive?.length) {
       changes.push({
         area: 'Carried forward',
-        what: `Kept ${merge.keptFromLive.length} promoted change(s): ${(merge.keptFromLive as string[]).map(describePath).join(', ')}`,
-        why: 'Promoted changes this release does not touch stay as they are',
+        what: `Kept ${merge.keptFromLive.length} change(s) put live for everyone: ${(merge.keptFromLive as string[]).map(describePath).join(', ')}`,
+        why: 'Changes put live for everyone that this release does not touch stay as they are',
         before: null,
         after: null,
         source: 'diff',
@@ -1120,7 +1120,7 @@ export class DebriefReleasesService implements OnModuleInit {
     const alert = {
       title: `Debriefs: v${draft.version} (${title}) is waiting`,
       body: first
-        ? `It would undo ${first.changedBy.label} on ${first.what}${conflicts.length > 1 ? ` and ${conflicts.length - 1} more` : ''}. Promote it to accept the overwrite, or dismiss it.`
+        ? `It would undo ${first.changedBy.label} on ${first.what}${conflicts.length > 1 ? ` and ${conflicts.length - 1} more` : ''}. Put it live for everyone to accept the overwrite, or dismiss it.`
         : `It does not pass the release checks: ${problems.join('; ')}`,
       data: { releaseId: draft.id },
     };

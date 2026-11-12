@@ -19,8 +19,6 @@ export const SESSION_CATEGORIES = [
   'published',
   /** Escalated to the clinical advisor and not decided. */
   'escalated',
-  /** In the viewer's scoring sample and not scored by them. */
-  'to_score',
   /** The weekly random sample for the κ gate, still without a verdict (who gives verdicts). */
   'agreement_sample',
   'all',
@@ -258,9 +256,20 @@ export const AUTONOMY_STEPS = [
 ] as const;
 export type AutonomyStep = (typeof AUTONOMY_STEPS)[number];
 
+/** The steps learners never see (plan §4: free to experiment before learners are involved). */
+export const LEARNER_FREE_STEPS: readonly AutonomyStep[] = [
+  'quick_test',
+  'gate_test',
+  'paired_trial',
+];
+
 /** auto: on its own; ask: waits for a person; off: never at this step. */
 export type StepPolicy = 'auto' | 'ask' | 'off';
-/** An organisation may only tighten: default (use the global), ask, never. */
+/**
+ * An organisation may only tighten: default (use the global), ask, never.
+ * Side-by-side trials take only default ("Allowed") or never ("Not on its
+ * sessions"); learner try-outs all three.
+ */
 export type OrgPolicy = 'default' | 'ask' | 'never';
 export const ORG_POLICY_STEPS = ['paired_trial', 'canary'] as const;
 export type OrgPolicyStep = (typeof ORG_POLICY_STEPS)[number];
@@ -303,14 +312,15 @@ export interface AutonomyPolicy {
 }
 
 /**
- * The policy before anyone set it: today's behaviour. Quick tests follow the
- * old `pmAgentStartsQuickTests` switch; a passed quick test starts the gate
- * and a passed gate starts the paired trial on their own (nothing reaches a
- * learner before the canary); a canary waits for a person. Pinned rules never.
+ * The policy before anyone set it. The steps learners never see (quick
+ * check, pass test, side-by-side trial) always run on their own, paid from
+ * the learning budget (plan §11.1 "Experiment: free"; decided 2026-11-12):
+ * they are not settings. A learner try-out (the canary) waits for a person
+ * until the owner switches it on. Pinned rules never.
  */
-export function defaultAutonomyMatrix(startsQuickTests = true): AutonomyMatrix {
+export function defaultAutonomyMatrix(): AutonomyMatrix {
   const row = (): Record<AutonomyStep, StepPolicy> => ({
-    quick_test: startsQuickTests ? 'auto' : 'ask',
+    quick_test: 'auto',
     gate_test: 'auto',
     paired_trial: 'auto',
     canary: 'ask',
@@ -327,14 +337,18 @@ export function defaultAutonomyMatrix(startsQuickTests = true): AutonomyMatrix {
   };
 }
 
-/** The stored policy over the defaults; malformed cells fall back. */
+/**
+ * The stored policy over the defaults; malformed cells fall back. Only the
+ * canary cell is read from storage: the steps learners never see are always
+ * "auto", whatever an older policy stored for them.
+ */
 export function normaliseAutonomy(
   stored: Partial<AutonomyPolicy> | null | undefined,
-  startsQuickTests = true,
 ): AutonomyPolicy {
-  const matrix = defaultAutonomyMatrix(startsQuickTests);
+  const matrix = defaultAutonomyMatrix();
   for (const kind of CONFIGURABLE_KINDS) {
     for (const step of AUTONOMY_STEPS) {
+      if (LEARNER_FREE_STEPS.includes(step)) continue;
       const v = stored?.matrix?.[kind]?.[step];
       if (v === 'auto' || v === 'ask' || v === 'off') matrix[kind][step] = v;
     }
@@ -344,7 +358,9 @@ export function normaliseAutonomy(
     const clean: Partial<Record<OrgPolicyStep, OrgPolicy>> = {};
     for (const step of ORG_POLICY_STEPS) {
       const v = o?.[step];
-      if (v === 'ask' || v === 'never') clean[step] = v;
+      // Side-by-side trials are "Allowed" or "Not on its sessions" (never):
+      // an older "ask" no longer exists and reads as allowed (2026-11-12).
+      if (v === 'never' || (v === 'ask' && step === 'canary')) clean[step] = v;
     }
     if (Object.keys(clean).length) orgs[org] = clean;
   }
@@ -440,12 +456,12 @@ export function relockReason(
   f: AutonomyFacts,
 ): string | null {
   if ((f.reverts[kind] ?? 0) >= RELOCK_REVERTS) {
-    return `${f.reverts[kind]} canaries reverted in the last 4 weeks`;
+    return `${f.reverts[kind]} learner try-outs were taken back in the last 4 weeks`;
   }
   if (f.failedBaseline.failed) {
     return `the monthly baseline failed${f.failedBaseline.detail ? ` (${f.failedBaseline.detail})` : ''}`;
   }
-  if (f.judgeDrift) return 'the judge has drifted';
+  if (f.judgeDrift) return 'the independent check has drifted';
   return null;
 }
 
@@ -479,23 +495,16 @@ function gateMeasureState(c: { kappa: number | null; n?: number }): string {
   if (c.n < GATE_MIN_REVIEWS) {
     return `not measured yet: ${c.n} of ${GATE_MIN_REVIEWS} reviews`;
   }
-  return 'not measurable yet (every answer the same)';
+  return 'not measurable yet: every answer is the same';
 }
 
-/** The steps learners never see (plan §4: free to experiment before learners are involved). */
-export const LEARNER_FREE_STEPS: readonly AutonomyStep[] = [
-  'quick_test',
-  'gate_test',
-  'paired_trial',
-];
-
 /**
- * May the owner set this kind to "on its own" at this step? Plan §4 "Improver
- * autonomy": quick tests, gate tests and paired trials never reach a learner,
- * so they may run on their own whatever the judge's agreement; only a clean
- * track record is needed (re-locks still apply). The canary reaches learners:
- * it also needs the judge to agree with people (κ ≥ 0.6 on the gated
- * measures). Promotion is always a person; pinned rules never.
+ * May this kind run on its own at this step? Quick checks, pass tests and
+ * side-by-side trials never reach a learner, so they always do (decided
+ * 2026-11-12; the learning budget is the limit). The canary (a learner
+ * try-out) reaches learners: it needs a clean track record and the
+ * independent check to agree with the clinical advisor (κ ≥ 0.6 on the
+ * gated measures). Live for everyone is always a person; pinned rules never.
  */
 export function kindEligibility(
   kind: ChangeKind,
@@ -509,15 +518,16 @@ export function kindEligibility(
       reason: 'Never: the clinical advisor or the owner approves every change.',
     };
   }
-  const relock = relockReason(kind, f);
-  if (relock) return { kind, eligible: false, reason: `Not now: ${relock}.` };
   if (LEARNER_FREE_STEPS.includes(step)) {
     return {
       kind,
       eligible: true,
-      reason: 'Yes: learners never see it; budget-capped.',
+      reason:
+        'Always on its own: learners never see it; paid from the learning budget.',
     };
   }
+  const relock = relockReason(kind, f);
+  if (relock) return { kind, eligible: false, reason: `Not now: ${relock}.` };
   if (!f.gate.met) {
     const low = f.gate.failing
       .map((c) => `${gateMeasureLabel(c.measure)} ${gateMeasureState(c)}`)
@@ -525,13 +535,13 @@ export function kindEligibility(
     return {
       kind,
       eligible: false,
-      reason: `Not yet: judge agreement below 0.6${low ? ` (${low})` : ''}.`,
+      reason: `Not yet: agreement below 0.6${low ? ` (${low})` : ''}.`,
     };
   }
   return {
     kind,
     eligible: true,
-    reason: 'Yes: judge agreement ≥ 0.6, clean track record.',
+    reason: 'Yes: agreement 0.6 or more, clean track record.',
   };
 }
 
@@ -550,8 +560,9 @@ export function stepEligibility(
 
 /**
  * Why an owner's change to the matrix is refused (null when it is fine):
- * pinned rules are not configurable, and "auto" needs the kind eligible at
- * that step (the κ gate only on the canary).
+ * pinned rules are not configurable; the steps learners never see always run
+ * on their own and can't be changed; "auto" on the canary needs the kind
+ * eligible (the κ gate), unless the owner confirms an override.
  */
 export function matrixChangeRefusal(
   kind: string,
@@ -567,7 +578,10 @@ export function matrixChangeRefusal(
     return 'pinned rules always need the clinical advisor or the owner';
   }
   if (!(AUTONOMY_STEPS as readonly string[]).includes(step)) {
-    return `${step} is not a test step (promoting to everyone is always a person)`;
+    return `${step} is not a test step (putting a change live for everyone is always a person)`;
+  }
+  if (LEARNER_FREE_STEPS.includes(step as AutonomyStep)) {
+    return `${step} always runs on its own (learners never see it); only the learner try-out (canary) can be set`;
   }
   if (!['auto', 'ask', 'off'].includes(value)) {
     return `${value} is not auto, ask or off`;
@@ -584,7 +598,7 @@ export function matrixChangeRefusal(
       return null;
     }
     if (!e.eligible)
-      return `${kind} cannot run ${step} on its own: ${e.reason}`;
+      return `${kind} cannot run learner try-outs on its own: ${e.reason}`;
   }
   return null;
 }
@@ -952,9 +966,9 @@ export function ideaState(idea: {
     if (e.handoff?.status === 'answered') return closed('answered');
   }
   for (const [k, label] of [
-    ['screen', 'quick test'],
-    ['gate', 'gate test'],
-    ['trial', 'paired trial'],
+    ['screen', 'quick check'],
+    ['gate', 'pass test'],
+    ['trial', 'side-by-side trial'],
   ] as const) {
     const r = e[k];
     if (r && (r.passed === false || r.status === 'failed')) {

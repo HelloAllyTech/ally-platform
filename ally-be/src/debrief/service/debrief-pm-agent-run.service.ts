@@ -505,11 +505,10 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       autonomy: {
         mode: autonomy,
         meaning:
-          autonomy === 'auto'
-            ? 'you may start quick tests for the kinds the policy below allows; a person starts canaries, promotes, and approves Builder, Bug Hunter and person items'
-            : 'propose and draft only; a person starts every quick test',
+          'you start quick checks (quick_test) yourself; the pass test (gate_test) and the side-by-side trial (paired_trial) follow on their own (learners never see them); learner try-outs (canary) follow the policy below; a person puts a change live for everyone, and approves Builder, Bug Hunter and person items',
         // Per kind of change × test step: auto (on its own), ask (a person
-        // starts it), off. Pinned rules are never yours to change.
+        // starts it), off. Only the canary can be "ask"; pinned rules are
+        // never yours to change.
         policy: this.autonomy
           ? ((await this.autonomy.policy().catch(() => null))?.matrix ?? null)
           : null,

@@ -342,9 +342,9 @@ export class DebriefTrialsService implements OnModuleInit {
           );
       }
       if (decision.status === 'reverted') {
-        // FR-54: every revert tells the owner, the canary's own included.
+        // FR-54: every revert tells the owner, a learner try-out's own included.
         await this.notifier?.owner({
-          title: 'Debriefs: a canary was reverted on its own',
+          title: 'Debriefs: a learner try-out was taken back on its own',
           body: decision.reason,
           data: { ideaId: id, releaseId: canary.releaseId ?? null },
         });

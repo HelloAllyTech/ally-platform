@@ -19,10 +19,7 @@ function build(stored: Record<string, any> | null = null) {
     update: jest.fn(async (_id, patch) => Object.assign(row, patch)),
   };
   const settings = {
-    get: jest.fn(async () => ({
-      pmAgentEnabled: true,
-      pmAgentStartsQuickTests: true,
-    })),
+    get: jest.fn(async () => ({ pmAgentEnabled: true })),
   };
   const audit = { log: jest.fn() };
   const notifier = { owner: jest.fn(async () => 1) };
@@ -53,43 +50,30 @@ describe('DebriefAutonomyService', () => {
     expect(row.autonomy).toBeNull();
   });
 
-  it('with no calibration yet, the tests learners never see may still run on their own; the canary may not', async () => {
+  it('the tests learners never see always run on their own and cannot be changed', async () => {
     const { service, row } = build();
     jest.spyOn(service, 'facts').mockResolvedValue(
       facts({
         gate: { met: false, failing: [{ measure: 'accuracy', kappa: null }] },
+        reverts: { prompts: 2 },
       }),
     );
-    await service.setMatrix(
-      [
-        { kind: 'settings', step: 'quick_test', value: 'auto' },
-        { kind: 'prompts', step: 'gate_test', value: 'auto' },
-        { kind: 'prompts', step: 'paired_trial', value: 'auto' },
-      ],
-      7,
-    );
-    expect(row.autonomy.matrix.settings.quick_test).toBe('auto');
-    expect(row.autonomy.matrix.prompts.gate_test).toBe('auto');
-    expect(row.autonomy.matrix.prompts.paired_trial).toBe('auto');
-    await expect(
-      service.setMatrix(
-        [{ kind: 'prompts', step: 'canary', value: 'auto' }],
-        7,
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    const view = await service.policy();
-    expect(view.matrix.pinned_rules.quick_test).not.toBe('auto');
-  });
-
-  it('the old quick-test switch turns quick tests on for settings and prompts without κ', async () => {
-    const { service, row } = build();
-    jest
-      .spyOn(service, 'facts')
-      .mockResolvedValue(facts({ gate: { met: false, failing: [] } }));
-    await service.mirrorLegacyQuickTestSwitch(true);
-    expect(row.autonomy.matrix.settings.quick_test).toBe('auto');
-    expect(row.autonomy.matrix.prompts.quick_test).toBe('auto');
-    expect(row.autonomy.matrix.prompts.canary).not.toBe('auto');
+    for (const step of ['quick_test', 'gate_test', 'paired_trial']) {
+      await expect(
+        service.setMatrix([{ kind: 'settings', step, value: 'ask' }], 7),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    }
+    expect(row.autonomy).toBeNull();
+    const policy = await service.policy();
+    expect(policy.matrix.prompts).toMatchObject({
+      quick_test: 'auto',
+      gate_test: 'auto',
+      paired_trial: 'auto',
+    });
+    expect(policy.matrix.pinned_rules.quick_test).toBe('off');
+    expect(
+      await service.forIdea({ change: { ideaKind: 'setting' } }, 'gate_test'),
+    ).toBe('auto');
   });
 
   it('a judge agreement below 0.6 drops a canary on its own back to asks first, recorded and told to the owner', async () => {
@@ -110,12 +94,12 @@ describe('DebriefAutonomyService', () => {
       kind: 'prompts',
       steps: ['canary'],
       by: 'system',
-      reason: 'judge agreement fell below 0.6',
+      reason: 'agreement fell below 0.6',
     });
     expect(notifier.owner).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Prompts, agents and default plans: back to asks first',
-        body: expect.stringContaining('Canary back to "Asks first"'),
+        body: expect.stringContaining('"Try on learners" back to "Asks first"'),
         data: { settings: 'autonomy', kind: 'prompts' },
       }),
     );
@@ -131,8 +115,9 @@ describe('DebriefAutonomyService', () => {
     expect(notifier.owner).toHaveBeenCalledTimes(2);
     expect(notifier.owner).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: 'Canary can now run on its own for settings (not budgets)',
-        body: expect.stringContaining('Turn it on?'),
+        title:
+          'Learner try-outs can now run on their own for settings (not budgets)',
+        body: expect.stringContaining('Switch it on?'),
         data: { settings: 'autonomy', kind: 'settings' },
       }),
     );
@@ -249,22 +234,28 @@ describe('DebriefAutonomyService', () => {
     expect(audit.log).toHaveBeenCalled();
   });
 
-  it('re-locks a kind on 2 reverts in 4 weeks: every auto cell drops to ask, with the reason', async () => {
-    const { service, row } = build();
+  it('re-locks a kind on 2 reverts in 4 weeks: its learner try-out drops to ask, with the reason', async () => {
+    const { service, row } = build({
+      matrix: {
+        prompts: { canary: 'auto' },
+        settings: { canary: 'auto' },
+      },
+    });
     const policy = await service.refreshRelocks(
       facts({ reverts: { prompts: 2 } }),
     );
     expect(policy.matrix.prompts).toEqual({
-      quick_test: 'ask',
-      gate_test: 'ask',
-      paired_trial: 'ask',
+      quick_test: 'auto',
+      gate_test: 'auto',
+      paired_trial: 'auto',
       canary: 'ask',
     });
-    expect(policy.matrix.settings.quick_test).toBe('auto');
+    expect(policy.matrix.settings.canary).toBe('auto');
     expect(row.autonomy.relocks).toEqual([
       expect.objectContaining({
         kind: 'prompts',
-        reason: '2 canaries reverted in the last 4 weeks',
+        steps: ['canary'],
+        reason: '2 learner try-outs were taken back in the last 4 weeks',
       }),
     ]);
   });
@@ -278,5 +269,21 @@ describe('DebriefAutonomyService', () => {
     expect(await service.orgAllows(idea, 'canary', 'org2')).toBe(true);
     expect(await service.orgAllows(idea, 'canary', 'org1')).toBe(false);
     expect(await service.forIdea(idea, 'canary', 'org1')).toBe('ask');
+  });
+});
+
+describe('DebriefAutonomyService per organisation', () => {
+  it('side-by-side trials take Allowed or Not on its sessions; "asks first" is refused', async () => {
+    const { service, row } = build();
+    await expect(
+      service.setOrg('org1', { paired_trial: 'ask' }, 7),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await service.setOrg('org1', { paired_trial: 'never', canary: 'ask' }, 7);
+    expect(row.autonomy.orgs.org1).toEqual({
+      paired_trial: 'never',
+      canary: 'ask',
+    });
+    await service.setOrg('org1', { paired_trial: 'default' }, 7);
+    expect(row.autonomy.orgs.org1).toEqual({ canary: 'ask' });
   });
 });

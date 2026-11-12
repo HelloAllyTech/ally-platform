@@ -32,12 +32,14 @@ import { DebriefSettingsService } from './debrief-settings.service';
 import type { AgreementView } from './debrief-agreement.service';
 
 /**
- * What the PM agent may do alone (PRD §12; plan §11.7), per kind of change
- * and test step, with per-organisation overrides that only tighten. The
- * owner changes it; "auto" needs an eligible kind (κ gate and a clean track
- * record); a kind re-locks to "ask" on its own after 2 canary reverts in 4
- * weeks, a failed sealed baseline or judge drift, with the reason recorded.
- * `pmAgentEnabled` stays the master switch. Promoting to everyone, Builder
+ * What the PM agent may do alone (PRD §12; plan §11.7). Quick checks, pass
+ * tests and side-by-side trials always run on their own (learners never see
+ * them); the owner sets only the learner try-out (canary) per kind of change.
+ * Per-organisation overrides only tighten. "auto" on the try-out needs an
+ * eligible kind (κ gate and a clean track record); it re-locks to "ask" on
+ * its own after 2 try-out reverts in 4 weeks, a failed sealed baseline,
+ * judge drift or agreement below 0.6, with the reason recorded.
+ * `pmAgentEnabled` stays the master switch. Live for everyone, Builder
  * hand-offs and bug reports always wait for a person: they are not steps here.
  */
 /** The kinds and steps in the owner's words (Settings › What the PM agent may do alone). */
@@ -47,10 +49,10 @@ const KIND_WORDS: Record<ChangeKind, string> = {
   pinned_rules: 'Pinned rules',
 };
 const STEP_WORDS: Record<AutonomyStep, string> = {
-  quick_test: 'Quick test',
-  gate_test: 'Gate test',
-  paired_trial: 'Paired trial',
-  canary: 'Canary',
+  quick_test: 'Quick check',
+  gate_test: 'Pass test',
+  paired_trial: 'Side-by-side trial',
+  canary: 'Try on learners',
 };
 
 @Injectable()
@@ -83,11 +85,7 @@ export class DebriefAutonomyService implements OnModuleInit {
 
   async policy(): Promise<AutonomyPolicy> {
     const row = await this.row();
-    const s = await this.settings.get();
-    return normaliseAutonomy(
-      row.autonomy as Partial<AutonomyPolicy> | null,
-      s.pmAgentStartsQuickTests,
-    );
+    return normaliseAutonomy(row.autonomy as Partial<AutonomyPolicy> | null);
   }
 
   private async save(policy: AutonomyPolicy): Promise<void> {
@@ -216,11 +214,12 @@ export class DebriefAutonomyService implements OnModuleInit {
   }
 
   /**
-   * Re-lock on its own: a kind whose track record broke (2 canary reverts in
-   * 4 weeks, a failed baseline, judge drift) drops every "auto" cell to
-   * "ask"; a judge agreement below 0.6 drops the canary alone (the only step
-   * the κ gate applies to). Each re-lock records the cells, the reason and
-   * that the system set it, and tells the owner. Going back takes the owner.
+   * Re-lock on its own: a kind whose track record broke (2 try-out reverts in
+   * 4 weeks, a failed baseline, judge drift) or whose agreement fell below
+   * 0.6 drops its canary (learner try-out) from "auto" to "ask"; the steps
+   * learners never see always stay on their own. Each re-lock records the
+   * cell, the reason and that the system set it, and tells the owner. Going
+   * back takes the owner.
    *
    * It also tells the owner, once, when a kind's canary becomes able to run on
    * its own (κ ≥ 0.6, clean record): an invitation, never switched on here.
@@ -239,14 +238,11 @@ export class DebriefAutonomyService implements OnModuleInit {
       const record = relockReason(kind, f);
       // The κ re-lock leaves an owner's override be (they chose it knowingly);
       // reverts, a failed baseline and drift re-lock everything regardless.
-      const steps = record
-        ? AUTONOMY_STEPS.filter((s) => policy.matrix[kind][s] === 'auto')
-        : !f.gate.met &&
-            policy.matrix[kind].canary === 'auto' &&
-            !policy.overrides?.[kind]
-          ? (['canary'] as AutonomyStep[])
-          : [];
-      const reason = record ?? 'judge agreement fell below 0.6';
+      const relock =
+        policy.matrix[kind].canary === 'auto' &&
+        (!!record || (!f.gate.met && !policy.overrides?.[kind]));
+      const steps: AutonomyStep[] = relock ? ['canary'] : [];
+      const reason = record ?? 'agreement fell below 0.6';
       if (steps.length) {
         for (const s of steps) policy.matrix[kind][s] = 'ask';
         if (steps.includes('canary') && policy.overrides?.[kind]) {
@@ -286,14 +282,14 @@ export class DebriefAutonomyService implements OnModuleInit {
     for (const r of relocked) {
       await this.notifyOwner({
         title: `${KIND_WORDS[r.kind]}: back to asks first`,
-        body: `The system set ${r.steps.map((s) => STEP_WORDS[s]).join(', ')} back to "Asks first": ${r.reason}. Turning it back on is up to you in Debrief settings.`,
+        body: `The system set ${r.steps.map((s) => `"${STEP_WORDS[s]}"`).join(', ')} back to "Asks first": ${r.reason}. Switching it back on is up to you in Debrief settings.`,
         data: { settings: 'autonomy', kind: r.kind },
       });
     }
     for (const kind of nowEligible) {
       await this.notifyOwner({
-        title: `Canary can now run on its own for ${KIND_WORDS[kind].toLowerCase()}`,
-        body: `Canary can now run on its own for ${KIND_WORDS[kind].toLowerCase()}. Turn it on? It stays "Asks first" until you change it in Debrief settings.`,
+        title: `Learner try-outs can now run on their own for ${KIND_WORDS[kind].toLowerCase()}`,
+        body: `The independent check now agrees with the clinical advisor, so "Try on learners" can run on its own for ${KIND_WORDS[kind].toLowerCase()}. Switch it on? It stays "Asks first" until you change it in Debrief settings.`,
         data: { settings: 'autonomy', kind },
       });
     }
@@ -367,7 +363,8 @@ export class DebriefAutonomyService implements OnModuleInit {
         ...(overridden.length
           ? {
               override: overridden.map((c) => c.kind),
-              reason: 'canary on its own before the judge-agreement gate',
+              reason:
+                'learner try-outs on their own before agreement reached 0.6',
             }
           : {}),
       },
@@ -398,11 +395,13 @@ export class DebriefAutonomyService implements OnModuleInit {
     const bad = entries.filter(
       ([k, v]) =>
         !(ORG_POLICY_STEPS as readonly string[]).includes(k) ||
-        !['default', 'ask', 'never'].includes(String(v)),
+        !['default', 'ask', 'never'].includes(String(v)) ||
+        // Side-by-side trials run on their own: "Allowed" or "Not on its sessions".
+        (k === 'paired_trial' && v === 'ask'),
     );
     if (bad.length) {
       throw new BadRequestException(
-        `${bad.map(([k]) => k).join(', ')}: use paired_trial or canary with default, ask or never`,
+        `${bad.map(([k]) => k).join(', ')}: use paired_trial (default or never) or canary (default, ask or never)`,
       );
     }
     const policy = await this.policy();
@@ -420,30 +419,6 @@ export class DebriefAutonomyService implements OnModuleInit {
       details: { source: 'autonomy_org', tenantId, changes },
     });
     return policy;
-  }
-
-  /**
-   * The old `pmAgentStartsQuickTests` switch, changed through the settings
-   * page: mirrored into the quick-test column. Turning it on is held to the
-   * same rule as the matrix at that step: a quick test reaches no learner, so
-   * any kind not re-locked goes to "auto" (no κ gate); pinned rules never.
-   */
-  async mirrorLegacyQuickTestSwitch(on: boolean): Promise<void> {
-    const f = on ? await this.facts() : null;
-    const policy = await this.policy();
-    for (const kind of CONFIGURABLE_KINDS) {
-      if (!on) {
-        if (policy.matrix[kind].quick_test === 'auto') {
-          policy.matrix[kind].quick_test = 'ask';
-        }
-      } else if (
-        policy.matrix[kind].quick_test === 'ask' &&
-        kindEligibility(kind, f!, 'quick_test').eligible
-      ) {
-        policy.matrix[kind].quick_test = 'auto';
-      }
-    }
-    await this.save(policy);
   }
 
   /** Settings › "What the PM agent may do alone": the matrix, eligibility, overrides, re-locks. */

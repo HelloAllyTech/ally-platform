@@ -118,19 +118,19 @@ export function proposeOwnerSettings(
   put(
     'gateCases',
     Math.min(gate, Math.max(20, gatePool)),
-    `Seeing a half-point drop takes ${gate} pairs; the gate set can hold about ${gatePool} sessions (a quarter of ${facts.eligibleSessionsPerMonth}/month over four months).`,
+    `Seeing a half-point drop takes ${gate} pairs; the test sessions can hold about ${gatePool} (a quarter of ${facts.eligibleSessionsPerMonth}/month over four months).`,
   );
   const gateValue = out.gateCases!.value as number;
   put(
     'sealedCases',
     Math.min(Math.round(gateValue * 0.6), Math.max(20, pool(0.15))),
-    `Six tenths of the gate set, within the sealed share of sessions (about ${pool(0.15)}).`,
+    `Six tenths of the test sessions, within the sealed share of sessions (about ${pool(0.15)}).`,
   );
   const freshGate = Math.floor(facts.eligibleSessionsPerMonth * 0.25);
   put(
     'gateRotationShare',
     Math.min(0.25, freshGate / Math.max(1, gateValue)),
-    `About ${freshGate} new gate-set sessions arrive a month, so up to ${Math.min(100, Math.round((freshGate / Math.max(1, gateValue)) * 100))}% of a ${gateValue}-case set can be replaced; a quarter is the most v9 asks for.`,
+    `About ${freshGate} new test sessions arrive a month, so up to ${Math.min(100, Math.round((freshGate / Math.max(1, gateValue)) * 100))}% of a ${gateValue}-case set can be replaced; a quarter is the most v9 asks for.`,
   );
   const paired = pairsFor(sdD, 0.3, confidence);
   put(
@@ -142,7 +142,7 @@ export function proposeOwnerSettings(
   put(
     'canaryMinRuns',
     minRuns,
-    'As many canary debriefs as a paired trial needs, so the two read alike.',
+    'As many try-out debriefs as a side-by-side trial needs, so the two read alike.',
   );
   const live = facts.liveRunsPerDay;
   if (live > 0) {
@@ -153,7 +153,7 @@ export function proposeOwnerSettings(
     put(
       'canaryShare',
       share,
-      `${live.toFixed(1)} live debriefs a day; ${Math.round(share * 100)}% of them reaches ${minRuns} canary runs in ${current.canaryMinDays} days.`,
+      `${live.toFixed(1)} live debriefs a day; ${Math.round(share * 100)}% of them reaches ${minRuns} try-out debriefs in ${current.canaryMinDays} days.`,
     );
     const days = Math.ceil(
       minRuns / (live * (out.canaryShare!.value as number)),
@@ -161,7 +161,7 @@ export function proposeOwnerSettings(
     put(
       'canaryMinDays',
       days,
-      `At that share, ${minRuns} canary runs take ${days} day(s).`,
+      `At that share, ${minRuns} try-out debriefs take ${days} day(s).`,
     );
   }
   const p90 = facts.costPerRunUsd.p90;
@@ -186,7 +186,7 @@ export function proposeOwnerSettings(
     put(
       'learningBudgetUsd',
       budget,
-      `${ideas} ideas a month through the quick test, the gate and a paired trial at $${perRun.toFixed(3)} a judged debrief ($${perIdea.toFixed(2)} each), the monthly sealed run ($${sealed.toFixed(2)}) and the PM agent's own calls (~$10).`,
+      `${ideas} ideas a month through the quick check, the pass test and a side-by-side trial at $${perRun.toFixed(3)} a judged debrief ($${perIdea.toFixed(2)} each), the monthly sealed run ($${sealed.toFixed(2)}) and the PM agent's own calls (~$10).`,
     );
   }
   return out;

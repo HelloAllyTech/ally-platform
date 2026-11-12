@@ -362,7 +362,7 @@ export class DebriefPmAgentService
     }
     if ((await this.stepPolicy(idea, 'quick_test')) === 'off') {
       throw new ConflictException(
-        'quick tests are off for this kind of change (owner policy)',
+        'quick checks are off for this kind of change',
       );
     }
     await this.requireLearningBudget();
@@ -374,7 +374,7 @@ export class DebriefPmAgentService
     );
     if (sessions.length === 0) {
       throw new ConflictException(
-        'the open test set is empty; build the test sets first',
+        'there are no practice sessions yet; add recent sessions to the test sets first',
       );
     }
     const startedAt = new Date().toISOString();
@@ -421,7 +421,7 @@ export class DebriefPmAgentService
         settings.gateCases,
       );
       if (sessions.length === 0) {
-        throw new ConflictException('the gate test set is empty');
+        throw new ConflictException('there are no test sessions yet');
       }
       await this.writeEvidence(ideaId, 'gate', {
         status: 'running',
@@ -588,22 +588,26 @@ export class DebriefPmAgentService
   ): Promise<{ step: string; status: 'running' }> {
     const idea = await this.getIdea(ideaId);
     if ((await this.stepPolicy(idea, step)) === 'off') {
-      throw new ConflictException(`${step} is off for this kind of change`);
+      throw new ConflictException(
+        `${step === 'gate_test' ? 'pass tests' : 'side-by-side trials'} are off while the PM agent is switched off`,
+      );
     }
     if (step === 'gate_test') {
       if (idea.evidence?.screen?.passed !== true) {
-        throw new ConflictException('the quick test has not passed');
+        throw new ConflictException('the quick check has not passed');
       }
       if (idea.evidence?.gate?.status === 'running') {
-        throw new ConflictException('the gate test is already running');
+        throw new ConflictException('the pass test is already running');
       }
       void this.gate(ideaId);
     } else {
       if (idea.evidence?.gate?.passed !== true) {
-        throw new ConflictException('the gate test has not passed');
+        throw new ConflictException('the pass test has not passed');
       }
       if (idea.evidence?.trial?.status === 'running') {
-        throw new ConflictException('the paired trial is already running');
+        throw new ConflictException(
+          'the side-by-side trial is already running',
+        );
       }
       await this.startTrial(ideaId);
     }
@@ -707,7 +711,7 @@ export class DebriefPmAgentService
       });
       await this.notifier?.owner({
         title: `Debriefs: v${(released as { version?: number })?.version ?? canary.version} is live for everyone`,
-        body: `Promoted from idea “${idea.text}”.${note ? ` ${note}` : ''}`,
+        body: `Put live for everyone from the idea “${idea.text}”.${note ? ` ${note}` : ''}`,
         data: { ideaId, releaseId: canary.releaseId },
         excludeUserId: userId,
       });
@@ -718,11 +722,11 @@ export class DebriefPmAgentService
       };
     }
     if (canary?.status === 'running') {
-      throw new ConflictException('the canary is still running');
+      throw new ConflictException('the learner try-out is still running');
     }
     if (idea.evidence?.trial?.status !== 'passed') {
       throw new ConflictException(
-        'only a change that passed its paired trial on real sessions can start a canary',
+        'only a change that passed its side-by-side trial on real sessions can be tried on learners',
       );
     }
     // Spec §4: the canary is only for changes learners can see; anything
@@ -730,7 +734,7 @@ export class DebriefPmAgentService
     const visible = isLearnerVisible(idea.change);
     if (visible && (await this.stepPolicy(idea, 'canary')) === 'off') {
       throw new ConflictException(
-        'canaries are off for this kind of change (owner policy)',
+        'learner try-outs are off for this kind of change',
       );
     }
     if (kind === 'release') {
@@ -796,7 +800,7 @@ export class DebriefPmAgentService
       DEBRIEF_AGENT_KEY,
       next as unknown as Record<string, unknown>,
       userId,
-      `PM agent idea (canary): ${idea.text}`,
+      `PM agent idea (learner try-out): ${idea.text}`,
     );
     // Plan §8.8: the exact prompt versions it runs, recorded now.
     await this.runner.pinPrompts(draft);
@@ -843,7 +847,7 @@ export class DebriefPmAgentService
     });
     await this.notifier?.owner({
       title: `Debriefs: v${version} is live for everyone`,
-      body: `Promoted from idea “${idea.text}” without a canary: learners don't see this change.${note ? ` ${note}` : ''}`,
+      body: `Put live for everyone from the idea “${idea.text}” without a learner try-out: learners don't see this change.${note ? ` ${note}` : ''}`,
       data: { ideaId, releaseId: draft.id },
       excludeUserId: userId,
     });
@@ -1249,7 +1253,7 @@ export class DebriefPmAgentService
        RETURNING id`,
       [
         DEBRIEF_AGENT_KEY,
-        `Pinned rule: ${why}`.slice(0, 300),
+        `${pinnedRuleName(input.promptCode)}: ${why}`.slice(0, 300),
         JSON.stringify(change),
         JSON.stringify({ why, proposedBy: userId }),
         hash,
@@ -1340,7 +1344,10 @@ export class DebriefPmAgentService
         DEBRIEF_AGENT_KEY,
         next as unknown as Record<string, unknown>,
         userId,
-        `Pinned rule (${code} v${version.version}): ${idea.text}`.slice(0, 300),
+        `${idea.text} (${pinnedRuleName(code)} v${version.version})`.slice(
+          0,
+          300,
+        ),
       );
       // Plan §8.8: the exact prompt versions it runs, recorded now.
       await this.runner.pinPrompts(draft);

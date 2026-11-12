@@ -114,7 +114,7 @@ export const DEBRIEF_POLICY: PolicySchema = {
       {
         type: 'boolean',
         default: true,
-        description: `This organisation's debriefs may use ${p} models. Off keeps its learners' sessions (live runs, paired trials, Ask Ally) away from ${p}.`,
+        description: `This organisation's debriefs may use ${p} models. Off keeps its learners' sessions (live debriefs, side-by-side trials, Ask Ally) away from ${p}.`,
         overridableBy: ['org'],
         group: 'Providers',
       },

@@ -80,7 +80,7 @@ describe('PM agent never-list and limits (spec C4, FR-53)', () => {
     expect(settingRefusal('monthlyCapUsd', 10)?.neverList).toBe('budgets');
     expect(settingRefusal('passScore', 7)?.neverList).toBe('judge');
     expect(settingRefusal('learningBudgetUsd', 10)?.neverList).toBe('budgets');
-    expect(settingRefusal('pmAgentStartsQuickTests', true)?.neverList).toBe(
+    expect(settingRefusal('pmAgentEnabled', false)?.neverList).toBe(
       'approval_list',
     );
     expect(settingRefusal('deadlineMs', 1)?.reason).toMatch(
@@ -153,16 +153,9 @@ describe('PM agent never-list and limits (spec C4, FR-53)', () => {
     expect(out.text.split(QUOTE_REMOVED)).toHaveLength(4);
   });
 
-  it('maps the two switches onto FR-55 modes', () => {
-    expect(
-      pmAgentAutonomy({ pmAgentEnabled: false, pmAgentStartsQuickTests: true }),
-    ).toBe('off');
-    expect(
-      pmAgentAutonomy({ pmAgentEnabled: true, pmAgentStartsQuickTests: false }),
-    ).toBe('propose_only');
-    expect(
-      pmAgentAutonomy({ pmAgentEnabled: true, pmAgentStartsQuickTests: true }),
-    ).toBe('auto');
+  it('maps the master switch onto FR-55 modes (propose-only is gone)', () => {
+    expect(pmAgentAutonomy({ pmAgentEnabled: false })).toBe('off');
+    expect(pmAgentAutonomy({ pmAgentEnabled: true })).toBe('auto');
   });
 });
 
@@ -275,16 +268,13 @@ describe('closing the loop (spec C5)', () => {
 });
 
 function tools(opts: {
-  mode?: 'auto' | 'propose_only' | 'off';
+  mode?: 'auto' | 'off';
   idea?: Record<string, any>;
   screen?: () => Promise<any>;
   queries?: Record<string, any[]>;
   transcript?: Array<{ role: string; text: string }>;
 }) {
-  const settings = {
-    pmAgentEnabled: opts.mode !== 'off',
-    pmAgentStartsQuickTests: opts.mode !== 'propose_only',
-  };
+  const settings = { pmAgentEnabled: opts.mode !== 'off' };
   const queries: Array<[string, any[]]> = [];
   const ds = {
     query: jest.fn(async (sql: string, params: any[] = []) => {
@@ -446,14 +436,7 @@ describe('the PM agent’s gateway tools enforce the rules', () => {
       ...routeA,
       change: { route: 'A', ideaKind: 'prompt_edit' },
     };
-    let t = tools({ idea: drafted, mode: 'propose_only' });
-    expect(
-      (await t.svc.call('ladder_start_quick_test', CLAIMS, { idea_id: IDEA }))
-        .refused,
-    ).toMatch(/propose-only/);
-    expect(t.pm.screen).not.toHaveBeenCalled();
-
-    t = tools({
+    let t = tools({
       idea: drafted,
       screen: async () => {
         throw new ConflictException(
@@ -716,7 +699,6 @@ describe('the scheduler packs the inputs and calls ally-ai with an agent token',
       ownerSettings: {
         get: jest.fn(async () => ({
           pmAgentEnabled: opts.mode !== 'off',
-          pmAgentStartsQuickTests: true,
           pmAgentRunCapUsd: 5,
         })),
       },
