@@ -1,30 +1,31 @@
-import React from "react";
+import React, { useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button } from "@ally-ui-mono/ui-shared";
-import { useScreenIdeaMutation } from "@api";
-import { formatUsd, shortId } from "@components/ally-guide/allyGuideFormat";
+import { Button, TextArea } from "@ally-ui-mono/ui-shared";
+import { useAskIdeaQuestionMutation, useScreenIdeaMutation, useStartIdeaStepMutation } from "@api";
+import { shortId } from "@components/ally-guide/allyGuideFormat";
 import { en } from "@constants";
 import { DebriefOwnerSettingSpec, PmAgentIdeaRow } from "@types";
 import { getErrorMessage } from "@utils";
 
 import {
-  canaryReasonLabel,
   codeWords,
   forecastMetricLabel,
   inWords,
   promptName,
   settingChangeLabel,
 } from "../consoleLabels";
+import { formatWhen } from "../consoleTable";
 import { ConsoleTag } from "../consoleUi";
 import { DebriefAccess } from "../debriefAccess";
 import { waitedFor } from "../queue";
+import { EvidenceBlock } from "./EvidenceBlock";
 import { Handoff } from "./Handoff";
 import {
   daysLeft,
   EXPIRY_WARNING_DAYS,
-  HANDOFF_KINDS,
+  ideaGroup,
   needsViewer,
   SCREENABLE,
   stage,
@@ -32,147 +33,93 @@ import {
 
 export const ideaCode = (idea: PmAgentIdeaRow) => idea.code ?? shortId(idea.id);
 
-const signed = (x: number | null | undefined) =>
-  x == null ? "—" : `${x > 0 ? "+" : ""}${x.toFixed(2)}`;
-const fixed1 = (x: number | null | undefined) => (x == null ? "—" : x.toFixed(1));
 const num = (x: number | null | undefined) =>
   x == null ? "—" : String(Math.round(x * 1000) / 1000);
 
-type RungState = "waiting" | "running" | "passed" | "not" | "failed";
+/** What the change touches, in one line (the draft release's summary). */
+export const changeSummary = (
+  idea: PmAgentIdeaRow,
+  spec?: Record<string, DebriefOwnerSettingSpec>,
+): string => {
+  const p = en.debriefs.pmPage;
+  if (idea.change.promptCode) return p.draft.prompt(promptName(idea.change.promptCode));
+  if (idea.change.settingKey) {
+    return settingChangeLabel(
+      idea.change.settingKey,
+      idea.change.settingValue,
+      spec?.[idea.change.settingKey],
+    );
+  }
+  return p.kinds[idea.change.ideaKind] ?? codeWords(idea.change.ideaKind);
+};
 
-/** One rung of the test ladder (v9 FR-52) as a tile: its name, state and the numbers behind it. */
-const Rung: React.FC<{
-  name: string;
-  state: RungState;
-  label: string;
-  detail: string;
-  testId: string;
-}> = ({ name, state, label, detail, testId }) => (
-  <li
-    data-testid={testId}
-    className={`flex flex-col gap-0.5 rounded-sm px-3 py-2.5 ${state === "passed" ? "bg-success-50" : "bg-white"}`}
-  >
-    <span className="text-[13px] font-semibold">{name}</span>
-    <span
-      className={`text-xs font-semibold ${state === "passed" ? "text-success-600" : state === "failed" || state === "not" ? "text-[#8A3800]" : "text-neutral-600"}`}
-    >
-      {label}
-    </span>
-    <span className="text-xs text-neutral-600">{detail}</span>
-  </li>
-);
-
-export const Ladder: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
-  const s = en.debriefs.pmAgent;
-  const { screen: q, gate: g, trial: t, canary: c } = idea.evidence;
-  const words: Record<RungState, string> = {
-    waiting: s.rungWaiting,
-    running: s.rungRunning,
-    passed: s.rungPassed,
-    not: s.rungNotPassed,
-    failed: s.rungFailed,
+/** Ask a question about an idea: the PM agent reads it on its next run. */
+const Questions: React.FC<{ idea: PmAgentIdeaRow; canAsk: boolean; startOpen: boolean }> = ({
+  idea,
+  canAsk,
+  startOpen,
+}) => {
+  const p = en.debriefs.pmPage.questions;
+  const [open, setOpen] = useState(startOpen);
+  const [text, setText] = useState("");
+  const [ask, { isLoading }] = useAskIdeaQuestionMutation();
+  const thread = idea.questions ?? [];
+  const post = async () => {
+    try {
+      await ask({ id: idea.id, text: text.trim() }).unwrap();
+      toast.success(p.sent);
+      setText("");
+      setOpen(false);
+    } catch (e) {
+      toast.error(getErrorMessage(e, en.debriefs.pmAgent.actionFailed));
+    }
   };
-  const qs: RungState = !q
-    ? "waiting"
-    : q.status === "running"
-      ? "running"
-      : q.status === "failed"
-        ? "failed"
-        : q.passed
-          ? "passed"
-          : "not";
-  const gs: RungState = !g
-    ? "waiting"
-    : g.status !== "done"
-      ? g.status === "running"
-        ? "running"
-        : "failed"
-      : g.passed
-        ? "passed"
-        : "not";
-  const ts: RungState = !t
-    ? "waiting"
-    : t.status === "running"
-      ? "running"
-      : t.status === "passed"
-        ? "passed"
-        : "not";
-  const cs: RungState = !c
-    ? "waiting"
-    : c.status === "running"
-      ? "running"
-      : c.status === "reverted"
-        ? "not"
-        : "passed";
+  if (!thread.length && !open) return null;
   return (
-    <div>
-      <div className="mb-2 text-xs text-neutral-600">{en.debriefs.pmPage.tests}</div>
-      <ol className="grid list-none grid-cols-2 gap-2 sm:grid-cols-4" data-testid="idea-ladder">
-        <Rung
-          testId="idea-screen"
-          name={s.ladder.quick}
-          state={qs}
-          label={q ? words[qs] : s.notScreened}
-          detail={
-            q?.status === "done"
-              ? `${s.screened(signed(q.lift), q.pairs)} · ${formatUsd(q.costUsd)}${q.challengerFailures > 0 ? ` · ${s.unfinished(q.challengerFailures)}` : ""}`
-              : ""
-          }
-        />
-        <Rung
-          testId="idea-gate"
-          name={s.ladder.gate}
-          state={gs}
-          label={words[gs]}
-          detail={
-            g?.status === "done"
-              ? `${s.gateLine(fixed1(g.baselineMedian), fixed1(g.challengerMedian), g.pairs)}${
-                  !g.passed
-                    ? ` · ${Object.entries(g.rules)
-                        .filter(([, ok]) => !ok)
-                        .map(([k]) => s.gateRules[k] ?? codeWords(k))
-                        .join(", ")}`
-                    : ""
-                }`
-              : ""
-          }
-        />
-        <Rung
-          testId="idea-trial"
-          name={s.ladder.trial}
-          state={ts}
-          label={words[ts]}
-          detail={
-            t
-              ? s.trialLine(
-                  t.comparisons,
-                  signed(t.meanDifference),
-                  signed(t.lower),
-                  signed(t.upper),
-                )
-              : ""
-          }
-        />
-        <Rung
-          testId="idea-canary"
-          name={s.ladder.canary}
-          state={cs}
-          label={
-            c
-              ? (s.canaryStatus[c.status] ?? c.status)
-              : stage(idea) === "canary"
-                ? en.debriefs.pmPage.needsApproval
-                : s.rungWaiting
-          }
-          detail={
-            c
-              ? `${s.canaryLine(Math.round(c.share * 100), c.canaryRuns ?? 0, fixed1(c.canaryMedian), fixed1(c.controlMedian))}${
-                  c.reason && c.status === "reverted" ? ` · ${canaryReasonLabel(c.reason)}` : ""
-                }`
-              : ""
-          }
-        />
-      </ol>
+    <div className="flex flex-col gap-2 rounded-sm bg-white px-4 py-3" data-testid="idea-questions">
+      {thread.map(q => (
+        <div key={q.id} className="text-sm">
+          <div className="text-xs text-neutral-600">
+            {q.role === "agent" ? p.agent : (q.by ?? p.someone)} · {formatWhen(q.at)}
+          </div>
+          <div>{q.text}</div>
+        </div>
+      ))}
+      {thread.length > 0 && <p className="text-xs text-neutral-600">{p.noAnswerYet}</p>}
+      {open && canAsk && (
+        <>
+          <TextArea
+            id={`idea-question-${idea.id}`}
+            labelText={p.label}
+            helperText={p.help}
+            rows={2}
+            value={text}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setText(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button
+              kind="primary"
+              size="sm"
+              disabled={!text.trim() || isLoading}
+              onClick={() => void post()}
+            >
+              {p.send}
+            </Button>
+            <Button kind="ghost" size="sm" onClick={() => setOpen(false)}>
+              {en.debriefs.pmAgent.cancel}
+            </Button>
+          </div>
+        </>
+      )}
+      {!open && canAsk && (
+        <button
+          type="button"
+          className="self-start text-sm text-primary-500 underline"
+          onClick={() => setOpen(true)}
+        >
+          {p.askAnother}
+        </button>
+      )}
     </div>
   );
 };
@@ -183,23 +130,50 @@ export const IdeaCard: React.FC<{
   access: DebriefAccess;
   settingSpec?: Record<string, DebriefOwnerSettingSpec>;
   canaryShare?: number;
+  liveVersion?: number | null;
   onDecide: (d: "approve" | "reject") => void;
-}> = ({ idea, access, settingSpec, canaryShare, onDecide }) => {
+  onOpenRelease?: (version: number) => void;
+}> = ({ idea, access, settingSpec, canaryShare, liveVersion, onDecide, onOpenRelease }) => {
   const s = en.debriefs.pmAgent;
   const p = en.debriefs.pmPage;
   const [screen, { isLoading: screening }] = useScreenIdeaMutation();
+  const [startStep, { isLoading: starting }] = useStartIdeaStepMutation();
+  const [asking, setAsking] = useState(false);
   const next = stage(idea);
   const mine = needsViewer(idea, access);
   const left = daysLeft(idea);
-  const open = idea.status === "proposed";
-  const live = idea.status === "active" && idea.releaseStatus === "ga";
-  const statusLabel = idea.expired
-    ? p.expired
-    : idea.status === "active" && !live
-      ? s.noLongerLive
-      : (s.ideaStatus[idea.status] ?? idea.status);
+  const group = ideaGroup(idea, access);
+  const open = idea.status === "proposed" && !["expired", "reverted", "rejected"].includes(group);
   const pinned = idea.change.ideaKind === "pinned_rule";
-  const canPromote = access.pmAgent && next === "promote";
+  const can = idea.can ?? {
+    approve: mine,
+    reject: pinned ? access.approvePinnedRule : access.pmAgent,
+    tryIt: access.pmAgent && SCREENABLE.has(idea.change.ideaKind),
+    askQuestion: false,
+    startStep: false,
+  };
+  const wait = idea.approval?.wait;
+  const canPromote = access.pmAgent && (wait === "promote" || next === "promote");
+  const statusLabel =
+    group === "expired"
+      ? p.expired
+      : group === "promoted"
+        ? idea.releaseStatus === "ga"
+          ? s.ideaStatus.active
+          : s.noLongerLive
+        : (p.groupStatus[group] ?? s.ideaStatus[idea.status] ?? idea.status);
+  const draft =
+    idea.releaseVersion != null && idea.releaseStatus !== "ga" && open ? idea.releaseVersion : null;
+
+  const start = async (step: "gate_test" | "paired_trial") => {
+    try {
+      await startStep({ id: idea.id, step }).unwrap();
+      toast.success(p.stepStarted);
+    } catch (e) {
+      toast.error(getErrorMessage(e, s.actionFailed));
+    }
+  };
+
   return (
     <article
       className="flex flex-col gap-[18px] rounded-sm bg-neutral-50 px-7 py-6"
@@ -213,12 +187,12 @@ export const IdeaCard: React.FC<{
             codeWords(idea.change.ideaKind)}
           {idea.change.promptCode ? ` · ${promptName(idea.change.promptCode)}` : ""}
         </ConsoleTag>
-        <ConsoleTag tone={live ? "success" : open && !idea.expired ? "warning" : "neutral"}>
+        <ConsoleTag tone={group === "promoted" ? "success" : open ? "warning" : "neutral"}>
           {statusLabel}
         </ConsoleTag>
         <span className="ml-auto text-[13px] text-neutral-600">
-          {p.waiting(waitedFor(idea.createdAt))}
-          {left !== null && open && !idea.expired ? ` · ${p.expiresIn(left)}` : ""}
+          {open && p.waiting(waitedFor(idea.approval?.since ?? idea.createdAt))}
+          {left !== null && open ? ` · ${p.expiresIn(left)}` : ""}
         </span>
       </div>
       <h2 className="text-2xl font-semibold leading-snug">{inWords(idea.title)}</h2>
@@ -261,6 +235,26 @@ export const IdeaCard: React.FC<{
           )}
         </p>
       )}
+      {draft !== null && (
+        <div
+          className="flex flex-col gap-1 rounded-sm border border-primary-200 bg-white px-4 py-3"
+          data-testid="idea-draft-release"
+        >
+          <div className="flex flex-wrap items-baseline gap-2 text-sm">
+            <span className="font-semibold">{p.draft.title(draft)}</span>
+            <span className="text-neutral-600">{p.draft.help}</span>
+            {liveVersion != null && (
+              <span className="ml-auto text-[13px] text-neutral-600">
+                {p.draft.against(liveVersion)}
+              </span>
+            )}
+          </div>
+          <div className="text-[13px] text-neutral-700">
+            {changeSummary(idea, settingSpec)}
+            {liveVersion != null ? ` · ${p.draft.rest(liveVersion)}` : ""}
+          </div>
+        </div>
+      )}
       {idea.evidence.forecast?.checkedAt && (
         <p className="text-sm" data-testid="idea-forecast">
           {s.forecast(
@@ -276,66 +270,98 @@ export const IdeaCard: React.FC<{
         </p>
       )}
       <Handoff idea={idea} />
-      {SCREENABLE.has(idea.change.ideaKind) && <Ladder idea={idea} />}
-
-      {open && !idea.expired && (mine || canPromote || access.pmAgent) && (
-        <div className="flex flex-col gap-2.5" data-testid="idea-actions">
-          {mine && next === "canary" && (
-            <button
-              type="button"
-              onClick={() => onDecide("approve")}
-              className="flex h-12 items-center justify-between rounded-sm bg-primary-500 px-4 text-[15px] font-semibold text-white"
-            >
-              {p.approveCanary}
-              {canaryShare != null && (
-                <span className="text-xs font-normal opacity-90">
-                  {p.recommended(Math.round(canaryShare * 100))}
-                </span>
-              )}
-            </button>
-          )}
-          {canPromote && (
-            <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
-              {s.promote}
-            </Button>
-          )}
-          {mine && next === "handoff" && idea.evidence.handoff && (
-            <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
-              {s.handoff.approve[idea.evidence.handoff.kind]}
-            </Button>
-          )}
-          {mine && pinned && (
-            <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
-              {p.approvePinned}
-            </Button>
-          )}
-          <div className="flex flex-wrap gap-2.5">
-            {access.pmAgent && SCREENABLE.has(idea.change.ideaKind) && (
-              <Button
-                kind="tertiary"
-                size="md"
-                disabled={screening || idea.evidence.screen?.status === "running"}
-                onClick={() =>
-                  void screen(idea.id)
-                    .unwrap()
-                    .catch(e => toast.error(getErrorMessage(e, s.actionFailed)))
-                }
-              >
-                {screening || idea.evidence.screen?.status === "running" ? s.screening : s.screen}
-              </Button>
-            )}
-            {(pinned ? access.approvePinnedRule : access.pmAgent) && (
-              <Button kind="danger--tertiary" size="md" onClick={() => onDecide("reject")}>
-                {s.reject}
-              </Button>
-            )}
-          </div>
-          {access.pmAgent && !mine && !canPromote && SCREENABLE.has(idea.change.ideaKind) && (
-            <p className="text-xs text-neutral-600">{s.canaryNeedsTrial}</p>
-          )}
-        </div>
+      {SCREENABLE.has(idea.change.ideaKind) && (
+        <EvidenceBlock title={p.tests} idea={idea} testId="idea-evidence" />
       )}
-      {open && left !== null && left <= EXPIRY_WARNING_DAYS && !idea.expired && (
+      {group === "promoted" && idea.releaseVersion != null && onOpenRelease && (
+        <button
+          type="button"
+          className="self-start text-sm text-primary-500 underline"
+          onClick={() => onOpenRelease(idea.releaseVersion as number)}
+        >
+          {p.becameRelease(idea.releaseVersion)}
+        </button>
+      )}
+
+      {open &&
+        (can.approve ||
+          canPromote ||
+          can.reject ||
+          can.tryIt ||
+          can.askQuestion ||
+          can.startStep) && (
+          <div className="flex flex-col gap-2.5" data-testid="idea-actions">
+            {can.approve && next === "canary" && !pinned && (
+              <button
+                type="button"
+                onClick={() => onDecide("approve")}
+                className="flex h-12 items-center justify-between rounded-sm bg-primary-500 px-4 text-[15px] font-semibold text-white"
+              >
+                {p.approveCanary}
+                {canaryShare != null && (
+                  <span className="text-xs font-normal opacity-90">
+                    {p.recommended(Math.round(canaryShare * 100))}
+                  </span>
+                )}
+              </button>
+            )}
+            {canPromote && (
+              <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
+                {s.promote}
+              </Button>
+            )}
+            {can.approve && next === "handoff" && idea.evidence.handoff && (
+              <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
+                {s.handoff.approve[idea.evidence.handoff.kind]}
+              </Button>
+            )}
+            {pinned && (idea.can ? idea.can.approve : access.approvePinnedRule) && (
+              <Button kind="primary" size="lg" onClick={() => onDecide("approve")}>
+                {p.approvePinned}
+              </Button>
+            )}
+            {can.startStep && (wait === "start_gate" || wait === "start_trial") && (
+              <Button
+                kind="primary"
+                size="lg"
+                disabled={starting}
+                onClick={() => void start(wait === "start_gate" ? "gate_test" : "paired_trial")}
+              >
+                {wait === "start_gate" ? p.startGate : p.startTrial}
+              </Button>
+            )}
+            <div className="flex flex-wrap gap-2.5">
+              {can.askQuestion && (
+                <Button kind="tertiary" size="md" onClick={() => setAsking(true)}>
+                  {p.questions.ask}
+                </Button>
+              )}
+              {can.tryIt && SCREENABLE.has(idea.change.ideaKind) && (
+                <Button
+                  kind="tertiary"
+                  size="md"
+                  disabled={screening || idea.evidence.screen?.status === "running"}
+                  onClick={() =>
+                    void screen(idea.id)
+                      .unwrap()
+                      .catch(e => toast.error(getErrorMessage(e, s.actionFailed)))
+                  }
+                >
+                  {screening || idea.evidence.screen?.status === "running" ? s.screening : s.screen}
+                </Button>
+              )}
+              {can.reject && (
+                <Button kind="danger--tertiary" size="md" onClick={() => onDecide("reject")}>
+                  {s.reject}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      {(asking || (idea.questions?.length ?? 0) > 0) && (
+        <Questions key={String(asking)} idea={idea} canAsk={can.askQuestion} startOpen={asking} />
+      )}
+      {open && left !== null && left <= EXPIRY_WARNING_DAYS && (
         <p className="text-xs text-[#8A3800]">{p.expiresIn(left)}</p>
       )}
 
@@ -348,5 +374,3 @@ export const IdeaCard: React.FC<{
     </article>
   );
 };
-
-export { HANDOFF_KINDS };

@@ -6,42 +6,31 @@ import { toast } from "sonner";
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import {
   useEscalateDebriefMutation,
-  useGetDebriefCalibrationSampleQuery,
-  useGetDebriefOverviewQuery,
-  useGetDebriefReviewQuery,
-  useGetDebriefRunsQuery,
-  useGetPmAgentStateQuery,
+  useGetDebriefAttentionQuery,
+  useGetDebriefSessionsQuery,
 } from "@api";
-import { formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { EmptyPanel, ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { en, ROUTES } from "@constants";
+import { DebriefAttention } from "@types";
 import { getErrorMessage } from "@utils";
 
 import { languageLabel, recipeLabel } from "../consoleLabels";
-import { pmAgentPath, settingsPath } from "../consoleRoutes";
+import { ANALYTICS_DEBRIEFS_TAB, pmAgentPath, settingsPath } from "../consoleRoutes";
 import { AlertBanner, Segmented } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
-import { needsViewer, recentlyReverted } from "../pm/ideaGroups";
 import {
-  buildSessionItems,
-  categoryList,
+  categoriesFor,
+  categoryCount,
   FILTER_KEYS,
   groupByDay,
-  HOME_CATEGORIES,
-  HomeCategory,
-  HomeFilters,
-  inCategory,
-  matchesFilters,
+  queueOrder,
   readHomeState,
-  SessionItem,
+  sessionsQuery,
   waitedFor,
 } from "../queue";
-import { scenarioTitle, SessionCard, SessionRow } from "./SessionCard";
+import { SessionCard, SessionRow } from "./SessionCard";
 
-/** The monthly cap turns the home's banner yellow at this share spent. */
-export const CAP_WARNING_SHARE = 0.8;
-
-/** A session link that keeps the home's category and filters, so Back and Previous/Next agree. */
+/** A session link that keeps the home's category and filters, so Back returns there. */
 export const sessionLink = (runId: string, params: URLSearchParams) => {
   const q = new URLSearchParams();
   for (const k of ["cat", ...FILTER_KEYS]) {
@@ -53,34 +42,15 @@ export const sessionLink = (runId: string, params: URLSearchParams) => {
 };
 
 const isTyping = (e: KeyboardEvent) => {
-  const t = e.target as HTMLElement | null;
+  const t = e.target;
   return (
-    !!t &&
+    t instanceof HTMLElement &&
     (t.tagName === "INPUT" ||
       t.tagName === "TEXTAREA" ||
       t.tagName === "SELECT" ||
       t.isContentEditable ||
       t.getAttribute("role") === "combobox")
   );
-};
-
-/** The items every Debriefs page reads the queue from: the home, and the session's Previous/Next. */
-export const useSessionItems = (canScore: boolean) => {
-  const [polling, setPolling] = useState(false);
-  const runs = useGetDebriefRunsQuery(
-    { status: "" },
-    { refetchOnMountOrArgChange: true, pollingInterval: polling ? 15_000 : 0 },
-  );
-  const review = useGetDebriefReviewQuery();
-  const sample = useGetDebriefCalibrationSampleQuery(undefined, { skip: !canScore });
-  const anyRunning = !!runs.data?.some(r => r.status === "running" || r.status === "queued");
-  // Polling follows whether a run is in flight; adjusted while rendering rather than in an effect.
-  if (anyRunning !== polling) setPolling(anyRunning);
-  const items = useMemo(
-    () => buildSessionItems(runs.data, review.data, canScore ? sample.data?.items : undefined),
-    [runs.data, review.data, sample.data, canScore],
-  );
-  return { items, runs, review };
 };
 
 type Item = { id: string; label: string };
@@ -110,26 +80,93 @@ const Filter: React.FC<{
   </div>
 );
 
-const uniq = (xs: Array<string | null>) =>
-  [...new Set(xs.filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b));
+type Banner = DebriefAttention["banners"][number];
+
+/** Where a banner's link goes. Banners link to the thing to read; they never act. */
+export const bannerHref = (b: Banner): string => {
+  switch (b.link.page) {
+    case "session":
+      return b.link.runId ? ROUTES.DEBRIEF_SESSION(b.link.runId) : ROUTES.DEBRIEFS;
+    case "pm_agent":
+      return pmAgentPath("ideas", b.link.ideaId);
+    case "settings":
+      return settingsPath(b.kind === "cap" ? "budget" : undefined);
+    case "analytics":
+      return `${ROUTES.ANALYTICS}?tab=${ANALYTICS_DEBRIEFS_TAB}`;
+    default:
+      return `${ROUTES.DEBRIEFS}${b.link.category ? `?cat=${b.link.category === "to_score" ? "score" : b.link.category}` : ""}`;
+  }
+};
+
+/** A banner in the console's words; ally-be's sentence only for a kind this build doesn't know. */
+export const bannerText = (b: Banner): string => {
+  const t = en.debriefs.home.banners;
+  const n = b.count ?? 1;
+  const waited = b.oldestSince ? waitedFor(b.oldestSince) : null;
+  switch (b.kind) {
+    case "urgent":
+      return t.urgent(n, waited);
+    case "held":
+      return t.held(n, waited, !!b.overdue);
+    case "escalated":
+      return t.escalated(n);
+    case "canary_reverted":
+      return t.reverted(n);
+    case "approval_expiring":
+      return t.expiring(n);
+    case "agent_off":
+      return t.off;
+    case "cap":
+      return t.cap(b.level === "red");
+    case "provider_down":
+      return t.provider;
+    case "language_not_recorded":
+      return t.language;
+    default:
+      return b.message;
+  }
+};
+
+const BANNER_ACTION: Record<string, keyof typeof en.debriefs.home.bannerActions> = {
+  session: "open",
+  home: "show",
+  pm_agent: "answer",
+  settings: "settings",
+  analytics: "analytics",
+};
 
 /**
- * The Debriefs home (redesign 2026-11-12): every debriefed session as a card, by category, with
- * the queue of what needs a person first. Opening one goes to its session page.
+ * The Debriefs home (redesign 2026-11-12): every debriefed session as a card, by category, the
+ * queue of what needs a person first. Opening one goes to its session page.
  */
 export const DebriefsHome: React.FC = () => {
   const h = en.debriefs.home;
   const navigate = useNavigate();
-  const access = useDebriefAccess();
   const [params, setParams] = useSearchParams();
-  const { cat, filters, list } = readHomeState(params, access.score);
-  const { items, runs, review } = useSessionItems(access.score);
-  const overview = useGetDebriefOverviewQuery();
-  const pm = useGetPmAgentStateQuery(undefined, {
-    skip: !access.pmAgent && !access.approvePinnedRule,
+  const [polling, setPolling] = useState(false);
+  const attention = useGetDebriefAttentionQuery(undefined, { pollingInterval: 60_000 });
+  // The access before the list has said: the attention payload, then the user's permissions.
+  const preAccess = useDebriefAccess(attention.data?.viewer);
+  const allowedBefore = categoriesFor({
+    score: preAccess.score,
+    escalations: preAccess.receivesEscalations,
   });
+  const { cat, filters, list } = readHomeState(params, [...allowedBefore, "score", "escalated"]);
+  // Fresh on every visit, and every 15 s while a debrief is being written.
+  const sessions = useGetDebriefSessionsQuery(sessionsQuery(cat, filters), {
+    refetchOnMountOrArgChange: true,
+    pollingInterval: polling ? 15_000 : 0,
+  });
+  const page = sessions.data;
+  const access = useDebriefAccess(page?.viewer ?? attention.data?.viewer);
+  const anyRunning = !!page?.items.some(r => r.status === "running" || r.status === "queued");
+  if (anyRunning !== polling) setPolling(anyRunning);
   const [escalate] = useEscalateDebriefMutation();
-  const ceiling = overview.data?.budget.runCeilingUsd;
+
+  const categories = useMemo(
+    () => categoriesFor({ score: access.score, escalations: access.receivesEscalations }),
+    [access.score, access.receivesEscalations],
+  );
 
   const set = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -140,27 +177,17 @@ export const DebriefsHome: React.FC = () => {
     setParams(next, { replace: true });
   };
 
-  const categories = HOME_CATEGORIES.filter(c => c !== "score" || access.score);
-  const counts = useMemo(
-    () =>
-      Object.fromEntries(
-        categories.map(c => [
-          c,
-          items.filter(i => inCategory(i, c) && matchesFilters(i, filters, ceiling)).length,
-        ]),
-      ) as Record<HomeCategory, number>,
-    [categories, items, filters, ceiling],
-  );
-  const shown = useMemo(
-    () => categoryList(items, cat, filters, ceiling),
-    [items, cat, filters, ceiling],
-  );
-  const groups =
-    cat === "needs"
-      ? shown.length
-        ? [{ label: h.inOrder, items: shown }]
-        : []
-      : groupByDay(shown, { today: h.today, yesterday: h.yesterday });
+  // ally-be sends the queue in order; it is kept in that order whatever the transport did.
+  const shown = useMemo(() => {
+    const items = page?.items ?? [];
+    return cat === "needs" || cat === "escalated" ? queueOrder(items) : items;
+  }, [page, cat]);
+  const queue = cat === "needs" || cat === "escalated";
+  const groups = queue
+    ? shown.length
+      ? [{ label: h.inOrder, items: shown }]
+      : []
+    : groupByDay(shown, { today: h.today, yesterday: h.yesterday });
 
   // j / k move through what is shown, Enter opens it, e escalates it (the Ally team only).
   const [selected, setSelected] = useState(0);
@@ -185,16 +212,9 @@ export const DebriefsHome: React.FC = () => {
       } else if (e.key === "Enter") {
         e.preventDefault();
         navigate(sessionLink(current.runId, params));
-      } else if (e.key === "e" && access.escalate && !current.escalated) {
-        const flag = current.flags[0];
-        const target = flag
-          ? { kind: "flags" as const, id: flag.id }
-          : current.review
-            ? { kind: "runs" as const, id: current.runId }
-            : null;
-        if (!target) return;
+      } else if (e.key === "e" && access.escalate && current.needsPerson && !current.escalated) {
         e.preventDefault();
-        escalate(target)
+        escalate({ kind: "runs", id: current.runId })
           .unwrap()
           .then(() => toast.success(en.debriefs.review.escalatedDone))
           .catch(err => toast.error(getErrorMessage(err, en.debriefs.review.failed)));
@@ -204,35 +224,12 @@ export const DebriefsHome: React.FC = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [shown, selected, navigate, params, access.escalate, escalate]);
 
-  const ideas = pm.data?.ideas ?? [];
-  const needsYou = ideas.filter(i => needsViewer(i, access)).length;
-  const reverted = access.pmAgent ? recentlyReverted(ideas) : [];
-  const o = overview.data;
-
-  // What is shown above everything: only for a role that can act on it.
-  const urgent = access.decideFlags
-    ? items.filter(i => i.urgent || (i.learnerDistress && i.review))
-    : [];
-  const escalatedToMe = access.advisor && !access.team ? items.filter(i => i.escalated) : [];
-  const oldest = (xs: SessionItem[]) =>
-    [...xs].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince))[0];
-  const capShare =
-    o?.budget.monthSpentUsd != null && o.budget.monthlyCapUsd > 0
-      ? o.budget.monthSpentUsd / o.budget.monthlyCapUsd
-      : 0;
-  const staff = access.team || access.owner;
-
-  const filterOptions = {
-    org: uniq(items.map(i => i.tenantName)).map(v => ({ id: v, label: v })),
-    language: uniq(items.map(i => i.language)).map(v => ({ id: v, label: languageLabel(v) })),
-    recipe: uniq(items.map(i => i.recipeKey)).map(v => ({ id: v, label: recipeLabel(v) })),
-  };
+  const needsYou = attention.data?.counts.pmAgentNeedsYou ?? 0;
+  const options = page?.filterOptions;
   const opts = (key: keyof typeof h.filters, more: Item[]): Item[] => [
     { id: "", label: h.filters[key].all },
     ...more,
   ];
-
-  const loading = !runs.data && !runs.isError;
 
   return (
     <div className="flex flex-col gap-5 font-primary" data-testid="debriefs-home">
@@ -243,85 +240,27 @@ export const DebriefsHome: React.FC = () => {
         <p className="text-[15px] text-neutral-600">{h.intro}</p>
       </header>
 
-      {urgent.length > 0 && (
+      {(attention.data?.banners ?? []).map((b, i) => (
         <AlertBanner
-          kind="error"
-          testId="home-urgent-banner"
+          key={`${b.kind}-${i}`}
+          kind={b.level === "red" ? "error" : "warning"}
+          testId={`home-banner-${b.kind}`}
           action={
             <Link
-              to={sessionLink(oldest(urgent).runId, params)}
-              className="inline-flex h-9 items-center rounded-sm bg-destructive-500 px-3.5 text-sm font-semibold text-white no-underline"
+              to={bannerHref(b)}
+              className={
+                b.level === "red" && b.link.page === "session"
+                  ? "inline-flex h-9 items-center rounded-sm bg-destructive-500 px-3.5 text-sm font-semibold text-white no-underline"
+                  : "text-sm font-semibold"
+              }
             >
-              {h.openIt}
+              {h.bannerActions[BANNER_ACTION[b.link.page] ?? "show"]}
             </Link>
           }
         >
-          <b>{h.urgentBanner(urgent.length, waitedFor(oldest(urgent).waitingSince))}</b>{" "}
-          {h.urgentWhere(scenarioTitle(oldest(urgent)))}
+          {bannerText(b)}
         </AlertBanner>
-      )}
-      {escalatedToMe.length > 0 && (
-        <AlertBanner
-          kind="error"
-          testId="home-escalated-banner"
-          action={
-            <Link
-              to={sessionLink(oldest(escalatedToMe).runId, params)}
-              className="inline-flex h-9 items-center rounded-sm bg-destructive-500 px-3.5 text-sm font-semibold text-white no-underline"
-            >
-              {h.openIt}
-            </Link>
-          }
-        >
-          <b>{h.escalatedBanner(escalatedToMe.length)}</b>
-        </AlertBanner>
-      )}
-      {reverted.length > 0 && (
-        <AlertBanner
-          kind="error"
-          testId="home-reverted-banner"
-          action={
-            <Link to={pmAgentPath("ideas", reverted[0].id)} className="text-sm font-semibold">
-              {h.readIt}
-            </Link>
-          }
-        >
-          <b>{h.reverted(reverted.length)}</b>
-        </AlertBanner>
-      )}
-      {staff && o?.mode === "off" && (
-        <AlertBanner kind="error" testId="home-off-banner">
-          <b>{en.debriefs.runs.offTitle}</b> {en.debriefs.runs.offMessage}
-        </AlertBanner>
-      )}
-      {staff && capShare >= CAP_WARNING_SHARE && o && (
-        <AlertBanner
-          kind={capShare >= 1 ? "error" : "warning"}
-          testId="home-cap-banner"
-          action={
-            <Link to={settingsPath("budget")} className="text-sm font-semibold">
-              {h.budgets}
-            </Link>
-          }
-        >
-          {h.capBanner(formatUsd(o.budget.monthSpentUsd), formatUsd(o.budget.monthlyCapUsd))}
-        </AlertBanner>
-      )}
-      {staff && !!o?.languageIncidents?.length && (
-        <AlertBanner kind="warning" testId="language-incidents">
-          <b>{en.debriefs.runs.languageIncident.title}</b>{" "}
-          {o.languageIncidents
-            .map(i =>
-              en.debriefs.runs.languageIncident.line(
-                i.tenantName ?? i.tenantId,
-                i.detected,
-                i.runs,
-                i.unsure,
-              ),
-            )
-            .join(" ")}
-        </AlertBanner>
-      )}
+      ))}
 
       <div className="flex flex-wrap items-center gap-3">
         <Segmented
@@ -333,7 +272,9 @@ export const DebriefsHome: React.FC = () => {
             label: (
               <>
                 {h.categories[c]}
-                <span className="text-xs opacity-75">{counts[c]}</span>
+                <span className="text-xs opacity-75" data-testid={`count-${c}`}>
+                  {categoryCount(page?.counts, c) ?? ""}
+                </span>
               </>
             ),
           }))}
@@ -389,6 +330,7 @@ export const DebriefsHome: React.FC = () => {
           {needsYou > 0 && (
             <span
               aria-label={h.needsYouCount(needsYou)}
+              data-testid="pm-needs-you"
               className="rounded-full bg-primary-500 px-[7px] py-px text-[11px] font-semibold text-white"
             >
               {needsYou}
@@ -410,22 +352,31 @@ export const DebriefsHome: React.FC = () => {
         <Filter
           id="org"
           label={h.filters.org.label}
-          value={filters.org ?? ""}
-          options={opts("org", filterOptions.org)}
-          onChange={v => set({ org: v })}
+          value={filters.tenantId ?? ""}
+          options={opts(
+            "org",
+            (options?.tenants ?? []).map(t => ({ id: t.id, label: t.name })),
+          )}
+          onChange={v => set({ tenantId: v })}
         />
         <Filter
           id="language"
           label={h.filters.language.label}
           value={filters.language ?? ""}
-          options={opts("language", filterOptions.language)}
+          options={opts(
+            "language",
+            (options?.languages ?? []).map(l => ({ id: l, label: languageLabel(l) })),
+          )}
           onChange={v => set({ language: v })}
         />
         <Filter
           id="recipe"
           label={h.filters.recipe.label}
           value={filters.recipe ?? ""}
-          options={opts("recipe", filterOptions.recipe)}
+          options={opts(
+            "recipe",
+            (options?.recipes ?? []).map(r => ({ id: r, label: recipeLabel(r) })),
+          )}
           onChange={v => set({ recipe: v })}
         />
         <Filter
@@ -434,19 +385,22 @@ export const DebriefsHome: React.FC = () => {
           value={filters.fallback ?? ""}
           options={opts(
             "fallback",
-            (["none", "low", "high"] as const).map(id => ({ id, label: h.filters.fallback[id] })),
+            (["none", "light", "heavy"] as const).map(id => ({
+              id,
+              label: h.filters.fallback[id],
+            })),
           )}
           onChange={v => set({ fallback: v })}
         />
         <Filter
           id="risk"
           label={h.filters.risk.label}
-          value={filters.risk ?? ""}
+          value={filters.riskCue ?? ""}
           options={opts(
             "risk",
-            (["yes", "no"] as const).map(id => ({ id, label: h.filters.risk[id] })),
+            (["true", "false"] as const).map(id => ({ id, label: h.filters.risk[id] })),
           )}
-          onChange={v => set({ risk: v })}
+          onChange={v => set({ riskCue: v })}
         />
         <Filter
           id="cost"
@@ -454,7 +408,7 @@ export const DebriefsHome: React.FC = () => {
           value={filters.cost ?? ""}
           options={opts(
             "cost",
-            (["over", "ceiling"] as const).map(id => ({ id, label: h.filters.cost[id] })),
+            (["over_0_20", "hit_ceiling"] as const).map(id => ({ id, label: h.filters.cost[id] })),
           )}
           onChange={v => set({ cost: v })}
         />
@@ -463,23 +417,20 @@ export const DebriefsHome: React.FC = () => {
         </span>
       </div>
 
-      {cat === "needs" && <p className="text-sm text-neutral-700">{h.queueNote}</p>}
+      {queue && <p className="text-sm text-neutral-700">{h.queueNote}</p>}
 
-      {runs.isError || review.isError ? (
+      {sessions.isError && !page ? (
         <ErrorPanel
           what={h.loadFailed}
-          error={runs.error ?? review.error}
-          onRetry={() => {
-            void runs.refetch();
-            void review.refetch();
-          }}
+          error={sessions.error}
+          onRetry={() => void sessions.refetch()}
         />
-      ) : loading ? (
+      ) : !page ? (
         <LoadingBlock lines={6} />
       ) : shown.length === 0 ? (
         <EmptyPanel title={h.empty[cat].title} message={h.empty[cat].message} />
       ) : (
-        <div ref={listRef} className="flex flex-col gap-5">
+        <div ref={listRef} className="flex flex-col gap-5" data-testid="home-list">
           {groups.map(g => (
             <section key={g.label} className="flex flex-col gap-3">
               <h2 className="text-xs font-semibold tracking-[.32px] text-neutral-600">{g.label}</h2>
@@ -515,5 +466,3 @@ export const DebriefsHome: React.FC = () => {
     </div>
   );
 };
-
-export type { HomeFilters };

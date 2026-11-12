@@ -93,11 +93,12 @@ const TestSetsView: React.FC<{
 export const PmAgentPage: React.FC = () => {
   const s = en.debriefs.pmAgent;
   const p = en.debriefs.pmPage;
-  const access = useDebriefAccess();
+  const state0 = useGetPmAgentStateQuery();
+  const access = useDebriefAccess(state0.data?.viewer);
   const [params, setParams] = useSearchParams();
   const raw = params.get("view") as PmAgentView | null;
   const view: PmAgentView = raw && VIEWS.includes(raw) ? raw : "ideas";
-  const state = useGetPmAgentStateQuery();
+  const state = state0;
   const overview = useGetDebriefOverviewQuery();
   const [run, { isLoading: running }] = useRunPmAgentMutation();
 
@@ -153,7 +154,17 @@ export const PmAgentPage: React.FC = () => {
           <LoadingBlock lines={8} />
         </div>
       ) : view === "releases" ? (
-        <ReleasesView canAct={access.releases} ideas={state.data.ideas} overview={overview.data} />
+        <ReleasesView
+          canAct={access.releases}
+          ideas={state.data.ideas}
+          overview={overview.data}
+          selected={params.get("release") ? Number(params.get("release")) : null}
+          onSelect={version => {
+            const next = new URLSearchParams(params);
+            next.set("release", String(version));
+            setParams(next, { replace: true });
+          }}
+        />
       ) : (
         <IdeasView
           state={state.data}
@@ -165,6 +176,7 @@ export const PmAgentPage: React.FC = () => {
             next.set("idea", id);
             setParams(next, { replace: true });
           }}
+          onOpenRelease={version => setParams({ view: "releases", release: String(version) })}
         />
       )}
     </div>

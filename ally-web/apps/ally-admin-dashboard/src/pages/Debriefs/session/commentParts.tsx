@@ -4,12 +4,12 @@ import { toast } from "sonner";
 
 import { Button, Checkbox, TextArea } from "@ally-ui-mono/ui-shared";
 import {
-  useAddExpertCommentMutation,
-  useDeleteExpertCommentMutation,
-  useEditExpertCommentMutation,
+  useAddDebriefCommentMutation,
+  useDeleteDebriefCommentMutation,
+  useEditDebriefCommentMutation,
   useGetMyExpertCommentsQuery,
   useMarkStillHappeningMutation,
-  useSetExpertCommentStatusMutation,
+  useSetDebriefCommentStatusMutation,
   useSetExpertVerdictMutation,
 } from "@api";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
@@ -98,10 +98,10 @@ export const Thread: React.FC<{
   const [editing, setEditing] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [add, adding] = useAddExpertCommentMutation();
-  const [edit] = useEditExpertCommentMutation();
-  const [remove, removing] = useDeleteExpertCommentMutation();
-  const [setStatus, statusing] = useSetExpertCommentStatusMutation();
+  const [add, adding] = useAddDebriefCommentMutation();
+  const [edit] = useEditDebriefCommentMutation();
+  const [remove, removing] = useDeleteDebriefCommentMutation();
+  const [setStatus, statusing] = useSetDebriefCommentStatusMutation();
   const run = async (p: Promise<unknown>, failed: string) => {
     try {
       await p;

@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { Button, Checkbox, TextArea } from "@ally-ui-mono/ui-shared";
-import { useGetDebriefCalibrationItemQuery, useSubmitDebriefRatingMutation } from "@api";
+import { useGetDebriefCalibrationItemQuery, useScoreDebriefSessionMutation } from "@api";
 import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { InfoTip } from "@components/ally-guide/InfoTip";
 import { en } from "@constants";
@@ -21,7 +21,7 @@ export const DEBRIEF_DIMENSIONS: DebriefDimension[] = [
   "tone",
   "clarity",
 ];
-const HARD_FAILS: DebriefHardFail[] = [
+export const HARD_FAILS: DebriefHardFail[] = [
   "missed_risk_cue",
   "fabricated_quote",
   "diagnoses_trainee",
@@ -81,7 +81,7 @@ const RatingForm: React.FC<{ item: DebriefCalibrationItem; onSaved?: () => void 
   onSaved,
 }) => {
   const strings = en.debriefs.rating;
-  const [submit, { isLoading: isSaving }] = useSubmitDebriefRatingMutation();
+  const [submit, { isLoading: isSaving }] = useScoreDebriefSessionMutation();
   const [scores, setScores] = useState<Partial<Record<DebriefDimension, number>>>(
     item.myRating?.scores ?? {},
   );

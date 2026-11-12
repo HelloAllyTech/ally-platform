@@ -66,6 +66,7 @@ import { UserModal } from "@components";
 import { AgentAvatar } from "@components/agent-avatar";
 import { ColorModeToggle } from "@components/color-mode-toggle/ColorModeToggle";
 import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
+import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import { SIDEBAR_ITEMS, ROUTES, en, profileSettings, USER_MODAL_FIELDS_IDS } from "@constants";
 import { useClickOutside, useUser } from "@hooks";
 
@@ -523,6 +524,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         showExpanded ? "flex-row px-2" : "flex-col"
       }`}
     >
+      <NotificationBell placement="above" />
       <IdeaCaptureLauncher />
       <ColorModeToggle />
     </div>

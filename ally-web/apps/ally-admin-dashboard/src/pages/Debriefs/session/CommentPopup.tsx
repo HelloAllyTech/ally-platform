@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 import { toast } from "sonner";
 
-import { useAddExpertCommentMutation } from "@api";
+import { useAddDebriefCommentMutation } from "@api";
 import { en } from "@constants";
 import { ExpertCommentDraftAnchor, ExpertCommentTag } from "@types";
 import { getErrorMessage } from "@utils";
@@ -22,7 +22,7 @@ export const CommentPopup: React.FC<{
   const s = en.debriefs.session.comment;
   const [tag, setTag] = useState<ExpertCommentTag | null>(null);
   const [body, setBody] = useState("");
-  const [add, { isLoading }] = useAddExpertCommentMutation();
+  const [add, { isLoading }] = useAddDebriefCommentMutation();
   const post = async () => {
     try {
       await add({ runId, comment: { ...anchor, body: body.trim(), tag } }).unwrap();

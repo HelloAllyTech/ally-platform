@@ -1,3 +1,5 @@
+import type { DebriefViewer } from "./debriefConsoleView";
+
 /**
  * The Debrief Console — mirrors ally-be `src/debrief/controller/debrief-console.controller.ts`.
  */
@@ -76,11 +78,6 @@ export interface DebriefRunRow {
   arm: "baseline" | "challenger" | null;
   createdAt: string;
   tenantName: string | null;
-  /** The scenario the roleplay ran (console redesign item 6); absent from an older backend. */
-  scenarioName?: string | null;
-  tenantId?: string | null;
-  /** Queue order from ally-be (0 urgent flag, 1 other flag, 2 below the bar, 3 the rest). */
-  queueRank?: number | null;
 }
 
 export interface DebriefRunStep {
@@ -109,41 +106,6 @@ export interface DebriefReplyTrace {
   costUsd: number;
   tools: Array<{ name: string; topic?: string; ok: boolean; ms: number; found: string }>;
   stoppedBy?: "max_turns" | "budget";
-  /** The learner's question and the reply sent (console redesign item 5); absent until ally-be sends them. */
-  question?: string | null;
-  reply?: string | null;
-  /** Whether the reply passed its checks or the fallback replaced it. */
-  outcome?: "passed" | "replaced" | null;
-  /** The card the question was about (a section such as `work_on_this[0]`). */
-  section?: string | null;
-  /** A replaced reply: the draft that was blocked and the check it failed. */
-  blocked?: string | null;
-  failedCheck?: string | null;
-  /** Time to the reply's first words. */
-  firstWordsMs?: number | null;
-  /** Whether the safety check found distress in the question. */
-  distress?: boolean | null;
-}
-
-/** One skill in the learner's running estimate (PRD §10): shown only in "How it was made". */
-export interface DebriefSkillEstimate {
-  skill: string;
-  /** 0..1, or null when it did not come up. */
-  level: number | null;
-  word?: string | null;
-}
-
-/** Something the viewer's role must decide on this session (console redesign item 21). */
-export interface DebriefPendingAction {
-  kind: "urgent_flag" | "flag" | "distress" | "held" | "below_bar" | "escalated";
-  role: "team" | "advisor";
-  /** The flag's id for a flag, else the run's. */
-  id: string;
-  since: string;
-  /** Turns to read first. */
-  turns?: number[];
-  /** The card section to read first, e.g. `work_on_this[0]`. */
-  section?: string | null;
 }
 
 export interface DebriefRunDetail {
@@ -183,20 +145,6 @@ export interface DebriefRunDetail {
   };
   cards: DebriefCardsData | null;
   error: string | null;
-  /** Console redesign additions; each is absent from an older backend. */
-  scenarioName?: string | null;
-  tenantName?: string | null;
-  createdAt?: string;
-  hasRiskCue?: boolean;
-  learnerDistress?: boolean;
-  arm?: "baseline" | "challenger" | null;
-  seconds?: number | null;
-  skillEstimate?: { skills: DebriefSkillEstimate[]; sessions: number } | null;
-  pendingActions?: DebriefPendingAction[];
-  /** Whether the viewer may add comments (review rights). */
-  canComment?: boolean;
-  /** The version a correction saves as (1 for the debrief as first published). */
-  cardVersion?: number | null;
 }
 
 export interface DebriefCardsData {
@@ -341,24 +289,37 @@ export interface PmAgentIdeaRow {
   createdAt: string;
   releaseVersion: number | null;
   releaseStatus: string | null;
-  /** Console redesign item 7: the short code people call it by, and when it lapses as "no decision". */
+  /** The short code people call it by, when ally-be sends one. */
   code?: string | null;
-  expiresAt?: string | null;
+  /** Console redesign item 7 (CONSOLE_API.md "PM agent: approvals"). */
+  decidedBy?: number | null;
+  decidedAt?: string | null;
+  changeKind?: "settings" | "guidance" | "prompts" | "models" | "pinned_rules" | null;
+  approval?: {
+    wait: "pinned_rule" | "handoff" | "start_gate" | "start_trial" | "start_canary" | "promote";
+    since: string;
+    expiresAt: string;
+    expiresInDays: number;
+    expired: boolean;
+    expiringSoon: boolean;
+  } | null;
   expired?: boolean;
+  notTakenForward?: boolean;
+  notTakenForwardReason?: "no_decision" | "rejected" | null;
   questions?: Array<{
     id: string;
+    role: "person" | "agent";
     by: string | null;
-    body: string;
     at: string;
-    reply?: string | null;
+    text: string;
   }>;
-}
-
-/** How free the PM agent is with one kind of change (PRD §12). */
-export interface PmAgentAutonomy {
-  kind: "settings" | "guidance" | "prompts" | "models" | "pinned_rules";
-  state: "alone" | "asks_first" | "always_asks" | "never";
-  reason: string | null;
+  can?: {
+    approve: boolean;
+    reject: boolean;
+    tryIt: boolean;
+    askQuestion: boolean;
+    startStep: boolean;
+  };
 }
 
 export interface PmAgentState {
@@ -366,18 +327,7 @@ export interface PmAgentState {
   at: string | null;
   learningSpentUsd: number | null;
   ideas: PmAgentIdeaRow[];
-  /** Console redesign item 8; absent from an older backend. */
-  autonomy?: PmAgentAutonomy[];
-}
-
-/** A pinned rule's live version and who signed it (console redesign item 9). */
-export interface DebriefPinnedRule {
-  key: string;
-  name: string;
-  version: number;
-  signedBy: string | null;
-  signedRole?: "clinical_advisor" | "owner" | null;
-  signedAt: string | null;
+  viewer?: DebriefViewer;
 }
 
 export interface DebriefReleaseRow {
@@ -390,6 +340,38 @@ export interface DebriefReleaseRow {
   promotedAt: string | null;
   prompts: Record<string, number | null>;
   maxRevisionRounds: number | null;
+  /** Releases page redesign; each is absent until ally-be sends it. */
+  title?: string | null;
+  /** Where it came from ("From idea PM-11 · approved by Priya", "Code release be-v1.190.2"). */
+  source?: string | null;
+  retiredAt?: string | null;
+  retiredReason?: string | null;
+  rolledBack?: boolean;
+  previousVersion?: number | null;
+  summary?: string | null;
+  changes?: Array<{
+    area: string;
+    what: string;
+    why?: string | null;
+    before?: string | null;
+    after?: string | null;
+  }>;
+  /** "Since going live" / "While it was live", against the live release before it. */
+  live?: {
+    debriefs: number;
+    judgeMedian: number | null;
+    hardFails: number | null;
+    costUsd: number | null;
+    seconds: number | null;
+    previous?: {
+      version: number;
+      judgeMedian: number | null;
+      hardFails: number | null;
+      costUsd: number | null;
+      seconds: number | null;
+    } | null;
+  } | null;
+  settings?: Record<string, number | boolean>;
 }
 
 export interface DebriefTenantRow {
@@ -426,8 +408,6 @@ export interface DebriefReviewRun {
   /** v9 FR-21: published, but the independent judge scored it below the bar or found a hard fail. */
   judgeBelowBar: boolean;
   judgeHardFails: Array<{ code: string; evidence: string }> | null;
-  scenarioName?: string | null;
-  queueRank?: number | null;
 }
 
 /** The words of a card a reviewer may rewrite; the quote never changes. */
@@ -535,34 +515,6 @@ export interface DebriefSettingsView {
   } | null;
   updatedAt: string;
   updatedBy: number | null;
-  /** Console redesign items 8, 9, 13; absent from an older backend. */
-  autonomy?: PmAgentAutonomy[];
-  pinnedRules?: DebriefPinnedRule[];
-  /** "What the PM agent may do alone": kind of change × test step (design update 2026-11-12). */
-  autonomyMatrix?: PmAgentAutonomyRow[];
-  /** Per organisation: may only tighten the defaults above. */
-  orgAutonomy?: DebriefOrgAutonomy[];
-}
-
-export type PmAgentAutonomyStep = "quick" | "gate" | "trial" | "canary";
-export type PmAgentAutonomyCell = "alone" | "asks_first" | "off" | "never";
-
-export interface PmAgentAutonomyRow {
-  kind: PmAgentAutonomy["kind"];
-  steps: Record<PmAgentAutonomyStep, PmAgentAutonomyCell>;
-  eligible: boolean;
-  eligibleReason: string | null;
-}
-
-export type DebriefOrgPolicy = "default" | "asks_first" | "never";
-
-export interface DebriefOrgAutonomy {
-  tenantId: string;
-  tenantName: string;
-  live: boolean;
-  trials: DebriefOrgPolicy;
-  canaries: DebriefOrgPolicy;
-  guidance: DebriefOrgPolicy;
 }
 
 /** A rate with its counts (v9 §3.3); `value` is null when nothing was counted. */

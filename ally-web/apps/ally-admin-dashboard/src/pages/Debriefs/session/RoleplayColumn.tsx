@@ -1,8 +1,8 @@
 import React from "react";
 
-import { EmptyPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
+import { EmptyPanel } from "@components/ally-guide/ConsoleStates";
 import { en } from "@constants";
-import { ExpertComment, ExpertCommentDraftAnchor, ExpertReviewDetail } from "@types";
+import { ExpertComment, ExpertCommentDraftAnchor, ExpertTranscriptTurn } from "@types";
 
 import { codeWords } from "../consoleLabels";
 import { turnAnchor } from "../expertReviewSelection";
@@ -19,9 +19,7 @@ export const turnDomId = (n: number) => `session-turn-${n}`;
 export const RoleplayColumn: React.FC<{
   runId: string;
   sessionId: string;
-  detail: ExpertReviewDetail | undefined;
-  failed: boolean;
-  loading: boolean;
+  transcript: ExpertTranscriptTurn[];
   roots: ExpertComment[];
   activeId: string | null;
   onFocusThread: (id: string) => void;
@@ -33,9 +31,7 @@ export const RoleplayColumn: React.FC<{
 }> = ({
   runId,
   sessionId,
-  detail,
-  failed,
-  loading,
+  transcript,
   roots,
   activeId,
   onFocusThread,
@@ -46,7 +42,7 @@ export const RoleplayColumn: React.FC<{
   canComment,
 }) => {
   const s = en.debriefs.session;
-  const turns = detail?.transcript ?? [];
+  const turns = transcript;
   return (
     <section
       aria-label={s.roleplay}
@@ -66,9 +62,7 @@ export const RoleplayColumn: React.FC<{
         className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 py-4"
         onMouseUp={canComment ? onSelect : undefined}
       >
-        {loading ? (
-          <LoadingBlock lines={8} />
-        ) : failed || !detail ? (
+        {turns.length === 0 ? (
           <EmptyPanel title={s.noTranscript} message={s.noTranscriptHelp} />
         ) : (
           turns.map(turn => {

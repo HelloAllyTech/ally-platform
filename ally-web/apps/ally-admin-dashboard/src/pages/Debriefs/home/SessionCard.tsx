@@ -4,32 +4,32 @@ import { Link } from "react-router-dom";
 
 import { formatUsd, shortId } from "@components/ally-guide/allyGuideFormat";
 import { en } from "@constants";
+import { DebriefRunStatus } from "@types";
 
 import { languageLabel, recipeLabel } from "../consoleLabels";
 import { score } from "../consoleTable";
-import { ConsoleTag } from "../consoleUi";
+import { ConsoleTag, TagTone } from "../consoleUi";
 import { SessionItem } from "../queue";
 
 /** Judge scores under this read in orange (the bar the judge holds debriefs to). */
 export const JUDGE_BAR = 8;
 
-export const statusTone = (item: SessionItem) =>
-  item.status === "published"
-    ? "success"
-    : item.belowBar && item.status !== "needs_person"
-      ? "neutral"
-      : "warning";
-
-/** The status a card leads with: what a person sees first. */
-export const statusLabel = (item: SessionItem): string => {
+/** The status a card or the session header leads with, and its colour. */
+export const statusOf = (s: {
+  status: DebriefRunStatus;
+  needsPerson?: boolean;
+  belowBar?: boolean;
+}): { label: string; tone: TagTone } => {
   const h = en.debriefs.home;
-  if (item.status === "needs_person") return h.status.needs;
-  if (item.belowBar) return h.status.below;
-  return en.debriefs.status[item.status] ?? item.status;
+  if (s.status === "needs_person" || s.needsPerson)
+    return { label: h.status.needs, tone: "warning" };
+  if (s.status === "below_bar" || s.belowBar) return { label: h.status.below, tone: "neutral" };
+  if (s.status === "published") return { label: en.debriefs.status.published, tone: "success" };
+  return { label: en.debriefs.status[s.status] ?? s.status, tone: "neutral" };
 };
 
-export const scenarioTitle = (item: Pick<SessionItem, "scenarioName" | "sessionId">) =>
-  item.scenarioName || en.debriefs.home.untitled(shortId(item.sessionId));
+export const scenarioTitle = (title: string | null | undefined, sessionId: string) =>
+  title || en.debriefs.home.untitled(shortId(sessionId));
 
 const ToScoreBadge: React.FC<{ size: number }> = ({ size }) => (
   <span
@@ -49,14 +49,15 @@ const time = (iso: string) =>
 
 const Tags: React.FC<{ item: SessionItem; short?: boolean }> = ({ item, short }) => {
   const h = en.debriefs.home;
+  const st = statusOf(item);
   return (
     <>
-      <ConsoleTag tone={statusTone(item)}>{statusLabel(item)}</ConsoleTag>
+      <ConsoleTag tone={st.tone}>{st.label}</ConsoleTag>
       {item.urgent && <ConsoleTag tone="urgent">{h.urgent}</ConsoleTag>}
       {item.flagged && (
         <ConsoleTag tone="flag">{short ? h.flaggedShort : h.learnerFlagged}</ConsoleTag>
       )}
-      {!short && item.hasRiskCue && <ConsoleTag tone="info">{h.importantMoment}</ConsoleTag>}
+      {!short && item.riskCue && <ConsoleTag tone="info">{h.importantMoment}</ConsoleTag>}
       {item.escalated && <ConsoleTag tone="info">{en.debriefs.review.escalated}</ConsoleTag>}
     </>
   );
@@ -66,15 +67,20 @@ const metaLine = (item: SessionItem) =>
   [
     item.tenantName ?? "—",
     languageLabel(item.language),
-    item.recipeKey ? recipeLabel(item.recipeKey) : null,
-    item.mode ? en.debriefs.mode[item.mode] : null,
+    item.recipe ? recipeLabel(item.recipe) : null,
+    en.debriefs.mode[item.mode] ?? null,
     shortId(item.sessionId),
   ]
     .filter(Boolean)
     .join(" · ");
 
 const judgeClass = (item: SessionItem) =>
-  item.judge !== null && item.judge < JUDGE_BAR ? "text-[#8A3800]" : "text-typography-900";
+  item.judgeOverall !== null && item.judgeOverall < JUDGE_BAR
+    ? "text-[#8A3800]"
+    : "text-typography-900";
+
+const usd = (v: number | null) => (v === null ? "—" : formatUsd(v));
+const secs = (v: number | null) => (v === null ? "—" : `${v} s`);
 
 /** One session as a card on the Debriefs home. */
 export const SessionCard: React.FC<{
@@ -88,6 +94,7 @@ export const SessionCard: React.FC<{
     <Link
       to={to}
       data-testid="session-card"
+      data-run={item.runId}
       data-selected={selected ? "true" : undefined}
       className={[
         "flex flex-col gap-3.5 rounded-sm bg-neutral-50 px-5 py-[18px] text-typography-900 no-underline",
@@ -100,15 +107,17 @@ export const SessionCard: React.FC<{
         {showScore && item.toScore && <ToScoreBadge size={22} />}
       </div>
       <div className="flex flex-col gap-1">
-        <div className="text-[17px] font-semibold">{scenarioTitle(item)}</div>
+        <div className="text-[17px] font-semibold">
+          {scenarioTitle(item.scenario.title, item.sessionId)}
+        </div>
         <div className="text-[13px] text-neutral-600">{metaLine(item)}</div>
       </div>
       <div className="grid grid-cols-4 gap-2 border-t border-neutral-100 pt-3">
         {[
-          [h.columns.judge, score(item.judge), judgeClass(item)],
-          [h.columns.evaluator, score(item.evaluator), ""],
-          [h.columns.cost, item.costUsd === null ? "—" : formatUsd(item.costUsd), ""],
-          [h.columns.time, item.seconds === null ? "—" : `${item.seconds} s`, ""],
+          [h.columns.judge, score(item.judgeOverall), judgeClass(item)],
+          [h.columns.evaluator, score(item.evaluatorOverall), ""],
+          [h.columns.cost, usd(item.costUsd), ""],
+          [h.columns.time, secs(item.seconds), ""],
         ].map(([label, value, cls]) => (
           <div key={label}>
             <div className="text-xs text-neutral-600">{label}</div>
@@ -130,6 +139,7 @@ export const SessionRow: React.FC<{
   <Link
     to={to}
     data-testid="session-row"
+    data-run={item.runId}
     data-selected={selected ? "true" : undefined}
     className={[
       "grid min-w-[980px] grid-cols-[220px_minmax(220px,2fr)_minmax(160px,1.2fr)_70px_70px_70px_60px_100px] items-center gap-3 border-b border-neutral-100 px-5 py-3.5 text-typography-900 no-underline",
@@ -140,20 +150,21 @@ export const SessionRow: React.FC<{
       <Tags item={item} short />
     </div>
     <div>
-      <div className="text-[15px] font-semibold">{scenarioTitle(item)}</div>
+      <div className="text-[15px] font-semibold">
+        {scenarioTitle(item.scenario.title, item.sessionId)}
+      </div>
       <div className="text-xs text-neutral-600">
         {shortId(item.sessionId)} · {languageLabel(item.language)}
-        {item.recipeKey ? ` · ${recipeLabel(item.recipeKey)}` : ""}
+        {item.recipe ? ` · ${recipeLabel(item.recipe)}` : ""}
       </div>
     </div>
     <div className="text-sm text-neutral-700">
-      {item.tenantName ?? "—"}
-      {item.mode ? ` · ${en.debriefs.mode[item.mode]}` : ""}
+      {item.tenantName ?? "—"} · {en.debriefs.mode[item.mode] ?? ""}
     </div>
-    <div className={`text-sm font-semibold ${judgeClass(item)}`}>{score(item.judge)}</div>
-    <div className="text-sm">{score(item.evaluator)}</div>
-    <div className="text-sm">{item.costUsd === null ? "—" : formatUsd(item.costUsd)}</div>
-    <div className="text-sm">{item.seconds === null ? "—" : `${item.seconds} s`}</div>
+    <div className={`text-sm font-semibold ${judgeClass(item)}`}>{score(item.judgeOverall)}</div>
+    <div className="text-sm">{score(item.evaluatorOverall)}</div>
+    <div className="text-sm">{usd(item.costUsd)}</div>
+    <div className="text-sm">{secs(item.seconds)}</div>
     <div className="flex items-center justify-end gap-2 text-[13px] text-neutral-600">
       {time(item.createdAt)}
       {showScore && item.toScore ? <ToScoreBadge size={20} /> : <span className="w-5" />}

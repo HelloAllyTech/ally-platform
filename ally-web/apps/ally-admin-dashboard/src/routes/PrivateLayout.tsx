@@ -12,6 +12,7 @@ import {
   useGetCharacterLibraryEnabledQuery,
 } from "@api";
 import { Sidebar, AccessDenied, ErrorBoundary } from "@components";
+import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import {
@@ -273,6 +274,9 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
             >
               <Menu size={24} aria-hidden="true" />
             </button>
+            <div className="ml-auto">
+              <NotificationBell placement="below" />
+            </div>
           </div>
           {/* The barrier sits inside the shell, not around it: a page that
               throws during render should cost the admin that page, not the

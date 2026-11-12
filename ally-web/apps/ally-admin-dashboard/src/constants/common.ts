@@ -489,8 +489,37 @@ export const ApiEndpoints = {
       `/v1/debriefs/console/runs/${id}/${action}`,
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
     ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
+    // The redesign (docs/debrief-harness/CONSOLE_API.md).
+    ME: "/v1/debriefs/console/me",
+    SESSIONS: "/v1/debriefs/console/sessions",
+    SESSION: (runId: string) => `/v1/debriefs/console/sessions/runs/${runId}`,
+    ATTENTION: "/v1/debriefs/console/attention",
+    ANALYTICS: "/v1/debriefs/console/analytics",
+    CORRECT_RUN: (runId: string) => `/v1/debriefs/console/runs/${runId}/correct`,
+    SCORE: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/score`,
+    COMMENTS: (runId: string) => `/v1/debriefs/console/runs/${runId}/comments`,
+    COMMENT: (id: string) => `/v1/debriefs/console/comments/${id}`,
+    COMMENT_ACTION: (id: string, action: "resolve" | "reopen") =>
+      `/v1/debriefs/console/comments/${id}/${action}`,
+    IDEA_QUESTIONS: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/questions`,
+    IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,
+    IDEA_APPROVE_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/approve-pinned-rule`,
+    PINNED_RULES: "/v1/debriefs/console/pinned-rules",
+    AUTONOMY: "/v1/debriefs/console/autonomy",
+    AUTONOMY_MATRIX: "/v1/debriefs/console/autonomy/matrix",
+    AUTONOMY_ORG: (tenantId: string) => `/v1/debriefs/console/autonomy/orgs/${tenantId}`,
+    BUDGETS: "/v1/debriefs/console/budgets",
+    EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
   },
   // Expert review (debrief orchestrator spec Part B): "Review debriefs (expert)" + the Analytics toggle.
+  // The caller's in-app notification feed (ally-be notification-feed.controller).
+  NOTIFICATIONS: {
+    LIST: "/v1/notifications",
+    UNREAD_COUNT: "/v1/notifications/unread-count",
+    READ: (id: string) => `/v1/notifications/${id}/read`,
+    READ_ALL: "/v1/notifications/read-all",
+  },
   DEBRIEF_EXPERT_REVIEW: {
     QUEUE: "/v1/debriefs/expert-review/queue",
     MY_COMMENTS: "/v1/debriefs/expert-review/my-comments",
@@ -1423,6 +1452,7 @@ export const TAG_TYPES = {
   DEBRIEF_CONSOLE: "debriefConsole",
   // Also registered in baseApi.ts's `tagTypes`.
   DEBRIEF_EXPERT_REVIEW: "debriefExpertReview",
+  NOTIFICATIONS: "notifications",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",

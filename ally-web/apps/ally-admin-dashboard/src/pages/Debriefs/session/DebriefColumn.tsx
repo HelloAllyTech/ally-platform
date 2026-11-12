@@ -4,19 +4,18 @@ import { formatMs, formatUsd } from "@components/ally-guide/allyGuideFormat";
 import { EmptyPanel } from "@components/ally-guide/ConsoleStates";
 import { en } from "@constants";
 import {
+  DebriefCardCorrection,
   DebriefCardsData,
-  DebriefReviewFlag,
-  DebriefRunDetail,
   DebriefRunStep,
+  DebriefSessionFlag,
+  DebriefSessionView,
   ExpertComment,
   ExpertCommentDraftAnchor,
-  ExpertReviewDetail,
 } from "@types";
 
-import { checkLabel, recipeLabel, sectionLabel, stepName } from "../consoleLabels";
+import { checkLabel, codeWords, recipeLabel, sectionLabel, stepName } from "../consoleLabels";
 import { Segmented } from "../consoleUi";
 import { ANCHOR_ATTR, askAnchor, cardAnchor } from "../expertReviewSelection";
-import { DraftChanges } from "../RunReasoning";
 import { SessionLogLink } from "../SessionLogLink";
 import { Line } from "./commentParts";
 import { CommentPopup } from "./CommentPopup";
@@ -25,13 +24,17 @@ import { CorrectInPlace } from "./CorrectInPlace";
 export type DebriefTab = "debrief" | "how" | "ask";
 export const cardDomId = (section: string) => `session-card-${section}`;
 
+/** What is being corrected in place: a flagged card, or a card of a held debrief. */
+export interface Correcting {
+  flagId: string | null;
+  section: string;
+}
+
 interface Props {
-  run: DebriefRunDetail;
-  detail: ExpertReviewDetail | undefined;
+  view: DebriefSessionView;
   tab: DebriefTab;
   onTab: (t: DebriefTab) => void;
-  flags: DebriefReviewFlag[];
-  correcting: string | null;
+  correcting: Correcting | null;
   onCorrectDone: () => void;
   onCorrected: () => void;
   highlightSection: string | null;
@@ -41,12 +44,44 @@ interface Props {
   pending: ExpertCommentDraftAnchor | null;
   onPendingDone: () => void;
   onSelect?: () => void;
-  canComment: boolean;
   modelLabel: (id: string) => string;
-  learnerDistress: boolean;
   /** Jump to a card (Ask Ally's "About:" link). */
-  onAbout?: (section: string) => void;
+  onAbout: (section: string) => void;
 }
+
+/** The words of a card a reviewer may rewrite, read from the card itself. */
+export const cardFields = (
+  cards: DebriefCardsData,
+  section: string,
+): { fields: DebriefCardCorrection; quote: { text: string; turn: number } | null } | null => {
+  if (section === "important_moment" && cards.important_moment) {
+    const c = cards.important_moment;
+    return {
+      fields: { lead: c.lead, body: c.body },
+      quote: { text: c.quote, turn: c.turn_index },
+    };
+  }
+  const m = /^(what_worked|work_on_this)\[(\d+)\]$/.exec(section);
+  if (m && m[1] === "what_worked") {
+    const c = cards.what_worked[Number(m[2])];
+    return c
+      ? { fields: { lead: c.lead, body: c.body }, quote: { text: c.quote, turn: c.turn_index } }
+      : null;
+  }
+  if (m) {
+    const c = cards.work_on_this[Number(m[2])];
+    return c
+      ? {
+          fields: { lead: c.lead, why: c.why, try_saying: c.try_saying },
+          quote: { text: c.quote, turn: c.turn_index },
+        }
+      : null;
+  }
+  if (section === "practise_next" && cards.practise_next) {
+    return { fields: { reason: cards.practise_next.reason }, quote: null };
+  }
+  return null;
+};
 
 /** One debrief card: a grey tile, its kind in small capitals above. */
 const Card: React.FC<{
@@ -54,7 +89,7 @@ const Card: React.FC<{
   kicker: string;
   kickerClass: string;
   lit: boolean;
-  flag?: DebriefReviewFlag;
+  flag?: DebriefSessionFlag;
   corrected?: string | null;
   children: React.ReactNode;
   after?: React.ReactNode;
@@ -100,7 +135,7 @@ const Quote: React.FC<{ children: React.ReactNode; turn: number }> = ({ children
 );
 
 const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
-  const { cards, run, detail, flags, correcting, highlightSection, roots, activeId } = props;
+  const { cards, view, correcting, highlightSection, roots, activeId } = props;
   const s = en.debriefs.session;
   const line = (section: string, text: string | null | undefined, className?: string) =>
     text ? (
@@ -114,37 +149,62 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
       />
     ) : null;
   const flagFor = (section: string) =>
-    flags.find(f => f.section === section && (f.status === "open" || f.status === "escalated"));
-  const versions = (section: string) =>
-    (detail?.corrections ?? []).filter(c => c.section === section && c.outcome === "corrected")
-      .length;
+    view.flags.find(
+      f => f.section === section && (f.status === "open" || f.status === "escalated"),
+    );
   const correctedLabel = (section: string) => {
-    const k = (detail?.corrections ?? []).filter(c => c.section === section);
+    const k = view.corrections.filter(c => c.section === section);
     const last = k[k.length - 1];
     if (!last) return null;
-    return last.outcome === "corrected"
-      ? s.correctedTag(versions(section) + 1)
-      : last.outcome === "removed"
-        ? en.debriefs.expertReview.cards.removed
-        : en.debriefs.expertReview.cards.kept;
+    if (last.outcome === "corrected") {
+      const v = view.versions.filter(x => x.section === section).length;
+      return s.correctedTag(v + 1);
+    }
+    return last.outcome === "removed"
+      ? en.debriefs.expertReview.cards.removed
+      : en.debriefs.expertReview.cards.kept;
   };
   const popupFor = (section: string) =>
-    props.canComment &&
+    view.can.comment &&
     props.pending?.anchorKind === "card" &&
     (props.pending.section === section || props.pending.section?.startsWith(`${section}.`)) ? (
-      <CommentPopup runId={run.id} anchor={props.pending} onDone={props.onPendingDone} />
+      <CommentPopup runId={view.run.id} anchor={props.pending} onDone={props.onPendingDone} />
     ) : null;
   const lit = (section: string) => highlightSection === section;
-  const editing = (section: string) => {
-    const f = flagFor(section);
-    return f && correcting === f.id ? f : null;
+  const editor = (section: string, title: string) => {
+    if (!correcting || correcting.section !== section) return null;
+    const flag = correcting.flagId ? view.flags.find(f => f.id === correcting.flagId) : undefined;
+    const fromCard = cardFields(cards, section);
+    const fields = flag?.card ?? fromCard?.fields;
+    if (!fields) return null;
+    return (
+      <CorrectInPlace
+        key={`edit-${section}`}
+        runId={view.run.id}
+        section={section}
+        flagId={correcting.flagId}
+        fields={fields}
+        title={title}
+        quote={fromCard?.quote ?? null}
+        version={view.cardVersion + 1}
+        onSaved={props.onCorrected}
+        onCancel={props.onCorrectDone}
+      />
+    );
   };
 
   return (
     <div className="flex flex-col gap-3" data-testid="session-debrief">
-      {props.learnerDistress && (
-        <div role="note" className="rounded-sm bg-[#FFF2E8] px-4 py-3 text-sm text-[#8A3800]">
-          <b>{s.distressTitle}</b> {s.distressBody}
+      {view.learnerDistress.present && (
+        <div
+          role="note"
+          className="rounded-sm bg-[#FFF2E8] px-4 py-3 text-sm text-[#8A3800]"
+          data-testid="distress-note"
+        >
+          <b>{s.distressTitle}</b>{" "}
+          {view.learnerDistress.inAskAlly && !view.learnerDistress.inSession
+            ? s.distressAskAlly
+            : s.distressBody}
         </div>
       )}
       <div
@@ -154,104 +214,82 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
         {line("opening", cards.opening)}
         {popupFor("opening")}
       </div>
-      {cards.important_moment && (
-        <Card
-          section="important_moment"
-          kicker={s.kinds.importantMoment}
-          kickerClass="text-primary-700"
-          lit={lit("important_moment")}
-          flag={flagFor("important_moment")}
-          corrected={correctedLabel("important_moment")}
-          after={popupFor("important_moment")}
-        >
-          <div className="text-[17px] font-semibold">
-            {line("important_moment.lead", cards.important_moment.lead)}
-          </div>
-          <Quote turn={cards.important_moment.turn_index}>
-            {line("important_moment.quote", cards.important_moment.quote)}
-          </Quote>
-          <p className="m-0 text-sm leading-relaxed text-neutral-700">
-            {line("important_moment.body", cards.important_moment.body)}
-          </p>
-        </Card>
-      )}
+      {cards.important_moment &&
+        (editor("important_moment", s.kinds.importantMoment) ?? (
+          <Card
+            section="important_moment"
+            kicker={s.kinds.importantMoment}
+            kickerClass="text-primary-700"
+            lit={lit("important_moment")}
+            flag={flagFor("important_moment")}
+            corrected={correctedLabel("important_moment")}
+            after={popupFor("important_moment")}
+          >
+            <div className="text-[17px] font-semibold">
+              {line("important_moment.lead", cards.important_moment.lead)}
+            </div>
+            <Quote turn={cards.important_moment.turn_index}>
+              {line("important_moment.quote", cards.important_moment.quote)}
+            </Quote>
+            <p className="m-0 text-sm leading-relaxed text-neutral-700">
+              {line("important_moment.body", cards.important_moment.body)}
+            </p>
+          </Card>
+        ))}
       {cards.what_worked.map((w, i) => {
         const section = `what_worked[${i}]`;
         return (
-          <Card
-            key={section}
-            section={section}
-            kicker={s.kinds.whatWorked}
-            kickerClass="text-success-600"
-            lit={lit(section)}
-            flag={flagFor(section)}
-            corrected={correctedLabel(section)}
-            after={popupFor(section)}
-          >
-            <div className="text-base font-semibold">
-              {w.skill} · {line(`${section}.lead`, w.lead)}
-            </div>
-            <Quote turn={w.turn_index}>{line(`${section}.quote`, w.quote)}</Quote>
-            <p className="m-0 text-sm leading-relaxed text-neutral-700">
-              {line(`${section}.body`, w.body)}
-            </p>
-          </Card>
+          editor(section, s.kinds.whatWorked) ?? (
+            <Card
+              key={section}
+              section={section}
+              kicker={s.kinds.whatWorked}
+              kickerClass="text-success-600"
+              lit={lit(section)}
+              flag={flagFor(section)}
+              corrected={correctedLabel(section)}
+              after={popupFor(section)}
+            >
+              <div className="text-base font-semibold">
+                {w.skill} · {line(`${section}.lead`, w.lead)}
+              </div>
+              <Quote turn={w.turn_index}>{line(`${section}.quote`, w.quote)}</Quote>
+              <p className="m-0 text-sm leading-relaxed text-neutral-700">
+                {line(`${section}.body`, w.body)}
+              </p>
+            </Card>
+          )
         );
       })}
       {cards.work_on_this.map((w, i) => {
         const section = `work_on_this[${i}]`;
-        const f = editing(section);
-        if (f) {
-          return (
-            <CorrectInPlace
-              key={section}
-              flag={f}
-              title={s.kinds.workOnThis}
-              quote={{ text: w.quote, turn: w.turn_index }}
-              version={versions(section) + 2}
-              onSaved={props.onCorrected}
-              onCancel={props.onCorrectDone}
-            />
-          );
-        }
         return (
-          <Card
-            key={section}
-            section={section}
-            kicker={s.kinds.workOnThis}
-            kickerClass="text-[#8A3800]"
-            lit={lit(section)}
-            flag={flagFor(section)}
-            corrected={correctedLabel(section)}
-            after={popupFor(section)}
-          >
-            <div className="text-base font-semibold">
-              {w.skill} · {line(`${section}.lead`, w.lead)}
-            </div>
-            <Quote turn={w.turn_index}>{line(`${section}.quote`, w.quote)}</Quote>
-            <p className="m-0 text-sm leading-relaxed text-neutral-700">
-              {s.whyItMatters} {line(`${section}.why`, w.why)}
-            </p>
-            <div className="rounded-sm border border-dashed border-primary-200 px-3.5 py-2.5 text-sm">
-              <b>{s.trySaying}</b> {line(`${section}.try_saying`, w.try_saying)}
-            </div>
-          </Card>
+          editor(section, s.kinds.workOnThis) ?? (
+            <Card
+              key={section}
+              section={section}
+              kicker={s.kinds.workOnThis}
+              kickerClass="text-[#8A3800]"
+              lit={lit(section)}
+              flag={flagFor(section)}
+              corrected={correctedLabel(section)}
+              after={popupFor(section)}
+            >
+              <div className="text-base font-semibold">
+                {w.skill} · {line(`${section}.lead`, w.lead)}
+              </div>
+              <Quote turn={w.turn_index}>{line(`${section}.quote`, w.quote)}</Quote>
+              <p className="m-0 text-sm leading-relaxed text-neutral-700">
+                {s.whyItMatters} {line(`${section}.why`, w.why)}
+              </p>
+              <div className="rounded-sm border border-dashed border-primary-200 px-3.5 py-2.5 text-sm">
+                <b>{s.trySaying}</b> {line(`${section}.try_saying`, w.try_saying)}
+              </div>
+            </Card>
+          )
         );
       })}
-      {/* A flag on a card other than "Work on this" is corrected in the same form. */}
-      {flags
-        .filter(f => correcting === f.id && !f.section.startsWith("work_on_this"))
-        .map(f => (
-          <CorrectInPlace
-            key={f.id}
-            flag={f}
-            title={sectionLabel(f.section)}
-            quote={null}
-            version={versions(f.section) + 2}
-            onSaved={props.onCorrected}
-            onCancel={props.onCorrectDone}
-          />
-        ))}
+      {correcting?.section === "practise_next" && editor("practise_next", s.kinds.practiseNext)}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {cards.practise_next && (
           <div id={cardDomId("practise_next")} className="rounded-sm bg-neutral-50 px-[18px] py-4">
@@ -291,11 +329,21 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
 
 const stepOk = (st: DebriefRunStep) => st.status === "done";
 
-/** "How it was made": the skill estimate, then each step with its model, time and cost. */
-const HowItWasMade: React.FC<Props> = ({ run, modelLabel }) => {
+const WORD_TONE: Record<string, string> = {
+  strength: "bg-success-50 text-success-600",
+  keep_practising: "bg-[#FFF2E8] text-[#8A3800]",
+  didnt_come_up: "bg-neutral-100 text-neutral-700",
+};
+
+/** "How it was made": the learner's skill estimate (only here), then each step. */
+const HowItWasMade: React.FC<Props> = ({ view, modelLabel }) => {
   const s = en.debriefs.session.how;
   const r = en.debriefs.run;
-  const est = run.skillEstimate;
+  const est = view.skillEstimate;
+  const how = view.howItWasMade;
+  const skills = [
+    ...new Set([...est.skillWords.map(w => w.skill), ...est.progress.map(p => p.skill)]),
+  ];
   return (
     <div className="flex flex-col gap-3" data-testid="session-how">
       <div className="flex flex-col gap-2.5 rounded-sm bg-neutral-50 px-5 py-4">
@@ -303,27 +351,37 @@ const HowItWasMade: React.FC<Props> = ({ run, modelLabel }) => {
           <h3 className="text-[15px] font-semibold">{s.skillHeading}</h3>
           <span className="ml-auto text-xs text-neutral-600">{s.skillOnlyHere}</span>
         </div>
-        {est?.skills.length ? (
+        {skills.length ? (
           <>
-            {est.skills.map(k => (
-              <div
-                key={k.skill}
-                className="grid grid-cols-[minmax(140px,1fr)_minmax(0,2fr)_120px] items-center gap-3 text-sm"
-                data-testid="skill-row"
-              >
-                <span>{k.skill}</span>
-                <span className="relative h-2 bg-neutral-100">
-                  <span
-                    className="absolute inset-y-0 left-0 bg-primary-500"
-                    style={{ width: `${Math.round((k.level ?? 0) * 100)}%` }}
-                  />
-                </span>
-                <span className="text-[13px] text-neutral-700">
-                  {k.word ?? (k.level === null ? s.didntComeUp : `${Math.round(k.level * 100)}%`)}
-                </span>
-              </div>
-            ))}
-            <div className="text-xs text-neutral-600">{s.skillFrom(est.sessions)}</div>
+            {skills.map(skill => {
+              const word = est.skillWords.find(w => w.skill === skill)?.word;
+              const trend = est.progress.find(p => p.skill === skill)?.trend;
+              return (
+                <div
+                  key={skill}
+                  className="grid grid-cols-[minmax(140px,1fr)_auto_minmax(120px,1fr)] items-center gap-3 text-sm"
+                  data-testid="skill-row"
+                >
+                  <span>{skill}</span>
+                  {word ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${WORD_TONE[word] ?? ""}`}
+                    >
+                      {s.words[word] ?? codeWords(word)}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="text-[13px] text-neutral-700">
+                    {trend ? (s.trends[trend] ?? codeWords(trend)) : ""}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="text-xs text-neutral-600">
+              {s.skillFrom(est.pastSessions ?? 0)}
+              {est.learnerLevel ? ` · ${s.level(est.learnerLevel)}` : ""}
+            </div>
           </>
         ) : (
           <p className="text-sm text-neutral-600">{s.noSkill}</p>
@@ -332,17 +390,17 @@ const HowItWasMade: React.FC<Props> = ({ run, modelLabel }) => {
       <div className="overflow-hidden rounded-sm bg-neutral-50">
         <div className="border-b border-neutral-100 px-5 py-3.5 text-sm text-neutral-700">
           {[
-            recipeLabel(run.recipeKey),
-            run.fallbackRung === 0 ? s.asWritten : r.fallback(run.fallbackRung),
-            run.releaseVersion != null ? s.release(run.releaseVersion) : null,
-            r.cost(formatUsd(run.estimatedCostUsd), formatUsd(run.actualCostUsd)),
+            recipeLabel(how.recipe),
+            how.fallbackRung === 0 ? s.asWritten : r.fallback(how.fallbackRung),
+            how.releaseVersion != null ? s.release(how.releaseVersion) : null,
+            r.cost(formatUsd(how.estimatedCostUsd), formatUsd(how.actualCostUsd)),
           ]
             .filter(Boolean)
             .join(" · ")}{" "}
-          · <SessionLogLink sessionId={run.scenarioSessionId} />
+          · <SessionLogLink sessionId={view.run.sessionId} />
         </div>
         <ol>
-          {run.steps.map((st, i) => (
+          {how.steps.map((st, i) => (
             <li
               key={i}
               className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-3 border-b border-neutral-100 px-5 py-3"
@@ -396,16 +454,11 @@ const HowItWasMade: React.FC<Props> = ({ run, modelLabel }) => {
           ))}
         </ol>
       </div>
-      {run.workspace?.decision && (
-        <div className="rounded-sm bg-neutral-50 px-5 py-3 text-sm" data-testid="run-decision">
-          <span className="font-semibold">{r.decision}:</span> {run.workspace.decision.why}
-        </div>
-      )}
-      {run.checkFailures.length > 0 && (
+      {how.checkFailures.length > 0 && (
         <div className="rounded-sm bg-neutral-50 px-5 py-3 text-sm">
           <p className="font-semibold">{r.checks}</p>
           <ul className="list-disc pl-5">
-            {run.checkFailures.map((f, i) => (
+            {how.checkFailures.map((f, i) => (
               <li key={i}>
                 {checkLabel(f.code)} · {sectionLabel(f.section)}: {f.detail}
               </li>
@@ -413,58 +466,54 @@ const HowItWasMade: React.FC<Props> = ({ run, modelLabel }) => {
           </ul>
         </div>
       )}
-      <details className="rounded-sm bg-neutral-50 px-5 py-3 text-sm">
-        <summary className="cursor-pointer font-semibold">{r.draftChanges}</summary>
-        <div className="mt-2">
-          <DraftChanges run={run} />
-        </div>
-      </details>
+      {how.error && <p className="text-sm text-neutral-700">{how.error}</p>}
     </div>
   );
 };
 
+type Tool = { name?: string; topic?: string };
+
 /**
  * Ask Ally: the learner's conversation with Ally after reading the debrief, exactly as they saw
- * it, with each reply's checks, lookups, time and cost. Read-only; Ask Ally is learner-only.
+ * it, with each reply's checks, lookups and cost. Read-only (Ask Ally is learner-only); people
+ * with review rights can select words to comment.
  */
-const AskAlly: React.FC<Props & { onAbout: (section: string) => void }> = props => {
-  const { run, modelLabel } = props;
+const AskAlly: React.FC<Props> = props => {
+  const { view, modelLabel } = props;
   const s = en.debriefs.session.ask;
-  const traces = run.workspace?.replyTraces ?? [];
-  if (traces.length === 0) return <EmptyPanel title={s.none} message={s.noneHelp} />;
-  const replaced = traces.filter(t => t.outcome === "replaced").length;
-  const anyDistressKnown = traces.some(t => t.distress != null);
-  const distress = traces.some(t => t.distress);
-  const firstWords = traces.map(t => t.firstWordsMs).filter((x): x is number => x != null);
-  const total = traces.reduce((sum, t) => sum + (t.costUsd ?? 0), 0);
-  const asked = traces.filter(t => t.question).length || traces.length;
+  const ex = view.askAlly.exchanges;
+  if (ex.length === 0) return <EmptyPanel title={s.none} message={s.noneHelp} />;
+  const replaced = ex.filter(t => t.check === "replaced").length;
+  const firstWords = ex.map(t => t.firstWordsMs).filter((x): x is number => x != null);
   return (
     <div className="flex flex-col gap-3" data-testid="session-ask">
       <div
         className="flex flex-wrap gap-x-[18px] gap-y-1.5 bg-neutral-50 px-4 py-2.5 text-[13px] text-neutral-700"
         data-testid="ask-summary"
       >
-        <span>{s.summary.questions(asked)}</span>
-        {traces.some(t => t.outcome) && <span>{s.summary.replaced(replaced)}</span>}
-        {anyDistressKnown && <span>{distress ? s.summary.distress : s.summary.noDistress}</span>}
+        <span>{s.summary.questions(ex.length)}</span>
+        <span>{s.summary.replaced(replaced)}</span>
+        <span>{view.learnerDistress.inAskAlly ? s.summary.distress : s.summary.noDistress}</span>
         {firstWords.length > 0 && (
           <span>
             {s.summary.firstWords(
-              formatMs(firstWords.sort((a, b) => a - b)[Math.floor(firstWords.length / 2)]),
+              formatMs([...firstWords].sort((a, b) => a - b)[Math.floor(firstWords.length / 2)]),
             )}
           </span>
         )}
-        <span>{s.summary.total(formatUsd(total))}</span>
+        {view.askAlly.totalCostUsd != null && (
+          <span>{s.summary.total(formatUsd(view.askAlly.totalCostUsd))}</span>
+        )}
       </div>
-      <div className="text-xs text-neutral-600">{props.canComment ? s.help : s.helpReadOnly}</div>
-      {traces.map((t, i) => {
-        const when = new Date(t.at).toLocaleTimeString(undefined, {
+      <div className="text-xs text-neutral-600">{view.can.comment ? s.help : s.helpReadOnly}</div>
+      {ex.map((t, i) => {
+        const when = new Date(t.askedAt).toLocaleTimeString(undefined, {
           hour: "2-digit",
           minute: "2-digit",
         });
-        const section = `ask_ally[${i}]`;
+        const tools = (t.tools as Tool[]).filter(x => x && typeof x === "object" && x.name);
         return (
-          <div key={`${t.at}-${i}`} className="flex flex-col gap-2" data-testid="ask-exchange">
+          <div key={`${t.askedAt}-${i}`} className="flex flex-col gap-2" data-testid="ask-exchange">
             <div className="self-start text-xs text-neutral-600">
               {t.section ? (
                 <>
@@ -482,46 +531,42 @@ const AskAlly: React.FC<Props & { onAbout: (section: string) => void }> = props 
                 when
               )}
             </div>
-            {t.question && (
-              <div className="max-w-[85%] self-end bg-primary-50 px-3.5 py-2.5 text-sm leading-normal">
-                <div className="mb-0.5 text-xs text-neutral-600">{en.debriefs.session.learner}</div>
-                <span {...{ [ANCHOR_ATTR]: askAnchor(i) }}>{t.question}</span>
-              </div>
-            )}
+            <div className="max-w-[85%] self-end bg-primary-50 px-3.5 py-2.5 text-sm leading-normal">
+              <div className="mb-0.5 text-xs text-neutral-600">{en.debriefs.session.learner}</div>
+              <span {...{ [ANCHOR_ATTR]: askAnchor(i) }}>{t.question}</span>
+            </div>
             <div className="flex max-w-[85%] flex-col gap-1.5 self-start bg-neutral-50 px-3.5 py-2.5 text-sm leading-normal">
               <div className="text-xs text-neutral-600">{s.ally}</div>
-              {t.reply ? (
-                <div {...(t.question ? {} : { [ANCHOR_ATTR]: askAnchor(i) })}>{t.reply}</div>
-              ) : (
-                <div className="text-neutral-600">{s.replyNotKept}</div>
-              )}
-              {t.outcome === "replaced" && (t.blocked || t.failedCheck) && (
+              {t.reply ? <div>{t.reply}</div> : <div className="text-neutral-600">{s.noReply}</div>}
+              {t.check === "replaced" && t.replacedReply && (
                 <details className="text-[13px] text-neutral-700">
                   <summary className="cursor-pointer text-[#8A3800]">{s.whatBlocked}</summary>
-                  {t.blocked && (
-                    <div className="mt-1.5 bg-white px-2.5 py-2 text-neutral-600 line-through">
-                      {t.blocked}
+                  <div className="mt-1.5 bg-white px-2.5 py-2 text-neutral-600 line-through">
+                    {t.replacedReply.reply}
+                  </div>
+                  {t.replacedReply.fails.length > 0 && (
+                    <div className="mt-1">
+                      {s.failedCheck(t.replacedReply.fails.map(checkLabel).join(", "))}
                     </div>
                   )}
-                  {t.failedCheck && <div className="mt-1">{s.failedCheck(t.failedCheck)}</div>}
                 </details>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 self-start text-xs">
-              {t.outcome && (
+              {t.check !== "no_reply" && (
                 <span
-                  className={`rounded-full px-2 py-0.5 font-semibold ${t.outcome === "passed" ? "bg-success-50 text-success-600" : "bg-[#FFF2E8] text-[#8A3800]"}`}
+                  className={`rounded-full px-2 py-0.5 font-semibold ${t.check === "passed" ? "bg-success-50 text-success-600" : "bg-[#FFF2E8] text-[#8A3800]"}`}
                 >
-                  {s.outcome[t.outcome]}
+                  {s.outcome[t.check]}
                 </span>
               )}
-              {t.tools.length > 0 && (
+              {tools.length > 0 && (
                 <span className="text-neutral-600">
                   {s.lookedUp(
-                    t.tools
+                    tools
                       .map(
                         tool =>
-                          `${en.debriefs.run.toolNames[tool.name] ?? tool.name}${tool.topic ? ` “${tool.topic}”` : ""}`,
+                          `${en.debriefs.run.toolNames[tool.name as string] ?? tool.name}${tool.topic ? ` “${tool.topic}”` : ""}`,
                       )
                       .join(", "),
                   )}
@@ -530,20 +575,21 @@ const AskAlly: React.FC<Props & { onAbout: (section: string) => void }> = props 
               <span className="text-neutral-600">
                 {[
                   t.firstWordsMs != null ? s.firstWordsOne(formatMs(t.firstWordsMs)) : null,
-                  formatUsd(t.costUsd),
+                  t.costUsd != null ? formatUsd(t.costUsd) : null,
+                  t.model ? modelLabel(t.model) : null,
                 ]
                   .filter(Boolean)
-                  .join(" · ")}{" "}
-                · <span title={t.model}>{modelLabel(t.model)}</span>
+                  .join(" · ")}
               </span>
-              {t.stoppedBy && (
-                <span className="text-neutral-600">{en.debriefs.run.stoppedBy[t.stoppedBy]}</span>
-              )}
             </div>
-            {props.canComment &&
+            {view.can.comment &&
               props.pending?.anchorKind === "debrief" &&
-              props.pending.section === section && (
-                <CommentPopup runId={run.id} anchor={props.pending} onDone={props.onPendingDone} />
+              props.pending.section === `ask_ally[${i}]` && (
+                <CommentPopup
+                  runId={view.run.id}
+                  anchor={props.pending}
+                  onDone={props.onPendingDone}
+                />
               )}
           </div>
         );
@@ -555,14 +601,14 @@ const AskAlly: React.FC<Props & { onAbout: (section: string) => void }> = props 
 /** The right column: the debrief, how it was made, and Ask Ally, as tabs. */
 export const DebriefColumn: React.FC<Props> = props => {
   const s = en.debriefs.session;
-  const asks = props.run.workspace?.replyTraces?.length ?? 0;
-  const cards = props.detail?.cards ?? props.run.cards;
+  const asks = props.view.askAlly.exchanges.length;
+  const cards = props.view.cards;
   return (
     <section
       aria-label={s.debrief}
       className="flex min-w-0 flex-[1_1_380px] flex-col gap-3 overflow-y-auto lg:h-[78vh]"
       data-testid="session-debrief-column"
-      onMouseUp={props.canComment ? props.onSelect : undefined}
+      onMouseUp={props.view.can.comment ? props.onSelect : undefined}
     >
       <div className="self-start">
         <Segmented<DebriefTab>
@@ -581,18 +627,10 @@ export const DebriefColumn: React.FC<Props> = props => {
         (cards ? (
           <TheDebrief {...props} cards={cards} />
         ) : (
-          <EmptyPanel title={s.noCards} message={props.run.error ?? undefined} />
+          <EmptyPanel title={s.noCards} message={props.view.howItWasMade.error ?? undefined} />
         ))}
       {props.tab === "how" && <HowItWasMade {...props} />}
-      {props.tab === "ask" && (
-        <AskAlly
-          {...props}
-          onAbout={section => {
-            props.onTab("debrief");
-            props.onAbout?.(section);
-          }}
-        />
-      )}
+      {props.tab === "ask" && <AskAlly {...props} />}
     </section>
   );
 };

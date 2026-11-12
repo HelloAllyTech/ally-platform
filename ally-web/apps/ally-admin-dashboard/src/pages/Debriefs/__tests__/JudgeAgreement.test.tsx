@@ -38,11 +38,13 @@ vi.mock("@api", async importOriginal => ({
   useGetDebriefCalibrationSampleQuery: () => h.sample(),
   useGetDebriefCalibrationAgreementQuery: () => h.agreement(),
   useGetDebriefCalibrationItemQuery: (id: string) => h.item(id),
-  useSubmitDebriefRatingMutation: () => [h.submit, { isLoading: false }],
+  useScoreDebriefSessionMutation: () => [h.submit, { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
-import { CalibrationTab } from "../CalibrationTab";
+import { JudgeAgreementSection } from "../metrics/JudgeAgreementSection";
+// eslint-disable-next-line import/first
+import { ScoreByHand } from "../ScoreByHand";
 
 const ok = (data: unknown) => ({
   data,
@@ -135,7 +137,7 @@ const ITEM = {
   myRating: null,
 };
 
-describe("CalibrationTab", () => {
+describe("Analytics › Debriefs › Judge agreement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.sample.mockReturnValue(ok(SAMPLE));
@@ -144,12 +146,10 @@ describe("CalibrationTab", () => {
     h.submit.mockReturnValue({ unwrap: () => Promise.resolve({ created: true }) });
   });
 
-  it("shows progress, the gate and only debriefs still to rate", () => {
-    render(<CalibrationTab />);
+  it("shows progress and the gate as a chart, with the table behind it", () => {
+    render(<JudgeAgreementSection />);
     expect(screen.getByTestId("kpi-Debriefs rated")).toHaveTextContent("1 of 150");
-    expect(screen.getByTestId("kpi-Rated by you")).toHaveTextContent("1");
     expect(screen.getByTestId("kpi-PM agent autonomy")).toHaveTextContent("Needs approval");
-    // The gate is a chart: each check's kappa against the 0.6 it needs, glossed in words.
     const accuracy = screen.getByTestId("gate-chart-accuracy");
     expect(accuracy).toHaveTextContent("0.72, substantial");
     expect(accuracy).toHaveTextContent("Target: ≥ 0.6");
@@ -159,16 +159,13 @@ describe("CalibrationTab", () => {
       "Needs 20 rated debriefs",
     );
     expect(screen.getByTestId("calibration-gate")).toHaveTextContent("0 is chance, 1 is always");
-    // The exact numbers stay in a collapsed table.
     const numbers = screen.getByTestId("gate-numbers");
     expect(numbers.tagName).toBe("DETAILS");
     expect(within(numbers).getAllByText("Passes")).toHaveLength(1);
-    expect(screen.getAllByTestId("calibration-row")).toHaveLength(1);
-    expect(screen.getAllByTestId("calibration-row")[0]).toHaveTextContent("Hindi");
   });
 
   it("shows agreement per part of the rubric as a chart, with the table behind it", () => {
-    render(<CalibrationTab />);
+    render(<JudgeAgreementSection />);
     const accuracy = screen.getByTestId("agreement-chart-accuracy");
     expect(accuracy).toHaveTextContent("Accuracy");
     expect(accuracy).toHaveTextContent("0.72, substantial");
@@ -177,23 +174,10 @@ describe("CalibrationTab", () => {
     expect(screen.getByTestId("agreement-numbers")).toHaveTextContent("0.6 higher");
   });
 
-  it("never shows the judge's scores or quality band in the sample", () => {
-    render(<CalibrationTab />);
-    const table = screen.getByTestId("calibration-table");
-    expect(table).not.toHaveTextContent(/tercile|low|high/i);
-  });
-
-  it("says when there is nothing scored yet", () => {
-    h.sample.mockReturnValue(ok({ population: 0, target: 150, items: [] }));
-    render(<CalibrationTab />);
-    expect(screen.getByText("No debriefs to rate yet")).toBeInTheDocument();
-  });
-
-  it("saves a rating only once every part is scored", async () => {
-    render(<CalibrationTab />);
-    fireEvent.click(screen.getByRole("button", { name: "Rate" }));
+  it("score by hand saves only once every part is scored", async () => {
+    const onSaved = vi.fn();
+    render(<ScoreByHand sessionId={ITEM.scenarioSessionId} onSaved={onSaved} />);
     expect(h.item).toHaveBeenCalledWith(ITEM.scenarioSessionId);
-    expect(screen.getByTestId("rating-transcript")).toHaveTextContent("Tell me more");
 
     const save = screen.getByRole("button", { name: "Save rating" });
     expect(save).toBeDisabled();
@@ -215,6 +199,7 @@ describe("CalibrationTab", () => {
 
     fireEvent.click(save);
     await waitFor(() => expect(h.toastSuccess).toHaveBeenCalledWith("Rating saved"));
+    expect(onSaved).toHaveBeenCalled();
     expect(h.submit).toHaveBeenCalledWith({
       sessionId: ITEM.scenarioSessionId,
       rating: {

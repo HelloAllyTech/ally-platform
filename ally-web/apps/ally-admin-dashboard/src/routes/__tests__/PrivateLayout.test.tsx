@@ -24,6 +24,9 @@ vi.mock("@components", async importOriginal => {
   };
 });
 
+vi.mock("@components/notification-bell/NotificationBell", () => ({
+  NotificationBell: () => null,
+}));
 // Mock ReportUploadProgressDialog to avoid API dependency
 vi.mock("@components/report-upload-progress-dialog/ReportUploadProgressDialog", () => ({
   default: () => null,

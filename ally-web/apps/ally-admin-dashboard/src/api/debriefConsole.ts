@@ -14,6 +14,20 @@ import {
   DebriefRunStatus,
   DebriefTenantRow,
   PmAgentState,
+  DebriefAttention,
+  DebriefAutonomyKind,
+  DebriefAutonomyStep,
+  DebriefAutonomyValue,
+  DebriefAutonomyView,
+  DebriefOrgOverride,
+  DebriefPinnedRulesView,
+  DebriefSessionsPage,
+  DebriefSessionsQuery,
+  DebriefSessionView,
+  DebriefViewer,
+  ExpertComment,
+  ExpertCommentTag,
+  NewExpertComment,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -220,6 +234,171 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    // --- The redesign (docs/debrief-harness/CONSOLE_API.md) ---------------------------------
+    getDebriefMe: builder.query<{ userId: number } & DebriefViewer, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.ME, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefSessions: builder.query<DebriefSessionsPage, DebriefSessionsQuery>({
+      query: q => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.SESSIONS,
+        method: HttpMethod.GET,
+        params: Object.fromEntries(
+          Object.entries(q).filter(([, v]) => v !== undefined && v !== ""),
+        ),
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefSession: builder.query<DebriefSessionView, string>({
+      query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SESSION(id), method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefAttention: builder.query<DebriefAttention, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.ATTENTION, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    correctDebriefRun: builder.mutation<
+      { id: string; version: number; section: string },
+      { id: string; section: string; correction: DebriefCardCorrection; note: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.CORRECT_RUN(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    scoreDebriefSession: builder.mutation<
+      unknown,
+      {
+        sessionId: string;
+        rating: { scores: Record<string, number>; hardFails: string[]; note?: string | null };
+      }
+    >({
+      query: ({ sessionId, rating }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.SCORE(sessionId),
+        method: HttpMethod.POST,
+        body: rating,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE, TAG_TYPES.DEBRIEF_CALIBRATION],
+    }),
+    addDebriefComment: builder.mutation<
+      ExpertComment,
+      { runId: string; comment: NewExpertComment }
+    >({
+      query: ({ runId, comment }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.COMMENTS(runId),
+        method: HttpMethod.POST,
+        body: comment,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    editDebriefComment: builder.mutation<
+      ExpertComment,
+      { id: string; body?: string; tag?: ExpertCommentTag | null }
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.COMMENT(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    deleteDebriefComment: builder.mutation<{ deleted: boolean }, string>({
+      query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.COMMENT(id), method: HttpMethod.DELETE }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    setDebriefCommentStatus: builder.mutation<
+      ExpertComment,
+      { id: string; action: "resolve" | "reopen" }
+    >({
+      query: ({ id, action }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.COMMENT_ACTION(id, action),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    askIdeaQuestion: builder.mutation<{ id: string; at: string }, { id: string; text: string }>({
+      query: ({ id, text }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_QUESTIONS(id),
+        method: HttpMethod.POST,
+        body: { text },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    startIdeaStep: builder.mutation<unknown, { id: string; step: "gate_test" | "paired_trial" }>({
+      query: ({ id, step }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_START_STEP(id),
+        method: HttpMethod.POST,
+        body: { step },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    approvePinnedRule: builder.mutation<
+      { releaseId: string; version: number; promptVersion: number },
+      { id: string; reason?: string }
+    >({
+      query: ({ id, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_APPROVE_PINNED(id),
+        method: HttpMethod.POST,
+        body: reason ? { reason } : {},
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefPinnedRules: builder.query<DebriefPinnedRulesView, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PINNED_RULES, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefAutonomy: builder.query<DebriefAutonomyView, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.AUTONOMY, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    setDebriefAutonomyMatrix: builder.mutation<
+      DebriefAutonomyView,
+      {
+        changes: Array<{
+          kind: DebriefAutonomyKind;
+          step: DebriefAutonomyStep;
+          value: DebriefAutonomyValue;
+        }>;
+      }
+    >({
+      query: body => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.AUTONOMY_MATRIX,
+        method: HttpMethod.PUT,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    setDebriefOrgAutonomy: builder.mutation<
+      DebriefAutonomyView,
+      {
+        tenantId: string;
+        changes: Partial<Record<"paired_trial" | "canary" | "guidance", DebriefOrgOverride>>;
+      }
+    >({
+      query: ({ tenantId, changes }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.AUTONOMY_ORG(tenantId),
+        method: HttpMethod.PUT,
+        body: { changes },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    setDebriefBudgets: builder.mutation<
+      { releaseId: string; version: number; changed: string[] },
+      { runCeilingUsd?: number; monthlyCapUsd?: number; note?: string }
+    >({
+      query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.BUDGETS, method: HttpMethod.PUT, body }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    emergencyStopDebriefTenant: builder.mutation<unknown, { tenantId: string; reason: string }>({
+      query: ({ tenantId, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.EMERGENCY_STOP(tenantId),
+        method: HttpMethod.POST,
+        body: { reason },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
   }),
 });
 
@@ -249,4 +428,23 @@ export const {
   useSetDebriefModelsMutation,
   useSetDebriefTenantRegionMutation,
   useEscalateDebriefMutation,
+  useGetDebriefMeQuery,
+  useGetDebriefSessionsQuery,
+  useGetDebriefSessionQuery,
+  useGetDebriefAttentionQuery,
+  useCorrectDebriefRunMutation,
+  useScoreDebriefSessionMutation,
+  useAddDebriefCommentMutation,
+  useEditDebriefCommentMutation,
+  useDeleteDebriefCommentMutation,
+  useSetDebriefCommentStatusMutation,
+  useAskIdeaQuestionMutation,
+  useStartIdeaStepMutation,
+  useApprovePinnedRuleMutation,
+  useGetDebriefPinnedRulesQuery,
+  useGetDebriefAutonomyQuery,
+  useSetDebriefAutonomyMatrixMutation,
+  useSetDebriefOrgAutonomyMutation,
+  useSetDebriefBudgetsMutation,
+  useEmergencyStopDebriefTenantMutation,
 } = debriefConsoleAPI;

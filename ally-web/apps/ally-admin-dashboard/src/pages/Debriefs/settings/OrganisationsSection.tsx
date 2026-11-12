@@ -2,8 +2,9 @@ import React, { useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button } from "@ally-ui-mono/ui-shared";
+import { Button, TextArea } from "@ally-ui-mono/ui-shared";
 import {
+  useEmergencyStopDebriefTenantMutation,
   useGetDebriefTenantsQuery,
   useSetDebriefTenantLiveMutation,
   useSetDebriefTenantRegionMutation,
@@ -27,7 +28,10 @@ export const OrganisationsSection: React.FC<{ access: DebriefAccess }> = ({ acce
   const s = en.debriefs.organisations;
   const t2 = en.debriefs.settingsPage.orgs;
   const tenants = useGetDebriefTenantsQuery();
-  const [setLive, { isLoading }] = useSetDebriefTenantLiveMutation();
+  const [setLive, { isLoading: switching }] = useSetDebriefTenantLiveMutation();
+  const [stop, { isLoading: stopping }] = useEmergencyStopDebriefTenantMutation();
+  const [reason, setReason] = useState("");
+  const isLoading = switching || stopping;
   const [target, setTarget] = useState<DebriefTenantRow | null>(null);
   const [setRegion, { isLoading: savingRegion }] = useSetDebriefTenantRegionMutation();
   // A region change asks first: it decides whether the organisation may be switched on.
@@ -63,7 +67,9 @@ export const OrganisationsSection: React.FC<{ access: DebriefAccess }> = ({ acce
   const confirm = async () => {
     if (!target) return;
     try {
-      await setLive({ tenantId: target.id, live: !target.live }).unwrap();
+      if (target.live) await stop({ tenantId: target.id, reason: reason.trim() }).unwrap();
+      else await setLive({ tenantId: target.id, live: true }).unwrap();
+      setReason("");
       toast.success(s.saved);
       setTarget(null);
     } catch (e) {
@@ -159,11 +165,21 @@ export const OrganisationsSection: React.FC<{ access: DebriefAccess }> = ({ acce
         cancelLabel={s.cancel}
         confirmLabel={target?.live ? t2.emergencyStop : s.switchOn}
         danger={target?.live}
+        confirmDisabled={!!target?.live && !reason.trim()}
         isWorking={isLoading}
         onConfirm={() => void confirm()}
         onClose={() => setTarget(null)}
       >
         <p>{target?.live ? t2.stopBody : s.onBody}</p>
+        {target?.live && (
+          <TextArea
+            id="emergency-stop-reason"
+            labelText={t2.stopReason}
+            rows={2}
+            value={reason}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
+          />
+        )}
       </ConfirmDialog>
       <ConfirmDialog
         isOpen={regionTarget !== null}

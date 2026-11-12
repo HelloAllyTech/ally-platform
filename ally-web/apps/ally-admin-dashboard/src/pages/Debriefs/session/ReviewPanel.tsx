@@ -2,16 +2,41 @@ import React from "react";
 
 import { Button } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
-import { ExpertComment, ExpertReviewDetail } from "@types";
+import { DebriefSessionView, ExpertComment, ExpertReviewDetail } from "@types";
 
-import { checkLabel, hardFailLabel, sectionLabel } from "../consoleLabels";
-import { score } from "../consoleTable";
-import { canDecideFlag, DebriefAccess } from "../debriefAccess";
-import { waitedFor } from "../queue";
-import { ScoreByHand } from "../ScoreByHand";
-import { FlagsPanel, Thread, VerdictPanel } from "./commentParts";
-import { PendingItem } from "./pendingActions";
-import { Decision } from "./WaitingBar";
+import { sectionLabel } from "../consoleLabels";
+import { DebriefAccess } from "../debriefAccess";
+import { HARD_FAILS, ScoreByHand } from "../ScoreByHand";
+import { Thread, VerdictPanel } from "./commentParts";
+import { isRed, pendingBody, pendingHeadline } from "./pendingActions";
+import { Decision, decisionLabel } from "./WaitingBar";
+
+/** The verdict panel reads expert review's shape; the session view carries the same facts. */
+export const verdictDetail = (view: DebriefSessionView): ExpertReviewDetail =>
+  ({
+    run: { id: view.run.id },
+    myReview: view.verdict
+      ? {
+          verdict: view.verdict.verdict,
+          hardFails: view.verdict.hardFails,
+          updatedAt: view.verdict.updatedAt ?? "",
+        }
+      : null,
+    otherReviews: { count: 0, verdicts: null },
+    judge: view.judge.hidden
+      ? null
+      : {
+          overall: view.judge.overall ?? null,
+          hardFails: (view.judge.hardFails ?? []).map(h => h.code),
+        },
+    evaluator: view.judge.hidden
+      ? null
+      : {
+          overall: view.judge.evaluatorOverall ?? null,
+          hardFails: (view.judge.evaluatorHardFails ?? []).map(h => h.code),
+        },
+    hardFailCodes: HARD_FAILS,
+  }) as unknown as ExpertReviewDetail;
 
 const Card: React.FC<{ tone: "error" | "warning" | "plain"; children: React.ReactNode }> = ({
   tone,
@@ -32,16 +57,10 @@ const Card: React.FC<{ tone: "error" | "warning" | "plain"; children: React.Reac
   </div>
 );
 
-/** The judge's reasons for holding or marking down a debrief, in words. */
-const JudgeReasons: React.FC<{ item: PendingItem }> = ({ item }) => {
-  const r = item.review;
-  if (!r) return null;
-  const lines = [
-    ...r.checkFailures.map(f => `${checkLabel(f.code)} · ${sectionLabel(f.section)}: ${f.detail}`),
-    ...r.evaluatorHardFails.map(h => `${hardFailLabel(h.code)}: ${h.evidence}`),
-    ...(r.judgeHardFails ?? []).map(h => `${hardFailLabel(h.code)}: ${h.evidence}`),
-  ];
-  if (!lines.length) return null;
+/** "Why the judge held it": the judge's, the Evaluator's and the checks' reasons, in words. */
+const JudgeReasons: React.FC<{ view: DebriefSessionView }> = ({ view }) => {
+  const reasons = view.judge.hidden ? [] : (view.judge.reasons ?? []);
+  if (reasons.length === 0) return null;
   return (
     <>
       <div className="text-xs text-neutral-600">{en.debriefs.session.panel.whyHeld}</div>
@@ -49,8 +68,8 @@ const JudgeReasons: React.FC<{ item: PendingItem }> = ({ item }) => {
         className="flex list-disc flex-col gap-1 pl-[18px] text-[13px] leading-normal text-typography-900"
         data-testid="judge-reasons"
       >
-        {lines.map((l, i) => (
-          <li key={i}>{l}</li>
+        {reasons.map((r, i) => (
+          <li key={i}>{r.text}</li>
         ))}
       </ul>
     </>
@@ -63,23 +82,20 @@ const JudgeReasons: React.FC<{ item: PendingItem }> = ({ item }) => {
  * Expert review and the calibration drawer did before the redesign.
  */
 export const ReviewPanel: React.FC<{
+  view: DebriefSessionView;
   access: DebriefAccess;
-  canComment: boolean;
-  items: PendingItem[];
-  detail: ExpertReviewDetail | undefined;
   roots: ExpertComment[];
   repliesByRoot: Map<string, ExpertComment[]>;
   activeId: string | null;
   onFocusThread: (id: string) => void;
   onDecide: (d: Decision) => void;
   onClose: () => void;
-  inSample: boolean;
-  sessionId: string;
   onScored: () => void;
 }> = props => {
-  const { access, items, detail } = props;
+  const { view, access } = props;
   const s = en.debriefs.session.panel;
-  const r = en.debriefs.review;
+  const items = view.pendingActions;
+  const decidedFlags = view.flags.filter(f => f.status !== "open" && f.status !== "escalated");
   return (
     <aside
       aria-label={s.label}
@@ -109,140 +125,70 @@ export const ReviewPanel: React.FC<{
       </div>
       <div className="flex flex-col gap-3 px-4 py-3.5">
         {items.length === 0 && <p className="text-sm text-neutral-600">{s.nothing}</p>}
-        {items.map(item => {
-          const f = item.flag;
-          const waited = waitedFor(item.since);
-          if (f) {
-            const escalated = item.kind === "escalated";
-            return (
-              <Card key={`f-${f.id}`} tone={escalated ? "plain" : item.level}>
-                <div
-                  className={`text-xs font-semibold ${item.level === "error" ? "text-destructive-600" : "text-[#8A3800]"}`}
-                >
-                  {escalated
-                    ? s.escalatedTo(waited)
-                    : f.urgent
-                      ? s.urgentFlag(waited)
-                      : s.flag(waited)}
-                </div>
-                <div className="text-[15px] font-semibold">
-                  {s.flagTitle(sectionLabel(f.section), r.reasons[f.reason] ?? f.reason)}
-                </div>
-                {f.note && (
-                  <div className="text-[13px] text-neutral-700">{s.theyAdded(f.note)}</div>
-                )}
-                {canDecideFlag(access, f.status === "escalated") && (
-                  <>
-                    <div className="grid grid-cols-3 gap-2">
-                      {f.card && (
-                        <Button
-                          kind="primary"
-                          size="md"
-                          onClick={() => props.onDecide({ type: "correct", flagId: f.id })}
-                        >
-                          {r.correct}
-                        </Button>
-                      )}
-                      <Button
-                        kind="tertiary"
-                        size="md"
-                        onClick={() => props.onDecide({ type: "keep", flagId: f.id })}
-                      >
-                        {r.keep}
-                      </Button>
-                      <Button
-                        kind="tertiary"
-                        size="md"
-                        onClick={() => props.onDecide({ type: "remove", flagId: f.id })}
-                      >
-                        {r.remove}
-                      </Button>
-                    </div>
-                    <div className="text-xs text-neutral-600">{s.keepRemoveHelp}</div>
-                  </>
-                )}
-                {access.escalate && f.status !== "escalated" && (
-                  <button
-                    type="button"
-                    className="self-start text-sm text-primary-500 underline"
-                    onClick={() => props.onDecide({ type: "escalate", kind: "flags", id: f.id })}
-                  >
-                    {s.escalate}
-                  </button>
-                )}
-              </Card>
-            );
-          }
+        {items.map((item, i) => {
+          const flag = item.flagId ? view.flags.find(f => f.id === item.flagId) : undefined;
+          const escalated = item.kind === "escalated_flag" || item.kind === "escalated_run";
+          const main = item.decisions.filter(d => d !== "escalate");
           return (
             <Card
-              key={`r-${item.kind}-${item.id}`}
-              tone={item.kind === "escalated" ? "plain" : item.level}
+              key={`${item.kind}-${item.flagId ?? i}`}
+              tone={escalated ? "plain" : isRed(item) ? "error" : "warning"}
             >
               <div
-                className={`text-xs font-semibold ${item.level === "error" ? "text-destructive-600" : "text-[#8A3800]"}`}
+                className={`text-xs font-semibold ${isRed(item) ? "text-destructive-600" : "text-[#8A3800]"}`}
               >
-                {item.kind === "held"
-                  ? s.held(score(item.review?.judgeOverall), waited)
-                  : item.kind === "distress"
-                    ? s.distress(waited)
-                    : item.kind === "below_bar"
-                      ? s.belowBar(score(item.review?.judgeOverall), waited)
-                      : s.escalatedTo(waited)}
+                {pendingHeadline(item)}
               </div>
-              {item.kind === "held" && (
-                <div className="text-[13px] text-neutral-700">{s.heldHelp}</div>
+              <div className="text-[15px] font-semibold">{pendingBody(item, view)}</div>
+              {flag?.note && (
+                <div className="text-[13px] text-neutral-700">{s.theyAdded(flag.note)}</div>
               )}
-              {item.kind === "distress" && (
-                <div className="text-[13px] text-neutral-700">{r.distressHelp}</div>
-              )}
-              {item.kind === "escalated" && item.review?.escalation?.note && (
-                <div className="text-[13px] text-neutral-700">{item.review.escalation.note}</div>
-              )}
-              <JudgeReasons item={item} />
-              {item.kind === "held" && access.decideHeld && (
+              {(item.kind === "held" || item.kind === "below_bar") && (
                 <>
-                  <Button
-                    kind="tertiary"
-                    size="md"
-                    onClick={() => props.onDecide({ type: "publish", runId: item.id })}
-                  >
-                    {r.publish}
-                  </Button>
-                  <Button
-                    kind="tertiary"
-                    size="md"
-                    onClick={() => props.onDecide({ type: "todays-debrief", runId: item.id })}
-                  >
-                    {r.fallback}
-                  </Button>
+                  {item.kind === "held" && (
+                    <div className="text-[13px] text-neutral-700">{s.heldHelp}</div>
+                  )}
+                  <JudgeReasons view={view} />
                 </>
               )}
-              <div className="flex flex-wrap gap-4 text-sm">
-                {(item.kind === "below_bar" || item.kind === "distress") && access.decideHeld && (
-                  <button
-                    type="button"
-                    className="text-primary-500 underline"
-                    onClick={() => props.onDecide({ type: "reviewed", runId: item.id })}
-                  >
-                    {item.kind === "distress" ? r.checkedOn : r.looksFine}
-                  </button>
-                )}
-                {access.escalate && !item.review?.escalation && item.kind !== "escalated" && (
-                  <button
-                    type="button"
-                    className="text-primary-500 underline"
-                    onClick={() => props.onDecide({ type: "escalate", kind: "runs", id: item.id })}
-                  >
-                    {s.escalate}
-                  </button>
-                )}
-              </div>
+              {main.length > 0 && (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {main.map(d => (
+                    <Button
+                      key={d}
+                      kind={d === "correct" ? "primary" : "tertiary"}
+                      size="md"
+                      onClick={() =>
+                        props.onDecide({
+                          decision: d,
+                          flagId: item.flagId,
+                          section: item.anchors.cardSection,
+                        })
+                      }
+                    >
+                      {decisionLabel(d)}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {item.flagId && main.includes("keep") && (
+                <div className="text-xs text-neutral-600">{s.keepRemoveHelp}</div>
+              )}
+              {item.decisions.includes("escalate") && (
+                <button
+                  type="button"
+                  className="self-start text-sm text-primary-500 underline"
+                  onClick={() => props.onDecide({ decision: "escalate", flagId: item.flagId })}
+                >
+                  {s.escalate}
+                </button>
+              )}
             </Card>
           );
         })}
 
-        {access.verdict && detail && (
-          <VerdictPanel key={detail.myReview?.updatedAt ?? "new"} detail={detail} />
+        {access.verdict && (
+          <VerdictPanel key={view.verdict?.updatedAt ?? "new"} detail={verdictDetail(view)} />
         )}
 
         <Card tone="plain">
@@ -250,29 +196,44 @@ export const ReviewPanel: React.FC<{
             {s.comments}{" "}
             <span className="text-[13px] font-normal text-neutral-600">· {props.roots.length}</span>
           </div>
-          {props.roots.length > 0 ? (
+          {props.roots.length > 0 && (
             <ul className="flex flex-col gap-3" data-testid="session-threads">
               {props.roots.map(root => (
                 <Thread
                   key={root.id}
                   root={root}
                   replies={props.repliesByRoot.get(root.id) ?? []}
-                  runId={detail?.run.id ?? ""}
+                  runId={view.run.id}
                   active={props.activeId === root.id}
                   onFocus={() => props.onFocusThread(root.id)}
-                  canAct={props.canComment}
+                  canAct={view.can.comment}
                 />
               ))}
             </ul>
-          ) : null}
+          )}
           <div className="text-xs text-neutral-600">
-            {props.canComment ? s.commentHint : s.commentsReadOnly}
+            {view.can.comment ? s.commentHint : s.commentsReadOnly}
           </div>
         </Card>
 
-        {detail && detail.flags.length > 0 && <FlagsPanel detail={detail} />}
+        {decidedFlags.length > 0 && (
+          <Card tone="plain">
+            <div className="text-[15px] font-semibold">{s.decidedFlags}</div>
+            <ul className="flex flex-col gap-2 text-sm" data-testid="decided-flags">
+              {decidedFlags.map(f => (
+                <li key={f.id}>
+                  <span className="font-medium">
+                    {en.debriefs.review.reasons[f.reason] ?? f.reason}
+                  </span>{" "}
+                  · {sectionLabel(f.section)}
+                  {f.resolutionNote ? ` — ${f.resolutionNote}` : ""}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
-        {access.score && props.inSample && (
+        {view.can.score && view.scoring.inMyScoringSample && (
           <details
             className="rounded-sm bg-neutral-50 px-4 py-3.5 text-sm"
             data-testid="score-by-hand"
@@ -282,7 +243,7 @@ export const ReviewPanel: React.FC<{
               <span className="text-xs font-normal text-neutral-600">· {s.inSample}</span>
             </summary>
             <div className="mt-2.5">
-              <ScoreByHand sessionId={props.sessionId} onSaved={props.onScored} />
+              <ScoreByHand sessionId={view.run.sessionId} onSaved={props.onScored} />
             </div>
           </details>
         )}

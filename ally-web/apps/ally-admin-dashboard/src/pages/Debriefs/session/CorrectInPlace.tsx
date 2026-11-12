@@ -3,9 +3,9 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { Button, TextArea, TextInput } from "@ally-ui-mono/ui-shared";
-import { useResolveDebriefFlagMutation } from "@api";
+import { useCorrectDebriefRunMutation, useResolveDebriefFlagMutation } from "@api";
 import { en } from "@constants";
-import { DebriefCardCorrection, DebriefReviewFlag } from "@types";
+import { DebriefCardCorrection } from "@types";
 import { getErrorMessage } from "@utils";
 
 /** The fields a reviewer may rewrite, in the order the card shows them. */
@@ -18,32 +18,42 @@ const FIELD_ORDER: Array<keyof DebriefCardCorrection> = [
 ];
 
 /**
- * Correct in place (PRD §6.7, build notes item 2): the flagged card turns into a form where it
- * sits. The quote stays locked; "What changed" is what the learner reads with the new words.
- * Saving resolves the flag as corrected, which ally-be stores as the card's next version.
+ * Correct in place (PRD §6.7, build notes item 2): the card turns into a form where it sits. The
+ * quote stays locked; "What changed" is what the learner reads with the new words. With a flag it
+ * resolves the flag as corrected; without one (a held or below-the-bar debrief) it corrects the
+ * run. Either way ally-be saves the card's next version.
  */
 export const CorrectInPlace: React.FC<{
-  flag: DebriefReviewFlag;
+  runId: string;
+  section: string;
+  flagId: string | null;
+  fields: DebriefCardCorrection;
   title: string;
   quote: { text: string; turn: number } | null;
   version: number;
   onSaved: () => void;
   onCancel: () => void;
-}> = ({ flag, title, quote, version, onSaved, onCancel }) => {
+}> = ({ runId, section, flagId, fields: original, title, quote, version, onSaved, onCancel }) => {
   const s = en.debriefs.session.correct;
-  const [draft, setDraft] = useState<DebriefCardCorrection>({ ...(flag.card ?? {}) });
+  const [draft, setDraft] = useState<DebriefCardCorrection>({ ...original });
   const [note, setNote] = useState("");
-  const [resolve, { isLoading }] = useResolveDebriefFlagMutation();
-  const fields = FIELD_ORDER.filter(f => flag.card?.[f] !== undefined);
-  const changed = fields.some(f => (draft[f] ?? "").trim() && draft[f] !== flag.card?.[f]);
+  const [resolve, resolving] = useResolveDebriefFlagMutation();
+  const [correctRun, correcting] = useCorrectDebriefRunMutation();
+  const fields = FIELD_ORDER.filter(f => original[f] !== undefined);
+  const changed = fields.some(f => (draft[f] ?? "").trim() && draft[f] !== original[f]);
   const today = new Date().toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  const id = flagId ?? `${runId}-${section}`;
 
   const save = async () => {
+    const correction = Object.fromEntries(
+      fields.filter(f => draft[f] !== original[f]).map(f => [f, (draft[f] ?? "").trim()]),
+    ) as DebriefCardCorrection;
     try {
-      const correction = Object.fromEntries(
-        fields.filter(f => draft[f] !== flag.card?.[f]).map(f => [f, (draft[f] ?? "").trim()]),
-      ) as DebriefCardCorrection;
-      await resolve({ id: flag.id, outcome: "corrected", note: note.trim(), correction }).unwrap();
+      if (flagId) {
+        await resolve({ id: flagId, outcome: "corrected", note: note.trim(), correction }).unwrap();
+      } else {
+        await correctRun({ id: runId, section, correction, note: note.trim() }).unwrap();
+      }
       toast.success(en.debriefs.review.corrected);
       onSaved();
     } catch (e) {
@@ -65,7 +75,7 @@ export const CorrectInPlace: React.FC<{
         f === "lead" ? (
           <TextInput
             key={f}
-            id={`correct-${flag.id}-${f}`}
+            id={`correct-${id}-${f}`}
             labelText={en.debriefs.review.fields[f]}
             value={draft[f] ?? ""}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -75,7 +85,7 @@ export const CorrectInPlace: React.FC<{
         ) : (
           <TextArea
             key={f}
-            id={`correct-${flag.id}-${f}`}
+            id={`correct-${id}-${f}`}
             labelText={en.debriefs.review.fields[f] ?? f}
             rows={2}
             value={draft[f] ?? ""}
@@ -109,7 +119,7 @@ export const CorrectInPlace: React.FC<{
         </div>
       )}
       <TextInput
-        id={`correct-${flag.id}-note`}
+        id={`correct-${id}-note`}
         labelText={s.whatChanged}
         value={note}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNote(e.target.value)}
@@ -124,7 +134,7 @@ export const CorrectInPlace: React.FC<{
         <Button
           kind="primary"
           size="md"
-          disabled={isLoading || !changed || !note.trim()}
+          disabled={resolving.isLoading || correcting.isLoading || !changed || !note.trim()}
           onClick={() => void save()}
         >
           {s.save(version)}

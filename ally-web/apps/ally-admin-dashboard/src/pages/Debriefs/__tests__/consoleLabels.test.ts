@@ -101,12 +101,13 @@ describe("inWords", () => {
   });
 });
 
-describe("console tab labels", () => {
-  it("names every Debrief Console tab (a missing key leaves a blank tab)", async () => {
-    const { DebriefConsoleTab } = await import("../DebriefConsole");
+describe("Debriefs home labels", () => {
+  it("names every category (a missing key leaves a blank switch)", async () => {
+    const { HOME_CATEGORIES } = await import("../queue");
     const { en } = await import("@constants");
-    for (const id of Object.values(DebriefConsoleTab)) {
-      expect((en.debriefs.tabs as Record<string, string>)[id], id).toBeTruthy();
+    for (const id of HOME_CATEGORIES) {
+      expect(en.debriefs.home.categories[id], id).toBeTruthy();
+      expect(en.debriefs.home.empty[id]?.title, id).toBeTruthy();
     }
   });
 });

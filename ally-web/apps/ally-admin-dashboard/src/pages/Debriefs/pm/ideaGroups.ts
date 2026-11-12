@@ -19,14 +19,28 @@ export const stage = (idea: PmAgentIdeaRow): "canary" | "promote" | "handoff" | 
   return idea.evidence.trial?.status === "passed" ? "canary" : null;
 };
 
-export type IdeaGroup = "needs" | "canary" | "testing" | "live" | "dropped";
-export const IDEA_GROUPS: IdeaGroup[] = ["needs", "canary", "testing", "live", "dropped"];
+export type IdeaGroup =
+  | "needs"
+  | "canary"
+  | "testing"
+  | "promoted"
+  | "rejected"
+  | "expired"
+  | "reverted";
+export const OPEN_GROUPS: IdeaGroup[] = ["needs", "canary", "testing"];
+export const CLOSED_GROUPS: IdeaGroup[] = ["promoted", "rejected", "expired", "reverted"];
+export const IDEA_GROUPS: IdeaGroup[] = [...OPEN_GROUPS, ...CLOSED_GROUPS];
 
-const DROPPED = new Set(["rejected", "retired", "blocked", "quarantined"]);
+const expired = (idea: PmAgentIdeaRow) =>
+  !!idea.expired || !!idea.approval?.expired || idea.notTakenForwardReason === "no_decision";
 
-/** May this viewer decide on this idea now? */
+/** May this viewer decide on this idea now? ally-be's `can` wins when it sends one. */
 export const needsViewer = (idea: PmAgentIdeaRow, access: DebriefAccess): boolean => {
-  if (idea.status !== "proposed" || idea.expired) return false;
+  if (idea.status !== "proposed" || expired(idea)) return false;
+  if (idea.can) {
+    if (idea.approval?.wait === "promote") return false;
+    return idea.can.approve || (idea.change.ideaKind === "pinned_rule" && access.approvePinnedRule);
+  }
   if (idea.change.ideaKind === "pinned_rule") return access.approvePinnedRule;
   const next = stage(idea);
   return access.pmAgent && (next === "canary" || next === "handoff");
@@ -37,17 +51,25 @@ export const needsViewer = (idea: PmAgentIdeaRow, access: DebriefAccess): boolea
  * waiting on a role the viewer doesn't hold reads as still being tested.
  */
 export const ideaGroup = (idea: PmAgentIdeaRow, access: DebriefAccess): IdeaGroup => {
-  if (idea.expired || DROPPED.has(idea.status)) return "dropped";
   const c = idea.evidence.canary?.status;
+  if (c === "reverted") return "reverted";
+  if (expired(idea)) return "expired";
+  if (c === "promoted" || idea.status === "active" || idea.status === "approved") {
+    return "promoted";
+  }
+  if (["rejected", "retired", "blocked", "quarantined"].includes(idea.status)) return "rejected";
   if (c === "running" || c === "passed") return "canary";
-  if (idea.status === "active" || idea.status === "approved" || c === "promoted") return "live";
   if (needsViewer(idea, access)) return "needs";
   return "testing";
 };
 
+export const isOpenGroup = (g: IdeaGroup) => OPEN_GROUPS.includes(g);
+
 /** Waiting time from the idea's creation; when it lapses (if ally-be sends an expiry). */
 export const daysLeft = (idea: PmAgentIdeaRow, now: number = Date.now()): number | null =>
-  idea.expiresAt ? Math.ceil((new Date(idea.expiresAt).getTime() - now) / 86_400_000) : null;
+  idea.approval?.expiresAt
+    ? Math.ceil((new Date(idea.approval.expiresAt).getTime() - now) / 86_400_000)
+    : null;
 
 /** Expiry within this many days turns the wait amber and raises the PM agent banner. */
 export const EXPIRY_WARNING_DAYS = 3;

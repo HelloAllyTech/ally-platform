@@ -99,6 +99,9 @@ vi.mock("@components", () => ({
 
 // The quick actions have their own suites (speech, drafts API, colour mode); here we only need to
 // know the primary nav carries them.
+vi.mock("@components/notification-bell/NotificationBell", () => ({
+  NotificationBell: () => <button data-testid="notification-bell" />,
+}));
 vi.mock("@components/idea-capture/IdeaCapture", () => ({
   IdeaCaptureLauncher: () => <button data-testid="idea-capture-button" />,
 }));

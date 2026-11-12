@@ -9308,6 +9308,14 @@ export const en = {
       },
     },
   },
+  notificationsBell: {
+    title: "Notifications",
+    titleUnread: (n: number) => `Notifications, ${n} unread`,
+    markAllRead: "Mark all read",
+    empty: "Nothing new.",
+    loading: "Loading…",
+    error: "Couldn't load notifications.",
+  },
   debriefs: {
     title: "Debriefs",
     intro:
@@ -9508,6 +9516,8 @@ export const en = {
         agent: "The PM agent",
       } as Record<string, string>,
       names: {
+        runCeilingUsd: "Run ceiling ($)",
+        monthlyCapUsd: "Monthly cap for debriefs ($)",
         quickTestCases: "Sessions in the quick test",
         quickTestMinLift: "Lift needed to pass (points)",
         gateCases: "Sessions in the gate set",
@@ -10000,6 +10010,7 @@ export const en = {
       categoriesLabel: "Categories",
       categories: {
         needs: "Needs a person",
+        escalated: "Escalated to you",
         flagged: "Flagged",
         below: "Below the bar",
         published: "Published",
@@ -10027,16 +10038,21 @@ export const en = {
           label: "Fallback step",
           all: "Any fallback step",
           none: "Ran as written",
-          low: "Step 1–2",
-          high: "Step 3–6",
+          light: "Step 1–2",
+          heavy: "Step 3–6",
         },
         risk: {
           label: "Risk cue",
           all: "With or without a risk cue",
-          yes: "With a risk cue",
-          no: "Without a risk cue",
+          true: "With a risk cue",
+          false: "Without a risk cue",
         },
-        cost: { label: "Cost", all: "Any cost", over: "Over $0.20", ceiling: "Hit the ceiling" },
+        cost: {
+          label: "Cost",
+          all: "Any cost",
+          over_0_20: "Over $0.20",
+          hit_ceiling: "Hit the ceiling",
+        },
       },
       keys: "j / k move · Enter open · e escalate",
       keysNoEscalate: "j / k move · Enter open",
@@ -10051,6 +10067,10 @@ export const en = {
           title: "Nothing needs a person",
           message:
             "Learners' flags and debriefs held below the bar appear here, most urgent first.",
+        },
+        escalated: {
+          title: "Nothing escalated to you",
+          message: "Flags and debriefs the Ally team asks you about appear here.",
         },
         flagged: {
           title: "No open flags",
@@ -10074,23 +10094,36 @@ export const en = {
           message: "Sessions in your scoring sample that you haven't scored appear here.",
         },
       } as Record<string, { title: string; message: string }>,
-      openIt: "Open it",
-      readIt: "Read it",
-      budgets: "Budgets",
-      urgentBanner: (n: number, waited: string) =>
-        n === 1
-          ? `1 urgent flag waiting ${waited}.`
-          : `${n} urgent items, the oldest waiting ${waited}.`,
-      urgentWhere: (scenario: string) =>
-        `A learner flagged the important moment, or showed distress, in “${scenario}”.`,
-      escalatedBanner: (n: number) =>
-        n === 1 ? "1 debrief escalated to you." : `${n} debriefs escalated to you.`,
-      reverted: (n: number) =>
-        n === 1
-          ? "A canary went back on its own: it missed a risk cue or did clearly worse."
-          : `${n} canaries went back on their own.`,
-      capBanner: (spent: string, cap: string) =>
-        `Debriefs have spent ${spent} of this month's ${cap} cap.`,
+      bannerActions: {
+        open: "Open it",
+        show: "Show them",
+        answer: "Answer it",
+        settings: "Budgets",
+        analytics: "See Analytics",
+      },
+      banners: {
+        urgent: (n: number, waited: string | null) =>
+          `${n === 1 ? "1 urgent item" : `${n} urgent items`}${waited ? ` waiting ${waited}` : ""}: a flag on an important moment, or a learner in distress.`,
+        held: (n: number, waited: string | null, overdue: boolean) =>
+          `${n === 1 ? "1 debrief is" : `${n} debriefs are`} held below the bar${waited ? `, the oldest for ${waited}` : ""}${overdue ? ", past the review deadline" : ""}. The learner sees “on its way”.`,
+        escalated: (n: number) =>
+          n === 1 ? "1 debrief escalated to you." : `${n} debriefs escalated to you.`,
+        reverted: (n: number) =>
+          n === 1
+            ? "A canary went back on its own: it missed a risk cue or did clearly worse."
+            : `${n} canaries went back on their own.`,
+        expiring: (n: number) =>
+          n === 1
+            ? "An approval closes as “no decision” within 3 days."
+            : `${n} approvals close as “no decision” within 3 days.`,
+        off: "The Debrief agent is switched off, so no new debriefs start.",
+        cap: (spent: boolean) =>
+          spent
+            ? "This month's debrief cap is spent: new debriefs fall back to today's."
+            : "Debriefs have spent 80% or more of this month's cap.",
+        provider: "A model provider is failing: more than half its steps failed in the last hour.",
+        language: "Some sessions are not recording their language.",
+      },
     },
     // One session's page (redesign 2026-11-12): the roleplay beside the debrief, and the review.
     session: {
@@ -10134,6 +10167,8 @@ export const en = {
         release: "Release",
         outOf10: (v: string) => `${v} / 10`,
         bar: (n: number) => `Bar is ${n}`,
+        hidden: "After your verdict",
+        hiddenSub: "So it doesn't steer you",
         revisions: (n: number) =>
           n === 0 ? "No revisions" : `${n} ${n === 1 ? "revision" : "revisions"}`,
         ceiling: (v: string) => `Ceiling ${v}`,
@@ -10158,6 +10193,8 @@ export const en = {
       flaggedTag: (reason: string) => `Flagged: “${reason}”`,
       correctedTag: (version: number) => `Corrected by the Ally team · version ${version}`,
       distressTitle: "Learner distress.",
+      distressAskAlly:
+        "The learner showed distress in Ask Ally after reading their debrief; Ally replied with care and the support lines.",
       distressBody:
         "The learner stepped out of the roleplay in distress. Their debrief opened with care and the support lines.",
       correct: {
@@ -10175,6 +10212,17 @@ export const en = {
         skillFrom: (n: number) =>
           `From ${n} past ${n === 1 ? "session" : "sessions"} · used by the Progress reader and the Writer`,
         noSkill: "No skill estimate was recorded for this run.",
+        words: {
+          strength: "A strength",
+          keep_practising: "Keep practising",
+          didnt_come_up: "Didn't come up",
+        } as Record<string, string>,
+        trends: {
+          more_consistent: "More consistent than before",
+          about_the_same: "About the same as before",
+          too_early: "Too early to tell",
+        } as Record<string, string>,
+        level: (l: string) => `learner level: ${l}`,
         didntComeUp: "Didn't come up",
         asWritten: "ran as written",
         release: (v: number) => `release v${v}`,
@@ -10208,6 +10256,7 @@ export const en = {
         about: "About:",
         ally: "Ally",
         replyNotKept: "The reply's words aren't kept for this run.",
+        noReply: "No reply was sent.",
         whatBlocked: "What was blocked",
         failedCheck: (check: string) => `Check that failed: ${check}`,
         lookedUp: (what: string) => `Looked up: ${what}`,
@@ -10221,6 +10270,11 @@ export const en = {
           title: "Remove this point from the learner's debrief?",
           confirm: "Remove it",
           label: "Why it was removed (optional; the learner reads this)",
+        },
+        checked: {
+          title: "Mark that you've checked on this learner?",
+          confirm: "Mark checked",
+          label: "What you did (the team reads this)",
         },
         learnerReads: "Shown to the learner on their debrief.",
       },
@@ -10242,6 +10296,7 @@ export const en = {
         urgent: (w: string) => `Urgent · ${w}.`,
         flag: (w: string) => `Learner flag · ${w}.`,
         held: (w: string) => `Held · ${w}.`,
+        heldOverdue: (w: string) => `Held · ${w}, past the review deadline.`,
         distress: (w: string) => `Learner distress · ${w}.`,
         belowBar: (w: string) => `Below the bar · ${w}.`,
         escalated: (w: string) => `Escalated to you · ${w}.`,
@@ -10253,6 +10308,13 @@ export const en = {
         belowBarBody: (judge: string) =>
           `Already published; the judge scored it ${judge}, below the bar.`,
         escalatedAsk: "The Ally team asks for your view.",
+        escalatedNote: (by: string, note: string) => `${by} asks: “${note}”`,
+        theTeam: "The Ally team",
+        distressAskAlly: "The learner showed distress in Ask Ally after reading the debrief.",
+        theCard: "the card",
+        judgeReasonsLink: "the judge's reasons",
+        askAlly: "the Ask Ally conversation",
+        escalate: "Escalate to clinical advisor",
         giveVerdict: "Give your verdict",
       },
       panel: {
@@ -10277,6 +10339,7 @@ export const en = {
         comments: "Comments",
         commentHint: "Select words in the roleplay or the debrief to add one.",
         commentsReadOnly: "Reviewers and the clinical advisor add comments.",
+        decidedFlags: "Flags already decided",
         scoreByHand: "Score by hand",
         inSample: "in your sample",
       },
@@ -10294,11 +10357,43 @@ export const en = {
       beingTested: (n: number) => `${n} being tested`,
       learningBudget: "Learning budget",
       ofThisMonth: (budget: string) => `of ${budget} this month`,
-      actsAlone: "Acts on its own for:",
+      actsAlone: "What it may change without asking a person (hover for why):",
+      openClosed: "Open or closed",
+      open: "Open",
+      closed: "Closed",
+      groupStatus: {
+        needs: "Waiting for a decision",
+        canary: "In canary",
+        testing: "Being tested",
+        rejected: "Rejected",
+        reverted: "Reverted",
+      } as Record<string, string>,
+      becameRelease: (v: number) => `Became release v${v}`,
+      startGate: "Start the gate test",
+      startTrial: "Start the paired trial",
+      stepStarted: "Started.",
+      draft: {
+        title: (v: number) => `Draft release v${v}`,
+        help: "what goes live if this is promoted",
+        against: (live: number) => `compared with v${live} (live)`,
+        rest: (live: number) => `everything else as in v${live}`,
+        prompt: (name: string) => `${name}: a new version`,
+      },
+      questions: {
+        ask: "Ask a question",
+        askAnother: "Ask another question",
+        label: "Your question",
+        help: "The PM agent reads it on its next run. Asking doesn't stop the 14-day clock.",
+        send: "Send",
+        sent: "Sent. The PM agent reads it on its next run.",
+        agent: "PM agent",
+        someone: "Someone",
+        noAnswerYet: "The PM agent can't answer here yet; it takes questions into its next run.",
+      },
       autonomyKinds: {
         settings: "Settings",
         guidance: "Guidance",
-        prompts: "Prompts",
+        prompts: "Prompts and agents",
         models: "Models",
         pinned_rules: "Pinned rules",
       } as Record<string, string>,
@@ -10312,8 +10407,10 @@ export const en = {
         needs: "Needs you",
         canary: "In canary",
         testing: "Being tested",
-        live: "Live",
-        dropped: "Not taken forward",
+        promoted: "Promoted",
+        rejected: "Rejected",
+        expired: "Expired (no decision)",
+        reverted: "Reverted",
       } as Record<string, string>,
       kinds: {
         pinned_rule: "Pinned rule",
@@ -10358,13 +10455,55 @@ export const en = {
         debrief_sealed: "Never shown to the PM agent",
       } as Record<string, string>,
       releases: {
-        since: (when: string, by: string) => `since ${when} · made by ${by}`,
-        judge: (median: string, n: number) => `Judge average ${median} on ${n} debriefs`,
-        cost: (v: string) => `${v} a debrief`,
-        otherVersions: "Other versions",
-        noOthers: "No other versions yet.",
+        explainer:
+          "A release is the exact set of prompt and recipe versions, models and settings learners get. Nothing live is edited directly: every change becomes a new release, and rolling back restores all of it together.",
+        onTheWay: (n: number) =>
+          `${n} ${n === 1 ? "change" : "changes"} on ${n === 1 ? "its" : "their"} way · see Ideas`,
+        listLabel: "Releases",
+        untitled: "Release",
+        rolledBack: "Rolled back",
+        since: (when: string) => `since ${when}`,
         fromIdea: (code: string) => `From idea ${code}`,
+        retired: (why: string) => `Retired: ${why}`,
         rollBack: "Roll back to this",
+        confirmLabel: "Confirm roll back",
+        confirmTitle: (v: string) => `Roll back to ${v}?`,
+        confirmBody:
+          "Every prompt, recipe, model and setting goes back to this release for all switched-on organisations. Debriefs already written don't change.",
+        whatChanged: (v: string) => `What changed from ${v}`,
+        whatChangedFirst: "What's in the first release",
+        why: (why: string) => `Why: ${why}`,
+        before: "Before",
+        after: "After",
+        areaPrompt: "Prompt",
+        promptChange: (name: string, from: number | null, to: number | null) =>
+          `${name}: ${from == null ? "none" : `v${from}`} → ${to == null ? "none" : `v${to}`}`,
+        restSame: (v: string) => `Everything else is the same as ${v}.`,
+        didItWork: "Did it work?",
+        beforeLive: "Before going live",
+        sinceLive: "Since going live",
+        whileLive: "While it was live",
+        vs: (x: string, v: number) => `vs ${x} in v${v}`,
+        same: "same as before",
+        stats: {
+          debriefs: "Debriefs",
+          judge: "Judge median",
+          judgeMean: "Judge average",
+          hardFails: "Hard fails",
+          cost: "Cost a debrief",
+          time: "Time to a debrief",
+        },
+        everything: "Everything in this release",
+        promptsHeading: "Prompts and recipes · Skills Store versions",
+        changed: "changed",
+        unchanged: "unchanged",
+        pinnedLock: "Pinned",
+        releaseOnly: "Release-only",
+        settingsHeading: "Settings in this release",
+        revisionRounds: (n: number) => `Revision rounds: ${n}`,
+        changeInSettings: "Change in Settings (makes a new release)",
+        pinnedHeading: "Pinned rules",
+        locked: "locked",
       },
       steps: {
         heading: "Steps and models",
@@ -10423,6 +10562,7 @@ export const en = {
         testOrg: "test organisation",
         emergencyStop: "Emergency stop",
         stopTitle: (name: string) => `Stop the new debrief for ${name}?`,
+        stopReason: "Why (the team reads this)",
         stopBody:
           "From now on its learners see “not available” where their debrief would be, not today's debrief. Debriefs already written stay as they are. Switching it back on is the owner's.",
       },
@@ -10437,28 +10577,39 @@ export const en = {
         shareSub: "Of each debrief's unspent budget",
         change: "Change",
         changeTitle: (name: string) => `Change ${name}?`,
+        releaseBody:
+          "This lives in the release, so changing it makes a new live release. Roll back undoes it.",
+        releaseMade: (v: number) => `Saved as release v${v}.`,
       },
       autonomy: {
         columns: {
           kind: "Kind of change",
-          quick: "Quick test",
-          gate: "Gate test",
-          trial: "Paired trial",
+          quick_test: "Quick test",
+          gate_test: "Gate test",
+          paired_trial: "Paired trial",
           canary: "Canary",
           promote: "Promote",
           eligible: "Eligible?",
         } as Record<string, string>,
-        cells: {
-          alone: "On its own",
-          asks_first: "Asks first",
-          off: "Off",
-          never: "Never",
+        kinds: {
+          settings: "Settings (not budgets)",
+          prompts: "Prompts, agents and default plans",
+          pinned_rules: "Pinned rules",
+          guidance: "Guidance",
+          models: "Models",
         } as Record<string, string>,
+        cells: { auto: "On its own", ask: "Asks first", off: "Off" } as Record<string, string>,
+        never: "Never",
         aPerson: "A person",
+        pinnedOnly: "Never · clinical advisor or owner only",
         eligibleYes: "Yes",
         eligibleNo: "Not yet",
-        notYet:
-          "The PM agent asks a person before every canary and promotion. Its freedom per kind of change shows here once ally-be records it.",
+        loading: "Loading…",
+        loadFailed: "Couldn't load what the PM agent may do alone.",
+        driftFrom: "Judge drift: measured from Release 2.",
+        drift: "Judge drift found: everything asks first.",
+        noDrift: "No judge drift.",
+        baselineFailed: "The monthly baseline failed: everything asks first.",
         perOrg: "Per organisation",
         perOrgHelp:
           "Paired trials and canaries reach real learners, so each organisation can tighten the defaults above. It can never loosen them. Prompts, models and the rubric are shared by every organisation, so they're set only above.",
@@ -10466,13 +10617,11 @@ export const en = {
           org: "Organisation",
           trials: "Paired trials on its learners",
           canaries: "Canaries on its learners",
-          guidance: "Changes to its own guidance",
         },
-        orgPolicy: {
-          default: "Use the default",
-          asks_first: "Asks first",
-          never: "Never",
-        } as Record<string, string>,
+        orgPolicy: { default: "Use the default", ask: "Asks first", never: "Never" } as Record<
+          string,
+          string
+        >,
         orgLive: "Live",
         orgNotLive: "Not switched on yet · no trials or canaries",
       },
