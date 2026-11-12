@@ -209,6 +209,24 @@ describe('the "waiting on you" bar', () => {
   const reader = { roles: debriefRoles([]) };
   const now = new Date('2026-11-12T09:00:00Z');
 
+  it('learner distress in the session: Read first goes to the distress turns (Notes #21)', () => {
+    const [a] = pendingActions(
+      {
+        ...base,
+        riskCueTurns: [],
+        learnerDistress: true,
+        distressTurns: [8, 6],
+      },
+      team,
+      now,
+    );
+    expect(a).toMatchObject({
+      kind: 'learner_distress',
+      level: 'red',
+      anchors: { turns: [6, 8] },
+    });
+  });
+
   it('an urgent flag for the Ally team, with anchors; nothing for a reader', () => {
     const f: PendingFacts = {
       ...base,

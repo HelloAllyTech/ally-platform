@@ -673,6 +673,11 @@ export class DebriefConsoleViewService implements OnModuleInit {
     const riskCueTurns = transcript
       .filter((t) => t.riskCue)
       .map((t) => t.turnIndex);
+    const distressTurns = (
+      (ws.safety?.learner_distress ?? []) as Array<{ turn_index?: unknown }>
+    )
+      .map((d) => Number(d?.turn_index))
+      .filter((n) => Number.isInteger(n) && n > 0);
     const reasons = heldReasons(run);
     const judge = ws.judge as
       | {
@@ -719,6 +724,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         learnerDistress: run.learnerDistress,
         judgeBelowBar,
         riskCueTurns,
+        distressTurns,
         heldReasonTurns: [
           ...new Set([...reasons.flatMap((r) => r.turns), ...riskCueTurns]),
         ].sort((a, b) => a - b),
@@ -816,6 +822,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
           (f) => f.section === ASK_ALLY_SECTION && f.status !== 'withdrawn',
         ),
         riskCueTurns,
+        distressTurns,
       },
       skillEstimate: {
         progress: (ws.progress?.items ?? []) as unknown[],

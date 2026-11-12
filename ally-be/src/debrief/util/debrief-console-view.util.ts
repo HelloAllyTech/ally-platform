@@ -525,6 +525,8 @@ export interface PendingFacts {
   learnerDistress: boolean;
   judgeBelowBar: boolean;
   riskCueTurns: number[];
+  /** Turns where the learner stepped out of the roleplay in distress (the safety reader's). */
+  distressTurns?: number[];
   heldReasonTurns: number[];
   escalation: { at: string; note: string | null; by: string | null } | null;
   /** Review deadline (owner setting flagReviewSlaHours). */
@@ -642,7 +644,12 @@ export function pendingActions(
         level: 'red',
         waitingSince: f.createdAt,
         title: 'The learner showed distress in this session.',
-        anchors: { turns: f.riskCueTurns },
+        // Notes #21: "Read first" goes to the learner's own distress turns.
+        anchors: {
+          turns: [
+            ...new Set([...(f.distressTurns ?? []), ...f.riskCueTurns]),
+          ].sort((a, b) => a - b),
+        },
         decisions: ['looks_fine', 'escalate'],
       });
     }
