@@ -123,6 +123,7 @@ class SimulationLogItem {
     required this.scenarioTitle,
     required this.score,
     this.sessionName,
+    this.counselorId,
   });
 
   factory SimulationLogItem.fromJson(Map<String, dynamic> json) {
@@ -144,6 +145,7 @@ class SimulationLogItem {
       scenarioTitle: scenario?['title'] as String? ?? json['scenarioTitle'] as String?,
       score: (json['score'] as num?)?.toDouble(),
       sessionName: (json['metadata'] as Map<String, dynamic>?)?['sessionName'] as String?,
+      counselorId: (json['counselorId'] as num?)?.toInt(),
     );
   }
 
@@ -157,6 +159,9 @@ class SimulationLogItem {
   /// `metadata.sessionName` — the only `logTitle` source a scenario session
   /// can have (it has no `details`).
   final String? sessionName;
+
+  /// Who did the session: the viewer's own reads the learner debrief view.
+  final int? counselorId;
 
   /// RN `CallLogItem.tsx`'s `logTitle` for a role-play row.
   String get logTitle => (sessionName?.isNotEmpty ?? false) ? sessionName! : 'ID-$id';

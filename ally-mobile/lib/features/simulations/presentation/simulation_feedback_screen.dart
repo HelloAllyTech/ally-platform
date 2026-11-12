@@ -56,6 +56,7 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
     super.key,
     required this.scenarioSessionId,
     this.fromLogs = false,
+    this.ownSession = false,
     this.pathId,
     this.caseId,
     this.languageId,
@@ -66,6 +67,10 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
   /// RN `route.params.fromLogs`: reached from a historical Call Logs row,
   /// so the debrief is read-only and leaving never forces a rating.
   final bool fromLogs;
+
+  /// From the logs, the viewer's own session: their debrief comes from the
+  /// learner view (read-only here), not the supervisor's.
+  final bool ownSession;
 
   /// RN `route.params.pathId` / `caseId`: the session belongs to a path or
   /// case, so back returns to its details and "Try another" is hidden.
@@ -724,6 +729,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           summary: _summary,
           retryLimitReached: _retryLimitReached,
           readOnly: widget.fromLogs,
+          supervisorView: widget.fromLogs && !widget.ownSession,
           // Anchors are chips only when there's a transcript to open.
           onOpenMoment: (_summary?.showTranscriptTab ?? true) ? _openMoment : null,
         );

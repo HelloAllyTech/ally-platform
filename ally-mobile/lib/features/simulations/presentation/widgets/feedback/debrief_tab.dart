@@ -44,7 +44,8 @@ class DebriefTab extends ConsumerStatefulWidget {
     required this.retryLimitReached,
     this.onOpenMoment,
     this.readOnly = false,
-  });
+    bool? supervisorView,
+  }) : supervisorView = supervisorView ?? readOnly;
 
   final AskAiChatController chat;
 
@@ -54,6 +55,10 @@ class DebriefTab extends ConsumerStatefulWidget {
   final bool retryLimitReached;
   final ValueChanged<String>? onOpenMoment;
   final bool readOnly;
+
+  /// Whose view of the debrief: the supervisor's (Roleplay Logs, someone
+  /// else's session) or the learner's own. Defaults to [readOnly].
+  final bool supervisorView;
 
   @override
   ConsumerState<DebriefTab> createState() => _DebriefTabState();
@@ -66,7 +71,7 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
     sessionId: widget.sessionId,
     // Roleplay Logs: the supervisor's view of the learner's debrief (v9
     // FR-26); a 403 (another organisation) or not_available keeps the note.
-    supervisor: widget.readOnly,
+    supervisor: widget.supervisorView,
   );
 
   @override

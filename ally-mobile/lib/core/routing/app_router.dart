@@ -328,6 +328,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SimulationFeedbackScreen(
           scenarioSessionId: state.pathParameters['sessionId']!,
           fromLogs: state.uri.queryParameters['fromLogs'] == 'true',
+          ownSession: state.uri.queryParameters['own'] == 'true',
           pathId: state.uri.queryParameters['pathId'],
           caseId: state.uri.queryParameters['caseId'],
           languageId: int.tryParse(state.uri.queryParameters['languageId'] ?? ''),
