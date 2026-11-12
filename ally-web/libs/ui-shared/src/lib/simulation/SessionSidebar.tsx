@@ -69,7 +69,7 @@ export const SessionSidebar: FC<SessionSidebarProps> = ({
         showLive && { id: SidebarTab.LIVE, label: "Live events" },
         showSupervisor && {
           id: SidebarTab.SUPERVISOR,
-          label: translations?.supervisorTab ?? "Supervisor",
+          label: translations?.supervisorTab ?? "AI Suggestions",
         },
         // Host tabs last, so adding one never moves the tab a learner lands on.
         ...extraTabs.map(({ id, label }) => ({ id, label })),
