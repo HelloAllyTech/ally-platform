@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -26,7 +27,7 @@ import {
   ThumbsUp,
   TrendingUp,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { I18nextProvider, useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import {
@@ -571,7 +572,35 @@ interface DebriefCardsProps {
  * No score, no percentage and no red anywhere: amber marks what needs
  * attention, and every status carries text plus an icon, never colour alone.
  */
-export const DebriefCards: FC<DebriefCardsProps> = ({
+/** Scripts that need more line height than Latin to stay legible (NFR-6: ≥ 1.6). */
+const INDIC_LANGUAGES = new Set(["hi", "mr", "ta", "kn", "bn", "ml", "te", "gu", "pa", "or"]);
+export const isIndicLanguage = (language?: string | null): boolean =>
+  INDIC_LANGUAGES.has(toLangAttribute(language) ?? "");
+
+/**
+ * PRD §9: everything in the debrief follows the session's language, labels
+ * included, whatever language the app is in. Languages without reviewed UI
+ * copy fall back to English labels (i18next's fallback).
+ */
+export const DebriefCards: FC<DebriefCardsProps> = props => {
+  const { i18n } = useTranslation();
+  const lng = toLangAttribute(props.view.language);
+  const debriefI18n = useMemo(
+    () =>
+      lng && i18n?.cloneInstance && lng !== toLangAttribute(i18n.language)
+        ? i18n.cloneInstance({ lng })
+        : null,
+    [i18n, lng],
+  );
+  if (!debriefI18n) return <DebriefCardsInLanguage {...props} />;
+  return (
+    <I18nextProvider i18n={debriefI18n}>
+      <DebriefCardsInLanguage {...props} />
+    </I18nextProvider>
+  );
+};
+
+const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
   view,
   sessionId,
   replyThread,
@@ -733,7 +762,9 @@ export const DebriefCards: FC<DebriefCardsProps> = ({
           <div
             lang={toLangAttribute(view.language)}
             data-testid="debrief-cards"
-            className="flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6"
+            className={`flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6 ${
+              isIndicLanguage(view.language) ? "[&_*]:!leading-[1.7]" : ""
+            }`}
           >
             <ReadAloudStatusLine />
             {/* FR-27: screen readers hear when the debrief is ready. */}

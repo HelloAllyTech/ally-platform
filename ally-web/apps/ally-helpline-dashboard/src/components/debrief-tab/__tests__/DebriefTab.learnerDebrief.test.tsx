@@ -260,6 +260,8 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
 
     const container = screen.getByTestId("debrief-cards");
     expect(container).toHaveAttribute("lang", "hi");
+    // NFR-6: Indic text gets line height of at least 1.6.
+    expect(container.className).toContain("[&_*]:!leading-[1.7]");
     expect(screen.getByText("postSim.debriefCards.header")).toBeInTheDocument();
     expect(screen.getByText("postSim.debriefCards.aiLabel")).toBeInTheDocument();
 
