@@ -171,7 +171,7 @@ export const uiSharedFakes = {
           }
         >
           {items.map((item: any, i: number) => (
-            <option key={i} value={text(item)}>
+            <option key={i} value={text(item)} disabled={Boolean(item?.disabled)}>
               {text(item)}
             </option>
           ))}

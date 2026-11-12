@@ -203,28 +203,42 @@ const CELL_TONE: Record<DebriefAutonomyValue, string> = {
   off: "bg-neutral-100",
 };
 
-type Item = { id: string; label: string };
+type Item = { id: string; label: string; disabled?: boolean };
 
+/**
+ * One cell of the autonomy grid: always a dropdown (design `Settings.dc.html`). A cell nobody may
+ * change here (Promote, pinned rules, or a reader without the owner's rights) is a disabled
+ * dropdown whose reason is in its name and tooltip.
+ */
 const CellSelect: React.FC<{
   id: string;
   label: string;
   value: string;
   items: Item[];
-  onChange: (v: string) => void;
+  onChange?: (v: string) => void;
   className?: string;
-}> = ({ id, label, value, items, onChange, className }) => (
-  <div className={`w-full ${className ?? ""}`} data-testid={id}>
+  disabled?: boolean;
+  /** Why it can't be changed: tooltip and accessible name. */
+  reason?: string;
+}> = ({ id, label, value, items, onChange, className, disabled, reason }) => (
+  <div
+    className={`w-full ${className ?? ""}`}
+    data-testid={id}
+    title={reason}
+    data-disabled={disabled ? "true" : undefined}
+  >
     <Dropdown
       id={id}
       size="sm"
-      titleText={label}
+      titleText={reason ? `${label}. ${reason}` : label}
       hideLabel
       label={label}
       items={items}
+      disabled={disabled}
       selectedItem={items.find(i => i.id === value) ?? items[0]}
       itemToString={(i: Item | null) => i?.label ?? ""}
       onChange={({ selectedItem }: { selectedItem: Item | null }) =>
-        selectedItem && onChange(selectedItem.id)
+        selectedItem && !selectedItem.disabled && onChange?.(selectedItem.id)
       }
     />
   </div>
@@ -240,18 +254,20 @@ const EligibleCell: React.FC<{ row: DebriefAutonomyView["kinds"][number]; pinned
 }) => {
   const s = en.debriefs.settingsPage.autonomy;
   if (pinned) return <span className="text-xs text-[#8A3800]">{s.pinnedOnly}</span>;
-  const tests = row.eligibility?.quick_test ?? { eligible: row.eligible, reason: row.reason };
+  const tests = row.eligibility?.quick_test ?? { eligible: true, reason: "" };
   const canary = row.eligibility?.canary ?? { eligible: row.eligible, reason: row.reason };
   const tone = (ok: boolean) => (ok ? "text-success-600" : "text-[#8A3800]");
   return (
     <span className="flex flex-col gap-0.5 text-xs" data-testid="autonomy-eligible">
-      <span className={tone(tests.eligible)} data-testid="autonomy-eligible-tests">
-        {s.testsLabel}: {tests.eligible ? s.eligibleYes : s.eligibleNo}
-        {!tests.eligible && ` · ${inWords(row.relockReason ?? tests.reason)}`}
-      </span>
+      {/* Tests learners never see need only a clean record: said only when that broke. */}
+      {!tests.eligible && (
+        <span className={tone(false)} data-testid="autonomy-eligible-tests">
+          {s.testsLabel}: {s.eligibleNo} · {inWords(row.relockReason ?? tests.reason)}
+        </span>
+      )}
       <span className={tone(canary.eligible)} data-testid="autonomy-eligible-canary">
-        {s.columns.canary}: {canary.eligible ? s.eligibleYes : s.eligibleNo} ·{" "}
-        {inWords(row.relockReason ?? canary.reason)}
+        {s.columns.canary}: {canary.eligible ? s.eligibleYes : s.eligibleNo.toLowerCase()} ·{" "}
+        {inWords(canary.eligible ? canary.reason : (row.relockReason ?? canary.reason))}
       </span>
     </span>
   );
@@ -266,6 +282,8 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
   const q = useGetDebriefAutonomyQuery();
   const [setMatrix] = useSetDebriefAutonomyMatrixMutation();
   const [setOrg] = useSetDebriefOrgAutonomyMutation();
+  // The kind whose canary the owner is about to let run alone before the κ gate is met.
+  const [overriding, setOverriding] = useState<DebriefAutonomyKind | null>(null);
   const view = q.data;
   const run = async (p: Promise<unknown>) => {
     try {
@@ -285,6 +303,34 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
   const editable = canEdit && view.can.change;
   return (
     <div className="flex flex-col gap-4">
+      <ConfirmDialog
+        isOpen={overriding !== null}
+        title={s.overrideTitle}
+        cancelLabel={s.overrideCancel}
+        confirmLabel={s.overrideConfirm}
+        danger
+        onClose={() => setOverriding(null)}
+        onConfirm={() => {
+          const kind = overriding;
+          setOverriding(null);
+          if (kind) {
+            void run(
+              setMatrix({
+                changes: [{ kind, step: "canary", value: "auto" }],
+                override: true,
+              }).unwrap(),
+            );
+          }
+        }}
+      >
+        <p className="m-0" data-testid="autonomy-override-body">
+          {overriding ? s.overrideBody(s.kinds[overriding].toLowerCase()) : ""}
+        </p>
+        <p className="m-0">{s.overrideSafety}</p>
+      </ConfirmDialog>
+      <p className="m-0 max-w-3xl text-sm text-neutral-600" data-testid="autonomy-intro">
+        {s.intro}
+      </p>
       <div className="overflow-x-auto rounded-sm bg-neutral-50" data-testid="autonomy-matrix">
         <div className="grid min-w-[980px] grid-cols-[minmax(170px,1.3fr)_repeat(5,minmax(110px,1fr))_minmax(170px,1.3fr)] gap-2.5 border-b border-neutral-100 px-5 py-2.5 text-xs text-neutral-600">
           <span>{s.columns.kind}</span>
@@ -305,48 +351,100 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
               className="grid min-w-[980px] grid-cols-[minmax(170px,1.3fr)_repeat(5,minmax(110px,1fr))_minmax(170px,1.3fr)] items-center gap-2.5 border-b border-neutral-100 px-5 py-2.5 text-sm"
             >
               <span className="font-medium">{s.kinds[kind]}</span>
-              {view.steps.map((st: DebriefAutonomyStep) =>
-                kind === "pinned_rules" ? (
-                  <span key={st}>
-                    <ConsoleTag>{s.never}</ConsoleTag>
-                  </span>
-                ) : editable && !fixed ? (
+              {view.steps.map((st: DebriefAutonomyStep) => {
+                if (kind === "pinned_rules") {
+                  return (
+                    <CellSelect
+                      key={st}
+                      id={`autonomy-${kind}-${st}`}
+                      label={`${s.kinds[kind]}, ${s.columns[st]}`}
+                      value="person"
+                      items={[{ id: "person", label: s.aPerson }]}
+                      disabled
+                      reason={s.pinnedReason}
+                      className="bg-neutral-100"
+                    />
+                  );
+                }
+                const e = row.eligibility?.[st] ?? { eligible: row.eligible, reason: row.reason };
+                // Only the κ gate can be overridden (by the owner, confirmed); never a re-lock,
+                // which shows on the steps learners never see too.
+                const overridable =
+                  st === "canary" && !e.eligible && (row.eligibility?.quick_test?.eligible ?? true);
+                const autoLabel = e.eligible
+                  ? s.cells.auto
+                  : overridable
+                    ? s.autoNeedsAgreement
+                    : s.autoNotNow;
+                return (
                   <CellSelect
                     key={st}
                     id={`autonomy-${kind}-${st}`}
                     label={`${s.kinds[kind]}, ${s.columns[st]}`}
                     value={row.cells[st]}
                     className={CELL_TONE[row.cells[st]]}
-                    items={(["auto", "ask", "off"] as DebriefAutonomyValue[])
-                      .filter(
-                        v =>
-                          v !== "auto" ||
-                          (row.eligibility?.[st]?.eligible ?? row.eligible) ||
-                          row.cells[st] === "auto",
-                      )
-                      .map(v => ({ id: v, label: s.cells[v] }))}
+                    disabled={!editable || fixed}
+                    reason={!editable || fixed ? s.ownerOnlyReason : undefined}
+                    items={(["auto", "ask", "off"] as DebriefAutonomyValue[]).map(v => ({
+                      id: v,
+                      label: v === "auto" ? autoLabel : s.cells[v],
+                      // Shown, but not selectable until eligible (an existing "auto" stays as it is).
+                      disabled:
+                        v === "auto" && !e.eligible && !overridable && row.cells[st] !== "auto",
+                    }))}
                     onChange={v =>
-                      void run(
-                        setMatrix({
-                          changes: [{ kind, step: st, value: v as DebriefAutonomyValue }],
-                        }).unwrap(),
-                      )
+                      v === "auto" && overridable && row.cells[st] !== "auto"
+                        ? setOverriding(kind)
+                        : void run(
+                            setMatrix({
+                              changes: [{ kind, step: st, value: v as DebriefAutonomyValue }],
+                            }).unwrap(),
+                          )
                     }
                   />
-                ) : (
-                  <span key={st}>
-                    <span
-                      className={`rounded-full px-2 py-[3px] text-xs font-semibold ${CELL_TONE[row.cells[st]]}`}
-                    >
-                      {s.cells[row.cells[st]]}
-                    </span>
-                  </span>
-                ),
-              )}
-              <span>
-                <ConsoleTag>{kind === "pinned_rules" ? s.never : s.aPerson}</ConsoleTag>
-              </span>
+                );
+              })}
+              <CellSelect
+                id={`autonomy-${kind}-promote`}
+                label={`${s.kinds[kind]}, ${s.columns.promote}`}
+                value="person"
+                items={[{ id: "person", label: s.aPerson }]}
+                disabled
+                reason={kind === "pinned_rules" ? s.pinnedReason : s.promoteReason}
+                className="bg-neutral-100"
+              />
               <EligibleCell row={row} pinned={kind === "pinned_rules"} />
+              {row.override && row.cells.canary === "auto" && (
+                <p
+                  className="col-span-full m-0 text-xs text-[#8A3800]"
+                  data-testid="autonomy-override"
+                >
+                  {s.overrideLine(
+                    row.override.name ?? s.someone,
+                    new Date(row.override.at).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                  )}
+                </p>
+              )}
+              {row.relock && (
+                <p
+                  className="col-span-full m-0 text-xs text-[#8A3800]"
+                  data-testid="autonomy-relock"
+                >
+                  {s.relockedLine(
+                    row.relock.steps.map(st => s.columns[st]).join(", "),
+                    new Date(row.relock.at).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                    inWords(row.relock.reason),
+                  )}
+                </p>
+              )}
             </div>
           );
         })}

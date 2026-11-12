@@ -366,6 +366,10 @@ export interface DebriefAutonomyView {
     eligibility?: Record<DebriefAutonomyStep, { eligible: boolean; reason: string }>;
     relockedAt: string | null;
     relockReason: string | null;
+    /** The owner set the canary on its own before the κ gate (an override). */
+    override?: { at: string; by: number; name: string | null } | null;
+    /** The latest re-lock by the system whose cells still ask first. */
+    relock?: { at: string; reason: string; steps: DebriefAutonomyStep[]; by: "system" } | null;
   }>;
   orgs: Array<{
     tenantId: string;

@@ -351,6 +351,8 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
           step: DebriefAutonomyStep;
           value: DebriefAutonomyValue;
         }>;
+        /** The owner confirmed a canary on its own before the judge-agreement gate. */
+        override?: boolean;
       }
     >({
       query: body => ({

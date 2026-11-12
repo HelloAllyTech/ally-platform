@@ -10794,8 +10794,28 @@ export const en = {
         } as Record<string, string>,
         cells: { auto: "On its own", ask: "Asks first", off: "Off" } as Record<string, string>,
         never: "Never",
-        aPerson: "A person",
-        pinnedOnly: "Never · clinical advisor or owner only",
+        aPerson: "Always a person",
+        pinnedOnly: "Always a person · clinical advisor or owner",
+        pinnedReason:
+          "Pinned rules are written and signed off by the clinical advisor or the owner",
+        promoteReason: "Promoting to everyone always needs a person.",
+        ownerOnlyReason: "Only the owner changes this.",
+        autoNeedsAgreement: "On its own (override)",
+        overrideTitle: "Let canaries run on their own?",
+        overrideBody: (kind: string) =>
+          `The judge hasn't been shown to agree with the clinical advisor yet. Canaries for ${kind} will reach learners without approval.`,
+        overrideSafety:
+          "The safety nets stay: a canary that misses a risk cue reverts on its own, and the system still sets it back to asks first after reverts or a failed baseline, and tells you.",
+        overrideConfirm: "Let them run",
+        overrideCancel: "Cancel",
+        overrideLine: (name: string, date: string) =>
+          `Canary: On its own · owner override, ${name}, ${date}`,
+        someone: "the owner",
+        autoNotNow: "On its own (not now)",
+        intro:
+          "Steps learners never see (quick test, gate test, paired trial) can run on their own. A canary reaches real learners, so it opens only once the judge agrees with the clinical advisor's reviews. Promoting to everyone always needs a person.",
+        relockedLine: (steps: string, date: string, reason: string) =>
+          `${steps}: Asks first · set by the system on ${date}: ${reason}. Turning it back on is up to the owner.`,
         eligibleYes: "Yes",
         eligibleNo: "Not yet",
         testsLabel: "Tests",
