@@ -27,7 +27,7 @@ function build(stored: Record<string, any> | null = null) {
   const audit = { log: jest.fn() };
   const notifier = { owner: jest.fn(async () => 1) };
   const service = new DebriefAutonomyService(
-    {} as any,
+    { query: jest.fn(async () => [{ name: 'Gopi' }]) } as any,
     rows as any,
     settings as any,
     audit as any,
@@ -138,6 +138,104 @@ describe('DebriefAutonomyService', () => {
     );
     await service.refreshRelocks(facts());
     expect(notifier.owner).toHaveBeenCalledTimes(2);
+  });
+
+  describe('canary override before the κ gate', () => {
+    const below = () =>
+      facts({
+        gate: { met: false, failing: [{ measure: 'accuracy', kappa: 0.4 }] },
+      });
+
+    it('needs the owner to confirm it', async () => {
+      const { service, row } = build();
+      jest.spyOn(service, 'facts').mockResolvedValue(below());
+      await expect(
+        service.setMatrix(
+          [{ kind: 'prompts', step: 'canary', value: 'auto' }],
+          7,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(row.autonomy).toBeNull();
+    });
+
+    it('is recorded (who, when) and audited as an override', async () => {
+      const { service, row, audit } = build();
+      jest.spyOn(service, 'facts').mockResolvedValue(below());
+      await service.setMatrix(
+        [{ kind: 'prompts', step: 'canary', value: 'auto' }],
+        7,
+        true,
+      );
+      expect(row.autonomy.matrix.prompts.canary).toBe('auto');
+      expect(row.autonomy.overrides.prompts).toMatchObject({
+        by: 7,
+        name: 'Gopi',
+      });
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: expect.objectContaining({ override: ['prompts'] }),
+        }),
+      );
+      // Setting it back clears the override.
+      await service.setMatrix(
+        [{ kind: 'prompts', step: 'canary', value: 'ask' }],
+        7,
+      );
+      expect(row.autonomy.overrides.prompts).toBeUndefined();
+    });
+
+    it('never overrides a re-lock, and pinned rules stay refused', async () => {
+      const { service } = build();
+      jest
+        .spyOn(service, 'facts')
+        .mockResolvedValue(facts({ ...below(), reverts: { prompts: 2 } }));
+      await expect(
+        service.setMatrix(
+          [{ kind: 'prompts', step: 'canary', value: 'auto' }],
+          7,
+          true,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.setMatrix(
+          [{ kind: 'pinned_rules', step: 'canary', value: 'auto' }],
+          7,
+          true,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('the κ re-lock leaves it; a revert re-lock still drops it, clears it and tells the owner', async () => {
+      const { service, row, notifier } = build();
+      jest.spyOn(service, 'facts').mockResolvedValue(below());
+      await service.setMatrix(
+        [{ kind: 'prompts', step: 'canary', value: 'auto' }],
+        7,
+        true,
+      );
+      await service.refreshRelocks(below());
+      expect(row.autonomy.matrix.prompts.canary).toBe('auto');
+      await service.refreshRelocks(
+        facts({ ...below(), reverts: { prompts: 2 } }),
+      );
+      expect(row.autonomy.matrix.prompts.canary).toBe('ask');
+      expect(row.autonomy.overrides.prompts).toBeUndefined();
+      expect(notifier.owner).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Prompts, agents and default plans: back to asks first',
+        }),
+      );
+    });
+
+    it('with the gate met there is no override', async () => {
+      const { service, row } = build();
+      jest.spyOn(service, 'facts').mockResolvedValue(facts());
+      await service.setMatrix(
+        [{ kind: 'prompts', step: 'canary', value: 'auto' }],
+        7,
+      );
+      expect(row.autonomy.overrides.prompts).toBeUndefined();
+    });
   });
 
   it('accepts "auto" for an eligible kind and audits it', async () => {

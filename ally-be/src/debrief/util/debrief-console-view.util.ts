@@ -278,6 +278,14 @@ export interface AutonomyPolicy {
    * owner is told once when it becomes possible (never switched on for them).
    */
   canaryEligible?: Partial<Record<ChangeKind, boolean>>;
+  /**
+   * The owner set a canary "on its own" before the κ gate was met (an
+   * override, confirmed and audited). The κ re-lock leaves it be; the other
+   * re-locks (reverts, baseline, drift) still apply and clear it.
+   */
+  overrides?: Partial<
+    Record<ChangeKind, { at: string; by: number; name: string | null }>
+  >;
 }
 
 /**
@@ -331,11 +339,19 @@ export function normaliseAutonomy(
     const v = stored?.canaryEligible?.[kind];
     if (typeof v === 'boolean') canaryEligible[kind] = v;
   }
+  const overrides: AutonomyPolicy['overrides'] = {};
+  for (const kind of CONFIGURABLE_KINDS) {
+    const o = stored?.overrides?.[kind];
+    if (o && typeof o.at === 'string' && matrix[kind].canary === 'auto') {
+      overrides[kind] = { at: o.at, by: Number(o.by), name: o.name ?? null };
+    }
+  }
   return {
     matrix,
     orgs,
     relocks: Array.isArray(stored?.relocks) ? stored!.relocks.slice(-50) : [],
     canaryEligible,
+    overrides,
   };
 }
 
@@ -517,6 +533,7 @@ export function matrixChangeRefusal(
   step: string,
   value: string,
   f: AutonomyFacts,
+  override = false,
 ): string | null {
   if (!(CHANGE_KINDS as readonly string[]).includes(kind)) {
     return `${kind} is not a kind of change`;
@@ -532,6 +549,15 @@ export function matrixChangeRefusal(
   }
   if (value === 'auto') {
     const e = kindEligibility(kind as ChangeKind, f, step as AutonomyStep);
+    // The owner may override the κ gate on the canary, confirmed; never a re-lock.
+    if (
+      !e.eligible &&
+      override &&
+      step === 'canary' &&
+      !relockReason(kind as ChangeKind, f)
+    ) {
+      return null;
+    }
     if (!e.eligible)
       return `${kind} cannot run ${step} on its own: ${e.reason}`;
   }

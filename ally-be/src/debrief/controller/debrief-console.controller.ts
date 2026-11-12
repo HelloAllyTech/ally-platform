@@ -324,6 +324,15 @@ class AutonomyMatrixDto {
   @ValidateNested({ each: true })
   @Type(() => MatrixCellDto)
   changes!: MatrixCellDto[];
+
+  @ApiProperty({
+    required: false,
+    description:
+      'The owner confirmed a canary "on its own" before the judge-agreement gate is met',
+  })
+  @IsOptional()
+  @IsBoolean()
+  override?: boolean;
 }
 
 class AutonomyOrgDto {
@@ -1141,10 +1150,10 @@ export class DebriefConsoleController {
   @DebriefAct('ownerSettings')
   @ApiOperation({
     summary:
-      'Change matrix cells (owner). "auto" only for an eligible kind; pinned rules are not configurable',
+      'Change matrix cells (owner). "auto" only where eligible, except a confirmed canary override; pinned rules are not configurable',
   })
   async setMatrix(@Req() req: AuthedRequest, @Body() body: AutonomyMatrixDto) {
-    await this.autonomy.setMatrix(body.changes, req.user.id);
+    await this.autonomy.setMatrix(body.changes, req.user.id, !!body.override);
     return this.view.autonomyView(await this.view.viewer(req.user.id));
   }
 

@@ -366,6 +366,7 @@ type WaitingRelease = {
                  eligible: boolean; reason: string;      // the canary's (the κ gate's step)
                  eligibility: Record<Step, { eligible: boolean; reason: string }>;
                  relock: { at; reason; steps: Step[]; by: 'system' } | null;  // latest system re-lock still asking first
+                 override: { at; by: number; name: string|null } | null;      // owner's canary override in force
                  relockedAt: string|null; relockReason: string|null }>;
   orgs: Array<{ tenantId; tenantName; live: boolean;
                 overrides: { paired_trial; canary: 'default'|'ask'|'never' } }>;
@@ -377,7 +378,7 @@ type WaitingRelease = {
 ```
 - **Kinds.** `settings` covers non-budget settings. `prompts` covers prompt edits, registry agents and default plans. `pinned_rules` is always never.
 - **Guidance and models are not kinds.** The PM agent never touches Context Library chunks (spec C4), and model trials come in Release 2. Stored cells for them are dropped when the policy is read.
-- `PUT autonomy/matrix {changes: [{kind, step, value}]}` (owner) is all or nothing. It returns 400 when `auto` is set where the kind is not eligible at that step, when `pinned_rules` is changed, or when the step is unknown.
+- `PUT autonomy/matrix {changes: [{kind, step, value}], override?: boolean}` (owner) is all or nothing. `override: true` is the owner's confirmed **canary override**: a canary may be set `auto` before the κ gate is met (never past a re-lock, never for pinned rules). It is recorded in `overrides[kind]` (who, when; audited with `override`), shown in the row as "On its own · owner override, <name>, <date>", and the κ re-lock leaves it be; reverts, a failed baseline and drift still re-lock it (and clear it), and a canary that misses a risk cue still auto-reverts. With the gate met there is no override. It returns 400 when `auto` is set where the kind is not eligible at that step, when `pinned_rules` is changed, or when the step is unknown.
 - `PUT autonomy/orgs/:tenantId {changes: {paired_trial?|canary?: 'default'|'ask'|'never'}}` (owner) only tightens: the stricter of the global and org settings applies.
 
 Eligibility is per step (plan §4 "Improver autonomy": free to analyse, measure and experiment

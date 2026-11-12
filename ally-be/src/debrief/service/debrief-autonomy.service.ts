@@ -235,14 +235,22 @@ export class DebriefAutonomyService implements OnModuleInit {
     const nowEligible: ChangeKind[] = [];
     for (const kind of CONFIGURABLE_KINDS) {
       const record = relockReason(kind, f);
+      // The κ re-lock leaves an owner's override be (they chose it knowingly);
+      // reverts, a failed baseline and drift re-lock everything regardless.
       const steps = record
         ? AUTONOMY_STEPS.filter((s) => policy.matrix[kind][s] === 'auto')
-        : !f.gate.met && policy.matrix[kind].canary === 'auto'
+        : !f.gate.met &&
+            policy.matrix[kind].canary === 'auto' &&
+            !policy.overrides?.[kind]
           ? (['canary'] as AutonomyStep[])
           : [];
       const reason = record ?? 'judge agreement fell below 0.6';
       if (steps.length) {
         for (const s of steps) policy.matrix[kind][s] = 'ask';
+        if (steps.includes('canary') && policy.overrides?.[kind]) {
+          policy.overrides = { ...policy.overrides };
+          delete policy.overrides[kind];
+        }
         policy.relocks.push({
           kind,
           at: new Date().toISOString(),
@@ -296,8 +304,7 @@ export class DebriefAutonomyService implements OnModuleInit {
     data: Record<string, unknown>;
   }): Promise<void> {
     try {
-      const { DebriefNotifier } =
-        await import('./debrief-notifier.service');
+      const { DebriefNotifier } = await import('./debrief-notifier.service');
       const notifier = this.moduleRef.get(DebriefNotifier, {
         strict: false,
       });
@@ -315,27 +322,67 @@ export class DebriefAutonomyService implements OnModuleInit {
   async setMatrix(
     changes: Array<{ kind: string; step: string; value: string }>,
     userId: number,
+    override = false,
   ): Promise<AutonomyPolicy> {
     if (!changes?.length)
       throw new BadRequestException('change at least one cell');
     const f = await this.facts();
     const problems = changes
-      .map((c) => matrixChangeRefusal(c.kind, c.step, c.value, f))
+      .map((c) => matrixChangeRefusal(c.kind, c.step, c.value, f, override))
       .filter((p): p is string => !!p);
     if (problems.length) throw new BadRequestException(problems.join('; '));
     const policy = await this.policy();
     const before = JSON.parse(JSON.stringify(policy.matrix));
+    // A canary set "on its own" before the κ gate is met is the owner's override.
+    const overridden = changes.filter(
+      (c) =>
+        c.step === 'canary' &&
+        c.value === 'auto' &&
+        !kindEligibility(c.kind as ChangeKind, f, 'canary').eligible,
+    );
+    const name = overridden.length ? await this.userName(userId) : null;
+    const at = new Date().toISOString();
+    policy.overrides = { ...(policy.overrides ?? {}) };
     for (const c of changes) {
-      policy.matrix[c.kind as ChangeKind][c.step as AutonomyStep] =
-        c.value as StepPolicy;
+      const kind = c.kind as ChangeKind;
+      policy.matrix[kind][c.step as AutonomyStep] = c.value as StepPolicy;
+      if (c.step === 'canary') {
+        if (overridden.includes(c)) {
+          policy.overrides[kind] = { at, by: userId, name };
+        } else {
+          delete policy.overrides[kind];
+        }
+      }
     }
     await this.save(policy);
     await this.audit.log({
       eventType: 'DEBRIEF_SETTINGS_CHANGED',
       userId,
-      details: { source: 'autonomy_matrix', changes, before },
+      details: {
+        source: 'autonomy_matrix',
+        changes,
+        before,
+        ...(overridden.length
+          ? {
+              override: overridden.map((c) => c.kind),
+              reason: 'canary on its own before the judge-agreement gate',
+            }
+          : {}),
+      },
     });
     return policy;
+  }
+
+  private async userName(userId: number): Promise<string | null> {
+    try {
+      const [u] = await this.dataSource.query(
+        `SELECT COALESCE(NULLIF(TRIM(name), ''), email) AS name FROM users WHERE id = $1`,
+        [userId],
+      );
+      return u?.name ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /** An organisation's overrides: default (use the global), ask or never. They only tighten. */
@@ -413,6 +460,8 @@ export class DebriefAutonomyService implements OnModuleInit {
       eligibility: Record<AutonomyStep, { eligible: boolean; reason: string }>;
       relockedAt: string | null;
       relockReason: string | null;
+      /** The owner set the canary on its own before the κ gate was met. */
+      override: { at: string; by: number; name: string | null } | null;
       /** The latest re-lock by the system whose cells still ask first (shown in the row). */
       relock: {
         at: string;
@@ -460,6 +509,7 @@ export class DebriefAutonomyService implements OnModuleInit {
           eligible: e.eligible,
           reason: e.reason,
           eligibility: stepEligibility(kind, f),
+          override: policy.overrides?.[kind] ?? null,
           relockedAt: last?.at ?? null,
           relockReason: last?.reason ?? null,
           relock: (() => {
