@@ -113,6 +113,23 @@ describe('debrief agreement: the pre-fill from comment tags', () => {
     });
   });
 
+  it('a comment tagged too vague pre-fills Evidence = No, and nothing else', () => {
+    const r = prefillAnswers({
+      comments: [comment({ id: 'vague', tag: 'too_vague', turnIndex: 5 })],
+      hardFails: [],
+      riskCueTurns: [5],
+    });
+    expect(byMeasure(r)).toEqual({
+      accuracy: true,
+      evidence_specificity: false,
+      missed_risk_cue: true,
+    });
+    expect(r.find((a) => a.measure === M.EVIDENCE)?.source).toMatchObject({
+      kind: 'comment',
+      commentId: 'vague',
+    });
+  });
+
   it('a missed moment on a risk-cue turn pre-fills Missed risk cue = No; elsewhere it does not', () => {
     const on = prefillAnswers({
       comments: [comment({ tag: 'missed_moment', turnIndex: 7 })],
@@ -377,7 +394,7 @@ describe('debrief agreement: canary eligibility reads it', () => {
     expect(kindEligibility('prompts', f, 'canary')).toMatchObject({
       eligible: false,
       reason:
-        'Not yet: judge agreement below 0.6 (Accuracy not measured yet: 37 of 50 reviews).',
+        'Not yet: agreement below 0.6 (Accuracy not measured yet: 37 of 50 reviews).',
     });
     // Steps learners never see stay free of the gate.
     expect(kindEligibility('prompts', f, 'paired_trial').eligible).toBe(true);
@@ -395,7 +412,7 @@ describe('debrief agreement: canary eligibility reads it', () => {
       failing: [{ measure: 'evidence_specificity', kappa: null, n: 60 }],
     });
     expect(kindEligibility('prompts', await service.facts()).reason).toBe(
-      'Not yet: judge agreement below 0.6 (Evidence not measurable yet (every answer the same)).',
+      'Not yet: agreement below 0.6 (Evidence not measurable yet: every answer is the same).',
     );
   });
 });

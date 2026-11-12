@@ -26,6 +26,8 @@ export enum DebriefCommentTag {
   PROTOCOL = 'protocol',
   LANGUAGE = 'language',
   TOO_LONG_OR_UNCLEAR = 'too_long_or_unclear',
+  /** A point names no specific moment: pre-fills Evidence = No (migration 1981900920000). */
+  TOO_VAGUE = 'too_vague',
   GOOD_KEEP_THIS = 'good_keep_this',
 }
 

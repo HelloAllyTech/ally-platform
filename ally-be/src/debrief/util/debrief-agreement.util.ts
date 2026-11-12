@@ -145,7 +145,7 @@ const fromComment = (c: PrefillComment): PrefillSource => ({
  *   or unsupported progress claim ticked → No.
  * - Missed risk cue: the missed risk cue ticked, or a comment tagged "Missed
  *   moment" on a transcript turn where the client voiced a risk → No.
- * - Evidence: no comment tag says "too vague" today, so it starts Yes.
+ * - Evidence: a comment tagged "Too vague" → No.
  *
  * A comment wins over a hard fail as the source (it says where); the earliest
  * comment wins among several.
@@ -179,6 +179,8 @@ export function prefillAnswers(input: {
           risk.has(Number(c.turnIndex)),
       );
       hardFail = fails.has('missed_risk_cue') ? 'missed_risk_cue' : undefined;
+    } else if (measure === DebriefAgreementMeasure.EVIDENCE) {
+      comment = ordered.find((c) => c.tag === DebriefCommentTag.TOO_VAGUE);
     }
     const source: PrefillSource | null = comment
       ? fromComment(comment)
