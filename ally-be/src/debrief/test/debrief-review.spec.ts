@@ -260,7 +260,11 @@ describe('comments for the PM agent', () => {
 });
 
 function buildService(
-  opts: { mine?: Record<string, unknown> | null; counselorId?: number } = {},
+  opts: {
+    mine?: Record<string, unknown> | null;
+    counselorId?: number;
+    myComments?: Array<Record<string, unknown>>;
+  } = {},
 ) {
   const run = {
     id: 'run-1',
@@ -296,10 +300,13 @@ function buildService(
     },
   };
   let mine = opts.mine ?? null;
-  const dataSource = {
+  const dataSource: Record<string, any> = {
     query: jest.fn(async (sql: string) => {
       if (sql.includes('FROM scenario_sessions')) {
         return [{ counselor_id: opts.counselorId ?? 99 }];
+      }
+      if (sql.includes('SELECT id, tag, "anchorKind"')) {
+        return opts.myComments ?? [];
       }
       if (sql.includes('INSERT INTO debrief_reviews')) {
         mine = {
@@ -308,11 +315,14 @@ function buildService(
           updatedAt: new Date(),
           reviewerId: 7,
         };
-        return [];
+        return [{ id: 'review-1' }];
       }
       return [];
     }),
   };
+  dataSource.transaction = jest.fn(async (fn: (m: unknown) => unknown) =>
+    fn(dataSource),
+  );
   const runs = { findOne: jest.fn(async () => run) };
   const reviews = {
     findOne: jest.fn(async () => mine),
@@ -572,5 +582,112 @@ describe('still happening (spec C5)', () => {
     expect(sql).toContain(`c."parentId" IS NULL`);
     expect(sql).toContain(`again."repeatOfId" = c.id`);
     expect(params).toEqual(['run-new', 30]);
+  });
+
+  describe('the κ-gate answers under the verdict', () => {
+    const answerRows = (ds: { query: jest.Mock }) =>
+      ds.query.mock.calls
+        .filter(([sql]) =>
+          String(sql).includes('INSERT INTO debrief_review_answers'),
+        )
+        .map(([, p]) => ({
+          measure: p[3],
+          answer: p[4],
+          prefilled: p[5],
+          changed: p[6],
+          source: p[7],
+        }));
+
+    it('stores each answer with its pre-fill and whether the reviewer changed it', async () => {
+      const { service, dataSource } = buildService({
+        myComments: [
+          {
+            id: 'c1',
+            tag: 'wrong_or_unsupported',
+            anchorKind: 'card',
+            turnIndex: null,
+            section: 'what_worked[0]',
+            createdAt: new Date('2026-11-10T10:00:00Z'),
+          },
+          {
+            id: 'c2',
+            tag: 'missed_moment',
+            anchorKind: 'transcript',
+            turnIndex: 2, // the risk-cue turn
+            section: null,
+            createdAt: new Date('2026-11-10T10:01:00Z'),
+          },
+        ],
+      });
+      await service.setVerdict('run-1', 7, {
+        verdict: DebriefReviewVerdict.NEEDS_WORK,
+        hardFails: [],
+        // Accuracy kept at the pre-filled No; Evidence changed Yes → No; risk left out.
+        answers: { accuracy: false, evidence_specificity: false },
+      });
+      const rows = answerRows(dataSource as any);
+      expect(rows).toEqual([
+        expect.objectContaining({
+          measure: 'accuracy',
+          answer: false,
+          prefilled: false,
+          changed: false,
+        }),
+        expect.objectContaining({
+          measure: 'evidence_specificity',
+          answer: false,
+          prefilled: true,
+          changed: true,
+          source: null,
+        }),
+        expect.objectContaining({
+          measure: 'missed_risk_cue',
+          answer: false,
+          prefilled: false,
+          changed: false,
+        }),
+      ]);
+      expect(JSON.parse(rows[0].source)).toMatchObject({
+        kind: 'comment',
+        commentId: 'c1',
+      });
+      expect(JSON.parse(rows[2].source)).toMatchObject({
+        kind: 'comment',
+        turnIndex: 2,
+      });
+    });
+
+    it('stores no answers when an older client sends none, and refuses anything but yes/no', async () => {
+      const { service, dataSource } = buildService();
+      await service.setVerdict('run-1', 7, {
+        verdict: DebriefReviewVerdict.NEEDS_WORK,
+        hardFails: [],
+      });
+      expect(answerRows(dataSource as any)).toEqual([]);
+      await expect(
+        service.setVerdict('run-1', 7, {
+          verdict: DebriefReviewVerdict.GOOD,
+          answers: { accuracy: 'yes' },
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.setVerdict('run-1', 7, {
+          verdict: DebriefReviewVerdict.GOOD,
+          answers: { tone: true },
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('the review screen carries the three questions, pre-filled', async () => {
+      const { service } = buildService();
+      const view = await service.detail('run-1', 7);
+      expect(view.agreement.map((q) => [q.measure, q.answer, q.saved])).toEqual(
+        [
+          ['accuracy', true, null],
+          ['evidence_specificity', true, null],
+          ['missed_risk_cue', true, null],
+        ],
+      );
+    });
   });
 });

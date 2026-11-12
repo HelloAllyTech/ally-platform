@@ -12,6 +12,7 @@ import {
   DebriefCommentStatus,
   DebriefCommentTag,
   DebriefReviewVerdict,
+  DebriefAgreementMeasure,
 } from '../../debrief/enum/debrief-review.enum';
 import { join } from 'path';
 import {
@@ -413,6 +414,10 @@ describe('CHECK constraints cover their enums', () => {
     ],
     ['CHK_debrief_review_comments_tag', Object.values(DebriefCommentTag)],
     ['CHK_debrief_review_comments_status', Object.values(DebriefCommentStatus)],
+    [
+      'CHK_debrief_review_answers_measure',
+      Object.values(DebriefAgreementMeasure),
+    ],
     ['CHK_agent_release_audit_action', Object.values(AgentReleaseAuditAction)],
     [
       'CHK_agent_release_audit_actor_kind',

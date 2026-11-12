@@ -18,6 +18,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsEnum,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -39,6 +40,20 @@ class VerdictDto {
   @ArrayMaxSize(10)
   @IsString({ each: true })
   hardFails?: string[];
+
+  @ApiProperty({
+    required: false,
+    description:
+      'The κ-gate questions: {accuracy, evidence_specificity, missed_risk_cue} → true (Yes) / false (No). Measures left out keep the pre-fill; without it no answers are stored.',
+    example: {
+      accuracy: true,
+      evidence_specificity: true,
+      missed_risk_cue: false,
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  answers?: Record<string, boolean>;
 }
 
 /**

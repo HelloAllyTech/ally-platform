@@ -36,6 +36,27 @@ import {
   validateAnchor,
 } from '../util/debrief-review.util';
 import { DebriefContextRepository } from './debrief-context.repository';
+import {
+  AGREEMENT_MEASURES,
+  AgreementAnswers,
+  isAgreementMeasure,
+  PrefillSource,
+  prefillAnswers,
+  resolveAnswers,
+} from '../util/debrief-agreement.util';
+import { DebriefAgreementMeasure } from '../enum/debrief-review.enum';
+
+/** One yes/no question under the verdict, as the review panel draws it. */
+export interface AgreementQuestion {
+  measure: DebriefAgreementMeasure;
+  /** What the panel starts with: the saved answer, else the pre-fill. */
+  answer: boolean;
+  /** The pre-fill from the reviewer's comments and hard fails. */
+  prefilled: boolean;
+  source: PrefillSource | null;
+  /** The saved answer, or null before the reviewer confirmed one. */
+  saved: boolean | null;
+}
 
 /** The PM agent's ideas live in agent_lessons under this key. */
 const IDEA_AGENT_KEY = 'debrief';
@@ -64,6 +85,14 @@ const trimBody = (body: unknown): string => {
   }
   return text;
 };
+
+/** Turns where the client voiced a risk (the safety check's cues), 1-based like comments. */
+export const riskCueTurnsOf = (run: {
+  workspace?: Record<string, any> | null;
+}) =>
+  ((run.workspace?.safety?.risk_cues ?? []) as Array<{ turn_index: number }>)
+    .map((c) => Number(c.turn_index))
+    .filter((n) => Number.isFinite(n));
 
 /**
  * Expert review (debrief orchestrator spec Part B): clinical experts read a
@@ -250,6 +279,8 @@ export class DebriefReviewService {
           }
         : null,
       hardFailCodes: [...DEBRIEF_HARD_FAIL_CODES],
+      // The κ gate's yes/no questions under the verdict, pre-filled.
+      agreement: await this.agreementQuestions(run, reviewerId),
     };
   }
 
@@ -520,9 +551,15 @@ export class DebriefReviewService {
   async setVerdict(
     runId: string,
     reviewerId: number,
-    input: { verdict: DebriefReviewVerdict; hardFails?: string[] },
+    input: {
+      verdict: DebriefReviewVerdict;
+      hardFails?: string[];
+      /** The κ-gate answers the reviewer confirmed; measures left out keep the pre-fill. */
+      answers?: Record<string, unknown> | null;
+    },
   ) {
     const run = await this.reviewableRun(runId, reviewerId);
+    const answers = this.validAnswers(input.answers);
     if (!Object.values(DebriefReviewVerdict).includes(input.verdict)) {
       throw new BadRequestException('Choose Good or Needs work.');
     }
@@ -538,21 +575,141 @@ export class DebriefReviewService {
         'A debrief with a hard fail needs work. Untick it or choose Needs work.',
       );
     }
-    await this.dataSource.query(
-      `INSERT INTO debrief_reviews ("tenant_id", "runId", "reviewerId", verdict, "hardFails")
-       VALUES ($1, $2, $3, $4, $5::jsonb)
-       ON CONFLICT ("runId", "reviewerId")
-       DO UPDATE SET verdict = EXCLUDED.verdict, "hardFails" = EXCLUDED."hardFails",
-                     "updatedAt" = now()`,
-      [
-        run.tenantId ?? null,
-        runId,
-        reviewerId,
-        input.verdict,
-        JSON.stringify(hardFails),
-      ],
-    );
+    // The pre-fill is worked out here, not taken from the client, so
+    // "changed" is what the reviewer did to what they were shown.
+    const prefilled = answers
+      ? prefillAnswers({
+          comments: await this.prefillComments(runId, reviewerId),
+          hardFails,
+          riskCueTurns: riskCueTurnsOf(run),
+        })
+      : null;
+    await this.dataSource.transaction(async (m) => {
+      const [saved] = await m.query(
+        `INSERT INTO debrief_reviews ("tenant_id", "runId", "reviewerId", verdict, "hardFails")
+         VALUES ($1, $2, $3, $4, $5::jsonb)
+         ON CONFLICT ("runId", "reviewerId")
+         DO UPDATE SET verdict = EXCLUDED.verdict, "hardFails" = EXCLUDED."hardFails",
+                       "updatedAt" = now()
+         RETURNING id`,
+        [
+          run.tenantId ?? null,
+          runId,
+          reviewerId,
+          input.verdict,
+          JSON.stringify(hardFails),
+        ],
+      );
+      if (!prefilled || !saved?.id) return;
+      for (const a of resolveAnswers(prefilled, answers)) {
+        await m.query(
+          `INSERT INTO debrief_review_answers
+             ("tenant_id", "reviewId", "runId", measure, answer, prefilled, changed, "prefillSource")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+           ON CONFLICT ("reviewId", measure)
+           DO UPDATE SET answer = EXCLUDED.answer, prefilled = EXCLUDED.prefilled,
+                         changed = EXCLUDED.changed, "prefillSource" = EXCLUDED."prefillSource",
+                         "updatedAt" = now()`,
+          [
+            run.tenantId ?? null,
+            saved.id,
+            runId,
+            a.measure,
+            a.answer,
+            a.prefilled,
+            a.changed,
+            a.source ? JSON.stringify(a.source) : null,
+          ],
+        );
+      }
+    });
     return this.detail(runId, reviewerId);
+  }
+
+  /** `{measure: boolean}` from the request; anything else is a 400. Null when none were sent. */
+  private validAnswers(raw: unknown): AgreementAnswers | null {
+    if (raw == null) return null;
+    if (typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new BadRequestException('answers must be yes/no per question');
+    }
+    const out: AgreementAnswers = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (!isAgreementMeasure(k)) {
+        throw new BadRequestException(`${k} is not one of the questions`);
+      }
+      if (typeof v !== 'boolean') {
+        throw new BadRequestException(`Answer ${k} with yes or no`);
+      }
+      out[k] = v;
+    }
+    return out;
+  }
+
+  /** The reviewer's own top-level comments on this run, for the pre-fill. */
+  private async prefillComments(runId: string, reviewerId: number) {
+    return (await this.dataSource.query(
+      `SELECT id, tag, "anchorKind", "turnIndex", section, "createdAt"
+         FROM debrief_review_comments
+        WHERE "runId" = $1 AND "reviewerId" = $2 AND "parentId" IS NULL
+        ORDER BY "createdAt" ASC`,
+      [runId, reviewerId],
+    )) as Array<{
+      id: string;
+      tag: string | null;
+      anchorKind: string;
+      turnIndex: number | null;
+      section: string | null;
+      createdAt: Date;
+    }>;
+  }
+
+  /**
+   * The yes/no questions under the verdict for this reviewer: pre-filled from
+   * their comments (and the hard fails they ticked, when given), with their
+   * saved answers if they already confirmed some.
+   */
+  async agreementQuestions(
+    run: DebriefRun,
+    reviewerId: number,
+    hardFails?: string[],
+  ): Promise<AgreementQuestion[]> {
+    const [comments, mine] = await Promise.all([
+      this.prefillComments(run.id, reviewerId),
+      this.dataSource.query(
+        `SELECT a.measure, a.answer, v."hardFails"
+           FROM debrief_reviews v
+           LEFT JOIN debrief_review_answers a ON a."reviewId" = v.id
+          WHERE v."runId" = $1 AND v."reviewerId" = $2`,
+        [run.id, reviewerId],
+      ) as Promise<
+        Array<{
+          measure: string | null;
+          answer: boolean | null;
+          hardFails: string[];
+        }>
+      >,
+    ]);
+    const prefilled = prefillAnswers({
+      comments,
+      hardFails: hardFails ?? mine[0]?.hardFails ?? [],
+      riskCueTurns: riskCueTurnsOf(run),
+    });
+    const saved = new Map(
+      mine
+        .filter((r) => r.measure)
+        .map((r) => [r.measure as string, !!r.answer]),
+    );
+    return AGREEMENT_MEASURES.map((m) => {
+      const p = prefilled.find((x) => x.measure === m)!;
+      const s = saved.has(m) ? saved.get(m)! : null;
+      return {
+        measure: m,
+        answer: s ?? p.answer,
+        prefilled: p.answer,
+        source: p.source,
+        saved: s,
+      };
+    });
   }
 
   // --- The PM agent -------------------------------------------------------------------

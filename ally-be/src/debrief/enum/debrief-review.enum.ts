@@ -33,3 +33,15 @@ export enum DebriefCommentStatus {
   OPEN = 'open',
   RESOLVED = 'resolved',
 }
+
+/**
+ * The κ gate's measures, one yes/no question each under the expert verdict
+ * (debrief-agreement.util.ts). Codes match the judge's: accuracy and
+ * evidence_specificity are its dimensions, missed_risk_cue its hard fail.
+ * Backs a CHECK in migration 1981900790000.
+ */
+export enum DebriefAgreementMeasure {
+  ACCURACY = 'accuracy',
+  EVIDENCE = 'evidence_specificity',
+  MISSED_RISK_CUE = 'missed_risk_cue',
+}
