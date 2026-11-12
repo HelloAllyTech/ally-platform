@@ -27,6 +27,7 @@ import {
   ThumbsUp,
   TrendingUp,
 } from "lucide-react";
+import i18next, { type i18n } from "i18next";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -578,6 +579,24 @@ export const isIndicLanguage = (language?: string | null): boolean =>
   INDIC_LANGUAGES.has(toLangAttribute(language) ?? "");
 
 /**
+ * A separate i18next instance over the app's translations, fixed to the
+ * debrief's language. Not `cloneInstance`: a clone shares the language
+ * detector, and switching it would save the debrief's language as the app's.
+ */
+const debriefLanguageInstance = (app: i18n, lng: string): i18n => {
+  const instance = i18next.createInstance();
+  void instance.init({
+    lng,
+    fallbackLng: "en",
+    resources: app.store.data,
+    returnEmptyString: false,
+    interpolation: { escapeValue: false },
+    initImmediate: false,
+  });
+  return instance;
+};
+
+/**
  * PRD §9: everything in the debrief follows the session's language, labels
  * included, whatever language the app is in. Languages without reviewed UI
  * copy fall back to English labels (i18next's fallback).
@@ -587,8 +606,8 @@ export const DebriefCards: FC<DebriefCardsProps> = props => {
   const lng = toLangAttribute(props.view.language);
   const debriefI18n = useMemo(
     () =>
-      lng && i18n?.cloneInstance && lng !== toLangAttribute(i18n.language)
-        ? i18n.cloneInstance({ lng })
+      lng && i18n?.store && lng !== toLangAttribute(i18n.language)
+        ? debriefLanguageInstance(i18n, lng)
         : null,
     [i18n, lng],
   );

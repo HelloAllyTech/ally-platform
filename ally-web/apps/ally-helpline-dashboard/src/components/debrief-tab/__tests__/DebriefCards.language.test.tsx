@@ -46,8 +46,10 @@ describe("DebriefCards language", () => {
       </I18nextProvider>,
     );
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("आपका डीब्रीफ़");
-    // The rest of the app stays in the app's language.
+    // The rest of the app stays in the app's language, and so does the
+    // language the app remembers.
     expect(screen.getByTestId("app")).toHaveTextContent("Your debrief");
+    expect(i18n.language).toBe("en");
   });
 
   it("knows which scripts need the taller line height", () => {
