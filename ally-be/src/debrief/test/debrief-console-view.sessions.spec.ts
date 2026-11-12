@@ -82,3 +82,47 @@ describe('DebriefConsoleViewService queue: urgent flags skip the undo window', (
     );
   });
 });
+
+/** Spec Q3: the clinical advisor gives a verdict before seeing the judge's scores. */
+describe('DebriefConsoleViewService list: advisor blinding', () => {
+  const row = (id: string) => ({
+    id,
+    scenarioSessionId: `s-${id}`,
+    rank: 4,
+    judgeOverall: '9.5',
+    evaluatorOverall: '9.1',
+    mode: 'live',
+    status: 'published',
+    fallbackRung: 0,
+  });
+  const make = () =>
+    new (DebriefConsoleViewService as any)({
+      query: jest.fn(async (sql: string) => {
+        if (sql.includes('"runId" = ANY')) return [{ runId: 'b' }];
+        if (sql.includes('SELECT * FROM ranked')) return [row('a'), row('b')];
+        if (sql.includes('count(*) FILTER')) return [{}];
+        return [];
+      }),
+    });
+
+  it('hides both scores on runs the advisor has not given a verdict on', async () => {
+    const out = await make().sessions(
+      parseSessionFilters({ category: 'published' }),
+      { userId: 902, roles: { clinicalAdvisor: true }, can: { verdict: true } },
+    );
+    const byId = Object.fromEntries(out.items.map((i: any) => [i.runId, i]));
+    expect(byId.a).toMatchObject({
+      judgeOverall: null,
+      evaluatorOverall: null,
+    });
+    expect(byId.b).toMatchObject({ judgeOverall: 9.5, evaluatorOverall: 9.1 });
+  });
+
+  it('the Ally team and the owner always see them', async () => {
+    const out = await make().sessions(
+      parseSessionFilters({ category: 'published' }),
+      { userId: 6, roles: { allyTeam: true, owner: true }, can: {} },
+    );
+    expect(out.items.map((i: any) => i.judgeOverall)).toEqual([9.5, 9.5]);
+  });
+});

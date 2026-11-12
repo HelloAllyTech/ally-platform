@@ -364,10 +364,44 @@ export class DebriefConsoleViewService implements OnModuleInit {
           : null,
         all: Number(counts?.all ?? 0),
       },
-      items: rows.map((r) => this.toItem(r)),
+      items: await this.blindForAdvisor(
+        rows.map((r) => this.toItem(r)),
+        viewer,
+      ),
       filterOptions: await this.filterOptions(),
       viewer: this.viewerPayload(viewer),
     };
+  }
+
+  /**
+   * A clinical advisor alone gives their verdict before seeing the judge's (spec Q3):
+   * the list hides both scores on runs they have not given a verdict on, as the
+   * session page does.
+   */
+  private async blindForAdvisor<
+    T extends {
+      runId: string;
+      judgeOverall: number | null;
+      evaluatorOverall: number | null;
+    },
+  >(items: T[], viewer: DebriefViewer): Promise<T[]> {
+    if (viewer.roles.allyTeam || viewer.roles.owner || !items.length) {
+      return items;
+    }
+    const mine = new Set(
+      (
+        (await this.dataSource.query(
+          `SELECT "runId"::text AS "runId" FROM debrief_reviews
+            WHERE "reviewerId" = $1 AND "runId" = ANY($2::uuid[])`,
+          [viewer.userId, items.map((i) => i.runId)],
+        )) as Array<{ runId: string }>
+      ).map((r) => r.runId),
+    );
+    return items.map((i) =>
+      mine.has(i.runId)
+        ? i
+        : { ...i, judgeOverall: null, evaluatorOverall: null },
+    );
   }
 
   private toItem(r: Record<string, any>) {
