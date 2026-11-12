@@ -690,6 +690,47 @@ describe("CallSummary — built-in summary save sends a patch, not the whole sum
   });
 });
 
+describe("CallSummary — a loading pulse from the autosave-triggered refetch must not unmount the form", () => {
+  const summaryCall = {
+    id: 1,
+    summaryStatus: ChatSummaryStatus.SUCCESS,
+    counselorId: 42,
+    details: {
+      chatId: 1,
+      callInfo: { notes: "" },
+      summary: { keyConcerns: "AI generated", tags: [{ tag: "anxiety", positivity_rating: 2 }] },
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUpdateCallSummary.mockImplementation(() => ({
+      unwrap: () => Promise.resolve({ success: true }),
+    }));
+    mockGetCustomFieldsEnabled.mockImplementation(() => customFieldsEnabledResult);
+    mockGetCustomFieldValues.mockImplementation(() => customFieldValuesResult);
+    mockUseSelector.mockReturnValue({
+      user: { userId: 42 },
+      permissions: ["edit:call:details", "view:settings:summary-fields"],
+    });
+  });
+
+  it("keeps the form (and the typed value) on screen when isSummaryLoading pulses true after data has already loaded", () => {
+    const { rerender } = render(
+      <CallSummary chatId={1} callSummary={summaryCall} isSummaryLoading={false} />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Key Concerns"), { target: { value: "typed by hand" } });
+
+    // updateCallSummary invalidates the CallSummary tag, so every autosave
+    // re-triggers this query — the exact moment the loading flag can pulse
+    // true again even though the form already has data on screen.
+    rerender(<CallSummary chatId={1} callSummary={summaryCall} isSummaryLoading={true} />);
+
+    expect(screen.getByLabelText("Key Concerns")).toHaveValue("typed by hand");
+  });
+});
+
 describe("CallSummary — edits autosave without pressing Save", () => {
   const summaryCall = {
     id: 1,

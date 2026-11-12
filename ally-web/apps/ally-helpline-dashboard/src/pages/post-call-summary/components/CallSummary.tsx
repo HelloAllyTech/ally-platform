@@ -461,7 +461,15 @@ const CallSummary: FC<CallSummaryProps> = ({
     navigateToCallLogs();
   };
 
-  if (canShowSummary && isSummaryLoading) {
+  // Only when there's nothing on screen yet. Without the `!summaryData`
+  // guard, every autosave re-triggered this the same way it used to
+  // re-trigger the "not found" branch below: updateCallSummary invalidates
+  // the CallSummary tag, isSummaryLoading pulses true for that background
+  // refetch, and the whole form — the textarea the counsellor is mid-keystroke
+  // in — unmounts for a spinner and remounts a moment later, taking focus
+  // with it. Confirmed 2026-11 ("type a letter, it autosaves, have to click
+  // back into the field to keep typing").
+  if (canShowSummary && isSummaryLoading && !summaryData) {
     return (
       <div className="flex justify-center items-center h-[calc(100dvh-80px)]">
         <Loading withOverlay={false} />
