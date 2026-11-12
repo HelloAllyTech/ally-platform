@@ -11,7 +11,7 @@ const signed = (x: number | null | undefined) =>
   x == null ? "—" : `${x > 0 ? "+" : ""}${x.toFixed(2)}`;
 const fixed1 = (x: number | null | undefined) => (x == null ? "—" : x.toFixed(1));
 
-type RungState = "waiting" | "running" | "passed" | "not" | "failed";
+export type RungState = "waiting" | "running" | "passed" | "not" | "failed" | "skipped";
 
 /** One rung of the test ladder (v9 FR-52) as a tile: its name, state and the numbers behind it. */
 const Rung: React.FC<{
@@ -45,6 +45,7 @@ export const Ladder: React.FC<{ idea: PmAgentIdeaRow }> = ({ idea }) => {
     passed: s.rungPassed,
     not: s.rungNotPassed,
     failed: s.rungFailed,
+    skipped: en.debriefs.pmPage.releases.skipped,
   };
   const qs: RungState = !q
     ? "waiting"
@@ -168,16 +169,38 @@ export const EvidenceBlock: React.FC<{
   title: string;
   source?: string | null;
   idea?: PmAgentIdeaRow | null;
+  /** The ladder as ally-be sends it for a release (instead of from an idea). */
+  rungs?: Array<{ name: string; state: RungState; label: string; detail: string }>;
   beforeTitle?: string;
   afterTitle?: string;
   stats?: EvidenceStat[];
   testId?: string;
-}> = ({ title, source, idea, beforeTitle, afterTitle, stats, testId }) => (
+}> = ({ title, source, idea, rungs, beforeTitle, afterTitle, stats, testId }) => (
   <section className="flex flex-col gap-3" data-testid={testId ?? "evidence"}>
     <div className="flex flex-wrap items-baseline gap-2">
       <h3 className="text-[15px] font-semibold">{title}</h3>
       {source && <span className="text-xs text-neutral-600">{source}</span>}
     </div>
+    {!idea && rungs && rungs.length > 0 && (
+      <div>
+        {beforeTitle && <div className="mb-2 text-xs text-neutral-600">{beforeTitle}</div>}
+        <ol
+          className="grid list-none grid-cols-2 gap-2 sm:grid-cols-4"
+          data-testid="release-ladder"
+        >
+          {rungs.map(r => (
+            <Rung
+              key={r.name}
+              testId={`rung-${r.name}`}
+              name={r.name}
+              state={r.state}
+              label={r.label}
+              detail={r.detail}
+            />
+          ))}
+        </ol>
+      </div>
+    )}
     {idea && (
       <div>
         {beforeTitle && <div className="mb-2 text-xs text-neutral-600">{beforeTitle}</div>}

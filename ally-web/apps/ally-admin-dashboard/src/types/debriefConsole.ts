@@ -295,8 +295,39 @@ export interface PmAgentIdeaRow {
   decidedBy?: number | null;
   decidedAt?: string | null;
   changeKind?: "settings" | "guidance" | "prompts" | "models" | "pinned_rules" | null;
+  /** Open = needs a person, being tested or in canary; closed = everything else. */
+  state?: "open" | "closed";
+  closedReason?:
+    | "promoted"
+    | "rejected"
+    | "expired"
+    | "reverted"
+    | "did_not_pass"
+    | "handed_off"
+    | "answered"
+    | "signed_off"
+    | "retired"
+    | null;
+  closedWhy?: string | null;
+  /** The release a promoted idea became (`release-history/:id`). */
+  releaseId?: string | null;
+  draftRelease?: {
+    id: string;
+    version: number;
+    status: string;
+    changedVsLive: DebriefBundleDiff;
+    compare: { releaseId: string };
+  } | null;
   approval?: {
-    wait: "pinned_rule" | "handoff" | "start_gate" | "start_trial" | "start_canary" | "promote";
+    wait:
+      | "pinned_rule"
+      | "handoff"
+      | "start_quick_test"
+      | "promote_budget"
+      | "start_gate"
+      | "start_trial"
+      | "start_canary"
+      | "promote";
     since: string;
     expiresAt: string;
     expiresInDays: number;
@@ -309,9 +340,10 @@ export interface PmAgentIdeaRow {
   questions?: Array<{
     id: string;
     role: "person" | "agent";
-    by: string | null;
+    by: number | string | null;
     at: string;
     text: string;
+    replyTo?: string;
   }>;
   can?: {
     approve: boolean;
@@ -319,6 +351,7 @@ export interface PmAgentIdeaRow {
     tryIt: boolean;
     askQuestion: boolean;
     startStep: boolean;
+    editDraft?: boolean;
   };
 }
 
@@ -328,6 +361,23 @@ export interface PmAgentState {
   learningSpentUsd: number | null;
   ideas: PmAgentIdeaRow[];
   viewer?: DebriefViewer;
+  counts?: { open: number; closed: number };
+}
+
+/** What a release changes against another (CONSOLE_API.md `BundleDiff`). */
+export interface DebriefBundleDiff {
+  prompts: Array<{ code: string; before: number | null; after: number | null; pinned: boolean }>;
+  settings: Array<{ key: string; before: unknown; after: unknown }>;
+  recipes: unknown[];
+  steps: Array<{
+    step: string;
+    field: "enabled" | "model" | "backupModel";
+    before: unknown;
+    after: unknown;
+  }>;
+  reply: unknown;
+  orchestrator: unknown;
+  budgetOnly: boolean;
 }
 
 export interface DebriefReleaseRow {

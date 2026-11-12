@@ -21,6 +21,10 @@ import {
   DebriefAutonomyView,
   DebriefOrgOverride,
   DebriefPinnedRulesView,
+  DebriefProposal,
+  DebriefReleaseCompare,
+  DebriefReleaseDetail,
+  DebriefReleaseHistory,
   DebriefSessionsPage,
   DebriefSessionsQuery,
   DebriefSessionView,
@@ -103,8 +107,12 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RUN(id), method: HttpMethod.GET }),
       providesTags: (_r, _e, id) => [{ type: TAG_TYPES.DEBRIEF_CONSOLE, id }],
     }),
-    getPmAgentState: builder.query<PmAgentState, void>({
-      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PM_AGENT, method: HttpMethod.GET }),
+    getPmAgentState: builder.query<PmAgentState, { state?: "open" | "closed" } | void>({
+      query: arg => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.PM_AGENT,
+        method: HttpMethod.GET,
+        params: arg && arg.state ? { state: arg.state } : undefined,
+      }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     runPmAgent: builder.mutation<
@@ -385,10 +393,43 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     setDebriefBudgets: builder.mutation<
-      { releaseId: string; version: number; changed: string[] },
+      { ideaId?: string; releaseId: string; version: number; changed?: string[] },
       { runCeilingUsd?: number; monthlyCapUsd?: number; note?: string }
     >({
       query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.BUDGETS, method: HttpMethod.PUT, body }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefReleaseHistory: builder.query<DebriefReleaseHistory, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RELEASE_HISTORY, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefReleaseDetail: builder.query<DebriefReleaseDetail, string>({
+      query: id => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.RELEASE_HISTORY_ITEM(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefReleaseCompare: builder.query<DebriefReleaseCompare, { id: string; with?: string }>({
+      query: ({ id, with: other }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.RELEASE_COMPARE(id),
+        method: HttpMethod.GET,
+        params: other ? { with: other } : undefined,
+      }),
+    }),
+    proposeDebriefChange: builder.mutation<
+      { ideaId: string; releaseId: string; version: number; budgetOnly: boolean },
+      DebriefProposal
+    >({
+      query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PROPOSE, method: HttpMethod.POST, body }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    promoteDebriefCodeDraft: builder.mutation<unknown, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.PROMOTE_CODE_DRAFT(id),
+        method: HttpMethod.POST,
+        body: reason ? { reason } : {},
+      }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     emergencyStopDebriefTenant: builder.mutation<unknown, { tenantId: string; reason: string }>({
@@ -447,4 +488,9 @@ export const {
   useSetDebriefOrgAutonomyMutation,
   useSetDebriefBudgetsMutation,
   useEmergencyStopDebriefTenantMutation,
+  useGetDebriefReleaseHistoryQuery,
+  useGetDebriefReleaseDetailQuery,
+  useGetDebriefReleaseCompareQuery,
+  useProposeDebriefChangeMutation,
+  usePromoteDebriefCodeDraftMutation,
 } = debriefConsoleAPI;

@@ -510,6 +510,11 @@ export const ApiEndpoints = {
     AUTONOMY_MATRIX: "/v1/debriefs/console/autonomy/matrix",
     AUTONOMY_ORG: (tenantId: string) => `/v1/debriefs/console/autonomy/orgs/${tenantId}`,
     BUDGETS: "/v1/debriefs/console/budgets",
+    RELEASE_HISTORY: "/v1/debriefs/console/release-history",
+    RELEASE_HISTORY_ITEM: (id: string) => `/v1/debriefs/console/release-history/${id}`,
+    RELEASE_COMPARE: (id: string) => `/v1/debriefs/console/releases/${id}/compare`,
+    PROPOSE: "/v1/debriefs/console/pm-agent/ideas/propose",
+    PROMOTE_CODE_DRAFT: (id: string) => `/v1/debriefs/console/releases/${id}/promote-code-draft`,
     EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
   },
   // Expert review (debrief orchestrator spec Part B): "Review debriefs (expert)" + the Analytics toggle.

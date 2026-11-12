@@ -6,7 +6,7 @@ import { Button, TextArea } from "@ally-ui-mono/ui-shared";
 import { useAskIdeaQuestionMutation, useScreenIdeaMutation, useStartIdeaStepMutation } from "@api";
 import { shortId } from "@components/ally-guide/allyGuideFormat";
 import { en } from "@constants";
-import { DebriefOwnerSettingSpec, PmAgentIdeaRow } from "@types";
+import { DebriefBundleDiff, DebriefOwnerSettingSpec, PmAgentIdeaRow } from "@types";
 import { getErrorMessage } from "@utils";
 
 import {
@@ -15,6 +15,7 @@ import {
   inWords,
   promptName,
   settingChangeLabel,
+  stepName,
 } from "../consoleLabels";
 import { formatWhen } from "../consoleTable";
 import { ConsoleTag } from "../consoleUi";
@@ -53,6 +54,28 @@ export const changeSummary = (
   return p.kinds[idea.change.ideaKind] ?? codeWords(idea.change.ideaKind);
 };
 
+/** A draft release's changes against the live one, in one line (from ally-be's BundleDiff). */
+export const diffSummary = (
+  diff: DebriefBundleDiff,
+  spec?: Record<string, DebriefOwnerSettingSpec>,
+): string => {
+  const p = en.debriefs.pmPage.draft;
+  const parts = [
+    ...diff.prompts.map(x => p.promptVersion(promptName(x.code), x.before, x.after)),
+    ...diff.settings.map(x =>
+      settingChangeLabel(x.key, x.after == null ? null : String(x.after), spec?.[x.key]),
+    ),
+    ...diff.steps.map(x =>
+      x.field === "enabled"
+        ? x.after
+          ? p.stepOn(stepName(x.step))
+          : p.stepOff(stepName(x.step))
+        : p.stepModel(stepName(x.step), String(x.after ?? "—")),
+    ),
+  ];
+  return parts.length ? parts.join(" · ") : p.nothing;
+};
+
 /** Ask a question about an idea: the PM agent reads it on its next run. */
 const Questions: React.FC<{ idea: PmAgentIdeaRow; canAsk: boolean; startOpen: boolean }> = ({
   idea,
@@ -80,7 +103,8 @@ const Questions: React.FC<{ idea: PmAgentIdeaRow; canAsk: boolean; startOpen: bo
       {thread.map(q => (
         <div key={q.id} className="text-sm">
           <div className="text-xs text-neutral-600">
-            {q.role === "agent" ? p.agent : (q.by ?? p.someone)} · {formatWhen(q.at)}
+            {q.role === "agent" ? p.agent : typeof q.by === "string" ? q.by : p.person} ·{" "}
+            {formatWhen(q.at)}
           </div>
           <div>{q.text}</div>
         </div>
@@ -132,7 +156,7 @@ export const IdeaCard: React.FC<{
   canaryShare?: number;
   liveVersion?: number | null;
   onDecide: (d: "approve" | "reject") => void;
-  onOpenRelease?: (version: number) => void;
+  onOpenRelease?: (releaseId: string) => void;
 }> = ({ idea, access, settingSpec, canaryShare, liveVersion, onDecide, onOpenRelease }) => {
   const s = en.debriefs.pmAgent;
   const p = en.debriefs.pmPage;
@@ -162,8 +186,11 @@ export const IdeaCard: React.FC<{
           ? s.ideaStatus.active
           : s.noLongerLive
         : (p.groupStatus[group] ?? s.ideaStatus[idea.status] ?? idea.status);
-  const draft =
-    idea.releaseVersion != null && idea.releaseStatus !== "ga" && open ? idea.releaseVersion : null;
+  const draft = open
+    ? (idea.draftRelease?.version ??
+      (idea.releaseVersion != null && idea.releaseStatus !== "ga" ? idea.releaseVersion : null))
+    : null;
+  const diff = idea.draftRelease?.changedVsLive;
 
   const start = async (step: "gate_test" | "paired_trial") => {
     try {
@@ -250,7 +277,7 @@ export const IdeaCard: React.FC<{
             )}
           </div>
           <div className="text-[13px] text-neutral-700">
-            {changeSummary(idea, settingSpec)}
+            {diff ? diffSummary(diff, settingSpec) : changeSummary(idea, settingSpec)}
             {liveVersion != null ? ` · ${p.draft.rest(liveVersion)}` : ""}
           </div>
         </div>
@@ -273,14 +300,19 @@ export const IdeaCard: React.FC<{
       {SCREENABLE.has(idea.change.ideaKind) && (
         <EvidenceBlock title={p.tests} idea={idea} testId="idea-evidence" />
       )}
-      {group === "promoted" && idea.releaseVersion != null && onOpenRelease && (
+      {group === "promoted" && idea.releaseId && onOpenRelease && (
         <button
           type="button"
           className="self-start text-sm text-primary-500 underline"
-          onClick={() => onOpenRelease(idea.releaseVersion as number)}
+          onClick={() => onOpenRelease(idea.releaseId as string)}
         >
-          {p.becameRelease(idea.releaseVersion)}
+          {idea.releaseVersion != null ? p.becameRelease(idea.releaseVersion) : p.seeRelease}
         </button>
+      )}
+      {idea.state === "closed" && idea.closedWhy && (
+        <p className="text-sm text-neutral-700" data-testid="idea-closed-why">
+          {idea.closedWhy}
+        </p>
       )}
 
       {open &&

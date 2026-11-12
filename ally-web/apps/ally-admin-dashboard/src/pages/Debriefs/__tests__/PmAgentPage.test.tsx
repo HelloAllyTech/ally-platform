@@ -22,6 +22,10 @@ const h = vi.hoisted(() => ({
   approvePinned: vi.fn(),
   ask: vi.fn(),
   startStep: vi.fn(),
+  history: vi.fn(),
+  detail: vi.fn(),
+  propose: vi.fn(),
+  promoteDraft: vi.fn(),
   permissions: [] as string[],
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -59,6 +63,11 @@ vi.mock("@api", async importOriginal => ({
   useAskIdeaQuestionMutation: () => [h.ask, { isLoading: false }],
   useStartIdeaStepMutation: () => [h.startStep, { isLoading: false }],
   useGetDebriefPinnedRulesQuery: () => ({ data: { rules: [] } }),
+  useGetDebriefReleaseHistoryQuery: () => h.history(),
+  useGetDebriefReleaseDetailQuery: (id: string) => h.detail(id),
+  useGetDebriefReleaseCompareQuery: () => ({ data: { prompts: [] } }),
+  useProposeDebriefChangeMutation: () => [h.propose, { isLoading: false }],
+  usePromoteDebriefCodeDraftMutation: () => [h.promoteDraft, { isLoading: false }],
 }));
 
 /* eslint-disable import/first */
@@ -87,6 +96,137 @@ const state = (ideas: unknown[], extra: Record<string, unknown> = {}) =>
     ...extra,
   });
 
+const item = (over: Record<string, unknown>) => ({
+  id: "r2",
+  version: 2,
+  status: "live",
+  title: "Put the risk-cue point first",
+  summary: null,
+  cameFrom: {
+    kind: "idea",
+    ideaId: IDEA.id,
+    title: "Put the risk-cue point first",
+    proposedBy: "pm_agent",
+  },
+  wentLiveAt: "2026-11-01T00:00:00Z",
+  liveTimes: 1,
+  retired: null,
+  ...over,
+});
+const HISTORY = {
+  items: [
+    item({}),
+    item({
+      id: "r1",
+      version: 1,
+      status: "retired",
+      title: "Seed release",
+      cameFrom: { kind: "code", tag: "be-v1.190.2" },
+      retired: { at: "2026-11-01T00:00:00Z", reason: "replaced", byVersion: 2, why: null },
+    }),
+  ],
+  pendingCodeDrafts: [],
+};
+const contents = {
+  prompts: [
+    {
+      code: "debrief_writer_system",
+      promptId: "p",
+      version: 13,
+      followsCurrent: false,
+      changed: true,
+      lock: "release_only",
+    },
+    {
+      code: "debrief_quality_rubric",
+      promptId: "q",
+      version: 2,
+      followsCurrent: false,
+      changed: false,
+      lock: "pinned",
+    },
+  ],
+  recipes: [],
+  steps: [
+    {
+      step: "writer",
+      model: "gemini-3-flash-preview",
+      backupModel: "gemini-2.5-flash",
+      status: "on",
+      createdBy: "code",
+      usedPct: 100,
+      costPerRunUsd: 0.018,
+      winRate: null,
+      changed: false,
+    },
+  ],
+  reply: null,
+  orchestrator: null,
+  settings: [{ key: "gateCases", value: 100, budget: false, changed: false }],
+  pinned: [{ code: "debrief_quality_rubric", label: "Rubric", version: 2, inRelease: true }],
+};
+const metrics = (judgeMedian: number, hardFails: number) => ({
+  debriefs: 40,
+  judged: 38,
+  judgeMedian,
+  hardFails,
+  costPerDebriefUsd: 0.07,
+  secondsToDebrief: 58,
+  period: { from: "2026-11-01", to: null },
+});
+const DETAIL_LIVE = {
+  ...item({}),
+  previous: { id: "r1", version: 1 },
+  notes: {
+    summary: "Opens with the important moment when the learner moved past a risk cue.",
+    changes: [
+      {
+        area: "Writer prompt v12 → v13",
+        what: "Important moment first",
+        why: "3 advisor comments",
+        before: "Open with strengths",
+        after: "Open with the moment",
+        source: "diff",
+      },
+    ],
+    written: true,
+    writtenBy: null,
+    writtenAt: null,
+    canWrite: false,
+  },
+  evidence: {
+    beforeLive: {
+      ladder: [
+        { rung: "quick_test", state: "passed", detail: "Open set, 30" },
+        { rung: "gate_test", state: "passed", detail: "Gate set, 100" },
+        { rung: "paired_trial", state: "passed", detail: "Better on 11" },
+        { rung: "canary", state: "passed", detail: "20 of 20" },
+      ],
+      ideaId: IDEA.id,
+    },
+    whileLive: { ...metrics(9.6, 1), previous: metrics(9.2, 3) },
+  },
+  contents,
+  compareWith: "r1",
+  can: { rollBack: false, writeNotes: false },
+};
+const DETAIL_OLD = {
+  ...HISTORY.items[1],
+  previous: null,
+  notes: {
+    summary: null,
+    changes: [],
+    written: false,
+    writtenBy: null,
+    writtenAt: null,
+    canWrite: true,
+  },
+  evidence: { beforeLive: { ladder: [], ideaId: null }, whileLive: null },
+  contents,
+  compareWith: null,
+  can: { rollBack: true, writeNotes: true },
+};
+
 const renderPage = (path = "/debriefs/pm-agent") =>
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -104,6 +244,11 @@ beforeEach(() => {
   h.steps.mockReturnValue(ok(STEPS));
   h.settings.mockReturnValue(ok(SETTINGS));
   h.autonomy.mockReturnValue({ data: undefined });
+  h.history.mockReturnValue(ok(HISTORY));
+  h.detail.mockImplementation((id: string) => ok(id === "r1" ? DETAIL_OLD : DETAIL_LIVE));
+  h.propose.mockReturnValue(
+    resolves({ ideaId: "new-idea", releaseId: "d1", version: 7, budgetOnly: false }),
+  );
   [
     h.decide,
     h.rollback,
@@ -368,36 +513,60 @@ describe("PM agent › Ideas", () => {
     expect(chips).toHaveTextContent("Pinned rules: never");
   });
 
-  it("splits ideas into Open and Closed; a promoted one links to its release", () => {
+  it("splits ideas into Open and Closed by ally-be's state; a promoted one links to its release", () => {
     h.pmAgent.mockReturnValue(
       state([
-        IDEA,
+        { ...IDEA, state: "open" },
         {
           ...IDEA,
           id: "p1",
           title: "Shorter lines",
-          status: "active",
-          releaseVersion: 6,
-          releaseStatus: "ga",
+          state: "closed",
+          closedReason: "promoted",
+          releaseVersion: 2,
+          releaseId: "r2",
         },
+        { ...IDEA, id: "x1", title: "Too late", state: "closed", closedReason: "expired" },
         {
           ...IDEA,
-          id: "x1",
-          title: "Too late",
-          expired: true,
-          notTakenForwardReason: "no_decision",
+          id: "v1",
+          title: "Shorter opening",
+          state: "closed",
+          closedReason: "reverted",
+          closedWhy: "Missed a risk cue in the canary.",
         },
       ]),
     );
     renderPage();
     expect(screen.queryByTestId("idea-group-promoted")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Closed" }));
-    expect(screen.getByTestId("idea-group-promoted")).toHaveTextContent("Became release v6");
+    expect(screen.getByTestId("idea-group-promoted")).toHaveTextContent("Became release v2");
     expect(screen.getByTestId("idea-group-expired")).toHaveTextContent("Too late");
+    expect(screen.getByTestId("idea-group-reverted")).toHaveTextContent("Missed a risk cue");
     fireEvent.click(within(screen.getByTestId("idea-group-promoted")).getByRole("button"));
-    fireEvent.click(screen.getByRole("button", { name: "Became release v6" }));
-    expect(h.releases).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Became release v2" }));
+    expect(h.detail).toHaveBeenCalledWith("r2");
     expect(screen.getByTestId("release-detail")).toBeInTheDocument();
+  });
+
+  it("proposes a change as a draft release, which opens as an idea", async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Propose a change" }));
+    const form = screen.getByTestId("propose-change");
+    const submit = within(form).getByRole("button", { name: "Propose it" });
+    expect(submit).toBeDisabled();
+    fireEvent.change(within(form).getByLabelText("What it is, in a few words"), {
+      target: { value: "Writer on GPT-4.1" },
+    });
+    fireEvent.change(within(form).getByLabelText("Writer"), { target: { value: "GPT-4.1" } });
+    expect(within(form).queryByTestId("propose-budgets")).toBeNull();
+    fireEvent.click(submit);
+    await waitFor(() =>
+      expect(h.propose).toHaveBeenCalledWith({
+        title: "Writer on GPT-4.1",
+        steps: [{ step: "writer", model: "gpt-4.1" }],
+      }),
+    );
   });
 
   it("asks a question about an idea when ally-be allows it", async () => {
@@ -421,8 +590,21 @@ describe("PM agent › Ideas", () => {
       state([
         {
           ...IDEA,
-          releaseVersion: 7,
-          releaseStatus: "draft",
+          draftRelease: {
+            id: "d7",
+            version: 7,
+            status: "draft",
+            compare: { releaseId: "r2" },
+            changedVsLive: {
+              prompts: [{ code: "debrief_writer_system", before: 12, after: 13, pinned: false }],
+              settings: [],
+              recipes: [],
+              steps: [],
+              reply: null,
+              orchestrator: null,
+              budgetOnly: false,
+            },
+          },
           evidence: { ...IDEA.evidence, trial: TRIAL_PASSED },
         },
       ]),
@@ -431,42 +613,38 @@ describe("PM agent › Ideas", () => {
     const box = screen.getByTestId("idea-draft-release");
     expect(box).toHaveTextContent("Draft release v7");
     expect(box).toHaveTextContent("compared with v2 (live)");
-    expect(box).toHaveTextContent("Writer's prompt: a new version");
+    expect(box).toHaveTextContent("Writer's prompt v12 → v13");
   });
 });
 
 describe("PM agent › Releases", () => {
-  it("lists only releases learners have had; the live one shows what changed and its steps read-only", () => {
-    h.releases.mockReturnValue(
-      ok([
-        { ...RELEASES[0], prompts: { debrief_writer_system: 13, debrief_quality_rubric: 2 } },
-        {
-          ...RELEASES[1],
-          promotedAt: "2026-10-02T00:00:00Z",
-          prompts: { debrief_writer_system: 12, debrief_quality_rubric: 2 },
-        },
-        { ...RELEASES[1], id: "draft", version: 3, status: "draft", promotedAt: null },
-      ]),
-    );
+  it("lists releases learners have had; the live one shows what changed, did it work, and everything in it", () => {
     renderPage("/debriefs/pm-agent?view=releases");
     expect(screen.getAllByTestId("release-row")).toHaveLength(2);
     const detail = screen.getByTestId("release-detail");
-    expect(detail).toHaveTextContent("v2");
-    expect(screen.getByTestId("release-changes")).toHaveTextContent("Writer's prompt: v12 → v13");
-    expect(screen.getByTestId("release-changes")).toHaveTextContent(
-      "Everything else is the same as v1.",
+    expect(detail).toHaveTextContent("v2 · Put the risk-cue point first");
+    expect(screen.getByTestId("release-source")).toHaveTextContent("From the PM agent's idea");
+    const changes = screen.getByTestId("release-changes");
+    expect(changes).toHaveTextContent("What changed from v1");
+    expect(changes).toHaveTextContent("Opens with the important moment");
+    expect(within(changes).getByTestId("release-change")).toHaveTextContent(
+      "Why: 3 advisor comments",
     );
-    expect(within(detail).queryByRole("button", { name: "Roll back to this" })).toBeNull();
+    expect(changes).toHaveTextContent("Everything else is the same as v1.");
+    const evidence = screen.getByTestId("release-evidence");
+    expect(evidence).toHaveTextContent("Before going live");
+    expect(evidence).toHaveTextContent("Since going live");
+    expect(within(evidence).getByTestId("evidence-stats")).toHaveTextContent("vs 9.2 in v1");
     expect(screen.getByTestId("release-contents").tagName).toBe("DETAILS");
     expect(screen.getByTestId("steps-and-models")).toHaveTextContent("Gemini 3 Flash");
-    expect(screen.queryByRole("button", { name: "Make a release with these changes" })).toBeNull();
+    expect(within(detail).queryByRole("button", { name: "Roll back to this" })).toBeNull();
+    expect(screen.getByTestId("on-their-way")).toHaveTextContent("1 change on its way");
   });
 
   it("rolls back to a retired release after an inline confirm; a failure says so", async () => {
-    h.releases.mockReturnValue(
-      ok([RELEASES[0], { ...RELEASES[1], promotedAt: "2026-10-02T00:00:00Z" }]),
-    );
-    renderPage("/debriefs/pm-agent?view=releases&release=1");
+    renderPage("/debriefs/pm-agent?view=releases&releaseId=r1");
+    expect(screen.getByTestId("release-source")).toHaveTextContent("retired when v2 went live");
+    expect(screen.getByTestId("release-changes")).toHaveTextContent("No notes written");
     fireEvent.click(screen.getByRole("button", { name: "Roll back to this" }));
     const confirm = screen.getByTestId("rollback-confirm");
     expect(confirm).toHaveTextContent("Debriefs already written don't change.");
@@ -476,12 +654,50 @@ describe("PM agent › Releases", () => {
     await waitFor(() => expect(h.toastError).toHaveBeenCalled());
   });
 
-  it("is read-only without the role", () => {
-    h.permissions = [];
-    h.releases.mockReturnValue(
-      ok([RELEASES[0], { ...RELEASES[1], promotedAt: "2026-10-02T00:00:00Z" }]),
+  it("shows a Skills Store or code release that would undo a promoted change as waiting, with Promote", async () => {
+    h.promoteDraft.mockReturnValue(resolves());
+    h.history.mockReturnValue(
+      ok({
+        ...HISTORY,
+        items: [
+          {
+            ...HISTORY.items[0],
+            cameFrom: {
+              kind: "skills_store",
+              by: { id: 3, name: "Priya" },
+              promptCode: "debrief_writer_system",
+              version: 13,
+            },
+          },
+          HISTORY.items[1],
+        ],
+        pendingCodeDrafts: [
+          {
+            id: "d9",
+            version: 9,
+            note: null,
+            createdAt: "2026-11-12T00:00:00Z",
+            wouldUndo: "Shorter “Try saying” lines",
+          },
+        ],
+      }),
     );
-    renderPage("/debriefs/pm-agent?view=releases&release=1");
+    renderPage("/debriefs/pm-agent?view=releases");
+    const waiting = screen.getByTestId("release-waiting");
+    expect(waiting).toHaveAttribute("role", "alert");
+    expect(waiting).toHaveTextContent("Waiting: v9 would undo Shorter “Try saying” lines.");
+    expect(screen.getAllByTestId("release-row")[0]).toHaveTextContent(
+      "Skills Store edit by Priya (published Writer's prompt v13)",
+    );
+    fireEvent.click(within(waiting).getByRole("button", { name: "Promote" }));
+    await waitFor(() => expect(h.promoteDraft).toHaveBeenCalledWith({ id: "d9" }));
+  });
+
+  it("offers no roll back when ally-be says the viewer can't", () => {
+    h.detail.mockImplementation(() =>
+      ok({ ...DETAIL_OLD, can: { rollBack: false, writeNotes: false } }),
+    );
+    renderPage("/debriefs/pm-agent?view=releases&releaseId=r1");
     expect(screen.queryByRole("button", { name: "Roll back to this" })).toBeNull();
   });
 });

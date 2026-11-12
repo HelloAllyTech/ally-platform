@@ -407,3 +407,148 @@ export interface AppNotification {
   readAt: string | null;
   createdAt: string;
 }
+
+/** Where a release came from (`release-history`). */
+export type DebriefReleaseOrigin =
+  | { kind: "idea"; ideaId: string; title: string; proposedBy: "pm_agent" | "person" }
+  | { kind: "code"; tag: string | null }
+  | { kind: "settings_change"; by: { id: number; name: string | null } | null; note: string | null }
+  | { kind: "roll_back"; fromVersion: number | null; reason: string | null }
+  /** A Skills Store publish that became a release by itself (shape pending in CONSOLE_API.md). */
+  | {
+      kind: "skills_store";
+      by: { id: number; name: string | null } | null;
+      promptCode?: string | null;
+      version?: number | null;
+      note?: string | null;
+    };
+
+export interface DebriefReleaseHistoryItem {
+  id: string;
+  version: number;
+  status: "live" | "retired";
+  title: string;
+  summary: string | null;
+  cameFrom: DebriefReleaseOrigin;
+  wentLiveAt: string;
+  liveTimes: number;
+  retired: null | {
+    at: string;
+    reason: "replaced" | "rolled_back";
+    byVersion: number | null;
+    why: string | null;
+  };
+}
+
+export interface DebriefReleaseHistory {
+  items: DebriefReleaseHistoryItem[];
+  /** Code or Skills Store releases waiting as drafts because they would undo a promoted change. */
+  pendingCodeDrafts: Array<{
+    id: string;
+    version: number;
+    note: string | null;
+    createdAt: string;
+    /** The promoted change it would undo, in words, when ally-be says. */
+    wouldUndo?: string | null;
+    source?: "code" | "skills_store";
+  }>;
+}
+
+export type DebriefRungState = "passed" | "failed" | "running" | "waiting" | "skipped" | "off";
+
+export interface DebriefLiveMetrics {
+  debriefs: number;
+  judged: number;
+  judgeMedian: number | null;
+  hardFails: number | null;
+  costPerDebriefUsd: number | null;
+  secondsToDebrief: number | null;
+  period: { from: string; to: string | null };
+}
+
+export interface DebriefReleaseDetail extends DebriefReleaseHistoryItem {
+  previous: { id: string; version: number } | null;
+  notes: {
+    summary: string | null;
+    changes: Array<{
+      area: string;
+      what: string | null;
+      why: string | null;
+      before: string | null;
+      after: string | null;
+      source: "diff" | "written";
+    }>;
+    written: boolean;
+    writtenBy: number | null;
+    writtenAt: string | null;
+    canWrite: boolean;
+  };
+  evidence: {
+    beforeLive: {
+      ladder: Array<{
+        rung: "quick_test" | "gate_test" | "paired_trial" | "canary";
+        state: DebriefRungState;
+        detail: string | null;
+      }>;
+      ideaId: string | null;
+    };
+    whileLive: null | (DebriefLiveMetrics & { previous: DebriefLiveMetrics | null });
+  };
+  contents: {
+    prompts: Array<{
+      code: string;
+      promptId: string | null;
+      version: number | null;
+      followsCurrent: boolean;
+      changed: boolean;
+      lock: "pinned" | "release_only";
+    }>;
+    recipes: Array<{
+      key: string;
+      steps: string[];
+      maxRevisionRounds: number | null;
+      shortForm: boolean;
+      changed: boolean;
+    }>;
+    steps: Array<{
+      step: string;
+      model: string | null;
+      backupModel: string | null;
+      status: "on" | "off" | "fixed";
+      createdBy: string;
+      usedPct: number | null;
+      costPerRunUsd: number | null;
+      winRate: number | null;
+      changed: boolean;
+    }>;
+    reply: string | null;
+    orchestrator: unknown;
+    settings: Array<{ key: string; value: unknown; budget: boolean; changed: boolean }>;
+    pinned: Array<{ code: string; label: string; version: number | null; inRelease: boolean }>;
+  };
+  compareWith: string | null;
+  can: { rollBack: boolean; writeNotes: boolean };
+}
+
+export interface DebriefReleaseCompare {
+  prompts: Array<{
+    code: string;
+    pinned: boolean;
+    before: { promptId: string; version: number; text: string } | null;
+    after: { promptId: string; version: number; text: string } | null;
+  }>;
+}
+
+/** "Propose a change" (`POST pm-agent/ideas/propose`). */
+export interface DebriefProposal {
+  title: string;
+  why?: string;
+  steps?: Array<{
+    step: string;
+    enabled?: boolean;
+    model?: string | null;
+    backupModel?: string | null;
+  }>;
+  settings?: { runCeilingUsd?: number; monthlyCapUsd?: number; passScore?: number };
+  reply?: string;
+}

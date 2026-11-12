@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import { pmAgentPath, PmAgentView } from "../consoleRoutes";
 import { BackLink, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { IdeasView } from "./IdeasView";
+import { ProposeChange } from "./ProposeChange";
 import { ReleasesView } from "./ReleasesView";
 
 const VIEWS: PmAgentView[] = ["ideas", "releases", "test-sets"];
@@ -93,12 +94,22 @@ const TestSetsView: React.FC<{
 export const PmAgentPage: React.FC = () => {
   const s = en.debriefs.pmAgent;
   const p = en.debriefs.pmPage;
-  const state0 = useGetPmAgentStateQuery();
-  const access = useDebriefAccess(state0.data?.viewer);
+  // Open and closed ideas come as two lists (CONSOLE_API.md); one list for the page.
+  const open = useGetPmAgentStateQuery({ state: "open" });
+  const closed = useGetPmAgentStateQuery({ state: "closed" });
+  const access = useDebriefAccess(open.data?.viewer);
+  const [proposing, setProposing] = useState(false);
   const [params, setParams] = useSearchParams();
   const raw = params.get("view") as PmAgentView | null;
   const view: PmAgentView = raw && VIEWS.includes(raw) ? raw : "ideas";
-  const state = state0;
+  const state = useMemo(() => {
+    if (!open.data) return { ...open, data: undefined };
+    const seen = new Set(open.data.ideas.map(i => i.id));
+    const ideas = [...open.data.ideas, ...(closed.data?.ideas ?? []).filter(i => !seen.has(i.id))];
+    return { ...open, data: { ...open.data, ideas } };
+  }, [open, closed.data]);
+  const onTheWay =
+    open.data?.counts?.open ?? open.data?.ideas.filter(i => i.state !== "closed").length ?? 0;
   const overview = useGetDebriefOverviewQuery();
   const [run, { isLoading: running }] = useRunPmAgentMutation();
 
@@ -120,6 +131,11 @@ export const PmAgentPage: React.FC = () => {
           <h1 className="font-secondary text-[28px] font-normal">{p.title}</h1>
           <div className="flex-1" />
           {access.pmAgent && (
+            <Button kind="tertiary" size="md" onClick={() => setProposing(true)}>
+              {p.propose.button}
+            </Button>
+          )}
+          {access.pmAgent && (
             <Button kind="tertiary" size="md" disabled={running} onClick={() => void runNow()}>
               {running ? s.running : s.runNow}
             </Button>
@@ -139,6 +155,16 @@ export const PmAgentPage: React.FC = () => {
         </nav>
       </header>
 
+      {proposing && (
+        <ProposeChange
+          canChangeBudgets={access.settings}
+          onCancel={() => setProposing(false)}
+          onDone={ideaId => {
+            setProposing(false);
+            setParams({ idea: ideaId });
+          }}
+        />
+      )}
       {view === "test-sets" ? (
         <TestSetsView overview={overview} canAct={access.testSets} />
       ) : state.isError ? (
@@ -156,12 +182,11 @@ export const PmAgentPage: React.FC = () => {
       ) : view === "releases" ? (
         <ReleasesView
           canAct={access.releases}
-          ideas={state.data.ideas}
-          overview={overview.data}
-          selected={params.get("release") ? Number(params.get("release")) : null}
-          onSelect={version => {
+          onTheWay={onTheWay}
+          selected={params.get("releaseId")}
+          onSelect={id => {
             const next = new URLSearchParams(params);
-            next.set("release", String(version));
+            next.set("releaseId", id);
             setParams(next, { replace: true });
           }}
         />
@@ -176,7 +201,7 @@ export const PmAgentPage: React.FC = () => {
             next.set("idea", id);
             setParams(next, { replace: true });
           }}
-          onOpenRelease={version => setParams({ view: "releases", release: String(version) })}
+          onOpenRelease={releaseId => setParams({ view: "releases", releaseId })}
         />
       )}
     </div>

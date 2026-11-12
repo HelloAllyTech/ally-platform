@@ -54,6 +54,7 @@ const ideaMeta = (idea: PmAgentIdeaRow, group: IdeaGroup) => {
   if (group === "promoted" && idea.releaseVersion != null)
     return p.becameRelease(idea.releaseVersion);
   if (group === "expired") return p.expiredNoDecision;
+  if (idea.state === "closed" && idea.closedWhy) return idea.closedWhy;
   const c = idea.evidence.canary;
   if (c) return p.canaryMeta(s.canaryStatus[c.status] ?? c.status, c.canaryRuns ?? 0);
   if (idea.evidence.trial?.status === "passed") return `${kind} · ${p.passedTrial}`;
@@ -99,7 +100,7 @@ export const IdeasView: React.FC<{
   access: DebriefAccess;
   focusId: string | null;
   onFocus: (id: string) => void;
-  onOpenRelease: (version: number) => void;
+  onOpenRelease: (releaseId: string) => void;
 }> = ({ state, overview, access, focusId, onFocus, onOpenRelease }) => {
   const p = en.debriefs.pmPage;
   const s = en.debriefs.pmAgent;

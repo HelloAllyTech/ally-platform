@@ -50,8 +50,26 @@ export const needsViewer = (idea: PmAgentIdeaRow, access: DebriefAccess): boolea
  * Which list an idea sits in on the Ideas page. "Needs you" is from the viewer's side: an idea
  * waiting on a role the viewer doesn't hold reads as still being tested.
  */
+const CLOSED_AS: Record<string, IdeaGroup> = {
+  promoted: "promoted",
+  signed_off: "promoted",
+  handed_off: "promoted",
+  answered: "promoted",
+  rejected: "rejected",
+  did_not_pass: "rejected",
+  retired: "rejected",
+  expired: "expired",
+  reverted: "reverted",
+};
+
 export const ideaGroup = (idea: PmAgentIdeaRow, access: DebriefAccess): IdeaGroup => {
+  // ally-be says open or closed, and why it closed; the rest is worked out for an older backend.
+  if (idea.state === "closed") return CLOSED_AS[idea.closedReason ?? ""] ?? "rejected";
   const c = idea.evidence.canary?.status;
+  if (idea.state === "open") {
+    if (c === "running" || c === "passed") return "canary";
+    return needsViewer(idea, access) ? "needs" : "testing";
+  }
   if (c === "reverted") return "reverted";
   if (expired(idea)) return "expired";
   if (c === "promoted" || idea.status === "active" || idea.status === "approved") {
