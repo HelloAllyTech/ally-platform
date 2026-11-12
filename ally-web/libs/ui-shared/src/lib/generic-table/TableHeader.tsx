@@ -10,42 +10,66 @@ import HeaderTooltip from "./HeaderTooltip";
 import { Column, SortDirection, TableFilter } from "./types";
 
 /**
- * TableHeader renders the table's <thead> with sortable and filterable columns.
+ * TableHeader renders the table's <thead> with sortable and filterable
+ * columns. Sort state (which column's header was clicked, to drive the
+ * Sort/Filter menu and the Sort popover) is local to this component. The
+ * filter popover's state is NOT local — it's owned by GenericTable and
+ * shared with its own "+ Filter"/chip entry point, so the two ways to open
+ * a filter popover can never silently diverge (see GenericTable.tsx's
+ * `openFilterForColumn`).
  *
  * @template T - The type of data for each row.
- * @param {Object} props - The props for the header.
- * @param {Column<T>[]} props.columns - The column definitions.
- * @param {TableFilter} props.filter - The current filter state.
- * @param {(key: string, value: string) => void} props.onSort - Handler for sort changes.
- * @param {(key: string, value: string | string[]) => void} props.onFilterChange - Handler for filter changes.
  */
 const TableHeader = <T extends Record<string, any>>({
   columns,
   filter,
   onSort,
-  onFilterChange,
+  selectedColumn,
+  filterSource,
+  searchText,
+  onSearchTextChange,
+  selectedValues,
+  textValue,
+  onTextChange,
+  onOpenFilter,
+  onCloseFilter,
+  onToggleOption,
+  onSaveMultiSelect,
+  onSelectFilterOption,
+  onDateSelect,
+  onNumberSelect,
 }: {
   columns: Column<T>[];
   filter: TableFilter;
   onSort: (key: string, value: SortDirection) => void;
-  onFilterChange: (key: string, value: string | string[]) => void;
+  selectedColumn: (Column<T> & { filterOptions: { label: string; value: string }[] }) | null;
+  filterSource: "header" | "chip" | null;
+  searchText: string;
+  onSearchTextChange: (text: string) => void;
+  selectedValues: string[];
+  textValue: string;
+  onTextChange: (text: string) => void;
+  onOpenFilter: (col: Column<T> | undefined, event: React.MouseEvent<HTMLElement>) => void;
+  onCloseFilter: () => void;
+  onToggleOption: (value: string) => void;
+  onSaveMultiSelect: () => void;
+  onSelectFilterOption: (colKey: string, value: string) => void;
+  onDateSelect: (key: string, value: string[]) => void;
+  onNumberSelect: (key: string, value: string[]) => void;
 }) => {
-  // State for popovers
+  // Local state for the Sort/Filter mini-menu and the Sort popover — purely
+  // "which column's header was clicked", unrelated to the shared filter
+  // popover state above.
   const [mainAnchorEl, setMainAnchorEl] = useState<null | HTMLElement>(null);
   const [sortAnchorEl, setSortAnchorEl] = useState<null | HTMLElement>(null);
-  const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
   const [activeCol, setActiveCol] = useState<null | Column<T>>(null);
-  const [searchText, setSearchText] = useState("");
-  const [multiSelectValues, setMultiSelectValues] = useState<string[]>([]);
 
   // Open main popover (Sort/Filter)
   const handleHeaderClick = (event: React.MouseEvent<HTMLElement>, col: Column<T>) => {
     if (col.sortable || col.filterable) {
-      setFilterAnchorEl(null);
       setSortAnchorEl(null);
       setMainAnchorEl(event.currentTarget);
       setActiveCol(col);
-      setSearchText("");
     }
   };
 
@@ -54,38 +78,17 @@ const TableHeader = <T extends Record<string, any>>({
     setSortAnchorEl(event.currentTarget);
   };
 
-  // Open filter popover
+  // Open the shared filter popover for the active column
   const handleFilterClick = (event: React.MouseEvent<HTMLElement>) => {
-    setFilterAnchorEl(event.currentTarget);
-    // Prefill array-valued filters (multiselect + number range) from current state
-    if (
-      activeCol &&
-      (activeCol.filterType === "multiselect" || activeCol.filterType === "number")
-    ) {
-      const existing = filter.find(f => f.key === activeCol.key);
-      setMultiSelectValues(Array.isArray(existing?.value) ? existing?.value : []);
-      setSearchText("");
-    } else if (activeCol && activeCol.filterType === "text") {
-      // TEXT reuses this same search box as its actual committed filter
-      // value (there's no separate option list to search within), so
-      // reopening it must restore what's already applied — otherwise
-      // clicking Apply with the box blanked out silently clears it.
-      const existing = filter.find(f => f.key === activeCol.key);
-      setSearchText(typeof existing?.value === "string" ? existing.value : "");
-      setMultiSelectValues([]);
-    } else {
-      setSearchText("");
-      setMultiSelectValues([]);
-    }
+    onOpenFilter(activeCol ?? undefined, event);
   };
 
-  // Close all popovers
+  // Close the Sort/Filter menu and Sort popover (the shared filter popover
+  // closes via its own onCloseFilter prop, called directly where needed).
   const handleCloseAll = () => {
-    setFilterAnchorEl(null);
     setSortAnchorEl(null);
     setMainAnchorEl(null);
     setActiveCol(null);
-    setSearchText("");
   };
 
   // Handle sort selection
@@ -96,68 +99,30 @@ const TableHeader = <T extends Record<string, any>>({
     handleCloseAll();
   };
 
-  // Handle filter option selection
-  const handleFilterOptionSelect = (value: string) => {
-    if (activeCol) {
-      onFilterChange(activeCol.key as string, value);
-    }
-    handleCloseAll();
-  };
-
-  // Toggle multi-select option
-  const handleToggleMultiSelectOption = (value: string) => {
-    setMultiSelectValues(prev =>
-      prev?.includes(value) ? prev.filter(v => v !== value) : [...prev, value],
-    );
-  };
-
-  // Save multi-select filter
-  const handleSaveMultiSelect = () => {
-    if (activeCol) {
-      onFilterChange(activeCol.key as string, multiSelectValues);
-    }
-    handleCloseAll();
-  };
-
-  const handleDateSelect = (key: string, value: string[]) => {
-    if (key && value) {
-      onFilterChange(key, value);
-    }
-    handleCloseAll();
-  };
-
-  const handleNumberSelect = (key: string, value: string[]) => {
-    if (key) {
-      onFilterChange(key, value);
-    }
-    handleCloseAll();
-  };
-
-  // Render filter popover content
-  const renderFilterPopover = () => {
-    if (!activeCol || !activeCol.filterable) return null;
+  // Render filter popover content for the column currently open via the
+  // header entry point.
+  const renderFilterPopover = (col: Column<T>) => {
+    if (selectedColumn?.key !== col.key || filterSource !== "header" || !col.filterable)
+      return null;
     return (
       <FilterPopover
-        anchorEl={filterAnchorEl}
-        open={Boolean(filterAnchorEl)}
-        onClose={handleCloseAll}
-        column={activeCol as any}
+        open
+        onClose={onCloseFilter}
+        column={selectedColumn}
         searchText={searchText}
-        onSearchTextChange={setSearchText}
-        selectedValues={multiSelectValues}
-        onToggleOption={handleToggleMultiSelectOption}
-        onSaveMultiSelect={handleSaveMultiSelect}
-        onSelectSingle={(_colKey, value) => handleFilterOptionSelect(value)}
-        onDateSelect={(key, value) => handleDateSelect(key, value)}
-        onNumberSelect={(key, value) => handleNumberSelect(key, value)}
-        singleSelectedValue={
-          activeCol
-            ? (() => {
-                const found = filter.find(f => f.key === activeCol.key);
-                return typeof found?.value === "string" ? found.value : "";
-              })()
-            : ""
-        }
+        onSearchTextChange={onSearchTextChange}
+        selectedValues={selectedValues}
+        onToggleOption={onToggleOption}
+        onSaveMultiSelect={onSaveMultiSelect}
+        onSelectSingle={onSelectFilterOption}
+        onDateSelect={onDateSelect}
+        onNumberSelect={onNumberSelect}
+        textValue={textValue}
+        onTextChange={onTextChange}
+        singleSelectedValue={(() => {
+          const found = filter.find(f => f.key === col.key);
+          return typeof found?.value === "string" ? found.value : "";
+        })()}
       />
     );
   };
@@ -262,7 +227,7 @@ const TableHeader = <T extends Record<string, any>>({
               )}
               {renderMainPopover(col)}
               {activeCol?.key === col.key && renderSortPopover()}
-              {activeCol?.key === col.key && col.filterable && renderFilterPopover()}
+              {renderFilterPopover(col)}
             </th>
           ))}
       </tr>

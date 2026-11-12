@@ -12,6 +12,7 @@ vi.mock("../FilterPopover", () => ({
       <button onClick={() => props.onSelectSingle(props.column?.key, "v1")}>select-single</button>
       <button onClick={props.onSaveMultiSelect}>save-multi</button>
       <span data-testid="search-text-value">{props.searchText}</span>
+      <span data-testid="text-value">{props.textValue}</span>
     </div>
   ),
 }));
@@ -145,11 +146,13 @@ describe("GenericTable", () => {
     fireEvent.click(screen.getByRole("button", { name: /filter/i }));
 
     // "Call Name" should now appear both as the table header and as an
-    // entry in the add-filter column picker.
+    // entry in the add-filter column picker — the picker's entry renders
+    // first in document order, so it's entries[0], not entries[length - 1]
+    // (that's the header label, a different click path entirely).
     const callNameEntries = screen.getAllByText("Call Name");
     expect(callNameEntries.length).toBeGreaterThan(1);
 
-    fireEvent.click(callNameEntries[callNameEntries.length - 1]);
+    fireEvent.click(callNameEntries[0]);
     const singleButtons = screen.getAllByText("select-single");
     fireEvent.click(singleButtons[singleButtons.length - 1]);
 
@@ -158,11 +161,10 @@ describe("GenericTable", () => {
     );
   });
 
-  it("prefills the TEXT filter's search box with the already-applied value when reopened", () => {
-    // The TEXT filter type reuses its search box as the actual committed
-    // filter value (no separate option list). Reopening the popover used to
-    // always blank it out, so re-applying without retyping silently cleared
-    // the filter that was already active.
+  it("prefills the TEXT filter's own value box with the already-applied value when reopened", () => {
+    // TEXT has its own dedicated draft (not the option-list search box).
+    // Reopening the popover used to always blank it out, so re-applying
+    // without retyping silently cleared the filter that was already active.
     const columns = [
       { key: "callName", header: "Call Name", filterable: true, filterType: "text" },
     ];
@@ -175,14 +177,16 @@ describe("GenericTable", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /filter/i }));
+    // The picker's entry renders first in document order — entries[0], not
+    // entries[length - 1] (the header label, a different click path).
     const callNameEntries = screen.getAllByText("Call Name");
-    fireEvent.click(callNameEntries[callNameEntries.length - 1]);
+    fireEvent.click(callNameEntries[0]);
     const singleButtons = screen.getAllByText("select-single");
     fireEvent.click(singleButtons[singleButtons.length - 1]);
 
-    // Reopen the same column's filter popover via the header (a separate,
-    // parallel popover path from the "+ Filter" chip used above, with its
-    // own copy of this prefill logic in TableHeader.tsx).
+    // Reopen the same column's filter popover via the header (a separate
+    // entry point from the "+ Filter" chip used above, sharing the same
+    // underlying state/handlers owned by GenericTable).
     const headerCell = screen
       .getAllByText("Call Name")
       .map(el => el.closest("th"))
@@ -191,7 +195,7 @@ describe("GenericTable", () => {
     const filterButtons = screen.getAllByText("Filter");
     fireEvent.click(filterButtons[filterButtons.length - 1]);
 
-    expect(screen.getAllByTestId("search-text-value").pop()).toHaveTextContent("v1");
+    expect(screen.getAllByTestId("text-value").pop()).toHaveTextContent("v1");
   });
 
   it("renders Load More and calls handler when not loading", () => {

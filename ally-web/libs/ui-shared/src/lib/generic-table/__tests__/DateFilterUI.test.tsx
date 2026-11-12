@@ -7,100 +7,99 @@ import "@testing-library/jest-dom";
 
 import DateFilterUI from "../DateFilterUI";
 
-// Mock react-calendar so we don't depend on its DOM. Two buttons: one fires
-// the library's real first-click behaviour for a range selection (an
-// "anchor" — both ends the same date, before a second date is ever picked),
-// the other a genuinely completed two-different-dates range.
+// Mock react-calendar so we don't depend on its DOM, modeling the real
+// library's actual v6 behaviour: with `selectRange` and `allowPartialRange`,
+// a first click fires onChange with a partial [Date, null] range; a second
+// click fires it with the completed [Date, Date] range. Without
+// `allowPartialRange`, react-calendar doesn't fire onChange at all on a
+// first click — this mock throws in that case, since a plain fabricated
+// mock previously hid exactly that real-library behaviour from these tests.
 vi.mock("react-calendar", () => ({
-  Calendar: ({ onChange }: any) => (
-    <>
-      <button onClick={() => onChange([new Date("2024-01-02"), new Date("2024-01-02")])}>
-        calendar-first-click-anchor
-      </button>
-      <button onClick={() => onChange([new Date("2024-01-02"), new Date("2024-01-03")])}>
-        calendar-range
-      </button>
-    </>
-  ),
+  Calendar: ({ onChange, allowPartialRange }: any) => {
+    if (!allowPartialRange) {
+      throw new Error(
+        "DateFilterUI must pass allowPartialRange — without it, react-calendar " +
+          "never fires onChange on a first click of a range selection.",
+      );
+    }
+    return (
+      <>
+        <button onClick={() => onChange([new Date("2024-01-02"), null])}>
+          calendar-first-click-partial
+        </button>
+        <button onClick={() => onChange([new Date("2024-01-02"), new Date("2024-01-03")])}>
+          calendar-range
+        </button>
+      </>
+    );
+  },
 }));
 
 describe("DateFilterUI", () => {
-  it("applies quick preset and calls onChange", () => {
-    const onChange = vi.fn();
-    render(<DateFilterUI selectedValues={[]} onChange={onChange} />);
+  it("applies a quick preset immediately, without needing Save", () => {
+    const onApply = vi.fn();
+    render(<DateFilterUI selectedValues={[]} onApply={onApply} />);
     fireEvent.click(screen.getByText("Today"));
-    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledTimes(1);
+    const [start, end] = onApply.mock.calls[0][0];
+    expect(new Date(start) < new Date(end)).toBe(true);
   });
 
-  it("commits the filter via onDateSelect when a quick preset is clicked, without needing Save", () => {
-    // onChange alone only reaches the (unrelated) multiselect staging array
-    // via FilterPopover's wiring — onDateSelect is the real commit path, and
-    // a preset click used to never call it, so clicking "Today" looked like
-    // it applied the filter but silently did nothing.
-    const onChange = vi.fn();
-    const onDateSelect = vi.fn();
-    render(<DateFilterUI selectedValues={[]} onChange={onChange} onDateSelect={onDateSelect} />);
-    fireEvent.click(screen.getByText("Today"));
-    expect(onDateSelect).toHaveBeenCalledTimes(1);
-    expect(onDateSelect).toHaveBeenCalledWith(onChange.mock.calls[0][0]);
+  it("shows the calendar immediately — there is no separate Custom mode to open it", () => {
+    const onApply = vi.fn();
+    render(<DateFilterUI selectedValues={[]} onApply={onApply} />);
+    expect(screen.getByText("calendar-range")).toBeInTheDocument();
   });
 
-  it("shows calendar for Custom preset, and picking a range only applies on Save", () => {
-    const onChange = vi.fn();
-    render(<DateFilterUI selectedValues={[]} onChange={onChange} />);
+  it("picking a custom range only applies on Save", () => {
+    const onApply = vi.fn();
+    render(<DateFilterUI selectedValues={[]} onApply={onApply} />);
 
-    fireEvent.click(screen.getByText("Custom"));
     fireEvent.click(screen.getByText("calendar-range"));
     // Picking the range updates the preview (Save becomes clickable below)
     // but must not apply the filter on its own — only Save does that.
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onApply).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("Save"));
-    expect(onChange).toHaveBeenCalledWith([
+    expect(onApply).toHaveBeenCalledWith([
       new Date("2024-01-02").toISOString(),
       new Date("2024-01-03").toISOString(),
     ]);
   });
 
-  it("does not apply the filter on the calendar's first-click anchor (From=To, before a second date is picked)", () => {
-    // react-calendar's own range-select behaviour: the first click already
-    // fires onChange with the same date for both ends, with no separate
-    // signal distinguishing "still choosing" from a real same-day range.
-    // Treating that as a committed selection applied a From=To filter the
-    // instant a counsellor clicked a start date, before they could ever pick
-    // a different end date.
-    const onChange = vi.fn();
-    render(<DateFilterUI selectedValues={[]} onChange={onChange} />);
+  it("shows a visible preview after picking just a start date, but keeps Save disabled until an end date is picked", () => {
+    // Without `allowPartialRange`, react-calendar v6 never fires onChange at
+    // all on the first click of a range selection — since this calendar is
+    // controlled (value={range}), that left the first click with no visible
+    // feedback whatsoever (clicking a date looked like nothing happened).
+    // With it, this partial [Date, null] onChange call now updates the
+    // preview, without prematurely applying or enabling Save.
+    const onApply = vi.fn();
+    render(<DateFilterUI selectedValues={[]} onApply={onApply} />);
 
-    fireEvent.click(screen.getByText("Custom"));
-    fireEvent.click(screen.getByText("calendar-first-click-anchor"));
+    fireEvent.click(screen.getByText("calendar-first-click-partial"));
 
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("opens the calendar when clicking directly into the From or To field, not only the Custom button", () => {
-    // The From/To boxes had no click handler at all — a counsellor clicking
-    // into what visually looks like a date field got nothing, since only the
-    // separate "Custom" preset button opened the calendar.
-    const onChange = vi.fn();
-    render(<DateFilterUI selectedValues={[]} onChange={onChange} />);
-
-    expect(screen.queryByText("calendar-range")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByPlaceholderText("Starting"));
-    expect(screen.getByText("calendar-range")).toBeInTheDocument();
-  });
-
-  it("enables Save only when a range is selected and calls onDateSelect", () => {
-    const onChange = vi.fn();
-    const onDateSelect = vi.fn();
-    render(<DateFilterUI selectedValues={[]} onChange={onChange} onDateSelect={onDateSelect} />);
-
-    // initially disabled
+    expect(onApply).not.toHaveBeenCalled();
     expect(screen.getByText("Save")).toBeDisabled();
+    expect(screen.getByText("From:").parentElement).toHaveTextContent(
+      new Date("2024-01-02").toLocaleDateString(),
+    );
+    expect(screen.getByText("To:").parentElement).toHaveTextContent("—");
+  });
 
-    // pick a preset with a full range
-    fireEvent.click(screen.getByText("This week"));
+  it("seeds the preview and enables Save from an already-applied range", () => {
+    const onApply = vi.fn();
+    render(
+      <DateFilterUI
+        selectedValues={["2024-01-02T00:00:00.000Z", "2024-01-03T00:00:00.000Z"]}
+        onApply={onApply}
+      />,
+    );
     expect(screen.getByText("Save")).toBeEnabled();
-    fireEvent.click(screen.getByText("Save"));
-    expect(onDateSelect).toHaveBeenCalled();
+    expect(screen.getByText("From:").parentElement).toHaveTextContent(
+      new Date("2024-01-02").toLocaleDateString(),
+    );
+    expect(screen.getByText("To:").parentElement).toHaveTextContent(
+      new Date("2024-01-03").toLocaleDateString(),
+    );
   });
 });
