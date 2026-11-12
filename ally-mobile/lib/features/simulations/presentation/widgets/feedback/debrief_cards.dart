@@ -931,6 +931,19 @@ class _ReadyCards extends ConsumerWidget {
           icon: Icon(Icons.trending_up, size: 20, color: AppColors.primary),
           children: [_Body(cards.progressNote!)],
         ),
+      // The safety reading found something but the Writer judged it ordinary
+      // low mood or grief, so there is no important moment to carry the
+      // support lines: they get a card of their own.
+      if (moment == null && view.riskCue && !view.distress && view.supportLines.isNotEmpty)
+        _Card(
+          key: const Key('debrief-card-support'),
+          title: ref.t('$_k.support.title'),
+          icon: Icon(Icons.volunteer_activism_outlined, size: 20, color: AppColors.primary),
+          children: [
+            _Body(ref.t('$_k.support.lead')),
+            _SupportLines(lines: view.supportLines),
+          ],
+        ),
       // A short debrief may come without a question (its rule checks don't
       // require one): no empty "One question to think about" card, but Ask
       // Ally stays, and the composer still docks where the question would be.

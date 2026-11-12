@@ -141,6 +141,11 @@ export interface LearnerDebriefView {
   progress?: LearnerProgress | null;
   /** The learner stepped out of the role in distress: support comes first. */
   distress?: boolean;
+  /**
+   * The safety reading found a risk cue. The support lines show whenever it
+   * did, with or without an important-moment card.
+   */
+  riskCue?: boolean;
   /** The organisation's support lines (the Guide's), crisis lines first. */
   supportLines?: GuideSupportLine[];
   /** Roleplays the cards link to that the learner can still open. */
@@ -780,6 +785,10 @@ export class DebriefAgentService implements OnModuleInit {
           cards,
           language: run.language,
           distress: run.learnerDistress === true,
+          // The safety reading found something. The apps show the support
+          // lines on their own when the Writer judged it ordinary low mood or
+          // grief and wrote no important moment.
+          riskCue: run.hasRiskCue === true,
           supportLines: await this.supportLines(s.tenant_id, run.language),
           practice: await this.practice.available(
             userId,

@@ -487,6 +487,7 @@ class LearnerDebriefView {
     this.helpful,
     this.flags = const [],
     this.distress = false,
+    this.riskCue = false,
     this.supportLines = const [],
     this.practice = const [],
     this.supervisor,
@@ -529,6 +530,7 @@ class LearnerDebriefView {
           ? _maps(feedback['flags']).map(DebriefMyFlag.fromJson).toList()
           : const [],
       distress: json['distress'] == true,
+      riskCue: json['riskCue'] == true,
       supportLines: _maps(json['supportLines'])
           .map(DebriefSupportLine.fromJson)
           .where((l) => l.phone.isNotEmpty)
@@ -557,6 +559,10 @@ class LearnerDebriefView {
   /// The learner stepped out of the role in distress: care comes before
   /// coaching (an acknowledgement and [supportLines] first).
   final bool distress;
+
+  /// The safety reading found a risk cue: the [supportLines] show even when
+  /// the debrief has no important-moment card.
+  final bool riskCue;
   final List<DebriefSupportLine> supportLines;
 
   /// The roleplays a card may link to; anything else gets no button.
@@ -592,6 +598,7 @@ class LearnerDebriefView {
     helpful: helpful ?? this.helpful,
     flags: flags ?? this.flags,
     distress: distress,
+    riskCue: riskCue,
     supportLines: supportLines,
     practice: practice,
     supervisor: supervisor,

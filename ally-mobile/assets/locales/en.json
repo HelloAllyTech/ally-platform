@@ -1275,6 +1275,10 @@
         "support": "Moments like this are hard. If this session brought something up for you, you can talk to:",
         "others": "Other moments like this"
       },
+      "support": {
+        "title": "Someone to talk to",
+        "lead": "If this session brought something up for you, you can talk to:"
+      },
       "distress": {
         "title": "Before your debrief",
         "body": "Something in this session seemed to touch you personally. That's okay, and it matters more than any feedback. Take a moment for yourself first.",

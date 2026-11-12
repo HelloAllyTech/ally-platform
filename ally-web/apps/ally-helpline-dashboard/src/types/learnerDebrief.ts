@@ -113,6 +113,12 @@ export interface LearnerDebriefView {
   /** The learner stepped out of the role in distress: support comes first. */
   distress?: boolean;
   supportLines?: DebriefSupportLine[];
+  /**
+   * The safety reading found something in the session. The support lines then
+   * show even when the debrief has no important-moment card (a cue the
+   * Writer judged ordinary low mood or grief).
+   */
+  riskCue?: boolean;
   /** Roleplays the cards link to that the learner can still open. */
   practice?: Array<{ id: number; title: string }>;
   /** Present only on a debrief picked for the pulse, with the answers so far. */

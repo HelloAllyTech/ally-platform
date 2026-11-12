@@ -459,6 +459,17 @@ const ReadyCards: FC<{
           </Card>
         )}
 
+        {!moment && view.riskCue && !view.distress && !!view.supportLines?.length && (
+          <Card
+            testId="debrief-card-support"
+            title={t("postSim.debriefCards.support.title")}
+            icon={<HeartHandshake aria-hidden="true" className="h-5 w-5 text-primary-600" />}
+          >
+            <Body>{t("postSim.debriefCards.support.lead")}</Body>
+            <SupportLines lines={view.supportLines} />
+          </Card>
+        )}
+
         {cards.reflective_question?.trim() ? (
           <Card
             testId="debrief-card-reflective-question"

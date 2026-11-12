@@ -483,6 +483,27 @@ void main() {
       expect(find.byKey(const Key('debrief-support-lines')), findsNWidgets(2));
     });
 
+    testWidgets('a risk cue with no important moment still shows the support lines', (tester) async {
+      final json = readyDebriefJson();
+      final cards = {...json['cards'] as Map<String, dynamic>}..remove('important_moment');
+      stubDebrief({...json, 'cards': cards, 'riskCue': true, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-card-important-moment')), findsNothing);
+      expect(find.byKey(const Key('debrief-card-support')), findsOneWidget);
+      expect(find.text('If this session brought something up for you, you can talk to:'), findsOneWidget);
+      expect(find.text('Tele-MANAS · +91 14416'), findsOneWidget);
+    });
+
+    testWidgets('no risk cue: no support card of its own', (tester) async {
+      final json = readyDebriefJson();
+      final cards = {...json['cards'] as Map<String, dynamic>}..remove('important_moment');
+      stubDebrief({...json, 'cards': cards, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-card-support')), findsNothing);
+    });
+
     testWidgets('a support line is a tel: link', (tester) async {
       final launcher = _FakeUrlLauncherPlatform();
       final previous = UrlLauncherPlatform.instance;

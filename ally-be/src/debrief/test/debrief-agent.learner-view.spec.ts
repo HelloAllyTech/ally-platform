@@ -167,9 +167,27 @@ describe('DebriefAgentService.learnerView', () => {
       cards: { opening: 'x' },
       language: 'hi',
       distress: false,
+      riskCue: false,
       supportLines: expect.any(Array),
       practice: [],
     });
+  });
+
+  it('says when the safety reading found a risk cue, so the support lines show without an important moment', async () => {
+    const view = await build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: { opening: 'x' },
+          language: 'en',
+          steps: [],
+          hasRiskCue: true,
+        },
+      ],
+    }).learnerView('s', 7);
+    expect(view).toMatchObject({ state: 'ready', riskCue: true });
+    expect((view as any).supportLines.length).toBeGreaterThan(0);
   });
 
   it('gives Tele-MANAS when the organisation set no support lines', async () => {

@@ -628,6 +628,36 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(screen.queryByTestId("debrief-distress")).not.toBeInTheDocument();
     });
 
+    it("keeps the support lines when the safety reading found something but there is no important moment", () => {
+      const noMoment = { ...CARDS, important_moment: null };
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: noMoment,
+          language: "en",
+          riskCue: true,
+          supportLines: [TELE_MANAS],
+        },
+      });
+      const { unmount } = renderTab();
+
+      expect(screen.queryByTestId("debrief-card-important-moment")).not.toBeInTheDocument();
+      const support = screen.getByTestId("debrief-card-support");
+      expect(within(support).getByText("postSim.debriefCards.support.lead")).toBeInTheDocument();
+      expect(within(support).getByRole("link", { name: /Tele-MANAS/ })).toHaveAttribute(
+        "href",
+        "tel:14416",
+      );
+      unmount();
+
+      // Nothing found: no support card of its own.
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: noMoment, language: "en", supportLines: [TELE_MANAS] },
+      });
+      renderTab();
+      expect(screen.queryByTestId("debrief-card-support")).not.toBeInTheDocument();
+    });
+
     it("puts care first when the learner was in distress, and the debrief opens on request", () => {
       mockLearnerDebriefQuery.mockReturnValue({
         data: {
