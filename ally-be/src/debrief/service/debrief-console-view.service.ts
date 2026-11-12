@@ -96,8 +96,12 @@ export class DebriefConsoleViewService implements OnModuleInit {
   onModuleInit(): void {
     // FR-54: the Ally team hears about approvals in their last 3 days and
     // urgent items past the review deadline, once each.
-    scheduledTaskRegistry.register('30min', 'debrief-console-alerts', () =>
-      this.notifyDue().then(() => undefined),
+    // When this runs is set in Debrief › Settings › Schedules (debrief_schedules).
+    scheduledTaskRegistry.registerConfigurable('debrief-console-alerts', () =>
+      this.notifyDue().then(({ approvals, urgent }) => {
+        const n = approvals + urgent;
+        return `${n} alert${n === 1 ? '' : 's'}`;
+      }),
     );
   }
 

@@ -19,6 +19,8 @@ import { DebriefConsoleController } from './controller/debrief-console.controlle
 import { DebriefLearnerController } from './controller/debrief-learner.controller';
 import { DebriefGatewayController } from './controller/debrief-gateway.controller';
 import { DebriefReviewController } from './controller/debrief-review.controller';
+import { DebriefSchedulesController } from './controller/debrief-schedules.controller';
+import { DebriefScheduleService } from './service/debrief-schedule.service';
 import { DebriefReview } from './entity/debrief-review.entity';
 import { DebriefReviewComment } from './entity/debrief-review-comment.entity';
 import { DebriefReviewService } from './service/debrief-review.service';
@@ -107,6 +109,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefGatewayController,
     // Expert review: the queue, the review screen, comments and verdicts.
     DebriefReviewController,
+    // Settings › Schedules: engineering only (the debrief_schedules toggle).
+    DebriefSchedulesController,
   ],
   providers: [
     // Ask Ally's agent in ally-ai (CONTRACT.md §5).
@@ -146,6 +150,8 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefNotifier,
     DebriefReviewService,
     GuideCrisisService,
+    // Runs the debrief / PM agent jobs when their stored schedule says.
+    DebriefScheduleService,
   ],
   // DebriefReviewService: `linkIdea` for the PM agent's idea.propose.
   exports: [DebriefAgentService, DebriefReviewService],

@@ -226,15 +226,29 @@ export class DebriefAgentService implements OnModuleInit {
   }
 
   onModuleInit(): void {
-    scheduledTaskRegistry.register('5min', 'debrief-agent-drain', () =>
+    // Debrief › Settings › Schedules: when these run is data (debrief_schedules).
+    scheduledTaskRegistry.registerConfigurable('debrief-agent-drain', () =>
       this.drain(),
     );
-    scheduledTaskRegistry.register('daily', 'debrief-cost-reconcile', () =>
-      this.reconcileCosts(),
+    scheduledTaskRegistry.registerConfigurable(
+      'debrief-cost-reconcile',
+      async () => {
+        await this.reconcileCosts();
+      },
     );
-    scheduledTaskRegistry.register('5min', 'debrief-stuck-sweep', async () => {
-      await this.resumeStuckRuns();
-      await this.sweepStuckRuns();
+    scheduledTaskRegistry.registerConfigurable(
+      'debrief-stuck-sweep',
+      async () => {
+        const resumed = await this.resumeStuckRuns();
+        const handed = await this.sweepStuckRuns();
+        return resumed + handed === 0
+          ? 'none stuck'
+          : `${resumed} resumed, ${handed} handed to a person`;
+      },
+    );
+    scheduledTaskRegistry.registerConfigurable('debrief-judge', async () => {
+      const n = await this.judge.drain(5);
+      return `${n} judged`;
     });
   }
 
@@ -446,8 +460,9 @@ export class DebriefAgentService implements OnModuleInit {
     );
   }
 
-  async drain(): Promise<void> {
-    if (this.config.debriefAgentMode === 'off') return;
+  /** Start debriefs waiting in switched-on organisations; says what it did, for the run log. */
+  async drain(): Promise<string> {
+    if (this.config.debriefAgentMode === 'off') return 'Debrief agent is off';
     await this.ensureRelease();
     // Only switched-on organisations: no automatic shadow runs elsewhere.
     const pending = await this.pendingSessions(
@@ -455,8 +470,8 @@ export class DebriefAgentService implements OnModuleInit {
       await this.liveTenants(),
     );
     if (pending.length === 0) {
-      await this.judge.drain(5);
-      return;
+      const judged = await this.judge.drain(5);
+      return judged ? `0 started · ${judged} judged` : '0 started';
     }
     let done = 0;
     await runWithConcurrency(pending, DRAIN_CONCURRENCY, async (s) => {
@@ -483,6 +498,7 @@ export class DebriefAgentService implements OnModuleInit {
       );
     });
     this.logger.info(`[debrief] drain finished ${done}/${pending.length}`);
+    return `${done} started`;
   }
 
   /**

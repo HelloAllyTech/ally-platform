@@ -68,6 +68,17 @@ export interface PmAgentRunOutcome {
   skipped?: string;
   status?: PmAgentRunResponse['status'];
   agentRunId?: string;
+  costUsd?: number | null;
+}
+
+/** One line for the Schedules run log: "PM agent: 2 ideas, $0.84" or why it skipped. */
+export function pmRunSummary(o: PmAgentRunOutcome): string {
+  if (o.status === 'failed') throw new Error(o.skipped ?? 'the run failed');
+  if (o.skipped) return `Skipped: ${o.skipped}`;
+  const n = o.ideas.length;
+  const cost = o.costUsd != null ? `, $${o.costUsd.toFixed(2)}` : '';
+  const spent = o.status === 'budget_spent' ? ' (budget spent)' : '';
+  return `PM agent: ${n} idea${n === 1 ? '' : 's'}${cost}${spent}`;
 }
 
 /**
@@ -103,16 +114,14 @@ export class DebriefPmAgentRunService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    scheduledTaskRegistry.register('weekly', 'debrief-pm-agent', async () => {
+    // When these run is set in Debrief › Settings › Schedules (debrief_schedules).
+    scheduledTaskRegistry.registerConfigurable('debrief-pm-agent', async () => {
       await this.testSets.build();
-      await this.run({ review: 'weekly' });
+      return pmRunSummary(await this.run({ review: 'weekly' }));
     });
-    scheduledTaskRegistry.register(
-      'monthly',
+    scheduledTaskRegistry.registerConfigurable(
       'debrief-pm-agent-review',
-      async () => {
-        await this.run({ review: 'monthly' });
-      },
+      async () => pmRunSummary(await this.run({ review: 'monthly' })),
     );
   }
 
@@ -338,6 +347,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       ideas: res.idea_ids ?? [],
       status: res.status,
       agentRunId,
+      costUsd: res.estimated_cost_usd ?? null,
       ...(res.status === 'failed'
         ? { skipped: `the run failed: ${res.error}` }
         : {}),

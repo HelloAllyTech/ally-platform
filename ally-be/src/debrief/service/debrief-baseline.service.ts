@@ -41,10 +41,16 @@ export class DebriefBaselineService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    scheduledTaskRegistry.register('monthly', 'debrief-baseline', async () => {
-      await this.run().catch((e) =>
-        this.logger.error(`[debrief] baseline failed: ${(e as Error).message}`),
-      );
+    // When this runs is set in Debrief › Settings › Schedules (debrief_schedules).
+    scheduledTaskRegistry.registerConfigurable('debrief-baseline', async () => {
+      try {
+        const b = await this.run();
+        const n = Object.keys(b.proposals ?? {}).length;
+        return `${n} value${n === 1 ? '' : 's'} proposed`;
+      } catch (e) {
+        this.logger.error(`[debrief] baseline failed: ${(e as Error).message}`);
+        throw e;
+      }
     });
   }
 

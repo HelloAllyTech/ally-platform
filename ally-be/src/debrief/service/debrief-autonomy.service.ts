@@ -54,7 +54,8 @@ export class DebriefAutonomyService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    scheduledTaskRegistry.register('daily', 'debrief-autonomy-relock', () =>
+    // When this runs is set in Debrief › Settings › Schedules (debrief_schedules).
+    scheduledTaskRegistry.registerConfigurable('debrief-autonomy-relock', () =>
       this.refreshRelocks().then(() => undefined),
     );
   }

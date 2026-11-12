@@ -114,12 +114,19 @@ export class DebriefPmAgentService implements OnModuleInit {
   onModuleInit(): void {
     // Closing the loop (spec C5): once a promoted idea has stood PM_HOLD_DAYS,
     // record whether the metric it named moved the way it said.
-    scheduledTaskRegistry.register('daily', 'debrief-pm-agent-forecasts', () =>
-      this.checkForecasts().then(() => undefined),
+    // When these run is set in Debrief › Settings › Schedules (debrief_schedules).
+    scheduledTaskRegistry.registerConfigurable(
+      'debrief-pm-agent-forecasts',
+      () =>
+        this.checkForecasts().then(
+          (n) => `${n} forecast${n === 1 ? '' : 's'} checked`,
+        ),
     );
     // Plan §11.7: an approval unanswered for 14 days expires as "no decision".
-    scheduledTaskRegistry.register('daily', 'debrief-pm-agent-expiry', () =>
-      this.expireApprovals().then(() => undefined),
+    scheduledTaskRegistry.registerConfigurable('debrief-pm-agent-expiry', () =>
+      this.expireApprovals().then(
+        (n) => `${n} approval${n === 1 ? '' : 's'} expired`,
+      ),
     );
   }
 

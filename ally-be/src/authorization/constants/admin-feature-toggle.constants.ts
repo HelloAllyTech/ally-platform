@@ -143,6 +143,11 @@ export enum FeatureToggleKey {
   // everyone until named here, one person at a time.
   DEBRIEF_CLINICAL_SIGN_OFF = 'debrief_clinical_sign_off',
 
+  // Debrief › Settings › Schedules (view, change, Run now, run history): for
+  // engineering. Granted person by person, never to a group; off for everyone
+  // until named (migration 1981900770000 adds no grant).
+  DEBRIEF_SCHEDULES = 'debrief_schedules',
+
   // Builder: the PRD-interview + coding agent that opens PRs
   BUILDER = 'builder',
 
@@ -529,6 +534,19 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
       multiTenantAdmin: false,
     },
     // Escalations arrive from every organisation's debriefs.
+    platformOnly: true,
+  },
+  {
+    key: FeatureToggleKey.DEBRIEF_SCHEDULES,
+    label: 'Debriefs — Schedules',
+    description:
+      'See and change when the Debrief agent and PM agent jobs run, run one now, and read the run history. For engineering.',
+    legacyGrants: {
+      superAdmin: false,
+      superDuperAdmin: false,
+      multiTenantAdmin: false,
+    },
+    // The jobs run for every organisation.
     platformOnly: true,
   },
   {
