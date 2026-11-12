@@ -105,6 +105,12 @@ export type GateResult = ReturnType<typeof summarise> & {
 export interface GateSafetyRecall {
   passed: boolean;
   reps: Array<{ rep: number; recall: number; missed: string[] }>;
+  /** Seeded cases and planted cues in the set it ran on. */
+  cases?: number;
+  planted?: number;
+  /** The challenger's Safety reader model (null = the configured default). */
+  model?: string | null;
+  ranAt?: string;
   error?: string;
 }
 

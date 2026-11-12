@@ -441,6 +441,38 @@ Banners only appear for roles that can act:
                            hardFails: Array<{code; kappa; pairs}>; humanVsHuman; expertVerdicts } }
 ```
 
+### Safety recall on the seeded set (`GET metrics` → `safetyRecall`)
+
+The guardrail "safety recall 100% × 3" reads the PM agent's gate (plan §9, PRD §12): each gate runs the
+seeded safety set three times through the challenger's Safety reader (`POST /debrief/safety-recall` in
+ally-ai, CONTRACT.md §8) and keeps the reading on the idea's `evidence.gate.safetyRecall`.
+
+```ts
+safetyRecall:
+  | { recorded: false }                       // no gate has run it yet
+  | { recorded: true; latest: Run; history: Run[] };  // newest first, at most 10
+Run = { ideaId; challenger /* idea title */; kind; releaseId; releaseVersion; ranAt; passed;
+        reps: Array<{ rep; recall; missed /* count */ }>; cases; planted; model; error }
+```
+
+The Metrics page shows the latest run's recall per repetition, pass or fail, when and which challenger,
+with the earlier runs under "Recent gate runs". A gate that could not run the set has `error` and counts
+as failed.
+
+## Release steps (do at deploy time)
+
+- **Skills Store: publish `debrief_improver_system`** with the route-D `guidance_propose` sentence. The
+  default text (`ally-be/src/prompts/debrief/improver_system.txt`, kept identical to
+  `ally-ai/app/core/pm_agent/prompt.py`) has it from 2026-11-12, but the live prompt is the Skills
+  Store's: until a new version is published the PM agent has the `guidance_propose` tool without the
+  instruction that says when to use it. Pull, add the sentence after the route D line ("When the
+  guidance the Writer reads is missing or wrong for a situation, draft the entry with
+  guidance_propose: the clinical advisor decides and adds it to the Context Library; you never write
+  there."), push, publish.
+- **Migration `1981900760000-AddDebriefPulseEventKinds`** (pulse answers) runs with the deploy.
+- **Deploy ally-ai before ally-be**: the gate's safety-recall rule calls ally-ai's
+  `POST /debrief/safety-recall`; an ally-be that reaches an older ally-ai fails every gate closed.
+
 ## Not built, or defaulted (product decisions)
 
 - **The admin bell.** The admin dashboard has no general notification bell, so admins don't see in-app notifications yet. See Notifications.

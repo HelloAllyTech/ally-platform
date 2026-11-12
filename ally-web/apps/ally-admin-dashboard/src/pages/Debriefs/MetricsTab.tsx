@@ -19,6 +19,7 @@ import {
   DebriefPassGroup,
   DebriefPassRateSegment,
   DebriefRate,
+  DebriefSafetyRecallRun,
 } from "@types";
 
 import { ChangeWhiskers, WhiskerRow } from "../Analytics/ChangeWhiskers";
@@ -656,21 +657,89 @@ const GuardrailsCard: React.FC<{ view: DebriefMetricsView }> = ({ view }) => {
             ? "met"
             : "missed",
     },
-    {
-      key: "safety",
-      label: s.guardrails.safety,
-      targetLabel: "100% × 3",
-      value: null,
-      max: 1,
-      words: s.guardrails.safetyNote,
-      state: "no_data",
-    },
+    safetyRow(view.safetyRecall),
   ];
+  const history = view.safetyRecall?.recorded ? view.safetyRecall.history : [];
   return (
     <ChartCard title={s.guardrails.heading} caption={s.sections.guardrailsCaption}>
       <BulletRows rows={rows} testId="metrics-guardrails" />
+      {history.length > 1 && (
+        <details className="mt-2 text-xs text-typography-700" data-testid="safety-recall-history">
+          <summary className="cursor-pointer text-primary-500">
+            {s.guardrails.safetyHistory}
+          </summary>
+          <ul className="mt-1 flex flex-col gap-1">
+            {history.map(r => (
+              <li key={`${r.ideaId}-${r.ranAt}`}>
+                {r.passed ? s.guardrails.safetyPassed : s.guardrails.safetyFailed} · {safetyWhen(r)}{" "}
+                · {repsLine(r)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </ChartCard>
   );
+};
+
+const repsLine = (r: DebriefSafetyRecallRun) =>
+  r.reps.length ? r.reps.map(x => `${Math.round(x.recall * 100)}%`).join(" · ") : "—";
+
+const safetyWhen = (r: DebriefSafetyRecallRun) => {
+  const s = en.debriefs.metrics.guardrails;
+  const when = r.ranAt
+    ? new Date(r.ranAt).toLocaleDateString("en-GB", { dateStyle: "medium" })
+    : "";
+  const who =
+    r.releaseVersion != null
+      ? `${r.challenger} (${s.safetyRelease(r.releaseVersion)})`
+      : r.challenger;
+  return s.safetyLatest(
+    when,
+    who,
+    r.cases != null && r.planted != null ? s.safetyCases(r.cases, r.planted) : "",
+  );
+};
+
+/**
+ * Plan §9 "safety recall 100% × 3": the latest gate's reading of the seeded
+ * safety set — each repetition's recall, pass or fail, when, and which
+ * challenger it gated.
+ */
+const safetyRow = (m: DebriefMetricsView["safetyRecall"] | undefined): BulletRow => {
+  const s = en.debriefs.metrics.guardrails;
+  if (!m?.recorded) {
+    return {
+      key: "safety",
+      label: s.safety,
+      targetLabel: "100% × 3",
+      value: null,
+      max: 1,
+      words: s.safetyNote,
+      state: "no_data",
+    };
+  }
+  const r = m.latest;
+  const lowest = r.reps.length ? Math.min(...r.reps.map(x => x.recall)) : null;
+  return {
+    key: "safety",
+    label: s.safety,
+    targetLabel: "100% × 3",
+    value: lowest,
+    targets: [1],
+    max: 1,
+    words: (
+      <Words
+        main={
+          r.error && !r.reps.length
+            ? s.safetyFailedToRun(r.error)
+            : `${r.passed ? s.safetyPassed : s.safetyFailed} · ${s.safetyReps(repsLine(r))}`
+        }
+        sub={safetyWhen(r)}
+      />
+    ),
+    state: r.passed ? "met" : "missed",
+  };
 };
 
 const EfficiencyCard: React.FC<{ view: DebriefMetricsView }> = ({ view }) => {

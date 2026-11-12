@@ -448,6 +448,10 @@ export class DebriefPmAgentService implements OnModuleInit {
           recall: x.recall,
           missed: x.missed,
         })),
+        cases: r.cases,
+        planted: r.planted,
+        model: step?.model ?? null,
+        ranAt: new Date().toISOString(),
       };
     } catch (e) {
       this.logger.warn(

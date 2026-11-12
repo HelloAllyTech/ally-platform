@@ -207,7 +207,7 @@ describe("Debriefs tab: steering, guardrails, experience, uptake", () => {
     expect(screen.getByTestId("metrics-guardrails-visible")).toHaveTextContent("Off target");
     expect(screen.getByTestId("metrics-guardrails-cost")).toHaveTextContent("On target");
     expect(screen.getByTestId("metrics-guardrails-fabricated")).toHaveTextContent("Off target");
-    expect(g).toHaveTextContent("Measured offline by the safety-recall gate");
+    expect(g).toHaveTextContent("No gate has run the seeded safety set yet");
   });
 
   it("shows experience over the window against targets, and by language and device", () => {
@@ -222,6 +222,61 @@ describe("Debriefs tab: steering, guardrails, experience, uptake", () => {
       "Pulse: knew what to practise next",
     );
     expect(screen.getByTestId("metrics-experience-pulseFairMoment")).toHaveTextContent("≥ 70%");
+  });
+
+  it("says no gate has run the seeded safety set yet", () => {
+    render(<MetricsTab />);
+    expect(screen.getByTestId("metrics-guardrails-safety")).toHaveTextContent(
+      "No gate has run the seeded safety set yet.",
+    );
+  });
+
+  it("reads the latest gate's safety recall × 3, when and for which challenger, with history", () => {
+    const run = (over: Record<string, unknown>) => ({
+      ideaId: "i2",
+      challenger: "Shorter Writer prompt",
+      kind: "prompt_edit",
+      releaseId: null,
+      releaseVersion: null,
+      ranAt: "2026-11-12T10:00:00Z",
+      passed: true,
+      reps: [1, 2, 3].map(rep => ({ rep, recall: 1, missed: 0 })),
+      cases: 18,
+      planted: 18,
+      model: "gemini-2.5-flash",
+      error: null,
+      ...over,
+    });
+    const v = fullView();
+    v.safetyRecall = {
+      recorded: true,
+      latest: run({}),
+      history: [
+        run({}),
+        run({
+          ideaId: "i1",
+          challenger: "Release",
+          releaseVersion: 9,
+          ranAt: "2026-11-10T10:00:00Z",
+          passed: false,
+          reps: [
+            { rep: 1, recall: 1, missed: 0 },
+            { rep: 2, recall: 0.94, missed: 1 },
+            { rep: 3, recall: 1, missed: 0 },
+          ],
+        }),
+      ],
+    };
+    h.metrics.mockReturnValue(answer(v));
+    render(<MetricsTab />);
+    const row = screen.getByTestId("metrics-guardrails-safety");
+    expect(row).toHaveTextContent("Passed · Recall 100% · 100% · 100%");
+    expect(row).toHaveTextContent("Shorter Writer prompt");
+    expect(row).toHaveTextContent("18 cases, 18 planted cues");
+    expect(row).toHaveTextContent("On target");
+    expect(screen.getByTestId("safety-recall-history")).toHaveTextContent(
+      "Failed · 10 Nov 2026 · Release (release v9)",
+    );
   });
 
   it("marks a rate with fewer than 20 counted as too few to read", () => {

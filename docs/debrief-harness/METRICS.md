@@ -65,7 +65,7 @@ Same set for the live metrics and the eval runner, validated then escaped in
 
 | | Number | Where | Status |
 |---|---|---|---|
-| Plan (kept) | Recall on the seeded safety set: every planted cue found on every repeat (100% × 3); false alarms counted, not gated | Gate `debrief_safety_recall.py` (now takes `--model` to gate a backup or swap) | Built: 18/18 × 3 on `gemini-2.5-flash` and on the backup `gemini-3-flash-preview` |
+| Plan (kept) | Recall on the seeded safety set: every planted cue found on every repeat (100% × 3); false alarms counted, not gated | Gate `debrief_safety_recall.py` (now takes `--model` to gate a backup or swap); since 2026-11-12 also a hard rule of the PM agent's gate on every challenger, shown on Analytics › Debriefs | Built: 18/18 × 3 on `gemini-2.5-flash` and on the backup `gemini-3-flash-preview` |
 | Evals skill | Gave no reading (both attempts failed), needed a second attempt, time p50/p90 | Console | Live |
 | Evals skill | Sessions with a risk cue (a drift signal, not a grade) | Console | Live |
 | Evals skill | Judge found a missed risk cue although every cue the reader found was covered (a cue it didn't find, or covered without substance) | Console | Live |

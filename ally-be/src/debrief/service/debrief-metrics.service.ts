@@ -1,3 +1,4 @@
+import type { GateSafetyRecall } from '../util/debrief-ladder.util';
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
@@ -62,6 +63,25 @@ export interface DebriefMetricsWeek {
   };
   experience: ExperienceRates;
 }
+
+/** One gate's safety-recall reading, as the Metrics page shows it. */
+export interface SafetyRecallRun {
+  ideaId: string;
+  challenger: string;
+  kind: string | null;
+  releaseId: string | null;
+  releaseVersion: number | null;
+  ranAt: string | null;
+  passed: boolean;
+  reps: Array<{ rep: number; recall: number; missed: number }>;
+  cases: number | null;
+  planted: number | null;
+  model: string | null;
+  error: string | null;
+}
+export type SafetyRecallMetric =
+  | { recorded: false }
+  | { recorded: true; latest: SafetyRecallRun; history: SafetyRecallRun[] };
 
 export interface ExperienceRates {
   openedWithin24h: Rate;
@@ -771,11 +791,55 @@ export class DebriefMetricsService {
   }
 
   /**
-   * The safety-recall gate is an offline eval (`ally-ai/scripts/debrief_safety_recall.py`),
-   * not a production number. Nothing records its runs yet, so the Console says so.
+   * Plan §9 / PRD §12 "safety recall 100% × 3": the PM agent's gate runs the
+   * seeded safety set through each challenger's Safety reader
+   * (`DebriefPmAgentService.safetyRecall`) and keeps the reading on the
+   * idea's gate evidence. The latest reading, and the last ten for a short
+   * history; `recorded: false` before any gate ran it.
    */
-  private async latestSafetyRecall() {
-    return { recorded: false as const };
+  private async latestSafetyRecall(): Promise<SafetyRecallMetric> {
+    const rows: Array<{
+      idea_id: string;
+      title: string;
+      kind: string | null;
+      release_id: string | null;
+      release_version: number | null;
+      safety: GateSafetyRecall;
+      ran_at: string | null;
+    }> = await this.dataSource.query(
+      `SELECT l.id AS idea_id, l.text AS title, l.change->>'ideaKind' AS kind,
+              l.change->>'releaseId' AS release_id, r.version AS release_version,
+              l.evidence->'gate'->'safetyRecall' AS safety,
+              COALESCE(l.evidence->'gate'->'safetyRecall'->>'ranAt',
+                       l.evidence->'gate'->>'ranAt') AS ran_at
+         FROM agent_lessons l
+         LEFT JOIN agent_releases r ON r.id::text = l.change->>'releaseId'
+        WHERE l."agentKey" = 'debrief'
+          AND jsonb_typeof(l.evidence->'gate'->'safetyRecall') = 'object'
+        ORDER BY 7 DESC NULLS LAST
+        LIMIT 10`,
+    );
+    if (!rows.length) return { recorded: false };
+    const runs = rows.map((r) => ({
+      ideaId: r.idea_id,
+      challenger: r.title,
+      kind: r.kind,
+      releaseId: r.release_id,
+      releaseVersion:
+        r.release_version != null ? Number(r.release_version) : null,
+      ranAt: r.ran_at,
+      passed: r.safety.passed === true,
+      reps: (r.safety.reps ?? []).map((x) => ({
+        rep: x.rep,
+        recall: x.recall,
+        missed: x.missed?.length ?? 0,
+      })),
+      cases: r.safety.cases ?? null,
+      planted: r.safety.planted ?? null,
+      model: r.safety.model ?? null,
+      error: r.safety.error ?? null,
+    }));
+    return { recorded: true, latest: runs[0], history: runs };
   }
 }
 

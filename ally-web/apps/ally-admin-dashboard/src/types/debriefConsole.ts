@@ -474,6 +474,25 @@ export interface DebriefPassGroup {
   judgeMean: number | null;
 }
 
+export interface DebriefSafetyRecallRun {
+  ideaId: string;
+  /** The idea whose challenger was gated. */
+  challenger: string;
+  kind: string | null;
+  releaseId: string | null;
+  releaseVersion: number | null;
+  ranAt: string | null;
+  passed: boolean;
+  reps: Array<{ rep: number; recall: number; missed: number }>;
+  cases: number | null;
+  planted: number | null;
+  model: string | null;
+  error: string | null;
+}
+export type DebriefSafetyRecallMetric =
+  | { recorded: false }
+  | { recorded: true; latest: DebriefSafetyRecallRun; history: DebriefSafetyRecallRun[] };
+
 export interface DebriefExperienceRates {
   openedWithin24h: DebriefRate;
   readThrough: DebriefRate;
@@ -540,7 +559,8 @@ export interface DebriefMetricsView {
     upper: number | null;
     insufficient: boolean;
   }>;
-  safetyRecall: { recorded: false };
+  /** Plan §9: the PM agent's gate runs the seeded safety set × 3 on each challenger. */
+  safetyRecall: DebriefSafetyRecallMetric;
   quality?: {
     byWeek: Array<{ week: string } & DebriefPassGroup>;
     byLanguage: Array<{ language: string; debriefs: number } & DebriefPassGroup>;
