@@ -258,6 +258,8 @@ export class DebriefConsoleService {
       id: string;
       name: string;
       live: boolean;
+      /** FR-46: switched off after being on — learners read "not available". */
+      stopped: boolean;
       isTest: boolean;
       region: DebriefRegion;
       hasSupportContact: boolean;
@@ -268,8 +270,9 @@ export class DebriefConsoleService {
       providers: string[];
     }>
   > {
-    const [live, regions, allowlists, spend] = await Promise.all([
+    const [live, stopped, regions, allowlists, spend] = await Promise.all([
       this.agent.liveTenants().then((ids) => new Set(ids)),
+      this.agent.stoppedTenants().then((ids) => new Set(ids)),
       this.agent.regions(),
       this.agent.providerAllowlists(),
       this.dataSource
@@ -304,6 +307,7 @@ export class DebriefConsoleService {
       }) => ({
         ...t,
         live: live.has(t.id),
+        stopped: !live.has(t.id) && stopped.has(t.id),
         region: regions.get(t.id) ?? 'india',
         providers: allowlists.get(t.id) ?? [...DEBRIEF_APPROVED_PROVIDERS],
         monthSpentUsd: Number((spend.get(t.id)?.spent ?? 0).toFixed(4)),

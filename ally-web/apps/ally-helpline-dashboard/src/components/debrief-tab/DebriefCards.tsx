@@ -572,8 +572,8 @@ interface DebriefCardsProps {
 
 /**
  * The Debrief agent's debrief, as structured cards. Only mounted when the
- * learner's organisation is switched on — `not_available` never reaches here
- * (see `useLearnerDebrief`).
+ * learner's organisation is switched on — `not_available` reaches here only
+ * after an emergency stop (see `useLearnerDebrief`).
  *
  * No score, no percentage and no red anywhere: amber marks what needs
  * attention, and every status carries text plus an icon, never colour alone.
@@ -743,6 +743,13 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
     );
   } else if (view.state === "on_its_way") {
     content = <Body>{t("postSim.debriefCards.onItsWay")}</Body>;
+  } else if (view.state === "not_available") {
+    // FR-46: the organisation's debriefs were stopped (only sent with `stopped`).
+    content = (
+      <div data-testid="debrief-not-available">
+        <Body>{t("postSim.debriefCards.notAvailable")}</Body>
+      </div>
+    );
   } else if (view.state === "too_short") {
     content = <Body>{t("postSim.debriefCards.tooShort")}</Body>;
   } else if (view.state === "failed") {

@@ -202,6 +202,10 @@ class _DebriefCardsState extends ConsumerState<DebriefCards> with WidgetsBinding
           ),
           LearnerDebriefState.takingLonger => _TakingLonger(controller: widget.controller),
           LearnerDebriefState.onItsWay => _Body(ref.t('$_k.onItsWay'), key: const Key('debrief-on-its-way')),
+          LearnerDebriefState.notAvailable when view.stopped => _Body(
+            ref.t('$_k.notAvailable'),
+            key: const Key('debrief-not-available'),
+          ),
           LearnerDebriefState.tooShort => _Body(ref.t('$_k.tooShort'), key: const Key('debrief-too-short')),
           LearnerDebriefState.failed => _LoadProblem(controller: widget.controller, offline: false),
           LearnerDebriefState.offline => _LoadProblem(controller: widget.controller, offline: true),

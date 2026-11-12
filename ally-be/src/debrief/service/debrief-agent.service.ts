@@ -47,6 +47,7 @@ import { DebriefPublishService } from './debrief-publish.service';
 import { DebriefTrialsService } from './debrief-trials.service';
 import { DebriefReleasesService } from './debrief-releases.service';
 import { DebriefPracticeService } from './debrief-practice.service';
+import { hasLegacyFeedback } from '../util/debrief-live.util';
 import {
   DebriefProgress,
   DebriefRunnerService,
@@ -79,6 +80,19 @@ export const DEBRIEF_POLICY: PolicySchema = {
     default: false,
     description:
       "Learners in this organisation read the Debrief agent's debrief instead of today's.",
+    overridableBy: ['org'],
+    group: 'Launch',
+  },
+  // FR-46: when the organisation was last switched off (epoch ms). After
+  // launch, off is an emergency stop: its learners read "not available" for
+  // sessions without a debrief already written, never today's debrief.
+  stoppedAt: {
+    type: 'int',
+    default: null,
+    nullable: true,
+    min: 0,
+    description:
+      'When this organisation was switched off (an emergency stop). Learners see "not available" for sessions without a debrief already written.',
     overridableBy: ['org'],
     group: 'Launch',
   },
@@ -130,6 +144,11 @@ export interface LearnerDebriefView {
   supportLines?: GuideSupportLine[];
   /** Roleplays the cards link to that the learner can still open. */
   practice?: Array<{ id: number; title: string }>;
+  /**
+   * `not_available` only: the organisation's debriefs were stopped (FR-46),
+   * so the tab says "not available" instead of showing today's debrief.
+   */
+  stopped?: boolean;
 }
 
 /** The roleplays a debrief's cards link to, once each. */
@@ -291,13 +310,36 @@ export class DebriefAgentService implements OnModuleInit {
   }
 
   async isLive(tenantId: string | null): Promise<boolean> {
-    if (!tenantId) return false;
+    return (await this.orgSwitch(tenantId)).live;
+  }
+
+  /** The tenant switch, and when it was last used as an emergency stop (FR-46). */
+  async orgSwitch(
+    tenantId: string | null,
+  ): Promise<{ live: boolean; stoppedAt: number | null }> {
+    if (!tenantId) return { live: false, stoppedAt: null };
     const row = await this.overrides.get(
       DEBRIEF_AGENT_KEY,
       AgentConfigLayer.ORG,
       tenantId,
     );
-    return row?.values?.live === true;
+    const live = row?.values?.live === true;
+    const stoppedAt = row?.values?.stoppedAt;
+    return {
+      live,
+      stoppedAt: !live && typeof stoppedAt === 'number' ? stoppedAt : null,
+    };
+  }
+
+  /** Organisations switched off after being on: an emergency stop (FR-46). */
+  async stoppedTenants(): Promise<string[]> {
+    const rows = await this.dataSource.query(
+      `SELECT "scopeId" FROM agent_config_overrides
+        WHERE "agentKey" = $1 AND layer = 'org' AND "values" ? 'stoppedAt'
+          AND COALESCE(("values"->>'live')::boolean, false) = false`,
+      [DEBRIEF_AGENT_KEY],
+    );
+    return rows.map((r: { scopeId: string }) => r.scopeId);
   }
 
   async setLive(
@@ -311,7 +353,11 @@ export class DebriefAgentService implements OnModuleInit {
       layer: AgentConfigLayer.ORG,
       scopeId: tenantId,
       schema: DEBRIEF_POLICY,
-      change: live ? { set: { live: true } } : { clear: ['live'] },
+      // Off is the emergency stop (FR-46): remember when, so learners read
+      // "not available" rather than today's debrief.
+      change: live
+        ? { set: { live: true }, clear: ['stoppedAt'] }
+        : { set: { stoppedAt: Date.now() }, clear: ['live'] },
       actorUserId: userId,
     });
   }
@@ -662,7 +708,9 @@ export class DebriefAgentService implements OnModuleInit {
   ): Promise<LearnerDebriefView> {
     const rows = await this.dataSource.query(
       `SELECT s."counselorId" AS counselor_id, s.tenant_id, s.status,
-              COALESCE(s."endedAt", s."updatedAt") AS ended_at
+              COALESCE(s."endedAt", s."updatedAt") AS ended_at,
+              (SELECT d.summary->'feedback' FROM scenario_session_details d
+                WHERE d."scenarioSessionId" = s.id LIMIT 1) AS feedback
          FROM scenario_sessions s WHERE s.id = $1`,
       [sessionId],
     );
@@ -681,8 +729,24 @@ export class DebriefAgentService implements OnModuleInit {
       [DebriefRunStatus.PUBLISHED, DebriefRunStatus.BELOW_BAR].includes(
         run.status,
       );
-    if (!written && !(await this.isLive(s.tenant_id))) {
-      return { state: 'not_available' };
+    if (!written) {
+      const org = await this.orgSwitch(s.tenant_id);
+      if (!org.live) {
+        // FR-46: after an emergency stop the tab says "not available" —
+        // except a debrief already written: today's note for a session that
+        // ended before the stop stays as it was.
+        if (
+          org.stoppedAt !== null &&
+          !(
+            s.ended_at &&
+            new Date(s.ended_at).getTime() < org.stoppedAt &&
+            hasLegacyFeedback(s.feedback)
+          )
+        ) {
+          return { state: 'not_available', stopped: true };
+        }
+        return { state: 'not_available' };
+      }
     }
     if (!run || run.status === DebriefRunStatus.QUEUED) {
       // Only a session the drain will still pick up is "on its way": one

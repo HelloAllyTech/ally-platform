@@ -9,7 +9,9 @@ import '../../../core/network/api_client.dart';
 /// web helpline's `types/learnerDebrief.ts`.
 ///
 /// `notAvailable` means the learner's organisation isn't switched on for the
-/// new debrief — callers then keep showing the existing debrief unchanged.
+/// new debrief — callers then keep showing the existing debrief unchanged —
+/// unless the view is `stopped` (an emergency stop, FR-46): then the tab
+/// says "not available".
 ///
 /// `failed` and `offline` are never sent by the server: the controller sets
 /// them when the request itself failed (a 5xx; no connection), so the
@@ -489,6 +491,7 @@ class LearnerDebriefView {
     this.practice = const [],
     this.supervisor,
     this.pulse,
+    this.stopped = false,
   });
 
   /// `GET /debriefs/sessions/:id/supervisor` (v9 FR-26), as a read-only
@@ -535,6 +538,7 @@ class LearnerDebriefView {
           if (_optInt(p['id']) case final id?) DebriefPracticeScenario(id: id, title: _str(p['title'])),
       ],
       pulse: DebriefPulse.parse(json['pulse']),
+      stopped: json['stopped'] == true,
     );
   }
 
@@ -565,13 +569,18 @@ class LearnerDebriefView {
   /// Present only on a debrief picked for the pulse.
   final DebriefPulse? pulse;
 
+  /// `notAvailable` only: the organisation's debriefs were stopped (FR-46),
+  /// so the tab says "not available" instead of today's debrief.
+  final bool stopped;
+
   DebriefPracticeScenario? practiceFor(int? scenarioId) =>
       scenarioId == null ? null : practice.where((p) => p.id == scenarioId).firstOrNull;
 
   /// Whether this answer replaces today's debrief. False for `not_available`
-  /// and for a `ready` answer with no cards (nothing to render).
+  /// (unless [stopped]: then the tab says "not available") and for a `ready`
+  /// answer with no cards (nothing to render).
   bool get isShowable =>
-      state != LearnerDebriefState.notAvailable && !(state == LearnerDebriefState.ready && cards == null);
+      (state != LearnerDebriefState.notAvailable || stopped) && !(state == LearnerDebriefState.ready && cards == null);
 
   LearnerDebriefView copyWith({bool? helpful, List<DebriefMyFlag>? flags, DebriefPulse? pulse}) => LearnerDebriefView(
     state: state,
@@ -587,6 +596,7 @@ class LearnerDebriefView {
     practice: practice,
     supervisor: supervisor,
     pulse: pulse ?? this.pulse,
+    stopped: stopped,
   );
 }
 

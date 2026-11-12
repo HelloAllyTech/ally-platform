@@ -11244,6 +11244,7 @@ export const en = {
         "Outside India there is no default support line. Add this organisation's own in its Ally guide settings before switching it on.",
       newDebrief: "New debrief",
       todays: "Today's debrief",
+      stopped: "Stopped · learners see \"not available\"",
       test: "Test",
       switchOn: "Switch on",
       onTitle: (name: string) => `Switch ${name} to the new debrief?`,

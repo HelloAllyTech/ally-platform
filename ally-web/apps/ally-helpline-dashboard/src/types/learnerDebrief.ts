@@ -3,7 +3,9 @@
  * as served by `GET /v1/debriefs/sessions/:sessionId`.
  *
  * `not_available` means the learner's organisation isn't switched on for the
- * new debrief — callers must then keep showing the existing debrief unchanged.
+ * new debrief — callers must then keep showing the existing debrief unchanged
+ * — unless `stopped` is set: the organisation's debriefs were stopped (FR-46),
+ * and the tab says "not available" instead.
  *
  * `taking_longer` is a run a person is finishing without a risk cue (plan
  * §10.3): the learner can Check again. With a risk cue it is `on_its_way`.
@@ -115,6 +117,8 @@ export interface LearnerDebriefView {
   practice?: Array<{ id: number; title: string }>;
   /** Present only on a debrief picked for the pulse, with the answers so far. */
   pulse?: DebriefPulse | null;
+  /** `not_available` only: an emergency stop (FR-46) — say "not available". */
+  stopped?: boolean;
 }
 
 /** One of the learner's flags, as a supervisor reads it (v9 FR-26). */

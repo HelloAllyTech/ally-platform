@@ -114,7 +114,9 @@ export const OrganisationsSection: React.FC<{ access: DebriefAccess }> = ({ acce
       ? t2.addLine
       : t.live
         ? `${s.newDebrief}${t.isTest ? ` · ${t2.testOrg}` : ""}`
-        : s.todays;
+        : t.stopped
+          ? s.stopped
+          : s.todays;
 
   return (
     <div className="flex flex-col gap-3" data-testid="organisations-tab">

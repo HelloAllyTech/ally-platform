@@ -223,6 +223,7 @@ const TENANTS = [
     id: "t2",
     name: "Northside",
     live: false,
+    stopped: true,
     isTest: false,
     region: "india",
     hasSupportContact: false,
@@ -338,6 +339,14 @@ describe("Debrief settings page: who can change what", () => {
     await waitFor(() =>
       expect(h.stop).toHaveBeenCalledWith({ tenantId: "t1", reason: "Bad advice" }),
     );
+  });
+
+  it("names an organisation stopped after launch, apart from one never switched on (FR-46)", () => {
+    h.permissions = ["system:access"];
+    renderPage();
+    const table = screen.getByTestId("organisations-table");
+    expect(table).toHaveTextContent('NorthsideStopped · learners see "not available"');
+    expect(table).not.toHaveTextContent("Today's debrief");
   });
 
   it("gives the owner Switch on, blocked outside India without a support line, and budget changes", () => {

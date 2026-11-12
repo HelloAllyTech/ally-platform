@@ -121,6 +121,8 @@ void main() {
       expect(of({'state': 'working'}).isShowable, isTrue);
       expect(of({'state': 'on_its_way'}).state, LearnerDebriefState.onItsWay);
       expect(of({'state': 'taking_longer'}).state, LearnerDebriefState.takingLonger);
+      expect(of({'state': 'not_available'}).isShowable, isFalse);
+      expect(of({'state': 'not_available', 'stopped': true}).isShowable, isTrue);
       expect(of({'state': 'too_short'}).state, LearnerDebriefState.tooShort);
       expect(of({'state': 'not_available'}).isShowable, isFalse);
       expect(of({'state': 'something_new'}).isShowable, isFalse);

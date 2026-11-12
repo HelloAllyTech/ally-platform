@@ -950,6 +950,13 @@ void main() {
       expect(find.text('What worked'), findsOneWidget);
     });
 
+    testWidgets('not_available after an emergency stop says so, not today\'s debrief (FR-46)', (tester) async {
+      stubDebrief({'state': 'not_available', 'stopped': true});
+      await h.pump(tester);
+      expect(find.byKey(const Key('debrief-not-available')), findsOneWidget);
+      expect(find.text("A debrief isn't available for this session."), findsOneWidget);
+    });
+
     testWidgets('too_short', (tester) async {
       stubDebrief({'state': 'too_short'});
       await h.pump(tester);

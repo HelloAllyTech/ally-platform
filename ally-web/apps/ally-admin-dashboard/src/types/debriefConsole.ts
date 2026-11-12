@@ -336,6 +336,8 @@ export interface DebriefTenantRow {
   id: string;
   name: string;
   live: boolean;
+  /** FR-46: switched off after being on — its learners read "not available". */
+  stopped?: boolean;
   isTest: boolean;
   /** The support line learners are shown, in words (console redesign item 12). */
   supportLine?: string | null;

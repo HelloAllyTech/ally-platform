@@ -152,6 +152,20 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     );
   });
 
+  it("says not available after an emergency stop, never today's debrief (FR-46)", () => {
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "not_available", stopped: true } });
+    renderTab();
+
+    expect(screen.getByTestId("debrief-not-available")).toHaveTextContent(
+      "postSim.debriefCards.notAvailable",
+    );
+    expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
+    expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
+      "s-1",
+      expect.objectContaining({ pollingInterval: 0 }),
+    );
+  });
+
   it("says the debrief didn't load, with Try again, when the request fails (PRD §6.12)", () => {
     const refetch = vi.fn();
     mockLearnerDebriefQuery.mockReturnValue({

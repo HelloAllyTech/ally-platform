@@ -12,6 +12,8 @@ function build(opts: {
   endedMinutesAgo?: number;
   profile?: Record<string, unknown> | null;
   region?: 'india' | 'outside_india';
+  stoppedMinutesAgo?: number;
+  feedback?: Record<string, unknown> | null;
 }) {
   const ended = new Date(Date.now() - (opts.endedMinutesAgo ?? 10) * 60_000);
   const dataSource = {
@@ -32,6 +34,7 @@ function build(opts: {
                   tenant_id: 't1',
                   status: 'ENDED',
                   ended_at: ended,
+                  feedback: opts.feedback ?? null,
                 },
               ],
     ),
@@ -40,7 +43,15 @@ function build(opts: {
   const overrides = {
     save: jest.fn(async () => undefined),
     get: jest.fn(async () =>
-      opts.live === false ? null : { values: { live: true } },
+      opts.live === false
+        ? opts.stoppedMinutesAgo !== undefined
+          ? {
+              values: {
+                stoppedAt: Date.now() - opts.stoppedMinutesAgo * 60_000,
+              },
+            }
+          : null
+        : { values: { live: true } },
     ),
   };
   return new DebriefAgentService(
@@ -89,6 +100,54 @@ describe('DebriefAgentService.learnerView', () => {
       ],
     }).learnerView('s', 7);
     expect(view).toMatchObject({ state: 'ready', cards: { opening: 'x' } });
+  });
+
+  it('says "not available" after an emergency stop, not today’s debrief (FR-46)', async () => {
+    // A session that ended after the stop: nothing written by the agent.
+    expect(
+      await build({
+        live: false,
+        stoppedMinutesAgo: 30,
+        endedMinutesAgo: 10,
+        feedback: { supervisorNote: 'today’s note' },
+      }).learnerView('s', 7),
+    ).toEqual({ state: 'not_available', stopped: true });
+    // A held run in the stopped organisation: no person-finished debrief either.
+    expect(
+      await build({
+        live: false,
+        stoppedMinutesAgo: 30,
+        runs: [{ mode: 'live', status: 'needs_person', steps: [] }],
+      }).learnerView('s', 7),
+    ).toEqual({ state: 'not_available', stopped: true });
+  });
+
+  it('keeps today’s note written before an emergency stop (FR-46)', async () => {
+    expect(
+      await build({
+        live: false,
+        stoppedMinutesAgo: 10,
+        endedMinutesAgo: 60,
+        feedback: { supervisorNote: 'today’s note' },
+      }).learnerView('s', 7),
+    ).toEqual({ state: 'not_available' });
+  });
+
+  it('remembers when an organisation was stopped, and forgets it when switched back on', async () => {
+    const svc = build({});
+    const overrides = (svc as any).overrides;
+    await svc.setLive('t1', false, 1);
+    expect(overrides.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        change: { set: { stoppedAt: expect.any(Number) }, clear: ['live'] },
+      }),
+    );
+    await svc.setLive('t1', true, 1);
+    expect(overrides.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        change: { set: { live: true }, clear: ['stoppedAt'] },
+      }),
+    );
   });
 
   it('serves a published live debrief, cards only', async () => {

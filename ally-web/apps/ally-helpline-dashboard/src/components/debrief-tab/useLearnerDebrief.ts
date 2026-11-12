@@ -119,7 +119,9 @@ export const useLearnerDebrief = (
   // RTK Query keeps the last good answer when a later poll fails, so only a
   // request that never succeeded reaches here without `data`.
   if (!data) return result(failed || loadFailed ? { state: "failed" } : null);
-  if (data.state === "not_available") return result(null);
+  // FR-46: after an emergency stop the tab says "not available", never
+  // today's debrief; otherwise the organisation simply isn't switched on.
+  if (data.state === "not_available") return result(data.stopped ? data : null);
   // A `ready` answer without cards has nothing to render — keep today's view.
   if (data.state === "ready" && !data.cards) return result(null);
   return result(data);

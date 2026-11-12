@@ -979,6 +979,7 @@
         "checkAgain": "Check again",
         "checking": "Checking…"
       },
+      "notAvailable": "A debrief isn't available for this session.",
       "onItsWay": "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day. We'll let you know.",
       "tooShort": "This session was too short for a debrief. Try a longer conversation next time and Ally will write you one.",
       "flag": {
