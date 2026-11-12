@@ -7,6 +7,7 @@ import { ROUTES } from "@constants";
 import { ChatSummaryStatus, CustomFieldEditPermission, CustomFieldType, UserRole } from "@types";
 
 import CallSummary from "../CallSummary";
+import { getSectionFields } from "../../utils";
 
 // --------------------- Mock hooks and modules --------------------- //
 const mockNavigate = vi.fn();
@@ -168,6 +169,17 @@ vi.mock("@containers", () => ({
 // one level deeper than CallSummary.tsx's own "../utils" / "../constants"
 // imports (relative to components/) — so they must be "../../..." to actually
 // intercept the module CallSummary.tsx resolves, not a nonexistent sibling path.
+// Every section gets this same fixed pair by default — see getSectionFields's
+// own mock doc comment below for why. A test that needs the real "this
+// section has nothing visible" case (the one the guard this mock works
+// around actually exists for) can temporarily override it via
+// mockImplementation, but MUST restore this default afterwards (in its own
+// afterEach) — vi.clearAllMocks() in other tests' beforeEach clears call
+// history only, it does not revert an overridden implementation.
+const defaultMockSectionFields = [
+  { key: "keyConcerns", type: "text", label: "Key Concerns", isEditable: true },
+  { key: "tags", type: "text", label: "Tags", isEditable: true },
+];
 vi.mock("../../utils", async importOriginal => {
   const actual = await importOriginal<typeof import("../../utils")>();
   return {
@@ -178,11 +190,10 @@ vi.mock("../../utils", async importOriginal => {
     // is kept real (via ...actual) since handleSave calls it unconditionally.
     // keyConcerns (not callId) because getFieldValue special-cases the derived
     // fields — callId reads details.chatId, so it can't stand in for a plain
-    // editable summary key.
-    getSectionFields: () => [
-      { key: "keyConcerns", type: "text", label: "Key Concerns", isEditable: true },
-      { key: "tags", type: "text", label: "Tags", isEditable: true },
-    ],
+    // editable summary key. A real vi.fn(), not a bare arrow function, so a
+    // test that needs the actual "nothing visible" case can override it via
+    // mockImplementation and restore this default afterwards.
+    getSectionFields: vi.fn(() => defaultMockSectionFields),
   };
 });
 // SummaryLoading.tsx also resolves to this same real module (via its own
@@ -497,6 +508,62 @@ describe("CallSummary — custom field save button visibility", () => {
   });
 });
 
+describe("CallSummary — a section with custom fields renders even with zero visible built-in fields", () => {
+  const summaryCall = {
+    id: 1,
+    summaryStatus: ChatSummaryStatus.SUCCESS,
+    counselorId: 42,
+    details: { chatId: 1, callInfo: { notes: "" }, summary: {} },
+  };
+  // "section" matches the single fake section this file's own getSummarySections
+  // mock always returns (see that mock's comment) — the real bug this covers
+  // is identical whichever section key is involved: Flow, in the field report
+  // this was found from, had the same shape (one built-in field, hidden by
+  // this tenant's visible-fields config, with a real custom field underneath
+  // it that vanished along with it).
+  const commentsField = (value: string | null) => ({
+    fieldDefinitionId: "cf-comments",
+    name: "Counsellor Comment",
+    fieldType: CustomFieldType.TEXT,
+    sectionKey: "section",
+    sectionLabel: "Section",
+    editPermission: CustomFieldEditPermission.BOTH,
+    value,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCustomFieldsEnabled.mockImplementation(() => customFieldsActiveResult);
+    mockUseSelector.mockReturnValue({
+      user: { userId: 42 },
+      permissions: ["edit:call:details", "view:settings:summary-fields"],
+    });
+  });
+
+  afterEach(() => {
+    // Restore the shared default — see defaultMockSectionFields's own doc
+    // comment on why this is required, not optional, cleanup.
+    vi.mocked(getSectionFields).mockImplementation(() => defaultMockSectionFields);
+  });
+
+  it("still shows the section (and its custom field) when the section has no built-in fields visible", () => {
+    // The shared test mock forces every section to have built-in fields
+    // (see its own comment on why) specifically so CustomFieldValuesPanel
+    // tests can render at all — override it back to the real "section has
+    // nothing visible" case, which is exactly the scenario that used to hide
+    // the whole section, custom fields included.
+    vi.mocked(getSectionFields).mockImplementation(() => []);
+    mockGetCustomFieldValues.mockReturnValue({ data: [commentsField("Spoke calmly throughout")] });
+
+    render(<CallSummary chatId={1} callSummary={summaryCall} />);
+
+    // The real point: the custom field rendered at all. Before the fix, the
+    // whole Flow section — this field included — never made it past the
+    // sections.map guard, since Flow had zero built-in fields visible.
+    expect(screen.getByLabelText("Counsellor Comment")).toHaveValue("Spoke calmly throughout");
+  });
+});
+
 describe("CallSummary — custom field save does not revert fields the user didn't touch", () => {
   const summaryCallAdminEdits = {
     summaryStatus: ChatSummaryStatus.SUCCESS,
@@ -687,6 +754,47 @@ describe("CallSummary — built-in summary save sends a patch, not the whole sum
     fireEvent.click(screen.getByRole("button", { name: "Save report" }));
 
     expect(mockUpdateCallSummary).not.toHaveBeenCalled();
+  });
+});
+
+describe("CallSummary — a loading pulse from the autosave-triggered refetch must not unmount the form", () => {
+  const summaryCall = {
+    id: 1,
+    summaryStatus: ChatSummaryStatus.SUCCESS,
+    counselorId: 42,
+    details: {
+      chatId: 1,
+      callInfo: { notes: "" },
+      summary: { keyConcerns: "AI generated", tags: [{ tag: "anxiety", positivity_rating: 2 }] },
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUpdateCallSummary.mockImplementation(() => ({
+      unwrap: () => Promise.resolve({ success: true }),
+    }));
+    mockGetCustomFieldsEnabled.mockImplementation(() => customFieldsEnabledResult);
+    mockGetCustomFieldValues.mockImplementation(() => customFieldValuesResult);
+    mockUseSelector.mockReturnValue({
+      user: { userId: 42 },
+      permissions: ["edit:call:details", "view:settings:summary-fields"],
+    });
+  });
+
+  it("keeps the form (and the typed value) on screen when isSummaryLoading pulses true after data has already loaded", () => {
+    const { rerender } = render(
+      <CallSummary chatId={1} callSummary={summaryCall} isSummaryLoading={false} />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Key Concerns"), { target: { value: "typed by hand" } });
+
+    // updateCallSummary invalidates the CallSummary tag, so every autosave
+    // re-triggers this query — the exact moment the loading flag can pulse
+    // true again even though the form already has data on screen.
+    rerender(<CallSummary chatId={1} callSummary={summaryCall} isSummaryLoading={true} />);
+
+    expect(screen.getByLabelText("Key Concerns")).toHaveValue("typed by hand");
   });
 });
 

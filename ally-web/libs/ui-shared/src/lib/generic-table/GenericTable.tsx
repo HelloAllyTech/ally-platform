@@ -108,12 +108,21 @@ export const GenericTable = forwardRef(
       setFilterAnchorEl(null);
       setSelectedColumn(col as Column<T> & { filterOptions: { label: string; value: string }[] });
       setOptionAnchorEl(event.currentTarget);
-      setSearchText("");
       // Prefill array-valued filters (multiselect + number range) from state
       if (col.filterType === "multiselect" || col.filterType === "number") {
         const existing = filter.find(f => f.key === col.key);
         setMultiSelectValues(Array.isArray(existing?.value) ? existing?.value : []);
+        setSearchText("");
+      } else if (col.filterType === "text") {
+        // TEXT reuses the same search box as its actual committed filter
+        // value (there's no separate option list to search within), so
+        // reopening it must restore what's already applied — otherwise
+        // clicking Apply with the box blanked out silently clears it.
+        const existing = filter.find(f => f.key === col.key);
+        setSearchText(typeof existing?.value === "string" ? existing.value : "");
+        setMultiSelectValues([]);
       } else {
+        setSearchText("");
         setMultiSelectValues([]);
       }
     };

@@ -72,6 +72,24 @@ describe("SelectedFiltersView", () => {
     expect(onRemoveFilter).toHaveBeenCalledWith("status");
   });
 
+  it("wraps the chip row instead of overflowing the page when many filters are active", () => {
+    // With no flex-wrap, several applied filters (common once a tenant has
+    // many filterable custom fields) overflowed past the visible page width
+    // instead of continuing on a new line.
+    const { container } = render(
+      <SelectedFiltersView
+        columns={columns}
+        sort={{ key: "", value: null } as any}
+        filter={[] as any}
+        onAddFilter={vi.fn()}
+        openFilterList={vi.fn() as any}
+        onRemoveSort={vi.fn()}
+        onRemoveFilter={vi.fn()}
+      />,
+    );
+    expect(container.firstElementChild).toHaveClass("flex-wrap");
+  });
+
   it("triggers add filter button", () => {
     const onAddFilter = vi.fn();
     render(

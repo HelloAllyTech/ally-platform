@@ -87,7 +87,17 @@ const TextField: FC<TextFieldProps> = ({
   return (
     <div className={`flex flex-col ${fullWidth ? "w-full" : ""} ${className ?? ""}`}>
       {label && <span className="text-xs text-typography-700">{label}</span>}
-      {hasAdornment ? (
+      {
+        // Always the same wrapper around `inputElement`, whether or not an
+        // adornment is present — only its className (and the adornments
+        // themselves) vary. Conditionally swapping this div in and out (as
+        // this used to) changes inputElement's position in the tree the
+        // instant one appears or disappears; the Enhance wand only shows for
+        // non-empty text, so that happened on literally the first keystroke,
+        // unmounting the real <TextArea> mid-edit and losing both the
+        // keystroke and focus. Confirmed via a screen recording 2026-11:
+        // typing one letter cleared the field and dropped focus entirely.
+        //
         // `relative` is load-bearing: adornments (the Enhance wand) pin
         // themselves with `absolute bottom-2 right-2`, which needs THIS row to
         // be their containing block. MUI's InputBase used to provide that; the
@@ -96,16 +106,18 @@ const TextField: FC<TextFieldProps> = ({
         // field's wand escaped and stacked in the corner of the page's
         // `relative` scroll panel, where only the last one in DOM order was
         // clickable.
-        <div
-          className={`relative flex items-center gap-2 w-full ${showBorder ? "border border-[#e3dbce] rounded" : ""}`}
-        >
-          {InputProps?.startAdornment}
-          <div className="flex-1 min-w-0">{inputElement}</div>
-          {InputProps?.endAdornment}
-        </div>
-      ) : (
-        inputElement
-      )}
+      }
+      <div
+        className={
+          hasAdornment
+            ? `relative flex items-center gap-2 w-full ${showBorder ? "border border-[#e3dbce] rounded" : ""}`
+            : "w-full"
+        }
+      >
+        {InputProps?.startAdornment}
+        <div className="flex-1 min-w-0">{inputElement}</div>
+        {InputProps?.endAdornment}
+      </div>
       {!hideError && <span className="text-xs text-destructive-500 h-[16px]">{errorText}</span>}
     </div>
   );

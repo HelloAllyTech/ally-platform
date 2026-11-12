@@ -761,7 +761,11 @@ void main() {
 
     test('POSTs multipart form data to the generate-from-audio route and parses values', () async {
       when(
-        () => dio.post<Map<String, dynamic>>('/chats/note/generate-from-audio', data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(
+          '/chats/note/generate-from-audio',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (invocation) async {
           final formData = invocation.namedArguments[#data] as FormData;
@@ -792,13 +796,42 @@ void main() {
 
     test('defaults transcript/values when the response omits them', () async {
       when(
-        () => dio.post<Map<String, dynamic>>('/chats/note/generate-from-audio', data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(
+          '/chats/note/generate-from-audio',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer((_) async => _response(<String, dynamic>{}));
 
       final result = await repository.generateNoteFromAudio(audioFilePath: audioPath, fields: const []);
 
       expect(result.transcript, '');
       expect(result.values, isEmpty);
+    });
+
+    test('gives this heavy, multi-LLM-call endpoint a longer receive timeout than the shared default', () async {
+      // Transcribing (possibly several WAV chunks for a long dictation) then
+      // extracting fields is multiple sequential LLM calls behind one
+      // response — comfortably past the shared client's 90s default, which
+      // made a long dictation time out and look like "no summary generated".
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/chats/note/generate-from-audio',
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => _response(<String, dynamic>{}));
+
+      await repository.generateNoteFromAudio(audioFilePath: audioPath, fields: const []);
+
+      final options = verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/chats/note/generate-from-audio',
+          data: any(named: 'data'),
+          options: captureAny(named: 'options'),
+        ),
+      ).captured.single as Options;
+      expect(options.receiveTimeout, greaterThan(const Duration(seconds: 90)));
     });
   });
 

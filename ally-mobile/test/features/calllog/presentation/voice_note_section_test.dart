@@ -97,6 +97,7 @@ void main() {
     ).thenAnswer((_) async {});
 
     Map<String, dynamic>? appliedValues;
+    var transcriptSavedCalls = 0;
     await pumpApp(
       tester,
       Scaffold(
@@ -107,6 +108,7 @@ void main() {
           onValuesApplied: (updates) async {
             appliedValues = updates;
           },
+          onTranscriptSaved: () => transcriptSavedCalls++,
         ),
       ),
       overrides: _overrides(repository),
@@ -156,6 +158,10 @@ void main() {
       // RN `transcriptRef`: seeded from the saved transcript, then appended.
       () => repository.saveNoteTranscript(chatId: 42, transcript: 'Earlier dictation.\nClient discussed anxiety.'),
     ).called(1);
+    // The caller's Transcript tab has its own provider that nothing else in
+    // this flow refreshes — without this callback firing, a saved dictation
+    // transcript stayed invisible until the app itself was restarted.
+    expect(transcriptSavedCalls, 1);
 
     // `VoiceNoteRecorder.reset()` (called once generation succeeds) does
     // real `dart:io` file-existence/delete calls on the fake temp path —

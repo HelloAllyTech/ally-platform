@@ -69,6 +69,7 @@ class VoiceNoteSection extends ConsumerStatefulWidget {
     required this.chatId,
     required this.onValuesApplied,
     this.onCustomValuesApplied,
+    this.onTranscriptSaved,
     this.existingTranscript,
   });
 
@@ -89,6 +90,14 @@ class VoiceNoteSection extends ConsumerStatefulWidget {
   /// RN `onCustomValuesApplied`: dictation upserted custom-field values, so
   /// the caller re-seeds its custom-field form from the server.
   final VoidCallback? onCustomValuesApplied;
+
+  /// Called once the dictated transcript has been persisted server-side
+  /// (`saveNoteTranscript`), so the caller can refetch the Transcript tab's
+  /// data — that tab is driven by its own provider, keyed off the chat's
+  /// messages, which nothing else in this flow refreshes. Without this, a
+  /// transcript saved here only becomes visible after the app (and its
+  /// providers) restart.
+  final VoidCallback? onTranscriptSaved;
 
   @override
   ConsumerState<VoiceNoteSection> createState() => _VoiceNoteSectionState();
@@ -208,6 +217,7 @@ class _VoiceNoteSectionState extends ConsumerState<VoiceNoteSection> {
           await ref
               .read(callLogRepositoryProvider)
               .saveNoteTranscript(chatId: widget.chatId, transcript: _transcript);
+          widget.onTranscriptSaved?.call();
         } catch (_) {
           // Non-fatal.
         }

@@ -766,6 +766,12 @@ class CallLogRepository {
     final response = await _dio.post<Map<String, dynamic>>(
       '/chats/note/generate-from-audio',
       data: formData,
+      // This endpoint transcribes (possibly several chunks, for a long
+      // dictation) and then runs field extraction — multiple sequential
+      // LLM calls behind one response, heavier than the shared client's
+      // default 90s budget comfortably covers. A long dictation timing out
+      // here looked exactly like "no summary generated".
+      options: Options(receiveTimeout: const Duration(minutes: 5)),
     );
     final data = response.data ?? {};
     final values = (data['values'] as List<dynamic>? ?? [])

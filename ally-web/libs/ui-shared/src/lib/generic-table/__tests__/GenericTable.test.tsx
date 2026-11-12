@@ -11,6 +11,7 @@ vi.mock("../FilterPopover", () => ({
     <div>
       <button onClick={() => props.onSelectSingle(props.column?.key, "v1")}>select-single</button>
       <button onClick={props.onSaveMultiSelect}>save-multi</button>
+      <span data-testid="search-text-value">{props.searchText}</span>
     </div>
   ),
 }));
@@ -155,6 +156,42 @@ describe("GenericTable", () => {
     expect(onFilterChange).toHaveBeenCalledWith(
       expect.objectContaining({ filter: [{ key: "callName", value: "v1" }] }),
     );
+  });
+
+  it("prefills the TEXT filter's search box with the already-applied value when reopened", () => {
+    // The TEXT filter type reuses its search box as the actual committed
+    // filter value (no separate option list). Reopening the popover used to
+    // always blank it out, so re-applying without retyping silently cleared
+    // the filter that was already active.
+    const columns = [
+      { key: "callName", header: "Call Name", filterable: true, filterType: "text" },
+    ];
+    render(
+      <GenericTable
+        columns={columns as any}
+        data={[{ callName: "" }]}
+        showSelectedFilters
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /filter/i }));
+    const callNameEntries = screen.getAllByText("Call Name");
+    fireEvent.click(callNameEntries[callNameEntries.length - 1]);
+    const singleButtons = screen.getAllByText("select-single");
+    fireEvent.click(singleButtons[singleButtons.length - 1]);
+
+    // Reopen the same column's filter popover via the header (a separate,
+    // parallel popover path from the "+ Filter" chip used above, with its
+    // own copy of this prefill logic in TableHeader.tsx).
+    const headerCell = screen
+      .getAllByText("Call Name")
+      .map(el => el.closest("th"))
+      .find((th): th is HTMLElement => th !== null) as HTMLElement;
+    fireEvent.click(within(headerCell).getByText("Call Name"));
+    const filterButtons = screen.getAllByText("Filter");
+    fireEvent.click(filterButtons[filterButtons.length - 1]);
+
+    expect(screen.getAllByTestId("search-text-value").pop()).toHaveTextContent("v1");
   });
 
   it("renders Load More and calls handler when not loading", () => {
