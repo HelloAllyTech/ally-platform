@@ -160,10 +160,11 @@ export const DebriefsHome: React.FC = () => {
   const allowedBefore = categoriesFor({
     score: preAccess.score,
     escalations: preAccess.receivesEscalations,
+    verdict: preAccess.verdict,
   });
   const { cat, filters, list } = readHomeState(
     params,
-    [...allowedBefore, "score", "escalated"],
+    [...allowedBefore, "score", "escalated", "agreement"],
     defaultCategory(preAccess),
   );
   // Fresh on every visit, and every 15 s while a debrief is being written.
@@ -178,8 +179,13 @@ export const DebriefsHome: React.FC = () => {
   const [escalate] = useEscalateDebriefMutation();
 
   const categories = useMemo(
-    () => categoriesFor({ score: access.score, escalations: access.receivesEscalations }),
-    [access.score, access.receivesEscalations],
+    () =>
+      categoriesFor({
+        score: access.score,
+        escalations: access.receivesEscalations,
+        verdict: access.verdict,
+      }),
+    [access.score, access.receivesEscalations, access.verdict],
   );
 
   const set = (patch: Record<string, string | null>) => {

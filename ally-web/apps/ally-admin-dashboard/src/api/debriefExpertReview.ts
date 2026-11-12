@@ -1,5 +1,5 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
-import { ExpertReviewDetail, ExpertVerdict } from "@types";
+import { AgreementMeasure, ExpertReviewDetail, ExpertVerdict } from "@types";
 
 import { baseAPI } from "./baseApi";
 
@@ -11,14 +11,21 @@ export const debriefExpertReviewAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
     setExpertVerdict: builder.mutation<
       ExpertReviewDetail,
-      { runId: string; verdict: ExpertVerdict; hardFails: string[] }
+      {
+        runId: string;
+        verdict: ExpertVerdict;
+        hardFails: string[];
+        /** The κ gate's yes/no answers the reviewer confirmed. */
+        answers?: Partial<Record<AgreementMeasure, boolean>>;
+      }
     >({
       query: ({ runId, ...body }) => ({
         url: ApiEndpoints.DEBRIEF_EXPERT_REVIEW.VERDICT(runId),
         method: HttpMethod.PUT,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_EXPERT_REVIEW],
+      // The session page reads the verdict and its answers from the console's session view.
+      invalidatesTags: [TAG_TYPES.DEBRIEF_EXPERT_REVIEW, TAG_TYPES.DEBRIEF_CONSOLE],
     }),
   }),
 });

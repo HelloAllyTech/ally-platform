@@ -9432,6 +9432,28 @@ export const en = {
             : `${n} other ${n === 1 ? "reviewer" : "reviewers"}`,
         otherVerdict: (verdict: string, fails: number) =>
           fails ? `${verdict}, ${fails} hard ${fails === 1 ? "fail" : "fails"}` : verdict,
+        // The κ gate's yes/no questions under the verdict (judge agreement, 2026-11-12).
+        agreement: {
+          heading: "Check these answers",
+          help: "Filled in from your comments. Change any that are wrong, then save your verdict.",
+          sample: "Agreement sample",
+          sampleHelp:
+            "Picked at random this week so judge agreement isn't built only from debriefs someone chose to open.",
+          yes: "Yes",
+          no: "No",
+          questions: {
+            accuracy: "Is everything the debrief says about the session accurate?",
+            evidence_specificity: "Does each point name a specific moment from the session?",
+            missed_risk_cue: "Does the debrief cover every risk the client raised?",
+          } as Record<string, string>,
+          hints: {
+            missed_risk_cue: "Self-harm, suicide, harm to others or abuse. Yes if there was none.",
+          } as Record<string, string>,
+          fromTurn: (turn: number) => `From your comment on turn ${turn}`,
+          fromSection: (section: string) => `From your comment on ${section}`,
+          fromDebrief: "From your comment on the debrief",
+          fromHardFail: "From the hard fail you ticked",
+        },
       },
       flags: {
         heading: "What the learner said",
@@ -9981,6 +10003,7 @@ export const en = {
         published: "Published",
         all: "All",
         score: "To score",
+        agreement: "Agreement sample",
       } as Record<string, string>,
       status: { needs: "Needs a person", below: "Below the bar" },
       urgent: "Urgent",
@@ -9988,6 +10011,9 @@ export const en = {
       flaggedShort: "Flagged",
       importantMoment: "Important moment",
       toScoreBadge: "To score: in your scoring sample",
+      agreementSampleTag: "Agreement sample",
+      agreementSampleHelp:
+        "Picked at random this week so judge agreement isn't built only from debriefs someone chose to open. Review it as usual and answer the questions under your verdict.",
       untitled: (id: string) => `Roleplay ${id}`,
       columns: { judge: "Judge", evaluator: "Evaluator", cost: "Cost", time: "Time" },
       layoutLabel: "Layout",
@@ -10058,6 +10084,11 @@ export const en = {
         score: {
           title: "Nothing left to score",
           message: "Sessions in your scoring sample that you haven't scored appear here.",
+        },
+        agreement: {
+          title: "Nothing in this week's sample",
+          message:
+            "Each Monday a few judged debriefs are picked at random for you to review. They wait here until you give a verdict.",
         },
       } as Record<string, { title: string; message: string }>,
       bannerActions: {
@@ -10710,6 +10741,10 @@ export const en = {
             name: "Re-lock autonomy",
             what: "Takes back “on its own” after reverts or a failed baseline",
           },
+          "debrief-agreement-sample": {
+            name: "Agreement sample",
+            what: "Puts a few judged debriefs, picked at random, in the clinical advisor's queue",
+          },
           "debrief-pm-agent-forecasts": {
             name: "Check forecasts",
             what: "Reads whether promoted ideas moved the metric they named",
@@ -10897,6 +10932,30 @@ export const en = {
         >,
         orgLive: "Live",
         orgNotLive: "Not switched on yet · no trials or canaries",
+        // Judge agreement with the clinical advisor (κ from the yes/no answers, 2026-11-12).
+        agreement: {
+          heading: "Judge agreement with the clinical advisor",
+          source: (sampled: number) =>
+            `from the yes/no answers on each expert review · random sample: ${sampled} this week`,
+          kappa: (k: string, n: number) => `κ ${k} · ${n} ${n === 1 ? "review" : "reviews"}`,
+          notYet: (n: number, min: number) => `${n} of ${min} reviews`,
+          states: {
+            not_enough: "Not measured yet",
+            undefined: "Every answer the same so far",
+            below: "Below 0.6",
+            met: "Met",
+          } as Record<string, string>,
+          caught: (caught: number, of: number) =>
+            of === 0
+              ? "No problems found yet"
+              : `Judge caught ${caught} of ${of} ${of === 1 ? "problem" : "problems"}`,
+          caughtHelp:
+            "Of the debriefs the clinical advisor answered No to, how many the judge also marked No.",
+          undefinedHelp:
+            "The advisor and the judge have only ever given the same answer, so agreement can't be worked out yet.",
+          footer: (min: number) =>
+            `Line at 0.6. Each needs ${min} reviews and κ ≥ 0.6. If any drops below, canaries go back to asking a person.`,
+        },
       },
       pinned: {
         notYet: "The pinned rules' versions show here once ally-be records who approved them.",

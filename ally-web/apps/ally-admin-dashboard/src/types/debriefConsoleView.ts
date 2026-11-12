@@ -9,7 +9,13 @@ import {
   DebriefRunStatus,
   DebriefRunStep,
 } from "./debriefConsole";
-import { ExpertComment, ExpertTranscriptTurn, ExpertVerdict } from "./debriefExpertReview";
+import {
+  AgreementMeasure,
+  AgreementQuestion,
+  ExpertComment,
+  ExpertTranscriptTurn,
+  ExpertVerdict,
+} from "./debriefExpertReview";
 
 export type DebriefCanAction =
   | "comment"
@@ -45,6 +51,7 @@ export type DebriefHomeCategoryParam =
   | "published"
   | "escalated"
   | "to_score"
+  | "agreement_sample"
   | "all";
 
 export interface DebriefSessionsQuery {
@@ -92,6 +99,8 @@ export interface DebriefSessionListItem {
   reviewed: boolean;
   inMyScoringSample: boolean;
   toScore: boolean;
+  /** In the weekly agreement sample, waiting for a verdict. */
+  agreementSample?: boolean;
   waitingSince: string | null;
 }
 
@@ -105,6 +114,8 @@ export interface DebriefSessionsPage {
     published: number;
     escalated: number;
     toScore: number | null;
+    /** Only for whoever gives verdicts. */
+    agreementSample?: number | null;
     all: number;
   };
   items: DebriefSessionListItem[];
@@ -290,6 +301,8 @@ export interface DebriefSessionView {
   earlierComments: ExpertComment[];
   verdict: { verdict: ExpertVerdict; hardFails: string[]; updatedAt: string | null } | null;
   scoring: { inMyScoringSample: boolean; scoredByMe: boolean };
+  /** The κ gate's questions under the verdict (who gives verdicts). */
+  agreement?: { inSample: boolean; questions: AgreementQuestion[] } | null;
   queue: {
     position: number | null;
     total: number;
@@ -381,13 +394,38 @@ export interface DebriefAutonomyView {
     };
   }>;
   facts: {
-    gate: { met: boolean; failing: Array<{ measure: string; kappa: number | null }> };
+    gate: {
+      met: boolean;
+      failing: Array<{ measure: string; kappa: number | null; n?: number }>;
+    };
     reverts: Partial<Record<DebriefAutonomyKind, number>>;
     failedBaseline: { failed: boolean; detail: string | null };
     judgeDrift: boolean | null;
   };
   relocks: Array<{ kind: DebriefAutonomyKind; at: string; reason: string }>;
   can: { change: boolean };
+  /** Judge agreement with the clinical advisor (older servers: absent). */
+  agreement?: DebriefAgreementView | null;
+}
+
+export interface DebriefMeasureAgreement {
+  measure: AgreementMeasure;
+  n: number;
+  minReviews: number;
+  kappa: number | null;
+  agreementPct: number | null;
+  /** Of the debriefs the advisor said No to, how many the judge also said No to. */
+  recallOnNo: { caught: number; of: number; pct: number | null };
+  state: "not_enough" | "undefined" | "below" | "met";
+  passes: boolean;
+}
+
+export interface DebriefAgreementView {
+  measures: DebriefMeasureAgreement[];
+  gate: { met: boolean };
+  minReviews: number;
+  kappa: number;
+  sample: { size: number; thisWeek: number; waiting: number };
 }
 
 export interface DebriefPinnedRulesView {

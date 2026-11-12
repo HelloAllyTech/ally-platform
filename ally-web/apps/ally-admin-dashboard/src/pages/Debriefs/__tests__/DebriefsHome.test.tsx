@@ -34,7 +34,7 @@ vi.mock("@api", async importOriginal => ({
 import { redirectForOldTab } from "../consoleRoutes";
 import { DebriefConsole } from "../DebriefConsole";
 import { bannerHref, bannerText } from "../home/DebriefsHome";
-import { queueOrder } from "../queue";
+import { CATEGORY_PARAM, categoriesFor, categoryCount, queueOrder } from "../queue";
 import { ok, resolves } from "./consoleFixtures";
 /* eslint-enable import/first */
 
@@ -220,6 +220,19 @@ describe("queue order", () => {
       "flag",
       "below",
     ]);
+  });
+});
+
+describe("Agreement sample category", () => {
+  it("shows only to whoever gives verdicts, and reads ally-be's agreement_sample", () => {
+    expect(categoriesFor({ score: false, escalations: true, verdict: true })).toContain(
+      "agreement",
+    );
+    expect(categoriesFor({ score: true, escalations: true, verdict: false })).not.toContain(
+      "agreement",
+    );
+    expect(CATEGORY_PARAM.agreement).toBe("agreement_sample");
+    expect(categoryCount({ agreementSample: 3 } as never, "agreement")).toBe(3);
   });
 });
 

@@ -33,6 +33,7 @@ export const agentName = from(() => en.debriefs.metrics.agents.registry.names);
 export const settingName = from(() => en.debriefs.settings.names);
 export const forecastMetricLabel = from(() => en.debriefs.pmAgent.forecastMetrics);
 export const promptName = from(() => en.debriefs.pmAgent.promptNames);
+export const gateMeasureLabel = from(() => en.debriefs.gateMeasures);
 
 /** A metric or code the PM agent may name in its own text, looked up in every label map we have. */
 const knownLabel = (code: string): string | undefined =>

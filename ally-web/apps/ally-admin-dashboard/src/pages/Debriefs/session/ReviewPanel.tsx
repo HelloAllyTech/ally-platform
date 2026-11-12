@@ -36,6 +36,7 @@ export const verdictDetail = (view: DebriefSessionView): ExpertReviewDetail =>
           hardFails: (view.judge.evaluatorHardFails ?? []).map(h => h.code),
         },
     hardFailCodes: HARD_FAILS,
+    agreement: view.agreement?.questions ?? [],
   }) as unknown as ExpertReviewDetail;
 
 const Card: React.FC<{ tone: "error" | "warning" | "plain"; children: React.ReactNode }> = ({
@@ -188,7 +189,11 @@ export const ReviewPanel: React.FC<{
         })}
 
         {access.verdict && (
-          <VerdictPanel key={view.verdict?.updatedAt ?? "new"} detail={verdictDetail(view)} />
+          <VerdictPanel
+            key={view.verdict?.updatedAt ?? "new"}
+            detail={verdictDetail(view)}
+            inSample={!!view.agreement?.inSample}
+          />
         )}
 
         <Card tone="plain">

@@ -7,7 +7,8 @@ import {
 
 /**
  * The Debriefs home's categories, in the order the switcher shows them. "Escalated to you" shows
- * only to someone who receives escalations; "To score" only to a scorer.
+ * only to someone who receives escalations; "To score" only to a scorer; "Agreement sample" only to
+ * whoever gives verdicts (the clinical advisor).
  */
 export const HOME_CATEGORIES = [
   "needs",
@@ -17,6 +18,7 @@ export const HOME_CATEGORIES = [
   "published",
   "all",
   "score",
+  "agreement",
 ] as const;
 export type HomeCategory = (typeof HOME_CATEGORIES)[number];
 
@@ -31,6 +33,7 @@ export const CATEGORY_PARAM: Record<HomeCategory, DebriefHomeCategoryParam> = {
   published: "published",
   all: "all",
   score: "to_score",
+  agreement: "agreement_sample",
 };
 
 /** A category's count from ally-be's `counts` (null when the viewer can't see it). */
@@ -39,7 +42,9 @@ export const categoryCount = (
   cat: HomeCategory,
 ): number | null => {
   if (!counts) return null;
-  return cat === "score" ? counts.toScore : counts[cat];
+  if (cat === "score") return counts.toScore;
+  if (cat === "agreement") return counts.agreementSample ?? null;
+  return counts[cat];
 };
 
 /** The home's filter row, as ally-be's `sessions` query takes it. Empty means "all". */
@@ -54,9 +59,16 @@ export const FILTER_KEYS = [
 export type HomeFilters = Pick<DebriefSessionsQuery, (typeof FILTER_KEYS)[number]>;
 
 /** Which categories this viewer gets. */
-export const categoriesFor = (opts: { score: boolean; escalations: boolean }): HomeCategory[] =>
+export const categoriesFor = (opts: {
+  score: boolean;
+  escalations: boolean;
+  verdict?: boolean;
+}): HomeCategory[] =>
   HOME_CATEGORIES.filter(
-    c => (c !== "score" || opts.score) && (c !== "escalated" || opts.escalations),
+    c =>
+      (c !== "score" || opts.score) &&
+      (c !== "escalated" || opts.escalations) &&
+      (c !== "agreement" || !!opts.verdict),
   );
 
 /**

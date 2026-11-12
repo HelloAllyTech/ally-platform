@@ -21,16 +21,18 @@ import { ContextCollectionLink } from "@components/context-collection-link";
 import { en, FeatureToggleKey, ROUTES } from "@constants";
 import { RootState } from "@store";
 import {
+  DebriefAgreementView,
   DebriefAutonomyKind,
   DebriefAutonomyStep,
   DebriefAutonomyValue,
   DebriefAutonomyView,
+  DebriefMeasureAgreement,
   DebriefOrgOverride,
   DebriefOwnerSettingSpec,
 } from "@types";
 import { getErrorMessage, hasFeature } from "@utils";
 
-import { inWords, settingName, settingValueLabel } from "../consoleLabels";
+import { gateMeasureLabel, inWords, settingName, settingValueLabel } from "../consoleLabels";
 import { SettingsSection } from "../consoleRoutes";
 import { BackLink, ConsoleTag, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
@@ -277,6 +279,66 @@ const EligibleCell: React.FC<{ row: DebriefAutonomyView["kinds"][number]; pinned
  * What the PM agent may do alone: kind of change × test step (on its own / asks first / off), and
  * per organisation, which can only tighten. The owner changes them; everyone else reads them.
  */
+const AGREEMENT_FG: Record<DebriefMeasureAgreement["state"], string> = {
+  not_enough: "text-neutral-600",
+  undefined: "text-neutral-600",
+  below: "text-[#8A3800]",
+  met: "text-[#0E6027]",
+};
+
+/**
+ * "Judge agreement with the clinical advisor" (design `Settings.dc.html`): per measure the κ from
+ * the advisor's yes/no answers against the judge, the reviews behind it, and how many of the
+ * advisor's No the judge also caught. The canary opens only when every measure is met.
+ */
+export const AgreementPanel: React.FC<{ agreement: DebriefAgreementView }> = ({ agreement }) => {
+  const a = en.debriefs.settingsPage.autonomy.agreement;
+  return (
+    <div className="flex flex-col gap-2.5 bg-neutral-50 px-5 py-4" data-testid="agreement-panel">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <h3 className="m-0 text-[15px] font-semibold">{a.heading}</h3>
+        <span className="text-xs text-neutral-600">{a.source(agreement.sample.thisWeek)}</span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {agreement.measures.map(m => {
+          const k = m.kappa;
+          const width = k === null ? 0 : Math.max(0, Math.min(1, k)) * 100;
+          return (
+            <div
+              key={m.measure}
+              data-testid={`agreement-row-${m.measure}`}
+              className="grid grid-cols-[minmax(96px,150px)_minmax(80px,1fr)_auto] items-center gap-x-3 gap-y-0.5 text-[13px]"
+            >
+              <span className="font-medium">{gateMeasureLabel(m.measure)}</span>
+              <span className="relative h-2.5 bg-neutral-200" aria-hidden="true">
+                <span
+                  className="absolute inset-y-0 left-0"
+                  style={{ width: `${width}%`, background: m.passes ? "#24A148" : "#FF832B" }}
+                />
+                <span className="absolute -bottom-1 -top-1 left-[60%] w-0.5 bg-[#161616]" />
+              </span>
+              <span
+                className={`text-right font-semibold ${AGREEMENT_FG[m.state]}`}
+                title={m.state === "undefined" ? a.undefinedHelp : undefined}
+              >
+                {a.states[m.state]}
+              </span>
+              <span className="col-start-2 col-end-4 text-xs text-neutral-600">
+                {m.state === "not_enough"
+                  ? a.notYet(m.n, m.minReviews)
+                  : a.kappa(k === null ? "—" : k.toFixed(2), m.n)}
+                {" · "}
+                <span title={a.caughtHelp}>{a.caught(m.recallOnNo.caught, m.recallOnNo.of)}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-xs text-neutral-600">{a.footer(agreement.minReviews)}</div>
+    </div>
+  );
+};
+
 const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
   const s = en.debriefs.settingsPage.autonomy;
   const q = useGetDebriefAutonomyQuery();
@@ -331,6 +393,7 @@ const Autonomy: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
       <p className="m-0 max-w-3xl text-sm text-neutral-600" data-testid="autonomy-intro">
         {s.intro}
       </p>
+      {view.agreement && <AgreementPanel agreement={view.agreement} />}
       <div className="overflow-x-auto rounded-sm bg-neutral-50" data-testid="autonomy-matrix">
         <div className="grid min-w-[980px] grid-cols-[minmax(170px,1.3fr)_repeat(5,minmax(110px,1fr))_minmax(170px,1.3fr)] gap-2.5 border-b border-neutral-100 px-5 py-2.5 text-xs text-neutral-600">
           <span>{s.columns.kind}</span>

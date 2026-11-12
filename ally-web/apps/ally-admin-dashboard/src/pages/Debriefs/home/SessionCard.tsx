@@ -59,6 +59,11 @@ const Tags: React.FC<{ item: SessionItem; short?: boolean }> = ({ item, short })
       )}
       {!short && item.riskCue && <ConsoleTag tone="info">{h.importantMoment}</ConsoleTag>}
       {item.escalated && <ConsoleTag tone="info">{en.debriefs.review.escalated}</ConsoleTag>}
+      {item.agreementSample && (
+        <span title={h.agreementSampleHelp} className="inline-flex">
+          <ConsoleTag tone="info">{h.agreementSampleTag}</ConsoleTag>
+        </span>
+      )}
     </>
   );
 };

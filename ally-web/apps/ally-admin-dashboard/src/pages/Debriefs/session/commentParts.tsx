@@ -14,11 +14,18 @@ import {
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
 import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
-import { ExpertComment, ExpertCommentTag, ExpertReviewDetail, ExpertVerdict } from "@types";
+import {
+  AgreementMeasure,
+  ExpertComment,
+  ExpertCommentTag,
+  ExpertReviewDetail,
+  ExpertVerdict,
+} from "@types";
 import { getErrorMessage } from "@utils";
 
 import { formatWhen, score } from "../consoleTable";
 import { ANCHOR_ATTR, segmentText } from "../expertReviewSelection";
+import { liveQuestions, sourceNote } from "./agreementQuestions";
 
 /**
  * The comment model from expert review (debrief orchestrator spec Part B), used on the session
@@ -268,15 +275,23 @@ export const Thread: React.FC<{
 };
 
 /** Good / Needs work and the hard fails; the scores appear only once it is given (spec Q3). */
-export const VerdictPanel: React.FC<{ detail: ExpertReviewDetail }> = ({ detail }) => {
+export const VerdictPanel: React.FC<{ detail: ExpertReviewDetail; inSample?: boolean }> = ({
+  detail,
+  inSample,
+}) => {
   const v = s().verdict;
   const [verdict, setVerdict] = useState<ExpertVerdict | null>(detail.myReview?.verdict ?? null);
   const [fails, setFails] = useState<string[]>(detail.myReview?.hardFails ?? []);
+  const [touched, setTouched] = useState<Partial<Record<AgreementMeasure, boolean>>>({});
+  const questions = liveQuestions(detail.agreement ?? [], fails, touched);
   const [save, { isLoading }] = useSetExpertVerdictMutation();
   const submit = async () => {
     if (!verdict) return;
+    const answers = questions.length
+      ? Object.fromEntries(questions.map(q => [q.measure, q.answer]))
+      : undefined;
     try {
-      await save({ runId: detail.run.id, verdict, hardFails: fails }).unwrap();
+      await save({ runId: detail.run.id, verdict, hardFails: fails, answers }).unwrap();
       toast.success(v.saved);
     } catch (e) {
       toast.error(getErrorMessage(e, v.failed));
@@ -324,6 +339,13 @@ export const VerdictPanel: React.FC<{ detail: ExpertReviewDetail }> = ({ detail 
           />
         ))}
       </fieldset>
+      {questions.length > 0 && (
+        <AgreementQuestions
+          questions={questions}
+          inSample={!!inSample}
+          onAnswer={(m, a) => setTouched(prev => ({ ...prev, [m]: a }))}
+        />
+      )}
       <Button size="sm" disabled={!verdict || isLoading} onClick={() => void submit()}>
         {detail.myReview ? v.update : v.save}
       </Button>
@@ -345,6 +367,71 @@ export const VerdictPanel: React.FC<{ detail: ExpertReviewDetail }> = ({ detail 
         <p className="text-xs text-typography-700">{v.hiddenNote}</p>
       )}
     </section>
+  );
+};
+
+/**
+ * The κ gate's yes/no questions under the verdict: one compact row each, pre-filled from the
+ * reviewer's comments (a small note says which), confirmed when the verdict is saved.
+ */
+const AgreementQuestions: React.FC<{
+  questions: ReturnType<typeof liveQuestions>;
+  inSample: boolean;
+  onAnswer: (m: AgreementMeasure, answer: boolean) => void;
+}> = ({ questions, inSample, onAnswer }) => {
+  const a = s().verdict.agreement;
+  return (
+    <fieldset className="flex flex-col gap-2" data-testid="agreement-questions">
+      <legend className="flex flex-wrap items-center gap-2 text-sm font-medium text-typography-900">
+        {a.heading}
+        {inSample && (
+          <span title={a.sampleHelp} data-testid="agreement-sample-tag">
+            <Pill tone="info">{a.sample}</Pill>
+          </span>
+        )}
+      </legend>
+      <p className="text-xs text-typography-700">{a.help}</p>
+      {questions.map(q => {
+        const note = sourceNote(q.source);
+        const label = a.questions[q.measure] ?? q.measure;
+        return (
+          <div
+            key={q.measure}
+            className="flex flex-col gap-1 border-t border-neutral-100 pt-2"
+            data-testid={`agreement-${q.measure}`}
+          >
+            <div className="flex items-start gap-2">
+              <p className="flex-1 text-[13px] leading-snug text-typography-900">{label}</p>
+              <div className="flex shrink-0" role="group" aria-label={label}>
+                {[true, false].map(yes => (
+                  <button
+                    key={String(yes)}
+                    type="button"
+                    aria-pressed={q.answer === yes}
+                    onClick={() => onAnswer(q.measure, yes)}
+                    className={[
+                      "h-7 min-w-[44px] border px-2 text-xs",
+                      yes ? "" : "-ml-px",
+                      q.answer === yes
+                        ? "border-primary-500 bg-primary-500 text-white"
+                        : "border-neutral-300 bg-white text-typography-900",
+                    ].join(" ")}
+                  >
+                    {yes ? a.yes : a.no}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {a.hints[q.measure] && <p className="text-xs text-neutral-600">{a.hints[q.measure]}</p>}
+            {note && (
+              <p className="text-xs text-neutral-600" data-testid="agreement-note">
+                {note}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </fieldset>
   );
 };
 

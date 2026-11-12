@@ -490,6 +490,58 @@ describe("What the PM agent may do alone", () => {
       </MemoryRouter>,
     );
 
+  it("shows judge agreement with the clinical advisor per measure: κ, reviews, problems caught", () => {
+    h.permissions = [];
+    const m = (measure: string, over: Record<string, unknown>) => ({
+      measure,
+      n: 0,
+      minReviews: 50,
+      kappa: null,
+      agreementPct: null,
+      recallOnNo: { caught: 0, of: 0, pct: null },
+      state: "not_enough",
+      passes: false,
+      ...over,
+    });
+    h.autonomy.mockReturnValue({
+      data: {
+        ...AUTONOMY,
+        agreement: {
+          measures: [
+            m("accuracy", { n: 37, recallOnNo: { caught: 3, of: 4, pct: 75 } }),
+            m("evidence_specificity", {
+              n: 52,
+              kappa: 0.71,
+              state: "met",
+              passes: true,
+              recallOnNo: { caught: 6, of: 7, pct: 85.7 },
+            }),
+            m("missed_risk_cue", { n: 60, state: "undefined" }),
+          ],
+          gate: { met: false },
+          minReviews: 50,
+          kappa: 0.6,
+          sample: { size: 5, thisWeek: 3, waiting: 2 },
+        },
+      },
+    });
+    renderPage();
+    const panel = screen.getByTestId("agreement-panel");
+    expect(panel).toHaveTextContent("Judge agreement with the clinical advisor");
+    expect(panel).toHaveTextContent("random sample: 3 this week");
+    expect(screen.getByTestId("agreement-row-accuracy")).toHaveTextContent(
+      "AccuracyNot measured yet37 of 50 reviews · Judge caught 3 of 4 problems",
+    );
+    expect(screen.getByTestId("agreement-row-evidence_specificity")).toHaveTextContent(
+      "EvidenceMetκ 0.71 · 52 reviews · Judge caught 6 of 7 problems",
+    );
+    expect(screen.getByTestId("agreement-row-missed_risk_cue")).toHaveTextContent(
+      "Missed risk cueEvery answer the same so farκ — · 60 reviews · No problems found yet",
+    );
+    expect(panel).toHaveTextContent("Each needs 50 reviews and κ ≥ 0.6");
+    expect(panel.textContent).not.toMatch(/[a-z]+_[a-z]+/);
+  });
+
   it("shows three rows, pinned rules always a person, and only the two per-organisation columns", () => {
     h.permissions = [];
     renderPage();

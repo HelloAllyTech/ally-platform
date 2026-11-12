@@ -80,6 +80,32 @@ export interface ExpertReviewDetail {
   judge: { overall: number | null; hardFails: string[] } | null;
   evaluator: { overall: number | null; hardFails: string[] } | null;
   hardFailCodes: string[];
+  /** The κ gate's yes/no questions under the verdict, pre-filled (older servers: absent). */
+  agreement?: AgreementQuestion[];
+}
+
+/** One κ-gate measure; the judge's codes. */
+export type AgreementMeasure = "accuracy" | "evidence_specificity" | "missed_risk_cue";
+
+/** Where a pre-filled "No" came from. */
+export type AgreementPrefillSource =
+  | {
+      kind: "comment";
+      commentId: string;
+      anchorKind: string;
+      turnIndex: number | null;
+      section: string | null;
+    }
+  | { kind: "hard_fail"; code: string };
+
+export interface AgreementQuestion {
+  measure: AgreementMeasure;
+  /** What the panel starts with: the saved answer, else the pre-fill. */
+  answer: boolean;
+  prefilled: boolean;
+  source: AgreementPrefillSource | null;
+  /** The saved answer; null before the reviewer confirmed one. */
+  saved: boolean | null;
 }
 
 /** A selection waiting to become a comment. */

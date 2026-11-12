@@ -666,6 +666,89 @@ describe("Session page", () => {
     );
   });
 
+  it("under the verdict the advisor confirms three yes/no answers, pre-filled from their comments", async () => {
+    h.session.mockReturnValue(
+      ok(
+        view({
+          viewer: ADVISOR,
+          judge: { hidden: true },
+          pendingActions: [],
+          can: { ...view().can, verdict: true, decideFlags: false },
+          agreement: {
+            inSample: true,
+            questions: [
+              {
+                measure: "accuracy",
+                answer: false,
+                prefilled: false,
+                saved: null,
+                source: {
+                  kind: "comment",
+                  commentId: "c1",
+                  anchorKind: "transcript",
+                  turnIndex: 12,
+                  section: null,
+                },
+              },
+              {
+                measure: "evidence_specificity",
+                answer: true,
+                prefilled: true,
+                saved: null,
+                source: null,
+              },
+              {
+                measure: "missed_risk_cue",
+                answer: true,
+                prefilled: true,
+                saved: null,
+                source: null,
+              },
+            ],
+          },
+        }),
+      ),
+    );
+    renderPage();
+    fireEvent.click(screen.getByTestId("review-button"));
+    const qs = screen.getByTestId("agreement-questions");
+    expect(qs).toHaveTextContent("Is everything the debrief says about the session accurate?");
+    expect(qs).toHaveTextContent("Does each point name a specific moment from the session?");
+    expect(qs).toHaveTextContent("Does the debrief cover every risk the client raised?");
+    expect(screen.getByTestId("agreement-sample-tag")).toHaveTextContent("Agreement sample");
+    // No raw codes anywhere in the questions.
+    expect(qs.textContent).not.toMatch(/[a-z]+_[a-z]+/);
+    const accuracy = screen.getByTestId("agreement-accuracy");
+    expect(accuracy).toHaveTextContent("From your comment on turn 12");
+    expect(within(accuracy).getByRole("button", { name: "No" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    // Ticking the missed risk cue makes that answer No, and says why.
+    fireEvent.click(screen.getByLabelText(/ignores how the learner responded/));
+    const risk = screen.getByTestId("agreement-missed_risk_cue");
+    expect(risk).toHaveTextContent("From the hard fail you ticked");
+    expect(within(risk).getByRole("button", { name: "No" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    // The reviewer changes Evidence to No.
+    fireEvent.click(
+      within(screen.getByTestId("agreement-evidence_specificity")).getByRole("button", {
+        name: "No",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save verdict" }));
+    await waitFor(() =>
+      expect(h.verdict).toHaveBeenCalledWith({
+        runId: "run-1",
+        verdict: "needs_work",
+        hardFails: ["missed_risk_cue"],
+        answers: { accuracy: false, evidence_specificity: false, missed_risk_cue: false },
+      }),
+    );
+  });
+
   it("How it was made shows the learner's skill estimate, only there", () => {
     renderPage();
     expect(screen.queryByTestId("skill-row")).toBeNull();
