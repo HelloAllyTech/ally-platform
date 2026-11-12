@@ -559,7 +559,9 @@ describe("PM agent › Ideas", () => {
     );
     renderPage();
     expect(screen.queryByTestId("idea-group-promoted")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Closed" }));
+    // The toggle carries the counts (Notes: like a pull-request list).
+    expect(screen.getByRole("button", { name: "Open · 1" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Closed · 3" }));
     expect(screen.getByTestId("idea-group-promoted")).toHaveTextContent("Became release v2");
     expect(screen.getByTestId("idea-group-expired")).toHaveTextContent("Too late");
     expect(screen.getByTestId("idea-group-reverted")).toHaveTextContent("Missed a risk cue");

@@ -218,8 +218,15 @@ export const IdeasView: React.FC<{
             value={side}
             onChange={setSide}
             items={[
-              { id: "open", label: p.open },
-              { id: "closed", label: p.closed },
+              // Notes: Open / Closed carry their counts, like a pull-request list.
+              {
+                id: "open",
+                label: `${p.open} · ${state.counts?.open ?? ideas.filter(i => i.state !== "closed").length}`,
+              },
+              {
+                id: "closed",
+                label: `${p.closed} · ${state.counts?.closed ?? ideas.filter(i => i.state === "closed").length}`,
+              },
             ]}
           />
           {groups.map(g => (
