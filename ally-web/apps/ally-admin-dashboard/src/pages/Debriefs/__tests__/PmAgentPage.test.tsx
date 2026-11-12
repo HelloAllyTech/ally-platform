@@ -8,16 +8,13 @@ import "@constants";
 const h = vi.hoisted(() => ({
   overview: vi.fn(),
   pmAgent: vi.fn(),
-  releases: vi.fn(),
   models: vi.fn(),
-  steps: vi.fn(),
   settings: vi.fn(),
   runPmAgent: vi.fn(),
   screen: vi.fn(),
   decide: vi.fn(),
   rollback: vi.fn(),
   build: vi.fn(),
-  setModels: vi.fn(),
   autonomy: vi.fn(),
   approvePinned: vi.fn(),
   ask: vi.fn(),
@@ -50,16 +47,13 @@ vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGetDebriefOverviewQuery: () => h.overview(),
   useGetPmAgentStateQuery: () => h.pmAgent(),
-  useGetDebriefReleasesQuery: () => h.releases(),
   useGetDebriefModelsQuery: () => h.models(),
-  useGetDebriefStepsQuery: () => h.steps(),
   useGetDebriefSettingsQuery: () => h.settings(),
   useRunPmAgentMutation: () => [h.runPmAgent, { isLoading: false }],
   useScreenIdeaMutation: () => [h.screen, { isLoading: false }],
   useDecideIdeaMutation: () => [h.decide, { isLoading: false }],
   useRollbackDebriefReleaseMutation: () => [h.rollback, { isLoading: false }],
   useBuildDebriefTestSetsMutation: () => [h.build, { isLoading: false }],
-  useSetDebriefModelsMutation: () => [h.setModels, { isLoading: false }],
   useGetDebriefAutonomyQuery: () => h.autonomy(),
   useApprovePinnedRuleMutation: () => [h.approvePinned, { isLoading: false }],
   useAskIdeaQuestionMutation: () => [h.ask, { isLoading: false }],
@@ -88,9 +82,7 @@ import {
   IDEA,
   MODELS,
   OVERVIEW,
-  RELEASES,
   SETTINGS,
-  STEPS,
   TEAM_PERMS,
   TRIAL_PASSED,
   ok,
@@ -251,9 +243,7 @@ beforeEach(() => {
   h.permissions = TEAM_PERMS;
   h.overview.mockReturnValue(ok(OVERVIEW));
   h.pmAgent.mockReturnValue(state([IDEA]));
-  h.releases.mockReturnValue(ok(RELEASES));
   h.models.mockReturnValue(ok(MODELS));
-  h.steps.mockReturnValue(ok(STEPS));
   h.settings.mockReturnValue(ok(SETTINGS));
   h.autonomy.mockReturnValue({ data: undefined });
   h.attention.mockReturnValue({ data: undefined });
@@ -262,16 +252,9 @@ beforeEach(() => {
   h.propose.mockReturnValue(
     resolves({ ideaId: "new-idea", releaseId: "d1", version: 7, budgetOnly: false }),
   );
-  [
-    h.decide,
-    h.rollback,
-    h.screen,
-    h.build,
-    h.setModels,
-    h.approvePinned,
-    h.ask,
-    h.startStep,
-  ].forEach(f => f.mockReturnValue(resolves()));
+  [h.decide, h.rollback, h.screen, h.build, h.approvePinned, h.ask, h.startStep].forEach(f =>
+    f.mockReturnValue(resolves()),
+  );
   h.runPmAgent.mockReturnValue(resolves({ report: "r", ideas: [] }));
 });
 

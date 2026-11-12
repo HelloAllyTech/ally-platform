@@ -251,15 +251,6 @@ const AUTONOMY = {
       relockReason: null,
     },
     {
-      kind: "guidance",
-      configurable: true,
-      cells: cells("ask"),
-      eligible: true,
-      reason: "",
-      relockedAt: null,
-      relockReason: null,
-    },
-    {
       kind: "prompts",
       configurable: true,
       cells: cells("ask"),
@@ -283,7 +274,7 @@ const AUTONOMY = {
       tenantId: "t1",
       tenantName: "Ally Demo",
       live: true,
-      overrides: { paired_trial: "default", canary: "ask", guidance: "default" },
+      overrides: { paired_trial: "default", canary: "ask" },
     },
   ],
   facts: {

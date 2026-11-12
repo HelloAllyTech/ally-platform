@@ -155,31 +155,6 @@ export const TRIAL_PASSED = {
   upper: 0.7,
 };
 
-export const RELEASES = [
-  {
-    id: "r2",
-    version: 2,
-    status: "ga",
-    authorKind: "human",
-    notes: "PM agent idea",
-    createdAt: "2026-11-01T00:00:00Z",
-    promotedAt: "2026-11-01T00:00:00Z",
-    prompts: {},
-    maxRevisionRounds: 2,
-  },
-  {
-    id: "r1",
-    version: 1,
-    status: "retired",
-    authorKind: "seed",
-    notes: null,
-    createdAt: "2026-10-01T00:00:00Z",
-    promotedAt: null,
-    prompts: {},
-    maxRevisionRounds: 2,
-  },
-];
-
 export const MODELS = {
   releaseVersion: 2,
   steps: [
@@ -200,21 +175,6 @@ export const MODELS = {
     ],
   },
 };
-
-export const STEPS = [
-  {
-    step: "writer",
-    model: "gemini-3-flash-preview",
-    backupModel: "gemini-2.5-flash",
-    inRecipes: ["standard", "short"],
-    done: 40,
-    failed: 2,
-    skipped: 0,
-    medianMs: 12000,
-    estimatedUsd: 0.018,
-    models: ["gemini-3-flash-preview"],
-  },
-];
 
 export const SETTINGS = {
   values: { canaryShare: 0.3, flagReviewSlaHours: 24 },

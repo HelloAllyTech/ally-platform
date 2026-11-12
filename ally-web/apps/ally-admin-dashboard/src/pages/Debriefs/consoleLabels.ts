@@ -31,8 +31,6 @@ export const recipeLabel = from(() => en.debriefs.metrics.filters.recipes);
 export const levelLabel = from(() => en.debriefs.metrics.filters.levels);
 export const agentName = from(() => en.debriefs.metrics.agents.registry.names);
 export const settingName = from(() => en.debriefs.settings.names);
-export const skipReasonLabel = from(() => en.debriefs.run.skipReasons);
-export const releaseStatusLabel = from(() => en.debriefs.releases.statuses);
 export const forecastMetricLabel = from(() => en.debriefs.pmAgent.forecastMetrics);
 export const promptName = from(() => en.debriefs.pmAgent.promptNames);
 

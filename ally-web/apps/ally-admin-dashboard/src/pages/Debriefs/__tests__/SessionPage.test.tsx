@@ -45,8 +45,6 @@ vi.mock("@api", async importOriginal => {
     useDeleteDebriefCommentMutation: () => [vi.fn(), { isLoading: false }],
     useSetDebriefCommentStatusMutation: () => [h.status, { isLoading: false }],
     useSetExpertVerdictMutation: () => [h.verdict, { isLoading: false }],
-    useGetMyExpertCommentsQuery: () => ok({ items: [] }),
-    useMarkStillHappeningMutation: () => [vi.fn(), { isLoading: false }],
   };
 });
 

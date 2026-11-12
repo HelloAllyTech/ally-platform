@@ -465,9 +465,6 @@ export const ApiEndpoints = {
   },
   DEBRIEF_CONSOLE: {
     OVERVIEW: "/v1/debriefs/console/overview",
-    RUNS: "/v1/debriefs/console/runs",
-    RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
-    STEPS: "/v1/debriefs/console/steps",
     SETTINGS: "/v1/debriefs/console/settings",
     METRICS: "/v1/debriefs/console/metrics",
     SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
@@ -477,19 +474,16 @@ export const ApiEndpoints = {
     PM_AGENT_ANALYSE: "/v1/debriefs/console/pm-agent/analyse",
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
       `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
-    RELEASES: "/v1/debriefs/console/releases",
     MODELS: "/v1/debriefs/console/models",
     ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
     TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",
     TENANTS: "/v1/debriefs/console/tenants",
     TENANT_LIVE: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/live`,
     TENANT_REGION: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/region`,
-    REVIEW: "/v1/debriefs/console/review",
     RUN_ACTION: (id: string, action: "publish" | "todays-debrief" | "reviewed") =>
       `/v1/debriefs/console/runs/${id}/${action}`,
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
     ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
-    // The redesign (docs/debrief-harness/CONSOLE_API.md).
     ME: "/v1/debriefs/console/me",
     SESSIONS: "/v1/debriefs/console/sessions",
     SESSION: (runId: string) => `/v1/debriefs/console/sessions/runs/${runId}`,
@@ -518,7 +512,6 @@ export const ApiEndpoints = {
     DISMISS_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/dismiss-waiting`,
     EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
   },
-  // Expert review (debrief orchestrator spec Part B): "Review debriefs (expert)" + the Analytics toggle.
   // The caller's in-app notification feed (ally-be notification-feed.controller).
   NOTIFICATIONS: {
     LIST: "/v1/notifications",
@@ -526,19 +519,11 @@ export const ApiEndpoints = {
     READ: (id: string) => `/v1/notifications/${id}/read`,
     READ_ALL: "/v1/notifications/read-all",
   },
+  // Expert review (debrief orchestrator spec Part B): the verdict, from the session's Review panel.
   DEBRIEF_EXPERT_REVIEW: {
-    QUEUE: "/v1/debriefs/expert-review/queue",
-    MY_COMMENTS: "/v1/debriefs/expert-review/my-comments",
-    RUN: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}`,
     VERDICT: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}/verdict`,
-    COMMENTS: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}/comments`,
-    COMMENT: (id: string) => `/v1/debriefs/expert-review/comments/${id}`,
-    COMMENT_ACTION: (id: string, action: "resolve" | "reopen" | "still-happening") =>
-      `/v1/debriefs/expert-review/comments/${id}/${action}`,
   },
   DEBRIEF_CALIBRATION: {
-    SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
-    AGREEMENT: "/v1/analytics/debrief-quality/calibration/agreement",
     ITEM: (sessionId: string) => `/v1/analytics/debrief-quality/calibration/${sessionId}`,
   },
   SKILL_EXPERIMENTS: {

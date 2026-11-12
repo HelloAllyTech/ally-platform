@@ -55,31 +55,6 @@ export interface DebriefOverview {
   }>;
 }
 
-export interface DebriefRunRow {
-  id: string;
-  scenarioSessionId: string;
-  mode: DebriefRunMode;
-  status: DebriefRunStatus;
-  skipReason: string | null;
-  recipeKey: string | null;
-  releaseVersion: number | null;
-  language: string | null;
-  learnerTurns: number;
-  hasRiskCue: boolean;
-  learnerDistress: boolean;
-  fallbackRung: number;
-  revisionRounds: number;
-  evaluatorOverall: number | null;
-  judgeOverall: number | null;
-  costUsd: number | null;
-  seconds: number | null;
-  checkFailureCount: number;
-  experimentId: string | null;
-  arm: "baseline" | "challenger" | null;
-  createdAt: string;
-  tenantName: string | null;
-}
-
 export interface DebriefRunStep {
   step: string;
   label: string;
@@ -96,55 +71,6 @@ export interface DebriefRunStep {
   reasoning?: string | null;
   output?: string | null;
   budgetLeftUsd?: number;
-}
-
-/** One Ask Ally reply: how it was reached. Never the learner's message. */
-export interface DebriefReplyTrace {
-  at: string;
-  model: string;
-  turns: number;
-  costUsd: number;
-  tools: Array<{ name: string; topic?: string; ok: boolean; ms: number; found: string }>;
-  stoppedBy?: "max_turns" | "budget";
-}
-
-export interface DebriefRunDetail {
-  id: string;
-  scenarioSessionId: string;
-  mode: DebriefRunMode;
-  status: DebriefRunStatus;
-  skipReason: string | null;
-  recipeKey: string | null;
-  releaseVersion: number | null;
-  language: string | null;
-  fallbackRung: number;
-  revisionRounds: number;
-  estimatedCostUsd: string;
-  actualCostUsd: string | null;
-  ceilingUsd: string | null;
-  evaluatorOverall: string | null;
-  evaluatorHardFails: Array<{ code: string; evidence: string }>;
-  checkFailures: Array<{ code: string; section: string; detail: string }>;
-  steps: DebriefRunStep[];
-  workspace: {
-    judge?: { overall: number | null; hardFails: Array<{ code: string; evidence: string }> };
-    evaluations?: Array<{
-      round: number;
-      overall: number | null;
-      hardFails: string[];
-      checks: string[];
-    }>;
-    decision?: { status: DebriefRunStatus; round: number | null; why: string };
-    drafts?: Array<{
-      round: number;
-      cards: DebriefCardsData;
-      critique: Array<{ section: string; note: string }>;
-    }>;
-    replyTraces?: DebriefReplyTrace[];
-    [k: string]: unknown;
-  };
-  cards: DebriefCardsData | null;
-  error: string | null;
 }
 
 export interface DebriefCardsData {
@@ -294,7 +220,7 @@ export interface PmAgentIdeaRow {
   /** Console redesign item 7 (CONSOLE_API.md "PM agent: approvals"). */
   decidedBy?: number | null;
   decidedAt?: string | null;
-  changeKind?: "settings" | "guidance" | "prompts" | "models" | "pinned_rules" | null;
+  changeKind?: "settings" | "prompts" | "pinned_rules" | null;
   /** Open = needs a person, being tested or in canary; closed = everything else. */
   state?: "open" | "closed";
   closedReason?:
@@ -380,50 +306,6 @@ export interface DebriefBundleDiff {
   budgetOnly: boolean;
 }
 
-export interface DebriefReleaseRow {
-  id: string;
-  version: number;
-  status: string;
-  authorKind: string;
-  notes: string | null;
-  createdAt: string;
-  promotedAt: string | null;
-  prompts: Record<string, number | null>;
-  maxRevisionRounds: number | null;
-  /** Releases page redesign; each is absent until ally-be sends it. */
-  title?: string | null;
-  /** Where it came from ("From idea PM-11 · approved by Priya", "Code release be-v1.190.2"). */
-  source?: string | null;
-  retiredAt?: string | null;
-  retiredReason?: string | null;
-  rolledBack?: boolean;
-  previousVersion?: number | null;
-  summary?: string | null;
-  changes?: Array<{
-    area: string;
-    what: string;
-    why?: string | null;
-    before?: string | null;
-    after?: string | null;
-  }>;
-  /** "Since going live" / "While it was live", against the live release before it. */
-  live?: {
-    debriefs: number;
-    judgeMedian: number | null;
-    hardFails: number | null;
-    costUsd: number | null;
-    seconds: number | null;
-    previous?: {
-      version: number;
-      judgeMedian: number | null;
-      hardFails: number | null;
-      costUsd: number | null;
-      seconds: number | null;
-    } | null;
-  } | null;
-  settings?: Record<string, number | boolean>;
-}
-
 export interface DebriefTenantRow {
   id: string;
   name: string;
@@ -440,52 +322,10 @@ export interface DebriefTenantRow {
   monthRuns?: number;
 }
 
-export interface DebriefReviewRun {
-  id: string;
-  scenarioSessionId: string;
-  status: DebriefRunStatus;
-  skipReason: string | null;
-  language: string | null;
-  hasRiskCue: boolean;
-  learnerDistress: boolean;
-  evaluatorOverall: string | null;
-  judgeOverall: number | null;
-  checkFailures: Array<{ code: string; section: string; detail: string }>;
-  evaluatorHardFails: Array<{ code: string; evidence: string }>;
-  createdAt: string;
-  tenantName: string | null;
-  escalation: { by: number; at: string; note: string | null } | null;
-  /** v9 FR-21: published, but the independent judge scored it below the bar or found a hard fail. */
-  judgeBelowBar: boolean;
-  judgeHardFails: Array<{ code: string; evidence: string }> | null;
-}
-
 /** The words of a card a reviewer may rewrite; the quote never changes. */
 export type DebriefCardCorrection = Partial<
   Record<"lead" | "body" | "why" | "try_saying" | "reason", string>
 >;
-
-export interface DebriefReviewFlag {
-  id: string;
-  runId: string;
-  scenarioSessionId: string;
-  section: string;
-  reason: "didnt_say" | "described_wrongly" | "advice_doesnt_fit" | "something_else";
-  note: string | null;
-  urgent: boolean;
-  status: "open" | "escalated";
-  createdAt: string;
-  language: string | null;
-  tenantName: string | null;
-  cardText: string | null;
-  card: DebriefCardCorrection | null;
-  scenarioName?: string | null;
-}
-
-export interface DebriefReviewQueue {
-  runs: DebriefReviewRun[];
-  flags: DebriefReviewFlag[];
-}
 
 /** A model a person may pick for a debrief step or for Ask Ally. */
 export interface DebriefModelChoice {
@@ -501,25 +341,6 @@ export interface DebriefModels {
   reply: string;
   judge: string;
   choices: { steps: DebriefModelChoice[]; reply: DebriefModelChoice[] };
-}
-
-/** v9 FR-38 "Registry": one recipe step as a capability, with 30 days of production use. */
-export interface DebriefStepUsage {
-  step: string;
-  model: string | null;
-  backupModel: string | null;
-  inRecipes: string[];
-  done: number;
-  failed: number;
-  skipped: number;
-  medianMs: number | null;
-  estimatedUsd: number;
-  models: string[];
-  /** Console redesign "Steps and models": share of runs that used it, paired-trial win rate, on/off. */
-  usedShare?: number | null;
-  winRate?: number | null;
-  enabled?: boolean | null;
-  fixed?: boolean | null;
 }
 
 export interface PmAgentLadderResult {

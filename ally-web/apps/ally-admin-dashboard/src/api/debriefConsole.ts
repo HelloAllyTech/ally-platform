@@ -1,17 +1,11 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
-  DebriefStepUsage,
   DebriefMetricsFilter,
   DebriefMetricsView,
   DebriefSettingsView,
   DebriefCardCorrection,
   DebriefModels,
   DebriefOverview,
-  DebriefReleaseRow,
-  DebriefRunDetail,
-  DebriefRunRow,
-  DebriefReviewQueue,
-  DebriefRunStatus,
   DebriefTenantRow,
   PmAgentState,
   DebriefAnalyticsView,
@@ -46,14 +40,6 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
     getDebriefOverview: builder.query<DebriefOverview, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.OVERVIEW, method: HttpMethod.GET }),
-      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
-    getDebriefRuns: builder.query<DebriefRunRow[], { status?: DebriefRunStatus | "" }>({
-      query: ({ status }) => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.RUNS,
-        method: HttpMethod.GET,
-        params: status ? { status } : undefined,
-      }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     getDebriefMetrics: builder.query<DebriefMetricsView, { weeks?: number } & DebriefMetricsFilter>(
@@ -100,14 +86,6 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    getDebriefSteps: builder.query<DebriefStepUsage[], void>({
-      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.STEPS, method: HttpMethod.GET }),
-      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
-    getDebriefRun: builder.query<DebriefRunDetail, string>({
-      query: id => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RUN(id), method: HttpMethod.GET }),
-      providesTags: (_r, _e, id) => [{ type: TAG_TYPES.DEBRIEF_CONSOLE, id }],
-    }),
     getPmAgentState: builder.query<PmAgentState, { state?: "open" | "closed" } | void>({
       query: arg => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.PM_AGENT,
@@ -144,24 +122,9 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    getDebriefReleases: builder.query<DebriefReleaseRow[], void>({
-      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.RELEASES, method: HttpMethod.GET }),
-      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
     getDebriefModels: builder.query<DebriefModels, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.MODELS, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
-    setDebriefModels: builder.mutation<
-      { releaseId: string; version: number; changed: string[] },
-      { steps?: Record<string, string>; reply?: string; note?: string }
-    >({
-      query: body => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.MODELS,
-        method: HttpMethod.POST,
-        body,
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     rollbackDebriefRelease: builder.mutation<
       { id: string; version: number },
@@ -201,10 +164,6 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    getDebriefReview: builder.query<DebriefReviewQueue, void>({
-      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.REVIEW, method: HttpMethod.GET }),
-      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
     actOnDebriefRun: builder.mutation<
       unknown,
       { id: string; action: "publish" | "todays-debrief" | "reviewed"; reason?: string }
@@ -243,7 +202,6 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    // --- The redesign (docs/debrief-harness/CONSOLE_API.md) ---------------------------------
     getDebriefMe: builder.query<{ userId: number } & DebriefViewer, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.ME, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
@@ -383,7 +341,7 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       DebriefAutonomyView,
       {
         tenantId: string;
-        changes: Partial<Record<"paired_trial" | "canary" | "guidance", DebriefOrgOverride>>;
+        changes: Partial<Record<"paired_trial" | "canary", DebriefOrgOverride>>;
       }
     >({
       query: ({ tenantId, changes }) => ({
@@ -465,9 +423,6 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
 
 export const {
   useGetDebriefOverviewQuery,
-  useGetDebriefRunsQuery,
-  useGetDebriefRunQuery,
-  useGetDebriefStepsQuery,
   useGetDebriefMetricsQuery,
   useGetDebriefSettingsQuery,
   useUpdateDebriefSettingsMutation,
@@ -477,16 +432,13 @@ export const {
   useRunPmAgentMutation,
   useScreenIdeaMutation,
   useDecideIdeaMutation,
-  useGetDebriefReleasesQuery,
   useRollbackDebriefReleaseMutation,
   useBuildDebriefTestSetsMutation,
   useGetDebriefTenantsQuery,
   useSetDebriefTenantLiveMutation,
-  useGetDebriefReviewQuery,
   useActOnDebriefRunMutation,
   useResolveDebriefFlagMutation,
   useGetDebriefModelsQuery,
-  useSetDebriefModelsMutation,
   useSetDebriefTenantRegionMutation,
   useEscalateDebriefMutation,
   useGetDebriefMeQuery,

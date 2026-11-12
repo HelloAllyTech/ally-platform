@@ -7,25 +7,21 @@ import {
   useAddDebriefCommentMutation,
   useDeleteDebriefCommentMutation,
   useEditDebriefCommentMutation,
-  useGetMyExpertCommentsQuery,
-  useMarkStillHappeningMutation,
   useSetDebriefCommentStatusMutation,
   useSetExpertVerdictMutation,
 } from "@api";
 import { ConfirmDialog } from "@components/ally-guide/ConfirmDialog";
-import { ErrorPanel, LoadingBlock } from "@components/ally-guide/ConsoleStates";
 import { Pill } from "@components/ally-guide/Pill";
 import { en } from "@constants";
 import { ExpertComment, ExpertCommentTag, ExpertReviewDetail, ExpertVerdict } from "@types";
 import { getErrorMessage } from "@utils";
 
-import { sectionLabel } from "../consoleLabels";
 import { formatWhen, score } from "../consoleTable";
 import { ANCHOR_ATTR, segmentText } from "../expertReviewSelection";
 
 /**
  * The comment model from expert review (debrief orchestrator spec Part B), used on the session
- * page: highlighted lines, threads, the verdict, learners' flags and "what happened to my comment".
+ * page: highlighted lines, threads and the verdict.
  */
 const s = () => en.debriefs.expertReview;
 
@@ -346,97 +342,6 @@ export const VerdictPanel: React.FC<{ detail: ExpertReviewDetail }> = ({ detail 
         </div>
       ) : (
         <p className="text-xs text-typography-700">{v.hiddenNote}</p>
-      )}
-    </section>
-  );
-};
-
-export const FlagsPanel: React.FC<{ detail: ExpertReviewDetail }> = ({ detail }) => {
-  const f = s().flags;
-  return (
-    <section className="flex flex-col gap-2" data-testid="expert-flags">
-      <h3 className="text-base font-medium text-typography-900">{f.heading}</h3>
-      {detail.flags.length === 0 ? (
-        <p className="text-sm text-typography-700">{f.empty}</p>
-      ) : (
-        <ul className="flex flex-col gap-2 text-sm">
-          {detail.flags.map(flag => (
-            <li key={flag.id} className="rounded border border-border-light p-2">
-              <p className="font-medium">{f.reasons[flag.reason ?? ""] ?? flag.reason}</p>
-              {flag.note && <p className="italic">“{flag.note}”</p>}
-              <p className="text-xs text-typography-700">
-                {sectionLabel(flag.section)} ·{" "}
-                {f.outcome(en.debriefs.status[flag.status] ?? flag.status)}
-                {flag.resolutionNote ? ` — ${flag.resolutionNote}` : ""}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-};
-
-/** "What happened to my comment", with "still happening" for this debrief (spec C5). */
-export const MyComments: React.FC<{ currentRunId?: string }> = ({ currentRunId }) => {
-  const m = s().mine;
-  const mine = useGetMyExpertCommentsQuery();
-  const [mark, { isLoading }] = useMarkStillHappeningMutation();
-  const items = (mine.data?.items ?? []).filter(c => c.runId !== currentRunId);
-  const markHere = async (c: ExpertComment) => {
-    if (!currentRunId) return;
-    try {
-      await mark({
-        id: c.id,
-        runId: currentRunId,
-        comment: { anchorKind: "debrief", body: m.stillHappening, tag: c.tag },
-      }).unwrap();
-      toast.success(m.stillHappeningDone);
-    } catch (e) {
-      toast.error(getErrorMessage(e, m.stillHappeningFailed));
-    }
-  };
-  return (
-    <section className="flex flex-col gap-2" data-testid="expert-my-comments">
-      <h3 className="text-base font-medium text-typography-900">{m.heading}</h3>
-      <p className="text-xs text-typography-700">{m.help}</p>
-      {mine.isError ? (
-        <ErrorPanel what={m.loadFailed} error={mine.error} onRetry={() => void mine.refetch()} />
-      ) : !mine.data ? (
-        <LoadingBlock lines={2} />
-      ) : items.length === 0 ? (
-        <p className="text-sm text-typography-700">{m.empty}</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {items.slice(0, 30).map(c => (
-            <li
-              key={c.id}
-              className="flex flex-col gap-1 rounded border border-border-light p-2 text-sm"
-              data-testid="my-comment"
-            >
-              <p className="text-xs text-typography-700">{m.onDebrief(formatWhen(c.createdAt))}</p>
-              {c.quotedText && <p className="italic text-typography-700">“{c.quotedText}”</p>}
-              <p className="whitespace-pre-wrap">{c.body}</p>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                {c.tag && <Pill tone="info">{s().tags[c.tag]}</Pill>}
-                <Pill tone={c.idea ? "info" : "neutral"}>{ideaStatusLabel(c.idea)}</Pill>
-                {c.status === "resolved" && <Pill tone="success">{s().threads.resolved}</Pill>}
-              </div>
-              {currentRunId && (
-                <div>
-                  <Button
-                    size="sm"
-                    kind="tertiary"
-                    disabled={isLoading}
-                    onClick={() => void markHere(c)}
-                  >
-                    {m.stillHappening}
-                  </Button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
       )}
     </section>
   );

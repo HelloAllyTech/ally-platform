@@ -246,44 +246,6 @@ describe('debrief feedback', () => {
     ).rejects.toThrow('Live run not found');
   });
 
-  it('queues a published debrief where the learner showed distress, first (FR-23)', async () => {
-    const { svc } = build();
-    const query = (svc as any).dataSource.query as jest.Mock;
-    query.mockResolvedValue([]);
-    await svc.queue();
-    const [sql] = query.mock.calls[0] as [string];
-    expect(sql).toContain(
-      `OR (r."learnerDistress" AND r.status = 'published')`,
-    );
-    expect(sql).toMatch(/ORDER BY r\."learnerDistress" DESC/);
-  });
-
-  it('queues a published debrief the independent judge scored below the bar (FR-21)', async () => {
-    const { svc } = build();
-    const query = (svc as any).dataSource.query as jest.Mock;
-    query.mockResolvedValue([]);
-    await svc.queue();
-    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain(
-      `OR (r.status = 'published' AND (r.workspace ? 'judge'`,
-    );
-    expect(sql).toContain(`(r.workspace->'judge'->>'overall')::float < $1`);
-    expect(sql).toContain(`r.workspace->'judge'->'hardFails'`);
-    expect(params).toEqual([8]);
-  });
-
-  it('keeps an escalated flag in the queue; only an open one waits out the undo window', async () => {
-    const { svc } = build();
-    const query = (svc as any).dataSource.query as jest.Mock;
-    query.mockResolvedValue([]);
-    await svc.queue();
-    const [sql] = query.mock.calls[1] as [string];
-    expect(sql).toMatch(/f\.status = 'escalated'\s+-- /);
-    expect(sql).toContain(
-      `(f.status = 'open' AND f."updatedAt" < now() - make_interval(secs => $1))`,
-    );
-  });
-
   describe('supervisorView (FR-26)', () => {
     const viewer = (tenantId: string | null, platformAdmin = false) => ({
       tenantId,

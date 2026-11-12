@@ -18,7 +18,6 @@ import {
   DebriefRunStatus,
 } from '../enum/debrief-run.enum';
 import { DebriefCards } from '../util/debrief-cards.util';
-import { DEBRIEF_SEED_BUNDLE } from '../constants/debrief-release.constants';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefPublishService } from './debrief-publish.service';
 import { LearnerDebriefView } from './debrief-agent.service';
@@ -459,59 +458,6 @@ export class DebriefFeedbackService {
         role: Number(m.senderId) === -1 ? 'ally' : 'learner',
         content: m.content,
         at: new Date(m.createdAt).toISOString(),
-      })),
-    };
-  }
-
-  async queue() {
-    // v9 FR-21: a published debrief the independent judge scores below the
-    // bar, or with a hard fail, goes to a person too.
-    const judgeBelow = `(r.workspace ? 'judge' AND (
-           (r.workspace->'judge'->>'overall')::float < $1
-           OR jsonb_array_length(coalesce(r.workspace->'judge'->'hardFails', '[]'::jsonb)) > 0))`;
-    const runs = await this.dataSource.query(
-      `SELECT r.id, r."scenarioSessionId", r.status, r."skipReason", r.language,
-              r."hasRiskCue", r."learnerDistress", r."evaluatorOverall",
-              (r.workspace->'judge'->>'overall')::float AS "judgeOverall",
-              r.workspace->'judge'->'hardFails' AS "judgeHardFails",
-              ${judgeBelow} AS "judgeBelowBar",
-              r."checkFailures", r."evaluatorHardFails", r."createdAt", t.name AS "tenantName",
-              r.workspace->'escalation' AS escalation
-         FROM debrief_runs r
-         LEFT JOIN tenants t ON t.id::text = r.tenant_id
-        WHERE r.mode = 'live'
-          AND NOT (r.workspace ? 'review')
-          AND (r.status IN ('needs_person','below_bar','failed')
-               -- v9 FR-23: a learner's own distress is an urgent item even
-               -- when the debrief published normally; someone checks on them.
-               OR (r."learnerDistress" AND r.status = 'published')
-               OR (r.status = 'published' AND ${judgeBelow}))
-        ORDER BY r."learnerDistress" DESC, r."hasRiskCue" DESC, r."createdAt" ASC
-        LIMIT 200`,
-      [DEBRIEF_SEED_BUNDLE.settings.passScore],
-    );
-    const flags = await this.dataSource.query(
-      `SELECT f.id, f."runId", f."scenarioSessionId", f.section, f.reason, f.note, f.urgent, f.status,
-              f."createdAt", r.cards, r.language, t.name AS "tenantName"
-         FROM debrief_run_feedback f
-         JOIN debrief_runs r ON r.id = f."runId"
-         LEFT JOIN tenants t ON t.id::text = f.tenant_id
-        WHERE f.kind = 'flag'
-          AND (f.status = 'escalated'
-               -- The undo window counts from the learner's last change; an
-               -- escalation is the team's, and must not hide the flag again.
-               OR (f.status = 'open' AND f."updatedAt" < now() - make_interval(secs => $1)))
-        ORDER BY f.urgent DESC, f."createdAt" ASC
-        LIMIT 200`,
-      // Flags still inside the learner's undo window are not work yet.
-      [Math.round(FLAG_UNDO_MS / 1000)],
-    );
-    return {
-      runs,
-      flags: flags.map(({ cards, ...f }: Record<string, any>) => ({
-        ...f,
-        cardText: sectionText(cards as DebriefCards, f.section),
-        card: correctableFields(cards as DebriefCards, f.section),
       })),
     };
   }

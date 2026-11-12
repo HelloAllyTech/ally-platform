@@ -21,21 +21,6 @@ export type DebriefHardFail =
   | "contradicts_protocol"
   | "unsupported_progress_claim";
 
-export interface DebriefCalibrationSampleItem {
-  scenarioSessionId: string;
-  language: string;
-  /** Judge-overall tercile the debrief was drawn from (0 low, 2 high). */
-  tercile: number;
-  raters: number;
-  ratedByMe: boolean;
-}
-
-export interface DebriefCalibrationSample {
-  population: number;
-  target: number;
-  items: DebriefCalibrationSampleItem[];
-}
-
 export interface DebriefRating {
   scores: Record<DebriefDimension, number>;
   hardFails: DebriefHardFail[];

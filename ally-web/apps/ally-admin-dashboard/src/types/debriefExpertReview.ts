@@ -1,13 +1,5 @@
 import { DebriefCardsData } from "./debriefConsole";
 
-/** Why a debrief is in the expert review queue (ally-be `REVIEW_SOURCES`). */
-export type ExpertReviewReason =
-  | "risk_cue"
-  | "below_bar"
-  | "learner_flag"
-  | "disagreement"
-  | "sample";
-
 export type ExpertVerdict = "good" | "needs_work";
 
 export type ExpertCommentAnchor = "transcript" | "card" | "debrief";
@@ -21,41 +13,6 @@ export type ExpertCommentTag =
   | "language"
   | "too_long_or_unclear"
   | "good_keep_this";
-
-export interface ExpertQueueItem {
-  runId: string;
-  sessionId: string;
-  status: string;
-  mode: "live" | "shadow";
-  language: string | null;
-  sessionType: string | null;
-  tenantId: string | null;
-  tenantName: string | null;
-  createdAt: string;
-  reasons: ExpertReviewReason[];
-  commentCount: number;
-  reviewCount: number;
-  myVerdict: ExpertVerdict | null;
-  /** Null until the caller has given a verdict on this debrief. */
-  judgeOverall: number | null;
-}
-
-export interface ExpertQueue {
-  items: ExpertQueueItem[];
-  filters: {
-    tenants: Array<{ id: string; name: string }>;
-    languages: string[];
-    sessionTypes: string[];
-  };
-}
-
-export interface ExpertQueueFilters {
-  tenantId?: string;
-  language?: string;
-  sessionType?: string;
-  source?: ExpertReviewReason;
-  includeReviewed?: boolean;
-}
 
 export interface ExpertTranscriptTurn {
   turnIndex: number;
@@ -86,11 +43,6 @@ export interface ExpertComment {
   /** The PM agent idea this comment fed (agent_lessons status). */
   idea: { id: string; title: string | null; status: string | null } | null;
   repeatOf: { id: string; runId: string | null; body: string | null } | null;
-}
-
-export interface ExpertMyComment extends ExpertComment {
-  language: string | null;
-  sessionType: string | null;
 }
 
 export interface ExpertReviewDetail {

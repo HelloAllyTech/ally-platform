@@ -345,7 +345,7 @@ export interface DebriefAttention {
 }
 
 export type DebriefAutonomyStep = "quick_test" | "gate_test" | "paired_trial" | "canary";
-export type DebriefAutonomyKind = "settings" | "guidance" | "prompts" | "models" | "pinned_rules";
+export type DebriefAutonomyKind = "settings" | "prompts" | "pinned_rules";
 export type DebriefAutonomyValue = "auto" | "ask" | "off";
 export type DebriefOrgOverride = "default" | "ask" | "never";
 
@@ -369,7 +369,6 @@ export interface DebriefAutonomyView {
     overrides: {
       paired_trial: DebriefOrgOverride;
       canary: DebriefOrgOverride;
-      guidance: DebriefOrgOverride;
     };
   }>;
   facts: {

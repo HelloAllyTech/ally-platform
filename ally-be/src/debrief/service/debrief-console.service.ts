@@ -1,13 +1,8 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
-import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
 import { debriefOverallSql } from '../../analytics/constants/debrief-quality.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
@@ -17,10 +12,8 @@ import {
   DEBRIEF_MODELS,
   DEBRIEF_REPLY_DEFAULT,
   DEBRIEF_SEED_BUNDLE,
-  DebriefBundle,
   DebriefStep,
   debriefChallengerBundle,
-  isOrchestrated,
   modelProblem,
   providerOfModel,
   validateDebriefBundle,
@@ -52,7 +45,7 @@ export const PICKABLE_STEPS = [
 const STEP_PROVIDERS: string[] = ['gemini', 'openai'];
 const REPLY_PROVIDERS: string[] = ['gemini', 'openai'];
 
-/** Read models for the Debrief Console: overview, runs, releases, tenants. */
+/** Read models for the Debrief Console: overview, step models, tenants. */
 @Injectable()
 export class DebriefConsoleService {
   constructor(
@@ -113,76 +106,6 @@ export class DebriefConsoleService {
         reply: usable(ai, REPLY_PROVIDERS),
       },
     };
-  }
-
-  /**
-   * A person's model change, made the way every change is: a new release
-   * from the live one, checked by the same rules (approved, priced, in the
-   * catalog, the Writer and Evaluator on different models, neither on the
-   * judge's), put live, and undone from Releases with Roll back.
-   */
-  async setModels(
-    change: { steps?: Partial<Record<string, string>>; reply?: string },
-    userId: number,
-    note?: string,
-  ) {
-    const { bundle } = await this.runner.resolveRelease();
-    const next = JSON.parse(JSON.stringify(bundle)) as DebriefBundle;
-    const changed: string[] = [];
-    for (const [step, model] of Object.entries(change.steps ?? {})) {
-      if (!model) continue;
-      if (!(PICKABLE_STEPS as string[]).includes(step)) {
-        throw new BadRequestException(`${step} has no model to choose`);
-      }
-      if (!STEP_PROVIDERS.includes(providerOfModel(model) as string)) {
-        throw new BadRequestException(
-          `${model}: debrief steps can't run on this provider yet`,
-        );
-      }
-      for (const recipe of Object.values(next.recipes)) {
-        for (const s of recipe?.steps ?? []) {
-          if (s.step === step && s.model !== model) {
-            s.model = model;
-            if (s.backupModel === model) s.backupModel = null;
-            if (!changed.includes(step)) changed.push(step);
-          }
-        }
-      }
-    }
-    if (change.reply) {
-      const provider = providerOfModel(change.reply);
-      if (!provider || !REPLY_PROVIDERS.includes(provider)) {
-        throw new BadRequestException(
-          `${change.reply}: Ask Ally can't run on this provider`,
-        );
-      }
-      const reply = next.reply ?? { ...DEBRIEF_REPLY_DEFAULT };
-      if (reply.model !== change.reply) {
-        next.reply = { ...reply, provider, model: change.reply };
-        changed.push('ask_ally');
-      }
-    }
-    if (!changed.length) throw new BadRequestException('No model changed');
-    const problems = validateDebriefBundle(
-      next,
-      await this.runner.modelCatalog(),
-    );
-    if (problems.length) throw new BadRequestException(problems.join('; '));
-    const draft = await this.releases.createDraft(
-      DEBRIEF_AGENT_KEY,
-      next as unknown as Record<string, unknown>,
-      userId,
-      `Model change: ${changed.join(', ')}${note ? ` — ${note}` : ''}`,
-    );
-    // Plan §8.8: the exact prompt versions it runs, recorded now.
-    await this.runner.pinPrompts(draft);
-    await this.releases.makeGa(
-      draft.id,
-      userId,
-      AgentReleaseAuditAction.PROMOTED,
-      note,
-    );
-    return { releaseId: draft.id, version: draft.version, changed };
   }
 
   async overview(days = 7) {
@@ -293,144 +216,6 @@ export class DebriefConsoleService {
     }));
   }
 
-  async listRuns(opts: { mode?: string; status?: string; limit?: number }) {
-    const params: unknown[] = [];
-    const p = (v: unknown) => {
-      params.push(v);
-      return `$${params.length}`;
-    };
-    // Production by default: the PM agent's replays are its experiments and
-    // are read from its ideas, not mixed into what learners could see.
-    let where = opts.mode
-      ? `r.mode = ${p(opts.mode)}`
-      : `r.mode IN ('shadow','live')`;
-    if (opts.status) where += ` AND r.status = ${p(opts.status)}`;
-    const rows = await this.dataSource.query(
-      `SELECT r.id, r."scenarioSessionId", r.mode, r.status, r."skipReason", r."recipeKey",
-              r."releaseVersion", r.language, r."learnerTurns", r."hasRiskCue", r."learnerDistress",
-              r."fallbackRung", r."revisionRounds", r."evaluatorOverall",
-              (r.workspace->'judge'->>'overall')::float AS "judgeOverall",
-              COALESCE(r."actualCostUsd", r."estimatedCostUsd") AS "costUsd",
-              extract(epoch FROM r."finishedAt" - r."startedAt")::int AS seconds,
-              jsonb_array_length(r."checkFailures") AS "checkFailureCount",
-              r."experimentId", r.arm, r."createdAt", t.name AS "tenantName"
-         FROM debrief_runs r
-         LEFT JOIN tenants t ON t.id::text = r.tenant_id
-        WHERE ${where}
-        ORDER BY r."createdAt" DESC
-        LIMIT ${p(Math.min(opts.limit ?? 100, 500))}`,
-      params,
-    );
-    return rows.map((x: Record<string, any>) => ({
-      ...x,
-      evaluatorOverall: num(x.evaluatorOverall),
-      costUsd: num(x.costUsd, 4),
-    }));
-  }
-
-  /**
-   * v9 FR-38 "Registry": the recipe's steps as capabilities — for each step,
-   * the model the GA release names, and over the last `days` of production
-   * runs how often it ran, failed or was skipped, its typical time and its
-   * estimated spend. Read from the runs' step timelines, so it shows what ran,
-   * not what the recipe says.
-   */
-  async stepUsage(days = 30): Promise<
-    Array<{
-      step: string;
-      model: string | null;
-      backupModel: string | null;
-      inRecipes: string[];
-      done: number;
-      failed: number;
-      skipped: number;
-      medianMs: number | null;
-      estimatedUsd: number;
-      models: string[];
-    }>
-  > {
-    const { bundle } = await this.runner.resolveRelease();
-    const rows: Array<{
-      step: string;
-      done: number;
-      failed: number;
-      skipped: number;
-      median_ms: number | null;
-      usd: number;
-      models: string[] | null;
-    }> = await this.dataSource.query(
-      `SELECT s->>'step' AS step,
-              count(*) FILTER (WHERE s->>'status' = 'done')::int AS done,
-              count(*) FILTER (WHERE s->>'status' = 'failed')::int AS failed,
-              count(*) FILTER (WHERE s->>'status' = 'skipped')::int AS skipped,
-              percentile_cont(0.5) WITHIN GROUP (ORDER BY (s->>'ms')::float)
-                FILTER (WHERE s->>'status' = 'done') AS median_ms,
-              COALESCE(sum((s->>'estimatedUsd')::float), 0)::float AS usd,
-              array_remove(array_agg(DISTINCT s->>'model'), NULL) AS models
-         FROM debrief_runs r, jsonb_array_elements(COALESCE(r.steps, '[]'::jsonb)) s
-        WHERE r.mode IN ('shadow','live')
-          AND r."createdAt" >= now() - make_interval(days => $1)
-        GROUP BY 1`,
-      [days],
-    );
-    const byStep = new Map(rows.map((r) => [r.step, r]));
-    const steps = new Map<
-      string,
-      { model: string | null; backupModel: string | null; recipes: string[] }
-    >();
-    for (const recipe of Object.values(bundle.recipes)) {
-      for (const st of recipe.steps) {
-        const seen = steps.get(st.step);
-        if (seen) seen.recipes.push(recipe.key);
-        else
-          steps.set(st.step, {
-            model: st.model ?? null,
-            backupModel: st.backupModel ?? null,
-            recipes: [recipe.key],
-          });
-      }
-    }
-    return [...steps.entries()].map(([step, st]) => {
-      const u = byStep.get(step);
-      return {
-        step,
-        model: st.model,
-        backupModel: st.backupModel,
-        inRecipes: st.recipes,
-        done: u?.done ?? 0,
-        failed: u?.failed ?? 0,
-        skipped: u?.skipped ?? 0,
-        medianMs: u?.median_ms != null ? Math.round(u.median_ms) : null,
-        estimatedUsd: Number((u?.usd ?? 0).toFixed(4)),
-        models: u?.models ?? [],
-      };
-    });
-  }
-
-  async getRun(id: string) {
-    const run = await this.runs.findOne({ where: { id } });
-    if (!run) throw new NotFoundException('Run not found');
-    return run;
-  }
-
-  async listReleases() {
-    const list = await this.releases.list(DEBRIEF_AGENT_KEY);
-    return list.map((r) => ({
-      id: r.id,
-      version: r.version,
-      status: r.status,
-      authorKind: r.authorKind,
-      notes: r.notes ?? null,
-      createdAt: r.createdAt,
-      promotedAt: (r as any).promotedAt ?? null,
-      prompts: (r.bundle as any)?.prompts ?? {},
-      settings: (r.bundle as any)?.settings ?? {},
-      maxRevisionRounds:
-        (r.bundle as any)?.recipes?.standard?.maxRevisionRounds ?? null,
-      orchestrated: isOrchestrated((r.bundle ?? {}) as Partial<DebriefBundle>),
-    }));
-  }
-
   /**
    * The orchestrator as a challenger (spec A11): a DRAFT release made from the
    * live GA bundle (the seed when there is none) with the orchestrator on and
@@ -460,16 +245,6 @@ export class DebriefConsoleService {
       status: release.status,
       agents: draft.orchestrator!.agents.map((a) => a.id),
     };
-  }
-
-  async rollback(releaseId: string, userId: number, reason?: string) {
-    const r = await this.releases.makeGa(
-      releaseId,
-      userId,
-      AgentReleaseAuditAction.ROLLED_BACK,
-      reason,
-    );
-    return { id: r.id, version: r.version };
   }
 
   async liveTenants(): Promise<Array<{ id: string; name: string }>> {

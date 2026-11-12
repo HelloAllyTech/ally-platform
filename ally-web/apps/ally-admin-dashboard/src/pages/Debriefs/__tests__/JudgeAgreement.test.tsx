@@ -6,8 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@constants";
 
 const h = vi.hoisted(() => ({
-  sample: vi.fn(),
-  agreement: vi.fn(),
   item: vi.fn(),
   submit: vi.fn(),
   toastError: vi.fn(),
@@ -36,8 +34,6 @@ vi.mock("../../Analytics/chartKit", () => ({
 }));
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetDebriefCalibrationSampleQuery: () => h.sample(),
-  useGetDebriefCalibrationAgreementQuery: () => h.agreement(),
   useGetDebriefCalibrationItemQuery: (id: string) => h.item(id),
   useScoreDebriefSessionMutation: () => [h.submit, { isLoading: false }],
 }));
@@ -75,27 +71,6 @@ const FAILS = [
   "contradicts_protocol",
   "unsupported_progress_claim",
 ];
-
-const SAMPLE = {
-  population: 40,
-  target: 150,
-  items: [
-    {
-      scenarioSessionId: "aaaaaaaa-0000-4000-8000-000000000001",
-      language: "hi",
-      tercile: 0,
-      raters: 0,
-      ratedByMe: false,
-    },
-    {
-      scenarioSessionId: "bbbbbbbb-0000-4000-8000-000000000002",
-      language: "en",
-      tercile: 2,
-      raters: 2,
-      ratedByMe: true,
-    },
-  ],
-};
 
 const dim = (k: number | null) => ({
   pairs: 25,
@@ -171,8 +146,6 @@ const ITEM = {
 describe("Analytics › Debriefs › Judge agreement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    h.sample.mockReturnValue(ok(SAMPLE));
-    h.agreement.mockReturnValue(ok(AGREEMENT));
     h.item.mockReturnValue(ok(ITEM));
     h.submit.mockReturnValue({ unwrap: () => Promise.resolve({ created: true }) });
   });

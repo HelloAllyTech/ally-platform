@@ -53,7 +53,7 @@ import {
   DebriefCommentTag,
 } from '../enum/debrief-review.enum';
 import { COMMENT_BODY_MAX, QUOTE_MAX } from '../util/debrief-review.util';
-import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
+import { DebriefRunMode } from '../enum/debrief-run.enum';
 import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefAgentService } from '../service/debrief-agent.service';
 import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
@@ -135,28 +135,6 @@ class TenantLiveDto {
   live!: boolean;
 }
 
-class ModelChangeDto {
-  @ApiProperty({
-    required: false,
-    description: 'step -> model id, e.g. { "writer": "gpt-4.1" }',
-  })
-  @IsOptional()
-  @IsObject()
-  steps?: Record<string, string>;
-
-  @ApiProperty({ required: false, description: "Ask Ally's model id" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  reply?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  note?: string;
-}
-
 class SettingsChangeDto {
   @ApiProperty({
     description:
@@ -178,16 +156,6 @@ class TenantRegionDto {
   @ApiProperty({ enum: ['india', 'outside_india'] })
   @IsIn(['india', 'outside_india'])
   region!: 'india' | 'outside_india';
-}
-
-class RunsQueryDto {
-  @IsOptional()
-  @IsIn(Object.values(DebriefRunMode))
-  mode?: DebriefRunMode;
-
-  @IsOptional()
-  @IsIn(Object.values(DebriefRunStatus))
-  status?: DebriefRunStatus;
 }
 
 class CorrectCardDto {
@@ -331,8 +299,7 @@ class AutonomyMatrixDto {
 
 class AutonomyOrgDto {
   @ApiProperty({
-    description:
-      '{ paired_trial?, canary?, guidance?: "default" | "ask" | "never" }',
+    description: '{ paired_trial?, canary?: "default" | "ask" | "never" }',
   })
   @IsObject()
   changes!: Record<string, string>;
@@ -504,16 +471,6 @@ export class DebriefConsoleController {
     }
   }
 
-  @Get('review')
-  @DebriefRead()
-  @ApiOperation({
-    summary:
-      'The review queue: live debriefs a person must finish or check, and open flags',
-  })
-  review() {
-    return this.feedback.queue();
-  }
-
   @Post('runs/:id/publish')
   @DebriefAct('heldDebrief')
   @ApiOperation({ summary: 'Publish a live run’s best draft as it is' })
@@ -611,13 +568,6 @@ export class DebriefConsoleController {
     );
   }
 
-  @Get('runs')
-  @DebriefRead()
-  @ApiOperation({ summary: 'Recent runs, newest first' })
-  runs(@Query() q: RunsQueryDto) {
-    return this.console.listRuns({ mode: q.mode, status: q.status });
-  }
-
   @Get('metrics')
   @DebriefRead()
   @ApiOperation({
@@ -675,28 +625,6 @@ export class DebriefConsoleController {
   })
   runBaseline() {
     return this.baseline.run();
-  }
-
-  @Get('steps')
-  @DebriefRead()
-  @ApiOperation({
-    summary:
-      "The recipe's steps as capabilities: model, and over 30 days how often each ran, failed or was skipped, its time and spend",
-  })
-  steps(@Query('days') days?: string) {
-    const d = Number(days);
-    return this.console.stepUsage(
-      Number.isInteger(d) && d > 0 && d <= 90 ? d : 30,
-    );
-  }
-
-  @Get('runs/:id')
-  @DebriefRead()
-  @ApiOperation({
-    summary: 'One run: every step, the checks, the verdicts and the cards',
-  })
-  run(@Param('id', ParseUUIDPipe) id: string) {
-    return this.console.getRun(id);
   }
 
   @Post('sessions/:sessionId/run')
@@ -796,13 +724,6 @@ export class DebriefConsoleController {
     return this.pmAgent.reject(id, req.user.id, body?.reason);
   }
 
-  @Get('releases')
-  @DebriefRead()
-  @ApiOperation({ summary: 'Every release, newest first' })
-  releases() {
-    return this.console.listReleases();
-  }
-
   @Get('models')
   @DebriefRead()
   @ApiOperation({
@@ -811,41 +732,6 @@ export class DebriefConsoleController {
   })
   models() {
     return this.console.models();
-  }
-
-  @Post('models')
-  @DebriefAct('releases')
-  @ApiOperation({
-    summary:
-      'Change step models: makes a new release from the live one and puts it live',
-    description:
-      "Checked by the same rules as every release (approved, priced, active in the LLM catalog; the Writer and Evaluator on different models, neither on the judge's). Undo with Roll back.",
-  })
-  async setModels(@Req() req: AuthedRequest, @Body() body: ModelChangeDto) {
-    // The live release is never edited: a model swap is a proposed change
-    // carrying a draft release, which climbs the ladder.
-    const out = await this.releaseHistory.proposeChange(
-      {
-        title: `Model change: ${[
-          ...Object.keys(body.steps ?? {}),
-          ...(body.reply ? ['ask_ally'] : []),
-        ].join(', ')}`,
-        why: body.note ?? null,
-        steps: Object.entries(body.steps ?? {}).map(([step, model]) => ({
-          step,
-          model,
-        })),
-        reply: body.reply ?? null,
-      },
-      req.user.id,
-    );
-    return {
-      ...out,
-      changed: [
-        ...out.diff.steps.map((d) => d.step),
-        ...(out.diff.reply ? ['ask_ally'] : []),
-      ],
-    };
   }
 
   @Post('releases/orchestrator-challenger')
@@ -1195,7 +1081,7 @@ export class DebriefConsoleController {
   @DebriefAct('ownerSettings')
   @ApiOperation({
     summary:
-      "An organisation's overrides (owner): paired_trial / canary / guidance → default | ask | never; only tightens",
+      "An organisation's overrides (owner): paired_trial / canary → default | ask | never; only tightens",
   })
   async setOrgAutonomy(
     @Param('tenantId') tenantId: string,

@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import {
   DEBRIEF_MODELS,
   DEBRIEF_SEED_BUNDLE,
@@ -62,42 +61,5 @@ describe('DebriefConsoleService models', () => {
     // The Anthropic account has no credit: Claude is offered nowhere yet.
     expect(m.choices.steps.map((c) => c.provider)).not.toContain('anthropic');
     expect(m.choices.reply.map((c) => c.provider)).not.toContain('anthropic');
-  });
-
-  it('makes a new live release with the chosen models, in every recipe', async () => {
-    const { svc, releases } = build();
-    const r = await svc.setModels(
-      { steps: { writer: 'gpt-4.1' }, reply: 'gpt-4.1-mini' },
-      7,
-      'try GPT for writing',
-    );
-    expect(r).toMatchObject({ version: 3, changed: ['writer', 'ask_ally'] });
-    const bundle = releases.createDraft.mock.calls[0][1] as any;
-    for (const recipe of Object.values(bundle.recipes) as any[]) {
-      const w = recipe.steps.find((s: any) => s.step === 'writer');
-      if (w) expect(w.model).toBe('gpt-4.1');
-    }
-    expect(bundle.reply).toMatchObject({
-      provider: 'openai',
-      model: 'gpt-4.1-mini',
-    });
-    expect(releases.makeGa).toHaveBeenCalledWith(
-      'r3',
-      7,
-      'promoted',
-      'try GPT for writing',
-    );
-  });
-
-  it('refuses a change that breaks a release rule or a provider the step cannot call', async () => {
-    const { svc, releases } = build();
-    await expect(
-      svc.setModels({ steps: { writer: DEBRIEF_MODELS.evaluator } }, 7),
-    ).rejects.toThrow("the evaluator runs on the writer's model");
-    await expect(
-      svc.setModels({ steps: { writer: 'claude-sonnet-4-6' } }, 7),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    await expect(svc.setModels({}, 7)).rejects.toThrow('No model changed');
-    expect(releases.createDraft).not.toHaveBeenCalled();
   });
 });

@@ -29,11 +29,11 @@ From the excerpt the user shared and the evals skill:
 - **Graders get checked too:** planted-fault catch rate (the gate), flip rate when re-judging, and
   later agreement with a judge from another model family (κ, plus recall on the reference's flagged
   cases). **Debrief quality and safety judging is calibrated by a clinical expert** (expert review
-  comments and verdicts, the Calibration tab's people-rated sample, κ ≥ 0.6 gate on the PM agent's
+  comments and verdicts, the people-rated sample scored by hand in a session's Review panel, κ ≥ 0.6 gate on the PM agent's
   autonomy). "No hand-labelled sets" is the **language-eval** rule only (no experts in every language);
   it does not apply here.
 
-Where each number is read: **Console** = admin **Analytics → Debriefs** (live, from production runs; moved out of the Debrief Console on 2026-11-11), and for the PM agent the Debrief Console's PM agent tab. **Eval** =
+Where each number is read: **Console** = admin **Analytics → Debriefs** (live, from production runs; moved out of the Debrief Console on 2026-11-11), and for the PM agent the Debrief Console's PM agent page. **Eval** =
 `ally-be/scripts/debrief-eval.js` on the prod test sets (open = dev, gate = test, sealed = never
 tuned on). **Gate** = a script that exits 1 on a miss.
 

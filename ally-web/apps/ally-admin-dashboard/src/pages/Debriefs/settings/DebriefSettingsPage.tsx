@@ -190,7 +190,7 @@ const Budgets: React.FC<{ canEdit: boolean }> = ({ canEdit }) => {
   );
 };
 
-/** The rows the grid shows (design 2026-11-12); guidance and models have no ideas yet. */
+/** The rows the grid shows (design 2026-11-12), in this order. */
 const MATRIX_KINDS: DebriefAutonomyKind[] = ["settings", "prompts", "pinned_rules"];
 const CELL_TONE: Record<DebriefAutonomyValue, string> = {
   auto: "bg-success-50",

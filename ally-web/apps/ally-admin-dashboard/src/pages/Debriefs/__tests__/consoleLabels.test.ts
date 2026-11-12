@@ -15,7 +15,6 @@ import {
   recipeLabel,
   sectionLabel,
   settingChangeLabel,
-  skipReasonLabel,
   stepName,
 } from "../consoleLabels";
 
@@ -34,7 +33,6 @@ describe("console labels", () => {
     expect(stepName("progress_reader")).toBe("Progress reader");
     expect(stepName("ask_ally")).toBe("Ask Ally");
     expect(recipeLabel("short")).toBe("Short session");
-    expect(skipReasonLabel("too_short")).toBe("The learner said nothing");
     expect(promptName("debrief_writer_system")).toBe("Writer's prompt");
   });
 

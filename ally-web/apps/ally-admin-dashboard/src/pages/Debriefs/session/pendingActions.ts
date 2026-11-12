@@ -9,8 +9,6 @@ import { waitedFor } from "../queue";
  * The "waiting on you" items come from ally-be (`pendingActions`, already filtered to the viewer's
  * role, in order). This file only puts them into the console's words.
  */
-export const isFlagKind = (p: DebriefSessionPending) => !!p.flagId;
-
 export const pendingHeadline = (p: DebriefSessionPending): string => {
   const s = en.debriefs.session.bar;
   const w = waitedFor(p.waitingSince);

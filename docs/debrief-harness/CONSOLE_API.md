@@ -1,8 +1,10 @@
 # Debrief console API (redesign)
 
 The contract between ally-be and the redesigned Debrief console pages in ally-web. Every
-route is under `/api/v1/debriefs/console` unless it says otherwise. The old console routes still
-work. Their response shapes are unchanged, but their **permissions changed** (see Roles).
+route is under `/api/v1/debriefs/console` unless it says otherwise. The old console routes the
+redesign still uses keep their response shapes, but their **permissions changed** (see Roles). The
+read routes only the old tabs called (`GET review`, `GET runs`, `GET runs/:id`, `GET steps`,
+`GET releases`) and `POST models` were removed; a model change is a `pm-agent/ideas/propose`.
 
 Build notes: debrief-console-redesign-notes.md (outside the repo). Code:
 `ally-be/src/debrief/controller/debrief-console.controller.ts`,
@@ -11,8 +13,8 @@ Build notes: debrief-console-redesign-notes.md (outside the repo). Code:
 `ally-be/src/debrief/util/debrief-console-roles.util.ts`,
 `ally-be/src/debrief/util/debrief-console-view.util.ts`.
 
-**No redaction.** The console shows real names and the real transcript. This also applies to the
-old Expert review screen, whose transcript is no longer redacted.
+**No redaction.** The console shows real names and the real transcript, including the expert-review
+routes the session page uses.
 
 ## Roles and who can act
 
@@ -40,7 +42,7 @@ rather than disable it.
 | `pmAgent` | yes | no | yes | `pm-agent/analyse`, `ideas/:id/screen`, `approve` (a budgets-only change: owner), `reject`, `questions`, `start-step`, `ideas/propose` and `ideas/:id/draft` (with `settings`: owner); `pinned-rules/proposals` |
 | `approvePinnedRule` | no* | yes | yes | `pm-agent/ideas/:id/approve-pinned-rule` |
 | `testSets` | yes | no | yes | `test-sets/build` |
-| `releases` | yes | no | yes | `models` (POST, makes a proposal), `releases/orchestrator-challenger`, `releases/:id/rollback`, `releases/:id/promote-waiting`, `releases/:id/dismiss-waiting`, `sessions/:sessionId/run` |
+| `releases` | yes | no | yes | `releases/orchestrator-challenger`, `releases/:id/rollback`, `releases/:id/promote-waiting`, `releases/:id/dismiss-waiting`, `sessions/:sessionId/run` |
 | `switchOrgOn` | no | no | yes | `tenants/:id/live` with `live: true` (403 for the Ally team), `tenants/:id/region` |
 | `emergencyStop` | yes | no | yes | `tenants/:id/live` with `live: false`, `tenants/:id/emergency-stop` |
 | `ownerSettings` | no | no | yes | `settings` (PUT), `settings/accept`, `settings/baseline`, `budgets`, `autonomy/matrix`, `autonomy/orgs/:id` |
@@ -257,7 +259,6 @@ A passed canary that was never promoted is stopped. `approve` on an expired item
 - `PATCH pm-agent/ideas/:id/draft` takes the same body and changes the draft until its tests start (409 after that).
 - These routes now create a proposed change instead of a live release:
   - `PUT budgets {runCeilingUsd?, monthlyCapUsd?, passScore?, note?}` (owner).
-  - `POST models` (old Releases tab). It returns `{ideaId, releaseId, version, budgetOnly, diff, changed}`.
   - `POST releases/orchestrator-challenger`, which adds `ideaId` to its response.
 
 ### Pinned rules
@@ -273,7 +274,7 @@ A passed canary that was never promoted is stopped. `approve` on an expired item
 ## Releases (like a GitHub Releases page)
 
 ### `GET release-history`
-Only releases that **have been live** are listed, newest first. The old `GET releases` is unchanged for the old tab.
+Only releases that **have been live** are listed, newest first.
 ```ts
 { items: Array<{
     id; version; status: 'live' | 'retired';

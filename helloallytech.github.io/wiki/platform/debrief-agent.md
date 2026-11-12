@@ -28,7 +28,7 @@ read) in the monorepo.
 | **Debrief graph** | Writes one debrief per ended session. A LangGraph graph: a recipe of steps (safety reader, analyst, progress reader, guidance lookup, writer, rule checks, evaluator, reviser), each with a pinned model and a backup model, a run budget, deadlines and a fallback ladder. | ally-ai `app/core/debrief_graph/` (`POST /debrief/runs`) |
 | **Orchestrator** (off by default) | A planner picks extra agents for the session (protocol check, deeper history, language specialist, cohort and course patterns, case memory, assessment anchoring) from a registry, in dependency waves, under the run's budget and time; a top-up adds agents when the first draft falls below the bar. The analyst and case memory always run (the "floor"). | ally-ai `debrief_graph/orchestrator.py`, registry in code |
 | **Ask Ally** | Answers a learner's reply under their debrief, streamed. A short tool loop (learner history, guidance search, live detections) with code checks and an in-request distress check; a reply that fails a check is replaced by a safe fallback. | ally-ai `app/core/ask_ally/` (`POST /ask-ally/replies`) |
-| **Expert review** | Clinical experts read the roleplay and the debrief side by side, comment on exact words, tag the comment, and give a verdict with hard fails. This is the ground truth the judge is calibrated against and what the PM agent learns from. | admin Debrief Console → Expert review |
+| **Expert review** | Clinical experts read the roleplay and the debrief side by side, comment on exact words, tag the comment, and give a verdict with hard fails. This is the ground truth the judge is calibrated against and what the PM agent learns from. | admin Debriefs → a session's Review panel (select words to comment) |
 | **PM agent** | Weekly (and on demand), one Deep Agent reads expert comments, metric failure points and redacted reporting views, and proposes ideas (prompt edits, setting changes, bug reports). Each idea climbs a ladder: quick test on the open set → full gate test → paired trial on real sessions → canary — and reaches learners only after a person promotes it. | ally-ai `app/core/pm_agent/` (`POST /pm-agent/runs`), tools served by ally-be |
 | **System of record** | Runs, releases, settings, reviews, metrics, filters, test sets, the eval runner. ally-ai is stateless per call; ally-be prepares every input and stores every output. | ally-be `src/debrief/` |
 
@@ -49,8 +49,10 @@ settings a run uses. Runs record the release version they ran on, so any number 
 
 ## 3. Where people see it
 
-- **Admin → Debriefs** (the Debrief Console): runs and run detail, the review queue, expert review, the
-  PM agent, releases (versions, models, steps), organisations, calibration, knowledge, settings.
+- **Admin → Debriefs** (the Debrief Console): the home list of sessions ("Needs a person" first),
+  each session's page (roleplay, debrief, Review panel with comments, verdict and score by hand),
+  the PM agent (ideas, releases with their steps and models, test sets) and Settings (organisations,
+  budgets, autonomy, pinned rules, guidance). Old `?tab=` links redirect.
 - **Admin → Analytics → Debriefs**: the live metrics as charts — headline tiles, the north-star
   uptake lift, pass and hard-fail rate by week with 95% bands, pass rate by language, guardrails,
   experience, and each agent.
