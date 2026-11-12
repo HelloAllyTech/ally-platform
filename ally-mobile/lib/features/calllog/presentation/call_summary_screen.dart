@@ -1607,6 +1607,13 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
+/// A shared label-column width across every `_FieldRow` in a section, so
+/// values start in a consistent vertical line regardless of how long each
+/// row's own label text is — RN's own layout had no such column and looked
+/// visibly ragged (confirmed on-device 2026-11); a label longer than this
+/// wraps onto a second line rather than overflowing.
+const _fieldRowLabelWidth = 150.0;
+
 /// RN `FieldRow` `styles.label` (+ `:`), IBM Plex Serif body.medium, low
 /// emphasis.
 const _fieldRowLabelStyle = TextStyle(
@@ -1650,10 +1657,14 @@ class _FieldRow extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: RnSize.of(context).vs(5)),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Text('$label:', style: _fieldRowLabelStyle),
+          SizedBox(
+            width: _fieldRowLabelWidth,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text('$label:', style: _fieldRowLabelStyle),
+            ),
           ),
           edit ?? Expanded(child: Text(value, style: _fieldValueTextStyle)),
         ],
@@ -1786,7 +1797,6 @@ class _EditableField extends StatelessWidget {
     required this.onChanged,
     required this.isEditing,
     this.isEnhancing = false,
-    this.placeholder = '-',
     this.keyboardType,
   });
 
@@ -1795,7 +1805,6 @@ class _EditableField extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final bool isEditing;
   final bool isEnhancing;
-  final String placeholder;
   final TextInputType? keyboardType;
 
   @override
@@ -1822,7 +1831,7 @@ class _EditableField extends StatelessWidget {
         constraints: const BoxConstraints(maxHeight: 200),
         child: SingleChildScrollView(
           child: Text(
-            value != null && value!.isNotEmpty ? value! : placeholder,
+            value != null && value!.isNotEmpty ? value! : '-',
             style: TextStyle(
               fontFamily: AppFonts.ibmPlexSerifRegular,
               fontSize: 14,
@@ -2096,6 +2105,24 @@ class _CustomFieldEditor extends ConsumerWidget {
     }
   }
 
+  /// Native calendar picker for a DATE custom field — this used to be a
+  /// plain text box expecting `YYYY-MM-DD` typed by hand. Writes back that
+  /// same wire format `onChanged` expects; only the display (via
+  /// [formatCustomFieldDate]) is DD-MM-YYYY. Added 2026-11.
+  Future<void> _pickDate(BuildContext context, String? value) async {
+    final normalized = normalizeCustomFieldDate(value);
+    final initialDate = normalized != null ? DateTime.parse(normalized) : DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    String pad(int n) => n.toString().padLeft(2, '0');
+    onChanged?.call(definition.id, '${picked.year}-${pad(picked.month)}-${pad(picked.day)}');
+  }
+
   Future<void> _pickMultiSelect(BuildContext context, List<String> options, List<String> selected) async {
     final result = await showDialog<List<String>>(
       context: context,
@@ -2133,19 +2160,21 @@ class _CustomFieldEditor extends ConsumerWidget {
         );
 
       case CustomFieldType.date:
+        final displayValue = formatCustomFieldDate(value);
+        final isEmpty = (value ?? '').isEmpty;
         return _FieldRow(
           label: label,
-          // RN `formatCustomFieldDate`.
-          value: formatCustomFieldDate(value),
+          value: displayValue,
           edit: canEdit
-              ? Expanded(
-                  child: _EditableField(
-                    fieldKey: def.id,
-                    // RN `normalizeCustomFieldDate` for the edited value.
-                    value: normalizeCustomFieldDate(value) ?? value,
-                    onChanged: typed,
-                    isEditing: true,
-                    placeholder: 'YYYY-MM-DD',
+              ? GestureDetector(
+                  key: ValueKey('date-field-${def.id}'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _pickDate(context, value),
+                  child: Text(
+                    isEmpty ? ref.t('common.select') : displayValue,
+                    style: isEmpty
+                        ? _fieldValueTextStyle.copyWith(color: AppColors.charcoal2.withValues(alpha: 0.5))
+                        : _fieldValueTextStyle,
                   ),
                 )
               : null,
