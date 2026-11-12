@@ -296,7 +296,9 @@ export class DebriefConsoleViewService implements OnModuleInit {
         `r."ceilingUsd" IS NOT NULL AND ${cost} >= r."ceilingUsd"::float * ${p(HIT_CEILING_SHARE)}`,
       );
     }
-    const open = `(f.status = 'escalated' OR (f.status = 'open' AND f."updatedAt" < now() - make_interval(secs => ${undo})))`;
+    // PRD §6.6: a flag on an important moment is work at once, as urgent;
+    // other flags only once the learner's 10-minute undo window has passed.
+    const open = `(f.status = 'escalated' OR (f.status = 'open' AND (f.urgent OR f."updatedAt" < now() - make_interval(secs => ${undo}))))`;
     return `
       WITH fl AS (
         SELECT f."runId",
@@ -646,8 +648,10 @@ export class DebriefConsoleViewService implements OnModuleInit {
       urgent: !!r.urgent,
       status: r.status,
       createdAt: iso(r.createdAt),
+      // An urgent flag is never held back by the undo window (PRD §6.6).
       inUndoWindow:
         r.status === 'open' &&
+        !r.urgent &&
         now - new Date(r.updatedAt).getTime() < FLAG_UNDO_MS,
       resolutionNote: r.resolutionNote ?? null,
       resolvedAt: iso(r.resolvedAt),

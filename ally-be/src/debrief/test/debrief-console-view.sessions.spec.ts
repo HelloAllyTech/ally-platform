@@ -57,3 +57,33 @@ describe('DebriefConsoleViewService.sessions parameters', () => {
     });
   }
 });
+
+/**
+ * PRD §6.6 [SAFETY]: a flag on an important moment enters the queue at once,
+ * as urgent; only other flags wait out the learner's 10-minute undo window.
+ */
+describe('DebriefConsoleViewService queue: urgent flags skip the undo window', () => {
+  it('counts an urgent open flag as work even inside the undo window', async () => {
+    const calls: string[] = [];
+    const svc = new (DebriefConsoleViewService as any)({
+      query: jest.fn(async (sql: string) => {
+        calls.push(sql);
+        return [];
+      }),
+    });
+    svc.scoringSample = async () => ({
+      inSample: new Set(),
+      ratedByMe: new Set(),
+    });
+    await svc.sessions(parseSessionFilters({ category: 'needs' }), {
+      userId: 1,
+      roles: {},
+      can: { score: false },
+      scorer: false,
+    } as any);
+    const sql = calls[0].replace(/\s+/g, ' ');
+    expect(sql).toContain(
+      `(f.status = 'escalated' OR (f.status = 'open' AND (f.urgent OR f."updatedAt" < now() - make_interval(secs => $1))))`,
+    );
+  });
+});
