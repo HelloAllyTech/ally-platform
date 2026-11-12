@@ -321,7 +321,11 @@ export class DebriefFeedbackService {
    */
   async decorate(view: LearnerDebriefView, userId: number) {
     if (view.state !== 'ready' || !view.runId || !view.cards) return view;
-    const rows = await this.feedback.find({ where: { runId: view.runId } });
+    // The Ask Ally distress item is the team's (created by the reply check,
+    // decided with a note to colleagues): never part of the learner's view.
+    const rows = (
+      await this.feedback.find({ where: { runId: view.runId } })
+    ).filter((r) => r.section !== ASK_ALLY_SECTION);
     const corrections: DebriefCorrection[] = rows
       .filter(
         (r) =>

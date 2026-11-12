@@ -148,6 +148,44 @@ describe('debrief feedback', () => {
     expect(saved[0].status).toBe('withdrawn');
   });
 
+  it("never shows the learner the team's Ask Ally distress item or its note", async () => {
+    const { svc } = build();
+    const at = new Date();
+    (svc as any).feedback.find = jest.fn(async () => [
+      {
+        id: 'd1',
+        runId: 'run-1',
+        userId: 7,
+        kind: 'flag',
+        section: 'ask_ally',
+        status: 'kept',
+        resolutionNote: 'Called their supervisor',
+        updatedAt: at,
+        resolvedAt: at,
+      },
+      {
+        id: 'f2',
+        runId: 'run-1',
+        userId: 7,
+        kind: 'flag',
+        section: 'what_worked[0]',
+        status: 'kept',
+        resolutionNote: 'It stays',
+        updatedAt: at,
+        resolvedAt: at,
+      },
+    ]);
+    (svc as any).runCorrections = jest.fn(async () => []);
+    const view: any = await svc.decorate(
+      { state: 'ready', runId: 'run-1', cards } as any,
+      7,
+    );
+    expect(view.corrections).toEqual([
+      expect.objectContaining({ section: 'what_worked[0]', note: 'It stays' }),
+    ]);
+    expect(view.feedback.flags.map((f: any) => f.id)).toEqual(['f2']);
+  });
+
   it('keeping a point needs a reason the learner can read', async () => {
     const { svc } = build({
       existing: { id: 'f', kind: 'flag', status: 'open' },
