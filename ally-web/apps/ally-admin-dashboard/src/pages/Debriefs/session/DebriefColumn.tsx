@@ -83,6 +83,37 @@ export const cardFields = (
   return null;
 };
 
+/**
+ * An open learner flag on a card: the reason and, when the learner wrote one, their note — one
+ * line, truncated; the whole note on hover or keyboard focus.
+ */
+const FlagTag: React.FC<{ flag: DebriefSessionFlag }> = ({ flag }) => {
+  const s = en.debriefs.session;
+  const text = s.flaggedTag(en.debriefs.review.reasons[flag.reason] ?? flag.reason, flag.note);
+  return (
+    <span
+      tabIndex={0}
+      aria-label={text}
+      data-testid="card-flag-tag"
+      className="group relative ml-auto min-w-0 max-w-full rounded-full bg-destructive-100 px-2 py-0.5 text-xs text-destructive-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-destructive-600"
+    >
+      <span aria-hidden="true" className="block truncate">
+        {text}
+      </span>
+      {flag.note && (
+        <span
+          role="tooltip"
+          aria-hidden="true"
+          data-testid="card-flag-note-full"
+          className="invisible absolute right-0 top-full z-20 mt-1 w-72 max-w-[80vw] whitespace-normal rounded-sm bg-neutral-900 px-3 py-2 text-xs text-white shadow-lg group-hover:visible group-focus:visible"
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+};
+
 /** One debrief card: a grey tile, its kind in small capitals above. */
 const Card: React.FC<{
   section: string;
@@ -90,43 +121,37 @@ const Card: React.FC<{
   kickerClass: string;
   lit: boolean;
   flag?: DebriefSessionFlag;
-  corrected?: string | null;
+  /** A decided flag: the line the learner reads under this card (PRD §6.7). */
+  outcome?: string | null;
   children: React.ReactNode;
   after?: React.ReactNode;
-}> = ({ section, kicker, kickerClass, lit, flag, corrected, children, after }) => {
-  const s = en.debriefs.session;
-  return (
-    <>
-      <div
-        id={cardDomId(section)}
-        data-testid="session-card-block"
-        data-section={section}
-        data-highlight={lit ? "true" : undefined}
-        className={[
-          "flex flex-col gap-2.5 rounded-sm bg-neutral-50 px-5 py-[18px]",
-          flag ? "outline outline-2 outline-destructive-200" : "",
-          lit ? "ring-2 ring-warning-200" : "",
-        ].join(" ")}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <div className={`text-xs tracking-[.32px] ${kickerClass}`}>{kicker}</div>
-          {flag && (
-            <span className="ml-auto rounded-full bg-destructive-100 px-2 py-0.5 text-xs text-destructive-600">
-              {s.flaggedTag(en.debriefs.review.reasons[flag.reason] ?? flag.reason)}
-            </span>
-          )}
-          {!flag && corrected && (
-            <span className="ml-auto rounded-full bg-success-50 px-2 py-0.5 text-xs text-success-600">
-              {corrected}
-            </span>
-          )}
-        </div>
-        {children}
+}> = ({ section, kicker, kickerClass, lit, flag, outcome, children, after }) => (
+  <>
+    <div
+      id={cardDomId(section)}
+      data-testid="session-card-block"
+      data-section={section}
+      data-highlight={lit ? "true" : undefined}
+      className={[
+        "flex flex-col gap-2.5 rounded-sm bg-neutral-50 px-5 py-[18px]",
+        flag ? "outline outline-2 outline-destructive-200" : "",
+        lit ? "ring-2 ring-warning-200" : "",
+      ].join(" ")}
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className={`text-xs tracking-[.32px] ${kickerClass}`}>{kicker}</div>
+        {flag && <FlagTag flag={flag} />}
       </div>
-      {after}
-    </>
-  );
-};
+      {children}
+      {!flag && outcome && (
+        <p data-testid="card-learner-outcome" className="m-0 text-xs text-neutral-700">
+          {outcome}
+        </p>
+      )}
+    </div>
+    {after}
+  </>
+);
 
 const Quote: React.FC<{ children: React.ReactNode; turn: number }> = ({ children, turn }) => (
   <blockquote className="m-0 rounded-sm bg-white px-3.5 py-2.5 text-sm text-neutral-700">
@@ -152,17 +177,19 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
     view.flags.find(
       f => f.section === section && (f.status === "open" || f.status === "escalated"),
     );
-  const correctedLabel = (section: string) => {
+  /** What the learner reads under the card once their flag was decided (the learner app's words). */
+  const outcomeLine = (section: string) => {
     const k = view.corrections.filter(c => c.section === section);
     const last = k[k.length - 1];
     if (!last) return null;
+    const o = s.learnerOutcome;
     if (last.outcome === "corrected") {
-      const v = view.versions.filter(x => x.section === section).length;
-      return s.correctedTag(v + 1);
+      const date = last.at
+        ? new Date(last.at).toLocaleDateString("en", { dateStyle: "medium" })
+        : "";
+      return o.corrected(date, last.note);
     }
-    return last.outcome === "removed"
-      ? en.debriefs.expertReview.cards.removed
-      : en.debriefs.expertReview.cards.kept;
+    return last.outcome === "removed" ? o.removed : o.kept(last.note);
   };
   const popupFor = (section: string) =>
     view.can.comment &&
@@ -222,7 +249,7 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
             kickerClass="text-primary-700"
             lit={lit("important_moment")}
             flag={flagFor("important_moment")}
-            corrected={correctedLabel("important_moment")}
+            outcome={outcomeLine("important_moment")}
             after={popupFor("important_moment")}
           >
             <div className="text-[17px] font-semibold">
@@ -247,7 +274,7 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
               kickerClass="text-success-600"
               lit={lit(section)}
               flag={flagFor(section)}
-              corrected={correctedLabel(section)}
+              outcome={outcomeLine(section)}
               after={popupFor(section)}
             >
               <div className="text-base font-semibold">
@@ -272,7 +299,7 @@ const TheDebrief: React.FC<Props & { cards: DebriefCardsData }> = props => {
               kickerClass="text-[#8A3800]"
               lit={lit(section)}
               flag={flagFor(section)}
-              corrected={correctedLabel(section)}
+              outcome={outcomeLine(section)}
               after={popupFor(section)}
             >
               <div className="text-base font-semibold">

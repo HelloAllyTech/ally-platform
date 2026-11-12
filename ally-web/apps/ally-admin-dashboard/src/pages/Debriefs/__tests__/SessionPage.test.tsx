@@ -322,6 +322,66 @@ describe("Session page", () => {
     expect(screen.getByTestId("session-facts")).toHaveTextContent("6.4 / 10");
   });
 
+  describe("learner flags on a card", () => {
+    const workCard = () =>
+      screen
+        .getAllByTestId("session-card-block")
+        .find(c => c.dataset.section === "work_on_this[0]") as HTMLElement;
+
+    it("an open flag shows its reason and the learner's note on one line, the whole note on focus", () => {
+      renderPage();
+      const tag = within(workCard()).getByTestId("card-flag-tag");
+      expect(tag).toHaveTextContent(
+        "Flagged: “Advice doesn't fit” · “She never said anything about harming herself.”",
+      );
+      expect(tag).toHaveAttribute("tabindex", "0");
+      expect(tag).toHaveAttribute(
+        "aria-label",
+        "Flagged: “Advice doesn't fit” · “She never said anything about harming herself.”",
+      );
+      expect(within(tag).getByTestId("card-flag-note-full")).toHaveClass("group-focus:visible");
+      expect(within(workCard()).queryByTestId("card-learner-outcome")).toBeNull();
+    });
+
+    it("an open flag without a note shows the reason alone", () => {
+      h.session.mockReturnValue(ok(view({ flags: [{ ...FLAG, note: null }] })));
+      renderPage();
+      const tag = within(workCard()).getByTestId("card-flag-tag");
+      expect(tag).toHaveTextContent(/^Flagged: “Advice doesn't fit”$/);
+      expect(within(tag).queryByTestId("card-flag-note-full")).toBeNull();
+    });
+
+    it.each([
+      [
+        { outcome: "kept", note: "The quote is right." },
+        "Reviewed: the Ally team kept this point. The quote is right.",
+      ],
+      [
+        { outcome: "corrected", note: "the advice now fits.", at: "2026-11-12T10:00:00Z" },
+        "Updated on Nov 12, 2026 after a review by the Ally team: the advice now fits.",
+      ],
+      [
+        { outcome: "removed", note: null },
+        "This point was removed after a review by the Ally team.",
+      ],
+    ])("a decided flag shows the line the learner reads, no admin tag (%o)", (correction, line) => {
+      h.session.mockReturnValue(
+        ok(
+          view({
+            flags: [{ ...FLAG, status: correction.outcome }],
+            corrections: [{ section: "work_on_this[0]", ...correction }],
+            pendingActions: [],
+          }),
+        ),
+      );
+      renderPage();
+      expect(within(workCard()).queryByTestId("card-flag-tag")).toBeNull();
+      expect(within(workCard()).getByTestId("card-learner-outcome")).toHaveTextContent(line);
+      expect(workCard()).not.toHaveTextContent("after the learner's flag");
+      expect(workCard()).not.toHaveTextContent("Corrected by the Ally team");
+    });
+  });
+
   it("keeps the Review panel closed until asked for, with the judge's reasons inside", () => {
     renderPage();
     expect(screen.queryByTestId("review-panel")).toBeNull();

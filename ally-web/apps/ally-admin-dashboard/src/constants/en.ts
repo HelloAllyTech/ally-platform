@@ -10159,8 +10159,16 @@ export const en = {
       },
       whyItMatters: "Why it matters:",
       trySaying: "Try saying:",
-      flaggedTag: (reason: string) => `Flagged: “${reason}”`,
-      correctedTag: (version: number) => `Corrected by the Ally team · version ${version}`,
+      flaggedTag: (reason: string, note?: string | null) =>
+        note?.trim() ? `Flagged: “${reason}” · “${note.trim()}”` : `Flagged: “${reason}”`,
+      /** Exactly what the learner reads under a card once their flag is decided (PRD §6.7). */
+      learnerOutcome: {
+        kept: (note: string | null) =>
+          `Reviewed: the Ally team kept this point. ${note ?? ""}`.trim(),
+        corrected: (date: string, note: string | null) =>
+          `Updated on ${date} after a review by the Ally team: ${note ?? ""}`.trim(),
+        removed: "This point was removed after a review by the Ally team.",
+      },
       distressTitle: "Learner distress.",
       distressAskAlly:
         "The learner showed distress in Ask Ally after reading their debrief; Ally replied with care and the support lines.",
@@ -11248,7 +11256,7 @@ export const en = {
         "Outside India there is no default support line. Add this organisation's own in its Ally guide settings before switching it on.",
       newDebrief: "New debrief",
       todays: "Today's debrief",
-      stopped: "Stopped · learners see \"not available\"",
+      stopped: 'Stopped · learners see "not available"',
       test: "Test",
       switchOn: "Switch on",
       onTitle: (name: string) => `Switch ${name} to the new debrief?`,
