@@ -2067,6 +2067,25 @@ class _CustomFieldEditor extends ConsumerWidget {
   /// JSON-encoded array of option *labels*; a bare non-JSON string (an old
   /// single-select-shaped value, or simply malformed) is treated as a
   /// one-item selection instead of discarded.
+  /// Resolves a stored SINGLE_SELECT value to its option's label. The value
+  /// is normally already the label (see [CustomFieldValue]'s own doc
+  /// comment), but a value written as the option's id instead — confirmed
+  /// happening for at least one admin-managed field, via some path other
+  /// than this screen's own save flow (which always writes labels, see
+  /// `onSelect` below) — is resolved the same way, rather than shown as a
+  /// raw id. Falls back to the raw value when it matches neither, so
+  /// nothing is silently hidden. Added 2026-11.
+  static String? _resolveSingleSelectValue(CustomFieldDefinition def, String? value) {
+    if (value == null || value.isEmpty) return value;
+    for (final o in def.sortedOptions) {
+      if (o.label == value) return value;
+    }
+    for (final o in def.sortedOptions) {
+      if (o.id == value) return o.label;
+    }
+    return value;
+  }
+
   static List<String> _parseMultiSelect(String? value) {
     if (value == null || value.isEmpty) return const [];
     try {
@@ -2134,13 +2153,14 @@ class _CustomFieldEditor extends ConsumerWidget {
 
       case CustomFieldType.singleSelect:
         final options = def.sortedOptions.map((o) => o.label).toList();
+        final resolvedValue = _resolveSingleSelectValue(def, value);
         return _FieldRow(
           label: label,
-          value: value ?? '-',
+          value: resolvedValue ?? '-',
           edit: canEdit
               ? _SummaryDropdown(
                   key: ValueKey('dropdown-${def.id}'),
-                  value: value ?? '',
+                  value: resolvedValue ?? '',
                   options: options,
                   placeholder: ref.t('common.select'),
                   onSelect: (selected) => onChanged?.call(def.id, selected),
