@@ -7,10 +7,7 @@ import {
 import { DataSource } from 'typeorm';
 import { redactText } from 'src/guide/safety/redaction';
 import { excludeTestTenants } from '../util/test-tenant.util';
-import {
-  DEBRIEF_QUALITY_DIMENSIONS,
-  debriefOverallSql,
-} from '../constants/debrief-quality.constants';
+import { DEBRIEF_QUALITY_DIMENSIONS } from '../constants/debrief-quality.constants';
 import { selectQuarterSample } from 'src/foundational-skills/util/human-rating.util';
 import {
   DEBRIEF_CALIBRATION_SEED,
@@ -26,10 +23,46 @@ import {
 import { RatedPair } from '../util/rater-agreement.util';
 import { DebriefQualityRepository } from '../repository/debrief-quality.repository';
 import { DEBRIEF_SEED_BUNDLE } from '../../debrief/constants/debrief-release.constants';
+import {
+  DebriefCards,
+  renderCards,
+} from '../../debrief/util/debrief-cards.util';
 
-/** The judge series the calibration set is checked against. */
-const JUDGE_PAIR = { judgeModel: 'gemini-2.5-pro', judgePromptVersion: 'v1' };
 const RUBRIC_VERSION = 'v1';
+
+/**
+ * The Debrief agent's debrief for each session and the independent judge's
+ * score of it (`debrief_runs.workspace.judge`, DebriefRunJudgeService): the
+ * live run, else the shadow one, latest first. Hand scores are compared with
+ * these, per dimension — `debrief_quality_judgment` holds only today's
+ * debriefs, scored by the old judge.
+ */
+const JUDGED_RUNS = `
+  SELECT DISTINCT ON (r."scenarioSessionId")
+         r."scenarioSessionId" AS session_id, r.id AS run_id, r.tenant_id,
+         r.language, r.cards, r.workspace->'judge' AS judge
+    FROM debrief_runs r
+   WHERE r.mode IN ('live', 'shadow')
+     AND r.cards IS NOT NULL
+     AND r.status IN ('published', 'below_bar')
+     AND r.workspace->'judge'->>'overall' IS NOT NULL
+   ORDER BY r."scenarioSessionId", (r.mode = 'live') DESC, r."createdAt" DESC`;
+
+interface StoredJudgment {
+  model?: string;
+  promptVersion?: string;
+  dimensions?: Array<{ dimension: string; score: number }>;
+  hardFails?: Array<{ code: string } | string>;
+}
+
+/** The judge's score on one dimension, or NaN when it gave none. */
+export function judgeScore(
+  judge: StoredJudgment | null | undefined,
+  dimension: string,
+): number {
+  const hit = judge?.dimensions?.find((d) => d.dimension === dimension);
+  return hit && Number.isFinite(Number(hit.score)) ? Number(hit.score) : NaN;
+}
 
 export interface DebriefRatingInput {
   scores: Record<string, number>;
@@ -59,13 +92,11 @@ export class DebriefCalibrationService {
     Array<{ cutId: string; compositeScore: number; language: string }>
   > {
     const rows = await this.dataSource.query(
-      `SELECT j."scenarioSessionId" AS id,
-              COALESCE(j."language", 'unknown') AS language,
-              ${debriefOverallSql('j')} AS overall
-         FROM debrief_quality_judgment j
-        WHERE j."judgeModel" = $1 AND j."judgePromptVersion" = $2
-          AND ${excludeTestTenants('j."tenant_id"')}`,
-      [JUDGE_PAIR.judgeModel, JUDGE_PAIR.judgePromptVersion],
+      `SELECT j.session_id AS id,
+              COALESCE(j.language, 'unknown') AS language,
+              (j.judge->>'overall')::numeric AS overall
+         FROM (${JUDGED_RUNS}) j
+        WHERE ${excludeTestTenants('j.tenant_id')}`,
     );
     return rows.map((r: { id: string; language: string; overall: string }) => ({
       cutId: r.id,
@@ -110,13 +141,12 @@ export class DebriefCalibrationService {
 
   private async assertRateable(raterId: number, sessionId: string) {
     const [row] = await this.dataSource.query(
-      `SELECT s."counselorId" AS counselor_id, j."debriefText" AS debrief_text,
-              COALESCE(j."language", 'en') AS language, j."tenant_id" AS tenant_id
-         FROM debrief_quality_judgment j
-         JOIN scenario_sessions s ON s.id = j."scenarioSessionId"
-        WHERE j."scenarioSessionId" = $1
-          AND j."judgeModel" = $2 AND j."judgePromptVersion" = $3`,
-      [sessionId, JUDGE_PAIR.judgeModel, JUDGE_PAIR.judgePromptVersion],
+      `SELECT s."counselorId" AS counselor_id, j.cards,
+              COALESCE(j.language, 'en') AS language, j.tenant_id
+         FROM (${JUDGED_RUNS}) j
+         JOIN scenario_sessions s ON s.id = j.session_id
+        WHERE j.session_id = $1`,
+      [sessionId],
     );
     if (!row) {
       throw new NotFoundException(
@@ -128,10 +158,13 @@ export class DebriefCalibrationService {
         'You cannot rate a debrief of your own practice.',
       );
     }
-    return row as {
-      debrief_text: string | null;
-      language: string;
-      tenant_id: string;
+    return {
+      // The debrief as the judge read it.
+      debrief_text: row.cards
+        ? renderCards(row.cards as DebriefCards)
+        : (row.debrief_text ?? null),
+      language: row.language as string,
+      tenant_id: row.tenant_id as string,
     };
   }
 
@@ -211,19 +244,28 @@ export class DebriefCalibrationService {
    */
   async getAgreement() {
     const cols = DEBRIEF_QUALITY_DIMENSIONS.map(
-      (d) =>
-        `h."${d.column}" AS "h_${d.column}", j."${d.column}" AS "j_${d.column}"`,
+      (d) => `h."${d.column}" AS "h_${d.column}"`,
     ).join(', ');
-    const judged: Array<Record<string, unknown>> = await this.dataSource.query(
+    const rated: Array<Record<string, unknown>> = await this.dataSource.query(
       `SELECT h."scenarioSessionId" AS id, ${cols},
-              h."hardFails" AS h_fails, j."hardFails" AS j_fails
+              h."hardFails" AS h_fails, j.judge
          FROM debrief_human_ratings h
-         JOIN debrief_quality_judgment j
-           ON j."scenarioSessionId" = h."scenarioSessionId"
-          AND j."judgeModel" = $1 AND j."judgePromptVersion" = $2
-        WHERE h."rubricVersion" = $3`,
-      [JUDGE_PAIR.judgeModel, JUDGE_PAIR.judgePromptVersion, RUBRIC_VERSION],
+         JOIN (${JUDGED_RUNS}) j ON j.session_id = h."scenarioSessionId"
+        WHERE h."rubricVersion" = $1`,
+      [RUBRIC_VERSION],
     );
+    // The current judge's score on each dimension, beside the hand score.
+    const judged = rated.map((r) => {
+      const judge = r.judge as StoredJudgment | null;
+      const row: Record<string, unknown> = { ...r, j_fails: judge?.hardFails };
+      for (const d of DEBRIEF_QUALITY_DIMENSIONS) {
+        row[`j_${d.column}`] = judgeScore(judge, d.dimension);
+      }
+      return row;
+    });
+    const latest = rated
+      .map((r) => r.judge as StoredJudgment | null)
+      .find((j) => j?.model);
     const hcols = DEBRIEF_QUALITY_DIMENSIONS.map(
       (d) =>
         `a."${d.column}" AS "a_${d.column}", b."${d.column}" AS "b_${d.column}"`,
@@ -260,11 +302,14 @@ export class DebriefCalibrationService {
     ) => {
       const dimensions: Record<string, DebriefScoreAgreement> = {};
       for (const d of DEBRIEF_QUALITY_DIMENSIONS) {
-        const pairs: RatedPair[] = rows.map((r) => ({
-          cutId: String(r.id),
-          a: Number(r[`${a}_${d.column}`]),
-          b: Number(r[`${b}_${d.column}`]),
-        }));
+        const pairs: RatedPair[] = rows
+          .map((r) => ({
+            cutId: String(r.id),
+            a: Number(r[`${a}_${d.column}`]),
+            b: Number(r[`${b}_${d.column}`]),
+          }))
+          // A dimension the judge left out is not a disagreement.
+          .filter((p) => Number.isFinite(p.a) && Number.isFinite(p.b));
         dimensions[d.dimension] = scoreAgreement(pairs);
       }
       const hardFails: Record<string, DebriefHardFailAgreement> = {};
@@ -283,7 +328,11 @@ export class DebriefCalibrationService {
     return {
       expertVerdicts: await this.expertVerdictAgreement(codesOf),
       rubricVersion: RUBRIC_VERSION,
-      judge: JUDGE_PAIR,
+      // The independent judge on the Debrief agent's runs.
+      judge: {
+        judgeModel: latest?.model ?? null,
+        judgePromptVersion: latest?.promptVersion ?? null,
+      },
       target: DEBRIEF_CALIBRATION_TARGET,
       coverage: {
         debriefs: Number(coverage?.debriefs ?? 0),

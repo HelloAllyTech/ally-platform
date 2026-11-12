@@ -57,7 +57,7 @@ export interface DebriefAgreementSide {
 
 export interface DebriefCalibrationAgreement {
   rubricVersion: string;
-  judge: { judgeModel: string; judgePromptVersion: string };
+  judge: { judgeModel: string | null; judgePromptVersion: string | null };
   target: number;
   coverage: { debriefs: number; ratings: number; raters: number };
   judgeVsHuman: DebriefAgreementSide;
