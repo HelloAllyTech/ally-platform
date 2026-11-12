@@ -40,8 +40,8 @@ rather than disable it.
 | `escalate` | yes | no | yes | `flags/:id/escalate`, `runs/:id/escalate` |
 | `verdict` | no | yes | no | expert-review `runs/:id/verdict` |
 | `score` | in the scoring sample only (403 otherwise) | yes | no | `sessions/:sessionId/score`, `GET /v1/analytics/debrief-quality/calibration/:id` (the Score by hand item) |
-| `pmAgent` | yes | no | yes | `pm-agent/analyse`, `ideas/:id/screen`, `approve` (a budgets-only change: owner), `reject`, `questions`, `start-step`, `ideas/propose` and `ideas/:id/draft` (with `settings`: owner); `pinned-rules/proposals` |
-| `approvePinnedRule` | no | yes | yes | `pm-agent/ideas/:id/approve-pinned-rule` |
+| `pmAgent` | yes | no | yes | `pm-agent/analyse`, `ideas/:id/screen`, `approve` (a budgets-only change: owner), `reject` (never a pinned rule), `questions`, `start-step`, `ideas/propose` and `ideas/:id/draft` (with `settings`: owner) |
+| `approvePinnedRule` | no | yes | yes | `pinned-rules/proposals`, `pm-agent/ideas/:id/approve-pinned-rule`, `withdraw-pinned-rule` (own only), `reject-pinned-rule` |
 | `testSets` | yes | no | yes | `test-sets/build` |
 | `releases` | yes | no | yes | `releases/orchestrator-challenger`, `releases/:id/rollback`, `releases/:id/promote-waiting`, `releases/:id/dismiss-waiting`, `sessions/:sessionId/run` |
 | `switchOrgOn` | no | no | yes | `tenants/:id/live` with `live: true` (403 for the Ally team), `tenants/:id/region` |
@@ -271,23 +271,34 @@ Each `ideas[]` row keeps its old fields and adds these:
 ```ts
 { decidedBy; decidedAt;
   state: 'open' | 'closed';
-  closedReason: null | 'promoted'|'rejected'|'expired'|'reverted'|'did_not_pass'|'handed_off'|'answered'|'signed_off'|'retired';
+  closedReason: null | 'promoted'|'rejected'|'expired'|'reverted'|'did_not_pass'|'handed_off'|'answered'|'signed_off'|'withdrawn'|'retired';
   closedWhy: string | null;          // e.g. the canary's revert reason, "did not pass the gate test"
   releaseId: string | null;          // the release a promoted idea became (link to release-history/:id)
   kind: string|null;                 // prompt_edit | setting | registry_agent | needs_code | defect | needs_person | pinned_rule | release
   changeKind: 'settings'|'prompts'|'pinned_rules'|null;
   approval: null | { wait: 'pinned_rule'|'handoff'|'start_quick_test'|'promote_budget'|'start_gate'|'start_trial'|'start_canary'|'promote';
-                     since; expiresAt; expiresInDays; expired; expiringSoon /* ≤ 3 days */ };
+                     since; expiresAt: string|null; expiresInDays: number|null;  // null: never expires (a pinned rule's first version)
+                     expired; expiringSoon /* ≤ 3 days */ };
   expired: boolean; notTakenForward: boolean; notTakenForwardReason: 'no_decision'|'rejected'|null;
   questions: Array<{ id; role: 'person'|'agent'; by: number|null; at; text; replyTo?: string; agentRunId?: string }>;
   draftRelease?: null | { id; version; status;            // open ideas only: the draft it carries
                           changedVsLive: BundleDiff; compare: { releaseId } };  // GET releases/:releaseId/compare
-  can: { approve; reject; tryIt; askQuestion; startStep; editDraft } }
+  can: { approve; reject; tryIt; askQuestion; startStep; editDraft;
+         withdraw?; askForChange? };     // pinned rules only
+  pinnedRule?: {                       // pinned-rule ideas only
+    name;                              // "Safety rules" | "Rubric" | "Judge's instructions"
+    firstVersion: boolean; mine: boolean; proposedBy: number|null;
+    liveVersion: number|null;
+    liveText: string|null;             // open items: the text in force, which "Ask for a change" is written against
+    segments: Array<{ text; changed: boolean }>|null;  // open items: the whole rule as it would read, the new wording `changed`
+    stale: boolean;                    // the passage is no longer in the rule
+    otherOpen: number;                 // other open proposals on the same rule
+    approvedNote: string|null } }
 ```
 The top level adds `counts: { open, closed }` and `viewer: { roles, can }`.
 
 - **Open** means the idea needs a person, is being tested, or is in canary.
-- **Closed** means it was promoted (with `releaseId`), rejected, expired with no decision, reverted (with `closedWhy`), did not pass a test, was handed to Builder or Bug Hunter, was answered, or is a pinned rule that was signed off.
+- **Closed** means it was promoted (with `releaseId`), rejected, expired with no decision, reverted (with `closedWhy`), did not pass a test, was handed to Builder or Bug Hunter, was answered, or is a pinned rule that was approved or withdrawn.
 - A draft release belongs to its idea. Drafts, releases being tested and canaries are **not** listed under Releases.
 
 An item expires 14 days after it started waiting on a person. A daily job
@@ -321,13 +332,41 @@ A passed canary that was never promoted is stopped. `approve` on an expired item
   - `POST releases/orchestrator-challenger`, which adds `ideaId` to its response.
 
 ### Pinned rules
-- `POST pinned-rules/proposals {promptCode, find, replace, why}` (`pmAgent`) returns `{id}` and notifies the owner. `promptCode` is one of `debrief_safety_reader_system`, `debrief_quality_rubric` or `debrief_quality_judge_system`. `find` must appear exactly once in the live text.
-- `POST pm-agent/ideas/:id/approve-pinned-rule {reason?}` (`approvePinnedRule`) returns `{releaseId, version, promptVersion}`. It creates a new Skills Store version and, when the live release pins that prompt, a **DRAFT** release. The sign-off is stored as `evidence.signoff = {by, at, promptVersion, releaseId}`.
+The three pinned rules are the Safety rules (`debrief_safety_reader_system`), the Rubric
+(`debrief_quality_rubric`) and the Judge's instructions (`debrief_quality_judge_system`, the
+judge's closing instructions after the rubric, transcript and debrief; ally-be sends its live
+text to ally-ai as `judge_instructions`, and ally-ai falls back to its own copy). Every action
+below is the clinical advisor's or the owner's (`approvePinnedRule`).
+
+- **First versions.** Each rule whose version in force (the live release's pin, else the Skills
+  Store's current) has no approval gets one item, `change = {ideaKind: 'pinned_rule', promptCode,
+  firstVersion: true, version}`, titled "Approve the current Safety rules (v1)". ally-be makes them
+  at boot and on `GET pm-agent` and `GET pinned-rules` (at most once a minute per process); a
+  partial unique index (migration 1981900900000) keeps one per rule and version, and none is made
+  once that version is approved. An open one for a version no longer in force is retired. A first
+  version never expires and cannot be rejected or withdrawn.
+- `POST pinned-rules/proposals {promptCode, find, replace, why}` returns `{id}` and notifies the
+  owner. `find` must appear exactly once in the live text; otherwise 400 says the passage is not in
+  the rule, or appears more than once. Another proposal on the same rule may be open.
+- `POST pm-agent/ideas/:id/approve-pinned-rule {reason?}` returns `{releaseId, version, promptVersion}`.
+  The proposer may approve their own. A change creates a new Skills Store version and, when the
+  live release pins that prompt, a **DRAFT** release the Ally team puts live (the Judge's
+  instructions are not in the release: the team publishes the version in the Skills Store). A
+  first version creates nothing and returns `releaseId: null`. Either way the approval is stored as
+  `evidence.signoff = {by, at, promptVersion, releaseId, firstVersion?}`.
+- `POST pm-agent/ideas/:id/withdraw-pinned-rule` withdraws your own proposal (403 for anyone
+  else's): `status = 'retired'`, `evidence.withdrawn = {by, at}`, `closedReason: 'withdrawn'`,
+  audited as `retired` with `{withdrawn: true}`.
+- `POST pm-agent/ideas/:id/reject-pinned-rule {reason}` rejects a proposal from the PM agent or
+  another person; the reason is required. It is kept as `evidence.rejection = {by, at, reason}`
+  (every rejection now keeps one), and the PM agent reads it in `idea_outcomes[].rejected_because`.
+  `POST pm-agent/ideas/:id/reject` returns 403 for a pinned rule.
 - `GET pinned-rules` returns:
 ```ts
 { rules: Array<{ code; label; version: number|null; pinnedByRelease; inBundle;
-                 signedBy: {id,name}|null; signedAt: string|null; ideaId; writtenBy: {id,name}|null; writtenAt; note }>;
-  proposals: Idea[] }
+                 signedBy: {id,name}|null; signedAt: string|null; ideaId; writtenBy: {id,name}|null; writtenAt; note;
+                 text: string|null }>;      // the whole rule in force
+  proposals: Idea[] }                        // open pinned-rule items, first versions included
 ```
 
 ## Releases (like a GitHub Releases page)

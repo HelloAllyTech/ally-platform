@@ -258,7 +258,10 @@ describe('pinned rules: first-version items', () => {
       firstVersion: true,
     });
     expect(typeof rubric.evidence.signoff.at).toBe('string');
-    expect(audit.at(-1)).toMatchObject({ action: 'approved', userId: OWNER });
+    expect(audit[audit.length - 1]).toMatchObject({
+      action: 'approved',
+      userId: OWNER,
+    });
   });
 
   it('cannot be rejected or withdrawn', async () => {
@@ -348,11 +351,11 @@ describe('pinned rules: proposals', () => {
     const idea = lessons.find((l) => l.id === id)!;
     expect(idea.status).toBe('retired');
     expect(idea.evidence.withdrawn).toMatchObject({ by: ADVISOR });
-    expect(ideaState(idea)).toMatchObject({
+    expect(ideaState(idea as any)).toMatchObject({
       state: 'closed',
       closedReason: 'withdrawn',
     });
-    expect(audit.at(-1)).toMatchObject({
+    expect(audit[audit.length - 1]).toMatchObject({
       action: 'retired',
       userId: ADVISOR,
       detail: { kind: 'pinned_rule', withdrawn: true },
@@ -378,7 +381,7 @@ describe('pinned rules: proposals', () => {
       by: OWNER,
       reason: 'Too vague for a safety rule',
     });
-    expect(audit.at(-1)).toMatchObject({
+    expect(audit[audit.length - 1]).toMatchObject({
       action: 'rejected',
       detail: { reason: 'Too vague for a safety rule', kind: 'pinned_rule' },
     });
