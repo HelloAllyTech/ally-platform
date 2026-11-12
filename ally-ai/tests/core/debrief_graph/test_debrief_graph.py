@@ -39,6 +39,36 @@ def gateway():
     return FakeGateway()
 
 
+class TestCueStrength:
+    async def test_every_cue_counts_for_the_risk_flag_and_carries_its_strength(
+        self, steps, gateway
+    ):
+        """A low-mood cue no longer forces an important moment (only a clear
+        one is required), but it still counts for has_risk_cue: the Console's
+        risk flag and the learner's support lines."""
+        steps.answers["safety-reader"] = {
+            "risk_cues": [
+                {
+                    "turn_index": 2,
+                    "quote": "Everything just feels grey lately.",
+                    "category": "hopelessness",
+                    "learner_response": "explored",
+                }
+            ],
+            "learner_distress": [],
+        }
+        result = await run(steps, gateway)
+
+        assert result["has_risk_cue"] is True
+        sent = gateway.tools("run_checks")[0]["safety"]["risk_cues"]
+        assert [c["strength"] for c in sent] == ["possible"]
+        writer = [c for c in steps.calls if c["path"] == "writer"][0]["body"]
+        assert writer["safety"]["risk_cues"][0]["strength"] == "possible"
+        assert result["workspace"]["safety"]["risk_cues"][0]["category"] == (
+            "hopelessness"
+        )
+
+
 class TestStandardRun:
     async def test_publishes_with_the_runners_step_records(self, steps, gateway):
         result = await run(steps, gateway)

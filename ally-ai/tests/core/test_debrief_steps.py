@@ -219,6 +219,46 @@ async def test_writer_is_told_every_risk_cue_turn_to_cover(dispatch_returns):
         TRANSCRIPT,
     )
     assert "RISK CUES TO COVER: turns 2, 9." in calls["prompt"]
+    assert "POSSIBLE RISK CUES" not in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_must_cover_a_clear_cue_and_decides_a_possible_one(
+    dispatch_returns,
+):
+    """A low-mood cue the reader filed under hopelessness is the Writer's call
+    (2026-11-12 gold sessions); a clear one is still required."""
+    from app.core.debrief.steps import write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {
+            "risk_cues": [
+                {"turn_index": 2, "strength": "clear"},
+                {"turn_index": 5, "strength": "possible"},
+                {"turn_index": 7, "strength": "possible"},
+            ],
+            "learner_distress": [],
+        },
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+    )
+    assert "RISK CUES TO COVER: turns 2." in calls["prompt"]
+    assert "POSSIBLE RISK CUES: turns 5, 7." in calls["prompt"]
+    assert "or you are unsure, treat it as a risk cue" in calls["prompt"]
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {"risk_cues": [{"turn_index": 5, "strength": "possible"}]},
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+    )
+    assert "RISK CUES TO COVER" not in calls["prompt"]
+    assert "POSSIBLE RISK CUES: turns 5." in calls["prompt"]
 
 
 @pytest.mark.asyncio

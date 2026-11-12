@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
+from app.core.debrief.cue_strength import is_clear
 from app.core.debrief.safety_reader import TranscriptTurn
 from app.core.debrief.schemas import (
     DebriefCards,
@@ -90,14 +91,15 @@ written in). Write everything else in the SESSION LANGUAGE.
 
 Cards:
 - opening: one or two sentences on the session as a whole.
-- important_moment: when the SAFETY READING lists a client risk cue, one card \
-about the most serious one: what the client said and how the trainee \
-responded. List every other risk cue in its "others", one sentence each. \
-Celebrate it when it was explored; when it was missed, say so \
-plainly and kindly with what to do next time. Never frame it as failure.
+- important_moment: when the client said something that is a clear risk cue \
+(see RISK CUES below), one card about the most serious one: what the client \
+said and how the trainee responded. List every other risk cue in its \
+"others", one sentence each. Celebrate it when it was explored; when it was \
+missed, say so plainly and kindly with what to do next time. Never frame it as \
+failure.
 - what_worked: 1 to 3 strengths, the most important first.
-- work_on_this: 1 to 3 points, the most important first. A missed risk cue \
-always comes first. Each says why it mattered and gives one concrete line \
+- work_on_this: 1 to 3 points, the most important first. A missed clear risk \
+cue always comes first. Each says why it mattered and gives one concrete line \
 the trainee could try saying next time.
 - practise_next: the one skill to practise next and why.
 - skill_words: for each skill in the evidence map, strength, keep_practising \
@@ -105,6 +107,18 @@ or didnt_come_up.
 - reflective_question: one open question for the trainee to think about.
 - progress_note: only when a PROGRESS reading is given, one or two sentences \
 following up on past points. Otherwise leave it empty.
+
+RISK CUES. A clear risk cue is a client statement about wanting to die or not \
+wanting to live, not wanting to be here or wishing they could disappear, \
+others being better off without them, not being able to go on, self-harm, a \
+plan or a means to end their life, wanting to harm someone, or being abused \
+or in danger. It counts whether it is said directly or indirectly, in any \
+language or mix of languages. Low mood, stress, tiredness, burden, \
+loneliness, grief or guilt without any of these is not a risk cue, even when \
+the SAFETY READING lists it: do not make an important moment of it, and \
+coach it as ordinary counselling (staying with the feeling, reflecting, \
+exploring it), never as assessing risk. When you are unsure whether a \
+statement is a clear risk cue, treat it as one.
 
 Use GUIDANCE passages only where they fit the moment; never cite them by \
 title. Lead lines at most 25 words, bodies at most 60 words. Plain words a \
@@ -353,15 +367,33 @@ async def write(
         "Never mention turn numbers in what you write; the quote is how the "
         "learner finds the moment."
     )
-    cue_turns = sorted({c.get("turn_index") for c in safety.get("risk_cues", [])})
+    cues = safety.get("risk_cues", [])
+    cue_turns = sorted({c.get("turn_index") for c in cues if is_clear(c)})
+    possible_turns = sorted(
+        {c.get("turn_index") for c in cues if not is_clear(c)} - set(cue_turns)
+    )
     if cue_turns:
-        # Code-owned, not prompt-owned: a debrief that leaves any cue out is
-        # the worst failure it can have, whatever the live prompt says.
+        # Code-owned, not prompt-owned: a debrief that leaves a clear cue out
+        # is the worst failure it can have, whatever the live prompt says.
         lines.append(
             "RISK CUES TO COVER: turns "
             + ", ".join(str(t) for t in cue_turns)
             + ". The important_moment card covers the most serious one; list "
             "every other one in important_moment.others."
+        )
+    if possible_turns:
+        # Code-owned: the Safety reader includes a statement when unsure, and
+        # these are the ones it filed under hopelessness with no word of
+        # death, self-harm or a means (cue_strength.py). The live prompt says
+        # what counts as a clear risk cue; unsure still means a card.
+        lines.append(
+            "POSSIBLE RISK CUES: turns "
+            + ", ".join(str(t) for t in possible_turns)
+            + ". The safety reader was not sure these are risk cues. Decide "
+            "each one by your instructions on risk cues. When one is a clear "
+            "risk cue, or you are unsure, treat it as a risk cue: the "
+            "important moment, or a line in important_moment.others. When it "
+            "is not, do not make an important moment of it."
         )
     lines += _practice_instruction(practice_options)
     if case_memory:

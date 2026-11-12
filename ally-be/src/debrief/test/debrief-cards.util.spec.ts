@@ -307,6 +307,35 @@ describe('debrief checks', () => {
     expect(run(c)).toContain(DebriefCheckCode.RISK_CUE_UNCOVERED);
   });
 
+  it("leaves a 'possible' cue to the Writer, and still requires a clear one", () => {
+    const lowMood = {
+      turn_index: 4,
+      quote: 'Exams',
+      category: 'hopelessness',
+      learner_response: 'missed',
+      strength: 'possible' as const,
+    };
+    const c = good();
+    c.important_moment = null;
+    // Only a possible cue: no important moment is not a failure.
+    expect(
+      run(c, { safety: { risk_cues: [lowMood], learner_distress: [] } }),
+    ).not.toContain(DebriefCheckCode.RISK_CUE_UNCOVERED);
+    // A clear cue beside it still needs the card; the possible one does not
+    // need a line in `others`.
+    const clearToo = {
+      risk_cues: [
+        { ...safety.risk_cues[0], strength: 'clear' as const },
+        lowMood,
+      ],
+      learner_distress: [],
+    };
+    expect(run(c, { safety: clearToo })).toContain(
+      DebriefCheckCode.RISK_CUE_UNCOVERED,
+    );
+    expect(run(good(), { safety: clearToo })).toEqual([]);
+  });
+
   it('refuses scores, diagnoses, exclamations and unsupported progress claims', () => {
     const c = good();
     c.opening = 'You scored 7/10 today!';

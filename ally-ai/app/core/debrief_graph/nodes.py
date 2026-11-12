@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Literal, Optional
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
+from app.core.debrief.cue_strength import with_strength
 from app.core.debrief_graph import inputs as body
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import (
@@ -182,7 +183,10 @@ async def after_reading(
         # would read as a safe session.
         return _end(Status.NEEDS_PERSON, "safety_reader_failed")
     safety = {
-        "risk_cues": safety_res.get("risk_cues") or [],
+        # Each cue keeps every field the reader returned, plus how sure it is
+        # (cue_strength.py): only a clear cue must become the important moment.
+        # Every cue still counts for has_risk_cue below.
+        "risk_cues": with_strength(safety_res.get("risk_cues") or []),
         "learner_distress": safety_res.get("learner_distress") or [],
     }
     analyst_step = ctx.step_of(state["recipe_key"], Step.ANALYST)

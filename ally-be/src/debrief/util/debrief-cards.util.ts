@@ -73,6 +73,13 @@ export interface SafetyReading {
     quote: string;
     category: string;
     learner_response: string;
+    /**
+     * How sure the cue is, set by ally-ai from the reader's own answer
+     * (`cue_strength.py`): `possible` is a hopelessness cue with no word of
+     * death, self-harm or a means, which the Writer may judge not a risk cue.
+     * Absent means clear.
+     */
+    strength?: 'clear' | 'possible';
   }>;
   learner_distress: Array<{ turn_index: number; quote: string }>;
 }
@@ -403,10 +410,19 @@ export function runDebriefChecks(input: {
     }
   }
 
-  // Every client risk cue is covered: the most serious one by the important
-  // moment, each other one by a line in its `others`. A cue left out is the
-  // worst failure a debrief can have, so a single uncovered turn fails.
-  const cueTurns = [...new Set(safety.risk_cues.map((c) => c.turn_index))];
+  // Every clear client risk cue is covered: the most serious one by the
+  // important moment, each other one by a line in its `others`. A cue left out
+  // is the worst failure a debrief can have, so a single uncovered turn fails.
+  // A `possible` cue is the Writer's call (low mood or grief is coached as
+  // ordinary counselling), so leaving it out is not a failure; a cue without a
+  // strength counts as clear.
+  const cueTurns = [
+    ...new Set(
+      safety.risk_cues
+        .filter((c) => c.strength !== 'possible')
+        .map((c) => c.turn_index),
+    ),
+  ];
   if (cueTurns.length > 0) {
     if (!cards.important_moment) {
       fail(
