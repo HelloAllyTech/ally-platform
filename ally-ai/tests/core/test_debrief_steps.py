@@ -247,7 +247,8 @@ async def test_writer_must_cover_a_clear_cue_and_decides_a_possible_one(
     )
     assert "RISK CUES TO COVER: turns 2." in calls["prompt"]
     assert "POSSIBLE RISK CUES: turns 5, 7." in calls["prompt"]
-    assert "or you are unsure, treat it as a risk cue" in calls["prompt"]
+    assert "or might and you cannot tell" in calls["prompt"]
+    assert "no coaching about assessing risk" in calls["prompt"]
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write(

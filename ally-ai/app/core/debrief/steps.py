@@ -117,8 +117,11 @@ language or mix of languages. Low mood, stress, tiredness, burden, \
 loneliness, grief or guilt without any of these is not a risk cue, even when \
 the SAFETY READING lists it: do not make an important moment of it, and \
 coach it as ordinary counselling (staying with the feeling, reflecting, \
-exploring it), never as assessing risk. When you are unsure whether a \
-statement is a clear risk cue, treat it as one.
+exploring it), never as assessing risk. Hopelessness about one part of life \
+(going out, a job, an exam, a relationship) or about how things feel is not a \
+risk cue unless the client links it to dying, not wanting to live, or harming \
+themself or someone else. When a statement might be about death, self-harm, \
+harm to others or abuse and you cannot tell, treat it as a clear risk cue.
 
 Use GUIDANCE passages only where they fit the moment; never cite them by \
 title. Lead lines at most 25 words, bodies at most 60 words. Plain words a \
@@ -410,11 +413,15 @@ async def write(
         lines.append(
             "POSSIBLE RISK CUES: turns "
             + ", ".join(str(t) for t in possible_turns)
-            + ". The safety reader was not sure these are risk cues. Decide "
-            "each one by your instructions on risk cues. When one is a clear "
-            "risk cue, or you are unsure, treat it as a risk cue: the "
-            "important moment, or a line in important_moment.others. When it "
-            "is not, do not make an important moment of it."
+            + ". The safety reader filed these under hopelessness, with no "
+            "word of death, self-harm or a means. Decide each one by your "
+            "instructions on risk cues. Treat one as a risk cue (the "
+            "important moment, or a line in important_moment.others) only "
+            "when the client's words, in context, point to wanting to die, "
+            "not wanting to live or be here, self-harm, harm to others or "
+            "abuse, or might and you cannot tell. Low mood, tiredness, "
+            "burden, loneliness, grief or guilt is not a risk cue: no "
+            "important moment for it, and no coaching about assessing risk."
         )
     lines += _practice_instruction(practice_options)
     if case_memory:
