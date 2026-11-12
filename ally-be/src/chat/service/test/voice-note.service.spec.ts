@@ -229,7 +229,10 @@ describe('VoiceNoteService', () => {
       mockTranscriptionsCreate.mockImplementation(() => {
         const index = callIndex++;
         return new Promise((resolve) =>
-          setTimeout(() => resolve({ text: chunkTexts[index] }), delaysMs[index]),
+          setTimeout(
+            () => resolve({ text: chunkTexts[index] }),
+            delaysMs[index],
+          ),
         );
       });
 
