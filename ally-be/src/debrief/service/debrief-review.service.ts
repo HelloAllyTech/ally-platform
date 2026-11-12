@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { redactText } from 'src/guide/safety/redaction';
 import {
   DEBRIEF_HARD_FAIL_CODES,
   DebriefHardFailCode,
@@ -243,10 +242,13 @@ export class DebriefReviewService {
     return run;
   }
 
-  /** The transcript as the review screen shows it: numbered, redacted, gaps and risk cues marked. */
-  private async reviewTranscript(
-    run: DebriefRun,
-  ): Promise<ReviewTranscriptTurn[]> {
+  /**
+   * The transcript as the review screen shows it: numbered, gaps and risk
+   * cues marked. Not redacted: reviewers and the clinical advisor need the
+   * real context (console redesign decision, 2026-11-12; the redaction rule
+   * belonged to the dropped outside-expert calibration set).
+   */
+  async reviewTranscript(run: DebriefRun): Promise<ReviewTranscriptTurn[]> {
     const turns = await this.context.transcript(run.scenarioSessionId);
     const cues = new Map<
       number,
@@ -265,7 +267,7 @@ export class DebriefReviewService {
     return turns.map((t) => ({
       turnIndex: t.turn_index,
       speaker: t.role === 'client' ? 'client' : 'learner',
-      text: redactText(t.text),
+      text: t.text,
       gap: isTranscriptGap(t.text),
       riskCue: cues.get(t.turn_index) ?? null,
     }));
@@ -384,7 +386,7 @@ export class DebriefReviewService {
   }
 
   /** A run's comments, oldest first, each with the idea it fed and whether it is the caller's. */
-  private async commentsForRun(runId: string, reviewerId: number) {
+  async commentsForRun(runId: string, reviewerId: number) {
     const rows: Array<Record<string, any>> = await this.dataSource.query(
       `SELECT c.*, u.name AS "reviewerName",
               l.status AS "ideaStatus", l.text AS "ideaTitle",

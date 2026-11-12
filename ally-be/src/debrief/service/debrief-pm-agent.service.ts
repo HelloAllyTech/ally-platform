@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
@@ -13,7 +14,10 @@ import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.r
 import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants';
 import { runWithConcurrency } from '../../analytics/util/judge-concurrency.util';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
-import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
+import {
+  AgentReleaseAuditAction,
+  AgentReleaseAuthorKind,
+} from '../../llm-agent/harness/enum/harness.enum';
 import { PromptVersioningService } from '../../prompt/service/prompt-versioning.service';
 import { PromptVersionSource } from '../../prompt/entity/prompt-version.entity';
 import {
@@ -28,7 +32,13 @@ import {
   MetricsViewLike,
 } from '../util/debrief-metric-failures.util';
 import { DebriefRunArm, DebriefRunMode } from '../enum/debrief-run.enum';
+import { createHash, randomUUID } from 'crypto';
+import {
+  approvalState,
+  PINNED_RULE_CODES,
+} from '../util/debrief-console-view.util';
 import { DebriefContextRepository } from './debrief-context.repository';
+import { DebriefAutonomyService } from './debrief-autonomy.service';
 import { DebriefMetricsService } from './debrief-metrics.service';
 import {
   GateResult,
@@ -78,13 +88,27 @@ export class DebriefPmAgentService implements OnModuleInit {
     private readonly ownerSettings: DebriefSettingsService,
     private readonly metrics: DebriefMetricsService,
     private readonly moduleRef: ModuleRef,
+    /** What may run on its own per kind and step (PRD §12); absent in unit tests. */
+    @Optional() private readonly autonomy?: DebriefAutonomyService,
   ) {}
+
+  /** The policy for this idea at this step; 'auto' when no policy is wired (tests). */
+  private async stepPolicy(
+    idea: Record<string, any>,
+    step: 'quick_test' | 'gate_test' | 'paired_trial' | 'canary',
+  ): Promise<'auto' | 'ask' | 'off'> {
+    return this.autonomy ? this.autonomy.forIdea(idea, step) : 'auto';
+  }
 
   onModuleInit(): void {
     // Closing the loop (spec C5): once a promoted idea has stood PM_HOLD_DAYS,
     // record whether the metric it named moved the way it said.
     scheduledTaskRegistry.register('daily', 'debrief-pm-agent-forecasts', () =>
       this.checkForecasts().then(() => undefined),
+    );
+    // Plan §11.7: an approval unanswered for 14 days expires as "no decision".
+    scheduledTaskRegistry.register('daily', 'debrief-pm-agent-expiry', () =>
+      this.expireApprovals().then(() => undefined),
     );
   }
 
@@ -146,6 +170,7 @@ export class DebriefPmAgentService implements OnModuleInit {
   async history(limit = 30): Promise<Array<Record<string, any>>> {
     return this.dataSource.query(
       `SELECT l.id, l.status, l.text AS title, l.change, l.evidence, l."createdAt",
+              l."decidedBy", l."decidedAt",
               r.version AS "releaseVersion", r.status AS "releaseStatus"
          FROM agent_lessons l
          LEFT JOIN agent_releases r ON r.id = l."releaseId"
@@ -279,6 +304,11 @@ export class DebriefPmAgentService implements OnModuleInit {
     ) {
       throw new ConflictException('this idea is already being tried');
     }
+    if ((await this.stepPolicy(idea, 'quick_test')) === 'off') {
+      throw new ConflictException(
+        'quick tests are off for this kind of change (owner policy)',
+      );
+    }
     await this.requireLearningBudget();
     const challenger = await this.challengerOptions(idea);
     const settings = await this.ownerSettings.get();
@@ -304,7 +334,7 @@ export class DebriefPmAgentService implements OnModuleInit {
         step: 'quick_test',
         ...result,
       });
-      if (result.passed) await this.gate(ideaId);
+      if (result.passed) await this.nextStep(idea, 'gate_test');
     })().catch(async (e) => {
       this.logger.error(
         `[pm-agent] quick test ${ideaId} failed: ${(e as Error).message}`,
@@ -352,13 +382,7 @@ export class DebriefPmAgentService implements OnModuleInit {
         step: 'gate',
         ...result,
       });
-      if (result.passed) {
-        await this.writeEvidence(ideaId, 'trial', {
-          status: 'running',
-          startedAt: new Date().toISOString(),
-          comparisons: 0,
-        });
-      }
+      if (result.passed) await this.nextStep(idea, 'paired_trial');
       return result;
     } catch (e) {
       this.logger.error(
@@ -418,6 +442,71 @@ export class DebriefPmAgentService implements OnModuleInit {
     return pairs;
   }
 
+  /**
+   * A rung passed: start the next one on its own when the policy says
+   * "auto", leave it waiting for a person on "ask", stop on "off".
+   */
+  private async nextStep(
+    idea: Record<string, any>,
+    step: 'gate_test' | 'paired_trial',
+  ): Promise<void> {
+    const policy = await this.stepPolicy(idea, step);
+    const key = step === 'gate_test' ? 'gate' : 'trial';
+    if (policy === 'auto') {
+      if (step === 'gate_test') await this.gate(idea.id);
+      else await this.startTrial(idea.id);
+      return;
+    }
+    await this.writeEvidence(idea.id, key, {
+      status: policy === 'ask' ? 'waiting' : 'off',
+      at: new Date().toISOString(),
+    });
+  }
+
+  private async startTrial(ideaId: string): Promise<void> {
+    await this.writeEvidence(ideaId, 'trial', {
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      comparisons: 0,
+    });
+  }
+
+  /**
+   * A person starts a step the policy left waiting ("ask"): the gate test
+   * after a passed quick test, or the paired trial after a passed gate.
+   */
+  async startStep(
+    ideaId: string,
+    step: 'gate_test' | 'paired_trial',
+    userId: number,
+  ): Promise<{ step: string; status: 'running' }> {
+    const idea = await this.getIdea(ideaId);
+    if ((await this.stepPolicy(idea, step)) === 'off') {
+      throw new ConflictException(`${step} is off for this kind of change`);
+    }
+    if (step === 'gate_test') {
+      if (idea.evidence?.screen?.passed !== true) {
+        throw new ConflictException('the quick test has not passed');
+      }
+      if (idea.evidence?.gate?.status === 'running') {
+        throw new ConflictException('the gate test is already running');
+      }
+      void this.gate(ideaId);
+    } else {
+      if (idea.evidence?.gate?.passed !== true) {
+        throw new ConflictException('the gate test has not passed');
+      }
+      if (idea.evidence?.trial?.status === 'running') {
+        throw new ConflictException('the paired trial is already running');
+      }
+      await this.startTrial(ideaId);
+    }
+    await this.audit('pipeline_step', ideaId, userId, {
+      step: `${step}_started`,
+    });
+    return { step, status: 'running' };
+  }
+
   /** Merge one rung's result into the idea's evidence. */
   async writeEvidence(
     ideaId: string,
@@ -428,7 +517,9 @@ export class DebriefPmAgentService implements OnModuleInit {
       | 'canary'
       | 'draft'
       | 'handoff'
-      | 'forecast',
+      | 'forecast'
+      | 'expiry'
+      | 'signoff',
     value: Record<string, unknown>,
   ): Promise<void> {
     await this.dataSource.query(
@@ -458,7 +549,17 @@ export class DebriefPmAgentService implements OnModuleInit {
     if (!['proposed', 'approved'].includes(idea.status)) {
       throw new ConflictException(`this idea is ${idea.status}`);
     }
+    if (approvalState(idea as any)?.expired) {
+      throw new ConflictException(
+        'this approval expired after 14 days with no decision',
+      );
+    }
     const kind = idea.change?.ideaKind;
+    if (kind === 'pinned_rule') {
+      throw new BadRequestException(
+        'a pinned-rule change is approved by the clinical advisor or the owner (approvePinnedRule)',
+      );
+    }
     if (['needs_code', 'defect', 'needs_person'].includes(kind)) {
       return this.approveHandoff(idea, userId, note);
     }
@@ -504,6 +605,11 @@ export class DebriefPmAgentService implements OnModuleInit {
     if (idea.evidence?.trial?.status !== 'passed') {
       throw new ConflictException(
         'only a change that passed its paired trial on real sessions can start a canary',
+      );
+    }
+    if ((await this.stepPolicy(idea, 'canary')) === 'off') {
+      throw new ConflictException(
+        'canaries are off for this kind of change (owner policy)',
       );
     }
     const { bundle } = await this.gaBundle();
@@ -660,6 +766,309 @@ export class DebriefPmAgentService implements OnModuleInit {
       note: note ?? null,
     });
     return { stage, id };
+  }
+
+  // --- Approvals: questions, expiry, pinned rules (plan §11.7) ----------------------
+
+  /**
+   * "Ask a question" on an item waiting for approval: a thread on the idea,
+   * kept in its evidence. The PM agent reads open questions on its next run
+   * (run context `open_questions`). Asking does not stop the 14-day clock.
+   */
+  async askQuestion(
+    ideaId: string,
+    userId: number,
+    text: string,
+  ): Promise<{ id: string; at: string }> {
+    const idea = await this.getIdea(ideaId);
+    if (['rejected', 'retired'].includes(idea.status)) {
+      throw new ConflictException(`this idea is ${idea.status}`);
+    }
+    const body = (text ?? '').trim();
+    if (!body) throw new BadRequestException('Write the question first');
+    const entry = {
+      id: randomUUID(),
+      role: 'person',
+      by: userId,
+      at: new Date().toISOString(),
+      text: body.slice(0, 2000),
+    };
+    await this.dataSource.query(
+      `UPDATE agent_lessons
+          SET evidence = jsonb_set(coalesce(evidence, '{}'::jsonb), '{questions}',
+                coalesce(evidence->'questions', '[]'::jsonb) || jsonb_build_array($2::jsonb)),
+              "updatedAt" = now()
+        WHERE id = $1::uuid`,
+      [ideaId, JSON.stringify(entry)],
+    );
+    await this.audit('pipeline_step', ideaId, userId, {
+      step: 'question',
+      questionId: entry.id,
+    });
+    return { id: entry.id, at: entry.at };
+  }
+
+  /** Questions people asked that the PM agent has not answered, for its run context. */
+  async openQuestions(): Promise<
+    Array<{ idea_id: string; title: string; question: string; at: string }>
+  > {
+    const rows: Array<{ id: string; text: string; questions: any[] }> =
+      await this.dataSource.query(
+        `SELECT id, text, evidence->'questions' AS questions FROM agent_lessons
+          WHERE "agentKey" = $1 AND status IN ('proposed','approved')
+            AND jsonb_array_length(coalesce(evidence->'questions','[]'::jsonb)) > 0`,
+        [DEBRIEF_AGENT_KEY],
+      );
+    const out: Array<{
+      idea_id: string;
+      title: string;
+      question: string;
+      at: string;
+    }> = [];
+    for (const r of rows) {
+      const qs = (r.questions ?? []) as Array<{
+        role: string;
+        text: string;
+        at: string;
+      }>;
+      const lastAgent = qs.map((q) => q.role).lastIndexOf('agent');
+      for (const q of qs.slice(lastAgent + 1)) {
+        if (q.role === 'person') {
+          out.push({
+            idea_id: r.id,
+            title: r.text,
+            question: q.text,
+            at: q.at,
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Plan §11.7: items unanswered for 14 days expire as "no decision". The
+   * idea is set aside (rejected, with `evidence.expiry`), so it shows under
+   * "Not taken forward"; a canary that passed and was never promoted is
+   * stopped, back to the release in force.
+   */
+  async expireApprovals(now = new Date()): Promise<number> {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT id, status, change, evidence, "createdAt" FROM agent_lessons
+        WHERE "agentKey" = $1 AND status IN ('proposed','approved')
+          AND NOT (coalesce(evidence, '{}'::jsonb) ? 'expiry')`,
+      [DEBRIEF_AGENT_KEY],
+    );
+    let expired = 0;
+    for (const idea of rows) {
+      const state = approvalState(idea as any, now);
+      if (!state?.expired) continue;
+      await this.writeEvidence(idea.id, 'expiry', {
+        at: now.toISOString(),
+        reason: 'no_decision',
+        wait: state.wait,
+        since: state.since,
+      });
+      await this.dataSource.query(
+        `UPDATE agent_lessons SET status = 'rejected', "updatedAt" = now() WHERE id = $1`,
+        [idea.id],
+      );
+      await this.audit('rejected', idea.id, null, {
+        reason: 'expired_no_decision',
+        wait: state.wait,
+      });
+      if (state.wait === 'promote') {
+        await this.releases
+          .stopCanary(
+            DEBRIEF_AGENT_KEY,
+            null,
+            false,
+            'approval expired with no decision',
+            {
+              actorKind: AgentReleaseAuthorKind.SYSTEM,
+              action: AgentReleaseAuditAction.CANARY_STOPPED,
+              detail: { ideaId: idea.id },
+            },
+          )
+          .catch((e) =>
+            this.logger.warn(
+              `[pm-agent] could not stop the canary of expired idea ${idea.id}: ${(e as Error).message}`,
+            ),
+          );
+      }
+      expired++;
+    }
+    return expired;
+  }
+
+  /**
+   * A pinned-rule proposal (plan §11.7 "always a person"): a change to the
+   * safety rules, the rubric or the judge's instructions, written as a find
+   * and replace on the prompt's live text. It waits in the PM agent's "Needs
+   * you" list for the clinical advisor or the owner.
+   */
+  async proposePinnedRule(
+    input: { promptCode: string; find: string; replace: string; why: string },
+    userId: number,
+  ): Promise<{ id: string }> {
+    if (!PINNED_RULE_CODES.has(input.promptCode)) {
+      throw new BadRequestException(
+        `${input.promptCode} is not a pinned rule; pinned: ${[...PINNED_RULE_CODES].join(', ')}`,
+      );
+    }
+    const { bundle } = await this.gaBundle();
+    const live = await this.context.promptText(
+      input.promptCode,
+      bundle.prompts[input.promptCode] ?? null,
+    );
+    if (!live) {
+      throw new NotFoundException(`${input.promptCode} has no live text`);
+    }
+    if (!input.find || live.indexOf(input.find) < 0) {
+      throw new BadRequestException(
+        'the passage to change is not in the live text; copy it exactly',
+      );
+    }
+    if (live.indexOf(input.find, live.indexOf(input.find) + 1) >= 0) {
+      throw new BadRequestException(
+        'that passage appears more than once; quote a longer one',
+      );
+    }
+    if (input.find === input.replace) {
+      throw new BadRequestException('the change is the same as the text');
+    }
+    const why = (input.why ?? '').trim();
+    if (!why) throw new BadRequestException('Say why the rule should change');
+    const change = {
+      ideaKind: 'pinned_rule',
+      promptCode: input.promptCode,
+      find: input.find,
+      replace: input.replace,
+    };
+    const hash = createHash('sha256')
+      .update(JSON.stringify(change))
+      .digest('hex');
+    const rows = await this.dataSource.query(
+      `INSERT INTO agent_lessons
+         ("agentKey", kind, scope, status, text, change, evidence, "contentHash", "authorKind")
+       SELECT $1::varchar, 'prompt', 'platform', 'proposed', $2::varchar, $3::jsonb, $4::jsonb,
+              $5::varchar, 'human'
+        WHERE NOT EXISTS (SELECT 1 FROM agent_lessons
+                           WHERE "agentKey" = $1::varchar AND "contentHash" = $5::varchar)
+       RETURNING id`,
+      [
+        DEBRIEF_AGENT_KEY,
+        `Pinned rule: ${why}`.slice(0, 300),
+        JSON.stringify(change),
+        JSON.stringify({ why, proposedBy: userId }),
+        hash,
+      ],
+    );
+    if (!rows?.[0]?.id) {
+      throw new ConflictException('this change has already been proposed');
+    }
+    await this.audit('proposed', rows[0].id, userId, { kind: 'pinned_rule' });
+    return { id: rows[0].id };
+  }
+
+  /**
+   * The clinical advisor or the owner signs a pinned-rule change off: the new
+   * text becomes a Skills Store version and a DRAFT release pins it. Nothing
+   * reaches learners until a person makes that release live (Releases).
+   * The sign-off (who, when) is kept on the idea and read by the pinned-rules
+   * list.
+   */
+  async approvePinnedRule(
+    ideaId: string,
+    userId: number,
+    note?: string,
+  ): Promise<{ releaseId: string; version: number; promptVersion: number }> {
+    const idea = await this.getIdea(ideaId);
+    if (idea.change?.ideaKind !== 'pinned_rule') {
+      throw new BadRequestException('this idea is not a pinned-rule change');
+    }
+    if (idea.status !== 'proposed') {
+      throw new ConflictException(`this idea is ${idea.status}`);
+    }
+    if (approvalState(idea as any)?.expired) {
+      throw new ConflictException(
+        'this approval expired after 14 days with no decision',
+      );
+    }
+    const code = idea.change.promptCode as string;
+    const { bundle } = await this.gaBundle();
+    const current = await this.context.promptText(
+      code,
+      bundle.prompts[code] ?? null,
+    );
+    if (!current || !current.includes(idea.change.find)) {
+      throw new ConflictException(
+        'the rule changed since this proposal; its passage is gone',
+      );
+    }
+    const [prompt] = await this.dataSource.query(
+      `SELECT id FROM prompts WHERE "promptCode" = $1`,
+      [code],
+    );
+    if (!prompt) {
+      throw new NotFoundException(`prompt ${code} is not in the Skills Store`);
+    }
+    const latest = await this.prompts.latestVersionOf(prompt.id);
+    const version = await this.prompts.createVersion(
+      prompt.id,
+      {
+        body: current.replace(idea.change.find, idea.change.replace),
+        baseVersion: latest,
+        source: PromptVersionSource.EXPERIMENT,
+        note: `Pinned-rule change ${ideaId}, signed off by user ${userId}: ${idea.text}`.slice(
+          0,
+          500,
+        ),
+        evalSummary: null,
+        createdBy: userId,
+      },
+      { translate: 'none' },
+    );
+    const next: DebriefBundle = JSON.parse(JSON.stringify(bundle));
+    let releaseId: string | null = null;
+    let releaseVersion: number | null = null;
+    if (code in next.prompts) {
+      next.prompts[code] = version.version;
+      const draft = await this.releases.createDraft(
+        DEBRIEF_AGENT_KEY,
+        next as unknown as Record<string, unknown>,
+        userId,
+        `Pinned rule (${code} v${version.version}): ${idea.text}`.slice(0, 300),
+      );
+      releaseId = draft.id;
+      releaseVersion = draft.version;
+    }
+    const signedAt = new Date().toISOString();
+    await this.writeEvidence(ideaId, 'signoff', {
+      by: userId,
+      at: signedAt,
+      note: note ?? null,
+      promptCode: code,
+      promptVersion: version.version,
+      releaseId,
+    });
+    await this.dataSource.query(
+      `UPDATE agent_lessons SET status = 'approved', "decidedBy" = $2, "decidedAt" = now(),
+              "releaseId" = $3, "updatedAt" = now() WHERE id = $1`,
+      [ideaId, userId, releaseId],
+    );
+    await this.audit('approved', ideaId, userId, {
+      kind: 'pinned_rule',
+      promptCode: code,
+      promptVersion: version.version,
+      releaseId,
+      note: note ?? null,
+    });
+    return {
+      releaseId: releaseId as string,
+      version: releaseVersion as number,
+      promptVersion: version.version,
+    };
   }
 
   // --- Closing the loop (spec C5, FR-64) ------------------------------------------

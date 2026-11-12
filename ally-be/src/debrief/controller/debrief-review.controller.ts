@@ -42,6 +42,7 @@ import {
 } from '../enum/debrief-review.enum';
 import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefReviewService } from '../service/debrief-review.service';
+import { DebriefAct } from '../util/debrief-console-roles.util';
 import {
   COMMENT_BODY_MAX,
   QUOTE_MAX,
@@ -216,7 +217,7 @@ export class DebriefReviewController {
   }
 
   @Put('runs/:id/verdict')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS, EXPERT)
+  @DebriefAct('verdict')
   @ApiOperation({
     summary:
       'Give or change your verdict; it also joins the judge calibration set',
@@ -230,7 +231,7 @@ export class DebriefReviewController {
   }
 
   @Post('runs/:id/comments')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS, EXPERT)
+  @DebriefAct('comment')
   @ApiOperation({
     summary: 'Comment on a line, a card or the whole debrief, or reply',
   })
@@ -243,7 +244,7 @@ export class DebriefReviewController {
   }
 
   @Patch('comments/:id')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS, EXPERT)
+  @DebriefAct('comment')
   @ApiOperation({ summary: 'Edit your comment' })
   editComment(
     @Param('id', ParseUUIDPipe) id: string,
@@ -254,7 +255,7 @@ export class DebriefReviewController {
   }
 
   @Delete('comments/:id')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS, EXPERT)
+  @DebriefAct('comment')
   @ApiOperation({ summary: 'Delete your comment' })
   deleteComment(
     @Param('id', ParseUUIDPipe) id: string,
@@ -264,7 +265,7 @@ export class DebriefReviewController {
   }
 
   @Post('comments/:id/resolve')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS, EXPERT)
+  @DebriefAct('comment')
   @ApiOperation({ summary: 'Resolve a thread' })
   resolve(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     return this.reviews.setStatus(
@@ -275,14 +276,14 @@ export class DebriefReviewController {
   }
 
   @Post('comments/:id/reopen')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS, EXPERT)
+  @DebriefAct('comment')
   @ApiOperation({ summary: 'Re-open a resolved thread' })
   reopen(@Param('id', ParseUUIDPipe) id: string, @Req() req: AuthedRequest) {
     return this.reviews.setStatus(id, req.user.id, DebriefCommentStatus.OPEN);
   }
 
   @Post('comments/:id/still-happening')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS, EXPERT)
+  @DebriefAct('comment')
   @ApiOperation({
     summary:
       'The problem this comment raised happened again on a later debrief: re-open it there',

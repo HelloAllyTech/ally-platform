@@ -23,4 +23,12 @@ export class DebriefOwnerSettings extends BaseWithoutTenantEntity {
 
   @Column({ type: 'int', nullable: true })
   updatedBy?: number | null;
+
+  /**
+   * What the PM agent may do alone (migration 1981900740000): the policy
+   * matrix, per-organisation overrides (tighten only) and automatic re-locks.
+   * Read through DebriefAutonomyService; null reads as today's defaults.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  autonomy?: Record<string, any> | null;
 }

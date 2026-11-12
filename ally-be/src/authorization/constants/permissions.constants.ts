@@ -404,6 +404,13 @@ const PERMISSIONS = {
   // transcript beside its cards, comment on exact lines and give a verdict.
   // Platform-tier groups by migration; clinical experts granted person by person.
   REVIEW_DEBRIEFS: 'review:admin:debriefs',
+  // The Debrief owner (debrief-console-redesign-notes.md, "Who can act"):
+  // switching an organisation on, budgets, test thresholds and accepted
+  // proposals, autonomy unlocks, steering weights, and (with REVIEW_DEBRIEFS
+  // holders) pinned-rule sign-off. SUPER_DUPER_ADMIN by migration; otherwise
+  // granted person by person. The Ally team acts on platform access
+  // (SYSTEM_ACCESS); the clinical advisor is REVIEW_DEBRIEFS.
+  MANAGE_DEBRIEF_SETTINGS: 'manage:admin:debrief-settings',
 
   // === PRODUCT ROADMAP ===
   // Three tiers, because the roadmap is a voting board rather than a CRUD screen:
@@ -601,6 +608,8 @@ const SUPER_DUPER_ADMIN_PERMISSIONS = [
   // a Builder session, and pinning a saved view for everyone. SUPER_ADMIN gets
   // VIEW + VOTE only (see above).
   PERMISSIONS.EDIT_PRODUCT_ROADMAP,
+  // The Debrief owner: budgets, thresholds, switching an organisation on.
+  PERMISSIONS.MANAGE_DEBRIEF_SETTINGS,
   PERMISSIONS.VIEW_AWS_LOGS,
   PERMISSIONS.VIEW_MOBILE_RELEASES,
   PERMISSIONS.TRIGGER_MOBILE_RELEASES,

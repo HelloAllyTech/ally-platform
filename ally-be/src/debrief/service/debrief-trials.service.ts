@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
@@ -25,6 +25,7 @@ import {
   AgentReleaseAuditAction,
 } from '../../llm-agent/harness/enum/harness.enum';
 import { DebriefPmAgentService } from './debrief-pm-agent.service';
+import { DebriefAutonomyService } from './debrief-autonomy.service';
 import { DebriefRunJudgeService } from './debrief-run-judge.service';
 import { DebriefRunnerService } from './debrief-runner.service';
 import { DebriefSettingsService } from './debrief-settings.service';
@@ -76,6 +77,7 @@ export class DebriefTrialsService implements OnModuleInit {
     private readonly settings: DebriefSettingsService,
     private readonly releases: AgentReleaseService,
     private readonly testSets: DebriefTestSetsService,
+    @Optional() private readonly autonomy?: DebriefAutonomyService,
   ) {}
 
   onModuleInit(): void {
@@ -136,6 +138,13 @@ export class DebriefTrialsService implements OnModuleInit {
         return;
       }
       const full = await this.pmAgent.getIdea(idea.id);
+      // An organisation may tighten paired trials on its learners' sessions.
+      if (
+        this.autonomy &&
+        !(await this.autonomy.orgAllows(full, 'paired_trial', run.tenantId))
+      ) {
+        return;
+      }
       const baseline =
         run.workspace?.judge ?? (await this.judge.judge(run).catch(() => null));
       const challenger = await this.runner.run(run.scenarioSessionId, {
@@ -236,6 +245,20 @@ export class DebriefTrialsService implements OnModuleInit {
     }
     const c = this.canaryCache.value;
     if (!c || c.share <= 0) return null;
+    if (this.autonomy && bucket(sessionId) < c.share) {
+      // An organisation may tighten canaries on its learners.
+      const [s] = await this.dataSource.query(
+        `SELECT tenant_id FROM scenario_sessions WHERE id = $1`,
+        [sessionId],
+      );
+      const idea = await this.pmAgent.getIdea(c.ideaId).catch(() => null);
+      if (
+        idea &&
+        !(await this.autonomy.orgAllows(idea, 'canary', s?.tenant_id ?? null))
+      ) {
+        return null;
+      }
+    }
     return bucket(sessionId) < c.share
       ? { ideaId: c.ideaId, release: c.release }
       : null;

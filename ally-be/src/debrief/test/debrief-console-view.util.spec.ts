@@ -1,0 +1,337 @@
+import { debriefRoles } from '../util/debrief-console-roles.util';
+import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
+import {
+  approvalState,
+  AutonomyFacts,
+  effectivePolicy,
+  heldReasons,
+  kindEligibility,
+  matrixChangeRefusal,
+  normaliseAutonomy,
+  parseSessionFilters,
+  pendingActions,
+  PendingFacts,
+  relockReason,
+  turnsIn,
+} from '../util/debrief-console-view.util';
+
+const eligible: AutonomyFacts = {
+  gate: { met: true, failing: [] },
+  reverts: {},
+  failedBaseline: { failed: false, detail: null },
+  judgeDrift: null,
+};
+const ineligible: AutonomyFacts = {
+  ...eligible,
+  gate: { met: false, failing: [{ measure: 'accuracy', kappa: 0.52 }] },
+};
+
+describe('session list filters', () => {
+  it('keeps known values and drops the rest', () => {
+    expect(
+      parseSessionFilters({
+        category: 'flagged',
+        fallback: 'heavy',
+        cost: 'hit_ceiling',
+        riskCue: 'true',
+        language: 'hi',
+        limit: '999',
+      }),
+    ).toEqual({
+      category: 'flagged',
+      fallback: 'heavy',
+      cost: 'hit_ceiling',
+      riskCue: true,
+      language: 'hi',
+      mode: 'production',
+      limit: 200,
+      offset: 0,
+    });
+    expect(
+      parseSessionFilters({ category: 'nope', cost: 'cheap' }),
+    ).toMatchObject({
+      category: 'needs',
+    });
+    expect(parseSessionFilters({ cost: 'cheap' }).cost).toBeUndefined();
+  });
+});
+
+describe('approvals expire after 14 days as "no decision"', () => {
+  const now = new Date('2026-11-20T00:00:00Z');
+  it('counts from when it started waiting on a person', () => {
+    const a = approvalState(
+      {
+        status: 'proposed',
+        createdAt: '2026-11-01T00:00:00Z',
+        change: { ideaKind: 'needs_code' },
+        evidence: {
+          handoff: { status: 'waiting', at: '2026-11-08T00:00:00Z' },
+        },
+      },
+      now,
+    )!;
+    expect(a.wait).toBe('handoff');
+    expect(a.expiresInDays).toBe(2);
+    expect(a.expiringSoon).toBe(true);
+    expect(a.expired).toBe(false);
+  });
+  it('expires, and nothing waits once expired or decided', () => {
+    const idea = {
+      status: 'proposed',
+      createdAt: '2026-11-01T00:00:00Z',
+      change: { ideaKind: 'pinned_rule' },
+      evidence: {},
+    };
+    expect(approvalState(idea, now)!.expired).toBe(true);
+    expect(
+      approvalState({ ...idea, evidence: { expiry: {} } }, now),
+    ).toBeNull();
+    expect(approvalState({ ...idea, status: 'rejected' }, now)).toBeNull();
+  });
+  it('a passed canary waits for a promotion', () => {
+    expect(
+      approvalState(
+        {
+          status: 'proposed',
+          createdAt: '2026-11-01T00:00:00Z',
+          change: { ideaKind: 'setting' },
+          evidence: {
+            canary: { status: 'passed', checkedAt: '2026-11-19T00:00:00Z' },
+          },
+        },
+        now,
+      )!.wait,
+    ).toBe('promote');
+  });
+});
+
+describe('PM agent autonomy policy', () => {
+  it('rejects "auto" when the kind is not eligible, and pinned rules always', () => {
+    expect(
+      matrixChangeRefusal('prompts', 'quick_test', 'auto', ineligible),
+    ).toMatch(/cannot run quick_test on its own.*0\.52/);
+    expect(
+      matrixChangeRefusal('prompts', 'quick_test', 'auto', eligible),
+    ).toBeNull();
+    expect(
+      matrixChangeRefusal('prompts', 'quick_test', 'ask', ineligible),
+    ).toBeNull();
+    expect(
+      matrixChangeRefusal('pinned_rules', 'quick_test', 'ask', eligible),
+    ).toMatch(/pinned rules/);
+    expect(matrixChangeRefusal('prompts', 'promote', 'auto', eligible)).toMatch(
+      /always a person/,
+    );
+    expect(kindEligibility('pinned_rules', eligible).eligible).toBe(false);
+  });
+
+  it('an organisation only tightens: the stricter of global and org wins', () => {
+    const policy = normaliseAutonomy({
+      orgs: {
+        org1: { canary: 'never', paired_trial: 'ask' },
+        // An attempt to loosen is dropped: "auto" is not an org value.
+        org2: { canary: 'auto' as any },
+      },
+    });
+    policy.matrix.settings.canary = 'auto';
+    expect(effectivePolicy(policy, true, 'settings', 'canary', null)).toBe(
+      'auto',
+    );
+    expect(effectivePolicy(policy, true, 'settings', 'canary', 'org1')).toBe(
+      'off',
+    );
+    expect(
+      effectivePolicy(policy, true, 'settings', 'paired_trial', 'org1'),
+    ).toBe('ask');
+    expect(effectivePolicy(policy, true, 'settings', 'canary', 'org2')).toBe(
+      'auto',
+    );
+    // Never looser than the global, whatever the org says.
+    policy.matrix.settings.paired_trial = 'off';
+    expect(
+      effectivePolicy(policy, true, 'settings', 'paired_trial', 'org1'),
+    ).toBe('off');
+    // The master switch.
+    expect(effectivePolicy(policy, false, 'settings', 'quick_test', null)).toBe(
+      'off',
+    );
+  });
+
+  it("defaults keep today's behaviour, the quick test following the old switch", () => {
+    expect(normaliseAutonomy(null, true).matrix.prompts).toEqual({
+      quick_test: 'auto',
+      gate_test: 'auto',
+      paired_trial: 'auto',
+      canary: 'ask',
+    });
+    expect(normaliseAutonomy(null, false).matrix.prompts.quick_test).toBe(
+      'ask',
+    );
+    expect(normaliseAutonomy(null).matrix.pinned_rules.quick_test).toBe('off');
+  });
+
+  it('re-locks on 2 reverts in 4 weeks, a failed baseline or judge drift, not on κ alone', () => {
+    expect(
+      relockReason('prompts', { ...eligible, reverts: { prompts: 2 } }),
+    ).toMatch(/2 canaries reverted/);
+    expect(
+      relockReason('settings', { ...eligible, reverts: { prompts: 2 } }),
+    ).toBeNull();
+    expect(
+      relockReason('prompts', {
+        ...eligible,
+        failedBaseline: { failed: true, detail: 'median 7.1, was 8.0' },
+      }),
+    ).toMatch(/baseline failed/);
+    expect(relockReason('prompts', { ...eligible, judgeDrift: true })).toMatch(
+      /drifted/,
+    );
+    expect(relockReason('prompts', ineligible)).toBeNull();
+  });
+});
+
+describe('the "waiting on you" bar', () => {
+  const base: PendingFacts = {
+    runMode: 'live',
+    status: 'published',
+    reviewed: false,
+    createdAt: '2026-11-12T08:00:00Z',
+    learnerDistress: false,
+    judgeBelowBar: false,
+    riskCueTurns: [5],
+    heldReasonTurns: [5],
+    escalation: null,
+    slaHours: 24,
+    flags: [],
+  };
+  const team = { roles: debriefRoles([PERMISSIONS.SYSTEM_ACCESS]) };
+  const advisor = { roles: debriefRoles([PERMISSIONS.REVIEW_DEBRIEFS], true) };
+  const reader = { roles: debriefRoles([]) };
+  const now = new Date('2026-11-12T09:00:00Z');
+
+  it('an urgent flag for the Ally team, with anchors; nothing for a reader', () => {
+    const f: PendingFacts = {
+      ...base,
+      flags: [
+        {
+          id: 'f1',
+          section: 'important_moment',
+          status: 'open',
+          urgent: true,
+          reason: 'advice_doesnt_fit',
+          note: 'She never said that',
+          since: '2026-11-12T08:30:00Z',
+          inUndoWindow: false,
+          cardTurns: [6],
+        },
+      ],
+    };
+    const [a] = pendingActions(f, team, now);
+    expect(a).toMatchObject({
+      kind: 'urgent_flag',
+      level: 'red',
+      flagId: 'f1',
+      overdue: false,
+      waitingSince: '2026-11-12T08:30:00Z',
+      anchors: {
+        turns: [6],
+        cardSection: 'important_moment',
+        learnerNote: 'She never said that',
+      },
+      decisions: ['correct', 'keep', 'remove', 'escalate'],
+    });
+    expect(pendingActions(f, reader, now)).toEqual([]);
+    // Inside the learner's undo window it is not work yet.
+    expect(
+      pendingActions(
+        { ...f, flags: [{ ...f.flags[0], inUndoWindow: true }] },
+        team,
+        now,
+      ),
+    ).toEqual([]);
+  });
+
+  it('a held debrief turns red once past flagReviewSlaHours', () => {
+    const f = { ...base, status: 'needs_person' };
+    expect(pendingActions(f, team, now)[0]).toMatchObject({
+      kind: 'held',
+      level: 'yellow',
+      overdue: false,
+    });
+    const late = pendingActions(f, team, new Date('2026-11-13T09:00:00Z'))[0];
+    expect(late).toMatchObject({ kind: 'held', level: 'red', overdue: true });
+    expect(late.decisions).toEqual(['publish', 'todays_debrief', 'escalate']);
+  });
+
+  it('escalations go to the clinical advisor, not the Ally team', () => {
+    const f: PendingFacts = {
+      ...base,
+      escalation: {
+        at: '2026-11-12T08:10:00Z',
+        note: 'Is this right?',
+        by: 'Priya',
+      },
+      flags: [
+        {
+          id: 'f2',
+          section: 'work_on_this[0]',
+          status: 'escalated',
+          urgent: true,
+          reason: 'advice_doesnt_fit',
+          note: null,
+          since: '2026-11-12T08:00:00Z',
+          inUndoWindow: false,
+          cardTurns: [5],
+        },
+      ],
+    };
+    const mine = pendingActions(f, advisor, now);
+    expect(mine.map((a) => a.kind)).toEqual([
+      'escalated_flag',
+      'escalated_run',
+    ]);
+    expect(mine[0].decisions).toEqual(['correct', 'keep', 'remove']);
+    expect(pendingActions(f, team, now).map((a) => a.kind)).toEqual([
+      'urgent_flag',
+    ]);
+  });
+});
+
+describe('why the judge held it', () => {
+  it('reads turn numbers out of the findings', () => {
+    expect(
+      turnsIn('the client raised hopelessness (turn 5); see turns 7-8'),
+    ).toEqual([5, 7, 8]);
+    const r = heldReasons({
+      workspace: {
+        judge: {
+          hardFails: [
+            { code: 'missed_risk_cue', evidence: 'turn 5 hopelessness' },
+          ],
+        },
+      },
+      checkFailures: [
+        {
+          code: 'C-9',
+          section: 'progress_note',
+          detail: 'claims progress without history',
+        },
+      ],
+      evaluatorHardFails: [],
+    });
+    expect(r).toEqual([
+      {
+        source: 'judge',
+        code: 'missed_risk_cue',
+        text: 'turn 5 hopelessness',
+        turns: [5],
+      },
+      {
+        source: 'check',
+        code: 'C-9',
+        text: 'claims progress without history',
+        turns: [],
+      },
+    ]);
+  });
+});

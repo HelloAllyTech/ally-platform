@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DataSource } from 'typeorm';
 import {
@@ -6,6 +6,7 @@ import {
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
 } from '../constants/debrief-release.constants';
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
+import { DebriefAutonomyService } from './debrief-autonomy.service';
 import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
 import {
   metricFailurePoints,
@@ -81,6 +82,8 @@ export class DebriefPmAgentToolsService {
     private readonly ownerSettings: DebriefSettingsService,
     private readonly context: DebriefContextRepository,
     private readonly runner: DebriefRunnerService,
+    /** What the agent may do alone per kind and step (PRD §12). */
+    @Optional() private readonly autonomy?: DebriefAutonomyService,
   ) {}
 
   async call(
@@ -467,6 +470,16 @@ export class DebriefPmAgentToolsService {
     if (mode === 'propose_only') {
       refuse(
         'propose-only mode: a person starts the quick test in the Console; the draft is waiting there',
+      );
+    }
+    const policy = this.autonomy
+      ? await this.autonomy.forIdea(idea, 'quick_test')
+      : 'auto';
+    if (policy !== 'auto') {
+      refuse(
+        policy === 'off'
+          ? 'quick tests are off for this kind of change (owner policy)'
+          : 'this kind of change asks first: a person starts the quick test in the Console; the draft is waiting there',
       );
     }
     const started = await this.pm.screen(idea.id);

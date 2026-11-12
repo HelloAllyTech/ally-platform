@@ -45,6 +45,8 @@ import { DebriefSettingsService } from './service/debrief-settings.service';
 import { DebriefBaselineService } from './service/debrief-baseline.service';
 import { DebriefReportingService } from './service/debrief-reporting.service';
 import { DebriefTrialsService } from './service/debrief-trials.service';
+import { DebriefAutonomyService } from './service/debrief-autonomy.service';
+import { DebriefConsoleViewService } from './service/debrief-console-view.service';
 import { DebriefOwnerSettings } from './entity/debrief-owner-settings.entity';
 import { DebriefProbeResult } from './entity/debrief-probe-result.entity';
 import { DebriefLearnerEvent } from './entity/debrief-learner-event.entity';
@@ -130,6 +132,10 @@ import { DebriefTestSetsService } from './service/debrief-test-sets.service';
     DebriefBaselineService,
     DebriefReportingService,
     DebriefTrialsService,
+    // What the PM agent may do alone, per kind and step (PRD §12).
+    DebriefAutonomyService,
+    // The redesigned console's read models: sessions, session view, attention.
+    DebriefConsoleViewService,
     DebriefLearnerEventsService,
     DebriefMetricsService,
     DebriefConsoleAuditInterceptor,

@@ -359,10 +359,11 @@ describe('DebriefReviewService', () => {
     expect(view.evaluator).toBeNull();
     expect(view.otherReviews).toEqual({ count: 1, verdicts: null });
     expect(view.myReview).toBeNull();
-    // The transcript is numbered, redacted, and marks the risk cue.
+    // The transcript is numbered, NOT redacted (the console shows the real
+    // context), and marks the risk cue.
     expect(view.transcript[0]).toMatchObject({
       speaker: 'learner',
-      text: 'Call me on [number]',
+      text: 'Call me on 98765 43210',
     });
     expect(view.transcript[1].riskCue).toEqual({
       category: 'sleep',

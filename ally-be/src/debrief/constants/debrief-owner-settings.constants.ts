@@ -151,6 +151,10 @@ export const OWNER_SETTINGS_SPEC = {
   // on without quick tests is propose-only (a person starts every quick
   // test); both on is auto. Builder hand-offs, bug reports, canaries and
   // promotions always wait for a person (approve-everything stage).
+  // `pmAgentEnabled` is the master switch. `pmAgentStartsQuickTests` was
+  // copied into the autonomy policy's quick-test column (migration
+  // 1981900740000); the policy (DebriefAutonomyService) now decides, and a
+  // change to this key is mirrored into that column.
   pmAgentEnabled: { default: true, kind: 'bool', group: 'agent' },
   pmAgentStartsQuickTests: { default: true, kind: 'bool', group: 'agent' },
   // What one PM agent run may spend on its own model calls, inside the

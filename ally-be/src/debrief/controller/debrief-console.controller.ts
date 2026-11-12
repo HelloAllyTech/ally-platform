@@ -1,9 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Put,
   Query,
@@ -21,16 +24,34 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsIn,
+  IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsObject,
+  IsUUID,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
-import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { DebriefAct, DebriefRead } from '../util/debrief-console-roles.util';
+import {
+  AUTONOMY_STEPS,
+  CHANGE_KINDS,
+  parseSessionFilters,
+} from '../util/debrief-console-view.util';
+import { DebriefConsoleViewService } from '../service/debrief-console-view.service';
+import { DebriefAutonomyService } from '../service/debrief-autonomy.service';
+import { DebriefReviewService } from '../service/debrief-review.service';
+import {
+  DebriefCommentAnchor,
+  DebriefCommentStatus,
+  DebriefCommentTag,
+} from '../enum/debrief-review.enum';
+import { COMMENT_BODY_MAX, QUOTE_MAX } from '../util/debrief-review.util';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefConsoleAuditInterceptor } from '../interceptor/debrief-console-audit.interceptor';
 import { DebriefAgentService } from '../service/debrief-agent.service';
@@ -168,6 +189,197 @@ class RunsQueryDto {
   status?: DebriefRunStatus;
 }
 
+class CorrectCardDto {
+  @ApiProperty({ description: 'The card, e.g. `work_on_this[0]`' })
+  @IsString()
+  @MaxLength(48)
+  section!: string;
+
+  @ApiProperty({ type: CardCorrectionDto })
+  @ValidateNested()
+  @Type(() => CardCorrectionDto)
+  correction!: CardCorrectionDto;
+
+  @ApiProperty({ description: 'What changed: the learner reads it' })
+  @IsString()
+  @MaxLength(500)
+  note!: string;
+}
+
+class ConsoleCommentDto {
+  @ApiProperty({ enum: DebriefCommentAnchor })
+  @IsEnum(DebriefCommentAnchor)
+  anchorKind!: DebriefCommentAnchor;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  turnIndex?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  section?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  spanStart?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  spanEnd?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(QUOTE_MAX)
+  quotedText?: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(COMMENT_BODY_MAX)
+  body!: string;
+
+  @ApiProperty({ required: false, enum: DebriefCommentTag, nullable: true })
+  @IsOptional()
+  @IsEnum(DebriefCommentTag)
+  tag?: DebriefCommentTag | null;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  parentId?: string;
+}
+
+class EditConsoleCommentDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMENT_BODY_MAX)
+  body?: string;
+
+  @ApiProperty({ required: false, enum: DebriefCommentTag, nullable: true })
+  @IsOptional()
+  @IsEnum(DebriefCommentTag)
+  tag?: DebriefCommentTag | null;
+}
+
+class QuestionDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(2000)
+  text!: string;
+}
+
+class StartStepDto {
+  @ApiProperty({ enum: ['gate_test', 'paired_trial'] })
+  @IsIn(['gate_test', 'paired_trial'])
+  step!: 'gate_test' | 'paired_trial';
+}
+
+class PinnedRuleProposalDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(100)
+  promptCode!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(4000)
+  find!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(4000)
+  replace!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(1000)
+  why!: string;
+}
+
+class MatrixCellDto {
+  @ApiProperty({ enum: CHANGE_KINDS })
+  @IsString()
+  kind!: string;
+
+  @ApiProperty({ enum: AUTONOMY_STEPS })
+  @IsString()
+  step!: string;
+
+  @ApiProperty({ enum: ['auto', 'ask', 'off'] })
+  @IsString()
+  value!: string;
+}
+
+class AutonomyMatrixDto {
+  @ApiProperty({ type: [MatrixCellDto] })
+  @IsArray()
+  @ArrayMaxSize(40)
+  @ValidateNested({ each: true })
+  @Type(() => MatrixCellDto)
+  changes!: MatrixCellDto[];
+}
+
+class AutonomyOrgDto {
+  @ApiProperty({
+    description:
+      '{ paired_trial?, canary?, guidance?: "default" | "ask" | "never" }',
+  })
+  @IsObject()
+  changes!: Record<string, string>;
+}
+
+class BudgetsDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  runCeilingUsd?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  monthlyCapUsd?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
+
+class EmergencyStopDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
+class ScoreDto {
+  @ApiProperty({ description: 'dimension -> 0..10' })
+  @IsObject()
+  scores!: Record<string, number>;
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  hardFails!: string[];
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
+}
+
 type AuthedRequest = { user: { id: number } };
 
 /**
@@ -194,10 +406,13 @@ export class DebriefConsoleController {
     private readonly settings: DebriefSettingsService,
     private readonly metrics: DebriefMetricsService,
     private readonly baseline: DebriefBaselineService,
+    private readonly view: DebriefConsoleViewService,
+    private readonly autonomy: DebriefAutonomyService,
+    private readonly reviews: DebriefReviewService,
   ) {}
 
   @Get('review')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({
     summary:
       'The review queue: live debriefs a person must finish or check, and open flags',
@@ -207,7 +422,7 @@ export class DebriefConsoleController {
   }
 
   @Post('runs/:id/publish')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('heldDebrief')
   @ApiOperation({ summary: 'Publish a live run’s best draft as it is' })
   publishRun(
     @Param('id', ParseUUIDPipe) id: string,
@@ -218,7 +433,7 @@ export class DebriefConsoleController {
   }
 
   @Post('runs/:id/todays-debrief')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('heldDebrief')
   @ApiOperation({
     summary: 'Show the learner today’s debrief for this session instead',
   })
@@ -231,7 +446,7 @@ export class DebriefConsoleController {
   }
 
   @Post('runs/:id/reviewed')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('heldDebrief')
   @ApiOperation({
     summary: 'A below-the-bar debrief was checked and stays as it is',
   })
@@ -244,16 +459,18 @@ export class DebriefConsoleController {
   }
 
   @Post('flags/:id/resolve')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('flagDecision')
   @ApiOperation({
     summary:
       'Resolve a learner’s flag: keep the point (with a reason) or remove it',
   })
-  resolveFlag(
+  async resolveFlag(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: AuthedRequest,
     @Body() body: ResolveFlagDto,
   ) {
+    // A clinical advisor decides only flags escalated to them.
+    await this.view.assertFlagDecision(id, await this.view.viewer(req.user.id));
     return this.feedback.resolveFlag(
       id,
       req.user.id,
@@ -264,7 +481,7 @@ export class DebriefConsoleController {
   }
 
   @Post('flags/:id/escalate')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('escalate')
   @ApiOperation({
     summary: 'Send a flag to the clinical advisor; it stays in the queue',
   })
@@ -277,7 +494,7 @@ export class DebriefConsoleController {
   }
 
   @Post('runs/:id/escalate')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('escalate')
   @ApiOperation({
     summary: 'Send a debrief waiting in Review to the clinical advisor',
   })
@@ -290,7 +507,7 @@ export class DebriefConsoleController {
   }
 
   @Get('overview')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({
     summary: 'Debrief agent at a glance: runs, judge scores, cost, budgets',
   })
@@ -302,14 +519,14 @@ export class DebriefConsoleController {
   }
 
   @Get('runs')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({ summary: 'Recent runs, newest first' })
   runs(@Query() q: RunsQueryDto) {
     return this.console.listRuns({ mode: q.mode, status: q.status });
   }
 
   @Get('metrics')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({
     summary:
       'Success metrics (v9 §3.3): the weekly steering proxy, guardrails, efficiency, experience by language and device, baselines and monthly uptake lift',
@@ -322,7 +539,7 @@ export class DebriefConsoleController {
   }
 
   @Get('settings')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({
     summary:
       'Owner settings (v9 FR-60): every test-ladder threshold and budget, with the baseline proposal',
@@ -332,14 +549,24 @@ export class DebriefConsoleController {
   }
 
   @Put('settings')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('ownerSettings')
   @ApiOperation({ summary: 'Change owner settings (audited)' })
-  updateSettings(@Req() req: AuthedRequest, @Body() body: SettingsChangeDto) {
-    return this.settings.update(body.changes, req.user.id);
+  async updateSettings(
+    @Req() req: AuthedRequest,
+    @Body() body: SettingsChangeDto,
+  ) {
+    const after = await this.settings.update(body.changes, req.user.id);
+    // The old quick-test switch now lives in the autonomy policy's quick-test column.
+    if (body.changes && 'pmAgentStartsQuickTests' in body.changes) {
+      await this.autonomy.mirrorLegacyQuickTestSwitch(
+        after.pmAgentStartsQuickTests,
+      );
+    }
+    return after;
   }
 
   @Post('settings/accept')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('ownerSettings')
   @ApiOperation({
     summary: "Accept some of the baseline job's proposed values",
   })
@@ -348,7 +575,7 @@ export class DebriefConsoleController {
   }
 
   @Post('settings/baseline')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('ownerSettings')
   @ApiOperation({
     summary:
       'Run the baseline job now: propose starting values from production data (it also runs monthly)',
@@ -358,7 +585,7 @@ export class DebriefConsoleController {
   }
 
   @Get('steps')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({
     summary:
       "The recipe's steps as capabilities: model, and over 30 days how often each ran, failed or was skipped, its time and spend",
@@ -371,7 +598,7 @@ export class DebriefConsoleController {
   }
 
   @Get('runs/:id')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({
     summary: 'One run: every step, the checks, the verdicts and the cards',
   })
@@ -380,7 +607,7 @@ export class DebriefConsoleController {
   }
 
   @Post('sessions/:sessionId/run')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('releases')
   @ApiOperation({
     summary: 'Debrief one session now, in shadow',
     description:
@@ -397,17 +624,22 @@ export class DebriefConsoleController {
   }
 
   @Get('pm-agent')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({ summary: "The PM agent's latest report and its ideas" })
-  async pmAgentState() {
+  async pmAgentState(@Req() req: AuthedRequest) {
+    const viewer = await this.view.viewer(req.user.id);
+    const ideas = await this.pmAgent.history(50);
     return {
       ...(await this.pmAgent.latestReport()),
-      ideas: await this.pmAgent.history(50),
+      // Each idea keeps its old fields, plus its approval clock (14 days),
+      // questions, kind and what this viewer may do (`can`).
+      ideas: ideas.map((i) => this.view.ideaView(i, viewer)),
+      viewer: { roles: viewer.roles, can: viewer.can },
     };
   }
 
   @Post('pm-agent/analyse')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
       'Start a PM agent run now (it also runs weekly, and monthly in depth); the report lands when it finishes',
@@ -417,7 +649,7 @@ export class DebriefConsoleController {
   }
 
   @Post('pm-agent/ideas/:id/screen')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('pmAgent')
   @ApiOperation({
     summary: 'Screen an idea on the open test set against the current release',
   })
@@ -426,7 +658,7 @@ export class DebriefConsoleController {
   }
 
   @Post('pm-agent/ideas/:id/approve')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('pmAgent')
   @ApiOperation({
     summary:
       'Approve an idea: route A starts its canary or promotes it; B opens a Builder session; C files a bug for Bug Hunter; D marks the question answered',
@@ -440,7 +672,7 @@ export class DebriefConsoleController {
   }
 
   @Post('pm-agent/ideas/:id/reject')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('pmAgent')
   @ApiOperation({ summary: 'Reject an idea' })
   reject(
     @Param('id', ParseUUIDPipe) id: string,
@@ -451,14 +683,14 @@ export class DebriefConsoleController {
   }
 
   @Get('releases')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({ summary: 'Every release, newest first' })
   releases() {
     return this.console.listReleases();
   }
 
   @Get('models')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({
     summary:
       "Each step's model in the live release, and the models a person may pick for it",
@@ -468,7 +700,7 @@ export class DebriefConsoleController {
   }
 
   @Post('models')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('releases')
   @ApiOperation({
     summary:
       'Change step models: makes a new release from the live one and puts it live',
@@ -484,7 +716,7 @@ export class DebriefConsoleController {
   }
 
   @Post('releases/orchestrator-challenger')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('releases')
   @ApiOperation({
     summary:
       'Make a DRAFT release from the live one with the orchestrator on (a challenger)',
@@ -496,7 +728,7 @@ export class DebriefConsoleController {
   }
 
   @Post('releases/:id/rollback')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('releases')
   @ApiOperation({
     summary: 'Make an earlier release live again; takes effect on the next run',
   })
@@ -509,7 +741,7 @@ export class DebriefConsoleController {
   }
 
   @Post('test-sets/build')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('testSets')
   @ApiOperation({
     summary: 'Add recent real sessions to the open, gate and sealed sets',
   })
@@ -518,7 +750,7 @@ export class DebriefConsoleController {
   }
 
   @Get('tenants')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefRead()
   @ApiOperation({
     summary: 'Organisations and whether their learners read the new debrief',
   })
@@ -527,7 +759,7 @@ export class DebriefConsoleController {
   }
 
   @Put('tenants/:tenantId/live')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('emergencyStop')
   @ApiOperation({
     summary: "Switch an organisation's learners to the new debrief, or back",
     description: 'Off is the emergency stop for one organisation.',
@@ -537,12 +769,18 @@ export class DebriefConsoleController {
     @Body() body: TenantLiveDto,
     @Req() req: AuthedRequest,
   ) {
+    // Off is the emergency stop (Ally team or owner); on is the owner's.
+    if (body.live && !(await this.view.viewer(req.user.id)).can.switchOrgOn) {
+      throw new ForbiddenException(
+        'Only the Debrief owner can switch an organisation on',
+      );
+    }
     await this.agent.setLive(tenantId, body.live, req.user.id);
     return { tenantId, live: body.live };
   }
 
   @Put('tenants/:tenantId/region')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @DebriefAct('switchOrgOn')
   @ApiOperation({
     summary: 'Where an organisation works (v9 FR-25)',
     description:
@@ -555,5 +793,300 @@ export class DebriefConsoleController {
   ) {
     await this.agent.setRegion(tenantId, body.region, req.user.id);
     return { tenantId, region: body.region };
+  }
+
+  // --- Redesigned console (docs/debrief-harness/CONSOLE_API.md) ---------------------
+
+  @Get('me')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      "The viewer's roles and every action they may take (`can`), for hiding buttons",
+  })
+  async me(@Req() req: AuthedRequest) {
+    const v = await this.view.viewer(req.user.id);
+    return { userId: v.userId, roles: v.roles, can: v.can, scorer: v.scorer };
+  }
+
+  @Get('sessions')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'The home list: a category (needs / flagged / below / published / escalated / to_score / all), filters, queue order and counts',
+  })
+  async sessions(
+    @Req() req: AuthedRequest,
+    @Query() q: Record<string, string>,
+  ) {
+    return this.view.sessions(
+      parseSessionFilters(q),
+      await this.view.viewer(req.user.id),
+    );
+  }
+
+  @Get('sessions/runs/:id')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'One session view: transcript, cards and versions, flags, Ask Ally, distress, skill estimate, judge, comments, queue and pending actions for your role',
+  })
+  async sessionView(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.view.session(id, await this.view.viewer(req.user.id));
+  }
+
+  @Get('attention')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Banners and counts for Debriefs home and the PM agent, only for roles that can act',
+  })
+  async attention(@Req() req: AuthedRequest) {
+    return this.view.attention(await this.view.viewer(req.user.id));
+  }
+
+  @Get('analytics')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Analytics › Debriefs: the six tiles, the cost panel and judge agreement',
+  })
+  analytics(@Query('days') days?: string) {
+    const d = Number(days);
+    return this.view.analytics(Number.isInteger(d) && d > 0 && d <= 90 ? d : 7);
+  }
+
+  @Post('runs/:id/correct')
+  @DebriefAct('heldDebrief')
+  @ApiOperation({
+    summary:
+      'Correct a card in place (no flag): quote locked, a "what changed" note the learner reads, a new version, the learner told',
+  })
+  correct(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: CorrectCardDto,
+  ) {
+    return this.feedback.correctRun(
+      id,
+      body.section,
+      body.correction,
+      body.note,
+      req.user.id,
+    );
+  }
+
+  @Post('sessions/:sessionId/score')
+  @DebriefAct('score')
+  @ApiOperation({
+    summary:
+      'Score by hand (clinical advisor; the Ally team only in the scoring sample). Feeds the κ gate',
+  })
+  async score(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ScoreDto,
+  ) {
+    return this.view.score(
+      sessionId,
+      await this.view.viewer(req.user.id),
+      body,
+    );
+  }
+
+  @Post('runs/:id/comments')
+  @DebriefAct('comment')
+  @ApiOperation({
+    summary:
+      'Comment on selected words in the roleplay or the debrief, or reply. Never enters the queue',
+  })
+  addComment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ConsoleCommentDto,
+  ) {
+    return this.reviews.addComment(id, req.user.id, body);
+  }
+
+  @Patch('comments/:id')
+  @DebriefAct('comment')
+  @ApiOperation({ summary: 'Edit your comment' })
+  editComment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: EditConsoleCommentDto,
+  ) {
+    return this.reviews.editComment(id, req.user.id, body);
+  }
+
+  @Delete('comments/:id')
+  @DebriefAct('comment')
+  @ApiOperation({ summary: 'Delete your comment' })
+  deleteComment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.reviews.deleteComment(id, req.user.id);
+  }
+
+  @Post('comments/:id/resolve')
+  @DebriefAct('comment')
+  @ApiOperation({ summary: 'Resolve a comment thread' })
+  resolveComment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.reviews.setStatus(
+      id,
+      req.user.id,
+      DebriefCommentStatus.RESOLVED,
+    );
+  }
+
+  @Post('comments/:id/reopen')
+  @DebriefAct('comment')
+  @ApiOperation({ summary: 'Re-open a comment thread' })
+  reopenComment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.reviews.setStatus(id, req.user.id, DebriefCommentStatus.OPEN);
+  }
+
+  @Post('pm-agent/ideas/:id/questions')
+  @DebriefAct('pmAgent')
+  @ApiOperation({
+    summary:
+      '"Ask a question" on an item waiting for approval; the PM agent reads it on its next run',
+  })
+  ask(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: QuestionDto,
+  ) {
+    return this.pmAgent.askQuestion(id, req.user.id, body.text);
+  }
+
+  @Post('pm-agent/ideas/:id/start-step')
+  @DebriefAct('pmAgent')
+  @ApiOperation({
+    summary:
+      'Start a step the autonomy policy left waiting ("asks first"): the gate test or the paired trial',
+  })
+  startStep(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: StartStepDto,
+  ) {
+    return this.pmAgent.startStep(id, body.step, req.user.id);
+  }
+
+  @Post('pm-agent/ideas/:id/approve-pinned-rule')
+  @DebriefAct('approvePinnedRule')
+  @ApiOperation({
+    summary:
+      'Sign off a pinned-rule change (clinical advisor or owner): a new prompt version and a DRAFT release',
+  })
+  approvePinnedRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthedRequest,
+    @Body() body: ReasonDto,
+  ) {
+    return this.pmAgent.approvePinnedRule(id, req.user.id, body?.reason);
+  }
+
+  @Post('pinned-rules/proposals')
+  @DebriefAct('pmAgent')
+  @ApiOperation({
+    summary:
+      'Propose a change to a pinned rule (safety rules, rubric, judge instructions); it waits for the clinical advisor or owner',
+  })
+  proposePinnedRule(
+    @Req() req: AuthedRequest,
+    @Body() body: PinnedRuleProposalDto,
+  ) {
+    return this.pmAgent.proposePinnedRule(body, req.user.id);
+  }
+
+  @Get('pinned-rules')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Current pinned versions (safety rules, rubric, judge instructions) with who signed and when, and open proposals',
+  })
+  pinnedRules() {
+    return this.view.pinnedRules();
+  }
+
+  @Get('autonomy')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'What the PM agent may do alone: kind × step matrix with eligibility, per-organisation overrides, re-locks',
+  })
+  async autonomyView(@Req() req: AuthedRequest) {
+    return this.view.autonomyView(await this.view.viewer(req.user.id));
+  }
+
+  @Put('autonomy/matrix')
+  @DebriefAct('ownerSettings')
+  @ApiOperation({
+    summary:
+      'Change matrix cells (owner). "auto" only for an eligible kind; pinned rules are not configurable',
+  })
+  async setMatrix(@Req() req: AuthedRequest, @Body() body: AutonomyMatrixDto) {
+    await this.autonomy.setMatrix(body.changes, req.user.id);
+    return this.view.autonomyView(await this.view.viewer(req.user.id));
+  }
+
+  @Put('autonomy/orgs/:tenantId')
+  @DebriefAct('ownerSettings')
+  @ApiOperation({
+    summary:
+      "An organisation's overrides (owner): paired_trial / canary / guidance → default | ask | never; only tightens",
+  })
+  async setOrgAutonomy(
+    @Param('tenantId') tenantId: string,
+    @Req() req: AuthedRequest,
+    @Body() body: AutonomyOrgDto,
+  ) {
+    await this.autonomy.setOrg(tenantId, body.changes, req.user.id);
+    return this.view.autonomyView(await this.view.viewer(req.user.id));
+  }
+
+  @Put('budgets')
+  @DebriefAct('ownerSettings')
+  @ApiOperation({
+    summary:
+      'Owner: change the run ceiling and the monthly cap (a new live release from the current one; undo with Roll back)',
+  })
+  budgets(@Req() req: AuthedRequest, @Body() body: BudgetsDto) {
+    return this.console.setBudgets(
+      { runCeilingUsd: body.runCeilingUsd, monthlyCapUsd: body.monthlyCapUsd },
+      req.user.id,
+      body.note,
+    );
+  }
+
+  @Post('tenants/:tenantId/emergency-stop')
+  @DebriefAct('emergencyStop')
+  @ApiOperation({
+    summary:
+      'Emergency stop (PRD FR-46): the organisation is switched off; its learners see "not available", not today\'s debrief',
+  })
+  async emergencyStop(
+    @Param('tenantId') tenantId: string,
+    @Req() req: AuthedRequest,
+    @Body() body: EmergencyStopDto,
+  ) {
+    await this.agent.setLive(tenantId, false, req.user.id);
+    return {
+      tenantId,
+      live: false,
+      learnersSee: 'not_available',
+      reason: body.reason,
+    };
   }
 }

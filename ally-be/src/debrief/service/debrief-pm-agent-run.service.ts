@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
@@ -6,6 +11,7 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
+import { DebriefAutonomyService } from './debrief-autonomy.service';
 import {
   DEBRIEF_AGENT_KEY,
   DEBRIEF_MODELS,
@@ -80,6 +86,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
     private readonly ownerSettings: DebriefSettingsService,
     private readonly context: DebriefContextRepository,
     private readonly testSets: DebriefTestSetsService,
+    @Optional() private readonly autonomy?: DebriefAutonomyService,
   ) {}
 
   onModuleInit(): void {
@@ -341,6 +348,12 @@ export class DebriefPmAgentRunService implements OnModuleInit {
       editable_prompts: editable,
       settings,
       idea_outcomes: outcomes,
+      // Plan §11.7 "Ask a question": what people asked on items waiting for
+      // approval, unanswered so far. Answer them in the report.
+      open_questions:
+        typeof this.pm.openQuestions === 'function'
+          ? await this.pm.openQuestions().catch(() => [])
+          : [],
       last_run: last
         ? {
             at: new Date(last.createdAt).toISOString(),
@@ -353,8 +366,13 @@ export class DebriefPmAgentRunService implements OnModuleInit {
         mode: autonomy,
         meaning:
           autonomy === 'auto'
-            ? 'you may start quick tests; a person starts canaries, promotes, and approves Builder, Bug Hunter and person items'
+            ? 'you may start quick tests for the kinds the policy below allows; a person starts canaries, promotes, and approves Builder, Bug Hunter and person items'
             : 'propose and draft only; a person starts every quick test',
+        // Per kind of change × test step: auto (on its own), ask (a person
+        // starts it), off. Pinned rules are never yours to change.
+        policy: this.autonomy
+          ? ((await this.autonomy.policy().catch(() => null))?.matrix ?? null)
+          : null,
       },
       metric_names: metrics.metric_names,
     };
