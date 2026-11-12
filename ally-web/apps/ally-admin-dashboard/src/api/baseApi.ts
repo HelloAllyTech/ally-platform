@@ -33,8 +33,11 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
-/** Reads whose 403 is expected for some roles and handled by the caller: no toast. */
-export const SILENT_FORBIDDEN_READS: string[] = [ApiEndpoints.AUTH.GET_USER_PREFERENCES];
+/**
+ * Reads whose 403 is expected for some roles and handled by the caller: no toast. A function, not
+ * a constant: read at module load it breaks every suite that mocks `@constants` wholesale.
+ */
+export const silentForbiddenReads = (): string[] => [ApiEndpoints.AUTH.GET_USER_PREFERENCES];
 
 /**
  * This function wraps the base query to handle authentication token refresh.
@@ -114,7 +117,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
       // the saved sidebar order (only holders of the preference grant have one; a clinical
       // advisor does not), which otherwise greeted them with this toast on every load.
       const url = typeof args === "string" ? args : args.url;
-      if (!SILENT_FORBIDDEN_READS.some(path => url.split("?")[0].endsWith(path))) {
+      if (!silentForbiddenReads().some(path => url.split("?")[0].endsWith(path))) {
         toast.error(en.error.forbidden);
       }
     }
